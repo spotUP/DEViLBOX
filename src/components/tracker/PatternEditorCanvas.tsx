@@ -54,10 +54,16 @@ interface ChannelTrigger {
 
 interface PatternEditorCanvasProps {
   onAcidGenerator?: (channelIndex: number) => void;
+  visibleChannels?: number; // For mobile: how many channels to show
+  startChannel?: number; // For mobile portrait: which channel to start from
 }
 
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
-export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.memo(({ onAcidGenerator }) => {
+export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.memo(({
+  onAcidGenerator,
+  visibleChannels,
+  startChannel = 0,
+}) => {
   const { isMobile } = useResponsiveSafe();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -810,9 +816,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const sourcePattern = ghostPattern || pattern;
       for (let ch = 0; ch < numChannels; ch++) {
         const x = LINE_NUMBER_WIDTH + ch * channelWidth + 8 - scrollLeft;
+        const colX = LINE_NUMBER_WIDTH + ch * channelWidth - scrollLeft;
 
         // Skip if outside visible area
         if (x + channelWidth < 0 || x > width) continue;
+
+        // Draw per-channel color tint on the column background
+        const chColor = pattern.channels[ch]?.color;
+        if (chColor) {
+          const prevAlpha = ctx.globalAlpha;
+          ctx.globalAlpha = isGhostRow ? 0.02 : (isHighlight ? 0.07 : 0.05);
+          ctx.fillStyle = chColor;
+          ctx.fillRect(colX, y, channelWidth, ROW_HEIGHT);
+          ctx.globalAlpha = prevAlpha;
+        }
 
         // Check if this channel exists in the source pattern (ghost patterns might have different channel counts)
         if (!sourcePattern.channels[ch]) {
@@ -860,6 +877,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         // Channel separator
         ctx.fillStyle = colors.border;
         ctx.fillRect(LINE_NUMBER_WIDTH + (ch + 1) * channelWidth - scrollLeft, y, 1, ROW_HEIGHT);
+
+        // Colored left stripe for channel (matches header inset border)
+        if (chColor) {
+          const prevAlpha = ctx.globalAlpha;
+          ctx.globalAlpha = isGhostRow ? 0.15 : 0.4;
+          ctx.fillStyle = chColor;
+          ctx.fillRect(colX, y, 2, ROW_HEIGHT);
+          ctx.globalAlpha = prevAlpha;
+        }
       }
       
       // Reset alpha after ghost row

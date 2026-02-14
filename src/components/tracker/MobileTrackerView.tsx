@@ -1,16 +1,19 @@
 /**
  * MobileTrackerView - Mobile-optimized tracker interface
- * Uses tabbed navigation for Pattern, Instruments, and Controls
+ * Vivid Tracker-inspired mobile layout with context-aware bottom input
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { MobileTabBar, type MobileTab } from '@components/layout/MobileTabBar';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { InstrumentList } from '@components/instruments/InstrumentList';
 import { TB303KnobPanel } from './TB303KnobPanel';
 import { FT2Toolbar } from './FT2Toolbar';
-import { Play, Square } from 'lucide-react';
+import { MobilePatternInput } from './mobile/MobilePatternInput';
+import { Play, Square, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTransportStore, useTrackerStore } from '@stores';
+import { useOrientation } from '@/hooks/useOrientation';
+import { haptics } from '@/utils/haptics';
 
 interface MobileTrackerViewProps {
   onShowPatterns?: () => void;
@@ -32,25 +35,118 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   showMasterFX,
 }) => {
   const [activeTab, setActiveTab] = useState<MobileTab>('pattern');
+  const [mobileChannel, setMobileChannel] = useState(0); // For portrait mode: which channel to show
   const { isPlaying, togglePlayPause } = useTransportStore();
-  const { patterns, currentPatternIndex } = useTrackerStore();
+  const { patterns, currentPatternIndex, cursor, setCell, moveCursor } = useTrackerStore();
   const pattern = patterns[currentPatternIndex];
+  const { orientation, isPortrait, isLandscape } = useOrientation();
+
+  // Calculate visible channels based on orientation
+  const visibleChannels = isLandscape ? 4 : 1;
+  const startChannel = isPortrait ? mobileChannel : 0;
+
+  // Handle channel navigation in portrait mode
+  const handleChannelPrev = useCallback(() => {
+    if (mobileChannel > 0) {
+      haptics.selection();
+      setMobileChannel(mobileChannel - 1);
+    }
+  }, [mobileChannel]);
+
+  const handleChannelNext = useCallback(() => {
+    const maxChannels = pattern?.numChannels || 8;
+    if (mobileChannel < maxChannels - 1) {
+      haptics.selection();
+      setMobileChannel(mobileChannel + 1);
+    }
+  }, [mobileChannel, pattern]);
+
+  // Handle note input from mobile keyboard
+  const handleNoteInput = useCallback((note: number) => {
+    const currentInstrument = 1; // TODO: Get from instrument store
+    setCell(cursor.channel, cursor.row, {
+      note,
+      instrument: currentInstrument,
+    });
+    // Advance cursor if in record mode
+    // TODO: Check recordMode and editStep from tracker store
+  }, [cursor, setCell]);
+
+  // Handle hex input (for effects, volume, instrument)
+  const handleHexInput = useCallback((value: number) => {
+    const { channel, row, columnType } = cursor;
+
+    switch (columnType) {
+      case 'instrument':
+        setCell(channel, row, { instrument: value });
+        break;
+      case 'volume':
+        setCell(channel, row, { volume: value });
+        break;
+      case 'effect':
+        setCell(channel, row, { effTyp: value });
+        break;
+      case 'effectParam':
+        setCell(channel, row, { eff: value });
+        break;
+    }
+
+    // Move cursor right after input
+    moveCursor('right');
+  }, [cursor, setCell, moveCursor]);
+
+  // Handle delete
+  const handleDelete = useCallback(() => {
+    const { channel, row } = cursor;
+    setCell(channel, row, {
+      note: 0,
+      instrument: 0,
+      volume: 0,
+      effTyp: 0,
+      eff: 0,
+    });
+  }, [cursor, setCell]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-dark-bg">
-      {/* Compact header with essential info */}
-      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-b border-dark-border">
+      {/* Fixed header with pattern info and transport */}
+      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-b border-dark-border safe-top">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-text-muted">PAT</span>
-          <span className="text-sm font-bold text-accent-primary">
+          <span className="text-xs text-text-muted font-mono">PAT</span>
+          <span className="text-sm font-bold text-accent-primary font-mono">
             {(currentPatternIndex + 1).toString().padStart(2, '0')}
           </span>
           <span className="text-xs text-text-secondary truncate max-w-[100px]">
             {pattern?.name || 'Untitled'}
           </span>
+
+          {/* Portrait mode: Channel selector */}
+          {isPortrait && (
+            <div className="flex items-center gap-1 ml-2 pl-2 border-l border-dark-border">
+              <button
+                onClick={handleChannelPrev}
+                disabled={mobileChannel === 0}
+                className="p-1 rounded bg-dark-bgTertiary disabled:opacity-30 touch-target-sm"
+                aria-label="Previous channel"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <span className="text-xs font-mono text-accent-primary min-w-[32px] text-center">
+                CH {(mobileChannel + 1).toString().padStart(2, '0')}
+              </span>
+              <button
+                onClick={handleChannelNext}
+                disabled={mobileChannel >= (pattern?.numChannels || 8) - 1}
+                className="p-1 rounded bg-dark-bgTertiary disabled:opacity-30 touch-target-sm"
+                aria-label="Next channel"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Quick transport controls */}
+        {/* Transport controls */}
         <div className="flex items-center gap-1">
           <button
             onClick={togglePlayPause}
@@ -67,10 +163,18 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
         </div>
       </div>
 
-      {/* Tab content */}
-      <div className="flex-1 min-h-0 overflow-hidden mobile-bottom-padding">
+      {/* Main content area - Pattern/Instruments/Controls tabs */}
+      <div className="flex-1 min-h-0 overflow-hidden" style={{ paddingBottom: activeTab === 'pattern' ? 'calc(180px + env(safe-area-inset-bottom, 0))' : 'calc(56px + env(safe-area-inset-bottom, 0))' }}>
         {activeTab === 'pattern' && (
-          <PatternEditorCanvas />
+          <div className="h-full flex flex-col">
+            {/* Pattern editor canvas - scrollable */}
+            <div className="flex-1 overflow-auto">
+              <PatternEditorCanvas
+                visibleChannels={visibleChannels}
+                startChannel={startChannel}
+              />
+            </div>
+          </div>
         )}
 
         {activeTab === 'instruments' && (
@@ -108,6 +212,15 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Mobile pattern input - only shown in pattern view */}
+      {activeTab === 'pattern' && (
+        <MobilePatternInput
+          onNoteInput={handleNoteInput}
+          onHexInput={handleHexInput}
+          onDelete={handleDelete}
+        />
+      )}
 
       {/* Bottom tab bar */}
       <MobileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
