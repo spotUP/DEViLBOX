@@ -14,6 +14,7 @@ import { Play, Square, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTransportStore, useTrackerStore } from '@stores';
 import { useOrientation } from '@/hooks/useOrientation';
 import { haptics } from '@/utils/haptics';
+import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
 
 interface MobileTrackerViewProps {
   onShowPatterns?: () => void;
@@ -107,6 +108,30 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
     });
   }, [cursor, setCell]);
 
+  // Gesture handlers for channel header (portrait mode only)
+  const channelHeaderGestures = useMobilePatternGestures({
+    onSwipeLeft: handleChannelNext,
+    onSwipeRight: handleChannelPrev,
+    enabled: isPortrait,
+  });
+
+  // Gesture handlers for pattern editor (cursor movement)
+  const handlePatternSwipeLeft = useCallback(() => {
+    moveCursor('left');
+  }, [moveCursor]);
+
+  const handlePatternSwipeRight = useCallback(() => {
+    moveCursor('right');
+  }, [moveCursor]);
+
+  const handlePatternSwipeUp = useCallback(() => {
+    moveCursor('up');
+  }, [moveCursor]);
+
+  const handlePatternSwipeDown = useCallback(() => {
+    moveCursor('down');
+  }, [moveCursor]);
+
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-dark-bg">
       {/* Fixed header with pattern info and transport */}
@@ -122,7 +147,10 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
 
           {/* Portrait mode: Channel selector */}
           {isPortrait && (
-            <div className="flex items-center gap-1 ml-2 pl-2 border-l border-dark-border">
+            <div
+              className="flex items-center gap-1 ml-2 pl-2 border-l border-dark-border touch-none"
+              {...channelHeaderGestures}
+            >
               <button
                 onClick={handleChannelPrev}
                 disabled={mobileChannel === 0}
@@ -172,6 +200,10 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
               <PatternEditorCanvas
                 visibleChannels={visibleChannels}
                 startChannel={startChannel}
+                onSwipeLeft={handlePatternSwipeLeft}
+                onSwipeRight={handlePatternSwipeRight}
+                onSwipeUp={handlePatternSwipeUp}
+                onSwipeDown={handlePatternSwipeDown}
               />
             </div>
           </div>

@@ -18,6 +18,7 @@ import { CellContextMenu, useCellContextMenu } from './CellContextMenu';
 import { ParameterEditor } from './ParameterEditor';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { useSwipeGesture } from '@hooks/useSwipeGesture';
 import { getTrackerReplayer, type DisplayState } from '@engine/TrackerReplayer';
@@ -56,6 +57,10 @@ interface PatternEditorCanvasProps {
   onAcidGenerator?: (channelIndex: number) => void;
   visibleChannels?: number; // For mobile: how many channels to show
   startChannel?: number; // For mobile portrait: which channel to start from
+  onSwipeLeft?: () => void; // For mobile: move cursor left
+  onSwipeRight?: () => void; // For mobile: move cursor right
+  onSwipeUp?: () => void; // For mobile: move cursor up
+  onSwipeDown?: () => void; // For mobile: move cursor down
 }
 
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
@@ -63,6 +68,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   onAcidGenerator,
   visibleChannels: _visibleChannels, // TODO: Implement mobile channel limiting
   startChannel: _startChannel = 0, // TODO: Implement mobile channel offset
+  onSwipeLeft,
+  onSwipeRight,
+  onSwipeUp,
+  onSwipeDown,
 }) => {
   const { isMobile } = useResponsiveSafe();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -83,6 +92,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Animation frame ref for smooth updates
   const rafRef = useRef<number | null>(null);
+
+  // Mobile gesture handlers
+  const patternGestures = useMobilePatternGestures({
+    onSwipeLeft,
+    onSwipeRight,
+    onSwipeUp,
+    onSwipeDown,
+    enabled: isMobile,
+  });
 
 
   // Get pattern and actions
@@ -1342,6 +1360,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         style={{ minHeight: 200 }}
         tabIndex={0}
         onContextMenu={cellContextMenu.handleContextMenu}
+        {...patternGestures}
       >
         <canvas
           ref={canvasRef}
