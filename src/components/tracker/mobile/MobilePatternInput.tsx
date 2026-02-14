@@ -180,9 +180,9 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
   onDelete,
 }) => {
   // Handle touch with pressure sensitivity (iOS 3D Touch / Force Touch)
-  const handleKeyTouch = useCallback((semitone: number, e: React.TouchEvent) => {
-    const touch = e.touches[0];
+  const handleKeyTouch = useCallback((semitone: number, _e: React.TouchEvent) => {
     // TODO: Implement velocity sensitivity from touch.force (iOS 3D Touch)
+    // const touch = e.touches[0];
     // const force = touch.force || 1.0;
     // const velocity = Math.min(127, Math.floor(force * 127));
     // Pass velocity to onNoteInput when implemented
