@@ -16,6 +16,7 @@ import { InstrumentOscilloscope } from '@components/visualization';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { MacroListEditor } from './MacroEditor';
 import { WavetableListEditor, type WavetableData } from './WavetableEditor';
+import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 
 // ============================================================================
 // CHIP-SPECIFIC PARAMETER RANGES (from Furnace insEdit.cpp)
@@ -516,7 +517,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   }, [paramRanges.opCount]);
 
   return (
-    <div className="space-y-4">
+    <ScrollLockContainer>
+      <div className="space-y-4">
       {/* Chip Header */}
       <div className="flex items-center justify-between bg-dark-bgSecondary p-3 rounded-lg border border-dark-border/50">
         <div className="flex items-center gap-3">
@@ -637,18 +639,22 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 
           {/* Operators Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {opOrder.slice(0, paramRanges.opCount).map((opIdx) => (
+            {opOrder.slice(0, paramRanges.opCount).map((opIdx) => {
+              const op = config.operators[opIdx];
+              if (!op) return null; // Skip missing operators (e.g. PSG instruments with no FM data)
+              return (
               <OperatorCard
                 key={opIdx}
                 index={opIdx}
-                op={config.operators[opIdx]}
+                op={op}
                 onUpdate={(u) => updateOperator(opIdx, u)}
                 ranges={paramRanges}
                 isExpanded={expandedOps.has(opIdx)}
                 onToggleExpand={() => toggleOpExpanded(opIdx)}
                 isCarrier={isOperatorCarrier(config.algorithm, opIdx)}
               />
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -788,7 +794,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       {category === "PCM" && (
         <PCMPanel config={config} onChange={onChange} />
       )}
-    </div>
+      </div>
+    </ScrollLockContainer>
   );
 };
 

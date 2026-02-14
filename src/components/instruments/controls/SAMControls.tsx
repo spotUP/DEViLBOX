@@ -5,6 +5,8 @@ import { MessageSquare, Zap, Activity, Book, ChevronDown, ChevronUp, Wand2 } fro
 import { useThemeStore } from '@stores';
 // @ts-expect-error -- SamJs is a JavaScript library without types
 import SamJs from '@engine/sam/samjs';
+import { VowelEditor } from './VowelEditor';
+import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 
 interface SAMControlsProps {
   config: SamConfig;
@@ -61,7 +63,8 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto scrollbar-modern">
+    <ScrollLockContainer>
+      <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto scrollbar-modern">
       {/* Speech Text Section */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center justify-between mb-4">
@@ -110,6 +113,17 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
         </div>
       </div>
 
+      {/* Vowel Editor (when sing mode enabled) */}
+      {config.singmode && (
+        <VowelEditor
+          vowelSequence={config.vowelSequence ?? []}
+          loopSingle={config.vowelLoopSingle ?? true}
+          onChange={(seq) => onChange({ vowelSequence: seq })}
+          onLoopToggle={(loop) => onChange({ vowelLoopSingle: loop })}
+          accentColor={knobColor}
+        />
+      )}
+
       {/* Main Parameters Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* XY Pad for Mouth/Throat */}
@@ -119,8 +133,9 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
             <h3 className="font-bold text-amber-400 uppercase tracking-tight">VOCAL CHARACTER</h3>
           </div>
           
-          <div 
-            className="w-40 h-40 bg-black/60 rounded-lg border border-gray-700 relative cursor-crosshair overflow-hidden"
+          <div
+            className="w-full max-w-[200px] aspect-square bg-black/60 rounded-lg border border-gray-700 relative cursor-crosshair overflow-hidden touch-none"
+            data-prevent-scroll
             onMouseMove={(e) => {
               if (e.buttons === 1) {
                 const rect = e.currentTarget.getBoundingClientRect();
@@ -134,6 +149,24 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
               const x = Math.max(0, Math.min(255, ((e.clientX - rect.left) / rect.width) * 255));
               const y = Math.max(0, Math.min(255, (1 - (e.clientY - rect.top) / rect.height) * 255));
               onChange({ mouth: Math.round(x), throat: Math.round(y) });
+            }}
+            onTouchMove={(e) => {
+              if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = Math.max(0, Math.min(255, ((touch.clientX - rect.left) / rect.width) * 255));
+                const y = Math.max(0, Math.min(255, (1 - (touch.clientY - rect.top) / rect.height) * 255));
+                onChange({ mouth: Math.round(x), throat: Math.round(y) });
+              }
+            }}
+            onTouchStart={(e) => {
+              if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = Math.max(0, Math.min(255, ((touch.clientX - rect.left) / rect.width) * 255));
+                const y = Math.max(0, Math.min(255, (1 - (touch.clientY - rect.top) / rect.height) * 255));
+                onChange({ mouth: Math.round(x), throat: Math.round(y) });
+              }
             }}
           >
             {/* Grid lines */}
@@ -228,6 +261,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
           </p>
         </div>
       </div>
-    </div>
+      </div>
+    </ScrollLockContainer>
   );
 };
