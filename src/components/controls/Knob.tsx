@@ -188,7 +188,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   }, []);
 
   // Handle double-tap for numeric input (mobile)
-  const handleTap = useCallback((e: React.TouchEvent) => {
+  const handleTap = useCallback((_e: React.TouchEvent) => {
     if (disabled) return;
     const now = Date.now();
     const timeSinceLastTap = now - lastTapTime.current;
@@ -205,9 +205,8 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   }, [disabled, clearLongPressTimer]);
 
   // Handle long-press for preset menu (mobile)
-  const handleLongPressStart = useCallback((e: React.TouchEvent) => {
+  const handleLongPressStart = useCallback((_e: React.TouchEvent) => {
     if (disabled) return;
-    const touch = e.touches[0];
     const rect = knobRef.current?.getBoundingClientRect();
     if (rect) {
       setMenuPosition({ x: rect.left + rect.width / 2, y: rect.top });

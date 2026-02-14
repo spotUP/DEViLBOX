@@ -61,8 +61,8 @@ interface PatternEditorCanvasProps {
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
 export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.memo(({
   onAcidGenerator,
-  visibleChannels,
-  startChannel = 0,
+  visibleChannels: _visibleChannels, // TODO: Implement mobile channel limiting
+  startChannel: _startChannel = 0, // TODO: Implement mobile channel offset
 }) => {
   const { isMobile } = useResponsiveSafe();
   const canvasRef = useRef<HTMLCanvasElement>(null);
