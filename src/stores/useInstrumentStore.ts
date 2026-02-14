@@ -529,6 +529,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
               return; // Handled
             }
 
+            if (updatedInstrument.synthType === 'HarmonicSynth' && updatedInstrument.harmonicSynth && updates.harmonicSynth) {
+              engine.updateHarmonicSynthParameters(id, updatedInstrument.harmonicSynth);
+              return; // Handled
+            }
+
             // Furnace instruments - re-encode and re-upload when parameters change
             if (updatedInstrument.synthType?.startsWith('Furnace') && updatedInstrument.furnace && updates.furnace) {
               console.log('[InstrumentStore] Furnace parameters changed, re-encoding instrument');

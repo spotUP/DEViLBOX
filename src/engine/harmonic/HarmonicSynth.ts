@@ -337,6 +337,91 @@ export class HarmonicSynth implements DevilboxSynth {
     }
   }
 
+  /**
+   * Apply configuration changes from the UI (called by ToneEngine)
+   */
+  applyConfig(updates: Partial<HarmonicSynthConfig>): void {
+    let needsRebuild = false;
+
+    // Update harmonics array
+    if (updates.harmonics) {
+      for (let i = 0; i < NUM_HARMONICS; i++) {
+        this.config.harmonics[i] = updates.harmonics[i] ?? this.config.harmonics[i];
+      }
+      needsRebuild = true;
+    }
+
+    // Update spectral controls
+    if (updates.spectralTilt !== undefined) {
+      this.config.spectralTilt = updates.spectralTilt;
+      needsRebuild = true;
+    }
+    if (updates.evenOddBalance !== undefined) {
+      this.config.evenOddBalance = updates.evenOddBalance;
+      needsRebuild = true;
+    }
+
+    // Update filter
+    if (updates.filter) {
+      if (updates.filter.type !== undefined) {
+        this.config.filter.type = updates.filter.type;
+        this.filter.type = updates.filter.type;
+      }
+      if (updates.filter.cutoff !== undefined) {
+        this.config.filter.cutoff = updates.filter.cutoff;
+        this.filter.frequency.value = updates.filter.cutoff;
+      }
+      if (updates.filter.resonance !== undefined) {
+        this.config.filter.resonance = updates.filter.resonance;
+        this.filter.Q.value = updates.filter.resonance;
+      }
+    }
+
+    // Update envelope
+    if (updates.envelope) {
+      if (updates.envelope.attack !== undefined) {
+        this.config.envelope.attack = updates.envelope.attack;
+      }
+      if (updates.envelope.decay !== undefined) {
+        this.config.envelope.decay = updates.envelope.decay;
+      }
+      if (updates.envelope.sustain !== undefined) {
+        this.config.envelope.sustain = updates.envelope.sustain;
+      }
+      if (updates.envelope.release !== undefined) {
+        this.config.envelope.release = updates.envelope.release;
+      }
+    }
+
+    // Update LFO
+    if (updates.lfo) {
+      let reconnectLFO = false;
+      if (updates.lfo.target !== undefined) {
+        this.config.lfo.target = updates.lfo.target;
+        reconnectLFO = true;
+      }
+      if (updates.lfo.rate !== undefined) {
+        this.config.lfo.rate = updates.lfo.rate;
+        this.lfo.frequency.value = updates.lfo.rate;
+      }
+      if (updates.lfo.depth !== undefined) {
+        this.config.lfo.depth = updates.lfo.depth;
+        reconnectLFO = true;
+      }
+      if (reconnectLFO) {
+        this.connectLFO();
+      }
+    }
+
+    // Rebuild waveform if harmonics or spectral params changed
+    if (needsRebuild) {
+      this.currentWave = this.buildPeriodicWave();
+      for (const voice of this.voices.values()) {
+        voice.osc.setPeriodicWave(this.currentWave);
+      }
+    }
+  }
+
   dispose(): void {
     // Kill all voices
     for (const voice of this.voices.values()) {

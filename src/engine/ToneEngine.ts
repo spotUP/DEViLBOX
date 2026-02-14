@@ -3225,6 +3225,28 @@ export class ToneEngine {
   }
 
   /**
+   * Update HarmonicSynth parameters in real-time without recreating the synth
+   */
+  public updateHarmonicSynthParameters(instrumentId: number, harmonicConfig: NonNullable<InstrumentConfig['harmonicSynth']>): void {
+    const synths: Array<{ applyConfig: (config: typeof harmonicConfig) => void }> = [];
+    this.instruments.forEach((instrument, key) => {
+      const [idPart] = key.split('-');
+      if (idPart === String(instrumentId) && (instrument as unknown as { applyConfig?: unknown }).applyConfig) {
+        synths.push(instrument as unknown as { applyConfig: (config: typeof harmonicConfig) => void });
+      }
+    });
+
+    if (synths.length === 0) {
+      // No instances yet - instrument will be created with correct config on next note
+      this.invalidateInstrument(instrumentId);
+      return;
+    }
+
+    // Apply config to all active instances
+    synths.forEach((synth) => synth.applyConfig(harmonicConfig));
+  }
+
+  /**
    * Get the WASM handle for a MAME synth instance
    */
   public getMAMESynthHandle(instrumentId: number): number {
