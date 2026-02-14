@@ -17,6 +17,21 @@ import { needsMigration, migrateProject } from '@/lib/migration';
 const STORAGE_KEY = 'devilbox-project';
 const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
 
+// Safari fallback for requestIdleCallback
+const requestIdleCallbackPolyfill =
+  typeof window !== 'undefined' && window.requestIdleCallback ||
+  ((cb: IdleRequestCallback) => setTimeout(() => cb({
+    didTimeout: false,
+    timeRemaining: () => 50
+  } as IdleDeadline), 1) as unknown as typeof window.requestIdleCallback);
+
+const cancelIdleCallbackPolyfill =
+  typeof window !== 'undefined' && window.cancelIdleCallback ||
+  ((id: number) => clearTimeout(id));
+
+const safeRequestIdleCallback = requestIdleCallbackPolyfill;
+const safeCancelIdleCallback = cancelIdleCallbackPolyfill;
+
 /**
  * SCHEMA VERSION - Bump this when making breaking changes to stored data format.
  * This will cause old localStorage data to be discarded on load.
@@ -340,20 +355,43 @@ export function useProjectPersistence() {
   //   return unsubscribe;
   // }, [markAsModified]);
 
-  // Auto-save when dirty
+  // Auto-save with requestIdleCallback (runs during browser idle time)
+  const idleCallbackRef = useRef<ReturnType<typeof safeRequestIdleCallback> | null>(null);
+
   const scheduleAutoSave = useCallback(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
+    if (idleCallbackRef.current) {
+      safeCancelIdleCallback(idleCallbackRef.current as number);
+    }
 
+    // Wait AUTO_SAVE_INTERVAL, then save during idle time
     saveTimeoutRef.current = setTimeout(() => {
-      if (isDirty) {
-        saveProjectToStorage();
-      }
+      if (!isDirty) return;
+
+      // Use requestIdleCallback to save during browser idle time
+      idleCallbackRef.current = safeRequestIdleCallback(
+        (deadline) => {
+          if (deadline.timeRemaining() > 100) {
+            // At least 100ms idle time - safe to save
+            console.log('[Persistence] Auto-saving project (idle time)...');
+            saveProjectToStorage();
+          } else {
+            // Not enough idle time, reschedule
+            saveTimeoutRef.current = setTimeout(() => {
+              if (isDirty) {
+                saveProjectToStorage();
+              }
+            }, 5000);
+          }
+        },
+        { timeout: 60000 } // Force save after 60s even if not idle
+      );
     }, AUTO_SAVE_INTERVAL);
   }, [isDirty]);
 
-  // Set up auto-save interval
+  // Set up auto-save with idle callback
   useEffect(() => {
     if (isDirty) {
       scheduleAutoSave();
@@ -362,6 +400,9 @@ export function useProjectPersistence() {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+      }
+      if (idleCallbackRef.current) {
+        safeCancelIdleCallback(idleCallbackRef.current as number);
       }
     };
   }, [isDirty, scheduleAutoSave]);
