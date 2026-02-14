@@ -1187,6 +1187,291 @@
     align-items: flex-start;
     gap: 12px;
   }
+
+  /* ============================================
+     MOBILE PATTERN INPUT - Touch-optimized tracker input
+     ============================================ */
+
+  .mobile-pattern-input {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--color-bg-secondary);
+    border-top: 2px solid var(--color-accent);
+    z-index: 100;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Piano keyboard styles */
+  .piano-key {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: none;
+    cursor: pointer;
+    transition: all 0.05s ease-out;
+    touch-action: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .piano-key-white {
+    background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+    border-right: 1px solid #495057;
+    color: #212529;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 8px;
+    box-shadow:
+      inset 0 -1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .piano-key-white:active {
+    background: linear-gradient(180deg, #dee2e6 0%, #adb5bd 100%);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15);
+    transform: translateY(1px);
+  }
+
+  .piano-key-black {
+    background: linear-gradient(180deg, #343a40 0%, #212529 100%);
+    position: absolute;
+    width: 8%;
+    height: 70%;
+    top: 0;
+    color: #f8f9fa;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 6px;
+    z-index: 2;
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.4),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .piano-key-black:active {
+    background: linear-gradient(180deg, #212529 0%, #000000 100%);
+    box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.5);
+    transform: translateY(1px);
+  }
+
+  /* Position black keys */
+  .piano-key-black:nth-of-type(2) { left: calc(8.33% - 4%); }  /* C# */
+  .piano-key-black:nth-of-type(4) { left: calc(25% - 4%); }    /* D# */
+  .piano-key-black:nth-of-type(7) { left: calc(50% - 4%); }    /* F# */
+  .piano-key-black:nth-of-type(9) { left: calc(66.67% - 4%); } /* G# */
+  .piano-key-black:nth-of-type(11) { left: calc(83.33% - 4%); } /* A# */
+
+  .piano-key-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    opacity: 0.7;
+  }
+
+  .piano-octave-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    background: var(--color-bg-hover);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.1s ease;
+    touch-action: manipulation;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .piano-octave-btn:hover:not(:disabled) {
+    background: var(--color-bg-active);
+    color: var(--color-text);
+    border-color: var(--color-accent);
+  }
+
+  .piano-octave-btn:active:not(:disabled) {
+    background: var(--color-accent);
+    color: var(--color-text-inverse);
+    transform: scale(0.95);
+  }
+
+  .piano-octave-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .piano-utility-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text);
+    cursor: pointer;
+    transition: all 0.1s ease;
+    touch-action: manipulation;
+    min-height: 56px;
+  }
+
+  .piano-utility-btn:hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-accent);
+  }
+
+  .piano-utility-btn:active {
+    background: var(--color-accent);
+    color: var(--color-text-inverse);
+    transform: scale(0.95);
+  }
+
+  /* Hex grid styles */
+  .hex-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    min-height: 56px;
+    background: var(--color-bg-tertiary);
+    border: 2px solid var(--color-border);
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-accent);
+    cursor: pointer;
+    transition: all 0.1s ease;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .hex-btn:hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-accent);
+    box-shadow: 0 0 12px var(--color-accent-glow);
+  }
+
+  .hex-btn:active {
+    background: var(--color-accent);
+    color: var(--color-text-inverse);
+    border-color: var(--color-accent);
+    transform: scale(0.95);
+    box-shadow: 0 0 20px var(--color-accent-glow);
+  }
+
+  .hex-btn-delete {
+    background: linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%);
+    border-color: var(--color-error);
+    color: #fca5a5;
+    gap: 8px;
+  }
+
+  .hex-btn-delete:hover {
+    background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+    border-color: #ef4444;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+  }
+
+  .hex-btn-delete:active {
+    background: var(--color-error);
+    color: white;
+    transform: scale(0.95);
+  }
+
+  /* Context menu styles */
+  .context-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px 24px;
+    min-height: 56px;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    touch-action: manipulation;
+    width: 100%;
+  }
+
+  .context-menu-btn:hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-accent);
+  }
+
+  .context-menu-btn:active {
+    background: var(--color-accent);
+    color: var(--color-text-inverse);
+    transform: scale(0.98);
+  }
+
+  .context-menu-btn-cancel {
+    background: var(--color-bg-secondary);
+    border-color: var(--color-border-light);
+    color: var(--color-text-muted);
+    margin-top: 8px;
+  }
+
+  .context-menu-btn-cancel:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text);
+  }
+
+  /* Touch action utilities */
+  .touch-none {
+    touch-action: none;
+  }
+
+  .touch-pan-y {
+    touch-action: pan-y;
+  }
+
+  .touch-pan-x {
+    touch-action: pan-x;
+  }
+
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* Safe area utilities */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  .safe-left {
+    padding-left: env(safe-area-inset-left, 0);
+  }
+
+  .safe-right {
+    padding-right: env(safe-area-inset-right, 0);
+  }
 }
 
 @layer utilities {
@@ -1228,6 +1513,11 @@
   .touch-target {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  .touch-target-sm {
+    min-width: 32px;
+    min-height: 32px;
   }
 
   .touch-target-lg {
