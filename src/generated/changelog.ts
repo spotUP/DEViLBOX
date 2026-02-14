@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-14T20:11:48.403Z
+ * Generated: 2026-02-14T20:13:00.060Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '550';
-export const BUILD_HASH = 'c521ea9';
+export const BUILD_NUMBER = '551';
+export const BUILD_HASH = '250d587';
 export const BUILD_DATE = '2026-02-14';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-14',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add file browser Load functionality to mobile menu"
+      },
       {
         type: 'fix',
         "description": "Restore /DEViLBOX/ base path to match repo name"
@@ -228,10 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore: sync remaining changes from previous development"
-      },
-      {
-        type: 'improvement',
-        "description": "Update project memory with mobile UX implementation"
       }
     ]
   }
