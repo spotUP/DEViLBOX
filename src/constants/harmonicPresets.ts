@@ -3,8 +3,7 @@
  * Additive synthesis presets exploring spectral shaping and harmonic content
  */
 
-import type { HarmonicSynthConfig } from '@typedefs/instrument';
-import type { SynthPreset } from './synthPresets';
+import type { InstrumentPreset } from '@typedefs/instrument';
 
 /** Sawtooth harmonic series: 1/n */
 const SAW_HARMONICS = Array.from({ length: 32 }, (_, i) => 1 / (i + 1));
@@ -78,13 +77,12 @@ const FILTERED_SAW_HARMONICS = Array.from({ length: 32 }, (_, i) => {
   return (1 / n) * Math.exp(-n * 0.15);
 });
 
-export const HARMONIC_PRESETS: SynthPreset[] = [
+export const HARMONIC_PRESETS: InstrumentPreset['config'][] = [
   {
-    id: 'harmonic-pure-sine',
+    type: 'synth' as const,
     name: 'Pure Sine',
-    description: 'Clean sine wave - fundamental only',
-    category: 'pad',
-    config: {
+    synthType: 'HarmonicSynth',
+    harmonicSynth: {
       harmonics: SINE_HARMONICS,
       spectralTilt: 0,
       evenOddBalance: 0,
@@ -92,14 +90,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 50, decay: 200, sustain: 80, release: 300 },
       lfo: { rate: 2, depth: 0, target: 'pitch' },
       maxVoices: 8,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+    volume: -6,
+    pan: 0,
   },
   {
-    id: 'harmonic-bright-saw',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Bright Saw',
-    description: 'Classic sawtooth with all harmonics',
-    category: 'lead',
-    config: {
+    harmonicSynth: {
       harmonics: SAW_HARMONICS,
       spectralTilt: 20,
       evenOddBalance: 0,
@@ -107,14 +107,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 5, decay: 150, sustain: 70, release: 200 },
       lfo: { rate: 5, depth: 15, target: 'filter' },
       maxVoices: 6,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-warm-square',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Warm Square',
-    description: 'Square wave - odd harmonics only',
-    category: 'bass',
-    config: {
+    harmonicSynth: {
       harmonics: SQUARE_HARMONICS,
       spectralTilt: -10,
       evenOddBalance: -100,
@@ -122,14 +124,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 10, decay: 200, sustain: 90, release: 150 },
       lfo: { rate: 1.5, depth: 0, target: 'pitch' },
       maxVoices: 8,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-mellow-triangle',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Mellow Triangle',
-    description: 'Soft triangle wave with gentle attack',
-    category: 'pad',
-    config: {
+    harmonicSynth: {
       harmonics: TRIANGLE_HARMONICS,
       spectralTilt: -20,
       evenOddBalance: -80,
@@ -137,14 +141,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 100, decay: 300, sustain: 85, release: 400 },
       lfo: { rate: 0.5, depth: 5, target: 'pitch' },
       maxVoices: 8,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-church-organ',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Church Organ',
-    description: 'Classic drawbar organ sound',
-    category: 'key',
-    config: {
+    harmonicSynth: {
       harmonics: ORGAN_HARMONICS,
       spectralTilt: 0,
       evenOddBalance: -60,
@@ -152,14 +158,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 20, decay: 100, sustain: 95, release: 100 },
       lfo: { rate: 6, depth: 3, target: 'pitch' },
       maxVoices: 8,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-vocal-formant',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Vocal Formant',
-    description: 'Human voice-like formant emphasis',
-    category: 'lead',
-    config: {
+    harmonicSynth: {
       harmonics: FORMANT_HARMONICS,
       spectralTilt: 0,
       evenOddBalance: 20,
@@ -167,14 +175,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 30, decay: 250, sustain: 60, release: 200 },
       lfo: { rate: 4, depth: 40, target: 'filter' },
       maxVoices: 6,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-bell',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Spectral Bell',
-    description: 'Bell-like with exponential harmonic decay',
-    category: 'fx',
-    config: {
+    harmonicSynth: {
       harmonics: BELL_HARMONICS,
       spectralTilt: -30,
       evenOddBalance: 30,
@@ -182,14 +192,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 1, decay: 2000, sustain: 10, release: 1500 },
       lfo: { rate: 0.3, depth: 0, target: 'pitch' },
       maxVoices: 6,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-metallic-pad',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Metallic Pad',
-    description: 'Shimmering pad with inharmonic partials',
-    category: 'pad',
-    config: {
+    harmonicSynth: {
       harmonics: METALLIC_HARMONICS,
       spectralTilt: 10,
       evenOddBalance: 0,
@@ -197,14 +209,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 200, decay: 400, sustain: 75, release: 600 },
       lfo: { rate: 1.2, depth: 20, target: 'spectral' },
       maxVoices: 8,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-glass',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Glass Chimes',
-    description: 'Crystalline sound with even harmonic emphasis',
-    category: 'fx',
-    config: {
+    harmonicSynth: {
       harmonics: GLASS_HARMONICS,
       spectralTilt: 15,
       evenOddBalance: 100,
@@ -212,14 +226,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 5, decay: 1500, sustain: 20, release: 1000 },
       lfo: { rate: 0.8, depth: 10, target: 'filter' },
       maxVoices: 6,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-reed',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Nasal Reed',
-    description: 'Clarinet/oboe-like timbre',
-    category: 'lead',
-    config: {
+    harmonicSynth: {
       harmonics: REED_HARMONICS,
       spectralTilt: -5,
       evenOddBalance: -70,
@@ -227,14 +243,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 15, decay: 200, sustain: 75, release: 150 },
       lfo: { rate: 5.5, depth: 5, target: 'pitch' },
       maxVoices: 6,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-pluck',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Plucked String',
-    description: 'Fast attack with filtered saw harmonics',
-    category: 'pluck',
-    config: {
+    harmonicSynth: {
       harmonics: FILTERED_SAW_HARMONICS,
       spectralTilt: -25,
       evenOddBalance: 0,
@@ -242,14 +260,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 2, decay: 800, sustain: 10, release: 200 },
       lfo: { rate: 0, depth: 0, target: 'pitch' },
       maxVoices: 8,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-phase-pad',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Phasing Pad',
-    description: 'Evolving pad with spectral LFO modulation',
-    category: 'pad',
-    config: {
+    harmonicSynth: {
       harmonics: SAW_HARMONICS,
       spectralTilt: -15,
       evenOddBalance: 0,
@@ -257,14 +277,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 300, decay: 500, sustain: 80, release: 800 },
       lfo: { rate: 0.25, depth: 80, target: 'spectral' },
       maxVoices: 8,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-dark-bass',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Dark Bass',
-    description: 'Deep bass with strong fundamental',
-    category: 'bass',
-    config: {
+    harmonicSynth: {
       harmonics: Array.from({ length: 32 }, (_, i) => Math.exp(-i * 0.8)),
       spectralTilt: -50,
       evenOddBalance: 0,
@@ -272,14 +294,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 5, decay: 150, sustain: 90, release: 100 },
       lfo: { rate: 0, depth: 0, target: 'pitch' },
       maxVoices: 6,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-bright-lead',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Bright Lead',
-    description: 'Cutting lead with boosted high harmonics',
-    category: 'lead',
-    config: {
+    harmonicSynth: {
       harmonics: Array.from({ length: 32 }, (_, i) => {
         const n = i + 1;
         return n <= 16 ? 1 / Math.sqrt(n) : 0.8 / n;
@@ -290,14 +314,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 3, decay: 100, sustain: 80, release: 150 },
       lfo: { rate: 6, depth: 25, target: 'filter' },
       maxVoices: 4,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-string-ensemble',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'String Ensemble',
-    description: 'Lush string section with slow attack',
-    category: 'string',
-    config: {
+    harmonicSynth: {
       harmonics: Array.from({ length: 32 }, (_, i) => {
         const n = i + 1;
         return (1 / n) * Math.exp(-n * 0.12);
@@ -308,14 +334,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 250, decay: 400, sustain: 85, release: 700 },
       lfo: { rate: 2, depth: 12, target: 'pitch' },
       maxVoices: 8,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-hollow',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Hollow Pipe',
-    description: 'Missing even harmonics for hollow sound',
-    category: 'key',
-    config: {
+    harmonicSynth: {
       harmonics: Array.from({ length: 32 }, (_, i) => {
         const n = i + 1;
         if (n % 2 === 0) return 0;
@@ -327,14 +355,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 40, decay: 300, sustain: 70, release: 250 },
       lfo: { rate: 3, depth: 8, target: 'filter' },
       maxVoices: 6,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-choir',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Synth Choir',
-    description: 'Choir-like vowel formants',
-    category: 'pad',
-    config: {
+    harmonicSynth: {
       harmonics: Array.from({ length: 32 }, (_, i) => {
         const n = i + 1;
         // Emphasize formant regions (vowel "ah")
@@ -348,14 +378,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 150, decay: 350, sustain: 80, release: 500 },
       lfo: { rate: 0.4, depth: 30, target: 'filter' },
       maxVoices: 8,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-saw-bass',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Analog Saw Bass',
-    description: 'Classic analog bass with saw wave',
-    category: 'bass',
-    config: {
+    harmonicSynth: {
       harmonics: SAW_HARMONICS,
       spectralTilt: -10,
       evenOddBalance: 0,
@@ -363,14 +395,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 5, decay: 120, sustain: 70, release: 80 },
       lfo: { rate: 0, depth: 0, target: 'pitch' },
       maxVoices: 4,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-sweeping-lead',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Sweeping Lead',
-    description: 'Lead with dynamic filter modulation',
-    category: 'lead',
-    config: {
+    harmonicSynth: {
       harmonics: SAW_HARMONICS,
       spectralTilt: 10,
       evenOddBalance: 0,
@@ -378,14 +412,16 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 10, decay: 200, sustain: 65, release: 180 },
       lfo: { rate: 3.5, depth: 60, target: 'filter' },
       maxVoices: 4,
-    } as Partial<HarmonicSynthConfig>,
+    },
+    effects: [],
+  volume: -6,
+  pan: 0,
   },
   {
-    id: 'harmonic-ethereal',
+    type: 'synth' as const,
+    synthType: 'HarmonicSynth',
     name: 'Ethereal Shimmer',
-    description: 'Dreamy pad with spectral morphing',
-    category: 'pad',
-    config: {
+    harmonicSynth: {
       harmonics: Array.from({ length: 32 }, (_, i) => {
         const n = i + 1;
         return Math.sin(n * Math.PI / 8) * (1 / n);
@@ -396,6 +432,6 @@ export const HARMONIC_PRESETS: SynthPreset[] = [
       envelope: { attack: 400, decay: 600, sustain: 75, release: 1000 },
       lfo: { rate: 0.15, depth: 90, target: 'spectral' },
       maxVoices: 8,
-    } as Partial<HarmonicSynthConfig>,
+    },
   },
 ];
