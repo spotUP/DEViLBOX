@@ -21,7 +21,14 @@ export interface Command {
 
 export interface KeyboardScheme {
   name: string;
-  id: string;
   version: string;
-  mappings: Record<string, { pc: string; mac: string }>;
+  platform: {
+    pc: Record<string, string>;
+    mac: Record<string, string>;
+  };
+  conflicts?: Array<{
+    combo: string;
+    browser: string;
+    solution: string;
+  }>;
 }
