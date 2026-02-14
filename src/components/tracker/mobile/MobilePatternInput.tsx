@@ -38,8 +38,8 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
     if (cursor.columnType === 'note') return 'piano';
     if (cursor.columnType === 'instrument' ||
         cursor.columnType === 'volume' ||
-        cursor.columnType === 'effect' ||
-        cursor.columnType === 'effectParam') return 'hex';
+        cursor.columnType === 'effTyp' ||
+        cursor.columnType === 'effParam') return 'hex';
     return 'piano'; // Default
   }, [cursor.columnType]);
 
@@ -184,7 +184,8 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
     const touch = e.touches[0];
     // @ts-ignore - force property exists on Touch in iOS Safari
     const force = touch.force || 1.0; // Default to 1.0 on Android
-    const velocity = Math.min(127, Math.floor(force * 127));
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _velocity = Math.min(127, Math.floor(force * 127)); // TODO: Pass velocity to onNoteInput
 
     // For now, just trigger the note (velocity handling can be added to onNoteInput later)
     onNotePress(semitone);

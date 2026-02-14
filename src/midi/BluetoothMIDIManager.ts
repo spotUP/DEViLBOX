@@ -82,7 +82,7 @@ Note: iOS requires Bluetooth MIDI devices to be paired through Settings first.`,
 /**
  * Request MIDI access with proper error handling for mobile
  */
-export const requestMIDIAccessMobile = async (): Promise<WebMidi.MIDIAccess | null> => {
+export const requestMIDIAccessMobile = async (): Promise<MIDIAccess | null> => {
   if (!isWebMIDISupported()) {
     throw new Error('Web MIDI API is not supported on this device/browser');
   }
@@ -111,12 +111,12 @@ export const requestMIDIAccessMobile = async (): Promise<WebMidi.MIDIAccess | nu
 /**
  * Get list of connected MIDI devices
  */
-export const getConnectedMIDIDevices = (access: WebMidi.MIDIAccess): {
-  inputs: WebMidi.MIDIInput[];
-  outputs: WebMidi.MIDIOutput[];
+export const getConnectedMIDIDevices = (access: MIDIAccess): {
+  inputs: MIDIInput[];
+  outputs: MIDIOutput[];
 } => {
-  const inputs: WebMidi.MIDIInput[] = [];
-  const outputs: WebMidi.MIDIOutput[] = [];
+  const inputs: MIDIInput[] = [];
+  const outputs: MIDIOutput[] = [];
 
   access.inputs.forEach((input) => inputs.push(input));
   access.outputs.forEach((output) => outputs.push(output));
@@ -127,14 +127,14 @@ export const getConnectedMIDIDevices = (access: WebMidi.MIDIAccess): {
 /**
  * Check if any MIDI devices are connected
  */
-export const hasConnectedMIDIDevices = (access: WebMidi.MIDIAccess): boolean => {
+export const hasConnectedMIDIDevices = (access: MIDIAccess): boolean => {
   return access.inputs.size > 0 || access.outputs.size > 0;
 };
 
 /**
  * Format MIDI device name for display
  */
-export const formatMIDIDeviceName = (device: WebMidi.MIDIInput | WebMidi.MIDIOutput): string => {
+export const formatMIDIDeviceName = (device: MIDIInput | MIDIOutput): string => {
   // Some devices have manufacturer + name, clean it up
   const name = device.name || 'Unknown Device';
   const manufacturer = device.manufacturer || '';

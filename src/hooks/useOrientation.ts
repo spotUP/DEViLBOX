@@ -7,6 +7,17 @@ import { useState, useEffect } from 'react';
 
 export type Orientation = 'portrait' | 'landscape';
 
+// Screen Orientation API types
+export type OrientationLockType =
+  | 'any'
+  | 'natural'
+  | 'landscape'
+  | 'portrait'
+  | 'portrait-primary'
+  | 'portrait-secondary'
+  | 'landscape-primary'
+  | 'landscape-secondary';
+
 export interface OrientationState {
   orientation: Orientation;
   isPortrait: boolean;

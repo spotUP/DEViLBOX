@@ -54,7 +54,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   }, [mobileChannel]);
 
   const handleChannelNext = useCallback(() => {
-    const maxChannels = pattern?.numChannels || 8;
+    const maxChannels = pattern?.channels.length || 8;
     if (mobileChannel < maxChannels - 1) {
       haptics.selection();
       setMobileChannel(mobileChannel + 1);
@@ -64,7 +64,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   // Handle note input from mobile keyboard
   const handleNoteInput = useCallback((note: number) => {
     const currentInstrument = 1; // TODO: Get from instrument store
-    setCell(cursor.channel, cursor.row, {
+    setCell(cursor.channelIndex, cursor.rowIndex, {
       note,
       instrument: currentInstrument,
     });
@@ -74,20 +74,20 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
 
   // Handle hex input (for effects, volume, instrument)
   const handleHexInput = useCallback((value: number) => {
-    const { channel, row, columnType } = cursor;
+    const { channelIndex, rowIndex, columnType } = cursor;
 
     switch (columnType) {
       case 'instrument':
-        setCell(channel, row, { instrument: value });
+        setCell(channelIndex, rowIndex, { instrument: value });
         break;
       case 'volume':
-        setCell(channel, row, { volume: value });
+        setCell(channelIndex, rowIndex, { volume: value });
         break;
-      case 'effect':
-        setCell(channel, row, { effTyp: value });
+      case 'effTyp':
+        setCell(channelIndex, rowIndex, { effTyp: value });
         break;
-      case 'effectParam':
-        setCell(channel, row, { eff: value });
+      case 'effParam':
+        setCell(channelIndex, rowIndex, { eff: value });
         break;
     }
 
@@ -97,8 +97,8 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
 
   // Handle delete
   const handleDelete = useCallback(() => {
-    const { channel, row } = cursor;
-    setCell(channel, row, {
+    const { channelIndex, rowIndex } = cursor;
+    setCell(channelIndex, rowIndex, {
       note: 0,
       instrument: 0,
       volume: 0,
@@ -136,7 +136,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
               </span>
               <button
                 onClick={handleChannelNext}
-                disabled={mobileChannel >= (pattern?.numChannels || 8) - 1}
+                disabled={mobileChannel >= (pattern?.channels.length || 8) - 1}
                 className="p-1 rounded bg-dark-bgTertiary disabled:opacity-30 touch-target-sm"
                 aria-label="Next channel"
               >
