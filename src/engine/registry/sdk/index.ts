@@ -46,6 +46,12 @@ SynthRegistry.registerLazy(
   () => import('./wam').then(() => {}),
 );
 
+// ── HarmonicSynth (additive/spectral) ────────────────────────────────────
+SynthRegistry.registerLazy(
+  ['HarmonicSynth'],
+  () => import('./harmonicsynth').then(() => {}),
+);
+
 // ── Misc synths (speech, JUCE WASM, special) ─────────────────────────────────
 SynthRegistry.registerLazy(
   [
