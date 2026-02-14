@@ -12,7 +12,7 @@ export interface PortPosition {
   y: number;
 }
 
-export const usePortPositions = () => {
+export const usePortPositions = (containerRef?: React.RefObject<HTMLElement | null>) => {
   const [positions, setPositions] = useState<Map<string, PortPosition>>(new Map());
   const elementRefs = useRef<Map<string, HTMLElement>>(new Map());
   const observerRef = useRef<ResizeObserver | null>(null);
@@ -31,17 +31,27 @@ export const usePortPositions = () => {
 
     elementRefs.current.set(portId, element);
 
-    // Calculate position relative to viewport
+    // Calculate position relative to container (or viewport if no container)
     const rect = element.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
 
+    // If we have a container reference, make coordinates relative to it
+    let relativeX = centerX;
+    let relativeY = centerY;
+
+    if (containerRef?.current) {
+      const containerRect = containerRef.current.getBoundingClientRect();
+      relativeX = centerX - containerRect.left;
+      relativeY = centerY - containerRect.top;
+    }
+
     setPositions((prev) => {
       const next = new Map(prev);
-      next.set(portId, { x: centerX, y: centerY });
+      next.set(portId, { x: relativeX, y: relativeY });
       return next;
     });
-  }, []);
+  }, [containerRef]);
 
   // Register a port element
   const registerPort = useCallback(
@@ -78,11 +88,14 @@ export const usePortPositions = () => {
       recalculateAll();
     };
 
-    window.addEventListener('scroll', handleScroll, true);
+    // Listen to scroll events on the container (if provided) and window
+    const scrollTarget = containerRef?.current || window;
+    scrollTarget.addEventListener('scroll', handleScroll, true);
+
     return () => {
-      window.removeEventListener('scroll', handleScroll, true);
+      scrollTarget.removeEventListener('scroll', handleScroll, true);
     };
-  }, [recalculateAll]);
+  }, [recalculateAll, containerRef]);
 
   return {
     positions,
