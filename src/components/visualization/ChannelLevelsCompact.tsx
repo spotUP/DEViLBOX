@@ -6,6 +6,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useTrackerStore, useTransportStore, useThemeStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
+import { useShallow } from 'zustand/react/shallow';
 
 interface ChannelLevelsCompactProps {
   height?: number;
@@ -26,7 +27,12 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
   const levelStatesRef = useRef<number[]>([]);
   const peakHoldsRef = useRef<{ level: number; frames: number }[]>([]);
 
-  const { patterns, currentPatternIndex } = useTrackerStore();
+  const { patterns, currentPatternIndex } = useTrackerStore(
+    useShallow((state) => ({
+      patterns: state.patterns,
+      currentPatternIndex: state.currentPatternIndex,
+    }))
+  );
   const isPlaying = useTransportStore((state) => state.isPlaying);
   const { currentThemeId } = useThemeStore();
 

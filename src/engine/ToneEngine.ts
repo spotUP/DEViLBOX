@@ -39,6 +39,8 @@ import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
 import { WAMSynth } from './wam/WAMSynth';
 import { CHIP_SYNTH_DEFS } from '../constants/chipParameters';
 import { useRomDialogStore } from '../stores/useRomDialogStore';
+import { SynthRegistry } from './registry/SynthRegistry';
+import { VoiceAllocator } from './audio/VoiceAllocator';
 
 interface VoiceState {
   instrument: Tone.ToneAudioNode | DevilboxSynth;
@@ -74,7 +76,8 @@ export class ToneEngine {
   public analyser: Tone.Analyser;
   // FFT for frequency visualization
   public fft: Tone.FFT;
-  
+  private analysersConnected: boolean = false;
+
   // Native AudioContext — owned by DEViLBOX, shared with Tone.js via Tone.setContext()
   // This allows WASM/WAM synths to use the real BaseAudioContext directly.
   private _nativeContext: AudioContext | null = null;
@@ -94,8 +97,8 @@ export class ToneEngine {
   // Polyphonic voice allocation for live keyboard/MIDI playing
   // Maps note (e.g., "C4") to channel index used for that note
   private liveVoiceAllocation: Map<string, number> = new Map();
-  // Pool of available channel indices for polyphonic playback (channels 100-115)
-  private liveVoicePool: number[] = [];
+  // Voice allocator with priority-based stealing (replaces simple pool)
+  private voiceAllocator: VoiceAllocator;
   private static readonly LIVE_VOICE_BASE_CHANNEL = 100; // Start at channel 100 to avoid tracker channels
   private static readonly MAX_LIVE_VOICES = 16;
 
@@ -224,13 +227,11 @@ export class ToneEngine {
       pan: 0,
     }).toDestination();
 
-    // Analyzers for visualization
+    // Analyzers for visualization (created but not connected by default)
     this.analyser = new Tone.Analyser('waveform', 1024);
     this.fft = new Tone.FFT(1024);
 
-    // Connect analyzers to master channel
-    this.masterChannel.connect(this.analyser);
-    this.masterChannel.connect(this.fft);
+    // Don't connect analyzers by default - use enableAnalysers() to connect when needed
 
     // Master effects merge point — both tracker and synth audio meet here
     this.masterEffectsInput = new Tone.Gain(1);
@@ -249,11 +250,11 @@ export class ToneEngine {
     // Instrument map
     this.instruments = new Map();
 
-    // Initialize live voice pool (channels 100-115 for polyphonic keyboard/MIDI)
-    this.liveVoicePool = [];
-    for (let i = 0; i < ToneEngine.MAX_LIVE_VOICES; i++) {
-      this.liveVoicePool.push(ToneEngine.LIVE_VOICE_BASE_CHANNEL + i);
-    }
+    // Initialize polyphonic voice allocator with priority-based stealing
+    this.voiceAllocator = new VoiceAllocator(
+      ToneEngine.LIVE_VOICE_BASE_CHANNEL,
+      ToneEngine.MAX_LIVE_VOICES
+    );
   }
 
   /**
@@ -1897,6 +1898,15 @@ export class ToneEngine {
     }
 
     try {
+      // Try SynthRegistry hook first (new registry architecture)
+      const registryDesc = SynthRegistry.get(config.synthType);
+      if (registryDesc?.onTriggerAttack) {
+        const handled = registryDesc.onTriggerAttack(instrument, note, safeTime, velocity, {
+          accent, slide, hammer, period, channelIndex, config,
+        });
+        if (handled) return;
+      }
+
       // Handle TB-303 with JC303 or DB303 engine (both support accent/slide)
       if (instrument instanceof JC303Synth) {
         // DEBUG LOGGING for JC303 synth calls
@@ -2098,6 +2108,13 @@ export class ToneEngine {
     }
 
     try {
+      // Try SynthRegistry hook first (new registry architecture)
+      const registryDesc = SynthRegistry.get(config.synthType);
+      if (registryDesc?.onTriggerRelease) {
+        const handled = registryDesc.onTriggerRelease(instrument, note, safeTime, { config });
+        if (handled) return;
+      }
+
       // Handle sample-based instruments
       if (config.synthType === 'Sampler') {
         const sampler = instrument as Tone.Sampler;
@@ -2249,13 +2266,8 @@ export class ToneEngine {
       }
     }
 
-    // Allocate a voice channel from the pool
-    if (this.liveVoicePool.length === 0) {
-      console.warn('[ToneEngine] No free voice channels for polyphonic playback');
-      return;
-    }
-
-    const channelIndex = this.liveVoicePool.shift()!;
+    // Allocate a voice channel (with stealing if all voices busy)
+    const channelIndex = this.voiceAllocator.allocate(note, instrumentId, velocity);
     this.liveVoiceAllocation.set(note, channelIndex);
 
     // Get immediate time for lowest latency triggering
@@ -2288,9 +2300,13 @@ export class ToneEngine {
       this.triggerNoteRelease(instrumentId, note, immediateTime, config);
     } else {
       // Allocated voice channel - release on specific instance
+      // Mark voice as releasing (lowers priority for stealing)
+      this.voiceAllocator.markReleasing(channelIndex);
       this.triggerNoteRelease(instrumentId, note, immediateTime, config, channelIndex);
-      // Return the channel to the pool
-      this.liveVoicePool.push(channelIndex);
+      // Free the voice after release envelope completes
+      setTimeout(() => {
+        this.voiceAllocator.free(channelIndex);
+      }, 100);
     }
   }
 
@@ -2305,7 +2321,7 @@ export class ToneEngine {
       } else {
         // Allocated voice channel
         this.triggerNoteRelease(instrumentId, note, 0, config, channelIndex);
-        this.liveVoicePool.push(channelIndex);
+        this.voiceAllocator.free(channelIndex);
       }
     }
     this.liveVoiceAllocation.clear();
@@ -4400,12 +4416,18 @@ export class ToneEngine {
    * Called when effects are added, removed, or reordered
    */
   public async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
+    // Fast path: if only parameters changed (no add/remove/reorder), just update params
+    if (this.canUseParameterUpdatePath(effects)) {
+      this.updateEffectParameters(effects);
+      return;
+    }
+
     // Version guard: if another rebuild starts while we're async, abort this one
     const myVersion = ++this.masterEffectsRebuildVersion;
     console.warn('[ToneEngine] rebuildMasterEffects v' + myVersion + ', effects:', effects.map(e => `${e.type}(${e.id})`));
 
     // Deep clone effects to avoid Immer proxy revocation issues during async operations
-    const effectsCopy = JSON.parse(JSON.stringify(effects)) as EffectConfig[];
+    const effectsCopy = structuredClone(effects) as EffectConfig[];
 
     // Disconnect masterEffectsInput output (preserves upstream connections from amigaFilter & synthBus)
     this.masterEffectsInput.disconnect();
@@ -4494,6 +4516,72 @@ export class ToneEngine {
       this.masterEffectsNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
 
 
+  }
+
+  /**
+   * Check if we can use the fast parameter update path (no structural changes).
+   */
+  private canUseParameterUpdatePath(newEffects: EffectConfig[]): boolean {
+    // Filter to enabled effects (like rebuild does)
+    const enabledNew = newEffects.filter((fx) => fx.enabled);
+    const currentIds = Array.from(this.masterEffectConfigs.keys());
+
+    // Different number of effects - need full rebuild
+    if (enabledNew.length !== currentIds.length) {
+      return false;
+    }
+
+    // Check if IDs and order match
+    for (let i = 0; i < enabledNew.length; i++) {
+      if (enabledNew[i].id !== currentIds[i]) {
+        return false; // Order changed or different effect
+      }
+
+      const current = this.masterEffectConfigs.get(currentIds[i]);
+      if (!current) return false;
+
+      // Type changed - need rebuild
+      if (enabledNew[i].type !== current.config.type) {
+        return false;
+      }
+    }
+
+    return true; // Only parameters changed - safe for fast path
+  }
+
+  /**
+   * Update effect parameters without rebuilding the chain (fast path).
+   */
+  private updateEffectParameters(newEffects: EffectConfig[]): void {
+    const enabledNew = newEffects.filter((fx) => fx.enabled);
+
+    for (const newConfig of enabledNew) {
+      const existing = this.masterEffectConfigs.get(newConfig.id);
+      if (!existing) continue;
+
+      // Update parameters on the existing node
+      Object.entries(newConfig.parameters || {}).forEach(([key, value]) => {
+        if (key in existing.node) {
+          const nodeAny = existing.node as any;
+          // Handle Tone.js Signal/Param types
+          if (nodeAny[key]?.value !== undefined) {
+            nodeAny[key].value = value;
+          } else {
+            nodeAny[key] = value;
+          }
+        }
+      });
+
+      // Update enabled state (bypass)
+      if ('wet' in existing.node) {
+        (existing.node as any).wet.value = newConfig.enabled ? 1 : 0;
+      }
+
+      // Update stored config
+      existing.config = newConfig;
+    }
+
+    console.log('[ToneEngine] Fast parameter update applied (no rebuild)');
   }
 
   /**
@@ -5514,6 +5602,28 @@ export class ToneEngine {
    */
   public getFFT(): Float32Array {
     return this.fft.getValue() as Float32Array;
+  }
+
+  /**
+   * Enable analysers for visualization (connects them to the audio graph)
+   */
+  public enableAnalysers(): void {
+    if (!this.analysersConnected) {
+      this.masterChannel.connect(this.analyser);
+      this.masterChannel.connect(this.fft);
+      this.analysersConnected = true;
+    }
+  }
+
+  /**
+   * Disable analysers to save CPU when visualizations are hidden
+   */
+  public disableAnalysers(): void {
+    if (this.analysersConnected) {
+      this.masterChannel.disconnect(this.analyser);
+      this.masterChannel.disconnect(this.fft);
+      this.analysersConnected = false;
+    }
   }
 
   // ============================================

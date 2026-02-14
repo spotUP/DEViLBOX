@@ -5,6 +5,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useTrackerStore } from '@stores';
+import { useShallow } from 'zustand/react/shallow';
 
 interface ChannelTunnelProps {
   height?: number;
@@ -14,7 +15,12 @@ export const ChannelTunnel: React.FC<ChannelTunnelProps> = ({ height = 100 }) =>
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
   const [width, setWidth] = useState(300);
-  const { patterns, currentPatternIndex } = useTrackerStore();
+  const { patterns, currentPatternIndex } = useTrackerStore(
+    useShallow((state) => ({
+      patterns: state.patterns,
+      currentPatternIndex: state.currentPatternIndex,
+    }))
+  );
   const pattern = patterns[currentPatternIndex];
   const channelCount = pattern?.channels.length || 4;
   const tunnelOffset = useRef(0);

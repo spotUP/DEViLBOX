@@ -53,6 +53,10 @@ export const ParticleField: React.FC<ParticleFieldProps> = ({ height = 100 }) =>
 
     const particles = particlesRef.current;
 
+    // Enable analysers when visualization is active
+    const engine = getToneEngine();
+    engine.enableAnalysers();
+
     const createParticle = (x: number, y: number, intensity: number): Particle => ({
       x,
       y,
@@ -96,13 +100,16 @@ export const ParticleField: React.FC<ParticleFieldProps> = ({ height = 100 }) =>
         p.y += p.vy;
         p.life -= 0.015;
 
-        // Apply gravity/attraction to center
+        // Apply gravity/attraction to center (using squared distance to avoid sqrt)
         const dx = width / 2 - p.x;
         const dy = height / 2 - p.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > 20) {
-          p.vx += (dx / dist) * 0.05;
-          p.vy += (dy / dist) * 0.05;
+        const distSq = dx * dx + dy * dy;
+        const threshold = 20 * 20; // 400
+        if (distSq > threshold) {
+          // Use inverse square law for force (eliminates sqrt)
+          const strength = 2.0 / distSq; // Adjusted for similar visual effect
+          p.vx += dx * strength;
+          p.vy += dy * strength;
         }
 
         // Damping
@@ -141,6 +148,8 @@ export const ParticleField: React.FC<ParticleFieldProps> = ({ height = 100 }) =>
         cancelAnimationFrame(animationRef.current);
       }
       particlesRef.current = [];
+      // Disable analysers to save CPU when visualization unmounts
+      engine.disableAnalysers();
     };
   }, [width, height]);
 

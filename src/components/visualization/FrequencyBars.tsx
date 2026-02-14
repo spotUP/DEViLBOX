@@ -13,6 +13,7 @@ export const FrequencyBars: React.FC<FrequencyBarsProps> = ({ height = 100 }) =>
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
   const [width, setWidth] = useState(300);
+  const gradientCacheRef = useRef<CanvasGradient[]>([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -45,6 +46,20 @@ export const FrequencyBars: React.FC<FrequencyBarsProps> = ({ height = 100 }) =>
     const barWidth = width / numBars;
     const smoothedValues = new Array(numBars).fill(0);
 
+    // Create gradient cache (only once per canvas resize)
+    gradientCacheRef.current = Array.from({ length: numBars }, (_, i) => {
+      const x = i * barWidth;
+      const gradient = ctx.createLinearGradient(x, 0, x, height);
+      gradient.addColorStop(0, '#00ffff');
+      gradient.addColorStop(0.5, '#00d4aa');
+      gradient.addColorStop(1, '#006655');
+      return gradient;
+    });
+
+    // Enable analysers when visualization is active
+    const engine = getToneEngine();
+    engine.enableAnalysers();
+
     const animate = () => {
       ctx.fillStyle = '#0a0a0b';
       ctx.fillRect(0, 0, width, height);
@@ -67,13 +82,8 @@ export const FrequencyBars: React.FC<FrequencyBarsProps> = ({ height = 100 }) =>
           const x = i * barWidth;
           const barHeight = smoothedValues[i];
 
-          // Create gradient for 3D effect
-          const gradient = ctx.createLinearGradient(x, height - barHeight, x, height);
-          gradient.addColorStop(0, '#00ffff');
-          gradient.addColorStop(0.5, '#00d4aa');
-          gradient.addColorStop(1, '#006655');
-
-          ctx.fillStyle = gradient;
+          // Use cached gradient for 3D effect
+          ctx.fillStyle = gradientCacheRef.current[i];
           ctx.fillRect(x + 1, height - barHeight, barWidth - 2, barHeight);
 
           // Top highlight
@@ -95,6 +105,8 @@ export const FrequencyBars: React.FC<FrequencyBarsProps> = ({ height = 100 }) =>
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
+      // Disable analysers to save CPU when visualization unmounts
+      engine.disableAnalysers();
     };
   }, [width, height]);
 

@@ -11,6 +11,12 @@ import { getToneEngine } from './engine/ToneEngine'
 // Enable Immer support for Map and Set (required for stores using these)
 enableMapSet();
 
+// Register synth descriptors with SynthRegistry
+// Built-in synths (Tone.js, Sampler, TB-303, Furnace) — eager registration
+import './engine/registry/builtin'
+// SDK synths (MAME, Buzz, VSTBridge, WAM, etc.) — lazy loader registration
+import './engine/registry/sdk'
+
 // Dev tools: synth tester (adds testAllSynths() etc. to window)
 import './utils/synthTester'
 
