@@ -11,6 +11,7 @@ import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 const PREVIEW_NOTE = 'C4';
 const PREVIEW_VELOCITY = 0.3;
 const RELEASE_DELAY_MS = 600;
+const PREVIEW_DEBOUNCE_MS = 400; // Wait 400ms after last change before triggering preview
 
 /** Synth types that don't produce useful audio from a simple note trigger */
 const SKIP_PREVIEW_TYPES: Set<SynthType> = new Set([
@@ -33,6 +34,7 @@ const SKIP_PREVIEW_TYPES: Set<SynthType> = new Set([
 export function useAutoPreview(instrumentId: number, instrument: InstrumentConfig) {
   const isPlayingRef = useRef(false);
   const releaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const triggerPreview = useCallback(() => {
     // Skip for non-tonal types
@@ -40,39 +42,60 @@ export function useAutoPreview(instrumentId: number, instrument: InstrumentConfi
 
     const engine = getToneEngine();
 
-    // Reset the release timer on every call
-    if (releaseTimerRef.current !== null) {
-      clearTimeout(releaseTimerRef.current);
-      releaseTimerRef.current = null;
+    // Skip preview if transport is playing - the actual playing notes will demonstrate the changes
+    if (engine.isPlaying()) return;
+
+    // Clear existing debounce timer
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     }
 
-    // Attack on first call (or if previous note already released)
-    if (!isPlayingRef.current) {
-      isPlayingRef.current = true;
-      engine.triggerPolyNoteAttack(instrumentId, PREVIEW_NOTE, PREVIEW_VELOCITY, instrument);
-    }
-
-    // Schedule release after idle period
-    releaseTimerRef.current = setTimeout(() => {
-      if (isPlayingRef.current) {
-        isPlayingRef.current = false;
-        // Use fresh config from store — parameters may have changed since attack
-        const freshConfig = useInstrumentStore.getState().getInstrument(instrumentId);
-        if (freshConfig) {
-          engine.triggerPolyNoteRelease(instrumentId, PREVIEW_NOTE, freshConfig);
-        }
+    // Debounce: only trigger preview after user stops adjusting for PREVIEW_DEBOUNCE_MS
+    debounceTimerRef.current = setTimeout(() => {
+      // Reset the release timer
+      if (releaseTimerRef.current !== null) {
+        clearTimeout(releaseTimerRef.current);
+        releaseTimerRef.current = null;
       }
-      releaseTimerRef.current = null;
-    }, RELEASE_DELAY_MS);
+
+      // Attack on first call (or if previous note already released)
+      if (!isPlayingRef.current) {
+        isPlayingRef.current = true;
+        engine.triggerPolyNoteAttack(instrumentId, PREVIEW_NOTE, PREVIEW_VELOCITY, instrument);
+      }
+
+      // Schedule release after idle period
+      releaseTimerRef.current = setTimeout(() => {
+        if (isPlayingRef.current) {
+          isPlayingRef.current = false;
+          // Use fresh config from store — parameters may have changed since attack
+          const freshConfig = useInstrumentStore.getState().getInstrument(instrumentId);
+          if (freshConfig) {
+            engine.triggerPolyNoteRelease(instrumentId, PREVIEW_NOTE, freshConfig);
+          }
+        }
+        releaseTimerRef.current = null;
+      }, RELEASE_DELAY_MS);
+
+      debounceTimerRef.current = null;
+    }, PREVIEW_DEBOUNCE_MS);
   }, [instrumentId, instrument]);
 
   // Cleanup on unmount: release any active preview note immediately
   useEffect(() => {
     return () => {
+      // Clear debounce timer
+      if (debounceTimerRef.current !== null) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      // Clear release timer
       if (releaseTimerRef.current !== null) {
         clearTimeout(releaseTimerRef.current);
         releaseTimerRef.current = null;
       }
+      // Release any active preview note
       if (isPlayingRef.current) {
         isPlayingRef.current = false;
         try {
