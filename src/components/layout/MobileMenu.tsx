@@ -50,7 +50,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
       {/* Hamburger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-2 right-2 z-50 p-2 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-lg hover:bg-dark-bgHover transition-colors"
+        className="fixed top-2 right-2 z-[10000] p-2 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-lg hover:bg-dark-bgHover transition-colors"
         aria-label="Menu"
       >
         {isOpen ? <X size={24} /> : <Menu size={24} />}
@@ -61,12 +61,12 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 bg-black/50 z-[9998]"
             onClick={() => setIsOpen(false)}
           />
 
           {/* Menu Panel */}
-          <div className="fixed top-0 right-0 bottom-0 w-80 max-w-[85vw] bg-dark-bgTertiary border-l border-dark-border z-50 overflow-y-auto">
+          <div className="fixed top-0 right-0 bottom-0 w-80 max-w-[85vw] bg-dark-bgTertiary border-l border-dark-border z-[9999] overflow-y-auto">
             {/* Header */}
             <div className="sticky top-0 bg-dark-bgSecondary border-b border-dark-border p-4 flex items-center justify-between">
               <h2 className="font-bold text-lg text-text-primary">Menu</h2>
