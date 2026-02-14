@@ -1,7 +1,7 @@
 export class KeyboardNormalizer {
   static isMac(): boolean {
     // Try modern API first (Chrome 90+, Edge 90+)
-    if ('userAgentData' in navigator && navigator.userAgentData?.platform) {
+    if ('userAgentData' in navigator && navigator.userAgentData) {
       const platform = navigator.userAgentData.platform;
       return platform.toUpperCase().indexOf('MAC') >= 0;
     }
