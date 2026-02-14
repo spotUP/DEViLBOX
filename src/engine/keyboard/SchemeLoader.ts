@@ -1,18 +1,21 @@
-import type { KeyboardScheme } from './types';
+import { KeyboardScheme, PlatformType } from './types';
 
 export class SchemeLoader {
-  static async load(schemeId: string): Promise<KeyboardScheme> {
-    if (!schemeId || typeof schemeId !== 'string') {
-      throw new Error('Invalid scheme ID');
-    }
+  private currentScheme: KeyboardScheme | null = null;
 
-    const response = await fetch(`/keyboard-schemes/${schemeId}.json`);
+  async loadScheme(schemeName: string): Promise<KeyboardScheme> {
+    const response = await fetch(`/keyboard-schemes/${schemeName}.json`);
 
     if (!response.ok) {
-      throw new Error(`Failed to load keyboard scheme: ${schemeId} (HTTP ${response.status})`);
+      throw new Error(`Failed to load scheme: ${schemeName}`);
     }
 
-    const scheme = await response.json();
-    return scheme as KeyboardScheme;
+    this.currentScheme = await response.json();
+    return this.currentScheme;
+  }
+
+  getCommand(keyCombo: string, platform: PlatformType): string | undefined {
+    if (!this.currentScheme) return undefined;
+    return this.currentScheme.platform[platform][keyCombo];
   }
 }

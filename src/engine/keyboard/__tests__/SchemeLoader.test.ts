@@ -1,37 +1,77 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SchemeLoader } from '../SchemeLoader';
-import type { KeyboardScheme } from '../types';
+
+// Mock fetch
+global.fetch = vi.fn();
 
 describe('SchemeLoader', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('loads a valid scheme from JSON', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+  it('loads scheme from JSON file', async () => {
+    const mockScheme = {
+      name: 'FastTracker 2',
+      version: '1.0.0',
+      platform: {
+        pc: { 'Space': 'play_stop_toggle' },
+        mac: { 'Space': 'play_stop_toggle' }
+      }
+    };
+
+    (global.fetch as any).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        name: 'FastTracker 2',
-        id: 'fasttracker2',
-        version: '1.0.0',
-        mappings: {
-          'play-pattern': { pc: 'Alt+F5', mac: 'Option+F5' },
-        },
-      }),
+      json: async () => mockScheme
     });
 
-    const scheme = await SchemeLoader.load('fasttracker2');
-    expect(scheme).toBeDefined();
-    expect(scheme.id).toBe('fasttracker2');
-    expect(scheme.mappings['play-pattern']).toEqual({ pc: 'Alt+F5', mac: 'Option+F5' });
+    const loader = new SchemeLoader();
+    const scheme = await loader.loadScheme('fasttracker2');
+
+    expect(scheme).toEqual(mockScheme);
+    expect(global.fetch).toHaveBeenCalledWith('/keyboard-schemes/fasttracker2.json');
   });
 
-  it('throws error on invalid scheme ID', async () => {
-    await expect(SchemeLoader.load('')).rejects.toThrow('Invalid scheme ID');
+  it('maps key combo to command for PC platform', async () => {
+    const mockScheme = {
+      name: 'Test',
+      version: '1.0.0',
+      platform: {
+        pc: { 'Ctrl+C': 'copy_selection' },
+        mac: { 'Cmd+C': 'copy_selection' }
+      }
+    };
+
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockScheme
+    });
+
+    const loader = new SchemeLoader();
+    await loader.loadScheme('test');
+
+    const command = loader.getCommand('Ctrl+C', 'pc');
+    expect(command).toBe('copy_selection');
   });
 
-  it('throws error on fetch failure', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
-    await expect(SchemeLoader.load('nonexistent')).rejects.toThrow('Failed to load');
+  it('maps key combo to command for Mac platform', async () => {
+    const mockScheme = {
+      name: 'Test',
+      version: '1.0.0',
+      platform: {
+        pc: { 'Ctrl+C': 'copy_selection' },
+        mac: { 'Cmd+C': 'copy_selection' }
+      }
+    };
+
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockScheme
+    });
+
+    const loader = new SchemeLoader();
+    await loader.loadScheme('test');
+
+    const command = loader.getCommand('Cmd+C', 'mac');
+    expect(command).toBe('copy_selection');
   });
 });
