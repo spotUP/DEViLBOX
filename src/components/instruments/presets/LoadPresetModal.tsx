@@ -583,16 +583,15 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
 
         {/* Footer */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-4 py-3 pb-6 sm:pb-3 bg-ft2-header border-t-2 border-ft2-border safe-area-bottom">
-          <div className="flex items-center gap-4">
-            <div className="text-ft2-textDim text-xs font-mono">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 min-w-0">
+            <div className="text-ft2-textDim text-xs font-mono truncate">
               {presetCount} PRESET{presetCount !== 1 ? 'S' : ''} • {browseMode === 'factory' ? activeCategory.toUpperCase() : (userFilterCategory === 'All' ? 'ALL USER' : userFilterCategory.toUpperCase())}
               {(selectedPresetName || selectedUserPresetId) && <span className="ml-2 text-ft2-text hidden sm:inline">• DOUBLE-CLICK TO APPLY</span>}
-              {(selectedPresetName || selectedUserPresetId) && <span className="ml-2 text-ft2-text sm:hidden">• SELECTED</span>}
             </div>
 
-            {/* Jam Indicator */}
+            {/* Jam Indicator - Hidden on mobile */}
             {selectedPreset && (
-              <div className="flex items-center gap-2 px-2 py-1 bg-amber-500/10 border border-amber-500/30 rounded animate-pulse-glow">
+              <div className="hidden sm:flex items-center gap-2 px-2 py-1 bg-amber-500/10 border border-amber-500/30 rounded animate-pulse-glow">
                 <Zap size={12} className="text-amber-400 fill-amber-400" />
                 <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">JAM ACTIVE</span>
               </div>
