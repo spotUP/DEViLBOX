@@ -160,8 +160,9 @@ export function useMobilePatternGestures({
         const absX = Math.abs(deltaX);
         const absY = Math.abs(deltaY);
 
-        // Only trigger scroll if this is primarily vertical movement
-        if (absY > absX && Math.abs(deltaY) > 1) {
+        // Only trigger scroll if this is significantly more vertical than horizontal
+        // Use 1.5x ratio to allow some horizontal drift while scrolling
+        if (absY > absX * 1.5 && Math.abs(deltaY) > 1) {
           onScroll(deltaY);
           touchState.current.lastY = touch.clientY;
         }
