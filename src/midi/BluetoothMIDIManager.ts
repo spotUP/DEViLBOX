@@ -50,7 +50,22 @@ export const isMobileDevice = (): boolean => {
  * Detect if Web MIDI API is supported
  */
 export const isWebMIDISupported = (): boolean => {
-  return typeof navigator !== 'undefined' && 'requestMIDIAccess' in navigator;
+  if (typeof navigator === 'undefined') {
+    console.log('[MIDI] Navigator is undefined (SSR context?)');
+    return false;
+  }
+
+  const hasAPI = 'requestMIDIAccess' in navigator;
+
+  if (!hasAPI) {
+    console.log('[MIDI] Web MIDI API not found in navigator');
+    console.log('[MIDI] Browser:', navigator.userAgent);
+    console.log('[MIDI] Protocol:', window.location.protocol);
+    console.log('[MIDI] Is HTTPS:', window.location.protocol === 'https:');
+    console.log('[MIDI] Is localhost:', window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  }
+
+  return hasAPI;
 };
 
 /**

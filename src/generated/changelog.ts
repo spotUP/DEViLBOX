@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-14T17:24:45.123Z
+ * Generated: 2026-02-14T17:35:24.276Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '529';
-export const BUILD_HASH = 'de46a41';
+export const BUILD_NUMBER = '533';
+export const BUILD_HASH = '89ae711';
 export const BUILD_DATE = '2026-02-14';
 
 // Full semantic version with build number
@@ -33,6 +33,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-14',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Optimize instrument loading and fix unused variable"
+      },
+      {
+        type: 'fix',
+        "description": "Use correct TrackerStore methods for cursor movement"
+      },
+      {
+        type: 'feature',
+        "description": "Add tap-to-cell and improve horizontal swipe gestures"
+      },
+      {
+        type: 'feature',
+        "description": "Add hamburger menu and improve MIDI support"
+      },
       {
         type: 'fix',
         "description": "Convert HARMONIC_PRESETS to InstrumentPreset['config'][] format"
@@ -222,22 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore: remove stale DB303/open303 source copies and outdated docs"
-      },
-      {
-        type: 'fix',
-        "description": "Suppress InvalidStateError in global handler"
-      },
-      {
-        type: 'fix',
-        "description": "Fix duplicate IDs in FT2Toolbar import path"
-      },
-      {
-        type: 'fix',
-        "description": "Ensure audio context is running before loading instruments"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent duplicate instrument IDs and stale instrument warnings"
       }
     ]
   }

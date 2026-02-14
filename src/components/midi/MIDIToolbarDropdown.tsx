@@ -139,6 +139,21 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
               <p className="text-sm text-text-secondary text-center mb-3">
                 Web MIDI API is not supported in this browser.
               </p>
+
+              {/* Safari-specific troubleshooting */}
+              {midiInfo.isIOS && (
+                <div className="text-xs bg-accent-warning/10 border border-accent-warning/30 rounded p-3 mb-3">
+                  <p className="font-bold text-accent-warning mb-2">Safari Troubleshooting:</p>
+                  <ul className="list-disc list-inside space-y-1 text-text-secondary">
+                    <li>Make sure you're using <strong>Safari</strong> (not Chrome on iOS)</li>
+                    <li>Web MIDI requires <strong>HTTPS</strong> - check the URL starts with https://</li>
+                    <li>Disable <strong>Private Browsing Mode</strong> - MIDI doesn't work in private mode</li>
+                    <li>Update to <strong>iOS 15+</strong> for full MIDI support</li>
+                    <li>Check browser console for detailed error messages</li>
+                  </ul>
+                </div>
+              )}
+
               {midiInfo.instructions && (
                 <div className="text-xs text-text-muted text-left bg-dark-bgSecondary rounded p-3 max-h-64 overflow-y-auto whitespace-pre-line">
                   {midiInfo.instructions}
