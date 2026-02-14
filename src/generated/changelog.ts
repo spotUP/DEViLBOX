@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-14T14:53:37.561Z
+ * Generated: 2026-02-14T15:33:34.553Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '509';
-export const BUILD_HASH = 'b8d5af7';
+export const BUILD_NUMBER = '510';
+export const BUILD_HASH = 'ceae8a4';
 export const BUILD_DATE = '2026-02-14';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-14',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Comprehensive performance optimization across rendering, audio, and state management"
+      },
       {
         type: 'feature',
         "description": "Make piano roll/input panel collapsible"
@@ -234,10 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add beat-synced grid glow and worm pulse"
-      },
-      {
-        type: 'feature',
-        "description": "Add music-reactive background tiles"
       }
     ]
   }

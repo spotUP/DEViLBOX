@@ -14,7 +14,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import type { InstrumentConfig, SynthType, EffectConfig } from '@typedefs/instrument';
 import {
   DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
-  DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM
+  DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM,
+  DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
@@ -38,6 +39,7 @@ import { DexedControls } from '../controls/DexedControls';
 import { OBXdControls } from '../controls/OBXdControls';
 import { WAMControls } from '../controls/WAMControls';
 import { VSTBridgePanel } from '../controls/VSTBridgePanel';
+import { HarmonicSynthControls } from '../controls/HarmonicSynthControls';
 import { TonewheelOrganControls } from '../controls/TonewheelOrganControls';
 import { MelodicaControls } from '../controls/MelodicaControls';
 import { VitalControls } from '../controls/VitalControls';
@@ -62,7 +64,7 @@ import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthE
 import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -138,6 +140,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isMAMEType(synthType)) return 'mame';
   if (isDexedType(synthType)) return 'dexed';
   if (isOBXdType(synthType)) return 'obxd';
+  if (synthType === 'HarmonicSynth') return 'harmonicsynth';
   if (synthType === 'WAM') return 'wam';
   if (synthType === 'TonewheelOrgan') return 'tonewheelOrgan';
   if (synthType === 'Melodica') return 'melodica';
@@ -1708,6 +1711,37 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <WAMControls
             instrument={instrument}
             onChange={handleChange}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // HARMONIC SYNTH EDITOR
+  // ============================================================================
+  if (editorMode === 'harmonicsynth') {
+    const harmonicConfig = deepMerge(DEFAULT_HARMONIC_SYNTH_VAL, instrument.harmonicSynth || {});
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+        />
+        <div className="synth-editor-content overflow-y-auto p-3">
+          <HarmonicSynthControls
+            config={harmonicConfig}
+            instrumentId={instrument.id}
+            onChange={(updates) => handleChange({ harmonicSynth: { ...harmonicConfig, ...updates } })}
           />
         </div>
       </div>
