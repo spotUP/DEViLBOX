@@ -9,6 +9,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { ChevronDown, ChevronUp, X, ExternalLink, Undo2 } from 'lucide-react';
 import { JC303StyledKnobPanel } from '@components/instruments/controls/JC303StyledKnobPanel';
 import { PopOutWindow, focusPopout } from '@components/ui/PopOutWindow';
+import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 import type { TB303Config, EffectConfig } from '@typedefs/instrument';
 
 export const TB303KnobPanel: React.FC = memo(() => {
@@ -107,13 +108,15 @@ export const TB303KnobPanel: React.FC = memo(() => {
           fitContent
         >
           <div style={{ background: '#1a1a1a' }}>
-            <JC303StyledKnobPanel
-              key={targetInstrument.id}
-              config={targetInstrument.tb303}
-              onChange={handleConfigChange}
-              onPresetLoad={handlePresetLoad}
-              instrumentId={targetInstrument.id}
-            />
+            <ScrollLockContainer>
+              <JC303StyledKnobPanel
+                key={targetInstrument.id}
+                config={targetInstrument.tb303}
+                onChange={handleConfigChange}
+                onPresetLoad={handlePresetLoad}
+                instrumentId={targetInstrument.id}
+              />
+            </ScrollLockContainer>
           </div>
         </PopOutWindow>
 
@@ -224,14 +227,16 @@ export const TB303KnobPanel: React.FC = memo(() => {
         overflow: 'auto'
       }}
     >
-      <JC303StyledKnobPanel
-        key={targetInstrument.id}
-        config={targetInstrument.tb303}
-        onChange={handleConfigChange}
-        onPresetLoad={handlePresetLoad}
-        instrumentId={targetInstrument.id}
-        headerActions={panelActions}
-      />
+      <ScrollLockContainer>
+        <JC303StyledKnobPanel
+          key={targetInstrument.id}
+          config={targetInstrument.tb303}
+          onChange={handleConfigChange}
+          onPresetLoad={handlePresetLoad}
+          instrumentId={targetInstrument.id}
+          headerActions={panelActions}
+        />
+      </ScrollLockContainer>
     </div>
   );
 });
