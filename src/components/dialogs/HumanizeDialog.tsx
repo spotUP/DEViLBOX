@@ -10,6 +10,7 @@ import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
 import { ModalFooter } from '@components/ui/ModalFooter';
 import { Button } from '@components/ui/Button';
+import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 
 interface HumanizeDialogProps {
   isOpen: boolean;
@@ -29,6 +30,14 @@ export const HumanizeDialog: React.FC<HumanizeDialogProps> = ({ isOpen, onClose 
     humanizeSelection(volumeVariation);
     onClose();
   };
+
+  // Enhanced keyboard controls
+  const { shortcuts } = useDialogKeyboard({
+    isOpen,
+    onConfirm: handleApply,
+    onCancel: onClose,
+    confirmDisabled: !selection,
+  });
 
   return (
     <Modal
@@ -87,14 +96,14 @@ export const HumanizeDialog: React.FC<HumanizeDialogProps> = ({ isOpen, onClose 
 
       <ModalFooter theme="modern" align="right">
         <Button variant="ghost" onClick={onClose}>
-          Cancel
+          Cancel {shortcuts.cancel && <span className="text-xs opacity-70 ml-2">{shortcuts.cancel}</span>}
         </Button>
         <Button
           variant="primary"
           onClick={handleApply}
           disabled={!selection}
         >
-          Apply
+          Apply {shortcuts.confirm && !selection ? null : shortcuts.confirm && <span className="text-xs opacity-70 ml-2">{shortcuts.confirm}</span>}
         </Button>
       </ModalFooter>
     </Modal>

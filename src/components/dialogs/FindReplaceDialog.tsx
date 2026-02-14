@@ -10,6 +10,7 @@ import { ModalHeader } from '@components/ui/ModalHeader';
 import { ModalFooter } from '@components/ui/ModalFooter';
 import { Button } from '@components/ui/Button';
 import { xmNoteToString, xmEffectToString, stringNoteToXM, effectStringToXM } from '@/lib/xmConversions';
+import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 
 interface FindReplaceDialogProps {
   isOpen: boolean;
@@ -138,6 +139,16 @@ export const FindReplaceDialog: React.FC<FindReplaceDialogProps> = ({ isOpen, on
     setMatchCount(null);
   };
 
+  // Enhanced keyboard controls: Enter = Find, Ctrl+Enter = Replace All
+  useDialogKeyboard({
+    isOpen,
+    onConfirm: handleFind, // Enter triggers Find
+    onCancel: onClose,
+    onCtrlEnter: handleReplace, // Ctrl+Enter triggers Replace All
+    confirmDisabled: !findValue,
+    ctrlEnterDisabled: !findValue,
+  });
+
   return (
     <Modal
       isOpen={isOpen}
@@ -229,21 +240,21 @@ export const FindReplaceDialog: React.FC<FindReplaceDialogProps> = ({ isOpen, on
 
       <ModalFooter theme="modern" align="right">
         <Button variant="ghost" onClick={onClose}>
-          Close
+          Close <span className="text-xs opacity-70 ml-2">Esc</span>
         </Button>
         <Button
           variant="default"
           onClick={handleFind}
           disabled={!findValue}
         >
-          Find
+          Find {!findValue ? null : <span className="text-xs opacity-70 ml-2">⏎</span>}
         </Button>
         <Button
           variant="primary"
           onClick={handleReplace}
           disabled={!findValue}
         >
-          Replace All
+          Replace All {!findValue ? null : <span className="text-xs opacity-70 ml-2">Ctrl+⏎</span>}
         </Button>
       </ModalFooter>
     </Modal>
