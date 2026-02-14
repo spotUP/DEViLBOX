@@ -198,6 +198,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   size="sm"
                 />
               </div>
+
+              {/* Mobile MIDI Info */}
+              <div className="pt-3 border-t border-ft2-border/30">
+                <div className="text-ft2-textDim text-[10px] font-mono space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-ft2-highlight">Mobile MIDI:</span>
+                    <span>
+                      {(() => {
+                        const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent) || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+                        const hasWebMIDI = 'requestMIDIAccess' in navigator;
+
+                        if (!hasWebMIDI) return '❌ Not supported';
+                        if (isIOS) return '🎹 iOS (Bluetooth pairing required)';
+                        return '✅ Supported';
+                      })()}
+                    </span>
+                  </div>
+
+                  {/* iOS Bluetooth Instructions */}
+                  {(() => {
+                    const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent) || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+                    if (isIOS) {
+                      return (
+                        <div className="bg-ft2-bg/50 rounded p-2 text-[9px] leading-relaxed">
+                          <div className="font-bold mb-1">To connect Bluetooth MIDI:</div>
+                          <ol className="list-decimal list-inside space-y-0.5 ml-1">
+                            <li>Open Settings → Bluetooth</li>
+                            <li>Turn on your MIDI device</li>
+                            <li>Pair it with your device</li>
+                            <li>Return to DEViLBOX and refresh</li>
+                          </ol>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              </div>
             </div>
           </section>
 
