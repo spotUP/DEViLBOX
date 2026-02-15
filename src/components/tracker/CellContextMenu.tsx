@@ -18,6 +18,7 @@ import {
   Music,
   Link,
   X,
+  Zap,
 } from 'lucide-react';
 import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import { useTrackerStore } from '@stores/useTrackerStore';

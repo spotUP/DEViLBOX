@@ -21,6 +21,7 @@ export interface MenuItem {
   checked?: boolean;
   radio?: boolean;
   danger?: boolean;
+  className?: string;
   submenu?: MenuItemType[];
   onClick?: () => void;
 }
@@ -182,6 +183,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-dark-bgHover'}
                 ${item.danger ? 'text-accent-error hover:bg-accent-error/10' : 'text-text-secondary'}
                 ${activeSubmenu === item.id ? 'bg-dark-bgHover' : ''}
+                ${item.className || ''}
               `}
               onClick={() => {
                 if (item.disabled) return;

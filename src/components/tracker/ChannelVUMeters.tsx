@@ -8,7 +8,7 @@
  */
 
 import React, { useEffect, useRef, memo } from 'react';
-import { useTrackerStore, useThemeStore, useUIStore } from '@stores';
+import { useTrackerStore, useUIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
 
@@ -49,7 +49,7 @@ interface ChannelVUMetersProps {
 }
 
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
-export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWidth: channelWidthProp, scrollLeft: scrollLeftProp = 0 }) => {
+export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ scrollLeft: scrollLeftProp = 0 }) => {
   const { patterns, currentPatternIndex } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex

@@ -20,6 +20,7 @@ import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
+import { haptics } from '@/utils/haptics';
 import { getTrackerReplayer, type DisplayState } from '@engine/TrackerReplayer';
 import * as Tone from 'tone';
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
@@ -144,21 +145,73 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // B/D Animation handlers
   const bdAnimations = useBDAnimations();
 
+  // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
+  const { numChannels, channelOffsets, channelWidths, normalChannelWidth, hasAcid, hasProb } = useMemo(() => {
+    if (!pattern) return { 
+      numChannels: 0, 
+      channelOffsets: [], 
+      channelWidths: [], 
+      normalChannelWidth: 260, 
+      hasAcid: false, 
+      hasProb: false 
+    };
+
+    const nc = pattern.channels.length;
+    const noteWidth = CHAR_WIDTH * 3 + 4;
+    
+    let acid = false;
+    let prob = false;
+    
+    // Scan channels for schema
+    for (const channel of pattern.channels) {
+      if (acid && prob) break;
+      if (!acid && channel.instrumentId !== null) {
+        const inst = instruments.find(i => i.id === channel.instrumentId);
+        if (inst?.synthType === 'TB303' || inst?.synthType === 'Buzz3o3') {
+          acid = true;
+        }
+      }
+      const cell = channel.rows[0];
+      if (cell) {
+        if (cell.flag1 !== undefined || cell.flag2 !== undefined) acid = true;
+        if (cell.probability !== undefined) prob = true;
+      }
+    }
+
+    const paramWidth = CHAR_WIDTH * 10 + 16
+      + (acid ? CHAR_WIDTH * 2 + 8 : 0)
+      + (prob ? CHAR_WIDTH * 2 + 4 : 0)
+      + CHAR_WIDTH * 2 + 4; 
+    const normalW = noteWidth + paramWidth + 20;
+    const collapsedW = 12;
+
+    const offsets: number[] = [];
+    const widths: number[] = [];
+    let currentX = LINE_NUMBER_WIDTH;
+    
+    for (let ch = 0; ch < nc; ch++) {
+      const isCollapsed = pattern.channels[ch]?.collapsed;
+      const chWidth = isCollapsed ? collapsedW : normalW;
+      offsets.push(currentX);
+      widths.push(chWidth);
+      currentX += chWidth;
+    }
+
+    return {
+      numChannels: nc,
+      channelOffsets: offsets,
+      channelWidths: widths,
+      normalChannelWidth: normalW,
+      hasAcid: acid,
+      hasProb: prob
+    };
+  }, [pattern, instruments]);
+
   // Calculate if all channels fit in viewport (for disabling horizontal scroll)
   const allChannelsFit = useMemo(() => {
-    if (!pattern) return true;
-    const noteWidth = CHAR_WIDTH * 3 + 4;
-    const firstCell = pattern.channels[0]?.rows[0];
-    const hasAcid = firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined;
-    const hasProb = firstCell?.probability !== undefined;
-    const paramWidth = CHAR_WIDTH * 10 + 16
-      + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
-      + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
-      + CHAR_WIDTH * 2 + 4;
-    const channelWidth = noteWidth + paramWidth + 20 + 20;
-    const totalWidth = pattern.channels.length * channelWidth;
-    return LINE_NUMBER_WIDTH + totalWidth <= dimensions.width;
-  }, [pattern, dimensions.width]);
+    if (!pattern || numChannels === 0) return true;
+    return (channelOffsets[numChannels - 1] + channelWidths[numChannels - 1]) <= dimensions.width;
+  }, [channelOffsets, channelWidths, numChannels, dimensions.width, pattern]);
 
   // Mobile gesture handlers
   // Vertical swipes move the cursor up/down
@@ -338,7 +391,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     } else {
       // Start new selection or just move cursor
       store.moveCursorToRow(cell.rowIndex);
-      store.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType);
+      store.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any);
       
       // If we move the cursor, start a new selection
       store.startSelection();
@@ -371,7 +424,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     const store = useTrackerStore.getState();
     store.moveCursorToRow(cell.rowIndex);
-    store.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType);
+    store.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any);
     store.startSelection();
     
     haptics.heavy();
@@ -475,6 +528,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       store.moveCursorToChannelAndColumn(channelIndex, columnType as any);
     }
   }, [pattern, isMobile, mobileChannelIndex, cursor.columnType, moveCursorToChannelAndColumn]);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (!containerRef.current) return;
+    
+    // Vertical scroll moves rows
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      const store = useTrackerStore.getState();
+      const rows = Math.round(e.deltaY / 20);
+      if (rows !== 0) {
+        const newRow = Math.max(0, Math.min(pattern.length - 1, cursor.rowIndex + rows));
+        store.moveCursorToRow(newRow);
+      }
+    }
+  }, [pattern.length, cursor.rowIndex]);
 
   // Mobile swipe handlers for pattern data (column navigation)
   const handleDataSwipeLeft = useCallback(() => {
@@ -1151,56 +1218,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       setRenderCounter(c => c + 1);
     }
 
-    // Track widths - must match getParamCanvas layout exactly
     const noteWidth = CHAR_WIDTH * 3 + 4;
-    
-    // Detect flag/prob columns by scanning current pattern data
-    // Also force them visible if the current channel's instrument is a 303
-    let hasAcid = false;
-    let hasProb = false;
-    
-    // Scan all channels for flag/prob data
-    for (const channel of pattern.channels) {
-      if (hasAcid && hasProb) break;
-      
-      // Check if this channel uses a 303 synth
-      if (!hasAcid && channel.instrumentId !== null) {
-        const inst = instruments.find(i => i.id === channel.instrumentId);
-        if (inst?.synthType === 'TB303' || inst?.synthType === 'Buzz3o3') {
-          hasAcid = true;
-        }
-      }
-
-      // Check first row of each channel for schema
-      const cell = channel.rows[0];
-      if (cell) {
-        if (cell.flag1 !== undefined || cell.flag2 !== undefined) hasAcid = true;
-        if (cell.probability !== undefined) hasProb = true;
-      }
-    }
-
-    // Automation: space for curve lane (no hex values shown)
-    const normalParamWidth = CHAR_WIDTH * 10 + 16
-      + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
-      + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
-      + CHAR_WIDTH * 2 + 4; // Space for automation lane
-    const normalChannelWidth = noteWidth + normalParamWidth + 20;
-    const collapsedWidth = 12;
-
-    // Calculate x-offsets for each channel (respecting collapsed state)
-    const channelOffsets: number[] = [];
-    const channelWidths: number[] = [];
-    let currentX = LINE_NUMBER_WIDTH;
-    
-    for (let ch = 0; ch < numChannels; ch++) {
-      const isCollapsed = pattern.channels[ch]?.collapsed;
-      const chWidth = isCollapsed ? collapsedWidth : normalChannelWidth;
-      channelOffsets.push(currentX);
-      channelWidths.push(chWidth);
-      currentX += chWidth;
-    }
-
-    const totalWidth = currentX;
+    const patternLength = pattern.length;
 
     // Clear canvas
     ctx.fillStyle = colors.bg;
@@ -1461,7 +1480,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (!pattern.channels[cursor.channelIndex]?.collapsed) {
       const cursorX = channelOffsets[cursor.channelIndex] + 8 - scrollLeft;
       let cursorOffsetX = 0;
-      let cursorW = CHAR_WIDTH; // Single char width for all except note
+      let caretWidth = CHAR_WIDTH; // Single char width for all except note
 
       // Param canvas layout offsets (matches getParamCanvas layout exactly):
       // inst(2) +4gap  vol(2) +4gap  eff(3) +4gap  eff2(3) +4gap  [accent +4gap  slide +4gap]  [prob(2)]
@@ -1483,7 +1502,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       switch (cursor.columnType) {
         case 'note':
-          cursorW = noteWidth;
+          caretWidth = noteWidth;
           break;
         case 'instrument':
           cursorOffsetX = paramBase + instOff + cursor.digitIndex * CHAR_WIDTH;
@@ -1533,13 +1552,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const caretH = ROW_HEIGHT;
       const caretY = centerLineTop;
       const caretX = cursorX + cursorOffsetX;
-      const caretW = caretW;
 
       // Clear any existing content (antialiased text edges bleed through otherwise)
-      ctx.clearRect(caretX, caretY, caretW, caretH);
+      ctx.clearRect(caretX, caretY, caretWidth, caretH);
       // Draw solid caret background (inverted style)
       ctx.fillStyle = caretBg;
-      ctx.fillRect(caretX, caretY, caretW, caretH);
+      ctx.fillRect(caretX, caretY, caretWidth, caretH);
 
       // Extract and redraw the character(s) under the cursor in white (inverted text)
       const cursorRow = isPlaying ? currentRow : cursor.rowIndex;
