@@ -69,8 +69,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   onAcidGenerator,
   visibleChannels: _visibleChannels, // TODO: Implement mobile channel limiting
   startChannel: _startChannel = 0, // TODO: Implement mobile channel offset
-  onSwipeLeft,
-  onSwipeRight,
+  onSwipeLeft: _onSwipeLeft, // Reserved - using internal handler instead
+  onSwipeRight: _onSwipeRight, // Reserved - using internal handler instead
   onSwipeUp: _onSwipeUp, // Reserved for future use - currently allows native scroll
   onSwipeDown: _onSwipeDown, // Reserved for future use - currently allows native scroll
 }) => {
