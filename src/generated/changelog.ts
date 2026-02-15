@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-14T20:13:00.060Z
+ * Generated: 2026-02-15T03:27:00.608Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '551';
-export const BUILD_HASH = '250d587';
-export const BUILD_DATE = '2026-02-14';
+export const BUILD_NUMBER = '576';
+export const BUILD_HASH = '1c921b7';
+export const BUILD_DATE = '2026-02-15';
 
 // Full semantic version with build number
 export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
@@ -33,6 +33,106 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-14',
     changes: [
+      {
+        type: 'fix',
+        "description": "Add status message and fix copy capitalization in clonePattern"
+      },
+      {
+        type: 'feature',
+        "description": "Add clonePattern command for pattern duplication"
+      },
+      {
+        type: 'fix',
+        "description": "Add defensive checks and use NOTE_OFF constant in playRow"
+      },
+      {
+        type: 'fix',
+        "description": "Rewrite playRow to trigger notes directly via ToneEngine"
+      },
+      {
+        type: 'feature',
+        "description": "Add playRow command for row audition"
+      },
+      {
+        type: 'fix',
+        "description": "Use setCurrentRow instead of non-existent startRow property"
+      },
+      {
+        type: 'fix',
+        "description": "Correct playFromCursor to use cursor.rowIndex and stop-then-restart behavior"
+      },
+      {
+        type: 'feature',
+        "description": "Add playFromCursor command for pattern playback"
+      },
+      {
+        type: 'fix',
+        "description": "Correct modifier order and add Mac Cmd support"
+      },
+      {
+        type: 'feature',
+        "description": "Add KeyComboFormatter for standardized key combo strings"
+      },
+      {
+        type: 'fix',
+        "description": "Add validation and error handling to SchemeLoader"
+      },
+      {
+        type: 'fix',
+        "description": "Correct SchemeLoader schema to match spec (platform-first nesting)"
+      },
+      {
+        type: 'feature',
+        "description": "Add SchemeLoader for keyboard scheme files"
+      },
+      {
+        type: 'fix',
+        "description": "Improve store validation and test coverage"
+      },
+      {
+        type: 'feature',
+        "description": "Add Zustand store for keyboard preferences"
+      },
+      {
+        type: 'feature',
+        "description": "Add CommandRegistry with context awareness"
+      },
+      {
+        type: 'feature',
+        "description": "Add modifier normalization for Mac/PC"
+      },
+      {
+        type: 'fix',
+        "description": "Add TypeScript types for navigator.userAgentData"
+      },
+      {
+        type: 'fix',
+        "description": "Use modern navigator API with fallback for platform detection"
+      },
+      {
+        type: 'feature',
+        "description": "Add platform detection to KeyboardNormalizer"
+      },
+      {
+        type: 'improvement',
+        "description": "Add Phase 1 implementation plan for keyboard navigation"
+      },
+      {
+        type: 'fix',
+        "description": "Update for multi-site server deployment"
+      },
+      {
+        type: 'improvement',
+        "description": "Add comprehensive keyboard navigation design"
+      },
+      {
+        type: 'feature',
+        "description": "Complete Docker containerization"
+      },
+      {
+        type: 'feature',
+        "description": "Add backend API with auth and file management"
+      },
       {
         type: 'feature',
         "description": "Add file browser Load functionality to mobile menu"
@@ -132,106 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Resolve 8 type errors across modular synth and hooks"
-      },
-      {
-        type: 'fix',
-        "description": "Re-enable silent auto-preview for waveform visualization"
-      },
-      {
-        type: 'fix',
-        "description": "Wire up HarmonicSynth parameter updates"
-      },
-      {
-        type: 'fix',
-        "description": "Disable auto-preview - user triggers notes manually"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent auto-preview during playback and debounce when editing"
-      },
-      {
-        type: 'fix',
-        "description": "Update instrument name when changing synth type"
-      },
-      {
-        type: 'fix',
-        "description": "Use SynthRegistry.knows() for lazy-loaded synths"
-      },
-      {
-        type: 'fix',
-        "description": "Add SynthRegistry check for HarmonicSynth and other registry synths"
-      },
-      {
-        type: 'feature',
-        "description": "Add HarmonicSynth to pads category"
-      },
-      {
-        type: 'improvement',
-        "description": "Add comprehensive Plugin SDK documentation"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update changelog and instrument editor"
-      },
-      {
-        type: 'feature',
-        "description": "Register HarmonicSynth in SDK"
-      },
-      {
-        type: 'feature',
-        "description": "Add effect registry descriptors for all effect types"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate EffectRegistry system"
-      },
-      {
-        type: 'feature',
-        "description": "Add HarmonicSynth - additive/spectral synthesis engine"
-      },
-      {
-        type: 'improvement',
-        "description": "Add comprehensive performance optimization summary"
-      },
-      {
-        type: 'improvement',
-        "description": "Integrate requestIdleCallback for idle-time auto-save"
-      },
-      {
-        type: 'improvement',
-        "description": "Comprehensive performance optimization across rendering, audio, and state management"
-      },
-      {
-        type: 'feature',
-        "description": "Make piano roll/input panel collapsible"
-      },
-      {
-        type: 'feature',
-        "description": "Add instrument selector and fix cursor bar styling"
-      },
-      {
-        type: 'fix',
-        "description": "Enable native scrolling and add clipboard actions"
-      },
-      {
-        type: 'feature',
-        "description": "Add swipe gestures for cursor movement and channel switching"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused touch variable in handleKeyTouch"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve remaining TypeScript errors"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript compilation errors in mobile UX code"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: sync remaining changes from previous development"
       }
     ]
   }
