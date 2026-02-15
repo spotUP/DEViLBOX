@@ -6,7 +6,7 @@
 import React from 'react';
 import { Grid3X3, Music2, SlidersHorizontal } from 'lucide-react';
 
-export type MobileTab = 'pattern' | 'instruments' | 'controls';
+export type MobileTab = 'pattern' | 'instruments';
 
 interface MobileTabBarProps {
   activeTab: MobileTab;
@@ -22,7 +22,6 @@ interface TabConfig {
 const tabs: TabConfig[] = [
   { id: 'pattern', label: 'Pattern', icon: <Grid3X3 size={20} /> },
   { id: 'instruments', label: 'Instruments', icon: <Music2 size={20} /> },
-  { id: 'controls', label: 'Controls', icon: <SlidersHorizontal size={20} /> },
 ];
 
 export const MobileTabBar: React.FC<MobileTabBarProps> = ({

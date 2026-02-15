@@ -156,22 +156,17 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
       {/* Input area */}
       {!isCollapsed && (
         <div className="p-2 bg-dark-bgSecondary">
-        {inputMode === 'piano' ? (
           <PianoKeyboard
+            mode={inputMode}
             currentOctave={currentOctave}
             onNotePress={handleNotePress}
+            onHexPress={handleHexPress}
             onNoteOff={handleNoteOff}
             onOctaveDown={handleOctaveDown}
             onOctaveUp={handleOctaveUp}
             onDelete={handleDeletePress}
           />
-        ) : (
-          <HexGrid
-            onHexPress={handleHexPress}
-            onDelete={handleDeletePress}
-          />
-        )}
-      </div>
+        </div>
       )}
 
       {/* Context menu overlay */}
@@ -189,19 +184,26 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
 
 /**
  * PianoKeyboard - Horizontal scrollable piano with octave controls
+ * Supports both Note input and Hex (0-F) input modes
  */
 interface PianoKeyboardProps {
+  mode: 'piano' | 'hex';
   currentOctave: number;
   onNotePress: (semitone: number) => void;
+  onHexPress: (value: number) => void;
   onNoteOff: () => void;
   onOctaveDown: () => void;
   onOctaveUp: () => void;
   onDelete: () => void;
 }
 
+const HEX_VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+
 const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
+  mode,
   currentOctave,
   onNotePress,
+  onHexPress,
   onNoteOff,
   onOctaveDown,
   onOctaveUp,
@@ -209,45 +211,63 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
 }) => {
   // Handle touch with pressure sensitivity (iOS 3D Touch / Force Touch)
   const handleKeyTouch = useCallback((semitone: number, _e: React.TouchEvent) => {
-    // TODO: Implement velocity sensitivity from touch.force (iOS 3D Touch)
-    // const touch = e.touches[0];
-    // const force = touch.force || 1.0;
-    // const velocity = Math.min(127, Math.floor(force * 127));
-    // Pass velocity to onNoteInput when implemented
+    if (mode === 'piano') {
+      onNotePress(semitone);
+    } else {
+      onHexPress(semitone);
+    }
+  }, [mode, onNotePress, onHexPress]);
 
-    // For now, just trigger the note (velocity handling can be added to onNoteInput later)
-    onNotePress(semitone);
-  }, [onNotePress]);
+  const handleKeyClick = useCallback((semitone: number) => {
+    if (mode === 'piano') {
+      onNotePress(semitone);
+    } else {
+      onHexPress(semitone);
+    }
+  }, [mode, onNotePress, onHexPress]);
+
+  // For hex mode, we show 16 semitones (C to D# in next octave)
+  // For piano mode, we show 12 semitones (full octave)
+  const numSemitones = mode === 'hex' ? 16 : 12;
+  const semitones = Array.from({ length: numSemitones }, (_, i) => i);
 
   return (
     <div className="flex flex-col gap-2">
       {/* Octave and utility controls */}
       <div className="flex items-center gap-2">
-        {/* Octave controls */}
-        <div className="flex items-center gap-1 bg-dark-bgTertiary rounded-lg p-1">
-          <button
-            onClick={onOctaveDown}
-            disabled={currentOctave === 0}
-            className="piano-octave-btn"
-            aria-label="Octave down"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <div className="px-3 py-1 min-w-[48px] text-center">
-            <span className="text-xs text-text-muted font-mono">OCT</span>
-            <div className="text-lg font-bold text-accent-primary font-mono">
-              {currentOctave}
+        {/* Octave controls - Only show in piano mode */}
+        {mode === 'piano' ? (
+          <div className="flex items-center gap-1 bg-dark-bgTertiary rounded-lg p-1">
+            <button
+              onClick={onOctaveDown}
+              disabled={currentOctave === 0}
+              className="piano-octave-btn"
+              aria-label="Octave down"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="px-3 py-1 min-w-[48px] text-center">
+              <span className="text-xs text-text-muted font-mono">OCT</span>
+              <div className="text-lg font-bold text-accent-primary font-mono">
+                {currentOctave}
+              </div>
             </div>
+            <button
+              onClick={onOctaveUp}
+              disabled={currentOctave === 7}
+              className="piano-octave-btn"
+              aria-label="Octave up"
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
-          <button
-            onClick={onOctaveUp}
-            disabled={currentOctave === 7}
-            className="piano-octave-btn"
-            aria-label="Octave up"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
+        ) : (
+          <div className="flex items-center px-4 py-2 bg-dark-bgTertiary rounded-lg">
+            <span className="text-xs font-bold text-accent-secondary font-mono tracking-wider">
+              HEX INPUT (0-F)
+            </span>
+          </div>
+        )}
 
         {/* Note-off and delete buttons */}
         <button
@@ -267,24 +287,28 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
         </button>
       </div>
 
-      {/* Piano keys - single octave with scroll */}
+      {/* Piano keys - dynamic layout */}
       <div className="relative h-[120px] bg-dark-bg rounded-lg overflow-hidden">
         {/* White keys layer (flex) */}
         <div className="absolute inset-0 flex">
-          {NOTE_NAMES.map((name, semitone) => {
-            const isBlackKey = BLACK_KEYS.includes(semitone);
-            if (isBlackKey) return null;
+          {semitones.map((semitone) => {
+            const isBlack = BLACK_KEYS.includes(semitone % 12);
+            if (isBlack) return null;
+            
+            const label = mode === 'hex' ? HEX_VALUES[semitone] : NOTE_NAMES[semitone % 12];
+            const octave = mode === 'hex' ? '' : currentOctave;
+
             return (
               <button
                 key={semitone}
                 onTouchStart={(e) => handleKeyTouch(semitone, e)}
-                onClick={() => onNotePress(semitone)}
+                onClick={() => handleKeyClick(semitone)}
                 className="piano-key piano-key-white"
-                aria-label={`${name}${currentOctave}`}
+                aria-label={mode === 'hex' ? `Hex ${label}` : `${label}${octave}`}
               >
                 <span className="piano-key-label">
-                  {name}
-                  <span className="text-[10px] opacity-60">{currentOctave}</span>
+                  {label}
+                  <span className="text-[10px] opacity-60">{octave}</span>
                 </span>
               </button>
             );
@@ -293,76 +317,39 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
         
         {/* Black keys layer (absolute) */}
         <div className="absolute inset-0 pointer-events-none">
-          {NOTE_NAMES.map((name, semitone) => {
-            const isBlackKey = BLACK_KEYS.includes(semitone);
-            if (!isBlackKey) return null;
+          {semitones.map((semitone) => {
+            const isBlack = BLACK_KEYS.includes(semitone % 12);
+            if (!isBlack) return null;
+
             // Calculate position based on white key positions
-            const whiteKeysBefore = NOTE_NAMES.slice(0, semitone).filter((_, i) => !BLACK_KEYS.includes(i)).length;
-            const whiteKeyWidth = 100 / 7; // 7 white keys per octave
-            const leftPos = (whiteKeysBefore * whiteKeyWidth) - 3; // Position between white keys
+            const octaveOffset = Math.floor(semitone / 12);
+            const noteInOctave = semitone % 12;
+            const whiteKeysBeforeInOctave = NOTE_NAMES.slice(0, noteInOctave).filter((_, i) => !BLACK_KEYS.includes(i)).length;
+            const totalWhiteKeys = mode === 'hex' ? 9 : 7; // 9 white keys for 16 semitones, 7 for 12
+            const whiteKeyWidth = 100 / totalWhiteKeys;
+            const leftPos = ((octaveOffset * 7 + whiteKeysBeforeInOctave) * whiteKeyWidth) - (whiteKeyWidth * 0.25);
+            
+            const label = mode === 'hex' ? HEX_VALUES[semitone] : NOTE_NAMES[semitone % 12];
+            const octave = mode === 'hex' ? '' : currentOctave;
+
             return (
               <button
                 key={semitone}
                 onTouchStart={(e) => handleKeyTouch(semitone, e)}
-                onClick={() => onNotePress(semitone)}
+                onClick={() => handleKeyClick(semitone)}
                 className="piano-key-black pointer-events-auto"
-                style={{ left: `${leftPos}%` }}
-                aria-label={`${name}${currentOctave}`}
+                style={{ left: `${leftPos}%`, width: `${whiteKeyWidth * 0.6}%` }}
+                aria-label={mode === 'hex' ? `Hex ${label}` : `${label}${octave}`}
               >
                 <span className="piano-key-label">
-                  {name}
-                  <span className="text-[10px] opacity-60">{currentOctave}</span>
+                  {label}
+                  <span className="text-[10px] opacity-60">{octave}</span>
                 </span>
               </button>
             );
           })}
         </div>
       </div>
-    </div>
-  );
-};
-
-/**
- * HexGrid - 4x4 grid for hexadecimal input (0-F)
- */
-interface HexGridProps {
-  onHexPress: (value: number) => void;
-  onDelete: () => void;
-}
-
-const HexGrid: React.FC<HexGridProps> = ({ onHexPress, onDelete }) => {
-  const hexValues = useMemo(() => {
-    const values = [];
-    for (let i = 0; i < 16; i++) {
-      values.push(i.toString(16).toUpperCase());
-    }
-    return values;
-  }, []);
-
-  return (
-    <div className="flex flex-col gap-2">
-      {/* Hex grid - 4x4 */}
-      <div className="grid grid-cols-4 gap-2">
-        {hexValues.map((hex, index) => (
-          <button
-            key={hex}
-            onClick={() => onHexPress(index)}
-            className="hex-btn"
-            aria-label={`Hex ${hex}`}
-          >
-            {hex}
-          </button>
-        ))}
-      </div>
-
-      {/* Delete button */}
-      <button
-        onClick={onDelete}
-        className="hex-btn hex-btn-delete w-full"
-      >
-        <Delete size={20} />
-        <span className="text-sm">DELETE</span>
-      </button>
     </div>
   );
 };
