@@ -146,7 +146,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-dark-bg">
       {/* Fixed header with pattern info and transport */}
-      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-b border-dark-border safe-top">
+      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-b border-dark-border safe-area-top">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {/* Transport controls - Moved to left to avoid hamburger menu overlap */}
           <div className="flex items-center gap-1 flex-shrink-0 mr-1">
@@ -225,7 +225,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
       </div>
 
       {/* Main content area - Pattern/Instruments/Controls tabs */}
-      <div className="flex-1 min-h-0 overflow-hidden" style={{ paddingBottom: activeTab === 'pattern' ? `calc(${isInputCollapsed ? '56px' : '180px'} + env(safe-area-inset-bottom, 0))` : 'calc(56px + env(safe-area-inset-bottom, 0))' }}>
+      <div className="flex-1 min-h-0 overflow-hidden" style={{ paddingBottom: activeTab === 'pattern' ? `calc(${isInputCollapsed ? '56px' : '180px'} + env(safe-area-inset-bottom, 0px))` : 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
         {activeTab === 'pattern' && (
           <div className="h-full flex flex-col">
             {/* Pattern editor canvas - scrollable */}

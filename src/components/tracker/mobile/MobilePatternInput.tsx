@@ -107,7 +107,7 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
   }, []);
 
   return (
-    <div className="mobile-pattern-input safe-bottom">
+    <div className="mobile-pattern-input safe-area-bottom">
       {/* Mode indicator bar */}
       <div className="flex items-center justify-between px-3 py-2 bg-dark-bgTertiary border-t border-dark-border">
         <div className="flex items-center gap-2">
@@ -389,7 +389,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full bg-dark-bgSecondary rounded-t-2xl p-4 safe-bottom"
+        className="w-full bg-dark-bgSecondary rounded-t-2xl p-4 safe-area-bottom"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col gap-2">

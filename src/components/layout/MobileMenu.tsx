@@ -56,7 +56,11 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
       {/* Hamburger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-2 right-2 z-[10000] p-2 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-lg hover:bg-dark-bgHover transition-colors"
+        className="fixed z-[10000] p-2 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-lg hover:bg-dark-bgHover transition-colors"
+        style={{
+          top: 'calc(0.5rem + env(safe-area-inset-top, 0px))',
+          right: 'calc(0.5rem + env(safe-area-inset-right, 0px))'
+        }}
         aria-label="Menu"
       >
         {isOpen ? <X size={24} /> : <Menu size={24} />}
