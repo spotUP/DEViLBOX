@@ -185,7 +185,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       + (acid ? CHAR_WIDTH * 2 + 8 : 0)
       + (prob ? CHAR_WIDTH * 2 + 4 : 0)
       + CHAR_WIDTH * 2 + 4; 
-    const normalW = noteWidth + paramWidth + 40; // +20 padding + 20 automation visual space
+    const normalW = noteWidth + paramWidth + 60; // Increased padding for wider header (was 40)
     const collapsedW = 12;
 
     const offsets: number[] = [];
@@ -1903,27 +1903,28 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   return (
                     <div
                       key={channel.id}
-                      className={`flex-shrink-0 flex items-center justify-between gap-2 px-3 py-1.5
+                      className={`flex-shrink-0 flex items-center justify-between gap-1 px-2 py-1
                         border-r border-dark-border transition-colors relative
                         ${channel.muted ? 'opacity-50' : ''}
                         ${channel.solo ? 'bg-accent-primary/10' : ''}`}
                       style={{
                         width: channelWidth,
                         backgroundColor: channel.color ? `${channel.color}15` : undefined,
-                        boxShadow: channel.color ? `inset 3px 0 0 ${channel.color}` : undefined,
+                        boxShadow: channel.color ? `inset 2px 0 0 ${channel.color}` : undefined,
                       }}
                     >
-                      <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 overflow-hidden flex-1 min-w-0">
                         <span
-                          className="font-bold font-mono text-sm flex-shrink-0"
+                          className="font-bold font-mono text-[11px] flex-shrink-0 opacity-80"
                           style={{ color: channel.color || 'var(--color-accent)' }}
                         >
                           {(idx + 1).toString().padStart(2, '0')}
                         </span>
                         <input
                           type="text"
-                          className="bg-transparent border-none outline-none font-mono text-[10px] text-text-muted hover:text-text-primary focus:text-accent-primary transition-colors min-w-0 flex-1 overflow-hidden text-ellipsis uppercase px-0"
-                          value={channel.name || `Channel ${idx + 1}`}
+                          className="bg-transparent border-none outline-none font-mono text-[10px] font-bold text-text-primary focus:text-accent-primary transition-colors min-w-0 flex-1 overflow-hidden text-ellipsis uppercase px-0 placeholder:text-text-muted/50"
+                          value={channel.name || ''}
+                          placeholder={`CH${idx + 1}`}
                           onChange={(e) => updateChannelName(idx, e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -1932,12 +1933,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                           }}
                           title={`Click to rename channel (Short: ${channel.shortName || (idx + 1)})`}
                         />
-                        <div className="flex-shrink-0 ml-auto">
+                        <div className="flex-shrink-0">
                           <ChannelVUMeter level={trigger.level} isActive={trigger.triggered} />
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
                         <ChannelContextMenu
                           channelIndex={idx}
                           channel={channel}
@@ -1991,15 +1992,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                         >
                           <Headphones size={12} />
                         </button>
-                        {pattern.channels.length > 1 && (
-                          <button
-                            onClick={() => removeChannel(idx)}
-                            className="p-1 rounded text-text-muted hover:text-accent-error hover:bg-dark-bgHover transition-colors"
-                            title="Remove Channel"
-                          >
-                            <Minus size={12} />
-                          </button>
-                        )}
                       </div>
                     </div>
                   );
