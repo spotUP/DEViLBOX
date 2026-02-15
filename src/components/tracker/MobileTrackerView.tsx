@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { MobileTabBar, type MobileTab } from '@components/layout/MobileTabBar';
+import { MobileTabBar } from '@components/layout/MobileTabBar';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { InstrumentList } from '@components/instruments/InstrumentList';
 import { TB303KnobPanel } from './TB303KnobPanel';
