@@ -170,7 +170,7 @@ interface TrackerStore {
   // Advanced editing
   transposeSelection: (semitones: number, currentInstrumentOnly?: boolean) => void;
   remapInstrument: (oldId: number, newId: number, scope: 'block' | 'track' | 'pattern' | 'song') => void;
-  interpolateSelection: (column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan', startValue: number, endValue: number, curve?: 'linear' | 'log' | 'exp' | 'scurve') => void;
+  interpolateSelection: (column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'effParam' | 'effParam2', startValue: number, endValue: number, curve?: 'linear' | 'log' | 'exp' | 'scurve') => void;
   humanizeSelection: (volumeVariation: number) => void;
   strumSelection: (tickDelay: number, direction: 'up' | 'down') => void;
   legatoSelection: () => void;

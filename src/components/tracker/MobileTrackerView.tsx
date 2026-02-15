@@ -10,7 +10,7 @@ import { InstrumentList } from '@components/instruments/InstrumentList';
 import { TB303KnobPanel } from './TB303KnobPanel';
 import { FT2Toolbar } from './FT2Toolbar';
 import { MobilePatternInput } from './mobile/MobilePatternInput';
-import { Play, Square, ChevronLeft, ChevronRight, Settings, Music2, SlidersHorizontal } from 'lucide-react';
+import { Play, Square, ChevronLeft, ChevronRight, Music2, SlidersHorizontal } from 'lucide-react';
 import { useTransportStore, useTrackerStore, useInstrumentStore } from '@stores';
 import { useOrientation } from '@/hooks/useOrientation';
 import { haptics } from '@/utils/haptics';

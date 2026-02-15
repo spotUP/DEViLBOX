@@ -145,6 +145,7 @@ interface FT2ToolbarProps {
   showPatterns?: boolean;
   showMasterFX?: boolean;
   showInstrumentFX?: boolean;
+  compact?: boolean;
 }
 
 export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
@@ -155,6 +156,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   onShowPatternOrder,
   onShowDrumpads,
   showMasterFX,
+  compact: compactProp,
 }) => {
   const {
     patterns,
@@ -198,7 +200,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const { isDirty, setMetadata, metadata } = useProjectStore();
   const { instruments, loadInstruments, updateInstrument, addInstrument, reset: resetInstruments } = useInstrumentStore();
   const { masterEffects } = useAudioStore();
-  const { compactToolbar, toggleCompactToolbar, oscilloscopeVisible } = useUIStore();
+  const { compactToolbar: compactState, toggleCompactToolbar, oscilloscopeVisible } = useUIStore();
+  const compactToolbar = compactProp ?? compactState;
   const { curves, reset: resetAutomation } = useAutomationStore();
   const addTab = useTabsStore((state) => state.addTab);
 
