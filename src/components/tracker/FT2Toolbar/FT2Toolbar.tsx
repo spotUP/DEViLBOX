@@ -706,7 +706,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               <Button variant="ghost" size="sm" onClick={onShowDrumpads}>Pads</Button>                        
               <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX}>Master FX</Button>
               
-              <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('chip-effects')}>Cmds</Button>
+              <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('chip-effects')}>Reference</Button>
               <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('shortcuts')}>Help</Button>
               <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>Settings</Button>
               <Button
