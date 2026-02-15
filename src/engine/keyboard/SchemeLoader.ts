@@ -1,4 +1,5 @@
-import { KeyboardScheme, PlatformType } from './types';
+import type { KeyboardScheme, PlatformType } from './types';
+import { normalizeUrl } from '@/utils/urlUtils';
 
 /**
  * SchemeLoader - Loads and manages keyboard shortcut schemes
@@ -41,11 +42,12 @@ export class SchemeLoader {
    * @throws Error if scheme not found or invalid format
    */
   async loadScheme(schemeName: string): Promise<KeyboardScheme> {
-    const response = await fetch(`/keyboard-schemes/${schemeName}.json`);
+    const path = normalizeUrl(`/keyboard-schemes/${schemeName}.json`);
+    const response = await fetch(path);
 
     if (!response.ok) {
       throw new Error(
-        `Failed to load scheme '${schemeName}': ${response.status} ${response.statusText}`
+        `Failed to load scheme '${schemeName}': ${response.status} ${response.statusText} (at ${path})`
       );
     }
 
@@ -56,7 +58,7 @@ export class SchemeLoader {
     }
 
     this.currentScheme = data;
-    return this.currentScheme;
+    return data;
   }
 
   /**

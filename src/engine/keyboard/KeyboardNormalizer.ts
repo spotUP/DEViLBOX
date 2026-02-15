@@ -1,4 +1,4 @@
-import { NormalizedKeyEvent } from './types';
+import type { NormalizedKeyEvent } from './types';
 
 export class KeyboardNormalizer {
   static isMac(): boolean {

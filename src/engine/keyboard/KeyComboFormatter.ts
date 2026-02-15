@@ -1,4 +1,4 @@
-import { NormalizedKeyEvent } from './types';
+import type { NormalizedKeyEvent } from './types';
 
 /**
  * KeyComboFormatter - Converts keyboard events to standardized combo strings
