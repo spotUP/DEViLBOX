@@ -372,14 +372,13 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
                     onClick={() => {
                       onClose();
                       // Trigger Help Modal with Chip tab
-                      // We can use a custom event or store if we want to be more direct
                       const event = new KeyboardEvent('keydown', { key: '?', shiftKey: true });
                       window.dispatchEvent(event);
                     }}
                     className="px-3 py-1.5 text-xs bg-pink-700 hover:bg-pink-600 text-white rounded flex items-center justify-center gap-1 transition-colors"
                   >
                     <Sliders size={12} />
-                    Chip Effects
+                    Chip Reference
                   </button>
                 </div>
               </div>
