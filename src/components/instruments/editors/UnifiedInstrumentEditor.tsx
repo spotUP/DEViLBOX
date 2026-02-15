@@ -27,6 +27,7 @@ import { TB303Controls } from '../controls/TB303Controls';
 import { FurnaceControls } from '../controls/FurnaceControls';
 import { BuzzmachineControls } from '../controls/BuzzmachineControls';
 import { SampleControls } from '../controls/SampleControls';
+import { DrumKitEditor } from './DrumKitEditor';
 import { DubSirenControls } from '../controls/DubSirenControls';
 import { SpaceLaserControls } from '../controls/SpaceLaserControls';
 import { V2Controls } from '../controls/V2Controls';
@@ -767,9 +768,35 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   }
 
   // ============================================================================
-  // SAMPLE EDITOR
+  // SAMPLE EDITOR (including DrumKit)
   // ============================================================================
   if (editorMode === 'sample') {
+    // Special case: DrumKit instruments use the DrumKitEditor
+    if (instrument.synthType === 'DrumKit') {
+      return (
+        <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515] h-full">
+          {/* Use common header but hide viz */}
+          <EditorHeader
+            instrument={instrument}
+            onChange={handleChange}
+            vizMode={vizMode}
+            onVizModeChange={setVizMode}
+            hideVisualization={true}
+            showHelpButton={false}
+          />
+
+          {/* DrumKit Editor (full height) */}
+          <div className="flex-1 overflow-hidden">
+            <DrumKitEditor
+              instrument={instrument}
+              onUpdate={handleChange}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Regular sample editor for other sample-based instruments
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         {/* Use common header but hide viz (sample editor has waveform) */}
