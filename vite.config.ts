@@ -35,7 +35,9 @@ function generateVersionFile() {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), generateVersionFile()],
-  base: process.env.VITE_BASE_URL || '/',
+  // Force root base path for subdomain deployment (Docker/live site)
+  // GitHub Pages deployment uses separate workflow with --base flag
+  base: '/',
   test: {
     // Vitest configuration
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
