@@ -156,6 +156,7 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
                     <li>Web MIDI requires <strong>HTTPS</strong> - check the URL starts with https://</li>
                     <li>Disable <strong>Private Browsing Mode</strong> - MIDI doesn't work in private mode</li>
                     <li>Check <strong>Settings → Safari → Advanced → Experimental Features</strong> and ensure 'Web MIDI API' is ON</li>
+                    <li><strong>Home Screen Apps (PWA):</strong> Apple sometimes disables MIDI for apps saved to the home screen. Try using the regular Safari browser tab.</li>
                     <li>Update to <strong>iOS 15+</strong> for full MIDI support</li>
                     <li>Check browser console for detailed error messages</li>
                   </ul>
