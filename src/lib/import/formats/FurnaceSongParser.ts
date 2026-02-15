@@ -177,6 +177,38 @@ const DIV_ELEMENT_GROOVE = 0x0a;
  * Maps Furnace file system IDs to the FurnaceChipEngine enum values
  * Used to set the correct chipType when converting instruments
  */
+/**
+ * Chip synth platform IDs that use native Furnace octave numbering.
+ * These do NOT need the -24 octave offset used for Amiga sample playback.
+ * The Furnace WASM engine handles their native octave range directly.
+ */
+const CHIP_SYNTH_IDS = new Set([
+  0x03,       // SN76489/SMS/PSG
+  0x04,       // Game Boy
+  0x05,       // PC Engine
+  0x06,       // NES
+  0x07,       // C64 8580
+  0x47,       // C64 6581
+  0xf0,       // SID2
+  0x80,       // AY-3-8910
+  0x82,       // YM2151/OPM
+  0x83,       // YM2612/OPN2
+  0x84,       // TIA
+  0x87,       // SNES
+  0x88,       // VRC6
+  0x89,       // OPLL
+  0x8a,       // FDS
+  0x8d,       // YM2203/OPN
+  0x8e,       // YM2608/OPNA
+  0x8f,       // OPL
+  0x90,       // OPL2
+  0x91,       // OPL3
+  0x97,       // SAA1099
+  0x98,       // OPZ
+  0xa0,       // YM2612 ext
+  0x02,       // Genesis (compound)
+]);
+
 const CHIP_ID_TO_ENGINE_CHIP: Record<number, number> = {
   0x02: 0,    // Genesis (compound) → OPN2
   0x03: 3,    // SN76489/SMS → PSG
@@ -1502,6 +1534,8 @@ function parseInstrument(reader: BinaryReader): FurnaceInstrument {
             s: (adsr2 >> 4) & 0x0F, r: adsr2 & 0x0F,
             duty, cut: cutRes & 0xFFF, res, resetDuty,
           };
+          // DEBUG: Log raw C64 parse for debugging silent instruments
+          console.log(`[FurnaceParser] Inst "${inst.name}" C64 PARSED: c64f1=0x${c64f1.toString(16)} c64f2=0x${c64f2.toString(16)} tri=${inst.c64.triOn} saw=${inst.c64.sawOn} pulse=${inst.c64.pulseOn} noise=${inst.c64.noiseOn} ADSR=${inst.c64.a}/${inst.c64.d}/${inst.c64.s}/${inst.c64.r} duty=${duty}`);
           break;
         }
         case 'SN': {
@@ -1627,18 +1661,187 @@ function parseInstrument(reader: BinaryReader): FurnaceInstrument {
       reader.seek(featEnd);
     }
   } else if (magic === 'INST') {
-    // Old instrument format
-    reader.readUint32(); // Block size
-    reader.readUint16(); // insVersion (consumed, not used)
+    // Old instrument format — Reference: instrument.cpp:2878-3200 (readInsDataOld)
+    // In the old format, ALL sections are read regardless of instrument type!
+    reader.readUint32(); // Block size (unused)
+    const instVersion = reader.readUint16(); // insVersion
     inst.type = reader.readUint8();
     reader.readUint8(); // reserved
     inst.name = readString(reader);
 
-    // Parse based on instrument type
-    if (inst.type === 0 || inst.type === 1) {
-      // FM instrument
-      inst.fm = parseFMDataOld(reader);
+    console.log(`[FurnaceParser] INST old format: name="${inst.name}" type=${inst.type} version=${instVersion}`);
+
+    // FM data — ALWAYS read (8 header bytes + 4 operators × 32 bytes = 136 bytes)
+    // Read header bytes without storing (we don't use FM data for C64 instruments)
+    reader.readUint8(); // fmAlg
+    reader.readUint8(); // fmFb
+    reader.readUint8(); // fmFms
+    reader.readUint8(); // fmAms
+    reader.readUint8(); // fmOps
+    reader.readUint8(); // fmOpllPreset
+    reader.skip(2); // reserved
+
+    // 4 operators, each 32 bytes
+    for (let j = 0; j < 4; j++) {
+      // am,ar,dr,mult,rr,sl,tl,dt2,rs,dt,d2r,ssgEnv = 12 bytes
+      reader.skip(12);
+      // dam,dvb,egt,ksl,sus,vib,ws,ksr = 8 bytes
+      reader.skip(8);
+      // enable (1) + kvs (1) + 10 reserved = 12 bytes
+      reader.skip(12);
     }
+
+    // GB data — ALWAYS read (4 bytes)
+    reader.readUint8(); // gbEnvVol
+    reader.readUint8(); // gbEnvDir
+    reader.readUint8(); // gbEnvLen
+    reader.readUint8(); // gbSoundLen
+
+    // C64 data — ALWAYS read (24 bytes)  ← THE KEY FIX!
+    // Reference: instrument.cpp:2951-2973
+    const c64TriOn = reader.readUint8() !== 0;
+    const c64SawOn = reader.readUint8() !== 0;
+    const c64PulseOn = reader.readUint8() !== 0;
+    const c64NoiseOn = reader.readUint8() !== 0;
+    const c64A = reader.readUint8();
+    const c64D = reader.readUint8();
+    const c64S = reader.readUint8();
+    const c64R = reader.readUint8();
+    const c64Duty = reader.readUint16(); // 2 bytes
+    const c64RingMod = reader.readUint8() !== 0;
+    const c64OscSync = reader.readUint8() !== 0;
+    const c64ToFilter = reader.readUint8() !== 0;
+    const c64InitFilter = reader.readUint8() !== 0;
+    reader.readUint8(); // c64VolIsCutoff (unused)
+    const c64Res = reader.readUint8();
+    const c64Lp = reader.readUint8() !== 0;
+    const c64Bp = reader.readUint8() !== 0;
+    const c64Hp = reader.readUint8() !== 0;
+    const c64Ch3Off = reader.readUint8() !== 0;
+    const c64Cut = reader.readUint16(); // 2 bytes
+    const c64DutyIsAbs = reader.readUint8() !== 0;
+    const c64FilterIsAbs = reader.readUint8() !== 0;
+
+    // Store C64 data on the instrument — this was MISSING before!
+    inst.c64 = {
+      triOn: c64TriOn,
+      sawOn: c64SawOn,
+      pulseOn: c64PulseOn,
+      noiseOn: c64NoiseOn,
+      a: c64A,
+      d: c64D,
+      s: c64S,
+      r: c64R,
+      duty: c64Duty,
+      ringMod: c64RingMod,
+      oscSync: c64OscSync,
+      toFilter: c64ToFilter,
+      initFilter: c64InitFilter,
+      res: c64Res,
+      lp: c64Lp,
+      bp: c64Bp,
+      hp: c64Hp,
+      ch3off: c64Ch3Off,
+      cut: c64Cut,
+      dutyIsAbs: c64DutyIsAbs,
+      filterIsAbs: c64FilterIsAbs,
+      noTest: false,
+      resetDuty: false,
+    };
+
+    console.log(`[FurnaceParser] INST C64 PARSED: tri=${c64TriOn} saw=${c64SawOn} pulse=${c64PulseOn} noise=${c64NoiseOn} ADSR=${c64A}/${c64D}/${c64S}/${c64R} duty=${c64Duty}`);
+
+    // Amiga data — ALWAYS read (16 bytes)
+    // Reference: instrument.cpp:2977-2987
+    const amigaInitSample = reader.readInt16();
+    reader.readUint8(); // amigaUseWave (unused)
+    reader.readUint8(); // amigaWaveLen (unused)
+    reader.skip(12); // reserved
+
+    if (amigaInitSample >= 0) {
+      inst.samples.push(amigaInitSample);
+    }
+
+    // Macro lengths — Reference: instrument.cpp:2990-3000
+    const volMacroLen = reader.readInt32();
+    const arpMacroLen = reader.readInt32();
+    const dutyMacroLen = reader.readInt32();
+    const waveMacroLen = reader.readInt32();
+    let pitchMacroLen = 0, ex1MacroLen = 0, ex2MacroLen = 0, ex3MacroLen = 0;
+    if (instVersion >= 17) {
+      pitchMacroLen = reader.readInt32();
+      ex1MacroLen = reader.readInt32();
+      ex2MacroLen = reader.readInt32();
+      ex3MacroLen = reader.readInt32();
+    }
+
+    // Macro loops — Reference: instrument.cpp:3002-3012
+    const volMacroLoop = reader.readInt32();
+    const arpMacroLoop = reader.readInt32();
+    const dutyMacroLoop = reader.readInt32();
+    const waveMacroLoop = reader.readInt32();
+    let pitchMacroLoop = -1, ex1MacroLoop = -1, ex2MacroLoop = -1, ex3MacroLoop = -1;
+    if (instVersion >= 17) {
+      pitchMacroLoop = reader.readInt32();
+      ex1MacroLoop = reader.readInt32();
+      ex2MacroLoop = reader.readInt32();
+      ex3MacroLoop = reader.readInt32();
+    }
+
+    // Arp mode and old heights — Reference: instrument.cpp:3014-3017
+    const arpMode = reader.readUint8();
+    reader.skip(3); // oldVolHeight, oldDutyHeight, oldWaveHeight
+
+    // Macro values — Reference: instrument.cpp:3018-3025 (READ_MACRO_VALS)
+    const readMacroVals = (len: number): number[] => {
+      const vals: number[] = [];
+      for (let i = 0; i < len; i++) {
+        vals.push(reader.readInt32());
+      }
+      return vals;
+    };
+
+    const volMacroVals = readMacroVals(volMacroLen);
+    const arpMacroVals = readMacroVals(arpMacroLen);
+    const dutyMacroVals = readMacroVals(dutyMacroLen);
+    const waveMacroVals = readMacroVals(waveMacroLen);
+
+    if (instVersion >= 17) {
+      const pitchMacroVals = readMacroVals(pitchMacroLen);
+      const ex1MacroVals = readMacroVals(ex1MacroLen);
+      const ex2MacroVals = readMacroVals(ex2MacroLen);
+      const ex3MacroVals = readMacroVals(ex3MacroLen);
+
+      // Store extended macros
+      if (pitchMacroLen > 0) {
+        inst.macros.push({ code: 4, length: pitchMacroLen, loop: pitchMacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: pitchMacroVals });
+      }
+      if (ex1MacroLen > 0) {
+        inst.macros.push({ code: 5, length: ex1MacroLen, loop: ex1MacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: ex1MacroVals });
+      }
+      if (ex2MacroLen > 0) {
+        inst.macros.push({ code: 6, length: ex2MacroLen, loop: ex2MacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: ex2MacroVals });
+      }
+      if (ex3MacroLen > 0) {
+        inst.macros.push({ code: 7, length: ex3MacroLen, loop: ex3MacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: ex3MacroVals });
+      }
+    }
+
+    // Store standard macros
+    if (volMacroLen > 0) {
+      inst.macros.push({ code: 0, length: volMacroLen, loop: volMacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: volMacroVals });
+    }
+    if (arpMacroLen > 0) {
+      inst.macros.push({ code: 1, length: arpMacroLen, loop: arpMacroLoop, release: -1, mode: arpMode, type: 0, delay: 0, speed: 1, data: arpMacroVals });
+    }
+    if (dutyMacroLen > 0) {
+      inst.macros.push({ code: 2, length: dutyMacroLen, loop: dutyMacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: dutyMacroVals });
+    }
+    if (waveMacroLen > 0) {
+      inst.macros.push({ code: 3, length: waveMacroLen, loop: waveMacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: waveMacroVals });
+    }
+
+    console.log(`[FurnaceParser] INST parsed ${inst.macros.length} macros, waveMacro: len=${waveMacroLen} vals=[${waveMacroVals.slice(0, 5).join(',')}${waveMacroLen > 5 ? '...' : ''}]`);
   } else {
     throw new Error(`Unknown instrument format: "${magic}"`);
   }
@@ -1718,57 +1921,6 @@ function parseFMData(reader: BinaryReader): FurnaceConfig {
       ws: damDt2Ws & 0x07,
     };
 
-    config.operators.push(op);
-  }
-
-  return config;
-}
-
-/**
- * Parse FM data (old format)
- */
-function parseFMDataOld(reader: BinaryReader): FurnaceConfig {
-  const config: FurnaceConfig = {
-    ...DEFAULT_FURNACE,
-    operators: [],
-    macros: [],
-    opMacros: [],
-    wavetables: [],
-  };
-
-  config.algorithm = reader.readUint8() & 0x07;
-  config.feedback = reader.readUint8() & 0x07;
-  config.fms = reader.readUint8() & 0x07;
-  config.ams = reader.readUint8() & 0x03;
-
-  const opCount = reader.readUint8();
-  config.ops = opCount;
-  config.opllPreset = reader.readUint8() & 0x1F;
-  reader.skip(2); // reserved
-
-  for (let i = 0; i < 4; i++) {
-    const op: FurnaceOperatorConfig = {
-      enabled: i < opCount,
-      am: reader.readUint8() !== 0,
-      ar: reader.readUint8(),
-      dr: reader.readUint8(),
-      mult: reader.readUint8(),
-      rr: reader.readUint8(),
-      sl: reader.readUint8(),
-      tl: reader.readUint8(),
-      dt2: reader.readUint8(),
-      rs: reader.readUint8(),
-      dt: reader.readInt8(),
-      d2r: reader.readUint8(),
-      ssg: reader.readUint8() & 0x0F,
-      ksl: 0,
-      ksr: false,
-      sus: false,
-      vib: false,
-      ws: 0,
-    };
-
-    reader.skip(10); // Additional old format data
     config.operators.push(op);
   }
 
@@ -2510,6 +2662,11 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
   console.log('[FurnaceParser] Subsong patLen:', subsong.patLen, 'ordersLen:', subsong.ordersLen);
   console.log('[FurnaceParser] Orders (first 3 channels):', subsong.orders?.slice(0, 3)?.map(o => o?.slice(0, 10)));
 
+  // Check if this is a chip synth platform (no -24 octave offset needed)
+  const primaryChipId = module.systems[0] || 0;
+  const isChipSynth = CHIP_SYNTH_IDS.has(primaryChipId);
+  console.log(`[FurnaceParser] Platform chip ID: 0x${primaryChipId.toString(16)}, isChipSynth: ${isChipSynth}`);
+
   // CRITICAL: Create combined patterns by ORDER POSITION, not by pattern index.
   // Furnace has per-channel order tables: orders[channel][orderPos] = patternIndex
   // Each channel can play a different pattern at each song position.
@@ -2542,7 +2699,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
           if (cell.effects.length > 0 && cell.effects.some(e => e.type >= 0)) {
             totalEffects++;
           }
-          const converted = convertFurnaceCell(cell);
+          const converted = convertFurnaceCell(cell, isChipSynth);
           if (converted.note > 0 && converted.note < 97) {
             totalConvertedNotes++;
           }
@@ -2592,6 +2749,15 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
   }
   // Log all pattern keys for debugging
   console.log(`[FurnaceParser] Pattern map keys:`, [...module.patterns.keys()].slice(0, 30));
+  
+  // Debug: Show first pattern's raw channel data BEFORE conversion
+  if (patterns.length > 0) {
+    const pat0 = patterns[0];
+    console.log(`[FurnaceParser] DEBUG Pattern 0 RAW: ${pat0.length} rows, first row has ${pat0[0]?.length} channels`);
+    console.log(`[FurnaceParser] DEBUG Pattern 0 row 0:`, pat0[0]?.map((c,i) => `ch${i}:note=${c.note}`).join(' '));
+    console.log(`[FurnaceParser] DEBUG Pattern 0 row 2:`, pat0[2]?.map((c,i) => `ch${i}:note=${c.note}`).join(' '));
+    console.log(`[FurnaceParser] DEBUG Pattern 0 row 4:`, pat0[4]?.map((c,i) => `ch${i}:note=${c.note}`).join(' '));
+  }
 
   return {
     instruments,
@@ -2709,8 +2875,10 @@ function convertFurnaceSample(furSample: FurnaceSample, id: number): ParsedSampl
 
 /**
  * Convert Furnace pattern cell to XM-compatible format
+ * @param cell The Furnace pattern cell
+ * @param isChipSynth If true, skip the -24 octave offset (chip synths use native Furnace octaves)
  */
-function convertFurnaceCell(cell: FurnacePatternCell): ConvertedPatternCell {
+function convertFurnaceCell(cell: FurnacePatternCell, isChipSynth: boolean = false): ConvertedPatternCell {
   let note = 0;
 
   if (cell.note === NOTE_OFF || cell.note === NOTE_RELEASE || cell.note === MACRO_RELEASE) {
@@ -2723,13 +2891,15 @@ function convertFurnaceCell(cell: FurnacePatternCell): ConvertedPatternCell {
     // Adjust octave for C (note 12) - Furnace stores it one lower
     const adjustedOctave = cell.note === 12 ? cell.octave + 1 : cell.octave;
     const finalOctave = adjustedOctave < 0 ? 0 : adjustedOctave;
-    // Furnace octaves are 2 higher than XM/MOD convention:
-    // Furnace C-4 = MOD/XM C-2 (period 428, natural Amiga rate)
-    // Reference: Furnace fur.cpp MOD import uses note+72 offset
-    // XM note: octave * 12 + semitone + 1 - 24 (subtract 2 octaves)
-    note = (finalOctave * 12) + semitone + 1 - 24;
+    
+    // For chip synths (SID, NES, GB, etc.), use native Furnace octave numbering
+    // For Amiga/sample-based, apply -24 offset (Furnace C-4 = MOD C-2)
+    const octaveOffset = isChipSynth ? 0 : -24;
+    note = (finalOctave * 12) + semitone + 1 + octaveOffset;
+    
+    // Clamp to valid range (1-96 playable, 97 = note off)
     if (note > 96) note = 96;
-    if (note < 1) note = 0;
+    if (note < 1) note = 1;
   }
 
   // Convert volume

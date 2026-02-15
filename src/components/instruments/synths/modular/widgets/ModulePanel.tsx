@@ -87,13 +87,13 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
   if (!descriptor) {
     return (
       <div
-        className="absolute bg-surface-secondary rounded border border-border p-2"
+        className="absolute bg-dark-bgSecondary rounded border border-dark-border p-2 z-50"
         style={{
           left: module.position?.x || 0,
           top: module.position?.y || 0,
         }}
       >
-        <span className="text-xs text-text-tertiary">Unknown module: {module.descriptorId}</span>
+        <span className="text-xs text-text-muted">Unknown module: {module.descriptorId}</span>
       </div>
     );
   }
@@ -126,7 +126,7 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
   return (
     <div
       className={`
-        absolute flex flex-col bg-surface-secondary rounded-sm border border-black/50 overflow-hidden
+        absolute flex flex-col bg-dark-bgSecondary rounded-sm border border-black/50 overflow-hidden
         ${isSelected ? 'ring-2 ring-accent-primary' : ''}
         shadow-xl transition-shadow
         ${isDragging ? 'cursor-grabbing shadow-2xl scale-[1.02] z-50' : 'cursor-default'}
@@ -194,7 +194,7 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
           {/* Input ports */}
           {inputPorts.length > 0 && (
             <div className="flex flex-col gap-1">
-              <span className="text-xs text-text-tertiary uppercase">Inputs</span>
+              <span className="text-xs text-text-muted uppercase">Inputs</span>
               {inputPorts.map((port) => {
                 const portRef: PortRef = { moduleId: module.id, portId: port.id };
                 return (
@@ -219,7 +219,7 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
           {/* Parameters */}
           {descriptor.parameters.length > 0 && (
             <div className="flex flex-col gap-2">
-              <span className="text-xs text-text-tertiary uppercase">Parameters</span>
+              <span className="text-xs text-text-muted uppercase">Parameters</span>
               <div className="grid grid-cols-2 gap-2">
                 {descriptor.parameters.map((param) => (
                   <div key={param.id} className="flex flex-col items-center gap-1">
@@ -231,7 +231,7 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
                       size="sm"
                       label={param.name}
                     />
-                    <span className="text-xs text-text-tertiary">
+                    <span className="text-xs text-text-muted">
                       {(module.parameters[param.id] ?? param.default).toFixed(2)}
                     </span>
                   </div>
@@ -243,7 +243,7 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
           {/* Output ports */}
           {outputPorts.length > 0 && (
             <div className="flex flex-col gap-1">
-              <span className="text-xs text-text-tertiary uppercase">Outputs</span>
+              <span className="text-xs text-text-muted uppercase">Outputs</span>
               {outputPorts.map((port) => {
                 const portRef: PortRef = { moduleId: module.id, portId: port.id };
                 return (

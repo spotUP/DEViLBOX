@@ -18,6 +18,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { idGenerator } from '../utils/idGenerator';
 import { DEFAULT_PATTERN_LENGTH, DEFAULT_NUM_CHANNELS, MAX_PATTERN_LENGTH, MAX_CHANNELS, MIN_CHANNELS, MIN_PATTERN_LENGTH } from '../constants/trackerConstants';
+import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
 
 // FT2-style bitwise mask system for copy/paste/transpose operations
 // Bit 0: Note
@@ -217,6 +218,8 @@ interface TrackerStore {
   setChannelColor: (channelIndex: number, color: string | null) => void;
   setChannelRows: (channelIndex: number, rows: TrackerCell[]) => void;
   reorderChannel: (fromIndex: number, toIndex: number) => void;
+  updateChannelName: (channelIndex: number, name: string) => void;
+  applySystemPreset: (presetId: string) => void;
   setChannelRecordGroup: (channelIndex: number, group: 0 | 1 | 2) => void;
   getChannelsInRecordGroup: (group: 1 | 2) => number[];
 
@@ -437,6 +440,12 @@ export const useTrackerStore = create<TrackerStore>()(
         const pattern = state.patterns[state.currentPatternIndex];
         if (row >= 0 && row < pattern.length) {
           state.cursor.rowIndex = row;
+          // If playing, tell the replayer to seek to this row
+          const replayer = getTrackerReplayer();
+          if (replayer.isPlaying()) {
+            // Use the current song position (pattern order index), seek to new row
+            replayer.seekTo(replayer.getCurrentPosition(), row);
+          }
         }
       }),
 
@@ -2074,6 +2083,119 @@ export const useTrackerStore = create<TrackerStore>()(
           toIndex <= state.cursor.channelIndex
         ) {
           state.cursor.channelIndex++;
+        }
+      }),
+
+    updateChannelName: (channelIndex, name) =>
+      set((state) => {
+        state.patterns.forEach((pattern) => {
+          if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
+            pattern.channels[channelIndex].name = name;
+          }
+        });
+      }),
+
+    applySystemPreset: (presetId) =>
+      set((state) => {
+        const preset = SYSTEM_PRESETS.find((p) => p.id === presetId);
+        if (!preset) return;
+
+        // Map DivChanType to CHANNEL_COLORS indices
+        // null, Red, Orange, Yellow, Green, Teal, Cyan, Blue, Purple, Pink, Gray
+        const getColorForType = (type: DivChanType): string | null => {
+          switch (type) {
+            case DivChanType.FM: return CHANNEL_COLORS[7]; // Blue
+            case DivChanType.PULSE: return CHANNEL_COLORS[1]; // Red
+            case DivChanType.WAVE: return CHANNEL_COLORS[3]; // Yellow
+            case DivChanType.NOISE: return CHANNEL_COLORS[10]; // Gray
+            case DivChanType.PCM: return CHANNEL_COLORS[4]; // Green
+            case DivChanType.OP: return CHANNEL_COLORS[6]; // Cyan
+            default: return null;
+          }
+        };
+
+        state.patterns.forEach((pattern) => {
+          if (preset.id === 'none') {
+            // Reset to generic names
+            pattern.channels.forEach((ch, i) => {
+              ch.name = `Channel ${i + 1}`;
+              ch.shortName = `${i + 1}`;
+              ch.color = null;
+              if (ch.channelMeta) {
+                delete ch.channelMeta.furnaceType;
+                delete ch.channelMeta.hardwareName;
+              }
+            });
+            return;
+          }
+
+          if (preset.channelDefs.length > 0) {
+            preset.channelDefs.forEach((chDef, idx) => {
+              const chColor = getColorForType(chDef.type);
+              if (idx < pattern.channels.length) {
+                // Update existing channel
+                pattern.channels[idx].name = chDef.name;
+                pattern.channels[idx].shortName = chDef.shortName;
+                pattern.channels[idx].color = chColor;
+                
+                // Technical metadata for 1:1 compatibility
+                pattern.channels[idx].channelMeta = {
+                  ...pattern.channels[idx].channelMeta,
+                  importedFromMOD: pattern.channels[idx].channelMeta?.importedFromMOD ?? false,
+                  channelType: chDef.type === DivChanType.PCM ? 'sample' : 'synth',
+                  // Furnace specific
+                  ...({
+                    furnaceType: chDef.type,
+                    hardwareName: chDef.name,
+                    shortName: chDef.shortName,
+                    systemId: preset.fileID
+                  } as any)
+                };
+              } else if (pattern.channels.length < MAX_CHANNELS) {
+                // Add missing hardware channels
+                const length = pattern.length;
+                pattern.channels.push({
+                  id: idGenerator.generate('channel'),
+                  name: chDef.name,
+                  shortName: chDef.shortName,
+                  rows: Array.from({ length }, () => ({ ...EMPTY_CELL })),
+                  muted: false,
+                  solo: false,
+                  collapsed: false,
+                  volume: 80,
+                  pan: 0,
+                  instrumentId: null,
+                  color: chColor,
+                  channelMeta: {
+                    importedFromMOD: false,
+                    channelType: chDef.type === DivChanType.PCM ? 'sample' : 'synth',
+                    // Furnace specific
+                    ...({
+                      furnaceType: chDef.type,
+                      hardwareName: chDef.name, shortName: chDef.shortName,
+                      systemId: preset.fileID
+                    } as any)
+                  }
+                });
+              }
+            });
+
+            // If pattern has more channels than preset, reset the rest to default
+            if (pattern.channels.length > preset.channelDefs.length) {
+              for (let i = preset.channelDefs.length; i < pattern.channels.length; i++) {
+                pattern.channels[i].name = `Channel ${i + 1}`;
+                pattern.channels[i].shortName = `${i + 1}`;
+                pattern.channels[i].color = null;
+              }
+            }
+          }
+        });
+
+        // Add status message
+        if (typeof window !== 'undefined') {
+          import('@stores/useUIStore').then(({ useUIStore }) => {
+            useUIStore.getState().setStatusMessage(`SYSTEM: ${preset.name.toUpperCase()}`);
+          });
         }
       }),
 

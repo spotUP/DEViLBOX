@@ -11,11 +11,13 @@ interface MacroLanesProps {
   pattern: Pattern;
   rowHeight: number;
   channelCount: number;
-  channelWidth: number;
+  channelOffsets: number[];
+  channelWidths: number[];
   rowNumWidth: number;
 }
 
 // Get color based on parameter
+// ... (rest of the helper functions)
 const getParameterColor = (parameter: string): string => {
   const colors: Record<string, string> = {
     cutoff: '#22c55e',    // Green
@@ -58,8 +60,9 @@ export const MacroLanes: React.FC<MacroLanesProps> = ({
   pattern,
   rowHeight,
   channelCount,
-  channelWidth,
-  rowNumWidth,
+  channelOffsets,
+  channelWidths,
+  rowNumWidth: _rowNumWidth,
 }) => {
   const columnVisibility = useTrackerStore((state) => state.columnVisibility);
   const setCell = useTrackerStore((state) => state.setCell);
@@ -140,7 +143,7 @@ export const MacroLanes: React.FC<MacroLanesProps> = ({
       style={{
         position: 'absolute',
         top: 0,
-        left: rowNumWidth,
+        left: 0,
         right: 0,
         height: pattern.length * rowHeight,
         zIndex: 5,
@@ -149,13 +152,17 @@ export const MacroLanes: React.FC<MacroLanesProps> = ({
     >
       {pattern.channels.map((channel, channelIndex) => {
         if (channelIndex >= channelCount) return null;
+        if (channel.collapsed) return null;
+
+        const colX = channelOffsets[channelIndex];
+        const channelWidth = channelWidths[channelIndex];
 
         return parameters.map((param) => {
           const { linePath, points } = generateMacroPaths(channel.rows, param, rowHeight);
           const color = getParameterColor(param);
           
           const paramIndex = parameters.indexOf(param);
-          const laneLeft = channelIndex * channelWidth + channelWidth - (parameters.length - paramIndex) * (LANE_WIDTH + 2) - 4;
+          const laneLeft = colX + channelWidth - (parameters.length - paramIndex) * (LANE_WIDTH + 2) - 4;
 
           return (
             <div

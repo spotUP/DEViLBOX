@@ -45,7 +45,27 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
     hoverPort,
   } = useModularState();
 
-  // Update camera state in config when it changes
+  // Sync camera when config.camera changes from outside (e.g. preset load)
+  useEffect(() => {
+    if (config.camera) {
+      cameraRef.current.setState(config.camera);
+      setCameraState(cameraRef.current.getState());
+    } else {
+      // If no camera state exists, fit all modules to view automatically on mount
+      const timer = setTimeout(() => {
+        if (containerRef.current && config.modules.length > 0) {
+          const rect = containerRef.current.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            cameraRef.current.fitToView(config.modules, rect.width, rect.height);
+            setCameraState(cameraRef.current.getState());
+          }
+        }
+      }, 100); // Small delay to ensure container is measured correctly
+      return () => clearTimeout(timer);
+    }
+  }, [config.camera]); // Removed config.modules dependency to avoid fitting on every change
+
+  // Update camera state in config when it changes locally
   useEffect(() => {
     const newCamera = cameraRef.current.getState();
     if (
@@ -59,6 +79,11 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
       });
     }
   }, [cameraState]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Helper to convert screen-space container coords to world coords for cables
+  const screenToWorld = useCallback((x: number, y: number) => {
+    return cameraRef.current.screenToWorld(x + (containerRef.current?.getBoundingClientRect().left || 0), y + (containerRef.current?.getBoundingClientRect().top || 0));
+  }, []);
 
   // Pan with middle mouse button or space+drag
   useEffect(() => {
@@ -165,7 +190,11 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
     if (!wiringSource) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      updateWiringPreview(e.clientX, e.clientY);
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const relativeX = e.clientX - rect.left;
+      const relativeY = e.clientY - rect.top;
+      updateWiringPreview(relativeX, relativeY);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -348,10 +377,13 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
         <svg className="absolute inset-0 pointer-events-auto z-0" style={{ width: '100%', height: '100%' }}>
           {/* Existing connections */}
           {config.connections.map((conn, idx) => {
-            const sourcePos = positions.get(getPortId(conn.source));
-            const targetPos = positions.get(getPortId(conn.target));
+            const sourcePosRaw = positions.get(getPortId(conn.source));
+            const targetPosRaw = positions.get(getPortId(conn.target));
 
-            if (!sourcePos || !targetPos) return null;
+            if (!sourcePosRaw || !targetPosRaw) return null;
+
+            const sourcePos = screenToWorld(sourcePosRaw.x, sourcePosRaw.y);
+            const targetPos = screenToWorld(targetPosRaw.x, targetPosRaw.y);
 
             return (
               <PatchCable
@@ -376,13 +408,21 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
 
           {/* Wiring preview */}
           {wiringSource && wiringPreview && positions.get(getPortId(wiringSource)) && (
-            <PatchCable
-              x1={positions.get(getPortId(wiringSource))!.x}
-              y1={positions.get(getPortId(wiringSource))!.y}
-              x2={wiringPreview.x}
-              y2={wiringPreview.y}
-              obstacles={moduleObstacles}
-            />
+            (() => {
+              const sourcePosRaw = positions.get(getPortId(wiringSource))!;
+              const sourcePos = screenToWorld(sourcePosRaw.x, sourcePosRaw.y);
+              const targetPos = screenToWorld(wiringPreview.x, wiringPreview.y);
+              
+              return (
+                <PatchCable
+                  x1={sourcePos.x}
+                  y1={sourcePos.y}
+                  x2={targetPos.x}
+                  y2={targetPos.y}
+                  obstacles={moduleObstacles}
+                />
+              );
+            })()
           )}
         </svg>
 
@@ -413,10 +453,10 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
 
       {/* Empty state */}
       {config.modules.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center text-text-tertiary pointer-events-none">
+        <div className="absolute inset-0 flex items-center justify-center text-text-muted pointer-events-none">
           <div className="text-center">
             <p className="text-sm">No modules yet. Click "Add Module" to get started.</p>
-            <p className="text-xs mt-2 text-text-quaternary">
+            <p className="text-xs mt-2 opacity-50">
               Middle-click to pan • Scroll to zoom • F to fit all
             </p>
           </div>
@@ -424,14 +464,14 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
       )}
 
       {/* Zoom and view controls */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-surface-secondary/90 backdrop-blur-md border border-border p-1 rounded-lg shadow-xl z-50">
-        <div className="px-2 text-[10px] font-mono text-text-secondary border-r border-border mr-1">
+      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-dark-bgSecondary/90 backdrop-blur-md border border-dark-border p-1 rounded-lg shadow-xl z-50">
+        <div className="px-2 text-[10px] font-mono text-text-secondary border-r border-dark-border mr-1">
           {Math.round(cameraState.zoom * 100)}%
         </div>
         
         <button
           onClick={handleZoomOut}
-          className="p-1.5 hover:bg-surface-tertiary rounded text-text-secondary hover:text-white transition-colors"
+          className="p-1.5 hover:bg-dark-bgHover rounded text-text-secondary hover:text-text-primary transition-colors"
           title="Zoom Out"
         >
           <ZoomOut size={16} />
@@ -439,17 +479,17 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
         
         <button
           onClick={handleZoomIn}
-          className="p-1.5 hover:bg-surface-tertiary rounded text-text-secondary hover:text-white transition-colors"
+          className="p-1.5 hover:bg-dark-bgHover rounded text-text-secondary hover:text-text-primary transition-colors"
           title="Zoom In"
         >
           <ZoomIn size={16} />
         </button>
         
-        <div className="w-px h-4 bg-border mx-1" />
+        <div className="w-px h-4 bg-dark-border mx-1" />
         
         <button
           onClick={handleFitToView}
-          className="p-1.5 hover:bg-surface-tertiary rounded text-text-secondary hover:text-white transition-colors"
+          className="p-1.5 hover:bg-dark-bgHover rounded text-text-secondary hover:text-text-primary transition-colors"
           title="Fit All Modules (F)"
         >
           <Maximize size={16} />
@@ -457,7 +497,7 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
 
         <button
           onClick={handleResetView}
-          className="p-1.5 hover:bg-surface-tertiary rounded text-text-secondary hover:text-white transition-colors"
+          className="p-1.5 hover:bg-dark-bgHover rounded text-text-secondary hover:text-text-primary transition-colors"
           title="Reset View (0)"
         >
           <RotateCcw size={16} />

@@ -56,8 +56,8 @@ export const RackStrip: React.FC<RackStripProps> = ({
 
   if (!descriptor) {
     return (
-      <div className="p-2 bg-surface-secondary rounded border border-border">
-        <span className="text-xs text-text-tertiary">Unknown module: {module.descriptorId}</span>
+      <div className="p-2 bg-dark-bgSecondary rounded border border-dark-border">
+        <span className="text-xs text-text-muted">Unknown module: {module.descriptorId}</span>
       </div>
     );
   }
@@ -84,43 +84,46 @@ export const RackStrip: React.FC<RackStripProps> = ({
       ref={setNodeRef}
       style={style}
       className={`
-        flex flex-col bg-surface-secondary rounded-lg border-2 overflow-hidden
-        ${isSelected ? 'border-accent-primary' : 'border-border'}
-        hover:border-border-hover transition-colors
+        flex flex-col bg-dark-bgSecondary rounded-lg border-2 overflow-hidden
+        ${isSelected ? 'border-accent-primary shadow-[0_0_10px_rgba(var(--color-accent-rgb),0.3)]' : 'border-dark-border'}
+        hover:border-accent-primary/50 transition-colors
       `}
       onClick={handleClick}
     >
       {/* Header */}
       <div
-        className="flex items-center gap-2 px-3 py-2 bg-surface-tertiary"
-        style={{ backgroundColor: descriptor.color || '#374151' }}
+        className="flex items-center gap-2 px-3 py-2"
+        style={{ 
+          backgroundColor: descriptor.color || '#374151',
+          backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0.1) 100%)'
+        }}
       >
         {/* Drag handle */}
         <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
-          <GripVertical className="w-4 h-4 text-text-secondary" />
+          <GripVertical className="w-4 h-4 text-white/70" />
         </div>
 
         {/* Collapse toggle */}
         <button
           onClick={handleToggleCollapse}
-          className="p-0.5 hover:bg-surface-secondary/20 rounded"
+          className="p-0.5 hover:bg-black/20 rounded transition-colors"
         >
           {isCollapsed ? (
-            <ChevronRight className="w-4 h-4 text-text-secondary" />
+            <ChevronRight className="w-4 h-4 text-white/70" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-text-secondary" />
+            <ChevronDown className="w-4 h-4 text-white/70" />
           )}
         </button>
 
         {/* Module name */}
-        <span className="flex-1 text-sm font-medium text-white">
+        <span className="flex-1 text-xs font-bold text-white uppercase tracking-wider truncate drop-shadow-md">
           {module.label || descriptor.name}
         </span>
 
         {/* Delete button */}
         <button
           onClick={handleDelete}
-          className="p-0.5 hover:bg-red-500/20 rounded text-text-tertiary hover:text-red-400"
+          className="p-0.5 hover:bg-accent-error/20 rounded text-white/50 hover:text-accent-error transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -128,9 +131,15 @@ export const RackStrip: React.FC<RackStripProps> = ({
 
       {/* Body (collapsible) */}
       {!isCollapsed && (
-        <div className="flex items-center gap-4 px-3 py-3">
+        <div className="flex items-center gap-4 px-3 py-3 relative">
+          {/* Subtle noise texture overlay */}
+          <div 
+            className="absolute inset-0 opacity-[0.03] pointer-events-none"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} 
+          />
+
           {/* Input ports */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 relative z-10">
             {inputPorts.map((port) => {
               const portRef: PortRef = { moduleId: module.id, portId: port.id };
               return (
@@ -152,7 +161,7 @@ export const RackStrip: React.FC<RackStripProps> = ({
           </div>
 
           {/* Parameters (knobs) */}
-          <div className="flex-1 flex gap-3 justify-center">
+          <div className="flex-1 flex gap-3 justify-center relative z-10">
             {descriptor.parameters.map((param) => (
               <div key={param.id} className="flex flex-col items-center gap-1">
                 <Knob
@@ -163,7 +172,7 @@ export const RackStrip: React.FC<RackStripProps> = ({
                   size="sm"
                   label={param.name}
                 />
-                <span className="text-xs text-text-tertiary">
+                <span className="text-[10px] text-text-muted font-mono">
                   {(module.parameters[param.id] ?? param.default).toFixed(2)}
                   {param.unit || ''}
                 </span>
@@ -172,7 +181,7 @@ export const RackStrip: React.FC<RackStripProps> = ({
           </div>
 
           {/* Output ports */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 relative z-10">
             {outputPorts.map((port) => {
               const portRef: PortRef = { moduleId: module.id, portId: port.id };
               return (

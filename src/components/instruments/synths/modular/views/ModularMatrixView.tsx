@@ -137,19 +137,19 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
   return (
     <div className="flex h-full bg-dark-bg overflow-hidden">
       {/* Matrix grid */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto scrollbar-modern">
         <table className="w-full border-collapse text-xs">
-          <thead className="sticky top-0 bg-surface-secondary z-10">
+          <thead className="sticky top-0 bg-dark-bgSecondary z-10">
             <tr>
-              <th className="border border-border p-2 text-left min-w-[120px]">Input \ Output</th>
+              <th className="border border-dark-border p-2 text-left min-w-[120px] text-text-primary">Input \ Output</th>
               {outputPorts.map((output) => (
                 <th
                   key={`${output.moduleId}.${output.portId}`}
-                  className="border border-border p-2 text-center min-w-[80px] max-w-[120px]"
+                  className="border border-dark-border p-2 text-center min-w-[80px] max-w-[120px]"
                 >
                   <div className="truncate text-text-secondary">{output.moduleName}</div>
                   <div
-                    className="truncate text-text-tertiary mt-1"
+                    className="truncate text-text-muted mt-1"
                     style={{ color: output.color }}
                   >
                     {output.portName}
@@ -160,10 +160,10 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
           </thead>
           <tbody>
             {inputPorts.map((input) => (
-              <tr key={`${input.moduleId}.${input.portId}`} className="hover:bg-surface-tertiary/30">
-                <td className="border border-border p-2 sticky left-0 bg-surface-secondary">
+              <tr key={`${input.moduleId}.${input.portId}`} className="hover:bg-dark-bgHover/30 transition-colors">
+                <td className="border border-dark-border p-2 sticky left-0 bg-dark-bgSecondary">
                   <div className="truncate text-text-secondary">{input.moduleName}</div>
-                  <div className="truncate text-text-tertiary mt-1" style={{ color: input.color }}>
+                  <div className="truncate text-text-muted mt-1" style={{ color: input.color }}>
                     {input.portName}
                   </div>
                 </td>
@@ -175,7 +175,7 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
                     <td
                       key={`${output.moduleId}.${output.portId}`}
                       className={`
-                        border border-border p-1 text-center cursor-pointer
+                        border border-dark-border p-1 text-center cursor-pointer
                         ${isConnected ? 'bg-accent-primary/20' : 'bg-dark-bg'}
                         hover:bg-accent-primary/30 transition-colors
                       `}
@@ -200,7 +200,7 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
                                 handleAmountChange(connection, parseFloat(e.target.value));
                               }}
                               onClick={(e) => e.stopPropagation()}
-                              className="w-12 h-1"
+                              className="w-12 h-1 accent-accent-primary"
                             />
                           )}
                         </div>
@@ -215,21 +215,21 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
 
         {/* Empty state */}
         {config.modules.length === 0 && (
-          <div className="flex items-center justify-center h-full text-text-tertiary">
+          <div className="flex items-center justify-center h-full text-text-muted">
             <p className="text-sm">No modules yet. Click "Add Module" to get started.</p>
           </div>
         )}
 
         {/* No ports state */}
         {config.modules.length > 0 && inputPorts.length === 0 && outputPorts.length === 0 && (
-          <div className="flex items-center justify-center h-full text-text-tertiary">
+          <div className="flex items-center justify-center h-full text-text-muted">
             <p className="text-sm">No ports available. Add modules with inputs/outputs.</p>
           </div>
         )}
       </div>
 
       {/* Sidebar - Module parameters */}
-      <div className="w-64 border-l border-border bg-surface-secondary overflow-y-auto">
+      <div className="w-64 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto scrollbar-modern">
         <div className="p-4">
           <h3 className="text-sm font-medium text-text-primary mb-4">Module Parameters</h3>
 
@@ -237,13 +237,13 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
           <select
             value={selectedModuleId || ''}
             onChange={(e) => setSelectedModuleId(e.target.value || null)}
-            className="w-full px-2 py-1.5 mb-4 bg-dark-bg border border-border rounded text-sm text-text-primary"
+            className="w-full px-2 py-1.5 mb-4 bg-dark-bg border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
           >
-            <option value="">Select module...</option>
+            <option value="" className="bg-dark-bgSecondary">Select module...</option>
             {config.modules.map((module) => {
               const descriptor = ModuleRegistry.get(module.descriptorId);
               return (
-                <option key={module.id} value={module.id}>
+                <option key={module.id} value={module.id} className="bg-dark-bgSecondary">
                   {module.label || descriptor?.name || module.id}
                 </option>
               );
@@ -254,7 +254,7 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
           {selectedModule && selectedDescriptor && (
             <div className="space-y-4">
               {selectedDescriptor.parameters.length === 0 && (
-                <p className="text-xs text-text-tertiary">No parameters available.</p>
+                <p className="text-xs text-text-muted">No parameters available.</p>
               )}
 
               {selectedDescriptor.parameters.map((param) => (
@@ -267,7 +267,7 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
                     size="sm"
                     label={param.name}
                   />
-                  <div className="text-xs text-text-tertiary">
+                  <div className="text-xs text-text-muted">
                     {(selectedModule.parameters[param.id] ?? param.default).toFixed(2)}
                     {param.unit && ` ${param.unit}`}
                   </div>

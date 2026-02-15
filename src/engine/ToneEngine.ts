@@ -825,6 +825,8 @@ export class ToneEngine {
   private getSafeTime(time?: number): number | null {
     // Check if audio context is running
     if (Tone.context.state !== 'running') {
+      // Log the actual state to help diagnose why it's not running
+      console.warn(`[ToneEngine] getSafeTime: context state is '${Tone.context.state}', not 'running'`);
       return null;
     }
 
@@ -2070,7 +2072,9 @@ export class ToneEngine {
         // Set chip channel on FurnaceDispatchSynth (for C64/GB/NES multi-channel tracker playback)
         if (instrument instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
           const maxCh = instrument.getNumChannels() || 3;
-          instrument.setChannel(channelIndex % maxCh);
+          const chipChannel = channelIndex % maxCh;
+          console.log(`[ToneEngine] FurnaceDispatch channelIndex=${channelIndex} maxCh=${maxCh} → chipChannel=${chipChannel}`);
+          instrument.setChannel(chipChannel);
         }
         // Standard synths - apply slide/accent for 303-style effects
         const targetFreq = Tone.Frequency(note).toFrequency();
@@ -2437,10 +2441,20 @@ export class ToneEngine {
     hammer?: boolean        // TT-303 hammer: legato without pitch glide
   ): void {
     const safeTime = this.getSafeTime(time);
-    if (safeTime === null) return;
+    if (safeTime === null) {
+      console.warn(`[ToneEngine] triggerNote: safeTime is null for id=${instrumentId}`);
+      return;
+    }
 
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
-    if (!instrument) return;
+    if (!instrument) {
+      console.warn(`[ToneEngine] triggerNote: No instrument for id=${instrumentId} type=${config.synthType}`);
+      return;
+    }
+    
+    // Debug: trace instrument type for FurnaceDispatch issues
+    const isFurnaceDispatch = instrument instanceof FurnaceDispatchSynth;
+    console.log(`[ToneEngine] triggerNote: id=${instrumentId} type=${config.synthType} isFurnaceDispatch=${isFurnaceDispatch} constructor=${instrument.constructor.name}`);
 
     if (channelIndex !== undefined) {
       // 1. Handle Past Note Actions (NNA)
@@ -2537,7 +2551,9 @@ export class ToneEngine {
           // Set chip channel on FurnaceDispatchSynth (for C64/GB/NES multi-channel tracker playback)
           if (voiceNode instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
             const maxCh = voiceNode.getNumChannels() || 3;
-            voiceNode.setChannel(channelIndex % maxCh);
+            const chipChannel = channelIndex % maxCh;
+            console.log(`[ToneEngine] FurnaceDispatch channelIndex=${channelIndex} maxCh=${maxCh} → chipChannel=${chipChannel}`);
+            voiceNode.setChannel(chipChannel);
           }
           // NoiseSynth and MetalSynth don't take note parameter: triggerAttack(time, velocity)
           if (config.synthType === 'NoiseSynth' || config.synthType === 'MetalSynth') {

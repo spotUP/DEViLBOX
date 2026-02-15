@@ -57,24 +57,24 @@ export const ModularToolbar: React.FC<ModularToolbarProps> = ({ config, onChange
   };
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-surface-secondary border-b border-border">
+    <div className="flex items-center gap-3 px-4 py-2 bg-dark-bgSecondary border-b border-dark-border text-text-primary">
       {/* Preset selector */}
       <div className="flex items-center gap-2">
         <span className="text-xs text-text-secondary">Preset:</span>
         <select
           onChange={(e) => handleLoadPreset(e.target.value)}
           value=""
-          className="px-2 py-1 bg-surface-tertiary border border-border rounded text-sm"
+          className="px-2 py-1 bg-dark-bgTertiary border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
         >
-          <option value="" disabled>
+          <option value="" disabled className="bg-dark-bgSecondary">
             Load preset...
           </option>
-          <option value="init">Init</option>
-          <option value="bass">Bass</option>
-          <option value="pad">Pad</option>
-          <option value="percussion">Percussion</option>
-          <option value="fmBell">FM Bell</option>
-          <option value="lead">Lead</option>
+          <option value="init" className="bg-dark-bgSecondary">Init</option>
+          <option value="bass" className="bg-dark-bgSecondary">Bass</option>
+          <option value="pad" className="bg-dark-bgSecondary">Pad</option>
+          <option value="percussion" className="bg-dark-bgSecondary">Percussion</option>
+          <option value="fmBell" className="bg-dark-bgSecondary">FM Bell</option>
+          <option value="lead" className="bg-dark-bgSecondary">Lead</option>
         </select>
       </div>
 
@@ -87,10 +87,10 @@ export const ModularToolbar: React.FC<ModularToolbarProps> = ({ config, onChange
         <select
           value={config.polyphony}
           onChange={(e) => handlePolyphonyChange(parseInt(e.target.value, 10))}
-          className="px-2 py-1 bg-surface-tertiary border border-border rounded text-sm"
+          className="px-2 py-1 bg-dark-bgTertiary border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
         >
           {[1, 2, 4, 8].map((n) => (
-            <option key={n} value={n}>
+            <option key={n} value={n} className="bg-dark-bgSecondary">
               {n}
             </option>
           ))}
@@ -100,7 +100,7 @@ export const ModularToolbar: React.FC<ModularToolbarProps> = ({ config, onChange
       {/* View mode selector */}
       <div className="flex items-center gap-2">
         <span className="text-xs text-text-secondary">View:</span>
-        <div className="flex gap-1 bg-surface-tertiary rounded p-0.5">
+        <div className="flex gap-1 bg-dark-bgTertiary rounded p-0.5 border border-dark-border">
           {(['rack', 'canvas', 'matrix'] as ModularViewMode[]).map((mode) => (
             <button
               key={mode}
@@ -109,8 +109,8 @@ export const ModularToolbar: React.FC<ModularToolbarProps> = ({ config, onChange
                 px-3 py-1 text-xs rounded transition-colors capitalize
                 ${
                   config.viewMode === mode
-                    ? 'bg-accent-primary text-white'
-                    : 'text-text-secondary hover:text-text-primary'
+                    ? 'bg-accent-primary text-white font-bold'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgHover'
                 }
               `}
             >
@@ -125,7 +125,7 @@ export const ModularToolbar: React.FC<ModularToolbarProps> = ({ config, onChange
       {/* Clear patch */}
       <button
         onClick={handleClearPatch}
-        className="flex items-center gap-1 px-2 py-1 hover:bg-surface-tertiary rounded text-sm text-text-secondary hover:text-red-400 transition-colors"
+        className="flex items-center gap-1 px-2 py-1 hover:bg-dark-bgHover rounded text-sm text-text-secondary hover:text-accent-error transition-colors"
         title="Clear patch"
       >
         <Trash2 className="w-4 h-4" />

@@ -37,7 +37,7 @@ import { useProjectStore } from '@stores/useProjectStore';
 import type { Pattern } from '@typedefs';
 
 // Lazy-loaded components for better startup performance
-const HelpModal = lazy(() => import('@components/help/HelpModal').then(m => ({ default: m.HelpModal })));
+const HelpModal = lazy(() => import('./components/help/HelpModal').then(m => ({ default: m.HelpModal })));
 const ExportDialog = lazy(() => import('@lib/export/ExportDialog').then(m => ({ default: m.ExportDialog })));
 const EditInstrumentModal = lazy(() => import('@components/instruments/EditInstrumentModal').then(m => ({ default: m.EditInstrumentModal })));
 const MasterEffectsModal = lazy(() => import('@components/effects').then(m => ({ default: m.MasterEffectsModal })));
