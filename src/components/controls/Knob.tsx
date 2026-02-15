@@ -4,6 +4,7 @@
  */
 
 import React, { useRef, useCallback, useEffect, useState, useId } from 'react';
+import { createPortal } from 'react-dom';
 import { useThemeStore } from '@stores';
 import { haptics } from '@/utils/haptics';
 
@@ -550,6 +551,20 @@ export const Knob: React.FC<KnobProps> = React.memo(({
         {formatValueDisplay(displayValue !== undefined ? displayValue : value)}{unit}
       </div>
     </div>
+
+    {/* Floating tooltip during drag */}
+    {isDragging && createPortal(
+      <div
+        className="fixed pointer-events-none z-[9999] px-2 py-1 bg-black/90 border border-accent-primary rounded text-xs font-mono font-bold text-white shadow-xl transform -translate-x-1/2 -translate-y-full"
+        style={{
+          left: (knobRef.current?.getBoundingClientRect().left || 0) + knobSize / 2,
+          top: (knobRef.current?.getBoundingClientRect().top || 0) - 8,
+        }}
+      >
+        {formatValueDisplay(displayValue !== undefined ? displayValue : value)}{unit}
+      </div>,
+      document.body
+    )}
 
     {/* Mobile numeric input modal */}
     {showNumericInput && (
