@@ -198,10 +198,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const steps = Math.trunc(horizontalAccumulatorRef.current / COLUMN_STEP_THRESHOLD);
       horizontalAccumulatorRef.current -= steps * COLUMN_STEP_THRESHOLD;
 
-      // Move cursor by N steps - Inverted to match swipe direction
+      // Move cursor by N steps
       const store = useTrackerStore.getState();
       for (let i = 0; i < Math.abs(steps); i++) {
-        store.moveCursor(steps > 0 ? 'left' : 'right');
+        store.moveCursor(steps > 0 ? 'right' : 'left');
       }
     }
   }, [pattern, isMobile]);
@@ -370,8 +370,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, [pattern, isMobile, mobileChannelIndex, moveCursorToChannelAndColumn]);
 
   const patternGestures = useMobilePatternGestures({
-    onSwipeLeft: handleDataSwipeRight,
-    onSwipeRight: handleDataSwipeLeft,
+    onSwipeLeft: handleDataSwipeLeft,
+    onSwipeRight: handleDataSwipeRight,
     onSwipeUp: handleSwipeUp,
     onSwipeDown: handleSwipeDown,
     onTap: handlePatternTap,
@@ -386,8 +386,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Channel header gestures for mobile
   const channelHeaderGestures = useMobilePatternGestures({
-    onSwipeLeft: handleHeaderSwipeRight,
-    onSwipeRight: handleHeaderSwipeLeft,
+    onSwipeLeft: handleHeaderSwipeLeft,
+    onSwipeRight: handleHeaderSwipeRight,
     enabled: isMobile,
   });
 
