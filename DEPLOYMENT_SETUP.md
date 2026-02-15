@@ -1,18 +1,13 @@
 # Automatic Deployment Setup
 
-The project is configured to automatically deploy to both GitHub Pages and your custom server on every push to `main`.
+The project is configured to automatically deploy to your custom server on every push to `main`.
 
 ## Current Setup
 
-### GitHub Pages (https://spotup.github.io/DEViLBOX/)
-- ✅ Configured and working
-- Builds with `base: '/DEViLBOX/'`
-- No additional setup required
-
 ### Custom Server (https://devilbox.uprough.net/)
-- 🔧 Requires GitHub Secrets configuration
 - Builds with `base: '/'`
-- Deploys via SSH/rsync
+- Deploys via SSH/rsync on every push to main
+- 🔧 Requires GitHub Secrets configuration (see below)
 
 ## Configure Custom Server Deployment
 
@@ -52,13 +47,9 @@ Copy the entire private key (including `-----BEGIN OPENSSH PRIVATE KEY-----` and
 
 When you push to `main`, GitHub Actions automatically:
 
-1. **Builds two versions:**
-   - GitHub Pages version with `/DEViLBOX/` base path
-   - Server version with `/` base path
+1. **Builds the app** with `/` base path for your server
 
-2. **Deploys to both locations:**
-   - GitHub Pages: Uses GitHub's built-in Pages deployment
-   - Custom Server: Uses rsync over SSH to sync files
+2. **Deploys to your server** via rsync over SSH
 
 3. **Builds desktop apps** (optional, already configured)
 
@@ -66,13 +57,6 @@ When you push to `main`, GitHub Actions automatically:
 
 If automatic deployment is not set up, you can deploy manually:
 
-### To GitHub Pages:
-```bash
-VITE_BASE_URL=/DEViLBOX/ npm run build
-npm run deploy
-```
-
-### To Custom Server:
 ```bash
 npm run build
 rsync -avz dist/ youruser@devilbox.uprough.net:/var/www/html/
@@ -90,13 +74,13 @@ rsync -avz dist/ youruser@devilbox.uprough.net:/var/www/html/
 - Check GitHub Actions logs for errors
 
 **Wrong base path after deployment**
-- GitHub Pages: Should show URLs starting with `/DEViLBOX/`
-- Custom Server: Should show URLs starting with `/`
-- Check the workflow built with the correct `VITE_BASE_URL`
+- Should show URLs starting with `/` (root path)
+- If you see broken asset paths, rebuild with `npm run build`
 
-## Disable Automatic Deployment
+## Re-enable GitHub Pages (Optional)
 
-To disable deployment to your custom server while keeping GitHub Pages:
+If you want to deploy to GitHub Pages in the future:
 
-1. Remove the `deploy-server` job from `.github/workflows/deploy.yml`
-2. Or remove the GitHub secrets to prevent the deployment step from running
+1. Add the GitHub Pages jobs back to `.github/workflows/deploy.yml`
+2. Build with: `VITE_BASE_URL=/DEViLBOX/ npm run build`
+3. Deploy with: `npm run deploy`
