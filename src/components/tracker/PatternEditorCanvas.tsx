@@ -1759,28 +1759,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         useTrackerStore.getState().moveCursorToRow(newRow);
       } else {
         // Horizontal scroll - scroll channels (only if they don't all fit)
-        const state = useTrackerStore.getState();
-        const noteWidth = CHAR_WIDTH * 3 + 4;
-        const firstCell = state.patterns[state.currentPatternIndex]?.channels[0]?.rows[0];
-        const hasAcid = firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined;
-        const hasProb = firstCell?.probability !== undefined;
-        const paramWidth = CHAR_WIDTH * 10 + 16
-          + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
-          + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
-          + CHAR_WIDTH * 2 + 4;
-        const chanWidth = noteWidth + paramWidth + 20 + 20;
-        const totalWidth = (state.patterns[state.currentPatternIndex]?.channels.length || 0) * chanWidth;
-        const maxScroll = Math.max(0, LINE_NUMBER_WIDTH + totalWidth - container.clientWidth);
+        // Use totalChannelsWidth from useMemo for consistency
+        const maxScroll = Math.max(0, LINE_NUMBER_WIDTH + totalChannelsWidth - container.clientWidth);
 
         if (maxScroll > 0) {
-          setScrollLeft(prev => Math.max(0, Math.min(maxScroll, prev + e.deltaX)));
+          const newScrollLeft = Math.max(0, Math.min(maxScroll, scrollLeft + e.deltaX));
+          setScrollLeft(newScrollLeft);
+          if (headerScrollRef.current) {
+            headerScrollRef.current.scrollLeft = newScrollLeft;
+          }
         }
       }
     };
 
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, []);
+  }, [scrollLeft, totalChannelsWidth, dimensions.width]);
 
   // Handle header scroll sync
   const handleHeaderScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
