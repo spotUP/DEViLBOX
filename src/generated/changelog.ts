@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-15T12:09:41.902Z
+ * Generated: 2026-02-15T16:33:29.289Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '604';
-export const BUILD_HASH = 'f3d9e1c';
+export const BUILD_NUMBER = '620';
+export const BUILD_HASH = '74e40c4';
 export const BUILD_DATE = '2026-02-15';
 
 // Full semantic version with build number
@@ -33,6 +33,70 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-15',
     changes: [
+      {
+        type: 'fix',
+        "description": "Chore: restore debug script and ensure all fixes are pushed"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: update debug script to use require instead of import"
+      },
+      {
+        type: 'fix',
+        "description": "Implement iOS safe area support for notch and home indicator"
+      },
+      {
+        type: 'feature',
+        "description": "Add WASM auto-rebuild to dev startup scripts"
+      },
+      {
+        type: 'fix',
+        "description": "Force base path to / for subdomain deployment"
+      },
+      {
+        type: 'fix',
+        "description": "Add jsondiffpatch dependency to server package.json"
+      },
+      {
+        type: 'fix',
+        "description": "Import missing DEFAULT constants for createInstrumentsForModule"
+      },
+      {
+        type: 'fix',
+        "description": "Add createInstrumentsForModule helper and null check for module song data"
+      },
+      {
+        type: 'fix',
+        "description": "Correct module import types and conversion in App.tsx FileBrowser"
+      },
+      {
+        type: 'fix',
+        "description": "Add onLoadTrackerModule handler to FileBrowser for .fur file support"
+      },
+      {
+        type: 'fix',
+        "description": "Move transport controls to avoid hamburger menu overlap"
+      },
+      {
+        type: 'feature',
+        "description": "Add inline mode to MIDI dropdown to work properly in mobile menu"
+      },
+      {
+        type: 'improvement',
+        "description": "Restore MIDI settings to mobile menu"
+      },
+      {
+        type: 'fix',
+        "description": "Fix mobile menu: add scrolling and remove MIDI dropdown that showed 'no options'"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update changelog with recent mobile improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Add Sign In/Sign Up to mobile hamburger menu"
+      },
       {
         type: 'fix',
         "description": "Resolve TypeScript errors in gesture handling"
@@ -174,70 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Use setCurrentRow instead of non-existent startRow property"
-      },
-      {
-        type: 'fix',
-        "description": "Correct playFromCursor to use cursor.rowIndex and stop-then-restart behavior"
-      },
-      {
-        type: 'feature',
-        "description": "Add playFromCursor command for pattern playback"
-      },
-      {
-        type: 'fix',
-        "description": "Correct modifier order and add Mac Cmd support"
-      },
-      {
-        type: 'feature',
-        "description": "Add KeyComboFormatter for standardized key combo strings"
-      },
-      {
-        type: 'fix',
-        "description": "Add validation and error handling to SchemeLoader"
-      },
-      {
-        type: 'fix',
-        "description": "Correct SchemeLoader schema to match spec (platform-first nesting)"
-      },
-      {
-        type: 'feature',
-        "description": "Add SchemeLoader for keyboard scheme files"
-      },
-      {
-        type: 'fix',
-        "description": "Improve store validation and test coverage"
-      },
-      {
-        type: 'feature',
-        "description": "Add Zustand store for keyboard preferences"
-      },
-      {
-        type: 'feature',
-        "description": "Add CommandRegistry with context awareness"
-      },
-      {
-        type: 'feature',
-        "description": "Add modifier normalization for Mac/PC"
-      },
-      {
-        type: 'fix',
-        "description": "Add TypeScript types for navigator.userAgentData"
-      },
-      {
-        type: 'fix',
-        "description": "Use modern navigator API with fallback for platform detection"
-      },
-      {
-        type: 'feature',
-        "description": "Add platform detection to KeyboardNormalizer"
-      },
-      {
-        type: 'improvement',
-        "description": "Add Phase 1 implementation plan for keyboard navigation"
-      },
-      {
-        type: 'fix',
-        "description": "Update for multi-site server deployment"
       }
     ]
   }

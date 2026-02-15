@@ -18,7 +18,7 @@ import type { Pattern, TrackerCell } from '@/types';
 import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
 import { getToneEngine } from './ToneEngine';
-import { useTransportStore } from '@/stores/useTransportStore';
+import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/audio';
 
 // ============================================================================
@@ -448,6 +448,9 @@ export class TrackerReplayer {
 
     // Clear audio-synced state queue
     this.clearStateQueue();
+
+    // Cancel any pending throttled row updates
+    cancelPendingRowUpdate();
 
     console.log('[TrackerReplayer] Stopped');
   }
@@ -1997,6 +2000,9 @@ export class TrackerReplayer {
 
     // Clear state queue
     this.clearStateQueue();
+
+    // Cancel any pending throttled row updates to prevent UI reverting to old position
+    cancelPendingRowUpdate();
 
     // Set new position
     this.songPos = Math.max(0, Math.min(songPos, this.song.songLength - 1));

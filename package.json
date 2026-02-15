@@ -15,6 +15,7 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
+    "start": "npm run dev",
     "prebuild": "node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js",
     "predev": "node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js && npm run type-check",
     "dev": "npm run asbuild && vite",
