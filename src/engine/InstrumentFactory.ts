@@ -92,6 +92,8 @@ import { WAMEffectNode } from './wam/WAMEffectNode';
 import { WAM_EFFECT_URLS, WAM_SYNTH_URLS } from '@/constants/wamPlugins';
 import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
+import { ModularSynth } from './modular/ModularSynth';
+import { DEFAULT_MODULAR_PATCH } from '@/types/modular';
 import { SynthRegistry } from './registry/SynthRegistry';
 import { EffectRegistry } from './registry/EffectRegistry';
 
@@ -397,6 +399,7 @@ export class InstrumentFactory {
     'MAMEK054539': 22,     // Measured 2026-02-07: -31.8dB → need +22dB
     'MAMEC352': 17,        // Measured 2026-02-07: -26.7dB → need +17dB
     'MAMERF5C400': 0,      // Silent (sample-playback chip, needs ROM + mapping)
+    'ModularSynth': 0,     // Not yet calibrated
   };
 
   /**
@@ -804,6 +807,10 @@ export class InstrumentFactory {
         break;
       case 'MAMEVASynth':
         instrument = this.createMAMEVASynth(config);
+        break;
+
+      case 'ModularSynth':
+        instrument = this.createModularSynth(config);
         break;
 
       case 'ChiptuneModule':
@@ -5100,6 +5107,13 @@ export class InstrumentFactory {
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('MAMEVASynth', config.volume));
     this.applyChipParameters(synth, config);
     return synth as unknown as Tone.ToneAudioNode;
+  }
+
+  private static createModularSynth(config: InstrumentConfig): DevilboxSynth {
+    const patchConfig = config.modularSynth || DEFAULT_MODULAR_PATCH;
+    const synth = new ModularSynth(patchConfig);
+    synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('ModularSynth', config.volume));
+    return synth;
   }
 
   /**
