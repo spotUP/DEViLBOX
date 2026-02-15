@@ -2179,13 +2179,9 @@ export const useTrackerStore = create<TrackerStore>()(
               }
             });
 
-            // If pattern has more channels than preset, reset the rest to default
+            // If pattern has more channels than preset, REMOVE them to match hardware constraints
             if (pattern.channels.length > preset.channelDefs.length) {
-              for (let i = preset.channelDefs.length; i < pattern.channels.length; i++) {
-                pattern.channels[i].name = `Channel ${i + 1}`;
-                pattern.channels[i].shortName = `${i + 1}`;
-                pattern.channels[i].color = null;
-              }
+              pattern.channels.splice(preset.channelDefs.length);
             }
           }
         });
