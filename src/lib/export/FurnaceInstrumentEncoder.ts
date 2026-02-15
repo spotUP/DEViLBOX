@@ -129,6 +129,7 @@ function resolveInsType(config: FurnaceConfig): number {
  * Reference: furnace-wasm/common/FurnaceDispatchWrapper.cpp:3631
  */
 export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'Instrument'): Uint8Array {
+  console.log(`[FurnaceEncoder] Encoding instrument "${name}", chipType=${config.chipType}, hasC64=${!!config.c64}`);
   const writer = new BinaryWriter();
 
   // Header magic: 0xF0 0xB1
@@ -218,6 +219,8 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
   // Then len × int32 values
   // 15 macros in order: vol, arp, duty, wave, pitch, ex1, ex2, ex3, alg, fb, fms, ams, panL, panR, phaseReset
   let stdOffset = 0;
+  const waveMacro = config.macros?.find(m => (m.code ?? m.type) === 3);
+  console.log(`[FurnaceEncoder] "${name}" macros: ${config.macros?.length ?? 0} total, wave macro: ${waveMacro ? `len=${waveMacro.data?.length}, data=[${waveMacro.data?.slice(0,4).join(',')}...]` : 'NONE'}`);
   if (config.macros && config.macros.length > 0) {
     stdOffset = writer.getPosition();
 
@@ -282,6 +285,12 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     chipOffset = writer.getPosition();
     const c64 = config.c64;
     
+    // DEBUG: Log the full config object
+    console.log(`[FurnaceEncoder] C64 FULL CONFIG for "${name}":`, JSON.stringify(c64, null, 2));
+    
+    // DEBUG: Log what we received from config
+    console.log(`[FurnaceEncoder] C64 INPUT from config "${name}": tri=${c64.triOn} saw=${c64.sawOn} pulse=${c64.pulseOn} noise=${c64.noiseOn} ADSR=${c64.a}/${c64.d}/${c64.s}/${c64.r} duty=${c64.duty}`);
+    
     // Fix C64 instruments with no waveform flags set (race condition workaround)
     // Reference: furnace-master c64.cpp line 445 - note-on initializes wave from static
     // flags before macros process, causing silent notes if all flags are false.
@@ -307,6 +316,11 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     if (c64.pulseOn || pulseOnOverride) waveFlags |= 4;  // Apply override directly
     if (c64.noiseOn) waveFlags |= 8;
     console.log(`[FurnaceEncoder] C64 instrument "${name}" waveFlags=0x${waveFlags.toString(16)} (tri=${c64.triOn} saw=${c64.sawOn} pulse=${c64.pulseOn||pulseOnOverride} noise=${c64.noiseOn}) ADSR=${c64.a}/${c64.d}/${c64.s}/${c64.r}`);
+    
+    // CRITICAL DEBUG: Check if waveFlags is 0 (would cause silent note)
+    if (waveFlags === 0) {
+      console.error(`[FurnaceEncoder] *** CRITICAL: C64 instrument "${name}" has waveFlags=0 - this will be SILENT! pulseOnOverride=${pulseOnOverride} ***`);
+    }
     writer.writeUint8(waveFlags);
     
     // Fix broken ADSR: if sustain is 0, the note drops to silence immediately.
@@ -318,9 +332,10 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     const r = c64.r || 0;
     if (s === 0 && (a === 0 && d === 0 && r === 0)) {
       // All-zero ADSR is always silent - provide minimal defaults
-      console.warn(`[FurnaceEncoder] C64 instrument "${name}" has all-zero ADSR (silent), setting minimal sustain`);
+      console.warn(`[FurnaceEncoder] C64 instrument "${name}" has all-zero ADSR (silent), setting minimal sustain s=1`);
       s = 1;  // ~6% volume - prevents stuck-silent voice
     }
+    console.log(`[FurnaceEncoder] C64 "${name}" ADSR FINAL: ${a}/${d}/${s}/${r} (original was ${c64.a || 0}/${c64.d || 0}/${c64.s || 0}/${c64.r || 0})`);
     writer.writeUint8(a);
     writer.writeUint8(d);
     writer.writeUint8(s);
@@ -344,12 +359,19 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     writer.writeUint8(c64.filterResonance ?? c64.filterRes ?? 0);
     writer.writeUint16(c64.filterCutoff ?? 0);
     // Byte 13: filter type flags
+    // Support both naming conventions: filterHP/filterLP/filterBP (InstrumentConverter) and hp/lp/bp (raw parser)
+    const c64Any = c64 as unknown as Record<string, unknown>;
     let filterTypeFlags = 0;
-    if (c64.filterHP) filterTypeFlags |= 1;
-    if (c64.filterLP) filterTypeFlags |= 2;
-    if (c64.filterBP) filterTypeFlags |= 4;
-    if (c64.filterCh3Off) filterTypeFlags |= 8;
+    if (c64.filterHP || c64Any.hp) filterTypeFlags |= 1;
+    if (c64.filterLP || c64Any.lp) filterTypeFlags |= 2;
+    if (c64.filterBP || c64Any.bp) filterTypeFlags |= 4;
+    if (c64.filterCh3Off || c64Any.ch3off) filterTypeFlags |= 8;
     writer.writeUint8(filterTypeFlags);
+    
+    // DEBUG: Log the C64 chip data bytes for verification
+    const chipEndPos = writer.getPosition();
+    console.log(`[FurnaceEncoder] C64 chip data for "${name}": ${chipEndPos - chipOffset} bytes starting at offset ${chipOffset}`);
+    console.log(`[FurnaceEncoder] C64 final: wave=0x${waveFlags.toString(16)} ADSR=${a}/${d}/${s}/${r} duty=${c64.duty || 0} filterFlags=${filterFlags.toString(2).padStart(8,'0')} filterRes=${c64.filterResonance ?? c64.filterRes ?? 0} filterCut=${c64.filterCutoff ?? 0} filterType=${filterTypeFlags.toString(2).padStart(4,'0')}`);
   }
 
   if (insType === DIV_INS_N163 && config.n163) {

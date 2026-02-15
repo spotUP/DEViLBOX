@@ -814,6 +814,9 @@ async function parseNewFormat(
       // Reference: c64.cpp line 447 just copies sustain directly: chan[c.chan].sustain=ins->c64.s;
       // While S=0 produces silence, it's valid SID behavior and we must preserve 1:1 compatibility.
       // DO NOT add ADSR validation - let the WASM handle it exactly like Furnace does.
+      
+      // DEBUG: Log the final C64 state after fixup
+      console.log(`[FurnaceParser] Inst ${i} "${inst.name}" C64 FINAL: tri=${inst.c64.triOn} saw=${inst.c64.sawOn} pulse=${inst.c64.pulseOn} noise=${inst.c64.noiseOn} ADSR=${inst.c64.a}/${inst.c64.d}/${inst.c64.s}/${inst.c64.r}`);
     }
     
     // Capture raw binary data for upload to WASM
@@ -1825,6 +1828,9 @@ function parseMacroData(reader: BinaryReader, inst: FurnaceInstrument, featEnd: 
 
     inst.macros.push(macro);
   }
+  
+  // DEBUG: Log parsed macros
+  console.log(`[FurnaceParser] parseMacroData complete: ${inst.macros.length} macros, wave macro: ${inst.macros.find(m => m.code === 3)?.data?.slice(0,4) || 'none'}`);
 }
 
 /**

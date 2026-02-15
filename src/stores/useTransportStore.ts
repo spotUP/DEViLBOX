@@ -65,6 +65,7 @@ interface TransportStore extends TransportState {
   getGrooveTemplate: () => GrooveTemplate;
   setCurrentGlobalRow: (row: number) => void;
   seekToGlobalRow: (row: number) => void;
+  cancelPendingRowUpdate: () => void; // Clear pending throttle timer on seek
   reset: () => void;
 }
 
@@ -74,6 +75,16 @@ let pendingRow: number | null = null;
 let pendingPatternLength: number | undefined = undefined;
 let throttleTimer: number | null = null;
 const THROTTLE_INTERVAL = 20; // 50Hz for Amiga PAL feel
+
+// Cancel pending throttle update (called on seek to prevent old row values reverting)
+export function cancelPendingRowUpdate(): void {
+  if (throttleTimer !== null) {
+    window.clearTimeout(throttleTimer);
+    throttleTimer = null;
+  }
+  pendingRow = null;
+  pendingPatternLength = undefined;
+}
 
 export const useTransportStore = create<TransportStore>()(
   immer((set, _get) => ({
@@ -338,6 +349,11 @@ export const useTransportStore = create<TransportStore>()(
       set((state) => {
         state.currentGlobalRow = Math.max(0, row);
       }),
+
+    // Cancel pending throttle timer (call on seek to prevent old row values reverting)
+    cancelPendingRowUpdate: () => {
+      cancelPendingRowUpdate();
+    },
 
     // Reset to initial state (for new project/tab)
     reset: () =>

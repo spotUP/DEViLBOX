@@ -36,17 +36,17 @@ describe('playRow command', () => {
     };
     const mockInstrument = { id: 1, name: 'Test' };
 
-    (useTrackerStore.getState as any) = vi.fn(() => ({
+    vi.mocked(useTrackerStore.getState).mockReturnValue({
       cursor: mockCursor,
       patterns: [mockPattern],
       currentPatternIndex: 0,
-    }));
+    } as any);
 
-    (getToneEngine as any) = vi.fn(() => mockEngine);
+    vi.mocked(getToneEngine).mockReturnValue(mockEngine as any);
 
-    (useInstrumentStore.getState as any) = vi.fn(() => ({
+    vi.mocked(useInstrumentStore.getState).mockReturnValue({
       instruments: [mockInstrument]
-    }));
+    } as any);
 
     playRow();
 
@@ -66,17 +66,17 @@ describe('playRow command', () => {
     const mockEngine = { triggerNoteAttack: vi.fn() };
     const mockInstrument = { id: 1, name: 'Test' };
 
-    (useTrackerStore.getState as any) = vi.fn(() => ({
+    vi.mocked(useTrackerStore.getState).mockReturnValue({
       cursor: mockCursor,
       patterns: [mockPattern],
       currentPatternIndex: 0,
-    }));
+    } as any);
 
-    (getToneEngine as any) = vi.fn(() => mockEngine);
+    vi.mocked(getToneEngine).mockReturnValue(mockEngine as any);
 
-    (useInstrumentStore.getState as any) = vi.fn(() => ({
+    vi.mocked(useInstrumentStore.getState).mockReturnValue({
       instruments: [mockInstrument]
-    }));
+    } as any);
 
     playRow();
 
@@ -94,17 +94,17 @@ describe('playRow command', () => {
     const mockCursor = { rowIndex: 0, channelIndex: 0, columnType: 'note' };
     const mockEngine = { triggerNoteAttack: vi.fn() };
 
-    (useTrackerStore.getState as any) = vi.fn(() => ({
+    vi.mocked(useTrackerStore.getState).mockReturnValue({
       cursor: mockCursor,
       patterns: [mockPattern],
       currentPatternIndex: 0,
-    }));
+    } as any);
 
-    (getToneEngine as any) = vi.fn(() => mockEngine);
+    vi.mocked(getToneEngine).mockReturnValue(mockEngine as any);
 
-    (useInstrumentStore.getState as any) = vi.fn(() => ({
+    vi.mocked(useInstrumentStore.getState).mockReturnValue({
       instruments: []
-    }));
+    } as any);
 
     const result = playRow();
     expect(result).toBe(true);
