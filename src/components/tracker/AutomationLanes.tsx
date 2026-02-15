@@ -16,7 +16,8 @@ interface AutomationLanesProps {
   patternLength: number;
   rowHeight: number;
   channelCount: number;
-  channelWidth: number;
+  channelOffsets: number[];
+  channelWidths: number[];
   rowNumWidth: number;
   scrollOffset: number;
   visibleStart: number;
@@ -57,7 +58,8 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   patternLength,
   rowHeight,
   channelCount,
-  channelWidth,
+  channelOffsets,
+  channelWidths,
   rowNumWidth,
   scrollOffset: _scrollOffset,
   visibleStart,
@@ -175,7 +177,9 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     const curve = curves[dragState.channelIndex];
     if (!curve) return;
 
-    const laneLeft = dragState.channelIndex * channelWidth + channelWidth - LANE_WIDTH - 4;
+    const chOffset = channelOffsets[dragState.channelIndex] - rowNumWidth;
+    const chWidth = channelWidths[dragState.channelIndex];
+    const laneLeft = chOffset + chWidth - LANE_WIDTH - 4;
     const yOffset = prevLen * rowHeight;
 
     const mouseY = e.clientY - rect.top - yOffset;
@@ -188,7 +192,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
 
     // Update point
     addPoint(curve.id, row, value);
-  }, [dragState, curves, channelWidth, prevLen, rowHeight, patternLength, addPoint]);
+  }, [dragState, curves, channelWidths, rowNumWidth, prevLen, rowHeight, patternLength, addPoint]);
 
   const handleMouseUp = useCallback(() => {
     setDragState(null);
@@ -235,8 +239,14 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
     return patternCurves.map((curve, channelIndex) => {
       if (!curve) return null;
 
+      const chOffset = channelOffsets[channelIndex] - rowNumWidth;
+      const chWidth = channelWidths[channelIndex];
+      
+      // Skip if channel is too narrow (collapsed)
+      if (chWidth < 20) return null;
+
       // Position this lane at the right edge of the channel
-      const laneLeft = channelIndex * channelWidth + channelWidth - LANE_WIDTH - 4;
+      const laneLeft = chOffset + chWidth - LANE_WIDTH - 4;
       const pHeight = pLength * rowHeight;
       const yOffset = startVirtualRow * rowHeight;
 

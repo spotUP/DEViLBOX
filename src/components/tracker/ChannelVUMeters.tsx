@@ -44,12 +44,13 @@ interface MeterState {
 }
 
 interface ChannelVUMetersProps {
-  channelWidth?: number; // Override default channel width (for VirtualizedTrackerView)
-  scrollLeft?: number;   // NEW: Explicit scroll offset from parent
+  channelOffsets?: number[]; // Explicit offsets from parent
+  channelWidths?: number[];  // Explicit widths from parent
+  scrollLeft?: number;       // Explicit scroll offset from parent
 }
 
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
-export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ scrollLeft: scrollLeftProp = 0 }) => {
+export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOffsets = [], channelWidths = [], scrollLeft: scrollLeftProp = 0 }) => {
   const { patterns, currentPatternIndex } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex
@@ -194,42 +195,28 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ scrollLef
   // Note: ROW_NUM_WIDTH is handled by the parent container's left offset
   // These widths MUST match PatternEditorCanvas rendering exactly
   const LINE_NUMBER_WIDTH = 40;
-  const CHAR_WIDTH = 10;
-  const COLLAPSED_CHANNEL_WIDTH = 12;
   const METER_WIDTH = 28;
 
   // Calculate channel center X accounting for collapsed channels
   const getChannelCenterX = (index: number) => {
-    if (!pattern) return index * 260 + 130;
-
-    // Sum widths of all channels before this one
-    let offset = LINE_NUMBER_WIDTH;
-    const noteWidth = CHAR_WIDTH * 3 + 4;
-    
-    // Check first row for schema of whole pattern
-    const cell0 = pattern.channels[0]?.rows[0];
-    const hasAcid = cell0?.flag1 !== undefined || cell0?.flag2 !== undefined;
-    const hasProb = cell0?.probability !== undefined;
-    
-    const normalParamWidth = CHAR_WIDTH * 10 + 16
-      + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
-      + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
-      + CHAR_WIDTH * 2 + 4; 
-    const normalChannelWidth = noteWidth + normalParamWidth + 20;
-
-    for (let i = 0; i < index; i++) {
-      const isCollapsed = pattern.channels[i]?.collapsed;
-      offset += isCollapsed ? COLLAPSED_CHANNEL_WIDTH : normalChannelWidth;
+    if (!channelOffsets[index] || !channelWidths[index]) {
+      return index * 260 + 130;
     }
 
+    // Use passed metrics from parent (PatternEditorCanvas)
+    const offset = channelOffsets[index] - LINE_NUMBER_WIDTH;
+    const width = channelWidths[index];
+
     // Add half of this channel's width to get center
-    const thisChannelWidth = pattern.channels[index]?.collapsed ? COLLAPSED_CHANNEL_WIDTH : normalChannelWidth;
-    return offset + thisChannelWidth / 2;
+    return offset + width / 2;
   };
 
   return (
     <div ref={containerRef} className="vu-meters-overlay">
       {Array(numChannels).fill(0).map((_, index) => {
+        // Skip if channel is collapsed (too narrow for swing)
+        if (channelWidths[index] && channelWidths[index] < 20) return null;
+
         const centerX = getChannelCenterX(index);
 
         return (
