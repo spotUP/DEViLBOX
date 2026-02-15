@@ -338,6 +338,8 @@ export interface BlockSelection {
   endChannel: number;
   startRow: number;
   endRow: number;
+  startColumn: CursorPosition['columnType'];
+  endColumn: CursorPosition['columnType'];
   columnTypes: CursorPosition['columnType'][];
 }
 
@@ -345,6 +347,7 @@ export interface ClipboardData {
   channels: number;
   rows: number;
   data: TrackerCell[][];
+  columnTypes?: CursorPosition['columnType'][];
 }
 
 export type ColumnVisibility = {

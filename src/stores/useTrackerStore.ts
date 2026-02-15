@@ -36,6 +36,11 @@ const MASK_ALL = 0b11111;       // All columns
 const hasMaskBit = (mask: number, bit: number): boolean => (mask & bit) !== 0;
 const toggleMaskBit = (mask: number, bit: number): number => mask ^ bit;
 
+// Define column order for range selection
+const COLUMN_ORDER: CursorPosition['columnType'][] = [
+  'note', 'instrument', 'volume', 'effTyp', 'effTyp2', 'flag1', 'flag2', 'probability'
+];
+
 // Macro slot structure for rapid data entry (FT2-style)
 interface MacroSlot {
   note: number;
@@ -144,7 +149,7 @@ interface TrackerStore {
 
   // Block operations
   startSelection: () => void;
-  updateSelection: (channelIndex: number, rowIndex: number) => void;
+  updateSelection: (channelIndex: number, rowIndex: number, columnType?: CursorPosition['columnType']) => void;
   endSelection: () => void;
   clearSelection: () => void;
   selectColumn: (channelIndex: number, columnType: CursorPosition['columnType']) => void;
@@ -722,15 +727,44 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: state.cursor.channelIndex,
           startRow: state.cursor.rowIndex,
           endRow: state.cursor.rowIndex,
+          startColumn: state.cursor.columnType,
+          endColumn: state.cursor.columnType,
           columnTypes: [state.cursor.columnType],
         };
       }),
 
-    updateSelection: (channelIndex, rowIndex) =>
+    updateSelection: (channelIndex, rowIndex, columnType) =>
       set((state) => {
         if (state.selection) {
           state.selection.endChannel = channelIndex;
           state.selection.endRow = rowIndex;
+
+          if (columnType) {
+            state.selection.endColumn = columnType;
+            
+            // Re-calculate columnTypes array for backward compatibility
+            const startCol = state.selection.startColumn;
+            let endCol = columnType;
+            if (endCol === 'effParam') endCol = 'effTyp';
+            if (endCol === 'effParam2') endCol = 'effTyp2';
+            let sCol = startCol;
+            if (sCol === 'effParam') sCol = 'effTyp';
+            if (sCol === 'effParam2') sCol = 'effTyp2';
+
+            const startIndex = COLUMN_ORDER.indexOf(sCol);
+            const endIndex = COLUMN_ORDER.indexOf(endCol);
+
+            if (startIndex !== -1 && endIndex !== -1) {
+              const min = Math.min(startIndex, endIndex);
+              const max = Math.max(startIndex, endIndex);
+              const types = COLUMN_ORDER.slice(min, max + 1);
+
+              if (types.includes('effTyp') && !types.includes('effParam')) types.push('effParam');
+              if (types.includes('effTyp2') && !types.includes('effParam2')) types.push('effParam2');
+
+              state.selection.columnTypes = types;
+            }
+          }
         }
       }),
 
@@ -739,6 +773,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (state.selection) {
           state.selection.endChannel = state.cursor.channelIndex;
           state.selection.endRow = state.cursor.rowIndex;
+          state.selection.endColumn = state.cursor.columnType;
         }
       }),
 
@@ -755,6 +790,8 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: channelIndex,
           startRow: 0,
           endRow: pattern.length - 1,
+          startColumn: columnType,
+          endColumn: columnType,
           columnTypes: [columnType],
         };
       }),
@@ -767,6 +804,8 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: channelIndex,
           startRow: 0,
           endRow: pattern.length - 1,
+          startColumn: 'note',
+          endColumn: 'probability',
           columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'flag1', 'flag2', 'probability'],
         };
       }),
@@ -779,6 +818,8 @@ export const useTrackerStore = create<TrackerStore>()(
           endChannel: pattern.channels.length - 1,
           startRow: 0,
           endRow: pattern.length - 1,
+          startColumn: 'note',
+          endColumn: 'probability',
           columnTypes: ['note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'flag1', 'flag2', 'probability'],
         };
       }),
@@ -795,42 +836,58 @@ export const useTrackerStore = create<TrackerStore>()(
             endChannel: state.cursor.channelIndex,
             startRow: state.cursor.rowIndex,
             endRow: state.cursor.rowIndex,
+            startColumn: state.cursor.columnType,
+            endColumn: state.cursor.columnType,
             columnTypes: [state.cursor.columnType],
           };
         }
 
-        const { startChannel, endChannel, startRow, endRow } = sel;
+        const { startChannel, endChannel, startRow, endRow, columnTypes } = sel;
         const minChannel = Math.min(startChannel, endChannel);
         const maxChannel = Math.max(startChannel, endChannel);
         const minRow = Math.min(startRow, endRow);
         const maxRow = Math.max(startRow, endRow);
 
-        const cellCount = (maxRow - minRow + 1) * (maxChannel - minChannel + 1);
-
-        // Use structuredClone for large selections (>1000 cells), spread for small
         const copiedData: TrackerCell[][] = [];
-        if (cellCount > 1000) {
-          // Large selection - use structuredClone (60-75% faster)
-          for (let ch = minChannel; ch <= maxChannel; ch++) {
-            copiedData.push(
-              structuredClone(pattern.channels[ch].rows.slice(minRow, maxRow + 1))
-            );
-          }
-        } else {
-          // Small selection - use spread (faster for <1000 cells)
-          for (let ch = minChannel; ch <= maxChannel; ch++) {
-            const channelData: TrackerCell[] = [];
-            for (let row = minRow; row <= maxRow; row++) {
-              channelData.push({ ...pattern.channels[ch].rows[row] });
+        const isFullCell = !columnTypes || columnTypes.length === 0 || columnTypes.length > 8;
+
+        for (let ch = minChannel; ch <= maxChannel; ch++) {
+          const channelData: TrackerCell[] = [];
+          for (let row = minRow; row <= maxRow; row++) {
+            const sourceCell = pattern.channels[ch].rows[row];
+            if (isFullCell) {
+              channelData.push({ ...sourceCell });
+            } else {
+              // Create a "sparse" cell with only selected fields
+              const sparseCell: TrackerCell = { ...EMPTY_CELL };
+              if (columnTypes.includes('note')) {
+                sparseCell.note = sourceCell.note;
+                sparseCell.instrument = sourceCell.instrument;
+              }
+              if (columnTypes.includes('instrument')) sparseCell.instrument = sourceCell.instrument;
+              if (columnTypes.includes('volume')) sparseCell.volume = sourceCell.volume;
+              if (columnTypes.includes('effTyp') || columnTypes.includes('effParam')) {
+                sparseCell.effTyp = sourceCell.effTyp;
+                sparseCell.eff = sourceCell.eff;
+              }
+              if (columnTypes.includes('effTyp2') || columnTypes.includes('effParam2')) {
+                sparseCell.effTyp2 = sourceCell.effTyp2;
+                sparseCell.eff2 = sourceCell.eff2;
+              }
+              if (columnTypes.includes('flag1')) sparseCell.flag1 = sourceCell.flag1;
+              if (columnTypes.includes('flag2')) sparseCell.flag2 = sourceCell.flag2;
+              if (columnTypes.includes('probability')) sparseCell.probability = sourceCell.probability;
+              channelData.push(sparseCell);
             }
-            copiedData.push(channelData);
           }
+          copiedData.push(channelData);
         }
 
         state.clipboard = {
           channels: maxChannel - minChannel + 1,
           rows: maxRow - minRow + 1,
           data: copiedData,
+          columnTypes: columnTypes,
         };
       }),
 
@@ -846,23 +903,72 @@ export const useTrackerStore = create<TrackerStore>()(
             endChannel: state.cursor.channelIndex,
             startRow: state.cursor.rowIndex,
             endRow: state.cursor.rowIndex,
+            startColumn: state.cursor.columnType,
+            endColumn: state.cursor.columnType,
             columnTypes: [state.cursor.columnType],
           };
         }
 
-        const { startChannel, endChannel, startRow, endRow } = sel;
+        const { startChannel, endChannel, startRow, endRow, columnTypes } = sel;
         const minChannel = Math.min(startChannel, endChannel);
         const maxChannel = Math.max(startChannel, endChannel);
         const minRow = Math.min(startRow, endRow);
         const maxRow = Math.max(startRow, endRow);
 
         const copiedData: TrackerCell[][] = [];
+        const isFullCell = !columnTypes || columnTypes.length === 0 || columnTypes.length > 8;
+
         for (let ch = minChannel; ch <= maxChannel; ch++) {
           const channelData: TrackerCell[] = [];
           for (let row = minRow; row <= maxRow; row++) {
-            channelData.push({ ...pattern.channels[ch].rows[row] });
-            // Clear the cell
-            pattern.channels[ch].rows[row] = { ...EMPTY_CELL };
+            const cell = pattern.channels[ch].rows[row];
+            
+            // Copy logic
+            if (isFullCell) {
+              channelData.push({ ...cell });
+              pattern.channels[ch].rows[row] = { ...EMPTY_CELL };
+            } else {
+              const sparseCell: TrackerCell = { ...EMPTY_CELL };
+              if (columnTypes.includes('note')) {
+                sparseCell.note = cell.note;
+                sparseCell.instrument = cell.instrument;
+                cell.note = 0;
+                cell.instrument = 0;
+              }
+              if (columnTypes.includes('instrument')) {
+                sparseCell.instrument = cell.instrument;
+                cell.instrument = 0;
+              }
+              if (columnTypes.includes('volume')) {
+                sparseCell.volume = cell.volume;
+                cell.volume = 0;
+              }
+              if (columnTypes.includes('effTyp') || columnTypes.includes('effParam')) {
+                sparseCell.effTyp = cell.effTyp;
+                sparseCell.eff = cell.eff;
+                cell.effTyp = 0;
+                cell.eff = 0;
+              }
+              if (columnTypes.includes('effTyp2') || columnTypes.includes('effParam2')) {
+                sparseCell.effTyp2 = cell.effTyp2;
+                sparseCell.eff2 = cell.eff2;
+                cell.effTyp2 = 0;
+                cell.eff2 = 0;
+              }
+              if (columnTypes.includes('flag1')) {
+                sparseCell.flag1 = cell.flag1;
+                cell.flag1 = undefined;
+              }
+              if (columnTypes.includes('flag2')) {
+                sparseCell.flag2 = cell.flag2;
+                cell.flag2 = undefined;
+              }
+              if (columnTypes.includes('probability')) {
+                sparseCell.probability = cell.probability;
+                cell.probability = undefined;
+              }
+              channelData.push(sparseCell);
+            }
           }
           copiedData.push(channelData);
         }
@@ -871,6 +977,7 @@ export const useTrackerStore = create<TrackerStore>()(
           channels: maxChannel - minChannel + 1,
           rows: maxRow - minRow + 1,
           data: copiedData,
+          columnTypes: columnTypes,
         };
 
         state.selection = null;
@@ -882,8 +989,10 @@ export const useTrackerStore = create<TrackerStore>()(
 
         const pattern = state.patterns[state.currentPatternIndex];
         const { channelIndex, rowIndex } = state.cursor;
-        const { data } = state.clipboard;
+        const { data, columnTypes } = state.clipboard;
         const { pasteMask } = state;
+        
+        const isSparse = !!(columnTypes && columnTypes.length > 0 && columnTypes.length <= 8);
 
         for (let ch = 0; ch < data.length; ch++) {
           const targetChannel = channelIndex + ch;
@@ -896,23 +1005,37 @@ export const useTrackerStore = create<TrackerStore>()(
             const sourceCell = data[ch][row];
             const targetCell = pattern.channels[targetChannel].rows[targetRow];
 
-            // Merge properties based on pasteMask
-            if (hasMaskBit(pasteMask, MASK_NOTE)) {
+            // Merge properties based on pasteMask AND columnTypes if sparse
+            if (hasMaskBit(pasteMask, MASK_NOTE) && (!isSparse || columnTypes.includes('note'))) {
               targetCell.note = sourceCell.note;
+              if (sourceCell.instrument !== 0) {
+                targetCell.instrument = sourceCell.instrument;
+              }
             }
-            if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
+            if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && (!isSparse || columnTypes.includes('instrument'))) {
               targetCell.instrument = sourceCell.instrument;
             }
-            if (hasMaskBit(pasteMask, MASK_VOLUME)) {
+            if (hasMaskBit(pasteMask, MASK_VOLUME) && (!isSparse || columnTypes.includes('volume'))) {
               targetCell.volume = sourceCell.volume;
             }
-            if (hasMaskBit(pasteMask, MASK_EFFECT)) {
+            if (hasMaskBit(pasteMask, MASK_EFFECT) && (!isSparse || columnTypes.includes('effTyp') || columnTypes.includes('effParam'))) {
               targetCell.effTyp = sourceCell.effTyp;
               targetCell.eff = sourceCell.eff;
             }
-            if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
+            if (hasMaskBit(pasteMask, MASK_EFFECT2) && (!isSparse || columnTypes.includes('effTyp2') || columnTypes.includes('effParam2'))) {
               targetCell.effTyp2 = sourceCell.effTyp2;
               targetCell.eff2 = sourceCell.eff2;
+            }
+            
+            // Flags and prob
+            if (isSparse) {
+              if (columnTypes.includes('flag1')) targetCell.flag1 = sourceCell.flag1;
+              if (columnTypes.includes('flag2')) targetCell.flag2 = sourceCell.flag2;
+              if (columnTypes.includes('probability')) targetCell.probability = sourceCell.probability;
+            } else {
+              if (sourceCell.flag1 !== undefined) targetCell.flag1 = sourceCell.flag1;
+              if (sourceCell.flag2 !== undefined) targetCell.flag2 = sourceCell.flag2;
+              if (sourceCell.probability !== undefined) targetCell.probability = sourceCell.probability;
             }
           }
         }
