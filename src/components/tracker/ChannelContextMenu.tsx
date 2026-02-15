@@ -26,6 +26,8 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  Rewind,
+  Shuffle,
 } from 'lucide-react';
 import { DropdownButton, type MenuItemType } from '@components/common/ContextMenu';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
@@ -53,6 +55,18 @@ interface ChannelContextMenuProps {
   onHumanize: (channelIndex: number) => void;
   onInterpolate: (channelIndex: number) => void;
   onAcidGenerator: (channelIndex: number) => void;
+  onReverseVisual?: (channelIndex: number) => void;
+  onPolyrhythm?: (channelIndex: number) => void;
+  onFibonacci?: (channelIndex: number) => void;
+  onEuclidean?: (channelIndex: number) => void;
+  onPingPong?: (channelIndex: number) => void;
+  onGlitch?: (channelIndex: number) => void;
+  onStrobe?: (channelIndex: number) => void;
+  onVisualEcho?: (channelIndex: number) => void;
+  onConverge?: (channelIndex: number) => void;
+  onSpiral?: (channelIndex: number) => void;
+  onBounce?: (channelIndex: number) => void;
+  onChaos?: (channelIndex: number) => void;
 }
 
 export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
@@ -68,6 +82,18 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   onHumanize,
   onInterpolate,
   onAcidGenerator,
+  onReverseVisual,
+  onPolyrhythm,
+  onFibonacci,
+  onEuclidean,
+  onPingPong,
+  onGlitch,
+  onStrobe,
+  onVisualEcho,
+  onConverge,
+  onSpiral,
+  onBounce,
+  onChaos,
 }) => {
   const { isLiveMode, queueChannelAction } = useLiveModeStore();
   const { toggleChannelMute, toggleChannelSolo, removeChannel, setChannelColor, patterns } = useTrackerStore();
@@ -410,6 +436,97 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
         onClick: () => onInterpolate(channelIndex),
       },
       { type: 'divider' },
+      // B/D Command Animations
+      {
+        id: 'bd-animations',
+        label: 'B/D Animations',
+        icon: <Sparkles size={14} />,
+        submenu: [
+          {
+            id: 'bd-reverse-visual',
+            label: 'Reverse Visual',
+            icon: <Rewind size={14} />,
+            onClick: () => onReverseVisual?.(channelIndex),
+            disabled: !onReverseVisual,
+          },
+          { type: 'divider' },
+          {
+            id: 'bd-polyrhythm',
+            label: 'Polyrhythm (E6x)...',
+            icon: <Repeat size={14} />,
+            onClick: () => onPolyrhythm?.(channelIndex),
+            disabled: !onPolyrhythm,
+          },
+          {
+            id: 'bd-fibonacci',
+            label: 'Fibonacci Sequence',
+            onClick: () => onFibonacci?.(channelIndex),
+            disabled: !onFibonacci,
+          },
+          {
+            id: 'bd-euclidean',
+            label: 'Euclidean Pattern...',
+            icon: <Shuffle size={14} />,
+            onClick: () => onEuclidean?.(channelIndex),
+            disabled: !onEuclidean,
+          },
+          { type: 'divider' },
+          {
+            id: 'bd-pingpong',
+            label: 'Ping-Pong',
+            icon: <ArrowUpDown size={14} />,
+            onClick: () => onPingPong?.(channelIndex),
+            disabled: !onPingPong,
+          },
+          {
+            id: 'bd-glitch',
+            label: 'Random Glitch',
+            icon: <Zap size={14} />,
+            onClick: () => onGlitch?.(channelIndex),
+            disabled: !onGlitch,
+          },
+          {
+            id: 'bd-strobe',
+            label: 'Strobe Visual',
+            icon: <Activity size={14} />,
+            onClick: () => onStrobe?.(channelIndex),
+            disabled: !onStrobe,
+          },
+          {
+            id: 'bd-echo',
+            label: 'Visual Echo',
+            icon: <Waves size={14} />,
+            onClick: () => onVisualEcho?.(channelIndex),
+            disabled: !onVisualEcho,
+          },
+          { type: 'divider' },
+          {
+            id: 'bd-converge',
+            label: 'Converge',
+            onClick: () => onConverge?.(channelIndex),
+            disabled: !onConverge,
+          },
+          {
+            id: 'bd-spiral',
+            label: 'Spiral Out',
+            onClick: () => onSpiral?.(channelIndex),
+            disabled: !onSpiral,
+          },
+          {
+            id: 'bd-bounce',
+            label: 'Bounce',
+            onClick: () => onBounce?.(channelIndex),
+            disabled: !onBounce,
+          },
+          {
+            id: 'bd-chaos',
+            label: 'Chaos',
+            onClick: () => onChaos?.(channelIndex),
+            disabled: !onChaos,
+          },
+        ],
+      },
+      { type: 'divider' },
       // Automation submenu (edit)
       {
         id: 'automation',
@@ -507,6 +624,18 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     onHumanize,
     onInterpolate,
     onAcidGenerator,
+    onReverseVisual,
+    onPolyrhythm,
+    onFibonacci,
+    onEuclidean,
+    onPingPong,
+    onGlitch,
+    onStrobe,
+    onVisualEcho,
+    onConverge,
+    onSpiral,
+    onBounce,
+    onChaos,
     toggleChannelMute,
     toggleChannelSolo,
     removeChannel,
