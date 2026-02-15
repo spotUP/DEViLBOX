@@ -123,41 +123,43 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
         </div>
 
         {/* Black keys layer (absolute) */}
-        {[...Array(24)].map((_, index) => {
-          const semitone = index % 12;
-          const isBlackKey = BLACK_KEYS.includes(semitone);
-          if (!isBlackKey) return null;
-          const isPressed = pressedKeys.has(index);
-          const displayOctave = Math.floor(index / 12) + octave;
+        <div className="absolute inset-0 pointer-events-none">
+          {[...Array(24)].map((_, index) => {
+            const semitone = index % 12;
+            const isBlackKey = BLACK_KEYS.includes(semitone);
+            if (!isBlackKey) return null;
+            const isPressed = pressedKeys.has(index);
+            const displayOctave = Math.floor(index / 12) + octave;
 
-          // Calculate position across 2 octaves
-          const octaveOffset = Math.floor(index / 12);
-          const whiteKeysBeforeInOctave = NOTE_NAMES.slice(0, semitone).filter((_, i) => !BLACK_KEYS.includes(i)).length;
-          const totalWhiteKeys = 14; // 2 octaves
-          const whiteKeyWidth = 100 / totalWhiteKeys;
-          const leftPos = ((octaveOffset * 7 + whiteKeysBeforeInOctave) * whiteKeyWidth) - (whiteKeyWidth * 0.25);
+            // Calculate position across 2 octaves
+            const octaveOffset = Math.floor(index / 12);
+            const whiteKeysBeforeInOctave = NOTE_NAMES.slice(0, semitone).filter((_, i) => !BLACK_KEYS.includes(i)).length;
+            const totalWhiteKeys = 14; // 2 octaves
+            const whiteKeyWidth = 100 / totalWhiteKeys;
+            const leftPos = ((octaveOffset * 7 + whiteKeysBeforeInOctave) * whiteKeyWidth) - (whiteKeyWidth * 0.25);
 
-          return (
-            <button
-              key={index}
-              onTouchStart={(e) => handleKeyPress(index, e)}
-              onTouchEnd={() => handleKeyRelease(index)}
-              onTouchCancel={() => handleKeyRelease(index)}
-              className={`piano-key piano-key-black ${isPressed ? 'opacity-70 scale-95' : ''}`}
-              style={{ 
-                left: `${leftPos}%`, 
-                width: `${whiteKeyWidth * 0.6}%`,
-                zIndex: 10
-              }}
-              aria-label={`${NOTE_NAMES[semitone]}${displayOctave}`}
-            >
-              <span className="piano-key-label">
-                {NOTE_NAMES[semitone]}
-                <span className="text-[9px] opacity-50">{displayOctave}</span>
-              </span>
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={index}
+                onTouchStart={(e) => handleKeyPress(index, e)}
+                onTouchEnd={() => handleKeyRelease(index)}
+                onTouchCancel={() => handleKeyRelease(index)}
+                className={`piano-key-black pointer-events-auto ${isPressed ? 'opacity-70 scale-95' : ''}`}
+                style={{ 
+                  left: `${leftPos}%`, 
+                  width: `${whiteKeyWidth * 0.6}%`,
+                  zIndex: 10
+                }}
+                aria-label={`${NOTE_NAMES[semitone]}${displayOctave}`}
+              >
+                <span className="piano-key-label">
+                  {NOTE_NAMES[semitone]}
+                  <span className="text-[9px] opacity-50">{displayOctave}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
