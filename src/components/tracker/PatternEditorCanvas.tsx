@@ -219,7 +219,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
 
     // Determine column type within the channel
-    let columnType: CursorPosition['columnType'] = 'note';
+    let columnType: 'note' | 'instrument' | 'volume' | 'effTyp' | 'effVal' | 'effTyp2' | 'effVal2' | 'flag1' | 'flag2' | 'probability' = 'note';
     
     // Column layout (offsets matching getParamCanvas):
     // note (noteWidth) -> 8px gap -> inst(2) -> 4gap -> vol(2) -> 4gap -> eff(1+2) -> 4gap -> eff2(1+2) -> 4gap
@@ -264,9 +264,26 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     store.moveCursorToColumn(columnType);
   }, [pattern, isMobile]);
 
+  // Mobile swipe handlers for channel navigation
+  const handleSwipeLeft = useCallback(() => {
+    if (!pattern || !isMobile) return;
+    const nextChannel = Math.min(pattern.channels.length - 1, mobileChannelIndex + 1);
+    if (nextChannel !== mobileChannelIndex) {
+      moveCursorToChannel(nextChannel);
+    }
+  }, [pattern, isMobile, mobileChannelIndex, moveCursorToChannel]);
+
+  const handleSwipeRight = useCallback(() => {
+    if (!pattern || !isMobile) return;
+    const prevChannel = Math.max(0, mobileChannelIndex - 1);
+    if (prevChannel !== mobileChannelIndex) {
+      moveCursorToChannel(prevChannel);
+    }
+  }, [pattern, isMobile, mobileChannelIndex, moveCursorToChannel]);
+
   const patternGestures = useMobilePatternGestures({
-    onSwipeLeft,
-    onSwipeRight,
+    onSwipeLeft: handleSwipeLeft,
+    onSwipeRight: handleSwipeRight,
     onSwipeUp: handleSwipeUp,
     onSwipeDown: handleSwipeDown,
     onTap: handlePatternTap,
@@ -355,23 +372,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     lineNumber: '#707070',
     lineNumberHighlight: '#f97316',
   }), [isCyanTheme]);
-
-  // Mobile swipe handlers
-  const handleSwipeLeft = useCallback(() => {
-    if (!pattern || !isMobile) return;
-    const nextChannel = Math.min(pattern.channels.length - 1, mobileChannelIndex + 1);
-    if (nextChannel !== mobileChannelIndex) {
-      moveCursorToChannel(nextChannel);
-    }
-  }, [pattern, isMobile, mobileChannelIndex, moveCursorToChannel]);
-
-  const handleSwipeRight = useCallback(() => {
-    if (!pattern || !isMobile) return;
-    const prevChannel = Math.max(0, mobileChannelIndex - 1);
-    if (prevChannel !== mobileChannelIndex) {
-      moveCursorToChannel(prevChannel);
-    }
-  }, [pattern, isMobile, mobileChannelIndex, moveCursorToChannel]);
 
   const swipeHandlers = useSwipeGesture({
     threshold: 50,

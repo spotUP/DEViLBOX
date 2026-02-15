@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-15T11:46:19.006Z
+ * Generated: 2026-02-15T11:49:20.294Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '593';
-export const BUILD_HASH = '0cc8ab8';
+export const BUILD_NUMBER = '596';
+export const BUILD_HASH = '86e4419';
 export const BUILD_DATE = '2026-02-15';
 
 // Full semantic version with build number
@@ -33,6 +33,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-15',
     changes: [
+      {
+        type: 'fix',
+        "description": "UI updates and debug script for C64 instrument analysis"
+      },
+      {
+        type: 'fix',
+        "description": "Fix C64 instruments with no waveform flags - handles race condition where note-on sets wave=0 before macros process"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Furnace C64/AY/OPL/OPLL core initialization - add missing setCore() calls"
+      },
       {
         type: 'fix',
         "description": "Update release job dependency from 'deploy' to 'deploy-server'"
@@ -226,18 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Correct GitHub Pages URLs in manifest.json"
-      },
-      {
-        type: 'fix',
-        "description": "Disable horizontal scroll and fix tap/swipe gestures"
-      },
-      {
-        type: 'feature',
-        "description": "Add PWA install-to-home-screen option"
-      },
-      {
-        type: 'fix',
-        "description": "Lock viewport and prevent unwanted scrolling behavior"
       }
     ]
   }
