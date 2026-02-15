@@ -10,8 +10,9 @@ import { InstrumentList } from '@components/instruments/InstrumentList';
 import { TB303KnobPanel } from './TB303KnobPanel';
 import { FT2Toolbar } from './FT2Toolbar';
 import { MobilePatternInput } from './mobile/MobilePatternInput';
-import { Play, Square, ChevronLeft, ChevronRight, Music2, SlidersHorizontal } from 'lucide-react';
+import { Play, Square, ChevronLeft, ChevronRight, Music2, SlidersHorizontal, Cpu } from 'lucide-react';
 import { useTransportStore, useTrackerStore, useInstrumentStore } from '@stores';
+import { SYSTEM_PRESETS } from '@/constants/systemPresets';
 import { useOrientation } from '@/hooks/useOrientation';
 import { haptics } from '@/utils/haptics';
 import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
@@ -39,7 +40,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   const [mobileChannel, setMobileChannel] = useState(0); // For portrait mode: which channel to show
   const [isInputCollapsed, setIsInputCollapsed] = useState(false); // Track MobilePatternInput collapse state
   const { isPlaying, togglePlayPause } = useTransportStore();
-  const { patterns, currentPatternIndex, cursor, setCell, moveCursor, copySelection, cutSelection, paste } = useTrackerStore();
+  const { patterns, currentPatternIndex, cursor, setCell, moveCursor, copySelection, cutSelection, paste, applySystemPreset } = useTrackerStore();
   const { instruments, currentInstrumentId, setCurrentInstrument } = useInstrumentStore();
   const pattern = patterns[currentPatternIndex];
   const { isPortrait, isLandscape } = useOrientation();
@@ -204,19 +205,33 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
           )}
 
           {/* Instrument selector */}
-          <div className="ml-1 pl-1 border-l border-dark-border flex-1 min-w-0">
+          <div className="ml-1 pl-1 border-l border-dark-border flex items-center gap-1 min-w-0">
             <select
               value={currentInstrumentId ?? 1}
               onChange={(e) => setCurrentInstrument(parseInt(e.target.value, 10))}
-              className="w-full text-xs bg-dark-bgTertiary border border-dark-border rounded px-2 py-1 text-text-primary font-mono truncate"
-              style={{ maxWidth: '120px' }}
+              className="text-[10px] bg-dark-bgTertiary border border-dark-border rounded px-1.5 py-1 text-text-primary font-mono truncate"
+              style={{ maxWidth: '80px' }}
             >
               {instruments.map((inst) => (
                 <option key={inst.id} value={inst.id}>
-                  {inst.name.substring(0, 20)}
+                  {inst.name.substring(0, 15)}
                 </option>
               ))}
             </select>
+            
+            <div className="flex items-center ml-1 pl-1 border-l border-dark-border">
+              <Cpu size={12} className="text-accent-primary mr-1" />
+              <select
+                className="bg-dark-bgTertiary text-text-primary text-[10px] h-6 border border-dark-border rounded px-1 hover:border-accent-primary outline-none max-w-[70px]"
+                onChange={(e) => applySystemPreset(e.target.value)}
+                defaultValue="none"
+              >
+                <option value="none" disabled>HW...</option>
+                {SYSTEM_PRESETS.map(preset => (
+                  <option key={preset.id} value={preset.id}>{preset.name.split(' ')[0].toUpperCase()}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 

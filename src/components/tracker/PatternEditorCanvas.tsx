@@ -109,7 +109,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     removeChannel,
     toggleChannelMute,
     toggleChannelSolo,
-    toggleChannelCollapse,
+    toggleChannelCollapse: _toggleChannelCollapse,
     setChannelColor,
     updateChannelName,
     setCell,
@@ -1826,17 +1826,30 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               <ChevronLeft size={20} />
             </button>
 
-            <div className="flex items-center gap-3">
-              <span
-                className="font-bold font-mono text-lg"
-                style={{ color: mobileChannel?.color || 'var(--color-accent)' }}
-              >
-                CH {(mobileChannelIndex + 1).toString().padStart(2, '0')}
-              </span>
-              <span className="text-xs text-text-muted">
-                / {pattern.channels.length.toString().padStart(2, '0')}
-              </span>
-              <ChannelVUMeter level={mobileTrigger.level} isActive={mobileTrigger.triggered} />
+            <div className="flex flex-col items-center">
+              <div className="flex items-center gap-3">
+                <span
+                  className="font-bold font-mono text-lg"
+                  style={{ color: mobileChannel?.color || 'var(--color-accent)' }}
+                >
+                  CH {(mobileChannelIndex + 1).toString().padStart(2, '0')}
+                </span>
+                <span className="text-xs text-text-muted">
+                  / {pattern.channels.length.toString().padStart(2, '0')}
+                </span>
+                <ChannelVUMeter level={mobileTrigger.level} isActive={mobileTrigger.triggered} />
+              </div>
+              <input
+                type="text"
+                className="bg-dark-bgPrimary/50 border border-dark-border/30 rounded px-2 py-0.5 mt-1 font-mono text-[10px] text-accent-primary text-center uppercase focus:border-accent-primary outline-none min-w-[120px]"
+                value={mobileChannel?.name || `Channel ${mobileChannelIndex + 1}`}
+                onChange={(e) => updateChannelName(mobileChannelIndex, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+              />
             </div>
 
             <button
