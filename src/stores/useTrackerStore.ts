@@ -336,6 +336,8 @@ export const useTrackerStore = create<TrackerStore>()(
           envMod: 2,
           pan: 2,
           probability: 2,
+          flag1: 1,
+          flag2: 1,
         };
 
         const currentDigits = DIGIT_COUNTS[state.cursor.columnType] || 0;
@@ -363,9 +365,16 @@ export const useTrackerStore = create<TrackerStore>()(
               break;
             }
 
-            const columnOrder: CursorPosition['columnType'][] = [
-              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'flag1', 'flag2', 'probability'
-            ];
+            const vis = state.columnVisibility;
+            const columnOrder: CursorPosition['columnType'][] = ['note'];
+            if (vis.instrument) columnOrder.push('instrument');
+            if (vis.volume) columnOrder.push('volume');
+            if (vis.effect) { columnOrder.push('effTyp'); columnOrder.push('effParam'); }
+            if (vis.effect2) { columnOrder.push('effTyp2'); columnOrder.push('effParam2'); }
+            if (vis.flag1) columnOrder.push('flag1');
+            if (vis.flag2) columnOrder.push('flag2');
+            if (vis.probability) columnOrder.push('probability');
+
             const currentColumnIndex = columnOrder.indexOf(state.cursor.columnType);
             // Safety: if cursor is on an unknown column, snap to note
             if (currentColumnIndex === -1) {
@@ -397,9 +406,16 @@ export const useTrackerStore = create<TrackerStore>()(
               break;
             }
 
-            const columnOrder2: CursorPosition['columnType'][] = [
-              'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2', 'flag1', 'flag2', 'probability'
-            ];
+            const vis = state.columnVisibility;
+            const columnOrder2: CursorPosition['columnType'][] = ['note'];
+            if (vis.instrument) columnOrder2.push('instrument');
+            if (vis.volume) columnOrder2.push('volume');
+            if (vis.effect) { columnOrder2.push('effTyp'); columnOrder2.push('effParam'); }
+            if (vis.effect2) { columnOrder2.push('effTyp2'); columnOrder2.push('effParam2'); }
+            if (vis.flag1) columnOrder2.push('flag1');
+            if (vis.flag2) columnOrder2.push('flag2');
+            if (vis.probability) columnOrder2.push('probability');
+
             const currentColumnIndex2 = columnOrder2.indexOf(state.cursor.columnType);
             // Safety: if cursor is on an unknown column, snap to note
             if (currentColumnIndex2 === -1) {
