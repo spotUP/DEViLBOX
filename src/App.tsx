@@ -52,6 +52,7 @@ const PianoRoll = lazy(() => import('./components/pianoroll/PianoRoll').then(m =
 const OscilloscopePopout = lazy(() => import('./components/visualization/OscilloscopePopout').then(m => ({ default: m.OscilloscopePopout })));
 const ArrangementView = lazy(() => import('./components/arrangement').then(m => ({ default: m.ArrangementView })));
 const FileBrowser = lazy(() => import('@components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser })));
+const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => ({ default: m.AuthModal })));
 
 function App() {
   // Check for application updates
@@ -94,6 +95,7 @@ function App() {
   const [pendingSongFile, setPendingSongFile] = useState<File | null>(null);
   const [showSongLoadConfirm, setShowSongLoadConfirm] = useState(false);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog, showKnobBar, setShowKnobBar } = useMIDIStore();
 
@@ -841,6 +843,7 @@ function App() {
         onShowInstruments={() => setShowInstrumentModal(true)}
         onLoad={() => setShowFileBrowser(true)}
         onShowDrumpads={() => setShowDrumpads(true)}
+        onShowAuth={() => setShowAuthModal(true)}
       >
         <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-y-hidden">
         {/* Top: Main workspace */}
@@ -1100,6 +1103,14 @@ function App() {
           latestVersion={latestVersion?.buildNumber || 'unknown'}
         />
       )}
+
+      {/* Auth Modal */}
+      <Suspense fallback={null}>
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+        />
+      </Suspense>
     </AppLayout>
     </GlobalDragDropHandler>
   );

@@ -22,6 +22,7 @@ interface AppLayoutProps {
   onShowPatternOrder?: () => void;
   onShowDrumpads?: () => void;
   onShowGrooveSettings?: () => void;
+  onShowAuth?: () => void;
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({
@@ -39,6 +40,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   onShowPatternOrder,
   onShowDrumpads,
   onShowGrooveSettings,
+  onShowAuth,
 }) => {
   const { isMobile } = useResponsive();
 
@@ -65,6 +67,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           onShowPatternOrder={onShowPatternOrder}
           onShowDrumpads={onShowDrumpads}
           onShowGrooveSettings={onShowGrooveSettings}
+          onShowAuth={onShowAuth}
         />
       )}
 
