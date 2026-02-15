@@ -21,6 +21,7 @@ import { FadeVolumeDialog } from './FadeVolumeDialog';
 import { RemapInstrumentDialog } from './RemapInstrumentDialog';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 import { PatternOrderModal } from '@components/dialogs/PatternOrderModal';
+import { SYSTEM_PRESETS } from '@/constants/systemPresets';
 import { StrumDialog } from '@components/dialogs/StrumDialog';
 import { AdvancedEditModal } from '@components/dialogs/AdvancedEditModal';
 import { KeyboardShortcutSheet } from './KeyboardShortcutSheet';
@@ -183,7 +184,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     setShowGhostPatterns,
     scaleVolume,
     fadeVolume,
-    remapInstrument
+    remapInstrument,
+    applySystemPreset
   } = useTrackerStore(useShallow((state) => ({
     patterns: state.patterns,
     currentPatternIndex: state.currentPatternIndex,
@@ -196,6 +198,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     scaleVolume: state.scaleVolume,
     fadeVolume: state.fadeVolume,
     remapInstrument: state.remapInstrument,
+    applySystemPreset: state.applySystemPreset
   })));
 
   const { loadInstruments } = useInstrumentStore(useShallow(s => ({ loadInstruments: s.loadInstruments })));
@@ -791,6 +794,25 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               <option value="pianoroll">Piano Roll</option>
               <option value="tb303">TB-303</option>
               <option value="arrangement">Arrangement</option>
+            </select>
+          </div>
+
+          {/* Hardware System Preset Selector - High Visibility */}
+          <div className="flex items-center gap-1.5 ml-1 pl-2 border-l border-dark-border">
+            <Cpu size={14} className="text-accent-primary animate-pulse" />
+            <select
+              className="px-2 py-1 text-[10px] font-black bg-dark-bgSecondary text-accent-primary border border-accent-primary/40 rounded hover:border-accent-primary transition-colors cursor-pointer outline-none shadow-glow-sm"
+              onChange={(e) => {
+                applySystemPreset(e.target.value);
+                notify.success(`Hardware System: ${SYSTEM_PRESETS.find(p => p.id === e.target.value)?.name.toUpperCase()}`);
+              }}
+              defaultValue="none"
+              title="Select Hardware System Preset (NES, SMS, Genesis, etc.)"
+            >
+              <option value="none" disabled>SELECT HARDWARE...</option>
+              {SYSTEM_PRESETS.map(preset => (
+                <option key={preset.id} value={preset.id} className="bg-dark-bgPrimary text-text-primary">{preset.name.toUpperCase()}</option>
+              ))}
             </select>
           </div>
 

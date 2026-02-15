@@ -619,6 +619,21 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               >
                 <MousePointerClick size={14} />
               </Button>
+
+              <div className="flex items-center ml-2 border-l border-dark-border pl-2 h-7 gap-1.5">
+                <span className="text-[9px] font-black text-accent-primary uppercase tracking-tighter">HW:</span>
+                <select
+                  className="bg-dark-bgPrimary text-text-primary text-[10px] font-bold h-6 border border-accent-primary/30 rounded px-1.5 hover:border-accent-primary transition-colors cursor-pointer outline-none min-w-[110px] shadow-glow-sm"
+                  onChange={(e) => applySystemPreset(e.target.value)}
+                  defaultValue="none"
+                  title="Apply Hardware System Preset"
+                >
+                  <option value="none" disabled>HARDWARE...</option>
+                  {SYSTEM_PRESETS.map(preset => (
+                    <option key={preset.id} value={preset.id}>{preset.name.toUpperCase()}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="ft2-section ft2-col-3">
               <FT2NumericInput label="Pattern" value={patternOrder[currentPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} format="hex" />
@@ -648,18 +663,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   Groove
                 </Button>
                 {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
-
-                <select
-                  className="bg-dark-bgSecondary text-text-primary text-[10px] h-7 border border-dark-border rounded px-1 ml-1 hover:border-accent-primary transition-colors cursor-pointer outline-none appearance-none min-w-[100px]"
-                  onChange={(e) => applySystemPreset(e.target.value)}
-                  defaultValue="none"
-                  title="Apply System/Hardware Preset"
-                >
-                  <option value="none" disabled>Hardware...</option>
-                  {SYSTEM_PRESETS.map(preset => (
-                    <option key={preset.id} value={preset.id}>{preset.name}</option>
-                  ))}
-                </select>
               </div>
               <div className="ft2-section ft2-col-3">
                 <FT2NumericInput

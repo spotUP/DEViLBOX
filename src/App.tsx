@@ -248,6 +248,9 @@ function App() {
         setInitialized(true);
 
         console.log('ToneEngine initialized');
+        
+        // Show hardware preset notification
+        useUIStore.getState().setStatusMessage('HARDWARE PRESETS READY', false, 5000);
       } catch (error) {
         console.error('Failed to initialize audio engine:', error);
         setInitError(error instanceof Error ? error.message : 'Unknown error');

@@ -2097,8 +2097,12 @@ export const useTrackerStore = create<TrackerStore>()(
 
     applySystemPreset: (presetId) =>
       set((state) => {
+        console.log(`[useTrackerStore] Applying hardware system preset: ${presetId}`);
         const preset = SYSTEM_PRESETS.find((p) => p.id === presetId);
-        if (!preset) return;
+        if (!preset) {
+          console.warn(`[useTrackerStore] Preset not found: ${presetId}`);
+          return;
+        }
 
         // Map DivChanType to CHANNEL_COLORS indices
         // null, Red, Orange, Yellow, Green, Teal, Cyan, Blue, Purple, Pink, Gray
@@ -2143,13 +2147,10 @@ export const useTrackerStore = create<TrackerStore>()(
                   ...pattern.channels[idx].channelMeta,
                   importedFromMOD: pattern.channels[idx].channelMeta?.importedFromMOD ?? false,
                   channelType: chDef.type === DivChanType.PCM ? 'sample' : 'synth',
-                  // Furnace specific
-                  ...({
-                    furnaceType: chDef.type,
-                    hardwareName: chDef.name,
-                    shortName: chDef.shortName,
-                    systemId: preset.fileID
-                  } as any)
+                  furnaceType: chDef.type,
+                  hardwareName: chDef.name,
+                  shortName: chDef.shortName,
+                  systemId: preset.fileID
                 };
               } else if (pattern.channels.length < MAX_CHANNELS) {
                 // Add missing hardware channels
@@ -2169,12 +2170,10 @@ export const useTrackerStore = create<TrackerStore>()(
                   channelMeta: {
                     importedFromMOD: false,
                     channelType: chDef.type === DivChanType.PCM ? 'sample' : 'synth',
-                    // Furnace specific
-                    ...({
-                      furnaceType: chDef.type,
-                      hardwareName: chDef.name, shortName: chDef.shortName,
-                      systemId: preset.fileID
-                    } as any)
+                    furnaceType: chDef.type,
+                    hardwareName: chDef.name,
+                    shortName: chDef.shortName,
+                    systemId: preset.fileID
                   }
                 });
               }
