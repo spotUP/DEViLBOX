@@ -91,14 +91,29 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
     };
   }, [isPanning]);
 
-  // Zoom with mouse wheel
+  // Zoom and Pan with mouse wheel
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       if (!containerRef.current) return;
 
       e.preventDefault();
-      const delta = -e.deltaY * 0.001;
-      cameraRef.current.zoomAt(e.clientX, e.clientY, delta);
+      
+      // Ctrl/Cmd + Wheel = Zoom
+      if (e.ctrlKey || e.metaKey) {
+        const delta = -e.deltaY * 0.001;
+        cameraRef.current.zoomAt(e.clientX, e.clientY, delta);
+      } 
+      // Regular Wheel = Pan
+      else {
+        // Shift + Wheel = Horizontal Pan
+        if (e.shiftKey) {
+          cameraRef.current.pan(-e.deltaY, 0);
+        } else {
+          // Standard: deltaY for vertical, deltaX for horizontal (trackpads)
+          cameraRef.current.pan(-e.deltaX, -e.deltaY);
+        }
+      }
+      
       setCameraState(cameraRef.current.getState());
     };
 
@@ -109,6 +124,15 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
       container?.removeEventListener('wheel', handleWheel);
     };
   }, []);
+
+  const handleBackgroundMouseDown = (e: React.MouseEvent) => {
+    // Only trigger if clicking directly on the background or grid
+    if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'rect') {
+      if (e.button === 0) { // Left click on background
+        setIsPanning(true);
+      }
+    }
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -285,6 +309,7 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
       ref={containerRef}
       className="relative flex flex-col h-full bg-surface-primary overflow-hidden"
       style={{ cursor: isPanning ? 'grabbing' : 'default' }}
+      onMouseDown={handleBackgroundMouseDown}
     >
       {/* Background grid */}
       <CanvasGrid zoom={cameraState.zoom} offsetX={cameraState.x} offsetY={cameraState.y} />
