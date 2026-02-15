@@ -17,7 +17,9 @@
   "scripts": {
     "prebuild": "node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js",
     "predev": "node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js && npm run type-check",
-    "dev": "npm run asbuild && concurrently \"vite\" \"node server/api.cjs\"",
+    "dev": "npm run asbuild && vite",
+    "dev:fullstack": "./dev.sh",
+    "dev:persistent": "./dev-persistent.sh",
     "build": "npm run asbuild && npm run type-check && vite build",
     "type-check": "tsc -b --force",
     "test": "vitest run",
