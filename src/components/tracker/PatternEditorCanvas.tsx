@@ -1899,7 +1899,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       {/* Desktop Channel Header */}
       {!isMobile && (
-        <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20 relative h-[37px]">
+        <div className="flex-shrink-0 bg-dark-bgTertiary border-dark-border z-20 relative h-[37px]">
           <div className="flex h-full">
             {/* Row number column header */}
             <div className="flex-shrink-0 px-2 text-text-muted text-xs font-medium text-center border-r border-dark-border flex items-center justify-center"
