@@ -329,7 +329,7 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
   return (
     <div
       ref={containerRef}
-      className="relative flex flex-col h-full bg-surface-primary overflow-hidden"
+      className="relative flex flex-col h-full bg-dark-bg overflow-hidden"
       style={{ cursor: isPanning ? 'grabbing' : 'default' }}
       onMouseDown={handleBackgroundMouseDown}
     >

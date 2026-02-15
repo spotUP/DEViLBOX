@@ -310,7 +310,7 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
   const laneOffsets = calculateLaneOffsets();
 
   return (
-    <div ref={containerRef} className="relative flex flex-col h-full bg-surface-primary overflow-hidden">
+    <div ref={containerRef} className="relative flex flex-col h-full bg-dark-bg overflow-hidden">
       {/* SVG overlay for cables */}
       <svg className="absolute inset-0 pointer-events-none z-10" style={{ width: '100%', height: '100%' }}>
         {/* Existing connections */}
