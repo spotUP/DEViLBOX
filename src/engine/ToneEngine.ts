@@ -2067,6 +2067,11 @@ export class ToneEngine {
           const maxCh = FurnaceSynth.getMaxChannels(instrument.getChipType());
           instrument.setChannelIndex(channelIndex % maxCh);
         }
+        // Set chip channel on FurnaceDispatchSynth (for C64/GB/NES multi-channel tracker playback)
+        if (instrument instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
+          const maxCh = instrument.getNumChannels() || 3;
+          instrument.setChannel(channelIndex % maxCh);
+        }
         // Standard synths - apply slide/accent for 303-style effects
         const targetFreq = Tone.Frequency(note).toFrequency();
         const finalVelocity = this.applySlideAndAccent(
@@ -2528,6 +2533,11 @@ export class ToneEngine {
           if (voiceNode instanceof FurnaceSynth && channelIndex !== undefined) {
             const maxCh = FurnaceSynth.getMaxChannels(voiceNode.getChipType());
             voiceNode.setChannelIndex(channelIndex % maxCh);
+          }
+          // Set chip channel on FurnaceDispatchSynth (for C64/GB/NES multi-channel tracker playback)
+          if (voiceNode instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
+            const maxCh = voiceNode.getNumChannels() || 3;
+            voiceNode.setChannel(channelIndex % maxCh);
           }
           // NoiseSynth and MetalSynth don't take note parameter: triggerAttack(time, velocity)
           if (config.synthType === 'NoiseSynth' || config.synthType === 'MetalSynth') {
