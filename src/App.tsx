@@ -991,22 +991,62 @@ function App() {
                 } else {
                   // Load other tracker modules (.fur, .mod, .xm, etc.)
                   const { loadModuleFile } = await import('@lib/import/ModuleLoader');
+                  const { convertModule, convertXMModule, convertMODModule } = await import('@lib/import/ModuleConverter');
+                  const { convertToInstrument } = await import('@lib/import/InstrumentConverter');
                   const moduleInfo = await loadModuleFile(new File([buffer], filename));
+                  
                   if (moduleInfo) {
-                    // Import the module automatically
-                    const { convertModule } = await import('@lib/import/ModuleConverter');
-                    const result = await convertModule(moduleInfo, { useLibopenmpt: true });
+                    let result;
+                    let instruments: InstrumentConfig[] = [];
+
+                    // Convert native format data (XM, MOD, FUR, etc.)
+                    if (moduleInfo.nativeData?.patterns) {
+                      const { format, patterns: nativePatterns, importMetadata, instruments: nativeInstruments } = moduleInfo.nativeData;
+                      const channelCount = importMetadata.originalChannelCount;
+                      const instrumentNames = nativeInstruments?.map((i: any) => i.name) || [];
+                      
+                      if (format === 'XM') {
+                        result = convertXMModule(nativePatterns as any, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
+                      } else if (format === 'MOD') {
+                        result = convertMODModule(nativePatterns as any, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
+                      } else {
+                        // FUR, DMF, etc.
+                        result = convertModule(moduleInfo.metadata.song);
+                      }
+
+                      // Create instruments from native data
+                      if (nativeInstruments) {
+                        let nextId = 1;
+                        for (const parsedInst of nativeInstruments) {
+                          const converted = convertToInstrument(parsedInst, nextId, format);
+                          instruments.push(...converted);
+                          nextId += converted.length;
+                        }
+                      }
+                    } else if (moduleInfo.metadata.song) {
+                      // Convert from generic song data
+                      result = convertModule(moduleInfo.metadata.song);
+                    }
+
                     if (result) {
                       const { loadPatterns, setCurrentPattern, setPatternOrder } = useTrackerStore.getState();
                       const { addInstrument } = useInstrumentStore.getState();
 
-                      result.instruments.forEach(inst => addInstrument(inst));
+                      // If no instruments created from native data, create from pattern data
+                      if (instruments.length === 0) {
+                        const { createInstrumentsForModule } = await import('@components/tracker/TrackerView');
+                        instruments = (createInstrumentsForModule as any)(result.patterns, result.instrumentNames || [], undefined);
+                      }
+
+                      instruments.forEach((inst: InstrumentConfig) => addInstrument(inst));
                       loadPatterns(result.patterns);
                       setCurrentPattern(0);
-                      if (result.orderList) {
-                        setPatternOrder(result.orderList);
+                      
+                      if (result.order && result.order.length > 0) {
+                        setPatternOrder(result.order);
                       }
-                      notify.success(`Imported ${filename}: ${result.patterns.length} patterns, ${result.instruments.length} instruments`);
+                      
+                      notify.success(`Imported ${filename}: ${result.patterns.length} patterns, ${instruments.length} instruments`);
                     }
                   }
                 }
