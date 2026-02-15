@@ -15,6 +15,7 @@ export interface RoutingOptions {
   bendRadius?: number; // Radius for rounded corners (0 = sharp 90-degree)
   padding?: number; // Extra space around obstacles
   laneOffset?: number; // Horizontal lane offset for cable spreading (0 = center)
+  obstacles?: { x: number; y: number; w: number; h: number }[]; // Module bounding boxes
 }
 
 /**
@@ -31,6 +32,7 @@ export function calculateOrthogonalPath(
   const {
     horizontalFirst = true,
     laneOffset = 0,
+    obstacles = [],
     // bendRadius = 0, // TODO: Implement curved bends
   } = options;
 
@@ -55,45 +57,57 @@ export function calculateOrthogonalPath(
   // Creates paths with equal space above and below horizontal segments
 
   const isInputOnLeft = dx > 0; // Source is left, target is right
-  // const targetIsBelow = dy > 0; // Reserved for future routing modes
 
   // Calculate routing waypoints with cable spreading
   const baseHorizontalOffset = 30; // Base horizontal exit/entry distance from ports
-  const laneSpacing = 15; // Horizontal spacing between parallel cables (increased for better separation)
-  const horizontalOffset = baseHorizontalOffset + (laneOffset * laneSpacing);
+  const laneSpacing = 10; // Horizontal spacing between parallel cables
+  const horizontalOffset = baseHorizontalOffset + (Math.abs(laneOffset) * laneSpacing);
 
-  // Calculate horizontal segment Y position to avoid module bodies
-  // Route through the gap between modules instead of through the middle
-  // Place horizontal segment in the middle of the gap between modules
-  const gapOffset = 160; // Large safe zone around modules (increased for maximum clearance)
-  const sourceGapEdge = start.y + gapOffset;  // Below source port/module
-  const targetGapEdge = end.y - gapOffset;     // Above target port/module
+  // Padding around modules
+  const padding = 20;
 
-  // Ensure we have enough space for the horizontal segment
-  // If modules are too close, route far outside the modules instead
-  const minSafeGap = 20; // Minimum gap needed between edges
-  const horizontalY = sourceGapEdge + minSafeGap < targetGapEdge
-    ? (sourceGapEdge + targetGapEdge) / 2  // Center of gap if there's room
-    : dy > 0
-      ? start.y + gapOffset + 10  // Route below source with extra margin
-      : end.y - gapOffset - 10;   // Route above target with extra margin
+  // Find all modules that are horizontally between the start and end points
+  const minX = Math.min(start.x, end.x) - padding;
+  const maxX = Math.max(start.x, end.x) + padding;
+  
+  const relevantObstacles = obstacles.filter(obs => {
+    const obsMaxX = obs.x + obs.w;
+    return obsMaxX > minX && obs.x < maxX;
+  });
+
+  // Calculate a Y coordinate that clears all relevant obstacles
+  let horizontalY: number;
+  
+  if (relevantObstacles.length === 0) {
+    // No obstacles, use simple middle-gap heuristic
+    horizontalY = (start.y + end.y) / 2;
+  } else {
+    // Find the highest and lowest points of the obstacles
+    const obsMinY = Math.min(...relevantObstacles.map(o => o.y)) - padding;
+    const obsMaxY = Math.max(...relevantObstacles.map(o => o.y + o.h)) + padding;
+
+    // Decide whether to route above or below the obstacles
+    // Default to the side that's closer to the average of start/end Y
+    const midY = (start.y + end.y) / 2;
+    if (Math.abs(midY - obsMinY) < Math.abs(midY - obsMaxY)) {
+      horizontalY = obsMinY - (Math.abs(laneOffset) * 5); // Route above
+    } else {
+      horizontalY = obsMaxY + (Math.abs(laneOffset) * 5); // Route below
+    }
+  }
 
   if (horizontalFirst && isInputOnLeft) {
-    // Route: horizontal exit → vertical to gap → horizontal → vertical entry
-    // Keeps horizontal segment in the gap between modules
+    // Route: horizontal exit → vertical to safe area → horizontal → vertical entry
     waypoints.push({ x: start.x + horizontalOffset, y: start.y });
     waypoints.push({ x: start.x + horizontalOffset, y: horizontalY });
     waypoints.push({ x: end.x - horizontalOffset, y: horizontalY });
     waypoints.push({ x: end.x - horizontalOffset, y: end.y });
   } else if (horizontalFirst && !isInputOnLeft) {
     // Routing backward (right to left)
-    // Use a wider arc to avoid overlapping with module
-    const offset = 40 + (laneOffset * laneSpacing);
-
-    waypoints.push({ x: start.x + offset, y: start.y });
-    waypoints.push({ x: start.x + offset, y: horizontalY });
-    waypoints.push({ x: end.x - offset, y: horizontalY });
-    waypoints.push({ x: end.x - offset, y: end.y });
+    waypoints.push({ x: start.x + horizontalOffset, y: start.y });
+    waypoints.push({ x: start.x + horizontalOffset, y: horizontalY });
+    waypoints.push({ x: end.x - horizontalOffset, y: horizontalY });
+    waypoints.push({ x: end.x - horizontalOffset, y: end.y });
   } else {
     // Route: vertical → horizontal → vertical
     waypoints.push({ x: start.x, y: horizontalY });
@@ -180,7 +194,8 @@ export function calculateCablePath(
   y2: number,
   useOrthogonal: boolean = true,
   bendRadius: number = 8,
-  laneOffset: number = 0
+  laneOffset: number = 0,
+  obstacles: { x: number; y: number; w: number; h: number }[] = []
 ): string {
   if (!useOrthogonal) {
     // Fallback to simple bezier
@@ -197,7 +212,7 @@ export function calculateCablePath(
   const waypoints = calculateOrthogonalPath(
     { x: x1, y: y1 },
     { x: x2, y: y2 },
-    { horizontalFirst: true, laneOffset }
+    { horizontalFirst: true, laneOffset, obstacles }
   );
 
   return waypointsToPath(waypoints, bendRadius);

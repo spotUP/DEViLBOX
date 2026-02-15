@@ -20,6 +20,7 @@ interface PatchCableProps {
   onClick?: () => void;
   useOrthogonal?: boolean; // Use orthogonal routing (default: true)
   laneOffset?: number; // Horizontal lane offset for cable spreading
+  obstacles?: { x: number; y: number; w: number; h: number }[]; // Module bounding boxes
 }
 
 const SIGNAL_COLORS: Record<SignalType, string> = {
@@ -40,9 +41,10 @@ export const PatchCable: React.FC<PatchCableProps> = ({
   onClick,
   useOrthogonal = true,
   laneOffset = 0,
+  obstacles = [],
 }) => {
-  // Calculate cable path (orthogonal or bezier) with lane offset for spreading
-  const pathData = calculateCablePath(x1, y1, x2, y2, useOrthogonal, 8, laneOffset);
+  // Calculate cable path (orthogonal or bezier) with lane offset for spreading and obstacle avoidance
+  const pathData = calculateCablePath(x1, y1, x2, y2, useOrthogonal, 8, laneOffset, obstacles);
 
   const strokeColor = color || SIGNAL_COLORS[signal];
 

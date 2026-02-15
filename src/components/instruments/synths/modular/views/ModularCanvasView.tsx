@@ -261,6 +261,17 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
 
   // Helper functions
   const getPortId = (portRef: PortRef) => `${portRef.moduleId}.${portRef.portId}`;
+  
+  // Calculate module bounding boxes for obstacle avoidance
+  const moduleObstacles = useMemo(() => {
+    return config.modules.map(m => ({
+      x: m.position?.x || 0,
+      y: m.position?.y || 0,
+      w: m.collapsed ? 120 : 180, // Matches ModulePanel widths
+      h: 200 // Approximate height (dynamic calculation would be better but this is a safe avg)
+    }));
+  }, [config.modules]);
+
   const isConnected = (portRef: PortRef) =>
     config.connections.some(
       (c) => getPortId(c.source) === getPortId(portRef) || getPortId(c.target) === getPortId(portRef)
@@ -289,7 +300,7 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
         {/* SVG layer for cables (Rendered BEFORE modules so they appear behind) */}
         <svg className="absolute inset-0 pointer-events-auto z-0" style={{ width: '100%', height: '100%' }}>
           {/* Existing connections */}
-          {config.connections.map((conn) => {
+          {config.connections.map((conn, idx) => {
             const sourcePos = positions.get(getPortId(conn.source));
             const targetPos = positions.get(getPortId(conn.target));
 
@@ -305,6 +316,8 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
                 color={conn.color}
                 isSelected={conn.id === selectedConnectionId}
                 onClick={() => handleConnectionClick(conn.id)}
+                obstacles={moduleObstacles}
+                laneOffset={idx % 8} // Spreads cables into 8 distinct lanes
               />
             );
           })}
@@ -316,6 +329,7 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
               y1={positions.get(getPortId(wiringSource))!.y}
               x2={wiringPreview.x}
               y2={wiringPreview.y}
+              obstacles={moduleObstacles}
             />
           )}
         </svg>
