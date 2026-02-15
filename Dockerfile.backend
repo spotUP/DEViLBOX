@@ -1,5 +1,5 @@
 # Backend API Dockerfile
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Install build dependencies for native modules (bcrypt, better-sqlite3)
 RUN apk add --no-cache python3 make g++
@@ -10,7 +10,7 @@ WORKDIR /app
 COPY server/package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Copy source code
 COPY server/src ./src

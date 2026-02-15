@@ -29,8 +29,10 @@ cp -r nginx /tmp/devilbox-deploy/
 cp -r server /tmp/devilbox-deploy/
 cp -r src /tmp/devilbox-deploy/
 cp -r public /tmp/devilbox-deploy/
+cp -r scripts /tmp/devilbox-deploy/
+cp -r assembly /tmp/devilbox-deploy/
 cp package*.json /tmp/devilbox-deploy/
-cp tsconfig.json /tmp/devilbox-deploy/
+cp tsconfig*.json /tmp/devilbox-deploy/
 cp vite.config.ts /tmp/devilbox-deploy/
 cp index.html /tmp/devilbox-deploy/
 cp tailwind.config.js /tmp/devilbox-deploy/ 2>/dev/null || true
@@ -71,23 +73,23 @@ ssh $SERVER_USER@$SERVER_IP << 'ENDSSH'
 cd /var/www/devilbox
 
 # Pull base images
-docker-compose pull || true
+docker compose pull || true
 
 # Build containers
-docker-compose build
+docker compose build
 
 # Stop old containers
-docker-compose down
+docker compose down
 
 # Start new containers
-docker-compose up -d
+docker compose up -d
 
 # Wait for health checks
 echo "Waiting for services to be healthy..."
 sleep 10
 
 # Check status
-docker-compose ps
+docker compose ps
 
 echo "✓ Containers started"
 ENDSSH
@@ -107,9 +109,9 @@ echo "2. Install SSL: ssh $SERVER_USER@$SERVER_IP 'docker exec devilbox-frontend
 echo "3. Test: https://devilbox.uprough.net"
 echo ""
 echo "Useful commands:"
-echo "  View logs:    ssh $SERVER_USER@$SERVER_IP 'docker-compose -f $DEPLOY_DIR/docker-compose.yml logs -f'"
-echo "  Restart:      ssh $SERVER_USER@$SERVER_IP 'docker-compose -f $DEPLOY_DIR/docker-compose.yml restart'"
-echo "  Stop:         ssh $SERVER_USER@$SERVER_IP 'docker-compose -f $DEPLOY_DIR/docker-compose.yml down'"
+echo "  View logs:    ssh $SERVER_USER@$SERVER_IP 'docker compose -f $DEPLOY_DIR/docker-compose.yml logs -f'"
+echo "  Restart:      ssh $SERVER_USER@$SERVER_IP 'docker compose -f $DEPLOY_DIR/docker-compose.yml restart'"
+echo "  Stop:         ssh $SERVER_USER@$SERVER_IP 'docker compose -f $DEPLOY_DIR/docker-compose.yml down'"
 
 # Cleanup
 rm -rf /tmp/devilbox-deploy
