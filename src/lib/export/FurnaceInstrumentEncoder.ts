@@ -281,17 +281,50 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
   if (insType === DIV_INS_C64 && config.c64) {
     chipOffset = writer.getPosition();
     const c64 = config.c64;
+    
+    // Fix C64 instruments with no waveform flags set (race condition workaround)
+    // Reference: furnace-master c64.cpp line 445 - note-on initializes wave from static
+    // flags before macros process, causing silent notes if all flags are false.
+    let pulseOnOverride = false;
+    const hasWaveform = c64.triOn || c64.sawOn || c64.pulseOn || c64.noiseOn;
+    if (!hasWaveform) {
+      const duty = c64.duty || 0;
+      if (duty !== 0 && duty !== 2048) {
+        // Non-default duty → must be pulse (duty only affects pulse waveform)
+        console.log(`[FurnaceEncoder] C64 instrument "${name}" has no waveform but duty=${duty}, forcing pulseOn`);
+        pulseOnOverride = true;
+      } else {
+        // No waveform and default/zero duty → default to pulse
+        console.log(`[FurnaceEncoder] C64 instrument "${name}" has no waveform, defaulting to pulseOn`);
+        pulseOnOverride = true;
+      }
+    }
+    
     // Byte 0: waveform flags
     let waveFlags = 0;
     if (c64.triOn) waveFlags |= 1;
     if (c64.sawOn) waveFlags |= 2;
-    if (c64.pulseOn) waveFlags |= 4;
+    if (c64.pulseOn || pulseOnOverride) waveFlags |= 4;  // Apply override directly
     if (c64.noiseOn) waveFlags |= 8;
+    console.log(`[FurnaceEncoder] C64 instrument "${name}" waveFlags=0x${waveFlags.toString(16)} (tri=${c64.triOn} saw=${c64.sawOn} pulse=${c64.pulseOn||pulseOnOverride} noise=${c64.noiseOn}) ADSR=${c64.a}/${c64.d}/${c64.s}/${c64.r}`);
     writer.writeUint8(waveFlags);
-    writer.writeUint8(c64.a || 0);
-    writer.writeUint8(c64.d || 0);
-    writer.writeUint8(c64.s || 0);
-    writer.writeUint8(c64.r || 0);
+    
+    // Fix broken ADSR: if sustain is 0, the note drops to silence immediately.
+    // While Furnace allows this, it makes instruments effectively silent.
+    // Enforce minimum sustain=1 (~6% volume) to prevent stuck-silent voices.
+    const a = c64.a || 0;
+    const d = c64.d || 0;
+    let s = c64.s || 0;
+    const r = c64.r || 0;
+    if (s === 0 && (a === 0 && d === 0 && r === 0)) {
+      // All-zero ADSR is always silent - provide minimal defaults
+      console.warn(`[FurnaceEncoder] C64 instrument "${name}" has all-zero ADSR (silent), setting minimal sustain`);
+      s = 1;  // ~6% volume - prevents stuck-silent voice
+    }
+    writer.writeUint8(a);
+    writer.writeUint8(d);
+    writer.writeUint8(s);
+    writer.writeUint8(r);
     writer.writeUint16(c64.duty || 0);
     writer.writeUint8(c64.ringMod ? 1 : 0);
     writer.writeUint8(c64.oscSync ? 1 : 0);

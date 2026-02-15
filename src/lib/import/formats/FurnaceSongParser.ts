@@ -771,6 +771,51 @@ async function parseNewFormat(
     const inst = parseInstrument(reader);
     const endOffset = reader.getOffset();
     
+    // Fix C64 instruments with no static waveform flags or broken ADSR
+    // Reference: furnace-master/src/engine/platform/c64.cpp lines 445-449 & 266-268
+    // 
+    // When a C64 instrument has all waveform flags false (triOn, sawOn, pulseOn, noiseOn),
+    // note-on initializes chan[].wave=0 (silent). Wave macros process LATER on tick(),
+    // creating a race condition where notes start silent. Furnace's native playback has
+    // the same issue, but it's one tick (very brief). For imported songs, this is worse.
+    //
+    // Additionally, if sustain=0, the SID voice volume drops to 0 immediately after attack/decay,
+    // making the instrument effectively silent even with correct waveform. This happens when
+    // instruments rely on pattern effects (20xx/21xx) to set ADSR at runtime.
+    //
+    // Fix: Initialize waveform flags and provide reasonable ADSR defaults.
+    if (inst.c64) {
+      const hasAnyWaveform = inst.c64.triOn || inst.c64.sawOn || inst.c64.pulseOn || inst.c64.noiseOn;
+      
+      if (!hasAnyWaveform) {
+        const waveMacro = inst.macros?.find(m => m.code === 3);  // DIV_MACRO_WAVE = 3
+        
+        if (waveMacro && waveMacro.data && waveMacro.data.length > 0) {
+          // Initialize from first wave macro value (Furnace format: 1=tri, 2=saw, 4=pulse, 8=noise)
+          const firstWave = waveMacro.data[0];
+          console.log(`[FurnaceParser] Inst ${i} "${inst.name}": C64 has no waveform, initializing from wave macro[0]=${firstWave}`);
+          
+          inst.c64.noiseOn = !!(firstWave & 8);
+          inst.c64.pulseOn = !!(firstWave & 4);
+          inst.c64.sawOn = !!(firstWave & 2);
+          inst.c64.triOn = !!(firstWave & 1);
+        } else if (inst.c64.duty && inst.c64.duty !== 2048) {
+          // No wave macro, but has non-default duty → must be pulse (duty only affects pulse)
+          console.log(`[FurnaceParser] Inst ${i} "${inst.name}": C64 has no waveform but duty=${inst.c64.duty}, setting pulseOn`);
+          inst.c64.pulseOn = true;
+        } else {
+          // No wave macro, no custom duty → default to pulse (Furnace's most common default)
+          console.log(`[FurnaceParser] Inst ${i} "${inst.name}": C64 has no waveform and no macro, defaulting to pulse`);
+          inst.c64.pulseOn = true;
+        }
+      }
+      
+      // NOTE: Furnace allows S=0 (sustain at 0 volume) without validation.
+      // Reference: c64.cpp line 447 just copies sustain directly: chan[c.chan].sustain=ins->c64.s;
+      // While S=0 produces silence, it's valid SID behavior and we must preserve 1:1 compatibility.
+      // DO NOT add ADSR validation - let the WASM handle it exactly like Furnace does.
+    }
+    
     // Capture raw binary data for upload to WASM
     const rawDataSize = endOffset - startOffset;
     console.log(`[FurnaceParser] Inst ${i} "${inst.name}": capturing ${rawDataSize} bytes from offset ${startOffset}`);
