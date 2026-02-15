@@ -9,7 +9,7 @@
  * - Keyboard shortcuts (Escape, Delete, F to fit all)
  */
 
-import React, { useCallback, useRef, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import type { ModularPatchConfig, PortRef, ModularConnection } from '../../../../../types/modular';
 import { ModulePanel } from '../widgets/ModulePanel';
 import { PatchCable } from '../widgets/PatchCable';
