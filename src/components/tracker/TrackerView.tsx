@@ -144,7 +144,7 @@ function createInstrumentsForModule(
 
 interface TrackerViewProps {
   onShowExport?: () => void;
-  onShowHelp?: () => void;
+  onShowHelp?: (tab?: string) => void;
   onShowMasterFX?: () => void;
   onShowInstrumentFX?: () => void;
   onShowInstruments?: () => void;

@@ -173,6 +173,7 @@ function App() {
   const [initError, setInitError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [helpInitialTab, setHelpInitialTab] = useState<'shortcuts' | 'effects' | 'chip-effects' | 'tutorial'>('shortcuts');
   const [showExport, setShowExport] = useState(false);
   const [showPatterns, setShowPatterns] = useState(false);
   const [showMasterFX, setShowMasterFX] = useState(false);
@@ -602,6 +603,7 @@ function App() {
 
   // Unified file loading handler for drag and drop
   const handleFileDrop = useCallback(async (file: File) => {
+    console.log('[App] handleFileDrop called with file:', file.name, 'type:', file.type, 'size:', file.size);
     const { addInstrument } = useInstrumentStore.getState();
     
     try {
@@ -609,9 +611,11 @@ function App() {
       
       // Check if it's a song format that will replace current project
       const isSongFormat = filename.match(/\.(dbx|mid|midi|mod|xm|it|s3m|fur|mptm|669|amf|ams|dbm|dmf|dsm|far|ftm|gdm|imf|mdl|med|mt2|mtm|okt|psm|ptm|sfx|stm|ult|umx)$/);
+      console.log('[App] isSongFormat:', isSongFormat, 'filename:', filename);
       
       if (isSongFormat) {
         // Show confirmation dialog for song formats
+        console.log('[App] Setting pending song file and showing confirmation dialog');
         setPendingSongFile(file);
         setShowSongLoadConfirm(true);
         return;
@@ -955,7 +959,11 @@ function App() {
                   <TrackerView
                     onShowPatterns={() => setShowPatterns(!showPatterns)}
                     onShowExport={() => setShowExport(true)}
-                    onShowHelp={() => setShowHelp(true)}
+                    onShowHelp={(tab) => {
+                      if (tab) setHelpInitialTab(tab as any);
+                      else setHelpInitialTab('shortcuts');
+                      setShowHelp(true);
+                    }}
                     onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
                     onShowInstrumentFX={() => setShowInstrumentFX(!showInstrumentFX)}
                     onShowInstruments={() => setShowInstrumentModal(true)}
@@ -983,7 +991,7 @@ function App() {
 
       {/* Modals */}
       <Suspense fallback={null}>
-        {showHelp && <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />}
+        {showHelp && <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} initialTab={helpInitialTab} />}
         {showExport && <ExportDialog isOpen={showExport} onClose={() => setShowExport(false)} />}
         {showInstrumentModal && <EditInstrumentModal isOpen={showInstrumentModal} onClose={() => setShowInstrumentModal(false)} />}
         {showMasterFX && <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />}

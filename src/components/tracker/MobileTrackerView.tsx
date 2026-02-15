@@ -19,7 +19,7 @@ import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
 interface MobileTrackerViewProps {
   onShowPatterns?: () => void;
   onShowExport?: () => void;
-  onShowHelp?: () => void;
+  onShowHelp?: (tab?: string) => void;
   onShowMasterFX?: () => void;
   onShowInstruments?: () => void;
   showPatterns?: boolean;

@@ -14,6 +14,7 @@ import {
   hasFurnaceEffects,
   getAllFurnaceEffects,
 } from '@utils/ft2EffectDescriptions';
+import { HelpCircle } from 'lucide-react';
 
 interface EffectPickerProps {
   isOpen: boolean;
@@ -171,7 +172,22 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
       >
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-700">
-          <h3 className="text-sm font-semibold text-neutral-100">Effect Commands</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-neutral-100">Effect Commands</h3>
+            <button
+              onClick={() => {
+                onClose();
+                // We don't have a direct way to open HelpModal from here without a store or prop
+                // But we can trigger a global shortcut or use UIStore if we wire it up
+                const event = new KeyboardEvent('keydown', { key: '?' });
+                window.dispatchEvent(event);
+              }}
+              className="p-1 text-neutral-500 hover:text-accent-primary transition-colors"
+              title="Open full reference"
+            >
+              <HelpCircle size={14} />
+            </button>
+          </div>
           <button onClick={onClose} className="text-neutral-400 hover:text-neutral-200" aria-label="Close effect picker">
             <X size={16} />
           </button>

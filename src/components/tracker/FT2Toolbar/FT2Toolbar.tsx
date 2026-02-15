@@ -56,7 +56,7 @@ import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { CURRENT_VERSION } from '@generated/changelog';
 
 // Build accept string for file input
-const ACCEPTED_FORMATS = ['.json', '.song.json', '.dbx', '.xml', ...getSupportedExtensions(), ...getSupportedMIDIExtensions()].join(',');
+const ACCEPTED_FORMATS = ['.json', '.dbx', '.xml', ...getSupportedExtensions(), ...getSupportedMIDIExtensions()].join(',');
 
 // Create instruments for imported module
 function createInstrumentsForModule(
@@ -136,7 +136,7 @@ function createInstrumentsForModule(
 interface FT2ToolbarProps {
   onShowPatterns?: () => void;
   onShowExport?: () => void;
-  onShowHelp?: () => void;
+  onShowHelp?: (tab?: string) => void;
   onShowMasterFX?: () => void;
   onShowInstrumentFX?: () => void;
   onShowInstruments?: () => void;
@@ -378,6 +378,17 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             instrumentNames,
           };
           console.log(`[Import] ${format} patterns converted:`, result.patterns.length, 'patterns, first pattern has', result.patterns[0]?.channels?.length, 'channels');
+          
+          // Debug: Check if notes are on different channels
+          const firstPattern = result.patterns[0];
+          if (firstPattern) {
+            console.log(`[Import] DEBUG Pattern 0 channel 0 notes:`, firstPattern.channels[0]?.rows.filter(r => r.note > 0).length, 'notes');
+            console.log(`[Import] DEBUG Pattern 0 channel 1 notes:`, firstPattern.channels[1]?.rows.filter(r => r.note > 0).length, 'notes');
+            console.log(`[Import] DEBUG Pattern 0 channel 2 notes:`, firstPattern.channels[2]?.rows.filter(r => r.note > 0).length, 'notes');
+            console.log(`[Import] DEBUG First 5 notes on ch0:`, firstPattern.channels[0]?.rows.filter(r => r.note > 0).slice(0, 5).map(r => r.note));
+            console.log(`[Import] DEBUG First 5 notes on ch1:`, firstPattern.channels[1]?.rows.filter(r => r.note > 0).slice(0, 5).map(r => r.note));
+            console.log(`[Import] DEBUG First 5 notes on ch2:`, firstPattern.channels[2]?.rows.filter(r => r.note > 0).slice(0, 5).map(r => r.note));
+          }
         } else {
           notify.error(`Unsupported native format: ${format}`);
           return;
@@ -684,7 +695,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           <div className="ft2-toolbar-row ft2-toolbar-row-menu">
             <div className="ft2-section">
               <input ref={fileInputRef} type="file" accept={ACCEPTED_FORMATS} onChange={handleFileLoad} className="hidden" />
-              <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
+              <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoading} loading={isLoading}>Load</Button>
               <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
               <Button variant="ghost" size="sm" onClick={handleSave}>Download</Button>
               <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>
@@ -695,7 +706,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               <Button variant="ghost" size="sm" onClick={onShowDrumpads}>Pads</Button>                        
               <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX}>Master FX</Button>
               
-              <Button variant="ghost" size="sm" onClick={onShowHelp}>Help</Button>
+              <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('chip-effects')}>Cmds</Button>
+              <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('shortcuts')}>Help</Button>
               <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>Settings</Button>
               <Button
                 variant={isFullscreen ? 'primary' : 'ghost'}
