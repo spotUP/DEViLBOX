@@ -66,97 +66,106 @@ export const usePatternPlayback = () => {
   // Handle playback start/stop
   useEffect(() => {
     const replayer = replayerRef.current;
-    if (isPlaying && pattern && !hasStartedRef.current) {
-      hasStartedRef.current = true;
-
-      // Check arrangement mode
+    
+    // IF we are playing and the song structure changed, we need to RELOAD the song in the replayer
+    // otherwise it won't know about the new patterns (like B/D animation helpers)
+    if (isPlaying && pattern) {
       const arrangement = useArrangementStore.getState();
+      
+      // Determine if we need to reload (song structure change while playing)
+      const needsReload = hasStartedRef.current;
 
-      // Determine format from metadata or default to XM
-      const format = (pattern.importMetadata?.sourceFormat ?? 'XM') as TrackerFormat;
-      const modData = pattern.importMetadata?.modData;
+      if (!hasStartedRef.current || needsReload) {
+        hasStartedRef.current = true;
 
-      console.log(`[Playback] Starting real-time playback (${format}), arrangement=${arrangement.isArrangementMode}`);
-      console.log(`[Playback] ${patterns.length} patterns, ${patternOrder.length} positions, ${pattern.channels.length} channels`);
+        // Determine format from metadata or default to XM
+        const format = (pattern.importMetadata?.sourceFormat ?? 'XM') as TrackerFormat;
+        const modData = pattern.importMetadata?.modData;
 
-      let effectivePatterns = patterns;
-      let effectiveSongPositions: number[];
-      let effectiveSongLength: number;
-      let effectiveNumChannels = pattern.channels.length;
+        console.log(`[Playback] ${needsReload ? 'Reloading' : 'Starting'} real-time playback (${format}), arrangement=${arrangement.isArrangementMode}`);
 
-      if (arrangement.isArrangementMode && arrangement.clips.length > 0) {
-        // --- Arrangement Mode ---
-        const resolved = resolveArrangement(
-          arrangement.clips,
-          arrangement.tracks,
-          patterns,
-          modData?.initialSpeed ?? 6,
-        );
+        let effectivePatterns = patterns;
+        let effectiveSongPositions: number[];
+        let effectiveSongLength: number;
+        let effectiveNumChannels = pattern.channels.length;
 
-        effectivePatterns = resolved.virtualPatterns;
-        effectiveSongPositions = resolved.songPositions;
-        effectiveSongLength = resolved.songPositions.length;
-        effectiveNumChannels = resolved.virtualPatterns[0]?.channels?.length ?? pattern.channels.length;
+        if (arrangement.isArrangementMode && arrangement.clips.length > 0) {
+          // --- Arrangement Mode ---
+          const resolved = resolveArrangement(
+            arrangement.clips,
+            arrangement.tracks,
+            patterns,
+            modData?.initialSpeed ?? 6,
+          );
 
-        console.log(`[Playback] Arrangement resolved: ${resolved.totalRows} rows, ${effectiveSongLength} chunks, ${effectiveNumChannels} channels`);
-      } else {
-        // --- Legacy Pattern Order Mode ---
-        const loopPatternOrder = isLooping ? [currentPatternIndex] : patternOrder;
-        effectiveSongPositions = loopPatternOrder;
-        effectiveSongLength = isLooping ? 1 : (modData?.songLength ?? patternOrder.length);
+          effectivePatterns = resolved.virtualPatterns;
+          effectiveSongPositions = resolved.songPositions;
+          effectiveSongLength = resolved.songPositions.length;
+          effectiveNumChannels = resolved.virtualPatterns[0]?.channels?.length ?? pattern.channels.length;
+        } else {
+          // --- Legacy Pattern Order Mode ---
+          const loopPatternOrder = isLooping ? [currentPatternIndex] : patternOrder;
+          effectiveSongPositions = loopPatternOrder;
+          effectiveSongLength = isLooping ? 1 : (modData?.songLength ?? patternOrder.length);
+        }
+
+        // Save current replayer state if reloading
+        const currentSongPos = replayer.getCurrentPosition();
+        const currentRow = replayer.getCurrentRow();
+
+        // Load song into TrackerReplayer
+        replayer.loadSong({
+          name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
+          format,
+          patterns: effectivePatterns,
+          instruments,
+          songPositions: effectiveSongPositions,
+          songLength: effectiveSongLength,
+          restartPosition: 0,
+          numChannels: effectiveNumChannels,
+          initialSpeed: modData?.initialSpeed ?? 6,
+          initialBPM: modData?.initialBPM ?? bpm,
+        });
+
+        if (needsReload) {
+          // Restore position after reload
+          // If the position is out of bounds (e.g. pattern order shrunk), seekTo handles clamping
+          replayer.seekTo(currentSongPos, currentRow);
+        }
+
+        // Set callbacks for UI updates
+        let lastPatternNum = -1;
+        let lastPosition = -1;
+
+        replayer.onRowChange = (row, patternNum, position) => {
+          setCurrentRowThrottled(row, effectivePatterns[patternNum]?.length ?? 64);
+
+          if (arrangement.isArrangementMode) {
+            const globalRow = position * 64 + row;
+            useArrangementStore.getState().setPlaybackRow(globalRow);
+            useTransportStore.getState().setCurrentGlobalRow(globalRow);
+          }
+
+          if (row === 0 && (patternNum !== lastPatternNum || position !== lastPosition)) {
+            lastPatternNum = patternNum;
+            lastPosition = position;
+            queueMicrotask(() => {
+              setCurrentPattern(patternNum);
+              setCurrentPosition(position);
+            });
+          }
+        };
+
+        replayer.onSongEnd = () => {
+          console.log('[Playback] Song ended');
+        };
+
+        // Start or resume real-time playback
+        // Always call play() - initial start OR after reload
+        replayer.play().catch((err) => {
+          console.error('Failed to start playback:', err);
+        });
       }
-
-      // Load song into TrackerReplayer
-      replayer.loadSong({
-        name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
-        format,
-        patterns: effectivePatterns,
-        instruments,
-        songPositions: effectiveSongPositions,
-        songLength: effectiveSongLength,
-        restartPosition: 0,
-        numChannels: effectiveNumChannels,
-        initialSpeed: modData?.initialSpeed ?? 6,
-        initialBPM: modData?.initialBPM ?? bpm,
-      });
-
-      // Set callbacks for UI updates
-      // PERF: Track last values to avoid redundant store updates
-      let lastPatternNum = -1;
-      let lastPosition = -1;
-
-      replayer.onRowChange = (row, patternNum, position) => {
-        setCurrentRowThrottled(row, effectivePatterns[patternNum]?.length ?? 64);
-
-        // Update arrangement global row for timeline playhead
-        if (arrangement.isArrangementMode) {
-          const globalRow = position * 64 + row; // Approximate: chunk * CHUNK_SIZE + row
-          useArrangementStore.getState().setPlaybackRow(globalRow);
-          useTransportStore.getState().setCurrentGlobalRow(globalRow);
-        }
-
-        // Only update pattern/position if they actually changed (avoids redundant renders)
-        if (row === 0 && (patternNum !== lastPatternNum || position !== lastPosition)) {
-          lastPatternNum = patternNum;
-          lastPosition = position;
-          // Batch these updates in a microtask to avoid blocking the audio callback
-          queueMicrotask(() => {
-            setCurrentPattern(patternNum);
-            setCurrentPosition(position);
-          });
-        }
-      };
-
-      replayer.onSongEnd = () => {
-        console.log('[Playback] Song ended');
-        // Could trigger stop or loop behavior here
-      };
-
-      // Start real-time playback
-      replayer.play().catch((err) => {
-        console.error('Failed to start playback:', err);
-      });
-
     } else if (!isPlaying && hasStartedRef.current) {
       // Stop playback
       console.log('[Playback] Stopping playback');

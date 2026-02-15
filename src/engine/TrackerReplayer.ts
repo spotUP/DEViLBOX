@@ -587,6 +587,7 @@ export class TrackerReplayer {
     if (!pattern) return;
 
     // Queue display state for audio-synced UI (tick 0 = start of row)
+    // Use swung time (safeTime) so visual follows the same timing as audio
     if (this.currentTick === 0) {
       this.queueDisplayState(safeTime, this.pattPos, patternNum, this.songPos, 0);
     }
@@ -2027,6 +2028,26 @@ export class TrackerReplayer {
     }
 
     console.log(`[TrackerReplayer] Seeked to songPos=${this.songPos}, pattPos=${this.pattPos}`);
+  }
+
+  /**
+   * Jump to a specific pattern by index (not song position).
+   * Finds the first song position that references this pattern and seeks there.
+   * If the pattern is not in the song order, it won't jump.
+   */
+  jumpToPattern(patternIndex: number, row: number = 0): void {
+    if (!this.song) return;
+    
+    // Find the first song position that plays this pattern
+    const songPos = this.song.songPositions.findIndex(p => p === patternIndex);
+    if (songPos !== -1) {
+      this.seekTo(songPos, row);
+    } else {
+      // Pattern not in song order - just update the display state
+      // Clear the state queue so old states don't override
+      this.clearStateQueue();
+      console.log(`[TrackerReplayer] Pattern ${patternIndex} not in song order, clearing state queue`);
+    }
   }
 
   isPlaying(): boolean { return this.playing; }

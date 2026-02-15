@@ -23,6 +23,7 @@ import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { useSwipeGesture } from '@hooks/useSwipeGesture';
 import { getTrackerReplayer, type DisplayState } from '@engine/TrackerReplayer';
 import * as Tone from 'tone';
+import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 
 const ROW_HEIGHT = 24;
 const CHAR_WIDTH = 10;
@@ -135,6 +136,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const { instruments } = useInstrumentStore(useShallow((state) => ({
     instruments: state.instruments
   })));
+
+  // B/D Animation handlers
+  const bdAnimations = useBDAnimations();
 
   // Calculate if all channels fit in viewport (for disabling horizontal scroll)
   const allChannelsFit = useMemo(() => {
@@ -432,6 +436,71 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     useUIStore.getState().setStatusMessage('INTERPOLATED');
   }, [pattern, setCell]);
 
+  // B/D Animation handler wrappers - use full channel or selection range
+  const getBDAnimationOptions = useCallback((channelIndex: number) => {
+    const startRow = selection
+      ? Math.min(selection.startRow, selection.endRow)
+      : 0;
+    const endRow = selection
+      ? Math.max(selection.startRow, selection.endRow)
+      : (pattern?.length ?? 64) - 1;
+    return {
+      patternIndex: currentPatternIndex,
+      channelIndex,
+      startRow,
+      endRow,
+    };
+  }, [selection, currentPatternIndex, pattern?.length]);
+
+  const handleReverseVisual = useCallback((channelIndex: number) => {
+    bdAnimations.applyReverseVisual(getBDAnimationOptions(channelIndex));
+  }, [bdAnimations, getBDAnimationOptions]);
+
+  const handlePolyrhythm = useCallback((channelIndex: number) => {
+    const opts = getBDAnimationOptions(channelIndex);
+    bdAnimations.applyPolyrhythm(opts.patternIndex, [channelIndex], [3], opts.startRow, opts.endRow);
+  }, [bdAnimations, getBDAnimationOptions]);
+
+  const handleFibonacci = useCallback((channelIndex: number) => {
+    bdAnimations.applyFibonacciSequence(getBDAnimationOptions(channelIndex));
+  }, [bdAnimations, getBDAnimationOptions]);
+
+  const handleEuclidean = useCallback((channelIndex: number) => {
+    bdAnimations.applyEuclideanPattern(getBDAnimationOptions(channelIndex), 5, 8);
+  }, [bdAnimations, getBDAnimationOptions]);
+
+  const handlePingPong = useCallback((channelIndex: number) => {
+    bdAnimations.applyPingPong(getBDAnimationOptions(channelIndex));
+  }, [bdAnimations, getBDAnimationOptions]);
+
+  const handleGlitch = useCallback((channelIndex: number) => {
+    bdAnimations.applyGlitch(getBDAnimationOptions(channelIndex));
+  }, [bdAnimations, getBDAnimationOptions]);
+
+  const handleStrobe = useCallback((channelIndex: number) => {
+    bdAnimations.applyStrobe(getBDAnimationOptions(channelIndex));
+  }, [bdAnimations, getBDAnimationOptions]);
+
+  const handleVisualEcho = useCallback((channelIndex: number) => {
+    bdAnimations.applyVisualEcho(getBDAnimationOptions(channelIndex));
+  }, [bdAnimations, getBDAnimationOptions]);
+
+  const handleConverge = useCallback((channelIndex: number) => {
+    bdAnimations.applyConverge(getBDAnimationOptions(channelIndex));
+  }, [bdAnimations, getBDAnimationOptions]);
+
+  const handleSpiral = useCallback((channelIndex: number) => {
+    bdAnimations.applySpiral(getBDAnimationOptions(channelIndex));
+  }, [bdAnimations, getBDAnimationOptions]);
+
+  const handleBounce = useCallback((channelIndex: number) => {
+    bdAnimations.applyBounce(getBDAnimationOptions(channelIndex));
+  }, [bdAnimations, getBDAnimationOptions]);
+
+  const handleChaos = useCallback((channelIndex: number) => {
+    bdAnimations.applyChaos(getBDAnimationOptions(channelIndex));
+  }, [bdAnimations, getBDAnimationOptions]);
+
   // PERF: VU meter polling moved to ref-based update (no React re-renders)
   // The ChannelVUMeters component handles its own animation loop
   // Header VU indicators are updated via refs in the render loop
@@ -633,35 +702,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const transportState = useTransportStore.getState();
     const uiState = useUIStore.getState();
 
-    const pattern = state.patterns[state.currentPatternIndex];
-    const smoothScrolling = transportState.smoothScrolling;
-    const showGhostPatterns = state.showGhostPatterns;
-
-    if (!pattern) {
-      ctx.fillStyle = colors.bg;
-      ctx.fillRect(0, 0, dimensions.width, dimensions.height);
-      ctx.fillStyle = colors.textMuted;
-      ctx.font = '16px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('No pattern loaded', dimensions.width / 2, dimensions.height / 2);
-      return;
-    }
-
     const cursor = state.cursor;
     const isPlaying = transportState.isPlaying;
     const useHex = uiState.useHexNumbers;
     const blankEmpty = uiState.blankEmptyCells;
     const audioSpeed = transportState.speed;
     const audioBpm = transportState.bpm;
+    const smoothScrolling = transportState.smoothScrolling;
+    const showGhostPatterns = state.showGhostPatterns;
 
     const { width, height } = dimensions;
-    const patternLength = pattern.length;
 
     // Audio-synced scrolling (BassoonTracker pattern)
     // Get state from audio context time, NOT from wall-clock or store updates
     let currentRow: number;
     let smoothOffset = 0;
+    let activePatternIndex = state.currentPatternIndex;
 
     if (isPlaying) {
       const replayer = getTrackerReplayer();
@@ -673,6 +729,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       if (audioState) {
         lastAudioStateRef.current = audioState;
         currentRow = audioState.row;
+        // CRITICAL: Use pattern index from audio state, not store!
+        // This ensures visual matches audio during pattern jumps, loops, and reloads.
+        activePatternIndex = audioState.pattern;
 
         if (smoothScrolling) {
           // ACCURATE SMOOTH SCROLLING:
@@ -712,6 +771,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       lastRowValueRef.current = -1;
       lastSmoothOffsetRef.current = 0;
     }
+
+    // Use the audio-synced pattern index for visual display
+    const pattern = state.patterns[activePatternIndex];
+    
+    if (!pattern) {
+      ctx.fillStyle = colors.bg;
+      ctx.fillRect(0, 0, dimensions.width, dimensions.height);
+      ctx.fillStyle = colors.textMuted;
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('No pattern loaded', dimensions.width / 2, dimensions.height / 2);
+      return;
+    }
+
+    const patternLength = pattern.length;
 
     // Calculate visible lines
     const visibleLines = Math.ceil(height / ROW_HEIGHT) + 2;
@@ -783,10 +858,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       
       if (isPlaying) {
         // During playback, show sequential flow through patterns
+        // Use activePatternIndex (from audio state) instead of currentPatternIndex (from store)
         if (showGhostPatterns && i < 0) {
           // Previous pattern
-          if (currentPatternIndex > 0) {
-            ghostPattern = patterns[currentPatternIndex - 1];
+          if (activePatternIndex > 0) {
+            ghostPattern = patterns[activePatternIndex - 1];
             rowIndex = ghostPattern.length + i; // i is negative
             // Validate rowIndex is within pattern bounds
             if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
@@ -807,8 +883,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           }
         } else if (showGhostPatterns && i >= patternLength) {
           // Next pattern
-          if (currentPatternIndex < patterns.length - 1) {
-            ghostPattern = patterns[currentPatternIndex + 1];
+          if (activePatternIndex < patterns.length - 1) {
+            ghostPattern = patterns[activePatternIndex + 1];
             rowIndex = i - patternLength;
             // Validate rowIndex is within pattern bounds
             if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
@@ -1402,6 +1478,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                           onHumanize={handleHumanize}
                           onInterpolate={handleInterpolate}
                           onAcidGenerator={onAcidGenerator || (() => {})}
+                          onReverseVisual={handleReverseVisual}
+                          onPolyrhythm={handlePolyrhythm}
+                          onFibonacci={handleFibonacci}
+                          onEuclidean={handleEuclidean}
+                          onPingPong={handlePingPong}
+                          onGlitch={handleGlitch}
+                          onStrobe={handleStrobe}
+                          onVisualEcho={handleVisualEcho}
+                          onConverge={handleConverge}
+                          onSpiral={handleSpiral}
+                          onBounce={handleBounce}
+                          onChaos={handleChaos}
                         />
                         <ChannelColorPicker
                           currentColor={channel.color}
