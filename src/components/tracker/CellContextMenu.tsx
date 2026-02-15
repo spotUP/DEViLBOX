@@ -17,6 +17,7 @@ import {
   BarChart3,
   Music,
   Link,
+  X,
 } from 'lucide-react';
 import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -50,13 +51,64 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     currentPatternIndex,
     setCell,
     cursor,
+    selection,
     selectColumn,
     selectChannel,
+    copySelection,
+    cutSelection,
+    paste,
+    transposeSelection,
+    interpolateSelection,
+    clearSelection,
   } = useTrackerStore();
 
   const pattern = patterns[currentPatternIndex];
+  const hasSelection = !!selection;
 
-  // Copy cell to clipboard
+  // Block handlers
+  const handleCopyBlock = useCallback(() => {
+    copySelection();
+    onClose();
+  }, [copySelection, onClose]);
+
+  const handleCutBlock = useCallback(() => {
+    cutSelection();
+    onClose();
+  }, [cutSelection, onClose]);
+
+  const handlePasteBlock = useCallback(() => {
+    paste();
+    onClose();
+  }, [paste, onClose]);
+
+  const handleTransposeBlock = useCallback((semitones: number) => {
+    transposeSelection(semitones);
+    onClose();
+  }, [transposeSelection, onClose]);
+
+  const handleInterpolateBlock = useCallback((column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan') => {
+    // Get values from start and end of selection
+    if (!selection || !pattern) return;
+    const startRow = Math.min(selection.startRow, selection.endRow);
+    const endRow = Math.max(selection.startRow, selection.endRow);
+    const ch = selection.startChannel;
+    
+    const startCell = pattern.channels[ch].rows[startRow];
+    const endCell = pattern.channels[ch].rows[endRow];
+    
+    const startVal = (startCell[column] as number) || 0;
+    const endVal = (endCell[column] as number) || 0;
+    
+    interpolateSelection(column, startVal, endVal);
+    onClose();
+  }, [selection, pattern, interpolateSelection, onClose]);
+
+  const handleClearBlock = useCallback(() => {
+    clearSelection();
+    onClose();
+  }, [clearSelection, onClose]);
+
+  // Copy cell to clipboard (legacy single cell)
   const handleCopy = useCallback(() => {
     if (!pattern) return;
     const cell = pattern.channels[channelIndex].rows[rowIndex];
@@ -148,24 +200,87 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   }, [channelIndex, selectChannel, onClose]);
 
   const menuItems = useMemo((): MenuItemType[] => [
-    // Cut/Copy/Paste
+    // Block Operations (if selection active)
+    ...(hasSelection ? [
+      {
+        id: 'block-header',
+        label: 'BLOCK OPERATIONS',
+        disabled: true,
+        className: 'text-accent-primary font-bold text-[10px] tracking-widest'
+      },
+      {
+        id: 'block-copy',
+        label: 'Copy Block',
+        icon: <Copy size={14} />,
+        onClick: handleCopyBlock,
+      },
+      {
+        id: 'block-cut',
+        label: 'Cut Block',
+        icon: <Scissors size={14} />,
+        onClick: handleCutBlock,
+      },
+      {
+        id: 'block-paste',
+        label: 'Paste Block',
+        icon: <ClipboardPaste size={14} />,
+        onClick: handlePasteBlock,
+      },
+      {
+        id: 'block-transpose',
+        label: 'Transpose Block',
+        icon: <TrendingUp size={14} />,
+        submenu: [
+          { id: 'transpose-up-1', label: '+1 Semitone', onClick: () => handleTransposeBlock(1) },
+          { id: 'transpose-down-1', label: '-1 Semitone', onClick: () => handleTransposeBlock(-1) },
+          { id: 'transpose-up-12', label: '+1 Octave', onClick: () => handleTransposeBlock(12) },
+          { id: 'transpose-down-12', label: '-1 Octave', onClick: () => handleTransposeBlock(-12) },
+        ]
+      },
+      {
+        id: 'block-interpolate',
+        label: 'Interpolate Block',
+        icon: <TrendingUp size={14} />,
+        submenu: [
+          { id: 'interp-vol', label: 'Interpolate Volume', onClick: () => handleInterpolateBlock('volume') },
+          { id: 'interp-cutoff', label: 'Interpolate Cutoff', onClick: () => handleInterpolateBlock('cutoff') },
+          { id: 'interp-res', label: 'Interpolate Resonance', onClick: () => handleInterpolateBlock('resonance') },
+        ]
+      },
+      {
+        id: 'block-clear',
+        label: 'Deselect Block',
+        icon: <X size={14} />,
+        onClick: handleClearBlock,
+      },
+      { type: 'divider' as const },
+    ] : []),
+
+    // Single Cell Operations (header)
+    {
+      id: 'cell-header',
+      label: 'CELL OPERATIONS',
+      disabled: true,
+      className: 'text-text-muted font-bold text-[10px] tracking-widest'
+    },
+    // Cut/Copy/Paste (Single Cell)
     {
       id: 'cut',
-      label: 'Cut',
+      label: 'Cut Cell',
       icon: <Scissors size={14} />,
       shortcut: 'Ctrl+X',
       onClick: handleCut,
     },
     {
       id: 'copy',
-      label: 'Copy',
+      label: 'Copy Cell',
       icon: <Copy size={14} />,
       shortcut: 'Ctrl+C',
       onClick: handleCopy,
     },
     {
       id: 'paste',
-      label: 'Paste',
+      label: 'Paste Cell',
       icon: <ClipboardPaste size={14} />,
       shortcut: 'Ctrl+V',
       onClick: handlePaste,
