@@ -18,7 +18,7 @@ import { ChannelContextMenu } from './ChannelContextMenu';
 import { CellContextMenu, useCellContextMenu } from './CellContextMenu';
 import { ParameterEditor } from './ParameterEditor';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
-import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { haptics } from '@/utils/haptics';
@@ -106,7 +106,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     patterns,
     currentPatternIndex,
     addChannel,
-    removeChannel,
     toggleChannelMute,
     toggleChannelSolo,
     toggleChannelCollapse: _toggleChannelCollapse,
@@ -126,7 +125,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     patterns: state.patterns,
     currentPatternIndex: state.currentPatternIndex,
     addChannel: state.addChannel,
-    removeChannel: state.removeChannel,
     toggleChannelMute: state.toggleChannelMute,
     toggleChannelSolo: state.toggleChannelSolo,
     toggleChannelCollapse: state.toggleChannelCollapse,
