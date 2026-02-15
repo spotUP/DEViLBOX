@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-15T12:06:08.080Z
+ * Generated: 2026-02-15T12:09:41.902Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '600';
-export const BUILD_HASH = '286da5a';
+export const BUILD_NUMBER = '604';
+export const BUILD_HASH = 'f3d9e1c';
 export const BUILD_DATE = '2026-02-15';
 
 // Full semantic version with build number
@@ -33,6 +33,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-15',
     changes: [
+      {
+        type: 'fix',
+        "description": "Resolve TypeScript errors in gesture handling"
+      },
+      {
+        type: 'feature',
+        "description": "Enhance pattern editor navigation gestures"
+      },
+      {
+        type: 'feature',
+        "description": "Add moveCursorToChannelAndColumn atomic action"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve piano keyboard layout layering issues"
+      },
       {
         type: 'fix',
         "description": "Fix mobile file browser: directories open on single tap"
@@ -222,22 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Update for multi-site server deployment"
-      },
-      {
-        type: 'improvement',
-        "description": "Add comprehensive keyboard navigation design"
-      },
-      {
-        type: 'feature',
-        "description": "Complete Docker containerization"
-      },
-      {
-        type: 'feature',
-        "description": "Add backend API with auth and file management"
-      },
-      {
-        type: 'feature',
-        "description": "Add file browser Load functionality to mobile menu"
       }
     ]
   }
