@@ -111,7 +111,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     onClose();
   }, [transposeSelection, onClose]);
 
-  const handleInterpolateBlock = useCallback((column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan') => {
+  const handleInterpolateBlock = useCallback((column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'effParam' | 'effParam2') => {
     // Get values from start and end of selection
     if (!selection || !pattern) return;
     const startRow = Math.min(selection.startRow, selection.endRow);
@@ -121,8 +121,11 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     const startCell = pattern.channels[ch].rows[startRow];
     const endCell = pattern.channels[ch].rows[endRow];
     
-    const startVal = (startCell[column] as number) || 0;
-    const endVal = (endCell[column] as number) || 0;
+    // Map column names to cell property names if they differ
+    const cellProp = column === 'effParam' ? 'eff' : column === 'effParam2' ? 'eff2' : column;
+    
+    const startVal = (startCell[cellProp] as number) || 0;
+    const endVal = (endCell[cellProp] as number) || 0;
     
     interpolateSelection(column, startVal, endVal);
     onClose();
@@ -268,6 +271,8 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
         icon: <TrendingUp size={14} />,
         submenu: [
           { id: 'interp-vol', label: 'Interpolate Volume', onClick: () => handleInterpolateBlock('volume') },
+          { id: 'interp-eff1', label: 'Interpolate Effect 1', onClick: () => handleInterpolateBlock('effParam') },
+          { id: 'interp-eff2', label: 'Interpolate Effect 2', onClick: () => handleInterpolateBlock('effParam2') },
           { id: 'interp-cutoff', label: 'Interpolate Cutoff', onClick: () => handleInterpolateBlock('cutoff') },
           { id: 'interp-res', label: 'Interpolate Resonance', onClick: () => handleInterpolateBlock('resonance') },
         ]
