@@ -207,6 +207,107 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, [pattern, isMobile]);
 
   // Handle tap on pattern canvas - move cursor to tapped cell
+  const getCellFromCoords = useCallback((clientX: number, clientY: number) => {
+    if (!pattern || !containerRef.current) return null;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const relativeX = clientX - rect.left + scrollLeft;
+    const relativeY = clientY - rect.top;
+
+    // Adjust for scrollY (which is baseY in render)
+    // baseY = centerLineTop - (topLines * ROW_HEIGHT) - smoothOffset;
+    // We want to know which row is at relativeY.
+    // The currentRow is at centerLineTop.
+    const centerLineTop = Math.floor(dimensions.height / 2) - ROW_HEIGHT / 2;
+    const rowOffset = Math.floor((relativeY - centerLineTop) / ROW_HEIGHT);
+    
+    const transportState = useTransportStore.getState();
+    const currentRow = transportState.isPlaying ? transportState.currentRow : cursor.rowIndex;
+    const rowIndex = currentRow + rowOffset;
+
+    // Calculate channel width - must match render() layout
+    const noteWidth = CHAR_WIDTH * 3 + 4;
+    const firstCell = pattern.channels[0]?.rows[0];
+    const hasAcid = firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined;
+    const hasProb = firstCell?.probability !== undefined;
+    const paramWidth = CHAR_WIDTH * 10 + 16
+      + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
+      + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
+      + CHAR_WIDTH * 2 + 4; // Automation column
+    const channelWidth = noteWidth + paramWidth + 20 + 20;
+
+    let channelIndex = 0;
+    let localX = relativeX - LINE_NUMBER_WIDTH;
+    if (relativeX > LINE_NUMBER_WIDTH) {
+      channelIndex = Math.floor(localX / channelWidth);
+      channelIndex = Math.max(0, Math.min(channelIndex, pattern.channels.length - 1));
+      localX = localX % channelWidth;
+    } else {
+      channelIndex = 0;
+      localX = -1;
+    }
+
+    // Determine column type
+    let columnType: CursorPosition['columnType'] = 'note';
+    if (localX >= noteWidth + 4) {
+      const xInParams = localX - (noteWidth + 8);
+      if (xInParams < CHAR_WIDTH * 2 + 4) columnType = 'instrument';
+      else if (xInParams < CHAR_WIDTH * 4 + 8) columnType = 'volume';
+      else if (xInParams < CHAR_WIDTH * 7 + 12) columnType = 'effTyp';
+      else if (xInParams < CHAR_WIDTH * 10 + 16) columnType = 'effTyp2';
+      else if (hasAcid && xInParams < CHAR_WIDTH * 12 + 24) columnType = xInParams < CHAR_WIDTH * 11 + 20 ? 'flag1' : 'flag2';
+      else if (hasProb) columnType = 'probability';
+    }
+
+    return {
+      rowIndex: Math.max(0, Math.min(rowIndex, pattern.length - 1)),
+      channelIndex,
+      columnType
+    };
+  }, [pattern, dimensions.height, scrollLeft, cursor.rowIndex]);
+
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isMobile || e.button !== 0) return; // Only left click on desktop
+
+    const cell = getCellFromCoords(e.clientX, e.clientY);
+    if (!cell) return;
+
+    const store = useTrackerStore.getState();
+    
+    if (e.shiftKey) {
+      // Extend selection
+      store.updateSelection(cell.channelIndex, cell.rowIndex);
+    } else {
+      // Start new selection or just move cursor
+      store.moveCursorToRow(cell.rowIndex);
+      store.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType);
+      
+      // If we move the cursor, start a new selection
+      store.startSelection();
+    }
+    
+    setIsDragging(true);
+  }, [isMobile, getCellFromCoords]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging || isMobile) return;
+
+    const cell = getCellFromCoords(e.clientX, e.clientY);
+    if (!cell) return;
+
+    const store = useTrackerStore.getState();
+    store.updateSelection(cell.channelIndex, cell.rowIndex);
+  }, [isDragging, isMobile, getCellFromCoords]);
+
+  const handleMouseUp = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+    }
+  }, [isDragging]);
+
+  // Handle tap on pattern canvas - move cursor to tapped cell
   const handlePatternTap = useCallback((tapX: number, tapY: number) => {
     if (!pattern || !isMobile || !containerRef.current || !canvasRef.current) return;
 
@@ -482,6 +583,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     border: '#252530',
     lineNumber: '#707070',
     lineNumberHighlight: '#f97316',
+    selection: 'rgba(59, 130, 246, 0.3)', // Semi-transparent blue for selection
   }), [isCyanTheme]);
 
   // Channel context menu handlers
@@ -1005,6 +1107,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     ctx.fillRect(0, 0, width, height);
 
     // Draw rows
+    const sel = state.selection;
+    const hasSelection = !!sel;
+    const minSelCh = hasSelection ? Math.min(sel.startChannel, sel.endChannel) : -1;
+    const maxSelCh = hasSelection ? Math.max(sel.startChannel, sel.endChannel) : -1;
+    const minSelRow = hasSelection ? Math.min(sel.startRow, sel.endRow) : -1;
+    const maxSelRow = hasSelection ? Math.max(sel.startRow, sel.endRow) : -1;
+
     for (let i = visibleStart; i < visibleEnd; i++) {
       let rowIndex: number;
       let isGhostRow = false;
@@ -1218,6 +1327,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           ctx.fillStyle = chColor;
           ctx.fillRect(colX, y, 2, ROW_HEIGHT);
           ctx.globalAlpha = prevAlpha;
+        }
+
+        // Draw selection highlight
+        if (hasSelection && !isGhostRow && ch >= minSelCh && ch <= maxSelCh && rowIndex >= minSelRow && rowIndex <= maxSelRow) {
+          ctx.fillStyle = colors.selection;
+          ctx.fillRect(colX, y, channelWidth, ROW_HEIGHT);
         }
       }
       
@@ -1709,6 +1824,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         style={{ minHeight: 200 }}
         tabIndex={0}
         onContextMenu={cellContextMenu.handleContextMenu}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
         {...patternGestures}
       >
         <canvas
