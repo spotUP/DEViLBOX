@@ -16,6 +16,7 @@ export interface PatternGestureConfig {
   onPinchZoom?: (scale: number) => void;
   onScroll?: (deltaY: number) => void; // Continuous scroll during touch drag
   onHorizontalScroll?: (deltaX: number) => void; // Continuous horizontal scroll
+  onTouchStart?: () => void; // Called when touch begins
   swipeThreshold?: number;
   longPressDelay?: number;
   enabled?: boolean;
@@ -69,6 +70,8 @@ export function useMobilePatternGestures({
   onLongPress,
   onPinchZoom,
   onScroll,
+  onHorizontalScroll,
+  onTouchStart: onTouchStartExternal,
   swipeThreshold = DEFAULT_SWIPE_THRESHOLD,
   longPressDelay = DEFAULT_LONG_PRESS_DELAY,
   enabled = true,
@@ -90,6 +93,11 @@ export function useMobilePatternGestures({
 
       const touch = e.touches[0];
       const numTouches = e.touches.length;
+
+      // Call external handler if provided (e.g. to reset accumulators)
+      if (onTouchStartExternal) {
+        onTouchStartExternal();
+      }
 
       touchState.current = {
         startX: touch.clientX,

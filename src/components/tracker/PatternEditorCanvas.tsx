@@ -20,10 +20,10 @@ import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { Plus, Minus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
-import { useSwipeGesture } from '@hooks/useSwipeGesture';
 import { getTrackerReplayer, type DisplayState } from '@engine/TrackerReplayer';
 import * as Tone from 'tone';
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
+import type { CursorPosition } from '@typedefs';
 
 const ROW_HEIGHT = 24;
 const CHAR_WIDTH = 10;
@@ -377,14 +377,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     onTap: handlePatternTap,
     onScroll: handleScroll,
     onHorizontalScroll: handleHorizontalScroll,
+    onTouchStart: () => {
+      horizontalAccumulatorRef.current = 0;
+    },
     swipeThreshold: 30, // Lower threshold for better mobile responsiveness
     enabled: isMobile,
   });
-
-  // Reset accumulator on touch start via standard event to keep logic simple
-  const handleTouchStart = useCallback(() => {
-    horizontalAccumulatorRef.current = 0;
-  }, []);
 
   // Channel header gestures for mobile
   const channelHeaderGestures = useMobilePatternGestures({
@@ -1711,7 +1709,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         style={{ minHeight: 200 }}
         tabIndex={0}
         onContextMenu={cellContextMenu.handleContextMenu}
-        onTouchStart={handleTouchStart}
         {...patternGestures}
       >
         <canvas
