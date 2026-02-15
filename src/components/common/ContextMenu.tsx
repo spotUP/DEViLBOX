@@ -111,9 +111,15 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       submenuTimerRef.current = null;
     }
     const rect = element.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const menuWidth = 180; // Approximate min-width
+
+    // Smart flip: if not enough space on right, show on left
+    const showOnRight = rect.right + menuWidth < viewportWidth - 10;
+
     setActiveSubmenu(itemId);
     setSubmenuPosition({
-      x: rect.right - 2,
+      x: showOnRight ? rect.right - 2 : rect.left - menuWidth + 2,
       y: rect.top - 4,
     });
   }, []);

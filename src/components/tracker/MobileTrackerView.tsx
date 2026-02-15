@@ -225,9 +225,14 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
       </div>
 
       {/* Main content area - Pattern/Instruments/Controls tabs */}
-      <div className="flex-1 min-h-0 overflow-hidden" style={{ paddingBottom: activeTab === 'pattern' ? `calc(${isInputCollapsed ? '56px' : '180px'} + env(safe-area-inset-bottom, 0px))` : 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
+      <div className="flex-1 min-h-0 relative">
         {activeTab === 'pattern' && (
-          <div className="h-full flex flex-col">
+          <div 
+            className="h-full flex flex-col"
+            style={{ 
+              paddingBottom: `calc(${isInputCollapsed ? '56px' : '180px'} + env(safe-area-inset-bottom, 0px))` 
+            }}
+          >
             {/* Pattern editor canvas - scrollable */}
             <div className="flex-1 overflow-auto">
               <PatternEditorCanvas
@@ -241,38 +246,44 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
         )}
 
         {activeTab === 'instruments' && (
-          <div className="h-full overflow-y-auto">
-            {/* TB303 Knobs and Toolbar - Moved from 'controls' tab */}
-            <div className="p-4 border-b border-dark-border bg-dark-bgSecondary">
-              <div className="mb-4">
-                <h3 className="text-xs font-bold text-text-muted uppercase mb-3 flex items-center gap-2">
-                  <SlidersHorizontal size={14} className="text-accent-primary" />
-                  Live Controls
-                </h3>
-                <TB303KnobPanel />
-              </div>
-              
-              <div>
-                <h3 className="text-xs font-bold text-text-muted uppercase mb-3 flex items-center gap-2">
-                  <Settings size={14} className="text-accent-secondary" />
-                  Tracker Actions
-                </h3>
-                <FT2Toolbar
-                  onShowPatterns={onShowPatterns}
-                  onShowExport={onShowExport}
-                  onShowHelp={onShowHelp}
-                  onShowMasterFX={onShowMasterFX}
-                  onShowInstruments={onShowInstruments}
-                  showPatterns={showPatterns}
-                  showMasterFX={showMasterFX}
-                />
+          <div className="h-full flex flex-col">
+            {/* Sticky Header for Instruments Tab */}
+            <div className="flex-shrink-0 sticky top-0 z-10 bg-dark-bg/95 backdrop-blur-md border-b border-dark-border shadow-lg">
+              <div className="p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5">
+                    <SlidersHorizontal size={12} className="text-accent-primary" />
+                    Live Ops
+                  </h3>
+                  <div className="h-px flex-1 bg-dark-border mx-3 opacity-30" />
+                </div>
+                <div className="overflow-x-auto pb-1 no-scrollbar">
+                  <FT2Toolbar
+                    onShowPatterns={onShowPatterns}
+                    onShowExport={onShowExport}
+                    onShowHelp={onShowHelp}
+                    onShowMasterFX={onShowMasterFX}
+                    onShowInstruments={onShowInstruments}
+                    showPatterns={showPatterns}
+                    showMasterFX={showMasterFX}
+                    compact={true}
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="p-2">
-              <h3 className="text-xs font-bold text-text-muted uppercase mb-3 px-2 flex items-center gap-2">
-                <Music2 size={14} className="text-accent-primary" />
-                Instrument List
+            {/* Scrollable Instrument List */}
+            <div 
+              className="flex-1 overflow-y-auto p-2"
+              style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px))' }}
+            >
+              <div className="mb-4">
+                <TB303KnobPanel />
+              </div>
+              
+              <h3 className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-3 px-2 flex items-center gap-1.5">
+                <Music2 size={12} className="text-accent-primary" />
+                Instruments
               </h3>
               <InstrumentList
                 variant="ft2"
