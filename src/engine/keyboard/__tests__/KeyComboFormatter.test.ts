@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { KeyComboFormatter } from '../KeyComboFormatter';
-import { NormalizedKeyEvent } from '../types';
+import type { NormalizedKeyEvent } from '../types';
 
 describe('KeyComboFormatter', () => {
   it('formats single key', () => {

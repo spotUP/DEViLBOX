@@ -1,4 +1,4 @@
-import { Command, CommandContext } from './types';
+import type { Command, CommandContext } from './types';
 
 export class CommandRegistry {
   private commands = new Map<string, Command>();

@@ -1,0 +1,212 @@
+{
+  "name": "OctaMED SoundStudio",
+  "version": "2.0.0",
+  "description": "OctaMED SoundStudio keyboard layout from official documentation. Authentic Amiga tracker mapping.",
+  "platform": {
+    "pc": {
+      "Up": "cursor_up",
+      "Down": "cursor_down",
+      "Left": "cursor_left",
+      "Right": "cursor_right",
+      
+      "Alt+Up": "first_block",
+      "Alt+Down": "last_block",
+      "Shift+Up": "prev_block",
+      "Shift+Down": "next_block",
+      
+      "F6": "jump_to_block_start",
+      "F7": "jump_to_block_quarter_1",
+      "F8": "jump_to_block_middle",
+      "F9": "jump_to_block_quarter_3",
+      "F10": "jump_to_block_end",
+      
+      "Alt+Left": "prev_track",
+      "Alt+Right": "next_track",
+      "Ctrl+Left": "screen_left",
+      "Ctrl+Right": "screen_right",
+      
+      "Ctrl+F1": "show_files_panel",
+      "Ctrl+F2": "show_play_panel",
+      "Ctrl+F3": "show_instruments_panel",
+      "Ctrl+F4": "show_block_panel",
+      "Ctrl+F5": "show_edit_panel",
+      "Ctrl+F6": "show_misc_panel",
+      "Ctrl+F7": "show_volume_panel",
+      "Ctrl+F8": "show_midi_panel",
+      "Ctrl+F9": "show_transpose_panel",
+      "Ctrl+F10": "show_range_panel",
+      
+      "Delete": "delete_note",
+      "Shift+Delete": "delete_note_and_command",
+      "Backspace": "delete_note_and_space",
+      "Alt+Backspace": "delete_track",
+      "Shift+Backspace": "insert_space",
+      "Shift+Alt+Backspace": "insert_track",
+      
+      "Escape": "toggle_edit_mode",
+      "Grave": "toggle_auto_space",
+      
+      "Ctrl+X": "cut_track",
+      "Ctrl+C": "copy_track",
+      "Ctrl+V": "paste_track",
+      "Ctrl+Shift+X": "cut_block",
+      "Ctrl+Shift+C": "copy_block",
+      "Ctrl+Shift+V": "paste_block",
+      
+      "Ctrl+Shift+0": "pick_note_0",
+      "Ctrl+Shift+1": "pick_note_1",
+      "Ctrl+Shift+2": "pick_note_2",
+      "Ctrl+Shift+3": "pick_note_3",
+      "Ctrl+Shift+4": "pick_note_4",
+      "Ctrl+Shift+5": "pick_note_5",
+      "Ctrl+Shift+6": "pick_note_6",
+      "Ctrl+Shift+7": "pick_note_7",
+      "Ctrl+Shift+8": "pick_note_8",
+      "Ctrl+Shift+9": "pick_note_9",
+      
+      "Shift+0": "enter_programmed_note_0",
+      "Shift+1": "enter_programmed_note_1",
+      "Shift+2": "enter_programmed_note_2",
+      "Shift+3": "enter_programmed_note_3",
+      "Shift+4": "enter_programmed_note_4",
+      "Shift+5": "enter_programmed_note_5",
+      "Shift+6": "enter_programmed_note_6",
+      "Shift+7": "enter_programmed_note_7",
+      "Shift+8": "enter_programmed_note_8",
+      "Shift+9": "enter_programmed_note_9",
+      
+      "Ctrl+A": "toggle_auto_advance",
+      "Ctrl+O": "create_volume_slide",
+      "Ctrl+T": "create_slide_transform",
+      "Ctrl+Shift+T": "create_slide_12",
+      
+      "Return": "insert_hold_symbol",
+      "A": "insert_hold_symbol_a",
+      "Shift+Return": "insert_hold_all_tracks",
+      
+      "F1": "select_octave_12",
+      "F2": "select_octave_23",
+      "F3": "select_octave_34",
+      "F4": "select_octave_45",
+      "F5": "select_octave_56",
+      
+      "Ctrl+P": "play_song",
+      "Shift+Alt+Space": "play_song_alt",
+      "Ctrl+Space": "play_block",
+      "Space": "stop",
+      "Alt+Space": "continue_block",
+      "Shift+Space": "continue_song",
+      
+      "Ctrl+Numpad1": "sequence_goto_end",
+      "Ctrl+Numpad2": "sequence_scroll_down",
+      "Ctrl+Numpad4": "sequence_decrease_block",
+      "Ctrl+Numpad5": "sequence_insert_current",
+      "Ctrl+Numpad6": "sequence_increase_block",
+      "Ctrl+Numpad7": "sequence_goto_top",
+      "Ctrl+Numpad8": "sequence_scroll_up",
+      "Ctrl+Numpad0": "sequence_insert_zero",
+      "Ctrl+NumpadDecimal": "sequence_delete_block",
+      
+      "Alt+Numpad1": "instrument_goto_end",
+      "Alt+Numpad2": "instrument_scroll_down",
+      "Alt+Numpad3": "instrument_quick_scroll_down",
+      "Alt+Numpad7": "instrument_goto_top",
+      "Alt+Numpad8": "instrument_scroll_up",
+      "Alt+Numpad9": "instrument_quick_scroll_up",
+      
+      "Shift+Left": "next_instrument",
+      "Shift+Right": "prev_instrument",
+      "Shift+Alt+Right": "instrument_16_forward",
+      "Shift+Alt+Left": "instrument_16_backward",
+      
+      "Ctrl+I": "select_instrument_name",
+      "Ctrl+Shift+I": "clear_instrument_name",
+      "Ctrl+R": "select_instrument_repeat",
+      
+      "Ctrl+F": "display_free_memory",
+      "Ctrl+Shift+F": "toggle_low_pass_filter",
+      "Tab": "highlight_current_line",
+      "Ctrl+Space": "reset_midi_effects"
+    },
+    "mac": {
+      "Up": "cursor_up",
+      "Down": "cursor_down",
+      "Left": "cursor_left",
+      "Right": "cursor_right",
+      
+      "Alt+Up": "first_block",
+      "Alt+Down": "last_block",
+      "Shift+Up": "prev_block",
+      "Shift+Down": "next_block",
+      
+      "F6": "jump_to_block_start",
+      "F7": "jump_to_block_quarter_1",
+      "F8": "jump_to_block_middle",
+      "F9": "jump_to_block_quarter_3",
+      "F10": "jump_to_block_end",
+      
+      "Alt+Left": "prev_track",
+      "Alt+Right": "next_track",
+      "Cmd+Left": "screen_left",
+      "Cmd+Right": "screen_right",
+      
+      "Cmd+F1": "show_files_panel",
+      "Cmd+F2": "show_play_panel",
+      "Cmd+F3": "show_instruments_panel",
+      "Cmd+F4": "show_block_panel",
+      "Cmd+F5": "show_edit_panel",
+      "Cmd+F6": "show_misc_panel",
+      "Cmd+F7": "show_volume_panel",
+      "Cmd+F8": "show_midi_panel",
+      "Cmd+F9": "show_transpose_panel",
+      "Cmd+F10": "show_range_panel",
+      
+      "Delete": "delete_note",
+      "Shift+Delete": "delete_note_and_command",
+      "Backspace": "delete_note_and_space",
+      "Alt+Backspace": "delete_track",
+      "Shift+Backspace": "insert_space",
+      "Shift+Alt+Backspace": "insert_track",
+      
+      "Escape": "toggle_edit_mode",
+      "Grave": "toggle_auto_space",
+      
+      "Cmd+X": "cut_track",
+      "Cmd+C": "copy_track",
+      "Cmd+V": "paste_track",
+      "Cmd+Shift+X": "cut_block",
+      "Cmd+Shift+C": "copy_block",
+      "Cmd+Shift+V": "paste_block",
+      
+      "Cmd+A": "toggle_auto_advance",
+      "Cmd+O": "create_volume_slide",
+      "Cmd+T": "create_slide_transform",
+      "Cmd+Shift+T": "create_slide_12",
+      
+      "Return": "insert_hold_symbol",
+      "Shift+Return": "insert_hold_all_tracks",
+      
+      "F1": "select_octave_12",
+      "F2": "select_octave_23",
+      "F3": "select_octave_34",
+      "F4": "select_octave_45",
+      "F5": "select_octave_56",
+      
+      "Cmd+P": "play_song",
+      "Shift+Alt+Space": "play_song_alt",
+      "Cmd+Space": "play_block",
+      "Space": "stop",
+      "Alt+Space": "continue_block",
+      "Shift+Space": "continue_song",
+      
+      "Shift+Left": "next_instrument",
+      "Shift+Right": "prev_instrument",
+      
+      "Cmd+I": "select_instrument_name",
+      "Cmd+Shift+I": "clear_instrument_name",
+      "Cmd+R": "select_instrument_repeat",
+      
+      "Tab": "highlight_current_line"
+    }
+  }
+}

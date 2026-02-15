@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { playFromCursor } from '../playFromCursor';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
-import { getToneEngine } from '@engine/ToneEngine';
 
 // Mock stores and engine
 vi.mock('@stores/useTrackerStore');

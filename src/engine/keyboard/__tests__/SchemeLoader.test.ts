@@ -28,6 +28,7 @@ describe('SchemeLoader', () => {
     const scheme = await loader.loadScheme('fasttracker2');
 
     expect(scheme).toEqual(mockScheme);
+    // BASE_URL defaults to / in vitest if not specified
     expect(global.fetch).toHaveBeenCalledWith('/keyboard-schemes/fasttracker2.json');
   });
 

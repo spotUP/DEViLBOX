@@ -1,6 +1,6 @@
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useUIStore } from '@stores/useUIStore';
-import { Pattern } from '@/types/tracker';
+import type { Pattern } from '@/types/tracker';
 
 /**
  * Clone Pattern - Create a deep copy of the current pattern
@@ -12,7 +12,7 @@ import { Pattern } from '@/types/tracker';
  * @returns true (always succeeds)
  */
 export function clonePattern(): boolean {
-  const { patterns, currentPatternIndex, addPattern } = useTrackerStore.getState();
+  const { patterns, currentPatternIndex } = useTrackerStore.getState();
   const currentPattern = patterns[currentPatternIndex];
 
   if (!currentPattern) {
@@ -26,8 +26,10 @@ export function clonePattern(): boolean {
   // Generate unique name
   clonedPattern.name = generateCloneName(currentPattern.name, patterns);
 
-  // Add the cloned pattern
-  addPattern(clonedPattern);
+  // Add the cloned pattern directly to state
+  useTrackerStore.setState((state) => {
+    state.patterns.push(clonedPattern);
+  });
 
   // Show status message
   useUIStore.getState().setStatusMessage(`PATTERN CLONED: ${clonedPattern.name}`);
