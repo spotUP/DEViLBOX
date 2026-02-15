@@ -234,35 +234,35 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
   return (
     <div className="flex flex-col gap-2">
       {/* Octave and utility controls */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 h-[56px]">
         {/* Octave controls - Only show in piano mode */}
         {mode === 'piano' ? (
-          <div className="flex items-center gap-1 bg-dark-bgTertiary rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-dark-bgTertiary rounded-lg p-1 h-full">
             <button
               onClick={onOctaveDown}
               disabled={currentOctave === 0}
-              className="piano-octave-btn"
+              className="piano-octave-btn h-full"
               aria-label="Octave down"
             >
               <ChevronLeft size={18} />
             </button>
-            <div className="px-3 py-1 min-w-[48px] text-center">
-              <span className="text-xs text-text-muted font-mono">OCT</span>
-              <div className="text-lg font-bold text-accent-primary font-mono">
+            <div className="px-3 py-1 min-w-[48px] text-center flex flex-col justify-center">
+              <span className="text-[10px] text-text-muted font-mono leading-none mb-1">OCT</span>
+              <div className="text-lg font-bold text-accent-primary font-mono leading-none">
                 {currentOctave}
               </div>
             </div>
             <button
               onClick={onOctaveUp}
               disabled={currentOctave === 7}
-              className="piano-octave-btn"
+              className="piano-octave-btn h-full"
               aria-label="Octave up"
             >
               <ChevronRight size={18} />
             </button>
           </div>
         ) : (
-          <div className="flex items-center px-4 py-2 bg-dark-bgTertiary rounded-lg">
+          <div className="flex items-center px-4 bg-dark-bgTertiary rounded-lg h-full">
             <span className="text-xs font-bold text-accent-secondary font-mono tracking-wider">
               HEX INPUT (0-F)
             </span>
@@ -272,7 +272,7 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
         {/* Note-off and delete buttons */}
         <button
           onClick={onNoteOff}
-          className="flex-1 piano-utility-btn"
+          className="flex-1 piano-utility-btn h-full"
         >
           <span className="font-mono text-sm">---</span>
           <span className="text-[10px] text-text-muted">OFF</span>
@@ -280,7 +280,7 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
 
         <button
           onClick={onDelete}
-          className="flex-1 piano-utility-btn"
+          className="flex-1 piano-utility-btn h-full"
         >
           <Delete size={18} />
           <span className="text-[10px] text-text-muted">DEL</span>
