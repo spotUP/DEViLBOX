@@ -12,6 +12,25 @@ if [ ! -d "server/node_modules" ]; then
   cd server && npm install && cd ..
 fi
 
+# Check if Furnace WASM needs rebuilding
+FURNACE_WASM="public/furnace-dispatch/FurnaceDispatch.wasm"
+FURNACE_SRC="furnace-wasm/common/FurnaceDispatchWrapper.cpp"
+if [ -f "$FURNACE_SRC" ] && [ -f "$FURNACE_WASM" ]; then
+  if [ "$FURNACE_SRC" -nt "$FURNACE_WASM" ]; then
+    echo "[$(date)] Furnace WASM source changed, rebuilding..."
+    if [ -d "furnace-wasm/build" ]; then
+      cd furnace-wasm/build && make -j4 && cd ../..
+      echo "[$(date)] ✓ Furnace WASM rebuilt"
+    else
+      echo "[$(date)] ⚠ furnace-wasm/build not found, skipping WASM rebuild"
+    fi
+  fi
+elif [ ! -f "$FURNACE_WASM" ] && [ -d "furnace-wasm/build" ]; then
+  echo "[$(date)] Furnace WASM missing, building..."
+  cd furnace-wasm/build && make -j4 && cd ../..
+  echo "[$(date)] ✓ Furnace WASM built"
+fi
+
 # Cleanup function to kill both servers on exit
 cleanup() {
   echo ""
