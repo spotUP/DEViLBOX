@@ -662,29 +662,32 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                 <div
                   key={file.id}
                   onClick={() => {
+                    // Directories: open on single tap (standard file browser behavior)
+                    if (file.isDirectory) {
+                      if (hasElectronFS()) {
+                        setCurrentPath(file.path);
+                        setElectronDirectory(file.path);
+                      } else {
+                        setCurrentPath(file.path);
+                      }
+                      setSelectedFile(null);
+                      return;
+                    }
+
+                    // Files: select on single tap, load on double tap
                     const now = Date.now();
-                    const isDoubleTap = lastClickRef.current.id === file.id && (now - lastClickRef.current.time) < 350;
+                    const isDoubleTap = lastClickRef.current.id === file.id && (now - lastClickRef.current.time) < 500;
                     
                     if (isDoubleTap) {
-                      // Action for double tap
-                      if (file.isDirectory) {
-                        if (hasElectronFS()) {
-                          setCurrentPath(file.path);
-                          setElectronDirectory(file.path);
-                        } else {
-                          setCurrentPath(file.path);
-                        }
-                        setSelectedFile(null);
-                      } else {
-                        setSelectedFile(file);
-                        if (mode === 'load') handleLoad();
-                      }
+                      // Double tap on file: load it
+                      setSelectedFile(file);
+                      if (mode === 'load') handleLoad();
                       // Reset to prevent triple-tap
                       lastClickRef.current = { id: '', time: 0 };
                       return;
                     }
 
-                    // Single tap action
+                    // Single tap on file: select it
                     lastClickRef.current = { id: file.id, time: now };
                     setSelectedFile(file);
                   }}
