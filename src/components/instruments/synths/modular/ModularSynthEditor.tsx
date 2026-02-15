@@ -9,10 +9,14 @@ import React, { useCallback } from 'react';
 import type { InstrumentConfig } from '../../../../types/instrument';
 import type { ModularPatchConfig } from '../../../../types/modular';
 import { MODULAR_INIT_PATCH } from '../../../../constants/modularPresets';
+import { registerBuiltInModules } from '../../../../engine/modular/modules';
 import { ModularToolbar } from './ModularToolbar';
 import { ModularRackView } from './views/ModularRackView';
 import { ModularCanvasView } from './views/ModularCanvasView';
 import { ModularMatrixView } from './views/ModularMatrixView';
+
+// Ensure modules are registered for UI use
+registerBuiltInModules();
 
 interface ModularSynthEditorProps {
   config: InstrumentConfig;
@@ -53,7 +57,7 @@ export const ModularSynthEditor: React.FC<ModularSynthEditorProps> = ({ config, 
       </div>
 
       {/* Status bar */}
-      <div className="flex items-center gap-4 px-4 py-1.5 bg-surface-secondary border-t border-border text-xs text-text-tertiary">
+      <div className="flex items-center gap-4 px-4 py-1.5 bg-dark-bgSecondary border-t border-dark-border text-xs text-text-muted">
         <span>Modules: {patchConfig.modules.length}</span>
         <span>Connections: {patchConfig.connections.length}</span>
         <span>Polyphony: {patchConfig.polyphony}</span>

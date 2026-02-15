@@ -109,7 +109,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     removeChannel,
     toggleChannelMute,
     toggleChannelSolo,
+    toggleChannelCollapse,
     setChannelColor,
+    updateChannelName,
     setCell,
     moveCursorToChannelAndColumn,
     copyTrack,
@@ -127,7 +129,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     removeChannel: state.removeChannel,
     toggleChannelMute: state.toggleChannelMute,
     toggleChannelSolo: state.toggleChannelSolo,
+    toggleChannelCollapse: state.toggleChannelCollapse,
     setChannelColor: state.setChannelColor,
+    updateChannelName: state.updateChannelName,
     setCell: state.setCell,
     moveCursorToChannelAndColumn: state.moveCursorToChannelAndColumn,
     copyTrack: state.copyTrack,
@@ -1403,7 +1407,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         }
 
         // Skip content if collapsed
-        if (isCollapsed) continue;
+        if (isCollapsed) {
+          // Draw shortName vertically if collapsed
+          const shortName = pattern.channels[ch].shortName || `${ch + 1}`;
+          ctx.fillStyle = chColor || colors.textMuted;
+          ctx.font = 'bold 9px monospace';
+          ctx.textAlign = 'center';
+          ctx.save();
+          ctx.translate(colX + channelWidth / 2 + 2, y + ROW_HEIGHT / 2);
+          ctx.rotate(-Math.PI / 2);
+          ctx.fillText(shortName.substring(0, 2).toUpperCase(), 0, 3);
+          ctx.restore();
+          continue;
+        }
 
         // Check if this channel exists in the source pattern (ghost patterns might have different channel counts)
         if (!sourcePattern.channels[ch]) {
@@ -1894,14 +1910,28 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                         boxShadow: channel.color ? `inset 3px 0 0 ${channel.color}` : undefined,
                       }}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 overflow-hidden">
                         <span
-                          className="font-bold font-mono text-sm"
+                          className="font-bold font-mono text-sm flex-shrink-0"
                           style={{ color: channel.color || 'var(--color-accent)' }}
                         >
                           {(idx + 1).toString().padStart(2, '0')}
                         </span>
-                        <ChannelVUMeter level={trigger.level} isActive={trigger.triggered} />
+                        <input
+                          type="text"
+                          className="bg-transparent border-none outline-none font-mono text-[10px] text-text-muted hover:text-text-primary focus:text-accent-primary transition-colors min-w-0 flex-1 overflow-hidden text-ellipsis uppercase"
+                          value={channel.name || `Channel ${idx + 1}`}
+                          onChange={(e) => updateChannelName(idx, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                          title={`Click to rename channel (Short: ${channel.shortName || (idx + 1)})`}
+                        />
+                        <div className="flex-shrink-0">
+                          <ChannelVUMeter level={trigger.level} isActive={trigger.triggered} />
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-1">
@@ -2050,7 +2080,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 pattern={pattern}
                 rowHeight={ROW_HEIGHT}
                 channelCount={pattern.channels.length}
-                channelWidth={channelHeaderWidth}
+                channelOffsets={channelOffsets}
+                channelWidths={channelWidths}
                 rowNumWidth={LINE_NUMBER_WIDTH}
               />
             </div>

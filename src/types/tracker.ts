@@ -105,6 +105,7 @@ export interface TrackerRow {
 export interface ChannelData {
   id: string;
   name: string;
+  shortName?: string;
   rows: TrackerCell[];
   muted: boolean;
   solo: boolean;
@@ -119,6 +120,8 @@ export interface ChannelData {
     originalIndex?: number; // Original position in MOD/XM
     addedAfterImport?: boolean;
     channelType?: 'sample' | 'synth' | 'hybrid';
+    furnaceType?: number; // Furnace DivChanType for system presets
+    hardwareName?: string; // Hardware-specific channel name
   };
 }
 

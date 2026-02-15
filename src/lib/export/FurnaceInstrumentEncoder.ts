@@ -214,28 +214,32 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
   }
 
   // === STD/Macro data ===
-  // Reference: FurnaceDispatchWrapper.cpp:3696-3730
+  // Reference: FurnaceDispatchWrapper.cpp:3696-3730 and Furnace instrument.h:106-128
   // Format per macro: [0]=len [1]=delay [2]=speed [3]=loop [4]=rel [5]=mode [6]=open
   // Then len × int32 values
-  // 15 macros in order: vol, arp, duty, wave, pitch, ex1, ex2, ex3, alg, fb, fms, ams, panL, panR, phaseReset
+  // 22 macros in order matching DIV_MACRO_* enum:
+  //   0=vol, 1=arp, 2=duty, 3=wave, 4=pitch, 5=ex1, 6=ex2, 7=ex3,
+  //   8=alg, 9=fb, 10=fms, 11=ams, 12=panL, 13=panR, 14=phaseReset,
+  //   15=ex4, 16=ex5, 17=ex6, 18=ex7, 19=ex8, 20=ex9, 21=ex10
+  // C64 uses: ex4(15)=special, ex5(16)=attack, ex6(17)=decay, ex7(18)=sustain, ex8(19)=release
   let stdOffset = 0;
   const waveMacro = config.macros?.find(m => (m.code ?? m.type) === 3);
   console.log(`[FurnaceEncoder] "${name}" macros: ${config.macros?.length ?? 0} total, wave macro: ${waveMacro ? `len=${waveMacro.data?.length}, data=[${waveMacro.data?.slice(0,4).join(',')}...]` : 'NONE'}`);
   if (config.macros && config.macros.length > 0) {
     stdOffset = writer.getPosition();
 
-    // Index macros by code (0-14). The 'code' field is the macro slot number.
+    // Index macros by code (0-21). The 'code' field is the macro slot number.
     // Fallback to 'type' for backward compatibility (old saved projects may have
     // code=undefined with slot number accidentally stored in type).
-    const macrosByCode: (FurnaceMacro | null)[] = new Array(15).fill(null);
+    const macrosByCode: (FurnaceMacro | null)[] = new Array(22).fill(null);
     for (const macro of config.macros) {
       const code = macro.code ?? macro.type;
-      if (code !== undefined && code >= 0 && code < 15) {
+      if (code !== undefined && code >= 0 && code < 22) {
         macrosByCode[code] = macro;
       }
     }
 
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 22; i++) {
       const macro = macrosByCode[i];
 
       if (macro && macro.data && macro.data.length > 0) {
@@ -332,8 +336,8 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     const r = c64.r || 0;
     if (s === 0 && (a === 0 && d === 0 && r === 0)) {
       // All-zero ADSR is always silent - provide minimal defaults
-      console.warn(`[FurnaceEncoder] C64 instrument "${name}" has all-zero ADSR (silent), setting minimal sustain s=1`);
-      s = 1;  // ~6% volume - prevents stuck-silent voice
+      console.warn(`[FurnaceEncoder] C64 instrument "${name}" has all-zero ADSR (silent), setting default sustain s=8`);
+      s = 8;  // 53% volume - audible but not maxed out (matches typical bass/arp instruments)
     }
     console.log(`[FurnaceEncoder] C64 "${name}" ADSR FINAL: ${a}/${d}/${s}/${r} (original was ${c64.a || 0}/${c64.d || 0}/${c64.s || 0}/${c64.r || 0})`);
     writer.writeUint8(a);

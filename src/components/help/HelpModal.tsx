@@ -6,16 +6,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Keyboard, Zap, BookOpen, Cpu } from 'lucide-react';
 import { CHIP_EFFECT_REFERENCE } from '../../data/ChipEffectReference';
-import { useTrackerStore, useInstrumentStore } from '@stores';
+import { useTrackerStore, useInstrumentStore } from '../../stores';
 import { FurnaceChipType } from '../../engine/chips/FurnaceChipEngine';
+
+type HelpTab = 'shortcuts' | 'effects' | 'chip-effects' | 'tutorial';
 
 interface HelpModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialTab?: HelpTab;
 }
-
-type HelpTab = 'shortcuts' | 'effects' | 'chip-effects' | 'tutorial';
 
 interface ShortcutGroup {
   title: string;

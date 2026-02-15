@@ -53,6 +53,7 @@ import type { InstrumentConfig, TB303Config } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
+import { SYSTEM_PRESETS } from '@/constants/systemPresets';
 import { CURRENT_VERSION } from '@generated/changelog';
 
 // Build accept string for file input
@@ -177,6 +178,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     reset: resetTracker,
     duplicatePosition,
     removeFromOrder,
+    applySystemPreset,
   } = useTrackerStore();
 
   const {
@@ -646,6 +648,18 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   Groove
                 </Button>
                 {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
+
+                <select
+                  className="bg-dark-bgSecondary text-text-primary text-[10px] h-7 border border-dark-border rounded px-1 ml-1 hover:border-accent-primary transition-colors cursor-pointer outline-none appearance-none min-w-[100px]"
+                  onChange={(e) => applySystemPreset(e.target.value)}
+                  defaultValue="none"
+                  title="Apply System/Hardware Preset"
+                >
+                  <option value="none" disabled>Hardware...</option>
+                  {SYSTEM_PRESETS.map(preset => (
+                    <option key={preset.id} value={preset.id}>{preset.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="ft2-section ft2-col-3">
                 <FT2NumericInput
@@ -695,7 +709,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           <div className="ft2-toolbar-row ft2-toolbar-row-menu">
             <div className="ft2-section">
               <input ref={fileInputRef} type="file" accept={ACCEPTED_FORMATS} onChange={handleFileLoad} className="hidden" />
-              <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoading} loading={isLoading}>Load</Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
               <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
               <Button variant="ghost" size="sm" onClick={handleSave}>Download</Button>
               <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>

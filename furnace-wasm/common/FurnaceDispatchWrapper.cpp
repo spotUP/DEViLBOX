@@ -337,6 +337,7 @@ struct ChannelMacroState {
   MacroState ex1, ex2, ex3;
   MacroState alg, fb, fms, ams;
   MacroState panL, panR, phaseReset;
+  MacroState ex4, ex5, ex6, ex7, ex8, ex9, ex10;  // C64 uses ex4=special, ex5-ex8=ADSR
   MacroState opMacros[4][20]; // Per-operator
 
   int insIndex;       // Current instrument
@@ -357,6 +358,8 @@ struct ChannelMacroState {
     ex1.init(); ex2.init(); ex3.init();
     alg.init(); fb.init(); fms.init(); ams.init();
     panL.init(); panR.init(); phaseReset.init();
+    ex4.init(); ex5.init(); ex6.init(); ex7.init();
+    ex8.init(); ex9.init(); ex10.init();
     for (int o = 0; o < 4; o++) {
       for (int p = 0; p < 20; p++) {
         opMacros[o][p].init();
@@ -390,6 +393,13 @@ struct ChannelMacroState {
       case 12: return &panL;
       case 13: return &panR;
       case 14: return &phaseReset;
+      case 15: return &ex4;
+      case 16: return &ex5;
+      case 17: return &ex6;
+      case 18: return &ex7;
+      case 19: return &ex8;
+      case 20: return &ex9;
+      case 21: return &ex10;
       default: return nullptr;
     }
   }
@@ -1624,13 +1634,93 @@ static void processChannelMacros(DispatchInstance* inst, int chan) {
   // Process extended macros (ex1-ex3 are chip-specific)
   if (im.ex1.valid) {
     doMacroTick(cms.ex1, im.ex1, cms.noteReleased);
-    // ex1 meaning varies by chip - commonly noise freq for PSG
+    if (cms.ex1.had) {
+      // ex1: For C64 = filter control (LP/BP/HP/3off flags), AY = noise mode, etc.
+      d->dispatch(DivCommand(DIV_CMD_C64_FILTER_MODE, chan, cms.ex1.val & 15));
+    }
   }
   if (im.ex2.valid) {
     doMacroTick(cms.ex2, im.ex2, cms.noteReleased);
+    if (cms.ex2.had) {
+      // ex2: For C64 = filter resonance
+      d->dispatch(DivCommand(DIV_CMD_C64_RESONANCE, chan, cms.ex2.val & 15));
+    }
   }
   if (im.ex3.valid) {
     doMacroTick(cms.ex3, im.ex3, cms.noteReleased);
+    if (cms.ex3.had) {
+      // ex3: For C64 = filter on/off for this channel
+      d->dispatch(DivCommand(DIV_CMD_C64_FILTER_RESET, chan, cms.ex3.val & 1, 0));
+    }
+  }
+
+  // Process C64-specific ADSR macros (ex4-ex8)
+  // Reference: furnace-master/src/engine/platform/c64.cpp lines 310-335, 684-696
+  // ex4 = special flags (gate/sync/ring/test packed in bits 0-3)
+  // ex5 = attack (0-15), ex6 = decay (0-15), ex7 = sustain (0-15), ex8 = release (0-15)
+  if (im.ex4.valid) {
+    doMacroTick(cms.ex4, im.ex4, cms.noteReleased);
+    if (cms.ex4.had) {
+      // ex4 bits: 0=gate, 1=sync, 2=ring, 3=test
+      // Use DIV_CMD_C64_EXTENDED: 0x4X=ring, 0x5X=sync
+      int val = cms.ex4.val;
+      // Ring modulation (bit 2)
+      d->dispatch(DivCommand(DIV_CMD_C64_EXTENDED, chan, 0x40 | ((val >> 2) & 1)));
+      // Sync (bit 1)  
+      d->dispatch(DivCommand(DIV_CMD_C64_EXTENDED, chan, 0x50 | ((val >> 1) & 1)));
+    }
+  }
+  
+  // Combine attack/decay macros for DIV_CMD_C64_AD
+  bool adsrChanged = false;
+  int attack = 0, decay = 0, sustain = 0, release = 0;
+  
+  if (im.ex5.valid) {
+    doMacroTick(cms.ex5, im.ex5, cms.noteReleased);
+    if (cms.ex5.had) {
+      attack = cms.ex5.val & 15;
+      adsrChanged = true;
+    }
+  }
+  if (im.ex6.valid) {
+    doMacroTick(cms.ex6, im.ex6, cms.noteReleased);
+    if (cms.ex6.had) {
+      decay = cms.ex6.val & 15;
+      adsrChanged = true;
+    }
+  }
+  if (adsrChanged && (im.ex5.valid || im.ex6.valid)) {
+    // DIV_CMD_C64_AD: value = (attack<<4) | decay
+    d->dispatch(DivCommand(DIV_CMD_C64_AD, chan, (attack << 4) | decay));
+  }
+  
+  // Combine sustain/release macros for DIV_CMD_C64_SR
+  adsrChanged = false;
+  if (im.ex7.valid) {
+    doMacroTick(cms.ex7, im.ex7, cms.noteReleased);
+    if (cms.ex7.had) {
+      sustain = cms.ex7.val & 15;
+      adsrChanged = true;
+    }
+  }
+  if (im.ex8.valid) {
+    doMacroTick(cms.ex8, im.ex8, cms.noteReleased);
+    if (cms.ex8.had) {
+      release = cms.ex8.val & 15;
+      adsrChanged = true;
+    }
+  }
+  if (adsrChanged && (im.ex7.valid || im.ex8.valid)) {
+    // DIV_CMD_C64_SR: value = (sustain<<4) | release
+    d->dispatch(DivCommand(DIV_CMD_C64_SR, chan, (sustain << 4) | release));
+  }
+  
+  // ex9 and ex10 are reserved for future use
+  if (im.ex9.valid) {
+    doMacroTick(cms.ex9, im.ex9, cms.noteReleased);
+  }
+  if (im.ex10.valid) {
+    doMacroTick(cms.ex10, im.ex10, cms.noteReleased);
   }
 }
 
@@ -1668,6 +1758,13 @@ static void initChannelMacros(DispatchInstance* inst, int chan, int insIndex, in
   if (im.ex1.valid) initMacroState(cms.ex1, im.ex1);
   if (im.ex2.valid) initMacroState(cms.ex2, im.ex2);
   if (im.ex3.valid) initMacroState(cms.ex3, im.ex3);
+  if (im.ex4.valid) initMacroState(cms.ex4, im.ex4);
+  if (im.ex5.valid) initMacroState(cms.ex5, im.ex5);
+  if (im.ex6.valid) initMacroState(cms.ex6, im.ex6);
+  if (im.ex7.valid) initMacroState(cms.ex7, im.ex7);
+  if (im.ex8.valid) initMacroState(cms.ex8, im.ex8);
+  if (im.ex9.valid) initMacroState(cms.ex9, im.ex9);
+  if (im.ex10.valid) initMacroState(cms.ex10, im.ex10);
 
   // Initialize operator macros
   for (int op = 0; op < 4; op++) {
@@ -3819,18 +3916,21 @@ void furnace_dispatch_set_instrument_full(int handle, int insIndex, unsigned cha
     // [0] len, [1] delay, [2] speed, [3] loop, [4] rel, [5] mode, [6] open
     // [7-...] values (len × 4 bytes)
 
-    // For now, parse the main macros (volume, arp, duty, wave, pitch)
-    // Full parsing would iterate through all macro types
+    // Parse all 22 standard macros matching DIV_MACRO_* enum (instrument.h:106-128)
+    // C64 uses ex4-ex8 for special/attack/decay/sustain/release
     int offset = 0;
     DivInstrumentMacro* macros[] = {
       &ins->std.volMacro, &ins->std.arpMacro, &ins->std.dutyMacro,
       &ins->std.waveMacro, &ins->std.pitchMacro, &ins->std.ex1Macro,
       &ins->std.ex2Macro, &ins->std.ex3Macro, &ins->std.algMacro,
       &ins->std.fbMacro, &ins->std.fmsMacro, &ins->std.amsMacro,
-      &ins->std.panLMacro, &ins->std.panRMacro, &ins->std.phaseResetMacro
+      &ins->std.panLMacro, &ins->std.panRMacro, &ins->std.phaseResetMacro,
+      &ins->std.ex4Macro, &ins->std.ex5Macro, &ins->std.ex6Macro,
+      &ins->std.ex7Macro, &ins->std.ex8Macro, &ins->std.ex9Macro,
+      &ins->std.ex10Macro
     };
 
-    for (int m = 0; m < 15 && stdOffset + offset + 7 < (unsigned int)dataLen; m++) {
+    for (int m = 0; m < 22 && stdOffset + offset + 7 < (unsigned int)dataLen; m++) {
       unsigned char* mc = std + offset;
       int len = mc[0];
       macros[m]->len = len;

@@ -19,6 +19,7 @@ import {
   createFile,
   deleteFile,
   pickSaveLocation,
+  pickFiles,
 } from '@/lib/fileSystemAccess';
 import type { FileEntry } from '@/lib/fileSystemAccess';
 import { hasElectronFS } from '@utils/electron';
@@ -317,6 +318,78 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     }
   };
 
+  // Browse files using native file picker
+  const handleBrowseFiles = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      if (isFileSystemAccessSupported()) {
+        // Use File System Access API native picker
+        const handles = await pickFiles({
+          multiple: false,
+          types: [
+            {
+              description: 'All Supported Files',
+              accept: {
+                'application/octet-stream': ['.dbx', '.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm', '.sqs', '.seq'],
+              },
+            },
+          ],
+        });
+        if (handles.length > 0) {
+          const file = await handles[0].getFile();
+          const filename = file.name;
+          
+          // Check if this is a binary file
+          if (isBinaryFile(filename)) {
+            if (onLoadTrackerModule) {
+              const buffer = await file.arrayBuffer();
+              await onLoadTrackerModule(buffer, filename);
+              onClose();
+            } else {
+              throw new Error('Binary file loading not supported');
+            }
+          } else {
+            // JSON project file
+            const content = await file.text();
+            const data = JSON.parse(content);
+            onLoad(data, filename);
+            onClose();
+          }
+        }
+      } else {
+        // Fallback to input element for browsers without File System Access API
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.dbx,.dbox,.mod,.xm,.it,.s3m,.fur,.mptm,.dmf,.ftm,.sqs,.seq,.xml';
+        input.onchange = async (e) => {
+          const file = (e.target as HTMLInputElement).files?.[0];
+          if (file) {
+            const filename = file.name;
+            if (isBinaryFile(filename)) {
+              if (onLoadTrackerModule) {
+                const buffer = await file.arrayBuffer();
+                await onLoadTrackerModule(buffer, filename);
+                onClose();
+              }
+            } else {
+              const content = await file.text();
+              const data = JSON.parse(content);
+              onLoad(data, filename);
+              onClose();
+            }
+          }
+        };
+        input.click();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load file');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Load selected file
   const handleLoad = async () => {
     if (!selectedFile) return;
@@ -533,11 +606,24 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             </button>
           )}
 
+          {/* Spacer */}
+          <div className="flex-1" />
+          
+          {/* Browse Files button - opens native file picker */}
+          {mode === 'load' && (
+            <button
+              onClick={handleBrowseFiles}
+              className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
+            >
+              Browse Files...
+            </button>
+          )}
+          
           {/* Open Folder button (when Web FS API available) */}
           {!hasElectronFS() && fileSource === 'demo' && (
             <button
               onClick={handleRequestFilesystemAccess}
-              className="ml-auto px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
+              className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
             >
               {hasFilesystemAccess ? 'Filesystem' : 'Open Folder...'}
             </button>

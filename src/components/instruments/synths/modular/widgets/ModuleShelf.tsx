@@ -48,7 +48,7 @@ export const ModuleShelf: React.FC<ModuleShelfProps> = ({ onAddModule }) => {
       {/* Trigger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-accent-primary hover:bg-accent-primary-hover rounded text-sm font-medium transition-colors"
+        className="flex items-center gap-2 px-3 py-1.5 bg-accent-primary hover:bg-accent-secondary text-white rounded text-sm font-bold transition-all shadow-md active:scale-95"
       >
         <Plus className="w-4 h-4" />
         Add Module
@@ -57,15 +57,15 @@ export const ModuleShelf: React.FC<ModuleShelfProps> = ({ onAddModule }) => {
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-surface-secondary border border-border rounded-lg shadow-xl z-[9999] max-h-96 overflow-y-auto">
+        <div className="absolute top-full left-0 mt-1 w-64 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-2xl z-[9999] max-h-96 overflow-y-auto scrollbar-modern">
           {categories.map((category) => {
             const modules = modulesByCategory[category];
             if (modules.length === 0) return null;
 
             return (
-              <div key={category} className="border-b border-border last:border-b-0">
+              <div key={category} className="border-b border-dark-border last:border-b-0">
                 {/* Category header */}
-                <div className="px-3 py-2 bg-surface-tertiary text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <div className="px-3 py-2 bg-dark-bgTertiary text-xs font-bold text-text-secondary uppercase tracking-widest border-b border-dark-border/50">
                   {CATEGORY_NAMES[category]}
                 </div>
 
@@ -75,15 +75,15 @@ export const ModuleShelf: React.FC<ModuleShelfProps> = ({ onAddModule }) => {
                     <button
                       key={module.id}
                       onClick={() => handleAddModule(module.id)}
-                      className="w-full px-4 py-2 text-left hover:bg-surface-tertiary transition-colors text-sm"
+                      className="w-full px-4 py-2 text-left hover:bg-dark-bgHover transition-colors text-sm group"
                     >
                       <div className="flex items-center gap-2">
                         {/* Color indicator */}
                         <div
-                          className="w-2 h-2 rounded-full"
+                          className="w-2 h-2 rounded-full shadow-sm group-hover:scale-125 transition-transform"
                           style={{ backgroundColor: module.color || '#6b7280' }}
                         />
-                        <span className="text-text-primary">{module.name}</span>
+                        <span className="text-text-primary group-hover:text-accent-primary transition-colors">{module.name}</span>
                       </div>
                     </button>
                   ))}

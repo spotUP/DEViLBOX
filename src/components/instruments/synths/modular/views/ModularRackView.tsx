@@ -383,7 +383,7 @@ export const ModularRackView: React.FC<ModularRackViewProps> = ({ config, onChan
 
         {/* Empty state */}
         {config.modules.length === 0 && (
-          <div className="flex items-center justify-center h-full text-text-tertiary">
+          <div className="flex items-center justify-center h-full text-text-muted">
             <p className="text-sm">No modules yet. Click "Add Module" to get started.</p>
           </div>
         )}

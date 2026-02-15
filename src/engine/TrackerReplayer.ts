@@ -311,6 +311,15 @@ export class TrackerReplayer {
     console.log(`[TrackerReplayer] Loaded: ${song.name} (${song.format}), ${song.numChannels}ch, ${song.patterns.length} patterns`);
     console.log(`[TrackerReplayer] Song positions: [${song.songPositions.join(', ')}], length: ${song.songLength}`);
     console.log(`[TrackerReplayer] Pattern lengths: ${song.patterns.map((p, i) => `${i}:${p?.length ?? 'null'}`).join(', ')}`);
+    console.log(`[TrackerReplayer] Pattern channel counts:`, song.patterns.map((p, i) => `${i}:${p?.channels?.length ?? 0}ch`).join(', '));
+    // DEBUG: Note distribution per channel for first pattern
+    if (song.patterns[0]?.channels) {
+      const noteCounts = song.patterns[0].channels.map((ch, idx) => {
+        const count = ch.rows?.filter(r => r.note > 0 && r.note < 97).length ?? 0;
+        return `ch${idx}:${count}`;
+      });
+      console.log(`[TrackerReplayer] Pattern 0 note distribution:`, noteCounts.join(', '));
+    }
     console.log(`[TrackerReplayer] Instruments:`, song.instruments.map(i => ({ id: i.id, name: i.name, hasSample: !!i.sample?.url })));
   }
 
@@ -402,6 +411,27 @@ export class TrackerReplayer {
     if (!this.song || this.playing) return;
 
     await Tone.start();
+
+    // CRITICAL: Wait for AudioContext to actually be running
+    // Tone.start() may return before context state changes
+    // Use raw AudioContext for state check (Tone.context.state has narrower TS types)
+    const rawCtx = Tone.context.rawContext;
+    const getState = () => rawCtx.state as string;
+    if (getState() !== 'running') {
+      console.log(`[TrackerReplayer] Context state after Tone.start(): ${getState()}, waiting...`);
+      await Tone.context.resume();
+      // Poll for running state with timeout
+      const maxWait = 2000;
+      const startTime = Date.now();
+      while (getState() !== 'running' && Date.now() - startTime < maxWait) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      if (getState() !== 'running') {
+        console.error(`[TrackerReplayer] AudioContext failed to start: ${getState()}`);
+        return;
+      }
+      console.log(`[TrackerReplayer] Context now running after ${Date.now() - startTime}ms`);
+    }
 
     // Ensure WASM synths (Open303, etc.) are initialized before starting playback.
     const engine = getToneEngine();
@@ -693,6 +723,11 @@ export class TrackerReplayer {
 
   private processRow(chIndex: number, ch: ChannelState, row: TrackerCell, time: number): void {
     if (!this.song) return;
+
+    // DEBUG: Log channel index for notes to verify multi-channel routing
+    if (row.note > 0 && row.note < 97) {
+      console.log(`[TrackerReplayer] processRow chIndex=${chIndex} row=${this.pattPos} note=${row.note} inst=${row.instrument}`);
+    }
 
     // Compute accent/slide/mute/hammer from flexible flag columns
     // Values: 0=none, 1=accent, 2=slide, 3=mute, 4=hammer
@@ -1653,7 +1688,7 @@ export class TrackerReplayer {
 
     // Check if this is a synth instrument (has synthType) or sample-based
     if (ch.instrument.synthType && ch.instrument.synthType !== 'Sampler') {
-      console.log(`[TrackerReplayer] Triggering synth note: inst=${ch.instrument.id} type=${ch.instrument.synthType} note=${noteName} xmNote=${ch.xmNote} vel=${velocity.toFixed(2)}`);
+      console.log(`[TrackerReplayer] Triggering synth note: inst=${ch.instrument.id} type=${ch.instrument.synthType} note=${noteName} xmNote=${ch.xmNote} vel=${velocity.toFixed(2)} chan=${channelIndex}`);
       
       // Use ToneEngine for synth instruments (TB303, drums, etc.)
       // Calculate duration based on speed/BPM (one row duration as default)
