@@ -883,6 +883,7 @@ int furnace_dispatch_create(int platformType, int sampleRate) {
     case DIV_SYSTEM_C64_6581:
     case DIV_SYSTEM_C64_8580:
       inst->dispatch = new DivPlatformC64();
+      ((DivPlatformC64*)inst->dispatch)->setCore(1); // Use reSIDfp (more accurate, better noise)
       inst->numChannels = 3;
       break;
     case DIV_SYSTEM_PET:
@@ -911,6 +912,7 @@ int furnace_dispatch_create(int platformType, int sampleRate) {
     // === PSG Chips ===
     case DIV_SYSTEM_AY8910:
       inst->dispatch = new DivPlatformAY8910();
+      ((DivPlatformAY8910*)inst->dispatch)->setCore(0); // Use SSG core (0=SSG, 1=atomic)
       inst->numChannels = 3;
       break;
     case DIV_SYSTEM_AY8930:
@@ -973,14 +975,17 @@ int furnace_dispatch_create(int platformType, int sampleRate) {
     case DIV_SYSTEM_OPL:
     case DIV_SYSTEM_OPL2:
       inst->dispatch = new DivPlatformOPL();
+      ((DivPlatformOPL*)inst->dispatch)->setCore(0); // Use Nuked-OPL3 (0=Nuked, 1=ymfm, 2=LLE)
       inst->numChannels = 9;
       break;
     case DIV_SYSTEM_OPL3:
       inst->dispatch = new DivPlatformOPL();
+      ((DivPlatformOPL*)inst->dispatch)->setCore(0); // Use Nuked-OPL3
       inst->numChannels = 18;
       break;
     case DIV_SYSTEM_OPLL:
       inst->dispatch = new DivPlatformOPLL();
+      ((DivPlatformOPLL*)inst->dispatch)->setCore(0); // Use Nuked-OPLL (most accurate)
       inst->numChannels = 9;
       break;
     case DIV_SYSTEM_ESFM:
@@ -1184,41 +1189,50 @@ int furnace_dispatch_create(int platformType, int sampleRate) {
     // === OPL Drums Variants ===
     case DIV_SYSTEM_OPL_DRUMS:
       inst->dispatch = new DivPlatformOPL();
+      ((DivPlatformOPL*)inst->dispatch)->setCore(0); // Use Nuked-OPL3
       inst->numChannels = 11; // 6 FM + 5 drums
       // TODO: Set drums mode via flags
       break;
     case DIV_SYSTEM_OPL2_DRUMS:
       inst->dispatch = new DivPlatformOPL();
+      ((DivPlatformOPL*)inst->dispatch)->setCore(0); // Use Nuked-OPL3
       inst->numChannels = 11;
       break;
     case DIV_SYSTEM_OPL3_DRUMS:
       inst->dispatch = new DivPlatformOPL();
+      ((DivPlatformOPL*)inst->dispatch)->setCore(0); // Use Nuked-OPL3
       inst->numChannels = 20; // 15 FM + 5 drums
       break;
     case DIV_SYSTEM_OPLL_DRUMS:
       inst->dispatch = new DivPlatformOPLL();
+      ((DivPlatformOPLL*)inst->dispatch)->setCore(0); // Use Nuked-OPLL
       inst->numChannels = 11; // 6 FM + 5 drums
       break;
     case DIV_SYSTEM_OPL4:
       inst->dispatch = new DivPlatformOPL();
+      ((DivPlatformOPL*)inst->dispatch)->setCore(0); // Use Nuked-OPL3
       inst->numChannels = 42; // 18 FM + 24 PCM
       break;
     case DIV_SYSTEM_OPL4_DRUMS:
       inst->dispatch = new DivPlatformOPL();
+      ((DivPlatformOPL*)inst->dispatch)->setCore(0); // Use Nuked-OPL3
       inst->numChannels = 44;
       break;
     case DIV_SYSTEM_Y8950:
       inst->dispatch = new DivPlatformOPL();
+      ((DivPlatformOPL*)inst->dispatch)->setCore(0); // Use Nuked-OPL3
       inst->numChannels = 10; // 9 FM + 1 ADPCM
       break;
     case DIV_SYSTEM_Y8950_DRUMS:
       inst->dispatch = new DivPlatformOPL();
+      ((DivPlatformOPL*)inst->dispatch)->setCore(0); // Use Nuked-OPL3
       inst->numChannels = 12; // 6 FM + 5 drums + 1 ADPCM
       break;
 
     // === VRC7 (Konami OPLL variant) ===
     case DIV_SYSTEM_VRC7:
       inst->dispatch = new DivPlatformOPLL();
+      ((DivPlatformOPLL*)inst->dispatch)->setCore(0); // Use Nuked-OPLL
       inst->numChannels = 6;
       // VRC7 uses OPLL with VRC7 mode
       break;
