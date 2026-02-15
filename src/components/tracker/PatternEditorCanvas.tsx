@@ -1695,6 +1695,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         ctx.fillStyle = '#ffffff';
         ctx.fillText(charStr, caretX, caretY + caretH / 2);
       }
+
+      // Final pass: Redraw channel separators to ensure they sit on top of row backgrounds
+      ctx.fillStyle = colors.border;
+      for (let ch = 0; ch < numChannels; ch++) {
+        const colX = channelOffsets[ch] - scrollLeft;
+        const channelWidth = channelWidths[ch];
+        if (colX + channelWidth >= 0 && colX <= width) {
+          ctx.fillRect(colX + channelWidth, 0, 1, height);
+        }
+      }
     }
   }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isCyanTheme, visibleStart, instruments, currentPatternIndex, patterns, scrollY, channelOffsets, channelWidths, numChannels, cursor, selection]);
 
