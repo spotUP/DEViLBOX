@@ -307,6 +307,21 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
   }, [isDragging]);
 
+  const handleLongPress = useCallback((x: number, y: number) => {
+    if (!isMobile) return;
+    
+    const cell = getCellFromCoords(x, y);
+    if (!cell) return;
+
+    const store = useTrackerStore.getState();
+    store.moveCursorToRow(cell.rowIndex);
+    store.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType);
+    store.startSelection();
+    
+    haptics.heavy();
+    useUIStore.getState().setStatusMessage('BLOCK START');
+  }, [isMobile, getCellFromCoords]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     const cell = getCellFromCoords(e.clientX, e.clientY);
@@ -391,9 +406,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Move cursor to tapped position
     const store = useTrackerStore.getState();
-    store.moveCursorToRow(validRow);
-    store.moveCursorToChannelAndColumn(channelIndex, columnType as any);
-  }, [pattern, isMobile]);
+    const currentSelection = store.selection;
+
+    if (currentSelection) {
+      // If we already have a selection, tapping a new cell extends it
+      store.updateSelection(channelIndex, validRow);
+      haptics.soft();
+      useUIStore.getState().setStatusMessage('BLOCK UPDATED');
+    } else {
+      // Normal move behavior
+      store.moveCursorToRow(validRow);
+      store.moveCursorToChannelAndColumn(channelIndex, columnType as any);
+    }
+  }, [pattern, isMobile, mobileChannelIndex, cursor.columnType, moveCursorToChannelAndColumn]);
 
   // Mobile swipe handlers for pattern data (column navigation)
   const handleDataSwipeLeft = useCallback(() => {
@@ -484,6 +509,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     onSwipeUp: handleSwipeUp,
     onSwipeDown: handleSwipeDown,
     onTap: handlePatternTap,
+    onLongPress: handleLongPress,
     onScroll: handleScroll,
     onHorizontalScroll: handleHorizontalScroll,
     onTouchStart: () => {
