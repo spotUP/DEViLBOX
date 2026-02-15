@@ -105,7 +105,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     toggleChannelSolo,
     setChannelColor,
     setCell,
-    moveCursorToChannel,
+    moveCursorToChannelAndColumn,
     copyTrack,
     cutTrack,
     pasteTrack,
@@ -123,7 +123,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     toggleChannelSolo: state.toggleChannelSolo,
     setChannelColor: state.setChannelColor,
     setCell: state.setCell,
-    moveCursorToChannel: state.moveCursorToChannel,
+    moveCursorToChannelAndColumn: state.moveCursorToChannelAndColumn,
     copyTrack: state.copyTrack,
     cutTrack: state.cutTrack,
     pasteTrack: state.pasteTrack,
@@ -182,6 +182,29 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       useTrackerStore.getState().moveCursorToRow(newRow);
     }
   }, [pattern, isMobile, cursor.rowIndex]);
+
+  // Ref to accumulate horizontal scroll distance
+  const horizontalAccumulatorRef = useRef(0);
+
+  const handleHorizontalScroll = useCallback((deltaX: number) => {
+    if (!pattern || !isMobile) return;
+
+    // We use a sensitivity threshold for horizontal column movement
+    // Roughly 20px per column step feels good
+    const COLUMN_STEP_THRESHOLD = 25;
+    horizontalAccumulatorRef.current += deltaX;
+
+    if (Math.abs(horizontalAccumulatorRef.current) >= COLUMN_STEP_THRESHOLD) {
+      const steps = Math.trunc(horizontalAccumulatorRef.current / COLUMN_STEP_THRESHOLD);
+      horizontalAccumulatorRef.current -= steps * COLUMN_STEP_THRESHOLD;
+
+      // Move cursor by N steps
+      const store = useTrackerStore.getState();
+      for (let i = 0; i < Math.abs(steps); i++) {
+        store.moveCursor(steps > 0 ? 'right' : 'left');
+      }
+    }
+  }, [pattern, isMobile]);
 
   // Handle tap on pattern canvas - move cursor to tapped cell
   const handlePatternTap = useCallback((tapX: number, tapY: number) => {
@@ -260,42 +283,113 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Move cursor to tapped position
     const store = useTrackerStore.getState();
     store.moveCursorToRow(validRow);
-    store.moveCursorToChannel(channelIndex);
-    store.moveCursorToColumn(columnType);
+    store.moveCursorToChannelAndColumn(channelIndex, columnType as any);
   }, [pattern, isMobile]);
 
-  // Mobile swipe handlers for channel navigation
-  const handleSwipeLeft = useCallback(() => {
+  // Mobile swipe handlers for pattern data (column navigation)
+  const handleDataSwipeLeft = useCallback(() => {
+    if (!pattern || !isMobile) return;
+    
+    const columnOrder: CursorPosition['columnType'][] = [
+      'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2'
+    ];
+    
+    // Scan current channel for flag/prob columns
+    const firstCell = pattern.channels[mobileChannelIndex]?.rows[0];
+    if (firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined) {
+      columnOrder.push('flag1', 'flag2');
+    }
+    if (firstCell?.probability !== undefined) {
+      columnOrder.push('probability');
+    }
+
+    const currentIndex = columnOrder.indexOf(cursor.columnType);
+    
+    // If we're not at the last column, move to next column
+    if (currentIndex !== -1 && currentIndex < columnOrder.length - 1) {
+      useTrackerStore.getState().moveCursorToColumn(columnOrder[currentIndex + 1]);
+    } else {
+      // Move to next channel's note column
+      const nextChannel = Math.min(pattern.channels.length - 1, mobileChannelIndex + 1);
+      if (nextChannel !== mobileChannelIndex) {
+        moveCursorToChannelAndColumn(nextChannel, 'note');
+      }
+    }
+  }, [pattern, isMobile, mobileChannelIndex, cursor.columnType, moveCursorToChannelAndColumn]);
+
+  const handleDataSwipeRight = useCallback(() => {
+    if (!pattern || !isMobile) return;
+    
+    const columnOrder: CursorPosition['columnType'][] = [
+      'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2'
+    ];
+    
+    // Scan current channel for flag/prob columns
+    const firstCell = pattern.channels[mobileChannelIndex]?.rows[0];
+    if (firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined) {
+      columnOrder.push('flag1', 'flag2');
+    }
+    if (firstCell?.probability !== undefined) {
+      columnOrder.push('probability');
+    }
+
+    const currentIndex = columnOrder.indexOf(cursor.columnType);
+    
+    // If we're not at the first column (note), move to previous column
+    if (currentIndex > 0) {
+      useTrackerStore.getState().moveCursorToColumn(columnOrder[currentIndex - 1]);
+    } else {
+      // Move to previous channel's last column (typically effParam2 or probability)
+      const prevChannel = Math.max(0, mobileChannelIndex - 1);
+      if (prevChannel !== mobileChannelIndex) {
+        const prevFirstCell = pattern.channels[prevChannel]?.rows[0];
+        let lastCol: CursorPosition['columnType'] = 'effParam2';
+        if (prevFirstCell?.probability !== undefined) lastCol = 'probability';
+        else if (prevFirstCell?.flag2 !== undefined) lastCol = 'flag2';
+        
+        moveCursorToChannelAndColumn(prevChannel, lastCol);
+      }
+    }
+  }, [pattern, isMobile, mobileChannelIndex, cursor.columnType, moveCursorToChannelAndColumn]);
+
+  // Mobile swipe handlers for channel header (direct channel jump)
+  const handleHeaderSwipeLeft = useCallback(() => {
     if (!pattern || !isMobile) return;
     const nextChannel = Math.min(pattern.channels.length - 1, mobileChannelIndex + 1);
     if (nextChannel !== mobileChannelIndex) {
-      moveCursorToChannel(nextChannel);
+      moveCursorToChannelAndColumn(nextChannel, 'note');
     }
-  }, [pattern, isMobile, mobileChannelIndex, moveCursorToChannel]);
+  }, [pattern, isMobile, mobileChannelIndex, moveCursorToChannelAndColumn]);
 
-  const handleSwipeRight = useCallback(() => {
+  const handleHeaderSwipeRight = useCallback(() => {
     if (!pattern || !isMobile) return;
     const prevChannel = Math.max(0, mobileChannelIndex - 1);
     if (prevChannel !== mobileChannelIndex) {
-      moveCursorToChannel(prevChannel);
+      moveCursorToChannelAndColumn(prevChannel, 'note');
     }
-  }, [pattern, isMobile, mobileChannelIndex, moveCursorToChannel]);
+  }, [pattern, isMobile, mobileChannelIndex, moveCursorToChannelAndColumn]);
 
   const patternGestures = useMobilePatternGestures({
-    onSwipeLeft: handleSwipeLeft,
-    onSwipeRight: handleSwipeRight,
+    onSwipeLeft: handleDataSwipeLeft,
+    onSwipeRight: handleDataSwipeRight,
     onSwipeUp: handleSwipeUp,
     onSwipeDown: handleSwipeDown,
     onTap: handlePatternTap,
     onScroll: handleScroll,
+    onHorizontalScroll: handleHorizontalScroll,
     swipeThreshold: 30, // Lower threshold for better mobile responsiveness
     enabled: isMobile,
   });
 
+  // Reset accumulator on touch start via standard event to keep logic simple
+  const handleTouchStart = useCallback(() => {
+    horizontalAccumulatorRef.current = 0;
+  }, []);
+
   // Channel header gestures for mobile
   const channelHeaderGestures = useMobilePatternGestures({
-    onSwipeLeft: handleSwipeLeft,
-    onSwipeRight: handleSwipeRight,
+    onSwipeLeft: handleHeaderSwipeLeft,
+    onSwipeRight: handleHeaderSwipeRight,
     enabled: isMobile,
   });
 
@@ -353,6 +447,25 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
   }, [currentThemeId]);
 
+  // Center current channel on mobile
+  useEffect(() => {
+    if (isMobile && pattern) {
+      const noteWidth = CHAR_WIDTH * 3 + 4;
+      const firstCell = pattern.channels[0]?.rows[0];
+      const hasAcid = firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined;
+      const hasProb = firstCell?.probability !== undefined;
+      const paramWidth = CHAR_WIDTH * 10 + 16
+        + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
+        + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
+        + CHAR_WIDTH * 2 + 4;
+      const channelWidth = noteWidth + paramWidth + 20 + 20;
+      
+      // Calculate target scroll to center the channel
+      const targetScroll = mobileChannelIndex * channelWidth;
+      setScrollLeft(targetScroll);
+    }
+  }, [isMobile, mobileChannelIndex, pattern]);
+
   // Colors based on theme
   const colors = useMemo(() => ({
     bg: '#0a0a0b',
@@ -372,12 +485,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     lineNumber: '#707070',
     lineNumberHighlight: '#f97316',
   }), [isCyanTheme]);
-
-  const swipeHandlers = useSwipeGesture({
-    threshold: 50,
-    onSwipeLeft: handleSwipeLeft,
-    onSwipeRight: handleSwipeRight,
-  });
 
   // Channel context menu handlers
   const handleFillPattern = useCallback((channelIndex: number, generatorType: GeneratorType) => {
@@ -1403,13 +1510,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const mobileTrigger = { level: 0, triggered: false };
 
   return (
-    <div className="flex flex-col h-full" {...(isMobile ? swipeHandlers : {})}>
+    <div className="flex flex-col h-full">
       {/* Mobile Channel Header */}
       {isMobile && (
         <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border relative touch-none" {...channelHeaderGestures}>
           <div className="flex items-center justify-between px-3 py-2">
             <button
-              onClick={handleSwipeRight}
+              onClick={handleHeaderSwipeRight}
               disabled={mobileChannelIndex <= 0}
               className={`p-2 rounded-lg transition-colors ${
                 mobileChannelIndex <= 0 ? 'text-text-muted opacity-30' : 'text-text-secondary hover:bg-dark-bgHover'
@@ -1432,7 +1539,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             </div>
 
             <button
-              onClick={handleSwipeLeft}
+              onClick={handleHeaderSwipeLeft}
               disabled={mobileChannelIndex >= pattern.channels.length - 1}
               className={`p-2 rounded-lg transition-colors ${
                 mobileChannelIndex >= pattern.channels.length - 1 ? 'text-text-muted opacity-30' : 'text-text-secondary hover:bg-dark-bgHover'
@@ -1604,6 +1711,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         style={{ minHeight: 200 }}
         tabIndex={0}
         onContextMenu={cellContextMenu.handleContextMenu}
+        onTouchStart={handleTouchStart}
         {...patternGestures}
       >
         <canvas
