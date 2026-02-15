@@ -307,6 +307,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
   }, [isDragging]);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const cell = getCellFromCoords(e.clientX, e.clientY);
+    if (cell) {
+      cellContextMenu.openMenu(e, cell.rowIndex, cell.channelIndex);
+    }
+  }, [getCellFromCoords, cellContextMenu]);
+
   // Handle tap on pattern canvas - move cursor to tapped cell
   const handlePatternTap = useCallback((tapX: number, tapY: number) => {
     if (!pattern || !isMobile || !containerRef.current || !canvasRef.current) return;
@@ -1823,7 +1831,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         className="flex-1 relative bg-dark-bg overflow-x-hidden touch-none"
         style={{ minHeight: 200 }}
         tabIndex={0}
-        onContextMenu={cellContextMenu.handleContextMenu}
+        onContextMenu={handleContextMenu}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
