@@ -407,7 +407,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (!cell) return;
 
     const store = useTrackerStore.getState();
-    store.updateSelection(cell.channelIndex, cell.rowIndex);
+    store.updateSelection(cell.channelIndex, cell.rowIndex, cell.columnType as any);
   }, [isDragging, isMobile, getCellFromCoords]);
 
   const handleMouseUp = useCallback(() => {
@@ -1451,7 +1451,53 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         // Draw selection highlight
         if (hasSelection && !isGhostRow && ch >= minSelCh && ch <= maxSelCh && rowIndex >= minSelRow && rowIndex <= maxSelRow) {
           ctx.fillStyle = colors.selection;
-          ctx.fillRect(colX, y, channelWidth, ROW_HEIGHT);
+          
+          const isMinCh = ch === minSelCh;
+          const isMaxCh = ch === maxSelCh;
+          const isSingleCh = isMinCh && isMaxCh;
+          
+          // If selecting across multiple channels, standard behavior is to select ALL columns
+          // for the "inner" channels. For start/end channels, we could be specific, 
+          // but for now let's just use the columnTypes if it's a single channel selection.
+          if (isSingleCh && sel.columnTypes && sel.columnTypes.length > 0 && sel.columnTypes.length < 9) {
+            const paramBase = 8 + noteWidth + 4;
+            sel.columnTypes.forEach(t => {
+              let cX = 0;
+              let cW = 0;
+              
+              if (t === 'note') {
+                cX = 8;
+                cW = noteWidth;
+              } else {
+                cX = paramBase;
+                if (t === 'instrument') {
+                  cW = CHAR_WIDTH * 2 + 4;
+                } else if (t === 'volume') {
+                  cX += CHAR_WIDTH * 2 + 4;
+                  cW = CHAR_WIDTH * 2 + 4;
+                } else if (t === 'effTyp' || t === 'effParam') {
+                  cX += (CHAR_WIDTH * 2 + 4) * 2;
+                  cW = CHAR_WIDTH * 3 + 4;
+                } else if (t === 'effTyp2' || t === 'effParam2') {
+                  cX += (CHAR_WIDTH * 2 + 4) * 2 + (CHAR_WIDTH * 3 + 4);
+                  cW = CHAR_WIDTH * 3 + 4;
+                } else if (t === 'flag1') {
+                  cX += (CHAR_WIDTH * 2 + 4) * 2 + (CHAR_WIDTH * 3 + 4) * 2;
+                  cW = CHAR_WIDTH + 4;
+                } else if (t === 'flag2') {
+                  cX += (CHAR_WIDTH * 2 + 4) * 2 + (CHAR_WIDTH * 3 + 4) * 2 + (CHAR_WIDTH + 4);
+                  cW = CHAR_WIDTH + 4;
+                } else if (t === 'probability') {
+                  cX += (CHAR_WIDTH * 2 + 4) * 2 + (CHAR_WIDTH * 3 + 4) * 2 + (CHAR_WIDTH + 4) * 2;
+                  cW = CHAR_WIDTH * 2 + 4;
+                }
+              }
+              if (cW > 0) ctx.fillRect(colX + cX, y, cW, ROW_HEIGHT);
+            });
+          } else {
+            // Full channel highlight
+            ctx.fillRect(colX, y, channelWidth, ROW_HEIGHT);
+          }
         }
 
         // Draw drag-over highlight (breadcrumb)
