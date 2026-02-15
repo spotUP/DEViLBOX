@@ -155,9 +155,31 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
                     <li>Make sure you're using <strong>Safari</strong> (not Chrome on iOS)</li>
                     <li>Web MIDI requires <strong>HTTPS</strong> - check the URL starts with https://</li>
                     <li>Disable <strong>Private Browsing Mode</strong> - MIDI doesn't work in private mode</li>
+                    <li>Check <strong>Settings → Safari → Advanced → Experimental Features</strong> and ensure 'Web MIDI API' is ON</li>
                     <li>Update to <strong>iOS 15+</strong> for full MIDI support</li>
                     <li>Check browser console for detailed error messages</li>
                   </ul>
+                  
+                  {/* Real-time diagnostics */}
+                  <div className="mt-3 pt-3 border-t border-accent-warning/20 font-mono text-[10px] text-text-muted space-y-1">
+                    <div className="flex justify-between">
+                      <span>Secure Context:</span>
+                      <span className={window.isSecureContext ? "text-accent-success" : "text-accent-error"}>
+                        {window.isSecureContext ? "YES" : "NO"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>PWA Mode:</span>
+                      <span>{
+                        // @ts-ignore
+                        (navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) ? "YES" : "NO"
+                      }</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Protocol:</span>
+                      <span>{window.location.protocol}</span>
+                    </div>
+                  </div>
                 </div>
               )}
 

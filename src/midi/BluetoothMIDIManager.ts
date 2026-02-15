@@ -56,13 +56,25 @@ export const isWebMIDISupported = (): boolean => {
   }
 
   const hasAPI = 'requestMIDIAccess' in navigator;
+  const isSecure = window.isSecureContext;
+  // @ts-ignore - standalone exists on navigator in iOS Safari
+  const isStandalone = navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
 
   if (!hasAPI) {
     console.log('[MIDI] Web MIDI API not found in navigator');
+    console.log('[MIDI] Secure Context:', isSecure);
+    console.log('[MIDI] Standalone (PWA):', isStandalone);
     console.log('[MIDI] Browser:', navigator.userAgent);
     console.log('[MIDI] Protocol:', window.location.protocol);
-    console.log('[MIDI] Is HTTPS:', window.location.protocol === 'https:');
-    console.log('[MIDI] Is localhost:', window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    
+    // Explicitly check for common iOS blockers
+    if (!isSecure && window.location.protocol !== 'http:' && window.location.hostname !== 'localhost') {
+      console.warn('[MIDI] Potential Secure Context issue - MIDI requires HTTPS');
+    }
+    
+    if (isStandalone && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      console.warn('[MIDI] iOS PWA mode detected. Note: Some iOS versions disable Web MIDI in standalone mode.');
+    }
   }
 
   return hasAPI;
