@@ -15,6 +15,7 @@ import type {
 import { DEFAULT_COLUMN_VISIBILITY, EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
 import { xmNoteToMidi, midiToXMNote } from '@/lib/xmConversions';
 import { getToneEngine } from '@engine/ToneEngine';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { idGenerator } from '../utils/idGenerator';
 import { DEFAULT_PATTERN_LENGTH, DEFAULT_NUM_CHANNELS, MAX_PATTERN_LENGTH, MAX_CHANNELS, MIN_CHANNELS, MIN_PATTERN_LENGTH } from '../constants/trackerConstants';
 
@@ -294,6 +295,11 @@ export const useTrackerStore = create<TrackerStore>()(
       set((state) => {
         if (index >= 0 && index < state.patterns.length) {
           state.currentPatternIndex = index;
+          // If playing, tell the replayer to jump to this pattern
+          const replayer = getTrackerReplayer();
+          if (replayer.isPlaying()) {
+            replayer.jumpToPattern(index);
+          }
         }
       }),
 

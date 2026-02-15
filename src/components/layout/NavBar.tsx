@@ -4,10 +4,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, themes } from '@stores';
+import { useAuthStore } from '@stores/useAuthStore';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Palette, Download } from 'lucide-react';
+import { Plus, X, Palette, Download, LogIn, LogOut, Cloud } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
+import { AuthModal } from '@components/dialogs/AuthModal';
 import { Button } from '@components/ui/Button';
 import { isElectron } from '@utils/electron';
 
@@ -33,6 +35,32 @@ const NavBarComponent: React.FC = () => {
 
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  // Auth state
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
+  const isServerAvailable = useAuthStore((state) => state.isServerAvailable);
+  const checkServerAvailability = useAuthStore((state) => state.checkServerAvailability);
+
+  // Check server availability on mount
+  useEffect(() => {
+    checkServerAvailability();
+  }, [checkServerAvailability]);
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-user-menu]')) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showUserMenu]);
 
 
   const currentTheme = getCurrentTheme();
@@ -97,6 +125,55 @@ const NavBarComponent: React.FC = () => {
 
         {/* Right: MIDI, Theme Switcher and Master Volume */}
         <div className="flex items-center gap-4">
+          {/* Cloud Login/User Button (Web only) */}
+          {!isElectron() && isServerAvailable && (
+            <div className="relative" data-user-menu>
+              {user ? (
+                // Logged in - show user dropdown
+                <>
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center gap-2 px-2 py-1 rounded text-text-secondary hover:text-text-primary hover:bg-dark-bgHover transition-colors"
+                    title={`Logged in as ${user.username}`}
+                  >
+                    <Cloud size={16} className="text-accent-success" />
+                    <span className="text-sm hidden sm:inline">{user.username}</span>
+                  </button>
+                  {showUserMenu && (
+                    <div className="absolute right-0 top-full mt-1 bg-dark-bgTertiary border border-dark-border rounded-md shadow-lg z-50 min-w-[160px]">
+                      <div className="px-3 py-2 border-b border-dark-border">
+                        <p className="text-xs text-text-muted">Signed in as</p>
+                        <p className="text-sm font-medium text-text-primary truncate">{user.username}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          logout();
+                          setShowUserMenu(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors flex items-center gap-2"
+                      >
+                        <LogOut size={14} />
+                        Sign Out
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Not logged in - show login button
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAuthModal(true)}
+                  icon={<LogIn size={14} />}
+                  iconPosition="left"
+                  title="Sign in to save files to the cloud"
+                >
+                  <span className="hidden sm:inline">Sign In</span>
+                </Button>
+              )}
+            </div>
+          )}
+
           {/* Download Button (Web only) */}
           {!isElectron() && (
             <Button
@@ -218,6 +295,11 @@ const NavBarComponent: React.FC = () => {
         onClose={() => setShowDownloadModal(false)}
       />
 
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </div>
   );
 };

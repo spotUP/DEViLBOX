@@ -3,11 +3,22 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Maximize2 } from 'lucide-react';
+import { X, Maximize2, Keyboard } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { useKeyboardStore } from '@stores/useKeyboardStore';
 import { Toggle } from '@components/controls/Toggle';
+import { KeyboardShortcutSheet } from '@components/tracker/KeyboardShortcutSheet';
+
+const KEYBOARD_SCHEMES = [
+  { id: 'fasttracker2', name: 'FastTracker 2', description: 'Classic FT2 layout (DOS/PC) - from ft2-clone source' },
+  { id: 'impulse-tracker', name: 'Impulse Tracker', description: 'IT/Schism Tracker style - from schismtracker source' },
+  { id: 'protracker', name: 'ProTracker', description: 'Amiga MOD tracker layout - from pt2-clone source' },
+  { id: 'octamed', name: 'OctaMED SoundStudio', description: 'Amiga OctaMED layout - from official documentation' },
+  { id: 'renoise', name: 'Renoise', description: 'Modern DAW/tracker layout - from official documentation' },
+  { id: 'openmpt', name: 'OpenMPT', description: 'ModPlug Tracker layout - from official wiki documentation' },
+];
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -33,14 +44,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setAmigaLimits,
     linearInterpolation,
     setLinearInterpolation,
-    audioLatency,
-    setAudioLatency,
     midiPolyphonic,
     setMidiPolyphonic
   } = useSettingsStore();
 
+  const { activeScheme, setActiveScheme, platformOverride, setPlatformOverride } = useKeyboardStore();
+
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -270,21 +282,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   size="sm"
                 />
               </div>
+            </div>
+          </section>
 
-              {/* Audio Latency */}
-              <div className="flex items-center justify-between border-t border-ft2-border/30 pt-3">
+          {/* Keyboard Section */}
+          <section>
+            <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">KEYBOARD</h3>
+            <div className="space-y-3">
+              {/* Keyboard Scheme */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-ft2-text text-xs font-mono">Keyboard Scheme:</label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowShortcuts(true)}
+                      className="p-1.5 bg-ft2-bg border border-ft2-border text-ft2-text hover:text-ft2-highlight hover:border-ft2-highlight transition-colors focus:outline-none flex items-center justify-center"
+                      title="View current keybindings"
+                    >
+                      <Keyboard size={14} />
+                    </button>
+                    <select
+                      value={activeScheme}
+                      onChange={(e) => setActiveScheme(e.target.value)}
+                      className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
+                    >
+                      {KEYBOARD_SCHEMES.map((scheme) => (
+                        <option key={scheme.id} value={scheme.id}>
+                          {scheme.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <span className="text-[9px] text-ft2-textDim font-mono leading-tight">
+                  {KEYBOARD_SCHEMES.find(s => s.id === activeScheme)?.description || 'Select a tracker layout'}
+                </span>
+              </div>
+
+              {/* Platform Override */}
+              <div className="flex items-center justify-between">
                 <div className="flex flex-col">
-                  <label className="text-ft2-text text-xs font-mono">Audio Latency Mode:</label>
-                  <span className="text-[9px] text-ft2-textDim font-mono">Low latency for live jamming vs stable playback</span>
+                  <label className="text-ft2-text text-xs font-mono">Platform:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Override Cmd/Ctrl detection</span>
                 </div>
                 <select
-                  value={audioLatency}
-                  onChange={(e) => setAudioLatency(e.target.value as 'interactive' | 'balanced' | 'playback')}
+                  value={platformOverride}
+                  onChange={(e) => setPlatformOverride(e.target.value as 'auto' | 'mac' | 'pc')}
                   className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
                 >
-                  <option value="interactive">Interactive (10ms)</option>
-                  <option value="balanced">Balanced (50ms)</option>
-                  <option value="playback">Stable (150ms)</option>
+                  <option value="auto">Auto-detect</option>
+                  <option value="mac">Mac (Cmd)</option>
+                  <option value="pc">PC (Ctrl)</option>
                 </select>
               </div>
             </div>
@@ -310,6 +358,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           </button>
         </div>
       </div>
+
+      {/* Keyboard Shortcut Sheet */}
+      <KeyboardShortcutSheet 
+        isOpen={showShortcuts} 
+        onClose={() => setShowShortcuts(false)} 
+      />
     </div>
   );
 };

@@ -19,7 +19,6 @@ import { FurnaceChipEngine, FurnaceChipType } from './chips/FurnaceChipEngine';
 import { FurnaceDispatchSynth } from './furnace-dispatch/FurnaceDispatchSynth';
 import { FurnaceSynth } from './FurnaceSynth';
 import { normalizeUrl } from '@utils/urlUtils';
-import { useSettingsStore } from '@stores/useSettingsStore';
 import { getNativeAudioNode, setDevilboxAudioContext } from '@utils/audio-context';
 import { SpaceyDelayerEffect } from './effects/SpaceyDelayerEffect';
 import { RETapeEchoEffect } from './effects/RETapeEchoEffect';
@@ -381,10 +380,8 @@ export class ToneEngine {
     }
 
     // Configure Transport for rock-solid audio scheduling
-    // Lower lookahead = faster triggering response, but more CPU sensitive
-    // New default is balanced (50ms)
-    const initialLatency = useSettingsStore.getState().audioLatency || 'balanced';
-    this.setAudioLatency(initialLatency);
+    // Always use interactive (10ms) for maximum snappiness
+    Tone.getContext().lookAhead = 0.01;
     Tone.getTransport().bpm.value = 125; // Default BPM
 
     // Wait for context to actually be running
@@ -702,34 +699,6 @@ export class ToneEngine {
    */
   public setMasterMute(muted: boolean): void {
     this.masterChannel.mute = muted;
-  }
-
-  /**
-   * Set audio lookahead/latency mode
-   * @param latency 'interactive' (10ms), 'balanced' (50ms), or 'playback' (150ms)
-   */
-  private _currentLatency: string = '';
-
-  public setAudioLatency(latency: 'interactive' | 'balanced' | 'playback'): void {
-    if (this._currentLatency === latency) return; // Skip redundant calls
-    this._currentLatency = latency;
-
-    let lookAhead = 0.05; // Default balanced
-
-    switch (latency) {
-      case 'interactive':
-        lookAhead = 0.01; // 10ms - Super snappy, might crackle on heavy tracks
-        break;
-      case 'balanced':
-        lookAhead = 0.05; // 50ms - Good middle ground
-        break;
-      case 'playback':
-        lookAhead = 0.15; // 150ms - Very stable, but noticeable triggering delay
-        break;
-    }
-
-    console.log(`[ToneEngine] Setting audio lookahead to ${lookAhead}s (${latency} mode)`);
-    Tone.getContext().lookAhead = lookAhead;
   }
 
   /**
