@@ -28,6 +28,8 @@ import {
   Sparkles,
   Rewind,
   Shuffle,
+  Minimize2,
+  Maximize2,
 } from 'lucide-react';
 import { DropdownButton, type MenuItemType } from '@components/common/ContextMenu';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
@@ -55,6 +57,7 @@ interface ChannelContextMenuProps {
   onHumanize: (channelIndex: number) => void;
   onInterpolate: (channelIndex: number) => void;
   onAcidGenerator: (channelIndex: number) => void;
+  onToggleCollapse?: (channelIndex: number) => void;
   onReverseVisual?: (channelIndex: number) => void;
   onPolyrhythm?: (channelIndex: number) => void;
   onFibonacci?: (channelIndex: number) => void;
@@ -82,6 +85,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   onHumanize,
   onInterpolate,
   onAcidGenerator,
+  onToggleCollapse,
   onReverseVisual,
   onPolyrhythm,
   onFibonacci,
@@ -96,7 +100,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   onChaos,
 }) => {
   const { isLiveMode, queueChannelAction } = useLiveModeStore();
-  const { toggleChannelMute, toggleChannelSolo, removeChannel, setChannelColor, patterns } = useTrackerStore();
+  const { toggleChannelMute, toggleChannelSolo, removeChannel, setChannelColor, toggleChannelCollapse, patterns } = useTrackerStore();
   const { setActiveParameter, setShowLane, getShowLane, removeCurve, getCurvesForPattern } = useAutomationStore();
   const { updateInstrument } = useInstrumentStore();
 
@@ -273,6 +277,17 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
 
     // Edit mode menu - focused on pattern editing
     return [
+      // Collapse
+      {
+        id: 'collapse',
+        label: channel.collapsed ? 'Expand Channel' : 'Collapse Channel',
+        icon: channel.collapsed ? <Maximize2 size={14} /> : <Minimize2 size={14} />,
+        onClick: () => {
+          if (onToggleCollapse) onToggleCollapse(channelIndex);
+          else toggleChannelCollapse(channelIndex);
+        },
+      },
+      { type: 'divider' },
       // Fill submenu
       {
         id: 'fill',
@@ -624,6 +639,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     onHumanize,
     onInterpolate,
     onAcidGenerator,
+    onToggleCollapse,
     onReverseVisual,
     onPolyrhythm,
     onFibonacci,
@@ -640,6 +656,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     toggleChannelSolo,
     removeChannel,
     setChannelColor,
+    toggleChannelCollapse,
     queueChannelAction,
     setActiveParameter,
     setShowLane,
@@ -647,6 +664,36 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     handleApplyChannelFxPreset,
     automationParams,
   ]);
+
+  return (
+    <DropdownButton
+      items={menuItems}
+      className={`
+        p-1 rounded transition-colors
+        ${isLiveMode
+          ? 'text-accent-error hover:bg-accent-error/20'
+          : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
+        }
+      `}
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="12" cy="12" r="1" />
+        <circle cx="12" cy="5" r="1" />
+        <circle cx="12" cy="19" r="1" />
+      </svg>
+    </DropdownButton>
+  );
+};
+
 
   return (
     <DropdownButton

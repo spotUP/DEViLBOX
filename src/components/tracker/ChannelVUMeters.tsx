@@ -20,14 +20,21 @@ const NUM_SEGMENTS = 26;
 const SEGMENT_GAP = 4;
 
 // Get segment color based on position (0 = bottom, 1 = top)
-const getSegmentColor = (ratio: number, isLit: boolean, hue: number = 0): { bg: string; glow: string } => {
+const getSegmentColor = (ratio: number, isLit: boolean): { bg: string; glow: string } => {
   if (!isLit) {
     return { bg: 'transparent', glow: 'none' };
   }
-  const saturation = hue === 180 ? 100 : 75 + ratio * 10;
-  const lightness = hue === 180 ? 45 + ratio * 15 : 40 + ratio * 20;
-  const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-  return { bg: color, glow: `0 0 6px ${color}` };
+  
+  let color: string;
+  if (ratio < 0.6) {
+    color = '#22c55e'; // Green
+  } else if (ratio < 0.85) {
+    color = '#eab308'; // Yellow
+  } else {
+    color = '#ef4444'; // Red
+  }
+  
+  return { bg: color, glow: `0 0 6px ${color}80` };
 };
 
 interface MeterState {
@@ -47,7 +54,6 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex
   })));
-  const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const performanceQuality = useUIStore((state) => state.performanceQuality);
   const pattern = patterns[currentPatternIndex];
   const numChannels = pattern?.channels.length || 4;
@@ -58,8 +64,6 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
   const meterStates = useRef<MeterState[]>([]);
   const animationRef = useRef<number | null>(null);
   const containerHeightRef = useRef(200);
-
-  const meterHue = currentThemeId === 'cyan-lineart' ? 180 : 0;
 
   // Initialize meter states
   useEffect(() => {
@@ -92,10 +96,8 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
   // Refs for values needed inside the animation loop
   const numChannelsRef = useRef(numChannels);
   const scrollLeftPropRef = useRef(scrollLeftProp);
-  const meterHueRef = useRef(meterHue);
   useEffect(() => { numChannelsRef.current = numChannels; }, [numChannels]);
   useEffect(() => { scrollLeftPropRef.current = scrollLeftProp; }, [scrollLeftProp]);
-  useEffect(() => { meterHueRef.current = meterHue; }, [meterHue]);
 
   // Start/stop animation - loop defined inside effect to avoid self-referencing
   useEffect(() => {
@@ -164,7 +166,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
 
             const isLit = s < activeSegments;
             const ratio = s / (NUM_SEGMENTS - 1);
-            const { bg, glow } = getSegmentColor(ratio, isLit, meterHueRef.current);
+            const { bg, glow } = getSegmentColor(ratio, isLit);
 
             segEl.style.backgroundColor = bg;
             segEl.style.boxShadow = glow;
@@ -190,30 +192,38 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelWi
   }
 
   // Note: ROW_NUM_WIDTH is handled by the parent container's left offset
-  const DEFAULT_CHANNEL_WIDTH = 260;
-  const COLLAPSED_CHANNEL_WIDTH = 60;
+  // These widths MUST match PatternEditorCanvas rendering exactly
+  const LINE_NUMBER_WIDTH = 40;
+  const CHAR_WIDTH = 10;
+  const COLLAPSED_CHANNEL_WIDTH = 12;
   const METER_WIDTH = 28;
-  const CHANNEL_WIDTH = channelWidthProp || DEFAULT_CHANNEL_WIDTH;
 
   // Calculate channel center X accounting for collapsed channels
-  // Parent container already starts at ROW_NUM_WIDTH, so we don't include it here
   const getChannelCenterX = (index: number) => {
-    // If using custom channel width (VirtualizedTrackerView), don't account for collapsed
-    if (channelWidthProp) {
-      return index * CHANNEL_WIDTH + CHANNEL_WIDTH / 2;
-    }
-
-    if (!pattern) return index * CHANNEL_WIDTH + CHANNEL_WIDTH / 2;
+    if (!pattern) return index * 260 + 130;
 
     // Sum widths of all channels before this one
-    let offset = 0;
+    let offset = LINE_NUMBER_WIDTH;
+    const noteWidth = CHAR_WIDTH * 3 + 4;
+    
+    // Check first row for schema of whole pattern
+    const cell0 = pattern.channels[0]?.rows[0];
+    const hasAcid = cell0?.flag1 !== undefined || cell0?.flag2 !== undefined;
+    const hasProb = cell0?.probability !== undefined;
+    
+    const normalParamWidth = CHAR_WIDTH * 10 + 16
+      + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
+      + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
+      + CHAR_WIDTH * 2 + 4; 
+    const normalChannelWidth = noteWidth + normalParamWidth + 20;
+
     for (let i = 0; i < index; i++) {
       const isCollapsed = pattern.channels[i]?.collapsed;
-      offset += isCollapsed ? COLLAPSED_CHANNEL_WIDTH : CHANNEL_WIDTH;
+      offset += isCollapsed ? COLLAPSED_CHANNEL_WIDTH : normalChannelWidth;
     }
 
     // Add half of this channel's width to get center
-    const thisChannelWidth = pattern.channels[index]?.collapsed ? COLLAPSED_CHANNEL_WIDTH : CHANNEL_WIDTH;
+    const thisChannelWidth = pattern.channels[index]?.collapsed ? COLLAPSED_CHANNEL_WIDTH : normalChannelWidth;
     return offset + thisChannelWidth / 2;
   };
 

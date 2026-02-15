@@ -229,30 +229,41 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const currentRow = transportState.isPlaying ? transportState.currentRow : cursor.rowIndex;
     const rowIndex = currentRow + rowOffset;
 
-    // Calculate channel width - must match render() layout
-    const noteWidth = CHAR_WIDTH * 3 + 4;
-    const firstCell = pattern.channels[0]?.rows[0];
-    const hasAcid = firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined;
-    const hasProb = firstCell?.probability !== undefined;
-    const paramWidth = CHAR_WIDTH * 10 + 16
-      + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
-      + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
-      + CHAR_WIDTH * 2 + 4; // Automation column
-    const channelWidth = noteWidth + paramWidth + 20 + 20;
-
     let channelIndex = 0;
-    let localX = relativeX - LINE_NUMBER_WIDTH;
-    if (relativeX > LINE_NUMBER_WIDTH) {
-      channelIndex = Math.floor(localX / channelWidth);
-      channelIndex = Math.max(0, Math.min(channelIndex, pattern.channels.length - 1));
-      localX = localX % channelWidth;
-    } else {
-      channelIndex = 0;
-      localX = -1;
+    let localX = -1;
+    let foundChannel = false;
+
+    for (let ch = 0; ch < numChannels; ch++) {
+      const off = channelOffsets[ch] - scrollLeft;
+      const w = channelWidths[ch];
+      if (relativeX >= off && relativeX < off + w) {
+        channelIndex = ch;
+        localX = relativeX - off - 8; // Adjust for internal padding
+        foundChannel = true;
+        break;
+      }
+    }
+
+    if (!foundChannel) {
+      if (relativeX < LINE_NUMBER_WIDTH) {
+        channelIndex = 0;
+        localX = -1;
+      } else {
+        return null;
+      }
     }
 
     // Determine column type
+    const isCollapsed = pattern.channels[channelIndex]?.collapsed;
+    if (isCollapsed) return { rowIndex: Math.max(0, Math.min(rowIndex, pattern.length - 1)), channelIndex, columnType: 'note' };
+
     let columnType: CursorPosition['columnType'] = 'note';
+    // Calculate widths for the current channel's schema (same as getParamCanvas)
+    const noteWidth = CHAR_WIDTH * 3 + 4;
+    const cell = pattern.channels[channelIndex]?.rows[0];
+    const hasAcid = cell?.flag1 !== undefined || cell?.flag2 !== undefined;
+    const hasProb = cell?.probability !== undefined;
+
     if (localX >= noteWidth + 4) {
       const xInParams = localX - (noteWidth + 8);
       if (xInParams < CHAR_WIDTH * 2 + 4) columnType = 'instrument';
@@ -268,9 +279,50 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       channelIndex,
       columnType
     };
-  }, [pattern, dimensions.height, scrollLeft, cursor.rowIndex]);
+  }, [pattern, dimensions.height, scrollLeft, cursor.rowIndex, channelOffsets, channelWidths, numChannels]);
 
   const [isDragging, setIsDragging] = useState(false);
+  const [dragOverCell, setDragOverCell] = useState<{ channelIndex: number; rowIndex: number } | null>(null);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const cell = getCellFromCoords(e.clientX, e.clientY);
+    if (cell) {
+      setDragOverCell({ channelIndex: cell.channelIndex, rowIndex: cell.rowIndex });
+      e.dataTransfer.dropEffect = 'copy';
+    } else {
+      setDragOverCell(null);
+    }
+  }, [getCellFromCoords]);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverCell(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverCell(null);
+
+    const cell = getCellFromCoords(e.clientX, e.clientY);
+    if (!cell) return;
+
+    try {
+      const dragData = e.dataTransfer.getData('application/x-devilbox-instrument');
+      if (dragData) {
+        const { id } = JSON.parse(dragData);
+        // Set instrument at this cell
+        useTrackerStore.getState().setCell(cell.channelIndex, cell.rowIndex, { 
+          instrument: id 
+        });
+        haptics.success();
+      }
+    } catch (err) {
+      console.error('[PatternEditor] Drop failed:', err);
+    }
+  }, [getCellFromCoords]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (isMobile || e.button !== 0) return; // Only left click on desktop
@@ -1127,15 +1179,28 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }
     }
 
-    // Base: inst(2) +4gap  vol(2) +4gap  eff(3) +4gap  eff2(3) +4gap = CW*10 + 16
-    // Acid: accent(1) +4gap  slide(1) +4gap = +CW*2 + 8
-    // Prob: prob(2) +4gap = +CW*2 + 4
     // Automation: space for curve lane (no hex values shown)
-    const paramWidth = CHAR_WIDTH * 10 + 16
+    const normalParamWidth = CHAR_WIDTH * 10 + 16
       + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0)
       + (hasProb ? CHAR_WIDTH * 2 + 4 : 0)
       + CHAR_WIDTH * 2 + 4; // Space for automation lane
-    const channelWidth = noteWidth + paramWidth + 20;
+    const normalChannelWidth = noteWidth + normalParamWidth + 20;
+    const collapsedWidth = 12;
+
+    // Calculate x-offsets for each channel (respecting collapsed state)
+    const channelOffsets: number[] = [];
+    const channelWidths: number[] = [];
+    let currentX = LINE_NUMBER_WIDTH;
+    
+    for (let ch = 0; ch < numChannels; ch++) {
+      const isCollapsed = pattern.channels[ch]?.collapsed;
+      const chWidth = isCollapsed ? collapsedWidth : normalChannelWidth;
+      channelOffsets.push(currentX);
+      channelWidths.push(chWidth);
+      currentX += chWidth;
+    }
+
+    const totalWidth = currentX;
 
     // Clear canvas
     ctx.fillStyle = colors.bg;
@@ -1292,11 +1357,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // Draw each channel (use ghost pattern if available)
       const sourcePattern = ghostPattern || pattern;
       for (let ch = 0; ch < numChannels; ch++) {
-        const x = LINE_NUMBER_WIDTH + ch * channelWidth + 8 - scrollLeft;
-        const colX = LINE_NUMBER_WIDTH + ch * channelWidth - scrollLeft;
+        const colX = channelOffsets[ch] - scrollLeft;
+        const channelWidth = channelWidths[ch];
+        const isCollapsed = pattern.channels[ch]?.collapsed;
 
         // Skip if outside visible area
-        if (x + channelWidth < 0 || x > width) continue;
+        if (colX + channelWidth < 0 || colX > width) continue;
+
+        const x = colX + 8;
 
         // Draw per-channel color tint on the column background
         const chColor = pattern.channels[ch]?.color;
@@ -1308,11 +1376,24 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           ctx.globalAlpha = prevAlpha;
         }
 
+        // Draw channel separator
+        ctx.fillStyle = colors.border;
+        ctx.fillRect(colX + channelWidth, y, 1, ROW_HEIGHT);
+
+        // Colored left stripe for channel (matches header inset border)
+        if (chColor) {
+          const prevAlpha = ctx.globalAlpha;
+          ctx.globalAlpha = isGhostRow ? 0.15 : 0.4;
+          ctx.fillStyle = chColor;
+          ctx.fillRect(colX, y, isCollapsed ? 4 : 2, ROW_HEIGHT);
+          ctx.globalAlpha = prevAlpha;
+        }
+
+        // Skip content if collapsed
+        if (isCollapsed) continue;
+
         // Check if this channel exists in the source pattern (ghost patterns might have different channel counts)
         if (!sourcePattern.channels[ch]) {
-          // Draw channel separator for missing channels
-          ctx.fillStyle = colors.border;
-          ctx.fillRect(LINE_NUMBER_WIDTH + (ch + 1) * channelWidth - scrollLeft, y, 1, ROW_HEIGHT);
           continue;
         }
 
@@ -1320,9 +1401,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const cell = sourcePattern.channels[ch].rows[rowIndex];
         
         // Safety check: skip if row doesn't exist (can happen with ghost patterns of different lengths)
-        if (!cell) {
-          continue;
-        }
         if (!cell) {
           continue;
         }
@@ -1351,23 +1429,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         );
         ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
 
-        // Channel separator
-        ctx.fillStyle = colors.border;
-        ctx.fillRect(LINE_NUMBER_WIDTH + (ch + 1) * channelWidth - scrollLeft, y, 1, ROW_HEIGHT);
-
-        // Colored left stripe for channel (matches header inset border)
-        if (chColor) {
-          const prevAlpha = ctx.globalAlpha;
-          ctx.globalAlpha = isGhostRow ? 0.15 : 0.4;
-          ctx.fillStyle = chColor;
-          ctx.fillRect(colX, y, 2, ROW_HEIGHT);
-          ctx.globalAlpha = prevAlpha;
-        }
-
         // Draw selection highlight
         if (hasSelection && !isGhostRow && ch >= minSelCh && ch <= maxSelCh && rowIndex >= minSelRow && rowIndex <= maxSelRow) {
           ctx.fillStyle = colors.selection;
           ctx.fillRect(colX, y, channelWidth, ROW_HEIGHT);
+        }
+
+        // Draw drag-over highlight (breadcrumb)
+        if (dragOverCell && !isGhostRow && ch === dragOverCell.channelIndex && rowIndex === dragOverCell.rowIndex) {
+          ctx.fillStyle = currentTheme.colors.accent + '66'; // 40% opacity accent
+          ctx.fillRect(colX, y, channelWidth, ROW_HEIGHT);
+          // Add a border to make it pop
+          ctx.strokeStyle = currentTheme.colors.accent;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(colX + 0.5, y + 0.5, channelWidth - 1, ROW_HEIGHT - 1);
         }
       }
       
@@ -1383,8 +1458,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Draw cursor — visible in all modes with mode-dependent color
     // FT2: Each digit is a separate cursor stop, always CHAR_WIDTH wide (except note)
-    {
-      const cursorX = LINE_NUMBER_WIDTH + cursor.channelIndex * channelWidth + 8 - scrollLeft;
+    if (!pattern.channels[cursor.channelIndex]?.collapsed) {
+      const cursorX = channelOffsets[cursor.channelIndex] + 8 - scrollLeft;
       let cursorOffsetX = 0;
       let cursorW = CHAR_WIDTH; // Single char width for all except note
 
@@ -1396,9 +1471,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const volOff = CHAR_WIDTH * 2 + 4;
       const eff1Off = CHAR_WIDTH * 4 + 8;
       const eff2Off = CHAR_WIDTH * 7 + 12;
+      
+      // Current channel's schema for cursor positioning
+      const cellForCursor = pattern.channels[cursor.channelIndex]?.rows[0];
+      const hasAcidC = cellForCursor?.flag1 !== undefined || cellForCursor?.flag2 !== undefined;
+      const hasProbC = cellForCursor?.probability !== undefined;
+      
       // Optional column positions depend on which columns exist
       const acidOff = CHAR_WIDTH * 10 + 16;
-      const probOff = acidOff + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0);
+      const probOff = acidOff + (hasAcidC ? CHAR_WIDTH * 2 + 8 : 0);
 
       switch (cursor.columnType) {
         case 'note':
@@ -1452,7 +1533,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const caretH = ROW_HEIGHT;
       const caretY = centerLineTop;
       const caretX = cursorX + cursorOffsetX;
-      const caretW = cursorW;
+      const caretW = caretW;
 
       // Clear any existing content (antialiased text edges bleed through otherwise)
       ctx.clearRect(caretX, caretY, caretW, caretH);
@@ -1514,8 +1595,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         ctx.fillText(charStr, caretX, caretY + caretH / 2);
       }
     }
-
-  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isCyanTheme, visibleStart, instruments, currentPatternIndex, patterns, scrollY]);
+  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isCyanTheme, visibleStart, instruments, currentPatternIndex, patterns, scrollY, channelOffsets, channelWidths, numChannels]);
 
   // Ref to keep render callback up to date for the animation loop
   const renderRef = useRef(render);
@@ -1863,6 +1943,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onWheel={handleWheel}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         {...patternGestures}
       >
         <canvas

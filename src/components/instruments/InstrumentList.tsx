@@ -208,6 +208,20 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     }
   };
 
+  const handleDragStart = (e: React.DragEvent, id: number) => {
+    e.dataTransfer.setData('application/x-devilbox-instrument', JSON.stringify({ id }));
+    e.dataTransfer.effectAllowed = 'copy';
+    
+    // Set a custom drag image or styling if desired
+    const target = e.currentTarget as HTMLElement;
+    target.style.opacity = '0.5';
+    
+    // Reset opacity after a short delay (so it doesn't affect the drag image)
+    setTimeout(() => {
+      target.style.opacity = '1';
+    }, 0);
+  };
+
   // Sort instruments by ID
   const sortedInstruments = [...instruments].sort((a, b) => a.id - b.id);
 
@@ -287,6 +301,8 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 key={instrument.id}
                 ref={isSelected ? selectedRef : undefined}
                 onClick={() => handleSelect(instrument.id, instrument)}
+                draggable="true"
+                onDragStart={(e) => handleDragStart(e, instrument.id)}
                 className={`
                   instrument-list-item
                   flex items-center gap-2 px-2 py-1.5 cursor-pointer border-b border-ft2-border
@@ -374,6 +390,8 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
               <div
                 ref={isSelected ? selectedRef : undefined}
                 onClick={() => handleSelect(instrument.id, instrument)}
+                draggable="true"
+                onDragStart={(e) => handleDragStart(e, instrument.id)}
                 className={`
                   group flex items-center gap-2 px-3 py-2 cursor-pointer transition-all
                   ${isSelected

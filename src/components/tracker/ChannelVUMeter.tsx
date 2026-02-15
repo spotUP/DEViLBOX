@@ -15,26 +15,16 @@ const NUM_SEGMENTS = 12;
 const DECAY_RATE = 0.85; // How fast the meter falls
 const DECAY_INTERVAL = 35; // ms between decay updates
 
-// Color gradient from bottom (dark blue) to top (bright cyan)
-// Using HSL: hue 180-190 (cyan), varying lightness
+// Color gradient from bottom (Green) to top (Red)
 const getSegmentColor = (index: number, total: number, isLit: boolean): string => {
   if (!isLit) {
-    // Off state - very dim version of the color
-    const ratio = index / (total - 1);
-    const lightness = 8 + ratio * 4; // 8-12% lightness when off
-    return `hsl(185, 80%, ${lightness}%)`;
+    return 'rgba(255, 255, 255, 0.05)';
   }
 
-  // Lit state - gradient from dark blue-cyan at bottom to bright cyan at top
   const ratio = index / (total - 1);
-  // Hue: 200 (blue) at bottom to 180 (cyan) at top
-  const hue = 200 - ratio * 20;
-  // Saturation: high throughout
-  const saturation = 85 + ratio * 15; // 85-100%
-  // Lightness: darker at bottom, brighter at top
-  const lightness = 35 + ratio * 30; // 35-65%
-
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  if (ratio < 0.6) return '#22c55e'; // Green
+  if (ratio < 0.85) return '#eab308'; // Yellow
+  return '#ef4444'; // Red
 };
 
 export const ChannelVUMeter: React.FC<ChannelVUMeterProps> = React.memo(
