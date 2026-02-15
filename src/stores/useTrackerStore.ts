@@ -1351,6 +1351,14 @@ export const useTrackerStore = create<TrackerStore>()(
               cell.envMod = Math.max(0, Math.min(127, value));
             } else if (column === 'pan') {
               cell.pan = Math.max(-100, Math.min(100, value));
+            } else if (column === 'effParam') {
+              // If no effect type set, default to volume (0x0C)
+              if (!cell.effTyp) cell.effTyp = 0x0C; 
+              cell.eff = Math.max(0, Math.min(255, value));
+            } else if (column === 'effParam2') {
+              // If no effect type 2 set, default to volume (0x0C)
+              if (!cell.effTyp2) cell.effTyp2 = 0x0C;
+              cell.eff2 = Math.max(0, Math.min(255, value));
             }
           }
         }
