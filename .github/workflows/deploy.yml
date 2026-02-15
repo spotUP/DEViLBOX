@@ -110,7 +110,7 @@ jobs:
 
   # Create a GitHub Release with all desktop app binaries
   release:
-    needs: [electron, deploy]
+    needs: [electron, deploy-server]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
