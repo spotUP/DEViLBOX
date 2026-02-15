@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-15T11:49:47.652Z
+ * Generated: 2026-02-15T12:06:08.080Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '597';
-export const BUILD_HASH = '24e4bac';
+export const BUILD_NUMBER = '600';
+export const BUILD_HASH = '286da5a';
 export const BUILD_DATE = '2026-02-15';
 
 // Full semantic version with build number
@@ -33,6 +33,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-15',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix mobile file browser: directories open on single tap"
+      },
+      {
+        type: 'feature',
+        "description": "Add full-stack dev scripts - runs backend + frontend together"
+      },
+      {
+        type: 'fix',
+        "description": "Fix unused variable warnings"
+      },
       {
         type: 'fix',
         "description": "Fix TypeScript compilation errors - add missing imports and fix hook declaration order"
@@ -226,18 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add file browser Load functionality to mobile menu"
-      },
-      {
-        type: 'fix',
-        "description": "Restore /DEViLBOX/ base path to match repo name"
-      },
-      {
-        type: 'fix',
-        "description": "Use lowercase /devilbox/ base path"
-      },
-      {
-        type: 'fix',
-        "description": "Remove /DEViLBOX/ base path from URLs"
       }
     ]
   }

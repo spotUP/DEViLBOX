@@ -15,6 +15,7 @@ export interface PatternGestureConfig {
   onLongPress?: (x: number, y: number) => void;
   onPinchZoom?: (scale: number) => void;
   onScroll?: (deltaY: number) => void; // Continuous scroll during touch drag
+  onHorizontalScroll?: (deltaX: number) => void; // Continuous horizontal scroll
   swipeThreshold?: number;
   longPressDelay?: number;
   enabled?: boolean;
@@ -32,6 +33,7 @@ interface TouchState {
   startY: number;
   currentX: number;
   currentY: number;
+  lastX: number; // For continuous scroll tracking
   lastY: number; // For continuous scroll tracking
   startTime: number;
   touches: number;
@@ -94,6 +96,7 @@ export function useMobilePatternGestures({
         startY: touch.clientY,
         currentX: touch.clientX,
         currentY: touch.clientY,
+        lastX: touch.clientX,
         lastY: touch.clientY,
         startTime: Date.now(),
         touches: numTouches,
@@ -154,8 +157,9 @@ export function useMobilePatternGestures({
         e.preventDefault();
       }
 
-      // Handle continuous scroll for single-touch vertical movement
-      if (numTouches === 1 && onScroll) {
+      // Handle continuous scroll for single-touch movement
+      if (numTouches === 1 && (onScroll || onHorizontalScroll)) {
+        const deltaX = touchState.current.lastX - touch.clientX;
         const deltaY = touchState.current.lastY - touch.clientY;
         const absX = Math.abs(deltaX);
         const absY = Math.abs(deltaY);
@@ -165,15 +169,19 @@ export function useMobilePatternGestures({
           e.preventDefault();
         }
 
-        // Only trigger scroll if this is significantly more vertical than horizontal
-        // Use 1.5x ratio to allow some horizontal drift while scrolling
-        if (absY > absX * 1.5 && Math.abs(deltaY) > 1) {
+        // Vertical scroll
+        if (onScroll && absY > absX * 1.5 && Math.abs(deltaY) > 1) {
           onScroll(deltaY);
           touchState.current.lastY = touch.clientY;
+        } 
+        // Horizontal scroll
+        else if (onHorizontalScroll && absX > absY * 1.5 && Math.abs(deltaX) > 1) {
+          onHorizontalScroll(deltaX);
+          touchState.current.lastX = touch.clientX;
         }
       }
     },
-    [enabled, onPinchZoom, onScroll, clearLongPressTimer]
+    [enabled, onPinchZoom, onScroll, onHorizontalScroll, clearLongPressTimer]
   );
 
   // Handle touch end
