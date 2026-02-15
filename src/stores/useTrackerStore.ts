@@ -785,11 +785,21 @@ export const useTrackerStore = create<TrackerStore>()(
 
     copySelection: () =>
       set((state) => {
-        if (!state.selection) return;
-
         const pattern = state.patterns[state.currentPatternIndex];
-        const { startChannel, endChannel, startRow, endRow } = state.selection;
+        let sel = state.selection;
+        
+        // Fallback: use current cell if no selection
+        if (!sel) {
+          sel = {
+            startChannel: state.cursor.channelIndex,
+            endChannel: state.cursor.channelIndex,
+            startRow: state.cursor.rowIndex,
+            endRow: state.cursor.rowIndex,
+            columnTypes: [state.cursor.columnType],
+          };
+        }
 
+        const { startChannel, endChannel, startRow, endRow } = sel;
         const minChannel = Math.min(startChannel, endChannel);
         const maxChannel = Math.max(startChannel, endChannel);
         const minRow = Math.min(startRow, endRow);
@@ -826,12 +836,21 @@ export const useTrackerStore = create<TrackerStore>()(
 
     cutSelection: () =>
       set((state) => {
-        if (!state.selection) return;
-
-        // Copy first
         const pattern = state.patterns[state.currentPatternIndex];
-        const { startChannel, endChannel, startRow, endRow } = state.selection;
+        let sel = state.selection;
+        
+        // Fallback: use current cell if no selection
+        if (!sel) {
+          sel = {
+            startChannel: state.cursor.channelIndex,
+            endChannel: state.cursor.channelIndex,
+            startRow: state.cursor.rowIndex,
+            endRow: state.cursor.rowIndex,
+            columnTypes: [state.cursor.columnType],
+          };
+        }
 
+        const { startChannel, endChannel, startRow, endRow } = sel;
         const minChannel = Math.min(startChannel, endChannel);
         const maxChannel = Math.max(startChannel, endChannel);
         const minRow = Math.min(startRow, endRow);
