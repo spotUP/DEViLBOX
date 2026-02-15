@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap, FolderOpen, Save, FilePlus, Trash2, List, Music, Grid3x3, Clock, Smartphone, LogIn, LogOut, User } from 'lucide-react';
+import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { AddToHomeScreenModal } from '@components/dialogs/AddToHomeScreenModal';
 import { useAuthStore } from '@stores/useAuthStore';
 
@@ -129,7 +130,15 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                 </div>
               )}
 
-              {/* Note: MIDI settings moved to desktop navbar only - too complex for mobile menu */}
+              {/* MIDI Settings */}
+              <div className="mb-4">
+                <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3">
+                  MIDI Settings
+                </h3>
+                <div className="bg-dark-bgSecondary rounded-lg p-3">
+                  <MIDIToolbarDropdown />
+                </div>
+              </div>
 
               {/* File Operations */}
               <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3 mt-6">
