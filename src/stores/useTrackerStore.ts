@@ -106,6 +106,7 @@ interface TrackerStore {
   moveCursorToRow: (row: number) => void;
   moveCursorToChannel: (channel: number) => void;
   moveCursorToColumn: (columnType: CursorPosition['columnType']) => void;
+  moveCursorToChannelAndColumn: (channel: number, columnType: CursorPosition['columnType']) => void;
   setCell: (channelIndex: number, rowIndex: number, cell: Partial<TrackerCell>) => void;
   clearCell: (channelIndex: number, rowIndex: number) => void;
   clearChannel: (channelIndex: number) => void;
@@ -446,6 +447,16 @@ export const useTrackerStore = create<TrackerStore>()(
       set((state) => {
         state.cursor.columnType = columnType;
         state.cursor.digitIndex = 0;
+      }),
+
+    moveCursorToChannelAndColumn: (channel, columnType) =>
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        if (channel >= 0 && channel < pattern.channels.length) {
+          state.cursor.channelIndex = channel;
+          state.cursor.columnType = columnType;
+          state.cursor.digitIndex = 0;
+        }
       }),
 
     setCell: (channelIndex, rowIndex, cellUpdate) =>
