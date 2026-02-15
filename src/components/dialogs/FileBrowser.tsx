@@ -6,7 +6,7 @@
  * - Server API (jailed to data/ directory)
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardDrive, History, RotateCcw } from 'lucide-react';
 import '@cubone/react-file-manager/dist/style.css';
 import {
