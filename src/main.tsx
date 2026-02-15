@@ -5,8 +5,6 @@ import './index.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 import { ResponsiveProvider } from './contexts/ResponsiveContext.tsx'
-import { useSettingsStore } from './stores/useSettingsStore'
-import { getToneEngine } from './engine/ToneEngine'
 
 // Enable Immer support for Map and Set (required for stores using these)
 enableMapSet();
@@ -21,15 +19,6 @@ import './engine/registry/effects'
 
 // Dev tools: synth tester (adds testAllSynths() etc. to window)
 import './utils/synthTester'
-
-// Subscribe to audio latency setting changes
-useSettingsStore.subscribe(
-  (state) => {
-    try {
-      getToneEngine().setAudioLatency(state.audioLatency);
-    } catch { /* ignore */ }
-  }
-);
 
 // Global error handlers for uncaught errors
 window.addEventListener('error', (event) => {
