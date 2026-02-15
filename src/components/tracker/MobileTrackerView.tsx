@@ -148,11 +148,30 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
       {/* Fixed header with pattern info and transport */}
       <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-b border-dark-border safe-top">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-xs text-text-muted font-mono">PAT</span>
-          <span className="text-sm font-bold text-accent-primary font-mono">
-            {(currentPatternIndex + 1).toString().padStart(2, '0')}
-          </span>
-          <span className="text-xs text-text-secondary truncate max-w-[60px]">
+          {/* Transport controls - Moved to left to avoid hamburger menu overlap */}
+          <div className="flex items-center gap-1 flex-shrink-0 mr-1">
+            <button
+              onClick={togglePlayPause}
+              className={`
+                p-2 rounded-lg transition-colors touch-target
+                ${isPlaying
+                  ? 'bg-accent-primary text-text-inverse'
+                  : 'bg-dark-bgTertiary text-text-primary hover:bg-dark-bgHover'
+                }
+              `}
+            >
+              {isPlaying ? <Square size={18} /> : <Play size={18} />}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <span className="text-xs text-text-muted font-mono">PAT</span>
+            <span className="text-sm font-bold text-accent-primary font-mono">
+              {(currentPatternIndex + 1).toString().padStart(2, '0')}
+            </span>
+          </div>
+
+          <span className="text-xs text-text-secondary truncate max-w-[40px] hidden sm:inline">
             {pattern?.name || 'Untitled'}
           </span>
 
@@ -190,7 +209,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
               value={currentInstrumentId ?? 1}
               onChange={(e) => setCurrentInstrument(parseInt(e.target.value, 10))}
               className="w-full text-xs bg-dark-bgTertiary border border-dark-border rounded px-2 py-1 text-text-primary font-mono truncate"
-              style={{ maxWidth: '140px' }}
+              style={{ maxWidth: '120px' }}
             >
               {instruments.map((inst) => (
                 <option key={inst.id} value={inst.id}>
@@ -201,21 +220,8 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
           </div>
         </div>
 
-        {/* Transport controls */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            onClick={togglePlayPause}
-            className={`
-              p-2 rounded-lg transition-colors touch-target
-              ${isPlaying
-                ? 'bg-accent-primary text-text-inverse'
-                : 'bg-dark-bgTertiary text-text-primary hover:bg-dark-bgHover'
-              }
-            `}
-          >
-            {isPlaying ? <Square size={18} /> : <Play size={18} />}
-          </button>
-        </div>
+        {/* Right spacer for the fixed hamburger menu button */}
+        <div className="w-12 flex-shrink-0" />
       </div>
 
       {/* Main content area - Pattern/Instruments/Controls tabs */}
