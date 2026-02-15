@@ -18,6 +18,7 @@ interface PatchCableProps {
   signal?: SignalType;
   isSelected?: boolean;
   onClick?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
   useOrthogonal?: boolean; // Use orthogonal routing (default: true)
   laneOffset?: number; // Horizontal lane offset for cable spreading
   obstacles?: { x: number; y: number; w: number; h: number }[]; // Module bounding boxes
@@ -39,6 +40,7 @@ export const PatchCable: React.FC<PatchCableProps> = ({
   signal = 'audio',
   isSelected = false,
   onClick,
+  onContextMenu,
   useOrthogonal = true,
   laneOffset = 0,
   obstacles = [],
@@ -49,7 +51,11 @@ export const PatchCable: React.FC<PatchCableProps> = ({
   const strokeColor = color || SIGNAL_COLORS[signal];
 
   return (
-    <g onClick={onClick} className="cursor-pointer">
+    <g 
+      onClick={onClick} 
+      onContextMenu={onContextMenu}
+      className="cursor-pointer"
+    >
       {/* Invisible thick line for easier clicking */}
       <path
         d={pathData}
