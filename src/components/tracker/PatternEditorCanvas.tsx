@@ -146,14 +146,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const bdAnimations = useBDAnimations();
 
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
-  const { numChannels, channelOffsets, channelWidths, normalChannelWidth, hasAcid, hasProb } = useMemo(() => {
+  const { numChannels, channelOffsets, channelWidths } = useMemo(() => {
     if (!pattern) return { 
       numChannels: 0, 
       channelOffsets: [], 
-      channelWidths: [], 
-      normalChannelWidth: 260, 
-      hasAcid: false, 
-      hasProb: false 
+      channelWidths: []
     };
 
     const nc = pattern.channels.length;
@@ -200,10 +197,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     return {
       numChannels: nc,
       channelOffsets: offsets,
-      channelWidths: widths,
-      normalChannelWidth: normalW,
-      hasAcid: acid,
-      hasProb: prob
+      channelWidths: widths
     };
   }, [pattern, instruments]);
 
@@ -1219,7 +1213,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
 
     const noteWidth = CHAR_WIDTH * 3 + 4;
-    const patternLength = pattern.length;
 
     // Clear canvas
     ctx.fillStyle = colors.bg;
@@ -1540,7 +1533,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // Current channel's schema for cursor positioning
       const cellForCursor = pattern.channels[cursor.channelIndex]?.rows[0];
       const hasAcidC = cellForCursor?.flag1 !== undefined || cellForCursor?.flag2 !== undefined;
-      const hasProbC = cellForCursor?.probability !== undefined;
       
       // Optional column positions depend on which columns exist
       const acidOff = CHAR_WIDTH * 10 + 16;
