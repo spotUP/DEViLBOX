@@ -8,6 +8,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { useTrackerStore, useTransportStore, useThemeStore, useInstrumentStore } from '@stores';
 import { AutomationLanes } from './AutomationLanes';
+import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ChannelVUMeter } from './ChannelVUMeter';
@@ -2016,22 +2017,44 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
         {/* Automation Lanes Overlay */}
         {pattern && (
-          <AutomationLanes
-            key={`automation-${pattern.id}-${renderCounter}`}
-            patternId={pattern.id}
-            patternLength={pattern.length}
-            rowHeight={ROW_HEIGHT}
-            channelCount={pattern.channels.length}
-            channelWidth={channelHeaderWidth}
-            rowNumWidth={LINE_NUMBER_WIDTH}
-            scrollOffset={scrollY}
-            visibleStart={visibleStart}
-            parameter="cutoff"
-            prevPatternId={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.id : (patterns.length > 1 ? patterns[patterns.length - 1]?.id : undefined)) : undefined}
-            prevPatternLength={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length > 1 ? patterns[patterns.length - 1]?.length : undefined)) : undefined}
-            nextPatternId={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.id : (patterns.length > 1 ? patterns[0]?.id : undefined)) : undefined}
-            nextPatternLength={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : undefined)) : undefined}
-          />
+          <>
+            <AutomationLanes
+              key={`automation-${pattern.id}-${renderCounter}`}
+              patternId={pattern.id}
+              patternLength={pattern.length}
+              rowHeight={ROW_HEIGHT}
+              channelCount={pattern.channels.length}
+              channelWidth={channelHeaderWidth}
+              rowNumWidth={LINE_NUMBER_WIDTH}
+              scrollOffset={scrollY}
+              visibleStart={visibleStart}
+              parameter="cutoff"
+              prevPatternId={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.id : (patterns.length > 1 ? patterns[patterns.length - 1]?.id : undefined)) : undefined}
+              prevPatternLength={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length > 1 ? patterns[patterns.length - 1]?.length : undefined)) : undefined}
+              nextPatternId={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.id : (patterns.length > 1 ? patterns[0]?.id : undefined)) : undefined}
+              nextPatternLength={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : undefined)) : undefined}
+            />
+            {/* Internal Macro Columns Overlay (only when visible) */}
+            <div 
+              style={{ 
+                position: 'absolute', 
+                top: scrollY, 
+                left: 0, 
+                right: 0, 
+                height: pattern.length * ROW_HEIGHT,
+                pointerEvents: 'none',
+                transform: `translateX(${-scrollLeft}px)`
+              }}
+            >
+              <MacroLanes
+                pattern={pattern}
+                rowHeight={ROW_HEIGHT}
+                channelCount={pattern.channels.length}
+                channelWidth={channelHeaderWidth}
+                rowNumWidth={LINE_NUMBER_WIDTH}
+              />
+            </div>
+          </>
         )}
 
         {/* VU Meters overlay - moved AFTER canvas and added z-30 */}

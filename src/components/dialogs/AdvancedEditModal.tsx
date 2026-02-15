@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { useTrackerStore } from '@stores';
 import { MacroSlotsPanel } from '../tracker/MacroSlotsPanel';
-import { Sliders, Shuffle, Download, X, ArrowUpDown, Maximize2, Minimize2, Copy, Calculator } from 'lucide-react';
+import { Sliders, Shuffle, Download, X, ArrowUpDown, Maximize2, Minimize2, Copy, Calculator, BookOpen } from 'lucide-react';
 
 interface AdvancedEditModalProps {
   onClose: () => void;
@@ -333,6 +333,54 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
 
                 <div className="text-xs text-ft2-textDim mt-2">
                   Import: Use File → Open Module
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Help & Reference */}
+          <div className="border border-ft2-border rounded">
+            <button
+              onClick={() => toggleSection('help')}
+              className="w-full px-3 py-2 bg-dark-bgTertiary hover:bg-dark-bgHover text-left text-sm font-medium text-ft2-text flex items-center justify-between transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <BookOpen size={14} />
+                Help & Reference
+              </span>
+              <span>{expandedSection === 'help' ? '▼' : '▶'}</span>
+            </button>
+            {expandedSection === 'help' && (
+              <div className="p-3 space-y-2 bg-dark-bgSecondary">
+                <div className="text-xs text-ft2-textDim mb-2">
+                  Quick access to command references and documentation
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      onClose();
+                      const event = new KeyboardEvent('keydown', { key: '?' });
+                      window.dispatchEvent(event);
+                    }}
+                    className="px-3 py-1.5 text-xs bg-neutral-700 hover:bg-neutral-600 text-white rounded flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <BookOpen size={12} />
+                    Full Reference (?)
+                  </button>
+                  <button
+                    onClick={() => {
+                      onClose();
+                      // Trigger Help Modal with Chip tab
+                      // We can use a custom event or store if we want to be more direct
+                      const event = new KeyboardEvent('keydown', { key: '?', shiftKey: true });
+                      window.dispatchEvent(event);
+                    }}
+                    className="px-3 py-1.5 text-xs bg-pink-700 hover:bg-pink-600 text-white rounded flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <Sliders size={12} />
+                    Chip Effects
+                  </button>
                 </div>
               </div>
             )}

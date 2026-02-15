@@ -3,15 +3,19 @@
  * Provides keyboard shortcuts, effect commands reference, and tutorials
  */
 
-import React, { useState, useEffect } from 'react';
-import { X, Keyboard, Zap, BookOpen } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Keyboard, Zap, BookOpen, Cpu } from 'lucide-react';
+import { CHIP_EFFECT_REFERENCE } from '../../data/ChipEffectReference';
+import { useTrackerStore, useInstrumentStore } from '@stores';
+import { FurnaceChipType } from '../../engine/chips/FurnaceChipEngine';
 
 interface HelpModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: HelpTab;
 }
 
-type HelpTab = 'shortcuts' | 'effects' | 'tutorial';
+type HelpTab = 'shortcuts' | 'effects' | 'chip-effects' | 'tutorial';
 
 interface ShortcutGroup {
   title: string;
@@ -438,8 +442,15 @@ const TUTORIAL_STEPS = [
   },
 ];
 
-export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<HelpTab>('shortcuts');
+export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTab = 'shortcuts' }) => {
+  const [activeTab, setActiveTab] = useState<HelpTab>(initialTab);
+
+  // Sync tab when initialTab changes or modal re-opens
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // Handle Escape key
   useEffect(() => {
@@ -456,6 +467,55 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
   const [tutorialStep, setTutorialStep] = useState(0);
+
+  const { cursor, patterns, currentPatternIndex } = useTrackerStore();
+  const { instruments } = useInstrumentStore();
+
+  const currentChip = useMemo(() => {
+    const pattern = patterns[currentPatternIndex];
+    if (!pattern) return null;
+    const cell = pattern.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
+    if (!cell?.instrument) return null;
+    const inst = instruments.find(i => i.id === cell.instrument);
+    if (!inst || !inst.synthType.startsWith('Furnace')) return null;
+    
+    // Extract chip type from instrument furnace config if available
+    if (inst.furnace?.chipType !== undefined) {
+      return inst.furnace.chipType;
+    }
+
+    // Map synthType string to FurnaceChipType as fallback
+    const typeMap: Record<string, number> = {
+      'FurnaceNES': FurnaceChipType.NES,
+      'FurnaceGB': FurnaceChipType.GB,
+      'FurnaceC64': FurnaceChipType.SID,
+      'FurnaceSID6581': FurnaceChipType.SID_6581,
+      'FurnaceSID8580': FurnaceChipType.SID_8580,
+      'FurnaceOPL': FurnaceChipType.OPL3,
+      'FurnaceOPL3': FurnaceChipType.OPL3,
+      'FurnaceOPLL': FurnaceChipType.OPLL,
+      'FurnaceOPN': FurnaceChipType.OPN,
+      'FurnaceOPN2': FurnaceChipType.OPN2,
+      'FurnaceOPM': FurnaceChipType.OPM,
+      'FurnacePCE': FurnaceChipType.PCE,
+      'FurnaceAY': FurnaceChipType.AY,
+      'FurnaceSNES': FurnaceChipType.SNES,
+      'FurnaceAmiga': FurnaceChipType.AMIGA,
+    };
+    return typeMap[inst.synthType] ?? null;
+  }, [cursor, patterns, currentPatternIndex, instruments]);
+
+  const chipEffects = useMemo(() => {
+    if (currentChip === null) return [];
+    return CHIP_EFFECT_REFERENCE[currentChip] || [];
+  }, [currentChip]);
+
+  const chipName = useMemo(() => {
+    if (currentChip === null) return 'Selected Chip';
+    // Find key name in FurnaceChipType
+    const entry = Object.entries(FurnaceChipType).find(([_, val]) => val === currentChip);
+    return entry ? entry[0] : 'Selected Chip';
+  }, [currentChip]);
 
   if (!isOpen) return null;
 
@@ -515,7 +575,20 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
             `}
           >
             <Zap size={16} className="inline mr-2" />
-            EFFECT COMMANDS
+            STANDARD EFFECTS
+          </button>
+          <button
+            onClick={() => setActiveTab('chip-effects')}
+            className={`
+              flex-1 px-4 py-3 font-mono text-sm transition-colors border-r border-ft2-border
+              ${activeTab === 'chip-effects'
+                ? 'bg-ft2-cursor text-ft2-bg font-bold'
+                : 'text-ft2-text hover:bg-ft2-bg'
+              }
+            `}
+          >
+            <Cpu size={16} className="inline mr-2" />
+            CHIP EFFECTS
           </button>
           <button
             onClick={() => setActiveTab('tutorial')}
@@ -602,6 +675,56 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Chip Effects Tab */}
+          {activeTab === 'chip-effects' && (
+            <div className="space-y-4">
+              <div className="bg-ft2-panel border border-ft2-border p-4 mb-4">
+                <h3 className="text-sm font-mono font-bold text-ft2-highlight mb-2">
+                  {currentChip !== null ? `CHIP EFFECTS: ${chipName}` : 'CHIP EFFECTS'}
+                </h3>
+                <p className="text-xs font-mono text-ft2-text leading-relaxed">
+                  {currentChip !== null 
+                    ? `These effects are specific to the ${chipName} sound chip used by the current instrument. They use effect codes 10xx and above.`
+                    : 'Select a chip-based instrument (Furnace) in the tracker to see its specific effect commands here.'
+                  }
+                </p>
+              </div>
+
+              {chipEffects.length > 0 ? (
+                <div className="grid gap-3">
+                  {chipEffects.map((effect, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-ft2-panel border border-ft2-border p-3 hover:border-ft2-highlight transition-colors"
+                    >
+                      <div className="flex items-start gap-3 mb-2">
+                        <div className="flex-shrink-0 w-12 px-2 py-1 bg-ft2-bg border border-ft2-cursor text-ft2-highlight font-bold text-xs font-mono text-center">
+                          {effect.command}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-mono text-sm font-bold text-ft2-text mb-1">
+                            {effect.name}
+                          </div>
+                          <div className="text-xs font-mono text-ft2-textDim">
+                            {effect.desc}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : currentChip !== null ? (
+                <div className="text-center py-8 text-ft2-textDim font-mono text-sm">
+                  No specific chip effects defined for {chipName} yet.
+                </div>
+              ) : (
+                <div className="text-center py-8 text-ft2-textDim font-mono text-sm">
+                  No chip-based instrument selected.
+                </div>
+              )}
             </div>
           )}
 

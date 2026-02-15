@@ -6,7 +6,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { useTrackerStore } from '@stores';
-import { Piano, Hash, Delete, ChevronLeft, ChevronRight, Copy, Scissors, ChevronDown, ChevronUp } from 'lucide-react';
+import { Piano, Hash, Delete, ChevronLeft, ChevronRight, Copy, Scissors, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface MobilePatternInputProps {
@@ -129,6 +129,18 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
+          {/* Help link */}
+          <button
+            onClick={() => {
+              const event = new KeyboardEvent('keydown', { key: '?' });
+              window.dispatchEvent(event);
+            }}
+            className="p-1.5 rounded bg-dark-bgSecondary hover:bg-dark-bgHover transition-colors"
+            aria-label="Help"
+          >
+            <HelpCircle size={14} className="text-text-muted" />
+          </button>
+
           {/* Context menu toggle */}
           <button
             onClick={handleLongPressStart}

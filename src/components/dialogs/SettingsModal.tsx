@@ -8,6 +8,7 @@ import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
+import { useTrackerStore } from '@stores/useTrackerStore';
 import { Toggle } from '@components/controls/Toggle';
 import { KeyboardShortcutSheet } from '@components/tracker/KeyboardShortcutSheet';
 
@@ -47,6 +48,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     midiPolyphonic,
     setMidiPolyphonic
   } = useSettingsStore();
+
+  const {
+    editStep, setEditStep,
+    insertMode, toggleInsertMode,
+    recQuantEnabled, setRecQuantEnabled,
+    recQuantRes, setRecQuantRes,
+    recReleaseEnabled, setRecReleaseEnabled
+  } = useTrackerStore();
 
   const { activeScheme, setActiveScheme, platformOverride, setPlatformOverride } = useKeyboardStore();
 
@@ -189,6 +198,83 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   onChange={toggleFullscreen}
                   size="sm"
                 />
+              </div>
+            </div>
+          </section>
+
+          {/* Recording Section */}
+          <section>
+            <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">RECORDING</h3>
+            <div className="space-y-3">
+              {/* Edit Step */}
+              <div className="flex items-center justify-between">
+                <label className="text-ft2-text text-xs font-mono">Edit Step:</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={editStep}
+                    onChange={(e) => setEditStep(Number(e.target.value))}
+                    min={0}
+                    max={16}
+                    className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono w-12 px-1 py-0.5"
+                  />
+                  <span className="text-[9px] text-ft2-textDim font-mono">rows</span>
+                </div>
+              </div>
+
+              {/* Edit Mode */}
+              <div className="flex items-center justify-between">
+                <label className="text-ft2-text text-xs font-mono">Edit Mode:</label>
+                <select
+                  value={insertMode ? 'insert' : 'overwrite'}
+                  onChange={(e) => {
+                    const wantInsert = e.target.value === 'insert';
+                    if (wantInsert !== insertMode) toggleInsertMode();
+                  }}
+                  className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
+                >
+                  <option value="overwrite">Overwrite</option>
+                  <option value="insert">Insert (Shift Rows)</option>
+                </select>
+              </div>
+
+              {/* Record Release */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">Record Key-Off:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Record === when keys are released</span>
+                </div>
+                <Toggle
+                  label=""
+                  value={recReleaseEnabled}
+                  onChange={setRecReleaseEnabled}
+                  size="sm"
+                />
+              </div>
+
+              {/* Quantization */}
+              <div className="flex items-center justify-between">
+                <label className="text-ft2-text text-xs font-mono">Quantization:</label>
+                <div className="flex items-center gap-2">
+                  <Toggle
+                    label=""
+                    value={recQuantEnabled}
+                    onChange={setRecQuantEnabled}
+                    size="sm"
+                  />
+                  <select
+                    value={recQuantRes}
+                    onChange={(e) => setRecQuantRes(Number(e.target.value))}
+                    disabled={!recQuantEnabled}
+                    className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight disabled:opacity-30"
+                  >
+                    <option value={1}>1 row</option>
+                    <option value={2}>2 rows</option>
+                    <option value={4}>4 rows (1/4)</option>
+                    <option value={8}>8 rows (1/2)</option>
+                    <option value={16}>16 rows (1 beat)</option>
+                  </select>
+                </div>
               </div>
             </div>
           </section>
