@@ -10,7 +10,7 @@ import { InstrumentList } from '@components/instruments/InstrumentList';
 import { TB303KnobPanel } from './TB303KnobPanel';
 import { FT2Toolbar } from './FT2Toolbar';
 import { MobilePatternInput } from './mobile/MobilePatternInput';
-import { Play, Square, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Square, ChevronLeft, ChevronRight, Settings, Music2, SlidersHorizontal } from 'lucide-react';
 import { useTransportStore, useTrackerStore, useInstrumentStore } from '@stores';
 import { useOrientation } from '@/hooks/useOrientation';
 import { haptics } from '@/utils/haptics';
@@ -35,7 +35,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   showPatterns,
   showMasterFX,
 }) => {
-  const [activeTab, setActiveTab] = useState<MobileTab>('pattern');
+  const [activeTab, setActiveTab] = useState<'pattern' | 'instruments'>('pattern');
   const [mobileChannel, setMobileChannel] = useState(0); // For portrait mode: which channel to show
   const [isInputCollapsed, setIsInputCollapsed] = useState(false); // Track MobilePatternInput collapse state
   const { isPlaying, togglePlayPause } = useTransportStore();
@@ -242,34 +242,45 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
 
         {activeTab === 'instruments' && (
           <div className="h-full overflow-y-auto">
-            <InstrumentList
-              variant="ft2"
-              showPreviewOnClick={true}
-              showPresetButton={true}
-              showSamplePackButton={true}
-              showEditButton={true}
-              onEditInstrument={onShowInstruments}
-            />
-          </div>
-        )}
-
-        {activeTab === 'controls' && (
-          <div className="h-full overflow-y-auto">
-            {/* TB303 Knobs */}
-            <div className="p-4 border-b border-dark-border">
-              <TB303KnobPanel />
+            {/* TB303 Knobs and Toolbar - Moved from 'controls' tab */}
+            <div className="p-4 border-b border-dark-border bg-dark-bgSecondary">
+              <div className="mb-4">
+                <h3 className="text-xs font-bold text-text-muted uppercase mb-3 flex items-center gap-2">
+                  <SlidersHorizontal size={14} className="text-accent-primary" />
+                  Live Controls
+                </h3>
+                <TB303KnobPanel />
+              </div>
+              
+              <div>
+                <h3 className="text-xs font-bold text-text-muted uppercase mb-3 flex items-center gap-2">
+                  <Settings size={14} className="text-accent-secondary" />
+                  Tracker Actions
+                </h3>
+                <FT2Toolbar
+                  onShowPatterns={onShowPatterns}
+                  onShowExport={onShowExport}
+                  onShowHelp={onShowHelp}
+                  onShowMasterFX={onShowMasterFX}
+                  onShowInstruments={onShowInstruments}
+                  showPatterns={showPatterns}
+                  showMasterFX={showMasterFX}
+                />
+              </div>
             </div>
 
-            {/* Simplified Toolbar */}
             <div className="p-2">
-              <FT2Toolbar
-                onShowPatterns={onShowPatterns}
-                onShowExport={onShowExport}
-                onShowHelp={onShowHelp}
-                onShowMasterFX={onShowMasterFX}
-                onShowInstruments={onShowInstruments}
-                showPatterns={showPatterns}
-                showMasterFX={showMasterFX}
+              <h3 className="text-xs font-bold text-text-muted uppercase mb-3 px-2 flex items-center gap-2">
+                <Music2 size={14} className="text-accent-primary" />
+                Instrument List
+              </h3>
+              <InstrumentList
+                variant="ft2"
+                showPreviewOnClick={true}
+                showPresetButton={true}
+                showSamplePackButton={true}
+                showEditButton={true}
+                onEditInstrument={onShowInstruments}
               />
             </div>
           </div>
