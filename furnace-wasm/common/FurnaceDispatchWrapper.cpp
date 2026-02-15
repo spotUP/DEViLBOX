@@ -22,6 +22,7 @@ extern "C" {
   void engine_set_instrument(int index, DivInstrument* ins);
   void engine_set_wavetable(int index, DivWavetable* wave);
   void engine_set_sample(int index, DivSample* sample);
+  void engine_register_instrument_set_callback(void (*cb)(int, DivInstrument*));
 }
 
 // ============================================================
@@ -548,6 +549,111 @@ void initMacroState(MacroState& state, MacroData& source) {
 
 // Global storage for instrument macros
 static std::map<int, InstrumentMacros> g_instrumentMacros;
+
+/**
+ * Copy a single DivInstrumentMacro to our MacroData format.
+ */
+static void copyMacroFromIns(MacroData& md, const DivInstrumentMacro& src, unsigned char macroType) {
+  md.macroType = macroType;
+  md.mode = src.mode;
+  md.open = src.open;
+  md.len = src.len;
+  md.delay = src.delay;
+  md.speed = (src.speed > 0) ? src.speed : 1;
+  md.loop = src.loop;
+  md.rel = src.rel;
+  md.valid = (src.len > 0);
+  for (int i = 0; i < src.len && i < MACRO_MAX_LENGTH; i++) {
+    md.val[i] = src.val[i];
+  }
+}
+
+/**
+ * Copy all macros from a DivInstrument to g_instrumentMacros.
+ * This enables our macro processor to use macros uploaded via set_instrument_full.
+ * Note: This is registered as a callback in engine_set_instrument, so it's called
+ * automatically whenever ANY instrument is set via any upload path.
+ */
+void syncMacrosFromInstrument(int insIndex, DivInstrument* ins) {
+  if (!ins) return;
+  
+  InstrumentMacros& im = g_instrumentMacros[insIndex];
+  im.valid = true;
+  
+  // Copy standard macros (index matches our getByType switch)
+  copyMacroFromIns(im.vol, ins->std.volMacro, 0);
+  copyMacroFromIns(im.arp, ins->std.arpMacro, 1);
+  copyMacroFromIns(im.duty, ins->std.dutyMacro, 2);
+  copyMacroFromIns(im.wave, ins->std.waveMacro, 3);
+  copyMacroFromIns(im.pitch, ins->std.pitchMacro, 4);
+  copyMacroFromIns(im.ex1, ins->std.ex1Macro, 5);
+  copyMacroFromIns(im.ex2, ins->std.ex2Macro, 6);
+  copyMacroFromIns(im.ex3, ins->std.ex3Macro, 7);
+  copyMacroFromIns(im.alg, ins->std.algMacro, 8);
+  copyMacroFromIns(im.fb, ins->std.fbMacro, 9);
+  copyMacroFromIns(im.fms, ins->std.fmsMacro, 10);
+  copyMacroFromIns(im.ams, ins->std.amsMacro, 11);
+  copyMacroFromIns(im.panL, ins->std.panLMacro, 12);
+  copyMacroFromIns(im.panR, ins->std.panRMacro, 13);
+  copyMacroFromIns(im.phaseReset, ins->std.phaseResetMacro, 14);
+  copyMacroFromIns(im.ex4, ins->std.ex4Macro, 15);
+  copyMacroFromIns(im.ex5, ins->std.ex5Macro, 16);
+  copyMacroFromIns(im.ex6, ins->std.ex6Macro, 17);
+  copyMacroFromIns(im.ex7, ins->std.ex7Macro, 18);
+  copyMacroFromIns(im.ex8, ins->std.ex8Macro, 19);
+  copyMacroFromIns(im.ex9, ins->std.ex9Macro, 20);
+  copyMacroFromIns(im.ex10, ins->std.ex10Macro, 21);
+  
+  // Copy FM operator macros (4 operators x 20 params)
+  // Operator macro type encoding: (op << 5) | param
+  // where op = 0-3 and param = 0-19
+  for (int op = 0; op < 4; op++) {
+    const DivInstrumentSTD::OpMacro& srcOp = ins->std.opMacros[op];
+    // Map each operator macro to its param index (matching Furnace's DIV_MACRO_OP_* order)
+    const DivInstrumentMacro* srcMacros[20] = {
+      &srcOp.amMacro,    // 0: AM
+      &srcOp.arMacro,    // 1: AR
+      &srcOp.drMacro,    // 2: DR
+      &srcOp.multMacro,  // 3: MULT
+      &srcOp.rrMacro,    // 4: RR
+      &srcOp.slMacro,    // 5: SL
+      &srcOp.tlMacro,    // 6: TL
+      &srcOp.dt2Macro,   // 7: DT2
+      &srcOp.rsMacro,    // 8: RS
+      &srcOp.dtMacro,    // 9: DT
+      &srcOp.d2rMacro,   // 10: D2R
+      &srcOp.ssgMacro,   // 11: SSG
+      &srcOp.damMacro,   // 12: DAM
+      &srcOp.dvbMacro,   // 13: DVB
+      &srcOp.egtMacro,   // 14: EGT
+      &srcOp.kslMacro,   // 15: KSL
+      &srcOp.susMacro,   // 16: SUS
+      &srcOp.vibMacro,   // 17: VIB
+      &srcOp.wsMacro,    // 18: WS
+      &srcOp.ksrMacro    // 19: KSR
+    };
+    for (int p = 0; p < 20; p++) {
+      unsigned char macroType = ((op + 1) << 5) | p;  // Operator macro encoding
+      copyMacroFromIns(im.opMacros[op][p], *srcMacros[p], macroType);
+    }
+  }
+  
+  // Log if wave macro has data (important for C64 debugging)
+  if (im.wave.valid) {
+    printf("[FurnaceDispatch] syncMacros: ins %d wave macro len=%d vals=[", insIndex, im.wave.len);
+    for (int i = 0; i < im.wave.len && i < 8; i++) {
+      printf("%d%s", im.wave.val[i], i < im.wave.len - 1 ? "," : "");
+    }
+    printf("]\n");
+  }
+}
+
+// Register the macro sync callback at startup
+static struct MacroCallbackRegistrar {
+  MacroCallbackRegistrar() {
+    engine_register_instrument_set_callback(syncMacrosFromInstrument);
+  }
+} g_macroCallbackRegistrar;
 
 // ============================================================
 // Instance management
@@ -3830,6 +3936,7 @@ void furnace_dispatch_set_instrument_full(int handle, int insIndex, unsigned cha
   }
 
   engine_set_instrument(insIndex, ins);
+  // Note: syncMacrosFromInstrument is called automatically via callback in engine_set_instrument
   printf("[FurnaceDispatch] Loaded full instrument %d: %s (type %d)\n",
          insIndex, ins->name.c_str(), ins->type);
 }

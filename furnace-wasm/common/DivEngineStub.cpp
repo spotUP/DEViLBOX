@@ -16,6 +16,14 @@ static std::vector<DivInstrument*> g_instruments;
 static std::vector<DivWavetable*> g_wavetables;
 static std::vector<DivSample*> g_samples;
 
+// Callback for when an instrument is set (for macro syncing)
+typedef void (*InstrumentSetCallback)(int index, DivInstrument* ins);
+static InstrumentSetCallback g_instrumentSetCallback = nullptr;
+
+void engine_register_instrument_callback(InstrumentSetCallback cb) {
+  g_instrumentSetCallback = cb;
+}
+
 // Default fallback instrument
 static DivInstrument g_defaultIns;
 
@@ -46,6 +54,10 @@ DivSample* DivEngine::getSample(int index) {
 // Functions called by the WASM wrapper to populate storage
 extern "C" {
 
+void engine_register_instrument_set_callback(void (*cb)(int, DivInstrument*)) {
+  g_instrumentSetCallback = cb;
+}
+
 void engine_set_instrument(int index, DivInstrument* ins) {
   if (index < 0) return;
   if (index >= (int)g_instruments.size()) {
@@ -53,6 +65,11 @@ void engine_set_instrument(int index, DivInstrument* ins) {
   }
   delete g_instruments[index];
   g_instruments[index] = ins;
+  
+  // Notify callback (used for macro syncing)
+  if (g_instrumentSetCallback) {
+    g_instrumentSetCallback(index, ins);
+  }
 }
 
 void engine_set_wavetable(int index, DivWavetable* wave) {
