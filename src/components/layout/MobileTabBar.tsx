@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Grid3X3, Music2, SlidersHorizontal } from 'lucide-react';
+import { Grid3X3, Music2 } from 'lucide-react';
 
 export type MobileTab = 'pattern' | 'instruments';
 
