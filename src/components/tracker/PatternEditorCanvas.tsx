@@ -1425,6 +1425,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
         const x = colX + 8;
 
+        // Active channel highlight (re-draw over row background)
+        if (ch === cursor.channelIndex && !isGhostRow) {
+          const prevAlpha = ctx.globalAlpha;
+          ctx.globalAlpha = 0.02;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(colX, y, channelWidth, ROW_HEIGHT);
+          ctx.globalAlpha = prevAlpha;
+        }
+
         // Skip content if collapsed
         if (isCollapsed) {
           // Draw shortName vertically if collapsed
