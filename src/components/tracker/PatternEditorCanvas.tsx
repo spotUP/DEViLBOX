@@ -94,7 +94,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Caches for rendered elements (Bassoon Tracker style)
   const noteCacheRef = useRef<NoteCache>({});
-  const paramCacheRef = useRef<NoteCache>({});
+  const instCacheRef = useRef<NoteCache>({});
+  const volCacheRef = useRef<NoteCache>({});
+  const effCacheRef = useRef<NoteCache>({});
+  const flagCacheRef = useRef<NoteCache>({});
+  const probCacheRef = useRef<NoteCache>({});
+  const paramCacheRef = useRef<NoteCache>({}); // Effect parameters cache
   const lineNumberCacheRef = useRef<NoteCache>({});
 
   // Animation frame ref for smooth updates
@@ -166,23 +171,34 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
     const showProb = columnVisibility.probability;
 
-    const paramWidth = CHAR_WIDTH * 10 + 16
-      + (showAcid ? CHAR_WIDTH * 2 + 8 : 0)
-      + (showProb ? CHAR_WIDTH * 2 + 4 : 0)
-      + CHAR_WIDTH * 2 + 4; 
-    const normalW = noteWidth + paramWidth + 60; // Increased padding for wider header (was 40)
-    const collapsedW = 12;
-
+    // Calculate per-channel widths based on effectCols
     const offsets: number[] = [];
     const widths: number[] = [];
     let currentX = LINE_NUMBER_WIDTH;
     
     for (let ch = 0; ch < nc; ch++) {
-      const isCollapsed = pattern.channels[ch]?.collapsed;
-      const chWidth = isCollapsed ? collapsedW : normalW;
-      offsets.push(currentX);
-      widths.push(chWidth);
-      currentX += chWidth;
+      const channel = pattern.channels[ch];
+      const isCollapsed = channel?.collapsed;
+      
+      if (isCollapsed) {
+        offsets.push(currentX);
+        widths.push(12);
+        currentX += 12;
+      } else {
+        // Get effect columns for this channel (default 2 for backward compatibility)
+        const effectCols = channel?.channelMeta?.effectCols ?? 2;
+        // inst(2)+4 vol(2)+4 + effectCols*(3+4) - but base layout is CW*4+8 for inst+vol
+        // Each effect column is 3 chars + 4px gap = CHAR_WIDTH*3+4
+        const effectWidth = effectCols * (CHAR_WIDTH * 3 + 4);
+        const paramWidth = CHAR_WIDTH * 4 + 8  // inst(2) + vol(2) + gaps
+          + effectWidth
+          + (showAcid ? CHAR_WIDTH * 2 + 8 : 0)
+          + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
+        const chWidth = noteWidth + paramWidth + 60;
+        offsets.push(currentX);
+        widths.push(chWidth);
+        currentX += chWidth;
+      }
     }
 
     return {
@@ -940,9 +956,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     flag1?: number,
     flag2?: number,
     probability?: number,
-    blankEmpty?: boolean
+    blankEmpty?: boolean,
+    effectCols?: number,
+    effects?: { type: number; param: number }[]
   ): HTMLCanvasElement => {
-    const key = `${instrument}-${volume}-${effTyp}-${eff}-${effTyp2}-${eff2}-f1${flag1 ?? 'x'}-f2${flag2 ?? 'x'}-p${probability ?? 'x'}-${blankEmpty ? 'B' : ''}`;
+    // Use effectCols to determine how many columns to render (default 2)
+    const numEffectCols = effectCols ?? 2;
+    
+    // Build effect key for caching
+    let effectKey = `${effTyp}-${eff}-${effTyp2}-${eff2}`;
+    if (effects && effects.length > 2) {
+      effectKey += `-ex${effects.slice(2).map(e => `${e.type}:${e.param}`).join('-')}`;
+    }
+    
+    const key = `${instrument}-${volume}-${effectKey}-f1${flag1 ?? 'x'}-f2${flag2 ?? 'x'}-p${probability ?? 'x'}-${blankEmpty ? 'B' : ''}-ec${numEffectCols}`;
     if (paramCacheRef.current[key]) {
       return paramCacheRef.current[key];
     }
@@ -951,8 +978,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const hasFlagColumns = flag1 !== undefined || flag2 !== undefined;
     const hasProb = probability !== undefined && probability > 0;
     const canvas = document.createElement('canvas');
-    // Base: inst(2)+4 vol(2)+4 eff(3)+4 eff2(3)+4 = CW*10+16
-    canvas.width = CHAR_WIDTH * 10 + 16 + (hasFlagColumns ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
+    // inst(2)+4 vol(2)+4 + numEffectCols*(3+4)
+    const effectWidth = numEffectCols * (CHAR_WIDTH * 3 + 4);
+    canvas.width = CHAR_WIDTH * 4 + 8 + effectWidth + (hasFlagColumns ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
     canvas.height = ROW_HEIGHT;
     const ctx = canvas.getContext('2d')!;
 
@@ -983,27 +1011,32 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
     x += CHAR_WIDTH * 2 + 4;
 
-    // Effect 1 (3 hex digits: type + param)
-    const hasEffect = effTyp !== 0 || eff !== 0;
-    if (hasEffect) {
-      ctx.fillStyle = colors.textEffect;
-      ctx.fillText(effTyp.toString(16).toUpperCase() + hexByte(eff), x, y);
-    } else if (!blankEmpty) {
-      ctx.fillStyle = colors.textMuted;
-      ctx.fillText('...', x, y);
+    // Render effect columns (variable 1-8)
+    for (let col = 0; col < numEffectCols; col++) {
+      let colEffTyp = 0;
+      let colEff = 0;
+      
+      if (col === 0) {
+        colEffTyp = effTyp;
+        colEff = eff;
+      } else if (col === 1) {
+        colEffTyp = effTyp2;
+        colEff = eff2;
+      } else if (effects && col < effects.length) {
+        colEffTyp = effects[col].type;
+        colEff = effects[col].param;
+      }
+      
+      const hasEffect = colEffTyp !== 0 || colEff !== 0;
+      if (hasEffect) {
+        ctx.fillStyle = colors.textEffect;
+        ctx.fillText(colEffTyp.toString(16).toUpperCase() + hexByte(colEff), x, y);
+      } else if (!blankEmpty) {
+        ctx.fillStyle = colors.textMuted;
+        ctx.fillText('...', x, y);
+      }
+      x += CHAR_WIDTH * 3 + 4;
     }
-    x += CHAR_WIDTH * 3 + 4;
-
-    // Effect 2 (3 hex digits: type + param)
-    const hasEffect2 = effTyp2 !== 0 || eff2 !== 0;
-    if (hasEffect2) {
-      ctx.fillStyle = colors.textEffect; // Same color as effect1
-      ctx.fillText(effTyp2.toString(16).toUpperCase() + hexByte(eff2), x, y);
-    } else if (!blankEmpty) {
-      ctx.fillStyle = colors.textMuted;
-      ctx.fillText('...', x, y);
-    }
-    x += CHAR_WIDTH * 3 + 4;
 
     // Flag columns (if present) - can be accent (1), slide (2), mute (3), hammer (4)
     if (hasFlagColumns) {
@@ -1205,6 +1238,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
 
     const noteWidth = CHAR_WIDTH * 3 + 4;
+    
+    // Calculate content width for centering
+    const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
+    const showProb = columnVisibility.probability;
+    const paramWidth = CHAR_WIDTH * 10 + 16
+      + (showAcid ? CHAR_WIDTH * 2 + 8 : 0)
+      + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
+    const contentWidth = noteWidth + 4 + paramWidth;
 
     // Clear canvas
     ctx.fillStyle = colors.bg;
@@ -1410,7 +1451,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         // Skip if outside visible area
         if (colX + channelWidth < 0 || colX > width) continue;
 
-        const x = colX + 8;
+        const x = colX + Math.floor((channelWidth - contentWidth) / 2);
         const chColor = pattern.channels[ch]?.color;
 
         // Active channel highlight (re-draw over row background)
@@ -1460,6 +1501,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         }
 
         // Parameters (including TB-303 accent/slide if present)
+        // Get effectCols from channel meta (default 2 for backward compatibility)
+        const channelMeta = sourcePattern.channels[ch]?.channelMeta;
+        const effectCols = channelMeta?.effectCols ?? 2;
+        
         const paramCanvas = getParamCanvas(
           cell.instrument || 0,
           cell.volume || 0,
@@ -1470,7 +1515,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           cell.flag1,
           cell.flag2,
           cell.probability,
-          blankEmpty
+          blankEmpty,
+          effectCols,
+          cell.effects
         );
         ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
 
@@ -1694,7 +1741,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         }
       }
     }
-  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isCyanTheme, visibleStart, instruments, currentPatternIndex, patterns, scrollY, channelOffsets, channelWidths, numChannels, cursor, selection]);
+  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isCyanTheme, visibleStart, instruments, currentPatternIndex, patterns, scrollY, channelOffsets, channelWidths, numChannels, cursor, selection, columnVisibility]);
 
   // Ref to keep render callback up to date for the animation loop
   const renderRef = useRef(render);
@@ -1749,7 +1796,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Clear caches when size changes
     noteCacheRef.current = {};
-    paramCacheRef.current = {};
+    instCacheRef.current = {};
+    volCacheRef.current = {};
+    effCacheRef.current = {};
+    flagCacheRef.current = {};
+    probCacheRef.current = {};
     lineNumberCacheRef.current = {};
   }, [dimensions]);
 
