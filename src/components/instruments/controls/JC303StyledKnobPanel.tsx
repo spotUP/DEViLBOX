@@ -442,9 +442,9 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         {/* --- PANEL DECORATIONS --- */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-0 right-0 h-1 bg-black/20"></div>
-          <div className="absolute top-[110px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]"></div>
+          <div className="absolute top-[110px] left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.02)]"></div>
           <div style={labelStyle(40, 115, 600)} className="text-accent-primary opacity-80">Classic</div>
-          <div className="absolute left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.05)]" style={{ top: '285px' }}></div>
+          <div className="absolute left-4 right-4 h-[2px] bg-black/40 shadow-[0_1px_0_rgba(255,255,255,0.02)]" style={{ top: '285px' }}></div>
         </div>
 
         {/* --- ROW 1: CLASSIC Controls (Always Visible) --- */}
@@ -478,7 +478,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                 "relative px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full border transition-all duration-200",
                 effectiveTab === t.id
                   ? `${t.bgClass} text-white border-transparent shadow-lg ${shadowClasses[t.id] || ''}`
-                  : `bg-black/40 ${t.textClass} border-white/10 hover:border-white/25 hover:bg-black/60`
+                  : `bg-black/40 ${t.textClass} border-white/5 hover:border-white/10 hover:bg-black/60`
               )}
             >
               {t.label}
@@ -486,7 +486,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                 <span 
                   className={clsx(
                     "absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-black/50 transition-all duration-300",
-                    t.ledOn ? t.bgClass : "bg-gray-800"
+                    t.ledOn ? t.bgClass : "bg-dark-bgActive"
                   )}
                   style={t.ledOn ? { boxShadow: `0 0 6px ${t.color}` } : undefined}
                 />
@@ -518,11 +518,11 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
               <div style={{ width: '65px' }}><Knob value={config.devilFish?.passbandCompensation ?? 0.9} min={0} max={1} defaultValue={0.9} onChange={(v) => updateDevilFish('passbandCompensation', v)} label="Bass" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
               <div style={{ width: '65px' }}><Knob value={config.devilFish?.resTracking ?? 0.7} min={0} max={1} defaultValue={0.7} onChange={(v) => updateDevilFish('resTracking', v)} label="Rez" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
               <div style={{ width: '65px' }}><Knob value={config.devilFish?.filterInputDrive ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterInputDrive', v)} label="Satur" size="md" color="#ff9900" formatValue={v => (v * 10).toFixed(1)} /></div>
-              <div className="w-px h-14 bg-gray-800 flex-shrink-0" />
+              <div className="w-px h-14 bg-white/5 flex-shrink-0" />
               <div style={{ width: '65px' }}><Knob value={config.devilFish?.diodeCharacter ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('diodeCharacter', v)} label="Bite" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
               <div style={{ width: '65px' }}><Knob value={config.devilFish?.duffingAmount ?? 0} min={-1} max={1} defaultValue={0} bipolar onChange={(v) => updateDevilFish('duffingAmount', v)} label="Tension" size="md" color="#ff9900" formatValue={v => Math.round(v * 100) + '%'} /></div>
               <div style={{ width: '65px' }}><Knob value={config.devilFish?.lpBpMix ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('lpBpMix', v)} label="LP/BP" size="md" color="#ff9900" formatValue={v => v < 0.05 ? 'LP' : v > 0.95 ? 'BP' : 'Mix'} /></div>
-              <div className="w-px h-14 bg-gray-800 flex-shrink-0" />
+              <div className="w-px h-14 bg-white/5 flex-shrink-0" />
               <div className="flex flex-col gap-1">
                 <label className="text-[8px] font-bold text-orange-500/70">FILTER</label>
                 <select value={config.devilFish?.filterSelect ?? 1} onChange={(e) => updateDevilFish('filterSelect', parseInt(e.target.value))} className="bg-[#111] text-[10px] text-orange-400 border border-orange-900/30 rounded px-1 py-1 outline-none focus:border-orange-500">
@@ -546,7 +546,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                   ))}
                 </div>
               </div>
-              <div className="w-px h-14 bg-gray-800 flex-shrink-0" />
+              <div className="w-px h-14 bg-white/5 flex-shrink-0" />
               <div style={{ width: '65px' }}><Knob value={config.lfo?.rate ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, rate: v })} label="Rate" size="md" color="#a855f7" formatValue={v => { const r = LFO_RATE_MIN * Math.pow(LFO_RATE_MAX/LFO_RATE_MIN, v); return r >= 10 ? r.toFixed(1) + 'Hz' : r.toFixed(2) + 'Hz'; }} /></div>
               <div style={{ width: '65px' }}><Knob value={config.lfo?.contour ?? 0} min={-1} max={1} defaultValue={0} bipolar onChange={(v) => updateLfo({ enabled: true, contour: v })} label="Contour" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
               <div style={{ width: '65px' }}><Knob value={config.lfo?.pwmDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateLfo({ enabled: true, pwmDepth: v })} label="PWM Mod" size="md" color="#a855f7" formatValue={v => Math.round(v * 100) + '%'} /></div>
@@ -562,7 +562,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
               <div style={{ width: '65px' }}><Knob value={config.devilFish?.filterFmDepth ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterFmDepth', v)} label="Filt FM" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
               <div style={{ width: '65px' }}><Knob value={config.devilFish?.filterTracking ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('filterTracking', v)} label="Filt Trk" size="md" color="#ff3333" formatValue={v => Math.round(v * 100) + '%'} /></div>
               <div style={{ width: '65px' }}><Knob value={config.slide?.time ?? 0.17} min={0} max={1} defaultValue={0.17} onChange={updateSlide} label="Slide" size="md" color="#ff3333" formatValue={v => Math.round(SLIDE_MIN * Math.pow(SLIDE_MAX / SLIDE_MIN, v)) + ' ms'} /></div>
-              <div className="w-px h-14 bg-gray-800 flex-shrink-0" />
+              <div className="w-px h-14 bg-white/5 flex-shrink-0" />
               <div style={{ width: '65px' }}><Knob value={config.devilFish?.softAttack ?? 0} min={0} max={1} defaultValue={0} onChange={(v) => updateDevilFish('softAttack', v)} label="S.Atk" size="md" color="#ff3333" formatValue={v => (0.3 * Math.pow(100, v)).toFixed(1) + ' ms'} /></div>
               <div style={{ width: '65px' }}><Knob value={config.devilFish?.normalDecay ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('normalDecay', v)} label="N.Dec" size="md" color="#ff3333" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
               <div style={{ width: '65px' }}><Knob value={config.devilFish?.accentDecay ?? 0.5} min={0} max={1} defaultValue={0.5} onChange={(v) => updateDevilFish('accentDecay', v)} label="Acc Dec" size="md" color="#ff3333" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
@@ -600,7 +600,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                   <span className="text-[10px] text-gray-300 w-8 text-right tabular-nums">{Math.round((config.chorus?.mix ?? 0.5) * 100)}%</span>
                 </div>
               </div>
-              <div className="w-px self-stretch bg-gray-800 flex-shrink-0" />
+              <div className="w-px self-stretch bg-white/5 flex-shrink-0" />
               {/* Delay */}
               <div className="flex flex-col gap-1.5 flex-1">
                 <span className="text-[9px] font-bold text-green-400/60 tracking-wider">DELAY</span>
@@ -636,10 +636,10 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
               <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">TB-303 WASM Engine</span>
             </div>
           </div>
-          <div className="h-8 w-px bg-gray-800"></div>
+          <div className="h-8 w-px bg-white/5"></div>
           <div className="flex flex-col">
             <label className="text-[8px] font-bold text-gray-500 mb-1">PRESET</label>
-            <select value="" onChange={(e) => { const p = TB303_PRESETS.find(pr => pr.name === e.target.value); if (p) { if (onPresetLoad) { onPresetLoad(p); } else if (p.tb303) { onChange(p.tb303 as Partial<TB303Config>); } } }} className="bg-[#111] text-[10px] text-accent-primary border border-gray-800 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors max-w-[160px]">
+            <select value="" onChange={(e) => { const p = TB303_PRESETS.find(pr => pr.name === e.target.value); if (p) { if (onPresetLoad) { onPresetLoad(p); } else if (p.tb303) { onChange(p.tb303 as Partial<TB303Config>); } } }} className="bg-[#111] text-[10px] text-accent-primary border border-white/5 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors max-w-[160px]">
               <option value="" disabled>Load Preset...</option>{TB303_PRESETS.map((p) => (<option key={p.name} value={p.name}>{p.name}{p.effects?.length ? ` [${p.effects.length} FX]` : ''}</option>))}
             </select>
           </div>

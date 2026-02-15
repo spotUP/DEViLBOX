@@ -32,7 +32,7 @@ const ChangeTypeLabel: React.FC<{ type: 'feature' | 'fix' | 'improvement' }> = (
 
 const VersionEntry: React.FC<{ entry: ChangelogEntry; isLatest: boolean }> = ({ entry, isLatest }) => {
   return (
-    <div className={`px-5 py-4 border-b border-white/5 last:border-b-0 ${isLatest ? 'bg-accent-primary/5' : ''}`}>
+    <div className={`px-5 py-4 border-b border-border last:border-b-0 ${isLatest ? 'bg-accent-primary/5' : ''}`}>
       <div className="flex items-center gap-2 mb-3">
         <span className={`font-bold ${isLatest ? 'text-accent-primary' : 'text-text-primary'}`}>
           v{entry.version}
@@ -132,7 +132,7 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-white/5 bg-black/20">
+        <div className="flex border-b border-border bg-black/20">
           <button
             onClick={() => setActiveTab('tips')}
             className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2
@@ -196,7 +196,7 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
         </div>
 
         {/* Navigation / Startup Toggle */}
-        <div className="px-6 py-4 flex items-center justify-between border-t border-white/5 bg-black/20">
+        <div className="px-6 py-4 flex items-center justify-between border-t border-border bg-black/20">
           {activeTab === 'tips' ? (
             <div className="flex gap-2">
               <button 

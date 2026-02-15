@@ -871,7 +871,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           </button>
 
           {/* Separator */}
-          <div className="w-px h-4 bg-dark-border mx-1" />
+          <div className="w-px h-4 bg-border opacity-50 mx-1" />
 
           {/* Mute Button */}
           <button

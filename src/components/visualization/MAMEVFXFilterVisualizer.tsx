@@ -46,7 +46,7 @@ export const MAMEVFXFilterVisualizer: React.FC<MAMEVFXFilterVisualizerProps> = (
   }, [k1, k2, width, height]);
 
   return (
-    <div className="relative bg-black/40 rounded border border-white/5 overflow-hidden" style={{ width, height }}>
+    <div className="relative bg-black/40 rounded border border-border overflow-hidden" style={{ width, height }}>
       <svg width={width} height={height} className="absolute inset-0">
         <path
           d={`M 0,${height} L ${points} L ${width},${height} Z`}
