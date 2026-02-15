@@ -1,5 +1,13 @@
 # DEViLBOX Docker Deployment Guide
 
+**⚠️ NOTE:** This guide was written for nginx-based deployment. The actual production server uses **Caddy** instead.
+
+**👉 See [CADDY_DEPLOYMENT.md](CADDY_DEPLOYMENT.md) for the correct, up-to-date deployment guide.**
+
+---
+
+## Legacy nginx Documentation (for reference only)
+
 Simplified deployment using Docker containers.
 
 ## Architecture
