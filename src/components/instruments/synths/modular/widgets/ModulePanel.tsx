@@ -130,6 +130,7 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
         ${isSelected ? 'border-accent-primary' : 'border-border'}
         hover:border-border-hover transition-colors
         ${isDragging ? 'cursor-grabbing' : 'cursor-default'}
+        pointer-events-auto
       `}
       style={{
         left: module.position?.x || 0,

@@ -286,62 +286,64 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
           transformOrigin: 'top left',
         }}
       >
-        {/* Module panels */}
-        {config.modules.map((module) => (
-          <ModulePanel
-            key={module.id}
-            module={module}
-            isSelected={module.id === selectedModuleId}
-            zoom={cameraState.zoom}
-            isConnected={isConnected}
-            isWiringSource={isWiringSource}
-            isPortHovered={isPortHovered}
-            onModuleClick={selectModule}
-            onModuleDelete={handleModuleDelete}
-            onModuleDragStart={handleModuleDragStart}
-            onModuleDrag={handleModuleDrag}
-            onModuleDragEnd={handleModuleDragEnd}
-            onPortClick={handlePortClick}
-            onPortHover={hoverPort}
-            onParameterChange={handleParameterChange}
-            registerPortPosition={registerPort}
-          />
-        ))}
-      </div>
+        {/* SVG layer for cables (Rendered BEFORE modules so they appear behind) */}
+        <svg className="absolute inset-0 pointer-events-auto z-0" style={{ width: '100%', height: '100%' }}>
+          {/* Existing connections */}
+          {config.connections.map((conn) => {
+            const sourcePos = positions.get(getPortId(conn.source));
+            const targetPos = positions.get(getPortId(conn.target));
 
-      {/* SVG overlay for cables (not transformed) */}
-      <svg className="absolute inset-0 pointer-events-none z-10" style={{ width: '100%', height: '100%' }}>
-        {/* Existing connections */}
-        {config.connections.map((conn) => {
-          const sourcePos = positions.get(getPortId(conn.source));
-          const targetPos = positions.get(getPortId(conn.target));
+            if (!sourcePos || !targetPos) return null;
 
-          if (!sourcePos || !targetPos) return null;
+            return (
+              <PatchCable
+                key={conn.id}
+                x1={sourcePos.x}
+                y1={sourcePos.y}
+                x2={targetPos.x}
+                y2={targetPos.y}
+                color={conn.color}
+                isSelected={conn.id === selectedConnectionId}
+                onClick={() => handleConnectionClick(conn.id)}
+              />
+            );
+          })}
 
-          return (
+          {/* Wiring preview */}
+          {wiringSource && wiringPreview && positions.get(getPortId(wiringSource)) && (
             <PatchCable
-              key={conn.id}
-              x1={sourcePos.x}
-              y1={sourcePos.y}
-              x2={targetPos.x}
-              y2={targetPos.y}
-              color={conn.color}
-              isSelected={conn.id === selectedConnectionId}
-              onClick={() => handleConnectionClick(conn.id)}
+              x1={positions.get(getPortId(wiringSource))!.x}
+              y1={positions.get(getPortId(wiringSource))!.y}
+              x2={wiringPreview.x}
+              y2={wiringPreview.y}
             />
-          );
-        })}
+          )}
+        </svg>
 
-        {/* Wiring preview */}
-        {wiringSource && wiringPreview && positions.get(getPortId(wiringSource)) && (
-          <PatchCable
-            x1={positions.get(getPortId(wiringSource))!.x}
-            y1={positions.get(getPortId(wiringSource))!.y}
-            x2={wiringPreview.x}
-            y2={wiringPreview.y}
-          />
-        )}
-      </svg>
+        {/* Module panels layer */}
+        <div className="absolute inset-0 pointer-events-none z-10">
+          {config.modules.map((module) => (
+            <ModulePanel
+              key={module.id}
+              module={module}
+              isSelected={module.id === selectedModuleId}
+              zoom={cameraState.zoom}
+              isConnected={isConnected}
+              isWiringSource={isWiringSource}
+              isPortHovered={isPortHovered}
+              onModuleClick={selectModule}
+              onModuleDelete={handleModuleDelete}
+              onModuleDragStart={handleModuleDragStart}
+              onModuleDrag={handleModuleDrag}
+              onModuleDragEnd={handleModuleDragEnd}
+              onPortClick={handlePortClick}
+              onPortHover={hoverPort}
+              onParameterChange={handleParameterChange}
+              registerPortPosition={registerPort}
+            />
+          ))}
+        </div>
+      </div>
 
       {/* Empty state */}
       {config.modules.length === 0 && (
