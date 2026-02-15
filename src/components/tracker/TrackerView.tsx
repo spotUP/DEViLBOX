@@ -33,7 +33,7 @@ import { TB303KnobPanel } from './TB303KnobPanel';
 import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
-import { Music2, Eye, EyeOff, Zap, List, Grid3x3, Piano, Radio, Activity, LayoutGrid, Cpu } from 'lucide-react';
+import { Music2, Eye, EyeOff, Zap, List, Grid3x3, Piano, Radio, Activity, LayoutGrid, Cpu, SlidersHorizontal } from 'lucide-react';
 import { InstrumentList } from '@components/instruments/InstrumentList';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { PianoRoll } from '../pianoroll';
@@ -891,6 +891,31 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             <LayoutGrid size={12} />
             <span>Pads</span>
           </button>
+
+          {/* Rec Button (with settings access) */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => useTrackerStore.getState().toggleRecordMode()}
+              className={`
+                px-2 py-1 text-xs rounded font-medium transition-colors flex items-center gap-1
+                ${useTrackerStore.getState().recordMode
+                  ? 'bg-accent-error text-white animate-pulse'
+                  : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+                }
+              `}
+              title="Toggle Recording Mode (Space)"
+            >
+              <div className={`w-2 h-2 rounded-full ${useTrackerStore.getState().recordMode ? 'bg-white' : 'bg-accent-error'}`} />
+              REC
+            </button>
+            <button
+              onClick={() => useUIStore.getState().openModal('settings')}
+              className="p-1 rounded bg-dark-bgSecondary text-text-secondary hover:text-text-primary transition-colors"
+              title="Recording Settings (Quantize, Edit Step...)"
+            >
+              <SlidersHorizontal size={12} />
+            </button>
+          </div>
 
           {/* Separator */}
           <div className="w-px h-4 bg-border opacity-50 mx-1" />
