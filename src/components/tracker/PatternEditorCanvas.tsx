@@ -119,7 +119,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     mobileChannelIndex,
     cursor,
     selection,
-    showGhostPatterns
+    showGhostPatterns,
+    columnVisibility
   } = useTrackerStore(useShallow((state) => ({
     pattern: state.patterns[state.currentPatternIndex],
     patterns: state.patterns,
@@ -1410,6 +1411,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         if (colX + channelWidth < 0 || colX > width) continue;
 
         const x = colX + 8;
+        const chColor = pattern.channels[ch]?.color;
 
         // Active channel highlight (re-draw over row background)
         if (ch === cursor.channelIndex && !isGhostRow) {
