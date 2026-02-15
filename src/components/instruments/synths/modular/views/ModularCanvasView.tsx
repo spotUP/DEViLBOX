@@ -17,6 +17,7 @@ import { CanvasGrid } from './CanvasGrid';
 import { CanvasCamera } from './CanvasCamera';
 import { usePortPositions } from '../hooks/usePortPositions';
 import { useModularState } from '../hooks/useModularState';
+import { ZoomIn, ZoomOut, Maximize, RotateCcw } from 'lucide-react';
 
 interface ModularCanvasViewProps {
   config: ModularPatchConfig;
@@ -275,6 +276,26 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
     }
   }, [selectedConnectionId, config, onChange, selectConnection]);
 
+  // View control handlers
+  const handleZoomIn = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    cameraRef.current.zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 0.2);
+    setCameraState(cameraRef.current.getState());
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    cameraRef.current.zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, -0.2);
+    setCameraState(cameraRef.current.getState());
+  }, []);
+
+  const handleResetView = useCallback(() => {
+    cameraRef.current.reset();
+    setCameraState(cameraRef.current.getState());
+  }, []);
+
   // Fit to view
   const handleFitToView = useCallback(() => {
     if (!containerRef.current) return;
@@ -396,9 +417,45 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
         </div>
       )}
 
-      {/* Zoom indicator */}
-      <div className="absolute bottom-4 right-4 px-2 py-1 bg-surface-secondary/80 backdrop-blur-sm rounded text-xs text-text-secondary pointer-events-none">
-        {Math.round(cameraState.zoom * 100)}%
+      {/* Zoom and view controls */}
+      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-surface-secondary/90 backdrop-blur-md border border-border p-1 rounded-lg shadow-xl z-50">
+        <div className="px-2 text-[10px] font-mono text-text-secondary border-r border-border mr-1">
+          {Math.round(cameraState.zoom * 100)}%
+        </div>
+        
+        <button
+          onClick={handleZoomOut}
+          className="p-1.5 hover:bg-surface-tertiary rounded text-text-secondary hover:text-white transition-colors"
+          title="Zoom Out"
+        >
+          <ZoomOut size={16} />
+        </button>
+        
+        <button
+          onClick={handleZoomIn}
+          className="p-1.5 hover:bg-surface-tertiary rounded text-text-secondary hover:text-white transition-colors"
+          title="Zoom In"
+        >
+          <ZoomIn size={16} />
+        </button>
+        
+        <div className="w-px h-4 bg-border mx-1" />
+        
+        <button
+          onClick={handleFitToView}
+          className="p-1.5 hover:bg-surface-tertiary rounded text-text-secondary hover:text-white transition-colors"
+          title="Fit All Modules (F)"
+        >
+          <Maximize size={16} />
+        </button>
+
+        <button
+          onClick={handleResetView}
+          className="p-1.5 hover:bg-surface-tertiary rounded text-text-secondary hover:text-white transition-colors"
+          title="Reset View (0)"
+        >
+          <RotateCcw size={16} />
+        </button>
       </div>
     </div>
   );
