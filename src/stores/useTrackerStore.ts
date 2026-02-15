@@ -1465,15 +1465,8 @@ export const useTrackerStore = create<TrackerStore>()(
 
             // Apply to the appropriate column
             if (column === 'volume') {
-              cell.volume = Math.max(0, Math.min(64, value)); // 0x00-0x40
-            } else if (column === 'cutoff') {
-              cell.cutoff = Math.max(0, Math.min(127, value));
-            } else if (column === 'resonance') {
-              cell.resonance = Math.max(0, Math.min(127, value));
-            } else if (column === 'envMod') {
-              cell.envMod = Math.max(0, Math.min(127, value));
-            } else if (column === 'pan') {
-              cell.pan = Math.max(-100, Math.min(100, value));
+              // XM volume column: 0x10 to 0x50 are volume values 0-64
+              cell.volume = Math.max(0x10, Math.min(0x50, value));
             } else if (column === 'effParam') {
               // If no effect type set, default to volume (0x0C)
               if (!cell.effTyp) cell.effTyp = 0x0C; 
@@ -1482,6 +1475,12 @@ export const useTrackerStore = create<TrackerStore>()(
               // If no effect type 2 set, default to volume (0x0C)
               if (!cell.effTyp2) cell.effTyp2 = 0x0C;
               cell.eff2 = Math.max(0, Math.min(255, value));
+            } else {
+              // Automation columns: 0x00-0xFF
+              if (column === 'cutoff') cell.cutoff = Math.max(0, Math.min(255, value));
+              else if (column === 'resonance') cell.resonance = Math.max(0, Math.min(255, value));
+              else if (column === 'envMod') cell.envMod = Math.max(0, Math.min(255, value));
+              else if (column === 'pan') cell.pan = Math.max(0, Math.min(255, value));
             }
           }
         }

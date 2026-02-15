@@ -113,22 +113,41 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   }, [transposeSelection, onClose]);
 
   const handleInterpolateBlock = useCallback((column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'effParam' | 'effParam2') => {
-    // Get values from start and end of selection
     if (!selection || !pattern) return;
-    const startRow = Math.min(selection.startRow, selection.endRow);
-    const endRow = Math.max(selection.startRow, selection.endRow);
+    const minRow = Math.min(selection.startRow, selection.endRow);
+    const maxRow = Math.max(selection.startRow, selection.endRow);
     const ch = selection.startChannel;
     
-    const startCell = pattern.channels[ch].rows[startRow];
-    const endCell = pattern.channels[ch].rows[endRow];
-    
-    // Map column names to cell property names if they differ
+    // Map column names to cell property names
     const cellProp = column === 'effParam' ? 'eff' : column === 'effParam2' ? 'eff2' : column;
     
-    const startVal = (startCell[cellProp] as number) || 0;
-    const endVal = (endCell[cellProp] as number) || 0;
-    
-    interpolateSelection(column, startVal, endVal);
+    // Search for first non-empty value in the selected range
+    let startVal: number | null = null;
+    for (let r = minRow; r <= maxRow; r++) {
+      const val = pattern.channels[ch].rows[r][cellProp] as number;
+      if (val !== undefined && val !== 0) {
+        startVal = val;
+        break;
+      }
+    }
+
+    // Search for last non-empty value
+    let endVal: number | null = null;
+    for (let r = maxRow; r >= minRow; r--) {
+      const val = pattern.channels[ch].rows[r][cellProp] as number;
+      if (val !== undefined && val !== 0) {
+        endVal = val;
+        break;
+      }
+    }
+
+    // If we didn't find any values, use 0 as fallback or abort
+    if (startVal === null && endVal === null) {
+      onClose();
+      return;
+    }
+
+    interpolateSelection(column, startVal || 0, endVal || 0);
     onClose();
   }, [selection, pattern, interpolateSelection, onClose]);
 
