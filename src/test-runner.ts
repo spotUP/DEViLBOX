@@ -130,6 +130,9 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
 
   // === Generic Furnace (default platform) ===
   'Furnace': { synthType: 'Furnace', volume: -12, furnace: DEFAULT_FURNACE },
+
+  // === Modular Synthesis ===
+  'ModularSynth': { synthType: 'ModularSynth', volume: -12 },
 };
 
 /* ALL FURNACE SYNTHS - FULL TEST CONFIG (for reference)
