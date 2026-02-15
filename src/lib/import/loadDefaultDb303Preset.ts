@@ -5,6 +5,7 @@
 
 import { parseDb303Preset } from './Db303PresetConverter';
 import type { TB303Config } from '@typedefs/instrument';
+import { normalizeUrl } from '@/utils/urlUtils';
 
 let cachedDefaultPreset: Partial<TB303Config> | null = null;
 
@@ -20,7 +21,8 @@ export async function loadDefaultDb303Preset(): Promise<Partial<TB303Config>> {
 
   try {
     // Fetch the default preset XML from public folder
-    const response = await fetch('/data/songs/db303-default-preset.xml');
+    const path = normalizeUrl('/data/songs/db303-default-preset.xml');
+    const response = await fetch(path);
 
     if (!response.ok) {
       console.warn('Failed to load default DB303 preset, using fallback defaults');

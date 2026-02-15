@@ -1336,7 +1336,7 @@ function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           inst.fm = parseFMData(reader);
           break;
         case 'MA':
-          parseMacroData(reader, inst);
+          parseMacroData(reader, inst, featEnd);
           break;
         case 'SM': {
           // Sample/Amiga data — Reference: instrument.cpp:2031-2057
@@ -1729,13 +1729,24 @@ function parseFMDataOld(reader: BinaryReader): FurnaceConfig {
 
 /**
  * Parse macro data
+ * Reference: instrument.cpp:1816 readFeatureMA
+ * 
+ * macroHeaderLen is the size of each macro entry's HEADER (not counting data).
+ * We read macros until featEnd, using macroHeaderLen to skip any extra header bytes.
  */
-function parseMacroData(reader: BinaryReader, inst: FurnaceInstrument): void {
-  const headerLen = reader.readUint16();
-  const headerEnd = reader.getOffset() + headerLen;
+function parseMacroData(reader: BinaryReader, inst: FurnaceInstrument, featEnd: number): void {
+  const macroHeaderLen = reader.readUint16();
+  
+  if (macroHeaderLen === 0 || macroHeaderLen > 32) {
+    console.warn(`[FurnaceParser] Invalid macro header length: ${macroHeaderLen}`);
+    return;
+  }
 
-  while (reader.getOffset() < headerEnd) {
+  while (reader.getOffset() < featEnd) {
+    const macroStartPos = reader.getOffset();
     const macroCode = reader.readUint8();
+    
+    // macroCode 255 = end of macro list
     if (macroCode === 255) break;
 
     const macro: FurnaceMacro = {
@@ -1744,14 +1755,21 @@ function parseMacroData(reader: BinaryReader, inst: FurnaceInstrument): void {
       loop: reader.readUint8(),
       release: reader.readUint8(),
       mode: reader.readUint8(),
-      type: reader.readUint8(),
+      type: reader.readUint8(),  // Actually wordSize byte: bits 0-3=open, bits 6-7=wordSize
       delay: reader.readUint8(),
       speed: reader.readUint8(),
       data: [],
     };
 
+    // Seek to end of header in case there are extra fields we don't read
+    const expectedHeaderEnd = macroStartPos + macroHeaderLen;
+    if (reader.getOffset() < expectedHeaderEnd && expectedHeaderEnd <= featEnd) {
+      reader.seek(expectedHeaderEnd);
+    }
+
+    // Read macro data values
     const wordSize = (macro.type >> 6) & 0x03;
-    for (let i = 0; i < macro.length; i++) {
+    for (let i = 0; i < macro.length && reader.getOffset() < featEnd; i++) {
       switch (wordSize) {
         case 0: macro.data.push(reader.readUint8()); break;
         case 1: macro.data.push(reader.readInt8()); break;
