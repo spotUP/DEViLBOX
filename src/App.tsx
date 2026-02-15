@@ -18,6 +18,7 @@ import { useProjectPersistence } from './hooks/useProjectPersistence';
 import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { EffectConfig, InstrumentConfig } from './types/instrument';
+import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
 import { PopOutWindow } from '@components/ui/PopOutWindow';
