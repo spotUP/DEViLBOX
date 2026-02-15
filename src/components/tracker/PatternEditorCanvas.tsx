@@ -1223,18 +1223,44 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     ctx.fillStyle = colors.bg;
     ctx.fillRect(0, 0, width, height);
 
-    // Draw full-height active channel highlight
-    if (pattern.channels[cursor.channelIndex]) {
-      const activeCh = cursor.channelIndex;
-      const colX = channelOffsets[activeCh] - scrollLeft;
-      const channelWidth = channelWidths[activeCh];
-      
-      // Only draw if visible and channel exists
-      if (colX + channelWidth > 0 && colX < width) {
+    // Draw full-height channel elements (backgrounds, separators, stripes)
+    for (let ch = 0; ch < numChannels; ch++) {
+      const colX = channelOffsets[ch] - scrollLeft;
+      const channelWidth = channelWidths[ch];
+      const isCollapsed = pattern.channels[ch]?.collapsed;
+      const chColor = pattern.channels[ch]?.color;
+
+      // Skip if outside visible area
+      if (colX + channelWidth < 0 || colX > width) continue;
+
+      // Active channel highlight (very subtle)
+      if (ch === cursor.channelIndex) {
         const prevAlpha = ctx.globalAlpha;
-        ctx.globalAlpha = 0.04;
+        ctx.globalAlpha = 0.02;
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(colX, 0, channelWidth, height);
+        ctx.globalAlpha = prevAlpha;
+      }
+
+      // Channel background tint
+      if (chColor) {
+        const prevAlpha = ctx.globalAlpha;
+        ctx.globalAlpha = 0.03;
+        ctx.fillStyle = chColor;
+        ctx.fillRect(colX, 0, channelWidth, height);
+        ctx.globalAlpha = prevAlpha;
+      }
+
+      // Channel separator
+      ctx.fillStyle = colors.border;
+      ctx.fillRect(colX + channelWidth, 0, 1, height);
+
+      // Colored left stripe
+      if (chColor) {
+        const prevAlpha = ctx.globalAlpha;
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = chColor;
+        ctx.fillRect(colX, 0, isCollapsed ? 4 : 2, height);
         ctx.globalAlpha = prevAlpha;
       }
     }
@@ -1398,29 +1424,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         if (colX + channelWidth < 0 || colX > width) continue;
 
         const x = colX + 8;
-
-        // Draw per-channel color tint on the column background
-        const chColor = pattern.channels[ch]?.color;
-        if (chColor) {
-          const prevAlpha = ctx.globalAlpha;
-          ctx.globalAlpha = isGhostRow ? 0.02 : (isHighlight ? 0.07 : 0.05);
-          ctx.fillStyle = chColor;
-          ctx.fillRect(colX, y, channelWidth, ROW_HEIGHT);
-          ctx.globalAlpha = prevAlpha;
-        }
-
-        // Draw channel separator
-        ctx.fillStyle = colors.border;
-        ctx.fillRect(colX + channelWidth, y, 1, ROW_HEIGHT);
-
-        // Colored left stripe for channel (matches header inset border)
-        if (chColor) {
-          const prevAlpha = ctx.globalAlpha;
-          ctx.globalAlpha = isGhostRow ? 0.15 : 0.4;
-          ctx.fillStyle = chColor;
-          ctx.fillRect(colX, y, isCollapsed ? 4 : 2, ROW_HEIGHT);
-          ctx.globalAlpha = prevAlpha;
-        }
 
         // Skip content if collapsed
         if (isCollapsed) {
