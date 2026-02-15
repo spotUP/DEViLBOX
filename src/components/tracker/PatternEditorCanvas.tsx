@@ -139,6 +139,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     cursor: state.cursor,
     selection: state.selection,
     showGhostPatterns: state.showGhostPatterns,
+    columnVisibility: state.columnVisibility,
   })));
 
   const { instruments } = useInstrumentStore(useShallow((state) => ({
@@ -160,28 +161,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const nc = pattern.channels.length;
     const noteWidth = CHAR_WIDTH * 3 + 4;
     
-    let acid = false;
-    let prob = false;
-    
-    // Scan channels for schema
-    for (const channel of pattern.channels) {
-      if (acid && prob) break;
-      if (!acid && channel.instrumentId !== null) {
-        const inst = instruments.find(i => i.id === channel.instrumentId);
-        if (inst?.synthType === 'TB303' || inst?.synthType === 'Buzz3o3') {
-          acid = true;
-        }
-      }
-      const cell = channel.rows[0];
-      if (cell) {
-        if (cell.flag1 !== undefined || cell.flag2 !== undefined) acid = true;
-        if (cell.probability !== undefined) prob = true;
-      }
-    }
+    // Determine extra column visibility from store settings (stable!)
+    const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
+    const showProb = columnVisibility.probability;
 
     const paramWidth = CHAR_WIDTH * 10 + 16
-      + (acid ? CHAR_WIDTH * 2 + 8 : 0)
-      + (prob ? CHAR_WIDTH * 2 + 4 : 0)
+      + (showAcid ? CHAR_WIDTH * 2 + 8 : 0)
+      + (showProb ? CHAR_WIDTH * 2 + 4 : 0)
       + CHAR_WIDTH * 2 + 4; 
     const normalW = noteWidth + paramWidth + 60; // Increased padding for wider header (was 40)
     const collapsedW = 12;
@@ -204,7 +190,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       channelWidths: widths,
       totalChannelsWidth: currentX - LINE_NUMBER_WIDTH
     };
-  }, [pattern, instruments]);
+  }, [pattern, instruments, columnVisibility]);
 
   // Calculate if all channels fit in viewport (for disabling horizontal scroll)
   const allChannelsFit = useMemo(() => {
