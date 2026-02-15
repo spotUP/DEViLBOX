@@ -1469,11 +1469,11 @@ export const useTrackerStore = create<TrackerStore>()(
               cell.volume = Math.max(0x10, Math.min(0x50, value));
             } else if (column === 'effParam') {
               // If no effect type set, default to volume (0x0C)
-              if (!cell.effTyp) cell.effTyp = 0x0C; 
+              if (cell.effTyp === 0) cell.effTyp = 0x0C; 
               cell.eff = Math.max(0, Math.min(255, value));
             } else if (column === 'effParam2') {
               // If no effect type 2 set, default to volume (0x0C)
-              if (!cell.effTyp2) cell.effTyp2 = 0x0C;
+              if (cell.effTyp2 === 0) cell.effTyp2 = 0x0C;
               cell.eff2 = Math.max(0, Math.min(255, value));
             } else {
               // Automation columns: 0x00-0xFF

@@ -93,14 +93,16 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
 
   // Block handlers
   const handleCopyBlock = useCallback(() => {
+    if (!hasSelection) return;
     copySelection();
     onClose();
-  }, [copySelection, onClose]);
+  }, [hasSelection, copySelection, onClose]);
 
   const handleCutBlock = useCallback(() => {
+    if (!hasSelection) return;
     cutSelection();
     onClose();
-  }, [cutSelection, onClose]);
+  }, [hasSelection, cutSelection, onClose]);
 
   const handlePasteBlock = useCallback(() => {
     paste();
@@ -108,24 +110,30 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   }, [paste, onClose]);
 
   const handleTransposeBlock = useCallback((semitones: number) => {
+    if (!hasSelection) return;
     transposeSelection(semitones);
     onClose();
-  }, [transposeSelection, onClose]);
+  }, [hasSelection, transposeSelection, onClose]);
 
   const handleInterpolateBlock = useCallback((column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'effParam' | 'effParam2') => {
     if (!selection || !pattern) return;
     const minRow = Math.min(selection.startRow, selection.endRow);
     const maxRow = Math.max(selection.startRow, selection.endRow);
-    const ch = selection.startChannel;
+    
+    // Search for first non-empty value in the selected range across ALL selected channels
+    // For now, let's interpolate based on the channel that was right-clicked
+    const ch = channelIndex;
     
     // Map column names to cell property names
     const cellProp = column === 'effParam' ? 'eff' : column === 'effParam2' ? 'eff2' : column;
     
-    // Search for first non-empty value in the selected range
+    // Search for first non-empty value
     let startVal: number | null = null;
     for (let r = minRow; r <= maxRow; r++) {
       const val = pattern.channels[ch].rows[r][cellProp] as number;
       if (val !== undefined && val !== 0) {
+        // For volume, 0 is technically a value (silence), but in tracker 0 usually means "no change"
+        // In XM volume column, 0x10-0x50 is volume. 0x00 is empty.
         startVal = val;
         break;
       }
@@ -141,15 +149,15 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       }
     }
 
-    // If we didn't find any values, use 0 as fallback or abort
-    if (startVal === null && endVal === null) {
+    // If we didn't find any values, abort
+    if (startVal === null || endVal === null) {
       onClose();
       return;
     }
 
-    interpolateSelection(column, startVal || 0, endVal || 0);
+    interpolateSelection(column, startVal, endVal);
     onClose();
-  }, [selection, pattern, interpolateSelection, onClose]);
+  }, [selection, pattern, channelIndex, interpolateSelection, onClose]);
 
   const handleClearBlock = useCallback(() => {
     clearSelection();
