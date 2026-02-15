@@ -101,23 +101,23 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) =
         <span className="text-text-secondary">
           Row <span className="text-accent-primary font-semibold">{rowDisplay}</span>
         </span>
-        <div className="w-px h-3 bg-dark-border"></div>
+        <div className="w-px h-3 bg-border opacity-50"></div>
         <span className="text-text-secondary">
           {channelDisplay}
         </span>
-        <div className="w-px h-3 bg-dark-border"></div>
+        <div className="w-px h-3 bg-border opacity-50"></div>
         <span className="text-text-secondary capitalize">
           {cursor.columnType}
         </span>
-        <div className="w-px h-3 bg-dark-border"></div>
+        <div className="w-px h-3 bg-border opacity-50"></div>
         <span className="text-text-secondary">
           Oct <span className="text-accent-primary font-semibold">{currentOctave}</span>
         </span>
-        <div className="w-px h-3 bg-dark-border"></div>
+        <div className="w-px h-3 bg-border opacity-50"></div>
         <span className="text-text-secondary" title={insertMode ? 'Insert mode: new data shifts rows down' : 'Overwrite mode: new data replaces existing'}>
           Mode: <span className={insertMode ? 'text-accent-warning' : 'text-accent-primary'}>{insertMode ? 'INS' : 'OVR'}</span>
         </span>
-        <div className="w-px h-3 bg-dark-border"></div>
+        <div className="w-px h-3 bg-border opacity-50"></div>
         <span className={`px-2 py-0.5 rounded ${recordMode ? 'bg-accent-error/20 text-accent-error' : 'text-text-muted'}`}>
           {recordMode ? 'REC' : 'EDIT'}
         </span>
@@ -137,7 +137,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) =
               <span className="font-bold uppercase">{deviceName}</span>
               {showKnobBar ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
             </button>
-            <div className="w-px h-3 bg-dark-border"></div>
+            <div className="w-px h-3 bg-border opacity-50"></div>
           </>
         )}
         
@@ -151,7 +151,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) =
               <Lightbulb size={12} />
               <span className="text-[10px] font-bold uppercase tracking-tight">Tips</span>
             </button>
-            <div className="w-px h-3 bg-dark-border"></div>
+            <div className="w-px h-3 bg-border opacity-50"></div>
           </>
         )}
 

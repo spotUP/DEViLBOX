@@ -74,7 +74,7 @@ export const ArrangementToolbar: React.FC = () => {
         <option value="arrangement">Arrangement</option>
       </select>
 
-      <div className="w-px h-5 bg-dark-border" />
+      <div className="w-px h-5 bg-border opacity-50" />
 
       {/* Transport Controls */}
       <div className="flex items-center gap-1">
@@ -98,7 +98,7 @@ export const ArrangementToolbar: React.FC = () => {
         </button>
       </div>
 
-      <div className="w-px h-5 bg-dark-border" />
+      <div className="w-px h-5 bg-border opacity-50" />
 
       {/* Tools */}
       <div className="flex items-center gap-1">
@@ -108,7 +108,7 @@ export const ArrangementToolbar: React.FC = () => {
         {toolBtn('split', <Scissors size={14} />, 'Split', 'S')}
       </div>
 
-      <div className="w-px h-5 bg-dark-border" />
+      <div className="w-px h-5 bg-border opacity-50" />
 
       {/* Zoom */}
       <div className="flex items-center gap-1">
@@ -136,7 +136,7 @@ export const ArrangementToolbar: React.FC = () => {
         </button>
       </div>
 
-      <div className="w-px h-5 bg-dark-border" />
+      <div className="w-px h-5 bg-border opacity-50" />
 
       {/* Snap */}
       <div className="flex items-center gap-1">
@@ -152,7 +152,7 @@ export const ArrangementToolbar: React.FC = () => {
         </select>
       </div>
 
-      <div className="w-px h-5 bg-dark-border" />
+      <div className="w-px h-5 bg-border opacity-50" />
 
       {/* Follow Playback */}
       <button

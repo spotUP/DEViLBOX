@@ -201,7 +201,7 @@ export const ChannelManager: React.FC<ChannelManagerProps> = ({ isOpen, onClose 
           <Button variant="ghost" size="sm" onClick={selectNone}>
             Select None
           </Button>
-          <div className="w-px h-6 bg-dark-border" />
+          <div className="w-px h-6 bg-border opacity-50" />
           <Button
             variant="ghost"
             size="sm"
@@ -232,7 +232,7 @@ export const ChannelManager: React.FC<ChannelManagerProps> = ({ isOpen, onClose 
             <Headphones size={14} className="mr-1" />
             Solo
           </Button>
-          <div className="w-px h-6 bg-dark-border" />
+          <div className="w-px h-6 bg-border opacity-50" />
           <span className="text-xs text-text-secondary">Record Group:</span>
           {([0, 1, 2] as const).map((group) => (
             <button
