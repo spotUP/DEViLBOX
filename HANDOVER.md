@@ -1,5 +1,9 @@
 # Furnace Chip Synth Testing Handover
 
+**Note:** For current project status across all features, see: [PROJECT_STATUS_2026-02-14.md](PROJECT_STATUS_2026-02-14.md)
+
+**Date:** 2026-02-10 (Last furnace chip fixes)
+
 ## Current Status
 
 ### Just Completed: OPZ (TX81Z) - Fixed
