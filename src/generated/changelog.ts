@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-15T11:49:20.294Z
+ * Generated: 2026-02-15T11:49:47.652Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '596';
-export const BUILD_HASH = '86e4419';
+export const BUILD_NUMBER = '597';
+export const BUILD_HASH = '24e4bac';
 export const BUILD_DATE = '2026-02-15';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-15',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix TypeScript compilation errors - add missing imports and fix hook declaration order"
+      },
       {
         type: 'fix',
         "description": "UI updates and debug script for C64 instrument analysis"
@@ -234,10 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Remove /DEViLBOX/ base path from URLs"
-      },
-      {
-        type: 'fix',
-        "description": "Correct GitHub Pages URLs in manifest.json"
       }
     ]
   }
