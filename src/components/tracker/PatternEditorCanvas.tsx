@@ -1910,6 +1910,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           channelIndex={cellContextMenu.cellInfo?.channelIndex ?? 0}
           rowIndex={cellContextMenu.cellInfo?.rowIndex ?? 0}
           onOpenParameterEditor={handleOpenParameterEditor}
+          onReverseVisual={() => handleReverseVisual(cellContextMenu.cellInfo?.channelIndex ?? 0)}
+          onPolyrhythm={() => handlePolyrhythm(cellContextMenu.cellInfo?.channelIndex ?? 0)}
+          onFibonacci={() => handleFibonacci(cellContextMenu.cellInfo?.channelIndex ?? 0)}
+          onEuclidean={() => handleEuclidean(cellContextMenu.cellInfo?.channelIndex ?? 0)}
+          onPingPong={() => handlePingPong(cellContextMenu.cellInfo?.channelIndex ?? 0)}
+          onGlitch={() => handleGlitch(cellContextMenu.cellInfo?.channelIndex ?? 0)}
+          onStrobe={() => handleStrobe(cellContextMenu.cellInfo?.channelIndex ?? 0)}
+          onVisualEcho={() => handleVisualEcho(cellContextMenu.cellInfo?.channelIndex ?? 0)}
+          onConverge={() => handleConverge(cellContextMenu.cellInfo?.channelIndex ?? 0)}
+          onSpiral={() => handleSpiral(cellContextMenu.cellInfo?.channelIndex ?? 0)}
+          onBounce={() => handleBounce(cellContextMenu.cellInfo?.channelIndex ?? 0)}
+          onChaos={() => handleChaos(cellContextMenu.cellInfo?.channelIndex ?? 0)}
         />
 
         {/* Visual Parameter Editor */}
