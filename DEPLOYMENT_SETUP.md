@@ -79,3 +79,4 @@ If you want to deploy to GitHub Pages in the future:
 1. Add the GitHub Pages jobs back to `.github/workflows/deploy.yml`
 2. Build with: `VITE_BASE_URL=/DEViLBOX/ npm run build`
 3. Deploy with: `npm run deploy`
+# Test deployment - Sun Feb 15 11:29:38 CET 2026
