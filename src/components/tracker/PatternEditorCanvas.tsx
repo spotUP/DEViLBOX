@@ -151,11 +151,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const bdAnimations = useBDAnimations();
 
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
-  const { numChannels, channelOffsets, channelWidths } = useMemo(() => {
+  const { numChannels, channelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
     if (!pattern) return { 
       numChannels: 0, 
       channelOffsets: [], 
-      channelWidths: []
+      channelWidths: [],
+      totalChannelsWidth: 0
     };
 
     const nc = pattern.channels.length;
@@ -184,7 +185,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       + (acid ? CHAR_WIDTH * 2 + 8 : 0)
       + (prob ? CHAR_WIDTH * 2 + 4 : 0)
       + CHAR_WIDTH * 2 + 4; 
-    const normalW = noteWidth + paramWidth + 20;
+    const normalW = noteWidth + paramWidth + 40; // +20 padding + 20 automation visual space
     const collapsedW = 12;
 
     const offsets: number[] = [];
@@ -202,15 +203,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     return {
       numChannels: nc,
       channelOffsets: offsets,
-      channelWidths: widths
+      channelWidths: widths,
+      totalChannelsWidth: currentX - LINE_NUMBER_WIDTH
     };
   }, [pattern, instruments]);
 
   // Calculate if all channels fit in viewport (for disabling horizontal scroll)
   const allChannelsFit = useMemo(() => {
     if (!pattern || numChannels === 0) return true;
-    return (channelOffsets[numChannels - 1] + channelWidths[numChannels - 1]) <= dimensions.width;
-  }, [channelOffsets, channelWidths, numChannels, dimensions.width, pattern]);
+    return (LINE_NUMBER_WIDTH + totalChannelsWidth) <= dimensions.width;
+  }, [totalChannelsWidth, numChannels, dimensions.width, pattern]);
 
   // Mobile gesture handlers
   // Vertical swipes move the cursor up/down
@@ -1785,19 +1787,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     setScrollLeft(e.currentTarget.scrollLeft);
   }, []);
 
-  // Calculate channel header width - must match render() layout
-  const noteWidthH = CHAR_WIDTH * 3 + 4;
-  const firstCellH = pattern?.channels[0]?.rows[0];
-  const hasAcidH = firstCellH?.flag1 !== undefined || firstCellH?.flag2 !== undefined;
-  const hasProbH = firstCellH?.probability !== undefined;
-  const paramWidthH = CHAR_WIDTH * 10 + 16
-    + (hasAcidH ? CHAR_WIDTH * 2 + 8 : 0)
-    + (hasProbH ? CHAR_WIDTH * 2 + 4 : 0)
-    + CHAR_WIDTH * 2 + 4; // Automation column
-  const channelHeaderWidth = noteWidthH + paramWidthH + 20 + 20; // +20 for automation lane visual space
-  // Channel count is global across all patterns (enforced by addChannel/removeChannel)
-  const totalChannelsWidth = pattern ? pattern.channels.length * channelHeaderWidth : 0;
-
   if (!pattern) {
     return (
       <div className="flex-1 flex items-center justify-center text-text-muted">
@@ -1909,6 +1898,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 {pattern.channels.map((channel, idx) => {
                   // Trigger levels are animation-driven via RAF; ChannelVUMeter is disabled
                   const trigger = { level: 0, triggered: false };
+                  const channelWidth = channelWidths[idx];
                   
                   return (
                     <div
@@ -1918,12 +1908,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                         ${channel.muted ? 'opacity-50' : ''}
                         ${channel.solo ? 'bg-accent-primary/10' : ''}`}
                       style={{
-                        width: channelHeaderWidth,
+                        width: channelWidth,
                         backgroundColor: channel.color ? `${channel.color}15` : undefined,
                         boxShadow: channel.color ? `inset 3px 0 0 ${channel.color}` : undefined,
                       }}
                     >
-                      <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
                         <span
                           className="font-bold font-mono text-sm flex-shrink-0"
                           style={{ color: channel.color || 'var(--color-accent)' }}
@@ -1932,7 +1922,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                         </span>
                         <input
                           type="text"
-                          className="bg-transparent border-none outline-none font-mono text-[10px] text-text-muted hover:text-text-primary focus:text-accent-primary transition-colors min-w-0 flex-1 overflow-hidden text-ellipsis uppercase"
+                          className="bg-transparent border-none outline-none font-mono text-[10px] text-text-muted hover:text-text-primary focus:text-accent-primary transition-colors min-w-0 flex-1 overflow-hidden text-ellipsis uppercase px-0"
                           value={channel.name || `Channel ${idx + 1}`}
                           onChange={(e) => updateChannelName(idx, e.target.value)}
                           onKeyDown={(e) => {
@@ -1942,7 +1932,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                           }}
                           title={`Click to rename channel (Short: ${channel.shortName || (idx + 1)})`}
                         />
-                        <div className="flex-shrink-0">
+                        <div className="flex-shrink-0 ml-auto">
                           <ChannelVUMeter level={trigger.level} isActive={trigger.triggered} />
                         </div>
                       </div>
@@ -2067,7 +2057,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               patternLength={pattern.length}
               rowHeight={ROW_HEIGHT}
               channelCount={pattern.channels.length}
-              channelWidth={channelHeaderWidth}
+              channelOffsets={channelOffsets}
+              channelWidths={channelWidths}
               rowNumWidth={LINE_NUMBER_WIDTH}
               scrollOffset={scrollY}
               visibleStart={visibleStart}
@@ -2106,7 +2097,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           className="absolute right-0 pointer-events-none z-30 overflow-hidden"
           style={{ top: 0, left: LINE_NUMBER_WIDTH, height: `calc(50% - ${ROW_HEIGHT / 2}px)` }}
         >
-          <ChannelVUMeters channelWidth={channelHeaderWidth} scrollLeft={scrollLeft} />
+          <ChannelVUMeters 
+            channelOffsets={channelOffsets} 
+            channelWidths={channelWidths} 
+            scrollLeft={scrollLeft} 
+          />
         </div>
 
         {/* Cell context menu */}
