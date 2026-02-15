@@ -54,6 +54,95 @@ const ArrangementView = lazy(() => import('./components/arrangement').then(m => 
 const FileBrowser = lazy(() => import('@components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser })));
 const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => ({ default: m.AuthModal })));
 
+// Helper function to create instruments from module patterns
+function createInstrumentsForModule(
+  patterns: Pattern[],
+  instrumentNames: string[],
+  sampleUrls?: Map<number, string>
+): InstrumentConfig[] {
+  const usedInstruments = new Set<number>();
+  for (const pattern of patterns) {
+    for (const channel of pattern.channels) {
+      for (const cell of channel.rows) {
+        if (cell.instrument !== null && cell.instrument > 0) {
+          usedInstruments.add(cell.instrument);
+        }
+      }
+    }
+  }
+
+  const instruments: InstrumentConfig[] = [];
+  const oscillatorTypes: Array<'sine' | 'square' | 'sawtooth' | 'triangle'> =
+    ['sawtooth', 'square', 'triangle', 'sine'];
+
+  for (const instNum of Array.from(usedInstruments).sort((a, b) => a - b)) {
+    const name = instrumentNames[instNum - 1] || `Instrument ${instNum}`;
+    const sampleUrl = sampleUrls?.get(instNum);
+
+    if (sampleUrl) {
+      instruments.push({
+        id: instNum,
+        name: name.trim() || `Sample ${instNum}`,
+        type: 'sample' as const,
+        synthType: 'Sampler',
+        effects: [],
+        volume: -6,
+        pan: 0,
+        parameters: { sampleUrl },
+      });
+    } else {
+      const oscType = oscillatorTypes[(instNum - 1) % oscillatorTypes.length];
+      instruments.push({
+        id: instNum,
+        name: name.trim() || `Instrument ${instNum}`,
+        type: 'synth' as const,
+        synthType: 'Synth',
+        oscillator: { ...DEFAULT_OSCILLATOR, type: oscType },
+        envelope: { ...DEFAULT_ENVELOPE },
+        filter: { ...DEFAULT_FILTER },
+        effects: [],
+        volume: -6,
+        pan: 0,
+      });
+    }
+  }
+
+  // Ensure instruments 0 and 1 exist as defaults
+  for (const defaultId of [0, 1]) {
+    if (!usedInstruments.has(defaultId)) {
+      const sampleUrl = sampleUrls?.get(defaultId);
+      if (sampleUrl) {
+        instruments.push({
+          id: defaultId,
+          name: defaultId === 0 ? 'Default' : 'Sample 01',
+          type: 'sample' as const,
+          synthType: 'Sampler',
+          effects: [],
+          volume: -6,
+          pan: 0,
+          parameters: { sampleUrl },
+        });
+      } else {
+        instruments.push({
+          id: defaultId,
+          name: defaultId === 0 ? 'Default' : 'Instrument 01',
+          type: 'synth' as const,
+          synthType: 'Synth',
+          oscillator: { ...DEFAULT_OSCILLATOR, type: 'sawtooth' },
+          envelope: { ...DEFAULT_ENVELOPE },
+          filter: { ...DEFAULT_FILTER },
+          effects: [],
+          volume: -6,
+          pan: 0,
+        });
+      }
+    }
+  }
+
+  instruments.sort((a, b) => a.id - b.id);
+  return instruments;
+}
+
 function App() {
   // Check for application updates
   const { updateAvailable, latestVersion, currentVersion, refresh } = useVersionCheck();
@@ -1009,7 +1098,7 @@ function App() {
                         result = convertXMModule(nativePatterns as any, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
                       } else if (format === 'MOD') {
                         result = convertMODModule(nativePatterns as any, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
-                      } else {
+                      } else if (moduleInfo.metadata.song) {
                         // FUR, DMF, etc.
                         result = convertModule(moduleInfo.metadata.song);
                       }
@@ -1034,8 +1123,7 @@ function App() {
 
                       // If no instruments created from native data, create from pattern data
                       if (instruments.length === 0) {
-                        const { createInstrumentsForModule } = await import('@components/tracker/TrackerView');
-                        instruments = (createInstrumentsForModule as any)(result.patterns, result.instrumentNames || [], undefined);
+                        instruments = createInstrumentsForModule(result.patterns, result.instrumentNames || [], undefined);
                       }
 
                       instruments.forEach((inst: InstrumentConfig) => addInstrument(inst));
