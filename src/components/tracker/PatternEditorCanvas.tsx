@@ -1223,6 +1223,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     ctx.fillStyle = colors.bg;
     ctx.fillRect(0, 0, width, height);
 
+    // Draw full-height active channel highlight
+    if (pattern.channels[cursor.channelIndex]) {
+      const activeCh = cursor.channelIndex;
+      const colX = channelOffsets[activeCh] - scrollLeft;
+      const channelWidth = channelWidths[activeCh];
+      
+      // Only draw if visible and channel exists
+      if (colX + channelWidth > 0 && colX < width) {
+        const prevAlpha = ctx.globalAlpha;
+        ctx.globalAlpha = 0.04;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(colX, 0, channelWidth, height);
+        ctx.globalAlpha = prevAlpha;
+      }
+    }
+
     // Draw rows
     const sel = state.selection;
     const hasSelection = !!sel;
@@ -1668,7 +1684,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         ctx.fillText(charStr, caretX, caretY + caretH / 2);
       }
     }
-  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isCyanTheme, visibleStart, instruments, currentPatternIndex, patterns, scrollY, channelOffsets, channelWidths, numChannels]);
+  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isCyanTheme, visibleStart, instruments, currentPatternIndex, patterns, scrollY, channelOffsets, channelWidths, numChannels, cursor, selection]);
 
   // Ref to keep render callback up to date for the animation loop
   const renderRef = useRef(render);
