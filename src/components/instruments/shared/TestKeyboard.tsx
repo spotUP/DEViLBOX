@@ -284,120 +284,122 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
           className="relative flex items-end justify-center"
           style={{ height: keyHeight }}
         >
-          <div className="relative flex">
-            {/* White keys */}
-            {whiteKeys.map((key, index) => {
-              const isActive = activeNotes.has(key.note);
-              const isOctaveStart = key.label === 'C';
-              return (
-                <button
-                  key={key.note}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    attackNote(key.note);
-                  }}
-                  onMouseUp={(e) => {
-                    e.preventDefault();
-                    releaseNote(key.note);
-                  }}
-                  onMouseLeave={() => {
-                    if (activeNotes.has(key.note)) releaseNote(key.note);
-                  }}
-                  onTouchStart={(e) => {
-                    e.preventDefault();
-                    attackNote(key.note);
-                  }}
-                  onTouchEnd={(e) => {
-                    e.preventDefault();
-                    releaseNote(key.note);
-                  }}
-                  className={`
-                    relative border border-ft2-border rounded-b
-                    transition-colors duration-75 cursor-pointer select-none touch-none
-                    ${isActive
-                      ? 'bg-cyan-400 shadow-lg shadow-cyan-400/50'
-                      : 'bg-white hover:bg-gray-100'
-                    }
-                    ${isOctaveStart && index > 0 ? 'border-l-2 border-l-gray-300' : ''}
-                  `}
-                  style={{
-                    width: whiteKeyWidth,
-                    height: keyHeight,
-                    marginRight: index < whiteKeys.length - 1 ? 1 : 0,
-                  }}
-                >
-                  <div className="absolute bottom-1 left-0 right-0 text-center">
-                    {isOctaveStart && (
-                      <div className="text-[8px] text-gray-400 font-mono">{key.octave}</div>
-                    )}
-                    <div
-                      className="font-bold text-gray-700"
-                      style={{ fontSize: whiteKeyWidth < 30 ? '8px' : '10px' }}
-                    >
-                      {key.label}
+          <div className="relative w-full h-full">
+            {/* White keys layer (flex) */}
+            <div className="flex w-full h-full">
+              {whiteKeys.map((key, index) => {
+                const isActive = activeNotes.has(key.note);
+                const isOctaveStart = key.label === 'C';
+                return (
+                  <button
+                    key={key.note}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      attackNote(key.note);
+                    }}
+                    onMouseUp={(e) => {
+                      e.preventDefault();
+                      releaseNote(key.note);
+                    }}
+                    onMouseLeave={() => {
+                      if (activeNotes.has(key.note)) releaseNote(key.note);
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      attackNote(key.note);
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      releaseNote(key.note);
+                    }}
+                    className={`
+                      relative border border-ft2-border rounded-b flex-1
+                      transition-colors duration-75 cursor-pointer select-none touch-none
+                      ${isActive
+                        ? 'bg-cyan-400 shadow-lg shadow-cyan-400/50'
+                        : 'bg-white hover:bg-gray-100'
+                      }
+                      ${isOctaveStart && index > 0 ? 'border-l-2 border-l-gray-300' : ''}
+                    `}
+                    style={{
+                      height: keyHeight,
+                    }}
+                  >
+                    <div className="absolute bottom-1 left-0 right-0 text-center">
+                      {isOctaveStart && (
+                        <div className="text-[8px] text-gray-400 font-mono">{key.octave}</div>
+                      )}
+                      <div
+                        className="font-bold text-gray-700"
+                        style={{ fontSize: whiteKeyWidth < 30 ? '8px' : '10px' }}
+                      >
+                        {key.label}
+                      </div>
+                      {key.keyboardKey && (
+                        <div className="text-[8px] text-gray-400 font-mono uppercase">
+                          {key.keyboardKey}
+                        </div>
+                      )}
                     </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Black keys layer (absolute) */}
+            <div className="absolute inset-0 pointer-events-none">
+              {blackKeys.map((key) => {
+                const isActive = activeNotes.has(key.note);
+                const leftPosition = getBlackKeyPosition(key);
+
+                return (
+                  <button
+                    key={key.note}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      attackNote(key.note);
+                    }}
+                    onMouseUp={(e) => {
+                      e.preventDefault();
+                      releaseNote(key.note);
+                    }}
+                    onMouseLeave={() => {
+                      if (activeNotes.has(key.note)) releaseNote(key.note);
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      attackNote(key.note);
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      releaseNote(key.note);
+                    }}
+                    className={`
+                      absolute border border-ft2-border rounded-b pointer-events-auto
+                      transition-colors duration-75 cursor-pointer select-none touch-none z-10
+                      ${isActive
+                        ? 'bg-amber-500 shadow-lg shadow-amber-500/50'
+                        : 'bg-gray-900 hover:bg-gray-700'
+                      }
+                    `}
+                    style={{
+                      left: leftPosition,
+                      width: blackKeyWidth,
+                      height: blackKeyHeight,
+                    }}
+                  >
                     {key.keyboardKey && (
-                      <div className="text-[8px] text-gray-400 font-mono uppercase">
+                      <div
+                        className="absolute bottom-1 left-0 right-0 text-center text-gray-400 font-mono uppercase"
+                        style={{ fontSize: '7px' }}
+                      >
                         {key.keyboardKey}
                       </div>
                     )}
-                  </div>
-                </button>
-              );
-            })}
-
-            {/* Black keys overlay */}
-            {blackKeys.map((key) => {
-              const isActive = activeNotes.has(key.note);
-              const leftPosition = getBlackKeyPosition(key);
-
-              return (
-                <button
-                  key={key.note}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    attackNote(key.note);
-                  }}
-                  onMouseUp={(e) => {
-                    e.preventDefault();
-                    releaseNote(key.note);
-                  }}
-                  onMouseLeave={() => {
-                    if (activeNotes.has(key.note)) releaseNote(key.note);
-                  }}
-                  onTouchStart={(e) => {
-                    e.preventDefault();
-                    attackNote(key.note);
-                  }}
-                  onTouchEnd={(e) => {
-                    e.preventDefault();
-                    releaseNote(key.note);
-                  }}
-                  className={`
-                    absolute border border-ft2-border rounded-b
-                    transition-colors duration-75 cursor-pointer select-none touch-none z-10
-                    ${isActive
-                      ? 'bg-amber-500 shadow-lg shadow-amber-500/50'
-                      : 'bg-gray-900 hover:bg-gray-700'
-                    }
-                  `}
-                  style={{
-                    left: leftPosition,
-                    width: blackKeyWidth,
-                    height: blackKeyHeight,
-                  }}
-                >
-                  {key.keyboardKey && (
-                    <div
-                      className="absolute bottom-1 left-0 right-0 text-center text-gray-400 font-mono uppercase"
-                      style={{ fontSize: '7px' }}
-                    >
-                      {key.keyboardKey}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

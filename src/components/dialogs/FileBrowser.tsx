@@ -112,6 +112,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   const [revisionsFileId, setRevisionsFileId] = useState<string | null>(null);
   const [revisionsFilename, setRevisionsFilename] = useState<string>('');
 
+  // Manual double-tap detection for touch devices (iOS)
+  const lastClickRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
+
   // Auth state
   const user = useAuthStore((state) => state.user);
   const isServerAvailable = useAuthStore((state) => state.isServerAvailable);
@@ -658,28 +661,32 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
               {files.map((file) => (
                 <div
                   key={file.id}
-                  onClick={() => setSelectedFile(file)}
-                  onDoubleClick={() => {
-                    if (file.isDirectory) {
-                      // Navigate into directory
-                      if (hasElectronFS()) {
-                        // Navigate into directory in Electron
-                        setCurrentPath(file.path);
-                        setElectronDirectory(file.path);
-                        setSelectedFile(null);
-                      } else if (hasServerFS) {
-                        // Navigate into directory on server
-                        setCurrentPath(file.path);
+                  onClick={() => {
+                    const now = Date.now();
+                    const isDoubleTap = lastClickRef.current.id === file.id && (now - lastClickRef.current.time) < 350;
+                    
+                    if (isDoubleTap) {
+                      // Action for double tap
+                      if (file.isDirectory) {
+                        if (hasElectronFS()) {
+                          setCurrentPath(file.path);
+                          setElectronDirectory(file.path);
+                        } else {
+                          setCurrentPath(file.path);
+                        }
                         setSelectedFile(null);
                       } else {
-                        // Navigate into directory via manifest (GitHub Pages)
-                        setCurrentPath(file.path);
-                        setSelectedFile(null);
+                        setSelectedFile(file);
+                        if (mode === 'load') handleLoad();
                       }
+                      // Reset to prevent triple-tap
+                      lastClickRef.current = { id: '', time: 0 };
                       return;
                     }
+
+                    // Single tap action
+                    lastClickRef.current = { id: file.id, time: now };
                     setSelectedFile(file);
-                    if (mode === 'load') handleLoad();
                   }}
                   className={`flex items-center gap-3 p-3 rounded cursor-pointer transition-colors ${
                     selectedFile?.id === file.id
