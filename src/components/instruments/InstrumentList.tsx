@@ -431,16 +431,22 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   </span>
                 )}
 
-                {/* Sample loop indicator */}
+                {/* Sample loop indicator - enhanced visibility */}
                 {instrument.sample?.loop && (
                   <span
-                    className="text-text-muted ml-auto"
+                    className="flex items-center gap-0.5 ml-auto"
                     title={instrument.sample.loopType === 'pingpong' ? 'Ping-pong loop' : 'Forward loop'}
                   >
                     {instrument.sample.loopType === 'pingpong' ? (
-                      <Repeat size={10} className="text-blue-400" />
+                      <>
+                        <Repeat size={12} className="text-blue-400" />
+                        <span className="text-[9px] text-blue-400 font-bold leading-none">↔</span>
+                      </>
                     ) : (
-                      <Repeat1 size={10} className="text-green-400" />
+                      <>
+                        <Repeat1 size={12} className="text-green-400" />
+                        <span className="text-[9px] text-green-400 font-bold leading-none">→</span>
+                      </>
                     )}
                   </span>
                 )}

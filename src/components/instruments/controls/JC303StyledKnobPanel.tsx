@@ -418,6 +418,14 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
 
   const totalHeight = 480;
 
+  const shadowClasses: Record<string, string> = {
+    osc: 'shadow-cyan-500/30',
+    mojo: 'shadow-orange-500/30',
+    devilfish: 'shadow-red-500/30',
+    lfo: 'shadow-purple-500/30',
+    fx: 'shadow-green-500/30'
+  };
+
   return (
     <div
       ref={containerRef}
@@ -469,16 +477,19 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
               className={clsx(
                 "relative px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full border transition-all duration-200",
                 effectiveTab === t.id
-                  ? `${t.bgClass} text-white border-transparent shadow-lg shadow-${t.id === 'osc' ? 'cyan' : t.id === 'mojo' ? 'orange' : t.id === 'devilfish' ? 'red' : t.id === 'lfo' ? 'purple' : 'green'}-500/30`
+                  ? `${t.bgClass} text-white border-transparent shadow-lg ${shadowClasses[t.id] || ''}`
                   : `bg-black/40 ${t.textClass} border-white/10 hover:border-white/25 hover:bg-black/60`
               )}
             >
               {t.label}
               {t.ledOn !== undefined && (
-                <span className={clsx(
-                  "absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-black/50 transition-all duration-300",
-                  t.ledOn ? `${t.bgClass} shadow-[0_0_6px_${t.color}]` : "bg-gray-800"
-                )} />
+                <span 
+                  className={clsx(
+                    "absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-black/50 transition-all duration-300",
+                    t.ledOn ? t.bgClass : "bg-gray-800"
+                  )}
+                  style={t.ledOn ? { boxShadow: `0 0 6px ${t.color}` } : undefined}
+                />
               )}
             </button>
           ))}
