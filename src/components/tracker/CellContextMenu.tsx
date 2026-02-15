@@ -33,6 +33,19 @@ interface CellContextMenuProps {
   onStrum?: () => void;
   onLegato?: () => void;
   onOpenParameterEditor?: (field: 'volume' | 'effect' | 'effectParam') => void;
+  // B/D Animation Ops
+  onReverseVisual?: () => void;
+  onPolyrhythm?: () => void;
+  onFibonacci?: () => void;
+  onEuclidean?: () => void;
+  onPingPong?: () => void;
+  onGlitch?: () => void;
+  onStrobe?: () => void;
+  onVisualEcho?: () => void;
+  onConverge?: () => void;
+  onSpiral?: () => void;
+  onBounce?: () => void;
+  onChaos?: () => void;
 }
 
 export const CellContextMenu: React.FC<CellContextMenuProps> = ({
@@ -45,6 +58,18 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   onStrum,
   onLegato,
   onOpenParameterEditor,
+  onReverseVisual,
+  onPolyrhythm,
+  onFibonacci,
+  onEuclidean,
+  onPingPong,
+  onGlitch,
+  onStrobe,
+  onVisualEcho,
+  onConverge,
+  onSpiral,
+  onBounce,
+  onChaos,
 }) => {
   const {
     patterns,
@@ -245,6 +270,25 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
           { id: 'interp-vol', label: 'Interpolate Volume', onClick: () => handleInterpolateBlock('volume') },
           { id: 'interp-cutoff', label: 'Interpolate Cutoff', onClick: () => handleInterpolateBlock('cutoff') },
           { id: 'interp-res', label: 'Interpolate Resonance', onClick: () => handleInterpolateBlock('resonance') },
+        ]
+      },
+      {
+        id: 'block-bd-ops',
+        label: 'B/D Operations',
+        icon: <Zap size={14} />,
+        submenu: [
+          { id: 'bd-reverse', label: 'Reverse Visual', onClick: onReverseVisual },
+          { id: 'bd-poly', label: 'Polyrhythm', onClick: onPolyrhythm },
+          { id: 'bd-fib', label: 'Fibonacci Sequence', onClick: onFibonacci },
+          { id: 'bd-eucl', label: 'Euclidean Pattern', onClick: onEuclidean },
+          { id: 'bd-pingpong', label: 'Ping-Pong', onClick: onPingPong },
+          { id: 'bd-glitch', label: 'Glitch', onClick: onGlitch },
+          { id: 'bd-strobe', label: 'Strobe', onClick: onStrobe },
+          { id: 'bd-echo', label: 'Visual Echo', onClick: onVisualEcho },
+          { id: 'bd-converge', label: 'Converge', onClick: onConverge },
+          { id: 'bd-spiral', label: 'Spiral', onClick: onSpiral },
+          { id: 'bd-bounce', label: 'Bounce', onClick: onBounce },
+          { id: 'bd-chaos', label: 'Chaos', onClick: onChaos },
         ]
       },
       {
