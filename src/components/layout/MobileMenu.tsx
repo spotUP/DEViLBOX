@@ -5,7 +5,6 @@
 
 import React, { useState } from 'react';
 import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap, FolderOpen, Save, FilePlus, Trash2, List, Music, Grid3x3, Clock, Smartphone, LogIn, LogOut, User } from 'lucide-react';
-import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { AddToHomeScreenModal } from '@components/dialogs/AddToHomeScreenModal';
 import { useAuthStore } from '@stores/useAuthStore';
 
@@ -72,9 +71,9 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
           />
 
           {/* Menu Panel */}
-          <div className="fixed top-0 right-0 bottom-0 w-80 max-w-[85vw] bg-dark-bgTertiary border-l border-dark-border z-[9999] overflow-y-auto">
+          <div className="fixed top-0 right-0 bottom-0 w-80 max-w-[85vw] bg-dark-bgTertiary border-l border-dark-border z-[9999] flex flex-col">
             {/* Header */}
-            <div className="sticky top-0 bg-dark-bgSecondary border-b border-dark-border p-4 flex items-center justify-between">
+            <div className="flex-shrink-0 bg-dark-bgSecondary border-b border-dark-border p-4 flex items-center justify-between">
               <h2 className="font-bold text-lg text-text-primary">Menu</h2>
               <button
                 onClick={() => setIsOpen(false)}
@@ -85,8 +84,8 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
               </button>
             </div>
 
-            {/* Menu Items */}
-            <div className="p-4 space-y-2">
+            {/* Menu Items - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
               {/* User Account - Show at top if server is available */}
               {isServerAvailable && (
                 <div className="mb-4">
@@ -130,15 +129,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                 </div>
               )}
 
-              {/* MIDI Settings - Inline component */}
-              <div className="mb-4">
-                <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3">
-                  MIDI Settings
-                </h3>
-                <div className="bg-dark-bgSecondary rounded-lg p-3">
-                  <MIDIToolbarDropdown />
-                </div>
-              </div>
+              {/* Note: MIDI settings moved to desktop navbar only - too complex for mobile menu */}
 
               {/* File Operations */}
               <h3 className="text-xs font-bold text-text-muted uppercase mb-2 px-3 mt-6">
