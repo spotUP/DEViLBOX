@@ -268,11 +268,12 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
     [selectConnection]
   );
 
-  const handleConnectionDelete = useCallback(() => {
-    if (selectedConnectionId) {
-      const updatedConnections = config.connections.filter((c) => c.id !== selectedConnectionId);
+  const handleConnectionDelete = useCallback((id?: string) => {
+    const connId = id || selectedConnectionId;
+    if (connId) {
+      const updatedConnections = config.connections.filter((c) => c.id !== connId);
       onChange({ ...config, connections: updatedConnections });
-      selectConnection(null);
+      if (selectedConnectionId === connId) selectConnection(null);
     }
   }, [selectedConnectionId, config, onChange, selectConnection]);
 
@@ -362,6 +363,11 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
                 color={conn.color}
                 isSelected={conn.id === selectedConnectionId}
                 onClick={() => handleConnectionClick(conn.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleConnectionDelete(conn.id);
+                }}
                 obstacles={moduleObstacles}
                 laneOffset={idx % 8} // Spreads cables into 8 distinct lanes
               />
