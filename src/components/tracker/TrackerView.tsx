@@ -33,7 +33,7 @@ import { TB303KnobPanel } from './TB303KnobPanel';
 import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
-import { Music2, Eye, EyeOff, Zap, List, Grid3x3, Piano, Radio, Activity, LayoutGrid } from 'lucide-react';
+import { Music2, Eye, EyeOff, Zap, List, Grid3x3, Piano, Radio, Activity, LayoutGrid, Cpu } from 'lucide-react';
 import { InstrumentList } from '@components/instruments/InstrumentList';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { PianoRoll } from '../pianoroll';
