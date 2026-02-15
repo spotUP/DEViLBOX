@@ -207,19 +207,61 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const channelWidth = noteWidth + paramWidth + 20 + 20; // +20 for automation lane visual space
 
     let channelIndex = 0;
+    let localX = relativeX - LINE_NUMBER_WIDTH;
     if (relativeX > LINE_NUMBER_WIDTH) {
-      channelIndex = Math.floor((relativeX - LINE_NUMBER_WIDTH) / channelWidth);
+      channelIndex = Math.floor(localX / channelWidth);
       channelIndex = Math.max(0, Math.min(channelIndex, pattern.channels.length - 1));
+      localX = localX % channelWidth;
+    } else {
+      // Tap on line numbers - just select note of channel 0
+      channelIndex = 0;
+      localX = -1; // Force note column
+    }
+
+    // Determine column type within the channel
+    let columnType: CursorPosition['columnType'] = 'note';
+    
+    // Column layout (offsets matching getParamCanvas):
+    // note (noteWidth) -> 8px gap -> inst(2) -> 4gap -> vol(2) -> 4gap -> eff(1+2) -> 4gap -> eff2(1+2) -> 4gap
+    if (localX < noteWidth + 4) {
+      columnType = 'note';
+    } else {
+      const xInParams = localX - (noteWidth + 8);
+      
+      // inst(2) +4gap -> 0 to CW*2+4
+      if (xInParams < CHAR_WIDTH * 2 + 4) {
+        columnType = 'instrument';
+      } 
+      // vol(2) +4gap -> CW*2+4 to CW*4+8
+      else if (xInParams < CHAR_WIDTH * 4 + 8) {
+        columnType = 'volume';
+      }
+      // eff(1+2) +4gap -> CW*4+8 to CW*7+12
+      else if (xInParams < CHAR_WIDTH * 7 + 12) {
+        columnType = 'effTyp'; // Snap to type first
+      }
+      // eff2(1+2) +4gap -> CW*7+12 to CW*10+16
+      else if (xInParams < CHAR_WIDTH * 10 + 16) {
+        columnType = 'effTyp2';
+      }
+      // acid columns (if present)
+      else if (hasAcid && xInParams < CHAR_WIDTH * 12 + 24) {
+        columnType = xInParams < CHAR_WIDTH * 11 + 20 ? 'flag1' : 'flag2';
+      }
+      // probability (if present)
+      else if (hasProb) {
+        columnType = 'probability';
+      }
     }
 
     // Clamp row to valid range
     const validRow = Math.max(0, Math.min(rowIndex, pattern.length - 1));
 
     // Move cursor to tapped position
-    console.log(`[PatternCanvas] Tap detected: x=${relativeX}, y=${relativeY}, row=${validRow}, channel=${channelIndex}, channelWidth=${channelWidth}`);
     const store = useTrackerStore.getState();
     store.moveCursorToRow(validRow);
     store.moveCursorToChannel(channelIndex);
+    store.moveCursorToColumn(columnType);
   }, [pattern, isMobile]);
 
   const patternGestures = useMobilePatternGestures({
@@ -230,6 +272,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     onTap: handlePatternTap,
     onScroll: handleScroll,
     swipeThreshold: 30, // Lower threshold for better mobile responsiveness
+    enabled: isMobile,
+  });
+
+  // Channel header gestures for mobile
+  const channelHeaderGestures = useMobilePatternGestures({
+    onSwipeLeft: handleSwipeLeft,
+    onSwipeRight: handleSwipeRight,
     enabled: isMobile,
   });
 
@@ -1357,7 +1406,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     <div className="flex flex-col h-full" {...(isMobile ? swipeHandlers : {})}>
       {/* Mobile Channel Header */}
       {isMobile && (
-        <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border relative">
+        <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border relative touch-none" {...channelHeaderGestures}>
           <div className="flex items-center justify-between px-3 py-2">
             <button
               onClick={handleSwipeRight}
@@ -1551,7 +1600,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       {/* Canvas Pattern Grid */}
       <div
         ref={containerRef}
-        className="flex-1 relative bg-dark-bg overflow-x-hidden"
+        className="flex-1 relative bg-dark-bg overflow-x-hidden touch-none"
         style={{ minHeight: 200 }}
         tabIndex={0}
         onContextMenu={cellContextMenu.handleContextMenu}

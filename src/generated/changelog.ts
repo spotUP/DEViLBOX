@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-15T03:27:00.608Z
+ * Generated: 2026-02-15T11:46:19.006Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '576';
-export const BUILD_HASH = '1c921b7';
+export const BUILD_NUMBER = '593';
+export const BUILD_HASH = '0cc8ab8';
 export const BUILD_DATE = '2026-02-15';
 
 // Full semantic version with build number
@@ -31,6 +31,80 @@ export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-15',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Update release job dependency from 'deploy' to 'deploy-server'"
+      },
+      {
+        type: 'improvement',
+        "description": "Trigger: test deployment with fresh secret"
+      },
+      {
+        type: 'improvement',
+        "description": "Test: trigger automatic deployment"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: use existing Hetzner secrets for deployment"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove GitHub Pages deployment, keep only custom server"
+      },
+      {
+        type: 'feature',
+        "description": "Automatic dual deployment to GitHub Pages and custom server"
+      },
+      {
+        type: 'fix',
+        "description": "Change base URL from /DEViLBOX/ to / for standalone server deployment"
+      },
+      {
+        type: 'improvement',
+        "description": "Update project documentation and status reports"
+      },
+      {
+        type: 'feature',
+        "description": "BD animations and command generator utilities"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: app configuration, stores, and dependency updates"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: Docker deployment configuration updates"
+      },
+      {
+        type: 'fix',
+        "description": "Furnace import improvements and C64 debugging tools"
+      },
+      {
+        type: 'feature',
+        "description": "Instrument editor improvements and DrumKitEditor"
+      },
+      {
+        type: 'feature',
+        "description": "Server-side file browser and files API"
+      },
+      {
+        type: 'fix',
+        "description": "Pattern switching during playback and tracker improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Add comprehensive keyboard scheme system with multiple tracker presets"
+      },
+      {
+        type: 'fix',
+        "description": "Sync macros from DivInstrument to g_instrumentMacros for all Furnace chips"
+      }
+    ]
+  },
+  {
+    version: '2026-02-14',
     date: '2026-02-14',
     changes: [
       {
@@ -164,74 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Lock viewport and prevent unwanted scrolling behavior"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent preset modal footer from causing horizontal scroll"
-      },
-      {
-        type: 'fix',
-        "description": "Improve preset modal footer visibility and usability"
-      },
-      {
-        type: 'fix',
-        "description": "Increase hamburger menu z-index to be always frontmost"
-      },
-      {
-        type: 'fix',
-        "description": "Mark isConnected param as intentionally unused"
-      },
-      {
-        type: 'fix',
-        "description": "Enable tap and swipe gestures in pattern editor"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused variables in cable routing"
-      },
-      {
-        type: 'fix',
-        "description": "Fix piano keyboard - white keys now visible"
-      },
-      {
-        type: 'fix',
-        "description": "Accept nullable ref in usePortPositions hook"
-      },
-      {
-        type: 'feature',
-        "description": "Expand mobile hamburger menu with FT2Toolbar features"
-      },
-      {
-        type: 'fix',
-        "description": "Add Safari-specific MIDI troubleshooting and debug logging"
-      },
-      {
-        type: 'improvement',
-        "description": "Optimize instrument loading and fix unused variable"
-      },
-      {
-        type: 'fix',
-        "description": "Use correct TrackerStore methods for cursor movement"
-      },
-      {
-        type: 'feature',
-        "description": "Add tap-to-cell and improve horizontal swipe gestures"
-      },
-      {
-        type: 'feature',
-        "description": "Add hamburger menu and improve MIDI support"
-      },
-      {
-        type: 'fix',
-        "description": "Convert HARMONIC_PRESETS to InstrumentPreset['config'][] format"
-      },
-      {
-        type: 'feature',
-        "description": "Mobile MIDI support, harmonic presets, and modular synth UI"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve 8 type errors across modular synth and hooks"
       }
     ]
   }

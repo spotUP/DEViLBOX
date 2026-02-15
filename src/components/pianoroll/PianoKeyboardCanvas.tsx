@@ -106,6 +106,8 @@ const PianoKeyboardCanvasComponent: React.FC<PianoKeyboardCanvasProps> = ({
       const isHovered = hoveredMidiRef.current === midi;
 
       // Key fill
+      const keyWidth = black ? Math.floor(KEYBOARD_WIDTH * 0.66) : KEYBOARD_WIDTH;
+      
       if (isActive || isDragTarget) {
         ctx.fillStyle = '#06b6d4';
       } else if (black) {
@@ -113,24 +115,24 @@ const PianoKeyboardCanvasComponent: React.FC<PianoKeyboardCanvasProps> = ({
       } else {
         ctx.fillStyle = outOfScale ? '#333338' : '#e8e8ec';
       }
-      ctx.fillRect(0, y, KEYBOARD_WIDTH, h);
+      ctx.fillRect(0, y, keyWidth, h);
 
       // Border between keys
       ctx.fillStyle = black ? '#333' : '#888';
-      ctx.fillRect(0, y + h - 0.5, KEYBOARD_WIDTH, 0.5);
+      ctx.fillRect(0, y + h - 0.5, keyWidth, 0.5);
 
       // Dim out-of-scale keys
       if (outOfScale && !isActive && !isDragTarget) {
         ctx.globalAlpha = 0.4;
         ctx.fillStyle = '#000';
-        ctx.fillRect(0, y, KEYBOARD_WIDTH, h);
+        ctx.fillRect(0, y, keyWidth, h);
         ctx.globalAlpha = 1;
       }
 
       // Hover highlight (blue tint)
       if (isHovered && !isActive && !isDragTarget) {
         ctx.fillStyle = 'rgba(59,130,246,0.15)';
-        ctx.fillRect(0, y, KEYBOARD_WIDTH, h);
+        ctx.fillRect(0, y, keyWidth, h);
       }
 
       // Note labels
@@ -147,7 +149,7 @@ const PianoKeyboardCanvasComponent: React.FC<PianoKeyboardCanvasProps> = ({
       // Active/drag-target key pressed effect
       if (isActive || isDragTarget) {
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.fillRect(2, y + 1, KEYBOARD_WIDTH - 4, h - 2);
+        ctx.fillRect(2, y + 1, keyWidth - 4, h - 2);
       }
     }
 

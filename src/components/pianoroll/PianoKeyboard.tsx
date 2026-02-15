@@ -76,6 +76,7 @@ const PianoKeyboardComponent: React.FC<PianoKeyboardProps> = ({
         const isC = midiNote % 12 === 0;
         const isActive = activeNotes.has(midiNote);
         const outOfScale = !inScale;
+        const keyWidth = isBlack ? '66%' : '100%';
 
         return (
           <div
@@ -93,6 +94,7 @@ const PianoKeyboardComponent: React.FC<PianoKeyboardProps> = ({
             `}
             style={{
               height: verticalZoom,
+              width: keyWidth,
               transform: isActive ? 'translateX(2px)' : 'translateX(0)', // Pressed effect
             }}
             onMouseDown={() => handleMouseDown(midiNote)}

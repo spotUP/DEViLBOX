@@ -216,25 +216,47 @@ export const PianoPopover: React.FC<PianoPopoverProps> = ({
         </div>
 
         {/* Piano Keyboard */}
-        <div className="piano-keyboard">
-          {NOTE_NAMES.map((note, i) => {
-            const isBlack = BLACK_KEYS.includes(i);
-            const isSelected = step.note === note;
+        <div className="piano-keyboard-container">
+          {/* White keys layer (flex) */}
+          <div className="piano-keyboard-white-layer">
+            {NOTE_NAMES.map((note, i) => {
+              if (BLACK_KEYS.includes(i)) return null;
+              const isSelected = step.note === note;
+              return (
+                <div
+                  key={note}
+                  className={`piano-key white ${isSelected ? 'selected' : ''}`}
+                  onClick={() => handleNoteClick(note)}
+                >
+                  <div className="key-label">{note}</div>
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* Black keys layer (absolute) */}
+          <div className="piano-keyboard-black-layer">
+            {NOTE_NAMES.map((note, i) => {
+              if (!BLACK_KEYS.includes(i)) return null;
+              const isSelected = step.note === note;
+              
+              // Calculate horizontal position
+              const whiteKeysBefore = NOTE_NAMES.slice(0, i).filter((_, idx) => !BLACK_KEYS.includes(idx)).length;
+              const whiteKeyWidth = 100 / 7; // 7 white keys in octave
+              const leftPos = (whiteKeysBefore * whiteKeyWidth) - (whiteKeyWidth * 0.25);
 
-            return (
-              <div
-                key={note}
-                className={`
-                  piano-key
-                  ${isBlack ? 'black' : 'white'}
-                  ${isSelected ? 'selected' : ''}
-                `}
-                onClick={() => handleNoteClick(note)}
-              >
-                <div className="key-label">{note}</div>
-              </div>
-            );
-          })}
+              return (
+                <div
+                  key={note}
+                  className={`piano-key black ${isSelected ? 'selected' : ''}`}
+                  style={{ left: `${leftPos}%`, width: `${whiteKeyWidth * 0.6}%` }}
+                  onClick={() => handleNoteClick(note)}
+                >
+                  <div className="key-label">{note}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </>
