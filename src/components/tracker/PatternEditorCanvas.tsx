@@ -83,6 +83,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const [scrollY, setScrollY] = useState(0);
   const [visibleStart, setVisibleStart] = useState(0);
   const [renderCounter, setRenderCounter] = useState(0);
+  
+  // Cell context menu
+  const cellContextMenu = useCellContextMenu();
+
   // PERF: Use ref instead of state for channel triggers to avoid re-renders
   const channelTriggersRef = useRef<ChannelTrigger[]>([]);
 
@@ -539,9 +543,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const currentTheme = getCurrentTheme();
   const lastThemeRef = useRef(currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
-
-  // Cell context menu
-  const cellContextMenu = useCellContextMenu();
 
   // Visual Parameter Editor state
   const [parameterEditorState, setParameterEditorState] = useState<{
