@@ -136,7 +136,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                   MIDI Settings
                 </h3>
                 <div className="bg-dark-bgSecondary rounded-lg p-3">
-                  <MIDIToolbarDropdown />
+                  <MIDIToolbarDropdown inline={true} />
                 </div>
               </div>
 

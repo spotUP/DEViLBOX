@@ -10,9 +10,12 @@ import { PerformancePanel } from './PerformancePanel';
 import { Cable, CircleDot, AlertCircle, Loader2, ArrowUpDown, Settings2, Smartphone } from 'lucide-react';
 import { getBluetoothMIDIInfo } from '../../midi/BluetoothMIDIManager';
 
+interface MIDIToolbarDropdownProps {
+  inline?: boolean; // If true, always shows expanded without button (for mobile menu)
+}
 
-const MIDIToolbarDropdownComponent: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
+const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inline = false }) => {
+  const [isOpen, setIsOpen] = useState(inline); // Start open if inline mode
   const [isInitializing, setIsInitializing] = useState(false);
   const [showLearnModal, setShowLearnModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -81,51 +84,55 @@ const MIDIToolbarDropdownComponent: React.FC = () => {
 
   return (
     <>
-    <div className="relative" ref={dropdownRef}>
-      {/* Toolbar Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`
-          flex items-center gap-2 px-2 py-1 rounded text-sm font-medium
-          transition-all duration-150
-          ${isOpen ? 'bg-dark-bgActive text-text-primary' : 'hover:bg-dark-bgHover'}
-          ${getStatusColor()}
-        `}
-        title={
-          !isSupported
-            ? 'MIDI not supported'
-            : !isInitialized
-            ? 'MIDI not initialized'
-            : selectedInputId || selectedOutputId
-            ? 'MIDI connected'
-            : 'No MIDI device'
-        }
-      >
-        <div className="relative">
-          <Cable size={16} />
-          {showActivity && (
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-accent-primary rounded-full animate-ping" />
-          )}
-        </div>
-        <span className="hidden sm:inline">MIDI</span>
-      </button>
-
-      {/* Dropdown */}
-      {isOpen && (
-        <div className="absolute right-0 top-full mt-1 w-80 max-h-[80vh] bg-dark-bgTertiary border border-dark-border rounded-lg shadow-xl z-50 overflow-y-auto">
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-dark-border bg-dark-bgSecondary">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-text-primary">MIDI Settings</h3>
-              {isInitializing && <Loader2 size={14} className="animate-spin text-accent-primary" />}
-            </div>
-            {lastError && (
-              <div className="flex items-center gap-2 mt-1 text-xs text-accent-error">
-                <AlertCircle size={12} />
-                <span>{lastError}</span>
-              </div>
+    <div className={inline ? "w-full" : "relative"} ref={inline ? undefined : dropdownRef}>
+      {/* Toolbar Button (hidden in inline mode) */}
+      {!inline && (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={`
+            flex items-center gap-2 px-2 py-1 rounded text-sm font-medium
+            transition-all duration-150
+            ${isOpen ? 'bg-dark-bgActive text-text-primary' : 'hover:bg-dark-bgHover'}
+            ${getStatusColor()}
+          `}
+          title={
+            !isSupported
+              ? 'MIDI not supported'
+              : !isInitialized
+              ? 'MIDI not initialized'
+              : selectedInputId || selectedOutputId
+              ? 'MIDI connected'
+              : 'No MIDI device'
+          }
+        >
+          <div className="relative">
+            <Cable size={16} />
+            {showActivity && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-accent-primary rounded-full animate-ping" />
             )}
           </div>
+          <span className="hidden sm:inline">MIDI</span>
+        </button>
+      )}
+
+      {/* Dropdown / Inline Content */}
+      {isOpen && (
+        <div className={inline ? "w-full" : "absolute right-0 top-full mt-1 w-80 max-h-[80vh] bg-dark-bgTertiary border border-dark-border rounded-lg shadow-xl z-50 overflow-y-auto"}>
+          {/* Header (only in dropdown mode) */}
+          {!inline && (
+            <div className="px-4 py-3 border-b border-dark-border bg-dark-bgSecondary">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-text-primary">MIDI Settings</h3>
+                {isInitializing && <Loader2 size={14} className="animate-spin text-accent-primary" />}
+              </div>
+              {lastError && (
+                <div className="flex items-center gap-2 mt-1 text-xs text-accent-error">
+                  <AlertCircle size={12} />
+                  <span>{lastError}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {isSupported === false ? (
             <div className="px-4 py-6">
