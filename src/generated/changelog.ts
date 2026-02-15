@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-15T16:33:29.289Z
+ * Generated: 2026-02-15T17:03:37.745Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '620';
-export const BUILD_HASH = '74e40c4';
+export const BUILD_NUMBER = '625';
+export const BUILD_HASH = '30ea6e5';
 export const BUILD_DATE = '2026-02-15';
 
 // Full semantic version with build number
@@ -33,6 +33,26 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-15',
     changes: [
+      {
+        type: 'fix',
+        "description": "Unify keyboard component height across modes"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: transport fixes, test updates, and enhanced furnace debugging"
+      },
+      {
+        type: 'improvement',
+        "description": "Unify command input and streamline tabs"
+      },
+      {
+        type: 'fix',
+        "description": "Restore correct horizontal gesture directions"
+      },
+      {
+        type: 'fix',
+        "description": "Invert horizontal swipe and scroll directions"
+      },
       {
         type: 'fix',
         "description": "Chore: restore debug script and ensure all fixes are pushed"
@@ -218,26 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Add status message and fix copy capitalization in clonePattern"
-      },
-      {
-        type: 'feature',
-        "description": "Add clonePattern command for pattern duplication"
-      },
-      {
-        type: 'fix',
-        "description": "Add defensive checks and use NOTE_OFF constant in playRow"
-      },
-      {
-        type: 'fix',
-        "description": "Rewrite playRow to trigger notes directly via ToneEngine"
-      },
-      {
-        type: 'feature',
-        "description": "Add playRow command for row audition"
-      },
-      {
-        type: 'fix',
-        "description": "Use setCurrentRow instead of non-existent startRow property"
       }
     ]
   }
