@@ -135,7 +135,7 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
   }, [selectedModule]);
 
   return (
-    <div className="flex h-full bg-surface-primary overflow-hidden">
+    <div className="flex h-full bg-dark-bg overflow-hidden">
       {/* Matrix grid */}
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-xs">
@@ -176,7 +176,7 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
                       key={`${output.moduleId}.${output.portId}`}
                       className={`
                         border border-border p-1 text-center cursor-pointer
-                        ${isConnected ? 'bg-accent-primary/20' : 'bg-surface-primary'}
+                        ${isConnected ? 'bg-accent-primary/20' : 'bg-dark-bg'}
                         hover:bg-accent-primary/30 transition-colors
                       `}
                       onClick={() => handleCellClick(input, output)}
@@ -237,7 +237,7 @@ export const ModularMatrixView: React.FC<ModularMatrixViewProps> = ({ config, on
           <select
             value={selectedModuleId || ''}
             onChange={(e) => setSelectedModuleId(e.target.value || null)}
-            className="w-full px-2 py-1.5 mb-4 bg-surface-primary border border-border rounded text-sm text-text-primary"
+            className="w-full px-2 py-1.5 mb-4 bg-dark-bg border border-border rounded text-sm text-text-primary"
           >
             <option value="">Select module...</option>
             {config.modules.map((module) => {

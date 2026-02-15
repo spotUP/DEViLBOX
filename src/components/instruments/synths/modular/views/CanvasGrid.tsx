@@ -34,7 +34,8 @@ export const CanvasGrid: React.FC<CanvasGridProps> = ({ zoom, offsetX, offsetY }
             cx={scaledSize / 2}
             cy={scaledSize / 2}
             r={Math.max(0.5, zoom * 1.5)}
-            fill="rgba(255, 255, 255, 0.1)"
+            fill="var(--color-text-muted)"
+            opacity="0.15"
           />
         </pattern>
       </defs>

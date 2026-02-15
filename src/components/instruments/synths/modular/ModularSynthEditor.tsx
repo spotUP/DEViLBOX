@@ -33,7 +33,7 @@ export const ModularSynthEditor: React.FC<ModularSynthEditorProps> = ({ config, 
   );
 
   return (
-    <div className="flex flex-col h-full bg-surface-primary">
+    <div className="flex flex-col h-full bg-dark-bg">
       {/* Toolbar */}
       <ModularToolbar config={patchConfig} onChange={handlePatchChange} />
 
