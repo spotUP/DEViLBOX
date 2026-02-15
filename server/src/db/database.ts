@@ -40,8 +40,19 @@ export function initDatabase() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS file_revisions (
+      id TEXT PRIMARY KEY,
+      file_id TEXT NOT NULL,
+      revision_number INTEGER NOT NULL,
+      data TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_files_user_id ON files(user_id);
     CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+    CREATE INDEX IF NOT EXISTS idx_revisions_file_id ON file_revisions(file_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_revisions_file_revision ON file_revisions(file_id, revision_number);
   `);
 
   console.log('[DB] Database initialized at:', DB_PATH);

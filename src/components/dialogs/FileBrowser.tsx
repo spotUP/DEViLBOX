@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File } from 'lucide-react';
+import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardDrive, History, RotateCcw } from 'lucide-react';
 import '@cubone/react-file-manager/dist/style.css';
 import {
   isFileSystemAccessSupported,
@@ -32,6 +32,18 @@ import {
   writeServerFile,
   type ServerFileEntry,
 } from '@/lib/serverFS';
+import { useAuthStore } from '@stores/useAuthStore';
+import {
+  isAuthenticated,
+  listUserFiles,
+  getFile as getCloudFile,
+  saveFile as saveCloudFile,
+  deleteFile as deleteCloudFile,
+  listRevisions,
+  restoreRevision,
+  type ServerFile,
+  type FileRevision,
+} from '@/lib/serverFilesApi';
 
 interface FileBrowserProps {
   isOpen: boolean;
@@ -51,8 +63,9 @@ interface FileItem {
   path: string;
   size?: number;
   modifiedAt?: Date;
-  source: 'filesystem';
+  source: 'filesystem' | 'cloud';
   handle?: FileSystemFileHandle | FileSystemDirectoryHandle;
+  cloudId?: string; // For cloud files
 }
 
 // Helper to detect tracker module files (binary formats)
@@ -89,6 +102,19 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   const [hasServerFS, setHasServerFS] = useState(false);
   const [currentPath, setCurrentPath] = useState<string>('');
   const [electronDirectory, setElectronDirectory] = useState<string | null>(null);
+  const [fileSource, setFileSource] = useState<'demo' | 'cloud'>('demo');
+  const [cloudFiles, setCloudFiles] = useState<ServerFile[]>([]);
+  
+  // Revision history state
+  const [showRevisions, setShowRevisions] = useState(false);
+  const [revisions, setRevisions] = useState<FileRevision[]>([]);
+  const [revisionsLoading, setRevisionsLoading] = useState(false);
+  const [revisionsFileId, setRevisionsFileId] = useState<string | null>(null);
+  const [revisionsFilename, setRevisionsFilename] = useState<string>('');
+
+  // Auth state
+  const user = useAuthStore((state) => state.user);
+  const isServerAvailable = useAuthStore((state) => state.isServerAvailable);
 
   // Check filesystem access on mount
   useEffect(() => {
@@ -113,6 +139,26 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     try {
       let items: FileItem[] = [];
 
+      // If viewing cloud files
+      if (fileSource === 'cloud' && isAuthenticated()) {
+        const files = await listUserFiles('songs');
+        setCloudFiles(files);
+        items = files.map((f: ServerFile) => ({
+          id: f.id,
+          name: f.filename,
+          isDirectory: false,
+          path: f.filename,
+          modifiedAt: new Date(f.updatedAt),
+          source: 'cloud' as const,
+          cloudId: f.id,
+        }));
+        items.sort((a, b) => a.name.localeCompare(b.name));
+        setFiles(items);
+        setIsLoading(false);
+        return;
+      }
+
+      // Demo files / filesystem mode
       // Check if Electron FS is available
       if (hasElectronFS() && window.electron?.fs) {
         // Use Electron native file system
@@ -216,13 +262,49 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [currentPath, electronDirectory, hasServerFS]);
+  }, [currentPath, electronDirectory, hasServerFS, fileSource]);
 
   useEffect(() => {
     if (isOpen) {
       loadFiles();
     }
-  }, [isOpen, loadFiles]);
+  }, [isOpen, loadFiles, fileSource]);
+
+  // Load revisions for a cloud file
+  const loadRevisions = useCallback(async (fileId: string, filename: string) => {
+    setRevisionsLoading(true);
+    setRevisionsFileId(fileId);
+    setRevisionsFilename(filename);
+    setShowRevisions(true);
+    try {
+      const result = await listRevisions(fileId);
+      setRevisions(result.revisions);
+    } catch (err) {
+      console.error('Failed to load revisions:', err);
+      setRevisions([]);
+    } finally {
+      setRevisionsLoading(false);
+    }
+  }, []);
+
+  // Restore a revision
+  const handleRestoreRevision = useCallback(async (revisionNumber: number) => {
+    if (!revisionsFileId) return;
+    setRevisionsLoading(true);
+    try {
+      await restoreRevision(revisionsFileId, revisionNumber);
+      // Reload files to show updated timestamp
+      await loadFiles();
+      setShowRevisions(false);
+      setRevisions([]);
+      setRevisionsFileId(null);
+    } catch (err) {
+      console.error('Failed to restore revision:', err);
+      setError(err instanceof Error ? err.message : 'Failed to restore revision');
+    } finally {
+      setRevisionsLoading(false);
+    }
+  }, [revisionsFileId, loadFiles]);
 
   // Request filesystem access
   const handleRequestFilesystemAccess = async () => {
@@ -239,6 +321,14 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     setError(null);
 
     try {
+      // Handle cloud file loading
+      if (selectedFile.source === 'cloud' && selectedFile.cloudId) {
+        const cloudFile = await getCloudFile(selectedFile.cloudId);
+        onLoad(cloudFile.data, cloudFile.filename);
+        onClose();
+        return;
+      }
+
       // Check if this is a binary file (tracker module, .sqs/.seq, etc.)
       if (isBinaryFile(selectedFile.name)) {
         if (!onLoadTrackerModule) {
@@ -314,6 +404,14 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       const data = currentProjectData();
       const filename = saveFilename.endsWith('.dbx') ? saveFilename : `${saveFilename}.dbx`;
 
+      // Save to cloud if viewing cloud files and authenticated
+      if (fileSource === 'cloud' && isAuthenticated()) {
+        await saveCloudFile(filename, data, 'songs');
+        loadFiles(); // Refresh file list
+        onClose();
+        return;
+      }
+
       // Check which filesystem to use
       if (hasElectronFS() && window.electron?.fs) {
         // Save via Electron
@@ -356,6 +454,13 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     if (!confirm(`Delete "${file.name}"?`)) return;
 
     try {
+      // Delete from cloud if it's a cloud file
+      if (file.source === 'cloud' && file.cloudId) {
+        await deleteCloudFile(file.cloudId);
+        loadFiles();
+        return;
+      }
+
       const dirHandle = getCurrentDirectory();
       if (dirHandle) {
         await deleteFile(file.name, dirHandle);
@@ -389,24 +494,67 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         </div>
 
         {/* View Mode Tabs */}
-        <div className="flex border-b border-dark-border">
+        <div className="flex border-b border-dark-border bg-dark-bgTertiary">
+          {/* Demo Files Tab */}
           <button
-            onClick={() => hasFilesystemAccess ? null : handleRequestFilesystemAccess()}
-            className={`px-4 py-2 text-sm font-medium ${
-              hasFilesystemAccess
-                ? 'text-accent-primary border-b-2 border-accent-primary'
+            onClick={() => {
+              setFileSource('demo');
+              setSelectedFile(null);
+            }}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+              fileSource === 'demo'
+                ? 'text-accent-primary border-b-2 border-accent-primary bg-dark-bgSecondary'
                 : 'text-text-muted hover:text-text-primary'
             }`}
           >
-            {hasFilesystemAccess ? 'Filesystem' : 'Open Folder...'}
+            <HardDrive size={14} />
+            Demo Files
           </button>
+
+          {/* Cloud Files Tab - only shown when logged in */}
+          {user && isServerAvailable && (
+            <button
+              onClick={() => {
+                setFileSource('cloud');
+                setSelectedFile(null);
+                setCurrentPath('');
+              }}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                fileSource === 'cloud'
+                  ? 'text-accent-primary border-b-2 border-accent-primary bg-dark-bgSecondary'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              <Cloud size={14} />
+              My Files
+            </button>
+          )}
+
+          {/* Open Folder button (when Web FS API available) */}
+          {!hasElectronFS() && fileSource === 'demo' && (
+            <button
+              onClick={handleRequestFilesystemAccess}
+              className="ml-auto px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
+            >
+              {hasFilesystemAccess ? 'Filesystem' : 'Open Folder...'}
+            </button>
+          )}
         </div>
 
         {/* Breadcrumb / Current Path */}
-        {currentPath && (
+        {currentPath && fileSource === 'demo' && (
           <div className="px-4 py-2 bg-dark-bgTertiary border-b border-dark-border">
             <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono truncate">
               <FolderOpen size={14} /> {currentPath}
+            </div>
+          </div>
+        )}
+
+        {/* Cloud Files Info */}
+        {fileSource === 'cloud' && user && (
+          <div className="px-4 py-2 bg-accent-primary/10 border-b border-dark-border">
+            <div className="flex items-center gap-1.5 text-xs text-accent-primary">
+              <Cloud size={14} /> Your saved files ({cloudFiles.length})
             </div>
           </div>
         )}
@@ -423,18 +571,47 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             <div className="flex items-center justify-center h-full text-text-muted">
               Loading...
             </div>
+          ) : fileSource === 'cloud' && !user ? (
+            // Cloud mode but not logged in
+            <div className="flex flex-col items-center justify-center h-full text-text-muted">
+              <Cloud size={48} className="mb-4 text-text-muted/50" />
+              <p className="mb-2 text-lg font-medium">Sign in to save files</p>
+              <p className="mb-4 text-sm text-center max-w-md">
+                Create a free account to save your songs to the cloud and access them from any device.
+              </p>
+              <button
+                onClick={() => setFileSource('demo')}
+                className="px-4 py-2 text-text-muted hover:text-text-primary"
+              >
+                View Demo Files Instead
+              </button>
+            </div>
           ) : files.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-text-muted">
-              <p className="mb-4">No files found</p>
-              {!hasElectronFS() && !hasServerFS && !hasFilesystemAccess && (
-                <button
-                  onClick={handleRequestFilesystemAccess}
-                  className="px-4 py-2 bg-accent-primary text-white rounded hover:bg-accent-hover"
-                >
-                  Open Folder
-                </button>
+              {fileSource === 'cloud' ? (
+                <>
+                  <Cloud size={48} className="mb-4 text-text-muted/50" />
+                  <p className="mb-2">No saved files yet</p>
+                  <p className="text-sm text-center max-w-md">
+                    {mode === 'save' 
+                      ? 'Enter a filename below and click Save to save your first file.'
+                      : 'Save a project first to see it here.'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mb-4">No files found</p>
+                  {!hasElectronFS() && !hasServerFS && !hasFilesystemAccess && (
+                    <button
+                      onClick={handleRequestFilesystemAccess}
+                      className="px-4 py-2 bg-accent-primary text-white rounded hover:bg-accent-hover"
+                    >
+                      Open Folder
+                    </button>
+                  )}
+                </>
               )}
-              {hasElectronFS() && !electronDirectory && (
+              {hasElectronFS() && !electronDirectory && fileSource === 'demo' && (
                 <button
                   onClick={async () => {
                     if (window.electron?.fs) {
@@ -454,8 +631,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-2">
-              {/* Back button when in subdirectory */}
-              {currentPath !== '' && (
+              {/* Back button when in subdirectory (not for cloud files) */}
+              {currentPath !== '' && fileSource === 'demo' && (
                 <div
                   onClick={() => {
                     if (hasElectronFS() && currentPath) {
@@ -524,6 +701,20 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                       {file.modifiedAt && ` • ${file.modifiedAt.toLocaleDateString()}`}
                     </div>
                   </div>
+                  {/* Version history button for cloud files */}
+                  {file.source === 'cloud' && file.cloudId && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        loadRevisions(file.cloudId!, file.name);
+                      }}
+                      className="text-text-muted hover:text-accent-primary p-1"
+                      title="Version History"
+                      aria-label="Version History"
+                    >
+                      <History size={14} />
+                    </button>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -562,16 +753,94 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           <button
             onClick={mode === 'load' ? handleLoad : handleSave}
             disabled={mode === 'load' && (!selectedFile || selectedFile.isDirectory)}
-            className={`px-6 py-2 rounded font-medium ${
+            className={`flex items-center gap-2 px-6 py-2 rounded font-medium ${
               (mode === 'load' && (!selectedFile || selectedFile.isDirectory))
                 ? 'bg-dark-bgTertiary text-text-muted cursor-not-allowed'
                 : 'bg-accent-primary text-white hover:bg-accent-primaryHover'
             }`}
           >
-            {mode === 'load' ? 'Load' : 'Save'}
+            {fileSource === 'cloud' && <Cloud size={16} />}
+            {mode === 'load' ? 'Load' : (fileSource === 'cloud' ? 'Save to Cloud' : 'Save')}
           </button>
         </div>
       </div>
+
+      {/* Version History Modal */}
+      {showRevisions && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60]">
+          <div className="bg-dark-bgPrimary border border-dark-border rounded-lg w-[400px] max-h-[500px] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
+              <div className="flex items-center gap-2">
+                <History size={18} className="text-accent-primary" />
+                <span className="font-semibold text-text-primary">Version History</span>
+              </div>
+              <button
+                onClick={() => {
+                  setShowRevisions(false);
+                  setRevisions([]);
+                  setRevisionsFileId(null);
+                }}
+                className="text-text-muted hover:text-text-primary"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* File info */}
+            <div className="px-4 py-2 bg-dark-bgSecondary border-b border-dark-border">
+              <span className="text-sm text-text-muted">File: </span>
+              <span className="text-sm text-text-primary font-medium">{revisionsFilename}</span>
+            </div>
+
+            {/* Revision list */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {revisionsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin w-6 h-6 border-2 border-accent-primary border-t-transparent rounded-full" />
+                </div>
+              ) : revisions.length === 0 ? (
+                <div className="text-center py-8 text-text-muted">
+                  No previous versions available.
+                  <br />
+                  <span className="text-sm">Versions are saved when you update a file.</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {revisions.map((rev) => (
+                    <div
+                      key={rev.id}
+                      className="flex items-center justify-between p-3 bg-dark-bgTertiary rounded border border-dark-border"
+                    >
+                      <div>
+                        <div className="text-text-primary font-medium">
+                          Version {rev.revisionNumber}
+                        </div>
+                        <div className="text-xs text-text-muted">
+                          {new Date(rev.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRestoreRevision(rev.revisionNumber)}
+                        disabled={revisionsLoading}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30 rounded text-sm font-medium disabled:opacity-50"
+                      >
+                        <RotateCcw size={14} />
+                        Restore
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 py-3 border-t border-dark-border text-xs text-text-muted">
+              Up to 10 versions are kept. Restoring creates a backup of the current version.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
