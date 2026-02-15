@@ -12,6 +12,7 @@ interface ModalHeaderProps {
   onClose?: () => void;
   theme?: 'modern' | 'retro';
   showCloseButton?: boolean;
+  className?: string;
 }
 
 export const ModalHeader: React.FC<ModalHeaderProps> = ({
@@ -21,6 +22,7 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
   onClose,
   theme = 'modern',
   showCloseButton = true,
+  className = '',
 }) => {
   // Theme-based classes
   const themeClasses = theme === 'retro'
@@ -34,7 +36,7 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
     : 'p-2 rounded-lg hover:bg-dark-bgHover text-text-muted hover:text-text-primary transition-colors focus:outline-none';
 
   return (
-    <div className={`flex items-center justify-between px-4 py-3 ${borderClasses} ${themeClasses}`}>
+    <div className={`flex items-center justify-between px-4 py-3 ${borderClasses} ${themeClasses} ${className}`}>
       <div className="flex items-center gap-3">
         {icon && (
           <div className="text-accent-primary">

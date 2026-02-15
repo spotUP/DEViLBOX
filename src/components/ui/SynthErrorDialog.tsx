@@ -50,9 +50,10 @@ export const SynthErrorDialog: React.FC = () => {
         title="Synth Error"
         subtitle={errorTypeLabels[activeError.errorType]}
         icon={<AlertTriangle className="w-6 h-6 text-red-500" />}
+        className="select-none"
       />
 
-      <div className="p-4 space-y-4 overflow-y-auto max-h-[60vh]">
+      <div className="p-4 space-y-4 overflow-y-auto max-h-[60vh] select-text">
         {/* Error Summary */}
         <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4">
           <div className="flex items-start gap-3">

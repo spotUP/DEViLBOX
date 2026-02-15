@@ -4,6 +4,7 @@
  */
 
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Copy, Check } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -14,6 +15,7 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  copied: boolean;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -23,6 +25,7 @@ export class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
+      copied: false,
     };
   }
 
@@ -38,9 +41,6 @@ export class ErrorBoundary extends Component<Props, State> {
       console.error('[ErrorBoundary] Caught error:', error);
       console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
     }
-
-    // In production, you could send this to an error reporting service
-    // Example: errorReportingService.log({ error, errorInfo });
   }
 
   handleReload = (): void => {
@@ -48,7 +48,28 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   handleReset = (): void => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
+    this.setState({ hasError: false, error: null, errorInfo: null, copied: false });
+  };
+
+  handleCopy = async (): Promise<void> => {
+    const { error, errorInfo } = this.state;
+    if (!error) return;
+
+    const debugInfo = `
+=== DEViLBOX Critical Error ===
+Message: ${error.toString()}
+Component Stack: ${errorInfo?.componentStack}
+User Agent: ${navigator.userAgent}
+Time: ${new Date().toISOString()}
+    `.trim();
+
+    try {
+      await navigator.clipboard.writeText(debugInfo);
+      this.setState({ copied: true });
+      setTimeout(() => this.setState({ copied: false }), 2000);
+    } catch (err) {
+      console.error('Failed to copy error info:', err);
+    }
   };
 
   render(): ReactNode {
@@ -60,9 +81,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
       // Default error UI
       return (
-        <div className="min-h-screen bg-bg flex items-center justify-center p-4">
-          <div className="max-w-lg w-full bg-bg-secondary rounded-lg border border-border p-6 text-center">
-            <div className="text-6xl mb-4">💀</div>
+        <div className="min-h-screen bg-bg flex items-center justify-center p-4 select-text">
+          <div className="max-w-lg w-full bg-bg-secondary rounded-lg border border-border p-6 text-center select-text">
+            <div className="text-6xl mb-4 select-none">💀</div>
             <h1 className="text-2xl font-bold text-text mb-2">
               Something went wrong
             </h1>
@@ -70,19 +91,33 @@ export class ErrorBoundary extends Component<Props, State> {
               DEViLBOX encountered an unexpected error. Your work may have been auto-saved.
             </p>
 
-            {import.meta.env.DEV && this.state.error && (
-              <details className="mb-4 text-left">
-                <summary className="cursor-pointer text-accent hover:text-accent-hover text-sm">
-                  Error Details (dev only)
-                </summary>
-                <pre className="mt-2 p-2 bg-bg rounded text-xs text-text-muted overflow-auto max-h-40">
-                  {this.state.error.toString()}
-                  {this.state.errorInfo?.componentStack}
-                </pre>
-              </details>
-            )}
+            <div className="mb-6 text-left">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-text-muted uppercase tracking-wider select-none">Error Details</span>
+                <button 
+                  onClick={this.handleCopy}
+                  className="flex items-center gap-1.5 px-2 py-1 text-[10px] bg-bg-tertiary hover:bg-border rounded transition-colors text-text-secondary select-none"
+                >
+                  {this.state.copied ? (
+                    <>
+                      <Check size={12} className="text-green-500" />
+                      <span className="text-green-500">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} />
+                      <span>Copy Info</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <pre className="p-3 bg-bg rounded text-xs text-red-400 overflow-auto max-h-60 font-mono border border-red-900/30">
+                {this.state.error?.toString()}
+                {this.state.errorInfo?.componentStack}
+              </pre>
+            </div>
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center select-none">
               <button
                 onClick={this.handleReset}
                 className="px-4 py-2 bg-bg-tertiary hover:bg-border rounded text-text transition-colors"
@@ -106,3 +141,4 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 
 export default ErrorBoundary;
+
