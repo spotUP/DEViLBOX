@@ -1833,12 +1833,34 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const newRow = Math.min(pattern.length + 32, currentRow + delta); // Allow scrolling 32 rows into next pattern
         useTrackerStore.getState().moveCursorToRow(newRow);
       } else {
-        // Horizontal scroll - scroll channels (only if they don't all fit)
+        // Horizontal scroll - scroll channels STEPPED (one by one)
         // Use totalChannelsWidth from useMemo for consistency
         const maxScroll = Math.max(0, LINE_NUMBER_WIDTH + totalChannelsWidth - container.clientWidth);
 
         if (maxScroll > 0) {
-          const newScrollLeft = Math.max(0, Math.min(maxScroll, scrollLeft + e.deltaX));
+          const direction = Math.sign(e.deltaX);
+          if (direction === 0) return;
+
+          // Find current leftmost visible channel
+          let currentCh = 0;
+          for (let i = 0; i < channelOffsets.length; i++) {
+            // channelOffsets[i] is the absolute X position.
+            // visual position = channelOffsets[i] - scrollLeft.
+            // If visual position <= LINE_NUMBER_WIDTH + small_threshold, it's the "current" one.
+            // Actually simpler: effectively scrollLeft is (channelOffsets[currentCh] - LINE_NUMBER_WIDTH).
+            const targetScroll = channelOffsets[i] - LINE_NUMBER_WIDTH;
+            if (targetScroll <= scrollLeft + 5) { // +5 epsilon
+              currentCh = i;
+            } else {
+              break;
+            }
+          }
+
+          let nextCh = currentCh + direction;
+          nextCh = Math.max(0, Math.min(channelOffsets.length - 1, nextCh));
+          
+          const newScrollLeft = Math.max(0, Math.min(maxScroll, channelOffsets[nextCh] - LINE_NUMBER_WIDTH));
+
           setScrollLeft(newScrollLeft);
           if (headerScrollRef.current) {
             headerScrollRef.current.scrollLeft = newScrollLeft;
@@ -1849,7 +1871,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, [scrollLeft, totalChannelsWidth, dimensions.width]);
+  }, [scrollLeft, totalChannelsWidth, dimensions.width, channelOffsets]);
 
   // Handle header scroll sync
   const handleHeaderScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
