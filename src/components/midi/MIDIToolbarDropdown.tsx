@@ -37,12 +37,25 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
   const openPatternDialog = useMIDIStore((state) => state.openPatternDialog);
 
   // Initialize MIDI on mount (when isSupported is null, we haven't checked yet)
+  // On iOS, we still auto-try but the store will retry if the API isn't ready yet
   useEffect(() => {
     if (!isInitialized && isSupported === null) {
       requestAnimationFrame(() => setIsInitializing(true));
       init().finally(() => requestAnimationFrame(() => setIsInitializing(false)));
     }
   }, [isInitialized, isSupported, init]);
+
+  // Retry MIDI init on user gesture (for iOS where API may need user interaction)
+  const handleRetryInit = async () => {
+    setIsInitializing(true);
+    // Reset support status so init re-checks
+    useMIDIStore.setState((state) => {
+      state.isSupported = null;
+      state.lastError = null;
+    });
+    await init();
+    setIsInitializing(false);
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -189,6 +202,15 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
                   {midiInfo.instructions}
                 </div>
               )}
+
+              {/* Retry button — on iOS, MIDI API may need a user gesture to activate */}
+              <button
+                onClick={handleRetryInit}
+                disabled={isInitializing}
+                className="w-full mt-3 px-4 py-2.5 bg-accent-primary/20 border border-accent-primary/30 rounded-lg text-sm font-bold text-accent-primary hover:bg-accent-primary/30 transition-colors disabled:opacity-50"
+              >
+                {isInitializing ? 'Checking...' : 'Retry MIDI Detection'}
+              </button>
             </div>
           ) : isSupported === null ? (
             <div className="px-4 py-6 text-center">

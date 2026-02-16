@@ -193,11 +193,25 @@ export const useMIDIStore = create<MIDIStore>()(
         const manager = getMIDIManager();
 
         if (!manager.isSupported()) {
-          set((state) => {
-            state.isSupported = false;
-            state.lastError = 'Web MIDI API not supported in this browser';
-          });
-          return false;
+          // On iOS Safari, Web MIDI API may not be immediately available.
+          // Retry once after a brief delay — the API can appear after page fully loads.
+          if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            console.log('[useMIDIStore] MIDI not found on iOS, retrying after delay...');
+            await new Promise(r => setTimeout(r, 500));
+            if (!manager.isSupported()) {
+              set((state) => {
+                state.isSupported = false;
+                state.lastError = 'Web MIDI API not supported — try opening in Safari (not PWA)';
+              });
+              return false;
+            }
+          } else {
+            set((state) => {
+              state.isSupported = false;
+              state.lastError = 'Web MIDI API not supported in this browser';
+            });
+            return false;
+          }
         }
 
         set((state) => {
