@@ -635,9 +635,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                     key={stepIdx}
                     className="mx-0.5 rounded-sm relative"
                     role="gridcell"
-                    style={{
-                      backgroundColor: isBeatMarker ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
-                    }}
                   >
                     <NoteGridCell
                       noteIndex={noteIndex}
@@ -654,6 +651,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                       velocity={isActive ? step?.velocity : 100}
                       cellSize={cellSize}
                       trailOpacity={trailOpacity}
+                      isBeatMarker={isBeatMarker}
                       onClick={handleNoteClick}
                       onToggleAccent={toggleAccent}
                       onToggleSlide={toggleSlide}
