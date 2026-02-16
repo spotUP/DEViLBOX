@@ -20,6 +20,48 @@
   font-weight: 600;
 }
 
+/* Instrument Selector */
+.tb303-instrument-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.tb303-instrument-selector label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.tb303-instrument-selector .instrument-select {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tb303-instrument-selector .instrument-select:hover {
+  border-color: var(--color-accent);
+  background: var(--color-bg-hover);
+}
+
+.tb303-instrument-selector .instrument-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(255, 0, 100, 0.2);
+}
+
 /* Initialization Screen */
 .tb303-init {
   display: flex;
