@@ -82,6 +82,9 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   // Acid pattern generator state
   const [showAcidGenerator, setShowAcidGenerator] = useState(false);
 
+  // Auto-sizing state - calculate cell size to fit viewport
+  const [cellSize, setCellSize] = useState(28); // 28px default (Tailwind w-7)
+
   // MIDI integration
   const { onMessage } = useMIDI();
   const { applyGridMIDIValue } = useMIDIStore();
@@ -92,6 +95,39 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       requestAnimationFrame(() => setFocusedCell({ noteIndex: 11, stepIndex: 0 }));
     }
   }, [focusedCell, maxSteps]);
+
+  // Auto-sizing: calculate optimal cell size to fit all steps without horizontal scroll
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const calculateSize = () => {
+      const containerWidth = container.clientWidth;
+      const LABEL_WIDTH = 48; // w-10 mr-2 = 40px + 8px
+      const PADDING = 16; // p-2 = 8px on each side
+      const CELL_GAP = 4; // mx-0.5 = 2px on each side per cell
+
+      // Available width for cells
+      const availableWidth = containerWidth - LABEL_WIDTH - PADDING;
+
+      // Calculate cell size (includes gap): availableWidth / maxSteps
+      const totalCellWidth = Math.floor(availableWidth / maxSteps);
+      
+      // Cell size is totalCellWidth minus gap, clamped to [14, 28]
+      const newCellSize = Math.max(14, Math.min(28, totalCellWidth - CELL_GAP));
+      
+      setCellSize(newCellSize);
+    };
+
+    // Initial calculation
+    calculateSize();
+
+    // Recalculate on resize
+    const resizeObserver = new ResizeObserver(calculateSize);
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, [maxSteps]);
 
   // RAF-based smooth scrolling (only when smooth scrolling enabled)
   useEffect(() => {
@@ -109,8 +145,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    // Cell width (28px) + margin (4px) = 32px per step, plus row label width (48px)
-    const CELL_WIDTH = 32;
+    // Cell width = cellSize + gap (mx-0.5 = 4px total), plus row label width
+    const CELL_WIDTH = cellSize + 4;
     const LABEL_WIDTH = 48;
     const msPerRow = (2.5 / bpm) * speed * 1000;
 
@@ -155,7 +191,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         rafIdRef.current = 0;
       }
     };
-  }, [isPlaying, smoothScrolling, bpm, speed, currentStep]);
+  }, [isPlaying, smoothScrolling, bpm, speed, currentStep, cellSize]);
 
   // Handle MIDI CC messages for parameter control
   useEffect(() => {
@@ -387,6 +423,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         onClearAll={clearAll}
         onRandomize={handleRandomize}
         onAcidGenerator={handleAcidGenerator}
+        cellSize={cellSize}
       />
 
       {/* Grid */}
@@ -404,12 +441,13 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
             {stepIndices.map((stepIdx) => (
               <div
                 key={stepIdx}
-                className={`w-7 h-4 flex items-center justify-center text-[10px] font-mono mx-0.5
+                className={`h-4 flex items-center justify-center text-[10px] font-mono mx-0.5
                   ${stepIdx % 4 === 0 ? 'text-text-primary' : 'text-text-muted'}
                   ${currentStep === stepIdx ? 'text-accent-primary font-bold' : ''}
                 `}
+                style={{ width: `${cellSize}px` }}
               >
-                {(stepIdx + 1).toString().padStart(2, '0')}
+                {stepIdx.toString().padStart(2, '0')}
               </div>
             ))}
           </div>
@@ -453,6 +491,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                       hammer={isActive ? step?.hammer : false}
                       octaveShift={isActive ? step?.octaveShift : 0}
                       velocity={isActive ? step?.velocity : 100}
+                      cellSize={cellSize}
                       onClick={handleNoteClick}
                       onToggleAccent={toggleAccent}
                       onToggleSlide={toggleSlide}

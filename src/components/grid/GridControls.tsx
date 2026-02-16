@@ -22,6 +22,7 @@ interface GridControlsProps {
   onClearAll: () => void;
   onRandomize?: () => void;
   onAcidGenerator?: () => void;
+  cellSize?: number; // Current auto-calculated cell size
 }
 
 export const GridControls: React.FC<GridControlsProps> = ({
@@ -37,6 +38,7 @@ export const GridControls: React.FC<GridControlsProps> = ({
   onClearAll,
   onRandomize,
   onAcidGenerator,
+  cellSize = 28,
 }) => {
   const [showMIDIPanel, setShowMIDIPanel] = useState(false);
 
@@ -96,6 +98,11 @@ export const GridControls: React.FC<GridControlsProps> = ({
         >
           Apply All
         </button>
+        
+        {/* Zoom indicator */}
+        <span className="text-xs text-text-muted" title="Auto-calculated cell size to fit viewport">
+          Zoom: {cellSize}px
+        </span>
       </div>
 
       {/* Separator */}
