@@ -144,14 +144,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
 
   // RAF-based smooth scrolling (only when smooth scrolling enabled)
   useEffect(() => {
-    const grid = gridRef.current;
-    const container = scrollContainerRef.current;
-    
     if (!isPlaying || !smoothScrolling) {
-      // Reset transform and refs when not playing
-      if (grid) {
-        grid.style.transform = '';
-      }
+      // Reset refs when not playing
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = 0;
@@ -159,7 +153,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       return;
     }
 
-    if (!container || !grid) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
     // Cell width = cellSize + gap (mx-0.5 = 4px total), plus row label width
     const CELL_WIDTH = cellSize + 4;
@@ -180,8 +175,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       const lerpFactor = 0.3;
       currentScrollRef.current += (targetScroll - currentScrollRef.current) * lerpFactor;
 
-      // Apply via GPU-accelerated transform instead of scrollLeft
-      grid.style.transform = `translateX(-${currentScrollRef.current}px)`;
+      // Apply scroll
+      container.scrollLeft = currentScrollRef.current;
 
       rafIdRef.current = requestAnimationFrame(animate);
     };
@@ -191,9 +186,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     rafIdRef.current = requestAnimationFrame(animate);
 
     return () => {
-      if (grid) {
-        grid.style.transform = '';
-      }
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = 0;
@@ -439,7 +431,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         <div
           ref={gridRef}
           className="inline-block min-w-full relative"
-          style={{ willChange: 'transform' }}
           role="grid"
           aria-label="TB-303 Pattern Grid"
           onKeyDown={handleKeyDown}
