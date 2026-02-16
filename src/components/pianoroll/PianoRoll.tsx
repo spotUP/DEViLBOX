@@ -959,7 +959,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
             className={`p-1.5 rounded transition-colors ${
               tool === 'select' ? 'bg-accent-primary text-text-inverse' : 'text-text-muted hover:text-text-primary'
             }`}
-            title="Select (1)"
+            title="Select tool (1) - Click notes to select, drag to move/resize, click empty space for selection box"
             aria-pressed={tool === 'select'}
           >
             <MousePointer2 size={14} />
@@ -969,7 +969,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
             className={`p-1.5 rounded transition-colors ${
               tool === 'draw' ? 'bg-accent-primary text-text-inverse' : 'text-text-muted hover:text-text-primary'
             }`}
-            title="Draw (2)"
+            title="Draw tool (2) - Click empty space to add notes, drag to paint multiple notes"
             aria-pressed={tool === 'draw'}
           >
             <Pencil size={14} />
@@ -979,7 +979,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
             className={`p-1.5 rounded transition-colors ${
               tool === 'erase' ? 'bg-accent-primary text-text-inverse' : 'text-text-muted hover:text-text-primary'
             }`}
-            title="Erase (3)"
+            title="Erase tool (3) - Click notes to delete them, drag to erase multiple"
             aria-pressed={tool === 'erase'}
           >
             <Eraser size={14} />
