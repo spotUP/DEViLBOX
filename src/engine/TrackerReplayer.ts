@@ -474,9 +474,7 @@ export class TrackerReplayer {
       engine.releaseAll();
     } catch { /* ignored */ }
 
-    // Reset position
-    this.songPos = 0;
-    this.pattPos = 0;
+    // Keep position — don't reset songPos/pattPos so playback resumes where it stopped
     this.currentTick = 0;
     this.totalTicksScheduled = 0;
     this.lastGrooveTemplateId = 'straight';
