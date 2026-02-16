@@ -208,7 +208,7 @@ export const useTrackerInput = () => {
 
   // Preview note with attack (called on keydown)
   const previewNote = useCallback(
-    (note: string, octave: number, key: string) => {
+    async (note: string, octave: number, key: string) => {
       if (currentInstrumentId === null) return;
 
       const engine = getToneEngine();
@@ -239,6 +239,9 @@ export const useTrackerInput = () => {
 
       // FT2: Get target channel for multi-channel recording
       const targetChannel = getTargetChannel();
+
+      // Ensure synth is ready (for WASM synths like FurnaceDispatch)
+      await engine.ensureInstrumentReady(instrument);
 
       // PERFORMANCE: Trigger audio FIRST before any state updates
       // State updates can cause React re-renders which delay audio

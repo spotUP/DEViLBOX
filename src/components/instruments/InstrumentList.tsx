@@ -118,6 +118,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
       const engine = getToneEngine();
 
+      // Ensure WASM synths are initialized before triggering
+      await engine.ensureInstrumentReady(inst);
+
       // Use C4 as default preview note, or C3 for bass instruments
       const isBass = inst.synthType === 'TB303' || inst.name.toLowerCase().includes('bass');
       const previewNote = isBass ? 'C3' : 'C4';
