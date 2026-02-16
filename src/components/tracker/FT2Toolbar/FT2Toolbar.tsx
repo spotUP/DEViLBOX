@@ -560,7 +560,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       setIsLooping(false);
       setCurrentRow(0); // Always start from first row of current pattern
       await engine.init();
-      play();
+      await play();
     }
   };
 
@@ -572,7 +572,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
       setIsLooping(true);
       setCurrentRow(0); // Always start from first row of current pattern
       await engine.init();
-      play();
+      await play();
     }
   };
 

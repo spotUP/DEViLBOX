@@ -46,10 +46,10 @@ interface TransportStore extends TransportState {
   setJitter: (jitter: number) => void;
   setUseMpcScale: (use: boolean) => void;
   setPosition: (position: string) => void;
-  play: () => void;
+  play: () => Promise<void>;
   pause: () => void;
   stop: () => void;
-  togglePlayPause: () => void;
+  togglePlayPause: () => Promise<void>;
   setIsLooping: (looping: boolean) => void;
   setCurrentRow: (row: number, patternLength?: number) => void;
   setCurrentRowThrottled: (row: number, patternLength?: number, immediate?: boolean) => void; // NEW: Throttled version for playback
@@ -166,9 +166,14 @@ export const useTransportStore = create<TransportStore>()(
         state.position = position;
       }),
 
-    play: () => {
+    play: async () => {
       // Auto-bake any instruments that need it before starting playback
       useInstrumentStore.getState().autoBakeInstruments();
+      
+      // CRITICAL for iOS: Start audio context synchronously during user gesture
+      // See: https://github.com/Tonejs/Tone.js/issues/164
+      const Tone = await import('tone');
+      await Tone.start();
       
       set((state) => {
         state.isPlaying = true;
@@ -193,11 +198,18 @@ export const useTransportStore = create<TransportStore>()(
         state.position = '0:0:0';
       }),
 
-    togglePlayPause: () => {
+    togglePlayPause: async () => {
       const isPlaying = _get().isPlaying;
       if (!isPlaying) {
         // Auto-bake before starting
         useInstrumentStore.getState().autoBakeInstruments();
+        
+        // CRITICAL for iOS: Start audio context synchronously during user gesture
+        // iOS requires Tone.start() to be called on the same callstack as the user interaction
+        // Calling it in an effect after the gesture ends will fail silently
+        // See: https://github.com/Tonejs/Tone.js/issues/164
+        const Tone = await import('tone');
+        await Tone.start();
       }
 
       set((state) => {

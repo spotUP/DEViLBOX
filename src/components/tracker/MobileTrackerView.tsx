@@ -152,7 +152,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
           {/* Transport controls - Moved to left to avoid hamburger menu overlap */}
           <div className="flex items-center gap-1 flex-shrink-0 mr-1">
             <button
-              onClick={togglePlayPause}
+              onClick={() => togglePlayPause().catch(console.error)}
               className={`
                 p-2 rounded-lg transition-colors touch-target
                 ${isPlaying
