@@ -236,6 +236,7 @@ interface NoteCellProps {
   octaveShift?: number;
   velocity?: number;
   cellSize?: number; // Dynamic cell size (14-28px), defaults to 28
+  trailOpacity?: number; // Trail effect opacity (0-1), 0 = no trail
   onClick: (noteIndex: number, stepIndex: number, modifiers?: { shift?: boolean; ctrl?: boolean; alt?: boolean }) => void;
   onToggleAccent?: (stepIndex: number) => void;
   onToggleSlide?: (stepIndex: number) => void;
@@ -260,6 +261,7 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   octaveShift = 0,
   velocity = 100,
   cellSize = 28,
+  trailOpacity = 0,
   onClick,
   onToggleAccent,
   onToggleSlide,
@@ -384,7 +386,11 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
         onWheel={handleWheel}
         onFocus={handleFocus}
         tabIndex={isFocused ? 0 : -1}
-        style={{ width: `${cellSize}px`, height: `${cellSize}px` }}
+        style={{ 
+          width: `${cellSize}px`, 
+          height: `${cellSize}px`,
+          boxShadow: trailOpacity > 0 ? `inset 0 0 0 100px rgba(239, 68, 68, ${trailOpacity * 0.4})` : undefined,
+        }}
         className={`
           rounded transition-all duration-75 border relative
           ${getBaseClasses()}
