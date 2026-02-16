@@ -244,6 +244,10 @@ export class TrackerReplayer {
   private bpm = 125;             // Beats per minute
   private globalVolume = 64;     // Global volume (0-64)
 
+  // Furnace speed alternation (speed1/speed2)
+  private speed2: number | null = null;  // null = no alternation (XM/MOD mode)
+  private speedAB = false;               // false = use speed1 next, true = use speed2 next
+
   // Pattern break/jump
   private pBreakPos = 0;
   private pBreakFlag = false;
@@ -314,6 +318,16 @@ export class TrackerReplayer {
     this.pBreakFlag = false;
     this.posJumpFlag = false;
     this.patternDelay = 0;
+
+    // Furnace speed alternation: if speed2 differs from speed1, enable alternation
+    if (song.speed2 !== undefined && song.speed2 !== song.initialSpeed) {
+      this.speed2 = song.speed2;
+      this.speedAB = true; // true = after row 0 (speed1), next will be speed2
+      console.log(`[TrackerReplayer] Furnace speed alternation: speed1=${song.initialSpeed}, speed2=${song.speed2}`);
+    } else {
+      this.speed2 = null;
+      this.speedAB = false;
+    }
 
     console.log(`[TrackerReplayer] Loaded: ${song.name} (${song.format}), ${song.numChannels}ch, ${song.patterns.length} patterns`);
     console.log(`[TrackerReplayer] Song positions: [${song.songPositions.join(', ')}], length: ${song.songLength}`);
@@ -657,6 +671,18 @@ export class TrackerReplayer {
     this.currentTick++;
     if (this.currentTick >= this.speed) {
       this.currentTick = 0;
+
+      // Furnace speed alternation: alternate between speed1 and speed2 each row
+      if (this.speed2 !== null) {
+        if (this.speedAB) {
+          this.speed = this.speed2;
+          this.speedAB = false;
+        } else {
+          this.speed = this.song!.initialSpeed;
+          this.speedAB = true;
+        }
+      }
+
       this.advanceRow();
     }
   }
@@ -1035,6 +1061,11 @@ export class TrackerReplayer {
           if (this.speed !== param) {
             console.log(`[TrackerReplayer] Fxx effect: setting speed to ${param} (was ${this.speed})`);
             this.speed = param;
+            // Fxx disables Furnace speed alternation (sets both speeds to same value)
+            if (this.speed2 !== null) {
+              console.log(`[TrackerReplayer] Fxx disabled speed alternation`);
+              this.speed2 = null;
+            }
             // Update UI to reflect the speed change from the module
             useTransportStore.getState().setSpeed(param);
           }
@@ -2057,6 +2088,16 @@ export class TrackerReplayer {
       this.posJumpFlag = false;
       this.patternDelay = 0;
 
+      // Re-sync speed alternation to match target row parity
+      if (this.speed2 !== null) {
+        // Furnace alternates: row 0 = speed1, row 1 = speed2, row 2 = speed1, ...
+        // speedAB=false means "next row will use speed1", so for the CURRENT row:
+        // even rows → currently using speed1, speedAB should be true (next = speed2)
+        // odd rows → currently using speed2, speedAB should be false (next = speed1)
+        this.speedAB = (this.pattPos % 2 === 0);
+        this.speed = (this.pattPos % 2 === 0) ? this.song.initialSpeed : this.speed2;
+      }
+
       // Re-sync scheduler timing to NOW so the next tick fires immediately
       // from the new position instead of waiting for the old schedule
       this.startTime = Tone.now();
@@ -2092,6 +2133,12 @@ export class TrackerReplayer {
     this.songPos = Math.max(0, Math.min(songPos, this.song.songLength - 1));
     this.pattPos = Math.max(0, pattPos);
     this.currentTick = 0;
+
+    // Re-sync speed alternation for stopped seek too
+    if (this.speed2 !== null) {
+      this.speedAB = (this.pattPos % 2 === 0);
+      this.speed = (this.pattPos % 2 === 0) ? this.song.initialSpeed : this.speed2;
+    }
     this.totalTicksScheduled = 0;
 
     // Clamp pattern position
