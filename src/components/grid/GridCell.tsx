@@ -388,10 +388,10 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
         className={`
           rounded transition-all duration-75 border relative
           ${getBaseClasses()}
-          ${isCurrentStep ? 'ring-2 ring-accent-primary ring-offset-1 ring-offset-dark-bg' : getOctaveBorderClasses()}
+          ${isCurrentStep && !isTriggered ? 'bg-accent-primary/30' : getOctaveBorderClasses()}
           ${isFocused && !isCurrentStep ? 'ring-2 ring-text-secondary ring-offset-1 ring-offset-dark-bg' : ''}
           ${isActive ? 'shadow-sm' : ''}
-          ${isTriggered && isActive ? '!bg-white scale-110 shadow-lg shadow-white/50' : ''}
+          ${isTriggered && isActive ? '!bg-white scale-[1.35] shadow-2xl shadow-white/70 !border-white' : ''}
           ${getVelocityRing()}
           focus:outline-none
         `}
