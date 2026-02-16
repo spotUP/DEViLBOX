@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-16T14:03:09.539Z
+ * Generated: 2026-02-16T14:20:15.908Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '689';
-export const BUILD_HASH = '1426fd0';
+export const BUILD_NUMBER = '691';
+export const BUILD_HASH = 'fe132a1';
 export const BUILD_DATE = '2026-02-16';
 
 // Full semantic version with build number
@@ -33,6 +33,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-16',
     changes: [
+      {
+        type: 'fix',
+        "description": "Use macro.code instead of macro.type for macro type lookup"
+      },
+      {
+        type: 'improvement',
+        "description": "Wip: save state before SID audio regression audit"
+      },
       {
         type: 'fix',
         "description": "Resolve format ReferenceError in ModuleLoader fallback path"
@@ -230,14 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Comprehensive stability and type-checking fixes"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TS1128 syntax error in ChannelContextMenu"
-      },
-      {
-        type: 'feature',
-        "description": "Add effect command interpolation to block selection"
       }
     ]
   }

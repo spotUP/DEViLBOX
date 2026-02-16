@@ -99,13 +99,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         // Forward a DivCommand to the correct chip dispatch
         const chip = this.getChip(data.platformType);
         if (chip && this.wasm) {
-          // Debug: log NOTE_ON commands (cmd=0 is NOTE_ON)
-          if (data.cmd === 0) {
-            console.log('[FurnaceDispatch Worklet] NOTE_ON: platform=', data.platformType, 'chan=', data.chan, 'note=', data.val1);
-          }
           this.wasm.cmd(chip.handle, data.cmd, data.chan, data.val1 || 0, data.val2 || 0);
-        } else {
-          console.warn('[FurnaceDispatch Worklet] dispatch: no chip for platform', data.platformType);
         }
         break;
       }

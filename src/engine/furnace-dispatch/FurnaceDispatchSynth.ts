@@ -58,152 +58,30 @@ const PLATFORM_CHANNELS: Record<number, string[]> = {
 
 /** Platform volume maximums (matching Furnace GET_VOLMAX per chip) */
 const PLATFORM_VOL_MAX: Record<number, number> = {
-  // Core/Meta
-  [FurnaceDispatchPlatform.NULL]: 15,
-  [FurnaceDispatchPlatform.YMU759]: 127,
-  [FurnaceDispatchPlatform.DUMMY]: 15,
-
-  // Compound systems
-  [FurnaceDispatchPlatform.GENESIS]: 127,
-  [FurnaceDispatchPlatform.GENESIS_EXT]: 127,
-  [FurnaceDispatchPlatform.SMS_OPLL]: 15,
-  [FurnaceDispatchPlatform.ARCADE]: 127,
-  [FurnaceDispatchPlatform.MSX2]: 127,
-  [FurnaceDispatchPlatform.NES_VRC7]: 127,
-  [FurnaceDispatchPlatform.NES_FDS]: 32,
-
-  // Console platforms
-  [FurnaceDispatchPlatform.SMS]: 15,
   [FurnaceDispatchPlatform.GB]: 15,
-  [FurnaceDispatchPlatform.PCE]: 31,
+  [FurnaceDispatchPlatform.SMS]: 15,
   [FurnaceDispatchPlatform.NES]: 15,
-  [FurnaceDispatchPlatform.SNES]: 127,
-  [FurnaceDispatchPlatform.SWAN]: 15,
-  [FurnaceDispatchPlatform.LYNX]: 127,
-  [FurnaceDispatchPlatform.VBOY]: 15,
-  [FurnaceDispatchPlatform.NDS]: 127,
-  [FurnaceDispatchPlatform.POKEMINI]: 2,
-  [FurnaceDispatchPlatform.TIA]: 15,
-  [FurnaceDispatchPlatform.POKEY]: 15,
-
-  // Commodore
   [FurnaceDispatchPlatform.C64_6581]: 15,
   [FurnaceDispatchPlatform.C64_8580]: 15,
-  [FurnaceDispatchPlatform.PET]: 1,
-  [FurnaceDispatchPlatform.VIC20]: 15,
-  [FurnaceDispatchPlatform.TED]: 8,
-  [FurnaceDispatchPlatform.C64_PCM]: 255,
-
-  // NES Expansion
-  [FurnaceDispatchPlatform.FDS]: 32,
-  [FurnaceDispatchPlatform.MMC5]: 15,
-  [FurnaceDispatchPlatform.N163]: 15,
-  [FurnaceDispatchPlatform.VRC6]: 63,
-  [FurnaceDispatchPlatform.VRC7]: 127,
-
-  // PSG Chips
-  [FurnaceDispatchPlatform.AY8910]: 15,  // AY is alias for AY8910
-  [FurnaceDispatchPlatform.AY8930]: 31,
+  [FurnaceDispatchPlatform.AY]: 15,
+  [FurnaceDispatchPlatform.AY8930]: 15,
   [FurnaceDispatchPlatform.SAA1099]: 15,
-  [FurnaceDispatchPlatform.T6W28]: 15,
-
-  // Yamaha FM
-  [FurnaceDispatchPlatform.YM2612]: 127,
-  [FurnaceDispatchPlatform.YM2612_EXT]: 127,
-  [FurnaceDispatchPlatform.YM2612_DUALPCM]: 127,
-  [FurnaceDispatchPlatform.YM2612_DUALPCM_EXT]: 127,
-  [FurnaceDispatchPlatform.YM2612_CSM]: 127,
-  [FurnaceDispatchPlatform.YM2151]: 127,
-  [FurnaceDispatchPlatform.OPZ]: 127,  // TX81Z is alias for OPZ
-  [FurnaceDispatchPlatform.YM2203]: 15,
-  [FurnaceDispatchPlatform.YM2203_EXT]: 127,
-  [FurnaceDispatchPlatform.YM2203_CSM]: 15,
-  [FurnaceDispatchPlatform.YM2608]: 255,
-  [FurnaceDispatchPlatform.YM2608_EXT]: 127,
-  [FurnaceDispatchPlatform.YM2608_CSM]: 255,
-  [FurnaceDispatchPlatform.YM2610_CRAP]: 255,
-  [FurnaceDispatchPlatform.YM2610_CRAP_EXT]: 127,
-  [FurnaceDispatchPlatform.YM2610_FULL]: 255,  // YM2610 is alias for YM2610_FULL
-  [FurnaceDispatchPlatform.YM2610_FULL_EXT]: 127,  // YM2610_EXT is alias for YM2610_FULL_EXT
-  [FurnaceDispatchPlatform.YM2610_CSM]: 255,
-  [FurnaceDispatchPlatform.YM2610B]: 255,
-  [FurnaceDispatchPlatform.YM2610B_EXT]: 127,
-  [FurnaceDispatchPlatform.YM2610B_CSM]: 255,
-
-  // OPL Family
-  [FurnaceDispatchPlatform.OPL]: 127,
-  [FurnaceDispatchPlatform.OPL2]: 127,
-  [FurnaceDispatchPlatform.OPL3]: 127,
-  [FurnaceDispatchPlatform.OPL_DRUMS]: 127,
-  [FurnaceDispatchPlatform.OPL2_DRUMS]: 127,
-  [FurnaceDispatchPlatform.OPL3_DRUMS]: 127,
-  [FurnaceDispatchPlatform.OPL4]: 127,
-  [FurnaceDispatchPlatform.OPL4_DRUMS]: 127,
-  [FurnaceDispatchPlatform.OPLL]: 15,
-  [FurnaceDispatchPlatform.OPLL_DRUMS]: 15,
-  [FurnaceDispatchPlatform.Y8950]: 127,
-  [FurnaceDispatchPlatform.Y8950_DRUMS]: 127,
-  [FurnaceDispatchPlatform.ESFM]: 63,
-
-  // Sample-based
-  [FurnaceDispatchPlatform.AMIGA]: 64,
-  [FurnaceDispatchPlatform.SEGAPCM]: 127,
-  [FurnaceDispatchPlatform.SEGAPCM_COMPAT]: 127,
-  [FurnaceDispatchPlatform.MULTIPCM]: 127,
-  [FurnaceDispatchPlatform.QSOUND]: 255,
-  [FurnaceDispatchPlatform.RF5C68]: 255,
-  [FurnaceDispatchPlatform.PCM_DAC]: 255,
-  [FurnaceDispatchPlatform.ES5506]: 255,  // 255 for native mode, 64 for amigaVol mode
-  [FurnaceDispatchPlatform.K007232]: 15,
-  [FurnaceDispatchPlatform.K053260]: 127,
-  [FurnaceDispatchPlatform.GA20]: 255,
-  [FurnaceDispatchPlatform.C140]: 255,
-  [FurnaceDispatchPlatform.C219]: 15,
-  [FurnaceDispatchPlatform.YMZ280B]: 255,
-  [FurnaceDispatchPlatform.MSM6258]: 8,
-  [FurnaceDispatchPlatform.MSM6295]: 8,
-
-  // Wavetable
   [FurnaceDispatchPlatform.SCC]: 15,
   [FurnaceDispatchPlatform.SCC_PLUS]: 15,
-  [FurnaceDispatchPlatform.NAMCO]: 15,
-  [FurnaceDispatchPlatform.NAMCO_15XX]: 15,
-  [FurnaceDispatchPlatform.NAMCO_CUS30]: 15,
-  [FurnaceDispatchPlatform.BUBSYS_WSG]: 15,
-  [FurnaceDispatchPlatform.X1_010]: 15,
-  [FurnaceDispatchPlatform.VERA]: 63,
-  [FurnaceDispatchPlatform.SOUND_UNIT]: 127,
-
-  // Other/Misc
-  [FurnaceDispatchPlatform.PCSPKR]: 1,
-  [FurnaceDispatchPlatform.PONG]: 1,
-  [FurnaceDispatchPlatform.PV1000]: 1,
-  [FurnaceDispatchPlatform.MSM5232]: 127,
-  [FurnaceDispatchPlatform.SM8521]: 31,
-  [FurnaceDispatchPlatform.DAVE]: 63,
-  [FurnaceDispatchPlatform.BIFURCATOR]: 255,
-  [FurnaceDispatchPlatform.POWERNOISE]: 15,
-
-  // ZX Spectrum Beeper
-  [FurnaceDispatchPlatform.SFX_BEEPER]: 1,
-  [FurnaceDispatchPlatform.SFX_BEEPER_QUADTONE]: 2,
-
-  // GBA
-  [FurnaceDispatchPlatform.GBA_DMA]: 2,
-  [FurnaceDispatchPlatform.GBA_MINMOD]: 255,
-
-  // Enhanced/Experimental
-  [FurnaceDispatchPlatform._5E01]: 15,
-
-  // SID variants
-  [FurnaceDispatchPlatform.SID2]: 15,
-  [FurnaceDispatchPlatform.SID3]: 15,
-
-  // Watara Supervision
-  [FurnaceDispatchPlatform.SUPERVISION]: 15,
-
-  // UPD1771C
-  [FurnaceDispatchPlatform.UPD1771C]: 31,
+  [FurnaceDispatchPlatform.PCE]: 31,       // 5-bit volume
+  [FurnaceDispatchPlatform.VIC20]: 15,
+  [FurnaceDispatchPlatform.TIA]: 15,
+  [FurnaceDispatchPlatform.POKEY]: 15,
+  [FurnaceDispatchPlatform.PV1000]: 15,
+  [FurnaceDispatchPlatform.POKEMINI]: 3,   // 2-bit volume
+  [FurnaceDispatchPlatform.PONG]: 1,       // on/off
+  [FurnaceDispatchPlatform.PCSPKR]: 1,     // on/off
+  [FurnaceDispatchPlatform.SFX_BEEPER]: 15,
+  [FurnaceDispatchPlatform.TED]: 8,        // 3-bit volume
+  [FurnaceDispatchPlatform.VRC6]: 15,
+  [FurnaceDispatchPlatform.MMC5]: 15,
+  [FurnaceDispatchPlatform.SWAN]: 15,
+  [FurnaceDispatchPlatform.LYNX]: 127,     // 7-bit volume
 };
 
 function getMaxVolume(platform: number): number {
@@ -284,19 +162,16 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   /**
    * Upload Furnace instrument binary data to the engine (legacy)
    * @param rawData - Raw binary instrument data from .fur file
-   * @param targetSlot - Optional explicit target slot (0-255). If provided, uses this instead of this.furnaceInstrumentIndex.
-   *                     CRITICAL: Must pass this when calling from async loops to avoid race conditions.
    * @deprecated Use uploadInstrumentFromConfig instead
    */
-  public async uploadInstrumentData(rawData: Uint8Array, targetSlot?: number): Promise<void> {
-    const slot = targetSlot ?? this.furnaceInstrumentIndex;
+  public async uploadInstrumentData(rawData: Uint8Array): Promise<void> {
     if (!rawData || rawData.length === 0) {
-      console.warn(`[FurnaceDispatchSynth] No instrument data to upload for index ${slot}`);
+      console.warn(`[FurnaceDispatchSynth] No instrument data to upload for index ${this.furnaceInstrumentIndex}`);
       return;
     }
     await this.ensureInitialized();
-    console.log(`[FurnaceDispatchSynth] Uploading instrument to slot ${slot} (${rawData.length} bytes) platform ${this.platformType}`);
-    this.engine.uploadFurnaceInstrument(slot, rawData, this.platformType);
+    console.log(`[FurnaceDispatchSynth] Uploading instrument ${this.furnaceInstrumentIndex} (${rawData.length} bytes) to platform ${this.platformType}`);
+    this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, rawData, this.platformType);
   }
 
   /**
@@ -321,7 +196,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       // Create the chip and wait for worklet to confirm creation
       const engineSampleRate = this.engine.getNativeCtx()?.sampleRate ?? nativeCtx.sampleRate;
       await this.engine.createChip(this.platformType, engineSampleRate);
-      await this.engine.waitForChipCreated(this.platformType);
+      await this.engine.waitForChipCreated();
 
       // Connect worklet output through a shared native GainNode.
       // The worklet lives in the engine's true native AudioContext. Tone.js uses
