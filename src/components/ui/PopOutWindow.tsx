@@ -113,6 +113,9 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
       #popout-root { display: inline-block; min-width: 100%; }
     </style></head><body><div id="popout-root"></div></body></html>`);
     popup.document.close();
+    
+    // Explicitly set title again to ensure it sticks
+    popup.document.title = title;
 
     // Clone all stylesheets from parent window
     const popupHead = popup.document.head;
