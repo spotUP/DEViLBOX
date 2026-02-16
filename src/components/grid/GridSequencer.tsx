@@ -59,7 +59,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   // Get instrument color for this channel
   const { patterns, currentPatternIndex } = useTrackerStore();
   const { instruments } = useInstrumentStore();
-  const channelInstrumentId = patterns[currentPattern Index]?.channels[channelIndex]?.instrumentId ?? 1;
+  const channelInstrumentId = patterns[currentPatternIndex]?.channels[channelIndex]?.instrumentId ?? 1;
   const channelInstrument = instruments.find(i => i.id === channelInstrumentId);
   const instrumentColor = channelInstrument ? getSynthInfo(channelInstrument.synthType).color : 'text-accent-primary';
 
