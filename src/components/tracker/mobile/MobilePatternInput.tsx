@@ -6,7 +6,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { useTrackerStore } from '@stores';
-import { Piano, Hash, Delete, ChevronLeft, ChevronRight, Copy, Scissors, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
+import { Piano, Delete, ChevronLeft, ChevronRight, Copy, Scissors, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface MobilePatternInputProps {
@@ -111,21 +111,10 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
       {/* Mode indicator bar */}
       <div className="flex items-center justify-between px-3 py-2 bg-dark-bgTertiary border-t border-dark-border">
         <div className="flex items-center gap-2">
-          {inputMode === 'piano' ? (
-            <>
-              <Piano size={16} className="text-accent-primary" />
-              <span className="text-xs font-mono text-text-secondary">
-                NOTE INPUT
-              </span>
-            </>
-          ) : (
-            <>
-              <Hash size={16} className="text-accent-secondary" />
-              <span className="text-xs font-mono text-text-secondary">
-                {cursor.columnType.toUpperCase()}
-              </span>
-            </>
-          )}
+          <Piano size={16} className="text-accent-primary" />
+          <span className="text-xs font-mono text-text-secondary">
+            {inputMode === 'piano' ? 'NOTE' : cursor.columnType.toUpperCase()}
+          </span>
         </div>
 
         <div className="flex items-center gap-1">
@@ -209,7 +198,15 @@ interface PianoKeyboardProps {
   onDelete: () => void;
 }
 
-const HEX_VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+// Hex labels mapped to each of the 12 piano key positions (semitone 0-11)
+const HEX_PIANO_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B'];
+// Extra hex values that don't fit on the 12-key piano
+const HEX_EXTRA = [
+  { label: 'C', value: 12 },
+  { label: 'D', value: 13 },
+  { label: 'E', value: 14 },
+  { label: 'F', value: 15 },
+];
 
 const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
   mode,
@@ -238,17 +235,15 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
     }
   }, [mode, onNotePress, onHexPress]);
 
-  // For hex mode, we show 16 semitones (C to D# in next octave)
-  // For piano mode, we show 12 semitones (full octave)
-  const numSemitones = mode === 'hex' ? 16 : 12;
-  const semitones = Array.from({ length: numSemitones }, (_, i) => i);
+  // Always 12 keys (one octave), labels change based on mode
+  const semitones = Array.from({ length: 12 }, (_, i) => i);
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Octave and utility controls */}
+      {/* Octave / hex-extra controls and utility buttons */}
       <div className="flex items-center gap-2 h-[56px]">
-        {/* Octave controls - Only show in piano mode */}
         {mode === 'piano' ? (
+          /* Octave controls for note mode */
           <div className="flex items-center gap-1 bg-dark-bgTertiary rounded-lg p-1 h-full">
             <button
               onClick={onOctaveDown}
@@ -274,10 +269,19 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
             </button>
           </div>
         ) : (
-          <div className="flex items-center px-4 bg-dark-bgTertiary rounded-lg h-full">
-            <span className="text-xs font-bold text-accent-secondary font-mono tracking-wider">
-              HEX INPUT (0-F)
-            </span>
+          /* Extra hex buttons C-F for hex mode */
+          <div className="flex items-center gap-1 bg-dark-bgTertiary rounded-lg p-1 h-full">
+            {HEX_EXTRA.map(({ label, value }) => (
+              <button
+                key={label}
+                onClick={() => onHexPress(value)}
+                onTouchStart={() => onHexPress(value)}
+                className="flex-1 h-full min-w-[40px] rounded-md bg-accent-secondary/20 hover:bg-accent-secondary/40 active:bg-accent-secondary/60 transition-colors flex items-center justify-center"
+                aria-label={`Hex ${label}`}
+              >
+                <span className="text-base font-bold font-mono text-accent-secondary">{label}</span>
+              </button>
+            ))}
           </div>
         )}
 
@@ -299,15 +303,15 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
         </button>
       </div>
 
-      {/* Piano keys - dynamic layout */}
+      {/* Piano keys - always 12 keys in standard piano layout */}
       <div className="relative h-[120px] bg-dark-bg rounded-lg overflow-hidden">
         {/* White keys layer (flex) */}
         <div className="absolute inset-0 flex">
           {semitones.map((semitone) => {
-            const isBlack = BLACK_KEYS.includes(semitone % 12);
+            const isBlack = BLACK_KEYS.includes(semitone);
             if (isBlack) return null;
             
-            const label = mode === 'hex' ? HEX_VALUES[semitone] : NOTE_NAMES[semitone % 12];
+            const label = mode === 'hex' ? HEX_PIANO_LABELS[semitone] : NOTE_NAMES[semitone];
             const octave = mode === 'hex' ? '' : currentOctave;
 
             return (
@@ -330,18 +334,15 @@ const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
         {/* Black keys layer (absolute) */}
         <div className="absolute inset-0 pointer-events-none">
           {semitones.map((semitone) => {
-            const isBlack = BLACK_KEYS.includes(semitone % 12);
+            const isBlack = BLACK_KEYS.includes(semitone);
             if (!isBlack) return null;
 
             // Calculate position based on white key positions
-            const octaveOffset = Math.floor(semitone / 12);
-            const noteInOctave = semitone % 12;
-            const whiteKeysBeforeInOctave = NOTE_NAMES.slice(0, noteInOctave).filter((_, i) => !BLACK_KEYS.includes(i)).length;
-            const totalWhiteKeys = mode === 'hex' ? 9 : 7; // 9 white keys for 16 semitones, 7 for 12
-            const whiteKeyWidth = 100 / totalWhiteKeys;
-            const leftPos = ((octaveOffset * 7 + whiteKeysBeforeInOctave) * whiteKeyWidth) - (whiteKeyWidth * 0.25);
+            const whiteKeysBeforeInOctave = NOTE_NAMES.slice(0, semitone).filter((_, i) => !BLACK_KEYS.includes(i)).length;
+            const whiteKeyWidth = 100 / 7; // always 7 white keys
+            const leftPos = (whiteKeysBeforeInOctave * whiteKeyWidth) - (whiteKeyWidth * 0.25);
             
-            const label = mode === 'hex' ? HEX_VALUES[semitone] : NOTE_NAMES[semitone % 12];
+            const label = mode === 'hex' ? HEX_PIANO_LABELS[semitone] : NOTE_NAMES[semitone];
             const octave = mode === 'hex' ? '' : currentOctave;
 
             return (
