@@ -512,12 +512,30 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       <div ref={scrollContainerRef} className="flex-1 overflow-auto p-2">
         <div
           ref={gridRef}
-          className="inline-block min-w-full"
+          className="inline-block min-w-full relative"
           role="grid"
           aria-label="TB-303 Pattern Grid"
           onKeyDown={handleKeyDown}
           tabIndex={0}
         >
+          {/* Beat marker column overlays - span full height */}
+          {stepIndices
+            .filter(stepIdx => stepIdx % 4 === 0)
+            .map(stepIdx => (
+              <div
+                key={`beat-${stepIdx}`}
+                className="absolute pointer-events-none rounded-sm"
+                style={{
+                  top: 0,
+                  bottom: 0,
+                  left: `${48 + (stepIdx * (cellSize + 4))}px`,
+                  width: `${cellSize}px`,
+                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  zIndex: 7,
+                }}
+              />
+            ))}
+
           {/* Step numbers header */}
           <div className="flex items-center mb-1 pl-12 relative" role="row" style={{ zIndex: 10 }}>
             {smoothMarker && isPlaying && currentStep >= 0 && (
@@ -550,12 +568,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                     height: `${cellSize}px`,
                   }}
                 >
-                  {isBeatMarker && (
-                    <div
-                      className="absolute inset-0"
-                      style={{ backgroundColor: 'rgba(255, 255, 255, 0.04)', zIndex: 0 }}
-                    />
-                  )}
                   {isCurrentDiscrete && (
                     <div
                       className="absolute inset-0"
@@ -634,17 +646,12 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 
                 // In smooth mode, don't show per-cell markers (use header overlay instead)
                 const isCurrentStepCheck = smoothMarker ? false : (currentStep === stepIdx);
-                const isBeatMarker = stepIdx % 4 === 0;
 
                 return (
                   <div
                     key={stepIdx}
                     className="mx-0.5 rounded-sm relative"
                     role="gridcell"
-                    style={{
-                      backgroundColor: isBeatMarker ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
-                      zIndex: 0,
-                    }}
                   >
                     <NoteGridCell
                       noteIndex={noteIndex}
