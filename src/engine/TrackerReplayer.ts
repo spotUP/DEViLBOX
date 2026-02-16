@@ -1045,8 +1045,15 @@ export class TrackerReplayer {
         break;
 
       case 0xD: // Pattern break
-        this.pBreakPos = x * 10 + y; // BCD
-        if (this.pBreakPos > 63) this.pBreakPos = 0;
+        // MOD uses BCD (binary-coded decimal), XM/IT/S3M/FUR use hex
+        if (this.song?.format === 'MOD') {
+          this.pBreakPos = x * 10 + y; // BCD: 0x15 = row 15
+          if (this.pBreakPos > 63) this.pBreakPos = 0;
+        } else {
+          this.pBreakPos = param; // Hex: 0x10 = row 16
+          // XM/Furnace patterns can be up to 256 rows
+          if (this.pBreakPos > 255) this.pBreakPos = 0;
+        }
         this.pBreakFlag = true;
         break;
 
