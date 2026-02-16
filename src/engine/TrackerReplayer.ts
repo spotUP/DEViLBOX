@@ -918,7 +918,7 @@ export class TrackerReplayer {
         );
       }
       this.releaseMacros(ch);
-      this.stopChannel(ch, chIndex);
+      this.stopChannel(ch, chIndex, time);
     }
 
     // Handle volume column (XM)
@@ -1832,7 +1832,7 @@ export class TrackerReplayer {
     }
   }
 
-  private stopChannel(ch: ChannelState, channelIndex?: number): void {
+  private stopChannel(ch: ChannelState, channelIndex?: number, time?: number): void {
     // Stop all pooled players (no disposal - they're reused)
     for (const player of ch.playerPool) {
       try {
@@ -1842,10 +1842,12 @@ export class TrackerReplayer {
     ch.player = null;
 
     // Release any active synth notes on this channel
+    // Use the scheduled time so NOTE_OFF arrives at the correct moment
+    // (time=0 means "immediately", which fails if NOTE_ON is still queued for a future time)
     if (ch.instrument && ch.instrument.synthType && ch.instrument.synthType !== 'Sampler' && ch.lastPlayedNoteName) {
       try {
         const engine = getToneEngine();
-        engine.triggerNoteRelease(ch.instrument.id, ch.lastPlayedNoteName, 0, ch.instrument, channelIndex);
+        engine.triggerNoteRelease(ch.instrument.id, ch.lastPlayedNoteName, time ?? 0, ch.instrument, channelIndex);
       } catch { /* ignored */ }
     }
     ch.lastPlayedNoteName = null; // Clear for next note sequence
