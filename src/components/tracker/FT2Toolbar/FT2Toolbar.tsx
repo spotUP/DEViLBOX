@@ -591,7 +591,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         {compactToolbar ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
       </button>
 
-      <div className="flex flex-1 min-w-0 overflow-hidden min-h-[120px]">
+      <div className="flex flex-1 min-w-0 overflow-hidden min-h-[120px] justify-between">
         <div className="flex-shrink min-w-0">
           <div className="ft2-toolbar-row">
             <div className="ft2-section ft2-col-1">
@@ -682,7 +682,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   ]}
                 />
               </div>
-              <div className="ft2-section ft2-col-4"></div>
             </div>
           )}
 
@@ -701,8 +700,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 </div>
               </div>
               <div className="ft2-section ft2-col-3">
-              </div>
-              <div className="ft2-section ft2-col-4">
               </div>
             </div>
           )}
@@ -736,7 +733,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </div>
         </div>
 
-        <VisualizerFrame variant="compact" className="min-w-[120px] max-w-[400px] flex-shrink-0 flex-grow border-l border-dark-border cursor-pointer group" style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center' }}>
+        <VisualizerFrame variant="compact" className="min-w-[120px] max-w-[350px] flex-shrink-0 border-l border-dark-border cursor-pointer group ml-auto" style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center' }}>
         <div className="relative w-full h-full flex items-center justify-center" onClick={() => {
           const modes: Array<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll'> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll'];
           const currentIndex = modes.indexOf(vizMode);
