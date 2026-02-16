@@ -26,7 +26,7 @@ import { useMIDI } from '../../hooks/useMIDI';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
-import { getSynthInfo } from '@constants/synthCategories';
+import { getSynthInfo, tailwindToHex } from '@constants/synthCategories';
 
 const NOTE_NAMES = ['B', 'A#', 'A', 'G#', 'G', 'F#', 'F', 'E', 'D#', 'D', 'C#', 'C'] as const;
 const NOTE_NAMES_FORWARD = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
@@ -61,7 +61,9 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   const { instruments } = useInstrumentStore();
   const channelInstrumentId = patterns[currentPatternIndex]?.channels[channelIndex]?.instrumentId ?? 1;
   const channelInstrument = instruments.find(i => i.id === channelInstrumentId);
-  const instrumentColor = channelInstrument ? getSynthInfo(channelInstrument.synthType).color : 'text-accent-primary';
+  const synthInfo = channelInstrument ? getSynthInfo(channelInstrument.synthType) : null;
+  const instrumentColor = synthInfo?.color ?? 'text-accent-primary';
+  const instrumentHex = tailwindToHex(instrumentColor);
 
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;
@@ -474,8 +476,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 >
                   {currentStep === stepIdx && (
                     <div
-                      className={`absolute inset-0 ${instrumentColor.replace('text-', 'bg-')}`}
-                      style={{ opacity: 0.6 }}
+                      className="absolute inset-0"
+                      style={{ backgroundColor: instrumentHex, opacity: 0.6 }}
                     />
                   )}
                   <span className="relative z-10">{stepIdx.toString().padStart(2, '0')}</span>
@@ -534,6 +536,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                       cellSize={cellSize}
                       trailOpacity={trailOpacity}
                       instrumentColor={instrumentColor}
+                      instrumentHex={instrumentHex}
                       onClick={handleNoteClick}
                       onToggleAccent={toggleAccent}
                       onToggleSlide={toggleSlide}
