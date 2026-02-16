@@ -2135,14 +2135,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 )}
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Canvas Pattern Grid */}
-      <div
-        ref={containerRef}
-        className="flex-1 relative bg-dark-bg overflow-x-hidden touch-none"
+                      </div>
+                    </div>
+                  </>
+                )}
+          
+                {/* Canvas Pattern Grid */}
+                <div
+                  ref={containerRef}
+                  className="flex-1 relative bg-dark-bg overflow-x-hidden touch-none"
+          
         style={{ minHeight: 200 }}
         tabIndex={0}
         onContextMenu={handleContextMenu}
