@@ -27,6 +27,7 @@ import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
 import { RomUploadDialog } from '@components/ui/RomUploadDialog';
 import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
+import { usePatternPlayback } from '@hooks/audio/usePatternPlayback';
 import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { importMIDIFile } from '@lib/import/MIDIImporter';
 import { importInstrument } from '@lib/export/exporters';
@@ -217,6 +218,11 @@ function App() {
 
   // Register MIDI Pad triggers
   usePadTriggers();
+
+  // Pattern playback engine - mounted at App level so it persists across view switches
+  // (tracker/grid/arrangement/303). Previously in TrackerView which caused audio cutoff
+  // when switching views and inability to stop playback from other views.
+  usePatternPlayback();
 
   // Register global keyboard shortcuts from active scheme
   useGlobalKeyboardHandler();

@@ -10,7 +10,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@hooks/tracker/BlockOperations';
-import { usePatternPlayback } from '@hooks/audio/usePatternPlayback';
 import { useFPSMonitor } from '@hooks/useFPSMonitor';
 import { InterpolateDialog } from '@components/dialogs/InterpolateDialog';
 import { HumanizeDialog } from '@components/dialogs/HumanizeDialog';
@@ -504,8 +503,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   useTrackerInput();
   const blockOps = useBlockOperations();
 
-  // Enable pattern playback
-  usePatternPlayback();
+  // NOTE: usePatternPlayback() is called in App.tsx so it persists across view switches
 
   // Module import handler - used by both mobile and desktop views
   const handleModuleImport = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
@@ -952,9 +950,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
           {/* Hardware System Preset Selector - High Visibility */}
           <div className="flex items-center gap-1.5 ml-1 pl-2 border-l border-dark-border">
-            <Cpu size={14} className="text-accent-primary animate-pulse" />
+            <Cpu size={14} className="text-text-secondary" />
             <select
-              className="px-2 py-1 text-[10px] font-black bg-dark-bgSecondary text-accent-primary border border-accent-primary/40 rounded hover:border-accent-primary transition-colors cursor-pointer outline-none shadow-glow-sm"
+              className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer outline-none"
               onChange={(e) => {
                 applySystemPreset(e.target.value);
                 notify.success(`Hardware System: ${SYSTEM_PRESETS.find(p => p.id === e.target.value)?.name.toUpperCase()}`);
