@@ -518,24 +518,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
           onKeyDown={handleKeyDown}
           tabIndex={0}
         >
-          {/* Beat marker column overlays - span full height */}
-          {stepIndices
-            .filter(stepIdx => stepIdx % 4 === 0)
-            .map(stepIdx => (
-              <div
-                key={`beat-${stepIdx}`}
-                className="absolute pointer-events-none rounded-sm"
-                style={{
-                  top: 0,
-                  bottom: 0,
-                  left: `${48 + (stepIdx * (cellSize + 4))}px`,
-                  width: `${cellSize}px`,
-                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                  zIndex: 7,
-                }}
-              />
-            ))}
-
           {/* Step numbers header */}
           <div className="flex items-center mb-1 pl-12 relative" role="row" style={{ zIndex: 10 }}>
             {smoothMarker && isPlaying && currentStep >= 0 && (
@@ -646,12 +628,16 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 
                 // In smooth mode, don't show per-cell markers (use header overlay instead)
                 const isCurrentStepCheck = smoothMarker ? false : (currentStep === stepIdx);
+                const isBeatMarker = stepIdx % 4 === 0;
 
                 return (
                   <div
                     key={stepIdx}
                     className="mx-0.5 rounded-sm relative"
                     role="gridcell"
+                    style={{
+                      backgroundColor: isBeatMarker ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
+                    }}
                   >
                     <NoteGridCell
                       noteIndex={noteIndex}
