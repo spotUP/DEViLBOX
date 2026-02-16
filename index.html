@@ -68,6 +68,30 @@
     </div>
     <script src="/FurnaceChips.js"></script>
     <script src="/MAMEChips.js"></script>
+    <!-- iOS Audio Unlock: Resume AudioContext on first touch/click BEFORE React mounts.
+         iOS Safari requires AudioContext.resume() inside a user gesture handler.
+         This fires as early as possible so the context is ready when React loads. -->
+    <script>
+      (function() {
+        function unlockAudio() {
+          // If ToneEngine has already created a context, resume it
+          if (window._toneEngine && window._toneEngine.nativeContext) {
+            var ctx = window._toneEngine.nativeContext;
+            if (ctx.state === 'suspended') {
+              ctx.resume().then(function() {
+                console.log('[iOS Audio Unlock] Context resumed via early handler');
+              });
+            }
+          }
+          document.removeEventListener('touchstart', unlockAudio, true);
+          document.removeEventListener('touchend', unlockAudio, true);
+          document.removeEventListener('click', unlockAudio, true);
+        }
+        document.addEventListener('touchstart', unlockAudio, true);
+        document.addEventListener('touchend', unlockAudio, true);
+        document.addEventListener('click', unlockAudio, true);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1620,8 +1620,11 @@ export const MakkM4Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
         const text = await file.text();
         wavetableData = text.split(/[\s,]+/).map(v => parseInt(v)).filter(v => !isNaN(v));
       } else {
-        const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        const audioCtx = new AudioCtxClass();
+        // Reuse the shared ToneEngine AudioContext for decoding.
+        // Creating throwaway contexts leaks them and iOS limits to ~4-6.
+        const { getDevilboxAudioContext } = await import('@utils/audio-context');
+        let audioCtx: AudioContext;
+        try { audioCtx = getDevilboxAudioContext(); } catch { audioCtx = new AudioContext(); }
         const arrayBuffer = await file.arrayBuffer();
         const buffer = await audioCtx.decodeAudioData(arrayBuffer);
         const rawData = buffer.getChannelData(0);

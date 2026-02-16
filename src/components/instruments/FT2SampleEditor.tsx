@@ -166,8 +166,11 @@ export const FT2SampleEditor: React.FC<FT2SampleEditorProps> = ({ instrument, on
       try {
         const response = await fetch(sampleUrl);
         const arrayBuffer = await response.arrayBuffer();
-        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        const audioContext = new AudioCtx();
+        // Reuse the shared ToneEngine AudioContext for decoding.
+        // Creating throwaway contexts leaks them and iOS limits to ~4-6.
+        const { getDevilboxAudioContext } = await import('@utils/audio-context');
+        let audioContext: AudioContext;
+        try { audioContext = getDevilboxAudioContext(); } catch { audioContext = new AudioContext(); }
         const buffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
 
         // Initialize loop points from instrument if available

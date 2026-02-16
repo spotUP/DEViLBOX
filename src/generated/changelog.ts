@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-16T15:31:09.868Z
+ * Generated: 2026-02-16T17:23:02.394Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '697';
-export const BUILD_HASH = '6875519';
+export const BUILD_NUMBER = '704';
+export const BUILD_HASH = '891f989';
 export const BUILD_DATE = '2026-02-16';
 
 // Full semantic version with build number
@@ -33,6 +33,34 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-16',
     changes: [
+      {
+        type: 'fix',
+        "description": "Stop playback keeps current position instead of resetting to start"
+      },
+      {
+        type: 'fix',
+        "description": "SID notes hanging forever - release hook passed time as note param, panic/ESC now silence audio"
+      },
+      {
+        type: 'fix',
+        "description": "Chip creation promise race - multiple synths sharing one platform no longer hang"
+      },
+      {
+        type: 'fix',
+        "description": "Seamless position change during playback (no audio pause)"
+      },
+      {
+        type: 'fix',
+        "description": "Retry Furnace WASM init on page reload when AudioContext was suspended"
+      },
+      {
+        type: 'fix',
+        "description": "Pass scheduled time to stopChannel for correct note-off timing"
+      },
+      {
+        type: 'fix',
+        "description": "Sample-accurate timing for Furnace dispatch commands - queue timestamped NOTE_ON/OFF in worklet, matching Furnace nextBuf() pattern"
+      },
       {
         type: 'fix',
         "description": "Resolve 5 TypeScript errors (systemId type, systems nullability)"
@@ -210,34 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Global audit and standardization of borders and dividers"
-      },
-      {
-        type: 'feature',
-        "description": "Add floating value tooltip to Knob control"
-      },
-      {
-        type: 'feature',
-        "description": "Enhance module panel visuals"
-      },
-      {
-        type: 'feature',
-        "description": "Enhance cable and port UX"
-      },
-      {
-        type: 'feature',
-        "description": "Add interactive zoom and view controls"
-      },
-      {
-        type: 'feature',
-        "description": "Implement standard pan/zoom navigation"
-      },
-      {
-        type: 'feature',
-        "description": "Test: add ModularSynth to volume calibration suite"
-      },
-      {
-        type: 'fix',
-        "description": "Register ModularSynth in InstrumentFactory"
       }
     ]
   }

@@ -209,7 +209,11 @@ export class ToneEngine {
     // Create the native AudioContext FIRST, before any Tone.js nodes.
     // This ensures all Tone.js nodes are created on the same context as native synths.
     // The context starts in 'suspended' state — init() resumes it after user interaction.
-    this._nativeContext = new AudioContext({ sampleRate: 44100, latencyHint: 'interactive' });
+    //
+    // NOTE: Do NOT hardcode sampleRate. iOS Safari natively uses 48000 Hz and
+    // forcing 44100 can cause silent output or context creation failure.
+    // Let the browser pick the optimal rate for the device hardware.
+    this._nativeContext = new AudioContext({ latencyHint: 'interactive' });
     Tone.setContext(this._nativeContext);
     // Register globally so WAM/WASM synths can access it without importing ToneEngine
     setDevilboxAudioContext(this._nativeContext);

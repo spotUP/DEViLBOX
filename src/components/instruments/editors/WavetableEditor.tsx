@@ -125,8 +125,11 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
         }
       } else {
         // Parse audio file
-        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        const audioCtx = new AudioCtx();
+        // Reuse the shared ToneEngine AudioContext for decoding.
+        // Creating throwaway contexts leaks them and iOS limits to ~4-6.
+        const { getDevilboxAudioContext } = await import('@utils/audio-context');
+        let audioCtx: AudioContext;
+        try { audioCtx = getDevilboxAudioContext(); } catch { audioCtx = new AudioContext(); }
         const arrayBuffer = await file.arrayBuffer();
         const buffer = await audioCtx.decodeAudioData(arrayBuffer);
         const rawData = buffer.getChannelData(0);
