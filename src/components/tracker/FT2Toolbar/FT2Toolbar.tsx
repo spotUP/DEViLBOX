@@ -12,7 +12,6 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
-import { InstrumentSelector } from './InstrumentSelector';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore, useTabsStore } from '@stores';
 import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
