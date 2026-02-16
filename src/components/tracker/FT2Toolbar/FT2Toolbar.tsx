@@ -644,7 +644,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             <div className="ft2-section ft2-section-playback">
               <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm" onClick={handlePlaySong} className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
               <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm" onClick={handlePlayPattern} className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
-              <Button variant={recordMode ? 'danger' : 'default'} size="sm" className="min-w-[48px]" onClick={toggleRecordMode}>{recordMode ? '● Rec' : 'Rec'}</Button>
             </div>
           </div>
 
