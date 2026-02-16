@@ -125,8 +125,8 @@ const VelocityLaneCanvasComponent: React.FC<VelocityLaneCanvasProps> = ({
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      // Background
-      ctx.fillStyle = '#0d0d0e';
+      // Background (dark but not pure black for better contrast)
+      ctx.fillStyle = '#1a1a1c';
       ctx.fillRect(0, 0, cw, LANE_HEIGHT);
 
       // Grid reference lines
@@ -150,11 +150,15 @@ const VelocityLaneCanvasComponent: React.FC<VelocityLaneCanvasProps> = ({
       const hz = horizontalZoomRef.current;
       const sx = scrollXRef.current;
       const sel = selectedNotesRef.current;
-      for (const note of notesRef.current) {
+      const notes = notesRef.current;
+      let visibleNoteCount = 0;
+      
+      for (const note of notes) {
         const x = (note.startRow - sx) * hz;
         const w = (note.endRow - note.startRow) * hz;
         if (x + w < 0 || x > cw) continue;
 
+        visibleNoteCount++;
         const barH = (note.velocity / 127) * LANE_HEIGHT;
         const barW = Math.max(3, w - 1);
         const isSelected = sel.has(note.id);
@@ -188,12 +192,25 @@ const VelocityLaneCanvasComponent: React.FC<VelocityLaneCanvasProps> = ({
         ctx.globalAlpha = 1;
       }
 
-      // VEL label
-      ctx.fillStyle = 'rgba(255,255,255,0.2)';
-      ctx.font = '9px monospace';
+      // VEL label (always visible)
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = 'bold 10px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
-      ctx.fillText('VEL', 4, 4);
+      ctx.fillText('VELOCITY', 6, 6);
+
+      // Help text when no notes visible
+      if (notes.length === 0 || visibleNoteCount === 0) {
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.font = '11px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        if (notes.length === 0) {
+          ctx.fillText('No notes in pattern - add notes above to see velocity bars', cw / 2, LANE_HEIGHT / 2);
+        } else {
+          ctx.fillText('Scroll to see velocity bars for notes', cw / 2, LANE_HEIGHT / 2);
+        }
+      }
 
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -323,7 +340,7 @@ const VelocityLaneCanvasComponent: React.FC<VelocityLaneCanvasProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative shrink-0 border-t border-dark-border overflow-hidden bg-dark-bgTertiary"
+      className="relative flex-1 shrink-0 border-t border-dark-border overflow-hidden"
       style={{ height: LANE_HEIGHT }}
       title="Velocity Editor: Click or drag velocity bars to adjust. Scroll wheel for fine adjustment."
     >
