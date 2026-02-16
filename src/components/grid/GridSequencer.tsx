@@ -451,7 +451,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
           tabIndex={0}
         >
           {/* Step numbers header */}
-          <div className="flex items-center mb-1 pl-12" role="row">
+          <div className="flex items-center mb-1 pl-12" role="row" style={{ isolation: 'isolate' }}>
             {stepIndices.map((stepIdx) => {
               const isTrailStep = trailSteps.some(t => t.step === stepIdx);
               const trailOpacity = trailSteps.find(t => t.step === stepIdx)?.opacity || 0;
@@ -466,7 +466,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                   style={{
                     width: `${cellSize}px`,
                     backgroundColor: isTrailStep ? `rgba(239, 68, 68, ${trailOpacity})` : (currentStep === stepIdx ? 'var(--color-accent)' : 'transparent'),
-                    zIndex: (currentStep === stepIdx || isTrailStep) ? 10 : 1,
+                    zIndex: (currentStep === stepIdx || isTrailStep) ? 100 : 1,
                   }}
                 >
                   {stepIdx.toString().padStart(2, '0')}
@@ -481,7 +481,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
             const isRootNote = noteIndex === rootNote;
 
             return (
-              <div key={noteIndex} className="flex items-center mb-0.5" role="row">
+              <div key={noteIndex} className="flex items-center mb-0.5" role="row" style={{ isolation: 'isolate' }}>
                 {/* Row label */}
                 <div
                   className={`w-10 mr-2 text-right text-xs font-mono
@@ -507,8 +507,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                     className="mx-0.5 rounded-sm transition-all duration-75 relative"
                     role="gridcell"
                     style={{
-                      backgroundColor: isTrailStep ? `rgba(239, 68, 68, ${trailOpacity * 0.3})` : (currentStep === stepIdx ? 'rgba(239, 68, 68, 0.15)' : (stepIdx % 4 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'transparent')),
-                      zIndex: (currentStep === stepIdx || isTrailStep) ? 10 : 1,
+                      backgroundColor: isTrailStep ? `rgba(239, 68, 68, ${trailOpacity * 0.3})` : (currentStep === stepIdx ? 'rgba(239, 68, 68, 0.6)' : (stepIdx % 4 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'transparent')),
+                      zIndex: (currentStep === stepIdx || isTrailStep) ? 100 : 1,
                     }}
                   >
                     <NoteGridCell
