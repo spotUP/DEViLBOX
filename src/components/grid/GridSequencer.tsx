@@ -511,7 +511,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
               <div
                 className="absolute rounded-sm pointer-events-none"
                 style={{
-                  top: 0,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
                   left: `${48 + (displayStep * (cellSize + 4))}px`,
                   width: `${cellSize}px`,
                   height: `${cellSize}px`,
@@ -572,7 +573,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                   <div
                     className="absolute rounded pointer-events-none"
                     style={{
-                      top: 0,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
                       left: `${48 + (displayStep * (cellSize + 4))}px`,
                       width: `${cellSize}px`,
                       height: `${cellSize}px`,
