@@ -363,17 +363,17 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   // Determine base color based on state - match button colors exactly
   const getBaseClasses = () => {
     if (!isActive) {
-      return 'bg-dark-bgTertiary hover:bg-dark-bgActive border-dark-border';
+      return 'bg-dark-bgTertiary hover:bg-dark-bgActive';
     }
     // Apply instrument color to active cells
     const colorClass = instrumentColor.replace('text-', '');
     
     // Accent notes get brighter version of instrument color
     if (accent) {
-      return `bg-${colorClass} hover:brightness-110 border-${colorClass}/50`;
+      return `bg-${colorClass} hover:brightness-110`;
     }
     // Normal notes get the instrument color with some opacity
-    return `bg-${colorClass}/80 hover:brightness-110 border-${colorClass}/50`;
+    return `bg-${colorClass}/80 hover:brightness-110`;
   };
 
   // Determine border color based on octave shift
@@ -398,13 +398,13 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
           height: `${cellSize}px`,
         }}
         className={`
-          rounded border relative
+          rounded relative
           transition-[transform,box-shadow] duration-75
           ${getBaseClasses()}
           ${getOctaveBorderClasses()}
           ${isFocused && !isCurrentStep ? 'ring-2 ring-text-secondary ring-offset-1 ring-offset-dark-bg' : ''}
           ${isActive ? 'shadow-sm' : ''}
-          ${isTriggered && isActive ? '!bg-white scale-[1.35] shadow-2xl shadow-white/70 !border-white' : ''}
+          ${isTriggered && isActive ? '!bg-white scale-[1.35] shadow-2xl shadow-white/70' : ''}
           ${getVelocityRing()}
           focus:outline-none
         `}
@@ -417,19 +417,19 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
           <div 
             className="absolute rounded pointer-events-none"
             style={{
-              inset: '-1px',
+              inset: '0',
               backgroundColor: instrumentHex,
               opacity: 0.35,
               zIndex: 4,
             }}
           />
         )}
-        {/* Trail overlay - renders on top of everything, extends over border */}
+        {/* Trail overlay - renders on top of everything */}
         {trailOpacity > 0 && (
           <div 
             className="absolute rounded pointer-events-none"
             style={{
-              inset: '-1px',
+              inset: '0',
               backgroundColor: instrumentHex,
               opacity: trailOpacity * 0.45,
               zIndex: 5,
