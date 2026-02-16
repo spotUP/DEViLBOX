@@ -464,13 +464,13 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
               return (
                 <div
                   key={stepIdx}
-                  className={`h-4 flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm transition-all duration-75
+                  className={`h-4 flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm
                     ${stepIdx % 4 === 0 ? 'text-text-secondary' : 'text-text-muted'}
-                    ${currentStep === stepIdx ? 'text-accent-primary font-bold' : ''}
+                    ${currentStep === stepIdx ? 'text-white font-bold' : ''}
                   `}
                   style={{
                     width: `${cellSize}px`,
-                    backgroundColor: currentStep === stepIdx ? 'var(--color-accent)' : 'transparent',
+                    backgroundColor: currentStep === stepIdx ? 'rgba(239, 68, 68, 0.6)' : 'transparent',
                   }}
                 >
                   {stepIdx.toString().padStart(2, '0')}
