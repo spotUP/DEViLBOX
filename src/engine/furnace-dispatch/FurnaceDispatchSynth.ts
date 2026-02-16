@@ -246,7 +246,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       // Create the chip and wait for worklet to confirm creation
       const engineSampleRate = this.engine.getNativeCtx()?.sampleRate ?? nativeCtx.sampleRate;
       await this.engine.createChip(this.platformType, engineSampleRate);
-      await this.engine.waitForChipCreated();
+      await this.engine.waitForChipCreated(this.platformType);
 
       // Connect worklet output through a shared native GainNode.
       // The worklet lives in the engine's true native AudioContext. Tone.js uses

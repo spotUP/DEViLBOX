@@ -896,6 +896,7 @@ export class FurnaceDispatchEngine {
   private _nativeCtx: AudioContext | null = null;
   private initialized = false;
   private initializing = false;
+  private _initPromise: Promise<void> | null = null; // Shared promise for concurrent init() callers
   // Multi-chip tracking — Map<platformType, chipInfo>
   // Mirrors Furnace's disCont[] array
   private chips: Map<number, { handle: number; numChannels: number }> = new Map();
@@ -907,9 +908,8 @@ export class FurnaceDispatchEngine {
   private _wasmReadyReject: ((err: Error) => void) | null = null;
   private _wasmReadyPromise: Promise<void> | null = null;
 
-  // Promise for chip creation
-  private _chipCreatedResolve: (() => void) | null = null;
-  private _chipCreatedPromise: Promise<void> | null = null;
+  // Per-platform promises for chip creation (fixes race when multiple synths share one platform)
+  private _chipCreatedPromises: Map<number, { promise: Promise<void>; resolve: () => void }> = new Map();
 
   // Oscilloscope data
   private oscCallbacks: Set<OscDataCallback> = new Set();
@@ -973,8 +973,19 @@ export class FurnaceDispatchEngine {
    * Loads worklet module and WASM binary.
    */
   async init(context: Record<string, unknown>): Promise<void> {
-    if (this.initialized || this.initializing) return;
+    // If already initialized, nothing to do
+    if (this.initialized) return;
+    // If init is in progress, wait for the existing attempt to finish
+    if (this.initializing && this._initPromise) {
+      return this._initPromise;
+    }
     this.initializing = true;
+
+    this._initPromise = this._doInit(context);
+    return this._initPromise;
+  }
+
+  private async _doInit(context: Record<string, unknown>): Promise<void> {
 
     try {
       const nativeCtx = getNativeContext(context);
@@ -1168,9 +1179,11 @@ export class FurnaceDispatchEngine {
         for (const chip of this.chips.values()) totalOscChannels += chip.numChannels;
         this.latestOscData = new Array(totalOscChannels).fill(null);
         console.log(`[FurnaceDispatch] Chip created: platform=${data.platformType}, channels=${data.numChannels}, total chips=${this.chips.size}`);
-        if (this._chipCreatedResolve) {
-          this._chipCreatedResolve();
-          this._chipCreatedResolve = null;
+        // Resolve per-platform chip creation promise
+        const chipPromise = this._chipCreatedPromises.get(data.platformType as number);
+        if (chipPromise) {
+          chipPromise.resolve();
+          this._chipCreatedPromises.delete(data.platformType as number);
         }
         break;
       }
@@ -1198,6 +1211,17 @@ export class FurnaceDispatchEngine {
    * The worklet handles reuse if the same platform already exists.
    */
   async createChip(platformType: number, sampleRate?: number): Promise<void> {
+    // If the chip already exists (created by another synth sharing the same platform), skip
+    if (this.chips.has(platformType)) {
+      return;
+    }
+
+    // If another synth is already creating this platform's chip, share its promise
+    const existing = this._chipCreatedPromises.get(platformType);
+    if (existing) {
+      return; // waitForChipCreated will use the shared promise
+    }
+
     // Ensure the worklet module is loaded first
     if (this._nativeCtx) {
       await FurnaceDispatchEngine.ensureModuleLoaded(this._nativeCtx);
@@ -1208,10 +1232,10 @@ export class FurnaceDispatchEngine {
       return;
     }
 
-    // Set up chip created promise before sending message
-    this._chipCreatedPromise = new Promise<void>((resolve) => {
-      this._chipCreatedResolve = resolve;
-    });
+    // Set up per-platform chip created promise before sending message
+    let resolve!: () => void;
+    const promise = new Promise<void>((r) => { resolve = r; });
+    this._chipCreatedPromises.set(platformType, { promise, resolve });
 
     this.workletNode.port.postMessage({
       type: 'createChip',
@@ -1222,10 +1246,25 @@ export class FurnaceDispatchEngine {
 
   /**
    * Wait for the chip to be created in the worklet.
+   * Uses per-platform promises so multiple synths sharing one platform don't race.
    */
-  async waitForChipCreated(): Promise<void> {
-    if (this._chipCreatedPromise) {
-      await this._chipCreatedPromise;
+  async waitForChipCreated(platformType?: number): Promise<void> {
+    // If platform specified, check if chip already exists
+    if (platformType !== undefined && this.chips.has(platformType)) {
+      return;
+    }
+    // Wait for the per-platform promise
+    if (platformType !== undefined) {
+      const entry = this._chipCreatedPromises.get(platformType);
+      if (entry) {
+        await entry.promise;
+        return;
+      }
+    }
+    // Fallback: wait for any pending chip creation (legacy callers)
+    for (const entry of this._chipCreatedPromises.values()) {
+      await entry.promise;
+      return;
     }
   }
 
