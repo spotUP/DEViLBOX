@@ -235,6 +235,7 @@ interface NoteCellProps {
   hammer?: boolean;  // TT-303: Legato without glide
   octaveShift?: number;
   velocity?: number;
+  cellSize?: number; // Dynamic cell size (14-28px), defaults to 28
   onClick: (noteIndex: number, stepIndex: number, modifiers?: { shift?: boolean; ctrl?: boolean; alt?: boolean }) => void;
   onToggleAccent?: (stepIndex: number) => void;
   onToggleSlide?: (stepIndex: number) => void;
@@ -258,6 +259,7 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   hammer = false,
   octaveShift = 0,
   velocity = 100,
+  cellSize = 28,
   onClick,
   onToggleAccent,
   onToggleSlide,
@@ -382,8 +384,9 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
         onWheel={handleWheel}
         onFocus={handleFocus}
         tabIndex={isFocused ? 0 : -1}
+        style={{ width: `${cellSize}px`, height: `${cellSize}px` }}
         className={`
-          w-7 h-7 rounded transition-all duration-75 border relative
+          rounded transition-all duration-75 border relative
           ${getBaseClasses()}
           ${isCurrentStep ? 'ring-2 ring-accent-primary ring-offset-1 ring-offset-dark-bg' : getOctaveBorderClasses()}
           ${isFocused && !isCurrentStep ? 'ring-2 ring-text-secondary ring-offset-1 ring-offset-dark-bg' : ''}
