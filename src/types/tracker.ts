@@ -124,7 +124,7 @@ export interface ChannelData {
     hardwareName?: string; // Hardware-specific channel name
     shortName?: string; // Short display name for channel headers
     effectCols?: number; // Number of effect columns (default 2)
-    systemId?: string; // System preset identifier
+    systemId?: number | string; // System preset identifier (number for Furnace fileID)
   };
 }
 
