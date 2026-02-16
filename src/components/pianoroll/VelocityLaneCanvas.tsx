@@ -10,11 +10,15 @@ import type { PianoRollNote } from '../../types/pianoRoll';
 
 const LANE_HEIGHT = 80;
 
-/** Channel colors matching NoteRenderer */
-const CHANNEL_COLORS = [
+/** Instrument colors matching NoteRenderer - expanded palette */
+const INSTRUMENT_COLORS = [
   '#06b6d4', '#a855f7', '#22c55e', '#f59e0b',
   '#ec4899', '#3b82f6', '#ef4444', '#14b8a6',
+  '#f97316', '#8b5cf6', '#10b981', '#eab308',
+  '#d946ef', '#0ea5e9', '#fb923c', '#84cc16',
 ];
+
+const DEFAULT_COLOR = '#64748b'; // gray for null instrument
 
 interface VelocityLaneCanvasProps {
   notes: PianoRollNote[];
@@ -155,7 +159,9 @@ const VelocityLaneCanvasComponent: React.FC<VelocityLaneCanvasProps> = ({
         const barW = Math.max(3, w - 1);
         const isSelected = sel.has(note.id);
         const isHovered = hoverNoteIdRef.current === note.id;
-        const color = CHANNEL_COLORS[note.channelIndex % CHANNEL_COLORS.length];
+        const color = note.instrument !== null
+          ? INSTRUMENT_COLORS[note.instrument % INSTRUMENT_COLORS.length]
+          : DEFAULT_COLOR;
 
         ctx.globalAlpha = isSelected ? 1 : (isHovered ? 0.9 : 0.7);
         ctx.fillStyle = color;
