@@ -1809,7 +1809,7 @@
 
 .ft2-toolbar-row {
   display: grid;
-  grid-template-columns: 220px 180px 180px 180px 1fr;
+  grid-template-columns: 220px 180px 180px 1fr;
   align-items: center;
   min-height: 32px;
   flex-shrink: 0;
@@ -1859,7 +1859,6 @@
 .ft2-col-1 { width: 220px; }
 .ft2-col-2 { width: 180px; }
 .ft2-col-3 { width: 180px; }
-.ft2-col-4, .ft2-col-instrument { width: 180px; }
 
 .ft2-section-playback {
   flex-shrink: 0;
