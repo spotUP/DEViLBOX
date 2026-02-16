@@ -237,6 +237,7 @@ interface NoteCellProps {
   velocity?: number;
   cellSize?: number; // Dynamic cell size (14-28px), defaults to 28
   trailOpacity?: number; // Trail effect opacity (0-1), 0 = no trail
+  isBeatMarker?: boolean; // Is this a beat marker position (every 4th step)
   onClick: (noteIndex: number, stepIndex: number, modifiers?: { shift?: boolean; ctrl?: boolean; alt?: boolean }) => void;
   onToggleAccent?: (stepIndex: number) => void;
   onToggleSlide?: (stepIndex: number) => void;
@@ -262,6 +263,7 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   velocity = 100,
   cellSize = 28,
   trailOpacity = 0,
+  isBeatMarker = false,
   onClick,
   onToggleAccent,
   onToggleSlide,
@@ -359,7 +361,9 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   // Determine base color based on state - match button colors exactly
   const getBaseClasses = () => {
     if (!isActive) {
-      return 'bg-dark-bgTertiary hover:bg-dark-bgActive';
+      return isBeatMarker 
+        ? 'bg-dark-bgActive hover:bg-dark-bgHover'
+        : 'bg-dark-bgTertiary hover:bg-dark-bgActive';
     }
     // Active cells use inline backgroundColor (applied in style prop)
     return 'hover:brightness-110';
