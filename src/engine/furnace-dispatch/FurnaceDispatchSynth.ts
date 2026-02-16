@@ -105,6 +105,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   private _volumeOffsetDb = 0; // Volume normalization offset in dB
   private furnaceInstrumentIndex = 0; // Which Furnace instrument slot this synth uses
   private _nativeGain: GainNode | null = null; // Shared native GainNode for audio routing
+  private _instrumentUploadPromise: Promise<void> | null = null; // Pending instrument upload
 
   constructor(platformType: number = FurnaceDispatchPlatform.GB) {
     this.output = getDevilboxAudioContext().createGain();
@@ -122,7 +123,11 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   }
 
   public async ensureInitialized(): Promise<void> {
-    return this._isReadyPromise;
+    await this._isReadyPromise;
+    // Also wait for any pending instrument upload to complete
+    if (this._instrumentUploadPromise) {
+      await this._instrumentUploadPromise;
+    }
   }
 
   /**
@@ -138,7 +143,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * @param name - Instrument name
    */
   public async uploadInstrumentFromConfig(config: Record<string, unknown>, name: string): Promise<void> {
-    await this.ensureInitialized();
+    await this._isReadyPromise; // Wait for chip init, but NOT for previous upload (avoid circular wait)
     console.log(`[FurnaceDispatchSynth] Encoding and uploading instrument ${this.furnaceInstrumentIndex} "${name}" to platform ${this.platformType}`);
 
     // Encode from config using our encoder
@@ -157,6 +162,13 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     for (let ch = 0; ch < numCh; ch++) {
       this.engine.setInstrument(ch, this.furnaceInstrumentIndex, this.platformType, true);
     }
+  }
+
+  /**
+   * Set the pending instrument upload promise so ensureInitialized() can wait for it.
+   */
+  public setInstrumentUploadPromise(promise: Promise<void>): void {
+    this._instrumentUploadPromise = promise;
   }
 
   /**

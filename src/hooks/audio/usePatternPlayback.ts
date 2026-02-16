@@ -134,11 +134,8 @@ export const usePatternPlayback = () => {
         const currentSongPos = replayer.getCurrentPosition();
         const currentRow = replayer.getCurrentRow();
 
-        // Ensure WASM synths (Furnace, TB303, etc.) are fully initialized before loading song
-        // and starting playback. This prevents 'triggerAttack blocked: ready=false' errors.
-        getToneEngine().ensureWASMSynthsReady(instruments).catch(err => {
-          console.error('[Playback] Failed to ensure WASM synths ready:', err);
-        });
+        // NOTE: WASM synth readiness is awaited inside replayer.play() via
+        // engine.ensureWASMSynthsReady(). No need for a duplicate fire-and-forget call here.
 
         // Load song into TrackerReplayer
         const furnaceData = pattern.importMetadata?.furnaceData;

@@ -226,12 +226,13 @@ const dispatchChipDescs: SynthDescriptor[] = DISPATCH_CHIPS.map(id => ({
     const furnaceIndex = config.furnace?.furnaceIndex ?? 0;
     instrument.setFurnaceInstrumentIndex(furnaceIndex);
     if (config.furnace) {
-      instrument.uploadInstrumentFromConfig(
+      const uploadPromise = instrument.uploadInstrumentFromConfig(
         config.furnace as unknown as Record<string, unknown>,
         config.name,
       ).catch(err => {
         console.error(`[FurnaceRegistry] Failed to upload instrument data for ${config.name}:`, err);
       });
+      instrument.setInstrumentUploadPromise(uploadPromise as Promise<void>);
     }
     return instrument;
   },
