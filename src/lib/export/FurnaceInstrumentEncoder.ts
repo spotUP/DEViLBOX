@@ -243,6 +243,8 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
       const macro = macrosByCode[i];
 
       if (macro && macro.data && macro.data.length > 0) {
+        // Log each non-empty macro for debugging
+        console.log(`[FurnaceEncoder] macro[${i}] len=${macro.data.length} loop=${macro.loop ?? 255} rel=${macro.release ?? 255} data=[${macro.data.slice(0,4).join(',')}${macro.data.length > 4 ? '...' : ''}]`);
         writer.writeUint8(macro.data.length);                                   // len
         writer.writeUint8(macro.delay ?? 0);                                    // delay
         writer.writeUint8(macro.speed ?? 1);                                    // speed

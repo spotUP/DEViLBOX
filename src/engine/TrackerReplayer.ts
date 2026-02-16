@@ -1488,6 +1488,11 @@ export class TrackerReplayer {
     const macros = ch.instrument.furnace.macros as FurnaceMacro[];
     if (macros.length === 0) return;
 
+    // Log macro processing on first tick only (avoid spam)
+    if (this.currentTick === 0 && this.pattPos % 16 === 0) {
+      console.log(`[Macros] inst=${ch.instrument.id} "${ch.instrument.name}" macros=${macros.length} types=[${macros.map(m => m.type).join(',')}]`);
+    }
+
     for (const macro of macros) {
       if (!macro.data || macro.data.length === 0) continue;
 
@@ -1518,6 +1523,10 @@ export class TrackerReplayer {
       }
 
       const value = macro.data[pos] ?? 0;
+      // Log macro value changes (every 16 rows to reduce spam)
+      if (this.pattPos % 16 === 0 && this.currentTick === 0) {
+        console.log(`[Macro] type=${macro.type} pos=${pos} val=${value} loop=${macro.loop} rel=${macro.release}`);
+      }
       this.applyMacroValue(ch, macro.type, value, time);
     }
 

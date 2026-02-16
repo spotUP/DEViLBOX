@@ -301,7 +301,8 @@ function convertFurnaceInstrument(
   };
 
   const chipKeys = furnaceData.chipConfig ? Object.keys(furnaceData.chipConfig).join(',') : 'none';
-  console.log(`[InstrumentConverter] Furnace instrument ${instrumentId}: "${parsed.name}" type=${furnaceData.chipType} -> ${synthType}, macros=${furnaceData.macros.length}, wavetables=${furnaceData.wavetables.length}, chipData=${chipKeys}, rawBinaryData=${parsed.rawBinaryData?.length ?? 0} bytes`);
+  const macroSummary = furnaceData.macros.map(m => `${m.type}:${m.data?.length || 0}`).join(',') || 'none';
+  console.log(`[InstrumentConverter] Furnace instrument ${instrumentId}: "${parsed.name}" type=${furnaceData.chipType} -> ${synthType}, macros=[${macroSummary}], wavetables=${furnaceData.wavetables.length}, chipData=${chipKeys}, rawBinaryData=${parsed.rawBinaryData?.length ?? 0} bytes`);
 
   return instrument;
 }
