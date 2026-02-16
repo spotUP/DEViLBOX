@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-16T06:00:56.353Z
+ * Generated: 2026-02-16T08:07:43.219Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '675';
-export const BUILD_HASH = 'aa4d2c4';
+export const BUILD_NUMBER = '680';
+export const BUILD_HASH = '92cb551';
 export const BUILD_DATE = '2026-02-16';
 
 // Full semantic version with build number
@@ -33,6 +33,26 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-16',
     changes: [
+      {
+        type: 'fix',
+        "description": "Explicitly set popout window title to prevent 'about:blank'"
+      },
+      {
+        type: 'fix',
+        "description": "Move channel scrollbar above headers"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: commit pending Furnace compatibility updates and hardware preset fixes"
+      },
+      {
+        type: 'fix',
+        "description": "Add resistance to stepped horizontal scrolling"
+      },
+      {
+        type: 'fix',
+        "description": "Implement stepped horizontal scrolling (channel by channel)"
+      },
       {
         type: 'fix',
         "description": "Center channel content for cleaner layout"
@@ -218,26 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Implement mouse-based block selection and visual highlight"
-      },
-      {
-        type: 'improvement',
-        "description": "Disable global text selection for native app feel"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript unused import errors"
-      },
-      {
-        type: 'fix',
-        "description": "Route FurnaceDispatchSynth notes to correct chip channels"
-      },
-      {
-        type: 'improvement',
-        "description": "Add iOS PWA restriction note to MIDI settings"
-      },
-      {
-        type: 'fix',
-        "description": "Add detailed diagnostics for iOS MIDI support"
       }
     ]
   }

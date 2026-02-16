@@ -348,6 +348,74 @@ export interface ImportMetadata {
     systemName: string;          // Human-readable system name from Furnace
     channelShortNames?: string[];  // Short channel names from subsong (if available)
     effectColumns?: number[];    // Effect columns per channel (1-8, default 1)
+    compatFlags?: {              // Compatibility flags for legacy .fur behavior
+      limitSlides?: boolean;
+      linearPitch?: number;
+      pitchSlideSpeed?: number;
+      loopModality?: number;
+      delayBehavior?: number;
+      jumpTreatment?: number;
+      properNoiseLayout?: boolean;
+      waveDutyIsVol?: boolean;
+      resetMacroOnPorta?: boolean;
+      legacyVolumeSlides?: boolean;
+      compatibleArpeggio?: boolean;
+      noteOffResetsSlides?: boolean;
+      targetResetsSlides?: boolean;
+      arpNonPorta?: boolean;
+      algMacroBehavior?: boolean;
+      brokenShortcutSlides?: boolean;
+      ignoreDuplicateSlides?: boolean;
+      stopPortaOnNoteOff?: boolean;
+      continuousVibrato?: boolean;
+      brokenDACMode?: boolean;
+      oneTickCut?: boolean;
+      newInsTriggersInPorta?: boolean;
+      arp0Reset?: boolean;
+      brokenSpeedSel?: boolean;
+      noSlidesOnFirstTick?: boolean;
+      rowResetsArpPos?: boolean;
+      ignoreJumpAtEnd?: boolean;
+      buggyPortaAfterSlide?: boolean;
+      gbInsAffectsEnvelope?: boolean;
+      sharedExtStat?: boolean;
+      ignoreDACModeOutsideIntendedChannel?: boolean;
+      e1e2AlsoTakePriority?: boolean;
+      newSegaPCM?: boolean;
+      fbPortaPause?: boolean;
+      snDutyReset?: boolean;
+      pitchMacroIsLinear?: boolean;
+      oldOctaveBoundary?: boolean;
+      noOPN2Vol?: boolean;
+      newVolumeScaling?: boolean;
+      volMacroLinger?: boolean;
+      brokenOutVol?: boolean;
+      brokenOutVol2?: boolean;
+      e1e2StopOnSameNote?: boolean;
+      brokenPortaArp?: boolean;
+      snNoLowPeriods?: boolean;
+      disableSampleMacro?: boolean;
+      oldArpStrategy?: boolean;
+      brokenPortaLegato?: boolean;
+      brokenFMOff?: boolean;
+      preNoteNoEffect?: boolean;
+      oldSampleOffset?: boolean;
+    };
+    grooves?: Array<{            // Groove patterns (custom tick timing for swing/shuffle)
+      len: number;               // Groove length (1-16)
+      val: number[];             // Tick values (16 entries, only first 'len' are used)
+    }>;
+    subsongCount: number;        // Total number of subsongs in module
+    subsongNames: string[];      // Name of each subsong
+    currentSubsong?: number;     // Currently active subsong index (used in UI)
+    allSubsongs?: {              // All subsong pattern data (stored but not displayed)
+      subsongIndex: number;
+      patterns: any[][][];       // Pattern data for this subsong
+      patternOrderTable: number[]; // Pattern order for this subsong
+      ordersLen: number;         // Number of orders in this subsong
+      initialSpeed: number;      // Initial speed for this subsong
+      initialBPM: number;        // Initial BPM for this subsong
+    }[];
   };
 }
 
