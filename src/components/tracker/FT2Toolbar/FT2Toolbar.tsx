@@ -191,6 +191,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     setIsLooping,
     play,
     stop,
+    setCurrentRow,
     grooveTemplateId,
     setGrooveTemplate,
     swing,
@@ -560,6 +561,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     else {
       if (isPlaying) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
       setIsLooping(false);
+      setCurrentRow(0); // Always start from first row of current pattern
       await engine.init();
       play();
     }
@@ -571,6 +573,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     else {
       if (isPlaying) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
       setIsLooping(true);
+      setCurrentRow(0); // Always start from first row of current pattern
       await engine.init();
       play();
     }

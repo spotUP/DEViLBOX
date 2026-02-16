@@ -9,12 +9,14 @@ import { getToneEngine } from '@engine/ToneEngine';
  * Toggle play/stop - Space bar in most trackers
  */
 export function playStopToggle(): boolean {
-  const { isPlaying, stop } = useTransportStore.getState();
+  const { isPlaying, stop, setCurrentRow } = useTransportStore.getState();
   
   if (isPlaying) {
     stop();
     getToneEngine().stop();
   } else {
+    // Always start from the first row of the current pattern
+    setCurrentRow(0);
     getToneEngine()
       .init()
       .then(() => useTransportStore.getState().play())
