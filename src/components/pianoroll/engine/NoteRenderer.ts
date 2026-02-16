@@ -26,7 +26,7 @@ const CHANNEL_COLORS = [
 ];
 
 const NOTE_RADIUS = 5;
-const NOTE_V_PADDING = 1; // vertical padding within lane
+const NOTE_V_PADDING = 3; // vertical padding within lane
 const RESIZE_HANDLE_COLOR = 'rgba(255,245,157,0.85)';
 
 export interface NoteRenderColors {
@@ -194,9 +194,9 @@ export class NoteRenderer {
     this.drawIndicators(ctx, x, y, noteW, h, note);
 
     // Note name label when zoomed in enough
-    if (noteW > 24 && vp.verticalZoom >= 10) {
+    if (noteW > 16 && vp.verticalZoom >= 10) {
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.font = `${Math.min(9, vp.verticalZoom - 3)}px Inter, system-ui, sans-serif`;
+      ctx.font = `${Math.min(10, vp.verticalZoom - 3)}px Inter, system-ui, sans-serif`;
       ctx.textBaseline = 'middle';
       const name = this.getNoteName(note.midiNote);
       ctx.fillText(name, x + 3, y + h / 2);

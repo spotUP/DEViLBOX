@@ -157,6 +157,10 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     setScroll(0, Math.max(0, Math.min(127, newScrollY)));
   }, [notes, containerHeight, view.showVelocityLane, view.verticalZoom, setScroll]);
 
+  // Pattern length and virtual row tracking
+  const patternLength = pattern?.length || 64;
+  const virtualRowOffsetRef = useRef<number>(0);
+
   // Auto-scroll during playback to keep playhead at piano keys edge
   const prevCurrentRowRef = useRef<number | null>(null);
   const prevPatternRef = useRef<Pattern | null>(null);
@@ -924,9 +928,6 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   const gridHeight = useMemo(() => {
     return view.showVelocityLane ? containerHeight - 80 : containerHeight;
   }, [containerHeight, view.showVelocityLane]);
-
-  const patternLength = pattern?.length || 64;
-  const virtualRowOffsetRef = useRef<number>(0);
 
   // Scale options for dropdown
   const scaleOptions = useMemo(() => {
