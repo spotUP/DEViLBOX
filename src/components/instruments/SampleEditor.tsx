@@ -95,8 +95,12 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       try {
         const response = await fetch(sampleUrl);
         const arrayBuffer = await response.arrayBuffer();
-        const audioContext = new (window.AudioContext || (window as unknown as Record<string, typeof AudioContext>).webkitAudioContext)();
-        const buffer = await audioContext.decodeAudioData(arrayBuffer);
+        // Reuse the shared ToneEngine AudioContext for decoding.
+        // Creating throwaway contexts leaks them and iOS limits to ~4-6.
+        const { getDevilboxAudioContext } = await import('@utils/audio-context');
+        let audioContext: AudioContext;
+        try { audioContext = getDevilboxAudioContext(); } catch { audioContext = new AudioContext(); }
+        const buffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
         setAudioBuffer(buffer);
 
         // Update sample info if not already set

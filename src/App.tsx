@@ -433,7 +433,10 @@ function App() {
   };
 
   useEffect(() => {
-    // Add a one-time global click listener to start audio if it hasn't been started
+    // Add a one-time global interaction listener to start audio if it hasn't been started.
+    // iOS Safari requires 'touchstart' — click events have a 300ms delay and may not
+    // qualify as a user gesture for AudioContext.resume(). We listen for all three
+    // event types to cover desktop (click/keydown) and mobile (touchstart).
     const handleFirstInteraction = async () => {
       if (contextState !== 'running') {
         try {
@@ -445,17 +448,20 @@ function App() {
           console.error('Failed to resume audio engine:', error);
         }
       }
-      // Remove listener after first interaction
+      // Remove all listeners after first interaction
       window.removeEventListener('click', handleFirstInteraction);
       window.removeEventListener('keydown', handleFirstInteraction);
+      window.removeEventListener('touchstart', handleFirstInteraction);
     };
 
     window.addEventListener('click', handleFirstInteraction);
     window.addEventListener('keydown', handleFirstInteraction);
+    window.addEventListener('touchstart', handleFirstInteraction);
 
     return () => {
       window.removeEventListener('click', handleFirstInteraction);
       window.removeEventListener('keydown', handleFirstInteraction);
+      window.removeEventListener('touchstart', handleFirstInteraction);
     };
   }, [contextState, setContextState]);
 

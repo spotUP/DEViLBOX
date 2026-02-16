@@ -50,9 +50,20 @@ export const useSynthErrorStore = create<SynthErrorStore>((set, get) => ({
     const debugData: SynthError['debugData'] = {
       timestamp: new Date().toISOString(),
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
-      audioContextState: typeof AudioContext !== 'undefined'
-        ? new AudioContext().state
-        : 'AudioContext not available',
+      // Read the existing ToneEngine context state instead of creating a throwaway
+      // AudioContext. Creating new contexts leaks them and iOS limits to ~4-6 total.
+      audioContextState: (() => {
+        try {
+          // Try to get the shared context from ToneEngine without importing it
+          // (avoid circular deps). Fall back to a safe check.
+          const w = window as unknown as Record<string, unknown>;
+          const engine = w._toneEngine as { getContextState?: () => string } | undefined;
+          if (engine?.getContextState) return engine.getContextState();
+          return 'unknown (no engine ref)';
+        } catch {
+          return 'unknown';
+        }
+      })(),
       wasmSupported: typeof WebAssembly !== 'undefined',
       ...errorInput.debugData,
     };

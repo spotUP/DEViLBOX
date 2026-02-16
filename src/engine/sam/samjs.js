@@ -81,7 +81,19 @@ let context = null;
  */
 const PlayBuffer = audiobuffer => {
   if (null === context) {
-    context = new AudioContext();
+    // Try to reuse the shared ToneEngine AudioContext to avoid exceeding
+    // iOS Safari's ~4-6 concurrent AudioContext limit.
+    // Access via the window global set by ToneEngine (avoids import issues in vendored JS).
+    try {
+      const engine = window._toneEngine;
+      if (engine && engine.nativeContext) {
+        context = engine.nativeContext;
+      } else {
+        context = new AudioContext();
+      }
+    } catch {
+      context = new AudioContext();
+    }
   }
   if (!context) {
     {

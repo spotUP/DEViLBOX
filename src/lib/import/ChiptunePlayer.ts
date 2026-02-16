@@ -3,6 +3,8 @@
  * Loads worklet from public folder to avoid import.meta.url issues
  */
 
+import { getDevilboxAudioContext } from '@utils/audio-context';
+
 export interface ChiptuneMetadata {
   dur: number;
   title?: string;
@@ -83,7 +85,22 @@ export class ChiptunePlayer {
 
   private async initWorklet(): Promise<void> {
     try {
-      this.context = new AudioContext();
+      // Try to reuse the shared ToneEngine AudioContext to avoid exceeding
+      // iOS Safari's ~4-6 concurrent AudioContext limit.
+      try {
+        this.context = getDevilboxAudioContext();
+        console.log('[ChiptunePlayer] Using shared ToneEngine AudioContext');
+      } catch {
+        // ToneEngine not initialized yet — create standalone context
+        this.context = new AudioContext();
+        console.log('[ChiptunePlayer] Created standalone AudioContext');
+      }
+
+      // Ensure context is running (may be suspended on iOS)
+      if (this.context.state === 'suspended') {
+        await this.context.resume();
+      }
+
       this.gain = this.context.createGain();
       this.gain.gain.value = 1;
 
