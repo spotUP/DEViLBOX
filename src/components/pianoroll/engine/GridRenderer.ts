@@ -134,14 +134,12 @@ export class GridRenderer {
       const x = vp.rowToPixelX(row);
       if (x < -1 || x > vp.width + 1) continue;
 
-      const isMeasure = row % 16 === 0;
-      const isBeat = row % 4 === 0;
+      // Use modulo for repeating pattern grid
+      const rowInPattern = row % patternLength;
+      const isMeasure = rowInPattern % 16 === 0;
+      const isBeat = rowInPattern % 4 === 0;
 
-      if (row > patternLength) {
-        // Beyond pattern: subtle overlay
-        ctx.fillStyle = this.colors.beyondPattern;
-        ctx.fillRect(x, 0, 1, vp.height);
-      } else if (isMeasure) {
+      if (isMeasure) {
         ctx.fillStyle = this.colors.measureLine;
         ctx.fillRect(x, 0, 1, vp.height);
       } else if (isBeat) {
@@ -153,11 +151,16 @@ export class GridRenderer {
       }
     }
 
-    // ---- Pattern end marker ----
-    const endX = vp.rowToPixelX(patternLength);
-    if (endX >= 0 && endX <= vp.width) {
-      ctx.fillStyle = this.colors.patternEnd;
-      ctx.fillRect(endX, 0, 2, vp.height);
+    // ---- Pattern end markers (repeating) ----
+    // Draw pattern end markers at every pattern length interval
+    const firstPatternEnd = Math.floor(range.startRow / patternLength) * patternLength;
+    for (let i = firstPatternEnd; i <= range.endRow; i += patternLength) {
+      if (i <= 0) continue; // Don't draw at row 0
+      const endX = vp.rowToPixelX(i);
+      if (endX >= 0 && endX <= vp.width) {
+        ctx.fillStyle = this.colors.patternEnd;
+        ctx.fillRect(endX, 0, 2, vp.height);
+      }
     }
 
     this.lastKey = key;
