@@ -2378,9 +2378,15 @@ export const useTrackerStore = create<TrackerStore>()(
           // If playing, tell the replayer to seek to this position
           const replayer = getTrackerReplayer();
           if (replayer.isPlaying()) {
-            // Maintain current row when jumping positions manually
-            const currentRow = useTransportStore.getState().currentRow;
-            replayer.seekTo(positionIndex, currentRow);
+            // ONLY seek if the replayer isn't already at this position.
+            // This prevents a "break" or "jump" when the replayer naturally advances 
+            // and we update the UI store to match.
+            if (replayer.getCurrentPosition() !== positionIndex) {
+              console.log(`[useTrackerStore] Manual seek to position ${positionIndex}`);
+              // Maintain current row when jumping positions manually
+              const currentRow = useTransportStore.getState().currentRow;
+              replayer.seekTo(positionIndex, currentRow);
+            }
           }
         }
       }),

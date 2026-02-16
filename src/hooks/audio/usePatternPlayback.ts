@@ -21,6 +21,19 @@ export const usePatternPlayback = () => {
   useAutomationStore();
   const { masterEffects } = useAudioStore();
 
+  // Pattern depends on currentPatternIndex and currentPositionIndex.
+  // We use refs for these to prevent the main playback loop from restarting 
+  // every time the UI position updates.
+  const currentPositionIndexRef = useRef(currentPositionIndex);
+  useEffect(() => {
+    currentPositionIndexRef.current = currentPositionIndex;
+  }, [currentPositionIndex]);
+
+  const currentPatternIndexRef = useRef(currentPatternIndex);
+  useEffect(() => {
+    currentPatternIndexRef.current = currentPatternIndex;
+  }, [currentPatternIndex]);
+
   const actualPatternIndex = patternOrder[currentPositionIndex] ?? currentPatternIndex;
   const pattern = patterns[actualPatternIndex];
   const engineRef = useRef(getToneEngine());
@@ -72,14 +85,21 @@ export const usePatternPlayback = () => {
     if (isPlaying && pattern) {
       const arrangement = useArrangementStore.getState();
       
-      // Determine if we need to reload (song structure change while playing)
-      const needsReload = hasStartedRef.current;
+      // Determine if we need to reload. 
+      // We ignore reloads if we are already playing and the replayer position 
+      // matches the store position (meaning it was a natural advancement).
+      const isNaturalAdvancement = hasStartedRef.current && 
+                                   replayer.isPlaying() && 
+                                   replayer.getCurrentPosition() === currentPositionIndexRef.current;
+      
+      const needsReload = hasStartedRef.current && !isNaturalAdvancement;
 
       if (!hasStartedRef.current || needsReload) {
         hasStartedRef.current = true;
-
-        // Determine format from metadata or default to XM
-        const format = (pattern.importMetadata?.sourceFormat ?? 'XM') as TrackerFormat;
+        
+        if (needsReload) {
+          console.log(`[Playback] Reloading: replayerPos=${replayer.getCurrentPosition()}, storePos=${currentPositionIndexRef.current}`);
+        }
         const modData = pattern.importMetadata?.modData;
 
         console.log(`[Playback] ${needsReload ? 'Reloading' : 'Starting'} real-time playback (${format}), arrangement=${arrangement.isArrangementMode}`);
@@ -192,7 +212,7 @@ export const usePatternPlayback = () => {
         replayerRef.current.onSongEnd = null;
       }
     };
-  }, [isPlaying, isLooping, pattern, instruments, patternOrder, patterns, bpm, currentPatternIndex, setCurrentPattern, setCurrentPosition, setCurrentRow, setCurrentRowThrottled]);
+  }, [isPlaying, isLooping, pattern, instruments, patternOrder, patterns, bpm, setCurrentPattern, setCurrentPosition, setCurrentRow, setCurrentRowThrottled]);
 
   return {
     isPlaying,
