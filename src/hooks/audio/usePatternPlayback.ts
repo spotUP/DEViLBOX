@@ -138,7 +138,10 @@ export const usePatternPlayback = () => {
         let lastPosition = -1;
 
         replayer.onRowChange = (row, patternNum, position) => {
-          setCurrentRowThrottled(row, effectivePatterns[patternNum]?.length ?? 64);
+          // If row is 0 or position changed, it's a jump or pattern start.
+          // Update immediately to prevent "ghost" frames from old position.
+          const isJump = row === 0 || position !== lastPosition;
+          setCurrentRowThrottled(row, effectivePatterns[patternNum]?.length ?? 64, isJump);
 
           if (arrangement.isArrangementMode) {
             const globalRow = position * 64 + row;

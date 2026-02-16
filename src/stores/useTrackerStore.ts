@@ -16,6 +16,7 @@ import { DEFAULT_COLUMN_VISIBILITY, EMPTY_CELL, CHANNEL_COLORS } from '@typedefs
 import { xmNoteToMidi, midiToXMNote } from '@/lib/xmConversions';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { useTransportStore } from './useTransportStore';
 import { idGenerator } from '../utils/idGenerator';
 import { DEFAULT_PATTERN_LENGTH, DEFAULT_NUM_CHANNELS, MAX_PATTERN_LENGTH, MAX_CHANNELS, MIN_CHANNELS, MIN_PATTERN_LENGTH } from '../constants/trackerConstants';
 import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
@@ -303,6 +304,7 @@ export const useTrackerStore = create<TrackerStore>()(
     setCurrentPattern: (index) =>
       set((state) => {
         if (index >= 0 && index < state.patterns.length) {
+          if (state.currentPatternIndex === index) return;
           state.currentPatternIndex = index;
           // If playing, tell the replayer to jump to this pattern
           const replayer = getTrackerReplayer();
@@ -2367,9 +2369,19 @@ export const useTrackerStore = create<TrackerStore>()(
     setCurrentPosition: (positionIndex) =>
       set((state) => {
         if (positionIndex >= 0 && positionIndex < state.patternOrder.length) {
+          if (state.currentPositionIndex === positionIndex) return;
           state.currentPositionIndex = positionIndex;
           // Also update current pattern to match this position
-          state.currentPatternIndex = state.patternOrder[positionIndex];
+          const nextPatternIndex = state.patternOrder[positionIndex];
+          state.currentPatternIndex = nextPatternIndex;
+
+          // If playing, tell the replayer to seek to this position
+          const replayer = getTrackerReplayer();
+          if (replayer.isPlaying()) {
+            // Maintain current row when jumping positions manually
+            const currentRow = useTransportStore.getState().currentRow;
+            replayer.seekTo(positionIndex, currentRow);
+          }
         }
       }),
 

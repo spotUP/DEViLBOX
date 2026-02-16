@@ -52,7 +52,7 @@ interface TransportStore extends TransportState {
   togglePlayPause: () => void;
   setIsLooping: (looping: boolean) => void;
   setCurrentRow: (row: number, patternLength?: number) => void;
-  setCurrentRowThrottled: (row: number, patternLength?: number) => void; // NEW: Throttled version for playback
+  setCurrentRowThrottled: (row: number, patternLength?: number, immediate?: boolean) => void; // NEW: Throttled version for playback
   setCurrentPattern: (index: number) => void;
   setSmoothScrolling: (smooth: boolean) => void;
   setMetronomeEnabled: (enabled: boolean) => void;
@@ -247,15 +247,15 @@ export const useTransportStore = create<TransportStore>()(
       }),
 
     // Throttled version of setCurrentRow for playback - limits to 50Hz for Amiga PAL feel
-    setCurrentRowThrottled: (row, patternLength) => {
+    setCurrentRowThrottled: (row, patternLength, immediate) => {
       const now = performance.now();
 
       // Store the latest pending values
       pendingRow = row;
       pendingPatternLength = patternLength;
 
-      // If enough time has passed, update immediately
-      if (now - lastUpdateTime >= THROTTLE_INTERVAL) {
+      // If immediate or enough time has passed, update immediately
+      if (immediate || now - lastUpdateTime >= THROTTLE_INTERVAL) {
         lastUpdateTime = now;
         _get().setCurrentRow(row, patternLength);
         pendingRow = null;
