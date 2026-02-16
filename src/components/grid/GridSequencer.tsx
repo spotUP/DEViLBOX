@@ -26,7 +26,6 @@ import { useMIDI } from '../../hooks/useMIDI';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
-import { getSynthInfo, tailwindToHex } from '@constants/synthCategories';
 
 const NOTE_NAMES = ['B', 'A#', 'A', 'G#', 'G', 'F#', 'F', 'E', 'D#', 'D', 'C#', 'C'] as const;
 const NOTE_NAMES_FORWARD = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
@@ -58,23 +57,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
 
   // Get channel and current pattern data
   const { patterns, currentPatternIndex } = useTrackerStore();
-  const { instruments } = useInstrumentStore();
   const channel = patterns[currentPatternIndex]?.channels[channelIndex];
-
-  // Helper to get instrument color for a specific step
-  const getStepInstrumentColor = useCallback((stepIdx: number): { color: string; hex: string } => {
-    const cell = channel?.rows?.[stepIdx];
-    const instrumentId = cell?.instrument ?? 0;
-    if (instrumentId === 0) {
-      return { color: 'text-accent-primary', hex: '#ef4444' };
-    }
-    const instrument = instruments.find(i => i.id === instrumentId);
-    if (!instrument) {
-      return { color: 'text-accent-primary', hex: '#ef4444' };
-    }
-    const synthInfo = getSynthInfo(instrument.synthType);
-    return { color: synthInfo.color, hex: tailwindToHex(synthInfo.color) };
-  }, [channel, instruments]);
 
   // Smooth marker scrolling state
   const [smoothMarker, setSmoothMarker] = useState(false);
@@ -544,14 +527,13 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 style={{
                   left: `${48 + (smoothStep * (cellSize + 4))}px`,
                   width: `${cellSize}px`,
-                  backgroundColor: getStepInstrumentColor(Math.floor(smoothStep)).hex,
+                  backgroundColor: '#ef4444',
                   opacity: 0.6,
                   transition: 'none', // No CSS transition, using RAF
                 }}
               />
             )}
             {stepIndices.map((stepIdx) => {
-              const { hex: stepInstrumentHex } = getStepInstrumentColor(stepIdx);
               const isCurrentDiscrete = !smoothMarker && currentStep === stepIdx;
               return (
                 <div
@@ -567,7 +549,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                   {isCurrentDiscrete && (
                     <div
                       className="absolute inset-0"
-                      style={{ backgroundColor: stepInstrumentHex, opacity: 0.6 }}
+                      style={{ backgroundColor: '#ef4444', opacity: 0.6 }}
                     />
                   )}
                   <span className="relative z-10">{stepIdx.toString().padStart(2, '0')}</span>
@@ -627,8 +609,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 const isCurrentStepCheck = smoothMarker 
                   ? (Math.abs(smoothStep - stepIdx) < 0.5)
                   : (currentStep === stepIdx);
-                
-                const { color: stepInstrumentColor, hex: stepInstrumentHex } = getStepInstrumentColor(stepIdx);
 
                 return (
                   <div
@@ -654,8 +634,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                       velocity={isActive ? step?.velocity : 100}
                       cellSize={cellSize}
                       trailOpacity={trailOpacity}
-                      instrumentColor={stepInstrumentColor}
-                      instrumentHex={stepInstrumentHex}
                       onClick={handleNoteClick}
                       onToggleAccent={toggleAccent}
                       onToggleSlide={toggleSlide}

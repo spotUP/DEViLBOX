@@ -237,8 +237,6 @@ interface NoteCellProps {
   velocity?: number;
   cellSize?: number; // Dynamic cell size (14-28px), defaults to 28
   trailOpacity?: number; // Trail effect opacity (0-1), 0 = no trail
-  instrumentColor?: string; // Tailwind color class from synth info
-  instrumentHex?: string; // CSS hex color for inline styles
   onClick: (noteIndex: number, stepIndex: number, modifiers?: { shift?: boolean; ctrl?: boolean; alt?: boolean }) => void;
   onToggleAccent?: (stepIndex: number) => void;
   onToggleSlide?: (stepIndex: number) => void;
@@ -264,8 +262,6 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   velocity = 100,
   cellSize = 28,
   trailOpacity = 0,
-  instrumentColor = 'text-accent-primary',
-  instrumentHex = '#ef4444',
   onClick,
   onToggleAccent,
   onToggleSlide,
@@ -390,7 +386,7 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
           width: `${cellSize}px`, 
           height: `${cellSize}px`,
           ...(isActive && !isTriggered && {
-            backgroundColor: accent ? instrumentHex : `${instrumentHex}CC`, // CC = 80% opacity
+            backgroundColor: accent ? '#ef4444' : '#ef4444CC', // CC = 80% opacity
           }),
         }}
         className={`
@@ -414,7 +410,7 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
             className="absolute rounded pointer-events-none"
             style={{
               inset: '0',
-              backgroundColor: instrumentHex,
+              backgroundColor: '#ef4444',
               opacity: 0.35,
               zIndex: 4,
             }}
@@ -426,7 +422,7 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
             className="absolute rounded pointer-events-none"
             style={{
               inset: '0',
-              backgroundColor: instrumentHex,
+              backgroundColor: '#ef4444',
               opacity: trailOpacity * 0.45,
               zIndex: 5,
             }}
