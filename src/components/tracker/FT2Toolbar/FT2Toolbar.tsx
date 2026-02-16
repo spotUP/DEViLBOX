@@ -623,7 +623,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 <MousePointerClick size={14} />
               </Button>
 
-              <div className="flex items-center ml-2 border-l border-dark-border pl-2 h-7 gap-1.5">
+              <div className="flex items-center ml-2 pl-2 h-7 gap-1.5">
                 <span className="text-[9px] font-black text-accent-primary uppercase tracking-tighter">HW:</span>
                 <select
                   className="bg-dark-bgPrimary text-text-primary text-[10px] font-bold h-6 border border-accent-primary/30 rounded px-1.5 hover:border-accent-primary transition-colors cursor-pointer outline-none min-w-[110px] shadow-glow-sm"
@@ -740,7 +740,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           </div>
         </div>
 
-        <VisualizerFrame variant="compact" className="flex-1 min-w-[120px] border-l border-dark-border cursor-pointer group" style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center' }}>
+        <VisualizerFrame variant="compact" className="min-w-[120px] max-w-[400px] flex-shrink-0 flex-grow border-l border-dark-border cursor-pointer group" style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center' }}>
         <div className="relative w-full h-full flex items-center justify-center" onClick={() => {
           const modes: Array<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll'> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll'];
           const currentIndex = modes.indexOf(vizMode);
