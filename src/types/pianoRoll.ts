@@ -103,8 +103,8 @@ export interface ContextMenuState {
  * Default piano roll view state
  */
 export const DEFAULT_PIANO_ROLL_VIEW: PianoRollViewState = {
-  horizontalZoom: 16,        // 16 pixels per row
-  verticalZoom: 12,          // 12 pixels per semitone
+  horizontalZoom: 24,        // 24 pixels per row (increased from 16)
+  verticalZoom: 18,          // 18 pixels per semitone (increased from 12)
   scrollX: 0,
   scrollY: 0,                // Start at C4 (middle C) at top, showing down to ~C1
   snapToGrid: true,
