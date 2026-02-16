@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-16T23:06:39.256Z
+ * Generated: 2026-02-16T23:27:35.675Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.775';
-export const BUILD_NUMBER = '775';
-export const BUILD_HASH = '28f8fc78';
+export const BUILD_VERSION = '1.0.778';
+export const BUILD_NUMBER = '778';
+export const BUILD_HASH = '2b242092';
 export const BUILD_DATE = '2026-02-16';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,7 +30,25 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.775',
+    version: '1.0.778',
+    date: '2026-02-17',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Sync normalDecay with filterEnvelope.decay across all TB-303 presets"
+      },
+      {
+        type: 'fix',
+        "description": "All knobs now responsive - use refs to prevent stale closures in effect/TB303 knob handlers"
+      },
+      {
+        type: 'fix',
+        "description": "TB-303 Decay knob now updates devilFish.normalDecay"
+      }
+    ]
+  },
+  {
+    version: '2026-02-16',
     date: '2026-02-16',
     changes: [
       {
@@ -220,18 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Extend playhead trail effect from 3 to 7 steps"
-      },
-      {
-        type: 'feature',
-        "description": "Add visual enhancements to grid view"
-      },
-      {
-        type: 'feature',
-        "description": "Add grid view auto-sizing to fit 64-step patterns"
-      },
-      {
-        type: 'fix',
-        "description": "Move usePatternPlayback to App level to persist across view switches"
       }
     ]
   }
