@@ -590,43 +590,6 @@ export class ToneEngine {
       }
     }
 
-    // FURNACE: Upload ALL instruments to the dispatch engine
-    // Real Furnace loads all instruments at song load time, then dispatches read from getIns(index).
-    // Without this, only the first instrument used gets uploaded, and all others use the default.
-    const furnaceConfigs = configs.filter(c => c.furnace && c.synthType?.startsWith('Furnace'));
-    if (furnaceConfigs.length > 0) {
-      try {
-        const { updateFurnaceInstrument } = await import('@lib/export/FurnaceInstrumentEncoder');
-        
-        // Find all FurnaceDispatchSynth instances (they share the same WASM engine)
-        const dispatchSynths: FurnaceDispatchSynth[] = [];
-        this.instruments.forEach((instrument) => {
-          if (instrument instanceof FurnaceDispatchSynth) {
-            dispatchSynths.push(instrument);
-          }
-        });
-
-        if (dispatchSynths.length > 0) {
-          // All FurnaceDispatchSynth instances share the same engine/chip, so we only need to upload ONCE per instrument.
-          // Use the first synth to upload all instruments to the shared WASM bank.
-          const uploadSynth = dispatchSynths[0];
-          console.log(`[ToneEngine] Uploading ${furnaceConfigs.length} Furnace instruments to shared WASM bank...`);
-          
-          for (const config of furnaceConfigs) {
-            if (!config.furnace) continue;
-            const furnaceIndex = config.furnace.furnaceIndex ?? (config.id - 1); // Default to id-1 (0-based)
-            const binaryData = updateFurnaceInstrument(config.furnace, config.name, furnaceIndex);
-            
-            // Upload to shared engine via first synth, passing explicit slot to avoid race condition
-            await uploadSynth.uploadInstrumentData(binaryData, furnaceIndex);
-            console.log(`[ToneEngine] Uploaded Furnace instrument ${config.id} "${config.name}" to slot ${furnaceIndex}`);
-          }
-        }
-      } catch (error) {
-        console.error('[ToneEngine] Failed to upload Furnace instruments:', error);
-      }
-    }
-
     // PERFORMANCE FIX: Warm up CPU-intensive synths by triggering a silent note
     // This forces Tone.js to compile/initialize audio graphs before playback starts
     const warmUpTypes = ['MetalSynth', 'MembraneSynth', 'NoiseSynth', 'FMSynth'];
@@ -706,12 +669,9 @@ export class ToneEngine {
    * Creates instances if needed and waits for their AudioWorklet WASM to be ready.
    */
   public async ensureWASMSynthsReady(configs: InstrumentConfig[]): Promise<void> {
-    const wasmConfigs = configs.filter((c) => {
-      const type = c.synthType || '';
-      return ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd'].includes(type) ||
-             type.startsWith('Furnace') || 
-             type === 'WAM';
-    });
+    const wasmConfigs = configs.filter((c) => 
+      ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd'].includes(c.synthType || '')
+    );
     if (wasmConfigs.length === 0) return;
 
     const promises: Promise<void>[] = [];
@@ -2594,10 +2554,6 @@ export class ToneEngine {
             const chipChannel = channelIndex % maxCh;
             console.log(`[ToneEngine] FurnaceDispatch channelIndex=${channelIndex} maxCh=${maxCh} → chipChannel=${chipChannel}`);
             voiceNode.setChannel(chipChannel);
-            // Set the Furnace instrument index from config (critical for multi-instrument songs!)
-            const furnaceIndex = config.furnace?.furnaceIndex ?? 0;
-            console.log(`[ToneEngine] FurnaceDispatch id=${config.id} name=${config.name} furnace=${!!config.furnace} furnaceIndex=${furnaceIndex} synthType=${config.synthType}`);
-            voiceNode.setFurnaceInstrumentIndex(furnaceIndex);
           }
           // NoiseSynth and MetalSynth don't take note parameter: triggerAttack(time, velocity)
           if (config.synthType === 'NoiseSynth' || config.synthType === 'MetalSynth') {

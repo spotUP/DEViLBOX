@@ -907,9 +907,9 @@ export class FurnaceDispatchEngine {
   private _wasmReadyReject: ((err: Error) => void) | null = null;
   private _wasmReadyPromise: Promise<void> | null = null;
 
-  // Promises for chip creation - keyed by platform to handle parallel init
-  private _chipCreatedPromises: Map<number, Promise<void>> = new Map();
-  private _chipCreatedResolvers: Map<number, () => void> = new Map();
+  // Promise for chip creation
+  private _chipCreatedResolve: (() => void) | null = null;
+  private _chipCreatedPromise: Promise<void> | null = null;
 
   // Oscilloscope data
   private oscCallbacks: Set<OscDataCallback> = new Set();
@@ -950,11 +950,6 @@ export class FurnaceDispatchEngine {
   /** Check if a chip for the given platform type exists */
   hasChip(platformType: number): boolean {
     return this.chips.has(platformType);
-  }
-
-  /** Get the effect router (for setting compatFlags) */
-  getEffectRouter(): FurnaceEffectRouter {
-    return this.effectRouter;
   }
 
   /** Whether audio is already routed from the worklet to destination */
@@ -1150,9 +1145,8 @@ export class FurnaceDispatchEngine {
         break;
 
       case 'chipCreated': {
-        const pt = data.platformType as number;
         // Track chip in multi-chip map (Furnace disCont[] pattern)
-        this.chips.set(pt, {
+        this.chips.set(data.platformType as number, {
           handle: data.handle as number,
           numChannels: data.numChannels as number
         });
@@ -1160,13 +1154,10 @@ export class FurnaceDispatchEngine {
         let totalOscChannels = 0;
         for (const chip of this.chips.values()) totalOscChannels += chip.numChannels;
         this.latestOscData = new Array(totalOscChannels).fill(null);
-        console.log(`[FurnaceDispatch] Chip created: platform=${pt}, channels=${data.numChannels}, total chips=${this.chips.size}`);
-        // Resolve the platform-specific chip creation promise
-        const resolver = this._chipCreatedResolvers.get(pt);
-        if (resolver) {
-          resolver();
-          this._chipCreatedResolvers.delete(pt);
-          this._chipCreatedPromises.delete(pt);
+        console.log(`[FurnaceDispatch] Chip created: platform=${data.platformType}, channels=${data.numChannels}, total chips=${this.chips.size}`);
+        if (this._chipCreatedResolve) {
+          this._chipCreatedResolve();
+          this._chipCreatedResolve = null;
         }
         break;
       }
@@ -1204,21 +1195,10 @@ export class FurnaceDispatchEngine {
       return;
     }
 
-    // If chip already exists, return immediately (idempotent)
-    if (this.chips.has(platformType)) {
-      return;
-    }
-
-    // If chip creation is already in progress for this platform, don't re-create
-    if (this._chipCreatedPromises.has(platformType)) {
-      return;
-    }
-
-    // Set up chip created promise for this platform before sending message
-    const chipPromise = new Promise<void>((resolve) => {
-      this._chipCreatedResolvers.set(platformType, resolve);
+    // Set up chip created promise before sending message
+    this._chipCreatedPromise = new Promise<void>((resolve) => {
+      this._chipCreatedResolve = resolve;
     });
-    this._chipCreatedPromises.set(platformType, chipPromise);
 
     this.workletNode.port.postMessage({
       type: 'createChip',
@@ -1229,27 +1209,10 @@ export class FurnaceDispatchEngine {
 
   /**
    * Wait for the chip to be created in the worklet.
-   * @param platformType - The platform type to wait for
    */
-  async waitForChipCreated(platformType?: number): Promise<void> {
-    // If chip already exists, resolve immediately
-    if (platformType !== undefined && this.chips.has(platformType)) {
-      return;
-    }
-
-    // Wait for the specific platform's chip creation promise
-    if (platformType !== undefined) {
-      const promise = this._chipCreatedPromises.get(platformType);
-      if (promise) {
-        await promise;
-      }
-      return;
-    }
-
-    // Fallback: wait for any pending chip creation (for backwards compat)
-    const promises = Array.from(this._chipCreatedPromises.values());
-    if (promises.length > 0) {
-      await Promise.all(promises);
+  async waitForChipCreated(): Promise<void> {
+    if (this._chipCreatedPromise) {
+      await this._chipCreatedPromise;
     }
   }
 
@@ -1648,6 +1611,13 @@ export class FurnaceDispatchEngine {
    */
   resetEffectMemory(): void {
     this.effectRouter.resetMemory();
+  }
+
+  /**
+   * Get the effect router instance for direct access if needed.
+   */
+  getEffectRouter(): FurnaceEffectRouter {
+    return this.effectRouter;
   }
 
   /**

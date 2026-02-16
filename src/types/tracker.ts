@@ -51,15 +51,6 @@ export type EffectType = number; // 0-35 (XM effect type)
 export type EffectParam = number; // 0x00-0xFF
 
 /**
- * Effect - Combined effect type and parameter
- * Used for variable effect columns (1-8 per channel in Furnace)
- */
-export interface Effect {
-  type: EffectType;   // Effect type (0-35)
-  param: EffectParam; // Effect parameter (0x00-0xFF)
-}
-
-/**
  * TrackerCell - Core pattern data cell
  *
  * XM-Compatible Core (5 bytes):
@@ -88,11 +79,6 @@ export interface TrackerCell {
   effTyp2: EffectType;          // Second effect type (0-35)
   eff2: EffectParam;            // Second effect parameter (0x00-0xFF)
   effect2?: string;             // Legacy string format (migration only)
-
-  // Variable effect columns (Furnace supports 1-8 per channel)
-  // If present, effects[0] maps to effTyp/eff, effects[1] maps to effTyp2/eff2
-  // effects[2-7] are additional columns not supported by legacy fields
-  effects?: Effect[];           // Array of effects for variable column support
 
   // TB-303 specific columns (flexible like effect columns)
   // 0 = empty, 1 = accent, 2 = slide
@@ -136,10 +122,6 @@ export interface ChannelData {
     channelType?: 'sample' | 'synth' | 'hybrid';
     furnaceType?: number; // Furnace DivChanType for system presets
     hardwareName?: string; // Hardware-specific channel name
-    shortName?: string; // Short channel name for collapsed view
-    systemId?: number; // Furnace system fileID
-    effectCols?: number; // Number of effect columns (1-8, default 2 for Furnace imports)
-    volMax?: number; // Maximum volume value for this channel's chip (e.g., 15 for C64, 127 for Genesis)
   };
 }
 
@@ -212,8 +194,7 @@ export interface ParsedSample {
  * Macros control instrument parameters per-tick (volume, arpeggio, duty, etc.)
  */
 export interface FurnaceMacroData {
-  code: number;      // Macro slot index (0-21)
-  type: number;      // Macro type code (legacy identifier)
+  type: number;      // Macro type code (0=vol, 1=arp, 2=duty, 3=wave, 4=pitch, etc.)
   data: number[];    // Macro values (up to 256 steps)
   loop: number;      // Loop point (-1 = no loop)
   release: number;   // Release point (-1 = none)
@@ -239,7 +220,6 @@ export interface FurnaceWavetableData {
 export interface FurnaceInstrumentData {
   chipType: number;              // DIV_INS_* type
   synthType: string;             // Mapped SynthType for DEViLBOX engine
-  furnaceIndex?: number;         // 0-based index in WASM instrument bank (matches Furnace's ins[n])
 
   // FM parameters (for FM chips: OPN, OPM, OPL, OPLL, etc.)
   fm?: {
@@ -277,40 +257,8 @@ export interface FurnaceInstrumentData {
   // Wavetables for wavetable chips
   wavetables: FurnaceWavetableData[];
 
-  // Chip-specific config (legacy format)
+  // Chip-specific config (optional)
   chipConfig?: Record<string, unknown>;
-
-  // Chip-specific data (top-level, used by FurnaceInstrumentEncoder)
-  c64?: {
-    triOn: boolean; sawOn: boolean; pulseOn: boolean; noiseOn: boolean;
-    a: number; d: number; s: number; r: number;
-    duty: number;
-    ringMod?: boolean; oscSync?: boolean;
-    toFilter?: boolean; initFilter?: boolean; dutyIsAbs?: boolean;
-    filterIsAbs?: boolean; noTest?: boolean; resetDuty?: boolean;
-    filterResonance?: number; filterRes?: number;
-    filterCutoff?: number;
-    filterHP?: boolean; filterLP?: boolean; filterBP?: boolean; ch3off?: boolean;
-    lp?: boolean; bp?: boolean; hp?: boolean;
-  };
-  gb?: {
-    envVol: number; envDir: number; envLen: number; soundLen: number;
-    softEnv?: boolean; alwaysInit?: boolean; doubleWave?: boolean;
-    hwSeqLen?: number; hwSeq?: Array<{ cmd: number; data: number }>;
-  };
-  snes?: {
-    a: number; d: number; s: number; r: number;
-    useEnv?: boolean; sus?: number; gainMode?: number; gain?: number; d2?: number;
-  };
-  n163?: {
-    wave: number; wavePos: number; waveLen: number; waveMode: number;
-    perChanPos?: boolean;
-  };
-  fds?: {
-    modSpeed: number; modDepth: number;
-    initModTableWithFirstWave?: boolean;
-    modTable?: number[];
-  };
 }
 
 export interface ParsedInstrument {
@@ -373,89 +321,6 @@ export interface ImportMetadata {
   xmData?: {
     frequencyType: 'amiga' | 'linear';
     defaultPanning: number[]; // Per-channel panning (0-255)
-  };
-
-  // Furnace-specific data (system presets and channel metadata)
-  furnaceData?: {
-    systems: number[];           // Array of Furnace system/chip IDs (fileID values)
-    systemChans: number[];       // Number of channels per system
-    systemName: string;          // Human-readable system name from Furnace
-    channelShortNames?: string[];  // Short channel names from subsong (if available)
-    effectColumns?: number[];    // Effect columns per channel (1-8, default 1)
-    compatFlags?: {              // Compatibility flags for legacy .fur behavior
-      limitSlides?: boolean;
-      linearPitch?: number;
-      pitchSlideSpeed?: number;
-      loopModality?: number;
-      delayBehavior?: number;
-      jumpTreatment?: number;
-      properNoiseLayout?: boolean;
-      waveDutyIsVol?: boolean;
-      resetMacroOnPorta?: boolean;
-      legacyVolumeSlides?: boolean;
-      compatibleArpeggio?: boolean;
-      noteOffResetsSlides?: boolean;
-      targetResetsSlides?: boolean;
-      arpNonPorta?: boolean;
-      algMacroBehavior?: boolean;
-      brokenShortcutSlides?: boolean;
-      ignoreDuplicateSlides?: boolean;
-      stopPortaOnNoteOff?: boolean;
-      continuousVibrato?: boolean;
-      brokenDACMode?: boolean;
-      oneTickCut?: boolean;
-      newInsTriggersInPorta?: boolean;
-      arp0Reset?: boolean;
-      brokenSpeedSel?: boolean;
-      noSlidesOnFirstTick?: boolean;
-      rowResetsArpPos?: boolean;
-      ignoreJumpAtEnd?: boolean;
-      buggyPortaAfterSlide?: boolean;
-      gbInsAffectsEnvelope?: boolean;
-      sharedExtStat?: boolean;
-      ignoreDACModeOutsideIntendedChannel?: boolean;
-      e1e2AlsoTakePriority?: boolean;
-      newSegaPCM?: boolean;
-      fbPortaPause?: boolean;
-      snDutyReset?: boolean;
-      pitchMacroIsLinear?: boolean;
-      oldOctaveBoundary?: boolean;
-      noOPN2Vol?: boolean;
-      newVolumeScaling?: boolean;
-      volMacroLinger?: boolean;
-      brokenOutVol?: boolean;
-      brokenOutVol2?: boolean;
-      e1e2StopOnSameNote?: boolean;
-      brokenPortaArp?: boolean;
-      snNoLowPeriods?: boolean;
-      disableSampleMacro?: boolean;
-      oldArpStrategy?: boolean;
-      brokenPortaLegato?: boolean;
-      brokenFMOff?: boolean;
-      preNoteNoEffect?: boolean;
-      oldSampleOffset?: boolean;
-    };
-    grooves?: Array<{            // Groove patterns (custom tick timing for swing/shuffle)
-      len: number;               // Groove length (1-16)
-      val: number[];             // Tick values (16 entries, only first 'len' are used)
-    }>;
-    // Furnace timing data (needed for 1:1 playback compatibility)
-    speed2?: number;             // Second speed for alternation (speed1 is in modData.initialSpeed)
-    hz?: number;                 // Ticks per second (50 PAL, 60 NTSC)
-    virtualTempoN?: number;      // Virtual tempo numerator
-    virtualTempoD?: number;      // Virtual tempo denominator
-
-    subsongCount: number;        // Total number of subsongs in module
-    subsongNames: string[];      // Name of each subsong
-    currentSubsong?: number;     // Currently active subsong index (used in UI)
-    allSubsongs?: {              // All subsong pattern data (stored but not displayed)
-      subsongIndex: number;
-      patterns: any[][][];       // Pattern data for this subsong
-      patternOrderTable: number[]; // Pattern order for this subsong
-      ordersLen: number;         // Number of orders in this subsong
-      initialSpeed: number;      // Initial speed for this subsong
-      initialBPM: number;        // Initial BPM for this subsong
-    }[];
   };
 }
 
