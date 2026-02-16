@@ -459,13 +459,14 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
               return (
                 <div
                   key={stepIdx}
-                  className={`h-4 flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm transition-all duration-75
+                  className={`h-4 flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm transition-all duration-75 relative
                     ${stepIdx % 4 === 0 ? 'text-text-secondary' : 'text-text-muted'}
                     ${currentStep === stepIdx ? 'text-accent-primary font-bold' : ''}
                   `}
                   style={{
                     width: `${cellSize}px`,
                     backgroundColor: isTrailStep ? `rgba(239, 68, 68, ${trailOpacity})` : (currentStep === stepIdx ? 'var(--color-accent)' : 'transparent'),
+                    zIndex: (currentStep === stepIdx || isTrailStep) ? 10 : 1,
                   }}
                 >
                   {stepIdx.toString().padStart(2, '0')}
@@ -503,10 +504,11 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 return (
                   <div
                     key={stepIdx}
-                    className="mx-0.5 rounded-sm transition-all duration-75"
+                    className="mx-0.5 rounded-sm transition-all duration-75 relative"
                     role="gridcell"
                     style={{
                       backgroundColor: isTrailStep ? `rgba(239, 68, 68, ${trailOpacity * 0.3})` : (currentStep === stepIdx ? 'rgba(239, 68, 68, 0.15)' : (stepIdx % 4 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'transparent')),
+                      zIndex: (currentStep === stepIdx || isTrailStep) ? 10 : 1,
                     }}
                   >
                     <NoteGridCell
