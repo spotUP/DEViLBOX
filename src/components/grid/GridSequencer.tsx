@@ -525,6 +525,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                       octaveShift={isActive ? step?.octaveShift : 0}
                       velocity={isActive ? step?.velocity : 100}
                       cellSize={cellSize}
+                      trailOpacity={trailOpacity}
                       onClick={handleNoteClick}
                       onToggleAccent={toggleAccent}
                       onToggleSlide={toggleSlide}
