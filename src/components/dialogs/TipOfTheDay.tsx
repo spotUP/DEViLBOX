@@ -161,10 +161,10 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
           </button>
         </div>
 
-        {/* Content */}
-        <div className="min-h-[300px] max-h-[50vh] overflow-y-auto scrollbar-modern bg-black/10">
+        {/* Content — fixed height so tabs don't cause dialog resize on iOS */}
+        <div className="h-[300px] overflow-y-auto scrollbar-modern bg-black/10">
           {activeTab === 'tips' ? (
-            <div className="p-8 flex flex-col items-center text-center space-y-6">
+            <div className="h-full p-8 flex flex-col items-center justify-center text-center space-y-6">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center bg-opacity-10 mb-2
                 ${isCyanTheme ? 'bg-cyan-500 text-cyan-400' : 'bg-red-500 text-red-500'}
               `}>
