@@ -55,34 +55,12 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
 
   const { currentRow, isPlaying, smoothScrolling, bpm, speed } = useTransportStore();
 
-  // Smooth marker scrolling state
-  const [smoothMarker, setSmoothMarker] = useState(false);
-  const [smoothStep, setSmoothStep] = useState(0);
-  const lastStepTimeRef2 = useRef(0);
-  const lastStepRef3 = useRef(-1); // Track last rendered step
-  const rafIdRef2 = useRef(0);
-
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;
-  const displayStep = smoothMarker ? smoothStep : currentStep;
   
   // Trail steps for visual effect (7 steps behind with decreasing opacity)
   const trailSteps = useMemo(() => {
     if (currentStep < 0) return [];
-    
-    if (smoothMarker) {
-      // Smooth mode: fractional positions with interpolated opacity
-      const activeStep = displayStep;
-      return [
-        { step: activeStep - 1, opacity: 0.5 },
-        { step: activeStep - 2, opacity: 0.4 },
-        { step: activeStep - 3, opacity: 0.3 },
-        { step: activeStep - 4, opacity: 0.2 },
-        { step: activeStep - 5, opacity: 0.15 },
-        { step: activeStep - 6, opacity: 0.1 },
-        { step: activeStep - 7, opacity: 0.05 },
-      ].filter(t => t.step >= 0); // Only show positive positions
-    }
     
     return [
       { step: (currentStep - 1 + maxSteps) % maxSteps, opacity: 0.5 },
@@ -93,7 +71,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       { step: (currentStep - 6 + maxSteps) % maxSteps, opacity: 0.1 },
       { step: (currentStep - 7 + maxSteps) % maxSteps, opacity: 0.05 },
     ];
-  }, [currentStep, maxSteps, smoothMarker, displayStep]);
+  }, [currentStep, maxSteps]);
 
   // Ref for scroll container
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -166,10 +144,10 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     return () => resizeObserver.disconnect();
   }, [maxSteps]);
 
-  // RAF-based smooth scrolling (only when smooth scrolling enabled and smooth marker disabled)
+  // RAF-based smooth scrolling (only when smooth scrolling enabled)
   useEffect(() => {
-    if (!isPlaying || !smoothScrolling || smoothMarker) {
-      // Reset refs when not playing or smooth marker is active
+    if (!isPlaying || !smoothScrolling) {
+      // Reset refs when not playing
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = 0;
@@ -185,8 +163,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     const LABEL_WIDTH = 48;
 
     const animate = () => {
-      // Use shared smoothStep state (or currentStep if smooth marker disabled)
-      const activeStep = smoothMarker ? smoothStep : currentStep;
+      // Use current step for discrete scrolling
+      const activeStep = currentStep;
       
       // Calculate target scroll position
       const stepPosition = LABEL_WIDTH + (activeStep * CELL_WIDTH);
@@ -215,50 +193,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         rafIdRef.current = 0;
       }
     };
-  }, [isPlaying, smoothScrolling, cellSize, smoothMarker, smoothStep, currentStep]);
-
-  // RAF-based smooth marker animation
-  useEffect(() => {
-    if (!isPlaying || !smoothMarker) {
-      lastStepTimeRef2.current = 0;
-      lastStepRef3.current = -1;
-      if (rafIdRef2.current) {
-        cancelAnimationFrame(rafIdRef2.current);
-        rafIdRef2.current = 0;
-      }
-      setSmoothStep(currentStep);
-      return;
-    }
-
-    const msPerRow = (2.5 / bpm) * speed * 1000;
-
-    const animate = () => {
-      const now = performance.now();
-
-      // Initialize on first run or step change
-      if (lastStepRef3.current !== currentStep) {
-        lastStepTimeRef2.current = now;
-        lastStepRef3.current = currentStep;
-        setSmoothStep(currentStep);
-      } else {
-        // Calculate fractional progress
-        const elapsed = now - lastStepTimeRef2.current;
-        const progress = Math.min(elapsed / msPerRow, 1.0);
-        setSmoothStep(currentStep + progress);
-      }
-
-      rafIdRef2.current = requestAnimationFrame(animate);
-    };
-
-    rafIdRef2.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (rafIdRef2.current) {
-        cancelAnimationFrame(rafIdRef2.current);
-        rafIdRef2.current = 0;
-      }
-    };
-  }, [isPlaying, smoothMarker, bpm, speed, currentStep]);
+  }, [isPlaying, smoothScrolling, cellSize, currentStep]);
 
   // Handle MIDI CC messages for parameter control
   useEffect(() => {
@@ -491,8 +426,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         onRandomize={handleRandomize}
         onAcidGenerator={handleAcidGenerator}
         cellSize={cellSize}
-        smoothMarker={smoothMarker}
-        onSmoothMarkerChange={setSmoothMarker}
       />
 
       {/* Grid */}
@@ -505,45 +438,10 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
           onKeyDown={handleKeyDown}
           tabIndex={0}
         >
-          {/* Animated gradient overlay for smooth visual flow */}
-          {smoothMarker && isPlaying && currentStep >= 0 && (
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: `linear-gradient(90deg, 
-                  transparent 0%, 
-                  transparent ${Math.max(0, ((displayStep / maxSteps) * 100) - 3)}%, 
-                  rgba(239, 68, 68, 0.15) ${Math.max(0, ((displayStep / maxSteps) * 100) - 1.5)}%, 
-                  rgba(239, 68, 68, 0.3) ${(displayStep / maxSteps) * 100}%, 
-                  rgba(239, 68, 68, 0.15) ${Math.min(100, ((displayStep / maxSteps) * 100) + 1.5)}%, 
-                  transparent ${Math.min(100, ((displayStep / maxSteps) * 100) + 3)}%, 
-                  transparent 100%
-                )`,
-                zIndex: 6,
-              }}
-            />
-          )}
-
           {/* Step numbers header */}
           <div className="flex items-center mb-1 pl-12 relative" role="row" style={{ zIndex: 10 }}>
-            {smoothMarker && isPlaying && currentStep >= 0 && (
-              <div
-                className="absolute rounded-sm pointer-events-none"
-                style={{
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  left: `${48 + (displayStep * (cellSize + 4))}px`,
-                  width: `${cellSize}px`,
-                  height: `${cellSize}px`,
-                  backgroundColor: '#ef4444',
-                  opacity: 0.6,
-                  transition: 'none', // No CSS transition, using RAF
-                  zIndex: 5,
-                }}
-              />
-            )}
             {stepIndices.map((stepIdx) => {
-              const isCurrentDiscrete = !smoothMarker && currentStep === stepIdx;
+              const isCurrentDiscrete = currentStep === stepIdx;
               const isBeatMarker = stepIdx % 4 === 0;
               return (
                 <div
@@ -587,55 +485,15 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                   {isRootNote && <span className="ml-0.5 text-[8px]">●</span>}
                 </div>
 
-                {/* Smooth marker overlay for this row */}
-                {smoothMarker && isPlaying && currentStep >= 0 && (
-                  <div
-                    className="absolute rounded pointer-events-none"
-                    style={{
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      left: `${48 + (displayStep * (cellSize + 4))}px`,
-                      width: `${cellSize}px`,
-                      height: `${cellSize}px`,
-                      backgroundColor: '#ef4444',
-                      opacity: 0.35,
-                      zIndex: 20,
-                    }}
-                  />
-                )}
-
               {/* Cells */}
               {stepIndices.map((stepIdx) => {
                 const step = gridPattern.steps[stepIdx];
                 const isActive = step?.noteIndex === noteIndex;
                 const isFocused = focusedCell?.noteIndex === noteIndex && focusedCell?.stepIndex === stepIdx;
                 
-                // Calculate trail opacity for smooth or discrete mode
-                let trailOpacity = 0;
-                if (smoothMarker) {
-                  // Smooth mode: calculate opacity based on distance
-                  const distance = displayStep - stepIdx;
-                  if (distance > 0 && distance < 7.5) {
-                    // Interpolate opacity based on distance
-                    const baseOpacity = distance < 1 ? 0.5 : 
-                                       distance < 2 ? 0.4 :
-                                       distance < 3 ? 0.3 :
-                                       distance < 4 ? 0.2 :
-                                       distance < 5 ? 0.15 :
-                                       distance < 6 ? 0.1 : 0.05;
-                    const fraction = distance - Math.floor(distance);
-                    const nextOpacity = distance < 6 ? 
-                      (distance < 1 ? 0.4 : distance < 2 ? 0.3 : distance < 3 ? 0.2 : 
-                       distance < 4 ? 0.15 : distance < 5 ? 0.1 : 0.05) : 0;
-                    trailOpacity = baseOpacity * (1 - fraction) + nextOpacity * fraction;
-                  }
-                } else {
-                  // Discrete mode: exact match
-                  trailOpacity = trailSteps.find(t => t.step === stepIdx)?.opacity || 0;
-                }
-                
-                // In smooth mode, don't show per-cell markers (use header overlay instead)
-                const isCurrentStepCheck = smoothMarker ? false : (currentStep === stepIdx);
+                // Calculate trail opacity (discrete mode only)
+                const trailOpacity = trailSteps.find(t => t.step === stepIdx)?.opacity || 0;
+                const isCurrentStepCheck = currentStep === stepIdx;
                 const isBeatMarker = stepIdx % 4 === 0;
 
                 return (
