@@ -54,10 +54,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   } = useGridPattern(channelIndex);
 
   const { currentRow, isPlaying, smoothScrolling, bpm, speed } = useTransportStore();
-
-  // Get channel and current pattern data
   const { patterns, currentPatternIndex } = useTrackerStore();
-  const channel = patterns[currentPatternIndex]?.channels[channelIndex];
 
   // Smooth marker scrolling state
   const [smoothMarker, setSmoothMarker] = useState(false);
