@@ -129,7 +129,7 @@ function initializeRegistry() {
   // Register all available commands
   const commands: Command[] = [
     // === PLAYBACK ===
-    { name: 'play_row', contexts: ['pattern'], handler: playRow, description: 'Play the current row (audition)' },
+    { name: 'play_row', contexts: ['pattern'], handler: () => { playRow(); return true; }, description: 'Play the current row (audition)' },
     { name: 'play_from_cursor', contexts: ['pattern', 'global'], handler: playFromCursor, description: 'Start playback from cursor position' },
     { name: 'play_stop_toggle', contexts: ['pattern', 'global'], handler: playStopToggle, description: 'Toggle play/stop' },
     { name: 'play_pattern', contexts: ['pattern', 'global'], handler: playPattern, description: 'Play current pattern from start' },
