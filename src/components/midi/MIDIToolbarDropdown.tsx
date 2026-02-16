@@ -160,8 +160,8 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
                 Web MIDI API is not supported in this browser.
               </p>
 
-              {/* Safari-specific troubleshooting */}
-              {midiInfo.isIOS && (
+              {/* Safari-specific troubleshooting - Only show if there's an error or failed attempt */}
+              {midiInfo.isIOS && lastError && (
                 <div className="text-xs bg-accent-warning/10 border border-accent-warning/30 rounded p-3 mb-3">
                   <p className="font-bold text-accent-warning mb-2">Safari Troubleshooting:</p>
                   <ul className="list-disc list-inside space-y-1 text-text-secondary">
