@@ -344,7 +344,21 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
   };
 
   const updateFilterEnvelope = (key: string, value: number) => {
-    onChange({ filterEnvelope: { ...configRef.current.filterEnvelope, [key]: value } });
+    const updates: Partial<TB303Config> = {
+      filterEnvelope: { ...configRef.current.filterEnvelope, [key]: value }
+    };
+    
+    // CRITICAL: When changing decay, also update devilFish.normalDecay
+    // The WASM uses normalDecay (not filterEnvelope.decay) for the actual filter envelope
+    if (key === 'decay') {
+      updates.devilFish = {
+        ...DEFAULT_TB303.devilFish,
+        ...(configRef.current.devilFish || {}),
+        normalDecay: value
+      } as TB303Config['devilFish'];
+    }
+    
+    onChange(updates);
   };
 
   const updateAccent = (key: string, value: number) => {

@@ -12,7 +12,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 import { Shuffle, Trash2, Wand2 } from 'lucide-react';
 import { xmNoteToString, stringNoteToXM } from '@/lib/xmConversions';
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentConfig, DevilFishConfig } from '@typedefs/instrument';
 import { DEFAULT_TB303 } from '@typedefs/instrument';
 import './TB303View.css';
 
@@ -174,7 +174,10 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   const cutoff = tb303Config?.filter.cutoff ?? 0.5;
   const resonance = tb303Config?.filter.resonance ?? 0.5;
   const envMod = tb303Config?.filterEnvelope.envMod ?? 0.5;
-  const decay = tb303Config?.filterEnvelope.decay ?? 0.5;
+  // CRITICAL: When Devil Fish is enabled, read decay from devilFish.normalDecay (not filterEnvelope.decay)
+  const decay = tb303Config?.devilFish?.enabled 
+    ? (tb303Config?.devilFish?.normalDecay ?? 0.164)
+    : (tb303Config?.filterEnvelope.decay ?? 0.5);
   const accent = tb303Config?.accent.amount ?? 0.5;
 
   // Convert tracker pattern data to TB303Step format
@@ -276,20 +279,19 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
     const config = tb303ConfigRef.current;
     if (!instrumentRef.current || !config) return;
     
-    // Sync devilFish.normalDecay with the main decay knob.
-    // In the site rip these are separate knobs, but TB303View has only one.
-    // Without this, applyConfig() overwrites normalDecay with the old DF value,
-    // making the decay knob appear to do nothing.
+    // CRITICAL: normalDecay is what the WASM actually uses for filter envelope.
+    // We must ALWAYS set devilFish.normalDecay, even if devilFish doesn't exist yet.
     const updatedConfig = {
       ...config,
       filterEnvelope: {
         ...config.filterEnvelope,
         decay: value,
       },
-      devilFish: config.devilFish ? {
-        ...config.devilFish,
+      devilFish: {
+        ...DEFAULT_TB303.devilFish,
+        ...(config.devilFish || {}),
         normalDecay: value,
-      } : config.devilFish,
+      } as DevilFishConfig,
     };
     getToneEngine().updateTB303Parameters(instrumentId, updatedConfig);
     debouncedStoreUpdate({ tb303: updatedConfig });
