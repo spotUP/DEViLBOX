@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-16T17:57:07.644Z
+ * Generated: 2026-02-16T18:25:24.587Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,20 +19,36 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '707';
-export const BUILD_HASH = 'abdb05c';
+export const BUILD_VERSION = '1.0.711';
+export const BUILD_NUMBER = '711';
+export const BUILD_HASH = 'e3c5340';
 export const BUILD_DATE = '2026-02-16';
 
-// Full semantic version with build number
-export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
+// Full version (patch IS the build number, so no need to append)
+export const FULL_VERSION = BUILD_VERSION;
 
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1',
+    version: '1.0.711',
     date: '2026-02-16',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Merge hex keyboard into piano - same layout with changed labels"
+      },
+      {
+        type: 'fix',
+        "description": "IOS MIDI - retry detection with delay + user gesture retry button"
+      },
+      {
+        type: 'fix',
+        "description": "Stabilize Tips/Changelog dialog height on iOS"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: regenerate changelog with latest commits"
+      },
       {
         type: 'fix',
         "description": "Play always starts from row 0 of current pattern"
@@ -216,28 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Resolve ReferenceError and clean up unused variables in metrics refactor"
-      },
-      {
-        type: 'fix',
-        "description": "Add missing Cpu icon import in TrackerView"
-      },
-      {
-        type: 'feature',
-        "description": "Improve hardware preset visibility and add mobile support"
-      }
-    ]
-  },
-  {
-    version: '2026-02-15',
-    date: '2026-02-15',
-    changes: [
-      {
-        type: 'feature',
-        "description": "Implement 1:1 hardware system presets and Furnace technical parity"
-      },
-      {
-        type: 'improvement',
-        "description": "Rename command buttons to 'Reference' for clarity"
       }
     ]
   }

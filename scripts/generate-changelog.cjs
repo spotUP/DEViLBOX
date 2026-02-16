@@ -55,13 +55,17 @@ function getGitLog() {
   }
 }
 
-// Get current version from package.json
+// Get version: major.minor from package.json, patch = git commit count (auto-bumps)
 function getVersion() {
   try {
     const pkg = JSON.parse(
       fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8')
     );
-    return pkg.version || '0.0.0';
+    const base = pkg.version || '0.0.0';
+    // Extract major.minor, replace patch with commit count
+    const [major, minor] = base.split('.');
+    const commitCount = getCommitCount();
+    return `${major || 0}.${minor || 0}.${commitCount}`;
   } catch {
     return '0.0.0';
   }
@@ -186,8 +190,8 @@ export const BUILD_NUMBER = '${buildNumber}';
 export const BUILD_HASH = '${gitHash}';
 export const BUILD_DATE = '${new Date().toISOString().split('T')[0]}';
 
-// Full semantic version with build number
-export const FULL_VERSION = \`\${BUILD_VERSION}.\${BUILD_NUMBER}\`;
+// Full version (patch IS the build number, so no need to append)
+export const FULL_VERSION = BUILD_VERSION;
 
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = ${entriesJson};
