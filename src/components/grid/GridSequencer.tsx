@@ -17,15 +17,16 @@ import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import * as Tone from 'tone';
 import { useGridPattern } from '../../hooks/useGridPattern';
 import { useTransportStore } from '../../stores/useTransportStore';
+import { useTrackerStore } from '../../stores/useTrackerStore';
+import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { GridControls } from './GridControls';
 import { NoteGridCell } from './GridCell';
 import { SCALES, isNoteInScale } from '../../lib/scales';
 import { useMIDI } from '../../hooks/useMIDI';
 import { useMIDIStore } from '../../stores/useMIDIStore';
-import { useTrackerStore } from '../../stores/useTrackerStore';
-import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
+import { getSynthInfo } from '@constants/synthCategories';
 
 const NOTE_NAMES = ['B', 'A#', 'A', 'G#', 'G', 'F#', 'F', 'E', 'D#', 'D', 'C#', 'C'] as const;
 const NOTE_NAMES_FORWARD = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
@@ -54,6 +55,13 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   } = useGridPattern(channelIndex);
 
   const { currentRow, isPlaying, smoothScrolling, bpm, speed } = useTransportStore();
+
+  // Get instrument color for this channel
+  const { patterns, currentPatternIndex } = useTrackerStore();
+  const { instruments } = useInstrumentStore();
+  const channelInstrumentId = patterns[currentPattern Index]?.channels[channelIndex]?.instrumentId ?? 1;
+  const channelInstrument = instruments.find(i => i.id === channelInstrumentId);
+  const instrumentColor = channelInstrument ? getSynthInfo(channelInstrument.synthType).color : 'text-accent-primary';
 
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;
@@ -451,22 +459,18 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
           tabIndex={0}
         >
           {/* Step numbers header */}
-          <div className="flex items-center mb-1 pl-12" role="row" style={{ isolation: 'isolate' }}>
+          <div className="flex items-center mb-1 pl-12" role="row">
             {stepIndices.map((stepIdx) => {
-              const isTrailStep = trailSteps.some(t => t.step === stepIdx);
-              const trailOpacity = trailSteps.find(t => t.step === stepIdx)?.opacity || 0;
-              
               return (
                 <div
                   key={stepIdx}
-                  className={`h-4 flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm transition-all duration-75 relative
+                  className={`h-4 flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm transition-all duration-75
                     ${stepIdx % 4 === 0 ? 'text-text-secondary' : 'text-text-muted'}
                     ${currentStep === stepIdx ? 'text-accent-primary font-bold' : ''}
                   `}
                   style={{
                     width: `${cellSize}px`,
-                    backgroundColor: isTrailStep ? `rgba(239, 68, 68, ${trailOpacity})` : (currentStep === stepIdx ? 'var(--color-accent)' : 'transparent'),
-                    zIndex: (currentStep === stepIdx || isTrailStep) ? 100 : 1,
+                    backgroundColor: currentStep === stepIdx ? 'var(--color-accent)' : 'transparent',
                   }}
                 >
                   {stepIdx.toString().padStart(2, '0')}
@@ -498,17 +502,15 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 const step = gridPattern.steps[stepIdx];
                 const isActive = step?.noteIndex === noteIndex;
                 const isFocused = focusedCell?.noteIndex === noteIndex && focusedCell?.stepIndex === stepIdx;
-                const isTrailStep = trailSteps.some(t => t.step === stepIdx);
                 const trailOpacity = trailSteps.find(t => t.step === stepIdx)?.opacity || 0;
 
                 return (
                   <div
                     key={stepIdx}
-                    className="mx-0.5 rounded-sm transition-all duration-75 relative"
+                    className="mx-0.5 rounded-sm relative"
                     role="gridcell"
                     style={{
-                      backgroundColor: isTrailStep ? `rgba(239, 68, 68, ${trailOpacity * 0.3})` : (currentStep === stepIdx ? 'rgba(239, 68, 68, 0.6)' : (stepIdx % 4 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'transparent')),
-                      zIndex: (currentStep === stepIdx || isTrailStep) ? 100 : 1,
+                      backgroundColor: stepIdx % 4 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
                     }}
                   >
                     <NoteGridCell
@@ -526,6 +528,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                       velocity={isActive ? step?.velocity : 100}
                       cellSize={cellSize}
                       trailOpacity={trailOpacity}
+                      instrumentColor={instrumentColor}
                       onClick={handleNoteClick}
                       onToggleAccent={toggleAccent}
                       onToggleSlide={toggleSlide}
