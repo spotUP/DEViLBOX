@@ -79,7 +79,6 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
   onGridDraw,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const playheadCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const widthRef = useRef(800);
@@ -105,11 +104,9 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
     drag: { isDragging: false, mode: 'none', startX: 0, startY: 0, currentX: 0, currentY: 0, noteId: null, originalNotes: [] },
   });
 
-  // Track dirty state (separate flags for main canvas vs playhead overlay)
+  // Track dirty state
   const dirtyRef = useRef(true);
-  const playheadDirtyRef = useRef(true);
   const prevPropsRef = useRef<string>('');
-  const prevPlayheadRef = useRef<number | null>(null);
 
   // Ghost notes from store
   const ghostNotes = usePianoRollStore((state) => state.ghostNotes);
@@ -147,18 +144,12 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
     dirtyRef.current = true;
   }, [notes, scrollX, scrollY, horizontalZoom, verticalZoom]);
 
-  // Mark dirty when relevant props change (playhead tracked separately)
+  // Mark dirty when relevant props change
   useEffect(() => {
     const key = `${scrollX}_${scrollY}_${horizontalZoom}_${verticalZoom}_${gridDivision}_${patternLength}_${notes.length}_${selectedNotes.size}_${showVelocity}_${ghostNotes.length}_${drag.isDragging}_${drag.currentX}_${drag.currentY}`;
     if (key !== prevPropsRef.current) {
       prevPropsRef.current = key;
       dirtyRef.current = true;
-      playheadDirtyRef.current = true; // viewport changed, playhead position shifts too
-    }
-    // Playhead-only changes (no main canvas redraw needed)
-    if (playheadRow !== prevPlayheadRef.current) {
-      prevPlayheadRef.current = playheadRow;
-      playheadDirtyRef.current = true;
     }
   });
 
@@ -187,15 +178,13 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
 
     const tick = () => {
       const canvas = canvasRef.current;
-      const phCanvas = playheadCanvasRef.current;
-      if (!canvas || !phCanvas) {
+      if (!canvas) {
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
 
       const ctx = canvas.getContext('2d');
-      const phCtx = phCanvas.getContext('2d');
-      if (!ctx || !phCtx) {
+      if (!ctx) {
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
@@ -216,14 +205,6 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
         canvas.style.width = `${displayW}px`;
         canvas.style.height = `${displayH}px`;
         dirtyRef.current = true;
-      }
-
-      if (phCanvas.width !== bufferW || phCanvas.height !== bufferH) {
-        phCanvas.width = bufferW;
-        phCanvas.height = bufferH;
-        phCanvas.style.width = `${displayW}px`;
-        phCanvas.style.height = `${displayH}px`;
-        playheadDirtyRef.current = true;
       }
 
       // Main canvas: grid + notes + selection box
@@ -255,18 +236,6 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
             const sy2 = rd.drag.currentY - containerRect.top;
             noteRendererRef.current.drawSelectionBox(ctx, sx1, sy1, sx2, sy2);
           }
-        }
-      }
-
-      // Playhead overlay canvas (redraws independently)
-      if (playheadDirtyRef.current) {
-        playheadDirtyRef.current = false;
-
-        phCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        phCtx.clearRect(0, 0, displayW, displayH);
-
-        if (rd.playheadRow !== null) {
-          noteRendererRef.current.drawPlayhead(phCtx, vp, rd.playheadRow);
         }
       }
 
@@ -454,17 +423,6 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
           display: 'block',
           width: '100%',
           height: '100%',
-        }}
-      />
-      <canvas
-        ref={playheadCanvasRef}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none',
         }}
       />
       <div
