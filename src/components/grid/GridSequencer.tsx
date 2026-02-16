@@ -564,7 +564,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
             const isRootNote = noteIndex === rootNote;
 
             return (
-              <div key={noteIndex} className="flex items-center mb-0.5" role="row" style={{ isolation: 'isolate' }}>
+              <div key={noteIndex} className="flex items-center mb-0.5 relative" role="row" style={{ isolation: 'isolate' }}>
                 {/* Row label */}
                 <div
                   className={`w-10 mr-2 text-right text-xs font-mono
@@ -575,6 +575,21 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                   {NOTE_NAMES[noteNameIndex]}
                   {isRootNote && <span className="ml-0.5 text-[8px]">●</span>}
                 </div>
+
+                {/* Smooth marker overlay for this row */}
+                {smoothMarker && isPlaying && currentStep >= 0 && (
+                  <div
+                    className="absolute rounded pointer-events-none"
+                    style={{
+                      left: `${48 + (smoothStep * (cellSize + 4))}px`,
+                      width: `${cellSize}px`,
+                      height: `${cellSize}px`,
+                      backgroundColor: '#ef4444',
+                      opacity: 0.35,
+                      zIndex: 4,
+                    }}
+                  />
+                )}
 
               {/* Cells */}
               {stepIndices.map((stepIdx) => {
@@ -606,9 +621,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                   trailOpacity = trailSteps.find(t => t.step === stepIdx)?.opacity || 0;
                 }
                 
-                const isCurrentStepCheck = smoothMarker 
-                  ? (Math.abs(smoothStep - stepIdx) < 0.5)
-                  : (currentStep === stepIdx);
+                // In smooth mode, don't show per-cell markers (use header overlay instead)
+                const isCurrentStepCheck = smoothMarker ? false : (currentStep === stepIdx);
 
                 return (
                   <div
