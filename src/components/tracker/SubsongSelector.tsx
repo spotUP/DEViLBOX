@@ -92,7 +92,7 @@ export const SubsongSelector: React.FC = React.memo(() => {
         });
       } else {
         // Find the subsong data
-        const subsongData = allSubsongs.find((s) => s.subsongIndex === newSubsongIndex);
+        const subsongData = allSubsongs.find((s: { subsongIndex: number }) => s.subsongIndex === newSubsongIndex);
 
         if (!subsongData) {
           notify.error(`Subsong ${newSubsongIndex} data not found`);
@@ -143,7 +143,7 @@ export const SubsongSelector: React.FC = React.memo(() => {
         className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer outline-none"
         title="Select subsong (Furnace multi-song module)"
       >
-        {subsongNames.map((name, idx) => (
+        {subsongNames.map((name: string, idx: number) => (
           <option key={idx} value={idx}>
             {idx + 1}. {name || `Subsong ${idx + 1}`}
           </option>

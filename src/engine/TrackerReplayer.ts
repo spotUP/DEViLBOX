@@ -207,6 +207,13 @@ export interface TrackerSong {
   numChannels: number;
   initialSpeed: number;
   initialBPM: number;
+  // Furnace-specific timing/compat (optional)
+  speed2?: number;
+  hz?: number;
+  virtualTempoN?: number;
+  virtualTempoD?: number;
+  compatFlags?: Record<string, unknown>;
+  grooves?: number[][];
 }
 
 // ============================================================================

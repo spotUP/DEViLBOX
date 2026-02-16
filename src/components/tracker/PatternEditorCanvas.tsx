@@ -1521,7 +1521,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           cell.probability,
           blankEmpty,
           effectCols,
-          cell.effects
+          undefined
         );
         ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
 

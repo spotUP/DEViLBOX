@@ -564,7 +564,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           : null;
         
         if (channelMetadata) {
-          console.log(`[Import] Applied system preset: ${furnaceData?.systemName}, systems: [${furnaceData?.systems.map(s => '0x' + s.toString(16)).join(', ')}]`);
+          console.log(`[Import] Applied system preset: ${furnaceData?.systemName}, systems: [${furnaceData?.systems.map((s: number) => '0x' + s.toString(16)).join(', ')}]`);
         }
 
         result = {

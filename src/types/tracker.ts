@@ -122,6 +122,9 @@ export interface ChannelData {
     channelType?: 'sample' | 'synth' | 'hybrid';
     furnaceType?: number; // Furnace DivChanType for system presets
     hardwareName?: string; // Hardware-specific channel name
+    shortName?: string; // Short display name for channel headers
+    effectCols?: number; // Number of effect columns (default 2)
+    systemId?: string; // System preset identifier
   };
 }
 
@@ -321,6 +324,32 @@ export interface ImportMetadata {
   xmData?: {
     frequencyType: 'amiga' | 'linear';
     defaultPanning: number[]; // Per-channel panning (0-255)
+  };
+
+  // Furnace-specific data
+  furnaceData?: {
+    speed2?: number;
+    hz?: number;
+    virtualTempoN?: number;
+    virtualTempoD?: number;
+    compatFlags?: Record<string, unknown>;
+    grooves?: number[][];
+    subsongCount?: number;
+    currentSubsong?: number;
+    subsongNames?: string[];
+    allSubsongs?: Array<{
+      subsongIndex: number;
+      patterns: unknown[][][];
+      patternOrderTable?: number[];
+      ordersLen?: number;
+      initialBPM?: number;
+      initialSpeed?: number;
+    }>;
+    systems?: number[];
+    systemChans?: number[];
+    systemName?: string;
+    channelShortNames?: string[];
+    effectColumns?: number[];
   };
 }
 

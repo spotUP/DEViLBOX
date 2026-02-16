@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-16T14:20:15.908Z
+ * Generated: 2026-02-16T15:20:54.611Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '691';
-export const BUILD_HASH = 'fe132a1';
+export const BUILD_NUMBER = '695';
+export const BUILD_HASH = '15270bf';
 export const BUILD_DATE = '2026-02-16';
 
 // Full semantic version with build number
@@ -33,6 +33,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-16',
     changes: [
+      {
+        type: 'fix',
+        "description": "Furnace instrument upload race condition - await uploads before playback"
+      },
+      {
+        type: 'fix',
+        "description": "Await FurnaceDispatch synth initialization before triggering notes"
+      },
+      {
+        type: 'feature',
+        "description": "Add detailed logging for instrument/macro debugging"
+      },
+      {
+        type: 'fix',
+        "description": "Revert: roll back to start-of-day state (b04b8a4) to fix SID audio regression"
+      },
       {
         type: 'fix',
         "description": "Use macro.code instead of macro.type for macro type lookup"
@@ -222,22 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Improve block interpolation logic"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve stability issues and unused variables"
-      },
-      {
-        type: 'feature',
-        "description": "Advanced obstacle-aware cable routing"
-      },
-      {
-        type: 'feature',
-        "description": "Implement column-specific selection and sparse clipboard"
-      },
-      {
-        type: 'fix',
-        "description": "Comprehensive stability and type-checking fixes"
       }
     ]
   }
