@@ -64,6 +64,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   const smoothProgressRef = useRef(0);
   const lastStepTimeRef2 = useRef(0);
   const rafIdRef2 = useRef(0);
+  const [, forceUpdate] = useState(0); // Force re-render on each RAF tick
 
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;
@@ -260,6 +261,9 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       const elapsed = now - lastStepTimeRef2.current;
       const progress = Math.min(elapsed / msPerRow, 1.0);
       smoothProgressRef.current = currentStep + progress;
+
+      // Force re-render at 60fps for smooth animation
+      forceUpdate(prev => prev + 1);
 
       rafIdRef2.current = requestAnimationFrame(animate);
     };
