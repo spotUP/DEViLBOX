@@ -45,6 +45,12 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     // Pending messages queue (buffer before init completes)
     this.pendingMessages = [];
 
+    // Scheduled command queue for sample-accurate timing
+    // Commands with a 'time' field are queued here and applied at the correct
+    // sample offset during process(), preventing up to 100ms of jitter from
+    // the main-thread lookahead scheduler.
+    this.scheduledCommands = [];
+
     // Exported WASM functions (cwrap'd)
     this.wasm = null;
 
@@ -96,10 +102,22 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       }
 
       case 'dispatch': {
-        // Forward a DivCommand to the correct chip dispatch
-        const chip = this.getChip(data.platformType);
-        if (chip && this.wasm) {
-          this.wasm.cmd(chip.handle, data.cmd, data.chan, data.val1 || 0, data.val2 || 0);
+        // If the command has a scheduled time, queue it for sample-accurate playback
+        if (data.time !== undefined && data.time > currentTime) {
+          this.scheduledCommands.push({
+            time: data.time,
+            platformType: data.platformType,
+            cmd: data.cmd,
+            chan: data.chan,
+            val1: data.val1 || 0,
+            val2: data.val2 || 0
+          });
+        } else {
+          // No time or time is in the past — execute immediately
+          const chip = this.getChip(data.platformType);
+          if (chip && this.wasm) {
+            this.wasm.cmd(chip.handle, data.cmd, data.chan, data.val1 || 0, data.val2 || 0);
+          }
         }
         break;
       }
@@ -622,6 +640,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     this.wasm = null;
     this.initialized = false;
     this.lastHeapBuffer = null;
+    this.scheduledCommands = [];
   }
 
   process(inputs, outputs, parameters) {
@@ -646,6 +665,21 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     }
 
     try {
+      // --- Process scheduled commands at sample-accurate positions ---
+      // Sort by time so earliest commands execute first
+      if (this.scheduledCommands.length > 0) {
+        this.scheduledCommands.sort((a, b) => a.time - b.time);
+        const blockEnd = currentTime + numSamples / sampleRate;
+        // Execute all commands scheduled for this audio block (or past-due)
+        while (this.scheduledCommands.length > 0 && this.scheduledCommands[0].time <= blockEnd) {
+          const sc = this.scheduledCommands.shift();
+          const chip = this.getChip(sc.platformType);
+          if (chip && this.wasm) {
+            this.wasm.cmd(chip.handle, sc.cmd, sc.chan, sc.val1, sc.val2);
+          }
+        }
+      }
+
       // Advance tick accumulator — tick ALL chips in lock-step
       // (Furnace pattern: for (i=0; i<systemLen; i++) disCont[i].dispatch->tick())
       this.tickAccumulator += numSamples;
