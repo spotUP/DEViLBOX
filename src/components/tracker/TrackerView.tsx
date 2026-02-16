@@ -510,13 +510,15 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Module import handler - used by both mobile and desktop views
   const handleModuleImport = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
     const { useLibopenmpt } = options;
+    let format = info.metadata.type; // Default from metadata
 
     // Always clean up engine state before import to prevent stale instruments/state
     getToneEngine().releaseAll();
 
     // Check if native parser data is available (XM/MOD)
     if (info.nativeData) {
-      const { format, importMetadata, instruments: parsedInstruments, patterns } = info.nativeData;
+      const { format: nativeFormat, importMetadata, instruments: parsedInstruments, patterns } = info.nativeData;
+      format = nativeFormat; // Use specific native format string
 
       console.log(`[Import] Using native ${format} parser`);
       console.log(`[Import] ${parsedInstruments.length} instruments, ${patterns.length} patterns`);
@@ -780,6 +782,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
     const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
     console.log('Imported module:', info.metadata.title, {
+      format,
       patterns: result.patterns.length,
       channels: result.channelCount,
       instruments: instruments.length,
