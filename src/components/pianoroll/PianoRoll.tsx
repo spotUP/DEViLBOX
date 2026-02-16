@@ -1089,7 +1089,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
         <button
           onClick={() => setShowVelocity(!view.showVelocity)}
           className={`p-1 rounded transition-colors ${view.showVelocity ? 'text-accent-primary' : 'text-text-muted'}`}
-          title="Show velocity on notes"
+          title="Show velocity bars on notes"
           aria-pressed={view.showVelocity}
         >
           {view.showVelocity ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -1097,7 +1097,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
         <button
           onClick={() => setShowVelocityLane(!view.showVelocityLane)}
           className={`p-1 rounded transition-colors ${view.showVelocityLane ? 'text-accent-primary' : 'text-text-muted'}`}
-          title="Velocity editing lane"
+          title="Velocity editor lane - click/drag bars to edit velocity, scroll wheel to adjust"
           aria-pressed={view.showVelocityLane}
         >
           <BarChart3 size={14} />
@@ -1107,7 +1107,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
         <button
           onClick={() => setMultiChannel(!view.multiChannel)}
           className={`p-1 rounded transition-colors ${view.multiChannel ? 'text-accent-primary' : 'text-text-muted'}`}
-          title="Show all channels"
+          title="Show all channels simultaneously - notes colored by instrument"
           aria-pressed={view.multiChannel}
         >
           <Layers size={14} />

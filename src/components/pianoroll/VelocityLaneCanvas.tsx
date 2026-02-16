@@ -323,12 +323,18 @@ const VelocityLaneCanvasComponent: React.FC<VelocityLaneCanvasProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative shrink-0 border-t border-dark-border overflow-hidden"
+      className="relative shrink-0 border-t border-dark-border overflow-hidden bg-dark-bgTertiary"
       style={{ height: LANE_HEIGHT }}
+      title="Velocity Editor: Click or drag velocity bars to adjust. Scroll wheel for fine adjustment."
     >
       <canvas
         ref={canvasRef}
-        style={{ display: 'block', width: '100%', height: LANE_HEIGHT }}
+        style={{ 
+          display: 'block', 
+          width: '100%', 
+          height: LANE_HEIGHT,
+          cursor: draggingNoteId ? 'ns-resize' : (hoverNoteIdRef.current ? 'ns-resize' : 'default')
+        }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
