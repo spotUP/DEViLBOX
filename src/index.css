@@ -1809,21 +1809,11 @@
 
 .ft2-toolbar-row {
   display: grid;
-  grid-template-columns: 220px 180px 180px 1fr;
+  grid-template-columns: 260px 220px 220px 220px 1fr;
   align-items: center;
   min-height: 32px;
   flex-shrink: 0;
   width: 100%;
-}
-
-.ft2-toolbar-row-menu {
-  display: flex;
-  grid-template-columns: none;
-  gap: 6px;
-  padding: 6px 14px;
-  background: var(--color-bg-tertiary);
-  margin: 0 -14px -8px -14px;
-  border-top: 1px solid var(--color-border);
 }
 
 .ft2-section {
@@ -1856,9 +1846,10 @@
 }
 
 /* Column Classes for Strict Alignment */
-.ft2-col-1 { width: 220px; }
-.ft2-col-2 { width: 180px; }
-.ft2-col-3 { width: 180px; }
+.ft2-col-1 { width: 260px; }
+.ft2-col-2 { width: 220px; }
+.ft2-col-3 { width: 220px; }
+.ft2-col-4 { width: 220px; }
 
 .ft2-section-playback {
   flex-shrink: 0;

@@ -217,17 +217,19 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
 
   // Parameter setters - update instrument store which will update ToneEngine
   const handleWaveformChange = useCallback((value: number) => {
-    if (!instrument || !tb303Config) return;
-    updateInstrument(instrumentId, {
-      tb303: {
-        ...tb303Config,
-        oscillator: {
-          ...tb303Config.oscillator,
-          type: value < 0.5 ? 'sawtooth' : 'square',
-        },
+    const config = tb303ConfigRef.current;
+    if (!instrumentRef.current || !config) return;
+    
+    const updatedConfig = {
+      ...config,
+      oscillator: {
+        ...config.oscillator,
+        type: (value < 0.5 ? 'sawtooth' : 'square') as 'sawtooth' | 'square',
       },
-    });
-  }, [instrumentId, instrument, tb303Config, updateInstrument]);
+    };
+    getToneEngine().updateTB303Parameters(instrumentId, updatedConfig);
+    debouncedStoreUpdate({ tb303: updatedConfig });
+  }, [instrumentId, debouncedStoreUpdate]);
 
   const handleCutoffChange = useCallback((value: number) => {
     const config = tb303ConfigRef.current;

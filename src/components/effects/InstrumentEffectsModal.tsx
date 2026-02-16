@@ -40,6 +40,12 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
   // Ref-based counter for unique IDs (avoids impure Date.now() during render)
   const idCounterRef = useRef(0);
 
+  // CRITICAL: Use ref for editingEffect to prevent stale closures in knob onChange handlers
+  const editingEffectRef = useRef<EffectConfig | null>(null);
+  React.useEffect(() => {
+    editingEffectRef.current = editingEffect;
+  }, [editingEffect]);
+
   // Load a factory preset
   const handleLoadPreset = useCallback((preset: MasterFxPreset) => {
     if (currentInstrumentId === null) return;
@@ -385,17 +391,19 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
                   <EffectParameterEditor
                     effect={editingEffect}
                     onUpdateParameter={(key, value) => {
-                      const updates = { parameters: { ...editingEffect.parameters, [key]: value } };
+                      const current = editingEffectRef.current;
+                      if (!current) return;
+                      const updates = { parameters: { ...current.parameters, [key]: value } };
                       if (currentInstrumentId !== null) {
-                        updateEffect(currentInstrumentId, editingEffect.id, updates);
+                        updateEffect(currentInstrumentId, current.id, updates);
                       }
-                      setEditingEffect({ ...editingEffect, ...updates });
+                      setEditingEffect({ ...current, ...updates });
                     }}
                     onUpdateWet={(wet) => {
-                      if (currentInstrumentId !== null) {
-                        updateEffect(currentInstrumentId, editingEffect.id, { wet });
-                      }
-                      setEditingEffect({ ...editingEffect, wet });
+                      const current = editingEffectRef.current;
+                      if (!current || currentInstrumentId === null) return;
+                      updateEffect(currentInstrumentId, current.id, { wet });
+                      setEditingEffect({ ...current, wet });
                     }}
                   />
                 </div>

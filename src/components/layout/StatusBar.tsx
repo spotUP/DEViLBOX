@@ -98,27 +98,27 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) =
       <div className="bg-dark-bgSecondary border-t border-dark-border flex items-center justify-between px-4 py-1.5 text-xs font-mono">
         {/* Left: Cursor Position & Mode */}
       <div className="flex items-center gap-4">
-        <span className="text-text-secondary">
+        <span className="text-text-primary">
           Row <span className="text-accent-primary font-semibold">{rowDisplay}</span>
         </span>
         <div className="w-px h-3 bg-border opacity-50"></div>
-        <span className="text-text-secondary">
+        <span className="text-text-primary">
           {channelDisplay}
         </span>
         <div className="w-px h-3 bg-border opacity-50"></div>
-        <span className="text-text-secondary capitalize">
+        <span className="text-text-primary capitalize">
           {cursor.columnType}
         </span>
         <div className="w-px h-3 bg-border opacity-50"></div>
-        <span className="text-text-secondary">
+        <span className="text-text-primary">
           Oct <span className="text-accent-primary font-semibold">{currentOctave}</span>
         </span>
         <div className="w-px h-3 bg-border opacity-50"></div>
-        <span className="text-text-secondary" title={insertMode ? 'Insert mode: new data shifts rows down' : 'Overwrite mode: new data replaces existing'}>
+        <span className="text-text-primary" title={insertMode ? 'Insert mode: new data shifts rows down' : 'Overwrite mode: new data replaces existing'}>
           Mode: <span className={insertMode ? 'text-accent-warning' : 'text-accent-primary'}>{insertMode ? 'INS' : 'OVR'}</span>
         </span>
         <div className="w-px h-3 bg-border opacity-50"></div>
-        <span className={`px-2 py-0.5 rounded ${recordMode ? 'bg-accent-error/20 text-accent-error' : 'text-text-muted'}`}>
+        <span className={`px-2 py-0.5 rounded ${recordMode ? 'bg-accent-error/20 text-accent-error' : 'text-text-primary'}`}>
           {recordMode ? 'REC' : 'EDIT'}
         </span>
       </div>

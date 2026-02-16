@@ -667,7 +667,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const getCurrentTheme = useThemeStore((state) => state.getCurrentTheme);
   const currentTheme = getCurrentTheme();
   const lastThemeRef = useRef(currentThemeId);
-  const isCyanTheme = currentThemeId === 'cyan-lineart';
 
   // Visual Parameter Editor state
   const [parameterEditorState, setParameterEditorState] = useState<{
@@ -744,7 +743,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     lineNumber: '#707070',
     lineNumberHighlight: '#f97316',
     selection: 'rgba(59, 130, 246, 0.3)', // Semi-transparent blue for selection
-  }), [isCyanTheme]);
+  }), [currentTheme]);
 
   // Channel context menu handlers
   const handleFillPattern = useCallback((channelIndex: number, generatorType: GeneratorType) => {
@@ -1660,11 +1659,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       // Mode-dependent caret color
       const isRecording = state.recordMode;
-      const isPlayingCaret = transportState.isPlaying;
       let caretBg: string;
       if (isRecording) {
         caretBg = currentTheme.colors.accent; // Theme accent for record mode
-      } else if (isPlayingCaret) {
+      } else if (isPlaying) {
         caretBg = currentTheme.colors.accentSecondary; // Secondary accent for playback
       } else {
         caretBg = currentTheme.colors.accent; // Theme accent for idle
@@ -1736,16 +1734,27 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }
 
       // Final pass: Redraw channel separators to ensure they sit on top of row backgrounds
-      ctx.fillStyle = colors.border;
       for (let ch = 0; ch < numChannels; ch++) {
         const colX = channelOffsets[ch] - scrollLeft;
         const channelWidth = channelWidths[ch];
         if (colX + channelWidth >= 0 && colX <= width) {
+          // Separator
+          ctx.fillStyle = colors.border;
           ctx.fillRect(colX + channelWidth, 0, 1, height);
+
+          // Colored stripe
+          const chColor = pattern.channels[ch]?.color;
+          if (chColor) {
+            const isCollapsed = pattern.channels[ch]?.collapsed;
+            ctx.globalAlpha = 0.4;
+            ctx.fillStyle = chColor;
+            ctx.fillRect(colX, 0, isCollapsed ? 4 : 2, height);
+            ctx.globalAlpha = 1.0;
+          }
         }
       }
     }
-  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, isCyanTheme, visibleStart, instruments, currentPatternIndex, patterns, scrollY, channelOffsets, channelWidths, numChannels, cursor, selection, columnVisibility]);
+  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, currentTheme, visibleStart, instruments, currentPatternIndex, patterns, scrollY, channelOffsets, channelWidths, numChannels, cursor, selection, columnVisibility]);
 
   // Ref to keep render callback up to date for the animation loop
   const renderRef = useRef(render);
@@ -2004,7 +2013,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             <div style={{ width: totalChannelsWidth, height: 1 }} />
           </div>
 
-          <div className="flex-shrink-0 bg-dark-bgTertiary border-dark-border z-20 relative h-[37px]">
+          <div className="flex-shrink-0 bg-dark-bgTertiary border-dark-border z-20 relative h-[28px]">
             <div className="flex h-full">
             {/* Row number column header */}
             <div className="flex-shrink-0 px-2 text-text-muted text-xs font-medium text-center border-r border-dark-border flex items-center justify-center"

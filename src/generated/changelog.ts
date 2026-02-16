@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-16T18:25:24.587Z
+ * Generated: 2026-02-16T23:06:39.256Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.711';
-export const BUILD_NUMBER = '711';
-export const BUILD_HASH = 'e3c5340';
+export const BUILD_VERSION = '1.0.775';
+export const BUILD_NUMBER = '775';
+export const BUILD_HASH = '28f8fc78';
 export const BUILD_DATE = '2026-02-16';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,208 +30,208 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.711',
+    version: '1.0.775',
     date: '2026-02-16',
     changes: [
       {
-        type: 'improvement',
-        "description": "Merge hex keyboard into piano - same layout with changed labels"
+        type: 'fix',
+        "description": "Correct parameter ranges to 0-1 normalized values matching DB303 site rip. All knobs were using Hz/ms/% ranges instead of 0-1, causing values to clamp at 1.0. Decay knob now syncs devilFish.normalDecay to prevent applyConfig() from overriding it. Added auto-instrument detection and dropdown for multiple 303s."
       },
       {
         type: 'fix',
-        "description": "IOS MIDI - retry detection with delay + user gesture retry button"
+        "description": "Use Zustand selectors to properly track pattern changes in piano roll"
       },
       {
         type: 'fix',
-        "description": "Stabilize Tips/Changelog dialog height on iOS"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: regenerate changelog with latest commits"
+        "description": "Debug: add comprehensive logging to diagnose piano roll interaction issues"
       },
       {
         type: 'fix',
-        "description": "Play always starts from row 0 of current pattern"
-      },
-      {
-        type: 'fix',
-        "description": "IOS audio - touchstart unlock, remove hardcoded 44100Hz, consolidate AudioContexts"
-      },
-      {
-        type: 'fix',
-        "description": "Stop playback no longer resets row position to 0"
-      },
-      {
-        type: 'fix',
-        "description": "Stop playback keeps current position instead of resetting to start"
-      },
-      {
-        type: 'fix',
-        "description": "SID notes hanging forever - release hook passed time as note param, panic/ESC now silence audio"
-      },
-      {
-        type: 'fix',
-        "description": "Chip creation promise race - multiple synths sharing one platform no longer hang"
-      },
-      {
-        type: 'fix',
-        "description": "Seamless position change during playback (no audio pause)"
-      },
-      {
-        type: 'fix',
-        "description": "Retry Furnace WASM init on page reload when AudioContext was suspended"
-      },
-      {
-        type: 'fix',
-        "description": "Pass scheduled time to stopChannel for correct note-off timing"
-      },
-      {
-        type: 'fix',
-        "description": "Sample-accurate timing for Furnace dispatch commands - queue timestamped NOTE_ON/OFF in worklet, matching Furnace nextBuf() pattern"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve 5 TypeScript errors (systemId type, systems nullability)"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve 22 TypeScript errors - add furnaceData to types, fix channelMeta"
-      },
-      {
-        type: 'fix',
-        "description": "Furnace instrument upload race condition - await uploads before playback"
-      },
-      {
-        type: 'fix',
-        "description": "Await FurnaceDispatch synth initialization before triggering notes"
+        "description": "Velocity lane now shows full width with helpful empty state"
       },
       {
         type: 'feature',
-        "description": "Add detailed logging for instrument/macro debugging"
-      },
-      {
-        type: 'fix',
-        "description": "Revert: roll back to start-of-day state (b04b8a4) to fix SID audio regression"
-      },
-      {
-        type: 'fix',
-        "description": "Use macro.code instead of macro.type for macro type lookup"
+        "description": "Improve piano roll velocity lane and multi-channel UX"
       },
       {
         type: 'improvement',
-        "description": "Wip: save state before SID audio regression audit"
+        "description": "Improve piano roll tool button tooltips"
       },
       {
-        type: 'fix',
-        "description": "Resolve format ReferenceError in ModuleLoader fallback path"
+        type: 'feature',
+        "description": "Color code notes by instrument in piano roll"
       },
       {
-        type: 'fix',
-        "description": "Eliminate playback break during natural position transitions"
-      },
-      {
-        type: 'fix',
-        "description": "Debug(furnace): enhanced logging for import and playback transitions"
-      },
-      {
-        type: 'fix',
-        "description": "Ensure Furnace and WAM synths are ready before playback starts"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve JSX syntax errors and improve scrollbar layout"
+        type: 'feature',
+        "description": "Ensure piano keys trigger on note edges during playback"
       },
       {
         type: 'improvement',
-        "description": "Clean up FurnaceDispatchEngine and wire up compat flags"
+        "description": "Improve piano roll smooth scrolling with ease-out-cubic"
       },
       {
         type: 'fix',
-        "description": "Resolve 1-frame position revert during playback navigation"
+        "description": "Piano roll initialization error and improve default zoom"
       },
       {
         type: 'feature',
-        "description": "Enhance Furnace .fur parser with subsong and compat flag support"
+        "description": "Seamless wrap-around scrolling for piano roll playback"
       },
       {
         type: 'feature',
-        "description": "Enhance ImportMetadata with Furnace-specific technical fingerprints"
+        "description": "Remove playhead line from piano roll during playback"
+      },
+      {
+        type: 'feature',
+        "description": "Add smooth RAF-based scrolling to piano roll playback"
+      },
+      {
+        type: 'improvement',
+        "description": "Revert: back to scrollLeft for proper viewport scrolling"
       },
       {
         type: 'fix',
-        "description": "Explicitly set popout window title to prevent 'about:blank'"
+        "description": "Remove unused variables and fix duplicate grid declaration"
+      },
+      {
+        type: 'feature',
+        "description": "Use CSS transform for GPU-accelerated smooth scrolling"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove smooth marker functionality, keep discrete mode with trails"
+      },
+      {
+        type: 'feature',
+        "description": "Add animated gradient overlay for smooth visual flow effect"
       },
       {
         type: 'fix',
-        "description": "Move channel scrollbar above headers"
+        "description": "Fix smooth marker vertical alignment with notes"
+      },
+      {
+        type: 'improvement',
+        "description": "Make viewport scrolling perfectly smooth - sync with marker animation"
       },
       {
         type: 'fix',
-        "description": "Chore: commit pending Furnace compatibility updates and hardware preset fixes"
+        "description": "Fix beat marker sizing - apply to cell button not wrapper"
+      },
+      {
+        type: 'improvement',
+        "description": "Simplify beat markers - just color every 4th cell background"
+      },
+      {
+        type: 'improvement',
+        "description": "Make beat markers appear IN FRONT of notes with full-height columns"
       },
       {
         type: 'fix',
-        "description": "Add resistance to stepped horizontal scrolling"
+        "description": "Fix smooth marker alignment and beat marker visibility"
       },
       {
         type: 'fix',
-        "description": "Implement stepped horizontal scrolling (channel by channel)"
+        "description": "Fix beat marker styling - lighter color, correct sizing, z-index"
       },
       {
         type: 'fix',
-        "description": "Center channel content for cleaner layout"
+        "description": "Fix jerky smooth marker - use state instead of forceUpdate"
+      },
+      {
+        type: 'feature',
+        "description": "Make smooth marker truly smooth - add per-row sliding overlays"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove unused useTrackerStore destructuring"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove unused channel variable"
       },
       {
         type: 'fix',
-        "description": "Skip hidden columns during cursor navigation"
+        "description": "Fix jerky smooth marker animation - force 60fps re-renders"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove per-step instrument color coding from grid markers"
+      },
+      {
+        type: 'feature',
+        "description": "Add smooth marker scrolling mode to grid view"
       },
       {
         type: 'fix',
-        "description": "Resolve ReferenceError for columnVisibility and chColor"
+        "description": "Fix note colors using inline hex values instead of Tailwind classes"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove borders from grid note cells"
+      },
+      {
+        type: 'improvement',
+        "description": "Use per-step instrument colors for trails and markers"
       },
       {
         type: 'fix',
-        "description": "Stabilize channel width using column visibility settings"
+        "description": "Fix instrument color: scan channel cells for actual instrument ID"
       },
       {
         type: 'fix',
-        "description": "Ensure channel separators are drawn on top of row backgrounds"
+        "description": "Fix invisible markers: use inline hex colors instead of dynamic Tailwind classes"
+      },
+      {
+        type: 'improvement',
+        "description": "Color trail and play markers with instrument color"
       },
       {
         type: 'fix',
-        "description": "Remove channel header bottom border to eliminate gap"
+        "description": "Fix header position marker alignment and remove transition"
+      },
+      {
+        type: 'improvement',
+        "description": "Make trail and play marker overlays exactly match cell size"
       },
       {
         type: 'fix',
-        "description": "Re-enable active channel highlight on populated rows"
+        "description": "Fix play marker flickering by limiting CSS transitions"
       },
       {
         type: 'fix',
-        "description": "Implement full-height channel backgrounds and separators"
+        "description": "Fix flickering play marker by removing duplicate trail effects"
       },
       {
         type: 'fix',
-        "description": "Extend active channel highlight to full height"
+        "description": "Fix trail effect to render on top of active cell backgrounds"
       },
       {
         type: 'fix',
-        "description": "Remove unused variables and add missing import"
+        "description": "Fix trail effect rendering in front of cell backgrounds"
       },
       {
         type: 'fix',
-        "description": "Strictly enforce hardware channel counts in system presets"
+        "description": "Fix trail layering and increase current step visibility"
       },
       {
         type: 'fix',
-        "description": "Synchronize channel header and grid scrolling"
+        "description": "Fix trail effect z-index to render in front of position markers"
+      },
+      {
+        type: 'improvement',
+        "description": "Extend playhead trail effect from 3 to 7 steps"
+      },
+      {
+        type: 'feature',
+        "description": "Add visual enhancements to grid view"
+      },
+      {
+        type: 'feature',
+        "description": "Add grid view auto-sizing to fit 64-step patterns"
       },
       {
         type: 'fix',
-        "description": "Increase channel width to prevent label cutoff in header"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve ReferenceError and clean up unused variables in metrics refactor"
+        "description": "Move usePatternPlayback to App level to persist across view switches"
       }
     ]
   }

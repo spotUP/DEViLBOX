@@ -18,7 +18,7 @@ import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
-import { ChevronDown, ChevronUp, FilePlus, Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
+import { FilePlus, Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
@@ -156,7 +156,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   onShowPatternOrder,
   onShowDrumpads,
   showMasterFX,
-  compact: compactProp,
 }) => {
   const {
     patterns,
@@ -197,8 +196,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const { isDirty, setMetadata, metadata } = useProjectStore();
   const { instruments, loadInstruments, updateInstrument, addInstrument, reset: resetInstruments } = useInstrumentStore();
   const { masterEffects } = useAudioStore();
-  const { compactToolbar: compactState, toggleCompactToolbar, oscilloscopeVisible } = useUIStore();
-  const compactToolbar = compactProp ?? compactState;
+  const { oscilloscopeVisible } = useUIStore();
+  const compactToolbar = false;
   const { curves, reset: resetAutomation } = useAutomationStore();
   const addTab = useTabsStore((state) => state.addTab);
 
@@ -588,11 +587,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   };
 
   return (
-    <div className={`ft2-toolbar ${compactToolbar ? 'ft2-toolbar-compact' : ''}`}>
-      <button className="panel-collapse-toggle" onClick={toggleCompactToolbar}>
-        {compactToolbar ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-      </button>
-
+    <div className="ft2-toolbar">
       <div className="flex flex-1 min-w-0 overflow-hidden min-h-[120px] justify-between">
         <div className="flex-shrink min-w-0">
           <div className="ft2-toolbar-row">
@@ -625,14 +620,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             <div className="ft2-section ft2-col-3">
               <FT2NumericInput label="Pattern" value={patternOrder[currentPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} format="hex" />
             </div>
+            <div className="ft2-section ft2-col-4">
+              <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} format="hex" />
+            </div>
             <div className="ft2-section ft2-section-playback">
               <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm" onClick={handlePlaySong} className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
               <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm" onClick={handlePlayPattern} className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
             </div>
           </div>
 
-          {!compactToolbar && (
-            <div className="ft2-toolbar-row">
+          <div className="ft2-toolbar-row">
               <div className="ft2-section ft2-col-1">
                 <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} format="hex" />
               </div>
@@ -669,21 +666,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   ]}
                 />
               </div>
-            </div>
-          )}
-
-          {!compactToolbar && (
-            <div className="ft2-toolbar-row">
-              <div className="ft2-section ft2-col-1">
-                <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} format="hex" />
-              </div>
-              <div className="ft2-section ft2-col-2">
+              <div className="ft2-section ft2-col-4">
                 <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} format="hex" />
               </div>
-              <div className="ft2-section ft2-col-3">
-              </div>
             </div>
-          )}
         </div>
 
         <VisualizerFrame variant="compact" className="min-w-[120px] max-w-[350px] flex-shrink-0 border-l border-dark-border cursor-pointer group ml-auto" style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center' }}>
