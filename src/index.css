@@ -1847,6 +1847,14 @@
   padding-right: 0;
 }
 
+/* Hide borders on empty sections */
+.ft2-section:empty {
+  border-right: none;
+  padding: 0;
+  width: 0;
+  min-width: 0;
+}
+
 /* Column Classes for Strict Alignment */
 .ft2-col-1 { width: 220px; }
 .ft2-col-2 { width: 180px; }
