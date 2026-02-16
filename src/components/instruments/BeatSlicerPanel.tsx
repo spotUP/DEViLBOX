@@ -39,13 +39,14 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
   selectedSliceId,
   onClose,
 }) => {
-  const { updateSlices, updateSliceConfig, createSlicedInstruments } = useInstrumentStore();
+  const { updateSlices, updateSliceConfig, createSlicedInstruments, createDrumKitFromSlices } = useInstrumentStore();
   const bpm = useTransportStore((state) => state.bpm);
 
   // Local state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingKit, setIsExportingKit] = useState(false);
 
   // Get slices and config from instrument or use defaults
   const slices = instrument.sample?.slices || [];
@@ -136,6 +137,31 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
       setIsExporting(false);
     }
   }, [slices, instrument.id, createSlicedInstruments]);
+
+  // Export slices to a single DrumKit
+  const handleExportToDrumKit = useCallback(async () => {
+    if (slices.length === 0) {
+      notify.error('No slices to export');
+      return;
+    }
+
+    setIsExportingKit(true);
+
+    try {
+      const drumKitId = await createDrumKitFromSlices(instrument.id, slices);
+
+      if (drumKitId) {
+        notify.success(`Created DrumKit with ${slices.length} slices`);
+      } else {
+        notify.error('Failed to create DrumKit');
+      }
+    } catch (error) {
+      console.error('[BeatSlicerPanel] DrumKit export failed:', error);
+      notify.error('DrumKit export failed');
+    } finally {
+      setIsExportingKit(false);
+    }
+  }, [slices, instrument.id, createDrumKitFromSlices]);
 
   // Format time display
   const formatTime = (seconds: number): string => {
@@ -337,24 +363,43 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
             </div>
           )}
 
-          {/* Export Button */}
+          {/* Export Buttons */}
           {slices.length > 0 && (
-            <button
-              onClick={handleExportSlices}
-              disabled={isExporting}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-ft2-cursor text-ft2-bg rounded text-xs font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isExporting ? (
-                <RefreshCw size={12} className="animate-spin" />
-              ) : (
-                <Download size={12} />
-              )}
-              <span>
-                {isExporting
-                  ? 'Creating...'
-                  : `Create ${slices.length} Sliced Instrument${slices.length > 1 ? 's' : ''}`}
-              </span>
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={handleExportSlices}
+                disabled={isExporting || isExportingKit}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-ft2-cursor text-ft2-bg rounded text-xs font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isExporting ? (
+                  <RefreshCw size={12} className="animate-spin" />
+                ) : (
+                  <Download size={12} />
+                )}
+                <span>
+                  {isExporting
+                    ? 'Creating...'
+                    : `Create ${slices.length} Sliced Instrument${slices.length > 1 ? 's' : ''}`}
+                </span>
+              </button>
+
+              <button
+                onClick={handleExportToDrumKit}
+                disabled={isExporting || isExportingKit}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-ft2-highlight text-ft2-bg rounded text-xs font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isExportingKit ? (
+                  <RefreshCw size={12} className="animate-spin" />
+                ) : (
+                  <Zap size={12} />
+                )}
+                <span>
+                  {isExportingKit
+                    ? 'Creating DrumKit...'
+                    : `Slice to DrumKit (MIDI 36+)`}
+                </span>
+              </button>
+            </div>
           )}
 
           {/* Help Text */}

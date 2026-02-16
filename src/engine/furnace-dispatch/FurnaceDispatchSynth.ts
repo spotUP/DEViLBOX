@@ -284,16 +284,19 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   /**
    * Upload Furnace instrument binary data to the engine (legacy)
    * @param rawData - Raw binary instrument data from .fur file
+   * @param targetSlot - Optional explicit target slot (0-255). If provided, uses this instead of this.furnaceInstrumentIndex.
+   *                     CRITICAL: Must pass this when calling from async loops to avoid race conditions.
    * @deprecated Use uploadInstrumentFromConfig instead
    */
-  public async uploadInstrumentData(rawData: Uint8Array): Promise<void> {
+  public async uploadInstrumentData(rawData: Uint8Array, targetSlot?: number): Promise<void> {
+    const slot = targetSlot ?? this.furnaceInstrumentIndex;
     if (!rawData || rawData.length === 0) {
-      console.warn(`[FurnaceDispatchSynth] No instrument data to upload for index ${this.furnaceInstrumentIndex}`);
+      console.warn(`[FurnaceDispatchSynth] No instrument data to upload for index ${slot}`);
       return;
     }
     await this.ensureInitialized();
-    console.log(`[FurnaceDispatchSynth] Uploading instrument ${this.furnaceInstrumentIndex} (${rawData.length} bytes) to platform ${this.platformType}`);
-    this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, rawData, this.platformType);
+    console.log(`[FurnaceDispatchSynth] Uploading instrument to slot ${slot} (${rawData.length} bytes) platform ${this.platformType}`);
+    this.engine.uploadFurnaceInstrument(slot, rawData, this.platformType);
   }
 
   /**
@@ -318,7 +321,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       // Create the chip and wait for worklet to confirm creation
       const engineSampleRate = this.engine.getNativeCtx()?.sampleRate ?? nativeCtx.sampleRate;
       await this.engine.createChip(this.platformType, engineSampleRate);
-      await this.engine.waitForChipCreated();
+      await this.engine.waitForChipCreated(this.platformType);
 
       // Connect worklet output through a shared native GainNode.
       // The worklet lives in the engine's true native AudioContext. Tone.js uses

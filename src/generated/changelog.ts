@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-16T08:07:43.219Z
+ * Generated: 2026-02-16T14:03:09.539Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '680';
-export const BUILD_HASH = '92cb551';
+export const BUILD_NUMBER = '689';
+export const BUILD_HASH = '1426fd0';
 export const BUILD_DATE = '2026-02-16';
 
 // Full semantic version with build number
@@ -33,6 +33,42 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-16',
     changes: [
+      {
+        type: 'fix',
+        "description": "Resolve format ReferenceError in ModuleLoader fallback path"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate playback break during natural position transitions"
+      },
+      {
+        type: 'fix',
+        "description": "Debug(furnace): enhanced logging for import and playback transitions"
+      },
+      {
+        type: 'fix',
+        "description": "Ensure Furnace and WAM synths are ready before playback starts"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve JSX syntax errors and improve scrollbar layout"
+      },
+      {
+        type: 'improvement',
+        "description": "Clean up FurnaceDispatchEngine and wire up compat flags"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve 1-frame position revert during playback navigation"
+      },
+      {
+        type: 'feature',
+        "description": "Enhance Furnace .fur parser with subsong and compat flag support"
+      },
+      {
+        type: 'feature',
+        "description": "Enhance ImportMetadata with Furnace-specific technical fingerprints"
+      },
       {
         type: 'fix',
         "description": "Explicitly set popout window title to prevent 'about:blank'"
@@ -202,42 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add effect command interpolation to block selection"
-      },
-      {
-        type: 'fix',
-        "description": "Layer patch cables behind modules"
-      },
-      {
-        type: 'feature',
-        "description": "Comprehensive UI modernization and UX enhancements"
-      },
-      {
-        type: 'feature',
-        "description": "Add B/D operations to selection context menu"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve ReferenceError by moving hook initialization to top"
-      },
-      {
-        type: 'feature',
-        "description": "Enable text selection and copying for error reports"
-      },
-      {
-        type: 'feature',
-        "description": "Implement touch-based block selection"
-      },
-      {
-        type: 'feature',
-        "description": "Hook up keyboard shortcuts to block selection"
-      },
-      {
-        type: 'feature',
-        "description": "Add block selection context menu with advanced functions"
-      },
-      {
-        type: 'feature',
-        "description": "Implement mouse-based block selection and visual highlight"
       }
     ]
   }

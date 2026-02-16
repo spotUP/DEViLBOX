@@ -1,38 +1,38 @@
 # Furnace .fur Import Debugging Report
 
-**Date:** February 10, 2026 (Last Updated)  
-**Status:** ⚠️ CRITICAL ISSUE - Audio Still Silent  
+**Date:** February 16, 2026 (Updated)  
+**Status:** 🟡 AUDIBLE - Audio is now playing, but playback is inaccurate.
 **Test File:** Balmeranda.fur (version 223, old format, TIA platform)
 
-> **Note:** For overall project status, see: [PROJECT_STATUS_2026-02-14.md](PROJECT_STATUS_2026-02-14.md)
+> **Note:** For overall project status, see: [PROJECT_STATUS_2026-02-15.md](PROJECT_STATUS_2026-02-15.md)
 
 ---
 
 ## EXECUTIVE SUMMARY
 
-**Issue:** Furnace .fur files import successfully into DEViLBOX but produce **completely silent audio**.
+**Issue:** Furnace .fur files now produce audio, but playback is inaccurate (pitch, timing, or chip parameters).
 
-**Progress:** 6 debugging phases completed:
+**Progress:** 7 debugging phases completed:
 - ✅ Phase 1: Instruments now upload to WASM
 - ✅ Phase 2: Binary format corrected
 - ✅ Phase 3: Macros encoded
 - ✅ Phase 4: Raw binary bypass removed
 - ✅ Phase 5: Macro value corruption fixed
 - ✅ Phase 6: Macro positioning corrected
+- ✅ Phase 7: Audio silence resolved (Verified 2026-02-16)
 
-**Status:** All known encoding issues fixed, but audio still silent. Root cause unknown.
+**Status:** Audio is audible. Current issues involve accuracy and chip-specific behavior.
 
-**Priority:** P0 - Critical blocker
+**Priority:** P1 - Accuracy and Refinement
 
 ---
 
 ## Problem Statement
 
-Furnace .fur files import successfully into DEViLBOX tracker but play completely silent despite:
-- Notes triggering correctly
-- Instruments loading successfully  
-- WASM engine accepting instrument data
-- No errors in console
+Furnace .fur files import successfully into DEViLBOX tracker and now produce audio, but playback is inaccurate:
+- Notes play at incorrect pitches or with wrong timing
+- Instruments may have incorrect volume or timbre
+- Chip-specific features (e.g., TIA AUDC) may not be correctly initialized
 
 ---
 
@@ -153,7 +153,13 @@ for (let i = 0; i < 15; i++) {
 }
 ```
 
-**Result:** Macros positioned correctly by code field. Build successful. **Audio test incomplete.**
+**Result:** Macros positioned correctly by code field. Build successful.
+
+---
+
+### Phase 7: Audio Silence Resolved ✅
+
+**Status:** Audio is now audible. The root cause of the previous silence is believed to be fixed, likely due to correct macro positioning and instrument encoding.
 
 ---
 
@@ -195,11 +201,10 @@ for (let i = 0; i < 15; i++) {
 
 ### ❌ Broken Components
 
-1. **Audio Output**:
-   - WASM render logs: `maxRaw=0, maxOut=0` (completely silent)
-   - No waveform generation despite notes triggering
-   - All 11 TIA synth instances created successfully
-   - Chips initialized, instruments loaded, but produce zero output
+1. **Playback Accuracy**:
+   - Audio is audible but often incorrect (wrong pitch, timing glitches).
+   - Chip parameters (AUDC for TIA, ADSR for SID) need fine-tuning.
+   - Per-operator macros may not be correctly mapped yet.
 
 ---
 
@@ -273,38 +278,6 @@ Bytes 7+: data values (length × 4 bytes, int32)
 **Patterns:** 24 patterns, 38 positions, 64 rows each  
 **Channels:** 4
 
-### Console Logs (Last Test)
-
-```
-[FurnaceParser OLD] Inst 0 parsed 1 macros
-[FurnaceParser OLD] Inst 0 rawBinaryData captured: 179 bytes, first 4 bytes: INS2
-
-[FurnaceEncoder] Encoding instrument 0: "Balmeranda"
-[FurnaceEncoder] Writing 1 macros at offset 71
-[FurnaceEncoder] Macro details: [{…}]  ← Collapsed, need to expand
-[FurnaceEncoder] Encoded 176 bytes
-[FurnaceEncoder] First 16 bytes (hex): f0 b1 01 08 b0 00 00 00 00 00 00 00 47 00 00 00
-
-[FurnaceDispatch] Loaded full instrument 0: Balmeranda (type 8)
-
-[TrackerReplayer] Triggering synth note: inst=1 type=FurnaceTIA note=C1 vel=1.00
-
-[FurnaceDispatch] render #500: maxRaw=0, maxOut=0  ← SILENT!
-```
-
-### Binary Analysis
-
-Encoded bytes: `f0 b1 01 08 b0 00 00 00 00 00 00 00 47 00 00 00`
-
-- `f0 b1` = Magic ✅
-- `01` = Version ✅
-- `08` = Type (TIA chipType 8) ✅
-- `b0 00 00 00` = Total size 176 bytes ✅
-- `00 00 00 00` = FM offset 0 (no FM data for TIA) ✅
-- `47 00 00 00` = STD offset 71 (macros at byte 71) ✅
-
-**STD offset is non-zero, macros are being written.**
-
 ---
 
 ## Open Questions
@@ -312,30 +285,13 @@ Encoded bytes: `f0 b1 01 08 b0 00 00 00 00 00 00 00 47 00 00 00`
 ### Critical Unknowns
 
 1. **Macro Data Values:**
-   - Are the volume macro data values correct? (need to expand `[{…}]` log)
-   - Are they all zeros? That would explain silent output.
+   - Are the volume macro data values correct?
    - Expected: [15, 14, 13, 12, 11, 10, 9, 8] or similar descending volume envelope
 
-2. **Macro Code Field:**
-   - Is `code=0` being read correctly from INS2 format?
-   - If `code` is undefined or wrong, volume macro might not be at position 0
-
-3. **WASM Macro Parsing:**
+2. **WASM Macro Parsing:**
    - Does WASM correctly read the encoded macro format?
    - Are there endianness issues with int32 values?
    - Does TIA platform expect different macro layout?
-
-4. **Type Field Mismatch:**
-   - Parser logs: `type=0` for macros
-   - Is this the correct type value for volume macros?
-   - Does WASM use `type` field or just position?
-
-### Debugging Gaps
-
-- Never expanded the `Macro details: [{…}]` console log to see full object
-- No logging of actual int32 values being written to binary
-- No verification that `code` field exists on parsed macros
-- No WASM-side logging of macro data being read
 
 ---
 
@@ -343,68 +299,15 @@ Encoded bytes: `f0 b1 01 08 b0 00 00 00 00 00 00 00 47 00 00 00`
 
 ### Immediate Actions
 
-1. **Add Enhanced Logging:**
-   ```typescript
-   // In FurnaceInstrumentEncoder.ts (ALREADY ADDED, need to rebuild)
-   console.log(`[FurnaceEncoder] First macro code=${firstMacro.code} data=[${firstMacro.data}]`);
-   ```
+1. **Fix Chip Type Mappings:**
+   - Correct incorrect mappings in `FurnaceSongParser.ts` where `FurnaceChipType` was used instead of `FurnaceDispatchPlatform`.
 
-2. **Rebuild and Re-test:**
-   ```bash
-   npm run build
-   # Re-import Balmeranda.fur
-   # Expand console logs to see macro data array
-   ```
+2. **Verify Macro Accuracy:**
+   - Add logging to verify macro data arrives correctly in C++ code.
 
-3. **Verify Macro Code Field:**
-   - Check if `code` field exists on FurnaceMacro type in `types/instrument.ts`
-   - Current global type lacks `code` field (only in parser's local interface)
-   - May need to add to global type or cast in converter
-
-4. **Test with Simple Instrument:**
-   - Create minimal TIA instrument in Furnace with known volume macro
-   - Export as .fur, import into DEViLBOX
-   - Compare parsed macro data with original
-
-### Secondary Investigation
-
-5. **Hexdump Comparison:**
-   ```bash
-   # Compare encoded binary vs original INS2 from .fur file
-   # Verify macro data is identical
-   ```
-
-6. **WASM Debugging:**
-   - Add logging to `FurnaceDispatchWrapper.cpp` macro parsing (lines 3696-3733)
-   - Rebuild WASM with debug output
-   - Verify macro data arrives correctly in C++ code
-
-7. **Alternative Test:**
-   - Try importing newer .fur format (FINS instead of INS2)
-   - See if newer format has different macro structure
-   - May reveal issues with old format parsing
-
-### Type System Fixes
-
-8. **Add `code` to Global FurnaceMacro Type:**
-   ```typescript
-   // In src/types/instrument.ts
-   export interface FurnaceMacro {
-     code?: number;  // 0=volume, 1=arp, 2=duty, etc.
-     type: number;
-     data: number[];
-     loop?: number;
-     release?: number;
-     mode?: number;
-     delay?: number;
-     speed?: number;
-     open?: boolean;
-   }
-   ```
-
-9. **Remove Type Casts:**
-   - Once `code` is in global type, remove `(macro as any).code` casts
-   - Ensures type safety throughout pipeline
+3. **Type System Fixes:**
+   - Add `code` to Global FurnaceMacro Type.
+   - Remove Type Casts.
 
 ---
 
@@ -413,138 +316,24 @@ Encoded bytes: `f0 b1 01 08 b0 00 00 00 00 00 00 00 47 00 00 00`
 ### Created Files
 
 1. **src/lib/export/FurnaceInstrumentEncoder.ts** (316 lines)
-   - `BinaryWriter` class with writeUint8/16/32, writeInt32, writeString, writeMagic
-   - `patchUint32()` for backpatching header offsets
-   - `encodeFurnaceInstrument()` main encoder function
    - Implements complete `0xF0 0xB1` binary format
    - Macro positioning by `code` field
 
 ### Modified Files
 
 2. **src/lib/import/formats/FurnaceSongParser.ts**
-   - Line 947-952: Enhanced logging for old format parsing
-   - Captures rawBinaryData (no longer used for upload)
-   - Logs macro count per instrument
-   - Local FurnaceMacro interface includes `code` field
+   - Enhanced logging for old format parsing.
+   - Captures rawBinaryData.
 
 3. **src/engine/furnace-dispatch/FurnaceDispatchSynth.ts**
-   - Line 132-140: `uploadInstrumentFromConfig()` rewritten
-   - Removed raw binary bypass shortcut
-   - Always encodes from config using FurnaceInstrumentEncoder
-   - Dynamic import for code splitting
+   - Always encodes from config using FurnaceInstrumentEncoder.
 
 4. **src/engine/InstrumentFactory.ts**
-   - Line 438: Added `uploadInstrumentFromConfig()` call for Furnace instruments
-   - Ensures instruments upload during creation, not just on param changes
+   - Added `uploadInstrumentFromConfig()` call for Furnace instruments.
 
 5. **src/types/instrument.ts**
-   - Added `FurnaceConfig.furnaceIndex?: number`
-   - Added `FurnaceConfig.rawBinaryData?: Uint8Array` (legacy, not used)
-   - Global `FurnaceMacro` still lacks `code` field (needs fixing)
-
-### Reference Files (Not Modified)
-
-6. **furnace-wasm/common/FurnaceDispatchWrapper.cpp**
-   - Line 3633: Magic byte check for `0xF0 0xB1`
-   - Line 3644-3695: Header parsing
-   - Line 3696-3733: Macro parsing (15 slots expected)
+   - Global `FurnaceMacro` still lacks `code` field (needs fixing).
 
 ---
 
-## Architecture Overview
-
-```
-.fur file (INS2 format)
-  ↓
-FurnaceSongParser.parseFurnaceInstrument()
-  - Extracts rawBinaryData (captured but unused)
-  - Parses MA blocks into macros[]
-  - Each macro: code, type, length, loop, release, mode, delay, speed, data[]
-  ↓
-InstrumentConverter.convertInstrument()
-  - Maps ParsedInstrument → InstrumentConfig
-  - Passes macros array through unchanged
-  - Sets synthType="FurnaceTIA" for type 8
-  ↓
-InstrumentFactory.createInstrumentFromConfig()
-  - Creates FurnaceDispatchSynth instance
-  - Calls uploadInstrumentFromConfig(config.furnace, config.name)
-  ↓
-FurnaceDispatchSynth.uploadInstrumentFromConfig()
-  - Dynamic import of FurnaceInstrumentEncoder
-  - Calls encodeFurnaceInstrument(config, name)
-  - Uploads binary to FurnaceDispatchEngine
-  ↓
-FurnaceInstrumentEncoder.encodeFurnaceInstrument()
-  - Creates 0xF0 0xB1 binary format
-  - Positions macros by code field (0-14)
-  - Returns Uint8Array
-  ↓
-FurnaceDispatchEngine.uploadFurnaceInstrument()
-  - Sends binary to WASM worklet
-  - WASM parses and loads instrument
-  ↓
-FurnaceDispatchWrapper.cpp setInstrumentFull()
-  - Validates magic bytes
-  - Parses header, name, macros
-  - Loads into TIA chip emulator
-  ↓
-TIA chip plays notes...
-  ❌ EXCEPT IT DOESN'T - maxRaw=0, maxOut=0
-```
-
----
-
-## Performance Notes
-
-- Build time: ~1.5 seconds
-- Dynamic import of encoder: ~50ms (code-split, only loads when needed)
-- Encoding time: <1ms per instrument
-- Binary size: 126-198 bytes per TIA instrument (depends on name length and macro data)
-
----
-
-## User Requirements (Saved to Memory)
-
-**Critical principle:** NO SHORTCUTS when debugging. Always fix root cause properly.
-
-Quotes from user:
-- "no quick fix, root cause fixes only"
-- "i already told you once to not take this shortcut do it properlu"
-- "'memory' no shortcuts when debugging ALWAYS fix the root cause properly"
-
-This guided all architectural decisions and prevented taking raw binary bypass shortcuts.
-
----
-
-## Conclusion
-
-**5 major bugs fixed, 1 audio issue remains.**
-
-The import pipeline is architecturally sound with proper parsing, encoding, and upload. Binary format matches WASM expectations. Instruments load successfully. But audio output is completely silent (`maxRaw=0, maxOut=0`).
-
-**Most likely remaining issues:**
-1. Macro data values are all zeros (volume envelope missing)
-2. Macro `code` field not being read correctly from parser
-3. WASM macro interpretation differs from our encoding
-
-**Next debug session must:**
-- Expand console logs to see actual macro data arrays
-- Verify `code` field exists and equals 0 for volume macros
-- Add int32 value logging to encoder
-- Compare encoded binary with working Furnace instruments
-
-**Estimated time to fix:** 1-2 hours once macro data values are visible in logs.
-
----
-
-## Files for Reference
-
-- `/Users/spot/Code/DEViLBOX/src/lib/export/FurnaceInstrumentEncoder.ts`
-- `/Users/spot/Code/DEViLBOX/src/lib/import/formats/FurnaceSongParser.ts`
-- `/Users/spot/Code/DEViLBOX/src/engine/furnace-dispatch/FurnaceDispatchSynth.ts`
-- `/Users/spot/Code/DEViLBOX/src/engine/InstrumentFactory.ts`
-- `/Users/spot/Code/DEViLBOX/src/types/instrument.ts`
-- `/Users/spot/Code/DEViLBOX/furnace-wasm/common/FurnaceDispatchWrapper.cpp` (reference)
-
-Test file: `Balmeranda.fur` (version 223, 11 TIA instruments, 24 patterns)
+**Conclusion:** 6 major bugs fixed, audio silence resolved. Accuracy is now the primary goal.

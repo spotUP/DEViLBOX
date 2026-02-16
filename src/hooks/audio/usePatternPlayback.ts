@@ -93,6 +93,7 @@ export const usePatternPlayback = () => {
                                    replayer.getCurrentPosition() === currentPositionIndexRef.current;
       
       const needsReload = hasStartedRef.current && !isNaturalAdvancement;
+      const format = (pattern.importMetadata?.sourceFormat as TrackerFormat) || 'XM';
 
       if (!hasStartedRef.current || needsReload) {
         hasStartedRef.current = true;
@@ -140,6 +141,7 @@ export const usePatternPlayback = () => {
         });
 
         // Load song into TrackerReplayer
+        const furnaceData = pattern.importMetadata?.furnaceData;
         replayer.loadSong({
           name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
           format,
@@ -151,6 +153,13 @@ export const usePatternPlayback = () => {
           numChannels: effectiveNumChannels,
           initialSpeed: modData?.initialSpeed ?? 6,
           initialBPM: modData?.initialBPM ?? bpm,
+          // Furnace-specific timing data (only set for .fur imports)
+          speed2: furnaceData?.speed2,
+          hz: furnaceData?.hz,
+          virtualTempoN: furnaceData?.virtualTempoN,
+          virtualTempoD: furnaceData?.virtualTempoD,
+          compatFlags: furnaceData?.compatFlags as any,
+          grooves: furnaceData?.grooves,
         });
 
         if (needsReload) {

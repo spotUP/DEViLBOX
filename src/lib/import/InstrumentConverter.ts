@@ -115,12 +115,15 @@ function convertFurnaceInstrument(
   const furnaceData = parsed.furnace!;
   const synthType = furnaceData.synthType as SynthType;
 
+  console.log(`[InstrumentConverter] Converting "${parsed.name}" to ${synthType}: chipType=${furnaceData.chipType}, macros=${furnaceData.macros.length}`);
+
   // Build FurnaceConfig from FurnaceInstrumentData
   const furnaceConfig: FurnaceConfig = {
     chipType: furnaceData.chipType,
 
     // Preserve the original Furnace instrument index (0-based in file)
-    furnaceIndex: parsed.id - 1,  // parsed.id is 1-based, Furnace uses 0-based
+    // Use parser's furnaceIndex if available, otherwise derive from id
+    furnaceIndex: furnaceData.furnaceIndex ?? (parsed.id - 1),
     
     // Preserve raw binary data for upload to WASM
     rawBinaryData: parsed.rawBinaryData,
@@ -157,7 +160,7 @@ function convertFurnaceInstrument(
 
     // Convert macros from FurnaceMacroData to FurnaceMacro
     macros: furnaceData.macros.map(m => ({
-      code: m.type,
+      code: m.code,
       type: m.type,
       data: [...m.data],
       loop: m.loop,
@@ -180,102 +183,109 @@ function convertFurnaceInstrument(
   };
 
   // Copy chip-specific data from parser output to FurnaceConfig
-  // The parser stores these in chipConfig keyed by chip name
-  if (furnaceData.chipConfig) {
-    const cc = furnaceData.chipConfig;
+  // The parser may store these either in chipConfig (old path) OR at top level (new path)
+  // Check both locations for compatibility
+  const cc = furnaceData.chipConfig || {};
+  
+  // Helper to get chip data from either location
+  const getChipData = <T>(key: string): T | undefined => {
+    return (furnaceData as unknown as Record<string, unknown>)[key] as T || (cc as Record<string, unknown>)[key] as T;
+  };
 
-    // Game Boy (DIV_INS_GB)
-    if (cc.gb) {
-      const gb = cc.gb as { envVol: number; envDir: number; envLen: number; soundLen: number;
-        softEnv?: boolean; alwaysInit?: boolean; hwSeqLen?: number;
-        hwSeq?: Array<{ cmd: number; data: number }> };
-      furnaceConfig.gb = {
-        envVol: gb.envVol,
-        envDir: gb.envDir,
-        envLen: gb.envLen,
-        soundLen: gb.soundLen,
-        softEnv: gb.softEnv,
-        alwaysInit: gb.alwaysInit,
-        hwSeqLen: gb.hwSeqLen,
-        hwSeq: gb.hwSeq,
-      };
-    }
+  // Game Boy (DIV_INS_GB)
+  const gbData = getChipData<{ envVol: number; envDir: number; envLen: number; soundLen: number;
+    softEnv?: boolean; alwaysInit?: boolean; doubleWave?: boolean; hwSeqLen?: number;
+    hwSeq?: Array<{ cmd: number; data: number }> }>('gb');
+  if (gbData) {
+    furnaceConfig.gb = {
+      envVol: gbData.envVol,
+      envDir: gbData.envDir,
+      envLen: gbData.envLen,
+      soundLen: gbData.soundLen,
+      softEnv: gbData.softEnv,
+      alwaysInit: gbData.alwaysInit,
+      doubleWave: gbData.doubleWave,
+      hwSeqLen: gbData.hwSeqLen,
+      hwSeq: gbData.hwSeq,
+    };
+  }
 
-    // C64 SID (DIV_INS_C64)
-    if (cc.c64) {
-      const c64 = cc.c64 as { triOn: boolean; sawOn: boolean; pulseOn: boolean; noiseOn: boolean;
-        toFilter: boolean; initFilter: boolean; dutyIsAbs: boolean;
-        lp: boolean; bp: boolean; hp: boolean; ch3off: boolean;
-        filterIsAbs: boolean; noTest: boolean; ringMod: boolean; oscSync: boolean;
-        resetDuty: boolean; a: number; d: number; s: number; r: number;
-        duty: number; cut: number; res: number };
-      furnaceConfig.c64 = {
-        triOn: c64.triOn,
-        sawOn: c64.sawOn,
-        pulseOn: c64.pulseOn,
-        noiseOn: c64.noiseOn,
-        a: c64.a,
-        d: c64.d,
-        s: c64.s,
-        r: c64.r,
-        duty: c64.duty,
-        ringMod: c64.ringMod,
-        oscSync: c64.oscSync,
-        toFilter: c64.toFilter,
-        initFilter: c64.initFilter,
-        filterResonance: c64.res,
-        filterCutoff: c64.cut,
-        filterLP: c64.lp,
-        filterBP: c64.bp,
-        filterHP: c64.hp,
-        filterCh3Off: c64.ch3off,
-        dutyIsAbs: c64.dutyIsAbs,
-        filterIsAbs: c64.filterIsAbs,
-        noTest: c64.noTest,
-        resetDuty: c64.resetDuty,
-      };
-    }
+  // C64 SID (DIV_INS_C64)
+  const c64Data = getChipData<{ triOn: boolean; sawOn: boolean; pulseOn: boolean; noiseOn: boolean;
+    toFilter: boolean; initFilter: boolean; dutyIsAbs: boolean;
+    lp: boolean; bp: boolean; hp: boolean; ch3off: boolean;
+    filterIsAbs: boolean; noTest: boolean; ringMod: boolean; oscSync: boolean;
+    resetDuty: boolean; a: number; d: number; s: number; r: number;
+    duty: number; cut: number; res: number }>('c64');
+  if (c64Data) {
+    console.log(`[InstrumentConverter]   - SID data: tri=${c64Data.triOn} saw=${c64Data.sawOn} pulse=${c64Data.pulseOn} noise=${c64Data.noiseOn} ADSR=${c64Data.a}/${c64Data.d}/${c64Data.s}/${c64Data.r} duty=${c64Data.duty}`);
+    
+    furnaceConfig.c64 = {
+      triOn: c64Data.triOn,
+      sawOn: c64Data.sawOn,
+      pulseOn: c64Data.pulseOn,
+      noiseOn: c64Data.noiseOn,
+      a: c64Data.a,
+      d: c64Data.d,
+      s: c64Data.s,
+      r: c64Data.r,
+      duty: c64Data.duty,
+      ringMod: c64Data.ringMod,
+      oscSync: c64Data.oscSync,
+      toFilter: c64Data.toFilter,
+      initFilter: c64Data.initFilter,
+      filterResonance: c64Data.res,
+      filterCutoff: c64Data.cut,
+      filterLP: c64Data.lp,
+      filterBP: c64Data.bp,
+      filterHP: c64Data.hp,
+      filterCh3Off: c64Data.ch3off,
+      dutyIsAbs: c64Data.dutyIsAbs,
+      filterIsAbs: c64Data.filterIsAbs,
+      noTest: c64Data.noTest,
+      resetDuty: c64Data.resetDuty,
+    };
+  }
 
-    // SNES (DIV_INS_SNES)
-    if (cc.snes) {
-      const snes = cc.snes as { a: number; d: number; s: number; r: number;
-        useEnv: boolean; sus: number; gainMode: number; gain: number; d2: number };
-      furnaceConfig.snes = {
-        useEnv: snes.useEnv,
-        gainMode: snes.gainMode,
-        gain: snes.gain,
-        a: snes.a,
-        d: snes.d,
-        s: snes.s,
-        r: snes.r,
-        d2: snes.d2,
-        sus: snes.sus,
-      };
-    }
+  // SNES (DIV_INS_SNES)
+  const snesData = getChipData<{ a: number; d: number; s: number; r: number;
+    useEnv: boolean; sus: number; gainMode: number; gain: number; d2: number }>('snes');
+  if (snesData) {
+    furnaceConfig.snes = {
+      useEnv: snesData.useEnv,
+      gainMode: snesData.gainMode,
+      gain: snesData.gain,
+      a: snesData.a,
+      d: snesData.d,
+      s: snesData.s,
+      r: snesData.r,
+      d2: snesData.d2,
+      sus: snesData.sus,
+    };
+  }
 
-    // Namco 163 (DIV_INS_N163)
-    if (cc.n163) {
-      const n163 = cc.n163 as { wave: number; wavePos: number; waveLen: number; waveMode: number; perChanPos?: boolean };
-      furnaceConfig.n163 = {
-        wave: n163.wave,
-        wavePos: n163.wavePos,
-        waveLen: n163.waveLen,
-        waveMode: n163.waveMode,
-        perChPos: n163.perChanPos ?? false,
-      };
-    }
+  // Namco 163 (DIV_INS_N163)
+  const n163Data = getChipData<{ wave: number; wavePos: number; waveLen: number; waveMode: number; perChanPos?: boolean }>('n163');
+  if (n163Data) {
+    furnaceConfig.n163 = {
+      wave: n163Data.wave,
+      wavePos: n163Data.wavePos,
+      waveLen: n163Data.waveLen,
+      waveMode: n163Data.waveMode,
+      perChPos: n163Data.perChanPos ?? false,
+    };
+  }
 
-    // FDS (DIV_INS_FDS)
-    if (cc.fds) {
-      const fds = cc.fds as { modSpeed: number; modDepth: number;
-        initModTableWithFirstWave: boolean; modTable: number[] };
-      furnaceConfig.fds = {
-        modSpeed: fds.modSpeed,
-        modDepth: fds.modDepth,
-        modTable: [...fds.modTable],
-        initModTableWithFirstWave: fds.initModTableWithFirstWave,
-      };
-    }
+  // FDS (DIV_INS_FDS)
+  const fdsData = getChipData<{ modSpeed: number; modDepth: number;
+    initModTableWithFirstWave: boolean; modTable: number[] }>('fds');
+  if (fdsData) {
+    furnaceConfig.fds = {
+      modSpeed: fdsData.modSpeed,
+      modDepth: fdsData.modDepth,
+      modTable: [...fdsData.modTable],
+      initModTableWithFirstWave: fdsData.initModTableWithFirstWave,
+    };
   }
 
   // Create the instrument config
@@ -300,8 +310,13 @@ function convertFurnaceInstrument(
     parameters: {},
   };
 
-  const chipKeys = furnaceData.chipConfig ? Object.keys(furnaceData.chipConfig).join(',') : 'none';
-  console.log(`[InstrumentConverter] Furnace instrument ${instrumentId}: "${parsed.name}" type=${furnaceData.chipType} -> ${synthType}, macros=${furnaceData.macros.length}, wavetables=${furnaceData.wavetables.length}, chipData=${chipKeys}, rawBinaryData=${parsed.rawBinaryData?.length ?? 0} bytes`);
+  const chipKeys: string[] = [];
+  if (furnaceConfig.c64) chipKeys.push('c64');
+  if (furnaceConfig.gb) chipKeys.push('gb');
+  if (furnaceConfig.snes) chipKeys.push('snes');
+  if (furnaceConfig.n163) chipKeys.push('n163');
+  if (furnaceConfig.fds) chipKeys.push('fds');
+  console.log(`[InstrumentConverter] Furnace instrument ${instrumentId}: "${parsed.name}" type=${furnaceData.chipType} -> ${synthType}, macros=${furnaceData.macros.length}, wavetables=${furnaceData.wavetables.length}, chipData=${chipKeys.join(',') || 'none'}, rawBinaryData=${parsed.rawBinaryData?.length ?? 0} bytes`);
 
   return instrument;
 }

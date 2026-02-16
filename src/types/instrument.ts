@@ -1493,6 +1493,7 @@ export const DEFAULT_FORMANT_SYNTH: FormantSynthConfig = {
 
 // Macro types from Furnace (DIV_MACRO_*)
 export const FurnaceMacroType = {
+  // Common macros (0-21)
   VOL: 0,
   ARP: 1,
   DUTY: 2,
@@ -1513,8 +1514,31 @@ export const FurnaceMacroType = {
   EX6: 17,
   EX7: 18,
   EX8: 19,
-  FMS2: 20,
-  AMS2: 21,
+  EX9: 20,
+  EX10: 21,
+
+  // FM Operator macros (base = 32, each operator adds 32)
+  // Operator 0: 32-51, Operator 1: 64-83, Operator 2: 96-115, Operator 3: 128-147
+  OP_AM: 32,
+  OP_AR: 33,
+  OP_DR: 34,
+  OP_MULT: 35,
+  OP_RR: 36,
+  OP_SL: 37,
+  OP_TL: 38,
+  OP_DT2: 39,
+  OP_RS: 40,
+  OP_DT: 41,
+  OP_D2R: 42,
+  OP_SSG: 43,
+  OP_DAM: 44,
+  OP_DVB: 45,
+  OP_EGT: 46,
+  OP_KSL: 47,
+  OP_SUS: 48,
+  OP_VIB: 49,
+  OP_WS: 50,
+  OP_KSR: 51,
 } as const;
 
 export type FurnaceMacroType = typeof FurnaceMacroType[keyof typeof FurnaceMacroType];
@@ -1563,7 +1587,7 @@ export interface FurnaceMacro {
   // Added from Furnace's DivInstrumentMacro - optional for backward compatibility
   delay?: number;    // Macro start delay in ticks
   speed?: number;    // Macro speed (1 = normal, 2 = half speed, etc.)
-  open?: boolean;    // Whether loop is "open" (continues past release)
+  open?: number;     // Bitfield: bits 1-2 = type (0=sequence,1=ADSR,2=LFO), bit 3 = activeRelease
 }
 
 // Complete per-operator macro set from Furnace
@@ -1610,6 +1634,7 @@ export interface FurnaceGBConfig {
   }>;
   softEnv?: boolean;      // Use software envelope
   alwaysInit?: boolean;   // Always initialize
+  doubleWave?: boolean;   // Use double wave
 }
 
 // C64 SID (DIV_INS_C64)
@@ -1639,6 +1664,7 @@ export interface FurnaceC64Config {
   filterIsAbs?: boolean; // Filter cutoff is absolute
   noTest?: boolean;      // Disable test bit
   resetDuty?: boolean;   // Reset duty cycle on note-on
+  volIsCutoff?: boolean; // Volume controls filter cutoff
 }
 
 // Amiga (DIV_INS_AMIGA)

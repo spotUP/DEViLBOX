@@ -1,0 +1,684 @@
+FURNACE TRACKER - EFFECT HANDLER MAPS BY PLATFORM
+===================================================
+Extracted from: Reference Code/furnace-master/src/engine/sysDef.cpp
+Date: 2026-02-16
+
+KEY:
+  "pre"  = effectHandlerMap (effects processed BEFORE note-on)
+  "post" = postEffectHandlerMap (effects processed AFTER note-on)
+  "preE" = preEffectHandlerMap (effects processed BEFORE everything, including ext ch)
+  constVal<N> = first parameter is always N
+  effectVal = second parameter is the raw effect value
+  effectValAnd<N> = second parameter is (val & N)
+  effectOpVal<N> = first parameter is (val>>4)-1, throws if (val>>4)>N
+  effectOpValNoZero<N> = same but also throws if (val>>4)<1
+  effectValLong<N> = combines cmd and val into ((cmd & ((1<<(N-8))-1))<<8)|val
+  negEffectVal = returns -(int)val
+
+NOTE ON CONSTRUCTION ORDER (CRITICAL):
+  fmOPNPostEffectHandlerMap is built in stages:
+    1. Initial block (0x11-0x63)
+    2. fmOPN2PostEffectHandlerMap = copy(fmOPNPostEffectHandlerMap)   <-- BEFORE step 3
+    3. Insert 0x10 (LFO) and 0x55 (SSG) into fmOPNPostEffectHandlerMap
+    4. Insert ayPostEffectHandlerMap into fmOPNPostEffectHandlerMap
+    5. fmOPNAPostEffectHandlerMap = copy(fmOPNPostEffectHandlerMap) + 0x1f
+
+  So fmOPN2PostEffectHandlerMap does NOT have:
+    - 0x10 (LFO), 0x55 (SSG), or any AY effects
+  But it DOES have all the base fmOPNPostEffectHandlerMap entries (0x11-0x63).
+
+  Wait - re-reading the code:
+    Line 511: fmOPNPostEffectHandlerMap is initially defined with 0x11-0x63
+    Line 578: THEN 0x10 and 0x55 are inserted
+    Line 582: THEN fmOPN2PostEffectHandlerMap = copy(fmOPNPostEffectHandlerMap)
+    
+  Actually let me re-read this more carefully...
+
+  Line 511-543: fmOPNPostEffectHandlerMap defined with entries 0x11-0x63
+  Line 544: fmOPMPostEffectHandlerMap = copy(fmOPNPostEffectHandlerMap) + extras
+  Line 578: fmOPNPostEffectHandlerMap gets 0x10 and 0x55 added
+  Line 582: fmOPN2PostEffectHandlerMap = copy(fmOPNPostEffectHandlerMap) AT THIS POINT
+  Line 584: fmOPNPostEffectHandlerMap gets ALL ayPostEffectHandlerMap merged in
+  Line 586: fmOPNAPostEffectHandlerMap = copy(fmOPNPostEffectHandlerMap) + 0x1f
+
+  So fmOPN2PostEffectHandlerMap HAS: all base (0x11-0x63) + 0x10 (LFO) + 0x55 (SSG)
+  But does NOT have: AY effects or 0x1f (ADPCM-A)
+
+
+================================================================================
+SHARED MAPS (used by multiple platforms)
+================================================================================
+
+--- ayPostEffectHandlerMap ---
+(Used by: AY8910, and merged into fmOPNPostEffectHandlerMap → used by OPN-family)
+
+Code | DIV_CMD                    | Type | Params                     | Description
+-----|----------------------------|------|----------------------------|------------------------------------------
+0x20 | DIV_CMD_STD_NOISE_MODE     | post |                            | Set channel mode (bit 0: square; bit 1: noise; bit 2: envelope)
+0x21 | DIV_CMD_STD_NOISE_FREQ     | post |                            | Set noise frequency (0 to 1F)
+0x22 | DIV_CMD_AY_ENVELOPE_SET    | post |                            | Set envelope mode (x: shape, y: enable for this channel)
+0x23 | DIV_CMD_AY_ENVELOPE_LOW    | post |                            | Set envelope period low byte
+0x24 | DIV_CMD_AY_ENVELOPE_HIGH   | post |                            | Set envelope period high byte
+0x25 | DIV_CMD_AY_ENVELOPE_SLIDE  | post | negEffectVal               | Envelope slide up
+0x26 | DIV_CMD_AY_ENVELOPE_SLIDE  | post |                            | Envelope slide down
+0x29 | DIV_CMD_AY_AUTO_ENVELOPE   | post |                            | Set auto-envelope (x: numerator; y: denominator)
+0x2c | DIV_CMD_AY_AUTO_PWM        | post |                            | Set timer period offset (bit 7: sign)
+0x2e | DIV_CMD_AY_IO_WRITE        | post | constVal<0>, effectVal     | Write to I/O port A
+0x2f | DIV_CMD_AY_IO_WRITE        | post | constVal<1>, effectVal     | Write to I/O port B
+
+--- fmEffectHandlerMap ---
+(Base FM effect map used by all FM chips)
+
+Code | DIV_CMD                    | Type | Params                     | Description
+-----|----------------------------|------|----------------------------|------------------------------------------
+0x30 | DIV_CMD_FM_HARD_RESET      | pre  |                            | Toggle hard envelope reset on new notes
+
+--- fmExtChEffectHandlerMap ---
+(= fmEffectHandlerMap + extended channel 3 toggle. Used as preEffectHandlerMap)
+
+Code | DIV_CMD                    | Type | Params                     | Description
+-----|----------------------------|------|----------------------------|------------------------------------------
+0x30 | DIV_CMD_FM_HARD_RESET      | preE |                            | Toggle hard envelope reset on new notes
+0x18 | DIV_CMD_FM_EXTCH           | preE |                            | Toggle extended channel 3 mode
+
+--- fmOPN2EffectHandlerMap ---
+(= fmEffectHandlerMap + sample direction. Used by YM2612)
+
+Code | DIV_CMD                    | Type | Params                     | Description
+-----|----------------------------|------|----------------------------|------------------------------------------
+0x30 | DIV_CMD_FM_HARD_RESET      | pre  |                            | Toggle hard envelope reset on new notes
+0xdf | DIV_CMD_SAMPLE_DIR         | pre  |                            | Set sample playback direction (0: normal; 1: reverse)
+
+--- fmOPNPostEffectHandlerMap ---
+(Base OPN post effects. Used by chips with AY channels like YM2203)
+(After all insertions, includes: base block + 0x10 + 0x55 + all ayPostEffectHandlerMap)
+
+Code | DIV_CMD                    | Type | Params                              | Description
+-----|----------------------------|------|--------------------------------------|------------------------------------------
+0x10 | DIV_CMD_FM_LFO             | post |                                      | Setup LFO (x: enable; y: speed)
+0x11 | DIV_CMD_FM_FB              | post |                                      | Set feedback (0 to 7)
+0x12 | DIV_CMD_FM_TL              | post | constVal<0>, effectVal               | Set level of operator 1 (0 highest, 7F lowest)
+0x13 | DIV_CMD_FM_TL              | post | constVal<1>, effectVal               | Set level of operator 2 (0 highest, 7F lowest)
+0x14 | DIV_CMD_FM_TL              | post | constVal<2>, effectVal               | Set level of operator 3 (0 highest, 7F lowest)
+0x15 | DIV_CMD_FM_TL              | post | constVal<3>, effectVal               | Set level of operator 4 (0 highest, 7F lowest)
+0x16 | DIV_CMD_FM_MULT            | post | effectOpValNoZero<4>, effectValAnd<15>| Set operator multiplier (x: op 1-4; y: mult)
+0x19 | DIV_CMD_FM_AR              | post | constVal<-1>, effectValAnd<31>       | Set attack of all operators (0 to 1F)
+0x1a | DIV_CMD_FM_AR              | post | constVal<0>, effectValAnd<31>        | Set attack of operator 1 (0 to 1F)
+0x1b | DIV_CMD_FM_AR              | post | constVal<1>, effectValAnd<31>        | Set attack of operator 2 (0 to 1F)
+0x1c | DIV_CMD_FM_AR              | post | constVal<2>, effectValAnd<31>        | Set attack of operator 3 (0 to 1F)
+0x1d | DIV_CMD_FM_AR              | post | constVal<3>, effectValAnd<31>        | Set attack of operator 4 (0 to 1F)
+0x20 | DIV_CMD_STD_NOISE_MODE     | post |                                      | [from AY] Set channel mode
+0x21 | DIV_CMD_STD_NOISE_FREQ     | post |                                      | [from AY] Set noise frequency
+0x22 | DIV_CMD_AY_ENVELOPE_SET    | post |                                      | [from AY] Set envelope mode
+0x23 | DIV_CMD_AY_ENVELOPE_LOW    | post |                                      | [from AY] Set envelope period low
+0x24 | DIV_CMD_AY_ENVELOPE_HIGH   | post |                                      | [from AY] Set envelope period high
+0x25 | DIV_CMD_AY_ENVELOPE_SLIDE  | post | negEffectVal                         | [from AY] Envelope slide up
+0x26 | DIV_CMD_AY_ENVELOPE_SLIDE  | post |                                      | [from AY] Envelope slide down
+0x29 | DIV_CMD_AY_AUTO_ENVELOPE   | post |                                      | [from AY] Set auto-envelope
+0x2c | DIV_CMD_AY_AUTO_PWM        | post |                                      | [from AY] Set timer period offset
+0x2e | DIV_CMD_AY_IO_WRITE        | post | constVal<0>, effectVal               | [from AY] Write to I/O port A
+0x2f | DIV_CMD_AY_IO_WRITE        | post | constVal<1>, effectVal               | [from AY] Write to I/O port B
+0x50 | DIV_CMD_FM_AM              | post | effectOpVal<4>, effectValAnd<1>      | Set AM (x: op 1-4, 0=all; y: AM)
+0x51 | DIV_CMD_FM_SL              | post | effectOpVal<4>, effectValAnd<15>     | Set sustain level
+0x52 | DIV_CMD_FM_RR              | post | effectOpVal<4>, effectValAnd<15>     | Set release
+0x53 | DIV_CMD_FM_DT              | post | effectOpVal<4>, effectValAnd<7>      | Set detune (3 is center)
+0x54 | DIV_CMD_FM_RS              | post | effectOpVal<4>, effectValAnd<3>      | Set envelope scale (0 to 3)
+0x55 | DIV_CMD_FM_SSG             | post | effectOpVal<4>, effectValAnd<15>     | Set SSG envelope (0-7 on, 8 off)
+0x56 | DIV_CMD_FM_DR              | post | constVal<-1>, effectValAnd<31>       | Set decay of all operators (0 to 1F)
+0x57 | DIV_CMD_FM_DR              | post | constVal<0>, effectValAnd<31>        | Set decay of operator 1 (0 to 1F)
+0x58 | DIV_CMD_FM_DR              | post | constVal<1>, effectValAnd<31>        | Set decay of operator 2 (0 to 1F)
+0x59 | DIV_CMD_FM_DR              | post | constVal<2>, effectValAnd<31>        | Set decay of operator 3 (0 to 1F)
+0x5a | DIV_CMD_FM_DR              | post | constVal<3>, effectValAnd<31>        | Set decay of operator 4 (0 to 1F)
+0x5b | DIV_CMD_FM_D2R             | post | constVal<-1>, effectValAnd<31>       | Set decay 2 of all operators (0 to 1F)
+0x5c | DIV_CMD_FM_D2R             | post | constVal<0>, effectValAnd<31>        | Set decay 2 of operator 1 (0 to 1F)
+0x5d | DIV_CMD_FM_D2R             | post | constVal<1>, effectValAnd<31>        | Set decay 2 of operator 2 (0 to 1F)
+0x5e | DIV_CMD_FM_D2R             | post | constVal<2>, effectValAnd<31>        | Set decay 2 of operator 3 (0 to 1F)
+0x5f | DIV_CMD_FM_D2R             | post | constVal<3>, effectValAnd<31>        | Set decay 2 of operator 4 (0 to 1F)
+0x60 | DIV_CMD_FM_OPMASK          | post |                                      | Set operator mask (bits 0-3)
+0x61 | DIV_CMD_FM_ALG             | post |                                      | Set algorithm (0 to 7)
+0x62 | DIV_CMD_FM_FMS             | post |                                      | Set LFO FM depth (0 to 7)
+0x63 | DIV_CMD_FM_AMS             | post |                                      | Set LFO AM depth (0 to 3)
+
+--- fmOPN2PostEffectHandlerMap ---
+(= fmOPNPostEffectHandlerMap snapshot AFTER 0x10+0x55 added, but BEFORE AY merge)
+(Used by: YM2612, YM2612_EXT, YM2612_CSM, YM2612_DUALPCM, YM2612_DUALPCM_EXT)
+
+Code | DIV_CMD                    | Type | Params                              | Description
+-----|----------------------------|------|--------------------------------------|------------------------------------------
+0x10 | DIV_CMD_FM_LFO             | post |                                      | Setup LFO (x: enable; y: speed)
+0x11 | DIV_CMD_FM_FB              | post |                                      | Set feedback (0 to 7)
+0x12 | DIV_CMD_FM_TL              | post | constVal<0>, effectVal               | Set level of operator 1 (0 highest, 7F lowest)
+0x13 | DIV_CMD_FM_TL              | post | constVal<1>, effectVal               | Set level of operator 2 (0 highest, 7F lowest)
+0x14 | DIV_CMD_FM_TL              | post | constVal<2>, effectVal               | Set level of operator 3 (0 highest, 7F lowest)
+0x15 | DIV_CMD_FM_TL              | post | constVal<3>, effectVal               | Set level of operator 4 (0 highest, 7F lowest)
+0x16 | DIV_CMD_FM_MULT            | post | effectOpValNoZero<4>, effectValAnd<15>| Set operator multiplier (x: op 1-4; y: mult)
+0x19 | DIV_CMD_FM_AR              | post | constVal<-1>, effectValAnd<31>       | Set attack of all operators (0 to 1F)
+0x1a | DIV_CMD_FM_AR              | post | constVal<0>, effectValAnd<31>        | Set attack of operator 1 (0 to 1F)
+0x1b | DIV_CMD_FM_AR              | post | constVal<1>, effectValAnd<31>        | Set attack of operator 2 (0 to 1F)
+0x1c | DIV_CMD_FM_AR              | post | constVal<2>, effectValAnd<31>        | Set attack of operator 3 (0 to 1F)
+0x1d | DIV_CMD_FM_AR              | post | constVal<3>, effectValAnd<31>        | Set attack of operator 4 (0 to 1F)
+0x50 | DIV_CMD_FM_AM              | post | effectOpVal<4>, effectValAnd<1>      | Set AM
+0x51 | DIV_CMD_FM_SL              | post | effectOpVal<4>, effectValAnd<15>     | Set sustain level
+0x52 | DIV_CMD_FM_RR              | post | effectOpVal<4>, effectValAnd<15>     | Set release
+0x53 | DIV_CMD_FM_DT              | post | effectOpVal<4>, effectValAnd<7>      | Set detune (3 is center)
+0x54 | DIV_CMD_FM_RS              | post | effectOpVal<4>, effectValAnd<3>      | Set envelope scale
+0x55 | DIV_CMD_FM_SSG             | post | effectOpVal<4>, effectValAnd<15>     | Set SSG envelope (0-7 on, 8 off)
+0x56 | DIV_CMD_FM_DR              | post | constVal<-1>, effectValAnd<31>       | Set decay of all operators (0 to 1F)
+0x57 | DIV_CMD_FM_DR              | post | constVal<0>, effectValAnd<31>        | Set decay of operator 1
+0x58 | DIV_CMD_FM_DR              | post | constVal<1>, effectValAnd<31>        | Set decay of operator 2
+0x59 | DIV_CMD_FM_DR              | post | constVal<2>, effectValAnd<31>        | Set decay of operator 3
+0x5a | DIV_CMD_FM_DR              | post | constVal<3>, effectValAnd<31>        | Set decay of operator 4
+0x5b | DIV_CMD_FM_D2R             | post | constVal<-1>, effectValAnd<31>       | Set decay 2 of all operators
+0x5c | DIV_CMD_FM_D2R             | post | constVal<0>, effectValAnd<31>        | Set decay 2 of operator 1
+0x5d | DIV_CMD_FM_D2R             | post | constVal<1>, effectValAnd<31>        | Set decay 2 of operator 2
+0x5e | DIV_CMD_FM_D2R             | post | constVal<2>, effectValAnd<31>        | Set decay 2 of operator 3
+0x5f | DIV_CMD_FM_D2R             | post | constVal<3>, effectValAnd<31>        | Set decay 2 of operator 4
+0x60 | DIV_CMD_FM_OPMASK          | post |                                      | Set operator mask (bits 0-3)
+0x61 | DIV_CMD_FM_ALG             | post |                                      | Set algorithm (0 to 7)
+0x62 | DIV_CMD_FM_FMS             | post |                                      | Set LFO FM depth (0 to 7)
+0x63 | DIV_CMD_FM_AMS             | post |                                      | Set LFO AM depth (0 to 3)
+NOTE: Does NOT have AY effects (0x20-0x2f). Does NOT have 0x1f (ADPCM-A).
+
+--- c64PostEffectHandlerMap ---
+(Used by: C64_6581, C64_8580)
+
+Code | DIV_CMD                    | Type | Params                     | Description
+-----|----------------------------|------|----------------------------|------------------------------------------
+0x10 | DIV_CMD_WAVE               | post |                            | Set waveform (bit 0: tri; bit 1: saw; bit 2: pulse; bit 3: noise)
+0x11 | DIV_CMD_C64_CUTOFF         | post |                            | Set coarse cutoff (not recommended; use 4xxx)
+0x12 | DIV_CMD_STD_NOISE_MODE     | post |                            | Set coarse pulse width (not recommended; use 3xxx)
+0x13 | DIV_CMD_C64_RESONANCE      | post |                            | Set resonance (0 to F)
+0x14 | DIV_CMD_C64_FILTER_MODE    | post |                            | Set filter mode (bit 0: LP; bit 1: BP; bit 2: HP)
+0x15 | DIV_CMD_C64_RESET_TIME     | post |                            | Set envelope reset time
+0x1a | DIV_CMD_C64_RESET_MASK     | post |                            | Disable envelope reset for this channel (1 disables; 0 enables)
+0x1b | DIV_CMD_C64_FILTER_RESET   | post |                            | Reset cutoff (x: on new note; y: now)
+0x1c | DIV_CMD_C64_DUTY_RESET     | post |                            | Reset pulse width (x: on new note; y: now)
+0x1e | DIV_CMD_C64_EXTENDED       | post |                            | Change other parameters (LEGACY)
+0x20 | DIV_CMD_C64_AD             | post |                            | Set attack/decay (x: attack; y: decay)
+0x21 | DIV_CMD_C64_SR             | post |                            | Set sustain/release (x: sustain; y: release)
+0x22 | DIV_CMD_C64_PW_SLIDE       | post | effectVal, constVal<1>     | Pulse width slide up
+0x23 | DIV_CMD_C64_PW_SLIDE       | post | effectVal, constVal<-1>    | Pulse width slide down
+0x24 | DIV_CMD_C64_CUTOFF_SLIDE   | post | effectVal, constVal<1>     | Filter cutoff slide up
+0x25 | DIV_CMD_C64_CUTOFF_SLIDE   | post | effectVal, constVal<-1>    | Filter cutoff slide down
+0x30-0x3f | DIV_CMD_C64_FINE_DUTY | post | effectValLong<12>          | Set pulse width (0 to FFF) [16 entries]
+0x40-0x47 | DIV_CMD_C64_FINE_CUTOFF| post | effectValLong<11>         | Set cutoff (0 to 7FF) [8 entries]
+
+--- segaPCMPostEffectHandlerMap ---
+(Used by: SEGAPCM)
+
+Code | DIV_CMD                    | Type | Params                     | Description
+-----|----------------------------|------|----------------------------|------------------------------------------
+0x20 | DIV_CMD_SAMPLE_FREQ        | post |                            | Set PCM frequency
+
+--- waveOnlyEffectHandlerMap ---
+(Used by: various simple wavetable chips)
+
+Code | DIV_CMD                    | Type | Params                     | Description
+-----|----------------------------|------|----------------------------|------------------------------------------
+0x10 | DIV_CMD_WAVE               | pre  |                            | Set waveform
+
+
+================================================================================
+PLATFORM-SPECIFIC MAPS
+================================================================================
+
+================================================================================
+1. GAME BOY (DIV_SYSTEM_GB)
+================================================================================
+effectHandlers (pre):
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x10 | DIV_CMD_WAVE               |                            | Set waveform
+0x11 | DIV_CMD_STD_NOISE_MODE     |                            | Set noise length (0: long; 1: short)
+0x12 | DIV_CMD_STD_NOISE_MODE     |                            | Set duty cycle (0 to 3)
+0x13 | DIV_CMD_GB_SWEEP_TIME      |                            | Setup sweep (x: time; y: shift)
+0x14 | DIV_CMD_GB_SWEEP_DIR       |                            | Set sweep direction (0: up; 1: down)
+
+postEffectHandlers: NONE
+preEffectHandlers: NONE
+
+================================================================================
+2. NES (DIV_SYSTEM_NES)
+================================================================================
+effectHandlers (pre):
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x11 | DIV_CMD_NES_DMC            |                            | Write to delta modulation counter (0 to 7F)
+0x12 | DIV_CMD_STD_NOISE_MODE     |                            | Set duty cycle/noise mode (pulse: 0 to 3; noise: 0 or 1)
+0x13 | DIV_CMD_NES_SWEEP          | constVal<0>, effectVal     | Sweep up (x: time; y: shift)
+0x14 | DIV_CMD_NES_SWEEP          | constVal<1>, effectVal     | Sweep down (x: time; y: shift)
+0x15 | DIV_CMD_NES_ENV_MODE       |                            | Set envelope mode (0: envelope, 1: length, 2: looping, 3: constant)
+0x16 | DIV_CMD_NES_LENGTH         |                            | Set length counter (refer to manual)
+0x17 | DIV_CMD_NES_COUNT_MODE     |                            | Set frame counter mode (0: 4-step, 1: 5-step)
+0x18 | DIV_CMD_SAMPLE_MODE        |                            | Select PCM/DPCM mode (0: PCM; 1: DPCM)
+0x19 | DIV_CMD_NES_LINEAR_LENGTH  |                            | Set triangle linear counter (0 to 7F; 80+ halt)
+0x20 | DIV_CMD_SAMPLE_FREQ        |                            | Set DPCM frequency (0 to F)
+
+postEffectHandlers: NONE
+preEffectHandlers: NONE
+
+================================================================================
+3. FDS (DIV_SYSTEM_FDS) - standalone chip
+================================================================================
+effectHandlers (pre):
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x10 | DIV_CMD_WAVE               |                            | Set waveform
+
+postEffectHandlers:
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x11 | DIV_CMD_FDS_MOD_DEPTH      |                            | Set modulation depth
+0x12 | DIV_CMD_FDS_MOD_HIGH       |                            | Set modulation speed high byte (x: enable; y: value)
+0x13 | DIV_CMD_FDS_MOD_LOW        |                            | Set modulation speed low byte
+0x14 | DIV_CMD_FDS_MOD_POS        |                            | Set modulator position
+0x15 | DIV_CMD_FDS_MOD_WAVE       |                            | Set modulator table to waveform
+0x16 | DIV_CMD_FDS_MOD_AUTO       |                            | Automatic modulation speed (x: numerator; y: denominator)
+
+preEffectHandlers: NONE
+
+NOTE: DIV_SYSTEM_NES_FDS is a COMPOUND SYSTEM (NES + FDS chip), not this.
+
+================================================================================
+4. PC ENGINE / HuC6280 (DIV_SYSTEM_PCE)
+================================================================================
+effectHandlers (pre):
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x10 | DIV_CMD_WAVE               |                            | Set waveform
+0x11 | DIV_CMD_STD_NOISE_MODE     |                            | Toggle noise mode
+0x12 | DIV_CMD_PCE_LFO_MODE       |                            | Setup LFO (0: disabled; 1: 1x; 2: 16x; 3: 256x depth)
+0x13 | DIV_CMD_PCE_LFO_SPEED      |                            | Set LFO speed
+
+postEffectHandlers: NONE
+preEffectHandlers: NONE
+
+================================================================================
+5. SNES (DIV_SYSTEM_SNES)
+================================================================================
+effectHandlers (pre):
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x18 | DIV_CMD_SNES_ECHO_ENABLE   |                            | Enable echo buffer
+0x19 | DIV_CMD_SNES_ECHO_DELAY    |                            | Set echo delay (0 to F)
+0x1a | DIV_CMD_SNES_ECHO_VOL_LEFT |                            | Set left echo volume
+0x1b | DIV_CMD_SNES_ECHO_VOL_RIGHT|                            | Set right echo volume
+0x1c | DIV_CMD_SNES_ECHO_FEEDBACK |                            | Set echo feedback
+0x1e | DIV_CMD_SNES_GLOBAL_VOL_LEFT |                          | Set dry output volume (left)
+0x1f | DIV_CMD_SNES_GLOBAL_VOL_RIGHT|                          | Set dry output volume (right)
+0x30 | DIV_CMD_SNES_ECHO_FIR      | constVal<0>, effectVal     | Set echo filter coefficient 0
+0x31 | DIV_CMD_SNES_ECHO_FIR      | constVal<1>, effectVal     | Set echo filter coefficient 1
+0x32 | DIV_CMD_SNES_ECHO_FIR      | constVal<2>, effectVal     | Set echo filter coefficient 2
+0x33 | DIV_CMD_SNES_ECHO_FIR      | constVal<3>, effectVal     | Set echo filter coefficient 3
+0x34 | DIV_CMD_SNES_ECHO_FIR      | constVal<4>, effectVal     | Set echo filter coefficient 4
+0x35 | DIV_CMD_SNES_ECHO_FIR      | constVal<5>, effectVal     | Set echo filter coefficient 5
+0x36 | DIV_CMD_SNES_ECHO_FIR      | constVal<6>, effectVal     | Set echo filter coefficient 6
+0x37 | DIV_CMD_SNES_ECHO_FIR      | constVal<7>, effectVal     | Set echo filter coefficient 7
+
+postEffectHandlers:
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x10 | DIV_CMD_WAVE               |                            | Set waveform
+0x11 | DIV_CMD_STD_NOISE_MODE     |                            | Toggle noise mode
+0x12 | DIV_CMD_SNES_ECHO          |                            | Toggle echo on this channel
+0x13 | DIV_CMD_SNES_PITCH_MOD     |                            | Toggle pitch modulation
+0x14 | DIV_CMD_SNES_INVERT        |                            | Toggle invert (x: left; y: right)
+0x15 | DIV_CMD_SNES_GAIN_MODE     |                            | Set envelope mode (0: ADSR, 1: gain/direct, 2: dec, 3: exp, 4: inc, 5: bent)
+0x16 | DIV_CMD_SNES_GAIN          |                            | Set gain (00 to 7F if direct; 00 to 1F otherwise)
+0x1d | DIV_CMD_STD_NOISE_FREQ     |                            | Set noise frequency (00 to 1F)
+0x20 | DIV_CMD_FM_AR              |                            | Set attack (0 to F)
+0x21 | DIV_CMD_FM_DR              |                            | Set decay (0 to 7)
+0x22 | DIV_CMD_FM_SL              |                            | Set sustain (0 to 7)
+0x23 | DIV_CMD_FM_RR              |                            | Set release (00 to 1F)
+
+preEffectHandlers: NONE
+
+================================================================================
+6. C64 - SID 6581 (DIV_SYSTEM_C64_6581)
+================================================================================
+effectHandlers (pre): NONE
+
+postEffectHandlers = c64PostEffectHandlerMap:
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x10 | DIV_CMD_WAVE               |                            | Set waveform (bit 0: tri; bit 1: saw; bit 2: pulse; bit 3: noise)
+0x11 | DIV_CMD_C64_CUTOFF         |                            | Set coarse cutoff (not recommended; use 4xxx)
+0x12 | DIV_CMD_STD_NOISE_MODE     |                            | Set coarse pulse width (not recommended; use 3xxx)
+0x13 | DIV_CMD_C64_RESONANCE      |                            | Set resonance (0 to F)
+0x14 | DIV_CMD_C64_FILTER_MODE    |                            | Set filter mode (bit 0: LP; bit 1: BP; bit 2: HP)
+0x15 | DIV_CMD_C64_RESET_TIME     |                            | Set envelope reset time
+0x1a | DIV_CMD_C64_RESET_MASK     |                            | Disable envelope reset for this channel (1=disable; 0=enable)
+0x1b | DIV_CMD_C64_FILTER_RESET   |                            | Reset cutoff (x: on new note; y: now)
+0x1c | DIV_CMD_C64_DUTY_RESET     |                            | Reset pulse width (x: on new note; y: now)
+0x1e | DIV_CMD_C64_EXTENDED       |                            | Change other parameters (LEGACY)
+0x20 | DIV_CMD_C64_AD             |                            | Set attack/decay (x: attack; y: decay)
+0x21 | DIV_CMD_C64_SR             |                            | Set sustain/release (x: sustain; y: release)
+0x22 | DIV_CMD_C64_PW_SLIDE       | effectVal, constVal<1>     | Pulse width slide up
+0x23 | DIV_CMD_C64_PW_SLIDE       | effectVal, constVal<-1>    | Pulse width slide down
+0x24 | DIV_CMD_C64_CUTOFF_SLIDE   | effectVal, constVal<1>     | Filter cutoff slide up
+0x25 | DIV_CMD_C64_CUTOFF_SLIDE   | effectVal, constVal<-1>    | Filter cutoff slide down
+0x30 | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | Set pulse width (0 to FFF) [3xxx]
+0x31 | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | (same, range 0x30-0x3f)
+0x32 | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x33 | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x34 | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x35 | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x36 | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x37 | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x38 | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x39 | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x3a | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x3b | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x3c | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x3d | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x3e | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x3f | DIV_CMD_C64_FINE_DUTY      | effectValLong<12>          | ...
+0x40 | DIV_CMD_C64_FINE_CUTOFF    | effectValLong<11>          | Set cutoff (0 to 7FF) [4xxx]
+0x41 | DIV_CMD_C64_FINE_CUTOFF    | effectValLong<11>          | (same, range 0x40-0x47)
+0x42 | DIV_CMD_C64_FINE_CUTOFF    | effectValLong<11>          | ...
+0x43 | DIV_CMD_C64_FINE_CUTOFF    | effectValLong<11>          | ...
+0x44 | DIV_CMD_C64_FINE_CUTOFF    | effectValLong<11>          | ...
+0x45 | DIV_CMD_C64_FINE_CUTOFF    | effectValLong<11>          | ...
+0x46 | DIV_CMD_C64_FINE_CUTOFF    | effectValLong<11>          | ...
+0x47 | DIV_CMD_C64_FINE_CUTOFF    | effectValLong<11>          | ...
+
+preEffectHandlers: NONE
+
+NOTE: DIV_SYSTEM_C64_8580 uses the SAME effect maps (empty pre, c64PostEffectHandlerMap post).
+
+================================================================================
+7. YM2612 / OPN2 / Genesis FM (DIV_SYSTEM_YM2612)
+================================================================================
+effectHandlers (pre) = fmOPN2EffectHandlerMap:
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x30 | DIV_CMD_FM_HARD_RESET      |                            | Toggle hard envelope reset on new notes
+0xdf | DIV_CMD_SAMPLE_DIR         |                            | Set sample playback direction (0: normal; 1: reverse)
+
+postEffectHandlers = fmOPN2PostEffectHandlerMap:
+Code | DIV_CMD                    | Params                              | Description
+-----|----------------------------|--------------------------------------|------------------------------------------
+0x10 | DIV_CMD_FM_LFO             |                                      | Setup LFO (x: enable; y: speed)
+0x11 | DIV_CMD_FM_FB              |                                      | Set feedback (0 to 7)
+0x12 | DIV_CMD_FM_TL              | constVal<0>, effectVal               | Set level of operator 1 (0 highest, 7F lowest)
+0x13 | DIV_CMD_FM_TL              | constVal<1>, effectVal               | Set level of operator 2
+0x14 | DIV_CMD_FM_TL              | constVal<2>, effectVal               | Set level of operator 3
+0x15 | DIV_CMD_FM_TL              | constVal<3>, effectVal               | Set level of operator 4
+0x16 | DIV_CMD_FM_MULT            | effectOpValNoZero<4>, effectValAnd<15>| Set operator multiplier
+0x19 | DIV_CMD_FM_AR              | constVal<-1>, effectValAnd<31>       | Set attack of all operators (0 to 1F)
+0x1a | DIV_CMD_FM_AR              | constVal<0>, effectValAnd<31>        | Set attack of operator 1
+0x1b | DIV_CMD_FM_AR              | constVal<1>, effectValAnd<31>        | Set attack of operator 2
+0x1c | DIV_CMD_FM_AR              | constVal<2>, effectValAnd<31>        | Set attack of operator 3
+0x1d | DIV_CMD_FM_AR              | constVal<3>, effectValAnd<31>        | Set attack of operator 4
+0x50 | DIV_CMD_FM_AM              | effectOpVal<4>, effectValAnd<1>      | Set AM
+0x51 | DIV_CMD_FM_SL              | effectOpVal<4>, effectValAnd<15>     | Set sustain level
+0x52 | DIV_CMD_FM_RR              | effectOpVal<4>, effectValAnd<15>     | Set release
+0x53 | DIV_CMD_FM_DT              | effectOpVal<4>, effectValAnd<7>      | Set detune (3 is center)
+0x54 | DIV_CMD_FM_RS              | effectOpVal<4>, effectValAnd<3>      | Set envelope scale (0 to 3)
+0x55 | DIV_CMD_FM_SSG             | effectOpVal<4>, effectValAnd<15>     | Set SSG envelope (0-7 on, 8 off)
+0x56 | DIV_CMD_FM_DR              | constVal<-1>, effectValAnd<31>       | Set decay of all operators (0 to 1F)
+0x57 | DIV_CMD_FM_DR              | constVal<0>, effectValAnd<31>        | Set decay of operator 1
+0x58 | DIV_CMD_FM_DR              | constVal<1>, effectValAnd<31>        | Set decay of operator 2
+0x59 | DIV_CMD_FM_DR              | constVal<2>, effectValAnd<31>        | Set decay of operator 3
+0x5a | DIV_CMD_FM_DR              | constVal<3>, effectValAnd<31>        | Set decay of operator 4
+0x5b | DIV_CMD_FM_D2R             | constVal<-1>, effectValAnd<31>       | Set decay 2 of all operators
+0x5c | DIV_CMD_FM_D2R             | constVal<0>, effectValAnd<31>        | Set decay 2 of operator 1
+0x5d | DIV_CMD_FM_D2R             | constVal<1>, effectValAnd<31>        | Set decay 2 of operator 2
+0x5e | DIV_CMD_FM_D2R             | constVal<2>, effectValAnd<31>        | Set decay 2 of operator 3
+0x5f | DIV_CMD_FM_D2R             | constVal<3>, effectValAnd<31>        | Set decay 2 of operator 4
+0x60 | DIV_CMD_FM_OPMASK          |                                      | Set operator mask (bits 0-3)
+0x61 | DIV_CMD_FM_ALG             |                                      | Set algorithm (0 to 7)
+0x62 | DIV_CMD_FM_FMS             |                                      | Set LFO FM depth (0 to 7)
+0x63 | DIV_CMD_FM_AMS             |                                      | Set LFO AM depth (0 to 3)
+
+preEffectHandlers: NONE
+
+--- YM2612 Extended Ch3 (DIV_SYSTEM_YM2612_EXT) ---
+Same as YM2612, BUT adds preEffectHandlers = fmExtChEffectHandlerMap:
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x30 | DIV_CMD_FM_HARD_RESET      |                            | Toggle hard envelope reset on new notes
+0x18 | DIV_CMD_FM_EXTCH           |                            | Toggle extended channel 3 mode
+
+--- YM2612 CSM (DIV_SYSTEM_YM2612_CSM) ---
+Same as YM2612_EXT (pre=fmOPN2EffectHandlerMap, post=fmOPN2PostEffectHandlerMap, preE=fmExtChEffectHandlerMap)
+
+--- YM2612 DualPCM (DIV_SYSTEM_YM2612_DUALPCM) ---
+Same as YM2612 (pre=fmOPN2EffectHandlerMap, post=fmOPN2PostEffectHandlerMap, no preE)
+
+--- YM2612 DualPCM EXT (DIV_SYSTEM_YM2612_DUALPCM_EXT) ---
+Same as YM2612_EXT (adds preE=fmExtChEffectHandlerMap)
+
+================================================================================
+8. AY-3-8910 / PSG (DIV_SYSTEM_AY8910)
+================================================================================
+effectHandlers (pre): NONE (empty map passed: {})
+
+postEffectHandlers = ayPostEffectHandlerMap:
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x20 | DIV_CMD_STD_NOISE_MODE     |                            | Set channel mode (bit 0: square; bit 1: noise; bit 2: envelope)
+0x21 | DIV_CMD_STD_NOISE_FREQ     |                            | Set noise frequency (0 to 1F)
+0x22 | DIV_CMD_AY_ENVELOPE_SET    |                            | Set envelope mode (x: shape, y: enable for this channel)
+0x23 | DIV_CMD_AY_ENVELOPE_LOW    |                            | Set envelope period low byte
+0x24 | DIV_CMD_AY_ENVELOPE_HIGH   |                            | Set envelope period high byte
+0x25 | DIV_CMD_AY_ENVELOPE_SLIDE  | negEffectVal               | Envelope slide up
+0x26 | DIV_CMD_AY_ENVELOPE_SLIDE  |                            | Envelope slide down
+0x29 | DIV_CMD_AY_AUTO_ENVELOPE   |                            | Set auto-envelope (x: numerator; y: denominator)
+0x2c | DIV_CMD_AY_AUTO_PWM        |                            | Set timer period offset (bit 7: sign)
+0x2e | DIV_CMD_AY_IO_WRITE        | constVal<0>, effectVal     | Write to I/O port A
+0x2f | DIV_CMD_AY_IO_WRITE        | constVal<1>, effectVal     | Write to I/O port B
+
+preEffectHandlers: NONE
+
+================================================================================
+9. NAMCO 163 (DIV_SYSTEM_N163)
+================================================================================
+effectHandlers (pre):
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x18 | DIV_CMD_N163_CHANNEL_LIMIT |                            | Change channel limits (0 to 7, x + 1)
+0x20 | DIV_CMD_N163_GLOBAL_WAVE_LOAD |                         | Load a waveform into memory
+0x21 | DIV_CMD_N163_GLOBAL_WAVE_LOADPOS|                       | Set position for wave load
+
+postEffectHandlers:
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x10 | DIV_CMD_WAVE               |                            | Select waveform
+0x11 | DIV_CMD_N163_WAVE_POSITION | effectVal, constVal<1>     | Set waveform playback position in RAM
+0x12 | DIV_CMD_N163_WAVE_LENGTH   | effectVal, constVal<1>     | Set waveform playback length in RAM (04 to FC in steps of 4)
+0x15 | DIV_CMD_N163_WAVE_POSITION | effectVal, constVal<2>     | Set waveform load position
+0x16 | DIV_CMD_N163_WAVE_LENGTH   | effectVal, constVal<2>     | Set waveform load length (04 to FC in steps of 4)
+0x1a | DIV_CMD_N163_WAVE_POSITION | effectVal, constVal<3>     | Set waveform playback and load position in RAM
+0x1b | DIV_CMD_N163_WAVE_LENGTH   | effectVal, constVal<3>     | Set waveform playback and load length in RAM (04 to FC in steps of 4)
+
+preEffectHandlers: NONE
+
+================================================================================
+10. AMIGA (DIV_SYSTEM_AMIGA)
+================================================================================
+effectHandlers (pre): NONE (empty map passed: {})
+
+postEffectHandlers:
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x10 | DIV_CMD_AMIGA_FILTER       |                            | Toggle filter (0 disables; 1 enables)
+0x11 | DIV_CMD_AMIGA_AM           |                            | Toggle AM with next channel
+0x12 | DIV_CMD_AMIGA_PM           |                            | Toggle period modulation with next channel
+0x13 | DIV_CMD_WAVE               |                            | Set waveform
+
+preEffectHandlers: NONE
+
+================================================================================
+11. SEGAPCM (DIV_SYSTEM_SEGAPCM)
+================================================================================
+effectHandlers (pre): NONE (empty map passed: {})
+
+postEffectHandlers = segaPCMPostEffectHandlerMap:
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x20 | DIV_CMD_SAMPLE_FREQ        |                            | Set PCM frequency
+
+preEffectHandlers: NONE
+
+NOTE: DIV_SYSTEM_SEGAPCM_COMPAT is a COMPOUND SYSTEM, not the actual chip.
+
+
+================================================================================
+ADDITIONAL SHARED MAPS (for reference)
+================================================================================
+
+--- fmOPMPostEffectHandlerMap ---
+(= fmOPNPostEffectHandlerMap base (0x11-0x63) + OPM-specific entries)
+(Used by: YM2151)
+
+ALL entries from fmOPNPostEffectHandlerMap base block (0x11-0x63), PLUS:
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x10 | DIV_CMD_STD_NOISE_FREQ     |                            | Set noise frequency (xx: value; 0 disables noise)
+0x17 | DIV_CMD_FM_LFO             |                            | Set LFO speed
+0x18 | DIV_CMD_FM_LFO_WAVE        |                            | Set LFO waveform (0 saw, 1 square, 2 triangle, 3 noise)
+0x1e | DIV_CMD_FM_AM_DEPTH        | effectValAnd<127>          | Set AM depth (0 to 7F)
+0x1f | DIV_CMD_FM_PM_DEPTH        | effectValAnd<127>          | Set PM depth (0 to 7F)
+0x55 | DIV_CMD_FM_DT2             | effectOpVal<4>, effectValAnd<3> | Set detune 2 (x: op 1-4; y: 0-3)
+0x60 | DIV_CMD_FM_OPMASK          |                            | Set operator mask (bits 0-3) [OVERRIDES base 0x60]
+
+--- fmOPLLPostEffectHandlerMap ---
+(Used by: OPLL/YM2413)
+
+Code | DIV_CMD                    | Params                              | Description
+-----|----------------------------|--------------------------------------|------------------------------------------
+0x10 | DIV_CMD_WAVE               |                                      | Set patch (0 to F)
+0x11 | DIV_CMD_FM_FB              |                                      | Set feedback (0 to 7)
+0x12 | DIV_CMD_FM_TL              | constVal<0>, effectVal               | Set level of operator 1 (0 highest, 3F lowest)
+0x13 | DIV_CMD_FM_TL              | constVal<1>, effectVal               | Set level of operator 2 (0 highest, F lowest)
+0x16 | DIV_CMD_FM_MULT            | effectOpValNoZero<2>, effectValAnd<15>| Set operator multiplier (x: op 1-2; y: mult)
+0x19 | DIV_CMD_FM_AR              | constVal<-1>, effectValAnd<15>       | Set attack of all operators (0 to F)
+0x1a | DIV_CMD_FM_AR              | constVal<0>, effectValAnd<15>        | Set attack of operator 1
+0x1b | DIV_CMD_FM_AR              | constVal<1>, effectValAnd<15>        | Set attack of operator 2
+0x50 | DIV_CMD_FM_AM              | effectOpVal<2>, effectValAnd<1>      | Set AM (x: op 1-2; y: AM)
+0x51 | DIV_CMD_FM_SL              | effectOpVal<2>, effectValAnd<15>     | Set sustain level
+0x52 | DIV_CMD_FM_RR              | effectOpVal<2>, effectValAnd<15>     | Set release
+0x53 | DIV_CMD_FM_VIB             | effectOpVal<2>, effectValAnd<1>      | Set vibrato
+0x54 | DIV_CMD_FM_RS              | effectOpVal<2>, effectValAnd<3>      | Set envelope scale (0 to 3)
+0x55 | DIV_CMD_FM_SUS             | effectOpVal<2>, effectValAnd<1>      | Set envelope sustain
+0x56 | DIV_CMD_FM_DR              | constVal<-1>, effectValAnd<15>       | Set decay of all operators (0 to F)
+0x57 | DIV_CMD_FM_DR              | constVal<0>, effectValAnd<15>        | Set decay of operator 1
+0x58 | DIV_CMD_FM_DR              | constVal<1>, effectValAnd<15>        | Set decay of operator 2
+0x5b | DIV_CMD_FM_KSR             | effectOpVal<2>, effectValAnd<1>      | Set whether key scales envelope
+
+--- fmOPLPostEffectHandlerMap ---
+(Used by: OPL/YM3526, OPL2/YM3812, OPL3/YMF262)
+
+Code | DIV_CMD                    | Params                              | Description
+-----|----------------------------|--------------------------------------|------------------------------------------
+0x10 | DIV_CMD_FM_LFO             | effectValAnd<1>                      | Set global AM depth (0: 1dB, 1: 4.8dB)
+0x11 | DIV_CMD_FM_FB              |                                      | Set feedback (0 to 7)
+0x12 | DIV_CMD_FM_TL              | constVal<0>, effectVal               | Set level of operator 1 (0 highest, 3F lowest)
+0x13 | DIV_CMD_FM_TL              | constVal<1>, effectVal               | Set level of operator 2
+0x14 | DIV_CMD_FM_TL              | constVal<2>, effectVal               | Set level of operator 3
+0x15 | DIV_CMD_FM_TL              | constVal<3>, effectVal               | Set level of operator 4
+0x16 | DIV_CMD_FM_MULT            | effectOpValNoZero<4>, effectValAnd<15>| Set operator multiplier
+0x17 | DIV_CMD_FM_LFO             | lambda: (val&1)+2                    | Set global vibrato depth (0: normal, 1: double)
+0x19 | DIV_CMD_FM_AR              | constVal<-1>, effectValAnd<15>       | Set attack of all operators (0 to F)
+0x1a | DIV_CMD_FM_AR              | constVal<0>, effectValAnd<15>        | Set attack of operator 1
+0x1b | DIV_CMD_FM_AR              | constVal<1>, effectValAnd<15>        | Set attack of operator 2
+0x1c | DIV_CMD_FM_AR              | constVal<2>, effectValAnd<15>        | Set attack of operator 3
+0x1d | DIV_CMD_FM_AR              | constVal<3>, effectValAnd<15>        | Set attack of operator 4
+0x2a | DIV_CMD_FM_WS              | effectOpVal<4>, effectValAnd<7>      | Set waveform (0-3 OPL2, 0-7 OPL3)
+0x50 | DIV_CMD_FM_AM              | effectOpVal<4>, effectValAnd<1>      | Set AM
+0x51 | DIV_CMD_FM_SL              | effectOpVal<4>, effectValAnd<15>     | Set sustain level
+0x52 | DIV_CMD_FM_RR              | effectOpVal<4>, effectValAnd<15>     | Set release
+0x53 | DIV_CMD_FM_VIB             | effectOpVal<4>, effectValAnd<1>      | Set vibrato
+0x54 | DIV_CMD_FM_RS              | effectOpVal<4>, effectValAnd<3>      | Set envelope scale
+0x55 | DIV_CMD_FM_SUS             | effectOpVal<4>, effectValAnd<1>      | Set envelope sustain
+0x56 | DIV_CMD_FM_DR              | constVal<-1>, effectValAnd<15>       | Set decay of all operators (0 to F)
+0x57 | DIV_CMD_FM_DR              | constVal<0>, effectValAnd<15>        | Set decay of operator 1
+0x58 | DIV_CMD_FM_DR              | constVal<1>, effectValAnd<15>        | Set decay of operator 2
+0x59 | DIV_CMD_FM_DR              | constVal<2>, effectValAnd<15>        | Set decay of operator 3
+0x5a | DIV_CMD_FM_DR              | constVal<3>, effectValAnd<15>        | Set decay of operator 4
+0x5b | DIV_CMD_FM_KSR             | effectOpVal<4>, effectValAnd<1>      | Set whether key scales envelope
+
+--- ay8930PostEffectHandlerMap ---
+(Used by: AY8930)
+
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x12 | DIV_CMD_STD_NOISE_MODE     | lambda: 0x10+(val&15)      | Set duty cycle (0 to 8)
+0x20 | DIV_CMD_STD_NOISE_MODE     |                            | Set channel mode (bit 0: square; bit 1: noise; bit 2: envelope)
+0x21 | DIV_CMD_STD_NOISE_FREQ     |                            | Set noise frequency (0 to FF)
+0x22 | DIV_CMD_AY_ENVELOPE_SET    |                            | Set envelope mode
+0x23 | DIV_CMD_AY_ENVELOPE_LOW    |                            | Set envelope period low byte
+0x24 | DIV_CMD_AY_ENVELOPE_HIGH   |                            | Set envelope period high byte
+0x25 | DIV_CMD_AY_ENVELOPE_SLIDE  | negEffectVal               | Envelope slide up
+0x26 | DIV_CMD_AY_ENVELOPE_SLIDE  |                            | Envelope slide down
+0x27 | DIV_CMD_AY_NOISE_MASK_AND  |                            | Set noise AND mask
+0x28 | DIV_CMD_AY_NOISE_MASK_OR   |                            | Set noise OR mask
+0x29 | DIV_CMD_AY_AUTO_ENVELOPE   |                            | Set auto-envelope
+0x2c | DIV_CMD_AY_AUTO_PWM        |                            | Automatic noise frequency
+0x2d | DIV_CMD_AY_IO_WRITE        | constVal<255>, effectVal   | NOT TO BE EMPLOYED BY THE COMPOSER
+0x2e | DIV_CMD_AY_IO_WRITE        | constVal<0>, effectVal     | Write to I/O port A
+0x2f | DIV_CMD_AY_IO_WRITE        | constVal<1>, effectVal     | Write to I/O port B
+
+
+================================================================================
+SUMMARY: WHICH SYSTEMS USE WHICH MAPS
+================================================================================
+
+DIV_SYSTEM_GB:         pre=inline(5 entries)                post=NONE                       preE=NONE
+DIV_SYSTEM_NES:        pre=inline(10 entries)               post=NONE                       preE=NONE
+DIV_SYSTEM_FDS:        pre=inline(1 entry: 0x10)            post=inline(6 entries)           preE=NONE
+DIV_SYSTEM_PCE:        pre=inline(4 entries)                post=NONE                       preE=NONE
+DIV_SYSTEM_SNES:       pre=inline(16 entries)               post=inline(12 entries)          preE=NONE
+DIV_SYSTEM_C64_6581:   pre=NONE                             post=c64PostEffectHandlerMap     preE=NONE
+DIV_SYSTEM_C64_8580:   pre=NONE                             post=c64PostEffectHandlerMap     preE=NONE
+DIV_SYSTEM_YM2612:     pre=fmOPN2EffectHandlerMap           post=fmOPN2PostEffectHandlerMap  preE=NONE
+DIV_SYSTEM_YM2612_EXT: pre=fmOPN2EffectHandlerMap           post=fmOPN2PostEffectHandlerMap  preE=fmExtChEffectHandlerMap
+DIV_SYSTEM_YM2612_CSM: pre=fmOPN2EffectHandlerMap           post=fmOPN2PostEffectHandlerMap  preE=fmExtChEffectHandlerMap
+DIV_SYSTEM_YM2612_DUALPCM:     pre=fmOPN2EffectHandlerMap   post=fmOPN2PostEffectHandlerMap  preE=NONE
+DIV_SYSTEM_YM2612_DUALPCM_EXT: pre=fmOPN2EffectHandlerMap   post=fmOPN2PostEffectHandlerMap  preE=fmExtChEffectHandlerMap
+DIV_SYSTEM_AY8910:     pre=NONE                             post=ayPostEffectHandlerMap      preE=NONE
+DIV_SYSTEM_N163:       pre=inline(3 entries)                post=inline(7 entries)           preE=NONE
+DIV_SYSTEM_AMIGA:      pre=NONE                             post=inline(4 entries)           preE=NONE
+DIV_SYSTEM_SEGAPCM:    pre=NONE                             post=segaPCMPostEffectHandlerMap preE=NONE
+DIV_SYSTEM_YM2151:     pre=fmEffectHandlerMap               post=fmOPMPostEffectHandlerMap   preE=NONE
+
+================================================================================
+SMS EXTRA (BONUS - not requested but commonly needed)
+================================================================================
+DIV_SYSTEM_SMS:
+effectHandlers (pre):
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x20 | DIV_CMD_STD_NOISE_MODE     |                            | Set noise mode (x: preset freq/ch3 freq; y: thin pulse/noise)
+
+postEffectHandlers: NONE
+preEffectHandlers: NONE
+
+================================================================================
+VRC6 EXTRA (BONUS - Famicom expansion)
+================================================================================
+DIV_SYSTEM_VRC6:
+effectHandlers (pre):
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x12 | DIV_CMD_STD_NOISE_MODE     |                            | Set duty cycle (pulse: 0 to 7)
+
+postEffectHandlers: NONE
+preEffectHandlers: NONE
+
+================================================================================
+MMC5 EXTRA (BONUS - Famicom expansion)
+================================================================================
+DIV_SYSTEM_MMC5:
+effectHandlers (pre):
+Code | DIV_CMD                    | Params                     | Description
+-----|----------------------------|----------------------------|------------------------------------------
+0x12 | DIV_CMD_STD_NOISE_MODE     |                            | Set duty cycle/noise mode (pulse: 0 to 3; noise: 0 or 1)
+
+postEffectHandlers: NONE
+preEffectHandlers: NONE
+
+================================================================================
+END OF DOCUMENT
+================================================================================

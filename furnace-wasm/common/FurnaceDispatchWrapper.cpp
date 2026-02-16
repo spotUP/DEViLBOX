@@ -1385,9 +1385,19 @@ static void processChannelMacros(DispatchInstance* inst, int chan);
 EMSCRIPTEN_KEEPALIVE
 int furnace_dispatch_cmd(int handle, int cmd, int chan, int val1, int val2) {
   auto it = g_instances.find(handle);
-  if (it == g_instances.end()) return -1;
+  if (it == g_instances.end()) {
+    printf("[furnace_dispatch_cmd] ERROR: handle %d not found\n", handle);
+    return -1;
+  }
 
   DispatchInstance* inst = it->second;
+
+  // Debug: log NOTE_ON and INSTRUMENT commands
+  if (cmd == DIV_CMD_NOTE_ON) {
+    printf("[furnace_dispatch_cmd] NOTE_ON: handle=%d chan=%d note=%d platform=%d\n", handle, chan, val1, inst->platformType);
+  } else if (cmd == DIV_CMD_INSTRUMENT) {
+    printf("[furnace_dispatch_cmd] INSTRUMENT: handle=%d chan=%d insIndex=%d force=%d\n", handle, chan, val1, val2);
+  }
 
   // Hook into commands for macro processing
   if (inst->macrosEnabled && chan >= 0 && chan < MAX_CHANNELS) {
@@ -3992,6 +4002,11 @@ void furnace_dispatch_set_instrument_full(int handle, int insIndex, unsigned cha
         ins->c64.lp = (chip[13] & 2) != 0;
         ins->c64.bp = (chip[13] & 4) != 0;
         ins->c64.ch3off = (chip[13] & 8) != 0;
+        printf("[FurnaceDispatch] C64 ins %d parsed: wave=%d%d%d%d ADSR=%d/%d/%d/%d duty=%d\n",
+               insIndex,
+               ins->c64.triOn ? 1 : 0, ins->c64.sawOn ? 1 : 0,
+               ins->c64.pulseOn ? 1 : 0, ins->c64.noiseOn ? 1 : 0,
+               ins->c64.a, ins->c64.d, ins->c64.s, ins->c64.r, ins->c64.duty);
         break;
 
       case DIV_INS_N163:

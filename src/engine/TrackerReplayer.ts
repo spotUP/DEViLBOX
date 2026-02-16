@@ -180,6 +180,14 @@ interface ChannelState {
   // Furnace effect state
   pitchFinesseSpeed: number;     // Pitch finesse slide speed (E5y)
   legatoMode: boolean;           // Legato mode flag (EAy)
+  fineTune: number;              // Absolute pitch offset (E5xx, centered at 0)
+  arpSpeed: number;              // Arpeggio speed in ticks (E0xx)
+  vibratoWaveform: number;       // Vibrato waveform (E3xx: 0=sine, 1=ramp, 2=square, 3=random)
+  vibratoRange: number;          // Vibrato depth multiplier (E4xx)
+  legato: boolean;               // Legato toggle (EAxx: inhibits note-on)
+  sampleBank: number;            // Sample bank (EBxx)
+  volSlideTarget: number;        // Volume portamento target (D3xx/D4xx)
+  volSlideSpeed: number;         // Volume portamento speed (1 for D3xx, 256 for D4xx)
 
   // TB-303 specific state
   previousSlideFlag: boolean;    // Previous row's slide flag (for proper 303 slide semantics)
@@ -212,6 +220,14 @@ export interface TrackerSong {
   numChannels: number;
   initialSpeed: number;
   initialBPM: number;
+
+  // Furnace-specific timing (optional, only set for .fur imports)
+  speed2?: number;               // Second speed for speed alternation
+  hz?: number;                   // Ticks per second (50 PAL, 60 NTSC)
+  virtualTempoN?: number;        // Virtual tempo numerator
+  virtualTempoD?: number;        // Virtual tempo denominator
+  compatFlags?: import('../lib/import/formats/FurnaceSongParser').FurnaceCompatFlags;
+  grooves?: Array<{ len: number; val: number[] }>;
 }
 
 // ============================================================================
@@ -238,9 +254,32 @@ export class TrackerReplayer {
   private songPos = 0;           // Current position in song order
   private pattPos = 0;           // Current row in pattern
   private currentTick = 0;       // Current tick (0 to speed-1)
-  private speed = 6;             // Ticks per row
+  private speed = 6;             // Ticks per row (current active speed)
   private bpm = 125;             // Beats per minute
   private globalVolume = 64;     // Global volume (0-64)
+
+  // Furnace speed alternation (matches playback.cpp speed system)
+  private speeds: number[] = [6]; // Speed list (1-16 entries)
+  private curSpeed = 0;          // Current index in speeds[]
+  private nextSpeed = 6;         // Cached next speed (for EDxx delay)
+  private isFurnace = false;     // Whether this is a Furnace module
+
+  // Furnace virtual tempo (matches playback.cpp virtual tempo system)
+  private virtualTempoN = 150;   // Virtual tempo numerator
+  private virtualTempoD = 150;   // Virtual tempo denominator
+  private _tempoAccum = 0;        // Virtual tempo accumulator
+  private hz = 60;               // Ticks per second
+
+  // Furnace compat flags
+  private _firstTick = false;     // True on the first tick of each row
+  private compatFlags: TrackerSong['compatFlags'] = undefined;
+
+  /**
+   * Get current virtual tempo accumulator (for debug/diagnostics)
+   */
+  get tempoAccumulator(): number {
+    return this._tempoAccum;
+  }
 
   // Pattern break/jump
   private pBreakPos = 0;
@@ -313,6 +352,40 @@ export class TrackerReplayer {
     this.posJumpFlag = false;
     this.patternDelay = 0;
 
+    // Initialize Furnace timing
+    this.isFurnace = (song.format as string) === 'XM' && song.hz !== undefined;
+    this.compatFlags = song.compatFlags;
+
+    if (this.isFurnace) {
+      // Speed alternation: build speed list from speed1/speed2
+      const speed2 = song.speed2 ?? song.initialSpeed;
+      if (speed2 !== song.initialSpeed) {
+        this.speeds = [song.initialSpeed, speed2];
+      } else {
+        this.speeds = [song.initialSpeed];
+      }
+      this.curSpeed = 0;
+      this.nextSpeed = this.speeds.length > 1 ? this.speeds[1] : this.speeds[0];
+
+      // Virtual tempo
+      this.virtualTempoN = song.virtualTempoN ?? 150;
+      this.virtualTempoD = song.virtualTempoD ?? 150;
+      this._tempoAccum = 0;
+      this.hz = song.hz ?? 60;
+
+      console.log(`[TrackerReplayer] Furnace timing: speeds=[${this.speeds.join(',')}], hz=${this.hz}, vtempo=${this.virtualTempoN}/${this.virtualTempoD}`);
+    } else {
+      // Standard MOD/XM timing
+      this.speeds = [song.initialSpeed];
+      this.curSpeed = 0;
+      this.nextSpeed = song.initialSpeed;
+      this.virtualTempoN = 150;
+      this.virtualTempoD = 150;
+      this._tempoAccum = 0;
+      this.hz = 60;
+    }
+    this._firstTick = false;
+
     console.log(`[TrackerReplayer] Loaded: ${song.name} (${song.format}), ${song.numChannels}ch, ${song.patterns.length} patterns`);
     console.log(`[TrackerReplayer] Song positions: [${song.songPositions.join(', ')}], length: ${song.songLength}`);
     console.log(`[TrackerReplayer] Pattern lengths: ${song.patterns.map((p, i) => `${i}:${p?.length ?? 'null'}`).join(', ')}`);
@@ -382,6 +455,14 @@ export class TrackerReplayer {
       macroWaveform: 0,
       pitchFinesseSpeed: 0,
       legatoMode: false,
+      fineTune: 0,
+      arpSpeed: 1,
+      vibratoWaveform: 0,
+      vibratoRange: 1,
+      legato: false,
+      sampleBank: 0,
+      volSlideTarget: -1,
+      volSlideSpeed: 0,
       previousSlideFlag: false,
       gateHigh: false,
       lastPlayedNoteName: null,
@@ -642,9 +723,17 @@ export class TrackerReplayer {
       if (this.currentTick === 0) {
         // Tick 0: Read new row data
         this.processRow(ch, channel, row, safeTime);
+        this._firstTick = true;
       } else {
         // Ticks 1+: Process continuous effects
         this.processEffectTick(ch, channel, row, safeTime + (this.currentTick * tickInterval));
+      }
+
+      // Furnace: continuous effects (volume slides, vibrato, portamento) also run on tick 0
+      // unless the noSlidesOnFirstTick compat flag is set.
+      // MOD/XM traditionally skip these on tick 0, Furnace does not by default.
+      if (this._firstTick && this.isFurnace && !this.compatFlags?.noSlidesOnFirstTick) {
+        this.processEffectTick(ch, channel, row, safeTime);
       }
 
       // Process MacroEngine every tick (moved from old processMacros)
@@ -656,6 +745,9 @@ export class TrackerReplayer {
     if (this.onTickProcess) {
       this.onTickProcess(this.currentTick, this.pattPos);
     }
+
+    // Clear firstTick after all channels processed (matches Furnace: firstTick=false at end of nextTick)
+    this._firstTick = false;
 
     // Advance tick counter
     this.currentTick++;
@@ -799,7 +891,7 @@ export class TrackerReplayer {
     // We need to track hammer separately for the synth to skip pitch glide
     const effectiveSlide = slide || hammer; // Gate stays high for both
 
-    if (noteValue && noteValue !== 0 && noteValue !== 97 && !probabilitySkip) {
+    if (noteValue && noteValue !== 0 && noteValue !== 97 && noteValue !== 98 && noteValue !== 99 && !probabilitySkip) {
       // Store the original XM note for synth instruments (avoids period table issues)
       ch.xmNote = noteValue;
       
@@ -812,6 +904,16 @@ export class TrackerReplayer {
         ch.portaTarget = usePeriod;
         if (param !== 0 && effect === 3) {
           ch.tonePortaSpeed = param;
+        }
+        // COMPAT FLAG: resetMacroOnPorta - restart macros when portamento encounters a new note
+        if (this.compatFlags?.resetMacroOnPorta) {
+          ch.macro.init(ch.instrument);
+        }
+        // COMPAT FLAG: newInsTriggersInPorta - if instrument changed during porta, trigger the note
+        if (this.compatFlags?.newInsTriggersInPorta && instNum > 0) {
+          ch.note = usePeriod;
+          ch.period = ch.note;
+          this.triggerNote(ch, time, 0, chIndex, accent, false, false);
         }
       } else {
         // Normal note - trigger
@@ -886,8 +988,10 @@ export class TrackerReplayer {
         // NOTE: For same-pitch slides, slideActive=true ensures the synth doesn't retrigger
         this.triggerNote(ch, time, offset, chIndex, accent, slideActive, effectiveSlide, hammer);
 
-        // Reset vibrato/tremolo positions
-        if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
+        // Reset vibrato/tremolo positions (unless continuousVibrato compat flag is set)
+        if (!this.compatFlags?.continuousVibrato) {
+          if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
+        }
         if ((ch.waveControl & 0x40) === 0) ch.tremoloPos = 0;
       }
     }
@@ -898,15 +1002,28 @@ export class TrackerReplayer {
     //
     // DB303 BEHAVIOR: A rest (empty row) breaks the slide chain.
     // When gate=false, the note is released and previousSlideFlag is cleared.
-    // Only rows with valid notes (not note-off) can have slide flags that affect the next row.
-    if (noteValue && noteValue !== 97) {
+    // Only rows with valid notes (not note-off/release) can have slide flags that affect the next row.
+    if (noteValue && noteValue !== 97 && noteValue !== 98 && noteValue !== 99) {
       ch.previousSlideFlag = (slide || hammer) ?? false;
     }
 
-    // Handle note off
+    // Handle note off (97), note release (98), macro release (99)
     if (noteValue === 97) {
-      // Clear slide flag - note-off breaks the slide chain
+      // NOTE OFF: Full stop - kill the note immediately
+      // Furnace: keyOn=false, keyOff=true, DIV_CMD_NOTE_OFF
       ch.previousSlideFlag = false;
+      
+      // COMPAT FLAG: noteOffResetsSlides - cancel pitch slides on note off
+      if (this.compatFlags?.noteOffResetsSlides) {
+        ch.portaSpeed = 0;
+        ch.tonePortaSpeed = 0;
+        ch.portaTarget = 0;
+      }
+      // COMPAT FLAG: stopPortaOnNoteOff - stop portamento specifically
+      if (this.compatFlags?.stopPortaOnNoteOff) {
+        ch.portaTarget = 0;
+        ch.tonePortaSpeed = 0;
+      }
       
       // DEBUG LOGGING for note-off
       const is303ForLog = ch.instrument?.synthType === 'TB303' || ch.instrument?.synthType === 'Buzz3o3';
@@ -921,6 +1038,38 @@ export class TrackerReplayer {
       }
       ch.macro.release();
       this.stopChannel(ch, chIndex);
+    } else if (noteValue === 98) {
+      // NOTE RELEASE: Enter envelope release phase - sound fades naturally
+      // Furnace: keyOn=false, keyOff=true, DIV_CMD_NOTE_OFF_ENV, releasing=true
+      ch.previousSlideFlag = false;
+
+      // COMPAT FLAG: noteOffResetsSlides - also applies to note release
+      if (this.compatFlags?.noteOffResetsSlides) {
+        ch.portaSpeed = 0;
+        ch.tonePortaSpeed = 0;
+        ch.portaTarget = 0;
+      }
+      if (this.compatFlags?.stopPortaOnNoteOff) {
+        ch.portaTarget = 0;
+        ch.tonePortaSpeed = 0;
+      }
+
+      ch.macro.release();
+      // For synth instruments, trigger release (envelope fade) instead of full stop
+      if (ch.instrument && ch.instrument.synthType && ch.instrument.synthType !== 'Sampler' && ch.lastPlayedNoteName) {
+        try {
+          const engine = getToneEngine();
+          engine.triggerNoteRelease(ch.instrument.id, ch.lastPlayedNoteName, 0, ch.instrument, chIndex);
+        } catch { /* ignored */ }
+      }
+      // For sample-based instruments, we could apply a fade-out or just let it ring
+      // Don't call stopChannel — the note should fade naturally
+    } else if (noteValue === 99) {
+      // MACRO RELEASE: Only release macros, note keeps playing
+      // Furnace: DIV_CMD_ENV_RELEASE, releasing=true
+      // Macros enter their release phase but the sound/note itself is not affected
+      ch.macro.release();
+      // Don't stop the channel or trigger envelope release
     }
 
     // Handle volume column (XM)
@@ -1010,39 +1159,117 @@ export class TrackerReplayer {
         break;
 
       case 0x8: // Set panning
-        ch.panning = param;
-        ch.panNode.pan.setValueAtTime((param - 128) / 128, time);
+        if (this.isFurnace) {
+          // Furnace: 08xy where x=left, y=right (0-F each)
+          // Convert to stereo position: panL=x*17, panR=y*17
+          // stereo = (R - L) / 255 = (y*17 - x*17) / 255
+          const panL = x * 17;
+          const panR = y * 17;
+          ch.panning = Math.round((panR - panL + 255) / 2);
+          const stereoPos = (panR - panL) / 255;
+          ch.panNode.pan.setValueAtTime(Math.max(-1, Math.min(1, stereoPos)), time);
+        } else {
+          ch.panning = param;
+          ch.panNode.pan.setValueAtTime((param - 128) / 128, time);
+        }
         break;
 
-      case 0x9: // Sample offset - handled in note processing
-        if (param !== 0) ch.sampleOffset = param;
+      case 0x9: // Sample offset (MOD/XM) or Set groove (Furnace)
+        if (this.isFurnace) {
+          // Furnace 09xx: Set groove pattern or speed
+          if (this.song?.grooves && param < this.song.grooves.length) {
+            const groove = this.song.grooves[param];
+            this.speeds = groove.val.slice(0, groove.len);
+            this.curSpeed = 0;
+            this.speed = this.speeds[0];
+            this.nextSpeed = this.speeds.length > 1 ? this.speeds[1] : this.speeds[0];
+            console.log(`[TrackerReplayer] 09xx: Set groove ${param}: [${this.speeds.join(',')}]`);
+          } else if (param > 0) {
+            this.speed = param;
+            this.speeds = [param];
+            this.curSpeed = 0;
+            this.nextSpeed = param;
+          }
+        } else {
+          // MOD/XM: 9xx = sample offset
+          if (param !== 0) ch.sampleOffset = param;
+        }
         break;
 
       case 0xA: // Volume slide - nothing on tick 0
         break;
 
       case 0xB: // Position jump
-        this.posJumpPos = param;
-        this.posJumpFlag = true;
+        // COMPAT FLAG: jumpTreatment controls how multiple 0Bxx effects interact
+        // - 0: normal (another 0Bxx overrides previous, preserves pBreakPos from 0Dxx)
+        // - 1: old Furnace (only first 0Bxx takes effect, resets pBreakPos)
+        // - 2: DefleMask (same as 1)
+        if (!this.posJumpFlag || this.compatFlags?.jumpTreatment === 0) {
+          this.posJumpPos = param;
+          this.posJumpFlag = true;
+          if (this.compatFlags?.jumpTreatment === 1 || this.compatFlags?.jumpTreatment === 2) {
+            this.pBreakPos = 0;
+          }
+        }
         this.pBreakFlag = true;
-        console.log(`[TrackerReplayer] Bxx Effect (Position Jump): targetPos=${param}, channel=${chIndex}, row=${this.pattPos}`);
         break;
 
-      case 0xC: // Set volume
-        ch.volume = Math.min(64, param);
-        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+      case 0xC: // Set volume (MOD/XM) or Retrigger (Furnace)
+        if (this.isFurnace) {
+          // Furnace: 0Cxx = retrigger every xx ticks
+          if (param > 0) {
+            ch.retrigCount = param;
+          }
+        } else {
+          ch.volume = Math.min(64, param);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        }
         break;
 
-      case 0xD: // Pattern break
-        this.pBreakPos = x * 10 + y; // BCD
+      case 0xD: { // Pattern break
+        // Furnace uses hex param, MOD/XM uses BCD
+        const breakPos = this.isFurnace ? param : (x * 10 + y);
         // Clamp to pattern length if known (default to 63 for legacy compatibility)
         const nextPattNum = this.song ? this.song.songPositions[this.songPos + 1] : undefined;
         const nextPattLen = (this.song && nextPattNum !== undefined) ? (this.song.patterns[nextPattNum]?.length ?? 64) : 64;
-        if (this.pBreakPos >= nextPattLen) this.pBreakPos = 0;
         
-        this.pBreakFlag = true;
-        console.log(`[TrackerReplayer] Dxx Effect (Pattern Break): targetRow=${this.pBreakPos}, channel=${chIndex}, row=${this.pattPos}`);
+        // COMPAT FLAG: jumpTreatment controls how 0Dxx interacts with 0Bxx
+        const jt = this.compatFlags?.jumpTreatment ?? 0;
+        if (jt === 2) {
+          // DefleMask: 0D always takes effect (overrides previous 0Bxx), unless last order + ignoreJumpAtEnd
+          const lastOrder = this.song ? this.songPos >= this.song.songPositions.length - 1 : false;
+          if (!lastOrder || !this.compatFlags?.ignoreJumpAtEnd) {
+            if (!this.posJumpFlag) {
+              // No 0Bxx present, jump to next order
+              this.posJumpPos = this.songPos + 1;
+              this.posJumpFlag = true;
+            }
+            this.pBreakPos = breakPos >= nextPattLen ? 0 : breakPos;
+            this.pBreakFlag = true;
+          }
+        } else if (jt === 1) {
+          // Old Furnace: 0D ignored if 0Bxx is already present (first wins)
+          const lastOrder = this.song ? this.songPos >= this.song.songPositions.length - 1 : false;
+          if (!this.posJumpFlag && (!lastOrder || !this.compatFlags?.ignoreJumpAtEnd)) {
+            this.posJumpPos = this.songPos + 1;
+            this.posJumpFlag = true;
+            this.pBreakPos = breakPos >= nextPattLen ? 0 : breakPos;
+            this.pBreakFlag = true;
+          }
+        } else {
+          // Normal (0): 0D sets break position, if no 0B present, advance to next order
+          const lastOrder = this.song ? this.songPos >= this.song.songPositions.length - 1 : false;
+          if (!lastOrder || !this.compatFlags?.ignoreJumpAtEnd) {
+            if (!this.posJumpFlag) {
+              this.posJumpPos = this.songPos + 1;
+              this.posJumpFlag = true;
+            }
+            this.pBreakPos = breakPos >= nextPattLen ? 0 : breakPos;
+            this.pBreakFlag = true;
+          }
+        }
         break;
+      }
 
       case 0xE: // Extended effects
         this.processExtendedEffect0(chIndex, ch, x, y, time);
@@ -1055,6 +1282,12 @@ export class TrackerReplayer {
           if (this.speed !== param) {
             console.log(`[TrackerReplayer] Fxx effect: setting speed to ${param} (was ${this.speed})`);
             this.speed = param;
+            // For Furnace: update the speeds array (single speed overrides alternation)
+            if (this.isFurnace) {
+              this.speeds = [param];
+              this.curSpeed = 0;
+              this.nextSpeed = param;
+            }
             // Update UI to reflect the speed change from the module
             useTransportStore.getState().setSpeed(param);
           }
@@ -1066,6 +1299,55 @@ export class TrackerReplayer {
             useTransportStore.getState().setBPM(param);
           }
         }
+        break;
+
+      // === Furnace Effects ===
+      case 0xDC: { // Delayed note cut (Furnace)
+        // DCxx: Cut note after xx ticks
+        // COMPAT FLAG: delayBehavior controls whether delay values >= speed are accepted
+        const dcComparison = this.compatFlags?.delayBehavior === 1 
+          ? (param > 0 && param <= this.nextSpeed)
+          : this.compatFlags?.delayBehavior === 2 
+            ? (param > 0)
+            : (param > 0 && param < this.nextSpeed);
+        if (dcComparison) {
+          ch.retrigCount = param; // Reuse retrigCount for delayed cut
+        }
+        break;
+      }
+
+      case 0xEC: { // Delayed note release (Furnace)
+        // ECxx: Release note envelope after xx ticks
+        // COMPAT FLAG: delayBehavior controls whether delay values >= speed are accepted
+        const ecComparison = this.compatFlags?.delayBehavior === 1
+          ? (param > 0 && param <= this.nextSpeed)
+          : this.compatFlags?.delayBehavior === 2
+            ? (param > 0)
+            : (param > 0 && param < this.nextSpeed);
+        if (ecComparison) {
+          ch.retrigCount = param;
+        }
+        break;
+      }
+
+      case 0xF0: // Set BPM (full range, Furnace)
+        // F0xx: Set BPM directly (0xF0 + xx = full 8-bit BPM value)
+        if (param > 0) {
+          this.bpm = param;
+          useTransportStore.getState().setBPM(param);
+        }
+        break;
+
+      case 0xF3: // Fine volume slide up (Furnace)
+        // F3xx: Increase volume by xx on tick 0
+        ch.volume = Math.min(64, ch.volume + param);
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        break;
+
+      case 0xF4: // Fine volume slide down (Furnace)
+        // F4xx: Decrease volume by xx on tick 0
+        ch.volume = Math.max(0, ch.volume - param);
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
         break;
 
       // === Furnace Extended Effects ===
@@ -1095,6 +1377,54 @@ export class TrackerReplayer {
         // Additional macro control commands can be added here
         break;
 
+      case 0xF8: // Single volume slide up (Furnace)
+        // F8xx: Increase volume by xx once, stop any ongoing slide
+        ch.volume = Math.min(64, ch.volume + param);
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        break;
+
+      case 0xF9: // Single volume slide down (Furnace)
+        // F9xx: Decrease volume by xx once, stop any ongoing slide
+        ch.volume = Math.max(0, ch.volume - param);
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        break;
+
+      case 0xFA: // Fast volume slide (Furnace)
+        // FAxy: Volume slide at 4x speed (x=up, y=down)
+        // Stored for per-tick processing at 4x rate
+        if (param !== 0) ch.globalVolSlide = param; // Reuse slide memory
+        break;
+
+      case 0xFC: // Delayed note release (Furnace)
+        // FCxx: Release note after xx ticks (envelope release, not full cut)
+        // Uses the delayed cut system with cutType=1 (release)
+        if (this.compatFlags?.delayBehavior === 2 || param < this.nextSpeed) {
+          ch.retrigCount = param + 1; // +1 because it's ticked after row processing
+        }
+        break;
+
+      case 0xFD: // Set virtual tempo numerator (Furnace)
+        // FDxx: Set virtual tempo numerator
+        if (this.isFurnace && param > 0) {
+          this.virtualTempoN = param;
+          // Recalculate BPM to match: BPM = 2.5 * hz * (N / D)
+          this.bpm = Math.round(2.5 * this.hz * (this.virtualTempoN / this.virtualTempoD));
+          console.log(`[TrackerReplayer] FDxx: virtualTempoN=${this.virtualTempoN}, BPM=${this.bpm}`);
+          useTransportStore.getState().setBPM(this.bpm);
+        }
+        break;
+
+      case 0xFE: // Set virtual tempo denominator (Furnace)
+        // FExx: Set virtual tempo denominator
+        if (this.isFurnace && param > 0) {
+          this.virtualTempoD = param;
+          // Recalculate BPM to match: BPM = 2.5 * hz * (N / D)
+          this.bpm = Math.round(2.5 * this.hz * (this.virtualTempoN / this.virtualTempoD));
+          console.log(`[TrackerReplayer] FExx: virtualTempoD=${this.virtualTempoD}, BPM=${this.bpm}`);
+          useTransportStore.getState().setBPM(this.bpm);
+        }
+        break;
+
       case 0xFF: // Stop song (Furnace)
         // FFxx: Stop playback
         this.stop();
@@ -1118,6 +1448,113 @@ export class TrackerReplayer {
       case 0x1B: // Retrigger with volume slide (Rxy) - IT style
         ch.retrigCount = param & 0x0F;
         ch.retrigVolSlide = (param >> 4) & 0x0F;
+        break;
+
+      // === Furnace Global Effects (0x80+) ===
+      case 0x80: { // Panning (linear, Furnace)
+        // 80xx: Linear panning (0=left, FF=right, 80=center)
+        // Convert linear to -1..1 range
+        ch.panning = (param - 128) / 128;
+        ch.panNode.pan.setValueAtTime(ch.panning, time);
+        break;
+      }
+
+      case 0x81: { // Pan left (8-bit, Furnace)
+        // 81xx: Set left panning volume (0-FF)
+        const panL = param / 255;
+        ch.panning = -(1 - panL); // Higher value = less panned left
+        ch.panNode.pan.setValueAtTime(ch.panning, time);
+        break;
+      }
+
+      case 0x82: { // Pan right (8-bit, Furnace)
+        // 82xx: Set right panning volume (0-FF)
+        const panR = param / 255;
+        ch.panning = 1 - panR; // Higher value = less panned right
+        ch.panNode.pan.setValueAtTime(ch.panning, time);
+        break;
+      }
+
+      case 0x83: // Pan slide (Furnace)
+        // 83xy: Pan slide (x=right speed, y=left speed)
+        if (param !== 0) ch.panSlide = param;
+        break;
+
+      case 0xD3: // Volume portamento (Furnace)
+        // D3xx: Slide volume to target xx
+        ch.volSlideTarget = param;
+        ch.volSlideSpeed = 1;
+        break;
+
+      case 0xD4: // Volume portamento fast (Furnace)
+        // D4xx: Fast volume slide to target xx (256x speed)
+        ch.volSlideTarget = param;
+        ch.volSlideSpeed = 256;
+        break;
+
+      case 0xE0: // Arp speed (Furnace)
+        // E0xx: Set arpeggio speed (ticks per arp step)
+        ch.arpSpeed = Math.max(1, param);
+        break;
+
+      case 0xE1: { // Portamento up shorthand (Furnace)
+        // E1xy: Portamento up by y semitones at speed x*4
+        const speed = ((param >> 4) & 0x0F) * 4;
+        const semitones = param & 0x0F;
+        if (speed > 0 && semitones > 0) {
+          ch.portaSpeed = speed;
+          ch.portaTarget = Math.max(113, ch.period - semitones * 16);
+        }
+        break;
+      }
+
+      case 0xE2: { // Portamento down shorthand (Furnace)
+        // E2xy: Portamento down by y semitones at speed x*4
+        const speed = ((param >> 4) & 0x0F) * 4;
+        const semitones = param & 0x0F;
+        if (speed > 0 && semitones > 0) {
+          ch.portaSpeed = speed;
+          ch.portaTarget = Math.min(856, ch.period + semitones * 16);
+        }
+        break;
+      }
+
+      case 0xE3: // Vibrato shape (Furnace standalone, NOT Exy)
+        // E3xx: Set vibrato waveform (0=sine, 1=ramp, 2=square, 3=random)
+        ch.vibratoWaveform = param & 0x03;
+        break;
+
+      case 0xE4: // Vibrato range (Furnace)
+        // E4xx: Set vibrato depth multiplier
+        ch.vibratoRange = param > 0 ? param : 1;
+        break;
+
+      case 0xE5: // Set pitch (Furnace)
+        // E5xx: Set absolute pitch offset (xx - 0x80, centered at 0x80)
+        ch.fineTune = param - 0x80;
+        this.updatePeriod(ch);
+        break;
+
+      case 0xEA: // Legato mode (Furnace)
+        // EAxx: Toggle legato mode (inhibits note-on, only changes pitch)
+        ch.legato = param > 0;
+        break;
+
+      case 0xEB: // Sample bank (Furnace, legacy)
+        // EBxx: Set sample bank for 17xx effects
+        ch.sampleBank = param;
+        break;
+
+      case 0xF1: // Single pitch slide up (Furnace, post-effect)
+        // F1xx: Slide pitch up by xx units once (after note-on)
+        ch.period = Math.max(113, ch.period - param);
+        this.updatePeriod(ch);
+        break;
+
+      case 0xF2: // Single pitch slide down (Furnace, post-effect)
+        // F2xx: Slide pitch down by xx units once (after note-on)
+        ch.period = Math.min(856, ch.period + param);
+        this.updatePeriod(ch);
         break;
     }
   }
@@ -1507,6 +1944,13 @@ export class TrackerReplayer {
       if (ch.period < ch.portaTarget) ch.period = ch.portaTarget;
     }
 
+    // COMPAT FLAG: targetResetsSlides - reset slides when portamento reaches target
+    if (ch.period === ch.portaTarget && this.compatFlags?.targetResetsSlides) {
+      ch.portaSpeed = 0;
+      ch.tonePortaSpeed = 0;
+      ch.portaTarget = 0;
+    }
+
     this.updatePeriod(ch);
   }
 
@@ -1561,11 +2005,13 @@ export class TrackerReplayer {
   private doVolumeSlide(ch: ChannelState, param: number, time: number): void {
     const x = (param >> 4) & 0x0F;
     const y = param & 0x0F;
+    // COMPAT FLAG: legacyVolumeSlides - 2x speed volume slides
+    const mult = this.compatFlags?.legacyVolumeSlides ? 2 : 1;
 
     if (x > 0) {
-      ch.volume = Math.min(64, ch.volume + x);
+      ch.volume = Math.min(64, ch.volume + x * mult);
     } else if (y > 0) {
-      ch.volume = Math.max(0, ch.volume - y);
+      ch.volume = Math.max(0, ch.volume - y * mult);
     }
 
     ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
@@ -2037,6 +2483,28 @@ export class TrackerReplayer {
       this.onSongEnd?.();
     } else if (this.songPos !== oldPos) {
       console.log(`[TrackerReplayer] Position Transition: pos=${oldPos}->${this.songPos}, row=${oldRow}->${this.pattPos}, pattern=${patternNum}`);
+    }
+
+    // Speed alternation (matches Furnace playback.cpp nextRow())
+    // After advancing, set ticks to current speed and cycle to next
+    if (this.isFurnace && this.speeds.length > 0) {
+      // Furnace brokenSpeedSel compat flag: DefleMask-style 2-speed selection
+      if (this.compatFlags?.brokenSpeedSel) {
+        const speed2 = this.speeds.length >= 2 ? this.speeds[1] : this.speeds[0];
+        const speed1 = this.speeds[0];
+        if ((patternLength & 1) && (this.songPos & 1)) {
+          this.speed = (this.pattPos & 1) ? speed2 : speed1;
+          this.nextSpeed = (this.pattPos & 1) ? speed1 : speed2;
+        } else {
+          this.speed = (this.pattPos & 1) ? speed1 : speed2;
+          this.nextSpeed = (this.pattPos & 1) ? speed2 : speed1;
+        }
+      } else {
+        // Normal speed alternation
+        this.speed = this.speeds[this.curSpeed];
+        this.curSpeed = (this.curSpeed + 1) % this.speeds.length;
+        this.nextSpeed = this.speeds[this.curSpeed];
+      }
     }
 
     // Notify

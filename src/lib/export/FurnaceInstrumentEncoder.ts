@@ -26,23 +26,35 @@
 import type { FurnaceConfig, FurnaceMacro } from '@typedefs/instrument';
 
 // DivInstrumentType values (from instrument.h)
+// DivInstrumentType values (from instrument.h)
 const DIV_INS_STD = 0;
 const DIV_INS_FM = 1;
 const DIV_INS_GB = 2;
 const DIV_INS_C64 = 3;
-const DIV_INS_N163 = 17;
-const DIV_INS_OPZ = 19;
-const DIV_INS_SNES = 29;
-const DIV_INS_OPL_DRUMS = 32;
-const DIV_INS_OPM = 33;
+const DIV_INS_AMIGA = 4;
+const DIV_INS_PCE = 5;
+const DIV_INS_AY = 6;
+const DIV_INS_TIA = 8;
 const DIV_INS_OPLL = 13;
 const DIV_INS_OPL = 14;
 const DIV_INS_FDS = 15;
+const DIV_INS_N163 = 17;
+const DIV_INS_OPZ = 19;
+const DIV_INS_VRC6 = 12;
+const DIV_INS_VRC6_SAW = 26;
+const DIV_INS_ES5506 = 27;
+const DIV_INS_SNES = 29;
+const DIV_INS_OPL_DRUMS = 32;
+const DIV_INS_OPM = 33;
+const DIV_INS_NES = 34;
 const DIV_INS_ESFM = 55;
+
+const DIV_INS_OPN2203 = 32; // same as LD/OPL_DRUMS in some versions, but unique in engine
+const DIV_INS_OPNBB = 33; // same as OPM in some versions
 
 /** All FM-based instrument types that have operator data */
 const FM_INSTRUMENT_TYPES = new Set([
-  DIV_INS_STD,  // STD can have FM data too
+  DIV_INS_STD,
   DIV_INS_FM,
   DIV_INS_OPLL,
   DIV_INS_OPL,
@@ -50,6 +62,11 @@ const FM_INSTRUMENT_TYPES = new Set([
   DIV_INS_OPL_DRUMS,
   DIV_INS_OPM,
   DIV_INS_ESFM,
+  DIV_INS_VRC6, // VRC6 has FM-like operator data for saw channel
+  DIV_INS_VRC6_SAW,
+  12, // VRC7 ID in some contexts
+  32, // OPN2203
+  33, // OPNBB
 ]);
 
 /**
@@ -119,7 +136,24 @@ function resolveInsType(config: FurnaceConfig): number {
   if (config.fds) return DIV_INS_FDS;        // 15
   if (config.snes) return DIV_INS_SNES;      // 29
   if (config.esfm) return DIV_INS_ESFM;      // 55
-  // Fall back to chipType as-is (works for FM types where values coincide)
+  if (config.amiga) return DIV_INS_AMIGA;    // 4
+  
+  // PCE and AY also have specific types in Furnace
+  if (config.chipType === 5) return DIV_INS_PCE; // 5
+  if (config.chipType === 6) return DIV_INS_AY;  // 6
+  if (config.chipType === 8) return DIV_INS_TIA; // 8
+  if (config.chipType === 21) return DIV_INS_NES; // 34
+  if (config.chipType === 27) return DIV_INS_ES5506; // 27
+
+  // SID variations (SID2=63, SID3=66) all use the C64 encoding block for base SID params
+  if (config.chipType === 63 || config.chipType === 66) return DIV_INS_C64;
+
+  // Special cases for FM variations
+  if (config.chipType === 12) return 12; // VRC7
+  if (config.chipType === 47) return DIV_INS_OPN2203; // 32
+  if (config.chipType === 48) return DIV_INS_OPNBB;   // 33
+
+  // Fall back to chipType as-is (works for FM types and other standard chips where values coincide)
   return config.chipType;
 }
 
@@ -167,7 +201,7 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
   //   [8]=dt2 [9]=rs [10]=dt(signed) [11]=d2r [12]=ssgEnv [13]=dam [14]=dvb [15]=egt
   //   [16]=ksl [17]=sus [18]=vib [19]=ws [20]=ksr [21]=kvs [22-23]=pad
   let fmOffset = 0;
-  if (FM_INSTRUMENT_TYPES.has(config.chipType) && config.operators && config.operators.length > 0) {
+  if (FM_INSTRUMENT_TYPES.has(insType) && config.operators && config.operators.length > 0) {
     fmOffset = writer.getPosition();
 
     writer.writeUint8(config.algorithm || 0);
@@ -285,7 +319,7 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     }
   }
 
-  if (insType === DIV_INS_C64 && config.c64) {
+  if ((insType === DIV_INS_C64 || insType === 63 || insType === 66) && config.c64) {
     chipOffset = writer.getPosition();
     const c64 = config.c64;
     
