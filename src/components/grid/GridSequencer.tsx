@@ -166,10 +166,10 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     return () => resizeObserver.disconnect();
   }, [maxSteps]);
 
-  // RAF-based smooth scrolling (only when smooth scrolling enabled)
+  // RAF-based smooth scrolling (only when smooth scrolling enabled and smooth marker disabled)
   useEffect(() => {
-    if (!isPlaying || !smoothScrolling) {
-      // Reset refs when not playing
+    if (!isPlaying || !smoothScrolling || smoothMarker) {
+      // Reset refs when not playing or smooth marker is active
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = 0;
@@ -505,6 +505,25 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
           onKeyDown={handleKeyDown}
           tabIndex={0}
         >
+          {/* Animated gradient overlay for smooth visual flow */}
+          {smoothMarker && isPlaying && currentStep >= 0 && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: `linear-gradient(90deg, 
+                  transparent 0%, 
+                  transparent ${Math.max(0, ((displayStep / maxSteps) * 100) - 3)}%, 
+                  rgba(239, 68, 68, 0.15) ${Math.max(0, ((displayStep / maxSteps) * 100) - 1.5)}%, 
+                  rgba(239, 68, 68, 0.3) ${(displayStep / maxSteps) * 100}%, 
+                  rgba(239, 68, 68, 0.15) ${Math.min(100, ((displayStep / maxSteps) * 100) + 1.5)}%, 
+                  transparent ${Math.min(100, ((displayStep / maxSteps) * 100) + 3)}%, 
+                  transparent 100%
+                )`,
+                zIndex: 6,
+              }}
+            />
+          )}
+
           {/* Step numbers header */}
           <div className="flex items-center mb-1 pl-12 relative" role="row" style={{ zIndex: 10 }}>
             {smoothMarker && isPlaying && currentStep >= 0 && (
