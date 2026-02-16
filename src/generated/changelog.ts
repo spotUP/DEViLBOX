@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-16T17:23:02.394Z
+ * Generated: 2026-02-16T17:57:07.644Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '704';
-export const BUILD_HASH = '891f989';
+export const BUILD_NUMBER = '707';
+export const BUILD_HASH = 'abdb05c';
 export const BUILD_DATE = '2026-02-16';
 
 // Full semantic version with build number
@@ -33,6 +33,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-16',
     changes: [
+      {
+        type: 'fix',
+        "description": "Play always starts from row 0 of current pattern"
+      },
+      {
+        type: 'fix',
+        "description": "IOS audio - touchstart unlock, remove hardcoded 44100Hz, consolidate AudioContexts"
+      },
+      {
+        type: 'fix',
+        "description": "Stop playback no longer resets row position to 0"
+      },
       {
         type: 'fix',
         "description": "Stop playback keeps current position instead of resetting to start"
@@ -226,18 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Rename command buttons to 'Reference' for clarity"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate chip-specific command reference and wire up recording settings"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve 'mostly black' UI issue and standardize backgrounds"
-      },
-      {
-        type: 'improvement',
-        "description": "Global audit and standardization of borders and dividers"
       }
     ]
   }
