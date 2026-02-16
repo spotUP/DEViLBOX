@@ -319,7 +319,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     shortName: 'SID',
     description: 'Commodore 64 SID chip - 3 voices with filters',
     bestFor: ['SID leads', 'Arpeggios', 'Filter sweeps', 'Demoscene'],
-    icon: 'Terminal',
+    icon: 'Computer',
     color: 'text-violet-500',
   },
   FurnaceAY: {
@@ -392,7 +392,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     shortName: '6581',
     description: 'Classic C64 SID - warm, gritty original chip',
     bestFor: ['Authentic C64', 'Warm bass', 'Classic demoscene'],
-    icon: 'Terminal',
+    icon: 'Computer',
     color: 'text-violet-400',
   },
   FurnaceSID8580: {
@@ -401,7 +401,7 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     shortName: '8580',
     description: 'Revised SID - cleaner filter, brighter sound',
     bestFor: ['Clean SID', 'Later C64/C128', 'Clearer filters'],
-    icon: 'Terminal',
+    icon: 'Computer',
     color: 'text-violet-600',
   },
   // Additional FM chips
