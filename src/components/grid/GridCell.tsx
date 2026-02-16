@@ -399,7 +399,7 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
           rounded border relative
           transition-[transform,box-shadow] duration-75
           ${getBaseClasses()}
-          ${isCurrentStep && !isTriggered ? 'bg-accent-primary/30' : getOctaveBorderClasses()}
+          ${getOctaveBorderClasses()}
           ${isFocused && !isCurrentStep ? 'ring-2 ring-text-secondary ring-offset-1 ring-offset-dark-bg' : ''}
           ${isActive ? 'shadow-sm' : ''}
           ${isTriggered && isActive ? '!bg-white scale-[1.35] shadow-2xl shadow-white/70 !border-white' : ''}
@@ -410,11 +410,23 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
         aria-label={`Step ${stepIndex + 1}, Note ${NOTE_NAMES[noteIndex]}${isActive ? `, Active` : ''}`}
         aria-pressed={isActive}
       >
-        {/* Trail overlay - renders on top of everything */}
+        {/* Current step marker overlay - exact same size as cell */}
+        {isCurrentStep && !isTriggered && (
+          <div 
+            className="absolute rounded pointer-events-none"
+            style={{
+              inset: '-1px',
+              backgroundColor: 'rgba(239, 68, 68, 0.3)',
+              zIndex: 4,
+            }}
+          />
+        )}
+        {/* Trail overlay - renders on top of everything, extends over border */}
         {trailOpacity > 0 && (
           <div 
-            className="absolute inset-0 rounded pointer-events-none"
+            className="absolute rounded pointer-events-none"
             style={{
+              inset: '-1px',
               backgroundColor: `rgba(239, 68, 68, ${trailOpacity * 0.4})`,
               zIndex: 5,
             }}
