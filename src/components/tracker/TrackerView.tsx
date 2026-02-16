@@ -553,7 +553,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
         // Apply system preset channel metadata from Furnace
         const furnaceData = importMetadata.furnaceData;
-        const channelMetadata = furnaceData 
+        const channelMetadata = (furnaceData?.systems && furnaceData?.systemChans)
           ? getChannelMetadataFromFurnace(
               furnaceData.systems,
               furnaceData.systemChans,
@@ -564,7 +564,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           : null;
         
         if (channelMetadata) {
-          console.log(`[Import] Applied system preset: ${furnaceData?.systemName}, systems: [${furnaceData?.systems.map((s: number) => '0x' + s.toString(16)).join(', ')}]`);
+          console.log(`[Import] Applied system preset: ${furnaceData?.systemName}, systems: [${furnaceData?.systems?.map((s: number) => '0x' + s.toString(16)).join(', ')}]`);
         }
 
         result = {
