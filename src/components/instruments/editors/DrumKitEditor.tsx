@@ -141,6 +141,8 @@ export const DrumKitEditor: React.FC<DrumKitEditorProps> = ({ instrument, onUpda
     try {
       await Tone.start();
       const engine = getToneEngine();
+      // Ensure synth is ready (for WASM synths like FurnaceDispatch)
+      await engine.ensureInstrumentReady(instrument);
       const noteName = midiToNoteName(note);
       const now = Tone.now();
       engine.triggerNoteAttack(instrument.id, noteName, now, 0.8, instrument);

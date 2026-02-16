@@ -670,7 +670,8 @@ export class ToneEngine {
    */
   public async ensureWASMSynthsReady(configs: InstrumentConfig[]): Promise<void> {
     const wasmConfigs = configs.filter((c) => 
-      ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd'].includes(c.synthType || '')
+      ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace'].includes(c.synthType || '') ||
+      c.synthType?.startsWith('Furnace')
     );
     if (wasmConfigs.length === 0) return;
 
@@ -684,6 +685,18 @@ export class ToneEngine {
     }
     if (promises.length > 0) {
       await Promise.all(promises);
+    }
+  }
+
+  /**
+   * Ensure a single instrument is ready to play.
+   * Creates the instrument if needed and waits for WASM/async initialization.
+   * Call this before triggerNoteAttack for FurnaceDispatch and other WASM synths.
+   */
+  public async ensureInstrumentReady(config: InstrumentConfig): Promise<void> {
+    const instrument = this.getInstrument(config.id, config);
+    if (instrument && typeof (instrument as any).ensureInitialized === 'function') {
+      await (instrument as any).ensureInitialized();
     }
   }
 

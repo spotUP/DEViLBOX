@@ -269,11 +269,14 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
 
   // ============ NOTE PREVIEW ============
 
-  const previewNoteSound = useCallback((midiNote: number) => {
+  const previewNoteSound = useCallback(async (midiNote: number) => {
     if (currentInstrumentId === null) return;
     const engine = getToneEngine();
     const instrument = instruments.find((i) => i.id === currentInstrumentId);
     if (!instrument) return;
+
+    // Ensure synth is ready (for WASM synths like FurnaceDispatch)
+    await engine.ensureInstrumentReady(instrument);
 
     const noteName = getNoteNameFromMidi(midiNote);
     previewingNote.current = noteName;

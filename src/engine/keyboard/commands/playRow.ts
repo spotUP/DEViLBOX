@@ -15,7 +15,7 @@ import { NOTE_OFF } from '@/types/tracker';
  *
  * @returns true (always plays row)
  */
-export function playRow(): boolean {
+export async function playRow(): Promise<boolean> {
   const { cursor, patterns, currentPatternIndex } = useTrackerStore.getState();
   const pattern = patterns[currentPatternIndex];
 
@@ -27,7 +27,9 @@ export function playRow(): boolean {
   const engine = getToneEngine();
   const { instruments } = useInstrumentStore.getState();
 
-  // Play all notes in the current row across all channels
+  // Collect notes to play
+  const notesToPlay: Array<{ instrumentId: number; noteStr: string; chIdx: number; instrument: typeof instruments[0] }> = [];
+
   pattern.channels.forEach((channel, chIdx) => {
     const cell = channel.rows[cursor.rowIndex];
 
@@ -42,9 +44,16 @@ export function playRow(): boolean {
     const instrument = instruments.find(i => i.id === instrumentId);
     if (!instrument) return;
 
-    // Note: triggerNoteAttack is synchronous and handles errors internally
-    engine.triggerNoteAttack(instrumentId, noteStr, chIdx, 1, instrument);
+    notesToPlay.push({ instrumentId, noteStr, chIdx, instrument });
   });
+
+  // Ensure all instruments are ready (for WASM synths)
+  await Promise.all(notesToPlay.map(n => engine.ensureInstrumentReady(n.instrument)));
+
+  // Now trigger all notes
+  for (const { instrumentId, noteStr, chIdx, instrument } of notesToPlay) {
+    engine.triggerNoteAttack(instrumentId, noteStr, chIdx, 1, instrument);
+  }
 
   return true;
 }
