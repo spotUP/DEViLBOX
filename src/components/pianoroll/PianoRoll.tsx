@@ -220,9 +220,12 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       const current = currentScrollXRef.current;
       const diff = target - current;
 
-      // Lerp towards target with factor 0.2 for smooth motion
-      if (Math.abs(diff) > 0.1) {
-        const newScroll = current + diff * 0.2;
+      // Ease-out-cubic for smooth deceleration: t = 1 - (1-t)^3
+      if (Math.abs(diff) > 0.05) {
+        const t = Math.min(Math.abs(diff) / 100, 1); // Normalize distance
+        const eased = 1 - Math.pow(1 - t, 3); // Cubic ease-out
+        const lerpFactor = Math.max(0.3, eased); // Min 0.3 for responsiveness
+        const newScroll = current + diff * lerpFactor;
         currentScrollXRef.current = newScroll;
         usePianoRollStore.setState({
           view: {
