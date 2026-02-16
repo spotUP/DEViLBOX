@@ -56,18 +56,25 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
 
   const { currentRow, isPlaying, smoothScrolling, bpm, speed } = useTransportStore();
 
-  // Get instrument color for this channel
+  // Get channel and current pattern data
   const { patterns, currentPatternIndex } = useTrackerStore();
   const { instruments } = useInstrumentStore();
   const channel = patterns[currentPatternIndex]?.channels[channelIndex];
-  // Use channel's explicit instrumentId, or find the first instrument used in any cell
-  const channelInstrumentId = channel?.instrumentId 
-    ?? channel?.rows?.find(r => r.instrument > 0)?.instrument 
-    ?? 1;
-  const channelInstrument = instruments.find(i => i.id === channelInstrumentId);
-  const synthInfo = channelInstrument ? getSynthInfo(channelInstrument.synthType) : null;
-  const instrumentColor = synthInfo?.color ?? 'text-accent-primary';
-  const instrumentHex = tailwindToHex(instrumentColor);
+
+  // Helper to get instrument color for a specific step
+  const getStepInstrumentColor = useCallback((stepIdx: number): { color: string; hex: string } => {
+    const cell = channel?.rows?.[stepIdx];
+    const instrumentId = cell?.instrument ?? 0;
+    if (instrumentId === 0) {
+      return { color: 'text-accent-primary', hex: '#ef4444' };
+    }
+    const instrument = instruments.find(i => i.id === instrumentId);
+    if (!instrument) {
+      return { color: 'text-accent-primary', hex: '#ef4444' };
+    }
+    const synthInfo = getSynthInfo(instrument.synthType);
+    return { color: synthInfo.color, hex: tailwindToHex(synthInfo.color) };
+  }, [channel, instruments]);
 
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;
@@ -467,6 +474,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
           {/* Step numbers header */}
           <div className="flex items-center mb-1 pl-12" role="row">
             {stepIndices.map((stepIdx) => {
+              const { hex: stepInstrumentHex } = getStepInstrumentColor(stepIdx);
               return (
                 <div
                   key={stepIdx}
@@ -481,7 +489,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                   {currentStep === stepIdx && (
                     <div
                       className="absolute inset-0"
-                      style={{ backgroundColor: instrumentHex, opacity: 0.6 }}
+                      style={{ backgroundColor: stepInstrumentHex, opacity: 0.6 }}
                     />
                   )}
                   <span className="relative z-10">{stepIdx.toString().padStart(2, '0')}</span>
@@ -514,6 +522,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 const isActive = step?.noteIndex === noteIndex;
                 const isFocused = focusedCell?.noteIndex === noteIndex && focusedCell?.stepIndex === stepIdx;
                 const trailOpacity = trailSteps.find(t => t.step === stepIdx)?.opacity || 0;
+                const { color: stepInstrumentColor, hex: stepInstrumentHex } = getStepInstrumentColor(stepIdx);
 
                 return (
                   <div
@@ -539,8 +548,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                       velocity={isActive ? step?.velocity : 100}
                       cellSize={cellSize}
                       trailOpacity={trailOpacity}
-                      instrumentColor={instrumentColor}
-                      instrumentHex={instrumentHex}
+                      instrumentColor={stepInstrumentColor}
+                      instrumentHex={stepInstrumentHex}
                       onClick={handleNoteClick}
                       onToggleAccent={toggleAccent}
                       onToggleSlide={toggleSlide}
