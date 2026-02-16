@@ -31,6 +31,7 @@ import { UndoHistoryPanel } from './UndoHistoryPanel';
 import { PatternMatrix } from './PatternMatrix';
 import { FT2Toolbar } from './FT2Toolbar';
 import { TB303KnobPanel } from './TB303KnobPanel';
+import { SubsongSelector } from './SubsongSelector';
 import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
@@ -964,6 +965,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               ))}
             </select>
           </div>
+
+          {/* Subsong Selector (Furnace multi-subsong modules) */}
+          <SubsongSelector />
 
           {/* Channel Selector (grid and piano roll views) */}
           {(viewMode === 'grid' || viewMode === 'pianoroll') && pattern && (
