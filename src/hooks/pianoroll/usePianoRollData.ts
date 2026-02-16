@@ -138,22 +138,30 @@ export function usePianoRollData(channelIndex?: number) {
   const addNote = useCallback(
     (midiNote: number, startRow: number, duration: number, velocity: number = 100, chIndex?: number) => {
       const targetChannel = chIndex ?? channelIndex ?? 0;
-      if (!pattern) return;
+      if (!pattern) {
+        console.warn('[usePianoRollData] addNote called but no pattern exists');
+        return;
+      }
+
+      console.log('[usePianoRollData] addNote:', { midiNote, startRow, duration, velocity, targetChannel });
 
       const beforeState = saveForUndo(pattern);
 
       // Convert MIDI note to XM note number
       const xmNote = midiToXMNote(midiNote);
+      console.log('[usePianoRollData] Converted MIDI', midiNote, 'to XM note', xmNote);
 
       // Convert velocity to volume (0-127 -> 0x10-0x50, XM set volume range)
       const volumeValue = Math.round((velocity / 127) * 64);
       const volume = 0x10 + volumeValue; // 0x10-0x50 = set volume 0-64
 
       // Set the note
+      console.log('[usePianoRollData] Setting cell:', { channel: targetChannel, row: startRow, xmNote, volume });
       setCell(targetChannel, startRow, { note: xmNote, volume });
 
       // Add note-off at end if within pattern
       if (startRow + duration < (pattern?.length || 64)) {
+        console.log('[usePianoRollData] Adding note-off at row', startRow + duration);
         setCell(targetChannel, startRow + duration, { note: 97 }); // 97 = note off
       }
 
@@ -162,6 +170,7 @@ export function usePianoRollData(channelIndex?: number) {
       if (afterPattern) {
         recordEdit(beforeState, afterPattern, currentPatternIndex, 'Add note');
       }
+      console.log('[usePianoRollData] Note added successfully');
     },
     [channelIndex, pattern, currentPatternIndex, setCell]
   );
