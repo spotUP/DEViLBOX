@@ -235,9 +235,9 @@ const MIDIToolbarDropdownComponent: React.FC<MIDIToolbarDropdownProps> = ({ inli
                   selectedId={selectedOutputId}
                   onSelect={selectOutput}
                 />
-                {/* Mobile Help - Show instructions if on mobile and no devices connected */}
+                {/* Mobile Help - Only show instructions if on mobile, no devices connected, AND there was an error */}
                 {(midiInfo.isIOS || midiInfo.instructions?.includes('Android')) &&
-                 inputDevices.length === 0 && outputDevices.length === 0 && (
+                 inputDevices.length === 0 && outputDevices.length === 0 && lastError && (
                   <div className="mt-2 p-3 bg-dark-bgSecondary rounded border border-dark-border">
                     <div className="flex items-center gap-2 mb-2">
                       <Smartphone size={14} className="text-accent-primary" />
