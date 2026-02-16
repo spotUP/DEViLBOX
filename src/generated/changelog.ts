@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-16T15:27:26.464Z
+ * Generated: 2026-02-16T15:31:09.868Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,8 +20,8 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '696';
-export const BUILD_HASH = 'ed2d07b';
+export const BUILD_NUMBER = '697';
+export const BUILD_HASH = '6875519';
 export const BUILD_DATE = '2026-02-16';
 
 // Full semantic version with build number
@@ -33,6 +33,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-02-16',
     changes: [
+      {
+        type: 'fix',
+        "description": "Resolve 5 TypeScript errors (systemId type, systems nullability)"
+      },
       {
         type: 'fix',
         "description": "Resolve 22 TypeScript errors - add furnaceData to types, fix channelMeta"
@@ -234,10 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Register ModularSynth in InstrumentFactory"
-      },
-      {
-        type: 'fix',
-        "description": "Final audit and fixes for block interpolation"
       }
     ]
   }

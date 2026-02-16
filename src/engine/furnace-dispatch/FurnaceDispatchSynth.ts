@@ -659,17 +659,17 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // Use force=true so insChanged is always set — the instrument data
     // in slot 0 may have been replaced by a preset load, and without
     // forcing, the dispatch skips copying params when the index matches.
-    console.log(`[FurnaceDispatchSynth] triggerAttack: note=${midiNote} chan=${chan} inst=${this.furnaceInstrumentIndex} platform=${pt}`);
-    this.engine.setInstrument(chan, this.furnaceInstrumentIndex, pt, true);
+    console.log(`[FurnaceDispatchSynth] triggerAttack: note=${midiNote} chan=${chan} inst=${this.furnaceInstrumentIndex} platform=${pt} time=${_time?.toFixed(4)}`);
+    this.engine.setInstrument(chan, this.furnaceInstrumentIndex, pt, true, _time);
 
     // Set volume based on velocity
     const maxVol = getMaxVolume(pt);
     const vol = Math.round(velocity * maxVol);
-    this.engine.setVolume(chan, vol, pt);
+    this.engine.setVolume(chan, vol, pt, _time);
 
     // Furnace dispatch uses (midiNote - 12) as the note value
     // The dispatch expects 12 = C-1, so MIDI 60 (C4) = note 60
-    this.engine.noteOn(chan, midiNote, pt);
+    this.engine.noteOn(chan, midiNote, pt, _time);
 
     // Track active note
     this.activeNotes.set(midiNote, chan);
@@ -682,22 +682,25 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     velocity: number = 1,
   ): void {
     this.triggerAttack(note, time, velocity);
-    // Schedule release after duration
+    // Schedule release using timestamped dispatch for sample-accurate timing
     const ctx = this.engine.getNativeCtx();
     if (ctx) {
       const chan = this.currentChannel;
       const releaseTime = (time ?? ctx.currentTime) + duration;
+      // Send note-off with scheduled time — the worklet will apply it
+      // at the exact sample position, avoiding setTimeout's ±15ms jitter
       const timeoutId = setTimeout(() => {
         this._releaseTimeouts.delete(chan);
+        // Fallback: if the scheduled command wasn't processed yet, release now
         this.triggerRelease(note);
-      }, Math.max(0, (releaseTime - ctx.currentTime) * 1000));
-      // Store so triggerAttack can cancel if a new note arrives before release
+      }, Math.max(0, (releaseTime - ctx.currentTime) * 1000) + 50); // +50ms grace
       this._releaseTimeouts.set(chan, timeoutId);
+      // Also send the release as a scheduled command for sample-accurate timing
+      this.triggerRelease(note, releaseTime);
     }
   }
 
   triggerRelease(note?: string | number, time?: number): void {
-    void time;
     if (!this._isReady || this._disposed) return;
 
     if (note !== undefined) {
@@ -710,13 +713,13 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
       const chan = this.activeNotes.get(midiNote);
       if (chan !== undefined) {
-        this.engine.noteOff(chan, this.platformType);
+        this.engine.noteOff(chan, this.platformType, time);
         this.activeNotes.delete(midiNote);
       }
     } else {
       // Release all active notes
       for (const [, chan] of this.activeNotes) {
-        this.engine.noteOff(chan, this.platformType);
+        this.engine.noteOff(chan, this.platformType, time);
       }
       this.activeNotes.clear();
     }

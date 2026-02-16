@@ -1219,31 +1219,31 @@ export class FurnaceDispatchEngine {
   /**
    * Send a raw dispatch command, routed to the correct chip by platformType.
    */
-  dispatch(cmd: number, chan: number, val1: number = 0, val2: number = 0, platformType?: number): void {
+  dispatch(cmd: number, chan: number, val1: number = 0, val2: number = 0, platformType?: number, time?: number): void {
     if (!this.workletNode) return;
     // Log note/instrument commands for debugging
     if (cmd === DivCmd.NOTE_ON || cmd === DivCmd.INSTRUMENT) {
       const cmdName = cmd === DivCmd.NOTE_ON ? 'NOTE_ON' : 'INSTRUMENT';
-      console.log(`[FurnaceDispatch] ${cmdName} ch=${chan} val1=${val1} val2=${val2} platform=${platformType}`);
+      console.log(`[FurnaceDispatch] ${cmdName} ch=${chan} val1=${val1} val2=${val2} platform=${platformType} time=${time?.toFixed(4)}`);
     }
     this.workletNode.port.postMessage({
       type: 'dispatch',
-      cmd, chan, val1, val2, platformType
+      cmd, chan, val1, val2, platformType, time
     });
   }
 
   /**
    * Send a note on command.
    */
-  noteOn(chan: number, note: number, platformType?: number): void {
-    this.dispatch(DivCmd.NOTE_ON, chan, note, 0, platformType);
+  noteOn(chan: number, note: number, platformType?: number, time?: number): void {
+    this.dispatch(DivCmd.NOTE_ON, chan, note, 0, platformType, time);
   }
 
   /**
    * Send a note off command.
    */
-  noteOff(chan: number, platformType?: number): void {
-    this.dispatch(DivCmd.NOTE_OFF, chan, 0, 0, platformType);
+  noteOff(chan: number, platformType?: number, time?: number): void {
+    this.dispatch(DivCmd.NOTE_OFF, chan, 0, 0, platformType, time);
   }
 
   /**
@@ -1251,15 +1251,15 @@ export class FurnaceDispatchEngine {
    * @param force - If true, forces insChanged even if index hasn't changed.
    *   Required after uploading new instrument data to the same slot.
    */
-  setInstrument(chan: number, insIndex: number, platformType?: number, force: boolean = false): void {
-    this.dispatch(DivCmd.INSTRUMENT, chan, insIndex, force ? 1 : 0, platformType);
+  setInstrument(chan: number, insIndex: number, platformType?: number, force: boolean = false, time?: number): void {
+    this.dispatch(DivCmd.INSTRUMENT, chan, insIndex, force ? 1 : 0, platformType, time);
   }
 
   /**
    * Set channel volume.
    */
-  setVolume(chan: number, volume: number, platformType?: number): void {
-    this.dispatch(DivCmd.VOLUME, chan, volume, 0, platformType);
+  setVolume(chan: number, volume: number, platformType?: number, time?: number): void {
+    this.dispatch(DivCmd.VOLUME, chan, volume, 0, platformType, time);
   }
 
   /**
