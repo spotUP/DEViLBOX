@@ -237,6 +237,7 @@ interface NoteCellProps {
   velocity?: number;
   cellSize?: number; // Dynamic cell size (14-28px), defaults to 28
   trailOpacity?: number; // Trail effect opacity (0-1), 0 = no trail
+  instrumentColor?: string; // Tailwind color class from synth info
   onClick: (noteIndex: number, stepIndex: number, modifiers?: { shift?: boolean; ctrl?: boolean; alt?: boolean }) => void;
   onToggleAccent?: (stepIndex: number) => void;
   onToggleSlide?: (stepIndex: number) => void;
@@ -262,6 +263,7 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   velocity = 100,
   cellSize = 28,
   trailOpacity = 0,
+  instrumentColor = 'text-accent-primary',
   onClick,
   onToggleAccent,
   onToggleSlide,
@@ -361,12 +363,15 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
     if (!isActive) {
       return 'bg-dark-bgTertiary hover:bg-dark-bgActive border-dark-border';
     }
-    // Accent notes get bright orange - same as warning buttons
+    // Apply instrument color to active cells
+    const colorClass = instrumentColor.replace('text-', '');
+    
+    // Accent notes get brighter version of instrument color
     if (accent) {
-      return 'bg-accent-warning hover:brightness-110 border-accent-warning/50';
+      return `bg-${colorClass} hover:brightness-110 border-${colorClass}/50`;
     }
-    // Normal notes get bright teal - same as Play buttons
-    return 'bg-accent-primary hover:brightness-110 border-accent-primary/50';
+    // Normal notes get the instrument color with some opacity
+    return `bg-${colorClass}/80 hover:brightness-110 border-${colorClass}/50`;
   };
 
   // Determine border color based on octave shift
@@ -389,7 +394,6 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
         style={{ 
           width: `${cellSize}px`, 
           height: `${cellSize}px`,
-          boxShadow: trailOpacity > 0 ? `inset 0 0 0 100px rgba(239, 68, 68, ${trailOpacity * 0.4})` : undefined,
         }}
         className={`
           rounded transition-all duration-75 border relative
@@ -405,22 +409,31 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
         aria-label={`Step ${stepIndex + 1}, Note ${NOTE_NAMES[noteIndex]}${isActive ? `, Active` : ''}`}
         aria-pressed={isActive}
       >
-        {/* Slide indicator - diagonal line */}
+        {/* Trail overlay - renders on top of everything */}
+        {trailOpacity > 0 && (
+          <div 
+            className="absolute inset-0 rounded pointer-events-none"
+            style={{
+              backgroundColor: `rgba(239, 68, 68, ${trailOpacity * 0.4})`,
+              zIndex: 5,
+            }}
+          />
+        )}
         {/* Slide indicator - diagonal line */}
         {isActive && slide && !mute && (
-          <span className="absolute inset-0 flex items-center justify-center text-white/90 text-xs font-bold">
+          <span className="absolute inset-0 flex items-center justify-center text-white/90 text-xs font-bold z-10">
             ↗
           </span>
         )}
         {/* Mute indicator */}
         {isActive && mute && (
-          <span className="absolute inset-0 flex items-center justify-center text-yellow-400 text-xs font-bold">
+          <span className="absolute inset-0 flex items-center justify-center text-yellow-400 text-xs font-bold z-10">
             M
           </span>
         )}
         {/* Hammer indicator */}
         {isActive && hammer && !mute && (
-          <span className="absolute inset-0 flex items-center justify-center text-cyan-400 text-xs font-bold">
+          <span className="absolute inset-0 flex items-center justify-center text-cyan-400 text-xs font-bold z-10">
             H
           </span>
         )}
