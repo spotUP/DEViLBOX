@@ -540,10 +540,12 @@ export class InstrumentFactory {
           (instrument as FurnaceDispatchSynth).setFurnaceInstrumentIndex(furnaceIndex);
           if (config.furnace) {
             // Encode and upload instrument from config (converts to FINS format)
+            // Track the promise so ensureInitialized() waits for the upload to complete
             console.log(`[InstrumentFactory] Queuing upload for instrument ${config.name}, furnaceIndex=${furnaceIndex}`);
-            (instrument as FurnaceDispatchSynth).uploadInstrumentFromConfig(config.furnace as unknown as Record<string, unknown>, config.name).catch(err => {
+            const uploadPromise = (instrument as FurnaceDispatchSynth).uploadInstrumentFromConfig(config.furnace as unknown as Record<string, unknown>, config.name).catch(err => {
               console.error(`[InstrumentFactory] Failed to upload instrument data for ${config.name}:`, err);
             });
+            (instrument as FurnaceDispatchSynth).setInstrumentUploadPromise(uploadPromise as Promise<void>);
           }
         } else {
           instrument = this.createFurnaceWithChip(config, FurnaceChipType.OPN2);
