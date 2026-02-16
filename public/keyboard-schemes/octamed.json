@@ -126,7 +126,7 @@
       "Ctrl+F": "display_free_memory",
       "Ctrl+Shift+F": "toggle_low_pass_filter",
       "Tab": "highlight_current_line",
-      "Ctrl+Space": "reset_midi_effects"
+      "Ctrl+M": "reset_midi_effects"
     },
     "mac": {
       "Up": "cursor_up",
