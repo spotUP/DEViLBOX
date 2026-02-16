@@ -641,7 +641,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             <div className="ft2-section ft2-col-3">
               <FT2NumericInput label="Pattern" value={patternOrder[currentPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} format="hex" />
             </div>
-            <div className="ft2-section ft2-col-instrument"><InstrumentSelector /></div>
             <div className="ft2-section ft2-section-playback">
               <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm" onClick={handlePlaySong} className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
               <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm" onClick={handlePlayPattern} className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
