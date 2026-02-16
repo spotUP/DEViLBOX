@@ -53,7 +53,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     clearAll,
   } = useGridPattern(channelIndex);
 
-  const { currentRow, isPlaying, smoothScrolling, bpm, speed } = useTransportStore();
+  const { currentRow, isPlaying, smoothScrolling } = useTransportStore();
 
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;
@@ -77,8 +77,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Smooth scroll tracking refs
-  const lastStepRef = useRef<number>(-1);
-  const lastStepTimeRef = useRef<number>(0);
   const currentScrollRef = useRef<number>(0);
   const rafIdRef = useRef<number>(0);
 
@@ -147,6 +145,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   // RAF-based smooth scrolling (only when smooth scrolling enabled)
   useEffect(() => {
     const grid = gridRef.current;
+    const container = scrollContainerRef.current;
     
     if (!isPlaying || !smoothScrolling) {
       // Reset transform and refs when not playing
@@ -160,8 +159,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       return;
     }
 
-    const container = scrollContainerRef.current;
-    const grid = gridRef.current;
     if (!container || !grid) return;
 
     // Cell width = cellSize + gap (mx-0.5 = 4px total), plus row label width
