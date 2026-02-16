@@ -13,17 +13,27 @@
 import { Viewport } from './Viewport';
 import type { PianoRollNote } from '../../../types/pianoRoll';
 
-/** Channel colors (hex) matching the existing palette */
-const CHANNEL_COLORS = [
-  '#06b6d4', // cyan
-  '#a855f7', // purple
-  '#22c55e', // green
-  '#f59e0b', // amber
-  '#ec4899', // pink
-  '#3b82f6', // blue
-  '#ef4444', // red
-  '#14b8a6', // teal
+/** Instrument colors - expanded palette for better differentiation */
+const INSTRUMENT_COLORS = [
+  '#06b6d4', // cyan - inst 0
+  '#a855f7', // purple - inst 1
+  '#22c55e', // green - inst 2
+  '#f59e0b', // amber - inst 3
+  '#ec4899', // pink - inst 4
+  '#3b82f6', // blue - inst 5
+  '#ef4444', // red - inst 6
+  '#14b8a6', // teal - inst 7
+  '#f97316', // orange - inst 8
+  '#8b5cf6', // violet - inst 9
+  '#10b981', // emerald - inst 10
+  '#eab308', // yellow - inst 11
+  '#d946ef', // fuchsia - inst 12
+  '#0ea5e9', // sky - inst 13
+  '#fb923c', // orange-400 - inst 14
+  '#84cc16', // lime - inst 15
 ];
+
+const DEFAULT_COLOR = '#64748b'; // gray for null instrument
 
 const NOTE_RADIUS = 5;
 const NOTE_V_PADDING = 3; // vertical padding within lane
@@ -151,7 +161,9 @@ export class NoteRenderer {
     const h = vp.verticalZoom - NOTE_V_PADDING * 2 - 1; // breathing room
 
     const noteW = Math.max(4, w - 1); // Minimum visible width, small gap
-    const color = CHANNEL_COLORS[note.channelIndex % CHANNEL_COLORS.length];
+    const color = note.instrument !== null
+      ? INSTRUMENT_COLORS[note.instrument % INSTRUMENT_COLORS.length]
+      : DEFAULT_COLOR;
 
     // Base opacity varies with velocity (squared curve for perceptual brightness)
     const velNorm = note.velocity / 127;
@@ -281,7 +293,9 @@ export class NoteRenderer {
     const y = rawY + NOTE_V_PADDING;
     const h = vp.verticalZoom - NOTE_V_PADDING * 2 - 1;
     const noteW = Math.max(4, w - 1);
-    const color = CHANNEL_COLORS[note.channelIndex % CHANNEL_COLORS.length];
+    const color = note.instrument !== null
+      ? INSTRUMENT_COLORS[note.instrument % INSTRUMENT_COLORS.length]
+      : DEFAULT_COLOR;
 
     ctx.globalAlpha = 0.35;
     ctx.fillStyle = color;
