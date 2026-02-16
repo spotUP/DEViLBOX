@@ -519,16 +519,18 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
           tabIndex={0}
         >
           {/* Step numbers header */}
-          <div className="flex items-center mb-1 pl-12 relative" role="row">
+          <div className="flex items-center mb-1 pl-12 relative" role="row" style={{ zIndex: 10 }}>
             {smoothMarker && isPlaying && currentStep >= 0 && (
               <div
-                className="absolute h-4 rounded-sm pointer-events-none"
+                className="absolute rounded-sm pointer-events-none"
                 style={{
                   left: `${48 + (displayStep * (cellSize + 4))}px`,
                   width: `${cellSize}px`,
+                  height: `${cellSize}px`,
                   backgroundColor: '#ef4444',
                   opacity: 0.6,
                   transition: 'none', // No CSS transition, using RAF
+                  zIndex: 5,
                 }}
               />
             )}
@@ -537,18 +539,19 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
               return (
                 <div
                   key={stepIdx}
-                  className={`h-4 flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm relative overflow-hidden
-                    ${stepIdx % 4 === 0 ? 'text-text-secondary' : 'text-text-muted'}
+                  className={`flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm relative overflow-hidden
+                    ${stepIdx % 4 === 0 ? 'text-text-tertiary' : 'text-text-muted'}
                     ${isCurrentDiscrete ? 'text-white font-bold' : ''}
                   `}
                   style={{
                     width: `${cellSize}px`,
+                    height: `${cellSize}px`,
                   }}
                 >
                   {isCurrentDiscrete && (
                     <div
                       className="absolute inset-0"
-                      style={{ backgroundColor: '#ef4444', opacity: 0.6 }}
+                      style={{ backgroundColor: '#ef4444', opacity: 0.6, zIndex: 1 }}
                     />
                   )}
                   <span className="relative z-10">{stepIdx.toString().padStart(2, '0')}</span>
@@ -585,7 +588,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                       height: `${cellSize}px`,
                       backgroundColor: '#ef4444',
                       opacity: 0.35,
-                      zIndex: 4,
+                      zIndex: 20,
                     }}
                   />
                 )}
