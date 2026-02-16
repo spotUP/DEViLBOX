@@ -170,8 +170,6 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   useEffect(() => {
     if (!isPlaying || !smoothScrolling) {
       // Reset refs when not playing
-      lastStepRef.current = -1;
-      lastStepTimeRef.current = 0;
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = 0;
@@ -185,31 +183,20 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     // Cell width = cellSize + gap (mx-0.5 = 4px total), plus row label width
     const CELL_WIDTH = cellSize + 4;
     const LABEL_WIDTH = 48;
-    const msPerRow = (2.5 / bpm) * speed * 1000;
 
     const animate = () => {
-      const now = performance.now();
-
-      // Detect step change
-      if (currentStep !== lastStepRef.current) {
-        lastStepRef.current = currentStep;
-        lastStepTimeRef.current = now;
-      }
-
-      // Calculate smooth progress between steps
-      const elapsed = now - lastStepTimeRef.current;
-      const progress = Math.min(elapsed / msPerRow, 1.0);
-
-      // Calculate target scroll position (current step + fractional progress to next)
-      const smoothStep = currentStep + progress;
-      const stepPosition = LABEL_WIDTH + (smoothStep * CELL_WIDTH);
+      // Use shared smoothStep state (or currentStep if smooth marker disabled)
+      const activeStep = smoothMarker ? smoothStep : currentStep;
+      
+      // Calculate target scroll position
+      const stepPosition = LABEL_WIDTH + (activeStep * CELL_WIDTH);
       const containerWidth = container.clientWidth;
 
       // Keep the playhead in the center third of the view
       const targetScroll = Math.max(0, stepPosition - containerWidth * 0.4);
 
-      // Lerp towards target for smooth movement
-      const lerpFactor = 0.15;
+      // Apply with minimal lerp for smoothness without lag
+      const lerpFactor = 0.3;
       currentScrollRef.current += (targetScroll - currentScrollRef.current) * lerpFactor;
 
       // Apply scroll
@@ -228,7 +215,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         rafIdRef.current = 0;
       }
     };
-  }, [isPlaying, smoothScrolling, bpm, speed, currentStep, cellSize]);
+  }, [isPlaying, smoothScrolling, cellSize, smoothMarker, smoothStep, currentStep]);
 
   // RAF-based smooth marker animation
   useEffect(() => {
