@@ -554,10 +554,13 @@ export class MacroEngine {
     const macros = instrument.furnace.macros;
 
     // Register all active macros from array (macros are indexed by type code)
+    // NOTE: macro.code contains the macro type (VOL=0, ARP=1, etc.)
+    // macro.type may contain word size flags, so we prefer .code
     for (const macro of macros) {
       if (!macro || !macro.data || macro.data.length === 0) continue;
       
-      const state = this.structByType(macro.type);
+      const macroType = macro.code ?? macro.type;
+      const state = this.structByType(macroType);
       if (state) {
         this.addMacro(state, macro, volMacroLinger);
       }
@@ -685,7 +688,8 @@ export class MacroEngine {
     const macros = this.ins.furnace.macros;
     
     // Find macro by type code in array
-    return macros.find(m => m.type === type) ?? null;
+    // NOTE: macro.code contains the macro type, macro.type may contain word size flags
+    return macros.find(m => (m.code ?? m.type) === type) ?? null;
   }
 
   /**
