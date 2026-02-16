@@ -80,6 +80,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const headerScrollRef = useRef<HTMLDivElement>(null);
+  const bottomScrollRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [scrollLeft, setScrollLeft] = useState(0);
   const [scrollY, setScrollY] = useState(0);
@@ -1874,6 +1875,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             if (headerScrollRef.current) {
               headerScrollRef.current.scrollLeft = newScrollLeft;
             }
+            if (bottomScrollRef.current) {
+              bottomScrollRef.current.scrollLeft = newScrollLeft;
+            }
           }
         }
       }
@@ -1885,7 +1889,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Handle header scroll sync
   const handleHeaderScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setScrollLeft(e.currentTarget.scrollLeft);
+    const left = e.currentTarget.scrollLeft;
+    setScrollLeft(left);
+    if (bottomScrollRef.current) bottomScrollRef.current.scrollLeft = left;
+  }, []);
+
+  // Handle bottom scroll sync
+  const handleBottomScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const left = e.currentTarget.scrollLeft;
+    setScrollLeft(left);
+    if (headerScrollRef.current) headerScrollRef.current.scrollLeft = left;
   }, []);
 
   if (!pattern) {
@@ -1980,8 +1993,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       {/* Desktop Channel Header */}
       {!isMobile && (
-        <div className="flex-shrink-0 bg-dark-bgTertiary border-dark-border z-20 relative h-[37px]">
-          <div className="flex h-full">
+        <>
+          {/* Top Scrollbar */}
+          <div
+            ref={bottomScrollRef}
+            onScroll={handleBottomScroll}
+            className={`flex-shrink-0 h-3 bg-dark-bgTertiary border-b border-dark-border overflow-x-auto ${allChannelsFit ? 'hidden' : ''}`}
+            style={{ paddingLeft: LINE_NUMBER_WIDTH }}
+          >
+            <div style={{ width: totalChannelsWidth, height: 1 }} />
+          </div>
+
+          <div className="flex-shrink-0 bg-dark-bgTertiary border-dark-border z-20 relative h-[37px]">
+            <div className="flex h-full">
             {/* Row number column header */}
             <div className="flex-shrink-0 px-2 text-text-muted text-xs font-medium text-center border-r border-dark-border flex items-center justify-center"
                  style={{ width: LINE_NUMBER_WIDTH }}>
@@ -1992,7 +2016,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             <div
               ref={headerScrollRef}
               onScroll={handleHeaderScroll}
-              className={`${allChannelsFit ? 'overflow-x-hidden' : 'overflow-x-auto'} scrollbar-hidden flex-1`}
+              className="overflow-x-hidden flex-1"
               data-vu-scroll
             >
               <div className="flex" style={{ width: totalChannelsWidth }}>
