@@ -202,13 +202,12 @@ export const usePatternPlayback = () => {
         });
       }
     } else if (!isPlaying && hasStartedRef.current) {
-      // Stop playback
+      // Stop playback — keep current position (don't reset row/position)
       console.log('[Playback] Stopping playback');
       hasStartedRef.current = false;
       replayer.stop();
       replayer.onRowChange = null;
       replayer.onSongEnd = null;
-      setCurrentRow(0);
     }
 
     return () => {
