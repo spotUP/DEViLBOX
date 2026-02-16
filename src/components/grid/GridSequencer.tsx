@@ -57,6 +57,16 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
 
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;
+  
+  // Trail steps for visual effect (3 steps behind with decreasing opacity)
+  const trailSteps = useMemo(() => {
+    if (currentStep < 0) return [];
+    return [
+      { step: (currentStep - 1 + maxSteps) % maxSteps, opacity: 0.4 },
+      { step: (currentStep - 2 + maxSteps) % maxSteps, opacity: 0.2 },
+      { step: (currentStep - 3 + maxSteps) % maxSteps, opacity: 0.1 },
+    ];
+  }, [currentStep, maxSteps]);
 
   // Ref for scroll container
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -438,18 +448,26 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         >
           {/* Step numbers header */}
           <div className="flex items-center mb-1 pl-12" role="row">
-            {stepIndices.map((stepIdx) => (
-              <div
-                key={stepIdx}
-                className={`h-4 flex items-center justify-center text-[10px] font-mono mx-0.5
-                  ${stepIdx % 4 === 0 ? 'text-text-primary' : 'text-text-muted'}
-                  ${currentStep === stepIdx ? 'text-accent-primary font-bold' : ''}
-                `}
-                style={{ width: `${cellSize}px` }}
-              >
-                {stepIdx.toString().padStart(2, '0')}
-              </div>
-            ))}
+            {stepIndices.map((stepIdx) => {
+              const isTrailStep = trailSteps.some(t => t.step === stepIdx);
+              const trailOpacity = trailSteps.find(t => t.step === stepIdx)?.opacity || 0;
+              
+              return (
+                <div
+                  key={stepIdx}
+                  className={`h-4 flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm transition-all duration-75
+                    ${stepIdx % 4 === 0 ? 'text-text-secondary' : 'text-text-muted'}
+                    ${currentStep === stepIdx ? 'text-accent-primary font-bold' : ''}
+                  `}
+                  style={{
+                    width: `${cellSize}px`,
+                    backgroundColor: isTrailStep ? `rgba(239, 68, 68, ${trailOpacity})` : (currentStep === stepIdx ? 'var(--color-accent)' : 'transparent'),
+                  }}
+                >
+                  {stepIdx.toString().padStart(2, '0')}
+                </div>
+              );
+            })}
           </div>
 
           {/* Note rows (filtered by scale) */}
@@ -475,9 +493,18 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 const step = gridPattern.steps[stepIdx];
                 const isActive = step?.noteIndex === noteIndex;
                 const isFocused = focusedCell?.noteIndex === noteIndex && focusedCell?.stepIndex === stepIdx;
+                const isTrailStep = trailSteps.some(t => t.step === stepIdx);
+                const trailOpacity = trailSteps.find(t => t.step === stepIdx)?.opacity || 0;
 
                 return (
-                  <div key={stepIdx} className="mx-0.5" role="gridcell">
+                  <div
+                    key={stepIdx}
+                    className="mx-0.5 rounded-sm transition-all duration-75"
+                    role="gridcell"
+                    style={{
+                      backgroundColor: isTrailStep ? `rgba(239, 68, 68, ${trailOpacity * 0.3})` : (currentStep === stepIdx ? 'rgba(239, 68, 68, 0.15)' : (stepIdx % 4 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'transparent')),
+                    }}
+                  >
                     <NoteGridCell
                       noteIndex={noteIndex}
                       stepIndex={stepIdx}
