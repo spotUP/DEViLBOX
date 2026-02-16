@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
+import * as Tone from 'tone';
 import { MobileTabBar } from '@components/layout/MobileTabBar';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { InstrumentList } from '@components/instruments/InstrumentList';
@@ -152,7 +153,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
           {/* Transport controls - Moved to left to avoid hamburger menu overlap */}
           <div className="flex items-center gap-1 flex-shrink-0 mr-1">
             <button
-              onClick={() => togglePlayPause().catch(console.error)}
+              onClick={() => { Tone.start(); togglePlayPause().catch(console.error); }}
               className={`
                 p-2 rounded-lg transition-colors touch-target
                 ${isPlaying

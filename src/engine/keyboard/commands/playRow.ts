@@ -1,3 +1,4 @@
+import * as Tone from 'tone';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -16,6 +17,8 @@ import { NOTE_OFF } from '@/types/tracker';
  * @returns true (always plays row)
  */
 export async function playRow(): Promise<boolean> {
+  // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
+  Tone.start();
   const { cursor, patterns, currentPatternIndex } = useTrackerStore.getState();
   const pattern = patterns[currentPatternIndex];
 
