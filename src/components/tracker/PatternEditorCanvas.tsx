@@ -101,6 +101,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const probCacheRef = useRef<NoteCache>({});
   const paramCacheRef = useRef<NoteCache>({}); // Effect parameters cache
   const lineNumberCacheRef = useRef<NoteCache>({});
+  
+  // Accumulator for horizontal scroll resistance
+  const scrollAccumulatorRef = useRef(0);
 
   // Animation frame ref for smooth updates
   const rafRef = useRef<number | null>(null);
@@ -1838,32 +1841,39 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const maxScroll = Math.max(0, LINE_NUMBER_WIDTH + totalChannelsWidth - container.clientWidth);
 
         if (maxScroll > 0) {
-          const direction = Math.sign(e.deltaX);
-          if (direction === 0) return;
-
-          // Find current leftmost visible channel
-          let currentCh = 0;
-          for (let i = 0; i < channelOffsets.length; i++) {
-            // channelOffsets[i] is the absolute X position.
-            // visual position = channelOffsets[i] - scrollLeft.
-            // If visual position <= LINE_NUMBER_WIDTH + small_threshold, it's the "current" one.
-            // Actually simpler: effectively scrollLeft is (channelOffsets[currentCh] - LINE_NUMBER_WIDTH).
-            const targetScroll = channelOffsets[i] - LINE_NUMBER_WIDTH;
-            if (targetScroll <= scrollLeft + 5) { // +5 epsilon
-              currentCh = i;
-            } else {
-              break;
-            }
-          }
-
-          let nextCh = currentCh + direction;
-          nextCh = Math.max(0, Math.min(channelOffsets.length - 1, nextCh));
+          // Accumulate scroll delta for resistance
+          scrollAccumulatorRef.current += e.deltaX;
           
-          const newScrollLeft = Math.max(0, Math.min(maxScroll, channelOffsets[nextCh] - LINE_NUMBER_WIDTH));
+          const SCROLL_THRESHOLD = 50; // Resistance threshold in pixels
+          
+          if (Math.abs(scrollAccumulatorRef.current) > SCROLL_THRESHOLD) {
+            const direction = Math.sign(scrollAccumulatorRef.current);
+            
+            // Reset accumulator after triggering
+            scrollAccumulatorRef.current = 0;
 
-          setScrollLeft(newScrollLeft);
-          if (headerScrollRef.current) {
-            headerScrollRef.current.scrollLeft = newScrollLeft;
+            if (direction === 0) return;
+
+            // Find current leftmost visible channel
+            let currentCh = 0;
+            for (let i = 0; i < channelOffsets.length; i++) {
+              const targetScroll = channelOffsets[i] - LINE_NUMBER_WIDTH;
+              if (targetScroll <= scrollLeft + 5) { // +5 epsilon
+                currentCh = i;
+              } else {
+                break;
+              }
+            }
+
+            let nextCh = currentCh + direction;
+            nextCh = Math.max(0, Math.min(channelOffsets.length - 1, nextCh));
+            
+            const newScrollLeft = Math.max(0, Math.min(maxScroll, channelOffsets[nextCh] - LINE_NUMBER_WIDTH));
+
+            setScrollLeft(newScrollLeft);
+            if (headerScrollRef.current) {
+              headerScrollRef.current.scrollLeft = newScrollLeft;
+            }
           }
         }
       }
