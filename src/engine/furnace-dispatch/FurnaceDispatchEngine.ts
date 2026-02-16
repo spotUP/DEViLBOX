@@ -1086,17 +1086,23 @@ export class FurnaceDispatchEngine {
 
       // Load worklet module
       console.log('[FurnaceDispatch] ensureModuleLoaded: adding worklet module...');
+      let workletModuleLoaded = false;
       try {
         await context.audioWorklet.addModule(`${baseUrl}furnace-dispatch/FurnaceDispatch.worklet.js${cacheBuster}`);
         console.log('[FurnaceDispatch] ensureModuleLoaded: worklet module added');
+        workletModuleLoaded = true;
       } catch (e: unknown) {
         // Swallow expected errors:
-        // - "already registered" / "duplicate" - module already loaded
-        // - "InvalidStateError" - context suspended (will retry when context resumes)
+        // - "already registered" / "duplicate" - module already loaded (safe to continue)
+        // - "InvalidStateError" - context suspended (NOT safe — need retry later)
         const msg = (e instanceof Error ? e.message : String(e));
         const name = (e instanceof Error ? e.name : '');
-        if (msg.includes('already') || msg.includes('duplicate') || name === 'InvalidStateError') {
-          console.log('[FurnaceDispatch] ensureModuleLoaded: worklet already loaded or context suspended');
+        if (msg.includes('already') || msg.includes('duplicate')) {
+          console.log('[FurnaceDispatch] ensureModuleLoaded: worklet already loaded');
+          workletModuleLoaded = true;
+        } else if (name === 'InvalidStateError') {
+          console.warn('[FurnaceDispatch] ensureModuleLoaded: context suspended, worklet not loaded (will retry)');
+          // Don't mark as loaded — allow retry when context is running
         } else {
           throw new Error(`Failed to load FurnaceDispatch worklet: ${msg}`);
         }
@@ -1127,7 +1133,14 @@ export class FurnaceDispatchEngine {
         }
       }
 
-      this.loadedContexts.add(context);
+      // Only mark context as loaded if the worklet module was actually loaded
+      // Don't cache on suspended context — allow retry when context is running
+      if (workletModuleLoaded) {
+        this.loadedContexts.add(context);
+      } else {
+        // Remove from initPromises so retry is possible
+        this.initPromises.delete(context);
+      }
     })();
 
     this.initPromises.set(context, initPromise);

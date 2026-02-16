@@ -98,6 +98,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   public _isReady = false;
   private _isReadyPromise!: Promise<void>;
   private _resolveReady!: () => void;
+  private _initFailed = false; // Track if initialization failed (e.g., suspended AudioContext on page reload)
+  private _pendingUploadConfig: { config: Record<string, unknown>, name: string } | null = null; // Stored for re-upload after retry init
   private currentChannel = 0;
   private platformType: number;
   private activeNotes: Map<number, number> = new Map(); // midiNote -> channel
@@ -124,6 +126,29 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
   public async ensureInitialized(): Promise<void> {
     await this._isReadyPromise;
+
+    // If initialization failed previously (e.g., AudioContext was suspended on page reload),
+    // retry now that the caller presumably has a running AudioContext (user gesture).
+    if (this._initFailed && !this._isReady && !this._disposed) {
+      console.log('[FurnaceDispatchSynth] Retrying initialization after previous failure, platform:', this.platformType);
+      this._initFailed = false;
+      // Create a fresh promise for the retry
+      this._isReadyPromise = new Promise((resolve) => { this._resolveReady = resolve; });
+      this.initialize();
+      await this._isReadyPromise;
+
+      // If retry succeeded and we have pending instrument data, re-upload it
+      if (this._isReady && this._pendingUploadConfig) {
+        const { config, name } = this._pendingUploadConfig;
+        this._pendingUploadConfig = null;
+        console.log('[FurnaceDispatchSynth] Re-uploading instrument after successful retry init');
+        const uploadPromise = this.uploadInstrumentFromConfig(config, name).catch(err => {
+          console.error('[FurnaceDispatchSynth] Re-upload failed:', err);
+        });
+        this._instrumentUploadPromise = uploadPromise as Promise<void>;
+      }
+    }
+
     // Also wait for any pending instrument upload to complete
     if (this._instrumentUploadPromise) {
       await this._instrumentUploadPromise;
@@ -143,7 +168,17 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * @param name - Instrument name
    */
   public async uploadInstrumentFromConfig(config: Record<string, unknown>, name: string): Promise<void> {
+    // Store config for re-upload if init needs to be retried (e.g., page reload with suspended AudioContext)
+    this._pendingUploadConfig = { config, name };
+
     await this._isReadyPromise; // Wait for chip init, but NOT for previous upload (avoid circular wait)
+
+    // If init failed, don't try to upload — ensureInitialized() will retry and re-upload
+    if (!this._isReady) {
+      console.warn(`[FurnaceDispatchSynth] Skipping upload for "${name}" — init not ready (will retry on ensureInitialized)`);
+      return;
+    }
+
     console.log(`[FurnaceDispatchSynth] Encoding and uploading instrument ${this.furnaceInstrumentIndex} "${name}" to platform ${this.platformType}`);
 
     // Encode from config using our encoder
@@ -153,6 +188,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     const binaryData = updateFurnaceInstrument(config as unknown as import('@typedefs/instrument').FurnaceConfig, name, this.furnaceInstrumentIndex);
     console.log(`[FurnaceDispatchSynth] Encoded ${binaryData.length} bytes for instrument ${this.furnaceInstrumentIndex}`);
     this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, binaryData, this.platformType);
+
+    // Clear pending config — upload succeeded
+    this._pendingUploadConfig = null;
 
     // Force insChanged on all channels so the new instrument data (waveform,
     // ADSR, filter, etc.) gets applied on the next note-on. Without this,
@@ -245,7 +283,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       console.log('[FurnaceDispatchSynth] Ready, platform:', this.platformType);
     } catch (err) {
       console.error('[FurnaceDispatchSynth] Init failed:', err);
-      // Resolve the promise even on failure to prevent ensureInitialized() from hanging
+      // Mark as failed so ensureInitialized() can retry when AudioContext is running
+      this._initFailed = true;
+      // Resolve the promise even on failure to prevent ensureInitialized() from hanging forever
       this._resolveReady();
     }
   }
