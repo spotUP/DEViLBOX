@@ -13,6 +13,7 @@ import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGener
 import { Shuffle, Trash2, Wand2 } from 'lucide-react';
 import { xmNoteToString, stringNoteToXM } from '@/lib/xmConversions';
 import type { InstrumentConfig } from '@typedefs/instrument';
+import { DEFAULT_TB303 } from '@typedefs/instrument';
 import './TB303View.css';
 
 // Parse tracker note (numeric XM or legacy string) to TB303Step format
@@ -78,15 +79,67 @@ interface TB303ViewProps {
 export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   // Get tracker store and instrument store
   const { patterns, currentPatternIndex, setCell } = useTrackerStore();
-  const { instruments, updateInstrument } = useInstrumentStore();
+  const { instruments, updateInstrument, addInstrument } = useInstrumentStore();
   // Use global transport for playback state (TrackerReplayer handles actual playback)
   const { isPlaying, currentRow, bpm } = useTransportStore();
   const currentPattern = patterns[currentPatternIndex];
   const channel = currentPattern?.channels[channelIndex];
 
+  // Find all TB-303 instruments
+  const tb303Instruments = useMemo(() => 
+    instruments.filter(inst => 
+      inst.synthType === 'TB303' || 
+      inst.synthType === 'Buzz3o3'
+    ),
+    [instruments]
+  );
+
   // Get instrument ID from channel (default to 0 if not set)
   const instrumentId = channel?.instrumentId ?? 0;
-  const instrument = instruments.find((inst) => inst.id === instrumentId);
+  let instrument = instruments.find((inst) => inst.id === instrumentId);
+
+  // Auto-detect or create TB-303 instrument
+  useEffect(() => {
+    if (!instrument || (instrument.synthType !== 'TB303' && instrument.synthType !== 'Buzz3o3')) {
+      // No valid TB-303 on this channel
+      if (tb303Instruments.length === 0) {
+        // No TB-303 instruments exist - create one
+        console.log('[TB303View] No TB-303 instruments found, creating default TB-303');
+        const newInst: InstrumentConfig = {
+          id: Date.now(),
+          name: 'TB-303',
+          type: 'synth',
+          synthType: 'TB303',
+          volume: 0.7,
+          pan: 0,
+          monophonic: true,
+          effects: [],
+          tb303: { ...DEFAULT_TB303 },
+        };
+        addInstrument(newInst);
+        // Assign to channel
+        useTrackerStore.setState((state) => {
+          const pattern = state.patterns[state.currentPatternIndex];
+          if (pattern && pattern.channels[channelIndex]) {
+            pattern.channels[channelIndex].instrumentId = newInst.id;
+          }
+        });
+      } else if (tb303Instruments.length === 1) {
+        // One TB-303 exists - auto-assign it
+        console.log('[TB303View] Auto-assigning TB-303 instrument:', tb303Instruments[0].name);
+        useTrackerStore.setState((state) => {
+          const pattern = state.patterns[state.currentPatternIndex];
+          if (pattern && pattern.channels[channelIndex]) {
+            pattern.channels[channelIndex].instrumentId = tb303Instruments[0].id;
+          }
+        });
+      }
+      // If multiple TB-303s exist, user can pick from dropdown (don't auto-assign)
+    }
+  }, [instrument, tb303Instruments, channelIndex, addInstrument]);
+
+  // Re-fetch instrument after auto-assignment
+  instrument = instruments.find((inst) => inst.id === (channel?.instrumentId ?? 0));
 
   // Current step syncs with global transport (mod 16 for 16-step view)
   const currentStep = isPlaying ? currentRow % 16 : -1;
@@ -114,14 +167,15 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
     }, 300); // Longer debounce - only update store 300ms after user stops dragging
   }, [instrumentId, updateInstrument]);
 
-  // Get TB-303 parameters from instrument config (stored as Hz/ms/%)
+  // Get TB-303 parameters from instrument config (all 0-1 normalized)
+  // Source of truth: db303 site rip — all knobs are 0-1, WASM converts internally
   const tb303Config = instrument?.tb303;
   const waveform = tb303Config?.oscillator.type === 'square' ? 1.0 : 0.0;
-  const cutoff = tb303Config?.filter.cutoff ?? 1000;
-  const resonance = tb303Config?.filter.resonance ?? 50;
-  const envMod = tb303Config?.filterEnvelope.envMod ?? 50;
-  const decay = tb303Config?.filterEnvelope.decay ?? 300;
-  const accent = tb303Config?.accent.amount ?? 50;
+  const cutoff = tb303Config?.filter.cutoff ?? 0.5;
+  const resonance = tb303Config?.filter.resonance ?? 0.5;
+  const envMod = tb303Config?.filterEnvelope.envMod ?? 0.5;
+  const decay = tb303Config?.filterEnvelope.decay ?? 0.5;
+  const accent = tb303Config?.accent.amount ?? 0.5;
 
   // Convert tracker pattern data to TB303Step format
   const steps = useMemo<TB303Step[]>(() => {
@@ -222,12 +276,20 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
     const config = tb303ConfigRef.current;
     if (!instrumentRef.current || !config) return;
     
+    // Sync devilFish.normalDecay with the main decay knob.
+    // In the site rip these are separate knobs, but TB303View has only one.
+    // Without this, applyConfig() overwrites normalDecay with the old DF value,
+    // making the decay knob appear to do nothing.
     const updatedConfig = {
       ...config,
       filterEnvelope: {
         ...config.filterEnvelope,
         decay: value,
       },
+      devilFish: config.devilFish ? {
+        ...config.devilFish,
+        normalDecay: value,
+      } : config.devilFish,
     };
     getToneEngine().updateTB303Parameters(instrumentId, updatedConfig);
     debouncedStoreUpdate({ tb303: updatedConfig });
@@ -293,6 +355,16 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
     });
   }, [channelIndex, setCell, steps]);
 
+  // Handler for switching between TB-303 instruments
+  const handleInstrumentChange = useCallback((newInstrumentId: number) => {
+    useTrackerStore.setState((state) => {
+      const pattern = state.patterns[state.currentPatternIndex];
+      if (pattern && pattern.channels[channelIndex]) {
+        pattern.channels[channelIndex].instrumentId = newInstrumentId;
+      }
+    });
+  }, [channelIndex]);
+
   // Show error if instrument not found or not TB-303
   if (!instrument) {
     return (
@@ -318,6 +390,25 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
     <div className="tb303-view">
       {/* Content starts here */}
       <>
+          {/* Instrument Selector - Only show if multiple TB-303 instruments exist */}
+          {tb303Instruments.length > 1 && (
+            <div className="tb303-instrument-selector">
+              <label htmlFor="tb303-instrument-select">TB-303 Instrument:</label>
+              <select
+                id="tb303-instrument-select"
+                value={instrumentId}
+                onChange={(e) => handleInstrumentChange(Number(e.target.value))}
+                className="instrument-select"
+              >
+                {tb303Instruments.map((inst) => (
+                  <option key={inst.id} value={inst.id}>
+                    {inst.name} (ID: {inst.id})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Transport Bar - Pattern controls only (playback via main transport) */}
           <div className="tb303-transport">
             {isPlaying && (
@@ -381,14 +472,13 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
                 <Knob
                   label="Cutoff"
                   value={cutoff}
-                  min={200}
-                  max={5000}
-                  logarithmic
+                  min={0}
+                  max={1}
                   onChange={handleCutoffChange}
                   bipolar={false}
                   size="md"
+                  formatValue={v => Math.round(314 * Math.pow(2394 / 314, v)) + ' Hz'}
                 />
-                <div className="param-value">{Math.round(cutoff)}Hz</div>
               </div>
 
               <div className="param-item">
@@ -396,12 +486,12 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
                   label="Resonance"
                   value={resonance}
                   min={0}
-                  max={100}
+                  max={1}
                   onChange={handleResonanceChange}
                   bipolar={false}
                   size="md"
+                  formatValue={v => Math.round(v * 100) + '%'}
                 />
-                <div className="param-value">{resonance}%</div>
               </div>
 
               <div className="param-item">
@@ -409,26 +499,25 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
                   label="Env Mod"
                   value={envMod}
                   min={0}
-                  max={100}
+                  max={1}
                   onChange={handleEnvModChange}
                   bipolar={false}
                   size="md"
+                  formatValue={v => Math.round(v * 100) + '%'}
                 />
-                <div className="param-value">{envMod}%</div>
               </div>
 
               <div className="param-item">
                 <Knob
                   label="Decay"
                   value={decay}
-                  min={200}
-                  max={2000}
-                  logarithmic
+                  min={0}
+                  max={1}
                   onChange={handleDecayChange}
                   bipolar={false}
                   size="md"
+                  formatValue={v => Math.round(200 * Math.pow(2000 / 200, v)) + ' ms'}
                 />
-                <div className="param-value">{Math.round(decay)}ms</div>
               </div>
 
               <div className="param-item">
@@ -436,12 +525,12 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
                   label="Accent"
                   value={accent}
                   min={0}
-                  max={100}
+                  max={1}
                   onChange={handleAccentChange}
                   bipolar={false}
                   size="md"
+                  formatValue={v => Math.round(v * 100) + '%'}
                 />
-                <div className="param-value">{accent}%</div>
               </div>
             </div>
           </div>
