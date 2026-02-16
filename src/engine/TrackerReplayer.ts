@@ -2037,15 +2037,48 @@ export class TrackerReplayer {
   seekTo(songPos: number, pattPos: number): void {
     if (!this.song) return;
 
-    const wasPlaying = this.playing;
+    // ---- Seamless seek while playing ----
+    // Don't stop channels or restart the scheduler — just update the position
+    // pointers so the next scheduled tick picks up from the new location.
+    // This prevents the audible pause that would occur from releasing all
+    // active notes and restarting the scheduler.
+    if (this.playing) {
+      this.songPos = Math.max(0, Math.min(songPos, this.song.songLength - 1));
+      this.pattPos = Math.max(0, pattPos);
+      this.currentTick = 0;
 
-    // Pause the scheduler
-    if (this.schedulerTimerId !== null) {
-      clearInterval(this.schedulerTimerId);
-      this.schedulerTimerId = null;
+      // Clamp pattern position
+      const patternNum = this.song.songPositions[this.songPos];
+      const pattern = this.song.patterns[patternNum];
+      if (pattern && this.pattPos >= pattern.length) {
+        this.pattPos = 0;
+      }
+
+      // Reset pattern break/jump flags so stale jumps don't fire
+      this.pBreakFlag = false;
+      this.posJumpFlag = false;
+      this.patternDelay = 0;
+
+      // Re-sync scheduler timing to NOW so the next tick fires immediately
+      // from the new position instead of waiting for the old schedule
+      this.startTime = Tone.now();
+      this.totalTicksScheduled = 0;
+      this.nextScheduleTime = this.startTime;
+
+      // Clear queued display states so old position updates don't flicker the UI
+      this.clearStateQueue();
+      cancelPendingRowUpdate();
+
+      // Notify UI of the new position immediately
+      if (this.onRowChange) {
+        this.onRowChange(this.pattPos, patternNum, this.songPos);
+      }
+
+      console.log(`[TrackerReplayer] Live-seeked to songPos=${this.songPos}, pattPos=${this.pattPos}`);
+      return;
     }
-    this.playing = false;
 
+    // ---- Full seek while stopped ----
     // Stop all channels (release synth notes + stop sample players)
     for (let i = 0; i < this.channels.length; i++) {
       this.stopChannel(this.channels[i], i);
@@ -2078,12 +2111,6 @@ export class TrackerReplayer {
     // Notify UI
     if (this.onRowChange) {
       this.onRowChange(this.pattPos, patternNum, this.songPos);
-    }
-
-    // Resume if was playing
-    if (wasPlaying) {
-      this.playing = true;
-      this.startScheduler();
     }
 
     console.log(`[TrackerReplayer] Seeked to songPos=${this.songPos}, pattPos=${this.pattPos}`);
