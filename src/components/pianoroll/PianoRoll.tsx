@@ -160,11 +160,18 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   // Auto-scroll during playback to keep playhead at piano keys edge
   const prevCurrentRowRef = useRef<number | null>(null);
   const prevPatternRef = useRef<Pattern | null>(null);
+  const targetScrollXRef = useRef<number>(0);
+  const currentScrollXRef = useRef<number>(0);
+  const scrollRafRef = useRef<number>(0);
+
+  // Update target scroll position when playhead moves
   useEffect(() => {
     if (isPlaying && currentRow !== null) {
       const patternChanged = prevPatternRef.current !== pattern;
 
       if (patternChanged) {
+        targetScrollXRef.current = 0;
+        currentScrollXRef.current = 0;
         usePianoRollStore.setState({
           view: {
             ...usePianoRollStore.getState().view,
@@ -179,12 +186,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
 
         if (currentPlayheadX > targetPlayheadX + view.horizontalZoom) {
           const newScrollX = currentRow - (targetPlayheadX / view.horizontalZoom);
-          usePianoRollStore.setState({
-            view: {
-              ...usePianoRollStore.getState().view,
-              scrollX: Math.max(0, newScrollX),
-            },
-          });
+          targetScrollXRef.current = Math.max(0, newScrollX);
         }
         prevCurrentRowRef.current = currentRow;
       }
@@ -193,6 +195,56 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       prevPatternRef.current = null;
     }
   }, [isPlaying, currentRow, pattern, view.scrollX, view.horizontalZoom]);
+
+  // RAF smooth scroll animation
+  useEffect(() => {
+    if (!isPlaying) {
+      if (scrollRafRef.current) {
+        cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = 0;
+      }
+      return;
+    }
+
+    const animate = () => {
+      const target = targetScrollXRef.current;
+      const current = currentScrollXRef.current;
+      const diff = target - current;
+
+      // Lerp towards target with factor 0.2 for smooth motion
+      if (Math.abs(diff) > 0.1) {
+        const newScroll = current + diff * 0.2;
+        currentScrollXRef.current = newScroll;
+        usePianoRollStore.setState({
+          view: {
+            ...usePianoRollStore.getState().view,
+            scrollX: newScroll,
+          },
+        });
+      } else if (Math.abs(diff) > 0.001) {
+        // Snap to target when very close
+        currentScrollXRef.current = target;
+        usePianoRollStore.setState({
+          view: {
+            ...usePianoRollStore.getState().view,
+            scrollX: target,
+          },
+        });
+      }
+
+      scrollRafRef.current = requestAnimationFrame(animate);
+    };
+
+    currentScrollXRef.current = view.scrollX;
+    scrollRafRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (scrollRafRef.current) {
+        cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = 0;
+      }
+    };
+  }, [isPlaying]);
 
   // Measure container height
   useEffect(() => {
