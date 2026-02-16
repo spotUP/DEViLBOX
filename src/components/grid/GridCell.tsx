@@ -365,15 +365,8 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
     if (!isActive) {
       return 'bg-dark-bgTertiary hover:bg-dark-bgActive';
     }
-    // Apply instrument color to active cells
-    const colorClass = instrumentColor.replace('text-', '');
-    
-    // Accent notes get brighter version of instrument color
-    if (accent) {
-      return `bg-${colorClass} hover:brightness-110`;
-    }
-    // Normal notes get the instrument color with some opacity
-    return `bg-${colorClass}/80 hover:brightness-110`;
+    // Active cells use inline backgroundColor (applied in style prop)
+    return 'hover:brightness-110';
   };
 
   // Determine border color based on octave shift
@@ -396,6 +389,9 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
         style={{ 
           width: `${cellSize}px`, 
           height: `${cellSize}px`,
+          ...(isActive && !isTriggered && {
+            backgroundColor: accent ? instrumentHex : `${instrumentHex}CC`, // CC = 80% opacity
+          }),
         }}
         className={`
           rounded relative
