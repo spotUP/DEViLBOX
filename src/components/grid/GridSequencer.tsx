@@ -524,6 +524,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
               <div
                 className="absolute rounded-sm pointer-events-none"
                 style={{
+                  top: 0,
                   left: `${48 + (displayStep * (cellSize + 4))}px`,
                   width: `${cellSize}px`,
                   height: `${cellSize}px`,
@@ -536,11 +537,12 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
             )}
             {stepIndices.map((stepIdx) => {
               const isCurrentDiscrete = !smoothMarker && currentStep === stepIdx;
+              const isBeatMarker = stepIdx % 4 === 0;
               return (
                 <div
                   key={stepIdx}
                   className={`flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm relative overflow-hidden
-                    ${stepIdx % 4 === 0 ? 'text-text-tertiary' : 'text-text-muted'}
+                    ${isBeatMarker ? 'text-text-tertiary' : 'text-text-muted'}
                     ${isCurrentDiscrete ? 'text-white font-bold' : ''}
                   `}
                   style={{
@@ -548,6 +550,12 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                     height: `${cellSize}px`,
                   }}
                 >
+                  {isBeatMarker && (
+                    <div
+                      className="absolute inset-0"
+                      style={{ backgroundColor: 'rgba(255, 255, 255, 0.04)', zIndex: 0 }}
+                    />
+                  )}
                   {isCurrentDiscrete && (
                     <div
                       className="absolute inset-0"
@@ -583,6 +591,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                   <div
                     className="absolute rounded pointer-events-none"
                     style={{
+                      top: 0,
                       left: `${48 + (displayStep * (cellSize + 4))}px`,
                       width: `${cellSize}px`,
                       height: `${cellSize}px`,
@@ -625,6 +634,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 
                 // In smooth mode, don't show per-cell markers (use header overlay instead)
                 const isCurrentStepCheck = smoothMarker ? false : (currentStep === stepIdx);
+                const isBeatMarker = stepIdx % 4 === 0;
 
                 return (
                   <div
@@ -632,7 +642,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                     className="mx-0.5 rounded-sm relative"
                     role="gridcell"
                     style={{
-                      backgroundColor: stepIdx % 4 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
+                      backgroundColor: isBeatMarker ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
+                      zIndex: 0,
                     }}
                   >
                     <NoteGridCell
