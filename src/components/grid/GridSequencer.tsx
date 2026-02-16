@@ -58,13 +58,17 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;
   
-  // Trail steps for visual effect (3 steps behind with decreasing opacity)
+  // Trail steps for visual effect (7 steps behind with decreasing opacity)
   const trailSteps = useMemo(() => {
     if (currentStep < 0) return [];
     return [
-      { step: (currentStep - 1 + maxSteps) % maxSteps, opacity: 0.4 },
-      { step: (currentStep - 2 + maxSteps) % maxSteps, opacity: 0.2 },
-      { step: (currentStep - 3 + maxSteps) % maxSteps, opacity: 0.1 },
+      { step: (currentStep - 1 + maxSteps) % maxSteps, opacity: 0.5 },
+      { step: (currentStep - 2 + maxSteps) % maxSteps, opacity: 0.4 },
+      { step: (currentStep - 3 + maxSteps) % maxSteps, opacity: 0.3 },
+      { step: (currentStep - 4 + maxSteps) % maxSteps, opacity: 0.2 },
+      { step: (currentStep - 5 + maxSteps) % maxSteps, opacity: 0.15 },
+      { step: (currentStep - 6 + maxSteps) % maxSteps, opacity: 0.1 },
+      { step: (currentStep - 7 + maxSteps) % maxSteps, opacity: 0.05 },
     ];
   }, [currentStep, maxSteps]);
 
