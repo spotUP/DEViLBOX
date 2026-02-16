@@ -170,31 +170,36 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
       const patternChanged = prevPatternRef.current !== pattern;
 
       if (patternChanged) {
-        targetScrollXRef.current = 0;
-        currentScrollXRef.current = 0;
-        usePianoRollStore.setState({
-          view: {
-            ...usePianoRollStore.getState().view,
-            scrollX: 0,
-          },
-        });
+        // Reset on pattern change
+        virtualRowOffsetRef.current = 0;
         prevPatternRef.current = pattern;
         prevCurrentRowRef.current = currentRow;
-      } else if (prevCurrentRowRef.current === null || currentRow >= prevCurrentRowRef.current) {
+      } else {
+        // Detect wrap-around: when currentRow < prevCurrentRow, pattern has looped
+        if (prevCurrentRowRef.current !== null && currentRow < prevCurrentRowRef.current) {
+          // Add pattern length to offset to create continuous scroll
+          virtualRowOffsetRef.current += patternLength;
+        }
+        
+        // Calculate virtual row (continuous, doesn't reset on loop)
+        const virtualRow = currentRow + virtualRowOffsetRef.current;
+        
         const targetPlayheadX = 72;
-        const currentPlayheadX = (currentRow - view.scrollX) * view.horizontalZoom;
+        const currentPlayheadX = (virtualRow - currentScrollXRef.current) * view.horizontalZoom;
 
         if (currentPlayheadX > targetPlayheadX + view.horizontalZoom) {
-          const newScrollX = currentRow - (targetPlayheadX / view.horizontalZoom);
+          const newScrollX = virtualRow - (targetPlayheadX / view.horizontalZoom);
           targetScrollXRef.current = Math.max(0, newScrollX);
         }
+        
         prevCurrentRowRef.current = currentRow;
       }
     } else {
       prevCurrentRowRef.current = null;
       prevPatternRef.current = null;
+      virtualRowOffsetRef.current = 0;
     }
-  }, [isPlaying, currentRow, pattern, view.scrollX, view.horizontalZoom]);
+  }, [isPlaying, currentRow, pattern, view.horizontalZoom, patternLength]);
 
   // RAF smooth scroll animation
   useEffect(() => {
@@ -921,6 +926,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   }, [containerHeight, view.showVelocityLane]);
 
   const patternLength = pattern?.length || 64;
+  const virtualRowOffsetRef = useRef<number>(0);
 
   // Scale options for dropdown
   const scaleOptions = useMemo(() => {

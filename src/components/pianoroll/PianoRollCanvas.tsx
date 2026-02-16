@@ -223,7 +223,7 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
 
         // 2. Draw notes
         noteRendererRef.current.render(
-          ctx, vp, rd.notes, rd.selectedNotes, rd.showVelocity, rd.ghostNotes,
+          ctx, vp, rd.notes, rd.selectedNotes, rd.showVelocity, rd.ghostNotes, rd.patternLength,
         );
 
         // 3. Draw selection box (from drag state)

@@ -60,6 +60,7 @@ export class NoteRenderer {
 
   /**
    * Draw all notes to the given context.
+   * Supports repeating pattern visualization by rendering notes at pattern boundaries.
    */
   render(
     ctx: CanvasRenderingContext2D,
@@ -68,23 +69,69 @@ export class NoteRenderer {
     selectedNoteIds: Set<string>,
     showVelocity: boolean,
     ghostNotes: PianoRollNote[],
+    patternLength?: number,
   ): void {
     const range = vp.getVisibleRange();
 
+    // If patternLength provided, calculate how many pattern repeats to show
+    const patternRepeats: number[] = [0]; // Always show at offset 0
+    if (patternLength && patternLength > 0) {
+      // Calculate which pattern repeats are visible
+      const firstRepeat = Math.floor(range.startRow / patternLength);
+      const lastRepeat = Math.ceil(range.endRow / patternLength);
+      
+      patternRepeats.length = 0;
+      for (let i = firstRepeat; i <= lastRepeat; i++) {
+        patternRepeats.push(i * patternLength);
+      }
+    }
+
     // Draw ghost notes first (under real notes)
-    for (const note of ghostNotes) {
-      this.drawGhostNote(ctx, vp, note);
+    for (const offset of patternRepeats) {
+      for (const note of ghostNotes) {
+        this.drawGhostNoteWithOffset(ctx, vp, note, offset, range);
+      }
     }
 
-    // Draw real notes
-    for (const note of notes) {
-      // Skip off-screen notes
-      if (note.endRow < range.startRow || note.startRow > range.endRow) continue;
-      if (note.midiNote < range.startNote || note.midiNote > range.endNote) continue;
+    // Draw real notes at all visible pattern offsets
+    for (const offset of patternRepeats) {
+      for (const note of notes) {
+        const offsetNote = {
+          ...note,
+          startRow: note.startRow + offset,
+          endRow: note.endRow + offset,
+        };
+        
+        // Skip off-screen notes
+        if (offsetNote.endRow < range.startRow || offsetNote.startRow > range.endRow) continue;
+        if (offsetNote.midiNote < range.startNote || offsetNote.midiNote > range.endNote) continue;
 
-      const isSelected = selectedNoteIds.has(note.id);
-      this.drawNote(ctx, vp, note, isSelected, showVelocity);
+        const isSelected = selectedNoteIds.has(note.id);
+        this.drawNote(ctx, vp, offsetNote, isSelected, showVelocity);
+      }
     }
+  }
+
+  /**
+   * Draw a ghost note with pattern offset.
+   */
+  private drawGhostNoteWithOffset(
+    ctx: CanvasRenderingContext2D,
+    vp: Viewport,
+    note: PianoRollNote,
+    offset: number,
+    range: { startRow: number; endRow: number; startNote: number; endNote: number },
+  ): void {
+    const offsetNote = {
+      ...note,
+      startRow: note.startRow + offset,
+      endRow: note.endRow + offset,
+    };
+    
+    if (offsetNote.endRow < range.startRow || offsetNote.startRow > range.endRow) return;
+    if (offsetNote.midiNote < range.startNote || offsetNote.midiNote > range.endNote) return;
+    
+    this.drawGhostNote(ctx, vp, offsetNote);
   }
 
   /**
