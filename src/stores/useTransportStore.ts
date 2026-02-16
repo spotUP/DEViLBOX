@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import * as Tone from 'tone';
 import type { TransportState, GrooveTemplate } from '@typedefs/audio';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { useInstrumentStore } from './useInstrumentStore';
@@ -171,8 +172,8 @@ export const useTransportStore = create<TransportStore>()(
       useInstrumentStore.getState().autoBakeInstruments();
       
       // CRITICAL for iOS: Start audio context synchronously during user gesture
+      // Dynamic import creates async delay that breaks iOS gesture chain
       // See: https://github.com/Tonejs/Tone.js/issues/164
-      const Tone = await import('tone');
       await Tone.start();
       
       set((state) => {
@@ -207,8 +208,8 @@ export const useTransportStore = create<TransportStore>()(
         // CRITICAL for iOS: Start audio context synchronously during user gesture
         // iOS requires Tone.start() to be called on the same callstack as the user interaction
         // Calling it in an effect after the gesture ends will fail silently
+        // Dynamic import creates async delay that breaks iOS gesture chain
         // See: https://github.com/Tonejs/Tone.js/issues/164
-        const Tone = await import('tone');
         await Tone.start();
       }
 
