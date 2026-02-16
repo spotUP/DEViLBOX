@@ -57,14 +57,14 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
 
   // Smooth marker scrolling state
   const [smoothMarker, setSmoothMarker] = useState(false);
-  const smoothProgressRef = useRef(0);
+  const [smoothStep, setSmoothStep] = useState(0);
   const lastStepTimeRef2 = useRef(0);
+  const lastStepRef3 = useRef(-1); // Track last rendered step
   const rafIdRef2 = useRef(0);
-  const [, forceUpdate] = useState(0); // Force re-render on each RAF tick
 
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;
-  const smoothStep = smoothMarker ? smoothProgressRef.current : currentStep;
+  const displayStep = smoothMarker ? smoothStep : currentStep;
   
   // Trail steps for visual effect (7 steps behind with decreasing opacity)
   const trailSteps = useMemo(() => {
@@ -72,7 +72,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     
     if (smoothMarker) {
       // Smooth mode: fractional positions with interpolated opacity
-      const activeStep = smoothStep;
+      const activeStep = displayStep;
       return [
         { step: activeStep - 1, opacity: 0.5 },
         { step: activeStep - 2, opacity: 0.4 },
@@ -93,7 +93,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       { step: (currentStep - 6 + maxSteps) % maxSteps, opacity: 0.1 },
       { step: (currentStep - 7 + maxSteps) % maxSteps, opacity: 0.05 },
     ];
-  }, [currentStep, maxSteps, smoothMarker, smoothStep]);
+  }, [currentStep, maxSteps, smoothMarker, displayStep]);
 
   // Ref for scroll container
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -234,11 +234,12 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
   useEffect(() => {
     if (!isPlaying || !smoothMarker) {
       lastStepTimeRef2.current = 0;
+      lastStepRef3.current = -1;
       if (rafIdRef2.current) {
         cancelAnimationFrame(rafIdRef2.current);
         rafIdRef2.current = 0;
       }
-      smoothProgressRef.current = currentStep;
+      setSmoothStep(currentStep);
       return;
     }
 
@@ -248,18 +249,16 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       const now = performance.now();
 
       // Initialize on first run or step change
-      if (lastStepTimeRef2.current === 0 || Math.floor(smoothProgressRef.current) !== currentStep) {
+      if (lastStepRef3.current !== currentStep) {
         lastStepTimeRef2.current = now;
-        smoothProgressRef.current = currentStep;
+        lastStepRef3.current = currentStep;
+        setSmoothStep(currentStep);
+      } else {
+        // Calculate fractional progress
+        const elapsed = now - lastStepTimeRef2.current;
+        const progress = Math.min(elapsed / msPerRow, 1.0);
+        setSmoothStep(currentStep + progress);
       }
-
-      // Calculate fractional progress
-      const elapsed = now - lastStepTimeRef2.current;
-      const progress = Math.min(elapsed / msPerRow, 1.0);
-      smoothProgressRef.current = currentStep + progress;
-
-      // Force re-render at 60fps for smooth animation
-      forceUpdate(prev => prev + 1);
 
       rafIdRef2.current = requestAnimationFrame(animate);
     };
@@ -525,7 +524,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
               <div
                 className="absolute h-4 rounded-sm pointer-events-none"
                 style={{
-                  left: `${48 + (smoothStep * (cellSize + 4))}px`,
+                  left: `${48 + (displayStep * (cellSize + 4))}px`,
                   width: `${cellSize}px`,
                   backgroundColor: '#ef4444',
                   opacity: 0.6,
@@ -581,7 +580,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                   <div
                     className="absolute rounded pointer-events-none"
                     style={{
-                      left: `${48 + (smoothStep * (cellSize + 4))}px`,
+                      left: `${48 + (displayStep * (cellSize + 4))}px`,
                       width: `${cellSize}px`,
                       height: `${cellSize}px`,
                       backgroundColor: '#ef4444',
@@ -601,7 +600,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 let trailOpacity = 0;
                 if (smoothMarker) {
                   // Smooth mode: calculate opacity based on distance
-                  const distance = smoothStep - stepIdx;
+                  const distance = displayStep - stepIdx;
                   if (distance > 0 && distance < 7.5) {
                     // Interpolate opacity based on distance
                     const baseOpacity = distance < 1 ? 0.5 : 
