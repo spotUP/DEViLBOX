@@ -212,7 +212,8 @@ export interface ParsedSample {
  * Macros control instrument parameters per-tick (volume, arpeggio, duty, etc.)
  */
 export interface FurnaceMacroData {
-  type: number;      // Macro type code (0=vol, 1=arp, 2=duty, 3=wave, 4=pitch, etc.)
+  code: number;      // Macro slot index (0-21)
+  type: number;      // Macro type code (legacy identifier)
   data: number[];    // Macro values (up to 256 steps)
   loop: number;      // Loop point (-1 = no loop)
   release: number;   // Release point (-1 = none)
@@ -238,6 +239,7 @@ export interface FurnaceWavetableData {
 export interface FurnaceInstrumentData {
   chipType: number;              // DIV_INS_* type
   synthType: string;             // Mapped SynthType for DEViLBOX engine
+  furnaceIndex?: number;         // 0-based index in WASM instrument bank (matches Furnace's ins[n])
 
   // FM parameters (for FM chips: OPN, OPM, OPL, OPLL, etc.)
   fm?: {
@@ -275,8 +277,40 @@ export interface FurnaceInstrumentData {
   // Wavetables for wavetable chips
   wavetables: FurnaceWavetableData[];
 
-  // Chip-specific config (optional)
+  // Chip-specific config (legacy format)
   chipConfig?: Record<string, unknown>;
+
+  // Chip-specific data (top-level, used by FurnaceInstrumentEncoder)
+  c64?: {
+    triOn: boolean; sawOn: boolean; pulseOn: boolean; noiseOn: boolean;
+    a: number; d: number; s: number; r: number;
+    duty: number;
+    ringMod?: boolean; oscSync?: boolean;
+    toFilter?: boolean; initFilter?: boolean; dutyIsAbs?: boolean;
+    filterIsAbs?: boolean; noTest?: boolean; resetDuty?: boolean;
+    filterResonance?: number; filterRes?: number;
+    filterCutoff?: number;
+    filterHP?: boolean; filterLP?: boolean; filterBP?: boolean; ch3off?: boolean;
+    lp?: boolean; bp?: boolean; hp?: boolean;
+  };
+  gb?: {
+    envVol: number; envDir: number; envLen: number; soundLen: number;
+    softEnv?: boolean; alwaysInit?: boolean; doubleWave?: boolean;
+    hwSeqLen?: number; hwSeq?: Array<{ cmd: number; data: number }>;
+  };
+  snes?: {
+    a: number; d: number; s: number; r: number;
+    useEnv?: boolean; sus?: number; gainMode?: number; gain?: number; d2?: number;
+  };
+  n163?: {
+    wave: number; wavePos: number; waveLen: number; waveMode: number;
+    perChanPos?: boolean;
+  };
+  fds?: {
+    modSpeed: number; modDepth: number;
+    initModTableWithFirstWave?: boolean;
+    modTable?: number[];
+  };
 }
 
 export interface ParsedInstrument {
@@ -405,6 +439,12 @@ export interface ImportMetadata {
       len: number;               // Groove length (1-16)
       val: number[];             // Tick values (16 entries, only first 'len' are used)
     }>;
+    // Furnace timing data (needed for 1:1 playback compatibility)
+    speed2?: number;             // Second speed for alternation (speed1 is in modData.initialSpeed)
+    hz?: number;                 // Ticks per second (50 PAL, 60 NTSC)
+    virtualTempoN?: number;      // Virtual tempo numerator
+    virtualTempoD?: number;      // Virtual tempo denominator
+
     subsongCount: number;        // Total number of subsongs in module
     subsongNames: string[];      // Name of each subsong
     currentSubsong?: number;     // Currently active subsong index (used in UI)

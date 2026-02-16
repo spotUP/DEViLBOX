@@ -29,8 +29,19 @@ static DivInstrument g_defaultIns;
 
 DivInstrument* DivEngine::getIns(int index, int fallbackType) {
   if (index >= 0 && index < (int)g_instruments.size() && g_instruments[index]) {
-    return g_instruments[index];
+    DivInstrument* ins = g_instruments[index];
+    // Debug: log C64 instrument fetches
+    if (fallbackType == 3 || ins->type == DIV_INS_C64) {
+      printf("[DivEngine::getIns] index=%d type=%d c64.wave=%d%d%d%d ADSR=%d/%d/%d/%d duty=%d\n",
+             index, ins->type,
+             ins->c64.triOn ? 1 : 0, ins->c64.sawOn ? 1 : 0,
+             ins->c64.pulseOn ? 1 : 0, ins->c64.noiseOn ? 1 : 0,
+             ins->c64.a, ins->c64.d, ins->c64.s, ins->c64.r, ins->c64.duty);
+    }
+    return ins;
   }
+  printf("[DivEngine::getIns] FALLBACK: index=%d not found (size=%d), returning default\n",
+         index, (int)g_instruments.size());
   return &g_defaultIns;
 }
 

@@ -265,6 +265,7 @@ interface InstrumentStore {
   updateSliceConfig: (instrumentId: number, config: BeatSliceConfig) => void;
   removeSlice: (instrumentId: number, sliceId: string) => void;
   createSlicedInstruments: (sourceId: number, slices: BeatSlice[], namePrefix?: string) => Promise<number[]>;
+  createDrumKitFromSlices: (sourceId: number, slices: BeatSlice[], namePrefix?: string) => Promise<number | null>;
 
   // Reset to initial state
   reset: () => void;
@@ -1798,6 +1799,134 @@ export const useInstrumentStore = create<InstrumentStore>()(
       } catch (error) {
         console.error('[InstrumentStore] Failed to create sliced instruments:', error);
         return [];
+      }
+    },
+
+    createDrumKitFromSlices: async (sourceId, slices, namePrefix = 'Kit') => {
+      const sourceInstrument = get().instruments.find((inst) => inst.id === sourceId);
+      if (!sourceInstrument?.sample?.url) {
+        console.error('[InstrumentStore] Source instrument has no sample');
+        return null;
+      }
+
+      const engine = getToneEngine();
+
+      try {
+        // Fetch and decode the source audio
+        const response = await fetch(sourceInstrument.sample.url);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await engine.decodeAudioData(arrayBuffer);
+
+        const existingIds = get().instruments.map((i) => i.id);
+        const newInstrumentIds: number[] = [];
+        const keymap: import('@typedefs/instrument').DrumKitKeyMapping[] = [];
+
+        // 1. Create individual sample instruments for each slice (hidden/internal)
+        for (let i = 0; i < slices.length; i++) {
+          const slice = slices[i];
+          const newId = findNextId([...existingIds, ...newInstrumentIds]);
+          newInstrumentIds.push(newId);
+
+          const sliceLength = slice.endFrame - slice.startFrame;
+          const numChannels = audioBuffer.numberOfChannels;
+          const sampleRate = audioBuffer.sampleRate;
+
+          const offlineCtx = new OfflineAudioContext(numChannels, sliceLength, sampleRate);
+          const sliceBuffer = offlineCtx.createBuffer(numChannels, sliceLength, sampleRate);
+
+          for (let ch = 0; ch < numChannels; ch++) {
+            const sourceData = audioBuffer.getChannelData(ch);
+            const destData = sliceBuffer.getChannelData(ch);
+            for (let j = 0; j < sliceLength; j++) {
+              destData[j] = sourceData[slice.startFrame + j];
+            }
+          }
+
+          const sliceArrayBuffer = await engine.encodeAudioData(sliceBuffer);
+          const blob = new Blob([sliceArrayBuffer], { type: 'audio/wav' });
+          const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+
+          const sliceName = slice.label || `Slice ${i + 1}`;
+          
+          // Add internal sample instrument
+          set((state) => {
+            state.instruments.push({
+              id: newId,
+              name: `(Slice ${i + 1})`.slice(0, 22),
+              type: 'sample',
+              synthType: 'Sampler',
+              sample: {
+                url: dataUrl,
+                audioBuffer: sliceArrayBuffer,
+                baseNote: 'C-4',
+                detune: 0,
+                loop: false,
+                loopStart: 0,
+                loopEnd: sliceLength,
+                sampleRate: sampleRate,
+                reverse: false,
+                playbackRate: 1,
+              },
+              envelope: { ...DEFAULT_ENVELOPE, sustain: 100 },
+              effects: [],
+              volume: -6,
+              pan: 0,
+            });
+          });
+
+          // Create mapping entry (starting from C-1 = MIDI 36)
+          const midiNote = 36 + i;
+          if (midiNote <= 127) {
+            keymap.push({
+              id: `mapping-${newId}`,
+              noteStart: midiNote,
+              noteEnd: midiNote,
+              sampleId: String(newId),
+              sampleUrl: dataUrl,
+              sampleName: sliceName,
+              pitchOffset: 0,
+              fineTune: 0,
+              volumeOffset: 0,
+              panOffset: 0,
+              baseNote: 'C-4',
+            });
+          }
+        }
+
+        // 2. Create the DrumKit instrument
+        const drumKitId = findNextId([...existingIds, ...newInstrumentIds]);
+        const kitName = sourceInstrument.name 
+          ? `${sourceInstrument.name} ${namePrefix}`
+          : `Sliced ${namePrefix}`;
+
+        set((state) => {
+          const drumKit: InstrumentConfig = {
+            id: drumKitId,
+            name: kitName.slice(0, 22),
+            type: 'synth',
+            synthType: 'DrumKit',
+            drumKit: {
+              ...DEFAULT_DRUMKIT,
+              keymap,
+            },
+            envelope: { ...DEFAULT_ENVELOPE, sustain: 100 },
+            effects: [],
+            volume: 0,
+            pan: 0,
+          };
+          state.instruments.push(drumKit);
+          state.currentInstrumentId = drumKitId;
+        });
+
+        console.log(`[InstrumentStore] Created DrumKit ${drumKitId} with ${keymap.length} slices`);
+        return drumKitId;
+      } catch (error) {
+        console.error('[InstrumentStore] Failed to create drum kit from slices:', error);
+        return null;
       }
     },
 

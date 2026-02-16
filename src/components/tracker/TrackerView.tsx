@@ -634,7 +634,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       let nextId = 1;
       for (let i = 0; i < parsedInstruments.length; i++) {
         // Use nextId to ensure globally unique IDs (handles multi-sample Furnace instruments)
-        const converted = convertToInstrument(parsedInstruments[i], nextId, format);
+        const converted = convertToInstrument(parsedInstruments[i], nextId, format as any);
         instruments.push(...converted);
         nextId += converted.length; // Advance ID by number of instruments created
       }

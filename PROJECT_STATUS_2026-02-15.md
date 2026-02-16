@@ -18,7 +18,10 @@
 - **Style Audit:** Verified removal of all legacy `surface-` CSS classes across the entire `src` directory.
 - **Tracker:** Updated `MacroLanes` to support variable channel widths and collapsed channel states.
 
-### 3. Recently Completed (Verified 2026-02-15) ✅
+### 3. Recently Completed (Verified 2026-02-16) ✅
+- ✅ **Furnace .fur Import Overhaul** - Achieving 1:1 source compatibility after comprehensive audit against Furnace C++ source. Fixed TIA/SNES mappings, macro parsing, pattern masks, and compatibility flags.
+- ✅ **Auto-slice to DrumKit** - Beat Slicer now supports one-click mapping of slices to a multi-sample DrumKit instrument (C-1 base).
+- ✅ **DB303 XML Import Accuracy** - Sound, parameter mapping, and timing verified against reference.
 - ✅ **Pattern length in header** - Shows `[64]` under ROW label.
 - ✅ **Ping-pong loop indicator** - Enhanced visibility in InstrumentList.
 - ✅ **DrumKit Visual Editor** - Full piano-roll UI.
@@ -31,15 +34,7 @@
 
 ## 🔴 Known Issues (Pending)
 
-### 1. Furnace .fur Import - Silent Audio ⚠️
-**Status:** Critical issue - instruments load but produce no sound.
-**Next Steps:** Deep dive into WASM message passing and sample rate conversions.
-
-### 2. DB303 XML Import Accuracy 🔄
-**Status:** High priority - sound is inaccurate.
-**Issue:** Parameter mapping and slide/accent timing need verification against reference files.
-
-### 3. Furnace Chip Volume Levels 🟡
+### 1. Furnace Chip Volume Levels 🟡
 **Status:** Medium priority - some chips are silent (-90dB) or too quiet.
 **Target Chips:** OPN, OPM, OPLL, GB, NES, PSG.
 
@@ -48,7 +43,6 @@
 ## 📋 Planned Enhancements
 
 ### ⏳ Not Started
-- [ ] Auto-slice to drumkit (Beat Slicer integration).
 - [ ] Sample layering (velocity zones, round-robin).
 - [ ] Pink/brown noise in Modular Synth NoiseModule.
 
@@ -67,8 +61,8 @@
 | **Swing/Timing** | ✅ Fixed |
 | **Tracker Effects** | ✅ All XM/IT effects complete |
 | **Pitch Envelope** | ✅ Complete |
-| **Furnace Import** | 🔴 Broken (silent audio) |
-| **DB303 Import** | 🟡 Inaccurate |
+| **Furnace Import** | ✅ Complete (Audited) |
+| **DB303 Import** | ✅ Complete |
 
 ---
 

@@ -48,7 +48,7 @@ export class MacroState {
 
   // Type info
   mode: MacroMode = MacroMode.SEQUENCE;
-  type = 0;        // Loop type (0=normal, 1=one-shot, etc.)
+  type = 0;        // Loop type (0=sequence, 1=ADSR, 2=LFO)
   macroType: number; // FurnaceMacroType value
 
   constructor(macroType: number) {
@@ -76,6 +76,7 @@ export class MacroState {
 
   /**
    * Prepare macro from source
+   * Based on Furnace's DivMacroStruct::prepare()
    */
   prepare(source: FurnaceMacro, volMacroLinger = false): void {
     this.has = true;
@@ -83,8 +84,11 @@ export class MacroState {
     this.actualHad = true;
     this.will = true;
     this.mode = source.mode as MacroMode;
-    this.type = ((source.open ? 1 : 0) >> 1) & 3; // Extract loop type from open flag
-    this.activeRelease = source.open ?? false;
+    // Extract type from open bitfield: bits 1-2 = type (0=sequence, 1=ADSR, 2=LFO)
+    const openVal = source.open ?? 0;
+    this.type = (openVal >> 1) & 3;
+    // Bit 3 = activeRelease
+    this.activeRelease = (openVal & 8) !== 0;
     this.linger = (this.macroType === FurnaceMacroType.VOL && volMacroLinger);
     
     // Set LFO phase from macro data (phase is at index 13 in ADSR/LFO mode)
@@ -319,6 +323,115 @@ export class MacroState {
 }
 
 /**
+ * FM operator macro state container
+ * Based on Furnace's DivMacroInt::IntOp
+ * Contains 20 macro states per operator
+ */
+export class IntOp {
+  am: MacroState;
+  ar: MacroState;
+  dr: MacroState;
+  mult: MacroState;
+  rr: MacroState;
+  sl: MacroState;
+  tl: MacroState;
+  dt2: MacroState;
+  rs: MacroState;
+  dt: MacroState;
+  d2r: MacroState;
+  ssg: MacroState;
+  dam: MacroState;
+  dvb: MacroState;
+  egt: MacroState;
+  ksl: MacroState;
+  sus: MacroState;
+  vib: MacroState;
+  ws: MacroState;
+  ksr: MacroState;
+
+  constructor(opIndex: number) {
+    // Operator macros have base types offset by (opIndex << 5)
+    // Furnace: opMacros[i].amMacro.macroType = DIV_MACRO_OP_AM + (i << 5)
+    const offset = opIndex << 5;
+    this.am = new MacroState(FurnaceMacroType.OP_AM + offset);
+    this.ar = new MacroState(FurnaceMacroType.OP_AR + offset);
+    this.dr = new MacroState(FurnaceMacroType.OP_DR + offset);
+    this.mult = new MacroState(FurnaceMacroType.OP_MULT + offset);
+    this.rr = new MacroState(FurnaceMacroType.OP_RR + offset);
+    this.sl = new MacroState(FurnaceMacroType.OP_SL + offset);
+    this.tl = new MacroState(FurnaceMacroType.OP_TL + offset);
+    this.dt2 = new MacroState(FurnaceMacroType.OP_DT2 + offset);
+    this.rs = new MacroState(FurnaceMacroType.OP_RS + offset);
+    this.dt = new MacroState(FurnaceMacroType.OP_DT + offset);
+    this.d2r = new MacroState(FurnaceMacroType.OP_D2R + offset);
+    this.ssg = new MacroState(FurnaceMacroType.OP_SSG + offset);
+    this.dam = new MacroState(FurnaceMacroType.OP_DAM + offset);
+    this.dvb = new MacroState(FurnaceMacroType.OP_DVB + offset);
+    this.egt = new MacroState(FurnaceMacroType.OP_EGT + offset);
+    this.ksl = new MacroState(FurnaceMacroType.OP_KSL + offset);
+    this.sus = new MacroState(FurnaceMacroType.OP_SUS + offset);
+    this.vib = new MacroState(FurnaceMacroType.OP_VIB + offset);
+    this.ws = new MacroState(FurnaceMacroType.OP_WS + offset);
+    this.ksr = new MacroState(FurnaceMacroType.OP_KSR + offset);
+  }
+
+  /**
+   * Initialize all operator macro states
+   */
+  init(): void {
+    this.am.init();
+    this.ar.init();
+    this.dr.init();
+    this.mult.init();
+    this.rr.init();
+    this.sl.init();
+    this.tl.init();
+    this.dt2.init();
+    this.rs.init();
+    this.dt.init();
+    this.d2r.init();
+    this.ssg.init();
+    this.dam.init();
+    this.dvb.init();
+    this.egt.init();
+    this.ksl.init();
+    this.sus.init();
+    this.vib.init();
+    this.ws.init();
+    this.ksr.init();
+  }
+
+  /**
+   * Get macro state by base type (0-19)
+   */
+  getByBaseType(baseType: number): MacroState | null {
+    switch (baseType) {
+      case 0: return this.am;
+      case 1: return this.ar;
+      case 2: return this.dr;
+      case 3: return this.mult;
+      case 4: return this.rr;
+      case 5: return this.sl;
+      case 6: return this.tl;
+      case 7: return this.dt2;
+      case 8: return this.rs;
+      case 9: return this.dt;
+      case 10: return this.d2r;
+      case 11: return this.ssg;
+      case 12: return this.dam;
+      case 13: return this.dvb;
+      case 14: return this.egt;
+      case 15: return this.ksl;
+      case 16: return this.sus;
+      case 17: return this.vib;
+      case 18: return this.ws;
+      case 19: return this.ksr;
+      default: return null;
+    }
+  }
+}
+
+/**
  * Macro interpreter for an instrument
  * Based on Furnace's DivMacroInt
  */
@@ -350,6 +463,11 @@ export class MacroEngine {
   ex6: MacroState;
   ex7: MacroState;
   ex8: MacroState;
+  ex9: MacroState;
+  ex10: MacroState;
+
+  // FM operator macros (4 operators, each with 20 macro types)
+  op: [IntOp, IntOp, IntOp, IntOp];
 
   // State
   hasRelease = false;
@@ -376,6 +494,16 @@ export class MacroEngine {
     this.ex6 = new MacroState(FurnaceMacroType.EX6);
     this.ex7 = new MacroState(FurnaceMacroType.EX7);
     this.ex8 = new MacroState(FurnaceMacroType.EX8);
+    this.ex9 = new MacroState(FurnaceMacroType.EX9);
+    this.ex10 = new MacroState(FurnaceMacroType.EX10);
+    
+    // Initialize 4 FM operator macro containers
+    this.op = [
+      new IntOp(0),
+      new IntOp(1),
+      new IntOp(2),
+      new IntOp(3),
+    ];
   }
 
   /**
@@ -384,7 +512,7 @@ export class MacroEngine {
   init(instrument: InstrumentConfig | null, volMacroLinger = false): void {
     this.ins = instrument;
     
-    // Reset all macros
+    // Reset all common macros
     this.vol.init();
     this.arp.init();
     this.duty.init();
@@ -405,6 +533,13 @@ export class MacroEngine {
     this.ex6.init();
     this.ex7.init();
     this.ex8.init();
+    this.ex9.init();
+    this.ex10.init();
+
+    // Reset all operator macros
+    for (let i = 0; i < 4; i++) {
+      this.op[i].init();
+    }
 
     this.macroList = [];
     this.macroSource = [];
@@ -430,8 +565,9 @@ export class MacroEngine {
 
     // Check if any macro has a release point
     for (const macro of this.macroSource) {
+      const openVal = macro.open ?? 0;
       // ADSR mode with release rate > 0
-      if (((macro.open ? 1 : 0) & 6) === 2) {
+      if ((openVal & 6) === 2) {
         if ((macro.data[8] ?? 0) > 0) {
           this.hasRelease = true;
         }
@@ -497,8 +633,20 @@ export class MacroEngine {
 
   /**
    * Get macro state by type
+   * Based on Furnace's DivMacroInt::structByType()
    */
   private structByType(type: number): MacroState | null {
+    // Check for operator macros (type >= 0x20)
+    // Furnace: type >= 0x20 means operator macro
+    // Operator index: ((type >> 5) - 1) & 3
+    // Base macro type: type & 0x1f
+    if (type >= 0x20) {
+      const opIndex = ((type >> 5) - 1) & 3;
+      const baseType = type & 0x1f;
+      return this.op[opIndex].getByBaseType(baseType);
+    }
+
+    // Common macros (type 0-21)
     switch (type) {
       case FurnaceMacroType.VOL: return this.vol;
       case FurnaceMacroType.ARP: return this.arp;
@@ -520,6 +668,8 @@ export class MacroEngine {
       case FurnaceMacroType.EX6: return this.ex6;
       case FurnaceMacroType.EX7: return this.ex7;
       case FurnaceMacroType.EX8: return this.ex8;
+      case FurnaceMacroType.EX9: return this.ex9;
+      case FurnaceMacroType.EX10: return this.ex10;
       default: return null;
     }
   }
