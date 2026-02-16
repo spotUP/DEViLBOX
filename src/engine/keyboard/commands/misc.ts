@@ -4,6 +4,9 @@
 
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useUIStore } from '@stores/useUIStore';
+import { getToneEngine } from '@engine/ToneEngine';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { useTransportStore } from '@stores/useTransportStore';
 
 /**
  * Show about dialog
@@ -44,6 +47,13 @@ export function toggleEditMode(): boolean {
  * Panic - stop all sounds immediately
  */
 export function panic(): boolean {
+  // Actually silence all audio — stop replayer, engine, and release all notes
+  const { isPlaying, stop } = useTransportStore.getState();
+  if (isPlaying) {
+    getTrackerReplayer().stop();
+    stop();
+  }
+  getToneEngine().releaseAll();
   useUIStore.getState().setStatusMessage('PANIC - All notes off', false, 1000);
   return true;
 }
@@ -390,6 +400,8 @@ export function recordMacro(): boolean {
  * Escape - cancel current operation
  */
 export function escapeCommand(): boolean {
+  // Silence any hanging note previews
+  getToneEngine().releaseAll();
   useUIStore.getState().setStatusMessage('', false, 1);
   return true;
 }

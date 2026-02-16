@@ -82,8 +82,14 @@ function createFurnaceWithChip(config: InstrumentConfig, chipType: number): Furn
 // ── Shared trigger hooks ─────────────────────────────────────────────────────
 // FM chips: no onTriggerAttack — ToneEngine handles channel index + triggerAttack
 
-function furnaceReleaseHook(synth: any, _note: string | undefined, time: number): boolean {
-  (synth as any).triggerRelease(time);
+function furnaceReleaseHook(synth: any, note: string | undefined, time: number): boolean {
+  // FurnaceDispatchSynth.triggerRelease(note?, time?) — must pass note to find correct channel
+  // FurnaceSynth.triggerRelease(time) — only takes time
+  if (synth instanceof FurnaceDispatchSynth) {
+    synth.triggerRelease(note, time);
+  } else {
+    (synth as any).triggerRelease(time);
+  }
   return true;
 }
 

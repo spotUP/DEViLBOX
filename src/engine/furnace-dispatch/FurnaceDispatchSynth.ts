@@ -766,7 +766,25 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   }
 
   releaseAll(): void {
+    // Clear any pending release timeouts
+    for (const [, timeout] of this._releaseTimeouts) {
+      clearTimeout(timeout);
+    }
+    this._releaseTimeouts.clear();
+
+    // Release tracked notes
     this.triggerRelease();
+
+    // SAFETY NET: Brute-force noteOff on ALL chip channels.
+    // If activeNotes tracking is out of sync (e.g., notes triggered via
+    // tracker replayer with channel routing), some notes may not be tracked.
+    // Send noteOff to every channel to guarantee silence.
+    if (this._isReady && !this._disposed) {
+      const numCh = this.engine.getChannelCount(this.platformType) || 3;
+      for (let ch = 0; ch < numCh; ch++) {
+        this.engine.noteOff(ch, this.platformType);
+      }
+    }
   }
 
   /**
