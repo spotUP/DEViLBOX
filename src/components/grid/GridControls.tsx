@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { Trash2, Shuffle, ChevronUp, ChevronDown, Cable, Wand2 } from 'lucide-react';
+import { Trash2, Shuffle, ChevronUp, ChevronDown, Cable, Wand2, TrendingUp } from 'lucide-react';
 import { ScaleSelector } from './ScaleSelector';
 import { MIDILearnPanel } from './MIDILearnPanel';
 
@@ -23,6 +23,8 @@ interface GridControlsProps {
   onRandomize?: () => void;
   onAcidGenerator?: () => void;
   cellSize?: number; // Current auto-calculated cell size
+  smoothMarker?: boolean;
+  onSmoothMarkerChange?: (enabled: boolean) => void;
 }
 
 export const GridControls: React.FC<GridControlsProps> = ({
@@ -39,6 +41,8 @@ export const GridControls: React.FC<GridControlsProps> = ({
   onRandomize,
   onAcidGenerator,
   cellSize = 28,
+  smoothMarker = false,
+  onSmoothMarkerChange,
 }) => {
   const [showMIDIPanel, setShowMIDIPanel] = useState(false);
 
@@ -121,6 +125,20 @@ export const GridControls: React.FC<GridControlsProps> = ({
 
       {/* Actions */}
       <div className="flex items-center gap-1">
+        {onSmoothMarkerChange && (
+          <button
+            onClick={() => onSmoothMarkerChange(!smoothMarker)}
+            className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+              smoothMarker
+                ? 'bg-accent-primary text-white'
+                : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgActive'
+            }`}
+            title="Smooth marker scrolling"
+          >
+            <TrendingUp size={12} />
+            Smooth
+          </button>
+        )}
         <button
           onClick={() => setShowMIDIPanel(!showMIDIPanel)}
           className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${

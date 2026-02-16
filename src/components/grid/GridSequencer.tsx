@@ -76,12 +76,34 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     return { color: synthInfo.color, hex: tailwindToHex(synthInfo.color) };
   }, [channel, instruments]);
 
+  // Smooth marker scrolling state
+  const [smoothMarker, setSmoothMarker] = useState(false);
+  const smoothProgressRef = useRef(0);
+  const lastStepTimeRef2 = useRef(0);
+  const rafIdRef2 = useRef(0);
+
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;
+  const smoothStep = smoothMarker ? smoothProgressRef.current : currentStep;
   
   // Trail steps for visual effect (7 steps behind with decreasing opacity)
   const trailSteps = useMemo(() => {
     if (currentStep < 0) return [];
+    
+    if (smoothMarker) {
+      // Smooth mode: fractional positions with interpolated opacity
+      const activeStep = smoothStep;
+      return [
+        { step: activeStep - 1, opacity: 0.5 },
+        { step: activeStep - 2, opacity: 0.4 },
+        { step: activeStep - 3, opacity: 0.3 },
+        { step: activeStep - 4, opacity: 0.2 },
+        { step: activeStep - 5, opacity: 0.15 },
+        { step: activeStep - 6, opacity: 0.1 },
+        { step: activeStep - 7, opacity: 0.05 },
+      ].filter(t => t.step >= 0); // Only show positive positions
+    }
+    
     return [
       { step: (currentStep - 1 + maxSteps) % maxSteps, opacity: 0.5 },
       { step: (currentStep - 2 + maxSteps) % maxSteps, opacity: 0.4 },
@@ -91,7 +113,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       { step: (currentStep - 6 + maxSteps) % maxSteps, opacity: 0.1 },
       { step: (currentStep - 7 + maxSteps) % maxSteps, opacity: 0.05 },
     ];
-  }, [currentStep, maxSteps]);
+  }, [currentStep, maxSteps, smoothMarker, smoothStep]);
 
   // Ref for scroll container
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -227,6 +249,47 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
       }
     };
   }, [isPlaying, smoothScrolling, bpm, speed, currentStep, cellSize]);
+
+  // RAF-based smooth marker animation
+  useEffect(() => {
+    if (!isPlaying || !smoothMarker) {
+      lastStepTimeRef2.current = 0;
+      if (rafIdRef2.current) {
+        cancelAnimationFrame(rafIdRef2.current);
+        rafIdRef2.current = 0;
+      }
+      smoothProgressRef.current = currentStep;
+      return;
+    }
+
+    const msPerRow = (2.5 / bpm) * speed * 1000;
+
+    const animate = () => {
+      const now = performance.now();
+
+      // Initialize on first run or step change
+      if (lastStepTimeRef2.current === 0 || Math.floor(smoothProgressRef.current) !== currentStep) {
+        lastStepTimeRef2.current = now;
+        smoothProgressRef.current = currentStep;
+      }
+
+      // Calculate fractional progress
+      const elapsed = now - lastStepTimeRef2.current;
+      const progress = Math.min(elapsed / msPerRow, 1.0);
+      smoothProgressRef.current = currentStep + progress;
+
+      rafIdRef2.current = requestAnimationFrame(animate);
+    };
+
+    rafIdRef2.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (rafIdRef2.current) {
+        cancelAnimationFrame(rafIdRef2.current);
+        rafIdRef2.current = 0;
+      }
+    };
+  }, [isPlaying, smoothMarker, bpm, speed, currentStep]);
 
   // Handle MIDI CC messages for parameter control
   useEffect(() => {
@@ -459,6 +522,8 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
         onRandomize={handleRandomize}
         onAcidGenerator={handleAcidGenerator}
         cellSize={cellSize}
+        smoothMarker={smoothMarker}
+        onSmoothMarkerChange={setSmoothMarker}
       />
 
       {/* Grid */}
@@ -472,21 +537,34 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
           tabIndex={0}
         >
           {/* Step numbers header */}
-          <div className="flex items-center mb-1 pl-12" role="row">
+          <div className="flex items-center mb-1 pl-12 relative" role="row">
+            {smoothMarker && isPlaying && currentStep >= 0 && (
+              <div
+                className="absolute h-4 rounded-sm pointer-events-none"
+                style={{
+                  left: `${48 + (smoothStep * (cellSize + 4))}px`,
+                  width: `${cellSize}px`,
+                  backgroundColor: getStepInstrumentColor(Math.floor(smoothStep)).hex,
+                  opacity: 0.6,
+                  transition: 'none', // No CSS transition, using RAF
+                }}
+              />
+            )}
             {stepIndices.map((stepIdx) => {
               const { hex: stepInstrumentHex } = getStepInstrumentColor(stepIdx);
+              const isCurrentDiscrete = !smoothMarker && currentStep === stepIdx;
               return (
                 <div
                   key={stepIdx}
                   className={`h-4 flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm relative overflow-hidden
                     ${stepIdx % 4 === 0 ? 'text-text-secondary' : 'text-text-muted'}
-                    ${currentStep === stepIdx ? 'text-white font-bold' : ''}
+                    ${isCurrentDiscrete ? 'text-white font-bold' : ''}
                   `}
                   style={{
                     width: `${cellSize}px`,
                   }}
                 >
-                  {currentStep === stepIdx && (
+                  {isCurrentDiscrete && (
                     <div
                       className="absolute inset-0"
                       style={{ backgroundColor: stepInstrumentHex, opacity: 0.6 }}
@@ -521,7 +599,35 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                 const step = gridPattern.steps[stepIdx];
                 const isActive = step?.noteIndex === noteIndex;
                 const isFocused = focusedCell?.noteIndex === noteIndex && focusedCell?.stepIndex === stepIdx;
-                const trailOpacity = trailSteps.find(t => t.step === stepIdx)?.opacity || 0;
+                
+                // Calculate trail opacity for smooth or discrete mode
+                let trailOpacity = 0;
+                if (smoothMarker) {
+                  // Smooth mode: calculate opacity based on distance
+                  const distance = smoothStep - stepIdx;
+                  if (distance > 0 && distance < 7.5) {
+                    // Interpolate opacity based on distance
+                    const baseOpacity = distance < 1 ? 0.5 : 
+                                       distance < 2 ? 0.4 :
+                                       distance < 3 ? 0.3 :
+                                       distance < 4 ? 0.2 :
+                                       distance < 5 ? 0.15 :
+                                       distance < 6 ? 0.1 : 0.05;
+                    const fraction = distance - Math.floor(distance);
+                    const nextOpacity = distance < 6 ? 
+                      (distance < 1 ? 0.4 : distance < 2 ? 0.3 : distance < 3 ? 0.2 : 
+                       distance < 4 ? 0.15 : distance < 5 ? 0.1 : 0.05) : 0;
+                    trailOpacity = baseOpacity * (1 - fraction) + nextOpacity * fraction;
+                  }
+                } else {
+                  // Discrete mode: exact match
+                  trailOpacity = trailSteps.find(t => t.step === stepIdx)?.opacity || 0;
+                }
+                
+                const isCurrentStepCheck = smoothMarker 
+                  ? (Math.abs(smoothStep - stepIdx) < 0.5)
+                  : (currentStep === stepIdx);
+                
                 const { color: stepInstrumentColor, hex: stepInstrumentHex } = getStepInstrumentColor(stepIdx);
 
                 return (
@@ -537,7 +643,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                       noteIndex={noteIndex}
                       stepIndex={stepIdx}
                       isActive={isActive}
-                      isCurrentStep={currentStep === stepIdx}
+                      isCurrentStep={isCurrentStepCheck}
                       isTriggered={currentStep === stepIdx && isActive}
                       isFocused={isFocused}
                       accent={isActive ? step?.accent : false}
