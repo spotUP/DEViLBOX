@@ -1025,6 +1025,7 @@ export class TrackerReplayer {
         this.posJumpPos = param;
         this.posJumpFlag = true;
         this.pBreakFlag = true;
+        console.log(`[TrackerReplayer] Bxx Effect (Position Jump): targetPos=${param}, channel=${chIndex}, row=${this.pattPos}`);
         break;
 
       case 0xC: // Set volume
@@ -1034,8 +1035,13 @@ export class TrackerReplayer {
 
       case 0xD: // Pattern break
         this.pBreakPos = x * 10 + y; // BCD
-        if (this.pBreakPos > 63) this.pBreakPos = 0;
+        // Clamp to pattern length if known (default to 63 for legacy compatibility)
+        const nextPattNum = this.song ? this.song.songPositions[this.songPos + 1] : undefined;
+        const nextPattLen = (this.song && nextPattNum !== undefined) ? (this.song.patterns[nextPattNum]?.length ?? 64) : 64;
+        if (this.pBreakPos >= nextPattLen) this.pBreakPos = 0;
+        
         this.pBreakFlag = true;
+        console.log(`[TrackerReplayer] Dxx Effect (Pattern Break): targetRow=${this.pBreakPos}, channel=${chIndex}, row=${this.pattPos}`);
         break;
 
       case 0xE: // Extended effects
@@ -1141,6 +1147,7 @@ export class TrackerReplayer {
       case 0x6: // Pattern loop
         if (y === 0) {
           ch.patternLoopRow = this.pattPos;
+          console.log(`[TrackerReplayer] E60 Effect (Loop Start): channel=${_chIndex}, row=${this.pattPos}`);
         } else {
           if (ch.patternLoopCount === 0) {
             ch.patternLoopCount = y;
@@ -1150,6 +1157,9 @@ export class TrackerReplayer {
           if (ch.patternLoopCount !== 0) {
             this.pBreakPos = ch.patternLoopRow;
             this.pBreakFlag = true;
+            console.log(`[TrackerReplayer] E6y Effect (Looping): channel=${_chIndex}, targetRow=${this.pBreakPos}, count=${ch.patternLoopCount}/${y}`);
+          } else {
+            console.log(`[TrackerReplayer] E6y Effect (Loop Finished): channel=${_chIndex}, row=${this.pattPos}`);
           }
         }
         break;
@@ -1986,6 +1996,9 @@ export class TrackerReplayer {
   private advanceRow(): void {
     if (!this.song) return;
 
+    const oldPos = this.songPos;
+    const oldRow = this.pattPos;
+
     // Pattern break
     if (this.pBreakFlag) {
       this.pattPos = this.pBreakPos;
@@ -2017,11 +2030,13 @@ export class TrackerReplayer {
 
     // Song end
     if (this.songPos >= this.song.songLength) {
-      console.log(`[TrackerReplayer] Song end, restarting at position ${this.song.restartPosition}`);
       this.songPos = this.song.restartPosition < this.song.songLength
         ? this.song.restartPosition
         : 0;
+      console.log(`[TrackerReplayer] Song End/Loop: pos=${oldPos}->${this.songPos}, row=${oldRow}->${this.pattPos}`);
       this.onSongEnd?.();
+    } else if (this.songPos !== oldPos) {
+      console.log(`[TrackerReplayer] Position Transition: pos=${oldPos}->${this.songPos}, row=${oldRow}->${this.pattPos}, pattern=${patternNum}`);
     }
 
     // Notify

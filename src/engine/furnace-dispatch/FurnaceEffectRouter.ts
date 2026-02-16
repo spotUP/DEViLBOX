@@ -313,6 +313,10 @@ export class FurnaceEffectRouter {
         break;
     }
 
+    if (commands.length > 0 && effect !== 0) {
+      console.log(`[FurnaceEffectRouter] Route: ch=${chan}, fx=0x${effect.toString(16).padStart(2, '0')}, param=0x${param.toString(16).padStart(2, '0')} -> [${commands.map(c => `cmd=${c.cmd},v1=${c.val1},v2=${c.val2}`).join(' | ')}]`);
+    }
+
     return commands;
   }
 

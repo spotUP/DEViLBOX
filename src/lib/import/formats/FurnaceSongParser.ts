@@ -3002,7 +3002,8 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, primarySubsongIn
     const speed = subsong?.speed1 || 6;
     const bpm = Math.round(2.5 * hz * (virtualTempo / virtualTempoD));
 
-    console.log(`[FurnaceParser] Subsong ${idx}: ${subsongPatterns.length} patterns`);
+    console.log(`[FurnaceParser] Subsong ${idx}: "${subsong.name}", ${subsongPatterns.length} patterns, ${subsong.ordersLen} orders, BPM: ${bpm}, Speed: ${speed}`);
+    console.log(`[FurnaceParser] Subsong ${idx} Order Table:`, subsong.orders.map((chOrders, chIdx) => `ch${chIdx}:[${chOrders.slice(0, 16).join(',')}${chOrders.length > 16 ? '...' : ''}]`).join(' | '));
 
     return {
       subsongIndex: idx,
