@@ -413,10 +413,10 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
         {/* Current step marker overlay - exact same size as cell */}
         {isCurrentStep && !isTriggered && (
           <div 
-            className="absolute rounded pointer-events-none"
+            className={`absolute rounded pointer-events-none ${instrumentColor.replace('text-', 'bg-')}`}
             style={{
               inset: '-1px',
-              backgroundColor: 'rgba(239, 68, 68, 0.3)',
+              opacity: 0.35,
               zIndex: 4,
             }}
           />
@@ -424,10 +424,10 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
         {/* Trail overlay - renders on top of everything, extends over border */}
         {trailOpacity > 0 && (
           <div 
-            className="absolute rounded pointer-events-none"
+            className={`absolute rounded pointer-events-none ${instrumentColor.replace('text-', 'bg-')}`}
             style={{
               inset: '-1px',
-              backgroundColor: `rgba(239, 68, 68, ${trailOpacity * 0.4})`,
+              opacity: trailOpacity * 0.45,
               zIndex: 5,
             }}
           />
