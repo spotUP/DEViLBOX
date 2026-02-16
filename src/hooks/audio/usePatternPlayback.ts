@@ -20,6 +20,7 @@ export const usePatternPlayback = () => {
   const { instruments } = useInstrumentStore();
   useAutomationStore();
   const { masterEffects } = useAudioStore();
+  const isArrangementMode = useArrangementStore((state) => state.isArrangementMode);
 
   // Pattern depends on currentPatternIndex and currentPositionIndex.
   // We use refs for these to prevent the main playback loop from restarting 
@@ -217,7 +218,7 @@ export const usePatternPlayback = () => {
         replayerRef.current.onSongEnd = null;
       }
     };
-  }, [isPlaying, isLooping, pattern, instruments, patternOrder, patterns, bpm, setCurrentPattern, setCurrentPosition, setCurrentRow, setCurrentRowThrottled]);
+  }, [isPlaying, isLooping, pattern, instruments, patternOrder, patterns, bpm, setCurrentPattern, setCurrentPosition, setCurrentRow, setCurrentRowThrottled, isArrangementMode]);
 
   return {
     isPlaying,

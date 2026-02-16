@@ -17,7 +17,7 @@ import { ArrangementContextMenu } from './ArrangementContextMenu';
 
 export const ArrangementView: React.FC = () => {
   const {
-    tracks, groups, view,
+    tracks, groups, automationLanes, view,
     setTool,
     selectedClipIds, removeClips, duplicateClips,
     clearSelection, selectAllClipsOnTrack,
@@ -93,25 +93,35 @@ export const ArrangementView: React.FC = () => {
       visible: boolean;
     }> = [];
     let runningY = 0;
+    const TRACK_SEPARATOR = 1;
+    const AUTOMATION_LANE_HEIGHT = 40;
+
     for (let i = 0; i < sorted.length; i++) {
       const t = sorted[i];
       const group = t.groupId ? groups.find(g => g.id === t.groupId) : null;
-      const visible = !group || !group.collapsed;
-      const bodyHeight = visible ? t.height : 0;
+      const visible = !group || (!group.collapsed && !group.folded);
+
+      // Automation
+      const trackAutoLanes = automationLanes.filter(l => l.trackId === t.id && l.visible);
+      const automationHeight = t.automationVisible ? trackAutoLanes.length * AUTOMATION_LANE_HEIGHT : 0;
+
+      const bodyHeight = t.collapsed ? 24 : t.height;
+      const totalHeight = bodyHeight + automationHeight;
+
       result.push({
         trackId: t.id,
         trackIndex: i,
         y: runningY,
-        height: bodyHeight,
-        bodyHeight,
-        automationY: runningY + bodyHeight,
-        automationHeight: 0,
+        height: visible ? totalHeight : 0,
+        bodyHeight: visible ? bodyHeight : 0,
+        automationY: runningY + (visible ? bodyHeight : 0),
+        automationHeight: visible ? automationHeight : 0,
         visible,
       });
-      if (visible) runningY += t.height;
+      if (visible) runningY += totalHeight + TRACK_SEPARATOR;
     }
     return result;
-  }, [tracks, groups]);
+  }, [tracks, groups, automationLanes]);
 
   // Context menu state
   const [ctxMenu, setCtxMenu] = React.useState<{
