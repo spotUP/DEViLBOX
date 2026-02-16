@@ -952,6 +952,11 @@ export class FurnaceDispatchEngine {
     return this.chips.has(platformType);
   }
 
+  /** Get the effect router (for setting compatFlags) */
+  getEffectRouter(): FurnaceEffectRouter {
+    return this.effectRouter;
+  }
+
   /** Whether audio is already routed from the worklet to destination */
   get audioRouted(): boolean { return this._audioRouted; }
 
@@ -1616,13 +1621,6 @@ export class FurnaceDispatchEngine {
    */
   resetEffectMemory(): void {
     this.effectRouter.resetMemory();
-  }
-
-  /**
-   * Get the effect router instance for direct access if needed.
-   */
-  getEffectRouter(): FurnaceEffectRouter {
-    return this.effectRouter;
   }
 
   /**

@@ -11,6 +11,7 @@
  */
 
 import { DivCmd, FurnaceDispatchPlatform } from './FurnaceDispatchEngine';
+import type { ImportMetadata } from '../../types/tracker';
 
 /**
  * Dispatch command result from effect routing
@@ -141,6 +142,9 @@ export class FurnaceEffectRouter {
   // Effect memory per channel (Furnace-style parameter persistence)
   private effectMemory: Map<number, Map<number, number>> = new Map();
 
+  // Furnace compatibility flags for legacy behavior
+  private compatFlags: NonNullable<NonNullable<ImportMetadata['furnaceData']>['compatFlags']> = {};
+
   constructor(platformType: number = FurnaceDispatchPlatform.GB) {
     this.platformType = platformType;
     this.family = getPlatformFamily(platformType);
@@ -152,6 +156,21 @@ export class FurnaceEffectRouter {
   setPlatform(platformType: number): void {
     this.platformType = platformType;
     this.family = getPlatformFamily(platformType);
+  }
+
+  /**
+   * Set compatibility flags from ImportMetadata
+   */
+  setCompatFlags(metadata: ImportMetadata | undefined): void {
+    this.compatFlags = metadata?.furnaceData?.compatFlags || {};
+    console.log('[FurnaceEffectRouter] Loaded compatFlags:', {
+      limitSlides: this.compatFlags.limitSlides,
+      linearPitch: this.compatFlags.linearPitch,
+      legacyVolumeSlides: this.compatFlags.legacyVolumeSlides,
+      compatibleArpeggio: this.compatFlags.compatibleArpeggio,
+      noteOffResetsSlides: this.compatFlags.noteOffResetsSlides,
+      continuousVibrato: this.compatFlags.continuousVibrato,
+    });
   }
 
   /**
@@ -209,20 +228,59 @@ export class FurnaceEffectRouter {
     switch (effect) {
       case 0x00: // Arpeggio
         if (param !== 0) {
+          // compatibleArpeggio flag changes arpeggio behavior (Furnace 0.5.x mode)
+          const arpMode = this.compatFlags.compatibleArpeggio ? 1 : 0;
           commands.push({ cmd: DivCmd.NOTE_PORTA, chan, val1: x, val2: y });
+          if (arpMode === 1) {
+            // Legacy arpeggio mode: different timing/behavior
+            commands.push({ cmd: DivCmd.HINT_ARPEGGIO, chan, val1: x, val2: y });
+          }
         }
         break;
 
       case 0x01: // Pitch slide up
-        commands.push({ cmd: DivCmd.PITCH, chan, val1: param, val2: 0 });
+        {
+          let slideVal = param;
+          // Apply limitSlides flag (clamp to ±128)
+          if (this.compatFlags.limitSlides && slideVal > 128) {
+            slideVal = 128;
+          }
+          // Apply pitchSlideSpeed multiplier
+          if (this.compatFlags.pitchSlideSpeed !== undefined && this.compatFlags.pitchSlideSpeed !== 4) {
+            slideVal = Math.floor((slideVal * this.compatFlags.pitchSlideSpeed) / 4);
+          }
+          commands.push({ cmd: DivCmd.PITCH, chan, val1: slideVal, val2: 0 });
+        }
         break;
 
       case 0x02: // Pitch slide down
-        commands.push({ cmd: DivCmd.PITCH, chan, val1: -param, val2: 0 });
+        {
+          let slideVal = param;
+          // Apply limitSlides flag (clamp to ±128)
+          if (this.compatFlags.limitSlides && slideVal > 128) {
+            slideVal = 128;
+          }
+          // Apply pitchSlideSpeed multiplier
+          if (this.compatFlags.pitchSlideSpeed !== undefined && this.compatFlags.pitchSlideSpeed !== 4) {
+            slideVal = Math.floor((slideVal * this.compatFlags.pitchSlideSpeed) / 4);
+          }
+          commands.push({ cmd: DivCmd.PITCH, chan, val1: -slideVal, val2: 0 });
+        }
         break;
 
       case 0x03: // Tone portamento
-        commands.push({ cmd: DivCmd.NOTE_PORTA, chan, val1: param, val2: 1 });
+        {
+          let portaVal = param;
+          // Apply limitSlides flag
+          if (this.compatFlags.limitSlides && portaVal > 128) {
+            portaVal = 128;
+          }
+          // Apply pitchSlideSpeed multiplier
+          if (this.compatFlags.pitchSlideSpeed !== undefined && this.compatFlags.pitchSlideSpeed !== 4) {
+            portaVal = Math.floor((portaVal * this.compatFlags.pitchSlideSpeed) / 4);
+          }
+          commands.push({ cmd: DivCmd.NOTE_PORTA, chan, val1: portaVal, val2: 1 });
+        }
         break;
 
       case 0x04: // Vibrato
@@ -274,11 +332,25 @@ export class FurnaceEffectRouter {
 
     switch (x) {
       case 0x1: // E1y - Fine pitch slide up
-        commands.push({ cmd: DivCmd.PITCH, chan, val1: y, val2: 0 });
+        {
+          let finePitch = y;
+          // Apply pitchSlideSpeed to fine slides
+          if (this.compatFlags.pitchSlideSpeed !== undefined && this.compatFlags.pitchSlideSpeed !== 4) {
+            finePitch = Math.floor((finePitch * this.compatFlags.pitchSlideSpeed) / 4);
+          }
+          commands.push({ cmd: DivCmd.PITCH, chan, val1: finePitch, val2: 0 });
+        }
         break;
 
       case 0x2: // E2y - Fine pitch slide down
-        commands.push({ cmd: DivCmd.PITCH, chan, val1: -y, val2: 0 });
+        {
+          let finePitch = y;
+          // Apply pitchSlideSpeed to fine slides
+          if (this.compatFlags.pitchSlideSpeed !== undefined && this.compatFlags.pitchSlideSpeed !== 4) {
+            finePitch = Math.floor((finePitch * this.compatFlags.pitchSlideSpeed) / 4);
+          }
+          commands.push({ cmd: DivCmd.PITCH, chan, val1: -finePitch, val2: 0 });
+        }
         break;
 
       case 0x3: // E3y - Glissando control
@@ -298,11 +370,19 @@ export class FurnaceEffectRouter {
         break;
 
       case 0xA: // EAy - Fine volume slide up
-        commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: y, val2: 0 });
+        {
+          // legacyVolumeSlides flag changes volume slide behavior
+          const volUp = this.compatFlags.legacyVolumeSlides ? Math.min(y * 2, 15) : y;
+          commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: volUp, val2: 0 });
+        }
         break;
 
       case 0xB: // EBy - Fine volume slide down
-        commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: 0, val2: y });
+        {
+          // legacyVolumeSlides flag changes volume slide behavior
+          const volDown = this.compatFlags.legacyVolumeSlides ? Math.min(y * 2, 15) : y;
+          commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: 0, val2: volDown });
+        }
         break;
 
       case 0xC: // ECy - Note cut
