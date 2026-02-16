@@ -56,7 +56,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       filterEnvelope: { envMod: 0.5, decay: 0.5 },
       accent: { amount: 0.5 },
       slide: { time: 0.17, mode: 'exponential' },
-      devilFish: { ...DF_DEFAULTS },
+      devilFish: { ...DF_DEFAULTS, normalDecay: 0.5 },
       lfo: { waveform: 0, rate: 0, contour: 0, pitchDepth: 0, pwmDepth: 0, filterDepth: 0 },
       chorus: { enabled: false, mode: 0, mix: 0.5 },
       phaser: { enabled: false, rate: 0.5, depth: 0.7, feedback: 0, mix: 0 },
@@ -79,7 +79,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       filterEnvelope: { envMod: 0.6, decay: 0.3 },
       accent: { amount: 0.7 },
       slide: { time: 0.17, mode: 'exponential' },
-      devilFish: { ...DF_DEFAULTS },
+      devilFish: { ...DF_DEFAULTS, normalDecay: 0.3 },
     },
     effects: [],
     volume: 0,
@@ -99,7 +99,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       devilFish: {
         ...DF_DEFAULTS,
         filterInputDrive: 0.15,   // Slight drive into filter for grit
-        normalDecay: 0.2,         // Snappier than default for squelch
+        normalDecay: 0.4,         // Match filterEnvelope.decay
       },
     },
     effects: [],
@@ -117,7 +117,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       filterEnvelope: { envMod: 0.25, decay: 0.2 },
       accent: { amount: 0.45 },
       slide: { time: 0.3, mode: 'exponential' },
-      devilFish: { ...DF_DEFAULTS },
+      devilFish: { ...DF_DEFAULTS, normalDecay: 0.2 },
     },
     effects: [],
     volume: 0,
@@ -136,7 +136,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       filterEnvelope: { envMod: 0.55, decay: 0.25 },
       accent: { amount: 0.65 },
       slide: { time: 0.15, mode: 'exponential' },
-      devilFish: { ...DF_DEFAULTS },
+      devilFish: { ...DF_DEFAULTS, normalDecay: 0.25 },
     },
     effects: [],
     volume: 0,
@@ -159,7 +159,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         ...DF_DEFAULTS,
         filterInputDrive: 0.4,    // Drive into filter = saturation before resonance
         duffingAmount: 0.3,       // Nonlinear stiffness adds harmonics
-        normalDecay: 0.15,        // Very snappy normal decay
+        normalDecay: 0.4,         // Match filterEnvelope.decay
         accentDecay: 0.003,       // ULTRA fast accent decay = acid scream
       },
     },
@@ -182,7 +182,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       slide: { time: 0.08, mode: 'exponential' },
       devilFish: {
         ...DF_DEFAULTS,
-        normalDecay: 0.12,
+        normalDecay: 0.45,        // Match filterEnvelope.decay
         accentDecay: 0.015,       // Fast accent decay for chaotic sweeps
         softAttack: 0.05,
         filterTracking: 0.6,
@@ -212,7 +212,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         ...DF_DEFAULTS,
         filterInputDrive: 0.5,    // Heavy drive
         duffingAmount: 0.2,
-        normalDecay: 0.15,
+        normalDecay: 0.35,        // Match filterEnvelope.decay
         accentDecay: 0.005,       // Very fast accent decay for acid burn
       },
     },
@@ -236,6 +236,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       devilFish: {
         ...DF_DEFAULTS,
         filterInputDrive: 0.2,
+        normalDecay: 0.35,
       },
     },
     effects: [
@@ -275,6 +276,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       devilFish: {
         ...DF_DEFAULTS,
         filterInputDrive: 0.15,
+        normalDecay: 0.3,
       },
     },
     effects: [
@@ -317,7 +319,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       filterEnvelope: { envMod: 0.5, decay: 0.4 },
       accent: { amount: 0.65 },
       slide: { time: 0.2, mode: 'exponential' },
-      devilFish: { ...DF_DEFAULTS },
+      devilFish: { ...DF_DEFAULTS, normalDecay: 0.4 },
     },
     effects: [
       {
@@ -351,7 +353,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       filterEnvelope: { envMod: 0.45, decay: 0.5 },
       accent: { amount: 0.6 },
       slide: { time: 0.25, mode: 'exponential' },
-      devilFish: { ...DF_DEFAULTS },
+      devilFish: { ...DF_DEFAULTS, normalDecay: 0.5 },
     },
     effects: [
       {
@@ -393,7 +395,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       filterEnvelope: { envMod: 0.5, decay: 0.4 },
       accent: { amount: 0.5 },
       slide: { time: 0.17, mode: 'exponential' },
-      devilFish: { ...DF_DEFAULTS },
+      devilFish: { ...DF_DEFAULTS, normalDecay: 0.4 },
       delay: { enabled: true, time: 0.3, feedback: 0.3, tone: 0.5, mix: 0.5, stereo: 0.75 },
     },
     effects: [],
@@ -414,6 +416,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       devilFish: {
         ...DF_DEFAULTS,
         filterInputDrive: 0.1,
+        normalDecay: 0.4,
       },
     },
     effects: [
@@ -460,7 +463,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         ...DF_DEFAULTS,
         filterInputDrive: 0.3,
         diodeCharacter: 0.15,
-        normalDecay: 0.3,
+        normalDecay: 0.35,
       },
     },
     effects: [
@@ -492,7 +495,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
         filterInputDrive: 0.6,    // Heavy drive
         diodeCharacter: 0.5,      // Strong diode character
         duffingAmount: 0.6,       // Aggressive nonlinearity
-        normalDecay: 0.12,
+        normalDecay: 0.45,        // Match filterEnvelope.decay
         accentDecay: 0.008,       // Fast accent decay for industrial aggression
       },
     },
@@ -520,7 +523,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       filterEnvelope: { envMod: 0.4, decay: 0.55 },
       accent: { amount: 0.5 },
       slide: { time: 0.3, mode: 'exponential' },
-      devilFish: { ...DF_DEFAULTS },
+      devilFish: { ...DF_DEFAULTS, normalDecay: 0.55 },
     },
     effects: [
       {
