@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import * as Tone from 'tone';
 import {
   MousePointer2,
   Pencil,
@@ -84,7 +85,7 @@ export const ArrangementToolbar: React.FC = () => {
               ? 'bg-green-600 text-white'
               : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-border hover:text-text-primary'
           }`}
-          onClick={togglePlayPause}
+          onClick={() => { Tone.start(); togglePlayPause(); }}
           title="Play/Pause (Space)"
         >
           <Play size={14} fill={isPlaying ? 'currentColor' : 'none'} />

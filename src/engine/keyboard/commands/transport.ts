@@ -2,6 +2,7 @@
  * Transport Commands - Play, Stop, Toggle playback
  */
 
+import * as Tone from 'tone';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getToneEngine } from '@engine/ToneEngine';
 
@@ -15,6 +16,10 @@ export function playStopToggle(): boolean {
     stop();
     getToneEngine().stop();
   } else {
+    // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
+    // before engine.init() which does async WASM loading
+    Tone.start();
+    
     // Always start from the first row of the current pattern
     setCurrentRow(0);
     getToneEngine()
@@ -38,6 +43,9 @@ export function playPattern(): boolean {
     stop();
   }
   
+  // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
+  Tone.start();
+  
   setCurrentRow(0);
   
   getToneEngine()
@@ -59,6 +67,9 @@ export function playSong(): boolean {
   if (isPlaying) {
     stop();
   }
+  
+  // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
+  Tone.start();
   
   setCurrentPattern(0);
   setCurrentRow(0);

@@ -10,6 +10,7 @@
  */
 
 import React, { useRef, useState, useCallback } from 'react';
+import * as Tone from 'tone';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore, useTabsStore } from '@stores';
@@ -52,7 +53,6 @@ import type { InstrumentConfig, TB303Config } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
-import { SYSTEM_PRESETS } from '@/constants/systemPresets';
 import { CURRENT_VERSION } from '@generated/changelog';
 
 // Build accept string for file input
@@ -162,8 +162,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     patterns,
     currentPatternIndex,
     setCurrentPattern,
-    expandPattern,
-    shrinkPattern,
     resizePattern,
     loadPatterns,
     setPatternOrder,
@@ -175,7 +173,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     reset: resetTracker,
     duplicatePosition,
     removeFromOrder,
-    applySystemPreset,
   } = useTrackerStore();
 
   const {
@@ -553,6 +550,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   };
 
   const handlePlaySong = async () => {
+    // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
+    // before any async work (engine.init fetches WASM). Fire-and-forget is fine.
+    Tone.start();
+    
     // Toggle: if already playing song, stop. Otherwise start song.
     if (isPlaying && !isLooping) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
     else {
@@ -565,6 +566,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   };
 
   const handlePlayPattern = async () => {
+    // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
+    Tone.start();
+    
     // Toggle: if already playing pattern, stop. Otherwise start pattern.
     if (isPlaying && isLooping) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
     else {
@@ -579,8 +583,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
   const isPlayingSong = isPlaying && !isLooping;
   const isPlayingPattern = isPlaying && isLooping;
 
-  const handleExpand = () => expandPattern?.(currentPatternIndex);
-  const handleShrink = () => shrinkPattern?.(currentPatternIndex);
   const handleLengthChange = (newLength: number) => {
     if (newLength >= 1 && newLength <= 256) resizePattern(currentPatternIndex, newLength);
   };
@@ -597,6 +599,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             <div className="ft2-section ft2-col-1">
               <FT2NumericInput label="Position" value={currentPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} format="hex" />
               <div className="flex gap-1 ml-auto">
+                <Button
+                  variant={tapActive ? 'primary' : 'default'}
+                  size="sm"
+                  onClick={handleTapTempo}
+                  title={`Tap Tempo (${tapCount} taps)`}
+                  className="min-w-[32px]"
+                >
+                  <MousePointerClick size={14} />
+                </Button>
                 <Button variant="default" size="sm" onClick={handleInsertPosition} className="min-w-[32px]">Ins</Button>
                 <Button variant="default" size="sm" onClick={handleDeletePosition} disabled={patternOrder.length <= 1} className="min-w-[32px]">Del</Button>
               </div>
@@ -610,30 +621,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 max={255}
                 throttleMs={50}
               />
-              <Button
-                variant={tapActive ? 'primary' : 'default'}
-                size="sm"
-                onClick={handleTapTempo}
-                title={`Tap Tempo (${tapCount} taps)`}
-                className="min-w-[40px] ml-1"
-              >
-                <MousePointerClick size={14} />
-              </Button>
-
-              <div className="flex items-center ml-2 pl-2 h-7 gap-1.5">
-                <span className="text-[9px] font-black text-accent-primary uppercase tracking-tighter">HW:</span>
-                <select
-                  className="bg-dark-bgPrimary text-text-primary text-[10px] font-bold h-6 border border-accent-primary/30 rounded px-1.5 hover:border-accent-primary transition-colors cursor-pointer outline-none min-w-[110px] shadow-glow-sm"
-                  onChange={(e) => applySystemPreset(e.target.value)}
-                  defaultValue="none"
-                  title="Apply Hardware System Preset"
-                >
-                  <option value="none" disabled>HARDWARE...</option>
-                  {SYSTEM_PRESETS.map(preset => (
-                    <option key={preset.id} value={preset.id}>{preset.name.toUpperCase()}</option>
-                  ))}
-                </select>
-              </div>
             </div>
             <div className="ft2-section ft2-col-3">
               <FT2NumericInput label="Pattern" value={patternOrder[currentPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} format="hex" />
@@ -691,46 +678,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} format="hex" />
               </div>
               <div className="ft2-section ft2-col-2">
-                <div className="ft2-numeric-group">
-                  <span className="ft2-numeric-label">Modify:</span>
-                  <div className="flex gap-1 ml-1">
-                    <Button variant="default" size="sm" onClick={handleExpand} className="min-w-[48px] text-[10px] py-0 h-5">Expand</Button>
-                    <Button variant="default" size="sm" onClick={handleShrink} className="min-w-[48px] text-[10px] py-0 h-5">Shrink</Button>
-                  </div>
-                </div>
+                <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} format="hex" />
               </div>
               <div className="ft2-section ft2-col-3">
               </div>
             </div>
           )}
-
-          <div className="ft2-toolbar-row ft2-toolbar-row-menu">
-            <div className="ft2-section">
-              <input ref={fileInputRef} type="file" accept={ACCEPTED_FORMATS} onChange={handleFileLoad} className="hidden" />
-              <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
-              <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
-              <Button variant="ghost" size="sm" onClick={handleSave}>Download</Button>
-              <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>
-              <Button variant="ghost" size="sm" onClick={() => addTab()} icon={<FilePlus size={14} />} iconPosition="left">New</Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)}>Clear</Button>
-              <Button variant="ghost" size="sm" onClick={onShowPatternOrder}>Order</Button>
-              <Button variant="ghost" size="sm" onClick={onShowInstruments}>Instruments</Button>
-              <Button variant="ghost" size="sm" onClick={onShowDrumpads}>Pads</Button>                        
-              <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX}>Master FX</Button>
-              
-              <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('chip-effects')}>Reference</Button>
-              <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('shortcuts')}>Help</Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>Settings</Button>
-              <Button
-                variant={isFullscreen ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={toggleFullscreen}
-                title={isFullscreen ? 'Exit Fullscreen (F11)' : 'Enter Fullscreen (F11)'}
-              >
-                {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-              </Button>
-            </div>
-          </div>
         </div>
 
         <VisualizerFrame variant="compact" className="min-w-[120px] max-w-[350px] flex-shrink-0 border-l border-dark-border cursor-pointer group ml-auto" style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center' }}>
@@ -793,6 +746,32 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
           )}
         </div>
         </VisualizerFrame>
+      </div>
+
+      <div className="flex items-center gap-1.5 py-1 w-full overflow-x-auto no-scrollbar">
+        <input ref={fileInputRef} type="file" accept={ACCEPTED_FORMATS} onChange={handleFileLoad} className="hidden" />
+        <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
+        <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
+        <Button variant="ghost" size="sm" onClick={handleSave}>Download</Button>
+        <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>
+        <Button variant="ghost" size="sm" onClick={() => addTab()} icon={<FilePlus size={14} />} iconPosition="left">New</Button>
+        <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)}>Clear</Button>
+        <Button variant="ghost" size="sm" onClick={onShowPatternOrder}>Order</Button>
+        <Button variant="ghost" size="sm" onClick={onShowInstruments}>Instruments</Button>
+        <Button variant="ghost" size="sm" onClick={onShowDrumpads}>Pads</Button>                        
+        <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX}>Master FX</Button>
+        
+        <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('chip-effects')}>Reference</Button>
+        <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('shortcuts')}>Help</Button>
+        <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>Settings</Button>
+        <Button
+          variant={isFullscreen ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? 'Exit Fullscreen (F11)' : 'Enter Fullscreen (F11)'}
+        >
+          {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </Button>
       </div>
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}

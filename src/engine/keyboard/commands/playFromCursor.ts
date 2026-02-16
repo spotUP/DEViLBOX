@@ -1,3 +1,4 @@
+import * as Tone from 'tone';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -12,6 +13,9 @@ import { getToneEngine } from '@engine/ToneEngine';
  * @returns true (always starts playback from cursor)
  */
 export function playFromCursor(): boolean {
+  // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
+  Tone.start();
+  
   const { cursor } = useTrackerStore.getState();
   const { isPlaying, stop, play, setCurrentRow } = useTransportStore.getState();
 
