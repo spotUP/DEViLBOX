@@ -125,12 +125,17 @@ function recordEdit(
  * Hook to get piano roll notes from current pattern
  */
 export function usePianoRollData(channelIndex?: number) {
-  const { patterns, currentPatternIndex, setCell } = useTrackerStore();
-  const pattern = patterns[currentPatternIndex];
+  // Use selector to properly track pattern changes
+  const currentPatternIndex = useTrackerStore((state) => state.currentPatternIndex);
+  const pattern = useTrackerStore((state) => state.patterns[state.currentPatternIndex]);
+  const setCell = useTrackerStore((state) => state.setCell);
+
+  console.log('[usePianoRollData] Render - pattern ref changed:', pattern?.length, 'notes will be recomputed');
 
   // Convert pattern to notes (support multi-channel when channelIndex is undefined)
   const notes = useMemo(() => {
     if (!pattern) return [];
+    console.log('[usePianoRollData] useMemo recomputing notes, pattern length:', pattern.length, 'channelIndex:', channelIndex);
     return patternToPianoRollNotes(pattern, channelIndex);
   }, [pattern, channelIndex]);
 
