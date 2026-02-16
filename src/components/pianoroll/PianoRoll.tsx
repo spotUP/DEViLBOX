@@ -284,16 +284,24 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
   }, [visibleNotes]);
 
   // Track active MIDI notes during playback
+  // Piano keys light up when playhead crosses left edge (startRow)
+  // and turn off when it crosses right edge (endRow)
   const activeNotes = useMemo(() => {
     if (!isPlaying || currentRow === null) return new Set<number>();
+    
     const active = new Set<number>();
+    const normalizedRow = currentRow % patternLength; // Handle pattern wrapping
+    
     notes.forEach((note) => {
-      if (currentRow >= note.startRow && currentRow < note.endRow) {
+      // Note is active when playhead is at or past left edge (startRow)
+      // and before right edge (endRow)
+      if (normalizedRow >= note.startRow && normalizedRow < note.endRow) {
         active.add(note.midiNote);
       }
     });
+    
     return active;
-  }, [isPlaying, currentRow, notes]);
+  }, [isPlaying, currentRow, notes, patternLength]);
 
   // Compute scale notes for grid highlighting
   const scaleNotesSet = useMemo(() => {
