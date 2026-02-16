@@ -21,7 +21,8 @@ import { FadeVolumeDialog } from './FadeVolumeDialog';
 import { RemapInstrumentDialog } from './RemapInstrumentDialog';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 import { PatternOrderModal } from '@components/dialogs/PatternOrderModal';
-import { SYSTEM_PRESETS } from '@/constants/systemPresets';
+import { SYSTEM_PRESETS, DivChanType } from '@/constants/systemPresets';
+import { CHANNEL_COLORS } from '@typedefs';
 import { StrumDialog } from '@components/dialogs/StrumDialog';
 import { AdvancedEditModal } from '@components/dialogs/AdvancedEditModal';
 import { KeyboardShortcutSheet } from './KeyboardShortcutSheet';
@@ -141,6 +142,128 @@ function createInstrumentsForModule(
 
   instruments.sort((a, b) => a.id - b.id);
   return instruments;
+}
+
+/**
+ * Generate channel metadata from Furnace system presets
+ * Maps each channel to its corresponding system/chip and applies preset names/types/colors
+ */
+function getChannelMetadataFromFurnace(
+  systems: number[],
+  systemChans: number[],
+  totalChannels: number,
+  channelShortNames?: string[],
+  effectColumns?: number[]
+): Array<{
+  name: string;
+  shortName: string;
+  color: string | null;
+  channelMeta: {
+    importedFromMOD: boolean;
+    furnaceType: number;
+    hardwareName: string;
+    shortName: string;
+    systemId: number;
+    channelType: 'sample' | 'synth';
+    effectCols?: number;
+  };
+}> {
+  const result: Array<{
+    name: string;
+    shortName: string;
+    color: string | null;
+    channelMeta: {
+      importedFromMOD: boolean;
+      furnaceType: number;
+      hardwareName: string;
+      shortName: string;
+      systemId: number;
+      channelType: 'sample' | 'synth';
+      effectCols?: number;
+    };
+  }> = [];
+
+  // Map DivChanType to color indices using CHANNEL_COLORS
+  const getColorForType = (type: DivChanType): string | null => {
+    switch (type) {
+      case DivChanType.FM: return CHANNEL_COLORS[7]; // Blue
+      case DivChanType.PULSE: return CHANNEL_COLORS[1]; // Red
+      case DivChanType.WAVE: return CHANNEL_COLORS[3]; // Yellow
+      case DivChanType.NOISE: return CHANNEL_COLORS[10]; // Gray
+      case DivChanType.PCM: return CHANNEL_COLORS[4]; // Green
+      case DivChanType.OP: return CHANNEL_COLORS[6]; // Cyan
+      default: return null;
+    }
+  };
+
+  let channelIndex = 0;
+  
+  // Iterate through each system and its channels
+  for (let sysIdx = 0; sysIdx < systems.length && channelIndex < totalChannels; sysIdx++) {
+    const systemId = systems[sysIdx];
+    const numChansForSystem = systemChans[sysIdx] || 0;
+    
+    // Find the matching system preset by fileID
+    const preset = SYSTEM_PRESETS.find(p => p.fileID === systemId);
+    
+    for (let localCh = 0; localCh < numChansForSystem && channelIndex < totalChannels; localCh++) {
+      if (preset && localCh < preset.channelDefs.length) {
+        const chDef = preset.channelDefs[localCh];
+        result.push({
+          name: chDef.name,
+          shortName: channelShortNames?.[channelIndex] || chDef.shortName,
+          color: getColorForType(chDef.type),
+          channelMeta: {
+            importedFromMOD: false,  // Furnace import, not MOD
+            furnaceType: chDef.type,
+            hardwareName: preset.name,
+            shortName: channelShortNames?.[channelIndex] || chDef.shortName,
+            systemId: systemId,
+            channelType: chDef.type === DivChanType.PCM ? 'sample' : 'synth',
+            effectCols: effectColumns?.[channelIndex] || 1,
+          },
+        });
+      } else {
+        // Fallback for unknown system or channel beyond preset definition
+        result.push({
+          name: `Channel ${channelIndex + 1}`,
+          shortName: channelShortNames?.[channelIndex] || `${channelIndex + 1}`,
+          color: null,
+          channelMeta: {
+            importedFromMOD: false,  // Furnace import, not MOD
+            furnaceType: DivChanType.PULSE,
+            hardwareName: preset?.name || 'Unknown',
+            shortName: channelShortNames?.[channelIndex] || `${channelIndex + 1}`,
+            systemId: systemId,
+            channelType: 'synth',
+            effectCols: effectColumns?.[channelIndex] || 1,
+          },
+        });
+      }
+      channelIndex++;
+    }
+  }
+
+  // Fill any remaining channels with defaults
+  while (result.length < totalChannels) {
+    const ch = result.length;
+    result.push({
+      name: `Channel ${ch + 1}`,
+      shortName: channelShortNames?.[ch] || `${ch + 1}`,
+      color: null,
+      channelMeta: {
+        importedFromMOD: false,  // Furnace import, not MOD
+        furnaceType: DivChanType.PULSE,
+        hardwareName: 'Unknown',
+        shortName: channelShortNames?.[ch] || `${ch + 1}`,
+        systemId: 0,
+        channelType: 'synth',
+        effectCols: effectColumns?.[ch] || 1,
+      },
+    });
+  }
+
+  return result;
 }
 
 interface TrackerViewProps {
@@ -425,6 +548,22 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         const numChannels = importMetadata.originalChannelCount || (patterns[0]?.[0] as unknown[] | undefined)?.length || 4;
         console.log(`[Import] ${format} pattern structure: ${patterns.length} patterns, ${patLen} rows, ${numChannels} channels`);
 
+        // Apply system preset channel metadata from Furnace
+        const furnaceData = importMetadata.furnaceData;
+        const channelMetadata = furnaceData 
+          ? getChannelMetadataFromFurnace(
+              furnaceData.systems,
+              furnaceData.systemChans,
+              numChannels,
+              furnaceData.channelShortNames,
+              furnaceData.effectColumns
+            )
+          : null;
+        
+        if (channelMetadata) {
+          console.log(`[Import] Applied system preset: ${furnaceData?.systemName}, systems: [${furnaceData?.systems.map(s => '0x' + s.toString(16)).join(', ')}]`);
+        }
+
         result = {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           patterns: (patterns as any[]).map((pat: any[][], idx: number) => ({
@@ -432,29 +571,39 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
             name: `Pattern ${idx}`,
             length: patLen,
             importMetadata,
-            channels: Array.from({ length: numChannels }, (_, ch) => ({
-              id: `channel-${ch}`,
-              name: `Channel ${ch + 1}`,
-              muted: false,
-              solo: false,
-              collapsed: false,
-              volume: 100,
-              pan: 0,
-              instrumentId: null,
-              color: null,
-              rows: pat.map((row: any[]) => {
-                const cell = row[ch] || {};
-                return {
-                  note: cell.note || 0,
-                  instrument: cell.instrument || 0,
-                  volume: cell.volume || 0,
-                  effTyp: cell.effectType || 0,
-                  eff: cell.effectParam || 0,
-                  effTyp2: cell.effectType2 || 0,
-                  eff2: cell.effectParam2 || 0,
-                };
-              }),
-            })),
+            channels: Array.from({ length: numChannels }, (_, ch) => {
+              const meta = channelMetadata?.[ch];
+              return {
+                id: `channel-${ch}`,
+                name: meta?.name || `Channel ${ch + 1}`,
+                shortName: meta?.shortName,
+                muted: false,
+                solo: false,
+                collapsed: false,
+                volume: 100,
+                pan: 0,
+                instrumentId: null,
+                color: meta?.color || null,
+                channelMeta: meta?.channelMeta,
+                rows: pat.map((row: any[]) => {
+                  const cell = row[ch] || {};
+                  return {
+                    note: cell.note || 0,
+                    instrument: cell.instrument || 0,
+                    volume: cell.volume || 0,
+                    effTyp: cell.effectType || 0,
+                    eff: cell.effectParam || 0,
+                    effTyp2: cell.effectType2 || 0,
+                    eff2: cell.effectParam2 || 0,
+                    // Include all effects from Furnace (1-8 per channel)
+                    effects: cell.effects?.map((e: { type: number; param: number }) => ({ 
+                      type: e.type, 
+                      param: e.param 
+                    })),
+                  };
+                }),
+              };
+            }),
           })),
           order: patternOrder.length > 0 ? patternOrder : [0],
           instrumentNames: parsedInstruments.map(i => i.name),

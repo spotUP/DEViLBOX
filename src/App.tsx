@@ -461,7 +461,7 @@ function App() {
 
   // Load song file after confirmation
   const loadSongFile = useCallback(async (file: File) => {
-    const { loadPatterns, setPatternOrder } = useTrackerStore.getState();
+    const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
     const { loadInstruments } = useInstrumentStore.getState();
     const { setBPM, setGrooveTemplate } = useTransportStore.getState();
     const { setMetadata } = useProjectStore.getState();
@@ -561,10 +561,62 @@ function App() {
         notify.success(`Loaded Furnace: ${file.name} (${instruments.length} instruments, ${convertedPatterns.length} patterns)`);
         
       } else if (filename.match(/\.(mod|xm|it|s3m|mptm|669|amf|ams|dbm|dsm|far|ftm|gdm|imf|mdl|med|mt2|mtm|okt|psm|ptm|sfx|stm|ult|umx)$/)) {
-        // Tracker module - pass to TrackerView's import mechanism via store
-        // This triggers the Import Module dialog which handles everything correctly
-        useUIStore.getState().setPendingModuleFile(file);
-        notify.info(`Opening import dialog for ${file.name}...`);
+        // Tracker module - use native parser directly (no dialog)
+        const { loadModuleFile } = await import('@lib/import/ModuleLoader');
+        const { convertModule, convertXMModule, convertMODModule } = await import('@lib/import/ModuleConverter');
+        const { convertToInstrument } = await import('@lib/import/InstrumentConverter');
+        
+        const buffer = await file.arrayBuffer();
+        const moduleInfo = await loadModuleFile(new File([buffer], file.name));
+        
+        if (moduleInfo) {
+          let result;
+          let instruments: InstrumentConfig[] = [];
+
+          // Convert native format data (XM, MOD, etc.)
+          if (moduleInfo.nativeData?.patterns) {
+            const { format, patterns: nativePatterns, importMetadata, instruments: nativeInstruments } = moduleInfo.nativeData;
+            const channelCount = importMetadata.originalChannelCount;
+            const instrumentNames = nativeInstruments?.map((i: any) => i.name) || [];
+            
+            if (format === 'XM') {
+              result = convertXMModule(nativePatterns as any, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
+            } else if (format === 'MOD') {
+              result = convertMODModule(nativePatterns as any, channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
+            } else if (moduleInfo.metadata.song) {
+              result = convertModule(moduleInfo.metadata.song);
+            }
+
+            // Create instruments from native data
+            if (nativeInstruments) {
+              let nextId = 1;
+              for (const parsedInst of nativeInstruments) {
+                const converted = convertToInstrument(parsedInst, nextId, format);
+                instruments.push(...converted);
+                nextId += converted.length;
+              }
+            }
+          } else if (moduleInfo.metadata.song) {
+            result = convertModule(moduleInfo.metadata.song);
+          }
+
+          if (result) {
+            // If no instruments created from native data, create from pattern data
+            if (instruments.length === 0) {
+              instruments = createInstrumentsForModule(result.patterns, result.instrumentNames || [], undefined);
+            }
+
+            instruments.forEach((inst: InstrumentConfig) => loadInstruments([inst]));
+            loadPatterns(result.patterns);
+            setCurrentPattern(0);
+            
+            if (result.order && result.order.length > 0) {
+              setPatternOrder(result.order);
+            }
+            
+            notify.success(`Imported ${file.name}: ${result.patterns.length} patterns, ${instruments.length} instruments`);
+          }
+        }
         
       } else if (filename.endsWith('.dbx')) {
         // DEViLBOX project file

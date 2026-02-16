@@ -1195,6 +1195,11 @@ export class FurnaceDispatchEngine {
       return;
     }
 
+    // If chip already exists, return immediately (idempotent)
+    if (this.chips.has(platformType)) {
+      return;
+    }
+
     // Set up chip created promise before sending message
     this._chipCreatedPromise = new Promise<void>((resolve) => {
       this._chipCreatedResolve = resolve;

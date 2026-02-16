@@ -502,6 +502,74 @@ export interface FurnaceWavetable {
   data: number[];
 }
 
+// Compatibility flags (50+ boolean flags for legacy behavior)
+export interface FurnaceCompatFlags {
+  limitSlides: boolean;
+  linearPitch: number;  // 0=off, 1=full, 2=partial
+  pitchSlideSpeed: number;
+  loopModality: number;  // 0=reset, 1=fake reset, 2=no reset
+  delayBehavior: number; // 0=strict, 1=broken, 2=lax
+  jumpTreatment: number; // 0=normal, 1=old Furnace, 2=DefleMask
+  properNoiseLayout: boolean;
+  waveDutyIsVol: boolean;
+  resetMacroOnPorta: boolean;
+  legacyVolumeSlides: boolean;
+  compatibleArpeggio: boolean;
+  noteOffResetsSlides: boolean;
+  targetResetsSlides: boolean;
+  arpNonPorta: boolean;
+  algMacroBehavior: boolean;
+  brokenShortcutSlides: boolean;
+  ignoreDuplicateSlides: boolean;
+  stopPortaOnNoteOff: boolean;
+  continuousVibrato: boolean;
+  brokenDACMode: boolean;
+  oneTickCut: boolean;
+  newInsTriggersInPorta: boolean;
+  arp0Reset: boolean;
+  brokenSpeedSel: boolean;
+  noSlidesOnFirstTick: boolean;
+  rowResetsArpPos: boolean;
+  ignoreJumpAtEnd: boolean;
+  buggyPortaAfterSlide: boolean;
+  gbInsAffectsEnvelope: boolean;
+  sharedExtStat: boolean;
+  ignoreDACModeOutsideIntendedChannel: boolean;
+  e1e2AlsoTakePriority: boolean;
+  newSegaPCM: boolean;
+  fbPortaPause: boolean;
+  snDutyReset: boolean;
+  pitchMacroIsLinear: boolean;
+  oldOctaveBoundary: boolean;
+  noOPN2Vol: boolean;
+  newVolumeScaling: boolean;
+  volMacroLinger: boolean;
+  brokenOutVol: boolean;
+  brokenOutVol2: boolean;
+  e1e2StopOnSameNote: boolean;
+  brokenPortaArp: boolean;
+  snNoLowPeriods: boolean;
+  disableSampleMacro: boolean;
+  oldArpStrategy: boolean;
+  brokenPortaLegato: boolean;
+  brokenFMOff: boolean;
+  preNoteNoEffect: boolean;
+  oldSampleOffset: boolean;
+}
+
+// Groove pattern (custom tick sequences for swing/shuffle)
+export interface FurnaceGroove {
+  len: number;
+  val: number[];  // Up to 16 tick values
+}
+
+// Patchbay connection (inter-chip routing)
+export interface FurnacePatchbayConnection {
+  portA: number;  // Source port
+  portB: number;  // Destination port
+  level: number;  // Mix level (0-255)
+}
+
 // Full module
 export interface FurnaceModule {
   // Meta
@@ -539,6 +607,16 @@ export interface FurnaceModule {
 
   // Song comment
   comment: string;
+
+  // Compatibility flags (for legacy .fur file behavior)
+  compatFlags?: FurnaceCompatFlags;
+
+  // Grooves (custom tick patterns for swing/shuffle)
+  grooves: FurnaceGroove[];
+
+  // Patchbay (inter-chip audio routing)
+  patchbay: FurnacePatchbayConnection[];
+  patchbayAuto: boolean;
 }
 
 /**
@@ -621,6 +699,9 @@ export async function parseFurnaceSong(buffer: ArrayBuffer): Promise<FurnaceModu
     samples: [],
     patterns: new Map(),
     comment: '',
+    grooves: [],
+    patchbay: [],
+    patchbayAuto: false,
   };
 
   if (version >= 240) {
@@ -699,8 +780,13 @@ async function parseNewFormat(
 
   // Patchbay
   const patchbayConns = reader.readUint32();
-  reader.skip(patchbayConns * 4); // Skip patchbay connections
-  reader.readUint8(); // patchbayAuto
+  for (let i = 0; i < patchbayConns; i++) {
+    const portA = reader.readUint16();
+    const portB = reader.readUint16();
+    // Note: Level might be in a different format, this is basic structure
+    module.patchbay.push({ portA, portB, level: 255 });
+  }
+  module.patchbayAuto = reader.readUint8() > 0;
 
   // Element pointers
   const insPtr: number[] = [];
@@ -708,7 +794,9 @@ async function parseNewFormat(
   const samplePtr: number[] = [];
   const subSongPtr: number[] = [];
   const patPtr: number[] = [];
+  const groovePtr: number[] = [];
   let commentPtr = 0;
+  let compatFlagsPtr = 0;
 
   // Read elements
   let hasElement = true;
@@ -766,7 +854,7 @@ async function parseNewFormat(
       }
       case DIV_ELEMENT_COMPAT_FLAGS: {
         reader.readUint32(); // Should be 1
-        reader.readUint32(); // Pointer (skip)
+        compatFlagsPtr = reader.readUint32();
         break;
       }
       case DIV_ELEMENT_COMMENTS: {
@@ -776,7 +864,9 @@ async function parseNewFormat(
       }
       case DIV_ELEMENT_GROOVE: {
         const count = reader.readUint32();
-        reader.skip(count * 4); // Skip groove pointers
+        for (let i = 0; i < count; i++) {
+          groovePtr.push(reader.readUint32());
+        }
         break;
       }
       default: {
@@ -918,6 +1008,20 @@ async function parseNewFormat(
       reader.readUint32(); // size
       module.comment = readString(reader);
     }
+  }
+
+  // Parse grooves
+  for (const ptr of groovePtr) {
+    reader.seek(ptr);
+    const groove = parseGroove(reader);
+    module.grooves.push(groove);
+  }
+
+  // Parse compatFlags
+  if (compatFlagsPtr > 0) {
+    reader.seek(compatFlagsPtr);
+    const compatFlags = parseCompatFlags(reader, version);
+    module.compatFlags = compatFlags;
   }
 }
 
@@ -1147,16 +1251,22 @@ async function parseOldFormat(
   // Reference: fur.cpp:1582-1596
   if (version >= 135) {
     for (let i = 0; i < module.systems.length; i++) {
-      reader.skip(12); // systemVol(f32) + systemPan(f32) + systemPanFR(f32)
+      module.systemVol.push(reader.readFloat32());
+      module.systemPan.push(reader.readFloat32());
+      module.systemPanFR.push(reader.readFloat32());
     }
     // Patchbay connections
     const patchbayConns = reader.readUint32();
-    reader.skip(patchbayConns * 4);
+    for (let i = 0; i < patchbayConns; i++) {
+      const portA = reader.readUint16();
+      const portB = reader.readUint16();
+      module.patchbay.push({ portA, portB, level: 255 });
+    }
   }
 
   // Reference: fur.cpp:1598
   if (version >= 136) {
-    reader.readUint8(); // patchbayAuto
+    module.patchbayAuto = reader.readUint8() > 0;
   }
 
   // Extended compat flags block 2
@@ -1169,10 +1279,15 @@ async function parseOldFormat(
   // Speeds and grooves
   // Reference: fur.cpp:1639-1659
   if (version >= 139) {
-    reader.skip(17); // speeds.len (1) + speeds.val (16)
+    reader.skip(17); // speeds.len (1) + speeds.val (16) - handled by subsong
     const grooveCount = reader.readUint8();
     for (let i = 0; i < grooveCount; i++) {
-      reader.skip(17); // groove.len (1) + groove.val (16)
+      const len = reader.readUint8();
+      const val: number[] = [];
+      for (let j = 0; j < 16; j++) {
+        val.push(reader.readUint8());
+      }
+      module.grooves.push({ len, val });
     }
   }
 
@@ -2359,6 +2474,156 @@ interface ConvertedPatternCell {
   effectParam: number;
   effectType2: number;
   effectParam2: number;
+  // All effects (for variable effect columns, 1-8 per channel)
+  effects?: { type: number; param: number }[];
+}
+
+/**
+ * Parse groove (tick pattern for swing/shuffle)
+ */
+function parseGroove(reader: BinaryReader): FurnaceGroove {
+  const magic = reader.readMagic(4);
+  if (magic !== 'GROV') {
+    throw new Error(`Expected GROV block, got: "${magic}"`);
+  }
+  reader.readUint32(); // Block size
+
+  const len = reader.readUint8();
+  const val: number[] = [];
+  for (let i = 0; i < 16; i++) {
+    val.push(reader.readUint8());
+  }
+
+  return { len, val };
+}
+
+/**
+ * Parse compatibility flags (50+ boolean flags for legacy behavior)
+ * Reference: furnace-master/src/engine/song.h lines 187-250
+ */
+function parseCompatFlags(reader: BinaryReader, version: number): FurnaceCompatFlags {
+  const magic = reader.readMagic(4);
+  if (magic !== 'FLAG') {
+    throw new Error(`Expected FLAG block, got: "${magic}"`);
+  }
+  const blockSize = reader.readUint32();
+  const startPos = reader.getOffset();
+
+  // Initialize with default values
+  const flags: FurnaceCompatFlags = {
+    limitSlides: true,
+    linearPitch: 0,
+    pitchSlideSpeed: 4,
+    loopModality: 0,
+    delayBehavior: 0,
+    jumpTreatment: 0,
+    properNoiseLayout: true,
+    waveDutyIsVol: false,
+    resetMacroOnPorta: false,
+    legacyVolumeSlides: false,
+    compatibleArpeggio: false,
+    noteOffResetsSlides: false,
+    targetResetsSlides: false,
+    arpNonPorta: false,
+    algMacroBehavior: false,
+    brokenShortcutSlides: false,
+    ignoreDuplicateSlides: false,
+    stopPortaOnNoteOff: false,
+    continuousVibrato: false,
+    brokenDACMode: false,
+    oneTickCut: false,
+    newInsTriggersInPorta: false,
+    arp0Reset: false,
+    brokenSpeedSel: false,
+    noSlidesOnFirstTick: false,
+    rowResetsArpPos: false,
+    ignoreJumpAtEnd: false,
+    buggyPortaAfterSlide: false,
+    gbInsAffectsEnvelope: true,
+    sharedExtStat: true,
+    ignoreDACModeOutsideIntendedChannel: false,
+    e1e2AlsoTakePriority: false,
+    newSegaPCM: true,
+    fbPortaPause: false,
+    snDutyReset: true,
+    pitchMacroIsLinear: false,
+    oldOctaveBoundary: false,
+    noOPN2Vol: false,
+    newVolumeScaling: true,
+    volMacroLinger: false,
+    brokenOutVol: false,
+    brokenOutVol2: false,
+    e1e2StopOnSameNote: false,
+    brokenPortaArp: false,
+    snNoLowPeriods: false,
+    disableSampleMacro: false,
+    oldArpStrategy: false,
+    brokenPortaLegato: false,
+    brokenFMOff: false,
+    preNoteNoEffect: false,
+    oldSampleOffset: true,
+  };
+
+  // Parse flags in order (reference: song.cpp DivCompatFlags::readData)
+  if (blockSize >= 1) flags.limitSlides = reader.readUint8() > 0;
+  if (blockSize >= 2) flags.linearPitch = reader.readUint8();
+  if (blockSize >= 3) flags.loopModality = reader.readUint8();
+  if (blockSize >= 4) flags.properNoiseLayout = reader.readUint8() > 0;
+  if (blockSize >= 5) flags.waveDutyIsVol = reader.readUint8() > 0;
+  if (blockSize >= 6) flags.resetMacroOnPorta = reader.readUint8() > 0;
+  if (blockSize >= 7) flags.legacyVolumeSlides = reader.readUint8() > 0;
+  if (blockSize >= 8) flags.compatibleArpeggio = reader.readUint8() > 0;
+  if (blockSize >= 9) flags.noteOffResetsSlides = reader.readUint8() > 0;
+  if (blockSize >= 10) flags.targetResetsSlides = reader.readUint8() > 0;
+  if (blockSize >= 11) flags.arpNonPorta = reader.readUint8() > 0;
+  if (blockSize >= 12) flags.algMacroBehavior = reader.readUint8() > 0;
+  if (blockSize >= 13) flags.brokenShortcutSlides = reader.readUint8() > 0;
+  if (blockSize >= 14) flags.ignoreDuplicateSlides = reader.readUint8() > 0;
+  if (blockSize >= 15) flags.stopPortaOnNoteOff = reader.readUint8() > 0;
+  if (blockSize >= 16) flags.continuousVibrato = reader.readUint8() > 0;
+  if (blockSize >= 17) flags.brokenDACMode = reader.readUint8() > 0;
+  if (blockSize >= 18) flags.oneTickCut = reader.readUint8() > 0;
+  if (blockSize >= 19) flags.newInsTriggersInPorta = reader.readUint8() > 0;
+  if (blockSize >= 20) flags.arp0Reset = reader.readUint8() > 0;
+  if (blockSize >= 21) flags.brokenSpeedSel = reader.readUint8() > 0;
+  if (blockSize >= 22) flags.noSlidesOnFirstTick = reader.readUint8() > 0;
+  if (blockSize >= 23) flags.rowResetsArpPos = reader.readUint8() > 0;
+  if (blockSize >= 24) flags.ignoreJumpAtEnd = reader.readUint8() > 0;
+  if (blockSize >= 25) flags.buggyPortaAfterSlide = reader.readUint8() > 0;
+  if (blockSize >= 26) flags.gbInsAffectsEnvelope = reader.readUint8() > 0;
+  if (blockSize >= 27) flags.sharedExtStat = reader.readUint8() > 0;
+  if (blockSize >= 28) flags.ignoreDACModeOutsideIntendedChannel = reader.readUint8() > 0;
+  if (blockSize >= 29) flags.e1e2AlsoTakePriority = reader.readUint8() > 0;
+  if (blockSize >= 30) flags.newSegaPCM = reader.readUint8() > 0;
+  if (blockSize >= 31) flags.fbPortaPause = reader.readUint8() > 0;
+  if (blockSize >= 32) flags.snDutyReset = reader.readUint8() > 0;
+  if (blockSize >= 33) flags.pitchMacroIsLinear = reader.readUint8() > 0;
+  if (blockSize >= 34) flags.pitchSlideSpeed = reader.readUint8();
+  if (blockSize >= 35) flags.oldOctaveBoundary = reader.readUint8() > 0;
+  if (blockSize >= 36) flags.noOPN2Vol = reader.readUint8() > 0;
+  if (blockSize >= 37) flags.newVolumeScaling = reader.readUint8() > 0;
+  if (blockSize >= 38) flags.volMacroLinger = reader.readUint8() > 0;
+  if (blockSize >= 39) flags.brokenOutVol = reader.readUint8() > 0;
+  if (blockSize >= 40) flags.brokenOutVol2 = reader.readUint8() > 0;
+  if (blockSize >= 41) flags.e1e2StopOnSameNote = reader.readUint8() > 0;
+  if (blockSize >= 42) flags.brokenPortaArp = reader.readUint8() > 0;
+  if (blockSize >= 43) flags.snNoLowPeriods = reader.readUint8() > 0;
+  if (blockSize >= 44) flags.delayBehavior = reader.readUint8();
+  if (blockSize >= 45) flags.jumpTreatment = reader.readUint8();
+  if (blockSize >= 46) flags.disableSampleMacro = reader.readUint8() > 0;
+  if (blockSize >= 47) flags.oldArpStrategy = reader.readUint8() > 0;
+  if (blockSize >= 48) flags.brokenPortaLegato = reader.readUint8() > 0;
+  if (blockSize >= 49) flags.brokenFMOff = reader.readUint8() > 0;
+  if (blockSize >= 50) flags.preNoteNoEffect = reader.readUint8() > 0;
+  if (blockSize >= 51) flags.oldSampleOffset = reader.readUint8() > 0;
+
+  // Skip any remaining bytes (future-proofing)
+  const endPos = startPos + blockSize;
+  if (reader.getOffset() < endPos) {
+    reader.seek(endPos);
+  }
+
+  return flags;
 }
 
 /**
@@ -2422,15 +2687,15 @@ function buildChannelChipIdMap(module: FurnaceModule): number[] {
  * Scan pattern data to find which channels each instrument is used on.
  * Returns a map from instrument index (0-based) to the set of channel indices.
  */
-function scanInstrumentChannels(module: FurnaceModule): Map<number, Set<number>> {
+function scanInstrumentChannels(module: FurnaceModule, subsongIndex = 0): Map<number, Set<number>> {
   const result = new Map<number, Set<number>>();
-  const subsong = module.subsongs[0];
+  const subsong = module.subsongs[subsongIndex];
   if (!subsong) return result;
 
   for (let orderPos = 0; orderPos < subsong.ordersLen; orderPos++) {
     for (let ch = 0; ch < module.chans; ch++) {
       const patIdx = subsong.orders[ch]?.[orderPos] ?? 0;
-      const key = `0_${ch}_${patIdx}`;
+      const key = `${subsongIndex}_${ch}_${patIdx}`;
       const pattern = module.patterns.get(key);
       if (!pattern) continue;
 
@@ -2452,12 +2717,21 @@ function scanInstrumentChannels(module: FurnaceModule): Map<number, Set<number>>
 
 /**
  * Convert Furnace module to DEViLBOX format
+ * @param module - Parsed Furnace module
+ * @param subsongIndex - Index of the subsong to convert (default: 0)
  */
-export function convertFurnaceToDevilbox(module: FurnaceModule): {
+export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0): {
   instruments: ParsedInstrument[];
   patterns: ConvertedPatternCell[][][]; // [pattern][row][channel]
   metadata: ImportMetadata;
 } {
+  // Validate subsongIndex
+  if (subsongIndex < 0 || subsongIndex >= module.subsongs.length) {
+    console.warn(`[FurnaceParser] Invalid subsongIndex ${subsongIndex}, falling back to 0`);
+    subsongIndex = 0;
+  }
+  
+  console.log(`[FurnaceParser] Converting subsong ${subsongIndex} of ${module.subsongs.length}`);
   // --- Build channel-to-chip mapping for STD instrument remapping ---
   // For compound chips like Genesis (FM + PSG), we need to know which
   // channels are FM vs PSG to correctly remap DIV_INS_STD instruments.
@@ -2465,7 +2739,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
   const channelChipId = buildChannelChipIdMap(module);
 
   // Scan pattern data to find which channels each instrument appears on
-  const instrumentChannels = scanInstrumentChannels(module);
+  const instrumentChannels = scanInstrumentChannels(module, subsongIndex);
 
   // Convert instruments with full Furnace data preservation
   const instruments: ParsedInstrument[] = module.instruments.map((inst, idx) => {
@@ -2650,11 +2924,11 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
     };
   });
 
-  // Convert patterns - flatten subsong 0 patterns
+  // Convert patterns - flatten selected subsong patterns
   const patterns: ConvertedPatternCell[][][] = [];
-  const subsong = module.subsongs[0];
+  const subsong = module.subsongs[subsongIndex];
   if (!subsong) {
-    return { instruments, patterns: [], metadata: createMetadata(module) };
+    return { instruments, patterns: [], metadata: createMetadata(module, subsongIndex) };
   }
 
   // Debug: Log pattern map keys
@@ -2769,8 +3043,8 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
 /**
  * Create import metadata
  */
-function createMetadata(module: FurnaceModule): ImportMetadata {
-  const subsong = module.subsongs[0];
+function createMetadata(module: FurnaceModule, subsongIndex = 0): ImportMetadata {
+  const subsong = module.subsongs[subsongIndex];
 
   // Calculate BPM from Furnace's timing system
   // 
@@ -2826,6 +3100,14 @@ function createMetadata(module: FurnaceModule): ImportMetadata {
       // (each combined pattern contains each channel's correct pattern data for that position)
       patternOrderTable: Array.from({ length: subsong?.ordersLen || 1 }, (_, i) => i),
       songMessage: module.comment,
+    },
+    // Furnace-specific data for applying system presets
+    furnaceData: {
+      systems: [...module.systems],
+      systemChans: [...module.systemChans],
+      systemName: module.systemName || 'Unknown',
+      channelShortNames: subsong?.channelShortNames,
+      effectColumns: subsong?.effectColumns ? [...subsong.effectColumns] : undefined,
     },
   };
 }
@@ -2908,34 +3190,28 @@ function convertFurnaceCell(cell: FurnacePatternCell, isChipSynth: boolean = fal
     volume = 0x10 + Math.min(64, Math.floor(cell.volume / 2));
   }
 
-  // Convert effects (up to 2 — our internal format supports 2 per cell)
-  let effectType = 0;
-  let effectParam = 0;
-  let effectType2 = 0;
-  let effectParam2 = 0;
-  if (cell.effects.length > 0) {
-    const fx = cell.effects[0];
-    effectType = mapFurnaceEffect(fx.type);
-    effectParam = fx.value & 0xFF;
+  // Convert ALL effects (Furnace supports 1-8 per channel)
+  const effects: { type: number; param: number }[] = [];
+  for (let i = 0; i < cell.effects.length; i++) {
+    const fx = cell.effects[i];
+    let effType = mapFurnaceEffect(fx.type);
+    let effParam = fx.value & 0xFF;
     // Split composite XM extended effects (E1x, E2x, E9x, EAx, EBx, ECx, EDx, EEx)
     // The mapping returns e.g. 0xE9 for retrigger, but the replayer expects
     // effectType=0x0E with sub-command in param high nibble: param = 0x9y
-    if (effectType >= 0xE0 && effectType <= 0xEF) {
-      const subCmd = effectType & 0x0F;
-      effectType = 0x0E;
-      effectParam = (subCmd << 4) | (effectParam & 0x0F);
+    if (effType >= 0xE0 && effType <= 0xEF) {
+      const subCmd = effType & 0x0F;
+      effType = 0x0E;
+      effParam = (subCmd << 4) | (effParam & 0x0F);
     }
+    effects.push({ type: effType, param: effParam });
   }
-  if (cell.effects.length > 1) {
-    const fx = cell.effects[1];
-    effectType2 = mapFurnaceEffect(fx.type);
-    effectParam2 = fx.value & 0xFF;
-    if (effectType2 >= 0xE0 && effectType2 <= 0xEF) {
-      const subCmd = effectType2 & 0x0F;
-      effectType2 = 0x0E;
-      effectParam2 = (subCmd << 4) | (effectParam2 & 0x0F);
-    }
-  }
+
+  // Legacy fields: first 2 effects for backward compatibility
+  const effectType = effects[0]?.type || 0;
+  const effectParam = effects[0]?.param || 0;
+  const effectType2 = effects[1]?.type || 0;
+  const effectParam2 = effects[1]?.param || 0;
 
   return {
     note,
@@ -2945,6 +3221,7 @@ function convertFurnaceCell(cell: FurnacePatternCell, isChipSynth: boolean = fal
     effectParam,
     effectType2,
     effectParam2,
+    effects: effects.length > 0 ? effects : undefined,
   };
 }
 

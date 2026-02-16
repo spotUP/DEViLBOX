@@ -51,6 +51,15 @@ export type EffectType = number; // 0-35 (XM effect type)
 export type EffectParam = number; // 0x00-0xFF
 
 /**
+ * Effect - Combined effect type and parameter
+ * Used for variable effect columns (1-8 per channel in Furnace)
+ */
+export interface Effect {
+  type: EffectType;   // Effect type (0-35)
+  param: EffectParam; // Effect parameter (0x00-0xFF)
+}
+
+/**
  * TrackerCell - Core pattern data cell
  *
  * XM-Compatible Core (5 bytes):
@@ -79,6 +88,11 @@ export interface TrackerCell {
   effTyp2: EffectType;          // Second effect type (0-35)
   eff2: EffectParam;            // Second effect parameter (0x00-0xFF)
   effect2?: string;             // Legacy string format (migration only)
+
+  // Variable effect columns (Furnace supports 1-8 per channel)
+  // If present, effects[0] maps to effTyp/eff, effects[1] maps to effTyp2/eff2
+  // effects[2-7] are additional columns not supported by legacy fields
+  effects?: Effect[];           // Array of effects for variable column support
 
   // TB-303 specific columns (flexible like effect columns)
   // 0 = empty, 1 = accent, 2 = slide
@@ -122,6 +136,10 @@ export interface ChannelData {
     channelType?: 'sample' | 'synth' | 'hybrid';
     furnaceType?: number; // Furnace DivChanType for system presets
     hardwareName?: string; // Hardware-specific channel name
+    shortName?: string; // Short channel name for collapsed view
+    systemId?: number; // Furnace system fileID
+    effectCols?: number; // Number of effect columns (1-8, default 2 for Furnace imports)
+    volMax?: number; // Maximum volume value for this channel's chip (e.g., 15 for C64, 127 for Genesis)
   };
 }
 
@@ -321,6 +339,15 @@ export interface ImportMetadata {
   xmData?: {
     frequencyType: 'amiga' | 'linear';
     defaultPanning: number[]; // Per-channel panning (0-255)
+  };
+
+  // Furnace-specific data (system presets and channel metadata)
+  furnaceData?: {
+    systems: number[];           // Array of Furnace system/chip IDs (fileID values)
+    systemChans: number[];       // Number of channels per system
+    systemName: string;          // Human-readable system name from Furnace
+    channelShortNames?: string[];  // Short channel names from subsong (if available)
+    effectColumns?: number[];    // Effect columns per channel (1-8, default 1)
   };
 }
 

@@ -15,9 +15,9 @@
 
 import * as Tone from 'tone';
 import type { Pattern, TrackerCell } from '@/types';
-import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
-import { FurnaceMacroType } from '@/types/instrument';
+import type { InstrumentConfig } from '@/types/instrument';
 import { getToneEngine } from './ToneEngine';
+import { MacroEngine } from './MacroEngine';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/audio';
 
@@ -169,12 +169,17 @@ interface ChannelState {
   panSlide: number;              // Pan slide memory (Pxx)
 
   // Macro state (Furnace instruments)
-  macroPos: number;              // Current position in macros
-  macroReleased: boolean;        // Whether note has been released
+  macro: MacroEngine;            // Macro engine instance
+  macroPos: number;              // Current position in macros (legacy)
+  macroReleased: boolean;        // Whether note has been released (legacy)
   macroPitchOffset: number;      // Current pitch offset from macros
   macroArpNote: number;          // Current arpeggio note offset
   macroDuty: number;             // Current duty cycle from macro
   macroWaveform: number;         // Current waveform from macro
+
+  // Furnace effect state
+  pitchFinesseSpeed: number;     // Pitch finesse slide speed (E5y)
+  legatoMode: boolean;           // Legato mode flag (EAy)
 
   // TB-303 specific state
   previousSlideFlag: boolean;    // Previous row's slide flag (for proper 303 slide semantics)
@@ -368,12 +373,15 @@ export class TrackerReplayer {
       patternLoopCount: 0,
       globalVolSlide: 0,
       panSlide: 0,
+      macro: new MacroEngine(),
       macroPos: 0,
       macroReleased: false,
       macroPitchOffset: 0,
       macroArpNote: 0,
       macroDuty: 0,
       macroWaveform: 0,
+      pitchFinesseSpeed: 0,
+      legatoMode: false,
       previousSlideFlag: false,
       gateHigh: false,
       lastPlayedNoteName: null,
@@ -639,8 +647,9 @@ export class TrackerReplayer {
         this.processEffectTick(ch, channel, row, safeTime + (this.currentTick * tickInterval));
       }
 
-      // Process Furnace macros every tick
-      this.processMacros(channel, safeTime + (this.currentTick * tickInterval));
+      // Process MacroEngine every tick (moved from old processMacros)
+      channel.macro.next();
+      this.applyMacroValues(channel, safeTime + (this.currentTick * tickInterval));
     }
 
     // Notify tick processing
@@ -910,7 +919,7 @@ export class TrackerReplayer {
           'color: #666'
         );
       }
-      this.releaseMacros(ch);
+      ch.macro.release();
       this.stopChannel(ch, chIndex);
     }
 
@@ -928,6 +937,16 @@ export class TrackerReplayer {
     const param2 = row.eff2 ?? 0;
     if (effect2 !== 0 || param2 !== 0) {
       this.processEffect0(chIndex, ch, effect2, param2, time);
+    }
+
+    // Process additional effects from effects array (columns 3-8 from Furnace)
+    if (row.effects && row.effects.length > 2) {
+      for (let i = 2; i < row.effects.length; i++) {
+        const fx = row.effects[i];
+        if (fx.type !== 0 || fx.param !== 0) {
+          this.processEffect0(chIndex, ch, fx.type, fx.param, time);
+        }
+      }
     }
   }
 
@@ -1043,6 +1062,38 @@ export class TrackerReplayer {
         }
         break;
 
+      // === Furnace Extended Effects ===
+      case 0xF5: // Single tick pitch slide up (Furnace)
+        // F5xy: Slide pitch up by xy units on tick 0 only
+        ch.period = Math.max(113, ch.period - param);
+        this.updatePeriod(ch);
+        break;
+
+      case 0xF6: // Single tick pitch slide down (Furnace)
+        // F6xy: Slide pitch down by xy units on tick 0 only
+        ch.period = Math.min(856, ch.period + param);
+        this.updatePeriod(ch);
+        break;
+
+      case 0xF7: // Macro control (Furnace)
+        // F7xy: Macro control commands
+        // x = command type (0=speed, 1=delay, etc.)
+        // y = value
+        if (x === 0) {
+          // Set macro speed
+          ch.macro.setSpeed(y);
+        } else if (x === 1) {
+          // Set macro delay
+          ch.macro.setDelay(y);
+        }
+        // Additional macro control commands can be added here
+        break;
+
+      case 0xFF: // Stop song (Furnace)
+        // FFxx: Stop playback
+        this.stop();
+        break;
+
       // === IT/Furnace Extended Effects ===
       case 0x10: // Global volume (Gxx)
         this.globalVolume = Math.min(64, param);
@@ -1081,8 +1132,10 @@ export class TrackerReplayer {
         ch.waveControl = (ch.waveControl & 0xF0) | (y & 0x0F);
         break;
 
-      case 0x5: // Set finetune
-        ch.finetune = y > 7 ? y - 16 : y;
+      case 0x5: // Pitch finesse (Furnace) - store for continuous effect
+        // E5y: Fine pitch slide up (continuous on ticks 1+)
+        // y = slide speed in fine units
+        ch.pitchFinesseSpeed = y;
         break;
 
       case 0x6: // Pattern loop
@@ -1101,7 +1154,13 @@ export class TrackerReplayer {
         }
         break;
 
-      case 0x7: // Tremolo waveform
+      case 0x7: // Macro release (Furnace)
+        // E7y: Release macros (for expressive legato)
+        ch.macro.release();
+        ch.macroReleased = true;
+        break;
+
+      case 0x8: // Tremolo waveform (was 0x7, shifted due to E7)
         ch.waveControl = (ch.waveControl & 0x0F) | ((y & 0x0F) << 4);
         break;
 
@@ -1109,12 +1168,17 @@ export class TrackerReplayer {
         ch.retrigCount = y;
         break;
 
-      case 0xA: // Fine volume up
+      case 0xA: // Legato mode (Furnace)
+        // EAy: Set legato mode (0=off, 1=on)
+        ch.legatoMode = y > 0;
+        break;
+
+      case 0xB: // Fine volume up
         ch.volume = Math.min(64, ch.volume + y);
         ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
         break;
 
-      case 0xB: // Fine volume down
+      case 0xC: // Fine volume down
         ch.volume = Math.max(0, ch.volume - y);
         ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
         break;
@@ -1154,6 +1218,16 @@ export class TrackerReplayer {
     const param2 = row.eff2 ?? 0;
     if (effect2 !== 0 || param2 !== 0) {
       this.processEffectTickSingle(chIndex, ch, row, effect2, param2, time);
+    }
+
+    // Process additional effects from effects array (columns 3-8 from Furnace)
+    if (row.effects && row.effects.length > 2) {
+      for (let i = 2; i < row.effects.length; i++) {
+        const fx = row.effects[i];
+        if (fx.type !== 0 || fx.param !== 0) {
+          this.processEffectTickSingle(chIndex, ch, row, fx.type, fx.param, time);
+        }
+      }
     }
 
     // Route continuous effects to Furnace dispatch engine (ticks 1+)
@@ -1274,7 +1348,12 @@ export class TrackerReplayer {
       case 0x7: this.doTremolo(ch, time); break;
       case 0xA: this.doVolumeSlide(ch, param, time); break;
       case 0xE:
-        if (x === 0x9 && y > 0) {
+        if (x === 0x5 && ch.pitchFinesseSpeed > 0) {
+          // E5y: Pitch finesse (continuous fine pitch slide)
+          // Slide pitch up by stored speed on every tick
+          ch.period = Math.max(113, ch.period - ch.pitchFinesseSpeed);
+          this.updatePeriod(ch);
+        } else if (x === 0x9 && y > 0) {
           ch.retrigCount--;
           if (ch.retrigCount <= 0) {
             ch.retrigCount = y;
@@ -1322,6 +1401,74 @@ export class TrackerReplayer {
   // ==========================================================================
   // EFFECT IMPLEMENTATIONS
   // ==========================================================================
+
+  /**
+   * Apply macro values to channel state (Furnace-style macros)
+   */
+  private applyMacroValues(ch: ChannelState, time: number): void {
+    const macro = ch.macro;
+    
+    // Volume macro
+    if (macro.vol.has && macro.vol.had) {
+      // Volume macro value is typically 0-15 or 0-255 depending on chip
+      // Scale to 0-64 for tracker volume
+      const volValue = macro.vol.val;
+      ch.volume = Math.max(0, Math.min(64, Math.floor((volValue / 15) * 64)));
+      ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+    }
+
+    // Arpeggio macro
+    if (macro.arp.has && macro.arp.had) {
+      // Arpeggio macro provides semitone offset
+      ch.macroArpNote = macro.arp.val;
+      // Apply arpeggio offset to period
+      const arpeggiatePeriod = this.periodPlusSemitones(ch.note, ch.macroArpNote, ch.finetune);
+      this.updatePeriodDirect(ch, arpeggiatePeriod);
+    }
+
+    // Pitch macro
+    if (macro.pitch.has && macro.pitch.had) {
+      // Pitch macro provides pitch offset in cents or fine pitch units
+      ch.macroPitchOffset = macro.pitch.val;
+      // Apply pitch offset
+      // TODO: Implement pitch offset application (may need synth support)
+    }
+
+    // Duty cycle macro
+    if (macro.duty.has && macro.duty.had) {
+      ch.macroDuty = macro.duty.val;
+      // Duty cycle is chip-specific, forward to synth if needed
+      // TODO: Route duty cycle changes to Furnace dispatch or synth
+    }
+
+    // Waveform macro
+    if (macro.wave.has && macro.wave.had) {
+      ch.macroWaveform = macro.wave.val;
+      // Waveform is chip-specific, forward to synth if needed
+      // TODO: Route waveform changes to Furnace dispatch or synth
+    }
+
+    // Panning macros
+    if ((macro.panL.has && macro.panL.had) || (macro.panR.has && macro.panR.had)) {
+      const panL = macro.panL.has && macro.panL.had ? macro.panL.val : 15;
+      const panR = macro.panR.has && macro.panR.had ? macro.panR.val : 15;
+      // Convert dual-channel panning to stereo position (-1 to +1)
+      // If both are 15: center (0)
+      // If panL=15, panR=0: hard right (+1)
+      // If panL=0, panR=15: hard left (-1)
+      const stereoPos = ((panR - panL) / 15);
+      ch.panNode.pan.setValueAtTime(stereoPos, time);
+    }
+
+    // Phase reset macro
+    if (macro.phaseReset.has && macro.phaseReset.had && macro.phaseReset.val > 0) {
+      // Phase reset triggers note restart
+      // TODO: Implement phase reset (may need synth support)
+    }
+
+    // Extended macros (ex1-ex8) are chip-specific
+    // TODO: Route extended macros to Furnace dispatch based on chip type
+  }
 
   private doArpeggio(ch: ChannelState, param: number): void {
     const x = (param >> 4) & 0x0F;
@@ -1478,135 +1625,6 @@ export class TrackerReplayer {
   // MACRO PROCESSING (Furnace instruments)
   // ==========================================================================
 
-  /**
-   * Process Furnace instrument macros for a channel
-   * Called every tick to apply macro values
-   */
-  private processMacros(ch: ChannelState, time: number): void {
-    if (!ch.instrument?.furnace?.macros) return;
-
-    const macros = ch.instrument.furnace.macros as FurnaceMacro[];
-    if (macros.length === 0) return;
-
-    for (const macro of macros) {
-      if (!macro.data || macro.data.length === 0) continue;
-
-      // Get current macro position, handling loop/release
-      let pos = ch.macroPos;
-      const speed = macro.speed || 1;
-
-      // Only advance every 'speed' ticks
-      if (this.currentTick % speed !== 0) continue;
-
-      // Handle release point
-      if (ch.macroReleased && macro.release >= 0 && pos < macro.release) {
-        pos = macro.release;
-      }
-
-      // Handle loop
-      if (pos >= macro.data.length) {
-        if (macro.loop >= 0 && macro.loop < macro.data.length) {
-          // If released and loop is before release, stay at end
-          if (ch.macroReleased && macro.release >= 0 && macro.loop < macro.release) {
-            pos = macro.data.length - 1;
-          } else {
-            pos = macro.loop;
-          }
-        } else {
-          pos = macro.data.length - 1; // Stay at last value
-        }
-      }
-
-      const value = macro.data[pos] ?? 0;
-      this.applyMacroValue(ch, macro.type, value, time);
-    }
-
-    // Advance macro position
-    ch.macroPos++;
-  }
-
-  /**
-   * Apply a macro value to a channel based on macro type
-   */
-  private applyMacroValue(ch: ChannelState, macroType: number, value: number, time: number): void {
-    switch (macroType) {
-      case FurnaceMacroType.VOL: // Volume (0-15 for most chips, scale to 0-64)
-        ch.volume = Math.round((value / 15) * 64);
-        ch.gainNode.gain.setValueAtTime(ch.volume / 64 * (this.globalVolume / 64), time);
-        break;
-
-      case FurnaceMacroType.ARP: // Arpeggio (note offset, can be negative)
-        ch.macroArpNote = value > 127 ? value - 256 : value; // Handle signed
-        if (ch.period > 0) {
-          // Apply arpeggio as period change
-          const semitoneRatio = Math.pow(2, ch.macroArpNote / 12);
-          const newPeriod = Math.round(ch.note / semitoneRatio);
-          this.updatePeriodDirect(ch, newPeriod);
-        }
-        break;
-
-      case FurnaceMacroType.DUTY: // Duty cycle
-        ch.macroDuty = value;
-        // Note: duty changes need to be handled by the synth engine
-        // For now, store for potential use
-        break;
-
-      case FurnaceMacroType.WAVE: // Waveform
-        ch.macroWaveform = value;
-        // Note: waveform changes need wavetable support
-        break;
-
-      case FurnaceMacroType.PITCH: // Pitch offset (fine pitch)
-        ch.macroPitchOffset = value > 127 ? value - 256 : value; // Signed
-        if (ch.period > 0) {
-          // Apply as small period adjustment
-          const pitchAdjust = ch.macroPitchOffset / 64; // Scale to reasonable range
-          const newPeriod = Math.round(ch.period * (1 - pitchAdjust * 0.01));
-          this.updatePeriodDirect(ch, Math.max(113, Math.min(856, newPeriod)));
-        }
-        break;
-
-      case FurnaceMacroType.EX1: // Extra 1 (chip-specific)
-      case FurnaceMacroType.EX2: // Extra 2
-      case FurnaceMacroType.EX3: // Extra 3
-      case FurnaceMacroType.EX4: // Extra 4
-      case FurnaceMacroType.EX5: // Extra 5
-      case FurnaceMacroType.EX6: // Extra 6
-      case FurnaceMacroType.EX7: // Extra 7
-      case FurnaceMacroType.EX8: // Extra 8
-        // Chip-specific macros - would need per-chip handling
-        break;
-
-      case FurnaceMacroType.ALG: // Algorithm (FM)
-      case FurnaceMacroType.FB: // Feedback (FM)
-      case FurnaceMacroType.FMS: // FM LFO speed
-      case FurnaceMacroType.AMS: // AM LFO speed
-        // FM macros - need FurnaceSynth integration
-        break;
-
-      case FurnaceMacroType.PAN_L: // Pan left
-        ch.panning = Math.max(0, 128 - value * 8);
-        ch.panNode.pan.setValueAtTime((ch.panning - 128) / 128, time);
-        break;
-
-      case FurnaceMacroType.PAN_R: // Pan right
-        ch.panning = Math.min(255, 128 + value * 8);
-        ch.panNode.pan.setValueAtTime((ch.panning - 128) / 128, time);
-        break;
-
-      case FurnaceMacroType.PHASE_RESET: // Phase reset
-        // Would need synth integration
-        break;
-    }
-  }
-
-  /**
-   * Handle note release for macros
-   */
-  private releaseMacros(ch: ChannelState): void {
-    ch.macroReleased = true;
-  }
-
   // ==========================================================================
   // VOICE CONTROL
   // ==========================================================================
@@ -1637,6 +1655,11 @@ export class TrackerReplayer {
     ch.macroReleased = false;
     ch.macroPitchOffset = 0;
     ch.macroArpNote = 0;
+
+    // Initialize macro engine with instrument (Furnace-style macros)
+    if (ch.instrument && ch.instrument.furnace?.macros) {
+      ch.macro.init(ch.instrument, false); // false = no volMacroLinger for now
+    }
 
     if (!ch.instrument) {
       // No instrument assigned - try to use the first available instrument

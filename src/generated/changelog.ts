@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-15T22:57:59.041Z
+ * Generated: 2026-02-16T06:00:56.353Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -20,9 +20,9 @@ export interface ChangelogEntry {
 
 // Build info
 export const BUILD_VERSION = '1.0.1';
-export const BUILD_NUMBER = '658';
-export const BUILD_HASH = '8f77811';
-export const BUILD_DATE = '2026-02-15';
+export const BUILD_NUMBER = '675';
+export const BUILD_HASH = 'aa4d2c4';
+export const BUILD_DATE = '2026-02-16';
 
 // Full semantic version with build number
 export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
@@ -31,8 +31,82 @@ export const FULL_VERSION = `${BUILD_VERSION}.${BUILD_NUMBER}`;
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
+    date: '2026-02-16',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Center channel content for cleaner layout"
+      },
+      {
+        type: 'fix',
+        "description": "Skip hidden columns during cursor navigation"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve ReferenceError for columnVisibility and chColor"
+      },
+      {
+        type: 'fix',
+        "description": "Stabilize channel width using column visibility settings"
+      },
+      {
+        type: 'fix',
+        "description": "Ensure channel separators are drawn on top of row backgrounds"
+      },
+      {
+        type: 'fix',
+        "description": "Remove channel header bottom border to eliminate gap"
+      },
+      {
+        type: 'fix',
+        "description": "Re-enable active channel highlight on populated rows"
+      },
+      {
+        type: 'fix',
+        "description": "Implement full-height channel backgrounds and separators"
+      },
+      {
+        type: 'fix',
+        "description": "Extend active channel highlight to full height"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused variables and add missing import"
+      },
+      {
+        type: 'fix',
+        "description": "Strictly enforce hardware channel counts in system presets"
+      },
+      {
+        type: 'fix',
+        "description": "Synchronize channel header and grid scrolling"
+      },
+      {
+        type: 'fix',
+        "description": "Increase channel width to prevent label cutoff in header"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve ReferenceError and clean up unused variables in metrics refactor"
+      },
+      {
+        type: 'fix',
+        "description": "Add missing Cpu icon import in TrackerView"
+      },
+      {
+        type: 'feature',
+        "description": "Improve hardware preset visibility and add mobile support"
+      }
+    ]
+  },
+  {
+    version: '2026-02-15',
     date: '2026-02-15',
     changes: [
+      {
+        type: 'feature',
+        "description": "Implement 1:1 hardware system presets and Furnace technical parity"
+      },
       {
         type: 'improvement',
         "description": "Rename command buttons to 'Reference' for clarity"
@@ -164,74 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Add detailed diagnostics for iOS MIDI support"
-      },
-      {
-        type: 'fix',
-        "description": "Unify keyboard component height across modes"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: transport fixes, test updates, and enhanced furnace debugging"
-      },
-      {
-        type: 'improvement',
-        "description": "Unify command input and streamline tabs"
-      },
-      {
-        type: 'fix',
-        "description": "Restore correct horizontal gesture directions"
-      },
-      {
-        type: 'fix',
-        "description": "Invert horizontal swipe and scroll directions"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: restore debug script and ensure all fixes are pushed"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: update debug script to use require instead of import"
-      },
-      {
-        type: 'fix',
-        "description": "Implement iOS safe area support for notch and home indicator"
-      },
-      {
-        type: 'feature',
-        "description": "Add WASM auto-rebuild to dev startup scripts"
-      },
-      {
-        type: 'fix',
-        "description": "Force base path to / for subdomain deployment"
-      },
-      {
-        type: 'fix',
-        "description": "Add jsondiffpatch dependency to server package.json"
-      },
-      {
-        type: 'fix',
-        "description": "Import missing DEFAULT constants for createInstrumentsForModule"
-      },
-      {
-        type: 'fix',
-        "description": "Add createInstrumentsForModule helper and null check for module song data"
-      },
-      {
-        type: 'fix',
-        "description": "Correct module import types and conversion in App.tsx FileBrowser"
-      },
-      {
-        type: 'fix',
-        "description": "Add onLoadTrackerModule handler to FileBrowser for .fur file support"
-      },
-      {
-        type: 'fix',
-        "description": "Move transport controls to avoid hamburger menu overlap"
-      },
-      {
-        type: 'feature',
-        "description": "Add inline mode to MIDI dropdown to work properly in mobile menu"
       }
     ]
   }
