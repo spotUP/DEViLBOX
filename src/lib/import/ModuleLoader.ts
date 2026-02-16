@@ -9,6 +9,7 @@ import { parseXM } from './formats/XMParser';
 import { parseMOD } from './formats/MODParser';
 import { parseFurnaceSong, convertFurnaceToDevilbox } from './formats/FurnaceSongParser';
 import { DefleMaskParser, type DMFModule } from './formats/DefleMaskParser';
+import { FurnaceDispatchEngine } from '@engine/furnace-dispatch/FurnaceDispatchEngine';
 import type { ParsedInstrument, ImportMetadata } from '../../types/tracker';
 
 // Raw pattern cell data from libopenmpt
@@ -250,6 +251,19 @@ async function loadWithNativeParser(
         patterns: result.patterns.length,
         channels: result.metadata.originalChannelCount,
       });
+
+      // Wire compatFlags to effect router
+      if (result.metadata.furnaceData?.compatFlags) {
+        try {
+          const engine = FurnaceDispatchEngine.getInstance();
+          const effectRouter = engine.getEffectRouter();
+          effectRouter.setCompatFlags(result.metadata);
+          console.log('[ModuleLoader] CompatFlags wired to effect router');
+        } catch (error) {
+          console.warn('[ModuleLoader] Failed to wire compatFlags:', error);
+        }
+      }
+
       return {
         format: 'FUR', // Furnace format - patterns already converted
         importMetadata: result.metadata,

@@ -1020,7 +1020,7 @@ async function parseNewFormat(
   // Parse compatFlags
   if (compatFlagsPtr > 0) {
     reader.seek(compatFlagsPtr);
-    const compatFlags = parseCompatFlags(reader, version);
+    const compatFlags = parseCompatFlags(reader);
     module.compatFlags = compatFlags;
   }
 }
@@ -2501,7 +2501,7 @@ function parseGroove(reader: BinaryReader): FurnaceGroove {
  * Parse compatibility flags (50+ boolean flags for legacy behavior)
  * Reference: furnace-master/src/engine/song.h lines 187-250
  */
-function parseCompatFlags(reader: BinaryReader, version: number): FurnaceCompatFlags {
+function parseCompatFlags(reader: BinaryReader): FurnaceCompatFlags {
   const magic = reader.readMagic(4);
   if (magic !== 'FLAG') {
     throw new Error(`Expected FLAG block, got: "${magic}"`);
@@ -2716,30 +2716,76 @@ function scanInstrumentChannels(module: FurnaceModule, subsongIndex = 0): Map<nu
 }
 
 /**
- * Convert Furnace module to DEViLBOX format
- * @param module - Parsed Furnace module
- * @param subsongIndex - Index of the subsong to convert (default: 0)
+ * Convert a single subsong to pattern data
  */
-export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0): {
+function convertSubsongPatterns(
+  module: FurnaceModule,
+  subsongIndex: number,
+  isChipSynth: boolean
+): ConvertedPatternCell[][][] {
+  const subsong = module.subsongs[subsongIndex];
+  if (!subsong) {
+    console.warn(`[FurnaceParser] Subsong ${subsongIndex} not found`);
+    return [];
+  }
+
+  const patterns: ConvertedPatternCell[][][] = [];
+  
+  for (let orderPos = 0; orderPos < subsong.ordersLen; orderPos++) {
+    const patternRows: ConvertedPatternCell[][] = [];
+
+    for (let row = 0; row < subsong.patLen; row++) {
+      const rowCells: ConvertedPatternCell[] = [];
+
+      for (let ch = 0; ch < module.chans; ch++) {
+        const patIdx = subsong.orders[ch]?.[orderPos] ?? 0;
+        const key = `${subsongIndex}_${ch}_${patIdx}`;
+        const pattern = module.patterns.get(key);
+
+        if (pattern && pattern.rows[row]) {
+          const cell = pattern.rows[row];
+          const converted = convertFurnaceCell(cell, isChipSynth);
+          rowCells.push(converted);
+        } else {
+          rowCells.push({ note: 0, instrument: 0, volume: 0, effectType: 0, effectParam: 0, effectType2: 0, effectParam2: 0 });
+        }
+      }
+
+      patternRows.push(rowCells);
+    }
+
+    patterns.push(patternRows);
+  }
+
+  return patterns;
+}
+
+/**
+ * Convert Furnace module to DEViLBOX format
+ * Converts ALL subsongs and stores them in metadata
+ * @param module - Parsed Furnace module
+ * @param primarySubsongIndex - Index of the subsong to use as primary (default: 0)
+ */
+export function convertFurnaceToDevilbox(module: FurnaceModule, primarySubsongIndex = 0): {
   instruments: ParsedInstrument[];
   patterns: ConvertedPatternCell[][][]; // [pattern][row][channel]
   metadata: ImportMetadata;
 } {
-  // Validate subsongIndex
-  if (subsongIndex < 0 || subsongIndex >= module.subsongs.length) {
-    console.warn(`[FurnaceParser] Invalid subsongIndex ${subsongIndex}, falling back to 0`);
-    subsongIndex = 0;
+  // Validate primarySubsongIndex
+  if (primarySubsongIndex < 0 || primarySubsongIndex >= module.subsongs.length) {
+    console.warn(`[FurnaceParser] Invalid primarySubsongIndex ${primarySubsongIndex}, falling back to 0`);
+    primarySubsongIndex = 0;
   }
   
-  console.log(`[FurnaceParser] Converting subsong ${subsongIndex} of ${module.subsongs.length}`);
+  console.log(`[FurnaceParser] Converting ALL ${module.subsongs.length} subsongs (primary: ${primarySubsongIndex})`);
   // --- Build channel-to-chip mapping for STD instrument remapping ---
   // For compound chips like Genesis (FM + PSG), we need to know which
   // channels are FM vs PSG to correctly remap DIV_INS_STD instruments.
   const channelChipInsType = buildChannelChipMap(module);
   const channelChipId = buildChannelChipIdMap(module);
 
-  // Scan pattern data to find which channels each instrument appears on
-  const instrumentChannels = scanInstrumentChannels(module, subsongIndex);
+  // Scan pattern data to find which channels each instrument appears on (use primary subsong)
+  const instrumentChannels = scanInstrumentChannels(module, primarySubsongIndex);
 
   // Convert instruments with full Furnace data preservation
   const instruments: ParsedInstrument[] = module.instruments.map((inst, idx) => {
@@ -2924,126 +2970,65 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
     };
   });
 
-  // Convert patterns - flatten selected subsong patterns
-  const patterns: ConvertedPatternCell[][][] = [];
-  const subsong = module.subsongs[subsongIndex];
-  if (!subsong) {
-    return { instruments, patterns: [], metadata: createMetadata(module, subsongIndex) };
+  // Convert patterns for primary subsong
+  const primarySubsong = module.subsongs[primarySubsongIndex];
+  if (!primarySubsong) {
+    return { instruments, patterns: [], metadata: createMetadata(module, primarySubsongIndex, []) };
   }
-
-  // Debug: Log pattern map keys
-  console.log('[FurnaceParser] Pattern map size:', module.patterns.size);
-  console.log('[FurnaceParser] Subsong patLen:', subsong.patLen, 'ordersLen:', subsong.ordersLen);
-  console.log('[FurnaceParser] Orders (first 3 channels):', subsong.orders?.slice(0, 3)?.map(o => o?.slice(0, 10)));
 
   // Check if this is a chip synth platform (no -24 octave offset needed)
   const primaryChipId = module.systems[0] || 0;
   const isChipSynth = CHIP_SYNTH_IDS.has(primaryChipId);
   console.log(`[FurnaceParser] Platform chip ID: 0x${primaryChipId.toString(16)}, isChipSynth: ${isChipSynth}`);
 
-  // CRITICAL: Create combined patterns by ORDER POSITION, not by pattern index.
-  // Furnace has per-channel order tables: orders[channel][orderPos] = patternIndex
-  // Each channel can play a different pattern at each song position.
-  // We must look up each channel's pattern from its own order table.
-  let totalRawNotes = 0;     // Notes in Furnace data (before conversion)
-  let totalConvertedNotes = 0; // Notes that survived conversion
-  let totalDroppedNotes = 0;   // Notes lost to octave clamping
-  let totalMissedLookups = 0;  // Pattern key lookups that failed
-  let totalEffects = 0;
-  const droppedExamples: string[] = [];
+  // Convert primary subsong patterns
+  const patterns = convertSubsongPatterns(module, primarySubsongIndex, isChipSynth);
 
-  for (let orderPos = 0; orderPos < subsong.ordersLen; orderPos++) {
-    const patternRows: ConvertedPatternCell[][] = [];
+  console.log(`[FurnaceParser] Primary subsong ${primarySubsongIndex}: ${patterns.length} patterns`);
 
-    for (let row = 0; row < subsong.patLen; row++) {
-      const rowCells: ConvertedPatternCell[] = [];
-
-      for (let ch = 0; ch < module.chans; ch++) {
-        // Look up this channel's pattern index for this order position
-        const patIdx = subsong.orders[ch]?.[orderPos] ?? 0;
-        const key = `0_${ch}_${patIdx}`;
-        const pattern = module.patterns.get(key);
-
-        if (pattern && pattern.rows[row]) {
-          const cell = pattern.rows[row];
-          // Track raw note data before conversion
-          if (cell.note >= 1 && cell.note <= 12) {
-            totalRawNotes++;
-          }
-          if (cell.effects.length > 0 && cell.effects.some(e => e.type >= 0)) {
-            totalEffects++;
-          }
-          const converted = convertFurnaceCell(cell, isChipSynth);
-          if (converted.note > 0 && converted.note < 97) {
-            totalConvertedNotes++;
-          }
-          // Detect dropped notes (raw had a note, converted has 0)
-          if (cell.note >= 1 && cell.note <= 12 && converted.note === 0) {
-            totalDroppedNotes++;
-            if (droppedExamples.length < 5) {
-              const noteNames = ['?', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C'];
-              droppedExamples.push(`${noteNames[cell.note] || '?'}${cell.octave} (ord=${orderPos} ch=${ch} row=${row})`);
-            }
-          }
-          rowCells.push(converted);
-        } else {
-          if (row === 0 && orderPos === 0) {
-            // Log first row lookup failures
-            totalMissedLookups++;
-            if (totalMissedLookups <= 5) {
-              console.log(`[FurnaceParser] Pattern lookup MISS: key="${key}" patternExists=${module.patterns.has(key)}`);
-            }
-          }
-          rowCells.push({
-            note: 0,
-            instrument: 0,
-            volume: 0,
-            effectType: 0,
-            effectParam: 0,
-            effectType2: 0,
-            effectParam2: 0,
-          });
-        }
-      }
-
-      patternRows.push(rowCells);
+  // Convert ALL other subsongs and store them
+  const allSubsongsData = module.subsongs.map((subsong, idx) => {
+    if (idx === primarySubsongIndex) {
+      // Primary subsong is returned as main patterns, skip it here
+      return null;
     }
 
-    patterns.push(patternRows);
-  }
+    const subsongPatterns = convertSubsongPatterns(module, idx, isChipSynth);
+    
+    // Calculate BPM for this subsong
+    const virtualTempo = subsong?.virtualTempo || 150;
+    const virtualTempoD = subsong?.virtualTempoD || 150;
+    const hz = subsong?.hz || 60;
+    const speed = subsong?.speed1 || 6;
+    const bpm = Math.round(2.5 * hz * (virtualTempo / virtualTempoD));
 
-  // Debug: Log converted patterns summary
-  const nonEmptyPatterns = patterns.filter(pat =>
-    pat.some(row => row.some(cell => cell.note > 0 || cell.instrument > 0 || cell.effectType > 0))
-  );
-  console.log(`[FurnaceParser] Converted ${patterns.length} patterns (by order position), ${nonEmptyPatterns.length} have data`);
-  console.log(`[FurnaceParser] Note stats: ${totalRawNotes} raw notes → ${totalConvertedNotes} survived, ${totalDroppedNotes} dropped (octave too low), ${totalEffects} effect cells`);
-  if (droppedExamples.length > 0) {
-    console.log(`[FurnaceParser] Dropped note examples:`, droppedExamples);
-  }
-  // Log all pattern keys for debugging
-  console.log(`[FurnaceParser] Pattern map keys:`, [...module.patterns.keys()].slice(0, 30));
-  
-  // Debug: Show first pattern's raw channel data BEFORE conversion
-  if (patterns.length > 0) {
-    const pat0 = patterns[0];
-    console.log(`[FurnaceParser] DEBUG Pattern 0 RAW: ${pat0.length} rows, first row has ${pat0[0]?.length} channels`);
-    console.log(`[FurnaceParser] DEBUG Pattern 0 row 0:`, pat0[0]?.map((c,i) => `ch${i}:note=${c.note}`).join(' '));
-    console.log(`[FurnaceParser] DEBUG Pattern 0 row 2:`, pat0[2]?.map((c,i) => `ch${i}:note=${c.note}`).join(' '));
-    console.log(`[FurnaceParser] DEBUG Pattern 0 row 4:`, pat0[4]?.map((c,i) => `ch${i}:note=${c.note}`).join(' '));
-  }
+    console.log(`[FurnaceParser] Subsong ${idx}: ${subsongPatterns.length} patterns`);
 
-  return {
-    instruments,
-    patterns,
-    metadata: createMetadata(module),
+    return {
+      subsongIndex: idx,
+      patterns: subsongPatterns,
+      patternOrderTable: Array.from({ length: subsong.ordersLen || 1 }, (_, i) => i),
+      ordersLen: subsong.ordersLen || 1,
+      initialSpeed: speed,
+      initialBPM: bpm,
+    };
+  }).filter((s): s is NonNullable<typeof s> => s !== null);
+
+  return { 
+    instruments, 
+    patterns, 
+    metadata: createMetadata(module, primarySubsongIndex, allSubsongsData) 
   };
 }
 
 /**
  * Create import metadata
  */
-function createMetadata(module: FurnaceModule, subsongIndex = 0): ImportMetadata {
+function createMetadata(
+  module: FurnaceModule, 
+  subsongIndex: number, 
+  allSubsongsData: NonNullable<NonNullable<ImportMetadata['furnaceData']>['allSubsongs']>
+): ImportMetadata {
   const subsong = module.subsongs[subsongIndex];
 
   // Calculate BPM from Furnace's timing system
@@ -3108,6 +3093,12 @@ function createMetadata(module: FurnaceModule, subsongIndex = 0): ImportMetadata
       systemName: module.systemName || 'Unknown',
       channelShortNames: subsong?.channelShortNames,
       effectColumns: subsong?.effectColumns ? [...subsong.effectColumns] : undefined,
+      compatFlags: module.compatFlags,
+      grooves: module.grooves.length > 0 ? module.grooves : undefined,
+      subsongCount: module.subsongs.length,
+      subsongNames: module.subsongs.map((s, i) => s.name || `Subsong ${i + 1}`),
+      currentSubsong: subsongIndex,
+      allSubsongs: allSubsongsData,
     },
   };
 }
