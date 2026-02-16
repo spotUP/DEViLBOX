@@ -55,8 +55,8 @@ jobs:
         with:
           switches: -avzr --delete
           path: dist/
-          remote_path: ${{ secrets.DEVILBOX_DEPLOY_PATH }}
-          remote_host: ${{ secrets.HETZNER_HOST }}
+          remote_path: /var/www/devilbox-dist/
+          remote_host: 89.167.21.154
           remote_user: root
           remote_key: ${{ secrets.HETZNER_SSH_KEY }}
 
