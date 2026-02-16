@@ -669,9 +669,12 @@ export class ToneEngine {
    * Creates instances if needed and waits for their AudioWorklet WASM to be ready.
    */
   public async ensureWASMSynthsReady(configs: InstrumentConfig[]): Promise<void> {
-    const wasmConfigs = configs.filter((c) => 
-      ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd'].includes(c.synthType || '')
-    );
+    const wasmConfigs = configs.filter((c) => {
+      const type = c.synthType || '';
+      return ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd'].includes(type) ||
+             type.startsWith('Furnace') || 
+             type === 'WAM';
+    });
     if (wasmConfigs.length === 0) return;
 
     const promises: Promise<void>[] = [];
