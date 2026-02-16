@@ -367,9 +367,12 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
 
   const handleNoteSelect = useCallback(
     (noteId: string, addToSelection: boolean) => {
+      console.log('[PianoRoll] handleNoteSelect:', { noteId, addToSelection, tool });
       if (tool === 'erase') {
+        console.log('[PianoRoll] Deleting note via handleNoteSelect');
         deleteNote(noteId);
       } else {
+        console.log('[PianoRoll] Selecting note:', noteId, 'addToSelection:', addToSelection);
         selectNote(noteId, addToSelection);
       }
     },
@@ -397,16 +400,19 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
 
   const handleGridClick = useCallback(
     (row: number, midiNote: number) => {
+      console.log('[PianoRoll] handleGridClick:', { row, midiNote, tool, channelIndex: view.channelIndex });
       hideContextMenu();
 
       if (tool === 'draw') {
         // Scale constraint
         const targetNote = snapToScale(midiNote);
         const duration = getEffectiveNoteLength();
+        console.log('[PianoRoll] Adding note:', { targetNote, row, duration, channel: view.channelIndex });
         addNote(targetNote, row, duration, 100, view.channelIndex);
       } else if (tool === 'select') {
         // Only clear if not starting a selection box
         if (!drag.isDragging) {
+          console.log('[PianoRoll] Clearing selection');
           clearSelection();
         }
       }

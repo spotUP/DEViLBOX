@@ -274,8 +274,11 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
     const { x, y, row, midiNote } = getCanvasCoords(e);
     const hit = hitTesterRef.current.hitTest(x, y);
 
+    console.log('[PianoRollCanvas] MouseDown:', { tool, x, y, row, midiNote, hit: hit ? `note ${hit.note.id} (${hit.zone})` : 'none' });
+
     if (tool === 'erase') {
       if (hit) {
+        console.log('[PianoRollCanvas] Erasing note:', hit.note.id);
         onNoteErase(hit.note.id);
       }
       return;
@@ -284,9 +287,11 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
     if (tool === 'draw') {
       if (hit) {
         // Clicking on existing note in draw mode - select it
+        console.log('[PianoRollCanvas] Draw mode: selecting existing note:', hit.note.id);
         onNoteSelect(hit.note.id, e.shiftKey || e.ctrlKey || e.metaKey);
       } else {
         // Click on empty space - add note
+        console.log('[PianoRollCanvas] Draw mode: adding note at row', row, 'midi', midiNote);
         onGridClick(row, midiNote);
         lastPaintedCellRef.current = `${row}_${midiNote}`;
       }
@@ -296,6 +301,7 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
     // Select tool
     if (hit) {
       // Select the note
+      console.log('[PianoRollCanvas] Select mode: selecting note:', hit.note.id);
       onNoteSelect(hit.note.id, e.shiftKey || e.ctrlKey || e.metaKey);
 
       // Start drag (move or resize)
@@ -305,6 +311,7 @@ const PianoRollCanvasComponent: React.FC<PianoRollCanvasProps> = ({
       onNoteDragStart(hit.note.id, mode as 'move' | 'resize-start' | 'resize-end', e);
     } else {
       // Click on empty space - start selection box
+      console.log('[PianoRollCanvas] Select mode: starting selection box at row', row, 'midi', midiNote);
       onSelectionBoxStart(row, midiNote, e);
     }
   }, [tool, getCanvasCoords, onNoteSelect, onNoteDragStart, onGridClick, onSelectionBoxStart, onNoteErase]);
