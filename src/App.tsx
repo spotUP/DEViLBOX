@@ -479,6 +479,24 @@ function App() {
     const { setMetadata } = useProjectStore.getState();
     
     try {
+      // === CRITICAL: Full state reset before loading new song ===
+      // Following Furnace's pattern: stop → release → dispose → load
+      // Without this, dirty state from the old song can break playback.
+      const { isPlaying, stop: stopTransport, reset: resetTransport } = useTransportStore.getState();
+      const engine = getToneEngine();
+      
+      // 1. Stop playback and release all active notes
+      if (isPlaying) {
+        stopTransport();
+      }
+      engine.releaseAll();
+      
+      // 2. Dispose all cached instruments (prevents stale synth instances)
+      engine.disposeAllInstruments();
+      
+      // 3. Reset transport state (BPM, speed, row, groove — all to defaults)
+      resetTransport();
+      
       const filename = file.name.toLowerCase();
       
       if (filename.endsWith('.mid') || filename.endsWith('.midi')) {

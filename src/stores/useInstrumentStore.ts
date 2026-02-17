@@ -1236,15 +1236,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
     // Import instruments from song file
     loadInstruments: (newInstruments) => {
-      // First invalidate all existing instruments in the engine
-      const engine = getToneEngine();
+      // Revoke blob URLs from old instruments to prevent memory leaks
       get().instruments.forEach((inst) => {
-        try {
-          engine.invalidateInstrument(inst.id);
-        } catch {
-          // Ignore errors during invalidation
-        }
+        revokeInstrumentSampleUrls(inst.sample);
       });
+
+      // Dispose ALL instruments in the engine (not just matching IDs)
+      // This prevents orphaned synths from old songs with different ID ranges
+      const engine = getToneEngine();
+      engine.disposeAllInstruments();
 
       // Migrate old instruments (backward compatibility)
       const migratedInstruments = newInstruments.map(inst => {
