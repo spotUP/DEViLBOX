@@ -475,7 +475,7 @@ function App() {
   const loadSongFile = useCallback(async (file: File) => {
     const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
     const { loadInstruments } = useInstrumentStore.getState();
-    const { setBPM, setGrooveTemplate } = useTransportStore.getState();
+    const { setBPM, setSpeed, setGrooveTemplate } = useTransportStore.getState();
     const { setMetadata } = useProjectStore.getState();
     
     try {
@@ -581,7 +581,9 @@ function App() {
         loadPatterns(convertedPatterns);
         if (patternOrder.length > 0) setPatternOrder(patternOrder);
         
-        setBPM(result.metadata.modData?.initialBPM || 150);
+        setBPM(result.metadata.modData?.initialBPM || 125);
+        const furnaceSpeed = result.metadata.modData?.initialSpeed;
+        if (furnaceSpeed) setSpeed(furnaceSpeed);
         setMetadata({
           name: result.metadata.sourceFile.replace(/\.[^/.]+$/, ''),
           author: '',
@@ -643,6 +645,12 @@ function App() {
             if (result.order && result.order.length > 0) {
               setPatternOrder(result.order);
             }
+
+            // Set BPM and speed from module metadata (prevents store/replayer mismatch)
+            const moduleBPM = result.metadata?.modData?.initialBPM;
+            const moduleSpeed = result.metadata?.modData?.initialSpeed;
+            if (moduleBPM) setBPM(moduleBPM);
+            if (moduleSpeed) setSpeed(moduleSpeed);
             
             notify.success(`Imported ${file.name}: ${result.patterns.length} patterns, ${instruments.length} instruments`);
           }

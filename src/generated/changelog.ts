@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-16T23:27:35.675Z
+ * Generated: 2026-02-17T00:20:53.712Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.778';
-export const BUILD_NUMBER = '778';
-export const BUILD_HASH = '2b242092';
-export const BUILD_DATE = '2026-02-16';
+export const BUILD_VERSION = '1.0.782';
+export const BUILD_NUMBER = '782';
+export const BUILD_HASH = '03e5bb40';
+export const BUILD_DATE = '2026-02-17';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,25 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.778',
+    version: '1.0.782',
     date: '2026-02-17',
     changes: [
+      {
+        type: 'fix',
+        "description": "Furnace 2nd effect column + scheduler BPM timing"
+      },
+      {
+        type: 'fix',
+        "description": "Pattern break 0Dxx uses hex for XM/Furnace, BCD only for MOD"
+      },
+      {
+        type: 'fix',
+        "description": "Implement Furnace speed1/speed2 alternation for correct timing"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
       {
         type: 'fix',
         "description": "Sync normalDecay with filterEnvelope.decay across all TB-303 presets"
@@ -222,22 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Fix trail effect to render on top of active cell backgrounds"
-      },
-      {
-        type: 'fix',
-        "description": "Fix trail effect rendering in front of cell backgrounds"
-      },
-      {
-        type: 'fix',
-        "description": "Fix trail layering and increase current step visibility"
-      },
-      {
-        type: 'fix',
-        "description": "Fix trail effect z-index to render in front of position markers"
-      },
-      {
-        type: 'improvement',
-        "description": "Extend playhead trail effect from 3 to 7 steps"
       }
     ]
   }
