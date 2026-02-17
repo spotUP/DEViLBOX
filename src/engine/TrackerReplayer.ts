@@ -543,7 +543,6 @@ export class TrackerReplayer {
     this.totalRowsProcessed = 0;
     this.totalTicksProcessed = 0;
     this.lastScheduledTime = 0;
-    console.log(`[Replayer Drift] startScheduler called at ${this.startTime.toFixed(3)} (songPos=${this.songPos} pattPos=${this.pattPos})`);
     this.lastPatternRowCount = 0;
 
     const schedulerTick = () => {
@@ -560,16 +559,26 @@ export class TrackerReplayer {
                             Math.abs(transportState.bpm - this.bpm) > 0.1;
 
       if (grooveChanged) {
-        // Reset timing relative to NOW to apply new timing rules immediately
-        this.startTime = currentTime + 0.01;
-        this.nextScheduleTime = this.startTime;
-        this.totalTicksScheduled = 0;
+        // Sync groove parameters WITHOUT resetting the scheduler timeline.
+        // Resetting startTime to "now" caused ~100ms cumulative drift per pattern
+        // because the scheduler had already scheduled 100ms ahead (lookahead),
+        // so "now" was ~100ms behind the scheduled timeline.
         this.lastGrooveTemplateId = transportState.grooveTemplateId;
         this.lastSwingAmount = transportState.swing;
         this.lastGrooveSteps = transportState.grooveSteps;
-        this.bpm = transportState.bpm;
         this.speed = transportState.speed;
-        console.log(`[Replayer Drift] grooveChanged reset! template=${this.lastGrooveTemplateId} swing=${this.lastSwingAmount} steps=${this.lastGrooveSteps} bpm=${this.bpm} speed=${this.speed}`);
+
+        // If BPM changed (e.g. user adjusted in UI), update tickInterval
+        // using the current schedule position as transition point (not "now")
+        // to avoid introducing a timing gap.
+        if (Math.abs(transportState.bpm - this.bpm) > 0.1) {
+          console.log(`[Replayer Drift] BPM sync from store: ${this.bpm} -> ${transportState.bpm}`);
+          this.bpm = transportState.bpm;
+          // Use nextScheduleTime as the transition baseline (same as Fxx handler)
+          // so we continue seamlessly from where we left off.
+          this.startTime = this.nextScheduleTime;
+          this.totalTicksScheduled = 1;
+        }
       }
 
       let tickInterval = 2.5 / this.bpm;
@@ -583,8 +592,7 @@ export class TrackerReplayer {
         // If BPM changed during processTick (Fxx effect), reset timing baseline
         // so future ticks use the new interval without a timing jump
         if (this.bpm !== bpmBefore) {
-          console.log(`[Replayer Drift] BPM CHANGED in processTick! ${bpmBefore} -> ${this.bpm} at tick=${this.totalTicksScheduled} songPos=${this.songPos} pattPos=${this.pattPos} currentTick=${this.currentTick}`);
-          console.trace('[Replayer Drift] BPM change stack');
+          console.log(`[Replayer] BPM changed: ${bpmBefore} -> ${this.bpm} (Fxx effect at pos=${this.songPos} row=${this.pattPos})`);
           this.startTime = this.nextScheduleTime;
           this.totalTicksScheduled = 1;
           tickInterval = 2.5 / this.bpm;
@@ -2105,21 +2113,13 @@ export class TrackerReplayer {
       const wallElapsed = Tone.now() - this.playbackStartWallTime;
       const schedElapsed = this.lastScheduledTime - this.playbackStartWallTime;
       const tickInterval = 2.5 / this.bpm;
-      // Use totalTicksProcessed for accurate expected time (handles speed changes)
       const expectedFromTicks = this.totalTicksProcessed * tickInterval;
-      const wallDriftMs = (wallElapsed - expectedFromTicks) * 1000;
       const schedDriftMs = (schedElapsed - expectedFromTicks) * 1000;
       const rowsThisPattern = this.totalRowsProcessed - this.lastPatternRowCount;
-      // Compute what the scheduled time SHOULD be from the formula
-      const expectedSchedTime = this.startTime + (this.totalTicksScheduled - 1) * tickInterval;
-      const formulaDiff = (this.lastScheduledTime - expectedSchedTime) * 1000;
       console.log(
-        `[Replayer Drift] Pos ${this.songPos} | ${this.totalRowsProcessed} rows (${rowsThisPattern} this pat) | ` +
-        `${this.totalTicksProcessed} ticks (sched=${this.totalTicksScheduled}) | ` +
-        `startTime=${this.startTime.toFixed(3)} lastSched=${this.lastScheduledTime.toFixed(3)} | ` +
-        `wall=${wallElapsed.toFixed(3)}s sched=${schedElapsed.toFixed(3)}s expected=${expectedFromTicks.toFixed(3)}s | ` +
-        `wallDrift=${wallDriftMs.toFixed(1)}ms schedDrift=${schedDriftMs.toFixed(1)}ms | ` +
-        `formulaDiff=${formulaDiff.toFixed(1)}ms | ` +
+        `[Replayer Drift] Pos ${this.songPos} | ${rowsThisPattern} rows | ` +
+        `${this.totalTicksProcessed} ticks | ` +
+        `schedDrift=${schedDriftMs.toFixed(1)}ms | ` +
         `BPM=${this.bpm} speed=${this.speed}`
       );
       this.lastPatternRowCount = this.totalRowsProcessed;

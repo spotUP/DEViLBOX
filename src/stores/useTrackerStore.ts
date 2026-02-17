@@ -206,7 +206,7 @@ interface TrackerStore {
   duplicatePosition: (positionIndex: number) => void;
   clearOrder: () => void;
   reorderPositions: (oldIndex: number, newIndex: number) => void;
-  setCurrentPosition: (positionIndex: number) => void;
+  setCurrentPosition: (positionIndex: number, fromReplayer?: boolean) => void;
 
   // Channel management
   addChannel: () => void;
@@ -2366,7 +2366,7 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
-    setCurrentPosition: (positionIndex) =>
+    setCurrentPosition: (positionIndex, fromReplayer) =>
       set((state) => {
         if (positionIndex >= 0 && positionIndex < state.patternOrder.length) {
           if (state.currentPositionIndex === positionIndex) return;
@@ -2375,12 +2375,18 @@ export const useTrackerStore = create<TrackerStore>()(
           const nextPatternIndex = state.patternOrder[positionIndex];
           state.currentPatternIndex = nextPatternIndex;
 
+          // If this update came from the replayer's natural playback advancement,
+          // do NOT call seekTo — the replayer already knows where it is.
+          // Only seek for user-initiated position changes (clicking pattern order, etc.)
+          // This prevents ~100ms cumulative drift per pattern caused by the seekTo
+          // resetting the scheduler timeline while the replayer's 100ms lookahead
+          // has already scheduled ahead.
+          if (fromReplayer) return;
+
           // If playing, tell the replayer to seek to this position
           const replayer = getTrackerReplayer();
           if (replayer.isPlaying()) {
             // ONLY seek if the replayer isn't already at this position.
-            // This prevents a "break" or "jump" when the replayer naturally advances 
-            // and we update the UI store to match.
             if (replayer.getCurrentPosition() !== positionIndex) {
               console.log(`[useTrackerStore] Manual seek to position ${positionIndex}`);
               // Maintain current row when jumping positions manually
