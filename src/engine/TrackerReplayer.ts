@@ -583,6 +583,8 @@ export class TrackerReplayer {
         // If BPM changed during processTick (Fxx effect), reset timing baseline
         // so future ticks use the new interval without a timing jump
         if (this.bpm !== bpmBefore) {
+          console.log(`[Replayer Drift] BPM CHANGED in processTick! ${bpmBefore} -> ${this.bpm} at tick=${this.totalTicksScheduled} songPos=${this.songPos} pattPos=${this.pattPos} currentTick=${this.currentTick}`);
+          console.trace('[Replayer Drift] BPM change stack');
           this.startTime = this.nextScheduleTime;
           this.totalTicksScheduled = 1;
           tickInterval = 2.5 / this.bpm;
