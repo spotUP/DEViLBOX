@@ -2108,11 +2108,16 @@ export class TrackerReplayer {
       const wallDriftMs = (wallElapsed - expectedFromTicks) * 1000;
       const schedDriftMs = (schedElapsed - expectedFromTicks) * 1000;
       const rowsThisPattern = this.totalRowsProcessed - this.lastPatternRowCount;
+      // Compute what the scheduled time SHOULD be from the formula
+      const expectedSchedTime = this.startTime + (this.totalTicksScheduled - 1) * tickInterval;
+      const formulaDiff = (this.lastScheduledTime - expectedSchedTime) * 1000;
       console.log(
         `[Replayer Drift] Pos ${this.songPos} | ${this.totalRowsProcessed} rows (${rowsThisPattern} this pat) | ` +
-        `${this.totalTicksProcessed} ticks | ` +
+        `${this.totalTicksProcessed} ticks (sched=${this.totalTicksScheduled}) | ` +
+        `startTime=${this.startTime.toFixed(3)} lastSched=${this.lastScheduledTime.toFixed(3)} | ` +
         `wall=${wallElapsed.toFixed(3)}s sched=${schedElapsed.toFixed(3)}s expected=${expectedFromTicks.toFixed(3)}s | ` +
         `wallDrift=${wallDriftMs.toFixed(1)}ms schedDrift=${schedDriftMs.toFixed(1)}ms | ` +
+        `formulaDiff=${formulaDiff.toFixed(1)}ms | ` +
         `BPM=${this.bpm} speed=${this.speed}`
       );
       this.lastPatternRowCount = this.totalRowsProcessed;
