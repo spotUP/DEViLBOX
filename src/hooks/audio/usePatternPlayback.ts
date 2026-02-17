@@ -202,7 +202,7 @@ export const usePatternPlayback = () => {
             // not a user action. This prevents false reloads at pattern boundaries.
             replayerAdvancedRef.current = true;
             queueMicrotask(() => {
-              setCurrentPattern(patternNum);
+              setCurrentPattern(patternNum, true);
               setCurrentPosition(position, true);
             });
           }
