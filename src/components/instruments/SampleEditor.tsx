@@ -1,19 +1,45 @@
 /**
- * SampleEditor - Full-featured sample editor with waveform visualization
- * Supports Sampler, Player, and GranularSynth instruments
+ * SampleEditor - State-of-the-art sample editor with waveform visualization
+ *
+ * Features:
+ * - Zoom/scroll with mouse wheel + minimap navigation
+ * - Range selection via mouse drag
+ * - Cut/Copy/Paste/Crop/Delete/Silence on selection
+ * - Fade In/Out, Volume adjust, Reverse, Normalize, DC removal
+ * - 20-level Undo/Redo (Ctrl+Z / Ctrl+Shift+Z)
+ * - Draggable start/end + loop handles
+ * - Loop types: Off / Forward / Pingpong
+ * - Spectrum/FFT view toggle
+ * - Enhancement panel, Amiga resampler, Beat slicer integration
+ * - Keyboard shortcuts (focus-gated)
+ * - WAV export
+ * - Supports Sampler, Player, and GranularSynth instruments
  */
 
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import {
   Upload, Trash2, Music, Play, Square, AlertCircle,
-  ZoomIn, ZoomOut, Repeat, Sparkles, Wand2, RefreshCcw, Maximize2, FlipVertical
+  ZoomIn, ZoomOut, Repeat, Sparkles, Wand2, RefreshCcw,
+  Scissors, Copy, ClipboardPaste, Crop, VolumeX, Volume2, Volume1,
+  Undo2, Redo2, Eye, Download,
+  ArrowLeft, ArrowRight, Maximize2, FlipHorizontal,
+  Activity, Waves
 } from 'lucide-react';
-import { useInstrumentStore, notify } from '../../stores';
+import { useInstrumentStore } from '../../stores';
 import type { InstrumentConfig } from '../../types/instrument';
 import { DEFAULT_GRANULAR } from '../../types/instrument';
 import * as Tone from 'tone';
 import { SampleEnhancerPanel } from './SampleEnhancerPanel';
+import { AmiResamplerModal } from './AmiResamplerModal';
+import { BeatSlicerPanel } from './BeatSlicerPanel';
 import type { ProcessedResult } from '../../utils/audio/SampleProcessing';
+import { bufferToDataUrl } from '../../utils/audio/SampleProcessing';
+import { drawSampleWaveform } from '../../utils/audio/drawSampleWaveform';
+import type { WaveformDrawOptions } from '../../utils/audio/drawSampleWaveform';
+import { useSampleEditorState } from '../../hooks/useSampleEditorState';
+import type { DragTarget } from '../../hooks/useSampleEditorState';
+
+// ─── Props & types ─────────────────────────────────────────────────────
 
 interface SampleEditorProps {
   instrument: InstrumentConfig;
@@ -28,62 +54,194 @@ interface SampleInfo {
   channels?: number;
 }
 
-// Note options for base note selection
 const NOTE_OPTIONS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const OCTAVE_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 
-export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange }) => {
-  const { 
-    updateInstrument: storeUpdateInstrument,
-    reverseSample,
-    normalizeSample,
-    invertLoopSample
-  } = useInstrumentStore();
+// Canvas sizes
+const CANVAS_W = 1120;
+const CANVAS_H = 300;
+const MINIMAP_H = 40;
 
-  // Use onChange prop if provided (for temp instruments), otherwise use store
-  const updateInstrument = useCallback((id: number, updates: Partial<InstrumentConfig>) => {
-    if (onChange) {
-      onChange(updates);
-    } else {
-      storeUpdateInstrument(id, updates);
+// ─── Icon button helper ────────────────────────────────────────────────
+
+const IconBtn: React.FC<{
+  onClick: () => void;
+  title: string;
+  disabled?: boolean;
+  children: React.ReactNode;
+  active?: boolean;
+  className?: string;
+}> = ({ onClick, title, disabled, children, active, className }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={title}
+    className={
+      'p-1.5 rounded transition-colors ' +
+      (active
+        ? 'bg-accent-primary/30 text-accent-primary'
+        : disabled
+          ? 'text-text-muted opacity-30 cursor-not-allowed'
+          : 'hover:bg-white/10 text-text-secondary') +
+      (className ? ' ' + className : '')
     }
-  }, [onChange, storeUpdateInstrument]);
+  >
+    {children}
+  </button>
+);
+
+// ─── Component ─────────────────────────────────────────────────────────
+
+export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange }) => {
+  const { updateInstrument: storeUpdateInstrument } = useInstrumentStore();
+
+  const updateInstrument = useCallback(
+    (id: number, updates: Partial<InstrumentConfig>) => {
+      if (onChange) onChange(updates);
+      else storeUpdateInstrument(id, updates);
+    },
+    [onChange, storeUpdateInstrument],
+  );
+
+  // ─── Refs ────────────────────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const dropZoneRef = useRef<HTMLDivElement>(null);
+  const minimapRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Tone.Player | null>(null);
   const animationRef = useRef<number | null>(null);
+  const isFileDraggingRef = useRef(false);
+  const selectionDragStart = useRef<number>(-1);
 
-  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
-  const [playbackPosition, setPlaybackPosition] = useState(0);
-  const [showEnhancer, setShowEnhancer] = useState(false);
-
-  // Get sample data from instrument
-  // Cast parameters to a concrete type so property accesses are typed correctly
+  // ─── Instrument data ────────────────────────────────────────────
   const params = (instrument.parameters || {}) as Record<string, unknown>;
-  const sampleUrl: string | null = (params.sampleUrl as string) || (instrument.granular?.sampleUrl as string) || null;
+  const sampleUrl: string | null =
+    (instrument.sample?.url as string) ||
+    (params.sampleUrl as string) ||
+    (instrument.granular?.sampleUrl as string) ||
+    null;
   const sampleInfo: SampleInfo | null = (params.sampleInfo as SampleInfo) || null;
-
-  // Sample parameters
-  const startTime = (params.startTime as number) ?? 0;
-  const endTime = (params.endTime as number) ?? 1;
-  const loopEnabled = (params.loopEnabled as boolean) ?? false;
-  const loopStart = (params.loopStart as number) ?? 0;
-  const loopEnd = (params.loopEnd as number) ?? 1;
-  const baseNote = (params.baseNote as string) ?? 'C4';
-  const playbackRate = (params.playbackRate as number) ?? 1;
-  const reverse = (params.reverse as boolean) ?? false;
-
-  // Granular-specific parameters
   const granular = instrument.granular;
   const isGranular = instrument.synthType === 'GranularSynth';
 
-  // Load audio buffer when URL changes
+  // ─── Persist callbacks for the state hook ────────────────────────
+  const onPersistBuffer = useCallback(
+    async (buffer: AudioBuffer, label: string) => {
+      const dataUrl = await bufferToDataUrl(buffer);
+      updateInstrument(instrument.id, {
+        parameters: {
+          ...instrument.parameters,
+          sampleUrl: dataUrl,
+          sampleInfo: {
+            name: sampleInfo?.name
+              ? sampleInfo.name.startsWith(label + '_')
+                ? sampleInfo.name
+                : label.replace(/\s+/g, '_') + '_' + sampleInfo.name
+              : label,
+            duration: buffer.duration,
+            size: Math.round(((dataUrl.split(',')[1] || '').length * 3) / 4),
+            sampleRate: buffer.sampleRate,
+            channels: buffer.numberOfChannels,
+          },
+        },
+      });
+    },
+    [instrument.id, instrument.parameters, sampleInfo, updateInstrument],
+  );
+
+  const onUpdateParams = useCallback(
+    (updates: Record<string, unknown>) => {
+      updateInstrument(instrument.id, {
+        parameters: { ...instrument.parameters, ...updates },
+      });
+    },
+    [instrument.id, instrument.parameters, updateInstrument],
+  );
+
+  // ─── State hook ──────────────────────────────────────────────────
+  const s = useSampleEditorState({
+    instrumentId: instrument.id,
+    instrumentParameters: instrument.parameters as Record<string, unknown> | undefined,
+    onPersistBuffer,
+    onUpdateParams,
+  });
+
+  const {
+    audioBuffer,
+    setAudioBuffer,
+    viewStart,
+    viewEnd,
+    zoomAtPosition,
+    scrollView,
+    showAll,
+    zoomToSelection,
+    selectionStart,
+    selectionEnd,
+    setSelection,
+    clearSelection,
+    selectAll,
+    hasSelection,
+    selectionLength,
+    setDragTarget,
+    dragTargetRef,
+    dragTarget,
+    clipboardBuffer,
+    canUndo,
+    canRedo,
+    undoLabel,
+    redoLabel,
+    undoCount,
+    redoCount,
+    showSpectrum,
+    setShowSpectrum,
+    showEnhancer,
+    setShowEnhancer,
+    showResampleModal,
+    setShowResampleModal,
+    showBeatSlicer,
+    setShowBeatSlicer,
+    isPlaying,
+    setIsPlaying,
+    playbackPosition,
+    setPlaybackPosition,
+    isLoading,
+    setIsLoading,
+    error,
+    setError,
+    doCut,
+    doCopy,
+    doPaste,
+    doCrop,
+    doDelete,
+    doSilence,
+    doFadeIn,
+    doFadeOut,
+    doVolumeUp,
+    doVolumeDown,
+    doReverse,
+    doNormalize,
+    doDcRemoval,
+    doUndo,
+    doRedo,
+    doExportWav,
+    doFindLoop,
+    params: editorParams,
+    updateParam,
+  } = s;
+
+  const {
+    startTime,
+    endTime,
+    loopEnabled,
+    loopStart,
+    loopEnd,
+    loopType,
+    baseNote,
+    playbackRate,
+    reverse,
+  } = editorParams;
+
+  // ─── Load audio buffer when URL changes ──────────────────────────
   useEffect(() => {
     if (!sampleUrl) {
       setAudioBuffer(null);
@@ -92,18 +250,23 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
 
     const loadBuffer = async () => {
       setIsLoading(true);
+      setError(null);
       try {
         const response = await fetch(sampleUrl);
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const ct = response.headers.get('content-type') || '';
+        if (ct.includes('text/html')) throw new Error('Server returned HTML (404?)');
         const arrayBuffer = await response.arrayBuffer();
-        // Reuse the shared ToneEngine AudioContext for decoding.
-        // Creating throwaway contexts leaks them and iOS limits to ~4-6.
         const { getDevilboxAudioContext } = await import('@utils/audio-context');
-        let audioContext: AudioContext;
-        try { audioContext = getDevilboxAudioContext(); } catch { audioContext = new AudioContext(); }
-        const buffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+        let ctx: AudioContext;
+        try {
+          ctx = getDevilboxAudioContext();
+        } catch {
+          ctx = new AudioContext();
+        }
+        const buffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
         setAudioBuffer(buffer);
 
-        // Update sample info if not already set
         if (!sampleInfo) {
           updateInstrument(instrument.id, {
             parameters: {
@@ -119,10 +282,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           });
         }
 
-        // Create player for preview
-        if (playerRef.current) {
-          playerRef.current.dispose();
-        }
+        if (playerRef.current) playerRef.current.dispose();
         playerRef.current = new Tone.Player(sampleUrl).toDestination();
       } catch (err) {
         console.error('[SampleEditor] Failed to load audio:', err);
@@ -133,328 +293,375 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     };
 
     loadBuffer();
-
     return () => {
       if (playerRef.current) {
         playerRef.current.dispose();
         playerRef.current = null;
       }
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sampleUrl]);
 
-  // Draw waveform
+  // ─── Canvas draw: main waveform ──────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const logicalWidth = 1120;
-    const logicalHeight = 300;
-    
-    if (canvas.width !== logicalWidth * dpr) {
-      canvas.width = logicalWidth * dpr;
-      canvas.height = logicalHeight * dpr;
+    if (canvas.width !== CANVAS_W * dpr) {
+      canvas.width = CANVAS_W * dpr;
+      canvas.height = CANVAS_H * dpr;
       ctx.scale(dpr, dpr);
     }
 
-    const width = logicalWidth;
-    const height = logicalHeight;
-    const midY = height / 2;
+    const opts: WaveformDrawOptions = {
+      audioBuffer,
+      viewStart,
+      viewEnd,
+      startTime,
+      endTime,
+      selectionStart,
+      selectionEnd,
+      loopEnabled,
+      loopStart,
+      loopEnd,
+      loopType: loopType || 'forward',
+      playbackPosition,
+      granularPosition: isGranular ? (granular?.scanPosition ?? undefined) : undefined,
+      activeDrag: dragTarget,
+      showSpectrum,
+    };
+    drawSampleWaveform(ctx, CANVAS_W, CANVAS_H, opts);
+  }, [
+    audioBuffer, viewStart, viewEnd, startTime, endTime,
+    selectionStart, selectionEnd, loopEnabled, loopStart, loopEnd, loopType,
+    playbackPosition, isGranular, granular, dragTarget, showSpectrum,
+  ]);
 
-    // Clear canvas with dark background
-    ctx.fillStyle = '#0f0c0c';
-    ctx.fillRect(0, 0, width, height);
+  // ─── Canvas draw: minimap ────────────────────────────────────────
+  useEffect(() => {
+    const canvas = minimapRef.current;
+    if (!canvas || !audioBuffer) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    // Draw grid lines
-    ctx.strokeStyle = '#1d1818';
-    ctx.lineWidth = 1;
-    for (let i = 1; i < 4; i++) {
-      ctx.beginPath();
-      ctx.moveTo(0, (height / 4) * i);
-      ctx.lineTo(width, (height / 4) * i);
-      ctx.stroke();
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== CANVAS_W * dpr) {
+      canvas.width = CANVAS_W * dpr;
+      canvas.height = MINIMAP_H * dpr;
+      ctx.scale(dpr, dpr);
     }
 
-    // Center line
-    ctx.strokeStyle = '#2f2525';
-    ctx.beginPath();
-    ctx.moveTo(0, midY);
-    ctx.lineTo(width, midY);
-    ctx.stroke();
+    const opts: WaveformDrawOptions = {
+      audioBuffer,
+      viewStart: 0,
+      viewEnd: 1,
+      startTime,
+      endTime,
+      selectionStart,
+      selectionEnd,
+      loopEnabled,
+      loopStart,
+      loopEnd,
+      loopType: loopType || 'forward',
+      playbackPosition: 0,
+      activeDrag: null,
+      simplified: true,
+      viewportRect: { start: viewStart, end: viewEnd },
+    };
+    drawSampleWaveform(ctx, CANVAS_W, MINIMAP_H, opts);
+  }, [
+    audioBuffer, viewStart, viewEnd, startTime, endTime,
+    selectionStart, selectionEnd, loopEnabled, loopStart, loopEnd, loopType,
+  ]);
 
-    if (!audioBuffer) {
-      // Draw placeholder with larger, clearer text
-      ctx.fillStyle = '#888080';
-      ctx.font = 'bold 24px "JetBrains Mono", "Consolas", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('Drop audio file here or click to upload', width / 2, midY - 15);
-      ctx.fillStyle = '#585050';
-      ctx.font = '18px "JetBrains Mono", "Consolas", monospace';
-      ctx.fillText('WAV, MP3, OGG, FLAC supported', width / 2, midY + 25);
-      return;
-    }
-
-    // Get audio data
-    const channelData = audioBuffer.getChannelData(0);
-    const samples = channelData.length;
-    const visibleSamples = Math.floor(samples / zoom);
-    const samplesPerPixel = visibleSamples / width;
-
-    // Draw waveform
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-
-    for (let x = 0; x < width; x++) {
-      const sampleIndex = Math.floor(x * samplesPerPixel);
-      const nextSampleIndex = Math.floor((x + 1) * samplesPerPixel);
-
-      let min = 1;
-      let max = -1;
-      for (let i = sampleIndex; i < nextSampleIndex && i < samples; i++) {
-        const val = channelData[i];
-        if (val < min) min = val;
-        if (val > max) max = val;
-      }
-
-      const minY = midY - min * midY * 0.85;
-      const maxY = midY - max * midY * 0.85;
-
-      if (x === 0) {
-        ctx.moveTo(x, minY);
-      }
-      ctx.lineTo(x, minY);
-      ctx.lineTo(x, maxY);
-    }
-    ctx.stroke();
-
-    // Draw start/end region
-    const startX = startTime * width;
-    const endX = endTime * width;
-
-    // Dimmed regions outside selection
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(0, 0, startX, height);
-    ctx.fillRect(endX, 0, width - endX, height);
-
-    // Start marker (green)
-    ctx.strokeStyle = '#10b981';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(startX, 0);
-    ctx.lineTo(startX, height);
-    ctx.stroke();
-    ctx.fillStyle = '#10b981';
-    ctx.font = '10px sans-serif';
-    ctx.fillText('S', startX + 3, 12);
-
-    // End marker (orange)
-    ctx.strokeStyle = '#f97316';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(endX, 0);
-    ctx.lineTo(endX, height);
-    ctx.stroke();
-    ctx.fillStyle = '#f97316';
-    ctx.fillText('E', endX - 10, 12);
-
-    // Loop region (if enabled)
-    if (loopEnabled) {
-      const loopStartX = loopStart * width;
-      const loopEndX = loopEnd * width;
-
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
-      ctx.fillRect(loopStartX, 0, loopEndX - loopStartX, height);
-
-      ctx.strokeStyle = '#3b82f6';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(loopStartX, 0);
-      ctx.lineTo(loopStartX, height);
-      ctx.moveTo(loopEndX, 0);
-      ctx.lineTo(loopEndX, height);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    // Granular scan position
-    if (isGranular && granular) {
-      const scanX = (granular.scanPosition / 100) * width;
-      ctx.strokeStyle = '#a855f7';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(scanX, 0);
-      ctx.lineTo(scanX, height);
-      ctx.stroke();
-      ctx.fillStyle = '#a855f7';
-      ctx.font = '10px sans-serif';
-      ctx.fillText('G', scanX + 3, height - 4);
-    }
-
-    // Playback position
-    if (isPlaying && playbackPosition > 0) {
-      const posX = playbackPosition * width;
-      ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(posX, 0);
-      ctx.lineTo(posX, height);
-      ctx.stroke();
-    }
-  }, [audioBuffer, zoom, startTime, endTime, loopEnabled, loopStart, loopEnd, isPlaying, playbackPosition, isGranular, granular]);
-
-  // Update parameter helper
-  const updateParam = useCallback((key: string, value: string | number | boolean | null) => {
-    updateInstrument(instrument.id, {
-      parameters: {
-        ...instrument.parameters,
-        [key]: value,
-      },
-    });
-  }, [instrument.id, instrument.parameters, updateInstrument]);
-
-  // Update granular parameter helper
-  const updateGranular = useCallback((key: string, value: string | number | boolean) => {
-    updateInstrument(instrument.id, {
-      granular: {
-        ...DEFAULT_GRANULAR,
-        ...instrument.granular,
-        [key]: value,
-      },
-    });
-  }, [instrument.id, instrument.granular, updateInstrument]);
-
-  // Handle file upload
-  const handleFileSelect = useCallback(async (file: File) => {
-    if (!file.type.startsWith('audio/') && !file.name.match(/\.(wav|mp3|ogg|flac|webm)$/i)) {
-      setError('Invalid file type. Please upload an audio file.');
-      return;
-    }
-
-    if (file.size > 15 * 1024 * 1024) {
-      setError('File too large. Maximum size is 15MB.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Read as data URL for storage
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+  // ─── Granular helper ─────────────────────────────────────────────
+  const updateGranular = useCallback(
+    (key: string, value: string | number | boolean) => {
+      updateInstrument(instrument.id, {
+        granular: { ...DEFAULT_GRANULAR, ...instrument.granular, [key]: value },
       });
+    },
+    [instrument.id, instrument.granular, updateInstrument],
+  );
 
-      // Get duration
-      const duration = await new Promise<number>((resolve, reject) => {
-        const audio = new Audio();
-        audio.onloadedmetadata = () => resolve(audio.duration);
-        audio.onerror = reject;
-        audio.src = dataUrl;
-      });
-
-      // Update instrument
-      const updates: Partial<InstrumentConfig> = {
-        parameters: {
-          ...instrument.parameters,
-          sampleUrl: dataUrl,
-          sampleInfo: {
-            name: file.name,
-            duration,
-            size: file.size,
+  // ─── File handling ───────────────────────────────────────────────
+  const handleFileSelect = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith('audio/') && !file.name.match(/\.(wav|mp3|ogg|flac|webm)$/i)) {
+        setError('Invalid file type');
+        return;
+      }
+      if (file.size > 15 * 1024 * 1024) {
+        setError('File too large (max 15MB)');
+        return;
+      }
+      setIsLoading(true);
+      setError(null);
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const duration = await new Promise<number>((resolve, reject) => {
+          const audio = new Audio();
+          audio.onloadedmetadata = () => resolve(audio.duration);
+          audio.onerror = reject;
+          audio.src = dataUrl;
+        });
+        const updates: Partial<InstrumentConfig> = {
+          parameters: {
+            ...instrument.parameters,
+            sampleUrl: dataUrl,
+            sampleInfo: { name: file.name, duration, size: file.size },
+            startTime: 0,
+            endTime: 1,
+            loopStart: 0,
+            loopEnd: 1,
           },
-          startTime: 0,
-          endTime: 1,
-          loopStart: 0,
-          loopEnd: 1,
-        },
-      };
-
-      // Also update granular sampleUrl if it's a granular synth
-      if (isGranular) {
-        updates.granular = {
-          ...DEFAULT_GRANULAR,
-          ...instrument.granular,
-          sampleUrl: dataUrl,
         };
+        if (isGranular) {
+          updates.granular = { ...DEFAULT_GRANULAR, ...instrument.granular, sampleUrl: dataUrl };
+        }
+        updateInstrument(instrument.id, updates);
+        clearSelection();
+        showAll();
+      } catch {
+        setError('Failed to load audio file');
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [instrument, updateInstrument, isGranular, clearSelection, showAll, setIsLoading, setError],
+  );
 
-      updateInstrument(instrument.id, updates);
-    } catch (err) {
-      setError('Failed to load audio file');
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [instrument, updateInstrument, isGranular]);
-
-  // File input change handler
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleFileSelect(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Drag and drop handlers
+  // ─── File drag & drop ───────────────────────────────────────────
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(true);
+    isFileDraggingRef.current = true;
   };
-
   const handleDragLeave = () => {
-    setIsDragging(false);
+    isFileDraggingRef.current = false;
   };
-
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(false);
+    isFileDraggingRef.current = false;
     const file = e.dataTransfer.files[0];
     if (file) handleFileSelect(file);
   };
 
-  // Canvas click to set markers
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    e.stopPropagation(); // Prevent double file picker from parent onClick
-    if (!audioBuffer) {
-      fileInputRef.current?.click();
-      return;
-    }
+  // ─── Canvas interaction helpers ──────────────────────────────────
+  const getCanvasNorm = useCallback(
+    (e: MouseEvent | React.MouseEvent): { x: number; y: number } => {
+      const canvas = canvasRef.current;
+      if (!canvas) return { x: 0, y: 0 };
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
+        y: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height)),
+      };
+    },
+    [],
+  );
 
+  const canvasXToNorm = useCallback(
+    (cx: number) => viewStart + cx * (viewEnd - viewStart),
+    [viewStart, viewEnd],
+  );
+
+  const canvasXToSample = useCallback(
+    (cx: number) => {
+      if (!audioBuffer) return 0;
+      return Math.round(canvasXToNorm(cx) * audioBuffer.length);
+    },
+    [audioBuffer, canvasXToNorm],
+  );
+
+  // Hit-test handles
+  const hitTestHandle = useCallback(
+    (normX: number, normY: number): DragTarget => {
+      const viewRange = viewEnd - viewStart;
+      const hitRadius = 0.015 / (viewRange || 1);
+      const pos = canvasXToNorm(normX);
+      const handleZone = 0.12;
+
+      // Top: start/end handles
+      if (normY < handleZone) {
+        if (Math.abs(pos - startTime) < hitRadius * viewRange) return 'start';
+        if (Math.abs(pos - endTime) < hitRadius * viewRange) return 'end';
+      }
+      // Bottom: loop handles
+      if (loopEnabled && normY > 1 - handleZone) {
+        if (Math.abs(pos - loopStart) < hitRadius * viewRange) return 'loopStart';
+        if (Math.abs(pos - loopEnd) < hitRadius * viewRange) return 'loopEnd';
+      }
+      // Fallback
+      if (Math.abs(pos - startTime) < hitRadius * viewRange) return 'start';
+      if (Math.abs(pos - endTime) < hitRadius * viewRange) return 'end';
+      if (loopEnabled) {
+        if (Math.abs(pos - loopStart) < hitRadius * viewRange) return 'loopStart';
+        if (Math.abs(pos - loopEnd) < hitRadius * viewRange) return 'loopEnd';
+      }
+      return null;
+    },
+    [viewStart, viewEnd, startTime, endTime, loopStart, loopEnd, loopEnabled, canvasXToNorm],
+  );
+
+  // ─── Canvas mouse down ──────────────────────────────────────────
+  const handleCanvasMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (!audioBuffer) {
+        fileInputRef.current?.click();
+        return;
+      }
+      // Ctrl+Click: granular scan position
+      if (isGranular && (e.ctrlKey || e.metaKey)) {
+        const { x } = getCanvasNorm(e);
+        updateGranular('scanPosition', canvasXToNorm(x) * 100);
+        return;
+      }
+      const { x, y } = getCanvasNorm(e);
+      const handle = hitTestHandle(x, y);
+      if (handle) {
+        setDragTarget(handle);
+        dragTargetRef.current = handle;
+        return;
+      }
+      // Start range selection
+      const sample = canvasXToSample(x);
+      selectionDragStart.current = sample;
+      setDragTarget('selection');
+      dragTargetRef.current = 'selection';
+      setSelection(sample, sample);
+    },
+    [
+      audioBuffer, isGranular, getCanvasNorm, hitTestHandle, setDragTarget,
+      dragTargetRef, canvasXToSample, canvasXToNorm, setSelection, updateGranular,
+    ],
+  );
+
+  // ─── Window-level mouse move/up for dragging ────────────────────
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const target = dragTargetRef.current;
+      if (!target) return;
+      const { x } = getCanvasNorm(e);
+      const pos = canvasXToNorm(x);
+
+      switch (target) {
+        case 'start':
+          updateParam('startTime', Math.max(0, Math.min(pos, endTime - 0.005)));
+          break;
+        case 'end':
+          updateParam('endTime', Math.min(1, Math.max(pos, startTime + 0.005)));
+          break;
+        case 'loopStart':
+          updateParam('loopStart', Math.max(0, Math.min(pos, loopEnd - 0.005)));
+          break;
+        case 'loopEnd':
+          updateParam('loopEnd', Math.min(1, Math.max(pos, loopStart + 0.005)));
+          break;
+        case 'selection': {
+          if (!audioBuffer) break;
+          const sample = canvasXToSample(x);
+          const lo = Math.min(selectionDragStart.current, sample);
+          const hi = Math.max(selectionDragStart.current, sample);
+          setSelection(Math.max(0, lo), Math.min(audioBuffer.length, hi));
+          break;
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      const target = dragTargetRef.current;
+      if (target === 'selection' && selectionStart >= 0 && selectionEnd <= selectionStart + 1) {
+        clearSelection();
+      }
+      setDragTarget(null);
+      dragTargetRef.current = null;
+      selectionDragStart.current = -1;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [
+    getCanvasNorm, canvasXToNorm, canvasXToSample, startTime, endTime,
+    loopStart, loopEnd, audioBuffer, selectionStart, selectionEnd,
+    updateParam, setSelection, clearSelection, setDragTarget, dragTargetRef,
+  ]);
+
+  // ─── Canvas hover cursor ─────────────────────────────────────────
+  const handleCanvasMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!audioBuffer || dragTargetRef.current) return;
+      const { x, y } = getCanvasNorm(e);
+      const handle = hitTestHandle(x, y);
+      const canvas = canvasRef.current;
+      if (canvas) canvas.style.cursor = handle ? 'ew-resize' : 'crosshair';
+    },
+    [audioBuffer, getCanvasNorm, hitTestHandle, dragTargetRef],
+  );
+
+  // ─── Mouse wheel: zoom / scroll ──────────────────────────────────
+  // Must use native addEventListener with { passive: false } to allow
+  // preventDefault() — React's onWheel registers as passive in Chrome.
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-
-    if (e.shiftKey) {
-      updateParam('endTime', Math.max(x, startTime + 0.01));
-    } else if (e.altKey && loopEnabled) {
-      if (e.ctrlKey || e.metaKey) {
-        updateParam('loopEnd', Math.max(x, loopStart + 0.01));
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (!audioBuffer) return;
+      if (e.shiftKey) {
+        scrollView(e.deltaY > 0 ? 1 : -1);
       } else {
-        updateParam('loopStart', Math.min(x, loopEnd - 0.01));
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width;
+        zoomAtPosition(e.deltaY > 0 ? 1.25 : 0.8, x);
       }
-    } else if (isGranular && e.ctrlKey) {
-      updateGranular('scanPosition', x * 100);
-    } else {
-      updateParam('startTime', Math.min(x, endTime - 0.01));
-    }
-  };
+    };
 
-  // Preview playback
-  const handlePlay = async () => {
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleWheel);
+  }, [audioBuffer, zoomAtPosition, scrollView]);
+
+  // ─── Minimap click ────────────────────────────────────────────────
+  const handleMinimapClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const canvas = minimapRef.current;
+      if (!canvas || !audioBuffer) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width;
+      const range = viewEnd - viewStart;
+      let ns = x - range / 2;
+      let ne = ns + range;
+      if (ns < 0) { ne -= ns; ns = 0; }
+      if (ne > 1) { ns -= ne - 1; ne = 1; ns = Math.max(0, ns); }
+      s.setView(ns, ne);
+    },
+    [audioBuffer, viewStart, viewEnd, s],
+  );
+
+  // ─── Preview playback ────────────────────────────────────────────
+  const handlePlay = useCallback(async () => {
     if (!playerRef.current || !audioBuffer) return;
-
     await Tone.start();
 
     if (isPlaying) {
@@ -469,130 +676,213 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     playerRef.current.reverse = reverse;
 
     const startOffset = startTime * audioBuffer.duration;
-    const duration = (endTime - startTime) * audioBuffer.duration;
-
-    playerRef.current.start(Tone.now(), startOffset, duration);
+    const dur = (endTime - startTime) * audioBuffer.duration;
+    playerRef.current.start(Tone.now(), startOffset, dur);
     setIsPlaying(true);
 
     const startToneTime = Tone.now();
     const animate = () => {
       const elapsed = Tone.now() - startToneTime;
       const progress = startTime + (elapsed / audioBuffer.duration) * (endTime - startTime) / playbackRate;
-
       if (progress >= endTime) {
         setIsPlaying(false);
         setPlaybackPosition(0);
         return;
       }
-
       setPlaybackPosition(progress);
       animationRef.current = requestAnimationFrame(animate);
     };
     animate();
-  };
+  }, [audioBuffer, isPlaying, playbackRate, reverse, startTime, endTime, setIsPlaying, setPlaybackPosition]);
 
-  // Clear sample
-  const handleClear = () => {
-    if (isPlaying) {
-      playerRef.current?.stop();
-      setIsPlaying(false);
-    }
+  // ─── Keyboard shortcuts (focus-gated) ─────────────────────────────
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+
+      if (mod && e.key === 'z' && !e.shiftKey) { e.preventDefault(); doUndo(); return; }
+      if (mod && e.key === 'z' && e.shiftKey) { e.preventDefault(); doRedo(); return; }
+      if (mod && e.key === 'y') { e.preventDefault(); doRedo(); return; }
+
+      if (mod && e.key === 'x') { e.preventDefault(); doCut(); return; }
+      if (mod && e.key === 'c') { e.preventDefault(); doCopy(); return; }
+      if (mod && e.key === 'v') { e.preventDefault(); doPaste(); return; }
+
+      if (mod && e.key === 'a') { e.preventDefault(); selectAll(); return; }
+      if (e.key === 'Escape') { clearSelection(); return; }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (hasSelection) { e.preventDefault(); doDelete(); }
+        return;
+      }
+
+      if (e.key === ' ') { e.preventDefault(); handlePlay(); return; }
+
+      if (e.key === '+' || e.key === '=') { zoomAtPosition(0.8, 0.5); return; }
+      if (e.key === '-') { zoomAtPosition(1.25, 0.5); return; }
+      if (e.key === '0') { showAll(); return; }
+
+      if (e.key === 'ArrowLeft') { scrollView(-1); return; }
+      if (e.key === 'ArrowRight') { scrollView(1); return; }
+    };
+
+    container.addEventListener('keydown', handleKeyDown);
+    return () => container.removeEventListener('keydown', handleKeyDown);
+  }, [
+    doUndo, doRedo, doCut, doCopy, doPaste, selectAll, clearSelection,
+    doDelete, hasSelection, zoomAtPosition, showAll, scrollView, handlePlay,
+  ]);
+
+  // ─── Clear sample ────────────────────────────────────────────────
+  const handleClear = useCallback(() => {
+    if (isPlaying) { playerRef.current?.stop(); setIsPlaying(false); }
     setAudioBuffer(null);
+    clearSelection();
     updateInstrument(instrument.id, {
-      parameters: {
-        ...instrument.parameters,
-        sampleUrl: null,
-        sampleInfo: null,
-      },
-      ...(isGranular ? { granular: { ...DEFAULT_GRANULAR, ...instrument.granular, sampleUrl: '' } } : {}),
+      parameters: { ...instrument.parameters, sampleUrl: null, sampleInfo: null },
+      ...(isGranular
+        ? { granular: { ...DEFAULT_GRANULAR, ...instrument.granular, sampleUrl: '' } }
+        : {}),
     });
-  };
+  }, [isPlaying, setIsPlaying, setAudioBuffer, clearSelection, instrument, updateInstrument, isGranular]);
 
-  // Format helpers
-  const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = (seconds % 60).toFixed(2);
-    return `${mins}:${secs.padStart(5, '0')}`;
-  };
+  // ─── Buffer processed (enhancer / resampler) ─────────────────────
+  const handleBufferProcessed = useCallback(
+    async (result: ProcessedResult, prefix: string) => {
+      const { buffer: newBuf, dataUrl } = result;
+      setAudioBuffer(newBuf);
+      updateInstrument(instrument.id, {
+        parameters: {
+          ...instrument.parameters,
+          sampleUrl: dataUrl,
+          sampleInfo: {
+            name: sampleInfo?.name
+              ? sampleInfo.name.startsWith(prefix + '_')
+                ? sampleInfo.name
+                : prefix + '_' + sampleInfo.name
+              : prefix + '_Sample',
+            duration: newBuf.duration,
+            size: Math.round(((dataUrl.split(',')[1] || '').length * 3) / 4),
+            sampleRate: newBuf.sampleRate,
+            channels: newBuf.numberOfChannels,
+          },
+        },
+      });
+    },
+    [instrument.id, instrument.parameters, sampleInfo, updateInstrument, setAudioBuffer],
+  );
 
-  const formatSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  // ─── Format helpers ──────────────────────────────────────────────
+  const formatDuration = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const ss = (sec % 60).toFixed(2);
+    return m + ':' + ss.padStart(5, '0');
   };
+  const formatSize = (b: number) => {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(2) + ' MB';
+  };
+  const formatSamples = (n: number) => (n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n));
+
+  const zoomLevel = 1 / (viewEnd - viewStart);
+  const isZoomed = viewEnd - viewStart < 0.999;
+
+  // ═══════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════════════
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
+    <div className="space-y-3" ref={containerRef} tabIndex={0} style={{ outline: 'none' }}>
+      {/* ─── Header ──────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <h3 className="font-mono text-text-primary text-sm font-bold flex items-center gap-2">
-          {isGranular ? <Sparkles size={16} className="text-violet-400" /> : <Music size={16} className="text-accent-primary" />}
-          {isGranular ? 'GRANULAR SAMPLE' : 'SAMPLE'}
+          {isGranular
+            ? <Sparkles size={16} className="text-violet-400" />
+            : <Music size={16} className="text-accent-primary" />}
+          {isGranular ? 'GRANULAR SAMPLE' : 'SAMPLE EDITOR'}
         </h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {audioBuffer && (
-            <button
-              onClick={() => setShowEnhancer(!showEnhancer)}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${
-                showEnhancer 
-                  ? 'bg-accent-primary text-text-inverse' 
-                  : 'bg-accent-primary/10 text-accent-primary border border-accent-primary/30 hover:bg-accent-primary/20'
-              }`}
-            >
-              <Wand2 size={12} />
-              {showEnhancer ? 'Hide Enhancer' : 'Enhance'}
-            </button>
+            <>
+              <button
+                onClick={() => setShowBeatSlicer(!showBeatSlicer)}
+                className={
+                  'flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ' +
+                  (showBeatSlicer
+                    ? 'bg-violet-500 text-white'
+                    : 'bg-violet-500/10 text-violet-400 border border-violet-500/30 hover:bg-violet-500/20')
+                }
+              >
+                <Scissors size={11} />
+                Slicer
+              </button>
+              <button
+                onClick={() => setShowResampleModal(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500/20"
+              >
+                <RefreshCcw size={11} />
+                Resample
+              </button>
+              <button
+                onClick={() => setShowEnhancer(!showEnhancer)}
+                className={
+                  'flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ' +
+                  (showEnhancer
+                    ? 'bg-accent-primary text-text-inverse'
+                    : 'bg-accent-primary/10 text-accent-primary border border-accent-primary/30 hover:bg-accent-primary/20')
+                }
+              >
+                <Wand2 size={11} />
+                Enhance
+              </button>
+            </>
           )}
           {sampleInfo && (
-            <span className="text-xs text-text-muted font-mono truncate max-w-[180px]">
+            <span className="text-xs text-text-muted font-mono truncate max-w-[140px]">
               {sampleInfo.name}
             </span>
           )}
         </div>
       </div>
 
-      {/* Enhancement Panel */}
+      {/* ─── Enhancement Panel ───────────────────────────────────── */}
       {showEnhancer && audioBuffer && (
         <SampleEnhancerPanel
           audioBuffer={audioBuffer}
           isLoading={isLoading}
-          onBufferProcessed={async (result: ProcessedResult) => {
-            const { buffer: newBuffer, dataUrl } = result;
-            
-            // Set the local buffer state immediately for visualization
-            setAudioBuffer(newBuffer);
-
-            updateInstrument(instrument.id, {
-              parameters: {
-                ...instrument.parameters,
-                sampleUrl: dataUrl,
-                sampleInfo: {
-                  name: sampleInfo?.name ? (sampleInfo.name.startsWith('Enhanced_') ? sampleInfo.name : `Enhanced_${sampleInfo.name}`) : 'Enhanced Sample',
-                  duration: newBuffer.duration,
-                  size: Math.round((dataUrl.split(',')[1].length * 3) / 4), // Accurate base64 size
-                  sampleRate: newBuffer.sampleRate,
-                  channels: newBuffer.numberOfChannels,
-                }
-              }
-            });
-          }}
+          onBufferProcessed={(r: ProcessedResult) => handleBufferProcessed(r, 'Enhanced')}
         />
       )}
 
-      {/* Error */}
+      {/* ─── Beat Slicer Panel ───────────────────────────────────── */}
+      {showBeatSlicer && audioBuffer && (
+        <BeatSlicerPanel
+          instrument={instrument}
+          audioBuffer={audioBuffer}
+          onClose={() => setShowBeatSlicer(false)}
+        />
+      )}
+
+      {/* ─── Error ───────────────────────────────────────────────── */}
       {error && (
-        <div className="flex items-center gap-2 p-3 bg-accent-error/20 border border-accent-error/40 rounded text-accent-error text-sm">
-          <AlertCircle size={16} />
+        <div className="flex items-center gap-2 p-2 bg-accent-error/20 border border-accent-error/40 rounded text-accent-error text-xs">
+          <AlertCircle size={14} />
           {error}
         </div>
       )}
 
-      {/* Waveform Display */}
+      {/* ─── Waveform canvas ─────────────────────────────────────── */}
       <div
-        ref={dropZoneRef}
-        className={`relative rounded-lg overflow-hidden border-2 transition-colors ${
-          isDragging ? 'border-accent-primary border-dashed bg-accent-primary/10' : 'border-dark-border'
-        } ${!audioBuffer ? 'cursor-pointer hover:border-accent-primary/50' : ''}`}
+        className={
+          'relative rounded-lg overflow-hidden border-2 transition-colors ' +
+          (isFileDraggingRef.current
+            ? 'border-accent-primary border-dashed bg-accent-primary/10'
+            : 'border-dark-border') +
+          (!audioBuffer ? ' cursor-pointer hover:border-accent-primary/50' : '')
+        }
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -600,27 +890,34 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       >
         <canvas
           ref={canvasRef}
-          width={1120}
-          height={300}
-          className="w-full h-[150px] cursor-crosshair"
+          width={CANVAS_W}
+          height={CANVAS_H}
+          className="w-full h-[150px]"
           style={{ imageRendering: 'pixelated' }}
-          onClick={handleCanvasClick}
+          onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
+          onDoubleClick={(e) => { e.preventDefault(); selectAll(); }}
         />
-
         {isLoading && (
           <div className="absolute inset-0 bg-dark-bg/80 flex items-center justify-center">
             <div className="animate-spin w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full" />
           </div>
         )}
-
-        {isDragging && (
-          <div className="absolute inset-0 bg-accent-primary/20 flex items-center justify-center">
-            <Upload size={32} className="text-accent-primary animate-bounce" />
-          </div>
-        )}
       </div>
 
-      {/* Hidden file input */}
+      {/* ─── Minimap (when zoomed) ───────────────────────────────── */}
+      {audioBuffer && isZoomed && (
+        <canvas
+          ref={minimapRef}
+          width={CANVAS_W}
+          height={MINIMAP_H}
+          className="w-full h-[20px] rounded border border-dark-border cursor-pointer"
+          style={{ imageRendering: 'pixelated' }}
+          onClick={handleMinimapClick}
+        />
+      )}
+
+      {/* ─── Hidden file input ───────────────────────────────────── */}
       <input
         ref={fileInputRef}
         type="file"
@@ -629,132 +926,137 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         className="hidden"
       />
 
-      {/* Sample Info & Controls */}
+      {/* ═══════════════ Controls (when sample loaded) ═══════════════ */}
       {audioBuffer && sampleInfo && (
         <>
-          {/* Info row */}
-          <div className="flex items-center justify-between text-xs font-mono text-text-muted">
-            <span>Duration: {formatDuration(sampleInfo.duration)}</span>
-            <span>Size: {formatSize(sampleInfo.size)}</span>
+          {/* ─── Info bar ────────────────────────────────────────── */}
+          <div className="flex items-center justify-between text-[10px] font-mono text-text-muted px-1">
+            <span>{formatDuration(sampleInfo.duration)} | {formatSize(sampleInfo.size)}</span>
             <span>
-              {sampleInfo.sampleRate ? `${(sampleInfo.sampleRate / 1000).toFixed(1)}kHz` : ''}
+              {sampleInfo.sampleRate ? (sampleInfo.sampleRate / 1000).toFixed(1) + 'kHz' : ''}
               {sampleInfo.channels === 1 ? ' Mono' : sampleInfo.channels === 2 ? ' Stereo' : ''}
+              {' | '}{audioBuffer.length.toLocaleString()} samples
             </span>
+            {hasSelection && (
+              <span className="text-blue-400">
+                Sel: {formatSamples(selectionLength)} ({((selectionLength / audioBuffer.length) * 100).toFixed(1)}%)
+              </span>
+            )}
+            <span>Zoom: {zoomLevel.toFixed(1)}x</span>
           </div>
 
-          {/* Playback controls */}
-          <div className="flex items-center gap-2">
+          {/* ─── Main toolbar ────────────────────────────────────── */}
+          <div className="flex items-center gap-1 flex-wrap">
+            {/* File & playback */}
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-3 py-2 bg-accent-primary/20 text-accent-primary rounded hover:bg-accent-primary/30 transition-colors text-sm"
+              className="flex items-center gap-1.5 px-2 py-1.5 bg-accent-primary/20 text-accent-primary rounded hover:bg-accent-primary/30 transition-colors text-xs"
             >
-              <Upload size={14} />
+              <Upload size={12} />
               Replace
             </button>
-
             <button
               onClick={handlePlay}
-              className={`p-2 rounded transition-colors ${
-                isPlaying ? 'bg-accent-error/20 text-accent-error' : 'bg-accent-success/20 text-accent-success'
-              }`}
-              title={isPlaying ? 'Stop' : 'Play preview'}
+              className={
+                'p-1.5 rounded transition-colors ' +
+                (isPlaying ? 'bg-accent-error/20 text-accent-error' : 'bg-accent-success/20 text-accent-success')
+              }
+              title={isPlaying ? 'Stop (Space)' : 'Play (Space)'}
             >
-              {isPlaying ? <Square size={16} /> : <Play size={16} />}
+              {isPlaying ? <Square size={14} /> : <Play size={14} />}
             </button>
-
             <button
               onClick={handleClear}
-              className="p-2 bg-accent-error/20 text-accent-error rounded hover:bg-accent-error/30 transition-colors"
+              className="p-1.5 bg-accent-error/20 text-accent-error rounded hover:bg-accent-error/30 transition-colors"
               title="Remove sample"
             >
-              <Trash2 size={16} />
+              <Trash2 size={14} />
             </button>
+
+            <div className="w-px h-6 bg-dark-border mx-1" />
+
+            {/* Undo / Redo */}
+            <IconBtn onClick={doUndo} title={'Undo' + (undoLabel ? ': ' + undoLabel : '') + ' (Ctrl+Z)'} disabled={!canUndo}>
+              <Undo2 size={14} />
+            </IconBtn>
+            {undoCount > 0 && <span className="text-[9px] font-mono text-text-muted -ml-1">{undoCount}</span>}
+            <IconBtn onClick={doRedo} title={'Redo' + (redoLabel ? ': ' + redoLabel : '') + ' (Ctrl+Shift+Z)'} disabled={!canRedo}>
+              <Redo2 size={14} />
+            </IconBtn>
+            {redoCount > 0 && <span className="text-[9px] font-mono text-text-muted -ml-1">{redoCount}</span>}
+
+            <div className="w-px h-6 bg-dark-border mx-1" />
+
+            {/* Clipboard */}
+            <div className="flex items-center gap-0.5 bg-dark-bgSecondary p-0.5 rounded border border-dark-border">
+              <IconBtn onClick={doCut} title="Cut (Ctrl+X)" disabled={!hasSelection}><Scissors size={13} /></IconBtn>
+              <IconBtn onClick={doCopy} title="Copy (Ctrl+C)" disabled={!hasSelection}><Copy size={13} /></IconBtn>
+              <IconBtn onClick={doPaste} title="Paste (Ctrl+V)" disabled={!clipboardBuffer}><ClipboardPaste size={13} /></IconBtn>
+              <IconBtn onClick={doCrop} title="Crop to selection" disabled={!hasSelection}><Crop size={13} /></IconBtn>
+              <IconBtn onClick={doDelete} title="Delete selection (Del)" disabled={!hasSelection}><Trash2 size={13} /></IconBtn>
+              <IconBtn onClick={doSilence} title="Silence selection" disabled={!hasSelection}><VolumeX size={13} /></IconBtn>
+            </div>
+
+            <div className="w-px h-6 bg-dark-border mx-1" />
+
+            {/* Processing */}
+            <div className="flex items-center gap-0.5 bg-dark-bgSecondary p-0.5 rounded border border-dark-border">
+              <IconBtn onClick={doFadeIn} title="Fade In" disabled={!hasSelection}>
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 14 L14 2" stroke="currentColor" strokeWidth="2" /><path d="M2 14 Q2 2 14 2" stroke="currentColor" strokeWidth="1.5" fill="none" opacity="0.4" /></svg>
+              </IconBtn>
+              <IconBtn onClick={doFadeOut} title="Fade Out" disabled={!hasSelection}>
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 2 L14 14" stroke="currentColor" strokeWidth="2" /><path d="M2 2 Q14 2 14 14" stroke="currentColor" strokeWidth="1.5" fill="none" opacity="0.4" /></svg>
+              </IconBtn>
+              <IconBtn onClick={doVolumeUp} title="Volume +3dB"><Volume2 size={13} /></IconBtn>
+              <IconBtn onClick={doVolumeDown} title="Volume -3dB"><Volume1 size={13} /></IconBtn>
+              <IconBtn onClick={doReverse} title="Reverse"><FlipHorizontal size={13} /></IconBtn>
+              <IconBtn onClick={doNormalize} title="Normalize"><Maximize2 size={13} /></IconBtn>
+              <IconBtn onClick={doDcRemoval} title="DC Offset Removal"><Activity size={13} /></IconBtn>
+            </div>
 
             <div className="flex-1" />
 
-            {/* Destructive Tools */}
-            <div className="flex items-center gap-1 bg-dark-bgSecondary p-1 rounded-lg border border-dark-border">
-              <button
-                onClick={async () => {
-                  setIsLoading(true);
-                  try {
-                    await reverseSample(instrument.id);
-                    notify.success('Sample reversed destructively');
-                  } catch {
-                    notify.error('Failed to reverse sample');
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                className="p-1.5 hover:bg-white/10 rounded transition-colors text-text-secondary"
-                title="Reverse Buffer (Destructive)"
-              >
-                <RefreshCcw size={14} className="-scale-x-100" />
-              </button>
-              <button
-                onClick={async () => {
-                  setIsLoading(true);
-                  try {
-                    await normalizeSample(instrument.id);
-                    notify.success('Sample normalized');
-                  } catch {
-                    notify.error('Failed to normalize sample');
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                className="p-1.5 hover:bg-white/10 rounded transition-colors text-text-secondary"
-                title="Normalize Buffer (Destructive)"
-              >
-                <Maximize2 size={14} />
-              </button>
-              <button
-                onClick={async () => {
-                  setIsLoading(true);
-                  try {
-                    await invertLoopSample(instrument.id);
-                    notify.success('Loop area inverted (Funk Repeat)');
-                  } catch {
-                    notify.error('Failed to invert loop');
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                disabled={!loopEnabled}
-                className="p-1.5 hover:bg-white/10 rounded transition-colors text-text-secondary disabled:opacity-30"
-                title="Invert Loop Phase (Destructive EFx)"
-              >
-                <FlipVertical size={14} />
-              </button>
-            </div>
+            {/* View */}
+            <IconBtn onClick={() => setShowSpectrum(!showSpectrum)} title="Toggle Spectrum View" active={showSpectrum}>
+              <Waves size={14} />
+            </IconBtn>
 
-            {/* Zoom */}
-            <button
-              onClick={() => setZoom(Math.max(1, zoom / 1.5))}
-              disabled={zoom <= 1}
-              className="p-2 bg-dark-bgTertiary text-text-secondary rounded hover:bg-dark-bgHover disabled:opacity-30"
-              title="Zoom out"
-            >
-              <ZoomOut size={14} />
-            </button>
-            <span className="text-xs font-mono text-text-muted w-10 text-center">{zoom.toFixed(1)}x</span>
-            <button
-              onClick={() => setZoom(Math.min(16, zoom * 1.5))}
-              disabled={zoom >= 16}
-              className="p-2 bg-dark-bgTertiary text-text-secondary rounded hover:bg-dark-bgHover disabled:opacity-30"
-              title="Zoom in"
-            >
-              <ZoomIn size={14} />
-            </button>
+            <div className="w-px h-6 bg-dark-border mx-1" />
+
+            {/* Zoom / scroll */}
+            <IconBtn onClick={() => scrollView(-1)} title="Scroll Left" disabled={viewStart <= 0.001}>
+              <ArrowLeft size={13} />
+            </IconBtn>
+            <IconBtn onClick={() => zoomAtPosition(0.7, 0.5)} title="Zoom In (+)" disabled={zoomLevel >= 100}>
+              <ZoomIn size={13} />
+            </IconBtn>
+            <span className="text-[10px] font-mono text-text-muted w-8 text-center">{zoomLevel.toFixed(1)}x</span>
+            <IconBtn onClick={() => zoomAtPosition(1.4, 0.5)} title="Zoom Out (-)" disabled={zoomLevel <= 1.01}>
+              <ZoomOut size={13} />
+            </IconBtn>
+            <IconBtn onClick={() => scrollView(1)} title="Scroll Right" disabled={viewEnd >= 0.999}>
+              <ArrowRight size={13} />
+            </IconBtn>
+            {isZoomed && (
+              <IconBtn onClick={showAll} title="Show All (0)"><Eye size={13} /></IconBtn>
+            )}
+            {hasSelection && (
+              <IconBtn onClick={zoomToSelection} title="Zoom to Selection"><Crop size={13} /></IconBtn>
+            )}
+
+            <div className="w-px h-6 bg-dark-border mx-1" />
+
+            {/* Export */}
+            <IconBtn onClick={doExportWav} title="Export as WAV"><Download size={14} /></IconBtn>
           </div>
 
-          {/* Parameters Panel */}
-          <div className="panel p-4 rounded-lg space-y-4">
-            {/* Base Note (for Sampler) */}
+          {/* ─── Parameters Panel ────────────────────────────────── */}
+          <div className="panel p-3 rounded-lg space-y-3">
+            {/* Base Note (Sampler) */}
             {instrument.synthType === 'Sampler' && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-mono text-text-muted text-xs mb-2">BASE NOTE</label>
+                  <label className="block font-mono text-text-muted text-xs mb-1">BASE NOTE</label>
                   <div className="flex gap-1">
                     <select
                       value={baseNote.replace(/\d/, '')}
@@ -764,7 +1066,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                       }}
                       className="input flex-1"
                     >
-                      {NOTE_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+                      {NOTE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                     <select
                       value={baseNote.match(/\d/)?.[0] || '4'}
@@ -774,13 +1076,13 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                       }}
                       className="input w-14"
                     >
-                      {OCTAVE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                      {OCTAVE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                     </select>
                   </div>
                 </div>
                 <div>
-                  <label className="block font-mono text-text-muted text-xs mb-2">
-                    PLAYBACK: <span className="text-accent-primary">{playbackRate.toFixed(2)}x</span>
+                  <label className="block font-mono text-text-muted text-xs mb-1">
+                    {'PLAYBACK: '}<span className="text-accent-primary">{playbackRate.toFixed(2)}x</span>
                   </label>
                   <input
                     type="range" min="0.25" max="4" step="0.01"
@@ -792,76 +1094,94 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
               </div>
             )}
 
-            {/* Start/End */}
+            {/* Start / End */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block font-mono text-text-muted text-xs mb-2">
-                  START: <span className="text-accent-success">{(startTime * 100).toFixed(1)}%</span>
+                <label className="block font-mono text-text-muted text-xs mb-1">
+                  {'START: '}<span className="text-accent-success">{(startTime * 100).toFixed(1)}%</span>
                 </label>
                 <input
-                  type="range" min="0" max="0.99" step="0.001"
-                  value={startTime}
+                  type="range" min="0" max="0.99" step="0.001" value={startTime}
                   onChange={(e) => updateParam('startTime', Math.min(parseFloat(e.target.value), endTime - 0.01))}
                   className="w-full"
                 />
               </div>
               <div>
-                <label className="block font-mono text-text-muted text-xs mb-2">
-                  END: <span className="text-accent-secondary">{(endTime * 100).toFixed(1)}%</span>
+                <label className="block font-mono text-text-muted text-xs mb-1">
+                  {'END: '}<span className="text-accent-secondary">{(endTime * 100).toFixed(1)}%</span>
                 </label>
                 <input
-                  type="range" min="0.01" max="1" step="0.001"
-                  value={endTime}
+                  type="range" min="0.01" max="1" step="0.001" value={endTime}
                   onChange={(e) => updateParam('endTime', Math.max(parseFloat(e.target.value), startTime + 0.01))}
                   className="w-full"
                 />
               </div>
             </div>
 
-            {/* Reverse toggle */}
+            {/* Reverse */}
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox" checked={reverse}
-                  onChange={(e) => updateParam('reverse', e.target.checked)}
-                  className="w-4 h-4 rounded"
-                />
+                <input type="checkbox" checked={reverse} onChange={(e) => updateParam('reverse', e.target.checked)} className="w-4 h-4 rounded" />
                 <span className="font-mono text-text-secondary text-xs">REVERSE</span>
               </label>
             </div>
 
-            {/* Loop Section */}
-            <div className="border-t border-dark-border pt-4">
-              <label className="flex items-center gap-2 cursor-pointer mb-3">
-                <input
-                  type="checkbox" checked={loopEnabled}
-                  onChange={(e) => updateParam('loopEnabled', e.target.checked)}
-                  className="w-4 h-4 rounded"
-                />
-                <Repeat size={14} className="text-blue-400" />
-                <span className="font-mono text-text-secondary text-xs">ENABLE LOOP</span>
-              </label>
+            {/* ─── Loop Section ───────────────────────────────────── */}
+            <div className="border-t border-dark-border pt-3">
+              <div className="flex items-center gap-3 mb-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={loopEnabled} onChange={(e) => updateParam('loopEnabled', e.target.checked)} className="w-4 h-4 rounded" />
+                  <Repeat size={14} className="text-blue-400" />
+                  <span className="font-mono text-text-secondary text-xs">LOOP</span>
+                </label>
+
+                {loopEnabled && (
+                  <>
+                    <div className="flex items-center gap-0.5 bg-dark-bgSecondary rounded border border-dark-border p-0.5 ml-2">
+                      <button
+                        onClick={() => updateParam('loopType', 'forward')}
+                        className={
+                          'px-2 py-0.5 rounded text-[10px] font-mono transition-colors ' +
+                          (loopType === 'forward' || !loopType ? 'bg-blue-500/30 text-blue-400' : 'text-text-muted hover:bg-white/5')
+                        }
+                        title="Forward loop"
+                      >{'\u2192'}</button>
+                      <button
+                        onClick={() => updateParam('loopType', 'pingpong')}
+                        className={
+                          'px-2 py-0.5 rounded text-[10px] font-mono transition-colors ' +
+                          (loopType === 'pingpong' ? 'bg-blue-500/30 text-blue-400' : 'text-text-muted hover:bg-white/5')
+                        }
+                        title="Ping-pong loop"
+                      >{'\u2194'}</button>
+                    </div>
+                    <button
+                      onClick={doFindLoop}
+                      className="px-2 py-0.5 rounded text-[10px] font-mono text-blue-300 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-colors ml-auto"
+                      title="Auto-find best loop point"
+                    >Auto</button>
+                  </>
+                )}
+              </div>
 
               {loopEnabled && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block font-mono text-text-muted text-xs mb-2">
-                      LOOP START: <span className="text-blue-400">{(loopStart * 100).toFixed(1)}%</span>
+                    <label className="block font-mono text-text-muted text-xs mb-1">
+                      {'LOOP START: '}<span className="text-blue-400">{(loopStart * 100).toFixed(1)}%</span>
                     </label>
                     <input
-                      type="range" min="0" max="0.99" step="0.001"
-                      value={loopStart}
+                      type="range" min="0" max="0.99" step="0.001" value={loopStart}
                       onChange={(e) => updateParam('loopStart', Math.min(parseFloat(e.target.value), loopEnd - 0.01))}
                       className="w-full"
                     />
                   </div>
                   <div>
-                    <label className="block font-mono text-text-muted text-xs mb-2">
-                      LOOP END: <span className="text-blue-400">{(loopEnd * 100).toFixed(1)}%</span>
+                    <label className="block font-mono text-text-muted text-xs mb-1">
+                      {'LOOP END: '}<span className="text-blue-400">{(loopEnd * 100).toFixed(1)}%</span>
                     </label>
                     <input
-                      type="range" min="0.01" max="1" step="0.001"
-                      value={loopEnd}
+                      type="range" min="0.01" max="1" step="0.001" value={loopEnd}
                       onChange={(e) => updateParam('loopEnd', Math.max(parseFloat(e.target.value), loopStart + 0.01))}
                       className="w-full"
                     />
@@ -870,113 +1190,87 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
               )}
             </div>
 
-            {/* Granular-specific controls */}
+            {/* ─── Granular controls ──────────────────────────────── */}
             {isGranular && granular && (
-              <div className="border-t border-dark-border pt-4 space-y-4">
+              <div className="border-t border-dark-border pt-3 space-y-3">
                 <h4 className="font-mono text-violet-400 text-xs font-bold flex items-center gap-2">
                   <Sparkles size={12} />
-                  GRANULAR CONTROLS
+                  GRANULAR
                 </h4>
-
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block font-mono text-text-muted text-xs mb-2">
-                      GRAIN SIZE: <span className="text-violet-400">{granular.grainSize}ms</span>
+                    <label className="block font-mono text-text-muted text-[10px] mb-1">
+                      {'GRAIN: '}<span className="text-violet-400">{granular.grainSize}ms</span>
                     </label>
-                    <input
-                      type="range" min="10" max="500" step="1"
-                      value={granular.grainSize}
-                      onChange={(e) => updateGranular('grainSize', parseInt(e.target.value))}
-                      className="w-full"
-                    />
+                    <input type="range" min="10" max="500" step="1" value={granular.grainSize}
+                      onChange={(e) => updateGranular('grainSize', parseInt(e.target.value))} className="w-full" />
                   </div>
                   <div>
-                    <label className="block font-mono text-text-muted text-xs mb-2">
-                      OVERLAP: <span className="text-violet-400">{granular.grainOverlap}%</span>
+                    <label className="block font-mono text-text-muted text-[10px] mb-1">
+                      {'OVERLAP: '}<span className="text-violet-400">{granular.grainOverlap}%</span>
                     </label>
-                    <input
-                      type="range" min="0" max="100" step="1"
-                      value={granular.grainOverlap}
-                      onChange={(e) => updateGranular('grainOverlap', parseInt(e.target.value))}
-                      className="w-full"
-                    />
+                    <input type="range" min="0" max="100" step="1" value={granular.grainOverlap}
+                      onChange={(e) => updateGranular('grainOverlap', parseInt(e.target.value))} className="w-full" />
+                  </div>
+                  <div>
+                    <label className="block font-mono text-text-muted text-[10px] mb-1">
+                      {'DENSITY: '}<span className="text-violet-400">{granular.density}</span>
+                    </label>
+                    <input type="range" min="1" max="16" step="1" value={granular.density}
+                      onChange={(e) => updateGranular('density', parseInt(e.target.value))} className="w-full" />
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block font-mono text-text-muted text-xs mb-2">
-                      SCAN POS: <span className="text-violet-400">{granular.scanPosition.toFixed(0)}%</span>
+                    <label className="block font-mono text-text-muted text-[10px] mb-1">
+                      {'SCAN: '}<span className="text-violet-400">{granular.scanPosition.toFixed(0)}%</span>
                     </label>
-                    <input
-                      type="range" min="0" max="100" step="0.1"
-                      value={granular.scanPosition}
-                      onChange={(e) => updateGranular('scanPosition', parseFloat(e.target.value))}
-                      className="w-full"
-                    />
+                    <input type="range" min="0" max="100" step="0.1" value={granular.scanPosition}
+                      onChange={(e) => updateGranular('scanPosition', parseFloat(e.target.value))} className="w-full" />
                   </div>
                   <div>
-                    <label className="block font-mono text-text-muted text-xs mb-2">
-                      SCAN SPEED: <span className="text-violet-400">{granular.scanSpeed}%</span>
+                    <label className="block font-mono text-text-muted text-[10px] mb-1">
+                      {'SPEED: '}<span className="text-violet-400">{granular.scanSpeed}%</span>
                     </label>
-                    <input
-                      type="range" min="-100" max="100" step="1"
-                      value={granular.scanSpeed}
-                      onChange={(e) => updateGranular('scanSpeed', parseInt(e.target.value))}
-                      className="w-full"
-                    />
+                    <input type="range" min="-100" max="100" step="1" value={granular.scanSpeed}
+                      onChange={(e) => updateGranular('scanSpeed', parseInt(e.target.value))} className="w-full" />
+                  </div>
+                  <div>
+                    <label className="block font-mono text-text-muted text-[10px] mb-1">
+                      {'PITCH RND: '}<span className="text-violet-400">{granular.randomPitch}%</span>
+                    </label>
+                    <input type="range" min="0" max="100" step="1" value={granular.randomPitch}
+                      onChange={(e) => updateGranular('randomPitch', parseInt(e.target.value))} className="w-full" />
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block font-mono text-text-muted text-xs mb-2">
-                      DENSITY: <span className="text-violet-400">{granular.density}</span>
-                    </label>
-                    <input
-                      type="range" min="1" max="16" step="1"
-                      value={granular.density}
-                      onChange={(e) => updateGranular('density', parseInt(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-mono text-text-muted text-xs mb-2">
-                      PITCH RAND: <span className="text-violet-400">{granular.randomPitch}%</span>
-                    </label>
-                    <input
-                      type="range" min="0" max="100" step="1"
-                      value={granular.randomPitch}
-                      onChange={(e) => updateGranular('randomPitch', parseInt(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox" checked={granular.reverse}
-                      onChange={(e) => updateGranular('reverse', e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="font-mono text-text-secondary text-xs">REVERSE GRAINS</span>
-                  </label>
-                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={granular.reverse}
+                    onChange={(e) => updateGranular('reverse', e.target.checked)} className="w-4 h-4 rounded" />
+                  <span className="font-mono text-text-secondary text-xs">REVERSE GRAINS</span>
+                </label>
               </div>
             )}
           </div>
 
-          {/* Help text */}
-          <div className="text-xs text-text-muted space-y-1">
-            <p><span className="text-text-secondary">Click</span> waveform = set start | <span className="text-text-secondary">Shift+Click</span> = set end</p>
-            {loopEnabled && <p><span className="text-text-secondary">Alt+Click</span> = loop start | <span className="text-text-secondary">Alt+Ctrl+Click</span> = loop end</p>}
-            {isGranular && <p><span className="text-text-secondary">Ctrl+Click</span> = set granular scan position</p>}
+          {/* ─── Help text ───────────────────────────────────────── */}
+          <div className="text-[10px] text-text-muted leading-relaxed px-1">
+            <span className="text-text-secondary">Drag handles</span>{' start/end \u2022 '}
+            <span className="text-text-secondary">Click+drag</span>{' select range \u2022 '}
+            <span className="text-text-secondary">Wheel</span>{' zoom \u2022 '}
+            <span className="text-text-secondary">Shift+Wheel</span>{' scroll \u2022 '}
+            <span className="text-text-secondary">Dbl-click</span>{' select all \u2022 '}
+            <span className="text-text-secondary">Ctrl+Z</span>{' undo'}
+            {loopEnabled && (
+              <>{' \u2022 '}<span className="text-text-secondary">Drag blue handles</span>{' loop'}</>
+            )}
+            {isGranular && (
+              <>{' \u2022 '}<span className="text-text-secondary">Ctrl+Click</span>{' granular pos'}</>
+            )}
           </div>
         </>
       )}
 
-      {/* Type-specific info */}
+      {/* ─── Empty state ─────────────────────────────────────────── */}
       {!audioBuffer && (
         <div className="text-center text-text-muted text-sm py-2">
           {instrument.synthType === 'Sampler' && 'Sampler maps the sample to C4 and pitches across the keyboard'}
@@ -984,6 +1278,17 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           {instrument.synthType === 'GranularSynth' && 'Granular breaks the sample into tiny grains for texture and pads'}
         </div>
       )}
+
+      {/* ─── AmiResamplerModal ───────────────────────────────────── */}
+      <AmiResamplerModal
+        isOpen={showResampleModal}
+        onClose={() => setShowResampleModal(false)}
+        audioBuffer={audioBuffer}
+        onBufferProcessed={(r: ProcessedResult) => {
+          setShowResampleModal(false);
+          handleBufferProcessed(r, 'Ami');
+        }}
+      />
     </div>
   );
 };

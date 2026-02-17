@@ -32,9 +32,47 @@ function generateVersionFile() {
   };
 }
 
+// Plugin to copy ONNX Runtime WASM files from node_modules to public/onnx-wasm/
+function copyOnnxWasmFiles() {
+  return {
+    name: 'copy-onnx-wasm',
+    buildStart() {
+      const srcDir = path.resolve(__dirname, 'node_modules/onnxruntime-web/dist');
+      const destDir = path.resolve(__dirname, 'public/onnx-wasm');
+      if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+      const wasmFiles = fs.readdirSync(srcDir).filter(f => f.endsWith('.wasm') || f.endsWith('.mjs'));
+      for (const file of wasmFiles) {
+        const destPath = path.resolve(destDir, file);
+        if (!fs.existsSync(destPath)) {
+          fs.copyFileSync(path.resolve(srcDir, file), destPath);
+          console.log(`Copied ONNX WASM: ${file}`);
+        }
+      }
+    },
+    // Vite blocks dynamic import() of .mjs files from public/ in dev mode.
+    // ONNX Runtime does `import('/onnx-wasm/ort-wasm-*.mjs')` which Vite intercepts
+    // and rejects. Serve these files directly via middleware before Vite's resolver.
+    configureServer(server: any) {
+      server.middlewares.use((req: any, res: any, next: any) => {
+        if (req.url?.startsWith('/onnx-wasm/') && (req.url.endsWith('.mjs') || req.url.includes('.mjs?'))) {
+          const filename = req.url.split('/').pop()?.split('?')[0];
+          const filePath = path.resolve(__dirname, 'public/onnx-wasm', filename);
+          if (fs.existsSync(filePath)) {
+            res.setHeader('Content-Type', 'application/javascript');
+            res.setHeader('Cache-Control', 'public, max-age=31536000');
+            fs.createReadStream(filePath).pipe(res);
+            return;
+          }
+        }
+        next();
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), generateVersionFile()],
+  plugins: [react(), generateVersionFile(), copyOnnxWasmFiles()],
   // Force root base path for subdomain deployment (Docker/live site)
   // GitHub Pages deployment uses separate workflow with --base flag
   base: '/',

@@ -7,9 +7,14 @@ import * as ort from 'onnxruntime-web';
 import { bufferToDataUrl } from './SampleProcessing';
 import type { ProcessedResult } from './SampleProcessing';
 
+// Configure ONNX Runtime WASM paths so the runtime can find its .wasm files.
+// Without this, the runtime tries to fetch them from the page URL, gets a 404 HTML page,
+// and fails with "expected magic word 00 61 73 6d" (because it got <!doctype html>).
+ort.env.wasm.wasmPaths = '/onnx-wasm/';
+
 // Initialize ONNX runtime options
 const ORT_OPTIONS: ort.InferenceSession.SessionOptions = {
-  executionProviders: ['webgpu', 'wasm'],
+  executionProviders: ['wasm'],
   graphOptimizationLevel: 'all',
 };
 

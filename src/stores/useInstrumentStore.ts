@@ -484,6 +484,19 @@ export const useInstrumentStore = create<InstrumentStore>()(
               }
             }
           }
+
+          // Clean up stale sub-configs when synthType changes,
+          // so persistence doesn't carry irrelevant data that could
+          // confuse migration/loading logic
+          if (synthTypeChanging && updates.synthType) {
+            const newType = updates.synthType;
+            if (newType !== 'TB303' && newType !== 'Buzz3o3') {
+              delete instrument.tb303;
+            }
+            if (newType !== 'Sampler' && newType !== 'Player') {
+              delete instrument.sample;
+            }
+          }
         }
       });
 
@@ -636,6 +649,17 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
         // Ensure ID is correct (deepMerge might have overwritten it if config had id)
         newInstrument.id = newId;
+
+        // Strip irrelevant synth sub-configs to prevent stale data from
+        // interfering with persistence (e.g., tb303 config on a Sampler instrument
+        // would cause loadInstruments migration confusion)
+        if (newInstrument.synthType && newInstrument.synthType !== 'TB303' && newInstrument.synthType !== 'Buzz3o3') {
+          delete newInstrument.tb303;
+        }
+        // Strip sample config from non-sample instruments
+        if (newInstrument.synthType && newInstrument.synthType !== 'Sampler' && newInstrument.synthType !== 'Player') {
+          delete newInstrument.sample;
+        }
 
         // Auto-set monophonic flag for synths that are inherently monophonic
         // Only set if not explicitly specified in config
@@ -1253,10 +1277,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
         return {
           ...completeInst,
-          // Fix synthType for instruments with tb303 config (stale localStorage migration)
-          synthType: (inst.tb303 && inst.synthType !== 'TB303' && inst.synthType !== 'Buzz3o3')
-            ? 'TB303' as const
-            : inst.synthType,
+          // Preserve the saved synthType — never force-override it
+          // (Previous migration forced TB303 if inst.tb303 existed, but
+          // createInstrument deep-merges with defaults that always include tb303,
+          // causing every Sampler/Player/etc. to revert to TB303 on reload)
+          synthType: inst.synthType,
           // Add type field if missing (backward compatibility)
           // Sampler = sample, everything else = synth
           type: inst.type || (inst.synthType === 'Sampler' ? 'sample' as const : 'synth' as const),

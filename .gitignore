@@ -35,7 +35,9 @@ mame-wasm/build/
 furnace-wasm/build/
 spacey-delayer-wasm/build/
 re-tape-echo-wasm/build/
+ami-sampler-wasm/build/
 public/rdpiano/roms/
+public/onnx-wasm/
 
 # ROM files and sample libraries (copyrighted material)
 public/roms/Mirage4Amiga/
