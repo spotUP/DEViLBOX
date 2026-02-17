@@ -3004,6 +3004,11 @@ export class ToneEngine {
    * Removes all audio nodes, effect chains, analysers, and type mappings.
    */
   public disposeAllInstruments(): void {
+    // Cancel all pending release-restore timeouts to prevent them from
+    // firing on new instruments and restoring wrong volume values
+    this.releaseRestoreTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.releaseRestoreTimeouts.clear();
+
     const allKeys = Array.from(this.instruments.keys());
     allKeys.forEach((key) => {
       this.disposeInstrumentByKey(key);
@@ -3013,6 +3018,10 @@ export class ToneEngine {
     this.decodedAudioBuffers.clear();
     this.activeVoices.clear();
     this.channelLastNote.clear();
+    this.channelMuteStates.clear();
+    this.channelPitchState.clear();
+    this.channelActivePlayer.clear();
+    this.lastTriggerTime = 0;
   }
 
   /**

@@ -315,9 +315,17 @@ export class TrackerReplayer {
     this.currentTick = 0;
     this.speed = song.initialSpeed;
     this.bpm = song.initialBPM;
+    this.globalVolume = 64;     // Reset global volume (Gxx effect can leave this at 0)
     this.pBreakFlag = false;
+    this.pBreakPos = 0;
     this.posJumpFlag = false;
+    this.posJumpPos = 0;
     this.patternDelay = 0;
+
+    // Clear stale callbacks from previous song
+    this.onRowChange = null;
+    this.onSongEnd = null;
+    this.onTickProcess = null;
 
     // Furnace speed alternation: if speed2 differs from speed1, enable alternation
     if (song.speed2 !== undefined && song.speed2 !== song.initialSpeed) {
