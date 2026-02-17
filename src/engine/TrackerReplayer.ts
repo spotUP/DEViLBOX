@@ -543,6 +543,7 @@ export class TrackerReplayer {
     this.totalRowsProcessed = 0;
     this.totalTicksProcessed = 0;
     this.lastScheduledTime = 0;
+    console.log(`[Replayer Drift] startScheduler called at ${this.startTime.toFixed(3)} (songPos=${this.songPos} pattPos=${this.pattPos})`);
     this.lastPatternRowCount = 0;
 
     const schedulerTick = () => {
@@ -568,7 +569,7 @@ export class TrackerReplayer {
         this.lastGrooveSteps = transportState.grooveSteps;
         this.bpm = transportState.bpm;
         this.speed = transportState.speed;
-        console.log(`[Replayer] Re-syncing scheduler for new groove: ${this.lastGrooveTemplateId} @ ${this.lastSwingAmount}% (${this.lastGrooveSteps} steps)`);
+        console.log(`[Replayer Drift] grooveChanged reset! template=${this.lastGrooveTemplateId} swing=${this.lastSwingAmount} steps=${this.lastGrooveSteps} bpm=${this.bpm} speed=${this.speed}`);
       }
 
       let tickInterval = 2.5 / this.bpm;

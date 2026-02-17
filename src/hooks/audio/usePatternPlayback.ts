@@ -108,6 +108,11 @@ export const usePatternPlayback = () => {
       const needsReload = hasStartedRef.current && !isNaturalAdvancement;
       const format = (pattern.importMetadata?.sourceFormat as TrackerFormat) || 'XM';
 
+      // DEBUG: Log every effect fire to diagnose false reloads
+      if (hasStartedRef.current) {
+        console.log(`[Replayer Drift] useEffect fired: wasAdvanced=${wasReplayerAdvanced} isPlaying=${replayer.isPlaying()} natural=${isNaturalAdvancement} needsReload=${needsReload}`);
+      }
+
       if (!hasStartedRef.current || needsReload) {
         hasStartedRef.current = true;
         
