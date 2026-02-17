@@ -4,6 +4,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { xmNoteToString } from '@/lib/xmConversions';
 import { NOTE_OFF } from '@/types/tracker';
+import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 
 /**
  * Play Row (Audition) - Play only the current row
@@ -18,6 +19,7 @@ import { NOTE_OFF } from '@/types/tracker';
  */
 export async function playRow(): Promise<boolean> {
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
+  unlockIOSAudio();
   Tone.start();
   const { cursor, patterns, currentPatternIndex } = useTrackerStore.getState();
   const pattern = patterns[currentPatternIndex];

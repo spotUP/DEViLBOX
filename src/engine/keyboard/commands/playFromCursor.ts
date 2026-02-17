@@ -2,6 +2,7 @@ import * as Tone from 'tone';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 
 /**
  * Play from Cursor - Start playback from current pattern position
@@ -14,6 +15,7 @@ import { getToneEngine } from '@engine/ToneEngine';
  */
 export function playFromCursor(): boolean {
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
+  unlockIOSAudio();
   Tone.start();
   
   const { cursor } = useTrackerStore.getState();

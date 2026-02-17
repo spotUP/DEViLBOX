@@ -68,13 +68,22 @@
     </div>
     <script src="/FurnaceChips.js"></script>
     <script src="/MAMEChips.js"></script>
-    <!-- iOS Audio Unlock: Resume AudioContext on first touch/click BEFORE React mounts.
-         iOS Safari requires AudioContext.resume() inside a user gesture handler.
-         This fires as early as possible so the context is ready when React loads. -->
+    <!-- iOS Audio Unlock: Play silent MP3 on first touch/click to bypass mute switch.
+         Also resume AudioContext which may be suspended on iOS.
+         This fires as early as possible so audio is ready when React loads. -->
     <script>
       (function() {
+        var silentAudio = null;
         function unlockAudio() {
-          // If ToneEngine has already created a context, resume it
+          // Play silent MP3 via native HTML audio to bypass iOS mute switch
+          if (!silentAudio) {
+            silentAudio = document.createElement('audio');
+            silentAudio.src = '/silent.mp3';
+            silentAudio.style.display = 'none';
+            document.body.appendChild(silentAudio);
+          }
+          try { silentAudio.play(); } catch(e) {}
+          // Also resume any existing AudioContext
           if (window._toneEngine && window._toneEngine.nativeContext) {
             var ctx = window._toneEngine.nativeContext;
             if (ctx.state === 'suspended') {

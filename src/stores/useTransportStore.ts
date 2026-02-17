@@ -8,6 +8,7 @@ import * as Tone from 'tone';
 import type { TransportState, GrooveTemplate } from '@typedefs/audio';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { useInstrumentStore } from './useInstrumentStore';
+import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { useUIStore } from './useUIStore';
 
 interface TransportStore extends TransportState {
@@ -174,6 +175,7 @@ export const useTransportStore = create<TransportStore>()(
       // CRITICAL for iOS: Start audio context synchronously during user gesture
       // Dynamic import creates async delay that breaks iOS gesture chain
       // See: https://github.com/Tonejs/Tone.js/issues/164
+      unlockIOSAudio(); // Play silent MP3 to bypass iOS mute switch
       await Tone.start();
       
       set((state) => {
@@ -210,6 +212,7 @@ export const useTransportStore = create<TransportStore>()(
         // Calling it in an effect after the gesture ends will fail silently
         // Dynamic import creates async delay that breaks iOS gesture chain
         // See: https://github.com/Tonejs/Tone.js/issues/164
+        unlockIOSAudio(); // Play silent MP3 to bypass iOS mute switch
         await Tone.start();
       }
 
