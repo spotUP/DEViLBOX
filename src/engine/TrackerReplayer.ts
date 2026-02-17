@@ -247,6 +247,9 @@ export class TrackerReplayer {
   // Timing drift diagnostics
   private playbackStartWallTime = 0; // Wall-clock time when playback started
   private totalRowsProcessed = 0;    // Total rows processed since start
+  private totalTicksProcessed = 0;   // Total ticks processed (tracks actual time regardless of speed changes)
+  private lastScheduledTime = 0;     // Scheduled audio time from last processTick call
+  private lastPatternRowCount = 0;   // Rows played in the last completed pattern
 
   // Furnace speed alternation (speed1/speed2)
   private speed2: number | null = null;  // null = no alternation (XM/MOD mode)
@@ -538,6 +541,9 @@ export class TrackerReplayer {
     this.totalTicksScheduled = 0;
     this.playbackStartWallTime = Tone.now();
     this.totalRowsProcessed = 0;
+    this.totalTicksProcessed = 0;
+    this.lastScheduledTime = 0;
+    this.lastPatternRowCount = 0;
 
     const schedulerTick = () => {
       if (!this.playing) return;
@@ -627,6 +633,10 @@ export class TrackerReplayer {
 
   private processTick(time: number): void {
     if (!this.song || !this.playing) return;
+
+    // Track scheduled time for drift diagnostics
+    this.lastScheduledTime = time;
+    this.totalTicksProcessed++;
 
     // Handle pattern delay
     if (this.patternDelay > 0) {
@@ -2089,11 +2099,22 @@ export class TrackerReplayer {
 
     // Timing drift diagnostics — log at every position boundary (row 0)
     if (this.pattPos === 0 && this.playbackStartWallTime > 0) {
-      const elapsed = Tone.now() - this.playbackStartWallTime;
+      const wallElapsed = Tone.now() - this.playbackStartWallTime;
+      const schedElapsed = this.lastScheduledTime - this.playbackStartWallTime;
       const tickInterval = 2.5 / this.bpm;
-      const expectedTime = this.totalRowsProcessed * this.speed * tickInterval;
-      const driftMs = (elapsed - expectedTime) * 1000;
-      console.log(`[Replayer Drift] Pos ${this.songPos} | ${this.totalRowsProcessed} rows | elapsed=${elapsed.toFixed(3)}s expected=${expectedTime.toFixed(3)}s drift=${driftMs.toFixed(1)}ms (BPM=${this.bpm}, speed=${this.speed})`);
+      // Use totalTicksProcessed for accurate expected time (handles speed changes)
+      const expectedFromTicks = this.totalTicksProcessed * tickInterval;
+      const wallDriftMs = (wallElapsed - expectedFromTicks) * 1000;
+      const schedDriftMs = (schedElapsed - expectedFromTicks) * 1000;
+      const rowsThisPattern = this.totalRowsProcessed - this.lastPatternRowCount;
+      console.log(
+        `[Replayer Drift] Pos ${this.songPos} | ${this.totalRowsProcessed} rows (${rowsThisPattern} this pat) | ` +
+        `${this.totalTicksProcessed} ticks | ` +
+        `wall=${wallElapsed.toFixed(3)}s sched=${schedElapsed.toFixed(3)}s expected=${expectedFromTicks.toFixed(3)}s | ` +
+        `wallDrift=${wallDriftMs.toFixed(1)}ms schedDrift=${schedDriftMs.toFixed(1)}ms | ` +
+        `BPM=${this.bpm} speed=${this.speed}`
+      );
+      this.lastPatternRowCount = this.totalRowsProcessed;
     }
     this.totalRowsProcessed++;
   }
