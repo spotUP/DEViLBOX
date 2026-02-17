@@ -108,7 +108,7 @@ interface TrackerStore {
   } | null;
 
   // Actions
-  setCurrentPattern: (index: number) => void;
+  setCurrentPattern: (index: number, fromReplayer?: boolean) => void;
   moveCursor: (direction: 'up' | 'down' | 'left' | 'right') => void;
   moveCursorToRow: (row: number) => void;
   moveCursorToChannel: (channel: number) => void;
@@ -301,11 +301,15 @@ export const useTrackerStore = create<TrackerStore>()(
     originalModuleData: null,
 
     // Actions
-    setCurrentPattern: (index) =>
+    setCurrentPattern: (index, fromReplayer) =>
       set((state) => {
         if (index >= 0 && index < state.patterns.length) {
           if (state.currentPatternIndex === index) return;
           state.currentPatternIndex = index;
+          // If this came from the replayer's natural advancement, don't jump —
+          // the replayer already knows where it is. jumpToPattern calls seekTo
+          // which resets the scheduler timeline, causing ~100ms drift per pattern.
+          if (fromReplayer) return;
           // If playing, tell the replayer to jump to this pattern
           const replayer = getTrackerReplayer();
           if (replayer.isPlaying()) {
