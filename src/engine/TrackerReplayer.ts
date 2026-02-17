@@ -433,9 +433,8 @@ export class TrackerReplayer {
   private schedulerInterval = 0.015; // Check every 15ms (must be < scheduleAheadTime)
   private nextScheduleTime = 0;
   
-  // Drift-free timing state
+  // Timing state (startTime kept only for drift diagnostics)
   private startTime = 0;
-  private totalTicksScheduled = 0;
   private lastGrooveTemplateId = 'straight';
   private lastSwingAmount = 100;
   private lastGrooveSteps = 2;
@@ -505,7 +504,6 @@ export class TrackerReplayer {
 
     // Keep position — don't reset songPos/pattPos so playback resumes where it stopped
     this.currentTick = 0;
-    this.totalTicksScheduled = 0;
     this.lastGrooveTemplateId = 'straight';
     this.lastSwingAmount = 100;
     this.lastGrooveSteps = 2;
@@ -536,9 +534,12 @@ export class TrackerReplayer {
   }
 
   private startScheduler(): void {
-    this.startTime = Tone.now() + 0.02;
-    this.nextScheduleTime = this.startTime;
-    this.totalTicksScheduled = 0;
+    // BassoonTracker architecture: initialize a continuous timeline that NEVER
+    // references Tone.now() again. The `time` variable only ever advances via
+    // `+= tickInterval`. Pattern boundaries, breaks, jumps — none of them
+    // touch the timeline. This makes cumulative drift impossible.
+    this.nextScheduleTime = Tone.now() + 0.02;
+    this.startTime = this.nextScheduleTime; // For drift diagnostics only
     this.playbackStartWallTime = Tone.now();
     this.totalRowsProcessed = 0;
     this.totalTicksProcessed = 0;
@@ -548,58 +549,37 @@ export class TrackerReplayer {
     const schedulerTick = () => {
       if (!this.playing) return;
 
-      const currentTime = Tone.now();
-      const scheduleUntil = currentTime + this.scheduleAheadTime;
+      const scheduleUntil = Tone.now() + this.scheduleAheadTime;
       const transportState = useTransportStore.getState();
-      
-      // Force immediate re-sync if groove/tempo parameters changed significantly
-      const grooveChanged = transportState.grooveTemplateId !== this.lastGrooveTemplateId || 
-                            transportState.swing !== this.lastSwingAmount ||
-                            transportState.grooveSteps !== this.lastGrooveSteps ||
-                            Math.abs(transportState.bpm - this.bpm) > 0.1;
 
-      if (grooveChanged) {
-        // Sync groove parameters WITHOUT resetting the scheduler timeline.
-        // Resetting startTime to "now" caused ~100ms cumulative drift per pattern
-        // because the scheduler had already scheduled 100ms ahead (lookahead),
-        // so "now" was ~100ms behind the scheduled timeline.
+      // Sync groove/swing parameters (never touches timeline)
+      if (transportState.grooveTemplateId !== this.lastGrooveTemplateId ||
+          transportState.swing !== this.lastSwingAmount ||
+          transportState.grooveSteps !== this.lastGrooveSteps) {
         this.lastGrooveTemplateId = transportState.grooveTemplateId;
         this.lastSwingAmount = transportState.swing;
         this.lastGrooveSteps = transportState.grooveSteps;
-        this.speed = transportState.speed;
-
-        // If BPM changed (e.g. user adjusted in UI), update tickInterval
-        // using the current schedule position as transition point (not "now")
-        // to avoid introducing a timing gap.
-        if (Math.abs(transportState.bpm - this.bpm) > 0.1) {
-          console.log(`[Replayer Drift] BPM sync from store: ${this.bpm} -> ${transportState.bpm}`);
-          this.bpm = transportState.bpm;
-          // Use nextScheduleTime as the transition baseline (same as Fxx handler)
-          // so we continue seamlessly from where we left off.
-          this.startTime = this.nextScheduleTime;
-          this.totalTicksScheduled = 1;
-        }
       }
 
-      let tickInterval = 2.5 / this.bpm;
+      // Sync BPM from UI (takes effect on next tick naturally)
+      if (Math.abs(transportState.bpm - this.bpm) > 0.1) {
+        console.log(`[Replayer] BPM sync from UI: ${this.bpm} -> ${transportState.bpm}`);
+        this.bpm = transportState.bpm;
+      }
+      // Note: speed is NOT synced from UI — it's controlled by Fxx effects
+      // and speed2 alternation within the replayer itself.
 
-      // Fill the buffer - schedule all ticks within look-ahead window
+      // Fill the lookahead buffer — BassoonTracker pattern:
+      // Schedule all ticks whose time falls within the look-ahead window.
+      // `nextScheduleTime` is a continuous accumulator that never resets.
       while (this.nextScheduleTime < scheduleUntil && this.playing) {
-        const bpmBefore = this.bpm;
         this.processTick(this.nextScheduleTime);
-        this.totalTicksScheduled++;
 
-        // If BPM changed during processTick (Fxx effect), reset timing baseline
-        // so future ticks use the new interval without a timing jump
-        if (this.bpm !== bpmBefore) {
-          console.log(`[Replayer] BPM changed: ${bpmBefore} -> ${this.bpm} (Fxx effect at pos=${this.songPos} row=${this.pattPos})`);
-          this.startTime = this.nextScheduleTime;
-          this.totalTicksScheduled = 1;
-          tickInterval = 2.5 / this.bpm;
-        }
-
-        // Calculate NEXT time based on total ticks since START to avoid cumulative drift
-        this.nextScheduleTime = this.startTime + (this.totalTicksScheduled * tickInterval);
+        // Advance timeline by one tick interval.
+        // If BPM changed during processTick (Fxx effect), the new interval
+        // takes effect immediately for the next tick — no reset needed.
+        const tickInterval = 2.5 / this.bpm;
+        this.nextScheduleTime += tickInterval;
       }
     };
 
@@ -2171,10 +2151,10 @@ export class TrackerReplayer {
       }
 
       // Re-sync scheduler timing to NOW so the next tick fires immediately
-      // from the new position instead of waiting for the old schedule
-      this.startTime = Tone.now();
-      this.totalTicksScheduled = 0;
-      this.nextScheduleTime = this.startTime;
+      // from the new position instead of waiting for the old schedule.
+      // This is the ONLY place nextScheduleTime is set to Tone.now() — and
+      // only for user-initiated seeks, never for natural pattern advancement.
+      this.nextScheduleTime = Tone.now();
 
       // Clear queued display states so old position updates don't flicker the UI
       this.clearStateQueue();
@@ -2211,7 +2191,6 @@ export class TrackerReplayer {
       this.speedAB = (this.pattPos % 2 === 0);
       this.speed = (this.pattPos % 2 === 0) ? this.song.initialSpeed : this.speed2;
     }
-    this.totalTicksScheduled = 0;
 
     // Clamp pattern position
     const patternNum = this.song.songPositions[this.songPos];
