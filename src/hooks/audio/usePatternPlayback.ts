@@ -48,6 +48,13 @@ export const usePatternPlayback = () => {
   // Track if we've started playback
   const hasStartedRef = useRef(false);
 
+  // Flag to distinguish replayer-driven position changes from user-driven ones.
+  // Without this, the replayer's 100ms lookahead scheduling means its getCurrentPosition()
+  // can be ahead of the store's currentPositionIndex when React re-renders. This causes
+  // isNaturalAdvancement to fail, triggering a full song reload at every pattern boundary,
+  // which resets the scheduler timeline and creates ~100ms cumulative drift per pattern.
+  const replayerAdvancedRef = useRef(false);
+
   // Sync BPM changes to engine (for visualization, metronome, etc.)
   useEffect(() => {
     engineRef.current.setBPM(bpm);
@@ -86,12 +93,17 @@ export const usePatternPlayback = () => {
     if (isPlaying && pattern) {
       const arrangement = useArrangementStore.getState();
       
-      // Determine if we need to reload. 
-      // We ignore reloads if we are already playing and the replayer position 
-      // matches the store position (meaning it was a natural advancement).
+      // Determine if we need to reload.
+      // Use the replayerAdvancedRef flag to detect natural position advances.
+      // The old approach (comparing replayer.getCurrentPosition() with store position)
+      // failed because the replayer's 100ms lookahead scheduling meant it was often
+      // 1+ positions ahead of the store when React re-rendered, causing false reloads.
+      const wasReplayerAdvanced = replayerAdvancedRef.current;
+      replayerAdvancedRef.current = false;
+      
       const isNaturalAdvancement = hasStartedRef.current && 
                                    replayer.isPlaying() && 
-                                   replayer.getCurrentPosition() === currentPositionIndexRef.current;
+                                   wasReplayerAdvanced;
       
       const needsReload = hasStartedRef.current && !isNaturalAdvancement;
       const format = (pattern.importMetadata?.sourceFormat as TrackerFormat) || 'XM';
@@ -185,6 +197,10 @@ export const usePatternPlayback = () => {
           if (row === 0 && (patternNum !== lastPatternNum || position !== lastPosition)) {
             lastPatternNum = patternNum;
             lastPosition = position;
+            // Mark as replayer-driven BEFORE the state update so the useEffect
+            // knows this position change came from natural playback advancement,
+            // not a user action. This prevents false reloads at pattern boundaries.
+            replayerAdvancedRef.current = true;
             queueMicrotask(() => {
               setCurrentPattern(patternNum);
               setCurrentPosition(position);
