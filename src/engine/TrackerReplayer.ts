@@ -20,6 +20,7 @@ import { FurnaceMacroType } from '@/types/instrument';
 import { getToneEngine } from './ToneEngine';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/audio';
+import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 
 // ============================================================================
 // CONSTANTS
@@ -445,6 +446,7 @@ export class TrackerReplayer {
   async play(): Promise<void> {
     if (!this.song || this.playing) return;
 
+    unlockIOSAudio(); // Play silent MP3 to bypass iOS mute switch
     await Tone.start();
 
     // CRITICAL: Wait for AudioContext to actually be running

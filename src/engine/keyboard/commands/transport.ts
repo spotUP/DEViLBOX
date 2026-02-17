@@ -5,6 +5,7 @@
 import * as Tone from 'tone';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 
 /**
  * Toggle play/stop - Space bar in most trackers
@@ -18,6 +19,7 @@ export function playStopToggle(): boolean {
   } else {
     // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
     // before engine.init() which does async WASM loading
+    unlockIOSAudio();
     Tone.start();
     
     // Always start from the first row of the current pattern
@@ -44,6 +46,7 @@ export function playPattern(): boolean {
   }
   
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
+  unlockIOSAudio();
   Tone.start();
   
   setCurrentRow(0);
@@ -69,6 +72,7 @@ export function playSong(): boolean {
   }
   
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
+  unlockIOSAudio();
   Tone.start();
   
   setCurrentPattern(0);
