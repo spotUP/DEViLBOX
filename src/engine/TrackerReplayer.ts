@@ -244,6 +244,10 @@ export class TrackerReplayer {
   private bpm = 125;             // Beats per minute
   private globalVolume = 64;     // Global volume (0-64)
 
+  // Timing drift diagnostics
+  private playbackStartWallTime = 0; // Wall-clock time when playback started
+  private totalRowsProcessed = 0;    // Total rows processed since start
+
   // Furnace speed alternation (speed1/speed2)
   private speed2: number | null = null;  // null = no alternation (XM/MOD mode)
   private speedAB = false;               // false = use speed1 next, true = use speed2 next
@@ -532,6 +536,8 @@ export class TrackerReplayer {
     this.startTime = Tone.now() + 0.02;
     this.nextScheduleTime = this.startTime;
     this.totalTicksScheduled = 0;
+    this.playbackStartWallTime = Tone.now();
+    this.totalRowsProcessed = 0;
 
     const schedulerTick = () => {
       if (!this.playing) return;
@@ -631,9 +637,11 @@ export class TrackerReplayer {
     // --- Groove & Swing Support ---
     const transportState = useTransportStore.getState();
     
-    // Sync BPM from UI if user changed it manually (but NOT speed - Fxx effects control that during playback)
-    if (transportState.bpm !== this.bpm) this.bpm = transportState.bpm;
-    // Note: Speed is controlled by Fxx effects during playback, don't override from UI
+    // BPM sync from UI is handled by the grooveChanged detector in schedulerTick
+    // (checks every 15ms with >0.1 threshold). We do NOT sync here because
+    // any mismatch triggers bpmBefore !== this.bpm in the while loop, causing
+    // a baseline reset that can accumulate timing errors over long playback.
+    // Speed is controlled by Fxx effects during playback, don't override from UI
 
     const tickInterval = 2.5 / this.bpm;
     let safeTime = time;
@@ -2078,6 +2086,16 @@ export class TrackerReplayer {
       const pattNum = this.song.songPositions[this.songPos];
       this.onRowChange(this.pattPos, pattNum, this.songPos);
     }
+
+    // Timing drift diagnostics — log at every position boundary (row 0)
+    if (this.pattPos === 0 && this.playbackStartWallTime > 0) {
+      const elapsed = Tone.now() - this.playbackStartWallTime;
+      const tickInterval = 2.5 / this.bpm;
+      const expectedTime = this.totalRowsProcessed * this.speed * tickInterval;
+      const driftMs = (elapsed - expectedTime) * 1000;
+      console.log(`[Replayer Drift] Pos ${this.songPos} | ${this.totalRowsProcessed} rows | elapsed=${elapsed.toFixed(3)}s expected=${expectedTime.toFixed(3)}s drift=${driftMs.toFixed(1)}ms (BPM=${this.bpm}, speed=${this.speed})`);
+    }
+    this.totalRowsProcessed++;
   }
 
   // ==========================================================================
