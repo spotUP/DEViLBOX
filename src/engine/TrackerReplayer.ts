@@ -551,12 +551,22 @@ export class TrackerReplayer {
         console.log(`[Replayer] Re-syncing scheduler for new groove: ${this.lastGrooveTemplateId} @ ${this.lastSwingAmount}% (${this.lastGrooveSteps} steps)`);
       }
 
-      const tickInterval = 2.5 / this.bpm;
+      let tickInterval = 2.5 / this.bpm;
 
       // Fill the buffer - schedule all ticks within look-ahead window
       while (this.nextScheduleTime < scheduleUntil && this.playing) {
+        const bpmBefore = this.bpm;
         this.processTick(this.nextScheduleTime);
         this.totalTicksScheduled++;
+
+        // If BPM changed during processTick (Fxx effect), reset timing baseline
+        // so future ticks use the new interval without a timing jump
+        if (this.bpm !== bpmBefore) {
+          this.startTime = this.nextScheduleTime;
+          this.totalTicksScheduled = 1;
+          tickInterval = 2.5 / this.bpm;
+        }
+
         // Calculate NEXT time based on total ticks since START to avoid cumulative drift
         this.nextScheduleTime = this.startTime + (this.totalTicksScheduled * tickInterval);
       }
