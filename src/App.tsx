@@ -529,7 +529,7 @@ function App() {
         const patLen = patterns[0]?.length || 64;
         const numChannels = patterns[0]?.[0]?.length || 4;
         
-        interface FurnaceCell { note?: number; instrument?: number; volume?: number; effectType?: number; effectParam?: number }
+        interface FurnaceCell { note?: number; instrument?: number; volume?: number; effectType?: number; effectParam?: number; effectType2?: number; effectParam2?: number }
         const convertedPatterns = patterns.map((pat: FurnaceCell[][], idx: number) => ({
           id: `pattern-${idx}`,
           name: `Pattern ${idx}`,
@@ -552,8 +552,8 @@ function App() {
                 volume: cell.volume || 0,
                 effTyp: cell.effectType || 0,
                 eff: cell.effectParam || 0,
-                effTyp2: 0,
-                eff2: 0,
+                effTyp2: cell.effectType2 || 0,
+                eff2: cell.effectParam2 || 0,
               };
             }),
           })),
