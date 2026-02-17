@@ -309,7 +309,7 @@ export const SAMPLE_PACK_PRESETS: InstrumentPreset['config'][] = [
     pan: 0,
     effects: [],
     sample: { 
-      url: `${DRUMNIBUS_BASE}/kicks/BD_Analog1.wav`, 
+      url: `${DRUMNIBUS_BASE}/kicks/BD_808A1200.wav`, 
       baseNote: 'C4',
       detune: 0, 
       loop: false, 
@@ -327,7 +327,7 @@ export const SAMPLE_PACK_PRESETS: InstrumentPreset['config'][] = [
     pan: 0,
     effects: [],
     sample: { 
-      url: `${DRUMNIBUS_BASE}/snares/SD_Analog1.wav`, 
+      url: `${DRUMNIBUS_BASE}/snares/SD_Analog_Noise1.wav`, 
       baseNote: 'C4',
       detune: 0, 
       loop: false, 
@@ -400,7 +400,7 @@ export const SAMPLE_PACK_PRESETS: InstrumentPreset['config'][] = [
     volume: -6,
     pan: 0,
     effects: [],
-    parameters: { sampleUrl: `${DRUMNIBUS_BASE}/kicks/BD_Analog1.wav` }
+    parameters: { sampleUrl: `${DRUMNIBUS_BASE}/kicks/BD_808A1200.wav` }
   },
   {
     name: 'Player Analog Snare',
@@ -409,7 +409,7 @@ export const SAMPLE_PACK_PRESETS: InstrumentPreset['config'][] = [
     volume: -8,
     pan: 0,
     effects: [],
-    parameters: { sampleUrl: `${DRUMNIBUS_BASE}/snares/SD_Analog1.wav` }
+    parameters: { sampleUrl: `${DRUMNIBUS_BASE}/snares/SD_Analog_Noise1.wav` }
   },
   {
     name: 'Player Sci-Fi FX',

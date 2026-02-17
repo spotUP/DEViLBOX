@@ -74,22 +74,35 @@
     <script>
       (function() {
         var silentAudio = null;
+        var unlocked = false;
         function unlockAudio() {
-          // Play silent MP3 via native HTML audio to bypass iOS mute switch
+          if (unlocked) return;
+          unlocked = true;
+          // 1) Play silent MP3 via native HTML audio to bypass iOS mute switch
           if (!silentAudio) {
             silentAudio = document.createElement('audio');
             silentAudio.src = '/silent.mp3';
             silentAudio.style.display = 'none';
             document.body.appendChild(silentAudio);
           }
-          try { silentAudio.play(); } catch(e) {}
-          // Also resume any existing AudioContext
+          try { silentAudio.play().catch(function(){}); } catch(e) {}
+          // 2) Resume + play silent buffer through the Web Audio context.
+          //    On iOS Safari, just calling resume() is NOT enough — the context
+          //    reports 'running' but won't produce audio until actual data flows
+          //    through it during a user gesture.
           if (window._toneEngine && window._toneEngine.nativeContext) {
             var ctx = window._toneEngine.nativeContext;
-            if (ctx.state === 'suspended') {
-              ctx.resume().then(function() {
-                console.log('[iOS Audio Unlock] Context resumed via early handler');
-              });
+            try {
+              if (ctx.state === 'suspended') ctx.resume();
+              var buf = ctx.createBuffer(1, 1, ctx.sampleRate || 44100);
+              var src = ctx.createBufferSource();
+              src.buffer = buf;
+              src.connect(ctx.destination);
+              src.start(0);
+              src.onended = function() { src.disconnect(); };
+              console.log('[iOS Audio Unlock] Silent buffer played through AudioContext');
+            } catch(e) {
+              console.warn('[iOS Audio Unlock] Early unlock failed:', e);
             }
           }
           document.removeEventListener('touchstart', unlockAudio, true);

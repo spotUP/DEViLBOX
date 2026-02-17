@@ -434,8 +434,6 @@ export class TrackerReplayer {
   private schedulerInterval = 0.015; // Check every 15ms (must be < scheduleAheadTime)
   private nextScheduleTime = 0;
   
-  // Timing state (startTime kept only for drift diagnostics)
-  private startTime = 0;
   private lastGrooveTemplateId = 'straight';
   private lastSwingAmount = 100;
   private lastGrooveSteps = 2;
@@ -446,7 +444,7 @@ export class TrackerReplayer {
   async play(): Promise<void> {
     if (!this.song || this.playing) return;
 
-    unlockIOSAudio(); // Play silent MP3 to bypass iOS mute switch
+    await unlockIOSAudio(); // Play silent MP3 + pump AudioContext for iOS
     await Tone.start();
 
     // CRITICAL: Wait for AudioContext to actually be running
@@ -541,7 +539,6 @@ export class TrackerReplayer {
     // `+= tickInterval`. Pattern boundaries, breaks, jumps — none of them
     // touch the timeline. This makes cumulative drift impossible.
     this.nextScheduleTime = Tone.now() + 0.02;
-    this.startTime = this.nextScheduleTime; // For drift diagnostics only
     this.playbackStartWallTime = Tone.now();
     this.totalRowsProcessed = 0;
     this.totalTicksProcessed = 0;
@@ -2092,7 +2089,6 @@ export class TrackerReplayer {
 
     // Timing drift diagnostics — log at every position boundary (row 0)
     if (this.pattPos === 0 && this.playbackStartWallTime > 0) {
-      const wallElapsed = Tone.now() - this.playbackStartWallTime;
       const schedElapsed = this.lastScheduledTime - this.playbackStartWallTime;
       const tickInterval = 2.5 / this.bpm;
       const expectedFromTicks = this.totalTicksProcessed * tickInterval;

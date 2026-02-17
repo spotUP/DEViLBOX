@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-17T08:51:20.066Z
+ * Generated: 2026-02-17T16:13:12.026Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.785';
-export const BUILD_NUMBER = '785';
-export const BUILD_HASH = '369b0821';
+export const BUILD_VERSION = '1.0.793';
+export const BUILD_NUMBER = '793';
+export const BUILD_HASH = 'cddaa7c6';
 export const BUILD_DATE = '2026-02-17';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,41 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.785',
+    version: '1.0.793',
     date: '2026-02-17',
     changes: [
+      {
+        type: 'feature',
+        "description": "IOS audio unlock via silent MP3 to bypass mute switch"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent setCurrentPattern -> jumpToPattern -> seekTo timeline reset"
+      },
+      {
+        type: 'fix',
+        "description": "Refactor scheduler to BassoonTracker continuous timeline pattern"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate cumulative timing drift (~100ms/pattern)"
+      },
+      {
+        type: 'fix',
+        "description": "Debug: add stack trace to BPM change detection in scheduler loop"
+      },
+      {
+        type: 'fix',
+        "description": "Debug: add startTime, totalTicksScheduled, formula check to drift log"
+      },
+      {
+        type: 'fix',
+        "description": "Debug: add drift diagnostic logs to find scheduler reset source"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate 107ms/pattern timing drift caused by false song reloads"
+      },
       {
         type: 'fix',
         "description": "Improve drift diagnostics with scheduled time & tick counting"
@@ -206,38 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add smooth marker scrolling mode to grid view"
-      },
-      {
-        type: 'fix',
-        "description": "Fix note colors using inline hex values instead of Tailwind classes"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove borders from grid note cells"
-      },
-      {
-        type: 'improvement',
-        "description": "Use per-step instrument colors for trails and markers"
-      },
-      {
-        type: 'fix',
-        "description": "Fix instrument color: scan channel cells for actual instrument ID"
-      },
-      {
-        type: 'fix',
-        "description": "Fix invisible markers: use inline hex colors instead of dynamic Tailwind classes"
-      },
-      {
-        type: 'improvement',
-        "description": "Color trail and play markers with instrument color"
-      },
-      {
-        type: 'fix',
-        "description": "Fix header position marker alignment and remove transition"
-      },
-      {
-        type: 'improvement',
-        "description": "Make trail and play marker overlays exactly match cell size"
       }
     ]
   }
