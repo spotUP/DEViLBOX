@@ -827,6 +827,7 @@ export class ToneEngine {
    * @param rate - Playback rate multiplier (1.0 = normal, 2.0 = double speed/up one octave, 0.5 = half speed/down one octave)
    */
   public setGlobalPlaybackRate(rate: number): void {
+    console.log('[ToneEngine] setGlobalPlaybackRate called:', rate);
     this.globalPlaybackRate = rate;
   }
 
@@ -2838,7 +2839,9 @@ export class ToneEngine {
             const sampleRate = config.sample?.sampleRate || 8363;
             const playbackRate = frequency / sampleRate;
             // Apply global playback rate multiplier for pitch shifting
-            (player as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
+            const finalRate = playbackRate * this.globalPlaybackRate;
+            console.log('[ToneEngine] MOD sample playback:', { playbackRate, globalRate: this.globalPlaybackRate, finalRate });
+            (player as unknown as { playbackRate: number }).playbackRate = finalRate;
           } else if (config.metadata?.modPlayback?.usePeriodPlayback && !period) {
             // Warn if period-based playback is enabled but no period provided
             console.warn('[ToneEngine] MOD/XM sample expects period but none provided');
