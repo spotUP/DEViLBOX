@@ -19,7 +19,7 @@ import { useTransportStore } from '../../stores/useTransportStore';
 import type { InstrumentConfig } from '../../types/instrument';
 import type { BeatSlice, BeatSliceConfig, SliceMode } from '../../types/beatSlicer';
 import { DEFAULT_BEAT_SLICE_CONFIG } from '../../types/beatSlicer';
-import { BeatSliceAnalyzer } from '../../lib/audio/BeatSliceAnalyzer';
+import { BeatSliceAnalyzer, removeSlice } from '../../lib/audio/BeatSliceAnalyzer';
 import { getToneEngine } from '../../engine/ToneEngine';
 
 interface BeatSlicerPanelProps {
@@ -100,6 +100,15 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
     setSlices([]);
     onSliceSelect?.(null);
   }, [setSlices, onSliceSelect]);
+
+  // Remove a single slice
+  const handleRemoveSlice = useCallback((sliceId: string) => {
+    const newSlices = removeSlice(slices, sliceId);
+    setSlices(newSlices);
+    if (selectedSliceId === sliceId) {
+      onSliceSelect?.(null);
+    }
+  }, [slices, setSlices, selectedSliceId, onSliceSelect]);
 
   // Preview a single slice
   const handlePreviewSlice = useCallback(async (slice: BeatSlice) => {
@@ -356,6 +365,16 @@ export const BeatSlicerPanel: React.FC<BeatSlicerPanelProps> = ({
                       title="Preview"
                     >
                       <Play size={10} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveSlice(slice.id);
+                      }}
+                      className="p-0.5 hover:bg-red-500/20 text-red-400 rounded"
+                      title="Remove slice"
+                    >
+                      <X size={10} />
                     </button>
                   </div>
                 ))}

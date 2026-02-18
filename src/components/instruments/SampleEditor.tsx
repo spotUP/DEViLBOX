@@ -39,6 +39,7 @@ import { drawSampleWaveform } from '../../utils/audio/drawSampleWaveform';
 import type { WaveformDrawOptions } from '../../utils/audio/drawSampleWaveform';
 import { useSampleEditorState } from '../../hooks/useSampleEditorState';
 import type { DragTarget } from '../../hooks/useSampleEditorState';
+import { addManualSlice } from '../../lib/audio/BeatSliceAnalyzer';
 
 // ─── Props & types ─────────────────────────────────────────────────────
 
@@ -124,6 +125,9 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   const sampleInfo: SampleInfo | null = (params.sampleInfo as SampleInfo) || null;
   const granular = instrument.granular;
   const isGranular = instrument.synthType === 'GranularSynth';
+
+  // ─── Beat slicer state ──────────────────────────────────────────
+  const [selectedSliceId, setSelectedSliceId] = React.useState<string | null>(null);
 
   // ─── Persist callbacks for the state hook ────────────────────────
   const onPersistBuffer = useCallback(
@@ -371,13 +375,14 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       activeDrag: dragTarget,
       showSpectrum,
       slices: showBeatSlicer ? instrument.sample?.slices : undefined,
+      selectedSliceId: showBeatSlicer ? selectedSliceId : null,
     };
     drawSampleWaveform(ctx, CANVAS_W, CANVAS_H, opts);
   }, [
     audioBuffer, viewStart, viewEnd, startTime, endTime,
     selectionStart, selectionEnd, loopEnabled, loopStart, loopEnd, loopType,
     playbackPosition, isGranular, granular, dragTarget, showSpectrum,
-    showBeatSlicer, instrument.sample?.slices,
+    showBeatSlicer, instrument.sample?.slices, selectedSliceId,
   ]);
 
   // ─── Canvas draw: minimap ────────────────────────────────────────
@@ -566,6 +571,27 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         fileInputRef.current?.click();
         return;
       }
+
+      // Manual slice mode: add slice at click position
+      const sliceConfig = instrument.sample?.sliceConfig;
+      if (showBeatSlicer && sliceConfig?.mode === 'manual') {
+        const { x } = getCanvasNorm(e);
+        const framePos = canvasXToSample(x);
+        const currentSlices = instrument.sample?.slices || [];
+
+        const newSlices = addManualSlice(currentSlices, framePos, audioBuffer, sliceConfig);
+
+        if (newSlices.length !== currentSlices.length) {
+          updateInstrument(instrument.id, {
+            sample: {
+              ...instrument.sample,
+              slices: newSlices,
+            },
+          });
+        }
+        return;
+      }
+
       // Ctrl+Click: granular scan position
       if (isGranular && (e.ctrlKey || e.metaKey)) {
         const { x } = getCanvasNorm(e);
@@ -589,6 +615,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     [
       audioBuffer, isGranular, getCanvasNorm, hitTestHandle, setDragTarget,
       dragTargetRef, canvasXToSample, canvasXToNorm, setSelection, updateGranular,
+      showBeatSlicer, instrument, updateInstrument,
     ],
   );
 
@@ -901,6 +928,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         <BeatSlicerPanel
           instrument={instrument}
           audioBuffer={audioBuffer}
+          selectedSliceId={selectedSliceId}
+          onSliceSelect={setSelectedSliceId}
           onClose={() => setShowBeatSlicer(false)}
         />
       )}
