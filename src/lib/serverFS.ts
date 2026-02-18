@@ -24,7 +24,8 @@ export async function isServerFSAvailable(): Promise<boolean> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 1000); // 1 second timeout
 
-    const response = await fetch(`${API_BASE}/api/files/songs`, {
+    // Check the public demo endpoint instead of auth-required endpoint
+    const response = await fetch(`${API_BASE}/api/demo/songs/`, {
       method: 'HEAD',
       signal: controller.signal
     });
@@ -93,17 +94,53 @@ export function listManifestDirectory(dirPath: string): ServerFileEntry[] {
 }
 
 /**
- * List directory contents
+ * List directory contents (public demo files, no auth required)
  */
 export async function listServerDirectory(dirPath: string): Promise<ServerFileEntry[]> {
   const cleanPath = dirPath.replace(/^\/+/, '');
-  const response = await fetch(`${API_BASE}/api/files/${cleanPath}`);
+
+  // Determine type (songs or instruments) and subpath
+  let type = 'songs';
+  let subpath = '';
+
+  if (cleanPath === '' || cleanPath === 'songs') {
+    type = 'songs';
+    subpath = '';
+  } else if (cleanPath === 'instruments') {
+    type = 'instruments';
+    subpath = '';
+  } else if (cleanPath.startsWith('instruments/')) {
+    type = 'instruments';
+    subpath = cleanPath.replace(/^instruments\/?/, '');
+  } else if (cleanPath.startsWith('songs/')) {
+    type = 'songs';
+    subpath = cleanPath.replace(/^songs\/?/, '');
+  } else {
+    // Assume it's a subpath within songs
+    type = 'songs';
+    subpath = cleanPath;
+  }
+
+  const response = await fetch(`${API_BASE}/api/demo/${type}/${subpath}`);
 
   if (!response.ok) {
     throw new Error(`Failed to list directory: ${response.statusText}`);
   }
 
   const data = await response.json();
+
+  // New API returns array directly
+  if (Array.isArray(data)) {
+    return data.map(entry => ({
+      name: entry.name,
+      path: cleanPath ? `${cleanPath}/${entry.name}` : entry.name,
+      isDirectory: entry.isDirectory,
+      size: entry.size,
+      modifiedAt: entry.modifiedAt,
+    }));
+  }
+
+  // Fallback for old format
   return data.items || [];
 }
 

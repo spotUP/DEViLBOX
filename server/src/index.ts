@@ -49,6 +49,56 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });
 });
 
+// Public demo file browsing (no auth required)
+import fs from 'fs';
+import path from 'path';
+
+app.get('/api/demo/:type/*', (req, res) => {
+  try {
+    const { type } = req.params;
+    const subpath = req.params[0] || '';
+
+    // Only allow 'songs' or 'instruments'
+    if (type !== 'songs' && type !== 'instruments') {
+      return res.status(400).json({ error: 'Invalid type' });
+    }
+
+    const dataRoot = process.env.DATA_ROOT || '/var/www/devilbox/data';
+    const basePath = path.join(dataRoot, 'public', type);
+    const targetPath = path.join(basePath, subpath);
+
+    // Security: ensure path is within basePath
+    if (!targetPath.startsWith(basePath)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (!fs.existsSync(targetPath)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const stats = fs.statSync(targetPath);
+
+    if (stats.isDirectory()) {
+      // List directory contents
+      const entries = fs.readdirSync(targetPath, { withFileTypes: true });
+      const result = entries.map(entry => ({
+        name: entry.name,
+        isDirectory: entry.isDirectory(),
+        path: subpath ? `${subpath}/${entry.name}` : entry.name,
+        size: entry.isDirectory() ? undefined : fs.statSync(path.join(targetPath, entry.name)).size,
+        modifiedAt: fs.statSync(path.join(targetPath, entry.name)).mtime.toISOString(),
+      }));
+      res.json(result);
+    } else {
+      // Return file
+      res.sendFile(targetPath);
+    }
+  } catch (error) {
+    console.error('[API] Demo file error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Static file serving for public demo content
 app.use('/data/public', express.static(process.env.DATA_ROOT + '/public' || '/var/www/devilbox/data/public'));
 
