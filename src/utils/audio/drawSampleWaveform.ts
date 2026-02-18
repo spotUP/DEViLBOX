@@ -38,7 +38,8 @@ export interface WaveformDrawOptions {
   activeDrag: string | null;
   
   // Beat slicer markers (frame positions)
-  slices?: Array<{ startFrame: number; endFrame: number }>;
+  slices?: Array<{ id: string; startFrame: number; endFrame: number; confidence?: number }>;
+  selectedSliceId?: string | null;
 
   // Display mode
   showSpectrum?: boolean;
@@ -295,6 +296,18 @@ function drawOverlays(
     drawLoopHandle(ctx, loopEndX, height, 'loopEnd', opts.activeDrag === 'loopEnd', opts.loopType);
   }
 
+  // ─── Selected slice highlight ────────
+  if (opts.selectedSliceId && opts.slices && opts.slices.length > 0 && opts.audioBuffer) {
+    const totalFrames = opts.audioBuffer.length;
+    const selectedSlice = opts.slices.find(s => s.id === opts.selectedSliceId);
+    if (selectedSlice) {
+      const startX = normToX(selectedSlice.startFrame / totalFrames);
+      const endX = normToX(selectedSlice.endFrame / totalFrames);
+      ctx.fillStyle = 'rgba(255, 165, 0, 0.15)'; // Orange tint
+      ctx.fillRect(startX, 0, endX - startX, height);
+    }
+  }
+
   // ─── Slice markers ───────────────────
   if (opts.slices && opts.slices.length > 0 && opts.audioBuffer) {
     const totalFrames = opts.audioBuffer.length;
@@ -308,17 +321,24 @@ function drawOverlays(
 
       // Only draw if in view
       if (startX >= 0 && startX <= width) {
-        // Dashed line
+        // Vary line style based on confidence
+        const confidence = slice.confidence ?? 1.0;
+        const lineWidth = 1 + confidence;  // 1-2px based on confidence
+        const alpha = 0.5 + confidence * 0.5;  // 0.5-1.0 opacity
+
+        // Dashed line with confidence-based styling
         ctx.setLineDash([4, 3]);
-        ctx.strokeStyle = COLORS.sliceMarker;
+        ctx.strokeStyle = `rgba(168, 85, 247, ${alpha})`;  // Purple with variable opacity
+        ctx.lineWidth = lineWidth;
         ctx.beginPath();
         ctx.moveTo(startX, 0);
         ctx.lineTo(startX, height);
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.lineWidth = 1;  // Reset
 
         // Slice number label
-        ctx.fillStyle = COLORS.sliceLabel;
+        ctx.fillStyle = `rgba(168, 85, 247, ${0.7 + confidence * 0.3})`;  // Label opacity 0.7-1.0
         ctx.font = 'bold 9px "JetBrains Mono", monospace';
         ctx.fillText(String(i + 1), startX + 3, 11);
       }
