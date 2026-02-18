@@ -827,7 +827,6 @@ export class ToneEngine {
    * @param rate - Playback rate multiplier (1.0 = normal, 2.0 = double speed/up one octave, 0.5 = half speed/down one octave)
    */
   public setGlobalPlaybackRate(rate: number): void {
-    console.log('[ToneEngine] setGlobalPlaybackRate called:', rate);
     this.globalPlaybackRate = rate;
   }
 

@@ -1035,7 +1035,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const hasEffect = colEffTyp !== 0 || colEff !== 0;
       if (hasEffect) {
         ctx.fillStyle = colors.textEffect;
-        ctx.fillText(colEffTyp.toString(16).toUpperCase() + hexByte(colEff), x, y);
+        // Convert effect type to character: 0-9 stay as digits, 10+ become A-Z
+        const effChar = colEffTyp < 10 ? colEffTyp.toString() : String.fromCharCode(55 + colEffTyp);
+        ctx.fillText(effChar + hexByte(colEff), x, y);
       } else if (!blankEmpty) {
         ctx.fillStyle = colors.textMuted;
         ctx.fillText('...', x, y);
@@ -1537,7 +1539,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               let cW = 0;
               
               if (t === 'note') {
-                cX = 8;
+                cX = 0; // Note column starts at x (centered position)
                 cW = noteWidth;
               } else {
                 cX = paramBase;
@@ -1563,7 +1565,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   cW = CHAR_WIDTH * 2 + 4;
                 }
               }
-              if (cW > 0) ctx.fillRect(colX + cX, y, cW, ROW_HEIGHT);
+              if (cW > 0) ctx.fillRect(x + cX, y, cW, ROW_HEIGHT); // Use x (centered) instead of colX
             });
           } else {
             // Full channel highlight

@@ -781,10 +781,6 @@ export class TrackerReplayer {
   private processRow(chIndex: number, ch: ChannelState, row: TrackerCell, time: number): void {
     if (!this.song) return;
 
-    // DEBUG: Log channel index for notes to verify multi-channel routing
-    if (row.note > 0 && row.note < 97) {
-      console.log(`[TrackerReplayer] processRow chIndex=${chIndex} row=${this.pattPos} note=${row.note} inst=${row.instrument}`);
-    }
 
     // Compute accent/slide/mute/hammer from flexible flag columns
     // Values: 0=none, 1=accent, 2=slide, 3=mute, 4=hammer
@@ -1931,6 +1927,23 @@ export class TrackerReplayer {
     const engine = getToneEngine();
     const globalRate = engine.getGlobalPlaybackRate();
     ch.player.playbackRate = (frequency / sampleRate) * globalRate;
+  }
+
+  /**
+   * Update all active players' playback rates when global playback rate changes
+   * Called by DJ pitch slider to apply pitch shift to already-playing samples
+   */
+  public updateAllPlaybackRates(): void {
+    const engine = getToneEngine();
+    const globalRate = engine.getGlobalPlaybackRate();
+
+    for (const ch of this.channels) {
+      if (ch.player && ch.period > 0) {
+        const sampleRate = ch.instrument?.sample?.sampleRate || 8363;
+        const frequency = AMIGA_PAL_FREQUENCY / ch.period;
+        ch.player.playbackRate = (frequency / sampleRate) * globalRate;
+      }
+    }
   }
 
   /**
