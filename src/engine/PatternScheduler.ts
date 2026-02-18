@@ -69,6 +69,7 @@ export class PatternScheduler {
   // Global pitch shift tracking (DJ-style performance control)
   private baseBPM: number = 125; // Base tempo (affected by Fxx effects)
   private pitchShiftSemitones: number = 0; // Pitch shift (affected by Wxx effects)
+  private globalPitchOffset: number = 0; // Pitch shift from external controls (DJ slider)
 
   /**
    * Track playback errors and notify user if threshold exceeded
@@ -120,6 +121,18 @@ export class PatternScheduler {
     } else {
       console.log('[PatternScheduler] Automation data is empty');
     }
+  }
+
+  /**
+   * Set global pitch offset from external controls (DJ slider, etc.)
+   * This offset is applied on top of pattern effects (Wxx, Fxx)
+   */
+  public setGlobalPitchOffset(semitones: number): void {
+    this.globalPitchOffset = semitones;
+    // Recalculate and apply effective BPM immediately
+    const playbackRate = Math.pow(2, (this.pitchShiftSemitones + this.globalPitchOffset) / 12);
+    const effectiveBPM = this.baseBPM * playbackRate;
+    Tone.getTransport().bpm.value = effectiveBPM;
   }
 
   /**
@@ -344,9 +357,9 @@ export class PatternScheduler {
 
     // Hardware Quirk: apply new BPM/Speed immediately
     if (tickResult.setBPM !== undefined) {
-      // Update base BPM (song tempo) and apply pitch shift
+      // Update base BPM (song tempo) and apply pitch shift (Wxx + global offset)
       this.baseBPM = tickResult.setBPM;
-      const playbackRate = Math.pow(2, this.pitchShiftSemitones / 12);
+      const playbackRate = Math.pow(2, (this.pitchShiftSemitones + this.globalPitchOffset) / 12);
       const effectiveBPM = this.baseBPM * playbackRate;
       engine.setBPM(effectiveBPM);
     }
@@ -354,10 +367,10 @@ export class PatternScheduler {
       (handler as unknown as { speed: number }).speed = tickResult.setSpeed;
     }
 
-    // Global Pitch Shift (DJ-style): Wxx effect
+    // Global Pitch Shift (DJ-style): Wxx effect (pattern-based, add to global offset)
     if (tickResult.setGlobalPitchShift !== undefined) {
       this.pitchShiftSemitones = tickResult.setGlobalPitchShift;
-      const playbackRate = Math.pow(2, this.pitchShiftSemitones / 12);
+      const playbackRate = Math.pow(2, (this.pitchShiftSemitones + this.globalPitchOffset) / 12);
       const effectiveBPM = this.baseBPM * playbackRate;
       Tone.getTransport().bpm.value = effectiveBPM;
     }
@@ -789,9 +802,10 @@ export class PatternScheduler {
       console.warn('[PatternScheduler] Could not release notes:', e);
     }
 
-    // Reset pitch shift to neutral when clearing schedule
+    // Reset pitch shift to neutral when clearing schedule (keep global offset)
     this.pitchShiftSemitones = 0;
-    Tone.getTransport().bpm.value = this.baseBPM;
+    const playbackRate = Math.pow(2, this.globalPitchOffset / 12);
+    Tone.getTransport().bpm.value = this.baseBPM * playbackRate;
 
     if (this.currentPlayback) {
       this.currentPlayback.rowPart.dispose();
