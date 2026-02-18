@@ -105,6 +105,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const processedCanvasRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
+  const filterCanvasRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const processedBuffers = useRef<Map<string, AudioBuffer>>(new Map());
 
   // Initialize with current buffer if provided
@@ -173,6 +174,51 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
       const yMax = (1 + max) * amp;
       ctx.fillRect(i, yMin, 1, Math.max(1, yMax - yMin));
     }
+  }, []);
+
+  // Helper: Draw filter visualization overlays (lo-cut and hi-cut)
+  const drawFilterOverlays = useCallback((
+    canvas: HTMLCanvasElement,
+    loCutHz: number,
+    hiCutHz: number
+  ) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.parentElement?.clientWidth || 300;
+    const height = 60;
+    canvas.width = width;
+    canvas.height = height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Logarithmic frequency to linear position conversion (40 Hz - 20000 Hz)
+    const toLin = (freq: number) => {
+      const minv = Math.log(40);
+      const maxv = Math.log(20000);
+      const scale = (maxv - minv) / width;
+      return (Math.log(freq) - minv) / scale;
+    };
+
+    // Lo-cut (high-pass) - purple overlay on LEFT side
+    const loCutPos = toLin(loCutHz);
+    ctx.fillStyle = 'rgba(171, 115, 218, 0.5)';
+    ctx.beginPath();
+    ctx.moveTo(0, height);
+    ctx.lineTo(loCutPos, height);
+    ctx.quadraticCurveTo(loCutPos + 20, height, loCutPos + 20, 0);
+    ctx.lineTo(0, 0);
+    ctx.fill();
+
+    // Hi-cut (low-pass) - blue overlay on RIGHT side
+    const hiCutPos = toLin(hiCutHz);
+    ctx.fillStyle = 'rgba(106, 176, 239, 0.5)';
+    ctx.beginPath();
+    ctx.moveTo(width, height);
+    ctx.lineTo(hiCutPos, height);
+    ctx.quadraticCurveTo(hiCutPos - 20, height, hiCutPos - 20, 0);
+    ctx.lineTo(width, 0);
+    ctx.fill();
   }, []);
 
   // Process sample with filters + limiter and return processed buffer
@@ -689,6 +735,18 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                           className="absolute top-0 left-0 w-full"
                           style={{ opacity: 0.6, mixBlendMode: 'screen' }}
                         />
+                        {/* Filter visualization overlay (lo-cut purple, hi-cut blue) */}
+                        <canvas
+                          ref={(el) => {
+                            if (el) {
+                              filterCanvasRefs.current.set(sample.id, el);
+                              // Draw filter overlays
+                              drawFilterOverlays(el, sample.loCutHz, sample.hiCutHz);
+                            }
+                          }}
+                          className="absolute top-0 left-0 w-full"
+                          style={{ opacity: 1, pointerEvents: 'none' }}
+                        />
                       </div>
 
                       {/* Filter Sliders */}
@@ -704,6 +762,11 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                               setSamples((prev) =>
                                 prev.map((s, i) => (i === index ? { ...s, loCutHz: newVal } : s))
                               );
+                              // Redraw filter overlay
+                              const filterCanvas = filterCanvasRefs.current.get(sample.id);
+                              if (filterCanvas) {
+                                drawFilterOverlays(filterCanvas, newVal, sample.hiCutHz);
+                              }
                             }}
                             className="w-full"
                             style={{ accentColor: '#fff' }}
@@ -720,6 +783,11 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                               setSamples((prev) =>
                                 prev.map((s, i) => (i === index ? { ...s, hiCutHz: newVal } : s))
                               );
+                              // Redraw filter overlay
+                              const filterCanvas = filterCanvasRefs.current.get(sample.id);
+                              if (filterCanvas) {
+                                drawFilterOverlays(filterCanvas, sample.loCutHz, newVal);
+                              }
                             }}
                             className="w-full"
                             style={{ accentColor: '#fff' }}
@@ -765,6 +833,11 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                               setSamples((prev) =>
                                 prev.map((s, i) => (i === index ? { ...s, loCutHz: newVal } : s))
                               );
+                              // Redraw filter overlay
+                              const filterCanvas = filterCanvasRefs.current.get(sample.id);
+                              if (filterCanvas) {
+                                drawFilterOverlays(filterCanvas, newVal, sample.hiCutHz);
+                              }
                             }}
                             className="w-14 bg-ft2-header border-0 rounded px-1 py-0.5 text-ft2-text text-[10px] outline-none"
                           />
@@ -780,6 +853,11 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                               setSamples((prev) =>
                                 prev.map((s, i) => (i === index ? { ...s, hiCutHz: newVal } : s))
                               );
+                              // Redraw filter overlay
+                              const filterCanvas = filterCanvasRefs.current.get(sample.id);
+                              if (filterCanvas) {
+                                drawFilterOverlays(filterCanvas, sample.loCutHz, newVal);
+                              }
                             }}
                             className="w-14 bg-ft2-header border-0 rounded px-1 py-0.5 text-ft2-text text-[10px] outline-none"
                           />
