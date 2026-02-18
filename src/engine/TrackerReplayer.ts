@@ -18,6 +18,7 @@ import type { Pattern, TrackerCell } from '@/types';
 import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
 import { getToneEngine } from './ToneEngine';
+import { getPatternScheduler } from './PatternScheduler';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/audio';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
@@ -244,6 +245,11 @@ export class TrackerReplayer {
   private speed = 6;             // Ticks per row
   private bpm = 125;             // Beats per minute
   private globalVolume = 64;     // Global volume (0-64)
+
+  // Global pitch shift (Wxx effect) - DJ-style smooth sliding
+  private globalPitchTarget = 0;      // Target semitones (-12 to +12)
+  private globalPitchCurrent = 0;     // Current semitones (slides toward target)
+  private globalPitchSlideSpeed = 0.5; // Semitones per tick (fixed speed for smooth slides)
 
   // Timing drift diagnostics
   private playbackStartWallTime = 0; // Wall-clock time when playback started
@@ -688,6 +694,9 @@ export class TrackerReplayer {
       this.processMacros(channel, safeTime + (this.currentTick * tickInterval));
     }
 
+    // Process global pitch shift slide (Wxx effect) - once per tick
+    this.doGlobalPitchSlide(safeTime);
+
     // Notify tick processing
     if (this.onTickProcess) {
       this.onTickProcess(this.currentTick, this.pattPos);
@@ -1127,6 +1136,12 @@ export class TrackerReplayer {
         ch.retrigCount = param & 0x0F;
         ch.retrigVolSlide = (param >> 4) & 0x0F;
         break;
+
+      case 0x20: // Global pitch shift (Wxx) - DJ-style smooth slide
+        // W00 = -12 semitones, W80 = 0 semitones, WFF = +12 semitones
+        // Set target - actual slide happens on ticks 1+
+        this.globalPitchTarget = ((param - 128) / 128) * 12;
+        break;
     }
   }
 
@@ -1494,6 +1509,51 @@ export class TrackerReplayer {
     }
 
     this.updateAllChannelVolumes(time);
+  }
+
+  /**
+   * Global pitch shift slide (Wxx effect) - DJ-style smooth sliding
+   * Slides current pitch toward target at fixed speed (0.5 semitones per tick)
+   */
+  private doGlobalPitchSlide(time: number): void {
+    // Skip if already at target
+    if (Math.abs(this.globalPitchCurrent - this.globalPitchTarget) < 0.01) {
+      this.globalPitchCurrent = this.globalPitchTarget;
+      return;
+    }
+
+    // Slide toward target at fixed speed
+    if (this.globalPitchCurrent < this.globalPitchTarget) {
+      this.globalPitchCurrent += this.globalPitchSlideSpeed;
+      if (this.globalPitchCurrent > this.globalPitchTarget) {
+        this.globalPitchCurrent = this.globalPitchTarget;
+      }
+    } else {
+      this.globalPitchCurrent -= this.globalPitchSlideSpeed;
+      if (this.globalPitchCurrent < this.globalPitchTarget) {
+        this.globalPitchCurrent = this.globalPitchTarget;
+      }
+    }
+
+    // Apply the new pitch shift
+    const playbackRate = Math.pow(2, this.globalPitchCurrent / 12);
+
+    // Update global playback rate for new notes
+    const engine = getToneEngine();
+    engine.setGlobalPlaybackRate(playbackRate);
+
+    // Update all currently playing samples
+    this.updateAllPlaybackRates();
+
+    // Update BPM to reflect pitch shift
+    const effectiveBPM = Math.round(this.bpm * playbackRate * 100) / 100;
+    useTransportStore.getState().setBPM(effectiveBPM);
+    Tone.getTransport().bpm.value = effectiveBPM;
+
+    // Update PatternScheduler so DJ pitch slider reflects the W command
+    // Access the internal state directly to avoid triggering the debounced BPM update
+    const scheduler = getPatternScheduler();
+    (scheduler as any).globalPitchOffset = this.globalPitchCurrent;
   }
 
   /**
