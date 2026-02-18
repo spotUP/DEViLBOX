@@ -118,10 +118,10 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
       </span>
 
       {/* ── Scale + Housing ─────────────────────────────────────────── */}
-      <div className="relative flex-1 min-h-0 w-full flex flex-row gap-0.5">
+      <div className="relative flex-1 min-h-0 w-full flex flex-row gap-0">
 
       {/* Scale marks — left of housing, -8 top / 0 mid / +8 bottom */}
-      <div className="relative flex-shrink-0 flex flex-col justify-between py-[4px]" style={{ width: 14 }}>
+      <div className="relative flex-shrink-0 flex flex-col justify-between py-[4px]" style={{ width: 18 }}>
         {['-8','','','-4','','','0','','','+4','','','+8'].map((label, i, arr) => {
           const isMajor = label !== '';
           return (
