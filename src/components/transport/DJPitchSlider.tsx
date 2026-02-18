@@ -11,6 +11,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import * as Tone from 'tone';
+import { getPatternScheduler } from '@engine/PatternScheduler';
 
 interface DJPitchSliderProps {
   className?: string;
@@ -30,38 +31,34 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
   const [pitch, setPitch] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
 
-  const baseBPMRef = useRef<number | null>(null);
-  const trackRef   = useRef<HTMLDivElement>(null);
-  const dragRef    = useRef({ startY: 0, startPitch: 0 });
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragRef  = useRef({ startY: 0, startPitch: 0 });
 
   // ── Audio ──────────────────────────────────────────────────────────
   const applyPitch = useCallback((raw: number) => {
     const clamped = Math.max(MIN_PITCH, Math.min(MAX_PITCH, raw));
-    console.log('[DJPitchSlider] applyPitch:', { raw, clamped, currentBPM: Tone.getTransport().bpm.value });
     setPitch(clamped);
-    if (baseBPMRef.current === null) {
-      baseBPMRef.current = Tone.getTransport().bpm.value;
-      console.log('[DJPitchSlider] Stored base BPM:', baseBPMRef.current);
-    }
-    const newBPM = baseBPMRef.current * Math.pow(2, clamped / 12);
-    console.log('[DJPitchSlider] Setting BPM:', { baseBPM: baseBPMRef.current, semitones: clamped, newBPM });
-    Tone.getTransport().bpm.value = newBPM;
+
+    // Set global pitch offset in PatternScheduler (works during playback and when stopped)
+    const scheduler = getPatternScheduler();
+    scheduler.setGlobalPitchOffset(clamped);
+
     onPitchChange?.(clamped);
   }, [onPitchChange]);
 
   const resetPitch = useCallback(() => {
-    if (baseBPMRef.current !== null) {
-      Tone.getTransport().bpm.value = baseBPMRef.current;
-      baseBPMRef.current = null;
-    }
     setPitch(0);
+
+    // Reset global pitch offset in PatternScheduler
+    const scheduler = getPatternScheduler();
+    scheduler.setGlobalPitchOffset(0);
+
     onPitchChange?.(0);
   }, [onPitchChange]);
 
   // ── Drag ───────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    console.log('[DJPitchSlider] Mouse down:', { clientY: e.clientY, currentPitch: pitch });
     dragRef.current = { startY: e.clientY, startPitch: pitch };
     setIsDragging(true);
   }, [pitch]);
@@ -206,28 +203,27 @@ export const DJPitchSliderHorizontal: React.FC<DJPitchSliderProps> = ({
   onPitchChange,
 }) => {
   const [pitchSemitones, setPitchSemitones] = useState(0);
-  const [baseBPM, setBaseBPM] = useState<number | null>(null);
 
   const handlePitchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseFloat(e.target.value);
     setPitchSemitones(newValue);
-    const playbackRate = Math.pow(2, newValue / 12);
-    if (baseBPM === null) {
-      setBaseBPM(Tone.getTransport().bpm.value);
-    }
-    const currentBase = baseBPM ?? Tone.getTransport().bpm.value;
-    Tone.getTransport().bpm.value = currentBase * playbackRate;
+
+    // Set global pitch offset in PatternScheduler
+    const scheduler = getPatternScheduler();
+    scheduler.setGlobalPitchOffset(newValue);
+
     onPitchChange?.(newValue);
-  }, [onPitchChange, baseBPM]);
+  }, [onPitchChange]);
 
   const handleDoubleClick = useCallback(() => {
     setPitchSemitones(0);
-    if (baseBPM !== null) {
-      Tone.getTransport().bpm.value = baseBPM;
-    }
-    setBaseBPM(null);
+
+    // Reset global pitch offset in PatternScheduler
+    const scheduler = getPatternScheduler();
+    scheduler.setGlobalPitchOffset(0);
+
     onPitchChange?.(0);
-  }, [onPitchChange, baseBPM]);
+  }, [onPitchChange]);
 
   const displayValue = pitchSemitones > 0
     ? `+${pitchSemitones.toFixed(1)}`
