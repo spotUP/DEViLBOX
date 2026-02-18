@@ -120,8 +120,8 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
       {/* ── Scale + Housing ─────────────────────────────────────────── */}
       <div className="relative flex-1 min-h-0 w-full">
 
-      {/* Scale marks — absolutely positioned, ticks flush against housing left edge */}
-      <div className="absolute inset-y-0 right-0 flex flex-col justify-between py-[4px]" style={{ left: 0, right: 'calc(100% - 18px)' }}>
+      {/* Scale marks — overlaps housing, ticks point at groove */}
+      <div className="absolute inset-y-0 z-10 pointer-events-none flex flex-col justify-between py-[4px]" style={{ left: 0, width: 18 }}>
         {['-8','','','-4','','','0','','','+4','','','+8'].map((label, i) => {
           const isMajor = label !== '';
           return (
@@ -137,8 +137,8 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
         })}
       </div>
 
-      {/* Housing — inset left to make room for scale labels */}
-      <div className="absolute inset-y-0 right-0" style={{ left: 18 }}>
+      {/* Housing — full width, sits behind scale */}
+      <div className="absolute inset-0">
 
 
 
