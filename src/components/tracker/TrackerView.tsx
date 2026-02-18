@@ -54,6 +54,7 @@ import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/
 import type { Pattern } from '@typedefs';
 import { downloadPattern } from '@lib/export/PatternExport';
 import { downloadTrack } from '@lib/export/TrackExport';
+import { DJPitchSlider } from '@components/transport/DJPitchSlider';
 
 // Create instruments for imported module, using samples if available
 function createInstrumentsForModule(
@@ -1174,7 +1175,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           )}
         </div>
 
-        {/* Instrument Panel Toggle Button - Flex item 2 - Hide on narrow windows */}
+        {/* DJ Pitch Slider - Flex item 2 */}
+        <div className="flex-shrink-0 flex items-center border-l border-ft2-border bg-ft2-header">
+          <DJPitchSlider />
+        </div>
+
+        {/* Instrument Panel Toggle Button - Flex item 3 - Hide on narrow windows */}
         {windowWidth >= 900 && (
           <button
             onClick={() => setShowInstrumentPanel(!showInstrumentPanel)}

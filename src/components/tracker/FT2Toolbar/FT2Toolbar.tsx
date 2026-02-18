@@ -41,7 +41,6 @@ import { SettingsModal } from '@components/dialogs/SettingsModal';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
-import { DJPitchSlider } from '@components/transport/DJPitchSlider';
 import { importSong, exportSong } from '@lib/export/exporters';
 import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
@@ -617,9 +616,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 max={255}
                 throttleMs={50}
               />
-            </div>
-            <div className="ft2-section flex items-center justify-center px-2">
-              <DJPitchSlider />
             </div>
             <div className="ft2-section ft2-col-3">
               <FT2NumericInput label="Pattern" value={patternOrder[currentPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} format="hex" />
