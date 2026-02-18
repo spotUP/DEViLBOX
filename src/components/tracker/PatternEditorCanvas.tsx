@@ -2037,10 +2037,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   const trigger = { level: 0, triggered: false };
                   const channelWidth = channelWidths[idx];
                   
+                  const isCollapsed = channel.collapsed;
+
                   return (
                     <div
                       key={channel.id}
-                      className={`flex-shrink-0 flex items-center justify-between gap-1 px-2 py-1
+                      className={`flex-shrink-0 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} gap-1 ${isCollapsed ? 'px-0' : 'px-2'} py-1
                         border-r border-dark-border transition-colors relative
                         ${channel.muted ? 'opacity-50' : ''}
                         ${channel.solo ? 'bg-accent-primary/10' : ''}`}
@@ -2050,7 +2052,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                         boxShadow: channel.color ? `inset 2px 0 0 ${channel.color}` : undefined,
                       }}
                     >
-                      <div className="flex items-center gap-1.5 overflow-hidden flex-1 min-w-0">
+                      {!isCollapsed && (
+                        <div className="flex items-center gap-1.5 overflow-hidden flex-1 min-w-0">
                         <span
                           className="font-bold font-mono text-[11px] flex-shrink-0 opacity-80"
                           style={{ color: channel.color || 'var(--color-accent)' }}
@@ -2074,8 +2077,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                           <ChannelVUMeter level={trigger.level} isActive={trigger.triggered} />
                         </div>
                       </div>
+                      )}
 
-                      <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
+                      {!isCollapsed && (
+                        <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
                         <ChannelContextMenu
                           channelIndex={idx}
                           channel={channel}
@@ -2129,7 +2134,26 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                         >
                           <Headphones size={12} />
                         </button>
+                        <button
+                          onClick={() => toggleChannelCollapse(idx)}
+                          className="p-1 rounded transition-colors text-text-muted hover:text-text-primary hover:bg-dark-bgHover"
+                          title="Collapse Channel"
+                        >
+                          <ChevronLeft size={12} />
+                        </button>
                       </div>
+                      )}
+
+                      {/* Collapsed state: just show expand button */}
+                      {isCollapsed && (
+                        <button
+                          onClick={() => toggleChannelCollapse(idx)}
+                          className="p-0.5 rounded transition-colors text-text-muted hover:text-text-primary hover:bg-dark-bgHover"
+                          title="Expand Channel"
+                        >
+                          <ChevronRight size={10} />
+                        </button>
+                      )}
                     </div>
                   );
                 })}
