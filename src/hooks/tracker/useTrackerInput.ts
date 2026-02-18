@@ -1173,7 +1173,14 @@ export const useTrackerInput = () => {
         const effKey = EFFECT_TYPE_KEY_MAP[keyLower];
         if (effKey !== undefined) {
           e.preventDefault();
-          setCell(cursor.channelIndex, cursor.rowIndex, { effTyp: effKey });
+          // Convert effTyp to effect letter (0-9 = '0'-'9', 10+ = 'A'-'Z')
+          const effChar = effKey < 10 ? effKey.toString() : String.fromCharCode(55 + effKey);
+          const effParam = currentCell.eff || 0;
+          const effectString = effChar + effParam.toString(16).padStart(2, '0').toUpperCase();
+          setCell(cursor.channelIndex, cursor.rowIndex, {
+            effTyp: effKey,
+            effect: effectString
+          });
           // FT2: Stay on same column, advance row by editStep with wrapping
           if (editStep > 0 && !isPlaying) {
             moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
@@ -1197,7 +1204,15 @@ export const useTrackerInput = () => {
           newValue = (currentValue & 0xF0) | hexDigit;
         }
 
-        setCell(cursor.channelIndex, cursor.rowIndex, { eff: newValue });
+        // Update effect string along with numeric eff value
+        const effTyp = currentCell.effTyp || 0;
+        const effChar = effTyp < 10 ? effTyp.toString() : String.fromCharCode(55 + effTyp);
+        const effectString = effChar + newValue.toString(16).padStart(2, '0').toUpperCase();
+
+        setCell(cursor.channelIndex, cursor.rowIndex, {
+          eff: newValue,
+          effect: effectString
+        });
 
         // FT2: Stay on same column/digit, advance row by editStep with wrapping
         if (editStep > 0 && !isPlaying) {
@@ -1211,7 +1226,14 @@ export const useTrackerInput = () => {
         const effKey = EFFECT_TYPE_KEY_MAP[keyLower];
         if (effKey !== undefined) {
           e.preventDefault();
-          setCell(cursor.channelIndex, cursor.rowIndex, { effTyp2: effKey });
+          // Convert effTyp2 to effect letter (0-9 = '0'-'9', 10+ = 'A'-'Z')
+          const effChar = effKey < 10 ? effKey.toString() : String.fromCharCode(55 + effKey);
+          const effParam = currentCell.eff2 || 0;
+          const effectString = effChar + effParam.toString(16).padStart(2, '0').toUpperCase();
+          setCell(cursor.channelIndex, cursor.rowIndex, {
+            effTyp2: effKey,
+            effect2: effectString
+          });
           // FT2: Stay on same column, advance row by editStep with wrapping
           if (editStep > 0 && !isPlaying) {
             moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
@@ -1271,7 +1293,15 @@ export const useTrackerInput = () => {
           newValue = (currentValue & 0xF0) | hexDigit;
         }
 
-        setCell(cursor.channelIndex, cursor.rowIndex, { eff2: newValue });
+        // Update effect2 string along with numeric eff2 value
+        const effTyp2 = currentCell.effTyp2 || 0;
+        const effChar = effTyp2 < 10 ? effTyp2.toString() : String.fromCharCode(55 + effTyp2);
+        const effectString = effChar + newValue.toString(16).padStart(2, '0').toUpperCase();
+
+        setCell(cursor.channelIndex, cursor.rowIndex, {
+          eff2: newValue,
+          effect2: effectString
+        });
 
         // FT2: Stay on same column/digit, advance row by editStep with wrapping
         if (editStep > 0 && !isPlaying) {
