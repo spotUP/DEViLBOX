@@ -131,6 +131,8 @@ export class ToneEngine {
   // Track active looping players per channel (to stop when new note triggers)
   private channelActivePlayer: Map<number, Tone.Player> = new Map();
 
+  // Active slice players for reference-based slicing (keyed by "instrumentId-note")
+  private slicePlayersMap: Map<string, Tone.Player> = new Map();
 
   // Per-channel last note state for slide/portamento effects (non-TB303 synths)
   // Tracks the last triggered note frequency so slides can glide to the new note
@@ -2009,10 +2011,58 @@ export class ToneEngine {
           if (!sampler.loaded) {
             return;
           }
-          try {
-            sampler.triggerAttack(note, safeTime, velocity);
-          } catch {
-            // Sampler may throw "No available buffers" if async loading hasn't completed
+
+          // Reference-based slicing: Check if this is a sliced instrument
+          const isSlicedSample = config.sample?.sliceStart !== undefined && config.sample?.sliceEnd !== undefined;
+
+          if (isSlicedSample) {
+            // Play only the slice range using Tone.Player
+            const baseNote = config.sample?.baseNote || 'C4';
+            const samplerInternal = sampler as unknown as { _buffers?: { get?: (note: string) => Tone.ToneAudioBuffer | undefined; _buffers?: Record<string, Tone.ToneAudioBuffer> } };
+            const buffer = samplerInternal._buffers?.get?.(baseNote) ||
+                           samplerInternal._buffers?._buffers?.[baseNote];
+
+            if (buffer && buffer.duration) {
+              const sampleRate = buffer.sampleRate || Tone.getContext().sampleRate;
+              const sliceStart = config.sample!.sliceStart!;
+              const sliceEnd = config.sample!.sliceEnd!;
+
+              // Convert frame indices to time offsets
+              const startTime = sliceStart / sampleRate;
+
+              try {
+                // Create a one-shot Player for this slice (no duration, plays until release)
+                const slicePlayer = new Tone.Player({
+                  url: buffer,
+                  volume: Tone.gainToDb(velocity) + (config.volume || -12),
+                }).toDestination();
+
+                // Calculate pitch adjustment for the note (relative to base note)
+                const baseFreq = Tone.Frequency(baseNote).toFrequency();
+                const targetFreq = Tone.Frequency(note).toFrequency();
+                const playbackRate = targetFreq / baseFreq;
+
+                (slicePlayer as unknown as { playbackRate: number }).playbackRate = playbackRate;
+
+                // Start at slice start
+                slicePlayer.start(safeTime, startTime);
+
+                // Store player reference for later release
+                this.slicePlayersMap.set(`${instrumentId}-${note}`, slicePlayer);
+
+              } catch (e) {
+                console.warn('[ToneEngine] Slice triggerAttack failed, falling back:', e);
+                sampler.triggerAttack(note, safeTime, velocity);
+              }
+            } else {
+              sampler.triggerAttack(note, safeTime, velocity);
+            }
+          } else {
+            try {
+              sampler.triggerAttack(note, safeTime, velocity);
+            } catch {
+              // Sampler may throw "No available buffers" if async loading hasn't completed
+            }
           }
         }
       } else if (config.synthType === 'Player' || config.synthType === 'GranularSynth') {
@@ -2139,6 +2189,24 @@ export class ToneEngine {
 
       // Handle sample-based instruments
       if (config.synthType === 'Sampler') {
+        // Check if this is a sliced sample with an active player
+        const sliceKey = `${instrumentId}-${note}`;
+        const slicePlayer = this.slicePlayersMap.get(sliceKey);
+
+        if (slicePlayer) {
+          // Stop and dispose the slice player
+          if (slicePlayer.state === 'started') {
+            slicePlayer.stop(safeTime);
+          }
+          // Schedule disposal after a short delay to allow for envelope decay
+          Tone.getTransport().scheduleOnce(() => {
+            slicePlayer.dispose();
+          }, safeTime + 0.1);
+          this.slicePlayersMap.delete(sliceKey);
+          return;
+        }
+
+        // Regular sampler release
         const sampler = instrument as Tone.Sampler;
         if (!sampler.loaded) return; // No sample loaded
         sampler.triggerRelease(note, safeTime);
@@ -2738,7 +2806,58 @@ export class ToneEngine {
 
         if (sampler.loaded) {
 
-          if (sampleOffset && sampleOffset > 0) {
+          // Reference-based slicing: Check if this is a sliced instrument
+          const isSlicedSample = config.sample?.sliceStart !== undefined && config.sample?.sliceEnd !== undefined;
+
+          if (isSlicedSample) {
+            // Play only the slice range using Tone.Player
+            const baseNote = config.sample?.baseNote || 'C4';
+            const samplerInternal = sampler as unknown as { _buffers?: { get?: (note: string) => Tone.ToneAudioBuffer | undefined; _buffers?: Record<string, Tone.ToneAudioBuffer> } };
+            const buffer = samplerInternal._buffers?.get?.(baseNote) ||
+                           samplerInternal._buffers?._buffers?.[baseNote];
+
+            if (buffer && buffer.duration) {
+              const sampleRate = buffer.sampleRate || Tone.getContext().sampleRate;
+              const sliceStart = config.sample!.sliceStart!;
+              const sliceEnd = config.sample!.sliceEnd!;
+
+              // Convert frame indices to time offsets
+              const startTime = sliceStart / sampleRate;
+              const endTime = sliceEnd / sampleRate;
+              const sliceDuration = endTime - startTime;
+
+              try {
+                // Create a one-shot Player for this slice
+                const slicePlayer = new Tone.Player({
+                  url: buffer,
+                  volume: Tone.gainToDb(velocity) + (config.volume || -12),
+                }).toDestination();
+
+                // Calculate pitch adjustment for the note (relative to base note)
+                const baseFreq = Tone.Frequency(baseNote).toFrequency();
+                const targetFreq = Tone.Frequency(note).toFrequency();
+                const playbackRate = targetFreq / baseFreq;
+
+                (slicePlayer as unknown as { playbackRate: number }).playbackRate = playbackRate;
+
+                // Start at slice start, stop at slice end
+                slicePlayer.start(safeTime, startTime);
+                slicePlayer.stop(safeTime + Math.min(duration, sliceDuration));
+
+                // Dispose after playback completes
+                Tone.getTransport().scheduleOnce(() => {
+                  slicePlayer.dispose();
+                }, safeTime + duration + 0.1);
+
+              } catch (e) {
+                console.warn('[ToneEngine] Slice playback failed, falling back:', e);
+                sampler.triggerAttackRelease(note, duration, safeTime, velocity);
+              }
+            } else {
+              console.warn('[ToneEngine] Cannot play slice - no buffer found');
+              sampler.triggerAttackRelease(note, duration, safeTime, velocity);
+            }
+          } else if (sampleOffset && sampleOffset > 0) {
             // 9xx Sample offset: Use Player for offset support
             // Tone.Sampler doesn't support sample offset, so we create a one-shot Player
             const baseNote = config.sample?.baseNote || 'C4';
@@ -2943,6 +3062,19 @@ export class ToneEngine {
     // Also clear pitch state and active player tracking for all channels
     this.channelPitchState.clear();
     this.channelActivePlayer.clear();
+
+    // Stop and dispose all active slice players
+    this.slicePlayersMap.forEach((player) => {
+      try {
+        if (player.state === 'started') {
+          player.stop();
+        }
+        player.dispose();
+      } catch {
+        // Ignore errors during cleanup
+      }
+    });
+    this.slicePlayersMap.clear();
 
   }
 

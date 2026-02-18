@@ -2318,9 +2318,16 @@ export interface SampleConfig {
   sampleRate?: number; // For converting loop points to seconds (default 8363 Hz for MOD)
   reverse: boolean;
   playbackRate: number; // 0.25-4x
+
   // Beat slicer data
   slices?: BeatSlice[];
   sliceConfig?: BeatSliceConfig;
+
+  // Reference-based slicing (memory optimization)
+  // When set, this sample is a slice of another instrument's buffer
+  sourceInstrumentId?: number; // Reference to the original instrument
+  sliceStart?: number; // Start frame in the source buffer
+  sliceEnd?: number; // End frame in the source buffer
 }
 
 /**
