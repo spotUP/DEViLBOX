@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-18T13:10:32.350Z
+ * Generated: 2026-02-18T14:29:30.523Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.803';
-export const BUILD_NUMBER = '803';
-export const BUILD_HASH = 'e9bfd2a4';
+export const BUILD_VERSION = '1.0.821';
+export const BUILD_NUMBER = '821';
+export const BUILD_HASH = 'd46aab57';
 export const BUILD_DATE = '2026-02-18';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,81 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.803',
+    version: '1.0.821',
     date: '2026-02-18',
     changes: [
+      {
+        type: 'fix',
+        "description": "AmigaPal UI issues - icon visibility, border clipping, and spacing"
+      },
+      {
+        type: 'fix',
+        "description": "Increase AmigaPal modal width to accommodate custom icons"
+      },
+      {
+        type: 'feature',
+        "description": "Replace AmigaPal copy icons with custom SVG icons"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve all type errors and React hooks violations from code audit"
+      },
+      {
+        type: 'feature',
+        "description": "Add Ableton Link-style sync via Web MIDI Clock"
+      },
+      {
+        type: 'feature',
+        "description": "Add Max for Live sample import utilities"
+      },
+      {
+        type: 'improvement',
+        "description": "Add comprehensive Modular Plugin SDK documentation"
+      },
+      {
+        type: 'feature',
+        "description": "Add 5 new Max for Live-inspired modular modules"
+      },
+      {
+        type: 'fix',
+        "description": "Make AmigaPal modal narrower with responsive waveform"
+      },
+      {
+        type: 'feature',
+        "description": "Add DJ-style turntable pitch slider to AmigaPal"
+      },
+      {
+        type: 'fix',
+        "description": "Make AmigaPal modal height dynamic instead of full-screen"
+      },
+      {
+        type: 'feature',
+        "description": "Update AmigaPal UI to use FT2 design system"
+      },
+      {
+        type: 'fix',
+        "description": "Replace non-existent Random icon with Shuffle"
+      },
+      {
+        type: 'feature',
+        "description": "Add real-time waveform preview showing processed output"
+      },
+      {
+        type: 'feature',
+        "description": "Completely rewrite AmigaPalModal UI to match original 1:1"
+      },
+      {
+        type: 'fix',
+        "description": "Stale sample playing after loading new sample from pack browser"
+      },
+      {
+        type: 'fix',
+        "description": "Preset preview not playing on first click in LoadPresetModal"
+      },
+      {
+        type: 'fix',
+        "description": "Complete 1:1 AmigaPal port with all features and bug fixes"
+      },
       {
         type: 'feature',
         "description": "Integrate AmigaPal 8-bit conversion into sample editor"
@@ -172,78 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Velocity lane now shows full width with helpful empty state"
-      },
-      {
-        type: 'feature',
-        "description": "Improve piano roll velocity lane and multi-channel UX"
-      },
-      {
-        type: 'improvement',
-        "description": "Improve piano roll tool button tooltips"
-      },
-      {
-        type: 'feature',
-        "description": "Color code notes by instrument in piano roll"
-      },
-      {
-        type: 'feature',
-        "description": "Ensure piano keys trigger on note edges during playback"
-      },
-      {
-        type: 'improvement',
-        "description": "Improve piano roll smooth scrolling with ease-out-cubic"
-      },
-      {
-        type: 'fix',
-        "description": "Piano roll initialization error and improve default zoom"
-      },
-      {
-        type: 'feature',
-        "description": "Seamless wrap-around scrolling for piano roll playback"
-      },
-      {
-        type: 'feature',
-        "description": "Remove playhead line from piano roll during playback"
-      },
-      {
-        type: 'feature',
-        "description": "Add smooth RAF-based scrolling to piano roll playback"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert: back to scrollLeft for proper viewport scrolling"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused variables and fix duplicate grid declaration"
-      },
-      {
-        type: 'feature',
-        "description": "Use CSS transform for GPU-accelerated smooth scrolling"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove smooth marker functionality, keep discrete mode with trails"
-      },
-      {
-        type: 'feature',
-        "description": "Add animated gradient overlay for smooth visual flow effect"
-      },
-      {
-        type: 'fix',
-        "description": "Fix smooth marker vertical alignment with notes"
-      },
-      {
-        type: 'improvement',
-        "description": "Make viewport scrolling perfectly smooth - sync with marker animation"
-      },
-      {
-        type: 'fix',
-        "description": "Fix beat marker sizing - apply to cell button not wrapper"
-      },
-      {
-        type: 'improvement',
-        "description": "Simplify beat markers - just color every 4th cell background"
       }
     ]
   }

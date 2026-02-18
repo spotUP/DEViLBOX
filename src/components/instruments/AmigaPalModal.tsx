@@ -12,7 +12,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { X, FolderOpen, Folder, Trash2, Shuffle } from 'lucide-react';
-import { CopyLimiterIcon, CopyLoCutIcon, CopyHiCutIcon, CopyPTNoteIcon } from '@components/icons/AmigaPalIcons';
+import { CopyLimiterIcon, CopyLoCutIcon, CopyHiCutIcon, CopyPTNoteIcon, LimiterIcon } from '@components/icons/AmigaPalIcons';
 import type { ProcessedResult } from '@utils/audio/SampleProcessing';
 
 // ProTracker notes (C-1 to B-3, 36 notes total)
@@ -739,11 +739,12 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                             )
                           );
                         }}
-                        className={`w-full px-2 py-1 border border-ft2-border text-xs font-bold ${
+                        className={`w-full px-2 py-1 border border-ft2-border text-xs font-bold flex items-center justify-center gap-1.5 ${
                           sample.limiterEnabled ? 'bg-ft2-header' : 'bg-ft2-bgSecondary text-ft2-textDim'
                         }`}
                       >
-                        🔨 Limiter
+                        <LimiterIcon size={12} />
+                        Limiter
                       </button>
                     </div>
 
