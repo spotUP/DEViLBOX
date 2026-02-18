@@ -1550,8 +1550,10 @@ export class TrackerReplayer {
     useTransportStore.getState().setBPM(effectiveBPM);
     Tone.getTransport().bpm.value = effectiveBPM;
 
-    // Update PatternScheduler so DJ pitch slider reflects the W command
-    // Access the internal state directly to avoid triggering the debounced BPM update
+    // Update global pitch in store (makes DJ slider move to reflect W command)
+    useTransportStore.getState().setGlobalPitch(this.globalPitchCurrent);
+
+    // Update PatternScheduler to stay in sync
     const scheduler = getPatternScheduler();
     (scheduler as any).globalPitchOffset = this.globalPitchCurrent;
   }

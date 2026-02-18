@@ -11,6 +11,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { getPatternScheduler } from '@engine/PatternScheduler';
+import { useTransportStore } from '@stores/useTransportStore';
 
 interface DJPitchSliderProps {
   className?: string;
@@ -27,8 +28,19 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
   className = '',
   onPitchChange,
 }) => {
-  const [pitch, setPitch] = useState(0);
+  // Read from global store (updated by W commands)
+  const globalPitch = useTransportStore((state) => state.globalPitch);
+  const setGlobalPitch = useTransportStore((state) => state.setGlobalPitch);
+
+  const [pitch, setPitch] = useState(globalPitch);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Sync local pitch with global store when it changes externally (from W commands)
+  useEffect(() => {
+    if (!isDragging) {
+      setPitch(globalPitch);
+    }
+  }, [globalPitch, isDragging]);
 
   const trackRef = useRef<HTMLDivElement>(null);
   const dragRef  = useRef({ startY: 0, startPitch: 0 });
@@ -44,22 +56,28 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
     const clamped = Math.max(MIN_PITCH, Math.min(MAX_PITCH, raw));
     setPitch(clamped);
 
+    // Update global pitch in store (so W commands can read it and vice versa)
+    setGlobalPitch(clamped);
+
     // Set global pitch offset in PatternScheduler (works during playback and when stopped)
     const scheduler = getPatternScheduler();
     scheduler.setGlobalPitchOffset(clamped);
 
     onPitchChange?.(clamped);
-  }, [onPitchChange]);
+  }, [onPitchChange, setGlobalPitch]);
 
   const resetPitch = useCallback(() => {
     setPitch(0);
+
+    // Update global pitch in store
+    setGlobalPitch(0);
 
     // Reset global pitch offset in PatternScheduler
     const scheduler = getPatternScheduler();
     scheduler.setGlobalPitchOffset(0);
 
     onPitchChange?.(0);
-  }, [onPitchChange]);
+  }, [onPitchChange, setGlobalPitch]);
 
   // ── Drag ───────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -207,28 +225,43 @@ export const DJPitchSliderHorizontal: React.FC<DJPitchSliderProps> = ({
   className = '',
   onPitchChange,
 }) => {
-  const [pitchSemitones, setPitchSemitones] = useState(0);
+  // Read from global store (updated by W commands)
+  const globalPitch = useTransportStore((state) => state.globalPitch);
+  const setGlobalPitch = useTransportStore((state) => state.setGlobalPitch);
+
+  const [pitchSemitones, setPitchSemitones] = useState(globalPitch);
+
+  // Sync local pitch with global store when it changes externally (from W commands)
+  useEffect(() => {
+    setPitchSemitones(globalPitch);
+  }, [globalPitch]);
 
   const handlePitchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseFloat(e.target.value);
     setPitchSemitones(newValue);
+
+    // Update global pitch in store
+    setGlobalPitch(newValue);
 
     // Set global pitch offset in PatternScheduler
     const scheduler = getPatternScheduler();
     scheduler.setGlobalPitchOffset(newValue);
 
     onPitchChange?.(newValue);
-  }, [onPitchChange]);
+  }, [onPitchChange, setGlobalPitch]);
 
   const handleDoubleClick = useCallback(() => {
     setPitchSemitones(0);
+
+    // Update global pitch in store
+    setGlobalPitch(0);
 
     // Reset global pitch offset in PatternScheduler
     const scheduler = getPatternScheduler();
     scheduler.setGlobalPitchOffset(0);
 
     onPitchChange?.(0);
-  }, [onPitchChange]);
+  }, [onPitchChange, setGlobalPitch]);
 
   const displayValue = pitchSemitones > 0
     ? `+${pitchSemitones.toFixed(1)}`
