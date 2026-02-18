@@ -1754,51 +1754,22 @@ export const useInstrumentStore = create<InstrumentStore>()(
       }
 
       const newInstrumentIds: number[] = [];
-      const engine = getToneEngine();
+      const existingIds = get().instruments.map((i) => i.id);
 
       try {
-        // Fetch and decode the source audio
+        // Get sample rate from source (fetch only to get metadata, not copy data)
+        const engine = getToneEngine();
         const response = await fetch(sourceInstrument.sample.url);
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await engine.decodeAudioData(arrayBuffer);
-
-        const existingIds = get().instruments.map((i) => i.id);
+        const sampleRate = audioBuffer.sampleRate;
 
         for (let i = 0; i < slices.length; i++) {
           const slice = slices[i];
           const newId = findNextId([...existingIds, ...newInstrumentIds]);
           newInstrumentIds.push(newId);
 
-          // Extract slice audio data
           const sliceLength = slice.endFrame - slice.startFrame;
-          const numChannels = audioBuffer.numberOfChannels;
-          const sampleRate = audioBuffer.sampleRate;
-
-          // Create offline context to render the slice
-          const offlineCtx = new OfflineAudioContext(numChannels, sliceLength, sampleRate);
-          const sliceBuffer = offlineCtx.createBuffer(numChannels, sliceLength, sampleRate);
-
-          // Copy audio data for each channel
-          for (let ch = 0; ch < numChannels; ch++) {
-            const sourceData = audioBuffer.getChannelData(ch);
-            const destData = sliceBuffer.getChannelData(ch);
-            for (let j = 0; j < sliceLength; j++) {
-              destData[j] = sourceData[slice.startFrame + j];
-            }
-          }
-
-          // Encode slice to ArrayBuffer (WAV)
-          const sliceArrayBuffer = await engine.encodeAudioData(sliceBuffer);
-
-          // Create data URL from the array buffer
-          const blob = new Blob([sliceArrayBuffer], { type: 'audio/wav' });
-          const dataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
-
-          // Create the new instrument
           const sliceName = slice.label || `${namePrefix} ${i + 1}`;
           const instrumentName = sourceInstrument.name
             ? `${sourceInstrument.name} - ${sliceName}`
@@ -1811,8 +1782,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
               type: 'sample',
               synthType: 'Sampler',
               sample: {
-                url: dataUrl,
-                audioBuffer: sliceArrayBuffer,
+                // REFERENCE-BASED: Point to source instead of duplicating data
+                url: sourceInstrument.sample!.url,
+                sourceInstrumentId: sourceId,
+                sliceStart: slice.startFrame,
+                sliceEnd: slice.endFrame,
+                // Inherit sample properties from source
                 baseNote: sourceInstrument.sample?.baseNote || 'C-4',
                 detune: sourceInstrument.sample?.detune || 0,
                 loop: false,
@@ -1838,7 +1813,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
           });
         }
 
-        console.log(`[InstrumentStore] Created ${newInstrumentIds.length} sliced instruments`);
+        console.log(`[InstrumentStore] Created ${newInstrumentIds.length} reference-based sliced instruments`);
         return newInstrumentIds;
       } catch (error) {
         console.error('[InstrumentStore] Failed to create sliced instruments:', error);
