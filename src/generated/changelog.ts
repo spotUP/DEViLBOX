@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-18T18:30:37.716Z
+ * Generated: 2026-02-18T19:43:19.677Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.840';
-export const BUILD_NUMBER = '840';
-export const BUILD_HASH = '7c566e04';
+export const BUILD_VERSION = '1.0.845';
+export const BUILD_NUMBER = '845';
+export const BUILD_HASH = '8a4c54dd';
 export const BUILD_DATE = '2026-02-18';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,29 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.840',
+    version: '1.0.845',
     date: '2026-02-18',
     changes: [
+      {
+        type: 'fix',
+        "description": "Filter modules.json from demo list and disable BLEP by default"
+      },
+      {
+        type: 'feature',
+        "description": "Add TD-3 patterns category to demo songs"
+      },
+      {
+        type: 'fix',
+        "description": "Handle disconnect errors in BLEP audio chain connection"
+      },
+      {
+        type: 'fix',
+        "description": "Add MIDI file import handler to prevent JSON parse error"
+      },
+      {
+        type: 'feature',
+        "description": "Add global BLEP synthesis for authentic Amiga sound"
+      },
       {
         type: 'feature',
         "description": "Add 50+ Amiga sample presets from ST-01/ST-02 packs"
@@ -212,32 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Broken waveform + missing neural upscaler in enhancer panel"
-      },
-      {
-        type: 'fix',
-        "description": "IOS audio unlock, clean initial state, instrument ID fixes, checkbox focus"
-      }
-    ]
-  },
-  {
-    version: '2026-02-17',
-    date: '2026-02-17',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Fix CI build: remove unused vars, iOS audio unlock, ONNX WASM loading, instrument persistence, sample editor rewrite"
-      },
-      {
-        type: 'feature',
-        "description": "IOS audio unlock via silent MP3 to bypass mute switch"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent setCurrentPattern -> jumpToPattern -> seekTo timeline reset"
-      },
-      {
-        type: 'fix',
-        "description": "Refactor scheduler to BassoonTracker continuous timeline pattern"
       }
     ]
   }
