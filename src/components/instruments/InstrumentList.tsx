@@ -111,9 +111,19 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       // Start audio context if needed
       await Tone.start();
 
-      // Verify context is actually running
+      // Wait for context to start (give it up to 500ms)
+      // This handles the case where the global click handler in App.tsx
+      // is still processing the same user interaction
+      let attempts = 0;
+      const maxAttempts = 10;
+      while (Tone.context.state !== 'running' && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        attempts++;
+      }
+
+      // If still not running after retries, silently bail out
+      // (This is expected on first page load - user just needs to click again)
       if (Tone.context.state !== 'running') {
-        console.warn('[InstrumentList] Audio context failed to start, state:', Tone.context.state);
         return;
       }
 
