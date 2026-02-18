@@ -185,9 +185,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const isCollapsed = channel?.collapsed;
       
       if (isCollapsed) {
+        // Collapsed: show note column + padding for collapse button
+        const collapsedWidth = noteWidth + 40; // Note column + button space
         offsets.push(currentX);
-        widths.push(12);
-        currentX += 12;
+        widths.push(collapsedWidth);
+        currentX += collapsedWidth;
       } else {
         // Get effect columns for this channel (default 2 for backward compatibility)
         const effectCols = channel?.channelMeta?.effectCols ?? 2;
@@ -1466,21 +1468,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           ctx.globalAlpha = prevAlpha;
         }
 
-        // Skip content if collapsed
-        if (isCollapsed) {
-          // Draw shortName vertically if collapsed
-          const shortName = pattern.channels[ch].shortName || `${ch + 1}`;
-          ctx.fillStyle = chColor || colors.textMuted;
-          ctx.font = 'bold 9px monospace';
-          ctx.textAlign = 'center';
-          ctx.save();
-          ctx.translate(colX + channelWidth / 2 + 2, y + ROW_HEIGHT / 2);
-          ctx.rotate(-Math.PI / 2);
-          ctx.fillText(shortName.substring(0, 2).toUpperCase(), 0, 3);
-          ctx.restore();
-          continue;
-        }
-
         // Check if this channel exists in the source pattern (ghost patterns might have different channel counts)
         if (!sourcePattern.channels[ch]) {
           continue;
@@ -1488,9 +1475,21 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
         // Get cell from source pattern
         const cell = sourcePattern.channels[ch].rows[rowIndex];
-        
+
         // Safety check: skip if row doesn't exist (can happen with ghost patterns of different lengths)
         if (!cell) {
+          continue;
+        }
+
+        // Collapsed: show only note column, skip parameter columns
+        if (isCollapsed) {
+          const noteCanvas = getNoteCanvas(
+            cell.note ?? 0,
+            cell.instrument ?? 0,
+            chColor,
+            false
+          );
+          ctx.drawImage(noteCanvas, x, y);
           continue;
         }
 
@@ -2042,7 +2041,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   return (
                     <div
                       key={channel.id}
-                      className={`flex-shrink-0 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} gap-1 ${isCollapsed ? 'px-0' : 'px-2'} py-1
+                      className={`flex-shrink-0 flex items-center justify-between gap-1 ${isCollapsed ? 'px-1' : 'px-2'} py-1
                         border-r border-dark-border transition-colors relative
                         ${channel.muted ? 'opacity-50' : ''}
                         ${channel.solo ? 'bg-accent-primary/10' : ''}`}
@@ -2144,15 +2143,23 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                       </div>
                       )}
 
-                      {/* Collapsed state: just show expand button */}
+                      {/* Collapsed state: show channel number and expand button */}
                       {isCollapsed && (
-                        <button
-                          onClick={() => toggleChannelCollapse(idx)}
-                          className="p-0.5 rounded transition-colors text-text-muted hover:text-text-primary hover:bg-dark-bgHover"
-                          title="Expand Channel"
-                        >
-                          <ChevronRight size={10} />
-                        </button>
+                        <div className="flex items-center justify-between w-full px-1">
+                          <span
+                            className="font-bold font-mono text-[9px] flex-shrink-0 opacity-80"
+                            style={{ color: channel.color || 'var(--color-accent)' }}
+                          >
+                            {(idx + 1).toString().padStart(2, '0')}
+                          </span>
+                          <button
+                            onClick={() => toggleChannelCollapse(idx)}
+                            className="p-0.5 rounded transition-colors text-text-muted hover:text-text-primary hover:bg-dark-bgHover"
+                            title="Expand Channel"
+                          >
+                            <ChevronRight size={10} />
+                          </button>
+                        </div>
                       )}
                     </div>
                   );
