@@ -5,14 +5,18 @@
 import fs from 'fs';
 import path from 'path';
 
-const DATA_ROOT = process.env.DATA_ROOT || '/var/www/devilbox/data';
-const PUBLIC_DIR = path.join(DATA_ROOT, 'public');
-const USERS_DIR = path.join(DATA_ROOT, 'users');
+// Helper functions to get paths (evaluated at runtime after env vars are loaded)
+const getDataRoot = () => process.env.DATA_ROOT || '/var/www/devilbox/data';
+const getPublicDir = () => path.join(getDataRoot(), 'public');
+const getUsersDir = () => path.join(getDataRoot(), 'users');
 
 /**
  * Initialize the data directory structure
  */
 export function initDataDirectories() {
+  const PUBLIC_DIR = getPublicDir();
+  const USERS_DIR = getUsersDir();
+
   // Create public demo directories
   const publicSongs = path.join(PUBLIC_DIR, 'songs');
   const publicInstruments = path.join(PUBLIC_DIR, 'instruments');
@@ -46,6 +50,8 @@ export function initDataDirectories() {
  * Create user directory structure with symlinks to public demos
  */
 export function createUserDirectory(userId: string): void {
+  const USERS_DIR = getUsersDir();
+  const PUBLIC_DIR = getPublicDir();
   const userDir = path.join(USERS_DIR, userId);
   const userSongs = path.join(userDir, 'songs');
   const userInstruments = path.join(userDir, 'instruments');
@@ -81,21 +87,21 @@ export function createUserDirectory(userId: string): void {
  * Get user's file directory
  */
 export function getUserDirectory(userId: string): string {
-  return path.join(USERS_DIR, userId);
+  return path.join(getUsersDir(), userId);
 }
 
 /**
  * Get user's songs directory
  */
 export function getUserSongsDirectory(userId: string): string {
-  return path.join(USERS_DIR, userId, 'songs');
+  return path.join(getUsersDir(), userId, 'songs');
 }
 
 /**
  * Get user's instruments directory
  */
 export function getUserInstrumentsDirectory(userId: string): string {
-  return path.join(USERS_DIR, userId, 'instruments');
+  return path.join(getUsersDir(), userId, 'instruments');
 }
 
 /**
