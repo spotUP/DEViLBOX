@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-18T20:50:49.021Z
+ * Generated: 2026-02-18T21:05:16.858Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.874';
-export const BUILD_NUMBER = '874';
-export const BUILD_HASH = 'b48d9f01';
+export const BUILD_VERSION = '1.0.878';
+export const BUILD_NUMBER = '878';
+export const BUILD_HASH = 'eeded8f9';
 export const BUILD_DATE = '2026-02-18';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,25 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.874',
+    version: '1.0.878',
     date: '2026-02-18',
     changes: [
+      {
+        type: 'fix',
+        "description": "Remove unused Tone import from DJPitchSlider"
+      },
+      {
+        type: 'fix',
+        "description": "Coordinate DJ pitch slider with PatternScheduler for accurate BPM control"
+      },
+      {
+        type: 'fix',
+        "description": "Center collapsed channels correctly to prevent content shift"
+      },
+      {
+        type: 'fix',
+        "description": "Use opaque concave gradient on DJ pitch slider handle"
+      },
       {
         type: 'fix',
         "description": "Remove unused chColor variable"
@@ -212,22 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Integrate AmigaPal with tracker's status message system"
-      },
-      {
-        type: 'fix',
-        "description": "Sharp filter overlay rendering on high-DPI displays"
-      },
-      {
-        type: 'improvement',
-        "description": "Add credits to AmigaPal modal title"
-      },
-      {
-        type: 'feature',
-        "description": "Add filter visualization overlays to AmigaPal waveforms"
-      },
-      {
-        type: 'fix',
-        "description": "Add padding inside orange selection border in AmigaPal"
       }
     ]
   }
