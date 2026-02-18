@@ -27,6 +27,13 @@ import { ADSRDescriptor } from './ADSRModule';
 import { MixerDescriptor } from './MixerModule';
 import { DelayDescriptor } from './DelayModule';
 import { SampleHoldDescriptor } from './SampleHoldModule';
+import { WaveshaperDescriptor } from './WaveshaperModule';
+import { CompressorDescriptor } from './CompressorModule';
+import { ReverbDescriptor } from './ReverbModule';
+import { RingModulatorDescriptor } from './RingModulatorModule';
+
+// Modulator modules (additional)
+import { ArpeggiatorDescriptor } from './ArpeggiatorModule';
 
 // I/O modules
 import { OutputDescriptor } from './OutputModule';
@@ -46,6 +53,7 @@ const builtInModules = [
 
   // Modulators
   LFODescriptor,
+  ArpeggiatorDescriptor,
 
   // Envelopes
   ADSRDescriptor,
@@ -54,6 +62,10 @@ const builtInModules = [
   MixerDescriptor,
   DelayDescriptor,
   SampleHoldDescriptor,
+  WaveshaperDescriptor,
+  CompressorDescriptor,
+  ReverbDescriptor,
+  RingModulatorDescriptor,
 
   // I/O
   OutputDescriptor,
@@ -83,6 +95,7 @@ export {
 
   // Modulator modules
   LFODescriptor,
+  ArpeggiatorDescriptor,
 
   // Envelope modules
   ADSRDescriptor,
@@ -91,6 +104,10 @@ export {
   MixerDescriptor,
   DelayDescriptor,
   SampleHoldDescriptor,
+  WaveshaperDescriptor,
+  CompressorDescriptor,
+  ReverbDescriptor,
+  RingModulatorDescriptor,
 
   // I/O modules
   OutputDescriptor,

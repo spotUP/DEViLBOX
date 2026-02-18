@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-18T08:48:45.399Z
+ * Generated: 2026-02-18T13:10:32.350Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.794';
-export const BUILD_NUMBER = '794';
-export const BUILD_HASH = 'db596b55';
+export const BUILD_VERSION = '1.0.803';
+export const BUILD_NUMBER = '803';
+export const BUILD_HASH = 'e9bfd2a4';
 export const BUILD_DATE = '2026-02-18';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,7 +30,49 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.794',
+    version: '1.0.803',
+    date: '2026-02-18',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Integrate AmigaPal 8-bit conversion into sample editor"
+      },
+      {
+        type: 'fix',
+        "description": "Make error messages selectable in file dialog"
+      },
+      {
+        type: 'fix',
+        "description": "Use absolute paths and public endpoint for file reading"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: ignore .env files"
+      },
+      {
+        type: 'feature',
+        "description": "Add local development support for demo file browsing"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent FileBrowser infinite re-render loop causing flickering"
+      },
+      {
+        type: 'fix',
+        "description": "Correct production API URL fallback in serverFS"
+      },
+      {
+        type: 'fix',
+        "description": "Broken waveform + missing neural upscaler in enhancer panel"
+      },
+      {
+        type: 'fix',
+        "description": "IOS audio unlock, clean initial state, instrument ID fixes, checkbox focus"
+      }
+    ]
+  },
+  {
+    version: '2026-02-17',
     date: '2026-02-17',
     changes: [
       {
@@ -202,42 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Simplify beat markers - just color every 4th cell background"
-      },
-      {
-        type: 'improvement',
-        "description": "Make beat markers appear IN FRONT of notes with full-height columns"
-      },
-      {
-        type: 'fix',
-        "description": "Fix smooth marker alignment and beat marker visibility"
-      },
-      {
-        type: 'fix',
-        "description": "Fix beat marker styling - lighter color, correct sizing, z-index"
-      },
-      {
-        type: 'fix',
-        "description": "Fix jerky smooth marker - use state instead of forceUpdate"
-      },
-      {
-        type: 'feature',
-        "description": "Make smooth marker truly smooth - add per-row sliding overlays"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove unused useTrackerStore destructuring"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove unused channel variable"
-      },
-      {
-        type: 'fix',
-        "description": "Fix jerky smooth marker animation - force 60fps re-renders"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove per-step instrument color coding from grid markers"
       }
     ]
   }
