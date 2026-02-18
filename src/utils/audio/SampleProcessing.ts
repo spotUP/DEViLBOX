@@ -378,3 +378,67 @@ function writeString(view: DataView, offset: number, string: string) {
     view.setUint8(offset + i, string.charCodeAt(i));
   }
 }
+
+/**
+ * Convert to 8-bit using AmigaPal algorithm for perfect Amiga samples
+ *
+ * This algorithm from AmigaPal by echolevel:
+ * 1. Normalizes to peak (maximizes SNR)
+ * 2. Converts to 8-bit signed (-128 to 127)
+ * 3. Applies proper quantization for authentic Amiga sound
+ *
+ * Perfect for ProTracker MODs and retro game audio!
+ * Reference: https://github.com/echolevel/AmigaPal
+ */
+export async function applyAmigaPal8Bit(
+  buffer: AudioBuffer
+): Promise<ProcessedResult> {
+  const numChannels = buffer.numberOfChannels;
+  const length = buffer.length;
+  const sampleRate = buffer.sampleRate;
+
+  // Step 1: Find peak for normalization (just like AmigaPal)
+  let maxPeak = 0;
+  for (let c = 0; c < numChannels; c++) {
+    const data = buffer.getChannelData(c);
+    for (let i = 0; i < length; i++) {
+      const abs = Math.abs(data[i]);
+      if (abs > maxPeak) maxPeak = abs;
+    }
+  }
+
+  // Create output buffer
+  const processedBuffer = new AudioBuffer({
+    length,
+    numberOfChannels: numChannels,
+    sampleRate
+  });
+
+  // Step 2: Normalize and convert to 8-bit for each channel
+  for (let c = 0; c < numChannels; c++) {
+    const inputData = buffer.getChannelData(c);
+    const outputData = processedBuffer.getChannelData(c);
+
+    for (let i = 0; i < length; i++) {
+      // Normalize to peak (max SNR, just like AmigaPal line 827)
+      let normalized = maxPeak > 0 ? inputData[i] / maxPeak : inputData[i];
+
+      // Clamp to -1 to 1 (AmigaPal lines 828-832)
+      normalized = Math.max(-1, Math.min(1, normalized));
+
+      // Convert to 8-bit signed: multiply by 128 and round (AmigaPal line 839)
+      let int8 = Math.round(normalized * 128);
+
+      // Clamp to 8-bit range (AmigaPal lines 840-845)
+      int8 = Math.max(-128, Math.min(127, int8));
+
+      // Convert back to float32 with 8-bit quantization
+      // This simulates the bit-depth reduction (AmigaPal lines 886-887)
+      const step = Math.pow(0.5, 8); // 1/256
+      outputData[i] = step * Math.floor((int8 / 128) / step);
+    }
+  }
+
+  const dataUrl = await bufferToDataUrl(processedBuffer);
+  return { buffer: processedBuffer, dataUrl };
+}

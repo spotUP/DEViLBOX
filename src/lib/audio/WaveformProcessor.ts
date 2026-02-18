@@ -109,6 +109,59 @@ export class WaveformProcessor {
   }
 
   /**
+   * AmigaPal 8-bit conversion - Perfect Amiga samples!
+   *
+   * Algorithm from AmigaPal by echolevel (https://github.com/echolevel/AmigaPal):
+   * 1. Normalize to peak (maximizes SNR before conversion)
+   * 2. Convert to 8-bit signed (-128 to 127) with proper rounding
+   * 3. Apply bit-depth quantization for authentic Amiga sound
+   *
+   * Perfect for ProTracker MODs and retro game audio!
+   */
+  public static amigaPal8Bit(buffer: AudioBuffer): AudioBuffer {
+    const { numberOfChannels: ch, length, sampleRate } = buffer;
+
+    // Step 1: Find peak for normalization (AmigaPal lines 821-824)
+    let peak = 0;
+    for (let c = 0; c < ch; c++) {
+      const data = buffer.getChannelData(c);
+      for (let i = 0; i < length; i++) {
+        const abs = Math.abs(data[i]);
+        if (abs > peak) peak = abs;
+      }
+    }
+
+    const out = this.createBuffer(length, ch, sampleRate);
+
+    // Step 2: Normalize and convert to 8-bit for each channel
+    for (let c = 0; c < ch; c++) {
+      const inp = buffer.getChannelData(c);
+      const o = out.getChannelData(c);
+
+      for (let i = 0; i < length; i++) {
+        // Normalize to peak (AmigaPal line 827)
+        let normalized = peak > 0 ? inp[i] / peak : inp[i];
+
+        // Clamp to -1 to 1 (AmigaPal lines 828-832)
+        normalized = Math.max(-1, Math.min(1, normalized));
+
+        // Convert to 8-bit signed: multiply by 128 and round (AmigaPal line 839)
+        let int8 = Math.round(normalized * 128);
+
+        // Clamp to 8-bit range (AmigaPal lines 840-845)
+        int8 = Math.max(-128, Math.min(127, int8));
+
+        // Convert back to float32 with 8-bit quantization
+        // This simulates the bit-depth reduction (AmigaPal lines 886-887)
+        const step = Math.pow(0.5, 8); // 1/256
+        o[i] = step * Math.floor((int8 / 128) / step);
+      }
+    }
+
+    return out;
+  }
+
+  /**
    * Invert phase in loop area (Destructive EFx)
    */
   public static invertLoop(buffer: AudioBuffer, start: number, end: number): AudioBuffer {
