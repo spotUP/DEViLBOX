@@ -134,6 +134,9 @@ export class PatternScheduler {
     const effectiveBPM = this.baseBPM * playbackRate;
     Tone.getTransport().bpm.value = effectiveBPM;
 
+    // CRITICAL: Also update transport store BPM (for TrackerReplayer sync)
+    useTransportStore.getState().setBPM(effectiveBPM);
+
     // CRITICAL: Also set global playback rate for samples (Amiga MOD support)
     const engine = getToneEngine();
     engine.setGlobalPlaybackRate(playbackRate);
@@ -809,7 +812,10 @@ export class PatternScheduler {
     // Reset pitch shift to neutral when clearing schedule (keep global offset)
     this.pitchShiftSemitones = 0;
     const playbackRate = Math.pow(2, this.globalPitchOffset / 12);
-    Tone.getTransport().bpm.value = this.baseBPM * playbackRate;
+    const effectiveBPM = this.baseBPM * playbackRate;
+    Tone.getTransport().bpm.value = effectiveBPM;
+    // Also update transport store BPM (for TrackerReplayer sync)
+    useTransportStore.getState().setBPM(effectiveBPM);
     // Also update sample playback rate
     const engine = getToneEngine();
     engine.setGlobalPlaybackRate(playbackRate);
