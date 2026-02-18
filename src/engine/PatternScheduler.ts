@@ -71,11 +71,6 @@ export class PatternScheduler {
   private pitchShiftSemitones: number = 0; // Pitch shift (affected by Wxx effects)
   private globalPitchOffset: number = 0; // Pitch shift from external controls (DJ slider)
 
-  // Amiga MOD live re-scheduling state
-  private currentPattern: Pattern | null = null;
-  private currentInstruments: InstrumentConfig[] = [];
-  private isRescheduling: boolean = false;
-
   /**
    * Track playback errors and notify user if threshold exceeded
    */
@@ -816,6 +811,7 @@ export class PatternScheduler {
     const playbackRate = Math.pow(2, this.globalPitchOffset / 12);
     Tone.getTransport().bpm.value = this.baseBPM * playbackRate;
     // Also update sample playback rate
+    const engine = getToneEngine();
     engine.setGlobalPlaybackRate(playbackRate);
 
     if (this.currentPlayback) {
