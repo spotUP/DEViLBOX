@@ -895,7 +895,7 @@ export const useTrackerInput = () => {
         }
         // Always restart playback from beginning
         if (isPlaying) stop();
-        setIsLooping(false);
+        setIsLooping(true); // Loop current pattern only
         getToneEngine().init().then(() => play());
         return;
       }

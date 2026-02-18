@@ -9,6 +9,7 @@
 
 import * as Tone from 'tone';
 import { getToneEngine } from './ToneEngine';
+import { getTrackerReplayer } from './TrackerReplayer';
 import { createFormatHandler } from './effects';
 import { type FormatHandler, type ModuleFormat, type TickResult, type ChannelState, type ActiveInstrumentMeta } from './effects/types';
 import { getAutomationPlayer } from './AutomationPlayer';
@@ -69,8 +70,8 @@ export class PatternScheduler {
   // Global pitch shift tracking (DJ-style performance control)
   private baseBPM: number = 125; // Base tempo (affected by Fxx effects)
   private pitchShiftSemitones: number = 0; // Pitch shift (affected by Wxx effects)
-  private globalPitchOffset: number = 0; // Pitch shift from external controls (DJ slider)
-  private lastStoreUpdateTime: number = 0; // Throttle transport store updates
+  private globalPitchOffset: number = 0; // Global pitch offset from DJ slider, etc.
+  private bpmUpdateTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Track playback errors and notify user if threshold exceeded
@@ -132,24 +133,25 @@ export class PatternScheduler {
     this.globalPitchOffset = semitones;
     const playbackRate = Math.pow(2, (this.pitchShiftSemitones + this.globalPitchOffset) / 12);
 
-    // Always update global playback rate immediately for new notes
+    // Update global playback rate field (for new notes)
     const engine = getToneEngine();
     engine.setGlobalPlaybackRate(playbackRate);
 
-    // Throttle BPM updates to prevent scheduler overload
-    // 30ms = ~33fps, fast enough for smooth response but not overwhelming
-    const now = Date.now();
-    if (now - this.lastStoreUpdateTime > 30) {
-      const effectiveBPM = this.baseBPM * playbackRate;
+    // CRITICAL: Update already-playing samples immediately
+    const replayer = getTrackerReplayer();
+    replayer.updateAllPlaybackRates();
 
-      // Direct BPM update - rampTo causes conflicts with rapid updates
-      Tone.getTransport().bpm.value = effectiveBPM;
-
-      // Update transport store BPM (for TrackerReplayer)
-      useTransportStore.getState().setBPM(effectiveBPM);
-
-      this.lastStoreUpdateTime = now;
+    // Debounce BPM updates - only update when slider hasn't moved for 200ms
+    // This prevents scheduler breakage during active drag
+    if (this.bpmUpdateTimer) {
+      clearTimeout(this.bpmUpdateTimer);
     }
+
+    this.bpmUpdateTimer = setTimeout(() => {
+      const effectiveBPM = Math.round(this.baseBPM * playbackRate * 100) / 100;
+      useTransportStore.getState().setBPM(effectiveBPM);
+      this.bpmUpdateTimer = null;
+    }, 200);
   }
 
   /**
@@ -388,7 +390,17 @@ export class PatternScheduler {
     if (tickResult.setGlobalPitchShift !== undefined) {
       this.pitchShiftSemitones = tickResult.setGlobalPitchShift;
       const playbackRate = Math.pow(2, (this.pitchShiftSemitones + this.globalPitchOffset) / 12);
-      const effectiveBPM = this.baseBPM * playbackRate;
+
+      // Update global playback rate (affects new notes)
+      engine.setGlobalPlaybackRate(playbackRate);
+
+      // Update already-playing samples immediately
+      const replayer = getTrackerReplayer();
+      replayer.updateAllPlaybackRates();
+
+      // Update BPM (rounded to avoid float noise)
+      const effectiveBPM = Math.round(this.baseBPM * playbackRate * 100) / 100;
+      useTransportStore.getState().setBPM(effectiveBPM);
       Tone.getTransport().bpm.value = effectiveBPM;
     }
 

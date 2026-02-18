@@ -983,7 +983,7 @@ async function testVolumeLevels() {
     if (meter) {
       try { meter.disconnect(); meter.dispose(); } catch { /* ignored */ }
     }
-    meter = new Tone.Meter({ channels: 1, smoothing: 0 });
+    meter = new Tone.Meter(0);
     meter.connect(Tone.getDestination());
     const config = SYNTH_CONFIGS[name];
     if (!config) continue;
@@ -2641,7 +2641,7 @@ async function testEffectSignalPath() {
   logHtml('<h2>Effect Signal Path Tests (Basic)</h2>');
   logHtml('<p class="info">Testing that effects pass audio through (synth → effect → meter). Target: signal above -60dB.</p>');
 
-  const meter = new Tone.Meter({ channels: 1, smoothing: 0 });
+  const meter = new Tone.Meter(0);
   meter.connect(Tone.getDestination());
 
   // Create a persistent keep-alive oscillator to prevent WebAudio from going idle
@@ -2767,7 +2767,7 @@ async function testEffectBehavior() {
   logHtml('<h2>Effect Behavior Tests (Advanced)</h2>');
   logHtml('<p class="info">Validates that effects actually modify audio as expected.</p>');
 
-  const meter = new Tone.Meter({ channels: 1, smoothing: 0 });
+  const meter = new Tone.Meter(0);
   meter.connect(Tone.getDestination());
 
   // Warm-up
@@ -2925,7 +2925,7 @@ async function testEffectWetDry() {
   logHtml('<h2>Wet/Dry Mix Tests</h2>');
   logHtml('<p class="info">Tests that wet parameter actually controls effect amount.</p>');
 
-  const meter = new Tone.Meter({ channels: 1, smoothing: 0 });
+  const meter = new Tone.Meter(0);
   meter.connect(Tone.getDestination());
 
   // Warm-up
@@ -3044,7 +3044,7 @@ async function testEffectParameters() {
   logHtml('<h2>Parameter Change Tests</h2>');
   logHtml('<p class="info">Tests that changing parameters actually affects the effect.</p>');
 
-  const meter = new Tone.Meter({ channels: 1, smoothing: 0 });
+  const meter = new Tone.Meter(0);
   meter.connect(Tone.getDestination());
 
   // Warm-up
@@ -3142,7 +3142,7 @@ async function testEffectABComparison() {
   logHtml('<h2>A/B Comparison Tests (Dry vs Wet)</h2>');
   logHtml('<p class="info">Compares signal with effect bypassed vs engaged. Effects should modify the signal.</p>');
 
-  const meter = new Tone.Meter({ channels: 1, smoothing: 0 });
+  const meter = new Tone.Meter(0);
   meter.connect(Tone.getDestination());
 
   // Keep-alive oscillator to prevent WebAudio from going idle

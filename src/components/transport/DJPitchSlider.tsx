@@ -33,6 +33,12 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
   const trackRef = useRef<HTMLDivElement>(null);
   const dragRef  = useRef({ startY: 0, startPitch: 0 });
 
+  // Use ref for pitch to prevent stale closures in drag callbacks (TB-303 pattern)
+  const pitchRef = useRef(0);
+  useEffect(() => {
+    pitchRef.current = pitch;
+  }, [pitch]);
+
   // ── Audio ──────────────────────────────────────────────────────────
   const applyPitch = useCallback((raw: number) => {
     const clamped = Math.max(MIN_PITCH, Math.min(MAX_PITCH, raw));
@@ -58,9 +64,9 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
   // ── Drag ───────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    dragRef.current = { startY: e.clientY, startPitch: pitch };
+    dragRef.current = { startY: e.clientY, startPitch: pitchRef.current };
     setIsDragging(true);
-  }, [pitch]);
+  }, []); // Remove pitch dependency - use pitchRef.current instead
 
   useEffect(() => {
     if (!isDragging) return;
