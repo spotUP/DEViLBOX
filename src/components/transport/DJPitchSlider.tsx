@@ -140,8 +140,6 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
       {/* Housing */}
       <div className="relative flex-1 min-h-0">
 
-        {/* Outer housing border */}
-        <div className="absolute inset-0 border border-dark-border/60 rounded-sm pointer-events-none" />
 
         {/* Center reference tick (left edge, marks 0) */}
         <div
