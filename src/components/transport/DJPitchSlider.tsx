@@ -37,12 +37,15 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
   // ── Audio ──────────────────────────────────────────────────────────
   const applyPitch = useCallback((raw: number) => {
     const clamped = Math.max(MIN_PITCH, Math.min(MAX_PITCH, raw));
+    console.log('[DJPitchSlider] applyPitch:', { raw, clamped, currentBPM: Tone.getTransport().bpm.value });
     setPitch(clamped);
     if (baseBPMRef.current === null) {
       baseBPMRef.current = Tone.getTransport().bpm.value;
+      console.log('[DJPitchSlider] Stored base BPM:', baseBPMRef.current);
     }
-    Tone.getTransport().bpm.value =
-      baseBPMRef.current * Math.pow(2, clamped / 12);
+    const newBPM = baseBPMRef.current * Math.pow(2, clamped / 12);
+    console.log('[DJPitchSlider] Setting BPM:', { baseBPM: baseBPMRef.current, semitones: clamped, newBPM });
+    Tone.getTransport().bpm.value = newBPM;
     onPitchChange?.(clamped);
   }, [onPitchChange]);
 
@@ -58,6 +61,7 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
   // ── Drag ───────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    console.log('[DJPitchSlider] Mouse down:', { clientY: e.clientY, currentPitch: pitch });
     dragRef.current = { startY: e.clientY, startPitch: pitch };
     setIsDragging(true);
   }, [pitch]);
@@ -158,11 +162,17 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
         >
           {/* Handle body */}
           <div
-            className={`absolute inset-0 rounded-[2px] transition-colors duration-75 ${
-              isDragging
-                ? 'bg-dark-bgTertiary border border-amber-400/50'
-                : 'bg-dark-bgSecondary border border-dark-border'
+            className={`absolute inset-0 rounded-[2px] transition-colors duration-75 border ${
+              isDragging ? 'border-amber-400/50' : 'border-dark-border'
             }`}
+            style={{
+              background: isDragging
+                ? 'linear-gradient(to bottom, #2a2010 0%, #1a1408 50%, #221a0a 100%)'
+                : 'linear-gradient(to bottom, #1e1b1b 0%, #0e0b0b 50%, #191616 100%)',
+              boxShadow: isDragging
+                ? 'inset 0 1px 0 rgba(251,191,36,0.15)'
+                : 'inset 0 1px 0 rgba(255,255,255,0.08)',
+            }}
           >
             {/* Top rib */}
             <div
