@@ -70,6 +70,7 @@ interface SampleItem {
   limiterMakeup: number;
   ptNote: string;
   ptSampleRate: number;
+  pitchShift: number; // -12 to +12 (percentage)
 }
 
 interface AmigaPalModalProps {
@@ -124,6 +125,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
         limiterMakeup: 0,
         ptNote: 'A-3',
         ptSampleRate: 27920,
+        pitchShift: 0,
       };
       setSamples([sampleItem]);
       setSelectedIndex(0);
@@ -173,16 +175,23 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
   // Process sample with filters + limiter and return processed buffer
   const processSamplePreview = useCallback(async (sample: SampleItem): Promise<AudioBuffer> => {
-    const { buffer, loCutHz, hiCutHz, limiterEnabled, limiterThresh, limiterMakeup } = sample;
+    const { buffer, loCutHz, hiCutHz, limiterEnabled, limiterThresh, limiterMakeup, pitchShift } = sample;
+
+    // Calculate playback rate from pitch shift percentage (-12 to +12)
+    const playbackRate = Math.pow(2, pitchShift / 12);
+
+    // Adjust output length based on playback rate
+    const outputLength = Math.ceil(buffer.length / playbackRate);
 
     const offlineContext = new OfflineAudioContext(
       buffer.numberOfChannels,
-      buffer.length,
+      outputLength,
       buffer.sampleRate
     );
 
     const source = offlineContext.createBufferSource();
     source.buffer = buffer;
+    source.playbackRate.value = playbackRate; // Apply pitch shift
 
     // Create filter chain (always active, matching original AmigaPal)
     const highPass = offlineContext.createBiquadFilter();
@@ -610,6 +619,37 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                       <div>
                         length: <span className="font-light">{sample.length.toFixed(2)} s</span>
                       </div>
+
+                      {/* Pitch Slider (Turntable Style) */}
+                      <div className="pt-2 pb-1">
+                        <div className="text-[10px] text-ft2-textDim mb-1 text-center">
+                          PITCH: {sample.pitchShift > 0 ? '+' : ''}{sample.pitchShift.toFixed(1)}
+                        </div>
+                        <div className="flex justify-center">
+                          <input
+                            type="range"
+                            min="-12"
+                            max="12"
+                            step="0.1"
+                            value={sample.pitchShift}
+                            onChange={(e) => {
+                              const newVal = Number(e.target.value);
+                              setSamples((prev) =>
+                                prev.map((s, i) => (i === index ? { ...s, pitchShift: newVal } : s))
+                              );
+                            }}
+                            className="pitch-slider-vertical"
+                            style={{
+                              writingMode: 'bt-lr',
+                              WebkitAppearance: 'slider-vertical',
+                              width: '8px',
+                              height: '80px',
+                              accentColor: '#ff6600',
+                            }}
+                          />
+                        </div>
+                      </div>
+
                       <div className="flex gap-0.5 pt-1">
                         <button
                           onClick={(e) => {
