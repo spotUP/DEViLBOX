@@ -553,7 +553,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                   disabled={!saveMod}
                   maxLength={22}
                   placeholder="AMIGAPAL_MOD"
-                  className="flex-1 bg-ft2-header px-2 py-1 border border-ft2-border text-xs font-bold text-ft2-text outline-none disabled:bg-ft2-bgSecondary"
+                  className="w-[140px] bg-ft2-header px-2 py-1 border border-ft2-border text-xs font-bold text-ft2-text outline-none disabled:bg-ft2-bgSecondary"
                   title="The title of the generated Protracker module, if 'Save mod' is enabled"
                 />
               </div>
