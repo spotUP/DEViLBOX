@@ -343,14 +343,14 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
-      <div
-        className="w-full max-w-[600px] h-full bg-[#292c34] flex flex-col overflow-hidden text-white"
-        style={{ fontFamily: 'monospace', fontSize: '13px' }}
-      >
+      <div className="w-full max-w-[600px] h-full bg-ft2-bg flex flex-col overflow-hidden text-ft2-text font-mono text-xs">
         {/* Title Bar */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-black">
-          <div className="text-sm">AmigaPal</div>
-          <button onClick={onClose} className="hover:bg-white/10 p-1 rounded">
+        <div className="flex items-center justify-between px-3 py-2 border-b-2 border-ft2-border bg-ft2-header">
+          <div className="text-sm font-bold text-ft2-highlight">AmigaPal</div>
+          <button
+            onClick={onClose}
+            className="hover:bg-ft2-border p-1.5 rounded transition-colors text-ft2-textDim hover:text-ft2-text"
+          >
             <X size={16} />
           </button>
         </div>
@@ -362,7 +362,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
             <div className="flex-1 space-y-1">
               {/* Output Path */}
               <div className="flex gap-1">
-                <span className="bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold">
+                <span className="bg-ft2-header px-2 py-1 border border-ft2-border font-bold">
                   Out path
                 </span>
                 <input
@@ -370,16 +370,16 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                   value={outputPath}
                   onChange={(e) => setOutputPath(e.target.value)}
                   disabled={outputDirSameAsSource}
-                  className="flex-1 bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold text-white outline-none disabled:bg-[#393c44]"
+                  className="flex-1 bg-ft2-header px-2 py-1 border border-ft2-border font-bold text-ft2-text outline-none disabled:bg-ft2-bgSecondary disabled:text-ft2-textDim"
                 />
                 <button
-                  className="bg-[#595c64] px-2 py-1 border border-[#232323] hover:bg-[#696c74]"
+                  className="bg-ft2-header px-2 py-1 border border-ft2-border hover:border-ft2-highlight transition-colors disabled:opacity-50"
                   disabled={outputDirSameAsSource}
                 >
                   <FolderOpen size={12} />
                 </button>
                 <button
-                  className="bg-[#595c64] px-2 py-1 border border-[#232323] hover:bg-[#696c74]"
+                  className="bg-ft2-header px-2 py-1 border border-ft2-border hover:border-ft2-highlight transition-colors disabled:opacity-50"
                   disabled={outputDirSameAsSource}
                 >
                   <Folder size={12} />
@@ -389,11 +389,11 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
               {/* Output dir same as source */}
               <button
                 onClick={() => setOutputDirSameAsSource(!outputDirSameAsSource)}
-                className={`w-full flex items-center gap-2 px-2 py-1 border border-[#232323] text-xs font-bold ${
-                  outputDirSameAsSource ? 'bg-[#595c64]' : 'bg-[#393c44] text-gray-400'
+                className={`w-full flex items-center gap-2 px-2 py-1 border border-ft2-border font-bold transition-colors ${
+                  outputDirSameAsSource ? 'bg-ft2-header text-ft2-text' : 'bg-ft2-bgSecondary text-ft2-textDim'
                 }`}
               >
-                <span className="bg-[#595c64] px-1.5 border border-[#232323]">
+                <span className="bg-ft2-header px-1.5 border border-ft2-border">
                   {outputDirSameAsSource ? '✓' : '✕'}
                 </span>
                 Output dir same as source
@@ -405,9 +405,9 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                   type="number"
                   value={globalSampleRate}
                   onChange={(e) => setGlobalSampleRate(Number(e.target.value))}
-                  className="flex-1 bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold text-white outline-none"
+                  className="flex-1 bg-ft2-header px-2 py-1 border border-ft2-border font-bold text-ft2-text outline-none focus:border-ft2-highlight"
                 />
-                <span className="bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold">
+                <span className="bg-ft2-header px-2 py-1 border border-ft2-border font-bold">
                   Sample rate (Hz)
                 </span>
               </div>
@@ -417,7 +417,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                 <select
                   value={globalPTNote}
                   onChange={(e) => setGlobalPTNote(e.target.value)}
-                  className="flex-1 bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold text-white outline-none"
+                  className="flex-1 bg-ft2-header px-2 py-1 border border-ft2-border font-bold text-ft2-text outline-none focus:border-ft2-highlight"
                 >
                   {PT_NOTES.map((n) => (
                     <option key={n.note} value={n.note}>
@@ -425,12 +425,12 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                     </option>
                   ))}
                 </select>
-                <span className="bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold whitespace-nowrap">
+                <span className="bg-ft2-header px-2 py-1 border border-ft2-border font-bold whitespace-nowrap">
                   Protracker note
                 </span>
                 <button
                   onClick={handleSetAll}
-                  className="bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold hover:bg-[#696c74] whitespace-nowrap"
+                  className="bg-ft2-header px-2 py-1 border border-ft2-border font-bold hover:border-ft2-highlight hover:text-ft2-highlight transition-colors whitespace-nowrap"
                 >
                   Set all
                 </button>
@@ -438,7 +438,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
               {/* Playback volume */}
               <div className="flex items-center gap-2 pt-1">
-                <span className="text-xs">Playback volume</span>
+                <span className="text-ft2-textDim">Playback volume</span>
                 <input
                   type="range"
                   min="0"
@@ -450,9 +450,9 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
               </div>
 
               {/* Status */}
-              <div className="pt-1 text-xs">
-                <strong>
-                  STATUS: <span style={{ color: '#ff99cc' }}>{statusMsg}</span>
+              <div className="pt-1">
+                <strong className="text-ft2-textDim">
+                  STATUS: <span className="text-pink-400">{statusMsg}</span>
                 </strong>
               </div>
             </div>
@@ -462,12 +462,12 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
               {/* Preview output */}
               <button
                 onClick={() => setPreviewOutput(!previewOutput)}
-                className={`w-full flex items-center gap-2 px-2 py-1 border border-[#232323] text-xs font-bold ${
-                  previewOutput ? 'bg-[#595c64]' : 'bg-[#393c44] text-gray-400'
+                className={`w-full flex items-center gap-2 px-2 py-1 border border-ft2-border text-xs font-bold ${
+                  previewOutput ? 'bg-ft2-header' : 'bg-ft2-bgSecondary text-ft2-textDim'
                 }`}
                 title="When enabled, note playback renders the output so you can hear it exactly as it'll be saved to file"
               >
-                <span className="bg-[#595c64] px-1.5 border border-[#232323]">
+                <span className="bg-ft2-header px-1.5 border border-ft2-border">
                   {previewOutput ? '✓' : '✕'}
                 </span>
                 Preview samplerate
@@ -477,24 +477,24 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
               <div className="flex gap-1">
                 <button
                   onClick={() => setTruncateFilenames(!truncateFilenames)}
-                  className={`flex-1 flex items-center gap-1 px-2 py-1 border border-[#232323] text-xs font-bold ${
-                    truncateFilenames ? 'bg-[#595c64]' : 'bg-[#393c44] text-gray-400'
+                  className={`flex-1 flex items-center gap-1 px-2 py-1 border border-ft2-border text-xs font-bold ${
+                    truncateFilenames ? 'bg-ft2-header' : 'bg-ft2-bgSecondary text-ft2-textDim'
                   }`}
                   title="Truncate output filename for better compatibility with old operating systems"
                 >
-                  <span className="bg-[#595c64] px-1 border border-[#232323]">
+                  <span className="bg-ft2-header px-1 border border-ft2-border">
                     {truncateFilenames ? '✓' : '✕'}
                   </span>
                   Truncate
                 </button>
                 <button
                   onClick={() => setSaveWav(!saveWav)}
-                  className={`flex-1 flex items-center gap-1 px-2 py-1 border border-[#232323] text-xs font-bold ${
-                    saveWav ? 'bg-[#595c64]' : 'bg-[#393c44] text-gray-400'
+                  className={`flex-1 flex items-center gap-1 px-2 py-1 border border-ft2-border text-xs font-bold ${
+                    saveWav ? 'bg-ft2-header' : 'bg-ft2-bgSecondary text-ft2-textDim'
                   }`}
                   title="Enable to export WAV rather than the default 8SVX"
                 >
-                  <span className="bg-[#595c64] px-1 border border-[#232323]">
+                  <span className="bg-ft2-header px-1 border border-ft2-border">
                     {saveWav ? '✓' : '✕'}
                   </span>
                   WAV
@@ -505,12 +505,12 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
               <div className="flex gap-1">
                 <button
                   onClick={() => setSaveMod(!saveMod)}
-                  className={`flex-1 flex items-center gap-1 px-2 py-1 border border-[#232323] text-xs font-bold ${
-                    saveMod ? 'bg-[#595c64]' : 'bg-[#393c44] text-gray-400'
+                  className={`flex-1 flex items-center gap-1 px-2 py-1 border border-ft2-border text-xs font-bold ${
+                    saveMod ? 'bg-ft2-header' : 'bg-ft2-bgSecondary text-ft2-textDim'
                   }`}
                   title="Enable to create and save a blank Protracker module containing up to 31 of the currently loaded samples"
                 >
-                  <span className="bg-[#595c64] px-1 border border-[#232323]">
+                  <span className="bg-ft2-header px-1 border border-ft2-border">
                     {saveMod ? '✓' : '✕'}
                   </span>
                   Save mod
@@ -518,12 +518,12 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                 <button
                   onClick={() => setUse128kb(!use128kb)}
                   disabled={!saveMod}
-                  className={`flex-1 flex items-center gap-1 px-2 py-1 border border-[#232323] text-xs font-bold ${
-                    use128kb ? 'bg-[#595c64]' : 'bg-[#393c44] text-gray-400'
+                  className={`flex-1 flex items-center gap-1 px-2 py-1 border border-ft2-border text-xs font-bold ${
+                    use128kb ? 'bg-ft2-header' : 'bg-ft2-bgSecondary text-ft2-textDim'
                   } disabled:opacity-50`}
                   title="If creating and saving a Protracker mod, choose whether it should support 128kb sample size limit rather than 64kb"
                 >
-                  <span className="bg-[#595c64] px-1 border border-[#232323]">
+                  <span className="bg-ft2-header px-1 border border-ft2-border">
                     {use128kb ? '✓' : '✕'}
                   </span>
                   12Ekb
@@ -532,7 +532,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
               {/* Title */}
               <div className="flex gap-1">
-                <span className="bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold">
+                <span className="bg-ft2-header px-2 py-1 border border-ft2-border text-xs font-bold">
                   Title
                 </span>
                 <input
@@ -542,7 +542,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                   disabled={!saveMod}
                   maxLength={22}
                   placeholder="AMIGAPAL_MOD"
-                  className="flex-1 bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold text-white outline-none disabled:bg-[#393c44]"
+                  className="flex-1 bg-ft2-header px-2 py-1 border border-ft2-border text-xs font-bold text-ft2-text outline-none disabled:bg-ft2-bgSecondary"
                   title="The title of the generated Protracker module, if 'Save mod' is enabled"
                 />
               </div>
@@ -551,13 +551,13 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
               <div className="flex gap-1">
                 <button
                   onClick={handleLoadFiles}
-                  className="flex-1 bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold hover:bg-[#696c74] flex items-center justify-center gap-1"
+                  className="flex-1 bg-ft2-header px-2 py-1 border border-ft2-border text-xs font-bold hover:border-ft2-highlight hover:text-ft2-highlight transition-colors flex items-center justify-center gap-1"
                 >
                   <FolderOpen size={12} /> Load
                 </button>
                 <button
                   onClick={handleClearAll}
-                  className="flex-1 bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold hover:bg-[#696c74] flex items-center justify-center gap-1"
+                  className="flex-1 bg-ft2-header px-2 py-1 border border-ft2-border text-xs font-bold hover:border-ft2-highlight hover:text-ft2-highlight transition-colors flex items-center justify-center gap-1"
                 >
                   <Trash2 size={12} /> Clear
                 </button>
@@ -567,7 +567,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
               <button
                 onClick={handleConvertAll}
                 disabled={samples.length === 0}
-                className="w-full bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold hover:bg-[#696c74] disabled:opacity-50 flex items-center justify-center gap-1 mt-1"
+                className="w-full bg-ft2-header px-2 py-1 border border-ft2-border text-xs font-bold hover:border-ft2-highlight hover:text-ft2-highlight transition-colors disabled:opacity-50 flex items-center justify-center gap-1 mt-1"
               >
                 <Shuffle size={12} /> Convert {samples.length}
               </button>
@@ -577,22 +577,22 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
         {/* Sample List or Drop Zone */}
         {samples.length === 0 ? (
-          <div className="flex-1 mx-5 mb-5 border-8 border-dashed border-[#999] rounded flex items-center justify-center">
+          <div className="flex-1 mx-5 mb-5 border-8 border-dashed border-ft2-border rounded flex items-center justify-center">
             <div className="text-center pb-24">
-              <div className="text-base font-bold mb-4">DROP FILES OR FOLDERS HERE</div>
-              <div className="text-4xl">⬇</div>
+              <div className="text-base font-bold mb-4 text-ft2-textDim">DROP FILES OR FOLDERS HERE</div>
+              <div className="text-4xl text-ft2-highlight">⬇</div>
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto px-5 pb-5" style={{ height: '603px' }}>
+          <div className="flex-1 overflow-y-auto px-5 pb-5 scrollbar-ft2" style={{ height: '603px' }}>
             {samples.map((sample, index) => {
               const isSelected = selectedIndex === index;
 
               return (
                 <div
                   key={sample.id}
-                  className={`py-1.5 ${index % 2 === 1 ? 'bg-[#393c44]' : ''} ${
-                    isSelected ? 'shadow-[inset_0_0_0_1px_orange]' : ''
+                  className={`py-1.5 ${index % 2 === 1 ? 'bg-ft2-bgSecondary' : ''} ${
+                    isSelected ? 'shadow-[inset_0_0_0_1px_orange] bg-ft2-header/30' : ''
                   }`}
                   onClick={() => setSelectedIndex(index)}
                 >
@@ -616,7 +616,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                             e.stopPropagation();
                             handleCopyLimiterToAll(index);
                           }}
-                          className="bg-[#595c64] border border-[#232323] w-5 h-5 text-[10px] hover:bg-[#696c74]"
+                          className="bg-ft2-header border border-ft2-border w-5 h-5 text-[10px] hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
                           title="Copy Limiter settings to all other files"
                         >
                           <Copy size={10} className="mx-auto" />
@@ -626,7 +626,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                             e.stopPropagation();
                             handleCopyLoCutToAll(index);
                           }}
-                          className="bg-[#595c64] border border-[#232323] w-5 h-5 text-[10px] hover:bg-[#696c74]"
+                          className="bg-ft2-header border border-ft2-border w-5 h-5 text-[10px] hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
                           title="Copy Lo Cut settings to all other files"
                         >
                           <Copy size={10} className="mx-auto" />
@@ -636,7 +636,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                             e.stopPropagation();
                             handleCopyHiCutToAll(index);
                           }}
-                          className="bg-[#595c64] border border-[#232323] w-5 h-5 text-[10px] hover:bg-[#696c74]"
+                          className="bg-ft2-header border border-ft2-border w-5 h-5 text-[10px] hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
                           title="Copy Hi Cut settings to all other files"
                         >
                           <Copy size={10} className="mx-auto" />
@@ -646,7 +646,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                             e.stopPropagation();
                             handleCopyPTNoteToAll(index);
                           }}
-                          className="bg-[#595c64] border border-[#232323] w-5 h-5 text-[10px] hover:bg-[#696c74]"
+                          className="bg-ft2-header border border-ft2-border w-5 h-5 text-[10px] hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
                           title="Copy PT note to all other files"
                         >
                           <Copy size={10} className="mx-auto" />
@@ -726,8 +726,8 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                             )
                           );
                         }}
-                        className={`w-full px-2 py-1 border border-[#232323] text-xs font-bold ${
-                          sample.limiterEnabled ? 'bg-[#595c64]' : 'bg-[#393c44] text-gray-400'
+                        className={`w-full px-2 py-1 border border-ft2-border text-xs font-bold ${
+                          sample.limiterEnabled ? 'bg-ft2-header' : 'bg-ft2-bgSecondary text-ft2-textDim'
                         }`}
                       >
                         🔨 Limiter
@@ -749,7 +749,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                                 prev.map((s, i) => (i === index ? { ...s, loCutHz: newVal } : s))
                               );
                             }}
-                            className="w-14 bg-[#595c64] border-0 rounded px-1 py-0.5 text-white text-[10px] outline-none"
+                            className="w-14 bg-ft2-header border-0 rounded px-1 py-0.5 text-ft2-text text-[10px] outline-none"
                           />
                           <span>hz</span>
                         </div>
@@ -764,7 +764,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                                 prev.map((s, i) => (i === index ? { ...s, hiCutHz: newVal } : s))
                               );
                             }}
-                            className="w-14 bg-[#595c64] border-0 rounded px-1 py-0.5 text-white text-[10px] outline-none"
+                            className="w-14 bg-ft2-header border-0 rounded px-1 py-0.5 text-ft2-text text-[10px] outline-none"
                           />
                           <span>hz</span>
                         </div>
@@ -828,7 +828,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                             )
                           );
                         }}
-                        className="w-full bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold text-white outline-none"
+                        className="w-full bg-ft2-header px-2 py-1 border border-ft2-border text-xs font-bold text-ft2-text outline-none"
                       >
                         {PT_NOTES.map((n) => (
                           <option key={n.note} value={n.note}>
@@ -843,7 +843,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                             e.stopPropagation();
                             handleRemoveFile(index);
                           }}
-                          className="flex-1 bg-[#595c64] px-2 py-1 border border-[#232323] hover:bg-[#696c74]"
+                          className="flex-1 bg-ft2-header px-2 py-1 border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
                         >
                           <Trash2 size={12} className="mx-auto" />
                         </button>
@@ -852,7 +852,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                             e.stopPropagation();
                             // TODO: Process single item
                           }}
-                          className="flex-1 bg-[#595c64] px-2 py-1 border border-[#232323] hover:bg-[#696c74]"
+                          className="flex-1 bg-ft2-header px-2 py-1 border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
                         >
                           <Shuffle size={12} className="mx-auto" />
                         </button>
