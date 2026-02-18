@@ -495,10 +495,10 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
             <button
               onClick={() => dirInputRef.current?.click()}
               className="flex items-center gap-2 px-3 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight text-ft2-text rounded transition-colors text-xs font-bold"
-              title="Upload Folder"
+              title="Upload Folder (supports Max for Live device folders)"
             >
               <Folder size={14} />
-              FOLDER
+              FOLDER / M4L
             </button>
             <button
               onClick={onClose}
