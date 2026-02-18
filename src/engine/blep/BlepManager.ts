@@ -51,13 +51,21 @@ export class BlepManager {
   connect(source: Tone.ToneAudioNode, destination: Tone.ToneAudioNode): void {
     if (!this.workletNode || !this.initialized) {
       console.warn('BLEP not initialized, bypassing');
-      source.connect(destination);
+      try {
+        source.connect(destination);
+      } catch (e) {
+        // Ignore if already connected
+      }
       return;
     }
 
     if (this.enabled) {
       // Route through BLEP: source -> worklet -> destination
-      source.disconnect(destination);
+      try {
+        source.disconnect(destination);
+      } catch (e) {
+        // Ignore if not connected
+      }
       source.connect(this.workletNode as any);
       (this.workletNode as any).connect(destination);
     } else {
@@ -70,7 +78,11 @@ export class BlepManager {
           // Ignore disconnect errors if already disconnected
         }
       }
-      source.connect(destination);
+      try {
+        source.connect(destination);
+      } catch (e) {
+        // Ignore if already connected
+      }
     }
   }
 
