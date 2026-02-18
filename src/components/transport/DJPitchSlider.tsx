@@ -112,17 +112,12 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
         {displayValue}
       </span>
 
-      {/* +12 label */}
-      <span className="text-[8px] font-mono text-text-muted/40 leading-none flex-shrink-0">
-        +12
-      </span>
-
       {/* ── Scale + Housing ─────────────────────────────────────────── */}
       <div className="relative flex-1 min-h-0 w-full">
 
       {/* Scale marks — overlaps housing, ticks point at groove */}
       <div className="absolute inset-y-0 z-10 pointer-events-none flex flex-col justify-between py-[4px]" style={{ left: 0, width: 18 }}>
-        {['-8','','','-4','','','0','','','+4','','','+8'].map((label, i) => {
+        {['+12','','+8','','+4','','0','','-4','','-8','','-12'].map((label, i) => {
           const isMajor = label !== '';
           return (
             <div key={i} className="flex items-center justify-end gap-0" style={{ flex: 1 }}>
@@ -189,10 +184,6 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
       </div>{/* Housing */}
       </div>{/* Scale + Housing */}
 
-      {/* -12 label */}
-      <span className="text-[8px] font-mono text-text-muted/40 leading-none flex-shrink-0">
-        -12
-      </span>
     </div>
   );
 };
