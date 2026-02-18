@@ -342,8 +342,8 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
-      <div className="w-full max-w-[600px] h-full bg-ft2-bg flex flex-col overflow-hidden text-ft2-text font-mono text-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+      <div className="w-full max-w-[600px] max-h-full bg-ft2-bg flex flex-col overflow-hidden text-ft2-text font-mono text-xs border-2 border-ft2-border rounded shadow-2xl">
         {/* Title Bar */}
         <div className="flex items-center justify-between px-3 py-2 border-b-2 border-ft2-border bg-ft2-header">
           <div className="text-sm font-bold text-ft2-highlight">AmigaPal</div>
@@ -584,7 +584,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto px-5 pb-5 scrollbar-ft2" style={{ height: '603px' }}>
+          <div className="overflow-y-auto px-5 pb-5 scrollbar-ft2" style={{ maxHeight: '400px' }}>
             {samples.map((sample, index) => {
               const isSelected = selectedIndex === index;
 
