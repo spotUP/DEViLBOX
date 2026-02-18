@@ -190,6 +190,7 @@ export interface TickResult {
   };
   patternDelay?: number;      // Delay pattern by N rows
   stopSong?: boolean;         // Stop song playback (F00)
+  setGlobalPitchShift?: number; // Global pitch shift in semitones (DJ pitch fader)
 }
 
 // Effect handler interface - implemented by format-specific handlers
