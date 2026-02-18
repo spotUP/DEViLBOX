@@ -354,7 +354,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
-      <div className="w-full max-w-[480px] max-h-full bg-ft2-bg flex flex-col overflow-hidden text-ft2-text font-mono text-xs border-2 border-ft2-border rounded shadow-2xl">
+      <div className="w-full max-w-[640px] max-h-full bg-ft2-bg flex flex-col overflow-hidden text-ft2-text font-mono text-xs border-2 border-ft2-border rounded shadow-2xl">
         {/* Title Bar */}
         <div className="flex items-center justify-between px-3 py-2 border-b-2 border-ft2-border bg-ft2-header">
           <div className="text-sm font-bold text-ft2-highlight">AmigaPal</div>
@@ -610,7 +610,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                   {/* Upper Section */}
                   <div className="flex gap-2">
                     {/* Left: File Info */}
-                    <div className="w-[120px] text-xs space-y-0.5">
+                    <div className="w-[140px] text-xs space-y-0.5">
                       <div>
                         Target filename: <br />
                         <span className="font-light">{sample.targetFilename}</span>
