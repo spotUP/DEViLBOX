@@ -481,7 +481,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                 <span className="bg-ft2-header px-1.5 border border-ft2-border">
                   {previewOutput ? '✓' : '✕'}
                 </span>
-                Preview samplerate
+                Preview sample rate
               </button>
 
               {/* Truncate + WAV */}
@@ -602,10 +602,11 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
               return (
                 <div
                   key={sample.id}
-                  className={`py-1.5 ${index % 2 === 1 ? 'bg-ft2-bgSecondary' : ''} ${
-                    isSelected ? 'shadow-[inset_0_0_0_1px_orange] bg-ft2-header/30' : ''
+                  className={`relative py-1.5 ${index % 2 === 1 ? 'bg-ft2-bgSecondary' : ''} ${
+                    isSelected ? 'shadow-[inset_0_0_0_2px_orange] bg-ft2-header/30' : ''
                   }`}
                   onClick={() => setSelectedIndex(index)}
+                  style={{ zIndex: isSelected ? 10 : 1 }}
                 >
                   {/* Upper Section */}
                   <div className="flex gap-2">
@@ -622,46 +623,46 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                         length: <span className="font-light">{sample.length.toFixed(2)} s</span>
                       </div>
 
-                      <div className="flex gap-0.5 pt-1">
+                      <div className="flex gap-1 pt-1">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleCopyLimiterToAll(index);
                           }}
-                          className="bg-ft2-header border border-ft2-border w-5 h-5 text-[10px] hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
+                          className="bg-ft2-bgSecondary border border-ft2-border w-7 h-7 flex items-center justify-center hover:border-ft2-highlight hover:bg-ft2-header transition-colors"
                           title="Copy Limiter settings to all other files"
                         >
-                          <CopyLimiterIcon size={10} className="mx-auto" />
+                          <CopyLimiterIcon size={16} className="text-ft2-text" />
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleCopyLoCutToAll(index);
                           }}
-                          className="bg-ft2-header border border-ft2-border w-5 h-5 text-[10px] hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
+                          className="bg-ft2-bgSecondary border border-ft2-border w-7 h-7 flex items-center justify-center hover:border-ft2-highlight hover:bg-ft2-header transition-colors"
                           title="Copy Lo Cut settings to all other files"
                         >
-                          <CopyLoCutIcon size={10} className="mx-auto" />
+                          <CopyLoCutIcon size={16} className="text-ft2-text" />
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleCopyHiCutToAll(index);
                           }}
-                          className="bg-ft2-header border border-ft2-border w-5 h-5 text-[10px] hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
+                          className="bg-ft2-bgSecondary border border-ft2-border w-7 h-7 flex items-center justify-center hover:border-ft2-highlight hover:bg-ft2-header transition-colors"
                           title="Copy Hi Cut settings to all other files"
                         >
-                          <CopyHiCutIcon size={10} className="mx-auto" />
+                          <CopyHiCutIcon size={16} className="text-ft2-text" />
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleCopyPTNoteToAll(index);
                           }}
-                          className="bg-ft2-header border border-ft2-border w-5 h-5 text-[10px] hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
+                          className="bg-ft2-bgSecondary border border-ft2-border w-7 h-7 flex items-center justify-center hover:border-ft2-highlight hover:bg-ft2-header transition-colors"
                           title="Copy PT note to all other files"
                         >
-                          <CopyPTNoteIcon size={10} className="mx-auto" />
+                          <CopyPTNoteIcon size={16} className="text-ft2-text" />
                         </button>
                       </div>
                     </div>
