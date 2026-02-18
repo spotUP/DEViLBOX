@@ -4,6 +4,7 @@
  */
 
 import { useRef, useCallback, useEffect } from 'react';
+import * as Tone from 'tone';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useInstrumentStore, useTransportStore } from '@stores';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
@@ -52,7 +53,17 @@ export function useAutoPreview(instrumentId: number, instrument: InstrumentConfi
     }
 
     // Debounce: only trigger preview after user stops adjusting for PREVIEW_DEBOUNCE_MS
-    debounceTimerRef.current = setTimeout(() => {
+    debounceTimerRef.current = setTimeout(async () => {
+      // Ensure audio context is started
+      try {
+        await Tone.start();
+        if (Tone.context.state !== 'running') {
+          return; // Context failed to start
+        }
+      } catch {
+        return; // Failed to start audio
+      }
+
       // Reset the release timer
       if (releaseTimerRef.current !== null) {
         clearTimeout(releaseTimerRef.current);
