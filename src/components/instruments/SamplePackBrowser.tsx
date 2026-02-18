@@ -283,10 +283,10 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
 
   // Load selected samples into current instrument(s)
   const handleLoadSamples = () => {
-    if (currentInstrumentId === null || selectedSamples.size === 0 || !selectedPack) return;
+    if (selectedSamples.size === 0 || !selectedPack) return;
 
     const urls = Array.from(selectedSamples);
-    
+
     // Find all sample objects for selected URLs
     const samplesToLoad: SampleInfo[] = [];
     for (const url of urls) {
@@ -299,37 +299,66 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       }
     }
 
-    // Load first sample into CURRENT instrument
+    const { createInstrument, getInstrument } = useInstrumentStore.getState();
     const first = samplesToLoad[0];
-    updateInstrument(currentInstrumentId, {
-      type: 'sample',
-      name: first.name,
-      synthType: 'Sampler',
-      sample: {
-        url: first.url,
-        baseNote: 'C4',
-        detune: 0,
-        loop: false,
-        loopStart: 0,
-        loopEnd: 0,
-        reverse: false,
-        playbackRate: 1,
-      },
-      effects: [],
-      volume: -6,
-      pan: 0,
-    });
 
-    // Force engine to reload the new sample for the current instrument
+    // Check if current instrument exists
+    const currentExists = currentInstrumentId !== null && getInstrument(currentInstrumentId);
+
+    let firstInstrumentId: number;
+
+    if (currentExists) {
+      // Load first sample into CURRENT instrument
+      updateInstrument(currentInstrumentId!, {
+        type: 'sample',
+        name: first.name,
+        synthType: 'Sampler',
+        sample: {
+          url: first.url,
+          baseNote: 'C4',
+          detune: 0,
+          loop: false,
+          loopStart: 0,
+          loopEnd: 0,
+          reverse: false,
+          playbackRate: 1,
+        },
+        effects: [],
+        volume: -6,
+        pan: 0,
+      });
+      firstInstrumentId = currentInstrumentId!;
+    } else {
+      // No current instrument or doesn't exist - create new one
+      firstInstrumentId = createInstrument({
+        type: 'sample',
+        name: first.name,
+        synthType: 'Sampler',
+        sample: {
+          url: first.url,
+          baseNote: 'C4',
+          detune: 0,
+          loop: false,
+          loopStart: 0,
+          loopEnd: 0,
+          reverse: false,
+          playbackRate: 1,
+        },
+        effects: [],
+        volume: -6,
+        pan: 0,
+      });
+    }
+
+    // Force engine to reload the new sample for the first instrument
     try {
-      getToneEngine().invalidateInstrument(currentInstrumentId);
+      getToneEngine().invalidateInstrument(firstInstrumentId);
     } catch {
       // Engine may not be available
     }
 
     // If multiple samples, create NEW instruments for the rest
     if (samplesToLoad.length > 1) {
-      const { createInstrument } = useInstrumentStore.getState();
       for (let i = 1; i < samplesToLoad.length; i++) {
         const s = samplesToLoad[i];
         createInstrument({
