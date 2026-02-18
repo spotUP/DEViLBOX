@@ -1457,7 +1457,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         if (colX + channelWidth < 0 || colX > width) continue;
 
         const x = colX + Math.floor((channelWidth - contentWidth) / 2);
-        const chColor = pattern.channels[ch]?.color;
 
         // Active channel highlight (re-draw over row background)
         if (ch === cursor.channelIndex && !isGhostRow) {
