@@ -360,12 +360,139 @@ export const CASIO_MT40_PACK: SamplePack = {
 };
 
 // ============================================================================
+// ST-01 SAMPLE PACK (Ami-Sampler)
+// Classic Amiga tracker sounds - 126 samples
+// ============================================================================
+
+const ST01_BASE_PATH = 'data/samples/packs/st-01';
+
+const ST01_KICKS = ['BassDrum1.wav', 'BassDrum2.wav', 'BassDrum3.wav', 'BassDrum4.wav'];
+const ST01_SNARES = ['Snare1.wav', 'Snare2.wav', 'Snare3.wav', 'Snare4.wav', 'Snare5.wav', 'PopSnare1.wav', 'PopSnare2.wav', 'PopSnare3.wav', 'Smash1.wav', 'Smash2.wav'];
+const ST01_CLAPS = ['Claps1.wav', 'Claps2.wav'];
+const ST01_HIHATS = ['HiHat1.wav', 'HiHat2.wav', 'CloseHiHat.wav'];
+const ST01_PERCUSSION = ['Claves.wav', 'Conga.wav', 'CowBell.wav', 'DxTom.wav', 'ElecTom.wav', 'Perco.wav', 'Shaker.wav', 'SynClaves.wav', 'WoodBlock.wav'];
+
+const ST01_BASS = [
+  'DeepBass.wav', 'DXBass.wav', 'FilterBass.wav', 'FunBass.wav', 'FunkBass.wav', 'KorgBass.wav',
+  'MonoBass.wav', 'MonsterBass.wav', 'PopBass.wav', 'RubberBass.wav', 'SlapBass.wav', 'SoftBass.wav',
+  'SyntheBass.wav', 'TechBass.wav', 'TuneBass.wav', 'WowBass.wav'
+];
+
+const ST01_STRINGS = [
+  'AnalogString.wav', 'KorgString.wav', 'RichString.wav', 'Strings1.wav', 'Strings2.wav',
+  'Strings3.wav', 'Strings4.wav', 'Strings5.wav', 'strings6.wav', 'Strings7.wav', 'Strings8.wav',
+  'WabberString.wav'
+];
+
+const ST01_LEADS = [
+  'Alien.wav', 'Aligator.wav', 'Asia.wav', 'BigBow.wav', 'Blast.wav', 'Blubzing.wav', 'Breath.wav',
+  'Call.wav', 'Celeste.wav', 'Chink.wav', 'Cinema.wav', 'Dangerous.wav', 'Detune.wav', 'DigDug.wav',
+  'DigiHarp.wav', 'DreamBells.wav', 'EPiano.wav', 'ExBells.wav', 'FaeryTale.wav', 'Gato.wav', 'Great.wav',
+  'HallBrass.wav', 'Heaven.wav', 'HeavySynth.wav', 'Heifer.wav', 'Hooman.wav', 'Horns.wav', 'JahrMarkt1.wav',
+  'JahrMarkt2.wav', 'Jetes.wav', 'Klickorgan.wav', 'KorgBeau.wav', 'KorgBow.wav', 'KorgFilter.wav',
+  'Koto.wav', 'Leader.wav', 'Licks.wav', 'Magic.wav', 'Marimba.wav', 'Mechanic1.wav', 'Mechanic2.wav',
+  'MetalKeys.wav', 'MuteClav.wav', 'Nice.wav', 'NightMare.wav', 'NoteMan.wav', 'Organ.wav', 'Outlaw.wav',
+  'PanFlute.wav', 'PingBells.wav', 'Pizza.wav', 'PolySynth.wav', 'Pulse.wav', 'RingPiano.wav',
+  'RoomBrass.wav', 'Shamus.wav', 'SineCZ.wav', 'SixTease.wav', 'Soundtrack.wav', 'Squares.wav',
+  'Stabs.wav', 'Steinway.wav', 'Strange.wav', 'Sweep.wav', 'SynBrass.wav', 'SynthPiano.wav',
+  'TheEgg.wav', 'TineWave.wav', 'Touch.wav', 'Voices.wav'
+];
+
+export const ST01_PACK: SamplePack = {
+  id: 'st-01',
+  name: 'ST-01 (Ami-Sampler)',
+  author: 'Unknown',
+  description: 'Classic Amiga tracker sounds from the Ami-Sampler VST. 126 samples including drums, basses, strings, leads and more. Perfect for classic tracker music and chiptune.',
+  basePath: ST01_BASE_PATH,
+  categories: ['kicks', 'snares', 'claps', 'hihats', 'percussion', 'bass', 'leads', 'pads'],
+  samples: {
+    kicks: ST01_KICKS.map(f => createSampleInfo(f, 'kicks', ST01_BASE_PATH)),
+    snares: ST01_SNARES.map(f => createSampleInfo(f, 'snares', ST01_BASE_PATH)),
+    claps: ST01_CLAPS.map(f => createSampleInfo(f, 'claps', ST01_BASE_PATH)),
+    hihats: ST01_HIHATS.map(f => createSampleInfo(f, 'hihats', ST01_BASE_PATH)),
+    percussion: ST01_PERCUSSION.map(f => createSampleInfo(f, 'percussion', ST01_BASE_PATH)),
+    bass: ST01_BASS.map(f => createSampleInfo(f, 'bass', ST01_BASE_PATH)),
+    leads: ST01_LEADS.map(f => createSampleInfo(f, 'leads', ST01_BASE_PATH)),
+    pads: ST01_STRINGS.map(f => createSampleInfo(f, 'pads', ST01_BASE_PATH)),
+    fx: [],
+    loops: [],
+    vocals: [],
+    other: [],
+  },
+  sampleCount: 126,
+};
+
+// ============================================================================
+// ST-02 SAMPLE PACK (Ami-Sampler)
+// Classic Amiga tracker sounds - 121 samples
+// ============================================================================
+
+const ST02_BASE_PATH = 'data/samples/packs/st-02';
+
+const ST02_KICKS = ['BassDrum5.wav', 'bassdrum8.wav', 'linnkick.wav'];
+const ST02_SNARES = ['Snare6.wav', 'Snare7.wav', 'Snare8.wav', 'Snare9.wav', 'snare10.wav', 'break.wav', 'snx.drum2.wav', 'snx.drum3.wav'];
+const ST02_HIHATS = ['HiHat3.wav', 'HiHat4.wav'];
+const ST02_PERCUSSION = [
+  'Cowbell2.wav', 'Cymbal1.wav', 'Cymbal2.wav', 'ridecymbal.wav',
+  'Perc-Agogo.wav', 'Perc-Bongo.wav', 'perc-drytom.wav', 'Perc-HandDrum.wav',
+  'Perc-Taiko.wav', 'Perc-Timbale.wav', 'Perc-Timpani.wav'
+];
+
+const ST02_BASS = [
+  'DumpfBass.wav', 'HammerBass.wav', 'HitBass.wav', 'HosBass.wav', 'MilBass.wav',
+  'MiniMoog.wav', 'SoloBass.wav', 'slapbass2.wav'
+];
+
+const ST02_LEADS = [
+  'AccGit.wav', 'accordion.wav', 'AcoPiano.wav', 'aeh.wav', 'AhhVox.wav', 'Alcom.wav', 'Aloog.wav',
+  'baba.wav', 'Balance.wav', 'Blower.wav', 'Bouncy.wav', 'Bratz.wav', 'Brian.wav', 'Bright.wav',
+  'Bubble.wav', 'China.wav', 'Cliop.wav', 'CordPiano.wav', 'DigiPop.wav', 'ElecGuitar.wav',
+  'EloPin.wav', 'fatbrass.wav', 'Friday.wav', 'GlassMute.wav', 'Glockenspiel.wav', 'Growl.wav',
+  'guitar1.wav', 'ha.wav', 'Hapsi.wav', 'he.wav', 'HighVibes.wav', 'HitMe1.wav', 'HitMe2.wav',
+  'IceRain.wav', 'importdev.wav', 'JamJam.wav', 'k.wav', 'kermie1.wav', 'kermie2.wav', 'kermie3.wav',
+  'kermie4.wav', 'kermie5.wav', 'kermie6.wav', 'kermie7.wav', 'Licks2.wav', 'LongSlap.wav',
+  'master.wav', 'Monkey.wav', 'o.wav', 'ok.wav', 'Paper.wav', 'Peck.wav', 'PinVoice.wav',
+  'PitchBrass.wav', 'Pizza2.wav', 'Poison.wav', 'RealKoto1.wav', 'RealKoto2.wav', 'Reflex.wav',
+  'Reverb2.wav', 'Ringtone.wav', 's.wav', 'SawJump.wav', 'Sequencer.wav', 'servant.wav', 'Sinbad.wav',
+  'SingerBell.wav', 'Siren.wav', 'SmartBrass.wav', 'SpeOwl.wav', 'Spoils.wav', 'SqBrass.wav',
+  'Squint.wav', 'Starpeace.wav', 'Stars.wav', 'stoehn.wav', 'stringsc.wav', 'swoop.wav', 'SynBuz.wav',
+  'SynPia.wav', 'Take.wav', 'Tallic.wav', 'TeaPiano.wav', 'Telephone.wav', 'Trio.wav', 'Tubes.wav',
+  'WarmBells.wav', 'Warmth.wav', 'YaskMe.wav'
+];
+
+export const ST02_PACK: SamplePack = {
+  id: 'st-02',
+  name: 'ST-02 (Ami-Sampler)',
+  author: 'Unknown',
+  description: 'More classic Amiga tracker sounds from the Ami-Sampler VST. 121 samples including Kermit vocals, percussion, basses and melodic instruments. Great for tracker music.',
+  basePath: ST02_BASE_PATH,
+  categories: ['kicks', 'snares', 'hihats', 'percussion', 'bass', 'leads', 'vocals'],
+  samples: {
+    kicks: ST02_KICKS.map(f => createSampleInfo(f, 'kicks', ST02_BASE_PATH)),
+    snares: ST02_SNARES.map(f => createSampleInfo(f, 'snares', ST02_BASE_PATH)),
+    claps: [],
+    hihats: ST02_HIHATS.map(f => createSampleInfo(f, 'hihats', ST02_BASE_PATH)),
+    percussion: ST02_PERCUSSION.map(f => createSampleInfo(f, 'percussion', ST02_BASE_PATH)),
+    bass: ST02_BASS.map(f => createSampleInfo(f, 'bass', ST02_BASE_PATH)),
+    leads: ST02_LEADS.map(f => createSampleInfo(f, 'leads', ST02_BASE_PATH)),
+    pads: [],
+    fx: [],
+    loops: [],
+    vocals: [], // kermie samples are in leads
+    other: [],
+  },
+  sampleCount: 121,
+};
+
+// ============================================================================
 // SAMPLE PACK REGISTRY
 // ============================================================================
 
 export const SAMPLE_PACKS: SamplePack[] = [
   DRUMNIBUS_PACK,
   CASIO_MT40_PACK,
+  ST01_PACK,
+  ST02_PACK,
 ];
 
 export const getSamplePackById = (id: string): SamplePack | undefined => {
