@@ -50,12 +50,54 @@ const WAVE_PREVIEW = '#f97316';  // Orange accent
 // Waveform Drawing
 // ============================================================================
 
-function drawWaveform(
-  canvas: HTMLCanvasElement,
-  buffer: AudioBuffer | null,
-  label: string,
-  rateLabel: string,
+/**
+ * Draw a single waveform layer (used by drawOverlayWaveform).
+ * Does NOT clear or draw background — caller handles that.
+ */
+function drawWaveformLayer(
+  ctx: CanvasRenderingContext2D,
+  data: Float32Array,
+  w: number,
+  h: number,
   color: string,
+  alpha: number,
+): void {
+  const cy = h / 2;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+
+  const step = Math.max(1, Math.floor(data.length / w));
+  for (let x = 0; x < w; x++) {
+    const idx = Math.floor((x / w) * data.length);
+    let min = 1.0;
+    let max = -1.0;
+    for (let j = 0; j < step && idx + j < data.length; j++) {
+      const v = data[idx + j];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    const y1 = cy - max * cy;
+    const y2 = cy - min * cy;
+    ctx.moveTo(x, y1);
+    ctx.lineTo(x, y2);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Draw overlaid before/after waveforms on a single canvas.
+ * Original is drawn at reduced opacity, resampled is drawn on top
+ * as a brighter "ghost" overlay so differences are visible.
+ */
+function drawOverlayWaveform(
+  canvas: HTMLCanvasElement,
+  original: AudioBuffer | null,
+  resampled: AudioBuffer | null,
+  targetRate: number,
 ): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -90,50 +132,71 @@ function drawWaveform(
   ctx.lineTo(w, cy);
   ctx.stroke();
 
-  // Label
-  ctx.font = '10px "JetBrains Mono", monospace';
-  ctx.fillStyle = '#686060';
-  ctx.fillText(label, 6, 14);
-
-  // Rate label (right side)
-  if (rateLabel) {
-    const tm = ctx.measureText(rateLabel);
-    ctx.fillStyle = color;
-    ctx.fillText(rateLabel, w - tm.width - 6, 14);
+  // Draw original waveform (dimmed when resampled exists)
+  if (original && original.length > 0) {
+    const origAlpha = resampled ? 0.3 : 0.8;
+    drawWaveformLayer(ctx, original.getChannelData(0), w, h, WAVE_ORIGINAL, origAlpha);
   }
 
-  // Draw waveform
-  if (buffer && buffer.length > 0) {
-    const data = buffer.getChannelData(0);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
+  // Draw resampled waveform on top as ghost overlay
+  if (resampled && resampled.length > 0) {
+    drawWaveformLayer(ctx, resampled.getChannelData(0), w, h, WAVE_PREVIEW, 0.9);
+  }
 
-    const step = Math.max(1, Math.floor(data.length / w));
-    for (let x = 0; x < w; x++) {
-      const idx = Math.floor((x / w) * data.length);
-      let min = 1.0;
-      let max = -1.0;
-      for (let j = 0; j < step && idx + j < data.length; j++) {
-        const v = data[idx + j];
-        if (v < min) min = v;
-        if (v > max) max = v;
-      }
-      const y1 = cy - max * cy;
-      const y2 = cy - min * cy;
-      ctx.moveTo(x, y1);
-      ctx.lineTo(x, y2);
-    }
-    ctx.stroke();
+  // Labels
+  ctx.font = '10px "JetBrains Mono", monospace';
 
-    // Info text
-    const durMs = ((buffer.length / buffer.sampleRate) * 1000).toFixed(0);
-    const info = `${buffer.length.toLocaleString()} samples \u00b7 ${durMs}ms \u00b7 ${buffer.numberOfChannels}ch`;
-    ctx.fillStyle = '#686060';
+  if (original && original.length > 0) {
+    // Original label + info (left side)
+    ctx.fillStyle = resampled ? WAVE_ORIGINAL + '88' : WAVE_ORIGINAL;
+    ctx.fillText('ORIGINAL', 6, 14);
+
+    const durMs = ((original.length / original.sampleRate) * 1000).toFixed(0);
+    const info = `${original.length.toLocaleString()} smp \u00b7 ${durMs}ms \u00b7 ${original.sampleRate} Hz`;
+    ctx.fillStyle = '#504848';
     ctx.fillText(info, 6, h - 6);
   } else {
     ctx.fillStyle = '#686060';
     ctx.fillText('No sample loaded', w / 2 - 40, cy + 4);
+  }
+
+  if (resampled && resampled.length > 0) {
+    // Resampled label (right side, top)
+    const resLabel = `RESAMPLED \u00b7 ${targetRate} Hz`;
+    const tm = ctx.measureText(resLabel);
+    ctx.fillStyle = WAVE_PREVIEW;
+    ctx.fillText(resLabel, w - tm.width - 6, 14);
+
+    // Resampled info (right side, bottom)
+    const durMs = ((resampled.length / resampled.sampleRate) * 1000).toFixed(0);
+    const resInfo = `${resampled.length.toLocaleString()} smp \u00b7 ${durMs}ms`;
+    const tm2 = ctx.measureText(resInfo);
+    ctx.fillStyle = WAVE_PREVIEW + '88';
+    ctx.fillText(resInfo, w - tm2.width - 6, h - 6);
+  } else {
+    // Hint text
+    const hint = 'Hit Preview to compare';
+    const tm = ctx.measureText(hint);
+    ctx.fillStyle = '#383030';
+    ctx.fillText(hint, w - tm.width - 6, 14);
+  }
+
+  // Legend dots (bottom center, only when both exist)
+  if (original && resampled) {
+    const legendY = h - 7;
+    const legendX = w / 2 - 50;
+    // Original dot
+    ctx.fillStyle = WAVE_ORIGINAL;
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(legendX, legendY, 6, 6);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#686060';
+    ctx.fillText('Before', legendX + 9, legendY + 6);
+    // Resampled dot
+    ctx.fillStyle = WAVE_PREVIEW;
+    ctx.fillRect(legendX + 55, legendY, 6, 6);
+    ctx.fillStyle = '#686060';
+    ctx.fillText('After', legendX + 64, legendY + 6);
   }
 }
 
@@ -152,8 +215,7 @@ export const AmiResamplerModal: React.FC<AmiResamplerModalProps> = ({
   const [previewBuffer, setPreviewBuffer] = useState<AudioBuffer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const beforeCanvasRef = useRef<HTMLCanvasElement>(null);
-  const afterCanvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const playerRef = useRef<Tone.Player | null>(null);
 
   // Reset state when modal opens
@@ -169,25 +231,15 @@ export const AmiResamplerModal: React.FC<AmiResamplerModalProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // Render canvases when data changes
+  // Render overlay canvas when data changes
   useEffect(() => {
     if (!isOpen) return;
-    if (beforeCanvasRef.current) {
-      drawWaveform(
-        beforeCanvasRef.current,
+    if (overlayCanvasRef.current) {
+      drawOverlayWaveform(
+        overlayCanvasRef.current,
         audioBuffer,
-        'ORIGINAL',
-        audioBuffer ? `${audioBuffer.sampleRate} Hz` : '',
-        WAVE_ORIGINAL,
-      );
-    }
-    if (afterCanvasRef.current) {
-      drawWaveform(
-        afterCanvasRef.current,
         previewBuffer,
-        'RESAMPLED',
-        previewBuffer ? `${options.targetRate} Hz` : '',
-        WAVE_PREVIEW,
+        options.targetRate,
       );
     }
   }, [isOpen, audioBuffer, previewBuffer, options.targetRate]);
@@ -300,19 +352,12 @@ export const AmiResamplerModal: React.FC<AmiResamplerModalProps> = ({
           </Button>
         </div>
 
-        {/* Waveform Displays */}
-        <div className="flex gap-2 p-3">
-          <div className="flex-1 rounded-lg overflow-hidden border border-dark-border">
+        {/* Waveform Display — overlaid before/after */}
+        <div className="p-3">
+          <div className="rounded-lg overflow-hidden border border-dark-border">
             <canvas
-              ref={beforeCanvasRef}
-              className="w-full h-[120px]"
-              style={{ imageRendering: 'pixelated' }}
-            />
-          </div>
-          <div className="flex-1 rounded-lg overflow-hidden border border-dark-border">
-            <canvas
-              ref={afterCanvasRef}
-              className="w-full h-[120px]"
+              ref={overlayCanvasRef}
+              className="w-full h-[140px]"
               style={{ imageRendering: 'pixelated' }}
             />
           </div>

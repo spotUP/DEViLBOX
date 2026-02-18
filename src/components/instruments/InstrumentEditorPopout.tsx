@@ -57,7 +57,7 @@ export const InstrumentEditorPopout: React.FC = () => {
 
   const synthInfo = currentInstrument?.synthType
     ? getSynthInfo(currentInstrument.synthType)
-    : getSynthInfo('TB303');
+    : getSynthInfo('Sampler');
 
   const tabs = [
     { id: 'sound' as const, label: 'Sound', icon: Settings },

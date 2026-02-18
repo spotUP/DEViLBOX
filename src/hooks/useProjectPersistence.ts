@@ -58,8 +58,9 @@ const safeCancelIdleCallback = cancelIdleCallbackPolyfill;
  *       inverted params where app value ≠ XML value. WASM was getting 0.1 instead of 0.91
  *       for passbandCompensation and 0.3 instead of 0.743 for resTracking.
  *       Fixed filterSelect migration (was hardcoding invalid value 1, now 0).
+ * - 14: Clean initial state — no default instruments, no song. Tracker starts empty.
  */
-const SCHEMA_VERSION = 13;
+const SCHEMA_VERSION = 14;
 
 interface SavedProject {
   version: string;

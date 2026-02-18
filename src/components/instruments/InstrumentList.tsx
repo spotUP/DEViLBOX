@@ -292,7 +292,8 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         style={!isFT2 ? { maxHeight } : undefined}
       >
         <div className="flex flex-col divide-y divide-ft2-border/30">
-        {sortedInstruments.map((instrument) => {
+        {sortedInstruments.map((instrument, index) => {
+          const displayNum = index + 1; // 1-based display number
           const synthInfo = getSynthInfo(instrument.synthType);
           const isSelected = instrument.id === currentInstrumentId;
           const IconComponent = getIcon(synthInfo?.icon || 'Music2');
@@ -319,8 +320,8 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 {/* ID */}
                 <span className={`font-mono text-xs font-bold w-6 ${isSelected ? 'text-ft2-bg' : 'text-ft2-highlight'}`}>
                   {useHexNumbers
-                    ? instrument.id.toString(16).toUpperCase().padStart(2, '0')
-                    : instrument.id.toString(10).padStart(2, '0')
+                    ? displayNum.toString(16).toUpperCase().padStart(2, '0')
+                    : displayNum.toString(10).padStart(2, '0')
                   }
                 </span>
 
@@ -410,7 +411,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     ${isSelected ? 'text-accent-primary' : 'text-text-muted'}
                   `}
                 >
-                  {String(instrument.id).padStart(2, '0')}
+                  {String(displayNum).padStart(2, '0')}
                 </span>
 
                 {/* Synth type icon */}

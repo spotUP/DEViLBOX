@@ -20,6 +20,11 @@ import './engine/registry/effects'
 // Dev tools: synth tester (adds testAllSynths() etc. to window)
 import './utils/synthTester'
 
+// iOS: Install global audio unlock listener so the very first touch/click
+// (even dismissing a modal) unlocks the AudioContext. No-op on non-iOS.
+import { installIOSAudioUnlock } from './utils/ios-audio-unlock'
+installIOSAudioUnlock();
+
 // Global error handlers for uncaught errors
 window.addEventListener('error', (event) => {
   // Suppress Tone.js PolySynth disposal errors - these happen when scheduled events

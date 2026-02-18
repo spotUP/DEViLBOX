@@ -46,7 +46,7 @@ import {
   DEFAULT_CHIPTUNE_MODULE,
   DEFAULT_WAM,
 } from '@typedefs/instrument';
-import { TB303_PRESETS } from '@constants/tb303Presets';
+
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { getDefaultFurnaceConfig, getDefaultEffectParameters } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -273,10 +273,9 @@ interface InstrumentStore {
 
 const createDefaultInstrument = (id: number): InstrumentConfig => ({
   id,
-  name: `TB303 ${String(id).padStart(2, '0')}`,
+  name: `Instrument ${String(id).padStart(2, '0')}`,
   type: 'synth', // DEViLBOX synth instrument
-  synthType: 'TB303',
-  tb303: { ...DEFAULT_TB303 },
+  synthType: 'Sampler',
   oscillator: { ...DEFAULT_OSCILLATOR },
   envelope: { ...DEFAULT_ENVELOPE },
   filter: { ...DEFAULT_FILTER },
@@ -383,7 +382,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.buzzmachine ||
         updates.spaceLaser ||
         updates.v2 ||
-        updates.wam
+        updates.wam ||
+        updates.parameters ||
+        updates.sample
       );
 
       set((state) => {
@@ -695,6 +696,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
       set((state) => {
         // Auto-set monophonic flag for inherently monophonic synths (same as createInstrument)
         const finalConfig = { ...config };
+
+        // Sanitize out-of-range IDs (e.g. Date.now() timestamps) to valid 1-128 range
+        if (finalConfig.id < 1 || finalConfig.id > 128) {
+          const existingIds = state.instruments.map(i => i.id);
+          finalConfig.id = findNextId(existingIds);
+        }
         if (finalConfig.monophonic === undefined) {
           const monoSynthTypes = new Set([
             'MonoSynth', 'DuoSynth',
@@ -1271,9 +1278,21 @@ export const useInstrumentStore = create<InstrumentStore>()(
       engine.disposeAllInstruments();
 
       // Migrate old instruments (backward compatibility)
+      // Also fix any out-of-range IDs (e.g. Date.now() timestamps from older versions)
+      const usedIds = new Set<number>();
       const migratedInstruments = newInstruments.map(inst => {
         // Ensure complete config for the synthType
         const completeInst = ensureCompleteInstrumentConfig(inst);
+
+        // Sanitize out-of-range IDs to valid 1-128 range
+        if (completeInst.id < 1 || completeInst.id > 128) {
+          let newId = 1;
+          for (let id = 1; id <= 128; id++) {
+            if (!usedIds.has(id)) { newId = id; break; }
+          }
+          completeInst.id = newId;
+        }
+        usedIds.add(completeInst.id);
 
         return {
           ...completeInst,
@@ -1968,8 +1987,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
       });
 
       set((state) => {
-        state.instruments = [{ ...TB303_PRESETS[0], id: 1, type: 'synth' } as InstrumentConfig];
-        state.currentInstrumentId = 1;
+        state.instruments = [];
+        state.currentInstrumentId = 0;
         state.presets = [];
       });
 

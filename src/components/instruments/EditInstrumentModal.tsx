@@ -96,9 +96,9 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
 
   // Create mode state
   const [isCreating, setIsCreating] = useState(createMode);
-  const [selectedSynthType, setSelectedSynthType] = useState<SynthType>('TB303');
+  const [selectedSynthType, setSelectedSynthType] = useState<SynthType>('Sampler');
   const [synthSearch, setSynthSearch] = useState('');
-  const [instrumentName, setInstrumentName] = useState('303 Classic');
+  const [instrumentName, setInstrumentName] = useState('Sampler');
   const [tempInstrument, setTempInstrument] = useState<InstrumentConfig | null>(null);
 
   // Edit mode state
@@ -131,16 +131,16 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
     requestAnimationFrame(() => {
       if (isOpen && createMode) {
         setIsCreating(true);
-        setSelectedSynthType('TB303');
-        setInstrumentName('303 Classic');
-        setTempInstrument(createTempInstrument('TB303'));
+        setSelectedSynthType('Sampler');
+        setInstrumentName('Sampler');
+        setTempInstrument(createTempInstrument('Sampler'));
       } else if (isOpen && !createMode) {
         if (instruments.length === 0) {
           // No instruments exist - auto-enter create mode
           setIsCreating(true);
-          setSelectedSynthType('TB303');
-          setInstrumentName('303 Classic');
-          setTempInstrument(createTempInstrument('TB303'));
+          setSelectedSynthType('Sampler');
+          setInstrumentName('Sampler');
+          setTempInstrument(createTempInstrument('Sampler'));
         } else if (!currentInstrument) {
           // Instruments exist but none selected - select first one
           setIsCreating(false);
@@ -247,9 +247,9 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   // Handle switching to create mode
   const handleStartCreate = () => {
     setIsCreating(true);
-    setSelectedSynthType('TB303');
-    setInstrumentName('303 Classic');
-    setTempInstrument(createTempInstrument('TB303'));
+    setSelectedSynthType('Sampler');
+    setInstrumentName('Sampler');
+    setTempInstrument(createTempInstrument('Sampler'));
   };
 
   // Handle synth type change from browse tab
@@ -283,7 +283,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
 
   // Get current instrument info
   const instrument = isCreating ? tempInstrument : currentInstrument;
-  const synthInfo = instrument?.synthType ? getSynthInfo(instrument.synthType) : getSynthInfo('TB303');
+  const synthInfo = instrument?.synthType ? getSynthInfo(instrument.synthType) : getSynthInfo('Sampler');
   // Icon rendered via SynthIconDisplay sub-component (module scope)
 
   // CREATE MODE UI

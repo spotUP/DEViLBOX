@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-17T16:13:12.026Z
+ * Generated: 2026-02-18T08:48:45.399Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.793';
-export const BUILD_NUMBER = '793';
-export const BUILD_HASH = 'cddaa7c6';
-export const BUILD_DATE = '2026-02-17';
+export const BUILD_VERSION = '1.0.794';
+export const BUILD_NUMBER = '794';
+export const BUILD_HASH = 'db596b55';
+export const BUILD_DATE = '2026-02-18';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.793',
+    version: '1.0.794',
     date: '2026-02-17',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix CI build: remove unused vars, iOS audio unlock, ONNX WASM loading, instrument persistence, sample editor rewrite"
+      },
       {
         type: 'feature',
         "description": "IOS audio unlock via silent MP3 to bypass mute switch"
@@ -234,10 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Remove per-step instrument color coding from grid markers"
-      },
-      {
-        type: 'feature',
-        "description": "Add smooth marker scrolling mode to grid view"
       }
     ]
   }
