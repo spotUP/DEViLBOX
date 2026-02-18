@@ -74,7 +74,8 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
       <div
         className="text-[11px] font-mono font-bold text-amber-400 min-w-[40px] text-center cursor-pointer select-none flex-shrink-0"
         onDoubleClick={handleDoubleClick}
-        title="Double-click to reset"
+        onContextMenu={(e) => { e.preventDefault(); handleDoubleClick(); }}
+        title="Double-click or right-click to reset"
       >
         {displayValue}
       </div>
@@ -92,7 +93,8 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
           value={pitchSemitones}
           onChange={handlePitchChange}
           onDoubleClick={handleDoubleClick}
-          title="DJ Pitch Control (-12 to +12 semitones)"
+          onContextMenu={(e) => { e.preventDefault(); handleDoubleClick(); }}
+          title="DJ Pitch Control (-12 to +12 semitones, right-click to reset)"
           style={{
             writingMode: 'bt-lr' as React.CSSProperties['writingMode'],
             WebkitAppearance: 'slider-vertical',
