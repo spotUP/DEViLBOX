@@ -10,7 +10,6 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import * as Tone from 'tone';
 import { getPatternScheduler } from '@engine/PatternScheduler';
 
 interface DJPitchSliderProps {
