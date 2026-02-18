@@ -94,7 +94,9 @@ export class AbletonLinkSync {
    * Handle incoming MIDI Clock messages
    */
   private handleMIDIMessage(event: MIDIMessageEvent): void {
-    const [status] = event.data;
+    if (!event.data) return;
+    const data = Array.from(event.data);
+    const [status] = data;
 
     switch (status) {
       case 0xf8: // MIDI Clock (24 ppqn)
