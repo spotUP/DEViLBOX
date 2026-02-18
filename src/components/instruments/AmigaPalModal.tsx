@@ -11,7 +11,8 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, FolderOpen, Folder, Trash2, Shuffle, Copy } from 'lucide-react';
+import { X, FolderOpen, Folder, Trash2, Shuffle } from 'lucide-react';
+import { CopyLimiterIcon, CopyLoCutIcon, CopyHiCutIcon, CopyPTNoteIcon } from '@components/icons/AmigaPalIcons';
 import type { ProcessedResult } from '@utils/audio/SampleProcessing';
 
 // ProTracker notes (C-1 to B-3, 36 notes total)
@@ -630,7 +631,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                           className="bg-ft2-header border border-ft2-border w-5 h-5 text-[10px] hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
                           title="Copy Limiter settings to all other files"
                         >
-                          <Copy size={10} className="mx-auto" />
+                          <CopyLimiterIcon size={10} className="mx-auto" />
                         </button>
                         <button
                           onClick={(e) => {
@@ -640,7 +641,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                           className="bg-ft2-header border border-ft2-border w-5 h-5 text-[10px] hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
                           title="Copy Lo Cut settings to all other files"
                         >
-                          <Copy size={10} className="mx-auto" />
+                          <CopyLoCutIcon size={10} className="mx-auto" />
                         </button>
                         <button
                           onClick={(e) => {
@@ -650,7 +651,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                           className="bg-ft2-header border border-ft2-border w-5 h-5 text-[10px] hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
                           title="Copy Hi Cut settings to all other files"
                         >
-                          <Copy size={10} className="mx-auto" />
+                          <CopyHiCutIcon size={10} className="mx-auto" />
                         </button>
                         <button
                           onClick={(e) => {
@@ -660,7 +661,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                           className="bg-ft2-header border border-ft2-border w-5 h-5 text-[10px] hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
                           title="Copy PT note to all other files"
                         >
-                          <Copy size={10} className="mx-auto" />
+                          <CopyPTNoteIcon size={10} className="mx-auto" />
                         </button>
                       </div>
                     </div>
