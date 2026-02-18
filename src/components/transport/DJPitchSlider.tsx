@@ -118,14 +118,14 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
       </span>
 
       {/* ── Scale + Housing ─────────────────────────────────────────── */}
-      <div className="relative flex-1 min-h-0 w-full flex flex-row gap-0">
+      <div className="relative flex-1 min-h-0 w-full">
 
-      {/* Scale marks — left of housing, -8 top / 0 mid / +8 bottom */}
-      <div className="relative flex-shrink-0 flex flex-col justify-between py-[4px]" style={{ width: 18 }}>
-        {['-8','','','-4','','','0','','','+4','','','+8'].map((label, i, arr) => {
+      {/* Scale marks — absolutely positioned, ticks flush against housing left edge */}
+      <div className="absolute inset-y-0 right-0 flex flex-col justify-between py-[4px]" style={{ left: 0, right: 'calc(100% - 18px)' }}>
+        {['-8','','','-4','','','0','','','+4','','','+8'].map((label, i) => {
           const isMajor = label !== '';
           return (
-            <div key={i} className="flex items-center justify-end gap-0.5" style={{ flex: 1 }}>
+            <div key={i} className="flex items-center justify-end gap-0" style={{ flex: 1 }}>
               {isMajor && (
                 <span className={`text-[6px] font-mono leading-none ${label === '0' ? 'text-amber-400/60' : 'text-text-muted/40'}`}>
                   {label}
@@ -137,8 +137,8 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
         })}
       </div>
 
-      {/* Housing */}
-      <div className="relative flex-1 min-h-0">
+      {/* Housing — inset left to make room for scale labels */}
+      <div className="absolute inset-y-0 right-0" style={{ left: 18 }}>
 
 
 
@@ -187,7 +187,7 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
           </div>
         </div>
       </div>{/* Housing */}
-      </div>{/* Scale + Housing row */}
+      </div>{/* Scale + Housing */}
 
       {/* -12 label */}
       <span className="text-[8px] font-mono text-text-muted/40 leading-none flex-shrink-0">
