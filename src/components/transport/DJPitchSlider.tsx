@@ -1,115 +1,184 @@
 /**
- * DJPitchSlider - Global pitch control for live DJ mixing
+ * DJPitchSlider - Technics SL-1200 style pitch fader
  *
- * Adjusts playback rate of entire song in real-time:
- * - Vertical turntable-style slider
- * - Range: -12% to +12% (semitones)
- * - Double-click to reset to 0
- * - Affects master transport tempo
+ * Custom-drawn vertical fader:
+ * - Thin center groove (the track)
+ * - Rectangular handle with three horizontal ribs
+ * - Center reference mark at 0 position
+ * - Range: -12 to +12 semitones
+ * - Double-click / right-click to reset
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import * as Tone from 'tone';
 
 interface DJPitchSliderProps {
-  /** Optional CSS class */
   className?: string;
-  /** Callback when pitch changes */
   onPitchChange?: (semitones: number) => void;
 }
 
+const MIN_PITCH = -12;
+const MAX_PITCH = 12;
+const PITCH_RANGE = 24; // MAX - MIN
+const HANDLE_H = 24;   // px — height of the fader cap
+const EDGE_PAD = 4;    // px — keep handle inside housing at extremes
+
 export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
   className = '',
-  onPitchChange
+  onPitchChange,
 }) => {
-  const [pitchSemitones, setPitchSemitones] = useState(0);
-  const [baseBPM, setBaseBPM] = useState<number | null>(null);
+  const [pitch, setPitch] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handlePitchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = parseFloat(e.target.value);
-    setPitchSemitones(newValue);
+  const baseBPMRef = useRef<number | null>(null);
+  const trackRef   = useRef<HTMLDivElement>(null);
+  const dragRef    = useRef({ startY: 0, startPitch: 0 });
 
-    // Calculate playback rate: 2^(semitones/12)
-    // +12 semitones = 2x speed (one octave up)
-    // -12 semitones = 0.5x speed (one octave down)
-    const playbackRate = Math.pow(2, newValue / 12);
-
-    // Store base BPM on first use
-    if (baseBPM === null) {
-      setBaseBPM(Tone.getTransport().bpm.value);
+  // ── Audio ──────────────────────────────────────────────────────────
+  const applyPitch = useCallback((raw: number) => {
+    const clamped = Math.max(MIN_PITCH, Math.min(MAX_PITCH, raw));
+    setPitch(clamped);
+    if (baseBPMRef.current === null) {
+      baseBPMRef.current = Tone.getTransport().bpm.value;
     }
+    Tone.getTransport().bpm.value =
+      baseBPMRef.current * Math.pow(2, clamped / 12);
+    onPitchChange?.(clamped);
+  }, [onPitchChange]);
 
-    // Adjust BPM to create pitch shift effect
-    // This changes both tempo AND pitch (like a DJ turntable)
-    const currentBase = baseBPM ?? Tone.getTransport().bpm.value;
-    Tone.getTransport().bpm.value = currentBase * playbackRate;
-
-    // Notify parent component
-    onPitchChange?.(newValue);
-  }, [onPitchChange, baseBPM]);
-
-  const handleDoubleClick = useCallback(() => {
-    // Reset to 0 on double-click
-    setPitchSemitones(0);
-    if (baseBPM !== null) {
-      Tone.getTransport().bpm.value = baseBPM;
+  const resetPitch = useCallback(() => {
+    if (baseBPMRef.current !== null) {
+      Tone.getTransport().bpm.value = baseBPMRef.current;
+      baseBPMRef.current = null;
     }
-    setBaseBPM(null);
+    setPitch(0);
     onPitchChange?.(0);
-  }, [onPitchChange, baseBPM]);
+  }, [onPitchChange]);
 
-  // Format display value
-  const displayValue = pitchSemitones > 0
-    ? `+${pitchSemitones.toFixed(1)}`
-    : pitchSemitones.toFixed(1);
+  // ── Drag ───────────────────────────────────────────────────────────
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = { startY: e.clientY, startPitch: pitch };
+    setIsDragging(true);
+  }, [pitch]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const onMove = (e: MouseEvent) => {
+      const h = trackRef.current?.clientHeight ?? 1;
+      const usable = h - HANDLE_H - EDGE_PAD * 2;
+      const dy = e.clientY - dragRef.current.startY;
+      applyPitch(dragRef.current.startPitch - (dy / usable) * PITCH_RANGE);
+    };
+
+    const onUp = () => setIsDragging(false);
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [isDragging, applyPitch]);
+
+  // ── Layout ─────────────────────────────────────────────────────────
+  // 0 = top of track (+12 st), 1 = bottom (-12 st)
+  const frac = (MAX_PITCH - pitch) / PITCH_RANGE;
+  const handleTop = `calc(${EDGE_PAD}px + ${frac} * (100% - ${HANDLE_H + EDGE_PAD * 2}px))`;
+
+  const displayValue = pitch > 0 ? `+${pitch.toFixed(1)}` : pitch.toFixed(1);
+  const atCenter = Math.abs(pitch) < 0.05;
 
   return (
-    <div className={`flex flex-col items-center py-2 px-1 gap-1 ${className}`}>
+    <div
+      className={`flex flex-col items-center py-2 gap-1 select-none ${className}`}
+      style={{ width: 36 }}
+    >
       {/* Label */}
-      <div className="text-[9px] font-mono text-text-muted uppercase tracking-wider flex-shrink-0">
+      <span className="text-[9px] font-mono text-text-muted uppercase tracking-wider flex-shrink-0">
         Pitch
-      </div>
+      </span>
 
-      {/* Value Display */}
-      <div
-        className="text-[11px] font-mono font-bold text-amber-400 min-w-[40px] text-center cursor-pointer select-none flex-shrink-0"
-        onDoubleClick={handleDoubleClick}
-        onContextMenu={(e) => { e.preventDefault(); handleDoubleClick(); }}
+      {/* Value readout */}
+      <span
+        className={`text-[10px] font-mono font-bold text-center cursor-pointer flex-shrink-0 transition-colors ${
+          atCenter ? 'text-text-muted' : 'text-amber-400'
+        }`}
+        onDoubleClick={resetPitch}
+        onContextMenu={(e) => { e.preventDefault(); resetPitch(); }}
         title="Double-click or right-click to reset"
       >
         {displayValue}
-      </div>
+      </span>
 
-      {/* +12 indicator */}
-      <div className="text-[8px] font-mono text-text-muted/50 flex-shrink-0">+12</div>
+      {/* +12 label */}
+      <span className="text-[8px] font-mono text-text-muted/40 leading-none flex-shrink-0">
+        +12
+      </span>
 
-      {/* Vertical Slider — fills remaining height */}
-      <div className="relative flex-1 flex items-center justify-center min-h-0">
-        <input
-          type="range"
-          min="-12"
-          max="12"
-          step="0.1"
-          value={pitchSemitones}
-          onChange={handlePitchChange}
-          onDoubleClick={handleDoubleClick}
-          onContextMenu={(e) => { e.preventDefault(); handleDoubleClick(); }}
-          title="DJ Pitch Control (-12 to +12 semitones, right-click to reset)"
-          style={{
-            writingMode: 'bt-lr' as React.CSSProperties['writingMode'],
-            WebkitAppearance: 'slider-vertical',
-            width: '20px',
-            height: '100%',
-            accentColor: '#fbbf24',
-            cursor: 'ns-resize',
-          }}
+      {/* ── Housing + Track ─────────────────────────────────────────── */}
+      <div className="relative flex-1 min-h-0 w-full">
+
+        {/* Outer housing border */}
+        <div className="absolute inset-0 border border-dark-border/60 rounded-sm pointer-events-none" />
+
+        {/* Center reference tick (left edge, marks 0) */}
+        <div
+          className="absolute left-0 w-1.5 h-px bg-amber-400/30 pointer-events-none"
+          style={{ top: '50%' }}
         />
-        {/* Center marker */}
-        <div className="absolute left-1/2 top-1/2 w-4 h-0.5 bg-amber-400/30 pointer-events-none -translate-x-1/2 -translate-y-1/2" />
+
+        {/* Track groove — thin vertical line down the center */}
+        <div
+          className="absolute top-2 bottom-2 left-1/2 w-px -translate-x-px pointer-events-none"
+          style={{ background: 'rgba(255,255,255,0.08)' }}
+        />
+
+        {/* Draggable area */}
+        <div
+          ref={trackRef}
+          className="absolute inset-0 cursor-ns-resize"
+          onMouseDown={handleMouseDown}
+          onContextMenu={(e) => { e.preventDefault(); resetPitch(); }}
+        />
+
+        {/* ── Fader handle (SL-1200 style) ─────────────────────────── */}
+        <div
+          className="absolute inset-x-1 pointer-events-none"
+          style={{ height: HANDLE_H, top: handleTop }}
+        >
+          {/* Handle body */}
+          <div
+            className={`absolute inset-0 rounded-[2px] transition-colors duration-75 ${
+              isDragging
+                ? 'bg-dark-bgTertiary border border-amber-400/50'
+                : 'bg-dark-bgSecondary border border-dark-border'
+            }`}
+          >
+            {/* Top rib */}
+            <div
+              className="absolute inset-x-2 h-px"
+              style={{ top: 5, background: isDragging ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.12)' }}
+            />
+            {/* Middle rib — slightly brighter, acts as center groove */}
+            <div
+              className="absolute inset-x-2 h-px"
+              style={{ top: '50%', transform: 'translateY(-50%)', background: isDragging ? 'rgba(251,191,36,0.6)' : 'rgba(255,255,255,0.18)' }}
+            />
+            {/* Bottom rib */}
+            <div
+              className="absolute inset-x-2 h-px"
+              style={{ bottom: 5, background: isDragging ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.12)' }}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* -12 indicator */}
-      <div className="text-[8px] font-mono text-text-muted/50 flex-shrink-0">-12</div>
+      {/* -12 label */}
+      <span className="text-[8px] font-mono text-text-muted/40 leading-none flex-shrink-0">
+        -12
+      </span>
     </div>
   );
 };
@@ -119,7 +188,7 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
  */
 export const DJPitchSliderHorizontal: React.FC<DJPitchSliderProps> = ({
   className = '',
-  onPitchChange
+  onPitchChange,
 }) => {
   const [pitchSemitones, setPitchSemitones] = useState(0);
   const [baseBPM, setBaseBPM] = useState<number | null>(null);
@@ -127,18 +196,12 @@ export const DJPitchSliderHorizontal: React.FC<DJPitchSliderProps> = ({
   const handlePitchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseFloat(e.target.value);
     setPitchSemitones(newValue);
-
     const playbackRate = Math.pow(2, newValue / 12);
-
-    // Store base BPM on first use
     if (baseBPM === null) {
       setBaseBPM(Tone.getTransport().bpm.value);
     }
-
-    // Adjust BPM to create pitch shift effect
     const currentBase = baseBPM ?? Tone.getTransport().bpm.value;
     Tone.getTransport().bpm.value = currentBase * playbackRate;
-
     onPitchChange?.(newValue);
   }, [onPitchChange, baseBPM]);
 
@@ -157,17 +220,8 @@ export const DJPitchSliderHorizontal: React.FC<DJPitchSliderProps> = ({
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      {/* Label */}
-      <div className="text-[9px] font-mono text-text-muted uppercase">
-        Pitch
-      </div>
-
-      {/* Range indicator */}
-      <div className="text-[8px] font-mono text-text-muted/50">
-        -12
-      </div>
-
-      {/* Horizontal Slider */}
+      <div className="text-[9px] font-mono text-text-muted uppercase">Pitch</div>
+      <div className="text-[8px] font-mono text-text-muted/50">-12</div>
       <input
         type="range"
         min="-12"
@@ -177,16 +231,9 @@ export const DJPitchSliderHorizontal: React.FC<DJPitchSliderProps> = ({
         onChange={handlePitchChange}
         onDoubleClick={handleDoubleClick}
         className="flex-1 min-w-[100px] max-w-[150px] accent-amber-500"
-        title="DJ Pitch Control (-12 to +12 semitones)"
         style={{ cursor: 'ew-resize' }}
       />
-
-      {/* Range indicator */}
-      <div className="text-[8px] font-mono text-text-muted/50">
-        +12
-      </div>
-
-      {/* Value Display */}
+      <div className="text-[8px] font-mono text-text-muted/50">+12</div>
       <div
         className="text-[11px] font-mono font-bold text-amber-400 min-w-[35px] text-center cursor-pointer select-none"
         onDoubleClick={handleDoubleClick}
