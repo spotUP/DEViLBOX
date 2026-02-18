@@ -52,3 +52,5 @@ scripts/db303-knob-diag.js
 
 # Test artifacts
 .playwright-mcp/
+/.env
+/server/.env
