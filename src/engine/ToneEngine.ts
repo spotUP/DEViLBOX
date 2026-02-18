@@ -88,6 +88,9 @@ export class ToneEngine {
   // High-performance WASM instance for DSP and scheduling
   private wasmInstance: WebAssembly.Exports | null = null;
 
+  // Global playback rate multiplier for pitch shifting (DJ slider, etc.)
+  private globalPlaybackRate: number = 1.0;
+
   // Instruments keyed by "instrumentId-channelIndex" for per-channel independence
   public instruments: Map<string, Tone.ToneAudioNode | DevilboxSynth>;
   // Track synth types for proper release handling
@@ -817,6 +820,21 @@ export class ToneEngine {
    */
   public getBPM(): number {
     return Tone.getTransport().bpm.value;
+  }
+
+  /**
+   * Set global playback rate multiplier for pitch shifting (affects all sample playback)
+   * @param rate - Playback rate multiplier (1.0 = normal, 2.0 = double speed/up one octave, 0.5 = half speed/down one octave)
+   */
+  public setGlobalPlaybackRate(rate: number): void {
+    this.globalPlaybackRate = rate;
+  }
+
+  /**
+   * Get current global playback rate multiplier
+   */
+  public getGlobalPlaybackRate(): number {
+    return this.globalPlaybackRate;
   }
 
   /**
@@ -2038,7 +2056,8 @@ export class ToneEngine {
             const sampleRate = config.sample?.sampleRate || 8363;
             const playbackRate = frequency / sampleRate;
 
-            (player as unknown as { playbackRate: number }).playbackRate = playbackRate;
+            // Apply global playback rate multiplier for pitch shifting
+            (player as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
           } else {
             // No period provided (keyboard playback) - calculate playback rate from note
             // The sample's base note is the pitch at playbackRate 1.0
@@ -2047,7 +2066,8 @@ export class ToneEngine {
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseFreq;
 
-            (player as unknown as { playbackRate: number }).playbackRate = playbackRate;
+            // Apply global playback rate multiplier for pitch shifting
+            (player as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
           }
 
           player.start(safeTime);
@@ -2089,7 +2109,8 @@ export class ToneEngine {
                 const targetFreq = Tone.Frequency(note).toFrequency();
                 const playbackRate = targetFreq / baseFreq;
 
-                (slicePlayer as unknown as { playbackRate: number }).playbackRate = playbackRate;
+                // Apply global playback rate multiplier for pitch shifting
+                (slicePlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
 
                 // Start at slice start
                 slicePlayer.start(safeTime, startTime);
@@ -2658,14 +2679,17 @@ export class ToneEngine {
             const modPlayback = config.metadata.modPlayback;
             const frequency = modPlayback.periodMultiplier / period;
             const sampleRate = config.sample?.sampleRate || 8363;
-            (voiceNode as unknown as { playbackRate: number }).playbackRate = frequency / sampleRate;
+            const playbackRate = frequency / sampleRate;
+            // Apply global playback rate multiplier for pitch shifting
+            (voiceNode as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
           } else {
             // FIX: Handle non-period playback for voice nodes (matches triggerNoteAttack)
             const baseNote = config.sample?.baseNote || 'C4';
             const baseFreq = Tone.Frequency(baseNote).toFrequency();
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseFreq;
-            (voiceNode as unknown as { playbackRate: number }).playbackRate = playbackRate;
+            // Apply global playback rate multiplier for pitch shifting
+            (voiceNode as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
           }
           const offset = sampleOffset ? sampleOffset / (voiceNode.buffer.sampleRate || 44100) : 0;
           voiceNode.start(safeTime, offset);
@@ -2767,13 +2791,15 @@ export class ToneEngine {
             // Use the sample's original rate (8363 Hz for MOD), NOT the audio context rate
             const sampleRate = config.sample?.sampleRate || 8363;
             const playbackRate = frequency / sampleRate;
-            (grainPlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * (config.granular?.playbackRate || 1);
+            // Apply global playback rate multiplier for pitch shifting
+            (grainPlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * (config.granular?.playbackRate || 1) * this.globalPlaybackRate;
           } else {
             // Calculate pitch shift from note (C4 = base pitch)
             const baseNote = Tone.Frequency('C4').toFrequency();
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseNote;
-            (grainPlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * (config.granular?.playbackRate || 1);
+            // Apply global playback rate multiplier for pitch shifting
+            (grainPlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * (config.granular?.playbackRate || 1) * this.globalPlaybackRate;
           }
           grainPlayer.start(safeTime);
           grainPlayer.stop(safeTime + duration);
@@ -2811,7 +2837,8 @@ export class ToneEngine {
             // Use the sample's original rate (8363 Hz for MOD), NOT the audio context rate
             const sampleRate = config.sample?.sampleRate || 8363;
             const playbackRate = frequency / sampleRate;
-            (player as unknown as { playbackRate: number }).playbackRate = playbackRate;
+            // Apply global playback rate multiplier for pitch shifting
+            (player as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
           } else if (config.metadata?.modPlayback?.usePeriodPlayback && !period) {
             // Warn if period-based playback is enabled but no period provided
             console.warn('[ToneEngine] MOD/XM sample expects period but none provided');
@@ -2820,7 +2847,8 @@ export class ToneEngine {
             const baseNote = Tone.Frequency('C4').toFrequency();
             const targetFreq = Tone.Frequency(note).toFrequency();
             const playbackRate = targetFreq / baseNote;
-            (player as unknown as { playbackRate: number }).playbackRate = playbackRate;
+            // Apply global playback rate multiplier for pitch shifting
+            (player as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
           }
 
           // Apply sample offset (9xx command) if present
@@ -2885,7 +2913,8 @@ export class ToneEngine {
                 const targetFreq = Tone.Frequency(note).toFrequency();
                 const playbackRate = targetFreq / baseFreq;
 
-                (slicePlayer as unknown as { playbackRate: number }).playbackRate = playbackRate;
+                // Apply global playback rate multiplier for pitch shifting
+                (slicePlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
 
                 // Start at slice start, stop at slice end
                 slicePlayer.start(safeTime, startTime);
@@ -2932,7 +2961,8 @@ export class ToneEngine {
                 const targetFreq = Tone.Frequency(note).toFrequency();
                 const playbackRate = targetFreq / baseFreq;
 
-                (offsetPlayer as unknown as { playbackRate: number }).playbackRate = playbackRate;
+                // Apply global playback rate multiplier for pitch shifting
+                (offsetPlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
 
                 // Start at offset, stop after duration
                 offsetPlayer.start(safeTime, clampedOffset);
