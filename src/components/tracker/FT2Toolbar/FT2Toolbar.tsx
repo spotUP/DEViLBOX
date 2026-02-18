@@ -875,6 +875,49 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             }
           }
 
+          // Handle MIDI files
+          if (filename.toLowerCase().endsWith('.mid') || filename.toLowerCase().endsWith('.midi')) {
+            try {
+              // Import as MIDI file
+              const { importMIDIFile } = await import('@lib/import/MIDIImporter');
+
+              // Convert data to File object if it's ArrayBuffer
+              const fileBlob = data instanceof ArrayBuffer
+                ? new Blob([data], { type: 'audio/midi' })
+                : data instanceof Blob
+                ? data
+                : new Blob([JSON.stringify(data)], { type: 'audio/midi' });
+
+              const file = new File([fileBlob], filename, { type: 'audio/midi' });
+
+              const result = await importMIDIFile(file, {
+                quantize: 1,
+                mergeChannels: false,
+                velocityToVolume: true,
+                defaultPatternLength: 64
+              });
+
+              console.log('[MIDI Import] Imported:', {
+                patterns: result.patterns.length,
+                bpm: result.bpm,
+                tracks: result.metadata.tracks
+              });
+
+              // Load patterns and set BPM
+              loadPatterns(result.patterns);
+              setBPM(result.bpm);
+              setCurrentPattern(0);
+              setPatternOrder(result.patterns.map((_, i) => i));
+
+              notify.success(`Loaded MIDI: ${result.metadata.name || filename} (${result.patterns.length} patterns, ${result.bpm} BPM)`);
+              return;
+            } catch (midiError) {
+              console.error('[MIDI Import] Failed:', midiError);
+              notify.error(`Failed to import MIDI: ${midiError instanceof Error ? midiError.message : 'Unknown error'}`);
+              return;
+            }
+          }
+
           // Handle JSON project files
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const proj = data as any;
