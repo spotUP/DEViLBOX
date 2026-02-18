@@ -70,6 +70,7 @@ export class PatternScheduler {
   private baseBPM: number = 125; // Base tempo (affected by Fxx effects)
   private pitchShiftSemitones: number = 0; // Pitch shift (affected by Wxx effects)
   private globalPitchOffset: number = 0; // Pitch shift from external controls (DJ slider)
+  private lastStoreUpdateTime: number = 0; // Throttle transport store updates
 
   /**
    * Track playback errors and notify user if threshold exceeded
@@ -129,17 +130,23 @@ export class PatternScheduler {
    */
   public setGlobalPitchOffset(semitones: number): void {
     this.globalPitchOffset = semitones;
-    // Recalculate and apply effective BPM immediately
+    // Recalculate playback rate
     const playbackRate = Math.pow(2, (this.pitchShiftSemitones + this.globalPitchOffset) / 12);
-    const effectiveBPM = this.baseBPM * playbackRate;
-    Tone.getTransport().bpm.value = effectiveBPM;
 
-    // CRITICAL: Also update transport store BPM (for TrackerReplayer sync)
-    useTransportStore.getState().setBPM(effectiveBPM);
-
-    // CRITICAL: Also set global playback rate for samples (Amiga MOD support)
+    // CRITICAL: Set global playback rate for samples IMMEDIATELY (no throttling)
+    // This ensures smooth pitch changes even during rapid slider movement
     const engine = getToneEngine();
     engine.setGlobalPlaybackRate(playbackRate);
+
+    // CRITICAL: Throttle BPM updates to prevent audio dropouts during drag
+    // Only update every 50ms to avoid overwhelming Transport and TrackerReplayer
+    const now = Date.now();
+    if (now - this.lastStoreUpdateTime > 50) {
+      const effectiveBPM = this.baseBPM * playbackRate;
+      Tone.getTransport().bpm.value = effectiveBPM;
+      useTransportStore.getState().setBPM(effectiveBPM);
+      this.lastStoreUpdateTime = now;
+    }
   }
 
   /**
