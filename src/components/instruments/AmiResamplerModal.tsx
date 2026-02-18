@@ -358,7 +358,6 @@ export const AmiResamplerModal: React.FC<AmiResamplerModalProps> = ({
             <canvas
               ref={overlayCanvasRef}
               className="w-full h-[140px]"
-              style={{ imageRendering: 'pixelated' }}
             />
           </div>
         </div>

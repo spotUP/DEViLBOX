@@ -161,13 +161,28 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
   const [beforeBuffer, setBeforeBuffer] = useState<AudioBuffer | null>(null);
   const [afterBuffer, setAfterBuffer] = useState<AudioBuffer | null>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Draw overlay when buffers change
-  useEffect(() => {
+  // Redraw helper
+  const redrawOverlay = useCallback(() => {
     if (overlayRef.current) {
       drawEnhancerOverlay(overlayRef.current, beforeBuffer || audioBuffer, afterBuffer);
     }
   }, [audioBuffer, beforeBuffer, afterBuffer]);
+
+  // Draw overlay when buffers change
+  useEffect(() => {
+    redrawOverlay();
+  }, [redrawOverlay]);
+
+  // Redraw on resize so the canvas doesn't look broken
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => redrawOverlay());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [redrawOverlay]);
 
   const [drive, setDrive] = useState(40);
   const [mix, setMix] = useState(30);
@@ -247,13 +262,30 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
       </div>
 
       {/* Before/After Waveform Overlay */}
-      <div className="px-4 pt-3">
+      <div className="px-4 pt-3" ref={containerRef}>
         <div className="rounded-lg overflow-hidden border border-dark-border">
           <canvas
             ref={overlayRef}
             className="w-full h-[100px]"
-            style={{ imageRendering: 'pixelated' }}
           />
+        </div>
+      </div>
+
+      {/* Tier 1: Neural Super-Res — shown first so it's always visible */}
+      <div className="px-4 pt-3">
+        <div className="flex items-center gap-4 p-3 bg-violet-500/5 border border-violet-500/20 rounded-lg">
+          <div className="flex items-center gap-2 shrink-0">
+            <Sparkles size={16} className="text-violet-400" />
+            <span className="text-[10px] font-bold text-violet-300 uppercase tracking-wider">Neural 8-bit Upscaler</span>
+          </div>
+          <p className="text-[10px] text-text-muted leading-snug flex-1 hidden sm:block">
+            Deep Learning — hallucinate missing high frequencies &amp; remove 8-bit noise.
+          </p>
+          <div className="shrink-0">
+            <Button variant="ft2" size="sm" onClick={() => handleProcess('neural')} disabled={isProcessing || parentLoading} icon={<Sparkles size={12} />}>
+              AI Resurrect
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -342,25 +374,8 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
           </div>
         </div>
 
-        {/* Tier 1: Neural (Full Width Footer) */}
-        <div className="md:col-span-3 pt-4 border-t border-dark-border space-y-3">
-          <div className="flex items-center gap-2">
-            <Sparkles size={14} className="text-violet-400" />
-            <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Tier 1: Neural Super-Res (BEST)</span>
-          </div>
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            <div className="flex-1">
-              <p className="text-[10px] text-text-muted leading-relaxed">
-                Uses Deep Learning to hallucinate missing high frequencies and remove 8-bit noise. 
-                <span className="text-violet-400 block mt-1 font-bold">WebGPU Acceleration Enabled</span>
-              </p>
-            </div>
-            <div className="w-full md:w-48">
-              <Button variant="ft2" size="sm" fullWidth onClick={() => handleProcess('neural')} disabled={isProcessing || parentLoading} icon={<Sparkles size={12} />}>
-                AI Resurrect
-              </Button>
-            </div>
-          </div>
+        {/* Pro tip */}
+        <div className="md:col-span-3 pt-3 border-t border-dark-border">
           <div className="p-2 bg-dark-bg border border-dark-border rounded text-[9px] text-text-muted font-mono leading-tight">
             PRO TIP: Chain these tools! Denoise first, then AI Resurrect, then add Stereo Width.
           </div>
