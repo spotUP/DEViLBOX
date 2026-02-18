@@ -76,6 +76,8 @@ export interface SampleEditorState {
   setShowResampleModal: (v: boolean) => void;
   showBeatSlicer: boolean;
   setShowBeatSlicer: (v: boolean) => void;
+  showAmigaPal: boolean;
+  setShowAmigaPal: (v: boolean) => void;
 
   // Playback
   isPlaying: boolean;
@@ -102,7 +104,6 @@ export interface SampleEditorState {
   doVolumeDown: () => Promise<void>;
   doReverse: () => Promise<void>;
   doNormalize: () => Promise<void>;
-  doAmigaPal8Bit: () => Promise<void>;
   doDcRemoval: () => Promise<void>;
   doUndo: () => void;
   doRedo: () => void;
@@ -280,6 +281,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
   const [showEnhancer, setShowEnhancer] = useState(false);
   const [showResampleModal, setShowResampleModal] = useState(false);
   const [showBeatSlicer, setShowBeatSlicer] = useState(false);
+  const [showAmigaPal, setShowAmigaPal] = useState(false);
 
   // ─── Playback ────────────────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false);
@@ -411,12 +413,6 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     }
   }, [audioBuffer, hasSelection, selectionStart, selectionEnd, applyOperation]);
 
-  const doAmigaPal8Bit = useCallback(async () => {
-    if (!audioBuffer) return;
-    await applyOperation('AmigaPal 8-bit', buf => WaveformProcessor.amigaPal8Bit(buf));
-    notify.success('Converted to perfect Amiga 8-bit!');
-  }, [audioBuffer, applyOperation]);
-
   const doDcRemoval = useCallback(async () => {
     if (!audioBuffer) return;
     if (hasSelection) {
@@ -469,13 +465,14 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     showEnhancer, setShowEnhancer,
     showResampleModal, setShowResampleModal,
     showBeatSlicer, setShowBeatSlicer,
+    showAmigaPal, setShowAmigaPal,
     isPlaying, setIsPlaying,
     playbackPosition, setPlaybackPosition,
     isLoading, setIsLoading,
     error, setError,
     doCut, doCopy, doPaste, doCrop, doDelete, doSilence,
     doFadeIn, doFadeOut, doVolumeUp, doVolumeDown,
-    doReverse, doNormalize, doAmigaPal8Bit, doDcRemoval,
+    doReverse, doNormalize, doDcRemoval,
     doUndo, doRedo, doExportWav, doFindLoop,
     params, updateParam,
   };

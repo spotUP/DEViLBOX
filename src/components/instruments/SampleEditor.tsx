@@ -31,6 +31,7 @@ import { DEFAULT_GRANULAR } from '../../types/instrument';
 import * as Tone from 'tone';
 import { SampleEnhancerPanel } from './SampleEnhancerPanel';
 import { AmiResamplerModal } from './AmiResamplerModal';
+import { AmigaPalModal } from './AmigaPalModal';
 import { BeatSlicerPanel } from './BeatSlicerPanel';
 import type { ProcessedResult } from '../../utils/audio/SampleProcessing';
 import { bufferToDataUrl } from '../../utils/audio/SampleProcessing';
@@ -200,6 +201,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     setShowResampleModal,
     showBeatSlicer,
     setShowBeatSlicer,
+    showAmigaPal,
+    setShowAmigaPal,
     isPlaying,
     setIsPlaying,
     playbackPosition,
@@ -220,7 +223,6 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     doVolumeDown,
     doReverse,
     doNormalize,
-    doAmigaPal8Bit,
     doDcRemoval,
     doUndo,
     doRedo,
@@ -1048,7 +1050,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
               <IconBtn onClick={doVolumeDown} title="Volume -3dB"><Volume1 size={13} /></IconBtn>
               <IconBtn onClick={doReverse} title="Reverse"><FlipHorizontal size={13} /></IconBtn>
               <IconBtn onClick={doNormalize} title="Normalize"><Maximize2 size={13} /></IconBtn>
-              <IconBtn onClick={doAmigaPal8Bit} title="AmigaPal 8-bit (Perfect Amiga samples!)" className="text-amber-400 hover:text-amber-300"><Waves size={13} /></IconBtn>
+              <IconBtn onClick={() => setShowAmigaPal(true)} title="AmigaPal 8-bit (Perfect Amiga samples!)" className="text-amber-400 hover:text-amber-300"><Waves size={13} /></IconBtn>
               <IconBtn onClick={doDcRemoval} title="DC Offset Removal"><Activity size={13} /></IconBtn>
             </div>
 
@@ -1325,6 +1327,17 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         onBufferProcessed={(r: ProcessedResult) => {
           setShowResampleModal(false);
           handleBufferProcessed(r, 'Ami');
+        }}
+      />
+
+      {/* ─── AmigaPalModal ────────────────────────────────────────── */}
+      <AmigaPalModal
+        isOpen={showAmigaPal}
+        onClose={() => setShowAmigaPal(false)}
+        buffer={audioBuffer}
+        onApply={(r: ProcessedResult) => {
+          setShowAmigaPal(false);
+          handleBufferProcessed(r, 'AmigaPal');
         }}
       />
     </div>
