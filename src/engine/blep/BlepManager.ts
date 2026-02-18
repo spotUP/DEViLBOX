@@ -47,8 +47,24 @@ export class BlepManager {
   /**
    * Connect BLEP processing to audio chain
    * Insert BLEP between source and destination
+   *
+   * Note: This is complex because we're mixing Tone.js and native AudioNodes.
+   * For now, BLEP is disabled by default to avoid connection issues.
+   * A future implementation could use Tone.js's native node wrapping.
    */
   connect(source: Tone.ToneAudioNode, destination: Tone.ToneAudioNode): void {
+    // For now, always bypass BLEP to avoid connection errors
+    // TODO: Properly wrap AudioWorkletNode in Tone.js ToneAudioNode
+    try {
+      source.connect(destination);
+    } catch (e) {
+      // Ignore if already connected
+    }
+
+    console.warn('BLEP audio routing disabled - requires Tone.js native node wrapping');
+    return;
+
+    /* Disabled until proper Tone.js integration
     if (!this.workletNode || !this.initialized) {
       console.warn('BLEP not initialized, bypassing');
       try {
@@ -66,24 +82,19 @@ export class BlepManager {
       } catch (e) {
         // Ignore if not connected
       }
+
+      // This needs proper Tone.js node wrapping
       source.connect(this.workletNode as any);
-      (this.workletNode as any).connect(destination);
+      this.workletNode.connect(destination as any);
     } else {
       // Bypass BLEP: source -> destination directly
-      if (this.workletNode) {
-        try {
-          source.disconnect(this.workletNode as any);
-          (this.workletNode as any).disconnect(destination);
-        } catch (e) {
-          // Ignore disconnect errors if already disconnected
-        }
-      }
       try {
         source.connect(destination);
       } catch (e) {
         // Ignore if already connected
       }
     }
+    */
   }
 
   /**

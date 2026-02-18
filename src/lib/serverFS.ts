@@ -72,6 +72,9 @@ export function listManifestDirectory(dirPath: string): ServerFileEntry[] {
       dirs.add(subdir);
     } else {
       // Direct child file
+      // Skip metadata files
+      if (remainder === 'modules.json') continue;
+
       files.push({
         name: remainder,
         path: cleanDir ? `${cleanDir}/${remainder}` : remainder,
