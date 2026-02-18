@@ -26,7 +26,7 @@ import {
   Activity, Waves
 } from 'lucide-react';
 import { useInstrumentStore } from '../../stores';
-import type { InstrumentConfig } from '../../types/instrument';
+import type { InstrumentConfig, DeepPartial } from '../../types/instrument';
 import { DEFAULT_GRANULAR } from '../../types/instrument';
 import * as Tone from 'tone';
 import { SampleEnhancerPanel } from './SampleEnhancerPanel';
@@ -96,8 +96,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   const { updateInstrument: storeUpdateInstrument } = useInstrumentStore();
 
   const updateInstrument = useCallback(
-    (id: number, updates: Partial<InstrumentConfig>) => {
-      if (onChange) onChange(updates);
+    (id: number, updates: DeepPartial<InstrumentConfig>) => {
+      if (onChange) onChange(updates as Partial<InstrumentConfig>);
       else storeUpdateInstrument(id, updates);
     },
     [onChange, storeUpdateInstrument],
@@ -241,6 +241,40 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     reverse,
   } = editorParams;
 
+  // ─── Sync loop params from parameters → sample config ────────────
+  // The sample editor writes loop settings to `parameters` (normalized 0-1),
+  // but the audio engine reads from `sample` (frame indices). Bridge them.
+  useEffect(() => {
+    const totalFrames = audioBuffer?.length ?? 0;
+    const sampleRate = audioBuffer?.sampleRate;
+    const currentSample = instrument.sample || {} as Record<string, unknown>;
+
+    // Convert normalized 0-1 positions to frame indices
+    const frameLoopStart = Math.round(loopStart * totalFrames);
+    const frameLoopEnd = Math.round(loopEnd * totalFrames);
+
+    // Only update if something actually changed to avoid infinite loops
+    const needsUpdate =
+      currentSample.loop !== loopEnabled ||
+      currentSample.loopStart !== frameLoopStart ||
+      currentSample.loopEnd !== frameLoopEnd ||
+      currentSample.loopType !== loopType ||
+      (sampleRate && currentSample.sampleRate !== sampleRate);
+
+    if (needsUpdate && totalFrames > 0) {
+      updateInstrument(instrument.id, {
+        sample: {
+          ...currentSample,
+          loop: loopEnabled,
+          loopStart: frameLoopStart,
+          loopEnd: frameLoopEnd,
+          loopType,
+          ...(sampleRate ? { sampleRate } : {}),
+        },
+      });
+    }
+  }, [loopEnabled, loopStart, loopEnd, loopType, audioBuffer, instrument.id, instrument.sample, updateInstrument]);
+
   // ─── Load audio buffer when URL changes ──────────────────────────
   useEffect(() => {
     if (!sampleUrl) {
@@ -333,12 +367,14 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       granularPosition: isGranular ? (granular?.scanPosition ?? undefined) : undefined,
       activeDrag: dragTarget,
       showSpectrum,
+      slices: showBeatSlicer ? instrument.sample?.slices : undefined,
     };
     drawSampleWaveform(ctx, CANVAS_W, CANVAS_H, opts);
   }, [
     audioBuffer, viewStart, viewEnd, startTime, endTime,
     selectionStart, selectionEnd, loopEnabled, loopStart, loopEnd, loopType,
     playbackPosition, isGranular, granular, dragTarget, showSpectrum,
+    showBeatSlicer, instrument.sample?.slices,
   ]);
 
   // ─── Canvas draw: minimap ────────────────────────────────────────
@@ -1121,7 +1157,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             {/* Reverse */}
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={reverse} onChange={(e) => updateParam('reverse', e.target.checked)} className="w-4 h-4 rounded" />
+                <input type="checkbox" checked={reverse} onChange={(e) => { updateParam('reverse', e.target.checked); e.target.blur(); }} className="w-4 h-4 rounded" />
                 <span className="font-mono text-text-secondary text-xs">REVERSE</span>
               </label>
             </div>
@@ -1130,7 +1166,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             <div className="border-t border-dark-border pt-3">
               <div className="flex items-center gap-3 mb-2">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={loopEnabled} onChange={(e) => updateParam('loopEnabled', e.target.checked)} className="w-4 h-4 rounded" />
+                  <input type="checkbox" checked={loopEnabled} onChange={(e) => { updateParam('loopEnabled', e.target.checked); e.target.blur(); }} className="w-4 h-4 rounded" />
                   <Repeat size={14} className="text-blue-400" />
                   <span className="font-mono text-text-secondary text-xs">LOOP</span>
                 </label>
@@ -1245,7 +1281,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={granular.reverse}
-                    onChange={(e) => updateGranular('reverse', e.target.checked)} className="w-4 h-4 rounded" />
+                    onChange={(e) => { updateGranular('reverse', e.target.checked); e.target.blur(); }} className="w-4 h-4 rounded" />
                   <span className="font-mono text-text-secondary text-xs">REVERSE GRAINS</span>
                 </label>
               </div>

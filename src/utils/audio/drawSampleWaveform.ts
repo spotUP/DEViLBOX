@@ -37,6 +37,9 @@ export interface WaveformDrawOptions {
   // Drag highlight
   activeDrag: string | null;
   
+  // Beat slicer markers (frame positions)
+  slices?: Array<{ startFrame: number; endFrame: number }>;
+
   // Display mode
   showSpectrum?: boolean;
   
@@ -64,6 +67,9 @@ const COLORS = {
   loopActive: '#60a5fa',
   playback: '#fbbf24',
   granular: '#a855f7',
+  sliceMarker: '#a855f7',
+  sliceMarkerDim: 'rgba(168, 85, 247, 0.35)',
+  sliceLabel: 'rgba(168, 85, 247, 0.7)',
   dimOverlay: 'rgba(0, 0, 0, 0.6)',
   viewport: 'rgba(255, 255, 255, 0.15)',
   viewportBorder: 'rgba(255, 255, 255, 0.4)',
@@ -287,6 +293,51 @@ function drawOverlays(
     ctx.stroke();
     ctx.setLineDash([]);
     drawLoopHandle(ctx, loopEndX, height, 'loopEnd', opts.activeDrag === 'loopEnd', opts.loopType);
+  }
+
+  // ─── Slice markers ───────────────────
+  if (opts.slices && opts.slices.length > 0 && opts.audioBuffer) {
+    const totalFrames = opts.audioBuffer.length;
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i < opts.slices.length; i++) {
+      const slice = opts.slices[i];
+      // Draw start boundary of each slice
+      const startNorm = slice.startFrame / totalFrames;
+      const startX = normToX(startNorm);
+
+      // Only draw if in view
+      if (startX >= 0 && startX <= width) {
+        // Dashed line
+        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = COLORS.sliceMarker;
+        ctx.beginPath();
+        ctx.moveTo(startX, 0);
+        ctx.lineTo(startX, height);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Slice number label
+        ctx.fillStyle = COLORS.sliceLabel;
+        ctx.font = 'bold 9px "JetBrains Mono", monospace';
+        ctx.fillText(String(i + 1), startX + 3, 11);
+      }
+
+      // Draw end boundary of last slice
+      if (i === opts.slices.length - 1) {
+        const endNorm = slice.endFrame / totalFrames;
+        const endX = normToX(endNorm);
+        if (endX >= 0 && endX <= width) {
+          ctx.setLineDash([4, 3]);
+          ctx.strokeStyle = COLORS.sliceMarkerDim;
+          ctx.beginPath();
+          ctx.moveTo(endX, 0);
+          ctx.lineTo(endX, height);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+    }
   }
 
   // ─── Granular scan position ──────────

@@ -105,8 +105,11 @@ export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
       if (tb303Instruments.length === 0) {
         // No TB-303 instruments exist - create one
         console.log('[TB303View] No TB-303 instruments found, creating default TB-303');
+        const existingIds = useInstrumentStore.getState().instruments.map(i => i.id);
+        let nextId = 1;
+        for (let id = 1; id <= 128; id++) { if (!existingIds.includes(id)) { nextId = id; break; } }
         const newInst: InstrumentConfig = {
-          id: Date.now(),
+          id: nextId,
           name: 'TB-303',
           type: 'synth',
           synthType: 'TB303',

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Sparkles, Zap, Wand2, RefreshCw, Eraser, MoveHorizontal, Hammer, Volume2, Scissors, RotateCcw } from 'lucide-react';
 import { 
   applySpectralExciter, 
@@ -15,6 +15,137 @@ import { Knob } from '../controls/Knob';
 import { Button } from '../ui/Button';
 import { notify } from '../../stores/useNotificationStore';
 
+// Waveform overlay colors
+const WAVE_BG = '#0f0c0c';
+const WAVE_GRID = '#1d1818';
+const WAVE_CENTER = '#2f2525';
+const WAVE_BEFORE = '#a855f7';  // Purple (matches neural/enhancer theme)
+const WAVE_AFTER = '#10b981';   // Green (enhanced result)
+
+function drawWaveLayer(
+  ctx: CanvasRenderingContext2D,
+  data: Float32Array,
+  w: number,
+  h: number,
+  color: string,
+  alpha: number,
+): void {
+  const cy = h / 2;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const step = Math.max(1, Math.floor(data.length / w));
+  for (let x = 0; x < w; x++) {
+    const idx = Math.floor((x / w) * data.length);
+    let min = 1.0;
+    let max = -1.0;
+    for (let j = 0; j < step && idx + j < data.length; j++) {
+      const v = data[idx + j];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    ctx.moveTo(x, cy - max * cy);
+    ctx.lineTo(x, cy - min * cy);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawEnhancerOverlay(
+  canvas: HTMLCanvasElement,
+  before: AudioBuffer | null,
+  after: AudioBuffer | null,
+): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  ctx.scale(dpr, dpr);
+
+  ctx.fillStyle = WAVE_BG;
+  ctx.fillRect(0, 0, w, h);
+
+  // Grid
+  ctx.strokeStyle = WAVE_GRID;
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) {
+    const x = (w / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  }
+  const cy = h / 2;
+  ctx.strokeStyle = WAVE_CENTER;
+  ctx.beginPath();
+  ctx.moveTo(0, cy);
+  ctx.lineTo(w, cy);
+  ctx.stroke();
+
+  // Before waveform (dimmed when after exists)
+  if (before && before.length > 0) {
+    drawWaveLayer(ctx, before.getChannelData(0), w, h, WAVE_BEFORE, after ? 0.3 : 0.8);
+  }
+
+  // After waveform overlay
+  if (after && after.length > 0) {
+    drawWaveLayer(ctx, after.getChannelData(0), w, h, WAVE_AFTER, 0.9);
+  }
+
+  // Labels
+  ctx.font = '10px "JetBrains Mono", monospace';
+
+  if (before && before.length > 0) {
+    ctx.fillStyle = after ? WAVE_BEFORE + '88' : WAVE_BEFORE;
+    ctx.fillText('BEFORE', 6, 14);
+    const durMs = ((before.length / before.sampleRate) * 1000).toFixed(0);
+    ctx.fillStyle = '#504848';
+    ctx.fillText(`${before.length.toLocaleString()} smp \u00b7 ${durMs}ms`, 6, h - 6);
+  }
+
+  if (after && after.length > 0) {
+    const label = 'ENHANCED';
+    const tm = ctx.measureText(label);
+    ctx.fillStyle = WAVE_AFTER;
+    ctx.fillText(label, w - tm.width - 6, 14);
+    const durMs = ((after.length / after.sampleRate) * 1000).toFixed(0);
+    const info = `${after.length.toLocaleString()} smp \u00b7 ${durMs}ms`;
+    const tm2 = ctx.measureText(info);
+    ctx.fillStyle = WAVE_AFTER + '88';
+    ctx.fillText(info, w - tm2.width - 6, h - 6);
+  } else if (!before) {
+    ctx.fillStyle = '#686060';
+    ctx.fillText('No sample loaded', w / 2 - 40, cy + 4);
+  } else {
+    const hint = 'Process to compare';
+    const tm = ctx.measureText(hint);
+    ctx.fillStyle = '#383030';
+    ctx.fillText(hint, w - tm.width - 6, 14);
+  }
+
+  // Legend (bottom center, only when both exist)
+  if (before && after) {
+    const legendY = h - 7;
+    const legendX = w / 2 - 50;
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = WAVE_BEFORE;
+    ctx.fillRect(legendX, legendY, 6, 6);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#686060';
+    ctx.fillText('Before', legendX + 9, legendY + 6);
+    ctx.fillStyle = WAVE_AFTER;
+    ctx.fillRect(legendX + 55, legendY, 6, 6);
+    ctx.fillStyle = '#686060';
+    ctx.fillText('After', legendX + 64, legendY + 6);
+  }
+}
+
 interface SampleEnhancerPanelProps {
   audioBuffer: AudioBuffer | null;
   onBufferProcessed: (result: ProcessedResult) => void;
@@ -27,7 +158,17 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
   isLoading: parentLoading
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
-  
+  const [beforeBuffer, setBeforeBuffer] = useState<AudioBuffer | null>(null);
+  const [afterBuffer, setAfterBuffer] = useState<AudioBuffer | null>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
+
+  // Draw overlay when buffers change
+  useEffect(() => {
+    if (overlayRef.current) {
+      drawEnhancerOverlay(overlayRef.current, beforeBuffer || audioBuffer, afterBuffer);
+    }
+  }, [audioBuffer, beforeBuffer, afterBuffer]);
+
   const [drive, setDrive] = useState(40);
   const [mix, setMix] = useState(30);
   const [freq, setFreq] = useState(4000);
@@ -41,6 +182,9 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
     if (!audioBuffer) return;
     
     setIsProcessing(true);
+    // Snapshot the current buffer as "before" for overlay comparison
+    setBeforeBuffer(audioBuffer);
+    setAfterBuffer(null);
     try {
       await new Promise(r => setTimeout(r, 50));
       let result: ProcessedResult;
@@ -74,6 +218,8 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
           return;
       }
       
+      // Store the result buffer for overlay display before replacing
+      setAfterBuffer(result.buffer);
       onBufferProcessed(result);
       notify.success(`Sample processed: ${type.toUpperCase()}`);
     } catch (err) {
@@ -98,6 +244,17 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
             PROCESSING...
           </div>
         )}
+      </div>
+
+      {/* Before/After Waveform Overlay */}
+      <div className="px-4 pt-3">
+        <div className="rounded-lg overflow-hidden border border-dark-border">
+          <canvas
+            ref={overlayRef}
+            className="w-full h-[100px]"
+            style={{ imageRendering: 'pixelated' }}
+          />
+        </div>
       </div>
 
       <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
