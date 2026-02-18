@@ -11,6 +11,7 @@ import { getSynthInfo } from '@constants/synthCategories';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as LucideIcons from 'lucide-react';
 import { X, Search, Check, Zap, Trash2, Download, Upload, Tag } from 'lucide-react';
+import * as Tone from 'tone';
 import type { InstrumentConfig, InstrumentPreset } from '@typedefs/instrument';
 
 type BrowseMode = 'factory' | 'user';
@@ -210,29 +211,51 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
   };
 
   // Auto-preview on click (factory)
-  const handleFactoryPresetClick = (preset: InstrumentPreset['config']) => {
+  const handleFactoryPresetClick = async (preset: InstrumentPreset['config']) => {
     setSelectedPresetName(preset.name || null);
     setSelectedUserPresetId(null);
 
-    const engine = getToneEngine();
-    const previewConfig = { ...preset, id: 999, isLive: true } as InstrumentConfig;
-    engine.triggerPolyNoteAttack(999, 'C4', 1, previewConfig);
-    setTimeout(() => {
-      engine.triggerPolyNoteRelease(999, 'C4', previewConfig);
-    }, 300);
+    try {
+      // Start audio context if needed (required for first interaction)
+      await Tone.start();
+
+      const engine = getToneEngine();
+      const previewConfig = { ...preset, id: 999, isLive: true } as InstrumentConfig;
+
+      // Ensure WASM synths are initialized before triggering
+      await engine.ensureInstrumentReady(previewConfig);
+
+      engine.triggerPolyNoteAttack(999, 'C4', 1, previewConfig);
+      setTimeout(() => {
+        engine.triggerPolyNoteRelease(999, 'C4', previewConfig);
+      }, 300);
+    } catch (error) {
+      console.warn('[LoadPresetModal] Factory preview failed:', error);
+    }
   };
 
   // Auto-preview on click (user)
-  const handleUserPresetClick = (presetId: string, config: InstrumentPreset['config']) => {
+  const handleUserPresetClick = async (presetId: string, config: InstrumentPreset['config']) => {
     setSelectedUserPresetId(presetId);
     setSelectedPresetName(null);
 
-    const engine = getToneEngine();
-    const previewConfig = { ...config, id: 999, isLive: true } as InstrumentConfig;
-    engine.triggerPolyNoteAttack(999, 'C4', 1, previewConfig);
-    setTimeout(() => {
-      engine.triggerPolyNoteRelease(999, 'C4', previewConfig);
-    }, 300);
+    try {
+      // Start audio context if needed (required for first interaction)
+      await Tone.start();
+
+      const engine = getToneEngine();
+      const previewConfig = { ...config, id: 999, isLive: true } as InstrumentConfig;
+
+      // Ensure WASM synths are initialized before triggering
+      await engine.ensureInstrumentReady(previewConfig);
+
+      engine.triggerPolyNoteAttack(999, 'C4', 1, previewConfig);
+      setTimeout(() => {
+        engine.triggerPolyNoteRelease(999, 'C4', previewConfig);
+      }, 300);
+    } catch (error) {
+      console.warn('[LoadPresetModal] User preview failed:', error);
+    }
   };
 
   // Delete user preset
