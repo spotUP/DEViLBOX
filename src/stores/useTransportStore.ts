@@ -41,8 +41,12 @@ interface TransportStore extends TransportState {
   // Arrangement timeline position
   currentGlobalRow: number;
 
+  // Global pitch shift (DJ pitch slider / W effect)
+  globalPitch: number; // Semitones (-16 to +16)
+
   // Actions
   setBPM: (bpm: number) => void;
+  setGlobalPitch: (pitch: number) => void;
   setTimeSignature: (numerator: number, denominator: number) => void;
   setSwing: (swing: number) => void;
   setJitter: (jitter: number) => void;
@@ -111,6 +115,7 @@ export const useTransportStore = create<TransportStore>()(
     jitter: 0,
     useMpcScale: false,
     currentGlobalRow: 0,
+    globalPitch: 0, // Default to no pitch shift
 
     // Actions
     setBPM: (bpm) =>
@@ -123,6 +128,11 @@ export const useTransportStore = create<TransportStore>()(
         } catch {
           // Ignore errors if store is being cleaned up
         }
+      }),
+
+    setGlobalPitch: (pitch) =>
+      set((state) => {
+        state.globalPitch = Math.max(-16, Math.min(16, pitch));
       }),
 
     setTimeSignature: (numerator, denominator) =>
