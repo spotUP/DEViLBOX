@@ -111,6 +111,12 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       // Start audio context if needed
       await Tone.start();
 
+      // Verify context is actually running
+      if (Tone.context.state !== 'running') {
+        console.warn('[InstrumentList] Audio context failed to start, state:', Tone.context.state);
+        return;
+      }
+
       // Clear any existing preview timeout
       if (previewTimeoutRef.current) {
         window.clearTimeout(previewTimeoutRef.current);
