@@ -150,7 +150,7 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
         {/* Track groove — thin vertical line down the center */}
         <div
           className="absolute top-2 bottom-2 left-1/2 w-px -translate-x-px pointer-events-none"
-          style={{ background: 'rgba(255,255,255,0.08)' }}
+          style={{ background: 'rgba(0,0,0,0.75)' }}
         />
 
         {/* Draggable area */}
