@@ -98,7 +98,7 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
           style={{
             writingMode: 'bt-lr' as React.CSSProperties['writingMode'],
             WebkitAppearance: 'slider-vertical',
-            width: '8px',
+            width: '20px',
             height: '100%',
             accentColor: '#fbbf24',
             cursor: 'ns-resize',
