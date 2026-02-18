@@ -603,10 +603,13 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                 <div
                   key={sample.id}
                   className={`relative py-1.5 ${index % 2 === 1 ? 'bg-ft2-bgSecondary' : ''} ${
-                    isSelected ? 'shadow-[inset_0_0_0_2px_orange] bg-ft2-header/30' : ''
+                    isSelected ? 'outline outline-2 outline-orange-500 bg-ft2-header/30' : ''
                   }`}
                   onClick={() => setSelectedIndex(index)}
-                  style={{ zIndex: isSelected ? 10 : 1 }}
+                  style={{
+                    zIndex: isSelected ? 10 : 1,
+                    outlineOffset: isSelected ? '-2px' : '0'
+                  }}
                 >
                   {/* Upper Section */}
                   <div className="flex gap-2">
