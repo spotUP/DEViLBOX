@@ -87,17 +87,22 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     setIsDragging(false);
     setDragCount(0);
 
+    // If a child component (e.g. SampleEditor) has its own drop handler and already
+    // processed this file, skip the app-level handler to avoid double-handling.
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-sample-drop-zone]')) return;
+
     const files = Array.from(e.dataTransfer.files);
-    
+
     if (files.length === 0) return;
 
     // Get first supported file
     const file = files.find(f => isSupportedFile(f.name));
-    
+
     if (!file) {
       console.warn('[DragDrop] No supported files found');
       return;

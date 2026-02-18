@@ -224,6 +224,9 @@ interface TrackerStore {
   setChannelRecordGroup: (channelIndex: number, group: 0 | 1 | 2) => void;
   getChannelsInRecordGroup: (group: 1 | 2) => number[];
 
+  // Clipboard
+  setClipboard: (data: ClipboardData) => void;
+
   // Import/Export
   loadPatterns: (patterns: Pattern[]) => void;
   importPattern: (pattern: Pattern) => number;
@@ -1012,6 +1015,11 @@ export const useTrackerStore = create<TrackerStore>()(
         };
 
         state.selection = null;
+      }),
+
+    setClipboard: (data) =>
+      set((state) => {
+        state.clipboard = data;
       }),
 
     paste: () =>

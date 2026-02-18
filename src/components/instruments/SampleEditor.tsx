@@ -32,6 +32,7 @@ import * as Tone from 'tone';
 import { SampleEnhancerPanel } from './SampleEnhancerPanel';
 import { AmiResamplerModal } from './AmiResamplerModal';
 import { MpcResamplerModal } from './MpcResamplerModal';
+import { AudioToMidiModal } from './AudioToMidiModal';
 import { AmigaPalModal } from './AmigaPalModal';
 import { BeatSlicerPanel } from './BeatSlicerPanel';
 import type { ProcessedResult } from '../../utils/audio/SampleProcessing';
@@ -206,6 +207,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     setShowResampleModal,
     showMpcResampleModal,
     setShowMpcResampleModal,
+    showAudioToMidiModal,
+    setShowAudioToMidiModal,
     showBeatSlicer,
     setShowBeatSlicer,
     showAmigaPal,
@@ -474,6 +477,11 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         };
         if (isGranular) {
           updates.granular = { ...DEFAULT_GRANULAR, ...instrument.granular, sampleUrl: dataUrl };
+        }
+        // If instrument.sample?.url exists it takes priority in sampleUrl derivation,
+        // so we must also update it here to ensure the waveform useEffect re-fires.
+        if (instrument.sample) {
+          updates.sample = { ...instrument.sample, url: dataUrl };
         }
         updateInstrument(instrument.id, updates);
         clearSelection();
@@ -903,6 +911,13 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                 MPC
               </button>
               <button
+                onClick={() => setShowAudioToMidiModal(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20"
+              >
+                <Music size={11} />
+                To MIDI
+              </button>
+              <button
                 onClick={() => setShowEnhancer(!showEnhancer)}
                 className={
                   'flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ' +
@@ -961,6 +976,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             : 'border-dark-border') +
           (!audioBuffer ? ' cursor-pointer hover:border-accent-primary/50' : '')
         }
+        data-sample-drop-zone="true"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -1378,6 +1394,14 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           setShowMpcResampleModal(false);
           handleBufferProcessed(r, 'MPC');
         }}
+      />
+
+      {/* ─── AudioToMidiModal ─────────────────────────────────────── */}
+      <AudioToMidiModal
+        isOpen={showAudioToMidiModal}
+        onClose={() => setShowAudioToMidiModal(false)}
+        audioBuffer={audioBuffer}
+        instrument={instrument}
       />
 
       {/* ─── AmigaPalModal ────────────────────────────────────────── */}

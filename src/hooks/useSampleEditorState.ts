@@ -76,6 +76,8 @@ export interface SampleEditorState {
   setShowResampleModal: (v: boolean) => void;
   showMpcResampleModal: boolean;
   setShowMpcResampleModal: (v: boolean) => void;
+  showAudioToMidiModal: boolean;
+  setShowAudioToMidiModal: (v: boolean) => void;
   showBeatSlicer: boolean;
   setShowBeatSlicer: (v: boolean) => void;
   showAmigaPal: boolean;
@@ -283,6 +285,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
   const [showEnhancer, setShowEnhancer] = useState(false);
   const [showResampleModal, setShowResampleModal] = useState(false);
   const [showMpcResampleModal, setShowMpcResampleModal] = useState(false);
+  const [showAudioToMidiModal, setShowAudioToMidiModal] = useState(false);
   const [showBeatSlicer, setShowBeatSlicer] = useState(false);
   const [showAmigaPal, setShowAmigaPal] = useState(false);
 
@@ -468,6 +471,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     showEnhancer, setShowEnhancer,
     showResampleModal, setShowResampleModal,
     showMpcResampleModal, setShowMpcResampleModal,
+    showAudioToMidiModal, setShowAudioToMidiModal,
     showBeatSlicer, setShowBeatSlicer,
     showAmigaPal, setShowAmigaPal,
     isPlaying, setIsPlaying,
