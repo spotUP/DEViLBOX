@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-18T19:43:19.677Z
+ * Generated: 2026-02-18T20:50:49.021Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.845';
-export const BUILD_NUMBER = '845';
-export const BUILD_HASH = '8a4c54dd';
+export const BUILD_VERSION = '1.0.874';
+export const BUILD_NUMBER = '874';
+export const BUILD_HASH = 'b48d9f01';
 export const BUILD_DATE = '2026-02-18';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,121 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.845',
+    version: '1.0.874',
     date: '2026-02-18',
     changes: [
+      {
+        type: 'fix',
+        "description": "Remove unused chColor variable"
+      },
+      {
+        type: 'fix',
+        "description": "Correct TypeScript errors in collapsed channel code"
+      },
+      {
+        type: 'feature',
+        "description": "Extend DJ pitch slider range to ±16 semitones"
+      },
+      {
+        type: 'fix',
+        "description": "Update pitch slider scale to match ±12 semitone range"
+      },
+      {
+        type: 'fix',
+        "description": "Overlap scale onto housing so ticks sit flush against slider"
+      },
+      {
+        type: 'fix',
+        "description": "Show note column when channels are collapsed"
+      },
+      {
+        type: 'feature',
+        "description": "Add collapse/expand button to channel headers"
+      },
+      {
+        type: 'fix',
+        "description": "Add setGlobalPitchShift to TickResult type"
+      },
+      {
+        type: 'fix',
+        "description": "Remove vertical scrollbar from channel headers"
+      },
+      {
+        type: 'fix',
+        "description": "Replace ugly light blue focus border with discrete themed ring"
+      },
+      {
+        type: 'fix',
+        "description": "Move pitch slider scale flush against housing using absolute positioning"
+      },
+      {
+        type: 'fix',
+        "description": "Sync effect string field when typing effect commands"
+      },
+      {
+        type: 'fix',
+        "description": "Remove duplicate center tick from pitch slider housing"
+      },
+      {
+        type: 'fix',
+        "description": "Widen pitch slider groove line to 3px"
+      },
+      {
+        type: 'fix',
+        "description": "Darken pitch slider groove line to near-black"
+      },
+      {
+        type: 'fix',
+        "description": "Remove housing border from DJ pitch slider"
+      },
+      {
+        type: 'feature',
+        "description": "Add SL-1200 style scale to DJ pitch slider"
+      },
+      {
+        type: 'feature',
+        "description": "Restyle DJ pitch slider as Technics SL-1200 fader"
+      },
+      {
+        type: 'fix',
+        "description": "Hide spurious vertical scrollbar in pattern editor"
+      },
+      {
+        type: 'fix',
+        "description": "Align input caret with centered channel content"
+      },
+      {
+        type: 'feature',
+        "description": "Add Wxx tracker effect for global pitch shift"
+      },
+      {
+        type: 'fix',
+        "description": "Widen DJ pitch slider to center thumb correctly"
+      },
+      {
+        type: 'feature',
+        "description": "Add right-click to reset DJ pitch slider"
+      },
+      {
+        type: 'fix',
+        "description": "Center DJ pitch slider zero marker vertically"
+      },
+      {
+        type: 'fix',
+        "description": "Make DJ pitch slider fill full tracker height"
+      },
+      {
+        type: 'fix',
+        "description": "Move DJ pitch slider from toolbar to between pattern editor and instrument list"
+      },
+      {
+        type: 'feature',
+        "description": "Add DJ pitch slider to transport toolbar"
+      },
+      {
+        type: 'feature',
+        "description": "Add MPC/SP-1200 style sample resampler"
+      },
       {
         type: 'fix',
         "description": "Filter modules.json from demo list and disable BLEP by default"
@@ -116,122 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Add padding inside orange selection border in AmigaPal"
-      },
-      {
-        type: 'fix',
-        "description": "Reduce Title input width in AmigaPal"
-      },
-      {
-        type: 'fix',
-        "description": "Make yellow selection border visible on top of all elements"
-      },
-      {
-        type: 'feature',
-        "description": "Replace Limiter emoji with custom icon"
-      },
-      {
-        type: 'fix',
-        "description": "AmigaPal UI issues - icon visibility, border clipping, and spacing"
-      },
-      {
-        type: 'fix',
-        "description": "Increase AmigaPal modal width to accommodate custom icons"
-      },
-      {
-        type: 'feature',
-        "description": "Replace AmigaPal copy icons with custom SVG icons"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve all type errors and React hooks violations from code audit"
-      },
-      {
-        type: 'feature',
-        "description": "Add Ableton Link-style sync via Web MIDI Clock"
-      },
-      {
-        type: 'feature',
-        "description": "Add Max for Live sample import utilities"
-      },
-      {
-        type: 'improvement',
-        "description": "Add comprehensive Modular Plugin SDK documentation"
-      },
-      {
-        type: 'feature',
-        "description": "Add 5 new Max for Live-inspired modular modules"
-      },
-      {
-        type: 'fix',
-        "description": "Make AmigaPal modal narrower with responsive waveform"
-      },
-      {
-        type: 'feature',
-        "description": "Add DJ-style turntable pitch slider to AmigaPal"
-      },
-      {
-        type: 'fix',
-        "description": "Make AmigaPal modal height dynamic instead of full-screen"
-      },
-      {
-        type: 'feature',
-        "description": "Update AmigaPal UI to use FT2 design system"
-      },
-      {
-        type: 'fix',
-        "description": "Replace non-existent Random icon with Shuffle"
-      },
-      {
-        type: 'feature',
-        "description": "Add real-time waveform preview showing processed output"
-      },
-      {
-        type: 'feature',
-        "description": "Completely rewrite AmigaPalModal UI to match original 1:1"
-      },
-      {
-        type: 'fix',
-        "description": "Stale sample playing after loading new sample from pack browser"
-      },
-      {
-        type: 'fix',
-        "description": "Preset preview not playing on first click in LoadPresetModal"
-      },
-      {
-        type: 'fix',
-        "description": "Complete 1:1 AmigaPal port with all features and bug fixes"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate AmigaPal 8-bit conversion into sample editor"
-      },
-      {
-        type: 'fix',
-        "description": "Make error messages selectable in file dialog"
-      },
-      {
-        type: 'fix',
-        "description": "Use absolute paths and public endpoint for file reading"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: ignore .env files"
-      },
-      {
-        type: 'feature',
-        "description": "Add local development support for demo file browsing"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent FileBrowser infinite re-render loop causing flickering"
-      },
-      {
-        type: 'fix',
-        "description": "Correct production API URL fallback in serverFS"
-      },
-      {
-        type: 'fix',
-        "description": "Broken waveform + missing neural upscaler in enhancer panel"
       }
     ]
   }
