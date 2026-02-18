@@ -130,28 +130,23 @@ export class PatternScheduler {
    */
   public setGlobalPitchOffset(semitones: number): void {
     this.globalPitchOffset = semitones;
+    const playbackRate = Math.pow(2, (this.pitchShiftSemitones + this.globalPitchOffset) / 12);
 
-    // CRITICAL: Throttle ALL updates to prevent audio stuttering during drag
-    // Update at a steady 100ms interval for smooth, glitch-free pitch shifting
+    // Always update global playback rate immediately for new notes
+    const engine = getToneEngine();
+    engine.setGlobalPlaybackRate(playbackRate);
+
+    // Throttle BPM updates to prevent scheduler overload
+    // 30ms = ~33fps, fast enough for smooth response but not overwhelming
     const now = Date.now();
-    if (now - this.lastStoreUpdateTime > 100) {
-      const playbackRate = Math.pow(2, (this.pitchShiftSemitones + this.globalPitchOffset) / 12);
+    if (now - this.lastStoreUpdateTime > 30) {
       const effectiveBPM = this.baseBPM * playbackRate;
 
-      // Update Transport BPM with smooth ramping to prevent clicks/glitches
-      const transport = Tone.getTransport();
-      if (transport.state === 'started') {
-        transport.bpm.rampTo(effectiveBPM, 0.05); // 50ms ramp for smooth transition
-      } else {
-        transport.bpm.value = effectiveBPM;
-      }
+      // Direct BPM update - rampTo causes conflicts with rapid updates
+      Tone.getTransport().bpm.value = effectiveBPM;
 
       // Update transport store BPM (for TrackerReplayer)
       useTransportStore.getState().setBPM(effectiveBPM);
-
-      // Update global playback rate for samples
-      const engine = getToneEngine();
-      engine.setGlobalPlaybackRate(playbackRate);
 
       this.lastStoreUpdateTime = now;
     }
