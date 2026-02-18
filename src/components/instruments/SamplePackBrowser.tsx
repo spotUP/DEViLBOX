@@ -320,6 +320,13 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       pan: 0,
     });
 
+    // Force engine to reload the new sample for the current instrument
+    try {
+      getToneEngine().invalidateInstrument(currentInstrumentId);
+    } catch {
+      // Engine may not be available
+    }
+
     // If multiple samples, create NEW instruments for the rest
     if (samplesToLoad.length > 1) {
       const { createInstrument } = useInstrumentStore.getState();
