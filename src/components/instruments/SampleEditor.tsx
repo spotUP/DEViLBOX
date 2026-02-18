@@ -220,6 +220,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     doVolumeDown,
     doReverse,
     doNormalize,
+    doAmigaPal8Bit,
     doDcRemoval,
     doUndo,
     doRedo,
@@ -1047,6 +1048,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
               <IconBtn onClick={doVolumeDown} title="Volume -3dB"><Volume1 size={13} /></IconBtn>
               <IconBtn onClick={doReverse} title="Reverse"><FlipHorizontal size={13} /></IconBtn>
               <IconBtn onClick={doNormalize} title="Normalize"><Maximize2 size={13} /></IconBtn>
+              <IconBtn onClick={doAmigaPal8Bit} title="AmigaPal 8-bit (Perfect Amiga samples!)" className="text-amber-400 hover:text-amber-300"><Waves size={13} /></IconBtn>
               <IconBtn onClick={doDcRemoval} title="DC Offset Removal"><Activity size={13} /></IconBtn>
             </div>
 

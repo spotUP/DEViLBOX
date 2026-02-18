@@ -102,6 +102,7 @@ export interface SampleEditorState {
   doVolumeDown: () => Promise<void>;
   doReverse: () => Promise<void>;
   doNormalize: () => Promise<void>;
+  doAmigaPal8Bit: () => Promise<void>;
   doDcRemoval: () => Promise<void>;
   doUndo: () => void;
   doRedo: () => void;
@@ -410,6 +411,12 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     }
   }, [audioBuffer, hasSelection, selectionStart, selectionEnd, applyOperation]);
 
+  const doAmigaPal8Bit = useCallback(async () => {
+    if (!audioBuffer) return;
+    await applyOperation('AmigaPal 8-bit', buf => WaveformProcessor.amigaPal8Bit(buf));
+    notify.success('Converted to perfect Amiga 8-bit!');
+  }, [audioBuffer, applyOperation]);
+
   const doDcRemoval = useCallback(async () => {
     if (!audioBuffer) return;
     if (hasSelection) {
@@ -468,7 +475,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     error, setError,
     doCut, doCopy, doPaste, doCrop, doDelete, doSilence,
     doFadeIn, doFadeOut, doVolumeUp, doVolumeDown,
-    doReverse, doNormalize, doDcRemoval,
+    doReverse, doNormalize, doAmigaPal8Bit, doDcRemoval,
     doUndo, doRedo, doExportWav, doFindLoop,
     params, updateParam,
   };
