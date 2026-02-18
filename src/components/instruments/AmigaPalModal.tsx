@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, FolderOpen, Folder, Trash2, Random, Copy } from 'lucide-react';
+import { X, FolderOpen, Folder, Trash2, Shuffle, Copy } from 'lucide-react';
 import type { ProcessedResult } from '@utils/audio/SampleProcessing';
 
 // ProTracker notes (C-1 to B-3, 36 notes total)
@@ -569,7 +569,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                 disabled={samples.length === 0}
                 className="w-full bg-[#595c64] px-2 py-1 border border-[#232323] text-xs font-bold hover:bg-[#696c74] disabled:opacity-50 flex items-center justify-center gap-1 mt-1"
               >
-                <Random size={12} /> Convert {samples.length}
+                <Shuffle size={12} /> Convert {samples.length}
               </button>
             </div>
           </div>
@@ -854,7 +854,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                           }}
                           className="flex-1 bg-[#595c64] px-2 py-1 border border-[#232323] hover:bg-[#696c74]"
                         >
-                          <Random size={12} className="mx-auto" />
+                          <Shuffle size={12} className="mx-auto" />
                         </button>
                       </div>
                     </div>
