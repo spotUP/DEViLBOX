@@ -602,7 +602,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
               return (
                 <div
                   key={sample.id}
-                  className={`relative py-1.5 ${index % 2 === 1 ? 'bg-ft2-bgSecondary' : ''} ${
+                  className={`relative px-3 py-2 ${index % 2 === 1 ? 'bg-ft2-bgSecondary' : ''} ${
                     isSelected ? 'outline outline-2 outline-orange-500 bg-ft2-header/30' : ''
                   }`}
                   onClick={() => setSelectedIndex(index)}
