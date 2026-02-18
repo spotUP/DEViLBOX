@@ -132,7 +132,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
     }
   }, [isOpen, buffer]);
 
-  // Helper: Draw waveform to canvas
+  // Helper: Draw waveform to canvas (responsive width)
   const drawWaveform = useCallback((
     canvas: HTMLCanvasElement,
     buffer: AudioBuffer,
@@ -141,7 +141,8 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const width = 420;
+    // Use parent container width for responsive sizing
+    const width = canvas.parentElement?.clientWidth || 300;
     const height = 60;
     canvas.width = width;
     canvas.height = height;
@@ -352,7 +353,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
-      <div className="w-full max-w-[600px] max-h-full bg-ft2-bg flex flex-col overflow-hidden text-ft2-text font-mono text-xs border-2 border-ft2-border rounded shadow-2xl">
+      <div className="w-full max-w-[480px] max-h-full bg-ft2-bg flex flex-col overflow-hidden text-ft2-text font-mono text-xs border-2 border-ft2-border rounded shadow-2xl">
         {/* Title Bar */}
         <div className="flex items-center justify-between px-3 py-2 border-b-2 border-ft2-border bg-ft2-header">
           <div className="text-sm font-bold text-ft2-highlight">AmigaPal</div>
@@ -608,7 +609,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                   {/* Upper Section */}
                   <div className="flex gap-2">
                     {/* Left: File Info */}
-                    <div className="w-[150px] text-xs space-y-0.5">
+                    <div className="w-[120px] text-xs space-y-0.5">
                       <div>
                         Target filename: <br />
                         <span className="font-light">{sample.targetFilename}</span>
@@ -618,36 +619,6 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                       </div>
                       <div>
                         length: <span className="font-light">{sample.length.toFixed(2)} s</span>
-                      </div>
-
-                      {/* Pitch Slider (Turntable Style) */}
-                      <div className="pt-2 pb-1">
-                        <div className="text-[10px] text-ft2-textDim mb-1 text-center">
-                          PITCH: {sample.pitchShift > 0 ? '+' : ''}{sample.pitchShift.toFixed(1)}
-                        </div>
-                        <div className="flex justify-center">
-                          <input
-                            type="range"
-                            min="-12"
-                            max="12"
-                            step="0.1"
-                            value={sample.pitchShift}
-                            onChange={(e) => {
-                              const newVal = Number(e.target.value);
-                              setSamples((prev) =>
-                                prev.map((s, i) => (i === index ? { ...s, pitchShift: newVal } : s))
-                              );
-                            }}
-                            className="pitch-slider-vertical"
-                            style={{
-                              writingMode: 'bt-lr',
-                              WebkitAppearance: 'slider-vertical',
-                              width: '8px',
-                              height: '80px',
-                              accentColor: '#ff6600',
-                            }}
-                          />
-                        </div>
                       </div>
 
                       <div className="flex gap-0.5 pt-1">
@@ -696,13 +667,13 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
                     {/* Right: Waveform */}
                     <div className="flex-1">
-                      <div className="relative" style={{ width: '420px', height: '60px' }}>
+                      <div className="relative w-full h-[60px]">
                         {/* Input waveform (pink/purple) */}
                         <canvas
                           ref={(el) => {
                             if (el) canvasRefs.current.set(sample.id, el);
                           }}
-                          className="absolute top-0 left-0"
+                          className="absolute top-0 left-0 w-full"
                           style={{ opacity: 0.5 }}
                         />
                         {/* Processed waveform overlay (cyan/blue) */}
@@ -710,13 +681,13 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                           ref={(el) => {
                             if (el) processedCanvasRefs.current.set(sample.id, el);
                           }}
-                          className="absolute top-0 left-0"
+                          className="absolute top-0 left-0 w-full"
                           style={{ opacity: 0.6, mixBlendMode: 'screen' }}
                         />
                       </div>
 
                       {/* Filter Sliders */}
-                      <div className="flex gap-4 mt-2" style={{ width: '420px' }}>
+                      <div className="flex gap-4 mt-2 w-full">
                         <div className="flex-1">
                           <input
                             type="range"
