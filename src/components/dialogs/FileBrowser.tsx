@@ -330,7 +330,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             {
               description: 'All Supported Files',
               accept: {
-                'application/octet-stream': ['.dbx', '.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm', '.sqs', '.seq'],
+                'application/octet-stream': ['.dbx', '.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm', '.sqs', '.seq', '.mid', '.midi'],
               },
             },
           ],
@@ -360,7 +360,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         // Fallback to input element for browsers without File System Access API
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.dbx,.dbox,.mod,.xm,.it,.s3m,.fur,.mptm,.dmf,.ftm,.sqs,.seq,.xml';
+        input.accept = '.dbx,.dbox,.mod,.xm,.it,.s3m,.fur,.mptm,.dmf,.ftm,.sqs,.seq,.mid,.midi,.xml';
         input.onchange = async (e) => {
           const file = (e.target as HTMLInputElement).files?.[0];
           if (file) {
@@ -649,7 +649,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         {/* File List */}
         <div className="flex-1 overflow-auto p-4">
           {error && (
-            <div className="bg-red-900/30 border border-red-500 text-red-300 px-4 py-2 rounded mb-4">
+            <div className="bg-red-900/30 border border-red-500 text-red-300 px-4 py-2 rounded mb-4 select-text">
               {error}
             </div>
           )}
