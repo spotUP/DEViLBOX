@@ -57,8 +57,20 @@ export function useAutoPreview(instrumentId: number, instrument: InstrumentConfi
       // Ensure audio context is started
       try {
         await Tone.start();
+
+        // Wait for context to start (give it up to 500ms)
+        // This handles the case where the global click handler in App.tsx
+        // is still processing the same user interaction
+        let attempts = 0;
+        const maxAttempts = 10;
+        while (Tone.context.state !== 'running' && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+          attempts++;
+        }
+
+        // If still not running after retries, silently bail out
         if (Tone.context.state !== 'running') {
-          return; // Context failed to start
+          return;
         }
       } catch {
         return; // Failed to start audio
