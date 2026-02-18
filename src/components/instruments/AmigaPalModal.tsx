@@ -187,8 +187,18 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
     const width = canvas.parentElement?.clientWidth || 300;
     const height = 60;
-    canvas.width = width;
-    canvas.height = height;
+    const dpr = window.devicePixelRatio || 1;
+
+    // Set canvas internal resolution for sharp rendering on high-DPI displays
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+
+    // Scale CSS display size back to original dimensions
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    // Scale drawing context to match device pixel ratio
+    ctx.scale(dpr, dpr);
 
     ctx.clearRect(0, 0, width, height);
 
