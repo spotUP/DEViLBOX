@@ -1456,7 +1456,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         // Skip if outside visible area
         if (colX + channelWidth < 0 || colX > width) continue;
 
-        const x = colX + Math.floor((channelWidth - contentWidth) / 2);
+        // Use noteWidth for collapsed channels, full contentWidth for expanded
+        const currentContentWidth = isCollapsed ? noteWidth : contentWidth;
+        const x = colX + Math.floor((channelWidth - currentContentWidth) / 2);
 
         // Active channel highlight (re-draw over row background)
         if (ch === cursor.channelIndex && !isGhostRow) {
