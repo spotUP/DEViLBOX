@@ -45,6 +45,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setAmigaLimits,
     linearInterpolation,
     setLinearInterpolation,
+    useBLEP,
+    setUseBLEP,
     midiPolyphonic,
     setMidiPolyphonic
   } = useSettingsStore();
@@ -365,6 +367,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   label=""
                   value={linearInterpolation}
                   onChange={setLinearInterpolation}
+                  size="sm"
+                />
+              </div>
+
+              {/* BLEP Synthesis */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">BLEP Synthesis:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Band-limited (reduces aliasing)</span>
+                </div>
+                <Toggle
+                  label=""
+                  value={useBLEP}
+                  onChange={setUseBLEP}
                   size="sm"
                 />
               </div>

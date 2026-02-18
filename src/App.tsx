@@ -9,6 +9,7 @@ import { TrackerView } from '@components/tracker/TrackerView';
 import { StatusBar } from '@components/layout/StatusBar';
 import { useAudioStore, useTrackerStore, useUIStore } from './stores';
 import { useMIDIStore } from './stores/useMIDIStore';
+import { useSettingsStore } from './stores/useSettingsStore';
 import { useHistoryStore } from './stores/useHistoryStore';
 import { useLiveModeStore } from './stores/useLiveModeStore';
 import { useButtonMappings } from './hooks/midi/useButtonMappings';
@@ -265,6 +266,16 @@ function App() {
 
     initAudio();
   }, []);
+
+  // Sync BLEP setting with ToneEngine
+  const useBLEP = useSettingsStore(state => state.useBLEP);
+  useEffect(() => {
+    if (!initialized) return;
+
+    const engine = getToneEngine();
+    engine.setBlepEnabled(useBLEP);
+    console.log(`[App] BLEP ${useBLEP ? 'enabled' : 'disabled'}`);
+  }, [useBLEP, initialized]);
 
   // Get undo/redo functions from history store
   const { undo, redo, canUndo, canRedo } = useHistoryStore();

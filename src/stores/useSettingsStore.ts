@@ -14,6 +14,7 @@ interface SettingsStore {
 
   // Audio Settings
   performanceQuality: 'high' | 'medium' | 'low';
+  useBLEP: boolean;          // Enable BLEP (Band-Limited Step) synthesis to reduce aliasing
 
   // MIDI Settings
   midiPolyphonic: boolean;   // Enable polyphonic MIDI playback (multiple simultaneous notes)
@@ -23,6 +24,7 @@ interface SettingsStore {
   setLinearInterpolation: (enabled: boolean) => void;
   setMasterTuning: (hz: number) => void;
   setPerformanceQuality: (quality: 'high' | 'medium' | 'low') => void;
+  setUseBLEP: (enabled: boolean) => void;
   setMidiPolyphonic: (enabled: boolean) => void;
 }
 
@@ -34,6 +36,7 @@ export const useSettingsStore = create<SettingsStore>()(
       linearInterpolation: true,
       masterTuning: 440,
       performanceQuality: 'high',
+      useBLEP: true,  // Default: BLEP enabled for better audio quality
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
 
     // Actions
@@ -57,6 +60,11 @@ export const useSettingsStore = create<SettingsStore>()(
         state.performanceQuality = performanceQuality;
       }),
 
+      setUseBLEP: (useBLEP) =>
+        set((state) => {
+          state.useBLEP = useBLEP;
+        }),
+
       setMidiPolyphonic: (midiPolyphonic) =>
         set((state) => {
           state.midiPolyphonic = midiPolyphonic;
@@ -69,6 +77,7 @@ export const useSettingsStore = create<SettingsStore>()(
         linearInterpolation: state.linearInterpolation,
         masterTuning: state.masterTuning,
         performanceQuality: state.performanceQuality,
+        useBLEP: state.useBLEP,
         midiPolyphonic: state.midiPolyphonic,
       }),
     }

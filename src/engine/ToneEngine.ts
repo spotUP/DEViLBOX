@@ -38,6 +38,7 @@ import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
 import { WAMSynth } from './wam/WAMSynth';
 import { CHIP_SYNTH_DEFS } from '../constants/chipParameters';
 import { useRomDialogStore } from '../stores/useRomDialogStore';
+import { BlepManager } from './blep/BlepManager';
 import { SynthRegistry } from './registry/SynthRegistry';
 import { VoiceAllocator } from './audio/VoiceAllocator';
 
@@ -80,6 +81,9 @@ export class ToneEngine {
   // Native AudioContext — owned by DEViLBOX, shared with Tone.js via Tone.setContext()
   // This allows WASM/WAM synths to use the real BaseAudioContext directly.
   private _nativeContext: AudioContext | null = null;
+
+  // BLEP (Band-Limited Step) processor for reducing aliasing
+  private blepManager: BlepManager = new BlepManager();
 
   // High-performance WASM instance for DSP and scheduling
   private wasmInstance: WebAssembly.Exports | null = null;
@@ -476,7 +480,50 @@ export class ToneEngine {
       console.warn('[ToneEngine] Furnace WASM init failed:', error);
     }
 
+    // Initialize BLEP processor (non-blocking, loads in background)
+    this.blepManager.init().then(() => {
+      // Connect BLEP into audio chain: masterEffectsInput → BLEP → masterChannel
+      this.reconnectBlepChain();
+    }).catch(error => {
+      console.warn('[ToneEngine] BLEP init failed (continuing without BLEP):', error);
+    });
+
     // Load AmigaFilter worklet handled by its class
+  }
+
+  /**
+   * Reconnect the BLEP audio chain based on current settings
+   * Called when BLEP is enabled/disabled or when the engine initializes
+   */
+  private reconnectBlepChain(): void {
+    // Disconnect existing connection
+    try {
+      this.masterEffectsInput.disconnect(this.masterChannel);
+    } catch (e) {
+      // Ignore if not connected
+    }
+
+    // Reconnect with or without BLEP
+    this.blepManager.connect(this.masterEffectsInput, this.masterChannel);
+  }
+
+  /**
+   * Enable or disable BLEP processing
+   * @param enabled Whether to enable BLEP
+   */
+  public setBlepEnabled(enabled: boolean): void {
+    this.blepManager.setEnabled(enabled);
+    // Reconnect audio chain to route through or bypass BLEP
+    if (this.blepManager.isInitialized()) {
+      this.reconnectBlepChain();
+    }
+  }
+
+  /**
+   * Check if BLEP is currently enabled
+   */
+  public isBlepEnabled(): boolean {
+    return this.blepManager.isEnabled();
   }
 
   /**
@@ -2025,7 +2072,7 @@ export class ToneEngine {
             if (buffer && buffer.duration) {
               const sampleRate = buffer.sampleRate || Tone.getContext().sampleRate;
               const sliceStart = config.sample!.sliceStart!;
-              const sliceEnd = config.sample!.sliceEnd!;
+              // Note: sliceEnd is available but not used here - slice plays until release
 
               // Convert frame indices to time offsets
               const startTime = sliceStart / sampleRate;

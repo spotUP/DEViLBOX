@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-18T16:59:47.272Z
+ * Generated: 2026-02-18T18:30:37.716Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.833';
-export const BUILD_NUMBER = '833';
-export const BUILD_HASH = '215dbcf3';
+export const BUILD_VERSION = '1.0.840';
+export const BUILD_NUMBER = '840';
+export const BUILD_HASH = '7c566e04';
 export const BUILD_DATE = '2026-02-18';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,37 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.833',
+    version: '1.0.840',
     date: '2026-02-18',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add 50+ Amiga sample presets from ST-01/ST-02 packs"
+      },
+      {
+        type: 'feature',
+        "description": "Add ST-01 and ST-02 Amiga sample packs (247 samples)"
+      },
+      {
+        type: 'feature',
+        "description": "Implement reference-based slicing for massive memory savings"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update auto-generated changelog"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate audio context startup warnings with patient retry logic"
+      },
+      {
+        type: 'fix',
+        "description": "Ensure audio context started in auto-preview hook"
+      },
+      {
+        type: 'fix',
+        "description": "Show beat slices on waveform even when panel closed"
+      },
       {
         type: 'fix',
         "description": "Verify audio context is running before instrument preview"
@@ -210,34 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Refactor scheduler to BassoonTracker continuous timeline pattern"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate cumulative timing drift (~100ms/pattern)"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add stack trace to BPM change detection in scheduler loop"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add startTime, totalTicksScheduled, formula check to drift log"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add drift diagnostic logs to find scheduler reset source"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate 107ms/pattern timing drift caused by false song reloads"
-      },
-      {
-        type: 'fix',
-        "description": "Improve drift diagnostics with scheduled time & tick counting"
-      },
-      {
-        type: 'fix',
-        "description": "Timing drift - sync BPM/speed on load, remove processTick BPM override"
       }
     ]
   }
