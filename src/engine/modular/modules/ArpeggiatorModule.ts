@@ -202,7 +202,7 @@ export const ArpeggiatorDescriptor: ModuleDescriptor = {
         }
       },
 
-      gateOn: (time: number, velocity: number) => {
+      gateOn: (_time: number, velocity: number) => {
         // When a note is held, add to arpeggiator
         const midiNote = Math.round(velocity * 127); // Use velocity as note number for now
         if (!heldNotes.includes(midiNote)) {
@@ -215,7 +215,7 @@ export const ArpeggiatorDescriptor: ModuleDescriptor = {
         }
       },
 
-      gateOff: (time: number) => {
+      gateOff: (_time: number) => {
         // When all notes released, stop arpeggiator
         heldNotes = [];
         stop();

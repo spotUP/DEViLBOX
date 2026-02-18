@@ -93,14 +93,15 @@ export function categorizeSample(filename: string): SampleCategory {
     return 'snares';
   }
   if (lower.includes('hat') || lower.includes('hh') || lower.includes('hihat')) {
-    return 'hats';
+    return 'hihats';
   }
-  if (lower.includes('clap') || lower.includes('snap') || lower.includes('rim') ||
-      lower.includes('perc') || lower.includes('shaker') || lower.includes('conga')) {
+  if (lower.includes('clap') || lower.includes('snap')) {
+    return 'claps';
+  }
+  if (lower.includes('rim') || lower.includes('perc') || lower.includes('shaker') ||
+      lower.includes('conga') || lower.includes('cymbal') || lower.includes('crash') ||
+      lower.includes('ride')) {
     return 'percussion';
-  }
-  if (lower.includes('cymbal') || lower.includes('crash') || lower.includes('ride')) {
-    return 'cymbals';
   }
 
   // Melodic
@@ -108,13 +109,11 @@ export function categorizeSample(filename: string): SampleCategory {
     return 'bass';
   }
   if (lower.includes('lead') || lower.includes('synth')) {
-    return 'synths';
+    return 'leads';
   }
-  if (lower.includes('pad') || lower.includes('string') || lower.includes('choir')) {
+  if (lower.includes('pad') || lower.includes('string') || lower.includes('choir') ||
+      lower.includes('piano') || lower.includes('key') || lower.includes('organ')) {
     return 'pads';
-  }
-  if (lower.includes('piano') || lower.includes('key') || lower.includes('organ')) {
-    return 'keys';
   }
 
   // FX
@@ -128,8 +127,8 @@ export function categorizeSample(filename: string): SampleCategory {
     return 'vocals';
   }
 
-  // Default to loops
-  return 'loops';
+  // Default to other
+  return 'other';
 }
 
 /**
@@ -201,11 +200,7 @@ export async function createSamplePackFromDirectory(
 
   for (const file of files) {
     try {
-      // Load audio buffer
-      const buffer = await loadAudioFile(file);
-
       // Parse metadata
-      const rootNote = parseRootNoteFromFilename(file.name);
       const category = categorizeSample(file.name);
 
       // Create data URL
@@ -213,14 +208,10 @@ export async function createSamplePackFromDirectory(
 
       // Create sample info
       const sampleInfo: SampleInfo = {
+        filename: file.name,
         name: file.name.replace(/\.[^.]+$/, ''), // Remove extension
         url: dataUrl,
         category,
-        duration: buffer.duration,
-        sampleRate: buffer.sampleRate,
-        channels: buffer.numberOfChannels,
-        rootNote: rootNote || undefined,
-        tags: [],
       };
 
       // Add to category
@@ -245,10 +236,13 @@ export async function createSamplePackFromDirectory(
   return {
     id: `m4l_${Date.now()}`,
     name: packName,
+    author: 'Max for Live',
+    description: `Imported from M4L device`,
+    basePath: '',
     categories,
     samples,
-    totalSamples: files.length,
-    isUserPack: true,
+    sampleCount: files.length,
+    isUserUploaded: true,
   };
 }
 

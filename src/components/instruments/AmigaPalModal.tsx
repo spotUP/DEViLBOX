@@ -99,7 +99,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
   const [saveMod, setSaveMod] = useState(false);
   const [use128kb, setUse128kb] = useState(false);
   const [modTitle, setModTitle] = useState('AMIGAPAL_MOD');
-  const [statusMsg, setStatusMsg] = useState('All is well');
+  const [statusMsg] = useState('All is well'); // setStatusMsg available for future use
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
@@ -269,7 +269,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (_e: React.ChangeEvent<HTMLInputElement>) => {
     // TODO: Load multiple audio files
   };
 

@@ -28,27 +28,26 @@ export const LinkSyncPanel: React.FC<LinkSyncPanelProps> = ({
     peers: [],
   });
   const [isEnabled, setIsEnabled] = useState(false);
-  const [midiAvailable, setMidiAvailable] = useState(false);
+  // Check if Web MIDI is available (static check, doesn't need state)
+  const midiAvailable = 'requestMIDIAccess' in navigator;
 
   useEffect(() => {
-    // Check if Web MIDI is available
-    setMidiAvailable('requestMIDIAccess' in navigator);
-
     if (!isEnabled) return;
 
     const link = getAbletonLink();
 
     // Subscribe to Link state changes
     const unsubscribe = link.subscribe((state) => {
-      setLinkState(state);
-
-      // Notify parent components
-      if (onBPMChange && state.bpm !== linkState.bpm) {
-        onBPMChange(state.bpm);
-      }
-      if (onPlayStateChange && state.isPlaying !== linkState.isPlaying) {
-        onPlayStateChange(state.isPlaying);
-      }
+      setLinkState((prevState) => {
+        // Notify parent components when values change
+        if (onBPMChange && state.bpm !== prevState.bpm) {
+          onBPMChange(state.bpm);
+        }
+        if (onPlayStateChange && state.isPlaying !== prevState.isPlaying) {
+          onPlayStateChange(state.isPlaying);
+        }
+        return state;
+      });
     });
 
     return () => {
