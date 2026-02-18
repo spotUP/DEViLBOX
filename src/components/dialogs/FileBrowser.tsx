@@ -122,14 +122,19 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
 
   // Check filesystem access on mount
   useEffect(() => {
-    const checkAccess = () => {
+    const checkAccess = async () => {
       const hasElectron = hasElectronFS();
       const hasWebFS = isFileSystemAccessSupported() && !!getCurrentDirectory();
-      
+
       setHasFilesystemAccess(hasElectron || hasWebFS);
-      // Don't check server FS on mount - will be checked when loading files
+
+      // Check server FS availability once on open (not in loadFiles to avoid loops)
+      if (!hasElectron && !hasWebFS) {
+        const serverFS = await isServerFSAvailable();
+        setHasServerFS(serverFS);
+      }
     };
-    
+
     if (isOpen) {
       checkAccess();
     }
@@ -171,7 +176,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           setIsLoading(false);
           return;
         }
-        
+
         const targetPath = electronDirectory || currentPath;
         if (targetPath) {
           // Get all entries, not just filtered ones (user can navigate all folders)
@@ -185,7 +190,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             modifiedAt: e.modifiedAt ? new Date(e.modifiedAt) : undefined,
             source: 'filesystem' as const,
           }));
-          
+
           // Sort: directories first, then files
           items.sort((a, b) => {
             if (a.isDirectory && !b.isDirectory) return -1;
@@ -194,14 +199,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           });
         }
       } else {
-        // Check if server FS is available (lazy check to avoid console errors on startup)
-        if (!hasServerFS) {
-          const serverFS = await isServerFSAvailable();
-          setHasServerFS(serverFS);
-        }
-        
+        // Try server FS first if we think it's available
         if (hasServerFS) {
-          // Use server file system (jailed to data/)
           try {
             const targetPath = currentPath || 'songs';
             const entries = await listServerDirectory(targetPath);
@@ -221,10 +220,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             if (!a.isDirectory && b.isDirectory) return 1;
             return a.name.localeCompare(b.name);
           });
-        } catch {
-          // Server may not be available, fall through to manifest
-          setHasServerFS(false);
-        }
+          } catch {
+            // Server not available, fall through to manifest
+          }
         }
 
         // Fallback: use build-time file manifest (works on GitHub Pages)
@@ -258,7 +256,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           }
         }
       }
-      
+
 
       setFiles(items);
     } catch (err) {
