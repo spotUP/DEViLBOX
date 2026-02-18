@@ -403,7 +403,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
       <div className="w-full max-w-[640px] max-h-full bg-ft2-bg flex flex-col overflow-hidden text-ft2-text font-mono text-xs border-2 border-ft2-border rounded shadow-2xl">
         {/* Title Bar */}
         <div className="flex items-center justify-between px-3 py-2 border-b-2 border-ft2-border bg-ft2-header">
-          <div className="text-sm font-bold text-ft2-highlight">AmigaPal</div>
+          <div className="text-sm font-bold text-ft2-highlight">AmigaPal by Syphus, icons by Spot</div>
           <button
             onClick={onClose}
             className="hover:bg-ft2-border p-1.5 rounded transition-colors text-ft2-textDim hover:text-ft2-text"
