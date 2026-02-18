@@ -2028,7 +2028,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             <div
               ref={headerScrollRef}
               onScroll={handleHeaderScroll}
-              className="overflow-x-hidden flex-1"
+              className="overflow-x-hidden overflow-y-hidden flex-1"
               data-vu-scroll
             >
               <div className="flex" style={{ width: totalChannelsWidth }}>
