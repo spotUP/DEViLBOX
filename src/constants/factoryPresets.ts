@@ -19,6 +19,7 @@ import { MAME_CHIP_PRESETS } from './mameChipPresets';
 import { DEXED_FACTORY_PRESETS, OBXD_FACTORY_PRESETS } from './jucePresets';
 import { FURNACE_CHIP_PRESETS } from './furnaceChipPresets';
 import { SAMPLE_PACK_PRESETS, WAVETABLE_PACK_PRESETS } from './samplePresets';
+import { AMI_PRESETS } from './amiPresets';
 import { BUZZMACHINE_FACTORY_PRESETS } from './buzzmachineFactoryPresets';
 import { MAKK_FACTORY_PRESETS } from './makkPresets';
 import { HARMONIC_PRESETS } from './harmonicPresets';
@@ -2817,6 +2818,7 @@ export const PRESET_CATEGORIES = {
   OBXd: OBXD_FACTORY_PRESETS,
   Samples: SAMPLE_PACK_PRESETS,
   Wavetables: WAVETABLE_PACK_PRESETS,
+  Amiga: AMI_PRESETS,
   Buzz: BUZZMACHINE_FACTORY_PRESETS,
   Makk: MAKK_FACTORY_PRESETS,
   Harmonic: HARMONIC_PRESETS,

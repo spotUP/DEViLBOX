@@ -4,12 +4,16 @@
  */
 
 import type { InstrumentPreset } from '@typedefs/instrument';
+import { AMI_PRESETS } from './amiPresets';
 
 // Paths to sample assets
 const CASIO_BASE = '/data/samples/packs/casio-mt40/leads';
 const DRUMNIBUS_BASE = '/data/samples/packs/drumnibus';
 
 export const SAMPLE_PACK_PRESETS: InstrumentPreset['config'][] = [
+  // === AMIGA SAMPLES (ST-01 / ST-02) ===
+  ...AMI_PRESETS,
+
   // === CASIO MT-40 LEADS (Single Sample Players) ===
   {
     name: 'MT-40 Accordion',
