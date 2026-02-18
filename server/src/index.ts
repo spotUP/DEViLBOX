@@ -63,7 +63,7 @@ app.get('/api/demo/:type/*', (req, res) => {
       return res.status(400).json({ error: 'Invalid type' });
     }
 
-    const dataRoot = process.env.DATA_ROOT || '/var/www/devilbox/data';
+    const dataRoot = path.resolve(process.env.DATA_ROOT || '/var/www/devilbox/data');
     const basePath = path.join(dataRoot, 'public', type);
     const targetPath = path.join(basePath, subpath);
 

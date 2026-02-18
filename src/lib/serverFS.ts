@@ -149,7 +149,30 @@ export async function listServerDirectory(dirPath: string): Promise<ServerFileEn
  */
 export async function readServerFile(filePath: string): Promise<ArrayBuffer> {
   const cleanPath = filePath.replace(/^\/+/, '');
-  const response = await fetch(`${API_BASE}/api/files/${cleanPath}`);
+
+  // Determine type and subpath (same logic as listServerDirectory)
+  let type = 'songs';
+  let subpath = '';
+
+  if (cleanPath === '' || cleanPath === 'songs') {
+    type = 'songs';
+    subpath = '';
+  } else if (cleanPath === 'instruments') {
+    type = 'instruments';
+    subpath = '';
+  } else if (cleanPath.startsWith('instruments/')) {
+    type = 'instruments';
+    subpath = cleanPath.replace(/^instruments\/?/, '');
+  } else if (cleanPath.startsWith('songs/')) {
+    type = 'songs';
+    subpath = cleanPath.replace(/^songs\/?/, '');
+  } else {
+    // Assume it's a subpath within songs
+    type = 'songs';
+    subpath = cleanPath;
+  }
+
+  const response = await fetch(`${API_BASE}/api/demo/${type}/${subpath}`);
 
   if (!response.ok) {
     throw new Error(`Failed to read file: ${response.statusText}`);
