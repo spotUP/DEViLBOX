@@ -374,7 +374,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       granularPosition: isGranular ? (granular?.scanPosition ?? undefined) : undefined,
       activeDrag: dragTarget,
       showSpectrum,
-      slices: showBeatSlicer ? instrument.sample?.slices : undefined,
+      slices: instrument.sample?.slices,
       selectedSliceId: showBeatSlicer ? selectedSliceId : null,
     };
     drawSampleWaveform(ctx, CANVAS_W, CANVAS_H, opts);
