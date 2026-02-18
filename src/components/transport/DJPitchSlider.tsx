@@ -93,7 +93,7 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
   return (
     <div
       className={`flex flex-col items-center py-2 gap-1 select-none ${className}`}
-      style={{ width: 36 }}
+      style={{ width: 52 }}
     >
       {/* Label */}
       <span className="text-[9px] font-mono text-text-muted uppercase tracking-wider flex-shrink-0">
@@ -117,8 +117,28 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
         +12
       </span>
 
-      {/* ── Housing + Track ─────────────────────────────────────────── */}
-      <div className="relative flex-1 min-h-0 w-full">
+      {/* ── Scale + Housing ─────────────────────────────────────────── */}
+      <div className="relative flex-1 min-h-0 w-full flex flex-row gap-0.5">
+
+      {/* Scale marks — left of housing, -8 top / 0 mid / +8 bottom */}
+      <div className="relative flex-shrink-0 flex flex-col justify-between py-[4px]" style={{ width: 14 }}>
+        {['-8','','','-4','','','0','','','+4','','','+8'].map((label, i, arr) => {
+          const isMajor = label !== '';
+          return (
+            <div key={i} className="flex items-center justify-end gap-0.5" style={{ flex: 1 }}>
+              {isMajor && (
+                <span className={`text-[6px] font-mono leading-none ${label === '0' ? 'text-amber-400/60' : 'text-text-muted/40'}`}>
+                  {label}
+                </span>
+              )}
+              <div className={`h-px flex-shrink-0 ${isMajor ? 'w-1.5' : 'w-1'} ${label === '0' ? 'bg-amber-400/40' : 'bg-text-muted/30'}`} />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Housing */}
+      <div className="relative flex-1 min-h-0">
 
         {/* Outer housing border */}
         <div className="absolute inset-0 border border-dark-border/60 rounded-sm pointer-events-none" />
@@ -173,7 +193,8 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
             />
           </div>
         </div>
-      </div>
+      </div>{/* Housing */}
+      </div>{/* Scale + Housing row */}
 
       {/* -12 label */}
       <span className="text-[8px] font-mono text-text-muted/40 leading-none flex-shrink-0">
