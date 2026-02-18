@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-18T14:29:30.523Z
+ * Generated: 2026-02-18T16:59:47.272Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.821';
-export const BUILD_NUMBER = '821';
-export const BUILD_HASH = 'd46aab57';
+export const BUILD_VERSION = '1.0.833';
+export const BUILD_NUMBER = '833';
+export const BUILD_HASH = '215dbcf3';
 export const BUILD_DATE = '2026-02-18';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,57 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.821',
+    version: '1.0.833',
     date: '2026-02-18',
     changes: [
+      {
+        type: 'fix',
+        "description": "Verify audio context is running before instrument preview"
+      },
+      {
+        type: 'fix',
+        "description": "Create new instrument when loading sample with no current instrument"
+      },
+      {
+        type: 'feature',
+        "description": "Complete beat slicer implementation with manual mode, deletion, and visual enhancements"
+      },
+      {
+        type: 'improvement',
+        "description": "Add comprehensive Ami-Sampler resample algorithm audit"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate AmigaPal with tracker's status message system"
+      },
+      {
+        type: 'fix',
+        "description": "Sharp filter overlay rendering on high-DPI displays"
+      },
+      {
+        type: 'improvement',
+        "description": "Add credits to AmigaPal modal title"
+      },
+      {
+        type: 'feature',
+        "description": "Add filter visualization overlays to AmigaPal waveforms"
+      },
+      {
+        type: 'fix',
+        "description": "Add padding inside orange selection border in AmigaPal"
+      },
+      {
+        type: 'fix',
+        "description": "Reduce Title input width in AmigaPal"
+      },
+      {
+        type: 'fix',
+        "description": "Make yellow selection border visible on top of all elements"
+      },
+      {
+        type: 'feature',
+        "description": "Replace Limiter emoji with custom icon"
+      },
       {
         type: 'fix',
         "description": "AmigaPal UI issues - icon visibility, border clipping, and spacing"
@@ -190,60 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Timing drift - sync BPM/speed on load, remove processTick BPM override"
-      },
-      {
-        type: 'fix',
-        "description": "Full state reset when loading new song prevents broken playback"
-      },
-      {
-        type: 'fix',
-        "description": "Furnace 2nd effect column + scheduler BPM timing"
-      },
-      {
-        type: 'fix',
-        "description": "Pattern break 0Dxx uses hex for XM/Furnace, BCD only for MOD"
-      },
-      {
-        type: 'fix',
-        "description": "Implement Furnace speed1/speed2 alternation for correct timing"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
-      },
-      {
-        type: 'fix',
-        "description": "Sync normalDecay with filterEnvelope.decay across all TB-303 presets"
-      },
-      {
-        type: 'fix',
-        "description": "All knobs now responsive - use refs to prevent stale closures in effect/TB303 knob handlers"
-      },
-      {
-        type: 'fix',
-        "description": "TB-303 Decay knob now updates devilFish.normalDecay"
-      }
-    ]
-  },
-  {
-    version: '2026-02-16',
-    date: '2026-02-16',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Correct parameter ranges to 0-1 normalized values matching DB303 site rip. All knobs were using Hz/ms/% ranges instead of 0-1, causing values to clamp at 1.0. Decay knob now syncs devilFish.normalDecay to prevent applyConfig() from overriding it. Added auto-instrument detection and dropdown for multiple 303s."
-      },
-      {
-        type: 'fix',
-        "description": "Use Zustand selectors to properly track pattern changes in piano roll"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add comprehensive logging to diagnose piano roll interaction issues"
-      },
-      {
-        type: 'fix',
-        "description": "Velocity lane now shows full width with helpful empty state"
       }
     ]
   }
