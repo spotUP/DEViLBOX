@@ -64,21 +64,26 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
     : pitchSemitones.toFixed(1);
 
   return (
-    <div className={`flex flex-col items-center gap-1 ${className}`}>
-      {/* Label and Value Display */}
-      <div className="text-[9px] font-mono text-text-muted uppercase tracking-wider">
+    <div className={`flex flex-col items-center py-2 px-1 gap-1 ${className}`}>
+      {/* Label */}
+      <div className="text-[9px] font-mono text-text-muted uppercase tracking-wider flex-shrink-0">
         Pitch
       </div>
+
+      {/* Value Display */}
       <div
-        className="text-[11px] font-mono font-bold text-amber-400 min-w-[40px] text-center cursor-pointer select-none"
+        className="text-[11px] font-mono font-bold text-amber-400 min-w-[40px] text-center cursor-pointer select-none flex-shrink-0"
         onDoubleClick={handleDoubleClick}
         title="Double-click to reset"
       >
         {displayValue}
       </div>
 
-      {/* Vertical Slider (Turntable Style) */}
-      <div className="relative">
+      {/* +12 indicator */}
+      <div className="text-[8px] font-mono text-text-muted/50 flex-shrink-0">+12</div>
+
+      {/* Vertical Slider — fills remaining height */}
+      <div className="relative flex-1 flex items-center justify-center min-h-0">
         <input
           type="range"
           min="-12"
@@ -87,33 +92,22 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
           value={pitchSemitones}
           onChange={handlePitchChange}
           onDoubleClick={handleDoubleClick}
-          className="pitch-slider-vertical"
           title="DJ Pitch Control (-12 to +12 semitones)"
           style={{
-            writingMode: 'bt-lr' as any,
+            writingMode: 'bt-lr' as React.CSSProperties['writingMode'],
             WebkitAppearance: 'slider-vertical',
             width: '8px',
-            height: '120px',
-            accentColor: '#fbbf24', // Amber/gold accent
+            height: '100%',
+            accentColor: '#fbbf24',
             cursor: 'ns-resize',
           }}
         />
-
-        {/* Center marker (0 position) */}
-        <div
-          className="absolute left-1/2 -translate-x-1/2 w-4 h-0.5 bg-amber-400/30 pointer-events-none"
-          style={{
-            top: '50%',
-            transform: 'translate(-50%, -50%)'
-          }}
-        />
+        {/* Center marker */}
+        <div className="absolute left-1/2 w-4 h-0.5 bg-amber-400/30 pointer-events-none -translate-x-1/2" />
       </div>
 
-      {/* Range indicators */}
-      <div className="flex flex-col items-center text-[8px] font-mono text-text-muted/50 gap-[88px] absolute mt-[32px]">
-        <div>+12</div>
-        <div>-12</div>
-      </div>
+      {/* -12 indicator */}
+      <div className="text-[8px] font-mono text-text-muted/50 flex-shrink-0">-12</div>
     </div>
   );
 };

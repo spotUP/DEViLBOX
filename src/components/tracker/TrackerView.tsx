@@ -1176,8 +1176,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         </div>
 
         {/* DJ Pitch Slider - Flex item 2 */}
-        <div className="flex-shrink-0 flex items-center border-l border-ft2-border bg-ft2-header">
-          <DJPitchSlider />
+        <div className="flex-shrink-0 self-stretch border-l border-ft2-border bg-ft2-header">
+          <DJPitchSlider className="h-full" />
         </div>
 
         {/* Instrument Panel Toggle Button - Flex item 3 - Hide on narrow windows */}
