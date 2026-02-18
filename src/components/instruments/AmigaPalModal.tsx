@@ -13,6 +13,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { X, FolderOpen, Folder, Trash2, Shuffle } from 'lucide-react';
 import { CopyLimiterIcon, CopyLoCutIcon, CopyHiCutIcon, CopyPTNoteIcon, LimiterIcon } from '@components/icons/AmigaPalIcons';
+import { useUIStore } from '@stores';
 import type { ProcessedResult } from '@utils/audio/SampleProcessing';
 
 // ProTracker notes (C-1 to B-3, 36 notes total)
@@ -100,7 +101,10 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
   const [saveMod, setSaveMod] = useState(false);
   const [use128kb, setUse128kb] = useState(false);
   const [modTitle, setModTitle] = useState('AMIGAPAL_MOD');
-  const [statusMsg] = useState('All is well'); // setStatusMsg available for future use
+
+  // Use tracker's status message system
+  const statusMessage = useUIStore((state) => state.statusMessage);
+  const setStatusMessage = useUIStore((state) => state.setStatusMessage);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
@@ -333,6 +337,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
   const handleClearAll = () => {
     setSamples([]);
     setSelectedIndex(null);
+    setStatusMessage('Samples cleared', false, 2000);
   };
 
   const handleRemoveFile = (index: number) => {
@@ -342,10 +347,13 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
     } else if (selectedIndex !== null && selectedIndex > index) {
       setSelectedIndex(selectedIndex - 1);
     }
+    setStatusMessage('Sample removed', false, 2000);
   };
 
   const handleConvertAll = async () => {
     if (samples.length === 0) return;
+
+    setStatusMessage(`Converting ${samples.length} sample${samples.length > 1 ? 's' : ''}...`, false, 0);
 
     // For now, just process the first sample and apply it
     const sample = samples[0];
@@ -357,6 +365,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
     };
 
     onApply(result);
+    setStatusMessage('Conversion complete!', false, 2000);
   };
 
   const handleSetAll = () => {
@@ -519,7 +528,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
               {/* Status */}
               <div className="pt-1">
                 <strong className="text-ft2-textDim">
-                  STATUS: <span className="text-pink-400">{statusMsg}</span>
+                  STATUS: <span className="text-pink-400">{statusMessage}</span>
                 </strong>
               </div>
             </div>
