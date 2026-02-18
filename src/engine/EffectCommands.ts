@@ -80,6 +80,9 @@ export interface EffectMemory {
     // Smooth macro target for \xx
     smoothMacroTarget?: number;
     smoothMacroStart?: number;
+
+    // Wxx - Global Pitch Shift (DJ-style)
+    globalPitchShift?: number; // 0-255, centered at 128 (0x80)
   };
 }
 
@@ -181,6 +184,9 @@ export interface EffectResult {
 
   // Panning
   setPan?: number; // 0-255 (0=left, 128=center, 255=right)
+
+  // Global Pitch Shift (DJ-style)
+  setGlobalPitchShift?: number; // semitones (-12 to +12)
 
   // Sample
   sampleOffset?: number;
@@ -648,6 +654,17 @@ export class EffectProcessor {
         mem.filterMode = modes[modeIndex];
         result.setFilterMode = modes[modeIndex];
       }
+    }
+    else if (effectLetter === 'W') {
+      // Wxx - Global Pitch Shift (DJ-style)
+      // W00 = -12 semitones (slowest)
+      // W80 = 0 semitones (no change, centered at 128)
+      // WFF = +12 semitones (fastest)
+      // Affects entire song playback like a DJ pitch slider
+      mem.globalPitchShift = param;
+      // Convert 0-255 to semitones (-12 to +12)
+      const semitones = ((param - 128) / 128) * 12;
+      result.setGlobalPitchShift = semitones;
     }
     else if (effect?.[0] === '\\') {
       // \xx - Smooth MIDI Macro (interpolated filter cutoff slide)
