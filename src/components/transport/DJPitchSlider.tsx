@@ -141,11 +141,6 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
       <div className="relative flex-1 min-h-0">
 
 
-        {/* Center reference tick (left edge, marks 0) */}
-        <div
-          className="absolute left-0 w-1.5 h-px bg-amber-400/30 pointer-events-none"
-          style={{ top: '50%' }}
-        />
 
         {/* Track groove — thin vertical line down the center */}
         <div
