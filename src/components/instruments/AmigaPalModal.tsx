@@ -102,6 +102,8 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
+  const processedCanvasRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
+  const processedBuffers = useRef<Map<string, AudioBuffer>>(new Map());
 
   // Initialize with current buffer if provided
   useEffect(() => {
@@ -128,50 +130,130 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
     }
   }, [isOpen, buffer]);
 
-  // Draw waveform for each sample
+  // Helper: Draw waveform to canvas
+  const drawWaveform = useCallback((
+    canvas: HTMLCanvasElement,
+    buffer: AudioBuffer,
+    color: { start: string; end: string }
+  ) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = 420;
+    const height = 60;
+    canvas.width = width;
+    canvas.height = height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const channelData = buffer.getChannelData(0);
+    const step = Math.ceil(channelData.length / width);
+    const amp = height / 2;
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, color.start);
+    gradient.addColorStop(1, color.end);
+
+    ctx.fillStyle = gradient;
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i < width; i++) {
+      let min = 1.0;
+      let max = -1.0;
+      for (let j = 0; j < step; j++) {
+        const datum = channelData[i * step + j];
+        if (datum < min) min = datum;
+        if (datum > max) max = datum;
+      }
+      const yMin = (1 + min) * amp;
+      const yMax = (1 + max) * amp;
+      ctx.fillRect(i, yMin, 1, Math.max(1, yMax - yMin));
+    }
+  }, []);
+
+  // Process sample with filters + limiter and return processed buffer
+  const processSamplePreview = useCallback(async (sample: SampleItem): Promise<AudioBuffer> => {
+    const { buffer, loCutHz, hiCutHz, limiterEnabled, limiterThresh, limiterMakeup } = sample;
+
+    const offlineContext = new OfflineAudioContext(
+      buffer.numberOfChannels,
+      buffer.length,
+      buffer.sampleRate
+    );
+
+    const source = offlineContext.createBufferSource();
+    source.buffer = buffer;
+
+    // Create filter chain (always active, matching original AmigaPal)
+    const highPass = offlineContext.createBiquadFilter();
+    highPass.type = 'highpass';
+    highPass.frequency.value = loCutHz;
+    highPass.Q.value = 0;
+
+    const lowPass = offlineContext.createBiquadFilter();
+    lowPass.type = 'lowpass';
+    lowPass.frequency.value = hiCutHz;
+    lowPass.Q.value = 0;
+
+    // Connect: source → highpass → lowpass
+    source.connect(highPass);
+    highPass.connect(lowPass);
+
+    if (limiterEnabled) {
+      // Create limiter (DynamicsCompressor)
+      const compressor = offlineContext.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(limiterThresh, offlineContext.currentTime);
+      compressor.knee.setValueAtTime(0.0, offlineContext.currentTime);
+      compressor.ratio.setValueAtTime(20.0, offlineContext.currentTime);
+      compressor.attack.setValueAtTime(0.0002, offlineContext.currentTime);
+      compressor.release.setValueAtTime(0.06, offlineContext.currentTime);
+
+      // Makeup gain
+      const makeupGain = offlineContext.createGain();
+      makeupGain.gain.setValueAtTime(1 + limiterMakeup / 100, offlineContext.currentTime);
+
+      // Connect: lowpass → compressor → makeup → destination
+      lowPass.connect(compressor);
+      compressor.connect(makeupGain);
+      makeupGain.connect(offlineContext.destination);
+    } else {
+      // No limiter: lowpass → destination
+      lowPass.connect(offlineContext.destination);
+    }
+
+    source.start(0);
+    return await offlineContext.startRendering();
+  }, []);
+
+  // Draw input waveforms (pink/purple)
   useEffect(() => {
     samples.forEach((sample) => {
       const canvas = canvasRefs.current.get(sample.id);
       if (!canvas) return;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const width = 420;
-      const height = 60;
-      canvas.width = width;
-      canvas.height = height;
-
-      ctx.clearRect(0, 0, width, height);
-
-      // Draw pink/purple gradient waveform
-      const channelData = sample.buffer.getChannelData(0);
-      const step = Math.ceil(channelData.length / width);
-      const amp = height / 2;
-
-      const gradient = ctx.createLinearGradient(0, 0, 0, height);
-      gradient.addColorStop(0, '#ff99cc'); // Pink
-      gradient.addColorStop(1, '#9966cc'); // Purple
-
-      ctx.fillStyle = gradient;
-      ctx.strokeStyle = gradient;
-      ctx.lineWidth = 1;
-
-      ctx.beginPath();
-      for (let i = 0; i < width; i++) {
-        let min = 1.0;
-        let max = -1.0;
-        for (let j = 0; j < step; j++) {
-          const datum = channelData[i * step + j];
-          if (datum < min) min = datum;
-          if (datum > max) max = datum;
-        }
-        const yMin = (1 + min) * amp;
-        const yMax = (1 + max) * amp;
-        ctx.fillRect(i, yMin, 1, Math.max(1, yMax - yMin));
-      }
+      drawWaveform(canvas, sample.buffer, { start: '#ff99cc', end: '#9966cc' });
     });
-  }, [samples]);
+  }, [samples, drawWaveform]);
+
+  // Process and draw preview waveforms (cyan/blue overlay)
+  useEffect(() => {
+    const processAll = async () => {
+      for (const sample of samples) {
+        try {
+          const processedBuffer = await processSamplePreview(sample);
+          processedBuffers.current.set(sample.id, processedBuffer);
+
+          const canvas = processedCanvasRefs.current.get(sample.id);
+          if (canvas) {
+            drawWaveform(canvas, processedBuffer, { start: '#00ffff', end: '#0099ff' });
+          }
+        } catch (err) {
+          console.warn('[AmigaPal] Preview processing failed:', err);
+        }
+      }
+    };
+
+    processAll();
+  }, [samples, processSamplePreview, drawWaveform]);
 
   const handleLoadFiles = () => {
     fileInputRef.current?.click();
@@ -575,11 +657,21 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                     {/* Right: Waveform */}
                     <div className="flex-1">
                       <div className="relative" style={{ width: '420px', height: '60px' }}>
+                        {/* Input waveform (pink/purple) */}
                         <canvas
                           ref={(el) => {
                             if (el) canvasRefs.current.set(sample.id, el);
                           }}
                           className="absolute top-0 left-0"
+                          style={{ opacity: 0.5 }}
+                        />
+                        {/* Processed waveform overlay (cyan/blue) */}
+                        <canvas
+                          ref={(el) => {
+                            if (el) processedCanvasRefs.current.set(sample.id, el);
+                          }}
+                          className="absolute top-0 left-0"
+                          style={{ opacity: 0.6, mixBlendMode: 'screen' }}
                         />
                       </div>
 
