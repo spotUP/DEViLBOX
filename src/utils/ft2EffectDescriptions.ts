@@ -175,6 +175,22 @@ export const FT2_EFFECT_DESCRIPTIONS: Record<string, EffectDescription> = {
     tick: 'tick-N',
     category: 'global',
   },
+  'W': {
+    command: 'Wxx',
+    name: 'Global Pitch Shift',
+    description: 'DJ-style pitch shift affecting entire song playback (like a turntable)',
+    parameters: 'xx=pitch (00=-12 semitones, 80=0/neutral, FF=+12 semitones)',
+    tick: 'tick-0',
+    category: 'global',
+  },
+  'Z': {
+    command: 'Zxx',
+    name: 'MIDI Macro',
+    description: 'IT-style filter control (cutoff/resonance/mode)',
+    parameters: 'xx: 00-7F=cutoff, 80-8F=resonance, 90-9F=filter mode',
+    tick: 'tick-0',
+    category: 'misc',
+  },
 };
 
 /**

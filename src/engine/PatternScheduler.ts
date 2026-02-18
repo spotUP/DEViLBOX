@@ -66,6 +66,10 @@ export class PatternScheduler {
   private pendingPositionJump: number | null = null;
   private effectProcessor = getEffectProcessor();
 
+  // Global pitch shift tracking (DJ-style performance control)
+  private baseBPM: number = 125; // Base tempo (affected by Fxx effects)
+  private pitchShiftSemitones: number = 0; // Pitch shift (affected by Wxx effects)
+
   /**
    * Track playback errors and notify user if threshold exceeded
    */
@@ -340,10 +344,22 @@ export class PatternScheduler {
 
     // Hardware Quirk: apply new BPM/Speed immediately
     if (tickResult.setBPM !== undefined) {
-      engine.setBPM(tickResult.setBPM);
+      // Update base BPM (song tempo) and apply pitch shift
+      this.baseBPM = tickResult.setBPM;
+      const playbackRate = Math.pow(2, this.pitchShiftSemitones / 12);
+      const effectiveBPM = this.baseBPM * playbackRate;
+      engine.setBPM(effectiveBPM);
     }
     if (tickResult.setSpeed !== undefined) {
       (handler as unknown as { speed: number }).speed = tickResult.setSpeed;
+    }
+
+    // Global Pitch Shift (DJ-style): Wxx effect
+    if (tickResult.setGlobalPitchShift !== undefined) {
+      this.pitchShiftSemitones = tickResult.setGlobalPitchShift;
+      const playbackRate = Math.pow(2, this.pitchShiftSemitones / 12);
+      const effectiveBPM = this.baseBPM * playbackRate;
+      Tone.getTransport().bpm.value = effectiveBPM;
     }
 
     if (tickResult.funkRepeat !== undefined) {
@@ -386,7 +402,11 @@ export class PatternScheduler {
       const initialBPM = pattern.importMetadata?.modData?.initialBPM || 125;
       const initialSpeed = pattern.importMetadata?.modData?.initialSpeed || 6;
       const { amigaLimits } = useSettingsStore.getState();
-      
+
+      // Initialize pitch shift tracking
+      this.baseBPM = initialBPM;
+      this.pitchShiftSemitones = 0;
+
       this.activeHandler.init({
         format: format,
         initialSpeed,
@@ -768,6 +788,10 @@ export class PatternScheduler {
     } catch (e) {
       console.warn('[PatternScheduler] Could not release notes:', e);
     }
+
+    // Reset pitch shift to neutral when clearing schedule
+    this.pitchShiftSemitones = 0;
+    Tone.getTransport().bpm.value = this.baseBPM;
 
     if (this.currentPlayback) {
       this.currentPlayback.rowPart.dispose();
