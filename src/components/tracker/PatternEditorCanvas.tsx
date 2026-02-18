@@ -1600,7 +1600,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Draw cursor — visible in all modes with mode-dependent color
     // FT2: Each digit is a separate cursor stop, always CHAR_WIDTH wide (except note)
     if (!pattern.channels[cursor.channelIndex]?.collapsed) {
-      const cursorX = channelOffsets[cursor.channelIndex] + 8 - scrollLeft;
+      // Calculate centering offset to match centered content (same as line 1457)
+      const colX = channelOffsets[cursor.channelIndex] - scrollLeft;
+      const channelWidth = channelWidths[cursor.channelIndex];
+      const cursorX = colX + Math.floor((channelWidth - contentWidth) / 2);
       let cursorOffsetX = 0;
       let caretWidth = CHAR_WIDTH; // Single char width for all except note
 
