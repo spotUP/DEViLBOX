@@ -1881,7 +1881,10 @@ export class TrackerReplayer {
     } else {
       player.loop = false;
     }
-    player.playbackRate = playbackRate;
+
+    // Apply global playback rate multiplier for pitch shifting (DJ slider, etc.)
+    const globalRate = engine.getGlobalPlaybackRate();
+    player.playbackRate = playbackRate * globalRate;
 
     ch.player = player; // Keep reference for updatePeriod compatibility
 
@@ -1924,7 +1927,10 @@ export class TrackerReplayer {
 
     const sampleRate = ch.instrument?.sample?.sampleRate || 8363;
     const frequency = AMIGA_PAL_FREQUENCY / period;
-    ch.player.playbackRate = frequency / sampleRate;
+    // Apply global playback rate multiplier for pitch shifting (DJ slider, etc.)
+    const engine = getToneEngine();
+    const globalRate = engine.getGlobalPlaybackRate();
+    ch.player.playbackRate = (frequency / sampleRate) * globalRate;
   }
 
   /**
