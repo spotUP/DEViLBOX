@@ -1483,12 +1483,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
         // Collapsed: show only note column, skip parameter columns
         if (isCollapsed) {
-          const noteCanvas = getNoteCanvas(
-            cell.note ?? 0,
-            cell.instrument ?? 0,
-            chColor,
-            false
-          );
+          const noteCanvas = getNoteCanvas(cell.note ?? 0, false);
           ctx.drawImage(noteCanvas, x, y);
           continue;
         }
@@ -2134,7 +2129,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                           <Headphones size={12} />
                         </button>
                         <button
-                          onClick={() => toggleChannelCollapse(idx)}
+                          onClick={() => _toggleChannelCollapse(idx)}
                           className="p-1 rounded transition-colors text-text-muted hover:text-text-primary hover:bg-dark-bgHover"
                           title="Collapse Channel"
                         >
@@ -2153,7 +2148,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                             {(idx + 1).toString().padStart(2, '0')}
                           </span>
                           <button
-                            onClick={() => toggleChannelCollapse(idx)}
+                            onClick={() => _toggleChannelCollapse(idx)}
                             className="p-0.5 rounded transition-colors text-text-muted hover:text-text-primary hover:bg-dark-bgHover"
                             title="Expand Channel"
                           >
