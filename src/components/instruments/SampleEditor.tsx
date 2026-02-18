@@ -19,7 +19,7 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 import {
   Upload, Trash2, Music, Play, Square, AlertCircle,
-  ZoomIn, ZoomOut, Repeat, Sparkles, Wand2, RefreshCcw,
+  ZoomIn, ZoomOut, Repeat, Sparkles, Wand2, RefreshCcw, Zap,
   Scissors, Copy, ClipboardPaste, Crop, VolumeX, Volume2, Volume1,
   Undo2, Redo2, Eye, Download,
   ArrowLeft, ArrowRight, Maximize2, FlipHorizontal,
@@ -31,6 +31,7 @@ import { DEFAULT_GRANULAR } from '../../types/instrument';
 import * as Tone from 'tone';
 import { SampleEnhancerPanel } from './SampleEnhancerPanel';
 import { AmiResamplerModal } from './AmiResamplerModal';
+import { MpcResamplerModal } from './MpcResamplerModal';
 import { AmigaPalModal } from './AmigaPalModal';
 import { BeatSlicerPanel } from './BeatSlicerPanel';
 import type { ProcessedResult } from '../../utils/audio/SampleProcessing';
@@ -203,6 +204,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     setShowEnhancer,
     showResampleModal,
     setShowResampleModal,
+    showMpcResampleModal,
+    setShowMpcResampleModal,
     showBeatSlicer,
     setShowBeatSlicer,
     showAmigaPal,
@@ -893,6 +896,13 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                 Resample
               </button>
               <button
+                onClick={() => setShowMpcResampleModal(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20"
+              >
+                <Zap size={11} />
+                MPC
+              </button>
+              <button
                 onClick={() => setShowEnhancer(!showEnhancer)}
                 className={
                   'flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ' +
@@ -1356,6 +1366,17 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         onBufferProcessed={(r: ProcessedResult) => {
           setShowResampleModal(false);
           handleBufferProcessed(r, 'Ami');
+        }}
+      />
+
+      {/* ─── MpcResamplerModal ───────────────────────────────────── */}
+      <MpcResamplerModal
+        isOpen={showMpcResampleModal}
+        onClose={() => setShowMpcResampleModal(false)}
+        audioBuffer={audioBuffer}
+        onBufferProcessed={(r: ProcessedResult) => {
+          setShowMpcResampleModal(false);
+          handleBufferProcessed(r, 'MPC');
         }}
       />
 
