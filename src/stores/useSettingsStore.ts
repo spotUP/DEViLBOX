@@ -36,7 +36,7 @@ export const useSettingsStore = create<SettingsStore>()(
       linearInterpolation: true,
       masterTuning: 440,
       performanceQuality: 'high',
-      useBLEP: true,  // Default: BLEP enabled for better audio quality
+      useBLEP: false,  // Default: BLEP disabled (audio routing needs Tone.js integration work)
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
 
     // Actions
