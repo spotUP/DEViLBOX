@@ -17,9 +17,9 @@ interface DJPitchSliderProps {
   onPitchChange?: (semitones: number) => void;
 }
 
-const MIN_PITCH = -12;
-const MAX_PITCH = 12;
-const PITCH_RANGE = 24; // MAX - MIN
+const MIN_PITCH = -16;
+const MAX_PITCH = 16;
+const PITCH_RANGE = 32; // MAX - MIN
 const HANDLE_H = 24;   // px — height of the fader cap
 const EDGE_PAD = 4;    // px — keep handle inside housing at extremes
 
@@ -117,7 +117,7 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
 
       {/* Scale marks — overlaps housing, ticks point at groove */}
       <div className="absolute inset-y-0 z-10 pointer-events-none flex flex-col justify-between py-[4px]" style={{ left: 0, width: 18 }}>
-        {['+12','','+8','','+4','','0','','-4','','-8','','-12'].map((label, i) => {
+        {['+16','','+8','','+4','','0','','-4','','-8','','-16'].map((label, i) => {
           const isMajor = label !== '';
           return (
             <div key={i} className="flex items-center justify-end gap-0" style={{ flex: 1 }}>
