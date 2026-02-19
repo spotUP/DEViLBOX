@@ -178,6 +178,10 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
     this._send('playing', playing ? 1 : 0);
   }
 
+  setEditorOpen(open: boolean) {
+    this._send('editorOpen', open ? 1 : 0);
+  }
+
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = clamp01(value);

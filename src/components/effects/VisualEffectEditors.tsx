@@ -2073,6 +2073,16 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
   const configRef = useRef(effect);
   useEffect(() => { configRef.current = effect; }, [effect]);
 
+  // Notify the worklet that the editor is open so it produces audio for preview
+  useEffect(() => {
+    const node = getToneEngine().getMasterEffectNode(effect.id);
+    if (node && 'setEditorOpen' in node) (node as { setEditorOpen(o: boolean): void }).setEditorOpen(true);
+    return () => {
+      const n = getToneEngine().getMasterEffectNode(effect.id);
+      if (n && 'setEditorOpen' in n) (n as { setEditorOpen(o: boolean): void }).setEditorOpen(false);
+    };
+  }, [effect.id]);
+
   const p = (key: string, def: number) => getParam(effect, key, def);
 
   const sourceMode   = p('sourceMode', 0);
@@ -2290,6 +2300,16 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateParameter,
   onUpdateWet,
 }) => {
+  // Notify the worklet that the editor is open so it produces audio for preview
+  useEffect(() => {
+    const node = getToneEngine().getMasterEffectNode(effect.id);
+    if (node && 'setEditorOpen' in node) (node as { setEditorOpen(o: boolean): void }).setEditorOpen(true);
+    return () => {
+      const n = getToneEngine().getMasterEffectNode(effect.id);
+      if (n && 'setEditorOpen' in n) (n as { setEditorOpen(o: boolean): void }).setEditorOpen(false);
+    };
+  }, [effect.id]);
+
   const hiss            = getParam(effect, 'hiss',            50);
   const dust            = getParam(effect, 'dust',            50);
   const age             = getParam(effect, 'age',             50);
