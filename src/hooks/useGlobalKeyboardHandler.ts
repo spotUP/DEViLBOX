@@ -119,9 +119,30 @@ import { setStep10, setStep11, setStep12, setStep13, setStep14, setStep15, setSt
   increaseStep, decreaseStep, setOctave8, setOctave9
 } from '@engine/keyboard/commands/edit';
 
+import { useTrackerStore } from '@stores/useTrackerStore';
+import { useUIStore } from '@stores/useUIStore';
+import { getToneEngine } from '@engine/ToneEngine';
+
 // Singleton registry - populated once with all available commands
 const globalRegistry = new CommandRegistry();
 let registryInitialized = false;
+
+function setVolumeInCell(volume: number): boolean {
+  const { cursor, setCell } = useTrackerStore.getState();
+  setCell(cursor.channelIndex, cursor.rowIndex, { volume });
+  return true;
+}
+
+function adjustVolumeInCell(delta: number): () => boolean {
+  return () => {
+    const { cursor, patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+    const cell = patterns[currentPatternIndex]?.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
+    if (!cell) return true;
+    const newVol = Math.max(0, Math.min(64, (cell.volume || 0) + delta));
+    setCell(cursor.channelIndex, cursor.rowIndex, { volume: newVol });
+    return true;
+  };
+}
 
 function initializeRegistry() {
   if (registryInitialized) return;
@@ -563,20 +584,74 @@ function initializeRegistry() {
     { name: 'show_context_menu', contexts: ['global', 'pattern'], handler: showContextMenu, description: 'Show context menu' },
     { name: 'show_command_palette', contexts: ['global'], handler: showCommandPalette, description: 'Show command palette' },
     
-    // === REMAINING PLACEHOLDER COMMANDS ===
-    ...createPlaceholderCommands([
-      // Play variations not yet implemented
-      'play_song_from_order', 'play_block', 'continue_song', 'play_line', 'play_row_and_advance',
-      // Volume operations
-      'set_volume_10', 'set_volume_20', 'set_volume_30', 'set_volume_40', 'set_volume_50',
-      'set_volume_60', 'set_volume_70', 'set_volume_80', 'set_volume_90', 'set_volume_100',
-      'decrease_volume', 'increase_volume',
-      // Advanced features
-      'toggle_filter', 'kill_sample', 'kill_to_end', 'kill_to_start',
-      'toggle_multichannel_mode', 'set_block_length',
-      // Hold commands (OctaMED)
-      'set_hold_0', 'set_hold_1', 'set_hold_2', 'set_hold_3',
-    ]),
+    // === PLAY VARIANTS ===
+    { name: 'play_song_from_order', contexts: ['pattern', 'global'], handler: playPattern, description: 'Play from current pattern' },
+    { name: 'play_block', contexts: ['pattern', 'global'], handler: playPattern, description: 'Play current block/pattern' },
+    { name: 'continue_song', contexts: ['pattern', 'global'], handler: () => { playFromCursor(); return true; }, description: 'Continue from cursor' },
+    { name: 'play_line', contexts: ['pattern'], handler: () => { playRow(); return true; }, description: 'Play current line' },
+    { name: 'play_row_and_advance', contexts: ['pattern'], handler: () => { playRow(); cursorDown(); return true; }, description: 'Play row and advance' },
+
+    // === VOLUME ===
+    { name: 'set_volume_10', contexts: ['pattern'], handler: () => setVolumeInCell(7), description: 'Set volume 10%' },
+    { name: 'set_volume_20', contexts: ['pattern'], handler: () => setVolumeInCell(13), description: 'Set volume 20%' },
+    { name: 'set_volume_30', contexts: ['pattern'], handler: () => setVolumeInCell(19), description: 'Set volume 30%' },
+    { name: 'set_volume_40', contexts: ['pattern'], handler: () => setVolumeInCell(26), description: 'Set volume 40%' },
+    { name: 'set_volume_50', contexts: ['pattern'], handler: () => setVolumeInCell(32), description: 'Set volume 50%' },
+    { name: 'set_volume_60', contexts: ['pattern'], handler: () => setVolumeInCell(38), description: 'Set volume 60%' },
+    { name: 'set_volume_70', contexts: ['pattern'], handler: () => setVolumeInCell(45), description: 'Set volume 70%' },
+    { name: 'set_volume_80', contexts: ['pattern'], handler: () => setVolumeInCell(51), description: 'Set volume 80%' },
+    { name: 'set_volume_90', contexts: ['pattern'], handler: () => setVolumeInCell(58), description: 'Set volume 90%' },
+    { name: 'set_volume_100', contexts: ['pattern'], handler: () => setVolumeInCell(64), description: 'Set volume 100%' },
+    { name: 'decrease_volume', contexts: ['pattern'], handler: adjustVolumeInCell(-4), description: 'Decrease volume' },
+    { name: 'increase_volume', contexts: ['pattern'], handler: adjustVolumeInCell(4), description: 'Increase volume' },
+
+    // === FILTER ===
+    { name: 'toggle_filter', contexts: ['global'], handler: () => {
+      useUIStore.getState().setStatusMessage('Amiga filter: in Settings', false, 1500);
+      return true;
+    }, description: 'Toggle filter' },
+
+    // === KILL COMMANDS ===
+    { name: 'kill_sample', contexts: ['pattern'], handler: () => {
+      getToneEngine().releaseAll();
+      useUIStore.getState().setStatusMessage('All notes off', false, 800);
+      return true;
+    }, description: 'Kill sample' },
+    { name: 'kill_to_end', contexts: ['pattern'], handler: () => {
+      const { cursor, patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+      for (let r = cursor.rowIndex; r < pattern.length; r++) {
+        setCell(cursor.channelIndex, r, { note: 97, instrument: 0 });
+      }
+      useUIStore.getState().setStatusMessage('Killed to end', false, 800);
+      return true;
+    }, description: 'Kill notes to end of pattern' },
+    { name: 'kill_to_start', contexts: ['pattern'], handler: () => {
+      const { cursor, setCell } = useTrackerStore.getState();
+      for (let r = 0; r <= cursor.rowIndex; r++) {
+        setCell(cursor.channelIndex, r, { note: 97, instrument: 0 });
+      }
+      useUIStore.getState().setStatusMessage('Killed to start', false, 800);
+      return true;
+    }, description: 'Kill notes to start of pattern' },
+
+    // === MULTI-CHANNEL MODE ===
+    { name: 'toggle_multichannel_mode', contexts: ['global'], handler: () => {
+      const { multiChannelRecord, toggleMultiChannelRecord } = useTrackerStore.getState();
+      toggleMultiChannelRecord();
+      useUIStore.getState().setStatusMessage(`Multi-channel: ${!multiChannelRecord ? 'ON' : 'OFF'}`, false, 1000);
+      return true;
+    }, description: 'Toggle multi-channel record mode' },
+    { name: 'set_block_length', contexts: ['pattern'], handler: () => {
+      useUIStore.getState().setStatusMessage('Block length: resize in pattern list', false, 1500);
+      return true;
+    }, description: 'Set block length' },
+
+    // === OCTAMED HOLD (not applicable) ===
+    { name: 'set_hold_0', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Hold: OctaMED only', false, 1000); return true; }, description: 'Set hold 0' },
+    { name: 'set_hold_1', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Hold: OctaMED only', false, 1000); return true; }, description: 'Set hold 1' },
+    { name: 'set_hold_2', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Hold: OctaMED only', false, 1000); return true; }, description: 'Set hold 2' },
+    { name: 'set_hold_3', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Hold: OctaMED only', false, 1000); return true; }, description: 'Set hold 3' },
   ];
 
   commands.forEach(cmd => globalRegistry.register(cmd));
