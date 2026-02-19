@@ -1943,14 +1943,21 @@ export const TapeSaturationEditor: React.FC<VisualEffectEditorProps> = ({
 // VINYL NOISE
 // ============================================================================
 
-// Speed values map to exact turntable rotation frequency (RPM / 60 Hz, scaled ×10):
-//   33 RPM → 0.55 Hz → speed 5.5
-//   45 RPM → 0.75 Hz → speed 7.5
-//   78 RPM → 1.30 Hz → speed 13.0
+// Speed = exact turntable rotation frequency (RPM/60 Hz, scaled ×10 for 0-100 UI range):
+//   33 RPM → 0.55 Hz → speed 5.5 | 45 RPM → 0.75 Hz → speed 7.5 | 78 RPM → 1.30 Hz → speed 13.0
 const VINYL_RPM_PRESETS = [
-  { label: '33', rpm: 33, hiss: 15, dust: 40, age: 20, speed: 5.5  },
-  { label: '45', rpm: 45, hiss: 25, dust: 50, age: 35, speed: 7.5  },
-  { label: '78', rpm: 78, hiss: 70, dust: 65, age: 75, speed: 13.0 },
+  { label: '33', rpm: 33, speed: 5.5  },
+  { label: '45', rpm: 45, speed: 7.5  },
+  { label: '78', rpm: 78, speed: 13.0 },
+] as const;
+
+// Condition presets — set hiss/dust/age independently of RPM.
+// Mix and match: e.g. "78 RPM + New" or "33 RPM + Shellac".
+const VINYL_CONDITION_PRESETS = [
+  { label: 'New',     hiss:  8, dust:  5, age:  4 },  // fresh from the sleeve
+  { label: 'Played',  hiss: 20, dust: 30, age: 18 },  // well-loved but cared for
+  { label: 'Worn',    hiss: 38, dust: 52, age: 44 },  // garage-sale find
+  { label: 'Shellac', hiss: 68, dust: 62, age: 70 },  // classic 78 rpm shellac
 ] as const;
 
 export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
@@ -1963,33 +1970,52 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
   const age   = getParam(effect, 'age',   50);
   const speed = getParam(effect, 'speed', 0);
 
-  const activeRpm = VINYL_RPM_PRESETS.find(
-    (p) => p.hiss === Math.round(hiss) && p.dust === Math.round(dust) &&
-            p.age === Math.round(age)  && Math.abs(speed - p.speed) < 0.5
+  const activeRpm  = VINYL_RPM_PRESETS.find(
+    (p) => Math.abs(speed - p.speed) < 0.5
   )?.rpm ?? null;
 
-  const applyRpmPreset = (p: typeof VINYL_RPM_PRESETS[number]) => {
-    onUpdateParameter('hiss',  p.hiss);
-    onUpdateParameter('dust',  p.dust);
-    onUpdateParameter('age',   p.age);
-    onUpdateParameter('speed', p.speed);
-  };
+  const activeCond = VINYL_CONDITION_PRESETS.find(
+    (p) => p.hiss === Math.round(hiss) && p.dust === Math.round(dust) && p.age === Math.round(age)
+  )?.label ?? null;
 
   return (
     <div className="space-y-4">
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#d97706" title="Vinyl Noise" />
 
-        {/* RPM mode selector */}
-        <div className="flex gap-2 mb-4">
-          <span className="text-xs text-text-muted self-center mr-1">RPM</span>
+        {/* RPM selector — sets rotation speed (LFO frequency) only */}
+        <div className="flex gap-2 mb-2">
+          <span className="text-xs text-text-muted self-center w-16 shrink-0">RPM</span>
           {VINYL_RPM_PRESETS.map((p) => (
             <button
               key={p.rpm}
-              onClick={() => applyRpmPreset(p)}
+              onClick={() => onUpdateParameter('speed', p.speed)}
               className={[
                 'flex-1 py-1.5 rounded-lg text-xs font-mono font-bold border transition-all',
                 activeRpm === p.rpm
+                  ? 'bg-amber-700/70 border-amber-500 text-amber-100'
+                  : 'bg-black/40 border-border text-text-muted hover:border-amber-700 hover:text-amber-300',
+              ].join(' ')}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Condition selector — sets hiss/dust/age (record condition) independently */}
+        <div className="flex gap-2 mb-4">
+          <span className="text-xs text-text-muted self-center w-16 shrink-0">Condition</span>
+          {VINYL_CONDITION_PRESETS.map((p) => (
+            <button
+              key={p.label}
+              onClick={() => {
+                onUpdateParameter('hiss', p.hiss);
+                onUpdateParameter('dust', p.dust);
+                onUpdateParameter('age',  p.age);
+              }}
+              className={[
+                'flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all',
+                activeCond === p.label
                   ? 'bg-amber-700/70 border-amber-500 text-amber-100'
                   : 'bg-black/40 border-border text-text-muted hover:border-amber-700 hover:text-amber-300',
               ].join(' ')}
