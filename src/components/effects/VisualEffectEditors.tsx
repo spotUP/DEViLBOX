@@ -554,7 +554,7 @@ export const AutoPannerEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <EffectOscilloscope pre={pre} post={post} color="#10b981" />
+      <EffectOscilloscope pre={pre} post={post} color="#22c55e" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#22c55e" title="Auto Panner" />
         <div className="flex justify-around items-end">
@@ -1643,7 +1643,6 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateParameter,
   onUpdateWet,
 }) => {
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
   const mode = getParam(effect, 'mode', 4);
   const rate = getParam(effect, 'rate', 300);
   const intensity = getParam(effect, 'intensity', 0.5);
@@ -1652,6 +1651,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
   const bass = getParam(effect, 'bass', 0);
   const treble = getParam(effect, 'treble', 0);
   const synced = isEffectBpmSynced(effect.parameters);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
@@ -2062,7 +2062,6 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
 }) => {
   const configRef = useRef(effect);
   useEffect(() => { configRef.current = effect; }, [effect]);
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   const p = (key: string, def: number) => getParam(effect, key, def);
 
@@ -2071,6 +2070,7 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
   const switchBranch = p('switchBranch', 0);
   const sampleIndex  = p('sampleIndex', 0);
   const activeCat    = TUMULT_CATEGORIES.find(c => sampleIndex >= c.start && sampleIndex <= c.end);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   const set = useCallback((key: string, value: number) => {
     onUpdateParameter(key, value);
@@ -2280,7 +2280,6 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateParameter,
   onUpdateWet,
 }) => {
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
   const hiss            = getParam(effect, 'hiss',            50);
   const dust            = getParam(effect, 'dust',            50);
   const age             = getParam(effect, 'age',             50);
@@ -2294,6 +2293,7 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
   const dropout         = getParam(effect, 'dropout',         0);
   const warp            = getParam(effect, 'warp',            0);
   const eccentricity    = getParam(effect, 'eccentricity',    0);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   const activeRpm  = VINYL_RPM_PRESETS.find(
     (p) => Math.abs(speed - p.speed) < 0.5
