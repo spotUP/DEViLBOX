@@ -39,6 +39,7 @@ import { MoogFilterEffect, MoogFilterModel, MoogFilterMode } from './effects/Moo
 import { MVerbEffect } from './effects/MVerbEffect';
 import { LeslieEffect } from './effects/LeslieEffect';
 import { SpringReverbEffect } from './effects/SpringReverbEffect';
+import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
 import { isEffectBpmSynced, getEffectSyncDivision, computeSyncedValue, SYNCABLE_EFFECT_PARAMS } from './bpmSync';
 import { SidechainCompressor } from './effects/SidechainCompressor';
 import { ArpeggioEngine } from './ArpeggioEngine';
@@ -172,6 +173,8 @@ export function getDefaultEffectParameters(type: string): Record<string, number 
       return { speed: 0.0, hornRate: 6.8, drumRate: 5.9, hornDepth: 0.7, drumDepth: 0.5, doppler: 0.5, width: 0.8, acceleration: 0.5 };
     case 'SpringReverb':
       return { decay: 0.6, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.7 };
+    case 'VinylNoise':
+      return { hiss: 50, dust: 50, age: 50, speed: 20 };
     default:
       return {};
   }
@@ -1526,6 +1529,18 @@ export class InstrumentFactory {
           wet: wetValue,
         });
         break;
+
+      case 'VinylNoise': {
+        const node = new VinylNoiseEffect({
+          hiss:  (Number(p.hiss)  || 50) / 100,
+          dust:  (Number(p.dust)  || 50) / 100,
+          age:   (Number(p.age)   || 50) / 100,
+          speed: (Number(p.speed) || 20) / 100,
+          wet: wetValue,
+        });
+        (node as Tone.ToneAudioNode & { _fxType?: string })._fxType = 'VinylNoise';
+        return node;
+      }
 
       // WAM 2.0 effects
       case 'WAMBigMuff':
