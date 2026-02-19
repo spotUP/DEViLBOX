@@ -100,7 +100,6 @@ const restoreState = (state: TabState) => {
   // Restore automation
   useAutomationStore.getState().loadCurves(state.automationCurves);
 
-  console.log('[TabsStore] Restored state for tab');
 };
 
 /**

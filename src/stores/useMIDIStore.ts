@@ -364,8 +364,6 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle CC messages
               if (message.type === 'cc' && message.cc !== undefined && message.value !== undefined) {
-                // Debug: Log all CC messages to help diagnose TD-3 issues
-                console.log(`[MIDI CC] CC ${message.cc} = ${message.value} (ch ${message.channel})`);
 
                 // Handle Mod Wheel (CC 1) -> Y-axis on MPK Mini joystick
                 if (message.cc === 1) {
@@ -401,7 +399,6 @@ export const useMIDIStore = create<MIDIStore>()(
 
                 // Find mapping for this CC (legacy/manual mapping)
                 const mapping = store.ccMappings.find((m) => m.ccNumber === message.cc);
-                console.log(`[MIDI CC] Mapping for CC ${message.cc}:`, mapping ? mapping.parameter : 'NONE');
 
                 if (mapping) {
                   // Convert CC value (0-127) to parameter range
@@ -424,7 +421,6 @@ export const useMIDIStore = create<MIDIStore>()(
                   // Call registered handler for this parameter (using external Map)
                   const handler = ccHandlersMap.get(mapping.parameter as TB303Parameter);
                   if (handler) {
-                    console.log(`[MIDI CC] Calling handler for ${mapping.parameter} with value ${paramValue.toFixed(2)}`);
                     handler(paramValue);
                   } else {
                     console.warn(`[MIDI CC] No handler registered for ${mapping.parameter}`);

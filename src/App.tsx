@@ -232,9 +232,7 @@ function App() {
 
   // Apply auto-compact mode on small screens (runs once on mount)
   useEffect(() => {
-    console.log('[App] Applying auto-compact, current tb303Collapsed:', useUIStore.getState().tb303Collapsed);
     applyAutoCompact();
-    console.log('[App] After auto-compact, tb303Collapsed:', useUIStore.getState().tb303Collapsed);
   }, [applyAutoCompact]);
 
   const { save: saveProject } = useProjectPersistence();
@@ -254,7 +252,6 @@ function App() {
         setContextState(engine.getContextState() as 'suspended' | 'running' | 'closed');
         setInitialized(true);
 
-        console.log('ToneEngine initialized');
         
         // Show hardware preset notification
         useUIStore.getState().setStatusMessage('HARDWARE PRESETS READY', false, 5000);
@@ -274,7 +271,6 @@ function App() {
 
     const engine = getToneEngine();
     engine.setBlepEnabled(useBLEP);
-    console.log(`[App] BLEP ${useBLEP ? 'enabled' : 'disabled'}`);
   }, [useBLEP, initialized]);
 
   // Get undo/redo functions from history store
@@ -460,7 +456,6 @@ function App() {
           const engine = getToneEngine();
           await engine.init();
           setContextState(engine.getContextState() as 'suspended' | 'running' | 'closed');
-          console.log('Audio engine resumed via first interaction');
         } catch (error) {
           console.error('Failed to resume audio engine:', error);
         }
@@ -707,7 +702,6 @@ function App() {
 
   // Unified file loading handler for drag and drop
   const handleFileDrop = useCallback(async (file: File) => {
-    console.log('[App] handleFileDrop called with file:', file.name, 'type:', file.type, 'size:', file.size);
     const { addInstrument } = useInstrumentStore.getState();
     
     try {
@@ -715,11 +709,9 @@ function App() {
       
       // Check if it's a song format that will replace current project
       const isSongFormat = filename.match(/\.(dbx|mid|midi|mod|xm|it|s3m|fur|mptm|669|amf|ams|dbm|dmf|dsm|far|ftm|gdm|imf|mdl|med|mt2|mtm|okt|psm|ptm|sfx|stm|ult|umx)$/);
-      console.log('[App] isSongFormat:', isSongFormat, 'filename:', filename);
       
       if (isSongFormat) {
         // Show confirmation dialog for song formats
-        console.log('[App] Setting pending song file and showing confirmation dialog');
         setPendingSongFile(file);
         setShowSongLoadConfirm(true);
         return;
@@ -755,15 +747,13 @@ function App() {
             const newInst = createDefaultTB303Instrument();
             addInst(newInst);
             tb303Instrument = newInst;
-            console.log('[FileDrop] Auto-created TB-303 instrument:', newInst.id);
           }
-          
+
           updateInstrument(tb303Instrument.id, {
             tb303: { ...tb303Instrument.tb303, ...presetConfig }
           });
-          
+
           notify.success(`Loaded DB303 preset: ${file.name}`);
-          console.log('[FileDrop] Applied preset to instrument:', tb303Instrument.id, presetConfig);
           
         } else if (isPattern) {
           // Import pattern - find or create TB-303 instrument
@@ -779,9 +769,8 @@ function App() {
             const newInst = createDefaultTB303Instrument();
             addInst(newInst);
             tb303Instrument = newInst;
-            console.log('[FileDrop] Auto-created TB-303 instrument:', newInst.id);
           }
-          
+
           const patternName = file.name.replace('.xml', '') || 'Imported Pattern';
           const { pattern: importedPattern, tempo } = parseDb303Pattern(text, patternName, tb303Instrument.id);
           
@@ -825,7 +814,6 @@ function App() {
           const newInst = createDefaultTB303Instrument();
           addInst(newInst);
           tb303Instrument = newInst;
-          console.log('[FileDrop] Auto-created TB-303 instrument for SQS:', newInst.id);
         }
         
         const buffer = await file.arrayBuffer();

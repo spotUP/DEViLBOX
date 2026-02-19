@@ -350,7 +350,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     updateInstrument: (id, updates) => {
-      console.log('[useInstrumentStore] updateInstrument called:', { id, updates, windowContext: window === window.parent ? 'main' : 'popup' });
       const currentInstrument = get().instruments.find((inst) => inst.id === id);
 
       // Check what's changing
@@ -552,7 +551,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
             // Furnace instruments - re-encode and re-upload when parameters change
             if (updatedInstrument.synthType?.startsWith('Furnace') && updatedInstrument.furnace && updates.furnace) {
-              console.log('[InstrumentStore] Furnace parameters changed, re-encoding instrument');
               engine.updateFurnaceInstrument(id, updatedInstrument);
               return; // Handled
             }
@@ -875,7 +873,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
             return get().bakeInstrument(id, 'lite');
           }
 
-          console.log(`[InstrumentStore] Pro-baking ${usedNotes.length} unique notes...`);
           const multiMap: Record<string, string> = {};
 
           for (const note of usedNotes) {
@@ -1005,7 +1002,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
       if (instrumentsToBake.length === 0) return;
 
-      console.log(`[InstrumentStore] Auto-baking ${instrumentsToBake.length} instruments...`);
 
       for (const inst of instrumentsToBake) {
         const preserved = inst.metadata!.preservedSynth!;
@@ -1515,9 +1511,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
         try {
           const engine = getToneEngine();
           engine.invalidateInstrument(id);
-          console.log(
-            `[InstrumentStore] Transformed instrument ${id} from Sampler to ${synthType}`
-          );
         } catch (error) {
           console.warn('[InstrumentStore] Could not invalidate instrument:', error);
         }
@@ -1813,7 +1806,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
           });
         }
 
-        console.log(`[InstrumentStore] Created ${newInstrumentIds.length} reference-based sliced instruments`);
         return newInstrumentIds;
       } catch (error) {
         console.error('[InstrumentStore] Failed to create sliced instruments:', error);
@@ -1941,7 +1933,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
           state.currentInstrumentId = drumKitId;
         });
 
-        console.log(`[InstrumentStore] Created DrumKit ${drumKitId} with ${keymap.length} slices`);
         return drumKitId;
       } catch (error) {
         console.error('[InstrumentStore] Failed to create drum kit from slices:', error);

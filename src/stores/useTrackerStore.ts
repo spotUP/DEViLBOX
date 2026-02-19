@@ -1927,6 +1927,8 @@ export const useTrackerStore = create<TrackerStore>()(
           cloned.id = idGenerator.generate('pattern');
           cloned.name = `${original.name} (Copy)`;
           state.patterns.splice(index + 1, 0, cloned);
+          // Shift patternOrder indices that are > index to account for the splice
+          state.patternOrder = state.patternOrder.map((p) => (p > index ? p + 1 : p));
           state.currentPatternIndex = index + 1;
         }
       }),
