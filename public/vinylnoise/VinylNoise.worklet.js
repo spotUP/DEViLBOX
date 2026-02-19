@@ -214,10 +214,10 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
         const hiss = this._noiseLowpass.process(noise) * 0.01;
         const dust = this._hissHighpass.process(signal);
 
-        // LFO modulates hiss gain ±25% (1.0 + 0.25·sin) so hiss never goes
-        // to zero or inverts — it breathes gently with the platter rotation.
-        const hissMod = lfoFreq > 0 ? 1.0 + 0.25 * lfoOut : 1.0;
-        const output = hiss * hissGain * hissMod + dust * dustGain;
+        // Hiss is a constant noise floor (stylus always in groove — no LFO).
+        // LFO modulates only the crackle/dust density, not the hiss level.
+        const dustMod = lfoFreq > 0 ? Math.max(0, lfoOut) : 1.0;
+        const output = hiss * hissGain + dust * dustGain * dustMod;
 
         outL[i] = output;
         outR[i] = output;
