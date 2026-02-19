@@ -216,7 +216,23 @@
       "Cmd+Shift+Tab": "prev_focus",
       
       "Tab": "next_channel",
-      "Shift+Tab": "prev_channel"
+      "Shift+Tab": "prev_channel",
+
+      "Cmd+Shift+1": "set_quantize_1",
+      "Cmd+Shift+2": "set_quantize_2",
+      "Cmd+Shift+3": "set_quantize_3",
+      "Cmd+Shift+4": "set_quantize_4",
+      "Cmd+Shift+5": "set_quantize_5",
+      "Cmd+Shift+6": "set_quantize_6",
+      "Cmd+Shift+7": "set_quantize_7",
+      "Cmd+Shift+8": "set_quantize_8",
+      "Cmd+Shift+9": "set_quantize_9",
+
+      "Cmd+Delete": "delete_pattern",
+      "Cmd+Insert": "insert_pattern",
+
+      "A": "insert_note_off_a",
+      "Shift+Insert": "paste_selection"
     }
   }
 }

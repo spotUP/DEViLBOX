@@ -141,7 +141,63 @@
       "Return": "play_pattern",
       "Backspace": "delete_note",
       "Cmd+Z": "undo",
-      "Cmd+Shift+Z": "redo"
+      "Cmd+Shift+Z": "redo",
+
+      "CapsLock": "toggle_key_repeat",
+
+      "Shift+F3": "cut_channel",
+      "Shift+F4": "copy_channel",
+      "Shift+F5": "paste_channel",
+
+      "Alt+F6": "play_pattern_from_f6",
+      "Alt+F7": "play_pattern_from_f7",
+      "Alt+F8": "play_pattern_from_f8",
+      "Alt+F9": "play_pattern_from_f9",
+      "Alt+F10": "play_pattern_from_f10",
+      "Cmd+F6": "record_pattern_from_f6",
+      "Cmd+F7": "record_pattern_from_f7",
+      "Cmd+F8": "record_pattern_from_f8",
+      "Cmd+F9": "record_pattern_from_f9",
+      "Cmd+F10": "record_pattern_from_f10",
+
+      "F11": "toggle_fullscreen",
+      "Alt+F11": "toggle_vu_meter_mode",
+      "F12": "toggle_filter_model",
+      "Shift+F12": "toggle_panning_mode",
+      "Cmd+F12": "toggle_timing_mode",
+
+      "Shift+Return": "insert_line",
+      "Alt+Return": "insert_line_all_channels",
+      "Cmd+Return": "insert_command_line",
+      "Insert": "paste_sample",
+      "Delete": "delete_sample",
+      "Shift+Backspace": "delete_line",
+      "Alt+Backspace": "delete_line_all_channels",
+      "Cmd+Backspace": "delete_command_line",
+
+      "Apostrophe": "prev_auto_instrument_slot",
+      "Backslash": "next_auto_instrument_slot",
+      "Alt+Backslash": "play_note_on_line",
+
+      "Alt+0": "set_multi_channel_0",
+      "Alt+1": "set_multi_channel_1",
+      "Alt+2": "set_multi_channel_2",
+      "Alt+3": "set_multi_channel_3",
+
+      "Numpad0": "set_sample_0",
+      "Numpad1": "set_sample_1",
+      "Numpad2": "set_sample_2",
+      "Numpad3": "set_sample_3",
+      "Numpad4": "set_sample_4",
+      "Numpad5": "set_sample_5",
+      "Numpad6": "set_sample_6",
+      "Numpad7": "set_sample_7",
+      "Numpad8": "set_sample_8",
+      "Numpad9": "set_sample_9",
+      "NumpadDivide": "set_sample_bank_a",
+      "NumpadMultiply": "set_sample_bank_b",
+      "NumpadMinus": "set_sample_bank_c",
+      "NumpadPlus": "sample_bank_modifier"
     }
   }
 }

@@ -206,7 +206,55 @@
       "Cmd+Shift+I": "clear_instrument_name",
       "Cmd+R": "select_instrument_repeat",
       
-      "Tab": "highlight_current_line"
+      "Tab": "highlight_current_line",
+
+      "Cmd+Shift+0": "pick_note_0",
+      "Cmd+Shift+1": "pick_note_1",
+      "Cmd+Shift+2": "pick_note_2",
+      "Cmd+Shift+3": "pick_note_3",
+      "Cmd+Shift+4": "pick_note_4",
+      "Cmd+Shift+5": "pick_note_5",
+      "Cmd+Shift+6": "pick_note_6",
+      "Cmd+Shift+7": "pick_note_7",
+      "Cmd+Shift+8": "pick_note_8",
+      "Cmd+Shift+9": "pick_note_9",
+
+      "Shift+0": "enter_programmed_note_0",
+      "Shift+1": "enter_programmed_note_1",
+      "Shift+2": "enter_programmed_note_2",
+      "Shift+3": "enter_programmed_note_3",
+      "Shift+4": "enter_programmed_note_4",
+      "Shift+5": "enter_programmed_note_5",
+      "Shift+6": "enter_programmed_note_6",
+      "Shift+7": "enter_programmed_note_7",
+      "Shift+8": "enter_programmed_note_8",
+      "Shift+9": "enter_programmed_note_9",
+
+      "Cmd+F": "display_free_memory",
+      "Cmd+Shift+F": "toggle_low_pass_filter",
+      "Cmd+M": "reset_midi_effects",
+
+      "Cmd+Numpad1": "sequence_goto_end",
+      "Cmd+Numpad2": "sequence_scroll_down",
+      "Cmd+Numpad4": "sequence_decrease_block",
+      "Cmd+Numpad5": "sequence_insert_current",
+      "Cmd+Numpad6": "sequence_increase_block",
+      "Cmd+Numpad7": "sequence_goto_top",
+      "Cmd+Numpad8": "sequence_scroll_up",
+      "Cmd+Numpad0": "sequence_insert_zero",
+      "Cmd+NumpadDecimal": "sequence_delete_block",
+
+      "Alt+Numpad1": "instrument_goto_end",
+      "Alt+Numpad2": "instrument_scroll_down",
+      "Alt+Numpad3": "instrument_quick_scroll_down",
+      "Alt+Numpad7": "instrument_goto_top",
+      "Alt+Numpad8": "instrument_scroll_up",
+      "Alt+Numpad9": "instrument_quick_scroll_up",
+
+      "Shift+Alt+Right": "instrument_16_forward",
+      "Shift+Alt+Left": "instrument_16_backward",
+
+      "A": "insert_hold_symbol_a"
     }
   }
 }
