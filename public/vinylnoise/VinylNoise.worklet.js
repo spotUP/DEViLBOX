@@ -165,12 +165,17 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
     const dustDB   = this._dustVolume * 60 - 30;
     const hissGain = VinylNoiseProcessor._dBToGain(hissDB + 5.0);
     const dustGain = VinylNoiseProcessor._dBToGain(dustDB - 6.0);
-    const lfoFreqMax = this._speed * 10; // 0..10 Hz
+
+    // LFO frequency = exact turntable rotation rate (RPM/60 Hz).
+    // At 33 RPM: 0.55 Hz, 45 RPM: 0.75 Hz, 78 RPM: 1.3 Hz.
+    // speed param: 0-1 → 0-10 Hz (so speed=0.055 → 0.55 Hz for 33 RPM).
+    // Fixed per block (not random) so hiss cycles once per platter revolution.
+    const lfoFreq = this._speed * 10; // Hz
+    const lfoPhaseInc = (2 * Math.PI * lfoFreq) / sampleRate;
 
     for (let i = 0; i < numSamples; i++) {
-      // LFO (sine, frequency randomly modulated each sample like viator-rust)
-      const lfoFreq = Math.random() * lfoFreqMax;
-      this._lfoPhase += (2 * Math.PI * lfoFreq) / sampleRate;
+      // Advance LFO phase at turntable rotation rate
+      this._lfoPhase += lfoPhaseInc;
       // Wrap phase to [0, 2π] to prevent floating-point precision loss in long sessions
       if (this._lfoPhase > 2 * Math.PI) this._lfoPhase -= 2 * Math.PI;
       const lfoOut = Math.sin(this._lfoPhase);
