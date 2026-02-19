@@ -272,7 +272,56 @@
       "Cmd+Tab": "switch_to_order_list",
       "Alt+B": "open_effect_visualizer",
       "Cmd+P": "show_playback_time",
-      "Alt+Q": "quantize_settings"
+      "Alt+Q": "quantize_settings",
+
+      "Shift+Insert": "paste_selection",
+      "Cmd+Shift+M": "toggle_clipboard_manager",
+      "Cmd+Shift+Left": "cycle_prev_clipboard",
+      "Cmd+Shift+Right": "cycle_next_clipboard",
+
+      "Shift+Period": "clear_field_it_style",
+      "Cmd+Delete": "clear_row_and_step",
+      "Shift+Delete": "clear_field_and_step_it",
+      "Cmd+Backspace": "delete_rows_all_channels",
+      "Alt+Backspace": "delete_rows_global",
+      "Cmd+Insert": "insert_rows_all_channels",
+      "Alt+Insert": "insert_rows_global",
+
+      "Cmd+1": "channel_record_select",
+      "Cmd+2": "channel_split_record_select",
+      "Cmd+R": "reset_channel",
+
+      "Cmd+Alt+Minus": "prev_sequence",
+      "Cmd+Alt+Plus": "next_sequence",
+
+      "Alt+PageDown": "cursor_down_by_beat",
+      "Alt+PageUp": "cursor_up_by_beat",
+      "Cmd+Alt+PageDown": "snap_to_beat_down",
+      "Cmd+Alt+PageUp": "snap_to_beat_up",
+      "Cmd+Alt+Home": "goto_first_row_first_channel",
+      "Cmd+Alt+End": "goto_last_row_last_channel",
+
+      "Cmd+Slash": "toggle_plugin_editor",
+      "Cmd+Alt+P": "toggle_channel_plugin_editor",
+      "Shift+Alt+P": "show_pattern_properties",
+      "Cmd+E": "split_keyboard_dialog",
+
+      "Backtick": "insert_note_cut",
+      "Equals": "insert_note_off",
+      "Shift+Equals": "insert_note_fade",
+      "Shift+Minus": "insert_param_control",
+      "Minus": "insert_smooth_param_control",
+
+      "0": "set_octave_0",
+      "1": "set_octave_1",
+      "2": "set_octave_2",
+      "3": "set_octave_3",
+      "4": "set_octave_4",
+      "5": "set_octave_5",
+      "6": "set_octave_6",
+      "7": "set_octave_7",
+      "8": "set_octave_8",
+      "9": "set_octave_9"
     }
   }
 }
