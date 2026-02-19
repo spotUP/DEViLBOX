@@ -696,7 +696,7 @@ export const ChebyshevEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateParameter,
   onUpdateWet,
 }) => {
-  const order = getParam(effect, 'order', 50);
+  const order = getParam(effect, 'order', 2);
 
   return (
     <div className="space-y-4">
@@ -2850,6 +2850,324 @@ export const SpringReverbEditor: React.FC<VisualEffectEditorProps> = ({
 };
 
 // ============================================================================
+// KISS OF SHAME EDITOR — pixel-perfect KoS tape deck UI
+// ============================================================================
+
+interface FilmstripKnobProps {
+  src: string;
+  frameCount: number;
+  frameW: number;
+  frameH: number;
+  value: number;         // 0-1 normalized
+  onChange: (v: number) => void;
+  defaultValue?: number; // double-click reset target (0-1), defaults to 0.5
+  style?: React.CSSProperties;
+}
+
+const FilmstripKnob: React.FC<FilmstripKnobProps> = ({
+  src, frameCount, frameW, frameH, value, onChange, defaultValue = 0.5, style,
+}) => {
+  const frame = Math.round(value * (frameCount - 1));
+  const bgY   = -(frame * frameH);
+
+  const startRef = useRef<{ startY: number; startValue: number } | null>(null);
+
+  // Pointer events give us correct pointerId for setPointerCapture and work
+  // cross-browser (Firefox/Safari don't expose pointerId on MouseEvent).
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    startRef.current = { startY: e.clientY, startValue: value };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, [value]);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!startRef.current) return;
+    const delta = startRef.current.startY - e.clientY;
+    const newVal = Math.max(0, Math.min(1, startRef.current.startValue + delta / 150));
+    onChange(newVal);
+  }, [onChange]);
+
+  const onPointerUp = useCallback(() => {
+    startRef.current = null;
+  }, []);
+
+  const onDblClick = useCallback(() => {
+    onChange(defaultValue);
+  }, [onChange, defaultValue]);
+
+  return (
+    <div
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onDoubleClick={onDblClick}
+      style={{
+        width: frameW,
+        height: frameH,
+        backgroundImage: `url(${src})`,
+        backgroundSize: `${frameW}px auto`,
+        backgroundPositionY: `${bgY}px`,
+        backgroundRepeat: 'no-repeat',
+        cursor: 'ns-resize',
+        userSelect: 'none',
+        position: 'absolute',
+        ...style,
+      }}
+    />
+  );
+};
+
+const KOS_PRESETS = [
+  { label: 'New Tape', drive: 20, character: 30, bias: 25, shame: 10, hiss: 15 },
+  { label: 'Studio',   drive: 40, character: 45, bias: 45, shame: 25, hiss: 30 },
+  { label: 'Home Deck',drive: 60, character: 60, bias: 60, shame: 55, hiss: 50 },
+  { label: 'Worn',     drive: 80, character: 70, bias: 80, shame: 80, hiss: 75 },
+];
+
+export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
+  effect,
+  onUpdateParameter,
+  onUpdateWet,
+}) => {
+  const [showReels, setShowReels] = useState(true);
+  const [reelFrame, setReelFrame] = useState(0);
+
+  const containerH = showReels ? 703 : 266;
+  const yOff       = showReels ? 0 : -437;
+
+  // Animate reels at ~20fps
+  useEffect(() => {
+    if (!showReels) return;
+    const id = setInterval(() => setReelFrame(f => (f + 1) % 31), 50);
+    return () => clearInterval(id);
+  }, [showReels]);
+
+  const drive     = getParam(effect, 'drive',     30) / 100;
+  const character = getParam(effect, 'character', 40) / 100;
+  const bias      = getParam(effect, 'bias',      40) / 100;
+  const shame     = getParam(effect, 'shame',     20) / 100;
+  const hiss      = getParam(effect, 'hiss',      20) / 100;
+  const speed     = getParam(effect, 'speed',      0);
+  const wet       = effect.wet / 100;
+
+  const BASE = '/kissofshame/ui/';
+
+  const reelBgY = -(reelFrame * 322);
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        width: 960,
+        height: containerH,
+        overflow: 'hidden',
+        userSelect: 'none',
+        cursor: 'default',
+      }}
+      onDoubleClick={(e) => {
+        // Only toggle if double-click is on the background, not a knob
+        if ((e.target as HTMLElement).tagName === 'DIV' && !(e.target as HTMLElement).dataset.knob) {
+          setShowReels(r => !r);
+        }
+      }}
+    >
+      {/* Background face */}
+      <img
+        src={BASE + (showReels ? 'FaceWithReels.png' : 'Face.png')}
+        style={{ position: 'absolute', top: 0, left: 0, width: 960, height: containerH, pointerEvents: 'none' }}
+        alt=""
+      />
+
+      {/* Spinning reels (only in full mode) */}
+      {showReels && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: 960,
+            height: 322,
+            backgroundImage: `url(${BASE}Wheels.png)`,
+            backgroundSize: '960px auto',
+            backgroundPositionY: `${reelBgY}px`,
+            backgroundRepeat: 'no-repeat',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {/* Input (drive) knob */}
+      <FilmstripKnob
+        src={BASE + 'InputKnob.png'}
+        frameCount={65} frameW={116} frameH={116}
+        value={drive}
+        onChange={(v) => onUpdateParameter('drive', Math.round(v * 100))}
+        defaultValue={0.3}
+        style={{ left: 104, top: 521 + yOff }}
+      />
+
+      {/* Shame decorative layer (ShameKnob.png — shows same value as shame knob) */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 401,
+          top: 491 + yOff,
+          width: 174,
+          height: 163,
+          backgroundImage: `url(${BASE}ShameKnob.png)`,
+          backgroundSize: '174px auto',
+          backgroundPositionY: `${-(Math.round(shame * 64) * 163)}px`,
+          backgroundRepeat: 'no-repeat',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Shame interactive knob (ShameCross.png — on top of ShameKnob) */}
+      <FilmstripKnob
+        src={BASE + 'ShameCross.png'}
+        frameCount={65} frameW={174} frameH={163}
+        value={shame}
+        onChange={(v) => onUpdateParameter('shame', Math.round(v * 100))}
+        defaultValue={0.2}
+        style={{ left: 401, top: 491 + yOff }}
+      />
+
+      {/* Age (bias) knob */}
+      <FilmstripKnob
+        src={BASE + 'AgeKnob.png'}
+        frameCount={65} frameW={74} frameH={72}
+        value={bias}
+        onChange={(v) => onUpdateParameter('bias', Math.round(v * 100))}
+        defaultValue={0.4}
+        style={{ left: 350, top: 455 + yOff }}
+      />
+
+      {/* Hiss knob */}
+      <FilmstripKnob
+        src={BASE + 'HissKnob.png'}
+        frameCount={65} frameW={78} frameH={72}
+        value={hiss}
+        onChange={(v) => onUpdateParameter('hiss', Math.round(v * 100))}
+        defaultValue={0.2}
+        style={{ left: 547, top: 455 + yOff }}
+      />
+
+      {/* Blend (wet) knob */}
+      <FilmstripKnob
+        src={BASE + 'BlendKnob.png'}
+        frameCount={65} frameW={78} frameH={72}
+        value={wet}
+        onChange={(v) => onUpdateWet(Math.round(v * 100))}
+        defaultValue={0.5}
+        style={{ left: 705, top: 455 + yOff }}
+      />
+
+      {/* Output (character) knob */}
+      <FilmstripKnob
+        src={BASE + 'OutputKnob.png'}
+        frameCount={65} frameW={122} frameH={116}
+        value={character}
+        onChange={(v) => onUpdateParameter('character', Math.round(v * 100))}
+        defaultValue={0.4}
+        style={{ left: 757, top: 521 + yOff }}
+      />
+
+      {/* VU Meter L — decorative static frame 0 */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 251,
+          top: 518 + yOff,
+          width: 108,
+          height: 108,
+          backgroundImage: `url(${BASE}VUMeterL.png)`,
+          backgroundSize: '108px auto',
+          backgroundPositionY: '0px',
+          backgroundRepeat: 'no-repeat',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* VU Meter R — decorative static frame 0 */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 605,
+          top: 518 + yOff,
+          width: 110,
+          height: 108,
+          backgroundImage: `url(${BASE}VUMeterR.png)`,
+          backgroundSize: '110px auto',
+          backgroundPositionY: '0px',
+          backgroundRepeat: 'no-repeat',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* TapeType button — S-111 vs A-456 */}
+      <div
+        onClick={() => onUpdateParameter('speed', speed === 0 ? 1 : 0)}
+        style={{
+          position: 'absolute',
+          left: 233,
+          top: 610 + yOff,
+          width: 42,
+          height: 39,
+          backgroundImage: `url(${BASE}TapeType.png)`,
+          backgroundSize: '42px auto',
+          backgroundPositionY: speed === 1 ? '-39px' : '0px',
+          backgroundRepeat: 'no-repeat',
+          cursor: 'pointer',
+        }}
+      />
+
+      {/* Environments — preset picker */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 388,
+          top: 654 + yOff,
+          width: 183,
+          height: 192,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Background Environments filmstrip image */}
+        <img
+          src={BASE + 'Environments.png'}
+          style={{ position: 'absolute', top: 0, left: 0, width: 183, height: 192, pointerEvents: 'none' }}
+          alt=""
+        />
+        {/* 4 preset buttons overlaid, stacked vertically */}
+        {KOS_PRESETS.map((preset, i) => (
+          <button
+            key={preset.label}
+            onClick={() => {
+              onUpdateParameter('drive',     preset.drive);
+              onUpdateParameter('character', preset.character);
+              onUpdateParameter('bias',      preset.bias);
+              onUpdateParameter('shame',     preset.shame);
+              onUpdateParameter('hiss',      preset.hiss);
+            }}
+            style={{
+              position: 'absolute',
+              top: i * 48,
+              left: 0,
+              width: 183,
+              height: 48,
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            title={preset.label}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
 // EFFECT EDITOR FACTORY
 // ============================================================================
 
@@ -2881,6 +3199,7 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   TapeSaturation: TapeSaturationEditor,
   Tumult: TumultEditor,
   VinylNoise: VinylNoiseEditor,
+  TapeSimulator: KissOfShameEditor,
   SidechainCompressor: SidechainCompressorEditor,
   SpaceyDelayer: SpaceyDelayerEditor,
   RETapeEcho: RETapeEchoEditor,
@@ -2954,6 +3273,7 @@ export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accen
   VinylNoise:          { bg: '#1a1008', bgEnd: '#120a04', accent: '#d97706', border: '#2a1a08' },
   SidechainCompressor: { bg: '#081a10', bgEnd: '#04120a', accent: '#10b981', border: '#0a2a18' },
   RETapeEcho:          { bg: '#2a0808', bgEnd: '#1a0404', accent: '#dc2626', border: '#3a1010' },
+  TapeSimulator:       { bg: '#1a1208', bgEnd: '#120e04', accent: '#b45309', border: '#2a1e08' },
   MoogFilter:          { bg: '#1a1508', bgEnd: '#120e04', accent: '#f59e0b', border: '#2a2008' },
   MVerb:               { bg: '#140a22', bgEnd: '#0c061a', accent: '#7c3aed', border: '#201432' },
   Leslie:              { bg: '#201408', bgEnd: '#180e04', accent: '#f97316', border: '#301e0a' },
@@ -3024,6 +3344,7 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
     VinylNoise: <Disc size={18} className="text-white" />,
     SidechainCompressor: <Gauge size={18} className="text-white" />,
     RETapeEcho: <Disc size={18} className="text-white" />,
+    TapeSimulator: <Disc size={18} className="text-white" />,
     MoogFilter: <Sliders size={18} className="text-white" />,
     MVerb: <Waves size={18} className="text-white" />,
     Leslie: <Radio size={18} className="text-white" />,
