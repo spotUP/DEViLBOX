@@ -188,11 +188,33 @@ export const useAudioStore = create<AudioStore>()(
     setMasterEffects: (effects) =>
       set((state) => {
         // Migrate old effects without category field (backward compatibility)
-        const migratedEffects = effects.map(effect => ({
-          ...effect,
-          // Add category if missing - default to 'tonejs' for old saved songs
-          category: effect.category || ('tonejs' as const),
-        }));
+        const migratedEffects = effects.map(effect => {
+          const withCategory = {
+            ...effect,
+            // Add category if missing - default to 'tonejs' for old saved songs
+            category: effect.category || ('tonejs' as const),
+          };
+
+          // Migrate Tumult effects: old default had switchBranch=1 (Follow mode),
+          // which gates noise to ~10% amplitude and silences brown noise entirely.
+          // Detect old data by switchBranch===1 and correlated stale defaults.
+          if (withCategory.type === 'Tumult' && Number(withCategory.parameters?.switchBranch) === 1) {
+            const p = withCategory.parameters ?? {};
+            return {
+              ...withCategory,
+              parameters: {
+                ...p,
+                switchBranch: 0,
+                ...(Number(p.mix) >= 1.0         ? { mix: 0.5 }            : {}),
+                ...(Number(p.peak1Enable) === 1  ? { peak1Enable: 0 }      : {}),
+                ...(Number(p.peak2Enable) === 1  ? { peak2Enable: 0 }      : {}),
+                ...(Number(p.followRelease) > 20 ? { followRelease: 15.0 } : {}),
+              },
+            };
+          }
+
+          return withCategory;
+        });
 
         state.masterEffects = migratedEffects;
         // Engine rebuild handled by usePatternPlayback's useEffect on masterEffectsKey

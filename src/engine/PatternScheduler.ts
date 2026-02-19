@@ -300,26 +300,15 @@ export class PatternScheduler {
     const intensity = transportState.swing / 100;
 
     if (grooveTemplate && grooveTemplate.id !== 'straight') {
-      return getGrooveOffset(grooveTemplate, row, rowDuration) * intensity;
+      const stride = Math.max(1, Math.round(transportState.grooveSteps / grooveTemplate.values.length));
+      const stretchedRow = Math.floor(row / stride);
+      return getGrooveOffset(grooveTemplate, stretchedRow, rowDuration) * intensity;
     }
 
-    // Fall back to legacy swing behavior
-    const swingAmount = transportState.swing;
-
-    // No swing at 100 (neutral)
-    if (swingAmount === 100) return 0;
-
-    // Swing affects every other row (odd rows in 2-row groupings)
-    const grooveSteps = transportState.grooveSteps || 2;
-    const isSwungRow = (row % grooveSteps) === (grooveSteps - 1);
-
-    if (!isSwungRow) return 0;
-
-    // Normalize: 100 -> 0, 200 -> 1, 0 -> -1
-    const normalizedSwing = (swingAmount - 100) / 100;
-    const maxSwingOffset = rowDuration * 0.5;
-
-    return normalizedSwing * maxSwingOffset;
+    // Straight template or no template = no timing offset.
+    // The legacy manual-swing path that was here applied offsets whenever swing ≠ 100,
+    // which caused every other row to be shifted even when the user selected "straight".
+    return 0;
   }
 
   /**

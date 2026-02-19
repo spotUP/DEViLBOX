@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-18T21:05:16.858Z
+ * Generated: 2026-02-19T11:01:44.927Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.878';
-export const BUILD_NUMBER = '878';
-export const BUILD_HASH = 'eeded8f9';
-export const BUILD_DATE = '2026-02-18';
+export const BUILD_VERSION = '1.0.919';
+export const BUILD_NUMBER = '919';
+export const BUILD_HASH = '3f6acafc';
+export const BUILD_DATE = '2026-02-19';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,179 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.878',
+    version: '1.0.919',
+    date: '2026-02-19',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Rename set→setParam, wire ToneEngine parameter dispatch"
+      },
+      {
+        type: 'feature',
+        "description": "TumultEditor React component — source, controls, 5-band EQ"
+      },
+      {
+        type: 'feature',
+        "description": "TumultEffect.ts — Tone.js wrapper with sample loading"
+      },
+      {
+        type: 'improvement',
+        "description": "Precompute clip exponents, env coefficients, hoist playerGain"
+      },
+      {
+        type: 'feature',
+        "description": "Worklet — clipper, sample player, envelope follower, processor"
+      },
+      {
+        type: 'feature',
+        "description": "Worklet — SVF filter classes (svf_*.cpp 1:1 port)"
+      },
+      {
+        type: 'feature',
+        "description": "Worklet — noise generator DSP (noise.cpp 1:1 port)"
+      },
+      {
+        type: 'feature',
+        "description": "Bundle 95 sample WAV files"
+      },
+      {
+        type: 'feature',
+        "description": "Add Tumult to type system and EffectRegistry"
+      },
+      {
+        type: 'feature',
+        "description": "VinylNoise — full vinyl emulator expansion"
+      },
+      {
+        type: 'improvement',
+        "description": "Add Tumult implementation plan"
+      },
+      {
+        type: 'improvement',
+        "description": "Add Tumult effect port design doc"
+      },
+      {
+        type: 'fix',
+        "description": "On/off toggle button is green when active in master effects chain"
+      },
+      {
+        type: 'fix',
+        "description": "Active LED is green in master effects chain column"
+      },
+      {
+        type: 'fix',
+        "description": "Remove redundant settings button from master effects chain items"
+      },
+      {
+        type: 'fix',
+        "description": "Master effects browser — widen chain column, narrow browser column"
+      },
+      {
+        type: 'feature',
+        "description": "VinylNoise — individual Hiss and Crackle volume controls"
+      },
+      {
+        type: 'fix',
+        "description": "VinylNoise hiss is now constant — LFO no longer modulates it"
+      },
+      {
+        type: 'feature',
+        "description": "VinylNoise presets + fix hiss LFO modulation depth"
+      },
+      {
+        type: 'feature',
+        "description": "Fix VinylNoise LFO to rotate at exact turntable speed (RPM presets)"
+      },
+      {
+        type: 'fix',
+        "description": "Initialize Ramper in VinylNoise worklet — crackles were never firing"
+      },
+      {
+        type: 'fix',
+        "description": "VinylNoise audit — wrap LFO phase, fix dispose order, document Ramper divergence"
+      },
+      {
+        type: 'feature',
+        "description": "Expose VinylNoise in effect picker"
+      },
+      {
+        type: 'feature',
+        "description": "Add VinylNoise effect UI editor"
+      },
+      {
+        type: 'feature',
+        "description": "Handle VinylNoise parameter updates in ToneEngine"
+      },
+      {
+        type: 'feature',
+        "description": "Wire VinylNoise into InstrumentFactory"
+      },
+      {
+        type: 'feature',
+        "description": "Register VinylNoise AudioEffectType"
+      },
+      {
+        type: 'feature',
+        "description": "Add VinylNoiseEffect Tone.js wrapper"
+      },
+      {
+        type: 'feature',
+        "description": "Add VinylNoise AudioWorklet DSP (viator-rust port)"
+      },
+      {
+        type: 'feature',
+        "description": "Sync DJ pitch slider with W effect commands"
+      },
+      {
+        type: 'feature',
+        "description": "Add smooth W effect (global pitch shift) with DJ-style sliding"
+      },
+      {
+        type: 'improvement',
+        "description": "Add vinyl noise effect design document"
+      },
+      {
+        type: 'fix',
+        "description": "Pattern editor and playback improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Add Audio-to-MIDI conversion in Sample Editor"
+      }
+    ]
+  },
+  {
+    version: '2026-02-18',
     date: '2026-02-18',
     changes: [
+      {
+        type: 'fix',
+        "description": "Reduce throttle to 30ms and remove rampTo for more responsive pitch shifting"
+      },
+      {
+        type: 'fix',
+        "description": "Use longer throttle interval and smooth BPM ramping for stutter-free pitch shifting"
+      },
+      {
+        type: 'fix',
+        "description": "Throttle BPM updates during pitch slider drag to prevent audio dropouts"
+      },
+      {
+        type: 'fix',
+        "description": "Update transport store BPM for TrackerReplayer timing sync"
+      },
+      {
+        type: 'fix',
+        "description": "Apply global playback rate in TrackerReplayer for MOD samples"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused variables and add missing engine declaration"
+      },
+      {
+        type: 'feature',
+        "description": "Add global playback rate for true pitch shifting on Amiga MOD samples"
+      },
       {
         type: 'fix',
         "description": "Remove unused Tone import from DJPitchSlider"
@@ -68,166 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Overlap scale onto housing so ticks sit flush against slider"
-      },
-      {
-        type: 'fix',
-        "description": "Show note column when channels are collapsed"
-      },
-      {
-        type: 'feature',
-        "description": "Add collapse/expand button to channel headers"
-      },
-      {
-        type: 'fix',
-        "description": "Add setGlobalPitchShift to TickResult type"
-      },
-      {
-        type: 'fix',
-        "description": "Remove vertical scrollbar from channel headers"
-      },
-      {
-        type: 'fix',
-        "description": "Replace ugly light blue focus border with discrete themed ring"
-      },
-      {
-        type: 'fix',
-        "description": "Move pitch slider scale flush against housing using absolute positioning"
-      },
-      {
-        type: 'fix',
-        "description": "Sync effect string field when typing effect commands"
-      },
-      {
-        type: 'fix',
-        "description": "Remove duplicate center tick from pitch slider housing"
-      },
-      {
-        type: 'fix',
-        "description": "Widen pitch slider groove line to 3px"
-      },
-      {
-        type: 'fix',
-        "description": "Darken pitch slider groove line to near-black"
-      },
-      {
-        type: 'fix',
-        "description": "Remove housing border from DJ pitch slider"
-      },
-      {
-        type: 'feature',
-        "description": "Add SL-1200 style scale to DJ pitch slider"
-      },
-      {
-        type: 'feature',
-        "description": "Restyle DJ pitch slider as Technics SL-1200 fader"
-      },
-      {
-        type: 'fix',
-        "description": "Hide spurious vertical scrollbar in pattern editor"
-      },
-      {
-        type: 'fix',
-        "description": "Align input caret with centered channel content"
-      },
-      {
-        type: 'feature',
-        "description": "Add Wxx tracker effect for global pitch shift"
-      },
-      {
-        type: 'fix',
-        "description": "Widen DJ pitch slider to center thumb correctly"
-      },
-      {
-        type: 'feature',
-        "description": "Add right-click to reset DJ pitch slider"
-      },
-      {
-        type: 'fix',
-        "description": "Center DJ pitch slider zero marker vertically"
-      },
-      {
-        type: 'fix',
-        "description": "Make DJ pitch slider fill full tracker height"
-      },
-      {
-        type: 'fix',
-        "description": "Move DJ pitch slider from toolbar to between pattern editor and instrument list"
-      },
-      {
-        type: 'feature',
-        "description": "Add DJ pitch slider to transport toolbar"
-      },
-      {
-        type: 'feature',
-        "description": "Add MPC/SP-1200 style sample resampler"
-      },
-      {
-        type: 'fix',
-        "description": "Filter modules.json from demo list and disable BLEP by default"
-      },
-      {
-        type: 'feature',
-        "description": "Add TD-3 patterns category to demo songs"
-      },
-      {
-        type: 'fix',
-        "description": "Handle disconnect errors in BLEP audio chain connection"
-      },
-      {
-        type: 'fix',
-        "description": "Add MIDI file import handler to prevent JSON parse error"
-      },
-      {
-        type: 'feature',
-        "description": "Add global BLEP synthesis for authentic Amiga sound"
-      },
-      {
-        type: 'feature',
-        "description": "Add 50+ Amiga sample presets from ST-01/ST-02 packs"
-      },
-      {
-        type: 'feature',
-        "description": "Add ST-01 and ST-02 Amiga sample packs (247 samples)"
-      },
-      {
-        type: 'feature',
-        "description": "Implement reference-based slicing for massive memory savings"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update auto-generated changelog"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate audio context startup warnings with patient retry logic"
-      },
-      {
-        type: 'fix',
-        "description": "Ensure audio context started in auto-preview hook"
-      },
-      {
-        type: 'fix',
-        "description": "Show beat slices on waveform even when panel closed"
-      },
-      {
-        type: 'fix',
-        "description": "Verify audio context is running before instrument preview"
-      },
-      {
-        type: 'fix',
-        "description": "Create new instrument when loading sample with no current instrument"
-      },
-      {
-        type: 'feature',
-        "description": "Complete beat slicer implementation with manual mode, deletion, and visual enhancements"
-      },
-      {
-        type: 'improvement',
-        "description": "Add comprehensive Ami-Sampler resample algorithm audit"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate AmigaPal with tracker's status message system"
       }
     ]
   }
