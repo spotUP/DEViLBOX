@@ -356,6 +356,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const pendingModuleFile = useUIStore((state) => state.pendingModuleFile);
   const setPendingModuleFile = useUIStore((state) => state.setPendingModuleFile);
   const setActiveView = useUIStore((state) => state.setActiveView);
+  const dialogOpen = useUIStore((state) => state.dialogOpen);
+  const closeDialogCommand = useUIStore((state) => state.closeDialogCommand);
 
   // View mode state
   type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303';
@@ -406,6 +408,42 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [showInstrumentPanel, setShowInstrumentPanel] = useState(true);
   const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
+
+  // Merge keyboard-triggered dialog commands into local dialog state
+  useEffect(() => {
+    if (!dialogOpen) return;
+    switch (dialogOpen) {
+      case 'interpolate-volume':
+      case 'interpolate-effect':
+        setShowInterpolate(true);
+        break;
+      case 'humanize':
+        setShowHumanize(true);
+        break;
+      case 'find-replace':
+        setShowFindReplace(true);
+        break;
+      case 'groove-settings':
+        setShowGrooveSettings(true);
+        break;
+      case 'scale-volume-block':
+        setVolumeOpScope('block');
+        setShowScaleVolume(true);
+        break;
+      case 'scale-volume-track':
+        setVolumeOpScope('track');
+        setShowScaleVolume(true);
+        break;
+      case 'scale-volume-pattern':
+        setVolumeOpScope('pattern');
+        setShowScaleVolume(true);
+        break;
+      case 'keyboard-help':
+        setShowShortcutSheet(true);
+        break;
+    }
+    closeDialogCommand();
+  }, [dialogOpen, closeDialogCommand]);
 
   // FPS monitoring (simplified - no longer does active measurement)
   const { fps, averageFps, quality } = useFPSMonitor();

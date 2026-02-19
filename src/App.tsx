@@ -171,6 +171,7 @@ function App() {
     pianoRollPoppedOut, setPianoRollPoppedOut,
     oscilloscopePoppedOut, setOscilloscopePoppedOut,
     arrangementPoppedOut, setArrangementPoppedOut,
+    showFileBrowser, setShowFileBrowser,
   } = useUIStore();
   const [initError, setInitError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -187,7 +188,7 @@ function App() {
   const [showInstrumentModal, setShowInstrumentModal] = useState(false);
   const [pendingSongFile, setPendingSongFile] = useState<File | null>(null);
   const [showSongLoadConfirm, setShowSongLoadConfirm] = useState(false);
-  const [showFileBrowser, setShowFileBrowser] = useState(false);
+  // showFileBrowser is now in UIStore (moved for keyboard command access)
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog, showKnobBar, setShowKnobBar } = useMIDIStore();
