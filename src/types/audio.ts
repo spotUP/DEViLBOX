@@ -242,6 +242,17 @@ export const GROOVE_TEMPLATES: GrooveTemplate[] = [
     values: [-10, 10, -10, 10],
     velocityOffsets: [0.1, -0.1, 0.1, -0.1],
   },
+  {
+    // Cosine wave over 16 steps: heavy/late at step 1, rushing at step 8, heavy/late at step 16.
+    // values[0] == values[15] so the loop boundary is seamless — no jump at the repeat point.
+    // Computed: round(20 * cos(2π * i / 15)) for i = 0..15
+    id: 'elastic',
+    name: 'Elastic',
+    category: 'custom',
+    description: 'Cosine swell — heavy at steps 1 & 16, rushing at step 8. Smooth loop.',
+    values: [20, 18, 13, 6, -2, -10, -16, -20, -20, -16, -10, -2, 6, 13, 18, 20],
+    velocityOffsets: [0.10, 0.09, 0.07, 0.03, -0.01, -0.05, -0.08, -0.10, -0.10, -0.08, -0.05, -0.01, 0.03, 0.07, 0.09, 0.10],
+  },
 ];
 
 /**

@@ -561,6 +561,9 @@ export class TrackerReplayer {
       if (transportState.grooveTemplateId !== this.lastGrooveTemplateId ||
           transportState.swing !== this.lastSwingAmount ||
           transportState.grooveSteps !== this.lastGrooveSteps) {
+        if (typeof window !== 'undefined' && (window as unknown as { GROOVE_DEBUG?: boolean }).GROOVE_DEBUG) {
+          console.log(`[Groove] template changed: "${this.lastGrooveTemplateId}" → "${transportState.grooveTemplateId}" swing=${transportState.swing} steps=${transportState.grooveSteps}`);
+        }
         this.lastGrooveTemplateId = transportState.grooveTemplateId;
         this.lastSwingAmount = transportState.swing;
         this.lastGrooveSteps = transportState.grooveSteps;
@@ -600,26 +603,21 @@ export class TrackerReplayer {
       // For TEMPLATES: swing is 0-200 where 100 = full template effect
       // This allows scaling the template groove up or down
       const templateIntensity = state.swing / 100;
-      const offset = getGrooveOffset(grooveTemplate, row, rowDuration) * templateIntensity;
-      return offset;
-    } else {
-      // For MANUAL SWING: swing is 0-200 where 100 = straight (no swing)
-      // Normalize to 0-1 range where 0 = straight, 1 = full swing
-      const swingIntensity = (state.swing - 100) / 100;
-      
-      // grooveSteps determines the swing resolution (2 = 16th notes, 3 = 8th note triplets, etc.)
-      const grooveSteps = state.grooveSteps || 2;
-      const isSwungHalf = (row % grooveSteps) >= (grooveSteps / 2);
-      
-      if (state.swing !== 100 && isSwungHalf) {
-        // At 100% swing (state.swing=200), shift by 33.3% of row duration (triplet timing)
-        // At 50% swing (state.swing=150), shift by 16.7%
-        // At 0% swing (state.swing=100), shift by 0% (straight)
-        const tripletShift = 0.3333;
-        const offset = swingIntensity * tripletShift * rowDuration;
-        return offset;
+      // grooveSteps = total cycle length in rows. stride = grooveSteps / template.values.length.
+      // e.g. grooveSteps=2, boom-bap(4 vals): stride=1 (natural 16th speed, cycle=4 rows)
+      //      grooveSteps=8, boom-bap(4 vals): stride=2 (8th note, cycle=8 rows)
+      //      grooveSteps=32, boom-bap(4 vals): stride=8 (cycle=32 rows)
+      const stride = Math.max(1, Math.round(state.grooveSteps / grooveTemplate.values.length));
+      const stretchedRow = Math.floor(row / stride);
+      const offset = getGrooveOffset(grooveTemplate, stretchedRow, rowDuration) * templateIntensity;
+      if (typeof window !== 'undefined' && (window as unknown as { GROOVE_DEBUG?: boolean }).GROOVE_DEBUG) {
+        console.log(`[Groove] row=${String(row).padStart(2)} template="${state.grooveTemplateId}" stride=${stride} intensity=${templateIntensity.toFixed(2)} offset=${(offset * 1000).toFixed(2)}ms rowDur=${(rowDuration * 1000).toFixed(1)}ms`);
       }
+      return offset;
     }
+    // Straight template or no template = no timing offset.
+    // The legacy manual-swing path that was here applied offsets whenever swing ≠ 100,
+    // which caused every other row to be shifted even when the user selected "straight".
     return 0;
   }
 
@@ -856,9 +854,10 @@ export class TrackerReplayer {
       // Store the original XM note for synth instruments (avoids period table issues)
       ch.xmNote = noteValue;
       
-      // For MOD files, use the raw period stored in the row (if available)
-      // This is more accurate than converting XM note numbers
-      const usePeriod = rawPeriod || this.noteToPeriod(noteValue, ch.finetune);
+      // Derive period from the note number (user's intent), falling back to rawPeriod
+      // for pure MOD rows that have a period but no XM note.
+      // Priority: noteValue → rawPeriod (fixes stale rawPeriod when user edits a MOD note)
+      const usePeriod = this.noteToPeriod(noteValue, ch.finetune) || rawPeriod || 0;
 
       // Check for tone portamento (3xx or 5xx) - don't trigger, just set target
       if (effect === 3 || effect === 5) {
@@ -914,7 +913,7 @@ export class TrackerReplayer {
         // We do this by still calling triggerNote with slide=true - the worklet
         // will just keep the note going without retriggering.
         // Use xmNoteToNoteName for 303 synths (avoids period table issues)
-        const newNoteName = is303Synth ? xmNoteToNoteName(noteValue) : periodToNoteName(usePeriod);
+        const newNoteName = is303Synth ? xmNoteToNoteName(noteValue ?? 0) : periodToNoteName(usePeriod);
         const isSamePitchSlide = slideActive &&
                                   ch.lastPlayedNoteName !== null &&
                                   newNoteName === ch.lastPlayedNoteName;
@@ -1515,7 +1514,7 @@ export class TrackerReplayer {
    * Global pitch shift slide (Wxx effect) - DJ-style smooth sliding
    * Slides current pitch toward target at fixed speed (0.5 semitones per tick)
    */
-  private doGlobalPitchSlide(time: number): void {
+  private doGlobalPitchSlide(_time: number): void {
     // Skip if already at target
     if (Math.abs(this.globalPitchCurrent - this.globalPitchTarget) < 0.01) {
       this.globalPitchCurrent = this.globalPitchTarget;
@@ -1805,14 +1804,15 @@ export class TrackerReplayer {
     
     let velocityOffset = 0;
     if (grooveTemplate) {
-      velocityOffset = getGrooveVelocity(grooveTemplate, this.pattPos) * intensity;
+      const stride = Math.max(1, Math.round(transportState.grooveSteps / grooveTemplate.values.length));
+      const stretchedRow = Math.floor(this.pattPos / stride);
+      velocityOffset = getGrooveVelocity(grooveTemplate, stretchedRow) * intensity;
     }
-    
+
     const velocity = Math.max(0, Math.min(1, (ch.volume / 64) + velocityOffset));
-    
-    // Debug log if swing is unusual (not 100)
-    if (transportState.swing !== 100 && this.pattPos === 0) {
-      console.log(`[TrackerReplayer] Swing debug: swing=${transportState.swing} intensity=${intensity.toFixed(2)} velocityOffset=${velocityOffset.toFixed(3)} velocity=${velocity.toFixed(3)}`);
+
+    if (typeof window !== 'undefined' && (window as unknown as { GROOVE_DEBUG?: boolean }).GROOVE_DEBUG && grooveTemplate && grooveTemplate.id !== 'straight') {
+      console.log(`[Groove] row=${String(this.pattPos).padStart(2)} ch=${channelIndex} velOffset=${velocityOffset >= 0 ? '+' : ''}${velocityOffset.toFixed(3)} velocity=${velocity.toFixed(3)}`);
     }
 
     // Schedule VU meter trigger at exact audio playback time for tight sync
@@ -1824,7 +1824,6 @@ export class TrackerReplayer {
 
     // Check if this is a synth instrument (has synthType) or sample-based
     if (ch.instrument.synthType && ch.instrument.synthType !== 'Sampler') {
-      console.log(`[TrackerReplayer] Triggering synth note: inst=${ch.instrument.id} type=${ch.instrument.synthType} note=${noteName} xmNote=${ch.xmNote} vel=${velocity.toFixed(2)} chan=${channelIndex}`);
       
       // Use ToneEngine for synth instruments (TB303, drums, etc.)
       // Calculate duration based on speed/BPM (one row duration as default)

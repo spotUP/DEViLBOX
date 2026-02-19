@@ -2841,7 +2841,6 @@ export class ToneEngine {
             const playbackRate = frequency / sampleRate;
             // Apply global playback rate multiplier for pitch shifting
             const finalRate = playbackRate * this.globalPlaybackRate;
-            console.log('[ToneEngine] MOD sample playback:', { playbackRate, globalRate: this.globalPlaybackRate, finalRate });
             (player as unknown as { playbackRate: number }).playbackRate = finalRate;
           } else if (config.metadata?.modPlayback?.usePeriodPlayback && !period) {
             // Warn if period-based playback is enabled but no period provided

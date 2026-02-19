@@ -150,10 +150,9 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
                     key={s}
                     onClick={() => {
                       setGrooveSteps(s);
-                      if (grooveTemplateId !== 'straight') setGrooveTemplate('straight');
                     }}
                     className={`px-2 py-2 text-[10px] font-mono border rounded transition-all ${
-                      grooveSteps === s && grooveTemplateId === 'straight'
+                      grooveSteps === s
                         ? 'bg-accent-primary border-accent-primary text-white font-bold'
                         : 'bg-dark-bgTertiary border-ft2-border text-text-secondary hover:border-text-muted'
                     }`}
