@@ -450,16 +450,19 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         const midiResult = await importMIDIFile(file, {
           quantize: 1, mergeChannels: false, velocityToVolume: true, defaultPatternLength: 64,
         });
-        const instruments = createInstrumentsForModule(midiResult.patterns, [], undefined);
         loadPatterns(midiResult.patterns);
-        loadInstruments(instruments);
+        if (midiResult.instruments.length > 0) {
+          loadInstruments(midiResult.instruments);
+        }
         setMetadata({
           name: midiResult.metadata.name,
           author: '',
           description: `Imported from ${file.name} (${midiResult.metadata.tracks} tracks)`,
         });
         setBPM(midiResult.bpm);
-        notify.success(`Loaded MIDI: ${midiResult.metadata.name}`);
+        notify.success(
+          `Imported: ${midiResult.metadata.name} — ${midiResult.instruments.length} instrument(s), BPM: ${midiResult.bpm}`
+        );
       } else {
         const songData = await importSong(file);
         if (!songData) {
@@ -894,11 +897,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
               // Load patterns and set BPM
               loadPatterns(result.patterns);
+              if (result.instruments.length > 0) {
+                loadInstruments(result.instruments);
+              }
               setBPM(result.bpm);
               setCurrentPattern(0);
               setPatternOrder(result.patterns.map((_, i) => i));
 
-              notify.success(`Loaded MIDI: ${result.metadata.name || filename} (${result.patterns.length} patterns, ${result.bpm} BPM)`);
+              notify.success(
+                `Imported: ${result.metadata.name || filename} — ${result.instruments.length} instrument(s), BPM: ${result.bpm}`
+              );
               return;
             } catch (midiError) {
               console.error('[MIDI Import] Failed:', midiError);
@@ -1001,6 +1009,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             resetInstruments();
             engine.disposeAllInstruments();
             loadPatterns(result.patterns);
+            if (result.instruments.length > 0) {
+              loadInstruments(result.instruments);
+            }
             setPatternOrder(result.patterns.map((_, i) => i));
             setCurrentPattern(0);
             setBPM(result.bpm);
@@ -1009,7 +1020,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               author: '',
               description: `Imported from MIDI (${result.metadata.tracks} track${result.metadata.tracks !== 1 ? 's' : ''})`,
             });
-            notify.success(`Imported: ${result.metadata.name}`);
+            notify.success(
+              `Imported: ${result.metadata.name} — ${result.instruments.length} instrument(s), BPM: ${result.bpm}`
+            );
           } else {
             const { loadModuleFile } = await import('@lib/import/ModuleLoader');
             const moduleInfo = await loadModuleFile(new File([buffer], filename));
