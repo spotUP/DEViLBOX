@@ -7,7 +7,7 @@
  * - Consistent layout and styling
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { EffectConfig } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import { BpmSyncControl } from './BpmSyncControl';
@@ -1960,6 +1960,265 @@ const VINYL_CONDITION_PRESETS = [
   { label: 'Shellac', hiss: 68, dust: 62, age: 70, riaa: 70, stylusResonance: 60, wornStylus: 70, pinch: 55, innerGroove: 60, ghostEcho: 40, dropout: 45, warp: 30, eccentricity: 35 },
 ] as const;
 
+// ─── Tumult sample categories (mirrors SAMPLE_PATHS order in TumultEffect.ts) ──
+const TUMULT_CATEGORIES = [
+  { label: 'Hum',        start: 0,  end: 4  },
+  { label: 'Machine',    start: 5,  end: 15 },
+  { label: 'Static',     start: 16, end: 21 },
+  { label: 'Vinyl',      start: 22, end: 26 },
+  { label: 'World',      start: 27, end: 44 },
+  { label: 'Plethora A', start: 45, end: 61 },
+  { label: 'Plethora B', start: 62, end: 71 },
+  { label: 'Plethora C', start: 72, end: 94 },
+] as const;
+
+const TUMULT_SAMPLE_NAMES: string[] = [
+  // hum
+  'Hyperspace','Alien Hum','Elec Hum','Feedback','VHS Hum',
+  // machine
+  'Fan','Dough','Fridge 1','Fridge 2','Furnace','Lettersort',
+  'Oven','Tattoo AC','Hotel Vent','Vending','Washing',
+  // static
+  'Elec Zap','Elec Noise','Film Static','Gramophone','Radio Fuzz','TV Static',
+  // vinyl
+  'Runoff','Old Vinyl','Vinyl Dust','Analogue','Vinyl Crackle',
+  // world
+  'City Snow','City Night','City Traffic','Crowd','Campfire 1','Fire 2','Campfire 3','Campfire 4',
+  'Rain LA','Forest Rain','Thunder Rain','City Rain','Traffic Rain','Metro','Waterfall 1',
+  'Waterfall 2','Waterfall 3','Waterfall 4',
+  // noiseplethora A
+  'A0 Radio 1','A0 Radio 2','A1 SineFM','A2 RingSqr',
+  'A3 RingSine 1','A3 RingSine 2','A4 CrossMod 1','A4 CrossMod 2',
+  'A5 Resonoise','A6 Grain 1','A6 Grain 2','A7 Grain3 1','A7 Grain3 2',
+  'A8 Grain4 1','A8 Grain4 2','A9 Basurilla 1','A9 Basurilla 2',
+  // noiseplethora B
+  'B0 ClusterSaw','B1 PwCluster','B2 CrCluster','B3 SineFM',
+  'B4 TriFM','B5 Prime','B6 PrimeCnoise','B7 Fibonacci','B8 Partial','B9 Phasing',
+  // noiseplethora C
+  'C0 Basura 1','C0 Basura 2','C1 Atari','C2 Filomena 1','C2 Filomena 2',
+  'C3 PSH','C4 Array 1','C4 Array 2','C4 Array 3','C4 Array 4',
+  'C5 Exists 1','C5 Exists 2','C6 WhoKnows 1','C6 WhoKnows 2','C6 WhoKnows 3',
+  'C7 Satan 1','C7 Satan 2','C8 BitCrush 1','C8 BitCrush 2','C8 BitCrush 3',
+  'C9 LFree 1','C9 LFree 2','C9 LFree 3',
+];
+
+export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
+  effect,
+  onUpdateParameter,
+}) => {
+  const configRef = useRef(effect);
+  useEffect(() => { configRef.current = effect; }, [effect]);
+
+  const p = (key: string, def: number) => getParam(effect, key, def);
+
+  const sourceMode   = p('sourceMode', 0);
+  const noiseMode    = p('noiseMode', 0);
+  const switchBranch = p('switchBranch', 1);
+  const sampleIndex  = p('sampleIndex', 0);
+  const activeCat    = TUMULT_CATEGORIES.find(c => sampleIndex >= c.start && sampleIndex <= c.end);
+
+  const set = useCallback((key: string, value: number) => {
+    onUpdateParameter(key, value);
+  }, [onUpdateParameter]);
+
+  const SOURCE_LABELS  = ['Off', 'Synth', 'Sample', 'Custom'] as const;
+  const NOISE_LABELS   = ['White', 'Pink', 'Brown', 'Velvet', 'Crushed'] as const;
+  const BRANCH_LABELS  = ['Duck', 'Raw', 'Follow'] as const;
+  // switchBranch values: Duck=0, Raw=2, Follow=1
+  const BRANCH_VALUES  = [0, 2, 1] as const;
+
+  const btnBase     = 'flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all';
+  const btnActive   = 'bg-violet-700/70 border-violet-500 text-violet-100';
+  const btnInactive = 'bg-black/40 border-border text-text-muted hover:border-violet-700 hover:text-violet-300';
+
+  return (
+    <div className="space-y-4">
+      {/* ── Section 1: Source ─────────────────────────────────────────────── */}
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader color="#7c3aed" title="Source" />
+
+        <div className="flex gap-2 mb-3">
+          {SOURCE_LABELS.map((label, i) => (
+            <button key={label} onClick={() => set('sourceMode', i)}
+              className={`${btnBase} ${sourceMode === i ? btnActive : btnInactive}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {sourceMode === 1 && (
+          <div className="flex gap-2">
+            {NOISE_LABELS.map((label, i) => (
+              <button key={label} onClick={() => set('noiseMode', i)}
+                className={`${btnBase} ${noiseMode === i ? btnActive : btnInactive}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {sourceMode === 2 && (
+          <>
+            <div className="flex gap-1.5 mb-2 flex-wrap">
+              {TUMULT_CATEGORIES.map((cat) => (
+                <button key={cat.label}
+                  onClick={() => set('sampleIndex', cat.start)}
+                  className={`px-2 py-1 rounded text-xs font-bold border transition-all ${
+                    activeCat?.label === cat.label ? btnActive : btnInactive
+                  }`}>
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+            {activeCat && (
+              <div className="flex gap-1.5 flex-wrap">
+                {Array.from({ length: activeCat.end - activeCat.start + 1 }, (_, i) => {
+                  const idx = activeCat.start + i;
+                  return (
+                    <button key={idx} onClick={() => set('sampleIndex', idx)}
+                      className={`px-2 py-1 rounded text-xs border transition-all ${
+                        sampleIndex === idx ? btnActive : btnInactive
+                      }`}>
+                      {TUMULT_SAMPLE_NAMES[idx]}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* ── Section 2: Master Controls ────────────────────────────────────── */}
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader color="#7c3aed" title="Controls" />
+
+        <div className="flex gap-6 items-start flex-wrap">
+          <Knob label="Gain" value={p('noiseGain', -10.6)} min={-35} max={35}
+            unit="dB" onChange={(v) => set('noiseGain', v)} />
+          <Knob label="Mix" value={p('mix', 1)} min={0} max={1}
+            onChange={(v) => set('mix', v)} />
+          <Knob label="Clip" value={p('clipAmount', 0.497)} min={0.05} max={1}
+            onChange={(v) => set('clipAmount', v)} />
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-text-muted mb-1">Mode</span>
+            <div className="flex gap-1.5">
+              {BRANCH_LABELS.map((label, i) => (
+                <button key={label} onClick={() => set('switchBranch', BRANCH_VALUES[i])}
+                  className={`px-3 py-1 rounded text-xs font-bold border transition-all ${
+                    switchBranch === BRANCH_VALUES[i] ? btnActive : btnInactive
+                  }`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {switchBranch === 0 && (
+          <div className="flex gap-4 mt-3 pt-3 border-t border-border flex-wrap">
+            <Knob label="Threshold" value={p('duckThreshold', -17.2)} min={-100} max={0}
+              unit="dB" onChange={(v) => set('duckThreshold', v)} />
+            <Knob label="Attack" value={p('duckAttack', 0)} min={0} max={500}
+              unit="ms" onChange={(v) => set('duckAttack', v)} />
+            <Knob label="Release" value={p('duckRelease', 21.5)} min={0} max={500}
+              unit="ms" onChange={(v) => set('duckRelease', v)} />
+          </div>
+        )}
+
+        {switchBranch === 1 && (
+          <div className="flex gap-4 mt-3 pt-3 border-t border-border flex-wrap">
+            <Knob label="Threshold" value={p('followThreshold', -10.7)} min={-100} max={0}
+              unit="dB" onChange={(v) => set('followThreshold', v)} />
+            <Knob label="Attack" value={p('followAttack', 0)} min={0} max={500}
+              unit="ms" onChange={(v) => set('followAttack', v)} />
+            <Knob label="Release" value={p('followRelease', 76.9)} min={0} max={500}
+              unit="ms" onChange={(v) => set('followRelease', v)} />
+            <Knob label="Amount" value={p('followAmount', 0.104)} min={0} max={1}
+              onChange={(v) => set('followAmount', v)} />
+          </div>
+        )}
+      </section>
+
+      {/* ── Section 3: 5-Band EQ ──────────────────────────────────────────── */}
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader color="#7c3aed" title="EQ" />
+
+        <div className="flex gap-4 flex-wrap">
+          <TumultEQBand label="HP" enableKey="hpEnable" freqKey="hpFreq" qKey="hpQ"
+            enabled={!!p('hpEnable', 0)} freq={p('hpFreq', 888.5)} q={p('hpQ', 0.7)}
+            onSet={set} showGain={false} />
+          <TumultEQBand label="Low" enableKey="peak1Enable" freqKey="peak1Freq"
+            gainKey="peak1Gain" qKey="peak1Q" typeKey="peak1Type"
+            enabled={!!p('peak1Enable', 1)} freq={p('peak1Freq', 20)}
+            gain={p('peak1Gain', -0.19)} q={p('peak1Q', 0.7)}
+            filterType={p('peak1Type', 0)} typeLabels={['Bell', 'Lo Shelf']}
+            onSet={set} showGain />
+          <TumultEQBand label="Mid" enableKey="peak2Enable" freqKey="peak2Freq"
+            gainKey="peak2Gain" qKey="peak2Q"
+            enabled={!!p('peak2Enable', 1)} freq={p('peak2Freq', 600)}
+            gain={p('peak2Gain', 1)} q={p('peak2Q', 1)}
+            onSet={set} showGain />
+          <TumultEQBand label="High" enableKey="peak3Enable" freqKey="peak3Freq"
+            gainKey="peak3Gain" qKey="peak3Q" typeKey="peak3Type"
+            enabled={!!p('peak3Enable', 0)} freq={p('peak3Freq', 2500)}
+            gain={p('peak3Gain', 1)} q={p('peak3Q', 1)}
+            filterType={p('peak3Type', 1)} typeLabels={['Bell', 'Hi Shelf']}
+            onSet={set} showGain />
+          <TumultEQBand label="LP" enableKey="lpEnable" freqKey="lpFreq" qKey="lpQ"
+            enabled={!!p('lpEnable', 0)} freq={p('lpFreq', 8500)} q={p('lpQ', 0.7)}
+            onSet={set} showGain={false} />
+        </div>
+      </section>
+    </div>
+  );
+};
+
+const TumultEQBand: React.FC<{
+  label: string;
+  enableKey: string; freqKey: string; gainKey?: string; qKey: string; typeKey?: string;
+  enabled: boolean; freq: number; gain?: number; q: number; filterType?: number;
+  typeLabels?: readonly [string, string];
+  onSet: (k: string, v: number) => void;
+  showGain: boolean;
+}> = ({ label, enableKey, freqKey, gainKey, qKey, typeKey, enabled, freq, gain, q,
+        filterType, typeLabels, onSet, showGain }) => (
+  <div className="flex-1 flex flex-col gap-2 min-w-[60px]">
+    <div className="flex items-center justify-between">
+      <span className="text-xs font-bold text-text-secondary">{label}</span>
+      <button
+        onClick={() => onSet(enableKey, enabled ? 0 : 1)}
+        className={`w-4 h-4 rounded-sm border transition-all ${
+          enabled ? 'bg-violet-500 border-violet-400' : 'bg-black/40 border-border'
+        }`}
+      />
+    </div>
+    {typeKey && typeLabels && (
+      <div className="flex gap-1">
+        {typeLabels.map((t, i) => (
+          <button key={t} onClick={() => onSet(typeKey, i)}
+            className={`flex-1 py-0.5 rounded text-[10px] border transition-all ${
+              filterType === i
+                ? 'bg-violet-700/70 border-violet-500 text-violet-100'
+                : 'bg-black/40 border-border text-text-muted'
+            }`}>
+            {t}
+          </button>
+        ))}
+      </div>
+    )}
+    <Knob label="Freq" value={freq} min={20} max={20000} unit="Hz"
+      onChange={(v) => onSet(freqKey, v)} size="sm" />
+    {showGain && gainKey && (
+      <Knob label="Gain" value={gain ?? 0} min={-24} max={24} unit="dB"
+        onChange={(v) => onSet(gainKey, v)} size="sm" />
+    )}
+    <Knob label="Q" value={q} min={0.7} max={10}
+      onChange={(v) => onSet(qKey, v)} size="sm" />
+  </div>
+);
+
 export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
   effect,
   onUpdateParameter,
@@ -2620,6 +2879,7 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   BiPhase: BiPhaseEditor,
   DubFilter: DubFilterEditor,
   TapeSaturation: TapeSaturationEditor,
+  Tumult: TumultEditor,
   VinylNoise: VinylNoiseEditor,
   SidechainCompressor: SidechainCompressorEditor,
   SpaceyDelayer: SpaceyDelayerEditor,
@@ -2690,6 +2950,7 @@ export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accen
   BiPhase:             { bg: '#180a20', bgEnd: '#100618', accent: '#a855f7', border: '#281430' },
   DubFilter:           { bg: '#081a0a', bgEnd: '#041204', accent: '#22c55e', border: '#0a2a0e' },
   TapeSaturation:      { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#ef4444', border: '#3a1a0a' },
+  Tumult:              { bg: '#0d0a1a', bgEnd: '#080612', accent: '#7c3aed', border: '#1a1030' },
   VinylNoise:          { bg: '#1a1008', bgEnd: '#120a04', accent: '#d97706', border: '#2a1a08' },
   SidechainCompressor: { bg: '#081a10', bgEnd: '#04120a', accent: '#10b981', border: '#0a2a18' },
   RETapeEcho:          { bg: '#2a0808', bgEnd: '#1a0404', accent: '#dc2626', border: '#3a1010' },
@@ -2759,6 +3020,7 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
     BiPhase: <Radio size={18} className="text-white" />,
     DubFilter: <Sliders size={18} className="text-white" />,
     TapeSaturation: <Zap size={18} className="text-white" />,
+    Tumult: <Radio size={18} className="text-white" />,
     VinylNoise: <Disc size={18} className="text-white" />,
     SidechainCompressor: <Gauge size={18} className="text-white" />,
     RETapeEcho: <Disc size={18} className="text-white" />,
