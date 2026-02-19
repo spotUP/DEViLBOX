@@ -1940,6 +1940,80 @@ export const TapeSaturationEditor: React.FC<VisualEffectEditorProps> = ({
 };
 
 // ============================================================================
+// VINYL NOISE
+// ============================================================================
+
+export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
+  effect,
+  onUpdateParameter,
+  onUpdateWet,
+}) => {
+  const hiss  = getParam(effect, 'hiss',  50);
+  const dust  = getParam(effect, 'dust',  50);
+  const age   = getParam(effect, 'age',   50);
+  const speed = getParam(effect, 'speed', 20);
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader color="#d97706" title="Vinyl Noise" />
+        <div className="flex justify-around items-end">
+          <Knob
+            value={hiss}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('hiss', v)}
+            label="Hiss"
+            color="#d97706"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={dust}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('dust', v)}
+            label="Dust"
+            color="#d97706"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={age}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('age', v)}
+            label="Age"
+            color="#b45309"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={speed}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('speed', v)}
+            label="Speed"
+            color="#92400e"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+        </div>
+      </section>
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <div className="flex justify-center">
+          <Knob
+            value={effect.wet}
+            min={0}
+            max={100}
+            onChange={onUpdateWet}
+            label="Mix"
+            color="#d97706"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+        </div>
+      </section>
+    </div>
+  );
+};
+
+// ============================================================================
 // SIDECHAIN COMPRESSOR
 // ============================================================================
 
@@ -2335,6 +2409,7 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   BiPhase: BiPhaseEditor,
   DubFilter: DubFilterEditor,
   TapeSaturation: TapeSaturationEditor,
+  VinylNoise: VinylNoiseEditor,
   SidechainCompressor: SidechainCompressorEditor,
   SpaceyDelayer: SpaceyDelayerEditor,
   RETapeEcho: RETapeEchoEditor,
@@ -2404,6 +2479,7 @@ export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accen
   BiPhase:             { bg: '#180a20', bgEnd: '#100618', accent: '#a855f7', border: '#281430' },
   DubFilter:           { bg: '#081a0a', bgEnd: '#041204', accent: '#22c55e', border: '#0a2a0e' },
   TapeSaturation:      { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#ef4444', border: '#3a1a0a' },
+  VinylNoise:          { bg: '#1a1008', bgEnd: '#120a04', accent: '#d97706', border: '#2a1a08' },
   SidechainCompressor: { bg: '#081a10', bgEnd: '#04120a', accent: '#10b981', border: '#0a2a18' },
   RETapeEcho:          { bg: '#2a0808', bgEnd: '#1a0404', accent: '#dc2626', border: '#3a1010' },
   MoogFilter:          { bg: '#1a1508', bgEnd: '#120e04', accent: '#f59e0b', border: '#2a2008' },
@@ -2472,6 +2548,7 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
     BiPhase: <Radio size={18} className="text-white" />,
     DubFilter: <Sliders size={18} className="text-white" />,
     TapeSaturation: <Zap size={18} className="text-white" />,
+    VinylNoise: <Disc size={18} className="text-white" />,
     SidechainCompressor: <Gauge size={18} className="text-white" />,
     RETapeEcho: <Disc size={18} className="text-white" />,
     MoogFilter: <Sliders size={18} className="text-white" />,
