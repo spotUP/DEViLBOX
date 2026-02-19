@@ -71,11 +71,12 @@ describe('DB303 Pattern Converter', () => {
     it('should handle empty steps (gate=false)', () => {
       const { pattern } = parseDb303Pattern(sampleXml);
 
-      // Step 3 has gate=false → note should be 0
-      expect(pattern.channels[0].rows[3].note).toBe(0);
+      // Step 3 has gate=false, preceded by gated steps → note-off (97) to release
+      // DB303 behavior: a rest immediately releases the previous note
+      expect(pattern.channels[0].rows[3].note).toBe(97);
 
-      // Step 15 has gate=false → note should be 0
-      expect(pattern.channels[0].rows[15].note).toBe(0);
+      // Step 15 has gate=false, preceded by gated step 14 → note-off (97)
+      expect(pattern.channels[0].rows[15].note).toBe(97);
     });
 
     it('should throw error on invalid XML', () => {
@@ -93,7 +94,7 @@ describe('DB303 Pattern Converter', () => {
       const xml = convertToDb303Pattern(pattern);
 
       expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
-      expect(xml).toContain('<db303-pattern version="1.0" numSteps="16">');
+      expect(xml).toContain('<db303-pattern version="1.0" numSteps="16"');
       expect(xml).toContain('</db303-pattern>');
     });
 

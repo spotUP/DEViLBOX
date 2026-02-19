@@ -81,6 +81,11 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'Reference Code/**', 'dist'],
     environment: 'happy-dom',
+    server: {
+      deps: {
+        inline: ['tone'], // Tone.js uses extensionless ESM imports that Node can't resolve without bundling
+      },
+    },
   },
   resolve: {
     alias: {

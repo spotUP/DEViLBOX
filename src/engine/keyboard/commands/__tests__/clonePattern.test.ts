@@ -21,14 +21,14 @@ describe('clonePattern command', () => {
       ]
     };
 
-    const mockAddPattern = vi.fn();
+    const mockSetState = vi.fn();
     const mockSetStatusMessage = vi.fn();
 
     (useTrackerStore.getState as any) = vi.fn(() => ({
       patterns: [mockPattern],
       currentPatternIndex: 0,
-      addPattern: mockAddPattern,
     }));
+    (useTrackerStore.setState as any) = mockSetState;
 
     (useUIStore.getState as any) = vi.fn(() => ({
       setStatusMessage: mockSetStatusMessage,
@@ -36,10 +36,15 @@ describe('clonePattern command', () => {
 
     clonePattern();
 
-    expect(mockAddPattern).toHaveBeenCalledTimes(1);
+    expect(mockSetState).toHaveBeenCalledTimes(1);
 
-    // Verify it's a deep clone (not the same reference)
-    const clonedPattern = mockAddPattern.mock.calls[0][0];
+    // Call the updater to extract the cloned pattern
+    const updater = mockSetState.mock.calls[0][0];
+    const fakeState = { patterns: [] as typeof mockPattern[] };
+    updater(fakeState);
+
+    expect(fakeState.patterns.length).toBe(1);
+    const clonedPattern = fakeState.patterns[0];
     expect(clonedPattern).not.toBe(mockPattern);
     expect(clonedPattern.name).toBe('Pattern 1 (Copy)');
     expect(clonedPattern.length).toBe(64);
@@ -61,14 +66,14 @@ describe('clonePattern command', () => {
       { ...mockPattern, name: 'Pattern 1 (Copy 2)' },
     ];
 
-    const mockAddPattern = vi.fn();
+    const mockSetState = vi.fn();
     const mockSetStatusMessage = vi.fn();
 
     (useTrackerStore.getState as any) = vi.fn(() => ({
       patterns: existingPatterns,
       currentPatternIndex: 0,
-      addPattern: mockAddPattern,
     }));
+    (useTrackerStore.setState as any) = mockSetState;
 
     (useUIStore.getState as any) = vi.fn(() => ({
       setStatusMessage: mockSetStatusMessage,
@@ -76,8 +81,11 @@ describe('clonePattern command', () => {
 
     clonePattern();
 
-    const clonedPattern = mockAddPattern.mock.calls[0][0];
-    expect(clonedPattern.name).toBe('Pattern 1 (Copy 3)');
+    const updater = mockSetState.mock.calls[0][0];
+    const fakeState = { patterns: [] as typeof mockPattern[] };
+    updater(fakeState);
+
+    expect(fakeState.patterns[0].name).toBe('Pattern 1 (Copy 3)');
   });
 
   it('returns true when successful', () => {

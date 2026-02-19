@@ -42,8 +42,8 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
   const rawNumSteps = parseInt(patternNode.getAttribute('numSteps') || '16', 10);
   const numSteps = Math.max(1, Math.min(256, isNaN(rawNumSteps) ? 16 : rawNumSteps));
   
-  // Parse rootNote (default: 36 = C2)
-  const rootNote = parseInt(patternNode.getAttribute('rootNote') || '36', 10);
+  // Parse rootNote (default: 48 = C3, matches DEViLBOX's C-3 = XM note 37 base)
+  const rootNote = parseInt(patternNode.getAttribute('rootNote') || '48', 10);
   
   // Parse tempo (BPM) and swing (0-1)
   const tempo = patternNode.getAttribute('tempo') ? parseInt(patternNode.getAttribute('tempo')!, 10) : undefined;
@@ -165,13 +165,13 @@ export function parseDb303Pattern(xmlString: string, patternName: string = 'DB30
  * @param pattern - The pattern to convert
  * @param tempo - BPM (default: 120)
  * @param swing - Swing amount 0-1 (default: 0)
- * @param rootNote - MIDI root note (default: 36 = C2)
+ * @param rootNote - MIDI root note (default: 48 = C3)
  */
 export function convertToDb303Pattern(
   pattern: Pattern,
   tempo: number = 120,
   swing: number = 0,
-  rootNote: number = 36
+  rootNote: number = 48
 ): string {
   const lines: string[] = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
@@ -210,9 +210,9 @@ export function convertToDb303Pattern(
 
     if (hasNote) {
       // Convert tracker note to db303 format
-      // Tracker note is 1-based MIDI note (C-0 = 1)
+      // XM note: 1 = C-0 (MIDI 12), so MIDI = XM + 11
       // db303: key (0-11) + octave relative to rootNote
-      const midiNote = cell.note - 1; // Convert to 0-based MIDI
+      const midiNote = cell.note + 11; // Convert XM note to MIDI
       
       // Calculate relative to rootNote
       const relativeNote = midiNote - rootNote;
@@ -236,14 +236,14 @@ export function convertToDb303Pattern(
  * @param filename - Filename (without extension)
  * @param tempo - BPM
  * @param swing - Swing amount 0-1
- * @param rootNote - MIDI root note (default: 36 = C2)
+ * @param rootNote - MIDI root note (default: 48 = C3)
  */
 export function downloadDb303Pattern(
   pattern: Pattern,
   filename: string = 'pattern',
   tempo: number = 120,
   swing: number = 0,
-  rootNote: number = 36
+  rootNote: number = 48
 ): void {
   const xml = convertToDb303Pattern(pattern, tempo, swing, rootNote);
   const blob = new Blob([xml], { type: 'application/xml' });
@@ -339,8 +339,8 @@ export async function exportCurrentPatternToDb303(
   const tempo = transportState.bpm || 120;
   const swing = transportState.swing || 0;
   
-  // Use rootNote 36 (C2) as default - this matches the db303 default
-  const rootNote = 36;
+  // Use rootNote 48 (C3) as default - matches DEViLBOX's C-3 base
+  const rootNote = 48;
   
   const exportFilename = filename || pattern.name?.replace(/[^a-zA-Z0-9-_]/g, '_') || 'pattern';
   
