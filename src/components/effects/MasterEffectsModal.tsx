@@ -740,19 +740,6 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
             }}
           />
 
-          {/* Edit Button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect();
-            }}
-            className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
-            style={{ color: `${enc.accent}70` }}
-            title="Edit parameters"
-          >
-            <Sliders size={14} />
-          </button>
-
           {/* On/Off Toggle */}
           <button
             onClick={(e) => {
