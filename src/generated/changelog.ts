@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-19T11:01:44.927Z
+ * Generated: 2026-02-19T14:35:55.076Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.919';
-export const BUILD_NUMBER = '919';
-export const BUILD_HASH = '3f6acafc';
+export const BUILD_VERSION = '1.0.924';
+export const BUILD_NUMBER = '924';
+export const BUILD_HASH = '67728852';
 export const BUILD_DATE = '2026-02-19';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,29 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.919',
+    version: '1.0.924',
     date: '2026-02-19',
     changes: [
+      {
+        type: 'fix',
+        "description": "Resolve all pre-existing test failures (1219/1219 passing)"
+      },
+      {
+        type: 'fix',
+        "description": "Full audit — wet accessor, stale UI defaults, Custom mode sample browser"
+      },
+      {
+        type: 'fix',
+        "description": "Groove system — stride formula, active state, MOD pitch priority"
+      },
+      {
+        type: 'fix',
+        "description": "Correct defaults — Duck mode, mix 0.5, all EQ bands off"
+      },
+      {
+        type: 'fix',
+        "description": "Use additive mix formula so music always passes through"
+      },
       {
         type: 'fix',
         "description": "Rename set→setParam, wire ToneEngine parameter dispatch"
@@ -218,26 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Use opaque concave gradient on DJ pitch slider handle"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused chColor variable"
-      },
-      {
-        type: 'fix',
-        "description": "Correct TypeScript errors in collapsed channel code"
-      },
-      {
-        type: 'feature',
-        "description": "Extend DJ pitch slider range to ±16 semitones"
-      },
-      {
-        type: 'fix',
-        "description": "Update pitch slider scale to match ±12 semitone range"
-      },
-      {
-        type: 'fix',
-        "description": "Overlap scale onto housing so ticks sit flush against slider"
       }
     ]
   }
