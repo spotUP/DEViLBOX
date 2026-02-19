@@ -56,9 +56,9 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      return new Tone.Chebyshev({ order: Number(p.order) || 50, oversample: (p.oversample as OverSampleType) || 'none', wet: c.wet / 100 });
+      return new Tone.Chebyshev({ order: Number(p.order) || 2, oversample: (p.oversample as OverSampleType) || 'none', wet: c.wet / 100 });
     },
-    getDefaultParameters: () => ({ order: 50, oversample: 'none' }),
+    getDefaultParameters: () => ({ order: 2, oversample: 'none' }),
   },
 
   // ── Filter ──────────────────────────────────────────────────────────────
