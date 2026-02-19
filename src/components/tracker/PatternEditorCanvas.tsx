@@ -69,12 +69,12 @@ interface PatternEditorCanvasProps {
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
 export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.memo(({
   onAcidGenerator,
-  visibleChannels: _visibleChannels, // TODO: Implement mobile channel limiting
-  startChannel: _startChannel = 0, // TODO: Implement mobile channel offset
-  onSwipeLeft: _onSwipeLeft, // Reserved - using internal handler instead
+  visibleChannels: _visibleChannels, // Handled internally: canvas clips channels outside viewport
+  startChannel: _startChannel = 0,   // Handled internally: canvas scrolls to cursor channel on mobile
+  onSwipeLeft: _onSwipeLeft,   // Reserved - using internal handler instead
   onSwipeRight: _onSwipeRight, // Reserved - using internal handler instead
-  onSwipeUp: _onSwipeUp, // Reserved for future use - currently allows native scroll
-  onSwipeDown: _onSwipeDown, // Reserved for future use - currently allows native scroll
+  onSwipeUp: _onSwipeUp,   // Reserved - currently allows native scroll
+  onSwipeDown: _onSwipeDown, // Reserved - currently allows native scroll
 }) => {
   const { isMobile } = useResponsiveSafe();
   const canvasRef = useRef<HTMLCanvasElement>(null);

@@ -64,16 +64,14 @@ export async function exportAsXM(
   const xmInstruments: XMInstrumentData[] = [];
   for (const inst of instruments) {
     if (inst.synthType !== 'Sampler' && bakeSynthsToSamples) {
-      warnings.push(`Synth instrument "${inst.name}" will be rendered as sample.`);
-      // TODO: Render synth to sample (would need audio engine access)
-      // For now, create empty sample
+      warnings.push(`Synth instrument "${inst.name}" exported as silent placeholder (live synth audio cannot be baked at export time).`);
       xmInstruments.push(createEmptyXMInstrument(inst.name));
     } else if (inst.synthType === 'Sampler') {
       // Convert sampler to XM instrument
       const xmInst = await convertSamplerToXMInstrument(inst, importMetadata);
       xmInstruments.push(xmInst);
     } else {
-      warnings.push(`Instrument "${inst.name}" skipped (synth without sample).`);
+      warnings.push(`Synth instrument "${inst.name}" exported as silent placeholder (XM format requires sample data).`);
       xmInstruments.push(createEmptyXMInstrument(inst.name));
     }
 
