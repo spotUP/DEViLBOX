@@ -2013,7 +2013,7 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
 
   const sourceMode   = p('sourceMode', 0);
   const noiseMode    = p('noiseMode', 0);
-  const switchBranch = p('switchBranch', 1);
+  const switchBranch = p('switchBranch', 0);
   const sampleIndex  = p('sampleIndex', 0);
   const activeCat    = TUMULT_CATEGORIES.find(c => sampleIndex >= c.start && sampleIndex <= c.end);
 
@@ -2057,7 +2057,7 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
           </div>
         )}
 
-        {sourceMode === 2 && (
+        {(sourceMode === 2 || sourceMode === 3) && (
           <>
             <div className="flex gap-1.5 mb-2 flex-wrap">
               {TUMULT_CATEGORIES.map((cat) => (
@@ -2094,9 +2094,9 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
         <SectionHeader color="#7c3aed" title="Controls" />
 
         <div className="flex gap-6 items-start flex-wrap">
-          <Knob label="Gain" value={p('noiseGain', -10.6)} min={-35} max={35}
+          <Knob label="Gain" value={p('noiseGain', -10.0)} min={-35} max={35}
             unit="dB" onChange={(v) => set('noiseGain', v)} />
-          <Knob label="Mix" value={p('mix', 1)} min={0} max={1}
+          <Knob label="Mix" value={p('mix', 0.5)} min={0} max={1}
             onChange={(v) => set('mix', v)} />
           <Knob label="Clip" value={p('clipAmount', 0.497)} min={0.05} max={1}
             onChange={(v) => set('clipAmount', v)} />
@@ -2118,22 +2118,22 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
 
         {switchBranch === 0 && (
           <div className="flex gap-4 mt-3 pt-3 border-t border-border flex-wrap">
-            <Knob label="Threshold" value={p('duckThreshold', -17.2)} min={-100} max={0}
+            <Knob label="Threshold" value={p('duckThreshold', -20.0)} min={-100} max={0}
               unit="dB" onChange={(v) => set('duckThreshold', v)} />
             <Knob label="Attack" value={p('duckAttack', 0)} min={0} max={500}
               unit="ms" onChange={(v) => set('duckAttack', v)} />
-            <Knob label="Release" value={p('duckRelease', 21.5)} min={0} max={500}
+            <Knob label="Release" value={p('duckRelease', 15.0)} min={0} max={500}
               unit="ms" onChange={(v) => set('duckRelease', v)} />
           </div>
         )}
 
         {switchBranch === 1 && (
           <div className="flex gap-4 mt-3 pt-3 border-t border-border flex-wrap">
-            <Knob label="Threshold" value={p('followThreshold', -10.7)} min={-100} max={0}
+            <Knob label="Threshold" value={p('followThreshold', -20.0)} min={-100} max={0}
               unit="dB" onChange={(v) => set('followThreshold', v)} />
             <Knob label="Attack" value={p('followAttack', 0)} min={0} max={500}
               unit="ms" onChange={(v) => set('followAttack', v)} />
-            <Knob label="Release" value={p('followRelease', 76.9)} min={0} max={500}
+            <Knob label="Release" value={p('followRelease', 15.0)} min={0} max={500}
               unit="ms" onChange={(v) => set('followRelease', v)} />
             <Knob label="Amount" value={p('followAmount', 0.104)} min={0} max={1}
               onChange={(v) => set('followAmount', v)} />
@@ -2151,13 +2151,13 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
             onSet={set} showGain={false} />
           <TumultEQBand label="Low" enableKey="peak1Enable" freqKey="peak1Freq"
             gainKey="peak1Gain" qKey="peak1Q" typeKey="peak1Type"
-            enabled={!!p('peak1Enable', 1)} freq={p('peak1Freq', 20)}
+            enabled={!!p('peak1Enable', 0)} freq={p('peak1Freq', 20)}
             gain={p('peak1Gain', -0.19)} q={p('peak1Q', 0.7)}
             filterType={p('peak1Type', 0)} typeLabels={['Bell', 'Lo Shelf']}
             onSet={set} showGain />
           <TumultEQBand label="Mid" enableKey="peak2Enable" freqKey="peak2Freq"
             gainKey="peak2Gain" qKey="peak2Q"
-            enabled={!!p('peak2Enable', 1)} freq={p('peak2Freq', 600)}
+            enabled={!!p('peak2Enable', 0)} freq={p('peak2Freq', 600)}
             gain={p('peak2Gain', 1)} q={p('peak2Q', 1)}
             onSet={set} showGain />
           <TumultEQBand label="High" enableKey="peak3Enable" freqKey="peak3Freq"
