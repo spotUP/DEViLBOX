@@ -68,14 +68,13 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
 
   // Handle note input from mobile keyboard
   const handleNoteInput = useCallback((note: number) => {
-    const currentInstrument = 1; // TODO: Get from instrument store
     setCell(cursor.channelIndex, cursor.rowIndex, {
       note,
-      instrument: currentInstrument,
+      instrument: currentInstrumentId ?? 1,
     });
     // Advance cursor if in record mode
     // TODO: Check recordMode and editStep from tracker store
-  }, [cursor, setCell]);
+  }, [cursor, setCell, currentInstrumentId]);
 
   // Handle hex input (for effects, volume, instrument)
   const handleHexInput = useCallback((value: number) => {
