@@ -881,10 +881,8 @@ export class ToneEngine {
 
   /** Notify noise-generating master effects (VinylNoise, Tumult) of playback state. */
   private _notifyNoiseEffectsPlaying(playing: boolean): void {
-    console.log('[ToneEngine] _notifyNoiseEffectsPlaying(', playing, ') — scanning', this.masterEffectConfigs.size, 'effects');
     this.masterEffectConfigs.forEach(({ node }) => {
       if (node instanceof VinylNoiseEffect) {
-        console.log('[ToneEngine] → notifying VinylNoiseEffect');
         node.setPlaying(playing);
       } else if (node instanceof TumultEffect) {
         node.setPlaying(playing);
@@ -4846,13 +4844,22 @@ export class ToneEngine {
       post.smoothingTimeConstant = 0.8;
 
       // Pre-tap: tap the signal feeding into effect[i]
-      // For effect[0]: source is masterEffectsInput; for others: source is the previous effect
-      const preSourceNode: Tone.ToneAudioNode = i === 0
+      // For effect[0]: source is masterEffectsInput; for others: source is the OUTPUT of the previous effect
+      const preSourceToneNode = i === 0
         ? this.masterEffectsInput
         : successNodes[i - 1];
-      const preNative = getNativeAudioNode(preSourceNode);
+      const preOutputNode = i === 0
+        ? undefined
+        : (successNodes[i - 1] as unknown as { output?: unknown }).output;
+      const preNative = preOutputNode
+        ? getNativeAudioNode(preOutputNode)
+        : getNativeAudioNode(preSourceToneNode);
       if (preNative) {
-        try { preNative.connect(pre); } catch { /* */ }
+        try { preNative.connect(pre); } catch (e) {
+          console.warn('[ToneEngine] Pre-analyser tap failed for effect', config.id, e);
+        }
+      } else {
+        console.warn('[ToneEngine] Pre-analyser: could not get native node for effect', config.id);
       }
 
       // Post-tap: tap the output of effect[i]
@@ -4861,7 +4868,11 @@ export class ToneEngine {
         ? getNativeAudioNode(postOutputNode)
         : getNativeAudioNode(successNodes[i]);
       if (postNative) {
-        try { postNative.connect(post); } catch { /* */ }
+        try { postNative.connect(post); } catch (e) {
+          console.warn('[ToneEngine] Post-analyser tap failed for effect', config.id, e);
+        }
+      } else {
+        console.warn('[ToneEngine] Post-analyser: could not get native node for effect', config.id);
       }
 
       this.masterEffectAnalysers.set(config.id, { pre, post });
@@ -4933,8 +4944,6 @@ export class ToneEngine {
       // Update stored config
       existing.config = newConfig;
     }
-
-    console.log('[ToneEngine] Fast parameter update applied (no rebuild)');
   }
 
   /**
@@ -4956,21 +4965,11 @@ export class ToneEngine {
     }
 
     const { node, config: prevConfig } = effectData;
-    if (config.type === 'VinylNoise') {
-      console.log('[ToneEngine] updateMasterEffectParams VinylNoise — wet:', prevConfig.wet, '→', config.wet,
-        'params:', JSON.stringify(config.parameters));
-    }
 
     try {
       // Only update wet if it actually changed
       if (config.wet !== prevConfig.wet) {
         const wetValue = config.wet / 100;
-        if (config.type === 'VinylNoise') {
-          const nodeAny = node as unknown as Record<string, unknown>;
-          console.log('[ToneEngine] VinylNoise wet changed →', wetValue,
-            'node.wet type=', typeof nodeAny.wet,
-            'is Signal?', nodeAny.wet instanceof Tone.Signal);
-        }
         if ('wet' in node && node.wet instanceof Tone.Signal) {
           node.wet.rampTo(wetValue, 0.02);
         } else if ('wet' in node && typeof (node as Record<string, unknown>).wet === 'number') {
@@ -4985,11 +4984,6 @@ export class ToneEngine {
         if (prevConfig.parameters[key] !== value) {
           changedParams[key] = value;
         }
-      }
-
-      if (config.type === 'VinylNoise') {
-        console.log('[ToneEngine] VinylNoise changedParams:', JSON.stringify(changedParams),
-          '(prevParams:', JSON.stringify(prevConfig.parameters), ')');
       }
 
       // Only apply effect params if something actually changed
