@@ -2920,24 +2920,24 @@ export const SpringReverbEditor: React.FC<VisualEffectEditorProps> = ({
   const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col items-center space-y-4 w-full">
       <EffectOscilloscope pre={pre} post={post} color="#059669" />
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
         <SectionHeader color="#059669" title="Spring Tank" />
-        <div className="flex justify-around items-end">
+        <div className="flex justify-center gap-8 items-end">
           <Knob value={decay} min={0} max={1} onChange={(v) => onUpdateParameter('decay', v)} label="Decay" color="#059669" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={damping} min={0} max={1} onChange={(v) => onUpdateParameter('damping', v)} label="Damp" color="#059669" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={tension} min={0} max={1} onChange={(v) => onUpdateParameter('tension', v)} label="Tension" color="#10b981" formatValue={(v) => `${Math.round(v * 100)}%`} />
         </div>
       </section>
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
         <SectionHeader color="#34d399" title="Character" />
         <div className="flex justify-center gap-8 items-end">
           <Knob value={drip} min={0} max={1} onChange={(v) => onUpdateParameter('drip', v)} label="Drip" color="#34d399" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={diffusion} min={0} max={1} onChange={(v) => onUpdateParameter('diffusion', v)} label="Diffusion" color="#34d399" formatValue={(v) => `${Math.round(v * 100)}%`} />
         </div>
       </section>
-      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
         <div className="flex justify-center gap-8 items-end">
           <Knob value={springMix} min={0} max={1} onChange={(v) => onUpdateParameter('mix', v)} label="Int. Mix" color="#6ee7b7" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet} label="Wet" color="#a7f3d0" formatValue={(v) => `${Math.round(v)}%`} />
