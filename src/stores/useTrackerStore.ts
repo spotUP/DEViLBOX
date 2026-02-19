@@ -1301,35 +1301,41 @@ export const useTrackerStore = create<TrackerStore>()(
         state.trackClipboard = channel.rows.map(row => ({ ...row }));
       }),
 
-    cutTrack: (channelIndex) =>
+    cutTrack: (channelIndex) => {
+      const patternIndex = get().currentPatternIndex;
+      const pattern = get().patterns[patternIndex];
+      if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
+      const beforePattern = pattern;
       set((state) => {
-        const pattern = state.patterns[state.currentPatternIndex];
-        if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
-
-        const channel = pattern.channels[channelIndex];
+        const p = state.patterns[state.currentPatternIndex];
+        if (channelIndex < 0 || channelIndex >= p.channels.length) return;
+        const channel = p.channels[channelIndex];
         state.trackClipboard = channel.rows.map(row => ({ ...row }));
-
-        // Clear the track
         channel.rows = channel.rows.map(() => ({ ...EMPTY_CELL }));
-      }),
+      });
+      useHistoryStore.getState().pushAction('CUT_TRACK', 'Cut track', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
-    pasteTrack: (channelIndex) =>
+    pasteTrack: (channelIndex) => {
+      if (!get().trackClipboard) return;
+      const patternIndex = get().currentPatternIndex;
+      const pattern = get().patterns[patternIndex];
+      if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
+      const beforePattern = pattern;
       set((state) => {
         if (!state.trackClipboard) return;
 
-        const pattern = state.patterns[state.currentPatternIndex];
-        if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
+        const p = state.patterns[state.currentPatternIndex];
+        if (channelIndex < 0 || channelIndex >= p.channels.length) return;
 
-        const channel = pattern.channels[channelIndex];
+        const channel = p.channels[channelIndex];
         const { pasteMask } = state;
 
-        // Paste as many rows as possible
-        const maxRows = Math.min(state.trackClipboard.length, pattern.length);
+        const maxRows = Math.min(state.trackClipboard.length, p.length);
         for (let row = 0; row < maxRows; row++) {
           const sourceCell = state.trackClipboard[row];
           const targetCell = channel.rows[row];
 
-          // Merge properties based on pasteMask
           if (hasMaskBit(pasteMask, MASK_NOTE)) {
             targetCell.note = sourceCell.note;
           }
@@ -1348,7 +1354,9 @@ export const useTrackerStore = create<TrackerStore>()(
             targetCell.eff2 = sourceCell.eff2;
           }
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('PASTE_TRACK', 'Paste track', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // FT2: Macro slots (quick-entry)
     writeMacroSlot: (slotIndex) =>
@@ -1370,7 +1378,10 @@ export const useTrackerStore = create<TrackerStore>()(
         };
       }),
 
-    readMacroSlot: (slotIndex) =>
+    readMacroSlot: (slotIndex) => {
+      if (slotIndex < 0 || slotIndex >= 8) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (slotIndex < 0 || slotIndex >= 8) return;
 
@@ -1431,10 +1442,14 @@ export const useTrackerStore = create<TrackerStore>()(
             channel.rows.pop();
           }
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('READ_MACRO', 'Apply macro', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // Advanced editing - Transpose selection by semitones
-    transposeSelection: (semitones, currentInstrumentOnly = false) =>
+    transposeSelection: (semitones, currentInstrumentOnly = false) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         const targetInstrumentId = currentInstrumentOnly ? state.patterns[state.currentPatternIndex].channels[state.cursor.channelIndex].rows[state.cursor.rowIndex].instrument : null;
@@ -1481,7 +1496,9 @@ export const useTrackerStore = create<TrackerStore>()(
             }
           }
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('TRANSPOSE', 'Transpose', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // Swap all occurrences of Instrument A with Instrument B
     remapInstrument: (oldId, newId, scope) =>
@@ -1520,7 +1537,10 @@ export const useTrackerStore = create<TrackerStore>()(
       }),
 
     // Advanced editing - Interpolate values in selection
-    interpolateSelection: (column, startValue, endValue, curve = 'linear') =>
+    interpolateSelection: (column, startValue, endValue, curve = 'linear') => {
+      if (!get().selection) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.selection) return;
 
@@ -1578,10 +1598,15 @@ export const useTrackerStore = create<TrackerStore>()(
             }
           }
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('INTERPOLATE', 'Interpolate', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // Advanced editing - Humanize selection (add random variation to volume)
-    humanizeSelection: (volumeVariation) =>
+    humanizeSelection: (volumeVariation) => {
+      if (!get().selection) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.selection) return;
 
@@ -1616,10 +1641,15 @@ export const useTrackerStore = create<TrackerStore>()(
             cell.volume = 0x10 + newVolume;
           }
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('HUMANIZE', 'Humanize', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // Strum: add incremental note delays across channels (EDx effect)
-    strumSelection: (tickDelay, direction) =>
+    strumSelection: (tickDelay, direction) => {
+      if (!get().selection) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.selection) return;
 
@@ -1650,11 +1680,16 @@ export const useTrackerStore = create<TrackerStore>()(
             }
           }
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('STRUM', 'Strum', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // Legato: for each channel in selection, extend each note's duration
     // by removing empty rows between consecutive notes (set slide flag)
-    legatoSelection: () =>
+    legatoSelection: () => {
+      if (!get().selection) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.selection) return;
 
@@ -1687,10 +1722,14 @@ export const useTrackerStore = create<TrackerStore>()(
             }
           }
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('LEGATO', 'Legato', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // FT2: Scale volume (multiply by factor)
-    scaleVolume: (scope, factor) =>
+    scaleVolume: (scope, factor) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         const getCells = (): TrackerCell[] => {
@@ -1729,10 +1768,14 @@ export const useTrackerStore = create<TrackerStore>()(
             cell.volume = Math.min(0x40, Math.max(0, Math.round(cell.volume * factor)));
           }
         });
-      }),
+      });
+      useHistoryStore.getState().pushAction('SCALE_VOLUME', 'Scale volume', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // FT2: Fade volume (linear interpolation)
-    fadeVolume: (scope, startVol, endVol) =>
+    fadeVolume: (scope, startVol, endVol) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         const getCells = (): TrackerCell[] => {
@@ -1774,7 +1817,9 @@ export const useTrackerStore = create<TrackerStore>()(
           const volume = Math.round(startVol + t * (endVol - startVol));
           cell.volume = Math.min(0x40, Math.max(0, volume));
         });
-      }),
+      });
+      useHistoryStore.getState().pushAction('FADE_VOLUME', 'Fade volume', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     addPattern: (length = DEFAULT_PATTERN_LENGTH) =>
       set((state) => {
@@ -1820,6 +1865,8 @@ export const useTrackerStore = create<TrackerStore>()(
           cloned.id = idGenerator.generate('pattern');
           cloned.name = `${original.name} (Copy)`;
           state.patterns.splice(index + 1, 0, cloned);
+          // Shift patternOrder indices that are > index to account for the splice
+          state.patternOrder = state.patternOrder.map((p) => (p > index ? p + 1 : p));
           // Add status message
           if (typeof window !== 'undefined') {
             import('@stores/useUIStore').then(({ useUIStore }) => {
