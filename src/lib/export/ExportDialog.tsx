@@ -543,7 +543,6 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
               setMasterEffects(data.masterEffects);
             }
 
-            console.log('Song imported:', data);
             notify.success(`Song "${data.metadata.name}" imported successfully!`);
           }
           break;
@@ -562,7 +561,6 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             setCurrentPattern(patternIndex);
             setCurrentInstrument(data.instrument.id);
 
-            console.log('SFX imported:', data);
             notify.success(`SFX "${data.name}" imported successfully!`);
           }
           break;
@@ -575,7 +573,6 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             addInstrument(data.instrument);
             setCurrentInstrument(data.instrument.id);
 
-            console.log('Instrument imported:', data);
             notify.success(`Instrument "${data.instrument.name}" imported successfully!`);
           }
           break;
@@ -1075,7 +1072,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       />
                     </div>
 
-                    {/* Bake synths to samples */}
+                    {/* Synth instrument handling */}
                     <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
                       <input
                         type="checkbox"
@@ -1083,7 +1080,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                         onChange={(e) => setBakeSynthsToSamples(e.target.checked)}
                         className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary"
                       />
-                      Render synth instruments as samples
+                      Include synth instrument slots (audio will be silent)
                     </label>
 
                     <div className="text-sm font-mono text-text-secondary space-y-1">
@@ -1164,7 +1161,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       </div>
                     </div>
 
-                    {/* Bake synths to samples */}
+                    {/* Synth instrument handling */}
                     <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
                       <input
                         type="checkbox"
@@ -1172,7 +1169,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                         onChange={(e) => setBakeSynthsToSamples(e.target.checked)}
                         className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary"
                       />
-                      Render synth instruments as samples
+                      Include synth instrument slots (audio will be silent)
                     </label>
 
                     <div className="text-sm font-mono text-text-secondary space-y-1">

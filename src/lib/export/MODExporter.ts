@@ -77,13 +77,13 @@ export async function exportAsMOD(
     }
 
     if (inst.synthType !== 'Sampler' && bakeSynthsToSamples) {
-      warnings.push(`Synth instrument "${inst.name}" will be rendered as sample.`);
-      // TODO: Render synth to sample
+      warnings.push(`Synth instrument "${inst.name}" exported as silent placeholder (live synth audio cannot be baked at export time).`);
       modSamples.push(createEmptySample());
     } else if (inst.synthType === 'Sampler') {
       const modSample = await convertSamplerToMODSample(inst, importMetadata);
       modSamples.push(modSample);
     } else {
+      warnings.push(`Synth instrument "${inst.name}" exported as silent placeholder (MOD format requires sample data).`);
       modSamples.push(createEmptySample());
     }
 
