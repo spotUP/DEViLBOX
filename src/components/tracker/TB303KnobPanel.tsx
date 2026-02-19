@@ -83,7 +83,7 @@ export const TB303KnobPanel: React.FC = memo(() => {
           onClose={() => setTB303PoppedOut(false)}
           title="DEViLBOX — TB-303"
           width={1200}
-          height={560}
+          height={640}
           fitContent
         >
           <div className="flex items-center justify-center h-full text-gray-500 text-sm">
@@ -104,7 +104,7 @@ export const TB303KnobPanel: React.FC = memo(() => {
           onClose={() => setTB303PoppedOut(false)}
           title="DEViLBOX — TB-303"
           width={1200}
-          height={560}
+          height={640}
           fitContent
         >
           <div style={{ background: '#1a1a1a' }}>

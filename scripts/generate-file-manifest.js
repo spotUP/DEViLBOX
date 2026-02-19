@@ -25,6 +25,7 @@ const EXTENSIONS = [
   '.symmod', '.ult', '.umx',
   '.fur', '.fui',
   '.mid', '.midi',
+  '.sqs', '.seq',
   '.wav', '.mp3', '.ogg', '.flac', '.aif', '.aiff'
 ];
 

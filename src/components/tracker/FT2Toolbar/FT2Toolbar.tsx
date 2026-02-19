@@ -48,6 +48,7 @@ import type { XMNote } from '@lib/import/formats/XMParser';
 import type { MODNote } from '@lib/import/formats/MODParser';
 import { convertToInstrument } from '@lib/import/InstrumentConverter';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
+import { clearSavedProject } from '@hooks/useProjectPersistence';
 import { parseDb303Pattern, exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
 import type { InstrumentConfig, TB303Config } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
@@ -1060,6 +1061,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   resetInstruments();
                   resetTracker();
                   resetTransport();
+                  clearSavedProject();
                   setShowClearModal(false);
                   notify.success('Reset to defaults');
                 }}

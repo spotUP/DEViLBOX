@@ -73,7 +73,7 @@ interface FileItem {
 const TRACKER_EXTENSIONS = ['.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.669', '.amf', '.ams', '.dbm', '.dmf', '.dsm', '.far', '.ftm', '.gdm', '.imf', '.mdl', '.med', '.mt2', '.mtm', '.okt', '.psm', '.ptm', '.sfx', '.stm', '.ult', '.umx'];
 
 // Binary file formats that need ArrayBuffer loading (not JSON)
-const BINARY_EXTENSIONS = [...TRACKER_EXTENSIONS, '.sqs', '.seq'];
+const BINARY_EXTENSIONS = [...TRACKER_EXTENSIONS, '.sqs', '.seq', '.mid', '.midi'];
 
 function isTrackerModule(filename: string): boolean {
   const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));

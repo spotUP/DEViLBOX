@@ -1698,8 +1698,9 @@ export class ToneEngine {
     });
 
     if (foundChains === 0) {
-      // No active chains found, but we still store the analyser 
+      // No active chains found, but we still store the analyser
       // so future chains (from buildInstrumentEffectChain) will connect to it
+    }
     this.instrumentAnalysers.set(instrumentId, analyser);
     return analyser;
   }
@@ -2613,8 +2614,6 @@ export class ToneEngine {
       return;
     }
     
-    const isFurnaceDispatch = instrument instanceof FurnaceDispatchSynth;
-
     if (channelIndex !== undefined) {
       // 1. Handle Past Note Actions (NNA)
       let voices = this.activeVoices.get(channelIndex) || [];
