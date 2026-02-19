@@ -75,64 +75,41 @@ export async function importMIDIFile(
 
   // Convert each MIDI track to a tracker pattern
   const patterns: Pattern[] = [];
+  const instruments: InstrumentConfig[] = [];
 
   if (opts.mergeChannels) {
-    // Build trackToInstId map (trackIndex → 1-based instId for non-empty tracks)
     const trackToInstId = new Map<number, number>();
-    const instruments: InstrumentConfig[] = [];
     let instId = 1;
     midi.tracks.forEach((track, ti) => {
       if (track.notes.length === 0) return;
       trackToInstId.set(ti, instId);
-      instruments.push(
-        gmProgramToInstrument(track.instrument.number, instId, track.instrument.percussion)
-      );
+      instruments.push(gmProgramToInstrument(track.instrument.number, instId, track.instrument.percussion));
       instId++;
     });
-    // Merge all MIDI tracks into a single pattern with multiple channels
-    const pattern = createPatternFromMIDI(midi, opts, ppq, rowsPerBeat, trackToInstId);
-    patterns.push(pattern);
-
-    return {
-      patterns,
-      instruments,
-      bpm,
-      timeSignature,
-      metadata: {
-        name: midi.name || file.name.replace(/\.[^/.]+$/, ''),
-        tracks: midi.tracks.length,
-        totalTicks: midi.durationTicks,
-      },
-    };
+    patterns.push(createPatternFromMIDI(midi, opts, ppq, rowsPerBeat, trackToInstId));
   } else {
-    // Create separate patterns for each MIDI track
-    const instruments: InstrumentConfig[] = [];
     let nonEmptyIndex = 0;
     for (let trackIndex = 0; trackIndex < midi.tracks.length; trackIndex++) {
       const track = midi.tracks[trackIndex];
-      if (track.notes.length === 0) continue; // Skip empty tracks
-
+      if (track.notes.length === 0) continue;
       const thisInstId = nonEmptyIndex + 1;
-      instruments.push(
-        gmProgramToInstrument(track.instrument.number, thisInstId, track.instrument.percussion)
-      );
-      const pattern = createPatternFromTrack(track, trackIndex, thisInstId, opts, ppq, rowsPerBeat);
-      patterns.push(pattern);
+      instruments.push(gmProgramToInstrument(track.instrument.number, thisInstId, track.instrument.percussion));
+      patterns.push(createPatternFromTrack(track, trackIndex, thisInstId, opts, ppq, rowsPerBeat));
       nonEmptyIndex++;
     }
-
-    return {
-      patterns,
-      instruments,
-      bpm,
-      timeSignature,
-      metadata: {
-        name: midi.name || file.name.replace(/\.[^/.]+$/, ''),
-        tracks: midi.tracks.length,
-        totalTicks: midi.durationTicks,
-      },
-    };
   }
+
+  return {
+    patterns,
+    instruments,
+    bpm,
+    timeSignature,
+    metadata: {
+      name: midi.name || file.name.replace(/\.[^/.]+$/, ''),
+      tracks: midi.tracks.length,
+      totalTicks: midi.durationTicks,
+    },
+  };
 }
 
 /**
