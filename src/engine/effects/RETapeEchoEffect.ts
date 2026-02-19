@@ -22,6 +22,11 @@
 import * as Tone from 'tone';
 import { getNativeContext } from '@utils/audio-context';
 
+function getRawNode(node: Tone.Gain): AudioNode {
+  const n = node as unknown as Record<string, AudioNode | undefined>;
+  return n._gainNode ?? n._nativeAudioNode ?? n._node ?? (node as unknown as AudioNode);
+}
+
 export interface RETapeEchoOptions {
   mode?: number;           // 0-5
   repeatRate?: number;     // 0-1
@@ -134,8 +139,10 @@ export class RETapeEchoEffect extends Tone.ToneAudioNode {
       });
 
       // Connect wet path: input → workletNode → wetGain (already connected to output)
-      Tone.connect(this.input, this.workletNode);
-      Tone.connect(this.workletNode, this.wetGain);
+      // Use getRawNode() to extract the underlying native AudioNode — Tone.connect()
+      // silently fails when crossing standardized-audio-context ↔ native AudioContext.
+      getRawNode(this.input).connect(this.workletNode);
+      this.workletNode.connect(getRawNode(this.wetGain));
 
     } catch (err) {
       console.error('[RETapeEcho] Init failed:', err);
