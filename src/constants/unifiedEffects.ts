@@ -59,6 +59,13 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     group: 'Distortion',
     description: 'Harmonic waveshaper distortion',
   },
+  {
+    category: 'tonejs',
+    type: 'TapeSaturation',
+    label: 'Tape Saturation',
+    group: 'Distortion',
+    description: 'Analog tape warmth with odd/even harmonic saturation and high-frequency rolloff',
+  },
 
   // ===== TIME-BASED (Tone.js) =====
   {
@@ -232,6 +239,13 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     label: 'Tumult',
     group: 'Texture',
     description: 'Noise & ambience generator — 5 synth modes + 95 bundled samples, 5-band SVF EQ, Duck/Follow sidechain (Tumult port)',
+  },
+  {
+    category: 'wasm',
+    type: 'TapeSimulator',
+    label: 'Tape Simulator',
+    group: 'Texture',
+    description: 'Analog tape deck emulator — saturation, wow/flutter, head bump, bias rolloff, hiss (Kiss of Shame port)',
   },
 
   // ===== PITCH (Tone.js) =====

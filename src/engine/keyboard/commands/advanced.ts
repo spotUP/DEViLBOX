@@ -8,7 +8,7 @@ import { useUIStore } from '@stores/useUIStore';
  * Interpolate volume values in selection
  */
 export function interpolateVolume(): boolean {
-  useUIStore.getState().setStatusMessage('Interpolate volume', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Interpolate volume', false, 1000);
   return true;
 }
 
@@ -16,7 +16,7 @@ export function interpolateVolume(): boolean {
  * Interpolate effect values in selection
  */
 export function interpolateEffect(): boolean {
-  useUIStore.getState().setStatusMessage('Interpolate effect', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Interpolate effect', false, 1000);
   return true;
 }
 
@@ -24,7 +24,7 @@ export function interpolateEffect(): boolean {
  * Amplify selection volume
  */
 export function amplifySelection(): boolean {
-  useUIStore.getState().setStatusMessage('Amplify selection', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Amplify selection', false, 1000);
   return true;
 }
 
@@ -32,7 +32,7 @@ export function amplifySelection(): boolean {
  * Apply current instrument to selection
  */
 export function applyCurrentInstrument(): boolean {
-  useUIStore.getState().setStatusMessage('Apply instrument', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Apply instrument', false, 1000);
   return true;
 }
 
@@ -40,7 +40,7 @@ export function applyCurrentInstrument(): boolean {
  * Expand pattern (double rows)
  */
 export function expandPattern(): boolean {
-  useUIStore.getState().setStatusMessage('Expand pattern', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Expand pattern', false, 1000);
   return true;
 }
 
@@ -48,7 +48,7 @@ export function expandPattern(): boolean {
  * Shrink pattern (halve rows)
  */
 export function shrinkPattern(): boolean {
-  useUIStore.getState().setStatusMessage('Shrink pattern', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Shrink pattern', false, 1000);
   return true;
 }
 
@@ -56,7 +56,7 @@ export function shrinkPattern(): boolean {
  * Grow selection (expand in place)
  */
 export function growSelection(): boolean {
-  useUIStore.getState().setStatusMessage('Grow selection', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Grow selection', false, 1000);
   return true;
 }
 
@@ -64,7 +64,7 @@ export function growSelection(): boolean {
  * Shrink selection (compress in place)
  */
 export function shrinkSelection(): boolean {
-  useUIStore.getState().setStatusMessage('Shrink selection', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Shrink selection', false, 1000);
   return true;
 }
 
@@ -72,7 +72,7 @@ export function shrinkSelection(): boolean {
  * Duplicate pattern
  */
 export function duplicatePattern(): boolean {
-  useUIStore.getState().setStatusMessage('Duplicate pattern', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Duplicate pattern', false, 1000);
   return true;
 }
 
@@ -80,7 +80,7 @@ export function duplicatePattern(): boolean {
  * Double block length
  */
 export function doubleBlockLength(): boolean {
-  useUIStore.getState().setStatusMessage('Double block length', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Double block length', false, 1000);
   return true;
 }
 
@@ -88,7 +88,7 @@ export function doubleBlockLength(): boolean {
  * Halve block length
  */
 export function halveBlockLength(): boolean {
-  useUIStore.getState().setStatusMessage('Halve block length', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Halve block length', false, 1000);
   return true;
 }
 
@@ -96,7 +96,7 @@ export function halveBlockLength(): boolean {
  * Double block (FT2/IT style)
  */
 export function doubleBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Double block', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Double block', false, 1000);
   return true;
 }
 
@@ -104,7 +104,7 @@ export function doubleBlock(): boolean {
  * Halve block (FT2/IT style)
  */
 export function halveBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Halve block', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Halve block', false, 1000);
   return true;
 }
 
@@ -112,7 +112,7 @@ export function halveBlock(): boolean {
  * Scale volume for track
  */
 export function scaleVolumeTrack(): boolean {
-  useUIStore.getState().setStatusMessage('Scale volume (track)', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Scale volume (track)', false, 1000);
   return true;
 }
 
@@ -120,7 +120,7 @@ export function scaleVolumeTrack(): boolean {
  * Scale volume for pattern
  */
 export function scaleVolumePattern(): boolean {
-  useUIStore.getState().setStatusMessage('Scale volume (pattern)', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Scale volume (pattern)', false, 1000);
   return true;
 }
 
@@ -128,7 +128,7 @@ export function scaleVolumePattern(): boolean {
  * Scale volume for block/selection
  */
 export function scaleVolumeBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Scale volume (block)', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Scale volume (block)', false, 1000);
   return true;
 }
 
@@ -136,7 +136,7 @@ export function scaleVolumeBlock(): boolean {
  * Swap channels
  */
 export function swapChannels(): boolean {
-  useUIStore.getState().setStatusMessage('Swap channels', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Swap channels', false, 1000);
   return true;
 }
 
@@ -144,7 +144,7 @@ export function swapChannels(): boolean {
  * Split pattern at cursor
  */
 export function splitPattern(): boolean {
-  useUIStore.getState().setStatusMessage('Split pattern', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Split pattern', false, 1000);
   return true;
 }
 
@@ -152,7 +152,7 @@ export function splitPattern(): boolean {
  * Join patterns
  */
 export function joinBlocks(): boolean {
-  useUIStore.getState().setStatusMessage('Join blocks', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Join blocks', false, 1000);
   return true;
 }
 
@@ -160,7 +160,7 @@ export function joinBlocks(): boolean {
  * Set pattern length
  */
 export function setPatternLength(): boolean {
-  useUIStore.getState().setStatusMessage('Set pattern length', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Set pattern length', false, 1000);
   return true;
 }
 
@@ -168,7 +168,7 @@ export function setPatternLength(): boolean {
  * Set BPM
  */
 export function setBpm(): boolean {
-  useUIStore.getState().setStatusMessage('Set BPM', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Set BPM', false, 1000);
   return true;
 }
 
@@ -176,7 +176,7 @@ export function setBpm(): boolean {
  * Set speed/ticks
  */
 export function setSpeed(): boolean {
-  useUIStore.getState().setStatusMessage('Set speed', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Set speed', false, 1000);
   return true;
 }
 
@@ -184,7 +184,7 @@ export function setSpeed(): boolean {
  * Set tempo
  */
 export function setTempo(): boolean {
-  useUIStore.getState().setStatusMessage('Set tempo', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Set tempo', false, 1000);
   return true;
 }
 
@@ -192,7 +192,7 @@ export function setTempo(): boolean {
  * Append block
  */
 export function appendBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Append block', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Append block', false, 1000);
   return true;
 }
 
@@ -200,7 +200,7 @@ export function appendBlock(): boolean {
  * Insert block
  */
 export function insertBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Insert block', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Insert block', false, 1000);
   return true;
 }
 
@@ -208,7 +208,7 @@ export function insertBlock(): boolean {
  * Split block
  */
 export function splitBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Split block', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Split block', false, 1000);
   return true;
 }
 
@@ -216,7 +216,7 @@ export function splitBlock(): boolean {
  * Go to specific block
  */
 export function gotoBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Go to block', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Go to block', false, 1000);
   return true;
 }
 
@@ -224,7 +224,7 @@ export function gotoBlock(): boolean {
  * Find sample
  */
 export function findSample(): boolean {
-  useUIStore.getState().setStatusMessage('Find sample', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Find sample', false, 1000);
   return true;
 }
 
@@ -232,7 +232,7 @@ export function findSample(): boolean {
  * Find and replace
  */
 export function findReplace(): boolean {
-  useUIStore.getState().setStatusMessage('Find/Replace', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Find/Replace', false, 1000);
   return true;
 }
 
@@ -240,7 +240,7 @@ export function findReplace(): boolean {
  * Find next
  */
 export function findNext(): boolean {
-  useUIStore.getState().setStatusMessage('Find next', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Find next', false, 1000);
   return true;
 }
 
@@ -248,7 +248,7 @@ export function findNext(): boolean {
  * Go to row/channel dialog
  */
 export function gotoDialog(): boolean {
-  useUIStore.getState().setStatusMessage('Go to...', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Go to...', false, 1000);
   return true;
 }
 
@@ -256,6 +256,6 @@ export function gotoDialog(): boolean {
  * Quantize settings
  */
 export function quantizeSettings(): boolean {
-  useUIStore.getState().setStatusMessage('Quantize settings', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Quantize settings', false, 1000);
   return true;
 }

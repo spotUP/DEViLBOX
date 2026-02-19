@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-19T14:35:55.076Z
+ * Generated: 2026-02-19T18:40:35.023Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.924';
-export const BUILD_NUMBER = '924';
-export const BUILD_HASH = '67728852';
+export const BUILD_VERSION = '1.0.928';
+export const BUILD_NUMBER = '928';
+export const BUILD_HASH = '5211f390';
 export const BUILD_DATE = '2026-02-19';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,25 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.924',
+    version: '1.0.928',
     date: '2026-02-19',
     changes: [
+      {
+        type: 'fix',
+        "description": "VinylNoise hiss audibility + tracker Backspace at row 0 + Cmd+Backspace on Mac"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: regenerate changelog"
+      },
+      {
+        type: 'feature',
+        "description": "Tumult — playback gate, sample-rate correction, followAmount default"
+      },
+      {
+        type: 'feature',
+        "description": "VinylNoise — playback gate, source mode, stylus/worn filters"
+      },
       {
         type: 'fix',
         "description": "Resolve all pre-existing test failures (1219/1219 passing)"
@@ -222,22 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add global playback rate for true pitch shifting on Amiga MOD samples"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused Tone import from DJPitchSlider"
-      },
-      {
-        type: 'fix',
-        "description": "Coordinate DJ pitch slider with PatternScheduler for accurate BPM control"
-      },
-      {
-        type: 'fix',
-        "description": "Center collapsed channels correctly to prevent content shift"
-      },
-      {
-        type: 'fix',
-        "description": "Use opaque concave gradient on DJ pitch slider handle"
       }
     ]
   }

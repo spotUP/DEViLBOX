@@ -95,11 +95,6 @@ export const useHistoryStore = create<HistoryStore>()(
         state.redoStack = [];
 
         state.currentActionId = action.id;
-
-        console.log(`History: ${type} - ${description}`, {
-          undoCount: state.undoStack.length,
-          redoCount: state.redoStack.length,
-        });
       }),
 
     // Undo last action
@@ -119,11 +114,6 @@ export const useHistoryStore = create<HistoryStore>()(
           // Update current action ID
           draft.currentActionId =
             draft.undoStack.length > 0 ? draft.undoStack[draft.undoStack.length - 1].id : null;
-
-          console.log(`Undo: ${poppedAction.type} - ${poppedAction.description}`, {
-            undoCount: draft.undoStack.length,
-            redoCount: draft.redoStack.length,
-          });
         }
       });
 
@@ -147,11 +137,6 @@ export const useHistoryStore = create<HistoryStore>()(
 
           // Update current action ID
           draft.currentActionId = poppedAction.id;
-
-          console.log(`Redo: ${poppedAction.type} - ${poppedAction.description}`, {
-            undoCount: draft.undoStack.length,
-            redoCount: draft.redoStack.length,
-          });
         }
       });
 
@@ -175,7 +160,6 @@ export const useHistoryStore = create<HistoryStore>()(
         state.undoStack = [];
         state.redoStack = [];
         state.currentActionId = null;
-        console.log('History cleared');
       }),
 
     // Set maximum stack size

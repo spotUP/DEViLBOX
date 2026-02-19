@@ -11,6 +11,7 @@ import { EffectRegistry } from '../EffectRegistry';
 import './tonejs';
 import './wasm';
 import './tumult';
+import './tapesimulator';
 
 // ── Lazy: Buzzmachine effects (23 effects) ────────────────────────────────
 EffectRegistry.registerLazy(

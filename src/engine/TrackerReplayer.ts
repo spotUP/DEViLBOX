@@ -252,11 +252,8 @@ export class TrackerReplayer {
   private globalPitchSlideSpeed = 0.5; // Semitones per tick (fixed speed for smooth slides)
 
   // Timing drift diagnostics
-  private playbackStartWallTime = 0; // Wall-clock time when playback started
   private totalRowsProcessed = 0;    // Total rows processed since start
   private totalTicksProcessed = 0;   // Total ticks processed (tracks actual time regardless of speed changes)
-  private lastScheduledTime = 0;     // Scheduled audio time from last processTick call
-  private lastPatternRowCount = 0;   // Rows played in the last completed pattern
 
   // Furnace speed alternation (speed1/speed2)
   private speed2: number | null = null;  // null = no alternation (XM/MOD mode)
@@ -525,11 +522,8 @@ export class TrackerReplayer {
     // `+= tickInterval`. Pattern boundaries, breaks, jumps — none of them
     // touch the timeline. This makes cumulative drift impossible.
     this.nextScheduleTime = Tone.now() + 0.02;
-    this.playbackStartWallTime = Tone.now();
     this.totalRowsProcessed = 0;
     this.totalTicksProcessed = 0;
-    this.lastScheduledTime = 0;
-    this.lastPatternRowCount = 0;
 
     const schedulerTick = () => {
       if (!this.playing) return;
@@ -607,8 +601,6 @@ export class TrackerReplayer {
   private processTick(time: number): void {
     if (!this.song || !this.playing) return;
 
-    // Track scheduled time for drift diagnostics
-    this.lastScheduledTime = time;
     this.totalTicksProcessed++;
 
     // Handle pattern delay

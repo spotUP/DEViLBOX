@@ -8,7 +8,7 @@ import { useUIStore } from '@stores/useUIStore';
  * Standard paste (overwrite mode)
  */
 export function pasteOverwrite(): boolean {
-  useUIStore.getState().setStatusMessage('Paste (overwrite)', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Paste (overwrite)', false, 1000);
   return true;
 }
 
@@ -16,7 +16,7 @@ export function pasteOverwrite(): boolean {
  * Paste insert mode (push existing data down)
  */
 export function pasteInsert(): boolean {
-  useUIStore.getState().setStatusMessage('Paste (insert)', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Paste (insert)', false, 1000);
   return true;
 }
 
@@ -24,7 +24,7 @@ export function pasteInsert(): boolean {
  * Paste mix mode (merge with existing, non-destructive)
  */
 export function pasteMix(): boolean {
-  useUIStore.getState().setStatusMessage('Paste (mix)', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Paste (mix)', false, 1000);
   return true;
 }
 
@@ -32,7 +32,7 @@ export function pasteMix(): boolean {
  * Paste flood (fill selection with clipboard data)
  */
 export function pasteFlood(): boolean {
-  useUIStore.getState().setStatusMessage('Paste (flood)', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Paste (flood)', false, 1000);
   return true;
 }
 
@@ -40,7 +40,7 @@ export function pasteFlood(): boolean {
  * Push forward paste (IT-style)
  */
 export function pushForwardPaste(): boolean {
-  useUIStore.getState().setStatusMessage('Push forward paste', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Push forward paste', false, 1000);
   return true;
 }
 
@@ -48,7 +48,7 @@ export function pushForwardPaste(): boolean {
  * Cut current row (delete and copy to clipboard)
  */
 export function cutRow(): boolean {
-  useUIStore.getState().setStatusMessage('Cut row', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Cut row', false, 1000);
   return true;
 }
 
@@ -56,7 +56,7 @@ export function cutRow(): boolean {
  * Copy current row
  */
 export function copyRow(): boolean {
-  useUIStore.getState().setStatusMessage('Copy row', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Copy row', false, 1000);
   return true;
 }
 
@@ -64,7 +64,7 @@ export function copyRow(): boolean {
  * Cut current note
  */
 export function cutNote(): boolean {
-  useUIStore.getState().setStatusMessage('Cut note', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Cut note', false, 1000);
   return true;
 }
 
@@ -72,7 +72,7 @@ export function cutNote(): boolean {
  * Clear current note
  */
 export function clearNote(): boolean {
-  useUIStore.getState().setStatusMessage('Clear note', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Clear note', false, 1000);
   return true;
 }
 
@@ -80,7 +80,7 @@ export function clearNote(): boolean {
  * Clear current row
  */
 export function clearRow(): boolean {
-  useUIStore.getState().setStatusMessage('Clear row', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Clear row', false, 1000);
   return true;
 }
 
@@ -88,7 +88,7 @@ export function clearRow(): boolean {
  * Delete row and pull up (like backspace)
  */
 export function deleteRowPullUp(): boolean {
-  useUIStore.getState().setStatusMessage('Delete row pull up', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Delete row pull up', false, 1000);
   return true;
 }
 
@@ -96,7 +96,7 @@ export function deleteRowPullUp(): boolean {
  * Insert row and push down
  */
 export function insertRowPushDown(): boolean {
-  useUIStore.getState().setStatusMessage('Insert row push down', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Insert row push down', false, 1000);
   return true;
 }
 
@@ -104,7 +104,7 @@ export function insertRowPushDown(): boolean {
  * Clear selection only (without cutting)
  */
 export function clearSelection(): boolean {
-  useUIStore.getState().setStatusMessage('Clear selection', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Clear selection', false, 1000);
   return true;
 }
 
@@ -112,7 +112,7 @@ export function clearSelection(): boolean {
  * Copy whole pattern
  */
 export function copyPattern(): boolean {
-  useUIStore.getState().setStatusMessage('Copy pattern', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Copy pattern', false, 1000);
   return true;
 }
 
@@ -120,7 +120,7 @@ export function copyPattern(): boolean {
  * Paste pattern
  */
 export function pastePattern(): boolean {
-  useUIStore.getState().setStatusMessage('Paste pattern', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Paste pattern', false, 1000);
   return true;
 }
 
@@ -128,7 +128,7 @@ export function pastePattern(): boolean {
  * Cut current channel
  */
 export function cutChannel(): boolean {
-  useUIStore.getState().setStatusMessage('Cut channel', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Cut channel', false, 1000);
   return true;
 }
 
@@ -136,7 +136,7 @@ export function cutChannel(): boolean {
  * Copy current channel
  */
 export function copyChannel(): boolean {
-  useUIStore.getState().setStatusMessage('Copy channel', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Copy channel', false, 1000);
   return true;
 }
 
@@ -144,6 +144,6 @@ export function copyChannel(): boolean {
  * Paste to current channel
  */
 export function pasteChannel(): boolean {
-  useUIStore.getState().setStatusMessage('Paste channel', false, 1000);
+  useUIStore.getState().setStatusMessage('Not yet implemented: Paste channel', false, 1000);
   return true;
 }

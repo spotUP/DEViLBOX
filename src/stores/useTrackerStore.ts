@@ -950,7 +950,9 @@ export const useTrackerStore = create<TrackerStore>()(
         };
       }),
 
-    cutSelection: () =>
+    cutSelection: () => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         let sel = state.selection;
@@ -1040,14 +1042,19 @@ export const useTrackerStore = create<TrackerStore>()(
         };
 
         state.selection = null;
-      }),
+      });
+      useHistoryStore.getState().pushAction('CUT_SELECTION', 'Cut', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     setClipboard: (data) =>
       set((state) => {
         state.clipboard = data;
       }),
 
-    paste: () =>
+    paste: () => {
+      if (!get().clipboard) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.clipboard) return;
 
@@ -1103,10 +1110,15 @@ export const useTrackerStore = create<TrackerStore>()(
             }
           }
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('PASTE', 'Paste', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // OpenMPT-style Mix Paste: Only fill empty cells
-    pasteMix: () =>
+    pasteMix: () => {
+      if (!get().clipboard) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.clipboard) return;
 
@@ -1146,10 +1158,15 @@ export const useTrackerStore = create<TrackerStore>()(
             }
           }
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('PASTE_MIX', 'Mix paste', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // OpenMPT-style Flood Paste: Paste repeatedly until pattern end
-    pasteFlood: () =>
+    pasteFlood: () => {
+      if (!get().clipboard) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.clipboard) return;
 
@@ -1195,10 +1212,15 @@ export const useTrackerStore = create<TrackerStore>()(
             currentRow += clipboardRows;
           }
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('PASTE_FLOOD', 'Flood paste', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // OpenMPT-style Push-Forward Paste: Insert clipboard data and shift existing content down
-    pastePushForward: () =>
+    pastePushForward: () => {
+      if (!get().clipboard) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.clipboard) return;
 
@@ -1265,7 +1287,9 @@ export const useTrackerStore = create<TrackerStore>()(
             }
           }
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('PASTE_PUSH_FORWARD', 'Push-forward paste', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // FT2: Track operations (single-channel copy/paste)
     copyTrack: (channelIndex) =>
@@ -2166,7 +2190,6 @@ export const useTrackerStore = create<TrackerStore>()(
 
     applySystemPreset: (presetId) =>
       set((state) => {
-        console.log(`[useTrackerStore] Applying hardware system preset: ${presetId}`);
         const preset = SYSTEM_PRESETS.find((p) => p.id === presetId);
         if (!preset) {
           console.warn(`[useTrackerStore] Preset not found: ${presetId}`);
@@ -2439,7 +2462,6 @@ export const useTrackerStore = create<TrackerStore>()(
           if (replayer.isPlaying()) {
             // ONLY seek if the replayer isn't already at this position.
             if (replayer.getCurrentPosition() !== positionIndex) {
-              console.log(`[useTrackerStore] Manual seek to position ${positionIndex}`);
               // Maintain current row when jumping positions manually
               const currentRow = useTransportStore.getState().currentRow;
               replayer.seekTo(positionIndex, currentRow);

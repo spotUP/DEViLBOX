@@ -110,19 +110,6 @@ export class PatternScheduler {
    */
   public setAutomation(automation: AutomationData): void {
     this.automation = automation;
-    // Debug: log automation data details
-    const patternIds = Object.keys(automation);
-    if (patternIds.length > 0) {
-      patternIds.forEach(pid => {
-        const channels = Object.keys(automation[pid] || {});
-        channels.forEach(ch => {
-          const params = Object.keys(automation[pid][Number(ch)] || {});
-          console.log(`[PatternScheduler] Automation set for pattern ${pid}, channel ${ch}:`, params);
-        });
-      });
-    } else {
-      console.log('[PatternScheduler] Automation data is empty');
-    }
   }
 
   /**
@@ -451,9 +438,6 @@ export class PatternScheduler {
     
     const localHandler = this.activeHandler;
     const engine = getToneEngine();
-
-    console.log(`[PatternScheduler] Scheduling ${format} pattern (Handler persistent: ${startOffset > 0}):`, pattern.name);
-
     // Set pattern in automation player
     this.automationPlayer.setPattern(pattern);
     this.automationPlayer.setAutomationData(this.automation);
@@ -698,21 +682,16 @@ export class PatternScheduler {
     const patternDuration = lastRowTiming.time + lastRowDuration;
     const absolutePatternEnd = startOffset + patternDuration;
     this.currentPatternEndTime = absolutePatternEnd;
-
-    console.log(`[PatternScheduler] Pattern duration: ${patternDuration}s, ends at: ${absolutePatternEnd}s, onPatternEnd set: ${!!this.onPatternEnd}`);
-
     // Capture callback reference to avoid issues with 'this' changing
     const patternEndCallback = this.onPatternEnd;
     if (patternEndCallback && !this.nextPatternScheduled) {
       // Fire callback at the EXACT last row to prevent premature pattern switching
       // Use the pre-computed last row start time
       const callbackTime = startOffset + lastRowTiming.time; // Fire at the start of the last row
-      console.log(`[PatternScheduler] Scheduling pattern end callback at ${callbackTime}s (last row start)`);
       events.push({
         time: callbackTime,
         audioCallback: () => {
           if (!this.nextPatternScheduled) {
-            console.log(`[PatternScheduler] Pattern end callback fired! Next pattern should start at ${absolutePatternEnd}s`);
             this.nextPatternScheduled = true;
             patternEndCallback();
           }
@@ -796,10 +775,7 @@ export class PatternScheduler {
     // Start transport if not running
     if (transport.state !== 'started') {
       transport.start();
-    }
-
-    console.log(`Scheduled ${events.length} rows for pattern ${pattern.name}`);
-  }
+    }  }
 
   /**
    * Get the transport time when the current pattern ends
