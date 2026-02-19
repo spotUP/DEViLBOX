@@ -4,38 +4,13 @@
 
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useUIStore } from '@stores/useUIStore';
+import { useTransportStore } from '@stores/useTransportStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
-import { useTransportStore } from '@stores/useTransportStore';
+import { saveProjectToStorage } from '@hooks/useProjectPersistence';
 
-/**
- * Show about dialog
- */
-export function showAbout(): boolean {
-  useUIStore.getState().setStatusMessage('About DEViLBOX', false, 2000);
-  return true;
-}
+// ====== REAL IMPLEMENTATIONS (kept from original) ======
 
-/**
- * Show keyboard shortcuts help
- */
-export function showKeyboardHelp(): boolean {
-  useUIStore.getState().setStatusMessage('Keyboard shortcuts', false, 1000);
-  return true;
-}
-
-/**
- * Open manual/documentation
- */
-export function openManual(): boolean {
-  window.open('https://github.com/username/devilbox/wiki', '_blank');
-  useUIStore.getState().setStatusMessage('Opening manual...', false, 1000);
-  return true;
-}
-
-/**
- * Toggle edit mode
- */
 export function toggleEditMode(): boolean {
   useTrackerStore.getState().toggleRecordMode();
   const newMode = useTrackerStore.getState().recordMode;
@@ -43,11 +18,7 @@ export function toggleEditMode(): boolean {
   return true;
 }
 
-/**
- * Panic - stop all sounds immediately
- */
 export function panic(): boolean {
-  // Actually silence all audio — stop replayer, engine, and release all notes
   const { isPlaying, stop } = useTransportStore.getState();
   if (isPlaying) {
     getTrackerReplayer().stop();
@@ -58,257 +29,12 @@ export function panic(): boolean {
   return true;
 }
 
-/**
- * Center cursor (scroll to center current position)
- */
-export function centerCursor(): boolean {
-  useUIStore.getState().setStatusMessage('Cursor centered', false, 1000);
+export function escapeCommand(): boolean {
+  getToneEngine().releaseAll();
+  useUIStore.getState().setStatusMessage('', false, 1);
   return true;
 }
 
-/**
- * Insert keyoff note
- */
-export function insertKeyoff(): boolean {
-  useUIStore.getState().setStatusMessage('Insert keyoff', false, 1000);
-  return true;
-}
-
-/**
- * Insert note cut
- */
-export function insertNoteCut(): boolean {
-  useUIStore.getState().setStatusMessage('Insert note cut', false, 1000);
-  return true;
-}
-
-/**
- * Insert fade out
- */
-export function insertFadeOut(): boolean {
-  useUIStore.getState().setStatusMessage('Insert fade out', false, 1000);
-  return true;
-}
-
-/**
- * Render selection to sample
- */
-export function renderToSample(): boolean {
-  useUIStore.getState().setStatusMessage('Render to sample', false, 1000);
-  return true;
-}
-
-/**
- * Render selection to new instrument
- */
-export function renderToInstrument(): boolean {
-  useUIStore.getState().setStatusMessage('Render to instrument', false, 1000);
-  return true;
-}
-
-/**
- * Render entire song to WAV
- */
-export function renderSong(): boolean {
-  useUIStore.getState().setStatusMessage('Render song', false, 1000);
-  return true;
-}
-
-/**
- * Export to MP3
- */
-export function exportMp3(): boolean {
-  useUIStore.getState().setStatusMessage('Export MP3', false, 1000);
-  return true;
-}
-
-/**
- * Quick save (auto-named backup)
- */
-export function quickSave(): boolean {
-  useUIStore.getState().setStatusMessage('Quick save', false, 1000);
-  return true;
-}
-
-/**
- * Revert to last saved
- */
-export function revertToSaved(): boolean {
-  useUIStore.getState().setStatusMessage('Revert to saved', false, 1000);
-  return true;
-}
-
-/**
- * Toggle compact mode
- */
-export function toggleCompactMode(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle compact mode', false, 1000);
-  return true;
-}
-
-/**
- * Reset view to default
- */
-export function resetView(): boolean {
-  useUIStore.getState().setStatusMessage('View reset', false, 1000);
-  return true;
-}
-
-/**
- * Increase pattern size
- */
-export function increasePatternSize(): boolean {
-  useUIStore.getState().setStatusMessage('Increase pattern size', false, 1000);
-  return true;
-}
-
-/**
- * Decrease pattern size
- */
-export function decreasePatternSize(): boolean {
-  useUIStore.getState().setStatusMessage('Decrease pattern size', false, 1000);
-  return true;
-}
-
-/**
- * Toggle hex mode
- */
-export function toggleHexMode(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle hex mode', false, 1000);
-  return true;
-}
-
-/**
- * Toggle row highlight
- */
-export function toggleRowHighlight(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle row highlight', false, 1000);
-  return true;
-}
-
-/**
- * Toggle channel names
- */
-export function toggleChannelNames(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle channel names', false, 1000);
-  return true;
-}
-
-/**
- * Zoom in
- */
-export function zoomIn(): boolean {
-  useUIStore.getState().setStatusMessage('Zoom in', false, 1000);
-  return true;
-}
-
-/**
- * Zoom out
- */
-export function zoomOut(): boolean {
-  useUIStore.getState().setStatusMessage('Zoom out', false, 1000);
-  return true;
-}
-
-/**
- * Reset zoom
- */
-export function resetZoom(): boolean {
-  useUIStore.getState().setStatusMessage('Zoom reset', false, 1000);
-  return true;
-}
-
-/**
- * Fit to window
- */
-export function fitToWindow(): boolean {
-  useUIStore.getState().setStatusMessage('Fit to window', false, 1000);
-  return true;
-}
-
-/**
- * Clone pattern to slot
- */
-export function clonePattern(): boolean {
-  useUIStore.getState().setStatusMessage('Clone pattern', false, 1000);
-  return true;
-}
-
-/**
- * Create new pattern
- */
-export function createPattern(): boolean {
-  useUIStore.getState().setStatusMessage('Create pattern', false, 1000);
-  return true;
-}
-
-/**
- * Delete current pattern
- */
-export function deletePattern(): boolean {
-  useUIStore.getState().setStatusMessage('Delete pattern', false, 1000);
-  return true;
-}
-
-/**
- * Import MIDI file
- */
-export function importMidi(): boolean {
-  useUIStore.getState().setStatusMessage('Import MIDI', false, 1000);
-  return true;
-}
-
-/**
- * Export MIDI file
- */
-export function exportMidi(): boolean {
-  useUIStore.getState().setStatusMessage('Export MIDI', false, 1000);
-  return true;
-}
-
-/**
- * Import sample
- */
-export function importSample(): boolean {
-  useUIStore.getState().setStatusMessage('Import sample', false, 1000);
-  return true;
-}
-
-/**
- * Export sample
- */
-export function exportSample(): boolean {
-  useUIStore.getState().setStatusMessage('Export sample', false, 1000);
-  return true;
-}
-
-/**
- * Open pattern properties
- */
-export function patternProperties(): boolean {
-  useUIStore.getState().setStatusMessage('Pattern properties', false, 1000);
-  return true;
-}
-
-/**
- * Open song properties
- */
-export function songProperties(): boolean {
-  useUIStore.getState().setStatusMessage('Song properties', false, 1000);
-  return true;
-}
-
-/**
- * Open cleanup dialog
- */
-export function cleanupUnused(): boolean {
-  useUIStore.getState().setStatusMessage('Cleanup unused', false, 1000);
-  return true;
-}
-
-/**
- * Toggle recording
- */
 export function toggleRecording(): boolean {
   useTrackerStore.getState().toggleRecordMode();
   const recorded = useTrackerStore.getState().recordMode;
@@ -316,116 +42,272 @@ export function toggleRecording(): boolean {
   return true;
 }
 
-/**
- * Preview current instrument
- */
-export function previewInstrument(): boolean {
-  useUIStore.getState().setStatusMessage('Preview instrument', false, 1000);
+// ====== HEX / ZOOM / DISPLAY ======
+
+export function toggleHexMode(): boolean {
+  const { useHexNumbers, setUseHexNumbers } = useUIStore.getState();
+  setUseHexNumbers(!useHexNumbers);
+  useUIStore.getState().setStatusMessage(`Hex mode: ${!useHexNumbers ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Preview current sample
- */
-export function previewSample(): boolean {
-  useUIStore.getState().setStatusMessage('Preview sample', false, 1000);
+export function zoomIn(): boolean {
+  const { trackerZoom, setTrackerZoom } = useUIStore.getState();
+  setTrackerZoom(trackerZoom + 10);
+  useUIStore.getState().setStatusMessage(`Zoom ${useUIStore.getState().trackerZoom}%`, false, 800);
   return true;
 }
 
-/**
- * Stop preview
- */
-export function stopPreview(): boolean {
-  useUIStore.getState().setStatusMessage('Stop preview', false, 1000);
+export function zoomOut(): boolean {
+  const { trackerZoom, setTrackerZoom } = useUIStore.getState();
+  setTrackerZoom(trackerZoom - 10);
+  useUIStore.getState().setStatusMessage(`Zoom ${useUIStore.getState().trackerZoom}%`, false, 800);
   return true;
 }
 
-/**
- * Show tempo tap dialog
- */
-export function tempoTap(): boolean {
-  useUIStore.getState().setStatusMessage('Tempo tap', false, 1000);
+export function resetZoom(): boolean {
+  useUIStore.getState().setTrackerZoom(100);
+  useUIStore.getState().setStatusMessage('Zoom 100%', false, 800);
   return true;
 }
 
-/**
- * Show quantize dialog
- */
-export function showQuantizeDialog(): boolean {
-  useUIStore.getState().setStatusMessage('Quantize', false, 1000);
+export function fitToWindow(): boolean {
+  useUIStore.getState().setTrackerZoom(100);
+  useUIStore.getState().setStatusMessage('Fit to window', false, 800);
   return true;
 }
 
-/**
- * Show humanize dialog
- */
-export function showHumanizeDialog(): boolean {
-  useUIStore.getState().setStatusMessage('Humanize', false, 1000);
+export function toggleCompactMode(): boolean {
+  useUIStore.getState().toggleCompactToolbar();
+  const compact = useUIStore.getState().compactToolbar;
+  useUIStore.getState().setStatusMessage(`Compact mode: ${compact ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Show groove settings
- */
+export function toggleRowHighlight(): boolean {
+  const { rowHighlightInterval, setRowHighlightInterval } = useUIStore.getState();
+  const cycle = [4, 8, 16, 32];
+  const next = cycle[(cycle.indexOf(rowHighlightInterval) + 1) % cycle.length];
+  setRowHighlightInterval(next);
+  useUIStore.getState().setStatusMessage(`Row highlight: every ${next}`, false, 1000);
+  return true;
+}
+
+export function toggleChannelNames(): boolean {
+  useUIStore.getState().toggleChannelNames();
+  const shown = useUIStore.getState().showChannelNames;
+  useUIStore.getState().setStatusMessage(`Channel names: ${shown ? 'ON' : 'OFF'}`, false, 1000);
+  return true;
+}
+
+// ====== INSERT SPECIAL NOTES ======
+
+export function insertKeyoff(): boolean {
+  const { cursor, setCell, moveCursor } = useTrackerStore.getState();
+  setCell(cursor.channelIndex, cursor.rowIndex, { note: 97, instrument: 0 });
+  moveCursor('down');
+  useUIStore.getState().setStatusMessage('Key off', false, 600);
+  return true;
+}
+
+export function insertNoteCut(): boolean {
+  // XM note cut: effect EC0 (cut at tick 0)
+  const { cursor, setCell, moveCursor } = useTrackerStore.getState();
+  setCell(cursor.channelIndex, cursor.rowIndex, { effTyp: 0x0E, eff: 0xC0 });
+  moveCursor('down');
+  useUIStore.getState().setStatusMessage('Note cut', false, 600);
+  return true;
+}
+
+export function insertFadeOut(): boolean {
+  // No XM fade-out cell type — use keyoff as closest equivalent
+  return insertKeyoff();
+}
+
+// ====== PATTERN OPERATIONS ======
+
+export function createPattern(): boolean {
+  useTrackerStore.getState().addPattern();
+  useUIStore.getState().setStatusMessage('Pattern created', false, 1000);
+  return true;
+}
+
+export function deletePattern(): boolean {
+  const { currentPatternIndex, deletePattern: del, patterns } = useTrackerStore.getState();
+  if (patterns.length <= 1) {
+    useUIStore.getState().setStatusMessage('Cannot delete last pattern', false, 1500);
+    return true;
+  }
+  del(currentPatternIndex);
+  useUIStore.getState().setStatusMessage('Pattern deleted', false, 1000);
+  return true;
+}
+
+export function clonePattern(): boolean {
+  const { currentPatternIndex, duplicatePattern } = useTrackerStore.getState();
+  duplicatePattern(currentPatternIndex);
+  useUIStore.getState().setStatusMessage('Pattern cloned', false, 1000);
+  return true;
+}
+
+export function increasePatternSize(): boolean {
+  const { currentPatternIndex, expandPattern } = useTrackerStore.getState();
+  expandPattern(currentPatternIndex);
+  return true;
+}
+
+export function decreasePatternSize(): boolean {
+  const { currentPatternIndex, shrinkPattern } = useTrackerStore.getState();
+  shrinkPattern(currentPatternIndex);
+  return true;
+}
+
+// ====== DIALOGS ======
+
 export function showGrooveSettings(): boolean {
-  useUIStore.getState().setStatusMessage('Groove settings', false, 1000);
+  useUIStore.getState().openDialogCommand('groove-settings');
   return true;
 }
 
-/**
- * Apply swing
- */
-export function applySwing(): boolean {
-  useUIStore.getState().setStatusMessage('Apply swing', false, 1000);
+export function showHumanizeDialog(): boolean {
+  useUIStore.getState().openDialogCommand('humanize');
   return true;
 }
 
-/**
- * Run script/macro
- */
-export function runScript(): boolean {
-  useUIStore.getState().setStatusMessage('Run script', false, 1000);
+export function showKeyboardHelp(): boolean {
+  useUIStore.getState().openDialogCommand('keyboard-help');
   return true;
 }
 
-/**
- * Record macro
- */
-export function recordMacro(): boolean {
-  useUIStore.getState().setStatusMessage('Record macro', false, 1000);
+export function showQuantizeDialog(): boolean {
+  useUIStore.getState().openDialogCommand('groove-settings');
   return true;
 }
 
-/**
- * Escape - cancel current operation
- */
-export function escapeCommand(): boolean {
-  // Silence any hanging note previews
-  getToneEngine().releaseAll();
-  useUIStore.getState().setStatusMessage('', false, 1);
-  return true;
-}
-
-/**
- * Confirm current operation
- */
 export function confirmCommand(): boolean {
-  useUIStore.getState().setStatusMessage('Confirmed', false, 1000);
+  useUIStore.getState().closeDialogCommand();
+  useUIStore.getState().closeModal();
   return true;
 }
 
-/**
- * Show context menu
- */
+// ====== TEMPO TAP ======
+
+const tapTimes: number[] = [];
+
+export function tempoTap(): boolean {
+  const now = performance.now();
+  tapTimes.push(now);
+  // Keep only last 8 taps, discard if gap > 3s
+  while (tapTimes.length > 1 && now - tapTimes[0] > 3000) tapTimes.shift();
+  if (tapTimes.length >= 2) {
+    const gaps = tapTimes.slice(1).map((t, i) => t - tapTimes[i]);
+    const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const bpm = Math.round(60000 / avgGap);
+    useTransportStore.getState().setBPM(bpm);
+    useUIStore.getState().setStatusMessage(`Tap BPM: ${bpm}`, false, 1500);
+  } else {
+    useUIStore.getState().setStatusMessage('Tap again...', false, 1500);
+  }
+  return true;
+}
+
+// ====== SAVE / QUICK SAVE ======
+
+export function quickSave(): boolean {
+  const ok = saveProjectToStorage();
+  useUIStore.getState().setStatusMessage(ok ? 'Saved' : 'Save failed', false, 1500);
+  return true;
+}
+
+// ====== PREVIEW ======
+
+export function previewInstrument(): boolean {
+  import('@engine/ToneEngine').then(({ getToneEngine: engine }) => {
+    import('@stores/useInstrumentStore').then(({ useInstrumentStore }) => {
+      const toneEng = engine();
+      const { currentInstrument } = useInstrumentStore.getState();
+      if (!currentInstrument) return;
+      toneEng.ensureInstrumentReady(currentInstrument).then(() => {
+        toneEng.triggerNoteAttack(currentInstrument.id, 'A4', 0, 0.8, currentInstrument);
+      });
+    });
+  });
+  useUIStore.getState().setStatusMessage('Preview', false, 600);
+  return true;
+}
+
+export function previewSample(): boolean {
+  return previewInstrument();
+}
+
+export function stopPreview(): boolean {
+  getToneEngine().releaseAll();
+  return true;
+}
+
+// ====== INFORMATIVE STUBS (no pipeline) ======
+
+export function renderToSample(): boolean {
+  useUIStore.getState().setStatusMessage('Render: not yet available', false, 1500);
+  return true;
+}
+export function renderToInstrument(): boolean { return renderToSample(); }
+export function renderSong(): boolean { return renderToSample(); }
+export function exportMp3(): boolean { return renderToSample(); }
+export function importMidi(): boolean {
+  useUIStore.getState().setStatusMessage('MIDI import: use File menu', false, 1500);
+  return true;
+}
+export function exportMidi(): boolean { return importMidi(); }
+export function importSample(): boolean { return importMidi(); }
+export function exportSample(): boolean { return importMidi(); }
+export function patternProperties(): boolean {
+  useUIStore.getState().setStatusMessage('Pattern length: resize in pattern list', false, 1500);
+  return true;
+}
+export function songProperties(): boolean {
+  useUIStore.getState().openModal('settings');
+  return true;
+}
+export function cleanupUnused(): boolean {
+  useUIStore.getState().setStatusMessage('Cleanup: remove unused in instrument list', false, 1500);
+  return true;
+}
+export function applySwing(): boolean {
+  useUIStore.getState().openDialogCommand('groove-settings');
+  return true;
+}
+export function runScript(): boolean {
+  useUIStore.getState().setStatusMessage('Scripts: not available', false, 1500);
+  return true;
+}
+export function recordMacro(): boolean { return runScript(); }
+export function showAbout(): boolean {
+  useUIStore.getState().setStatusMessage('DEViLBOX — tracker + synth environment', false, 3000);
+  return true;
+}
+export function openManual(): boolean {
+  useUIStore.getState().setStatusMessage('Manual: see Help menu', false, 2000);
+  return true;
+}
+export function centerCursor(): boolean {
+  useUIStore.getState().setStatusMessage('Cursor centered', false, 800);
+  return true;
+}
+export function revertToSaved(): boolean {
+  useUIStore.getState().setStatusMessage('Revert: refresh page to reload saved', false, 2000);
+  return true;
+}
+export function resetView(): boolean {
+  useUIStore.setState({ visiblePanels: ['tracker', 'oscilloscope', 'pattern-list'] });
+  useUIStore.getState().setStatusMessage('View reset', false, 1000);
+  return true;
+}
 export function showContextMenu(): boolean {
-  useUIStore.getState().setStatusMessage('Context menu', false, 1000);
+  useUIStore.getState().setStatusMessage('Right-click for context menu', false, 1500);
   return true;
 }
-
-/**
- * Show quick command palette
- */
 export function showCommandPalette(): boolean {
-  useUIStore.getState().setStatusMessage('Command palette', false, 1000);
+  useUIStore.getState().setStatusMessage('Command palette: not yet available', false, 1500);
   return true;
 }
