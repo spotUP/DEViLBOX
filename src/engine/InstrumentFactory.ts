@@ -174,10 +174,10 @@ export function getDefaultEffectParameters(type: string): Record<string, number 
     case 'SpringReverb':
       return { decay: 0.6, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.7 };
     case 'VinylNoise':
-      return { hiss: 20, dust: 30, age: 18, speed: 5.5,
-               riaa: 30, stylusResonance: 25, wornStylus: 0,
-               pinch: 15, innerGroove: 0, ghostEcho: 0,
-               dropout: 0, warp: 0, eccentricity: 0 };  // "Played" condition at 33 RPM
+      return { hiss: 50, dust: 58, age: 45, speed: 5.5,
+               riaa: 52, stylusResonance: 50, wornStylus: 28,
+               pinch: 35, innerGroove: 25, ghostEcho: 20,
+               dropout: 10, warp: 10, eccentricity: 18 };  // "Played" condition at 33 RPM
     default:
       return {};
   }

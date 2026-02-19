@@ -185,7 +185,7 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
     this._dustVolume = 0.5;  // maps to [-30, +30] dB
     this._age        = 0.5;  // maps to [0, 30] dB drive
     this._speed      = 0.0;  // maps to [0, 10] Hz LFO freq (0 = no LFO modulation, matches C++ default)
-    this._sourceMode = true; // true=add to input, false=replace
+    this._sourceMode = false; // false=noise only; true=add noise to input audio
 
     // New emulator params (0-1 normalized)
     this._riaa = 0.3; this._stylusResonance = 0.25; this._wornStylus = 0.0;
@@ -203,15 +203,17 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
     this._lfoPhase        = 0.0;
 
     // ─── Age (mid distortion) state ──────────────────────────────────────────
-    this._bpFilter = new TPTSVFilter();       // 600 Hz BP — mid-range selector
+    this._bpFilterL = new TPTSVFilter();      // 600 Hz BP — mid-range selector, left
+    this._bpFilterR = new TPTSVFilter();      // 600 Hz BP — mid-range selector, right
 
     // ─── Vinyl emulator filters ───────────────────────────────────────────────
     // RIAA de-emphasis (stereo biquad, coefficients fixed at sample rate)
     this._riaaL = new Biquad(); this._riaaR = new Biquad();
-    // Stylus resonance: peaking EQ at 14kHz
-    this._stylusResFilter = new Biquad();
-    // Worn stylus: HF shelf + allpass phase smear
-    this._wornStylusShelf = new Biquad(); this._wornStylusAllpass = new Biquad();
+    // Stylus resonance: peaking EQ at 14kHz (independent L/R state)
+    this._stylusResFilterL = new Biquad(); this._stylusResFilterR = new Biquad();
+    // Worn stylus: HF shelf + allpass phase smear (independent L/R state)
+    this._wornStylusShelfL = new Biquad(); this._wornStylusShelfR = new Biquad();
+    this._wornStylusAllpassL = new Biquad(); this._wornStylusAllpassR = new Biquad();
     // Pinch: HPF at 5kHz (per channel for independent state)
     this._pinchHPFL = new Biquad(); this._pinchHPFR = new Biquad();
     // Ghost echo: 3 bandpass filters for tap coloring
@@ -236,6 +238,13 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
     // ─── Pre-allocated temp buffers (avoid GC churn in process()) ────────────
     this._procL = new Float32Array(128); this._procR = new Float32Array(128);
     this._dustL = new Float32Array(128); this._dustR = new Float32Array(128);
+
+    // ─── Playback gate — silence noise when tracker is idle ───────────────────
+    // Cooldown: when playback stops, noise fades out over 4 seconds so abrupt
+    // cuts don't occur during keyboard jamming.
+    this._playing        = false;
+    this._cooldownTotal  = Math.round(sampleRate * 4);  // 4-second fade
+    this._cooldownRemain = 0;
 
     this._initFilters();
 
@@ -271,7 +280,8 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
     const driveDB = this._age * 30;
     const reso = 0.05 + (driveDB / 30) * 0.9;  // 0.05..0.95
     const Q = 1 / (2 * reso);
-    this._bpFilter.setParams(600, Q, sampleRate);
+    this._bpFilterL.setParams(600, Q, sampleRate);
+    this._bpFilterR.setParams(600, Q, sampleRate);
   }
 
   // ─── RIAA de-emphasis (bilinear transform of analog time constants) ─────────
@@ -297,12 +307,15 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
   _updateStylusResFilter() {
     const dB = this._stylusResonance * 8;
     const Q  = 0.7 + this._stylusResonance * 1.3;
-    this._stylusResFilter.setPeakingEQ(14000, Q, dB, sampleRate);
+    this._stylusResFilterL.setPeakingEQ(14000, Q, dB, sampleRate);
+    this._stylusResFilterR.setPeakingEQ(14000, Q, dB, sampleRate);
   }
 
   _updateWornStylusFilters() {
-    this._wornStylusShelf.setHighShelf(9000, this._wornStylus * -18, sampleRate);
-    this._wornStylusAllpass.setAllpass1(6000, sampleRate);
+    this._wornStylusShelfL.setHighShelf(9000, this._wornStylus * -18, sampleRate);
+    this._wornStylusShelfR.setHighShelf(9000, this._wornStylus * -18, sampleRate);
+    this._wornStylusAllpassL.setAllpass1(6000, sampleRate);
+    this._wornStylusAllpassR.setAllpass1(6000, sampleRate);
   }
 
   _updateEchoTapFilters() {
@@ -326,6 +339,14 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
       case 'dropout':         this._dropout = data.value; break;
       case 'warp':            this._warp = data.value; break;
       case 'eccentricity':    this._eccentricity = data.value; break;
+      case 'playing':
+        this._playing = !!data.value;
+        if (this._playing) {
+          this._cooldownRemain = 0; // resume immediately at full gain
+        } else {
+          this._cooldownRemain = this._cooldownTotal; // begin cooldown fade
+        }
+        break;
     }
   }
 
@@ -375,10 +396,12 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
       // zeros on the exact reset sample. The difference is one sample per crackle cycle
       // — perceptually unnoticeable for vinyl noise.
       if (this._rampedValue >= 1.0) {
-        // Reset: start a new fade-in ramp (from current=0.96 to target=1.0 over 3ms)
+        // Reset: start a new fade-in ramp (from 0.96 to 1.0 over 3ms).
+        // _rampRef[0] must start at 0.96 to match setTarget's currentValue so that
+        // stepDelta = 0.04/N advances it from 0.96 to 1.0 (not from 0 to 0.04).
         this._ramper.setTarget(0.96, 1.0, Math.round(sampleRate * 0.003));
         this._rampedValue = 0.0;
-        this._rampRef[0] = 0.0;
+        this._rampRef[0] = 0.96;
       } else {
         signal *= this._rampedValue;
       }
@@ -420,15 +443,14 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
     const compGain = VinylNoiseProcessor._dBToGain(compDB);
 
     for (let i = 0; i < numSamples; i++) {
-      // Process both channels but use same BP filter state (mono mid, like original)
-      for (const ch of [L, R]) {
-        const x   = ch[i];
-        const mid  = this._bpFilter.processBandpass(x);
-        const rest = x - mid;
-        const distMid  = (2 / Math.PI) * Math.atan(mid * drive);
-        const compMid  = distMid * compGain;
-        ch[i] = (1 - mix) * rest + compMid * mix;
-      }
+      // Left channel
+      const xL   = L[i];
+      const midL = this._bpFilterL.processBandpass(xL);
+      L[i] = (1 - mix) * (xL - midL) + (2 / Math.PI) * Math.atan(midL * drive) * compGain * mix;
+      // Right channel
+      const xR   = R[i];
+      const midR = this._bpFilterR.processBandpass(xR);
+      R[i] = (1 - mix) * (xR - midR) + (2 / Math.PI) * Math.atan(midR * drive) * compGain * mix;
     }
   }
 
@@ -453,18 +475,18 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
         xR += this._riaa * (this._riaaR.process(xR) - xR);
       }
 
-      // 2. Stylus resonance — peaking EQ near 14kHz (shared filter state, subtle stereo spread)
+      // 2. Stylus resonance — peaking EQ near 14kHz (independent L/R state)
       if (this._stylusResonance > 0.001) {
-        xL = this._stylusResFilter.process(xL);
-        xR = this._stylusResFilter.process(xR);
+        xL = this._stylusResFilterL.process(xL);
+        xR = this._stylusResFilterR.process(xR);
       }
 
-      // 3. Worn stylus — HF rolloff + allpass phase smear
+      // 3. Worn stylus — HF rolloff + allpass phase smear (independent L/R state)
       if (wornBlend > 0.001) {
-        xL = this._wornStylusShelf.process(xL);
-        xL += wornBlend * (this._wornStylusAllpass.process(xL) - xL);
-        xR = this._wornStylusShelf.process(xR);
-        xR += wornBlend * (this._wornStylusAllpass.process(xR) - xR);
+        xL = this._wornStylusShelfL.process(xL);
+        xL += wornBlend * (this._wornStylusAllpassL.process(xL) - xL);
+        xR = this._wornStylusShelfR.process(xR);
+        xR += wornBlend * (this._wornStylusAllpassR.process(xR) - xR);
       }
 
       // 4. Pinch — even-harmonic distortion via HF emphasis then tanh
@@ -533,38 +555,61 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
     const outR = output[1] || output[0];
     const n = outL ? outL.length : 128;
 
-    // Step 1: Synthesize crackle+hiss (side effect: advances _lfoPhase)
-    this._synthesizeCrackle(this._dustL, this._dustR, n);
+    // Step 1: Synthesize crackle+hiss, gated by playback state.
+    // When not playing, fade out over _cooldownTotal samples so keyboard jamming
+    // doesn't cut off abruptly; once fully cooled, skip synthesis entirely.
+    let noiseGain = 1.0;
+    if (!this._playing) {
+      if (this._cooldownRemain <= 0) {
+        noiseGain = 0.0;
+      } else {
+        noiseGain = this._cooldownRemain / this._cooldownTotal;
+        this._cooldownRemain -= n;
+        if (this._cooldownRemain < 0) this._cooldownRemain = 0;
+      }
+    }
+    if (noiseGain > 0.0) {
+      this._synthesizeCrackle(this._dustL, this._dustR, n);
+      if (noiseGain < 1.0) {
+        for (let i = 0; i < n; i++) {
+          this._dustL[i] *= noiseGain;
+          this._dustR[i] *= noiseGain;
+        }
+      }
+    } else {
+      this._dustL.fill(0, 0, n);
+      this._dustR.fill(0, 0, n);
+    }
 
-    // Step 2: Build input buffers from source or zeros
+    // Step 2: Build input buffers — mix source audio WITH noise so the entire emulator
+    // chain (RIAA, stylus resonance, warp, ghostEcho, etc.) processes the noise signal.
     const input = inputs[0];
     const inL = input && input[0] ? input[0] : null;
     const inR = input && input[1] ? input[1] : (inL || null);
     if (this._sourceMode && inL) {
       for (let i = 0; i < n; i++) {
-        this._procL[i] = inL[i] || 0;
-        this._procR[i] = (inR && inR[i]) || 0;
+        this._procL[i] = (inL[i] || 0) + this._dustL[i];
+        this._procR[i] = ((inR && inR[i]) || 0) + this._dustR[i];
       }
     } else {
-      this._procL.fill(0, 0, n);
-      this._procR.fill(0, 0, n);
+      for (let i = 0; i < n; i++) {
+        this._procL[i] = this._dustL[i];
+        this._procR[i] = this._dustR[i];
+      }
     }
 
-    // Step 3: Run vinyl emulator signal chain
+    // Step 3: Run vinyl emulator signal chain (noise now passes through all effects)
     this._processAudio(this._procL, this._procR, outL, outR, n);
 
-    // Steps 4 & 5: Add noise, apply dropout
-    const dropoutActive = this._dropout > 0.001;
-    for (let i = 0; i < n; i++) {
-      outL[i] += this._dustL[i];
-      outR[i] += this._dustR[i];
-      if (dropoutActive) {
+    // Step 4: Apply dropout to combined output
+    if (this._dropout > 0.001) {
+      for (let i = 0; i < n; i++) {
         outL[i] *= this._dropL.process(this._dropout, sampleRate);
         outR[i] *= this._dropR.process(this._dropout, sampleRate);
       }
     }
 
-    // Step 6: Age distortion (mid-range arctan saturation)
+    // Step 5: Age distortion (mid-range arctan saturation)
     this._distortMidRange(outL, outR, n);
 
     return true;

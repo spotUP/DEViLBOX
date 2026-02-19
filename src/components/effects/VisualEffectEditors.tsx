@@ -1954,10 +1954,10 @@ const VINYL_RPM_PRESETS = [
 // Condition presets — set all 12 params (hiss/dust/age + 9 emulator) independently of RPM.
 // Mix and match: e.g. "78 RPM + New" or "33 RPM + Shellac".
 const VINYL_CONDITION_PRESETS = [
-  { label: 'New',     hiss:  8, dust:  5, age:  4, riaa: 25, stylusResonance: 20, wornStylus:  0, pinch: 10, innerGroove:  0, ghostEcho:  0, dropout:  0, warp:  0, eccentricity:  5 },
-  { label: 'Played',  hiss: 20, dust: 30, age: 18, riaa: 35, stylusResonance: 30, wornStylus: 15, pinch: 20, innerGroove: 10, ghostEcho: 10, dropout:  5, warp:  5, eccentricity: 10 },
-  { label: 'Worn',    hiss: 38, dust: 52, age: 44, riaa: 50, stylusResonance: 45, wornStylus: 45, pinch: 35, innerGroove: 35, ghostEcho: 25, dropout: 20, warp: 15, eccentricity: 20 },
-  { label: 'Shellac', hiss: 68, dust: 62, age: 70, riaa: 70, stylusResonance: 60, wornStylus: 70, pinch: 55, innerGroove: 60, ghostEcho: 40, dropout: 45, warp: 30, eccentricity: 35 },
+  { label: 'New',     hiss: 28, dust: 22, age: 18, riaa: 35, stylusResonance: 30, wornStylus:  0, pinch: 15, innerGroove:  5, ghostEcho:  5, dropout:  0, warp:  0, eccentricity:  8 },
+  { label: 'Played',  hiss: 50, dust: 58, age: 45, riaa: 52, stylusResonance: 50, wornStylus: 28, pinch: 35, innerGroove: 25, ghostEcho: 20, dropout: 10, warp: 10, eccentricity: 18 },
+  { label: 'Worn',    hiss: 70, dust: 78, age: 66, riaa: 68, stylusResonance: 65, wornStylus: 62, pinch: 52, innerGroove: 55, ghostEcho: 40, dropout: 35, warp: 28, eccentricity: 32 },
+  { label: 'Shellac', hiss: 86, dust: 86, age: 86, riaa: 84, stylusResonance: 80, wornStylus: 84, pinch: 72, innerGroove: 76, ghostEcho: 58, dropout: 62, warp: 46, eccentricity: 52 },
 ] as const;
 
 // ─── Tumult sample categories (mirrors SAMPLE_PATHS order in TumultEffect.ts) ──
@@ -2135,7 +2135,7 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
               unit="ms" onChange={(v) => set('followAttack', v)} />
             <Knob label="Release" value={p('followRelease', 15.0)} min={0} max={500}
               unit="ms" onChange={(v) => set('followRelease', v)} />
-            <Knob label="Amount" value={p('followAmount', 0.104)} min={0} max={1}
+            <Knob label="Amount" value={p('followAmount', 0.7)} min={0} max={1}
               onChange={(v) => set('followAmount', v)} />
           </div>
         )}
