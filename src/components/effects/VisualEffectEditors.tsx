@@ -1943,6 +1943,16 @@ export const TapeSaturationEditor: React.FC<VisualEffectEditorProps> = ({
 // VINYL NOISE
 // ============================================================================
 
+// Speed values map to exact turntable rotation frequency (RPM / 60 Hz, scaled ×10):
+//   33 RPM → 0.55 Hz → speed 5.5
+//   45 RPM → 0.75 Hz → speed 7.5
+//   78 RPM → 1.30 Hz → speed 13.0
+const VINYL_RPM_PRESETS = [
+  { label: '33', rpm: 33, hiss: 15, dust: 40, age: 20, speed: 5.5  },
+  { label: '45', rpm: 45, hiss: 25, dust: 50, age: 35, speed: 7.5  },
+  { label: '78', rpm: 78, hiss: 70, dust: 65, age: 75, speed: 13.0 },
+] as const;
+
 export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
   effect,
   onUpdateParameter,
@@ -1951,12 +1961,44 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
   const hiss  = getParam(effect, 'hiss',  50);
   const dust  = getParam(effect, 'dust',  50);
   const age   = getParam(effect, 'age',   50);
-  const speed = getParam(effect, 'speed', 20);
+  const speed = getParam(effect, 'speed', 0);
+
+  const activeRpm = VINYL_RPM_PRESETS.find(
+    (p) => p.hiss === Math.round(hiss) && p.dust === Math.round(dust) &&
+            p.age === Math.round(age)  && Math.abs(speed - p.speed) < 0.5
+  )?.rpm ?? null;
+
+  const applyRpmPreset = (p: typeof VINYL_RPM_PRESETS[number]) => {
+    onUpdateParameter('hiss',  p.hiss);
+    onUpdateParameter('dust',  p.dust);
+    onUpdateParameter('age',   p.age);
+    onUpdateParameter('speed', p.speed);
+  };
 
   return (
     <div className="space-y-4">
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#d97706" title="Vinyl Noise" />
+
+        {/* RPM mode selector */}
+        <div className="flex gap-2 mb-4">
+          <span className="text-xs text-text-muted self-center mr-1">RPM</span>
+          {VINYL_RPM_PRESETS.map((p) => (
+            <button
+              key={p.rpm}
+              onClick={() => applyRpmPreset(p)}
+              className={[
+                'flex-1 py-1.5 rounded-lg text-xs font-mono font-bold border transition-all',
+                activeRpm === p.rpm
+                  ? 'bg-amber-700/70 border-amber-500 text-amber-100'
+                  : 'bg-black/40 border-border text-text-muted hover:border-amber-700 hover:text-amber-300',
+              ].join(' ')}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex justify-around items-end">
           <Knob
             value={hiss}
@@ -1990,7 +2032,7 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
             min={0}
             max={100}
             onChange={(v) => onUpdateParameter('speed', v)}
-            label="Speed"
+            label="Flutter"
             color="#92400e"
             formatValue={(v) => `${Math.round(v)}%`}
           />
