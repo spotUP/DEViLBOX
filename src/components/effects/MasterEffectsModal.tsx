@@ -747,7 +747,7 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
               onToggle();
             }}
             className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
-            style={{ color: effect.enabled ? enc.accent : 'rgba(255,255,255,0.2)' }}
+            style={{ color: effect.enabled ? '#10b981' : 'rgba(255,255,255,0.2)' }}
             title={effect.enabled ? 'Disable' : 'Enable'}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
