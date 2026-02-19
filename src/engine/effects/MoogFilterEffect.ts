@@ -71,6 +71,7 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
   // WASM worklet
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
+  private pendingParams: Array<{ paramId: number; value: number }> = [];
 
   // JS fallback (ScriptProcessor)
   private fallbackNode: ScriptProcessorNode | null = null;
@@ -369,11 +370,11 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
 
   private sendParam(paramId: number, value: number) {
     if (this.workletNode && this.isWasmReady) {
-      this.workletNode.port.postMessage({
-        type: 'parameter',
-        paramId,
-        value,
-      });
+      this.workletNode.port.postMessage({ type: 'parameter', paramId, value });
+    } else {
+      // Queue param until WASM is ready; last write wins for each paramId
+      this.pendingParams = this.pendingParams.filter(p => p.paramId !== paramId);
+      this.pendingParams.push({ paramId, value });
     }
   }
 

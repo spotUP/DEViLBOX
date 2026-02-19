@@ -1288,7 +1288,14 @@ const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
         setHasGui(true);
         guiContainerRef.current.appendChild(gui);
 
-        // Auto-scale plugin GUI to fill container
+        // Per-effect minimum scale overrides (for zoom-in requests)
+        const WAM_MIN_SCALE: Record<string, number> = {
+          WAMQuadraFuzz: 1.3,
+          WAMVoxAmp: 1.15,
+        };
+        const effectMinScale = WAM_MIN_SCALE[effect.type] ?? 0;
+
+        // Auto-scale plugin GUI to fill container (centered)
         const scaleToFit = () => {
           const container = guiContainerRef.current;
           if (!container || !gui) return;
@@ -1300,16 +1307,19 @@ const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
           const h = gui.offsetHeight || gui.scrollHeight || gui.clientHeight;
           if (!w || !h) return;
           const cw = container.clientWidth;
-          const ch = container.clientHeight;
-          if (!cw || !ch) return;
-          const scale = Math.min(cw / w, ch / h);
+          const ch = container.clientHeight || 300;
+          if (!cw) return;
+          const naturalScale = Math.min(cw / w, ch / h);
+          const scale = Math.max(effectMinScale, naturalScale);
           const scaledW = w * scale;
           const scaledH = h * scale;
+          // Update container height to match scaled GUI height (no empty space below)
+          container.style.height = `${Math.max(scaledH, 300)}px`;
           gui.style.position = 'absolute';
           gui.style.transformOrigin = 'top left';
           gui.style.transform = `scale(${scale})`;
-          gui.style.left = `${(cw - scaledW) / 2}px`;
-          gui.style.top = `${(ch - scaledH) / 2}px`;
+          gui.style.left = `${Math.max(0, (cw - scaledW) / 2)}px`;
+          gui.style.top = `${Math.max(0, (ch - scaledH) / 2)}px`;
         };
 
         resizeObserver = new ResizeObserver(scaleToFit);
@@ -2902,13 +2912,13 @@ export const SpringReverbEditor: React.FC<VisualEffectEditorProps> = ({
       </section>
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#34d399" title="Character" />
-        <div className="flex justify-around items-end">
+        <div className="flex justify-center gap-8 items-end">
           <Knob value={drip} min={0} max={1} onChange={(v) => onUpdateParameter('drip', v)} label="Drip" color="#34d399" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={diffusion} min={0} max={1} onChange={(v) => onUpdateParameter('diffusion', v)} label="Diffusion" color="#34d399" formatValue={(v) => `${Math.round(v * 100)}%`} />
         </div>
       </section>
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <div className="flex justify-around items-end">
+        <div className="flex justify-center gap-8 items-end">
           <Knob value={springMix} min={0} max={1} onChange={(v) => onUpdateParameter('mix', v)} label="Int. Mix" color="#6ee7b7" formatValue={(v) => `${Math.round(v * 100)}%`} />
           <Knob value={effect.wet} min={0} max={100} onChange={onUpdateWet} label="Wet" color="#a7f3d0" formatValue={(v) => `${Math.round(v)}%`} />
         </div>
@@ -2997,7 +3007,7 @@ export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateParameter,
   onUpdateWet,
 }) => {
-  const [showReels, setShowReels] = useState(true);
+  const [showReels, setShowReels] = useState(false);
   const [reelFrame, setReelFrame] = useState(0);
 
   const containerH = showReels ? 703 : 266;
