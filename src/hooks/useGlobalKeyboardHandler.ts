@@ -658,21 +658,6 @@ function initializeRegistry() {
   registryInitialized = true;
 }
 
-/**
- * Create placeholder commands that log their invocation
- * These serve as stubs until real implementations are added
- */
-function createPlaceholderCommands(names: string[]): Command[] {
-  return names.map(name => ({
-    name,
-    contexts: ['pattern', 'global'] as CommandContext[],
-    handler: () => {
-      console.log(`[Keyboard] Command '${name}' not yet implemented`);
-      return false; // Return false = don't prevent default browser behavior
-    },
-    description: `${name} (not yet implemented)`,
-  }));
-}
 
 /**
  * Determine the current command context based on focused element
