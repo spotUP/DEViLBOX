@@ -32,6 +32,7 @@ import { SpringReverbEffect } from './effects/SpringReverbEffect';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
 import { TumultEffect, type TumultOptions } from './effects/TumultEffect';
 import { TapeSimulatorEffect } from './effects/TapeSimulatorEffect';
+import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
 import { WAMEffectNode } from './wam/WAMEffectNode';
 import { SidechainCompressor } from './effects/SidechainCompressor';
 import { TapeSaturation } from './effects/TapeSaturation';
@@ -4974,6 +4975,12 @@ export class ToneEngine {
       // Only apply effect params if something actually changed
       if (Object.keys(changedParams).length > 0) {
         this.applyEffectParametersDiff(node, config.type, changedParams);
+
+        // If bpmSync or syncDivision changed, immediately recompute synced params
+        if ('bpmSync' in changedParams || 'syncDivision' in changedParams) {
+          const currentBpm = Tone.getTransport().bpm.value;
+          this.updateBpmSyncedEffects(currentBpm).catch(() => {});
+        }
       }
 
       // Update stored config
@@ -5064,6 +5071,8 @@ export class ToneEngine {
         if (node instanceof Tone.Phaser) {
           if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
           if ('octaves' in changed) node.octaves = changed.octaves as number;
+          if ('baseFrequency' in changed) node.baseFrequency = Number(changed.baseFrequency);
+          if ('Q' in changed) node.Q.rampTo(changed.Q as number, R);
         }
         break;
 
@@ -5144,7 +5153,7 @@ export class ToneEngine {
 
       case 'StereoWidener':
         if (node instanceof Tone.StereoWidener) {
-          if ('width' in changed) node.width.rampTo(changed.width as number, R);
+          if ('width' in changed) node.width.rampTo(Math.min(0.85, Number(changed.width)), R);
         }
         break;
 
@@ -5198,10 +5207,9 @@ export class ToneEngine {
 
       case 'DubFilter':
         if (node instanceof DubFilterEffect) {
-          const dubFilter = node as unknown as { cutoff: number; resonance: number; gain: number };
-          if ('cutoff' in changed) dubFilter.cutoff = Number(changed.cutoff);
-          if ('resonance' in changed) dubFilter.resonance = Number(changed.resonance);
-          if ('gain' in changed) dubFilter.gain = Number(changed.gain);
+          if ('cutoff' in changed) node.setCutoff(Number(changed.cutoff));
+          if ('resonance' in changed) node.setResonance(Number(changed.resonance));
+          if ('gain' in changed) node.setGain(Number(changed.gain));
         }
         break;
 
@@ -5263,7 +5271,7 @@ export class ToneEngine {
 
       case 'JCReverb':
         if (node instanceof Tone.JCReverb) {
-          if ('roomSize' in changed) node.roomSize.rampTo(changed.roomSize as number, R);
+          if ('roomSize' in changed) node.roomSize.rampTo(Math.min(0.9, Number(changed.roomSize)), R);
         }
         break;
 
@@ -5361,6 +5369,14 @@ export class ToneEngine {
         if (node instanceof WAMEffectNode) {
           for (const [key, value] of Object.entries(changed)) {
             if (key === 'bpmSync' || key === 'syncDivision') continue;
+            node.setParameter(key, Number(value));
+          }
+        }
+        break;
+
+      case 'Neural':
+        if (node instanceof NeuralEffectWrapper) {
+          for (const [key, value] of Object.entries(changed)) {
             node.setParameter(key, Number(value));
           }
         }
