@@ -29,6 +29,7 @@ import { MoogFilterEffect, type MoogFilterModel, type MoogFilterMode } from './e
 import { MVerbEffect } from './effects/MVerbEffect';
 import { LeslieEffect } from './effects/LeslieEffect';
 import { SpringReverbEffect } from './effects/SpringReverbEffect';
+import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
 import { WAMEffectNode } from './wam/WAMEffectNode';
 import { SidechainCompressor } from './effects/SidechainCompressor';
 import { TapeSaturation } from './effects/TapeSaturation';
@@ -5218,6 +5219,15 @@ export class ToneEngine {
         if (node instanceof TapeSaturation) {
           if ('drive' in changed) node.drive = (changed.drive as number) / 100; // UI 0-100 → internal 0-1
           if ('tone' in changed) node.tone = changed.tone as number;
+        }
+        break;
+
+      case 'VinylNoise':
+        if (node instanceof VinylNoiseEffect) {
+          if ('hiss'  in changed) node.setHiss (Number(changed.hiss)  / 100);
+          if ('dust'  in changed) node.setDust (Number(changed.dust)  / 100);
+          if ('age'   in changed) node.setAge  (Number(changed.age)   / 100);
+          if ('speed' in changed) node.setSpeed(Number(changed.speed) / 100);
         }
         break;
 
