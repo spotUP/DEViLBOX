@@ -122,6 +122,7 @@ export class MVerbEffect extends Tone.ToneAudioNode {
       this.workletNode.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
           this.isWasmReady = true;
+          // Send initial params from _options (always up-to-date via setters)
           this.sendParam(PARAM_DAMPING, this._options.damping);
           this.sendParam(PARAM_DENSITY, this._options.density);
           this.sendParam(PARAM_BANDWIDTH, this._options.bandwidth);
@@ -131,6 +132,11 @@ export class MVerbEffect extends Tone.ToneAudioNode {
           this.sendParam(PARAM_GAIN, this._options.gain);
           this.sendParam(PARAM_MIX, 1.0); // WASM always 100% wet
           this.sendParam(PARAM_EARLYMIX, this._options.earlyMix);
+          // Flush any params queued before WASM was ready (overrides _options with latest user values)
+          for (const { paramId, value } of this.pendingParams) {
+            this.sendParam(paramId, value);
+          }
+          this.pendingParams = [];
           this.swapToWasm();
         } else if (event.data.type === 'error') {
           console.warn('[MVerb] WASM worklet error:', event.data.error);
