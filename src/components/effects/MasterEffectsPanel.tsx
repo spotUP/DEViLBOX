@@ -27,6 +27,8 @@ import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPrese
 import { AVAILABLE_EFFECTS, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
+import { MiniOutputMeter } from './EffectVisualizer';
+import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
 
 // Dynamics effects have no wet/dry mixing — default to 100 to avoid misleading UI
 const DYNAMICS_EFFECTS = new Set<string>(['Compressor', 'EQ3']);
@@ -49,6 +51,9 @@ function SortableEffectItem({ effect, onToggle, onRemove, onEdit, onWetChange }:
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+  const isGrMode = effect.type === 'Compressor' || effect.type === 'SidechainCompressor';
 
   return (
     <div
@@ -78,6 +83,13 @@ function SortableEffectItem({ effect, onToggle, onRemove, onEdit, onWetChange }:
             {effect.enabled ? 'Active' : 'Bypassed'}
           </div>
         </div>
+
+        {/* Live output meter */}
+        <MiniOutputMeter
+          post={post}
+          pre={isGrMode ? pre : undefined}
+          grMode={isGrMode}
+        />
 
         {/* Wet/Dry Control */}
         <div className="flex items-center gap-2">
