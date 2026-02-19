@@ -989,6 +989,27 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             setCurrentPattern(0);
             setPatternOrder(importedPatterns.map((_, i) => i));
             notify.success(`Imported ${importedPatterns.length} TD-3 pattern(s)`);
+          } else if (isMIDIFile(lower)) {
+            // Standard MIDI file (.mid/.midi)
+            const result = await importMIDIFile(new File([buffer], filename), { mergeChannels: true });
+            if (result.patterns.length === 0) {
+              notify.error('No patterns found in MIDI file');
+              return;
+            }
+            resetAutomation();
+            resetTransport();
+            resetInstruments();
+            engine.disposeAllInstruments();
+            loadPatterns(result.patterns);
+            setPatternOrder(result.patterns.map((_, i) => i));
+            setCurrentPattern(0);
+            setBPM(result.bpm);
+            setMetadata({
+              name: result.metadata.name,
+              author: '',
+              description: `Imported from MIDI (${result.metadata.tracks} track${result.metadata.tracks !== 1 ? 's' : ''})`,
+            });
+            notify.success(`Imported: ${result.metadata.name}`);
           } else {
             const { loadModuleFile } = await import('@lib/import/ModuleLoader');
             const moduleInfo = await loadModuleFile(new File([buffer], filename));

@@ -1175,6 +1175,25 @@ function App() {
                   setCurrentPattern(0);
                   setPatternOrder(importedPatterns.map((_, i) => i));
                   notify.success(`Imported ${importedPatterns.length} TD-3 pattern(s)`);
+                } else if (lower.endsWith('.mid') || lower.endsWith('.midi')) {
+                  // Standard MIDI file import
+                  const { importMIDIFile } = await import('@lib/import/MIDIImporter');
+                  const result = await importMIDIFile(new File([buffer], filename), { mergeChannels: true });
+                  if (result.patterns.length === 0) {
+                    notify.error('No patterns found in MIDI file');
+                    return;
+                  }
+                  const { loadPatterns: loadPats, setCurrentPattern: setCurPat, setPatternOrder: setPO } = useTrackerStore.getState();
+                  const { setBPM: setB, reset: resetTransport } = useTransportStore.getState();
+                  const { reset: resetInstruments } = useInstrumentStore.getState();
+                  resetTransport();
+                  resetInstruments();
+                  getToneEngine().disposeAllInstruments();
+                  loadPats(result.patterns);
+                  setPO(result.patterns.map((_: unknown, i: number) => i));
+                  setCurPat(0);
+                  setB(result.bpm);
+                  notify.success(`Imported: ${result.metadata.name}`);
                 } else {
                   // Load other tracker modules (.fur, .mod, .xm, etc.)
                   const { loadModuleFile } = await import('@lib/import/ModuleLoader');

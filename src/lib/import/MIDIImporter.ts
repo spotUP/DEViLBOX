@@ -119,16 +119,15 @@ function createPatternFromMIDI(
     )
   );
 
-  // Group notes by MIDI channel
+  // Group notes by track index — each track becomes one tracker channel
   const channelNotes: Map<number, Array<{ tick: number; note: { midi: number; velocity: number; ticks: number; durationTicks: number } }>> = new Map();
 
-  midi.tracks.forEach(track => {
+  midi.tracks.forEach((track, trackIndex) => {
     track.notes.forEach(note => {
-      const channel = note.midi % 16; // Use MIDI note mod 16 as channel
-      if (!channelNotes.has(channel)) {
-        channelNotes.set(channel, []);
+      if (!channelNotes.has(trackIndex)) {
+        channelNotes.set(trackIndex, []);
       }
-      channelNotes.get(channel)!.push({
+      channelNotes.get(trackIndex)!.push({
         tick: note.ticks,
         note,
       });
