@@ -174,7 +174,10 @@ export function getDefaultEffectParameters(type: string): Record<string, number 
     case 'SpringReverb':
       return { decay: 0.6, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.7 };
     case 'VinylNoise':
-      return { hiss: 20, dust: 30, age: 18, speed: 5.5 };  // "Played" condition at 33 RPM
+      return { hiss: 20, dust: 30, age: 18, speed: 5.5,
+               riaa: 30, stylusResonance: 25, wornStylus: 0,
+               pinch: 15, innerGroove: 0, ghostEcho: 0,
+               dropout: 0, warp: 0, eccentricity: 0 };  // "Played" condition at 33 RPM
     default:
       return {};
   }
@@ -1532,10 +1535,19 @@ export class InstrumentFactory {
 
       case 'VinylNoise': {
         const node = new VinylNoiseEffect({
-          hiss:  (p.hiss  != null ? Number(p.hiss)  : 20) / 100,
-          dust:  (p.dust  != null ? Number(p.dust)  : 30) / 100,
-          age:   (p.age   != null ? Number(p.age)   : 18) / 100,
-          speed: (p.speed != null ? Number(p.speed) : 5.5) / 100,
+          hiss:            (p.hiss            != null ? Number(p.hiss)            : 20)  / 100,
+          dust:            (p.dust            != null ? Number(p.dust)            : 30)  / 100,
+          age:             (p.age             != null ? Number(p.age)             : 18)  / 100,
+          speed:           (p.speed           != null ? Number(p.speed)           : 5.5) / 100,
+          riaa:            (p.riaa            != null ? Number(p.riaa)            : 30)  / 100,
+          stylusResonance: (p.stylusResonance != null ? Number(p.stylusResonance) : 25)  / 100,
+          wornStylus:      (p.wornStylus      != null ? Number(p.wornStylus)      : 0)   / 100,
+          pinch:           (p.pinch           != null ? Number(p.pinch)           : 15)  / 100,
+          innerGroove:     (p.innerGroove     != null ? Number(p.innerGroove)     : 0)   / 100,
+          ghostEcho:       (p.ghostEcho       != null ? Number(p.ghostEcho)       : 0)   / 100,
+          dropout:         (p.dropout         != null ? Number(p.dropout)         : 0)   / 100,
+          warp:            (p.warp            != null ? Number(p.warp)            : 0)   / 100,
+          eccentricity:    (p.eccentricity    != null ? Number(p.eccentricity)    : 0)   / 100,
           wet: wetValue,
         });
         (node as Tone.ToneAudioNode & { _fxType?: string })._fxType = 'VinylNoise';

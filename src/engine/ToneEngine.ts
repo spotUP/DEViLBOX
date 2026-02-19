@@ -5224,10 +5224,19 @@ export class ToneEngine {
 
       case 'VinylNoise':
         if (node instanceof VinylNoiseEffect) {
-          if ('hiss'  in changed) node.setHiss (Number(changed.hiss)  / 100);
-          if ('dust'  in changed) node.setDust (Number(changed.dust)  / 100);
-          if ('age'   in changed) node.setAge  (Number(changed.age)   / 100);
-          if ('speed' in changed) node.setSpeed(Number(changed.speed) / 100);
+          if ('hiss'            in changed) node.setHiss           (Number(changed.hiss)            / 100);
+          if ('dust'            in changed) node.setDust           (Number(changed.dust)            / 100);
+          if ('age'             in changed) node.setAge            (Number(changed.age)             / 100);
+          if ('speed'           in changed) node.setSpeed          (Number(changed.speed)           / 100);
+          if ('riaa'            in changed) node.setRiaa           (Number(changed.riaa)            / 100);
+          if ('stylusResonance' in changed) node.setStylusResonance(Number(changed.stylusResonance) / 100);
+          if ('wornStylus'      in changed) node.setWornStylus     (Number(changed.wornStylus)      / 100);
+          if ('pinch'           in changed) node.setPinch          (Number(changed.pinch)           / 100);
+          if ('innerGroove'     in changed) node.setInnerGroove    (Number(changed.innerGroove)     / 100);
+          if ('ghostEcho'       in changed) node.setGhostEcho      (Number(changed.ghostEcho)       / 100);
+          if ('dropout'         in changed) node.setDropout        (Number(changed.dropout)         / 100);
+          if ('warp'            in changed) node.setWarp           (Number(changed.warp)            / 100);
+          if ('eccentricity'    in changed) node.setEccentricity   (Number(changed.eccentricity)    / 100);
         }
         break;
 
