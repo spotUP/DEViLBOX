@@ -4954,6 +4954,15 @@ export class ToneEngine {
   }
 
   /**
+   * Returns the pre/post AnalyserNodes for a master effect by ID.
+   * Pre-analyser receives the signal before the effect; post receives after.
+   * Returns null if the effect ID is not found (effect disabled or not yet built).
+   */
+  public getMasterEffectAnalysers(id: string): { pre: AnalyserNode; post: AnalyserNode } | null {
+    return this.masterEffectAnalysers.get(id) ?? null;
+  }
+
+  /**
    * Update parameters for a single master effect
    * Called when effect parameters change (wet, specific params)
    */
