@@ -1569,38 +1569,6 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
-    // Apply a given instrument ID to all non-empty cells in the selection (atomic undo)
-    applyInstrumentToSelection: (instrumentId) => {
-      const patternIndex = get().currentPatternIndex;
-      const beforePattern = get().patterns[patternIndex];
-      set((state) => {
-        const pattern = state.patterns[state.currentPatternIndex];
-        const { selection: sel, cursor: cur } = state;
-        const range = sel
-          ? {
-              minCh: Math.min(sel.startChannel, sel.endChannel),
-              maxCh: Math.max(sel.startChannel, sel.endChannel),
-              minRow: Math.min(sel.startRow, sel.endRow),
-              maxRow: Math.max(sel.startRow, sel.endRow),
-            }
-          : {
-              minCh: cur.channelIndex, maxCh: cur.channelIndex,
-              minRow: cur.rowIndex, maxRow: cur.rowIndex,
-            };
-        for (let ch = range.minCh; ch <= range.maxCh; ch++) {
-          if (ch >= pattern.channels.length) continue;
-          for (let row = range.minRow; row <= range.maxRow; row++) {
-            if (row >= pattern.length) continue;
-            const cell = pattern.channels[ch].rows[row];
-            if (cell && cell.note && cell.note !== 0) {
-              cell.instrument = instrumentId;
-            }
-          }
-        }
-      });
-      useHistoryStore.getState().pushAction('APPLY_INSTRUMENT', 'Apply instrument', patternIndex, beforePattern, get().patterns[patternIndex]);
-    },
-
     // Advanced editing - Interpolate values in selection
     interpolateSelection: (column, startValue, endValue, curve = 'linear') => {
       if (!get().selection) return;

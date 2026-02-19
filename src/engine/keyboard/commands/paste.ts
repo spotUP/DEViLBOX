@@ -138,7 +138,10 @@ export function insertRowPushDown(): boolean {
  * Clear selection only (without cutting to clipboard)
  */
 export function clearSelection(): boolean {
-  useTrackerStore.getState().cutSelection();
+  const store = useTrackerStore.getState();
+  const savedClipboard = store.clipboard;
+  store.cutSelection();
+  if (savedClipboard) store.setClipboard(savedClipboard);
   return true;
 }
 
