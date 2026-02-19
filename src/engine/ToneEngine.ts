@@ -608,10 +608,8 @@ export class ToneEngine {
         // Also wait for any custom buffer loading promises (ArrayBuffer-based samples)
         const pendingLoads = Array.from(this.instrumentLoadingPromises.values());
         if (pendingLoads.length > 0) {
-          console.log(`[ToneEngine] Waiting for ${pendingLoads.length} samples to decode...`);
           await Promise.all(pendingLoads);
           if (generation !== this.preloadGeneration) return; // Superseded
-          console.log(`[ToneEngine] All ${pendingLoads.length} samples loaded`);
         }
       } catch (error) {
         console.error('[ToneEngine] Some samples failed to load:', error);
@@ -621,10 +619,8 @@ export class ToneEngine {
     // Wait for speech synths to render
     if (speechReadyPromises.length > 0) {
       try {
-        console.log(`[ToneEngine] Waiting for ${speechReadyPromises.length} speech synths to render...`);
         await Promise.all(speechReadyPromises);
         if (generation !== this.preloadGeneration) return; // Superseded
-        console.log(`[ToneEngine] All ${speechReadyPromises.length} speech synths ready`);
       } catch (error) {
         console.error('[ToneEngine] Some speech synths failed to render:', error);
       }
@@ -643,10 +639,8 @@ export class ToneEngine {
     }
     if (wasmPromises.length > 0) {
       try {
-        console.log(`[ToneEngine] Waiting for ${wasmPromises.length} WASM synth(s) to initialize...`);
         await Promise.all(wasmPromises);
         if (generation !== this.preloadGeneration) return; // Superseded
-        console.log(`[ToneEngine] All WASM synths ready`);
       } catch (error) {
         console.error('[ToneEngine] Some WASM synths failed to initialize:', error);
       }
@@ -1255,7 +1249,6 @@ export class ToneEngine {
         // Prepend BASE_URL for relative paths (handles /DEViLBOX/ prefix in production)
         if (sampleUrl) {
           sampleUrl = normalizeUrl(sampleUrl);
-          console.log(`[ToneEngine] Sampler ${instrumentId} URL normalized: ${sampleUrl}`);
         }
 
         // If we have a stored edited buffer, use that instead of URL
@@ -1707,11 +1700,6 @@ export class ToneEngine {
     if (foundChains === 0) {
       // No active chains found, but we still store the analyser 
       // so future chains (from buildInstrumentEffectChain) will connect to it
-      console.log(`[ToneEngine] Lazy-created analyser for instrument ${instrumentId} (waiting for notes)`);
-    } else {
-      console.log(`[ToneEngine] Lazy-created analyser for instrument ${instrumentId} and connected ${foundChains} active chains`);
-    }
-
     this.instrumentAnalysers.set(instrumentId, analyser);
     return analyser;
   }
@@ -2229,7 +2217,6 @@ export class ToneEngine {
         if (instrument instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
           const maxCh = instrument.getNumChannels() || 3;
           const chipChannel = channelIndex % maxCh;
-          console.log(`[ToneEngine] FurnaceDispatch channelIndex=${channelIndex} maxCh=${maxCh} → chipChannel=${chipChannel}`);
           instrument.setChannel(chipChannel);
         }
         // Standard synths - apply slide/accent for 303-style effects
@@ -2626,9 +2613,7 @@ export class ToneEngine {
       return;
     }
     
-    // Debug: trace instrument type for FurnaceDispatch issues
     const isFurnaceDispatch = instrument instanceof FurnaceDispatchSynth;
-    console.log(`[ToneEngine] triggerNote: id=${instrumentId} type=${config.synthType} isFurnaceDispatch=${isFurnaceDispatch} constructor=${instrument.constructor.name}`);
 
     if (channelIndex !== undefined) {
       // 1. Handle Past Note Actions (NNA)
@@ -2729,7 +2714,6 @@ export class ToneEngine {
           if (voiceNode instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
             const maxCh = voiceNode.getNumChannels() || 3;
             const chipChannel = channelIndex % maxCh;
-            console.log(`[ToneEngine] FurnaceDispatch channelIndex=${channelIndex} maxCh=${maxCh} → chipChannel=${chipChannel}`);
             voiceNode.setChannel(chipChannel);
           }
           // NoiseSynth and MetalSynth don't take note parameter: triggerAttack(time, velocity)
@@ -3497,7 +3481,6 @@ export class ToneEngine {
         synth.uploadInstrumentData(binaryData);
       });
       
-      console.log(`[ToneEngine] Updated ${synths.length} Furnace synth instance(s) for instrument ${instrumentId}`);
     }).catch(err => {
       console.error('[ToneEngine] Failed to encode Furnace instrument:', err);
     });
@@ -3631,7 +3614,6 @@ export class ToneEngine {
           (i: InstrumentConfig) => i.id === instrumentId
         );
         if (config) {
-          console.log(`[ToneEngine] speakMAMEChipText: creating instrument on-demand for id=${instrumentId}, type=${config.synthType}`);
           instrument = this.getInstrument(instrumentId, config) ?? undefined;
           // Wait for WASM synth to initialize (ensures worklet is ready before speakText)
           if (instrument && typeof (instrument as any).ensureInitialized === 'function') {
@@ -3652,11 +3634,6 @@ export class ToneEngine {
 
     const synth = instrument as unknown as { speakText?: (text: string) => void; _isReady?: boolean; workletNode?: unknown };
     if (typeof synth.speakText === 'function') {
-      console.log(
-        `[ToneEngine] speakMAMEChipText: key="${instrumentKey}", ` +
-        `ready=${synth._isReady ?? '?'}, worklet=${!!synth.workletNode}, ` +
-        `ctxState=${this._nativeContext?.state ?? '?'}`
-      );
       synth.speakText(text);
     } else {
       console.warn(`[ToneEngine] speakMAMEChipText: instrument key="${instrumentKey}" has no speakText method`);
