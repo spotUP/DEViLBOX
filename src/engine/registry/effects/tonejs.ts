@@ -246,10 +246,10 @@ const tonejs: EffectDescriptor[] = [
       const p = c.parameters;
       return new Tone.Phaser({
         frequency: Number(p.frequency) || 0.5, octaves: Number(p.octaves) || 3,
-        baseFrequency: Number(p.baseFrequency) || 350, wet: c.wet / 100,
+        baseFrequency: Number(p.baseFrequency) || 1000, Q: Number(p.Q) || 10, wet: c.wet / 100,
       });
     },
-    getDefaultParameters: () => ({ frequency: 0.5, octaves: 3, baseFrequency: 350 }),
+    getDefaultParameters: () => ({ frequency: 0.5, octaves: 3, baseFrequency: 1000, Q: 10 }),
   },
   {
     id: 'Tremolo', name: 'Tremolo', category: 'tonejs', group: 'Modulation',
