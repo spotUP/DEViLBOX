@@ -31,6 +31,7 @@ import { LeslieEffect } from './effects/LeslieEffect';
 import { SpringReverbEffect } from './effects/SpringReverbEffect';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
 import { TumultEffect, type TumultOptions } from './effects/TumultEffect';
+import { TapeSimulatorEffect } from './effects/TapeSimulatorEffect';
 import { WAMEffectNode } from './wam/WAMEffectNode';
 import { SidechainCompressor } from './effects/SidechainCompressor';
 import { TapeSaturation } from './effects/TapeSaturation';
@@ -117,6 +118,8 @@ export class ToneEngine {
   private masterEffectsNodes: Tone.ToneAudioNode[] = [];
   private masterEffectConfigs: Map<string, { node: Tone.ToneAudioNode; config: EffectConfig }> = new Map();
   private masterEffectsRebuildVersion = 0;
+  // Pre/post AnalyserNode taps for each master effect (for visualizers)
+  private masterEffectAnalysers: Map<string, { pre: AnalyserNode; post: AnalyserNode }> = new Map();
   private _isPlaying = false;
 
   // Per-channel audio routing (volume, pan, mute/solo, metering)
@@ -878,8 +881,10 @@ export class ToneEngine {
 
   /** Notify noise-generating master effects (VinylNoise, Tumult) of playback state. */
   private _notifyNoiseEffectsPlaying(playing: boolean): void {
+    console.log('[ToneEngine] _notifyNoiseEffectsPlaying(', playing, ') — scanning', this.masterEffectConfigs.size, 'effects');
     this.masterEffectConfigs.forEach(({ node }) => {
       if (node instanceof VinylNoiseEffect) {
+        console.log('[ToneEngine] → notifying VinylNoiseEffect');
         node.setPlaying(playing);
       } else if (node instanceof TumultEffect) {
         node.setPlaying(playing);
@@ -4472,6 +4477,12 @@ export class ToneEngine {
     });
     this.masterEffectsNodes = [];
     this.masterEffectConfigs.clear();
+    // Disconnect and clear analyser taps
+    this.masterEffectAnalysers.forEach(({ pre, post }) => {
+      try { pre.disconnect(); } catch { /* */ }
+      try { post.disconnect(); } catch { /* */ }
+    });
+    this.masterEffectAnalysers.clear();
 
     // Dispose master channel and analyzers
     this.analyser.dispose();
@@ -4740,6 +4751,12 @@ export class ToneEngine {
     });
     this.masterEffectsNodes = [];
     this.masterEffectConfigs.clear();
+    // Disconnect and clear analyser taps
+    this.masterEffectAnalysers.forEach(({ pre, post }) => {
+      try { pre.disconnect(); } catch { /* */ }
+      try { post.disconnect(); } catch { /* */ }
+    });
+    this.masterEffectAnalysers.clear();
 
     // Filter to only enabled effects
     const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
@@ -4814,6 +4831,41 @@ export class ToneEngine {
     // Debug: Success
     // console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' connected chain OK, nodes:',
     //   this.masterEffectsNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
+
+    // Create pre/post AnalyserNode taps for each effect (side-branch, non-destructive)
+    const rawCtx = Tone.getContext().rawContext as AudioContext;
+    for (let i = 0; i < successNodes.length; i++) {
+      const config = successConfigs[i];
+
+      const pre = rawCtx.createAnalyser();
+      pre.fftSize = 2048;
+      pre.smoothingTimeConstant = 0.8;
+
+      const post = rawCtx.createAnalyser();
+      post.fftSize = 2048;
+      post.smoothingTimeConstant = 0.8;
+
+      // Pre-tap: tap the signal feeding into effect[i]
+      // For effect[0]: source is masterEffectsInput; for others: source is the previous effect
+      const preSourceNode: Tone.ToneAudioNode = i === 0
+        ? this.masterEffectsInput
+        : successNodes[i - 1];
+      const preNative = getNativeAudioNode(preSourceNode);
+      if (preNative) {
+        try { preNative.connect(pre); } catch { /* */ }
+      }
+
+      // Post-tap: tap the output of effect[i]
+      const postOutputNode = (successNodes[i] as unknown as { output?: unknown }).output;
+      const postNative = postOutputNode
+        ? getNativeAudioNode(postOutputNode)
+        : getNativeAudioNode(successNodes[i]);
+      if (postNative) {
+        try { postNative.connect(post); } catch { /* */ }
+      }
+
+      this.masterEffectAnalysers.set(config.id, { pre, post });
+    }
 
     // Sync playback state into freshly created noise-generating nodes
     this._notifyNoiseEffectsPlaying(this._isPlaying);
@@ -4904,11 +4956,21 @@ export class ToneEngine {
     }
 
     const { node, config: prevConfig } = effectData;
+    if (config.type === 'VinylNoise') {
+      console.log('[ToneEngine] updateMasterEffectParams VinylNoise — wet:', prevConfig.wet, '→', config.wet,
+        'params:', JSON.stringify(config.parameters));
+    }
 
     try {
       // Only update wet if it actually changed
       if (config.wet !== prevConfig.wet) {
         const wetValue = config.wet / 100;
+        if (config.type === 'VinylNoise') {
+          const nodeAny = node as unknown as Record<string, unknown>;
+          console.log('[ToneEngine] VinylNoise wet changed →', wetValue,
+            'node.wet type=', typeof nodeAny.wet,
+            'is Signal?', nodeAny.wet instanceof Tone.Signal);
+        }
         if ('wet' in node && node.wet instanceof Tone.Signal) {
           node.wet.rampTo(wetValue, 0.02);
         } else if ('wet' in node && typeof (node as Record<string, unknown>).wet === 'number') {
@@ -4923,6 +4985,11 @@ export class ToneEngine {
         if (prevConfig.parameters[key] !== value) {
           changedParams[key] = value;
         }
+      }
+
+      if (config.type === 'VinylNoise') {
+        console.log('[ToneEngine] VinylNoise changedParams:', JSON.stringify(changedParams),
+          '(prevParams:', JSON.stringify(prevConfig.parameters), ')');
       }
 
       // Only apply effect params if something actually changed
@@ -5262,6 +5329,17 @@ export class ToneEngine {
           for (const key of Object.keys(changed)) {
             node.setParam(key as keyof TumultOptions, Number(changed[key]));
           }
+        }
+        break;
+
+      case 'TapeSimulator':
+        if (node instanceof TapeSimulatorEffect) {
+          if ('drive'     in changed) node.setDrive    (Number(changed.drive)     / 100);
+          if ('character' in changed) node.setCharacter(Number(changed.character) / 100);
+          if ('bias'      in changed) node.setBias     (Number(changed.bias)      / 100);
+          if ('shame'     in changed) node.setShame    (Number(changed.shame)     / 100);
+          if ('hiss'      in changed) node.setHiss     (Number(changed.hiss)      / 100);
+          if ('speed'     in changed) node.setSpeed    (Number(changed.speed)); // 0|1 integer, not /100
         }
         break;
 
