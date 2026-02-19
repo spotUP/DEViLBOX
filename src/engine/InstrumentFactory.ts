@@ -174,7 +174,7 @@ export function getDefaultEffectParameters(type: string): Record<string, number 
     case 'SpringReverb':
       return { decay: 0.6, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.7 };
     case 'VinylNoise':
-      return { hiss: 50, dust: 50, age: 50, speed: 0 };
+      return { hiss: 20, dust: 30, age: 18, speed: 5.5 };  // "Played" condition at 33 RPM
     default:
       return {};
   }
@@ -1532,10 +1532,10 @@ export class InstrumentFactory {
 
       case 'VinylNoise': {
         const node = new VinylNoiseEffect({
-          hiss:  (Number(p.hiss)  || 50) / 100,
-          dust:  (Number(p.dust)  || 50) / 100,
-          age:   (Number(p.age)   || 50) / 100,
-          speed: (Number(p.speed) || 20) / 100,
+          hiss:  (p.hiss  != null ? Number(p.hiss)  : 20) / 100,
+          dust:  (p.dust  != null ? Number(p.dust)  : 30) / 100,
+          age:   (p.age   != null ? Number(p.age)   : 18) / 100,
+          speed: (p.speed != null ? Number(p.speed) : 5.5) / 100,
           wet: wetValue,
         });
         (node as Tone.ToneAudioNode & { _fxType?: string })._fxType = 'VinylNoise';
