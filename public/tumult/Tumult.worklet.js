@@ -1328,10 +1328,9 @@ class TumultProcessor extends AudioWorkletProcessor {
     this._updateBands();
     this._updateFollower();
 
-    // Playback gate — silence noise when tracker is idle, 4-second cooldown
-    this._playing        = false;
-    this._cooldownTotal  = Math.round(sampleRate * 4);
-    this._cooldownRemain = 0;
+    // Playback gate — active when playing or editor is open (for preview while stopped)
+    this._playing    = false;
+    this._editorOpen = false;
 
     this.port.onmessage = (e) => {
       const { type, param, value, bufferL, bufferR, sampleRate: bufferSampleRate } = e.data;
@@ -1343,11 +1342,8 @@ class TumultProcessor extends AudioWorkletProcessor {
         );
       } else if (param === 'playing') {
         this._playing = !!value;
-        if (this._playing) {
-          this._cooldownRemain = 0;
-        } else {
-          this._cooldownRemain = this._cooldownTotal;
-        }
+      } else if (param === 'editorOpen') {
+        this._editorOpen = !!value;
       } else if (param !== undefined) {
         this.p[param] = value;
         if (param === 'clipAmount') {
@@ -1396,17 +1392,8 @@ class TumultProcessor extends AudioWorkletProcessor {
     const noiseGainLin = Math.pow(10, p.noiseGain / 20);
     const pGain = p.sourceMode === 3 ? Math.pow(10, p.playerGain / 20) : 1;
 
-    // Playback gate with 4-second cooldown (same as VinylNoise)
-    let playGate = 1.0;
-    if (!this._playing) {
-      if (this._cooldownRemain <= 0) {
-        playGate = 0.0;
-      } else {
-        playGate = this._cooldownRemain / this._cooldownTotal;
-        this._cooldownRemain -= (outL?.length ?? 128);
-        if (this._cooldownRemain < 0) this._cooldownRemain = 0;
-      }
-    }
+    // Playback gate — active only when playing or editor is open
+    const playGate = (this._playing || this._editorOpen) ? 1.0 : 0.0;
 
     for (let i = 0; i < (outL?.length ?? 128); i++) {
       // ── Dry signal ──────────────────────────────────────────────────────

@@ -280,6 +280,10 @@ export class TumultEffect extends Tone.ToneAudioNode {
     this._send('playing', playing ? 1 : 0);
   }
 
+  setEditorOpen(open: boolean) {
+    this._send('editorOpen', open ? 1 : 0);
+  }
+
   setParam(param: keyof TumultOptions, value: number) {
     (this._params as Record<string, number>)[param] = value;
     if (param === 'wet') {

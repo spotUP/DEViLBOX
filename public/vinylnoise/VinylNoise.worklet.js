@@ -240,11 +240,9 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
     this._dustL = new Float32Array(128); this._dustR = new Float32Array(128);
 
     // ─── Playback gate — silence noise when tracker is idle ───────────────────
-    // Cooldown: when playback stops, noise fades out over 4 seconds so abrupt
-    // cuts don't occur during keyboard jamming.
-    this._playing        = false;
-    this._cooldownTotal  = Math.round(sampleRate * 4);  // 4-second fade
-    this._cooldownRemain = 0;
+    // Active when playing OR when the editor is open (for preview while stopped).
+    this._playing    = false;
+    this._editorOpen = false;
 
     this._initFilters();
 
@@ -341,11 +339,9 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
       case 'eccentricity':    this._eccentricity = data.value; break;
       case 'playing':
         this._playing = !!data.value;
-        if (this._playing) {
-          this._cooldownRemain = 0; // resume immediately at full gain
-        } else {
-          this._cooldownRemain = this._cooldownTotal; // begin cooldown fade
-        }
+        break;
+      case 'editorOpen':
+        this._editorOpen = !!data.value;
         break;
     }
   }
@@ -559,18 +555,8 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
     const n = outL ? outL.length : 128;
 
     // Step 1: Synthesize crackle+hiss, gated by playback state.
-    // When not playing, fade out over _cooldownTotal samples so keyboard jamming
-    // doesn't cut off abruptly; once fully cooled, skip synthesis entirely.
-    let noiseGain = 1.0;
-    if (!this._playing) {
-      if (this._cooldownRemain <= 0) {
-        noiseGain = 0.0;
-      } else {
-        noiseGain = this._cooldownRemain / this._cooldownTotal;
-        this._cooldownRemain -= n;
-        if (this._cooldownRemain < 0) this._cooldownRemain = 0;
-      }
-    }
+    // Active only when the tracker is playing or the editor is open.
+    const noiseGain = (this._playing || this._editorOpen) ? 1.0 : 0.0;
     if (noiseGain > 0.0) {
       this._synthesizeCrackle(this._dustL, this._dustR, n);
       if (noiseGain < 1.0) {
