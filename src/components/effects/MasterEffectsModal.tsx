@@ -450,8 +450,8 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
 
         {/* Main Content — 3-column layout: Chain | Editor | Browser */}
         <div className="flex-1 overflow-hidden flex">
-          {/* Left: Effect Chain (1/4) */}
-          <div className="w-1/4 border-r border-dark-border flex flex-col">
+          {/* Left: Effect Chain (30%) */}
+          <div className="w-[30%] border-r border-dark-border flex flex-col">
             <div className="p-4 border-b border-dark-border bg-dark-bgSecondary">
               <h3 className="text-sm font-bold text-text-primary mb-1">Effect Chain</h3>
               <p className="text-xs text-text-muted">Drag to reorder. Click to edit.</p>
@@ -543,8 +543,8 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
             )}
           </div>
 
-          {/* Right: Effect Browser (1/4) */}
-          <div className="w-1/4 flex flex-col">
+          {/* Right: Effect Browser (20%) */}
+          <div className="w-[20%] flex flex-col">
             <div className="p-4 border-b border-dark-border bg-dark-bgSecondary space-y-3">
               <div>
                 <h3 className="text-sm font-bold text-text-primary">Effect Browser</h3>
