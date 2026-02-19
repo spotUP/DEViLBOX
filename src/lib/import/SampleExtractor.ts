@@ -412,7 +412,8 @@ export async function extractSamples(file: File): Promise<ExtractionResult> {
     case 'S3M':
       return extractS3M(data);
     case 'IT':
-      throw new Error('IT format sample extraction not yet implemented');
+      console.warn('[SampleExtractor] IT format sample extraction not yet implemented');
+      return { samples: [], format: 'IT', title: readString(data, 4, 26) };
     default:
       throw new Error(`Unsupported format: ${format}`);
   }
