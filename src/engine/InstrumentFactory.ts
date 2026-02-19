@@ -134,7 +134,7 @@ export function getDefaultEffectParameters(type: string): Record<string, number 
     case 'BitCrusher':
       return { bits: 4 };
     case 'Chebyshev':
-      return { order: 50, oversample: 'none' };
+      return { order: 2, oversample: 'none' };
     case 'FrequencyShifter':
       return { frequency: 0 };
     case 'PingPongDelay':
@@ -1033,7 +1033,7 @@ export class InstrumentFactory {
 
       case 'Chebyshev':
         node = new Tone.Chebyshev({
-          order: p.order || 50,
+          order: p.order || 2,
           oversample: p.oversample || 'none',
           wet: wetValue,
         });
