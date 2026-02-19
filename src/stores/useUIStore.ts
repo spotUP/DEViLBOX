@@ -9,6 +9,18 @@ import type { PanelType } from '@typedefs/project';
 
 export type PerformanceQuality = 'high' | 'medium' | 'low';
 
+export type DialogCommand =
+  | 'interpolate-volume'
+  | 'interpolate-effect'
+  | 'humanize'
+  | 'find-replace'
+  | 'groove-settings'
+  | 'scale-volume-block'
+  | 'scale-volume-track'
+  | 'scale-volume-pattern'
+  | 'keyboard-help'
+  | 'tempo-tap';
+
 interface UIStore {
   // State
   visiblePanels: PanelType[];
@@ -93,6 +105,17 @@ interface UIStore {
 
   // Module import actions
   setPendingModuleFile: (file: File | null) => void;
+
+  // Dialog command (keyboard → dialog bridge)
+  dialogOpen: DialogCommand | null;
+  showFileBrowser: boolean;
+  showChannelNames: boolean;
+
+  // Dialog bridge actions
+  openDialogCommand: (dialog: DialogCommand) => void;
+  closeDialogCommand: () => void;
+  setShowFileBrowser: (show: boolean) => void;
+  toggleChannelNames: () => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -137,6 +160,11 @@ export const useUIStore = create<UIStore>()(
       statusMessage: 'All Right',
       prevStatusMessage: 'All Right',
       pendingModuleFile: null,
+
+      // Dialog bridge (keyboard → dialog)
+      dialogOpen: null,
+      showFileBrowser: false,
+      showChannelNames: false,
 
       // Actions
       togglePanel: (panel) =>
@@ -350,6 +378,19 @@ export const useUIStore = create<UIStore>()(
         set((state) => {
           state.pendingModuleFile = file;
         }),
+
+      // Dialog bridge actions
+      openDialogCommand: (dialog) =>
+        set((state) => { state.dialogOpen = dialog; }),
+
+      closeDialogCommand: () =>
+        set((state) => { state.dialogOpen = null; }),
+
+      setShowFileBrowser: (show) =>
+        set((state) => { state.showFileBrowser = show; }),
+
+      toggleChannelNames: () =>
+        set((state) => { state.showChannelNames = !state.showChannelNames; }),
     })),
     {
       name: 'devilbox-ui-settings',
