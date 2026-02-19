@@ -676,9 +676,9 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
             width: 7,
             height: 7,
             borderRadius: '50%',
-            backgroundColor: effect.enabled ? enc.accent : `${enc.bg}`,
+            backgroundColor: effect.enabled ? '#10b981' : `${enc.bg}`,
             boxShadow: effect.enabled
-              ? `0 0 4px 1px ${enc.accent}80, 0 0 10px 3px ${enc.accent}25`
+              ? '0 0 4px 1px #10b98180, 0 0 10px 3px #10b98125'
               : 'inset 0 1px 2px rgba(0,0,0,0.5)',
             transition: 'all 0.3s ease',
             flexShrink: 0,
