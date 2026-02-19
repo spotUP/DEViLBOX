@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-19T18:40:35.023Z
+ * Generated: 2026-02-19T20:32:34.809Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.928';
-export const BUILD_NUMBER = '928';
-export const BUILD_HASH = '5211f390';
+export const BUILD_VERSION = '1.0.948';
+export const BUILD_NUMBER = '948';
+export const BUILD_HASH = 'bc75afcc';
 export const BUILD_DATE = '2026-02-19';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,89 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.928',
+    version: '1.0.948',
     date: '2026-02-19',
     changes: [
+      {
+        type: 'fix',
+        "description": "Wire undo history + fix clonePattern + console cleanup"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: remove debug console.logs from UIStore migration, add plan docs"
+      },
+      {
+        type: 'fix',
+        "description": "Syntax errors in useHistoryStore/PatternScheduler, remove dead diagnostic fields in TrackerReplayer"
+      },
+      {
+        type: 'fix',
+        "description": "Beta readiness — console cleanup, undo/redo, bug fixes"
+      },
+      {
+        type: 'feature',
+        "description": "Add MiniOutputMeter to effect chain cards — live RMS bar for each effect"
+      },
+      {
+        type: 'fix',
+        "description": "Consistency pass — hook after getParam calls in 3 editors, fix AutoPanner color"
+      },
+      {
+        type: 'improvement',
+        "description": "Move useEffectAnalyser call to after all getParam reads for consistency"
+      },
+      {
+        type: 'feature',
+        "description": "Add live visualizers to all effect editors — waveshaper curves, oscilloscopes, spectrums, GR meter"
+      },
+      {
+        type: 'fix',
+        "description": "Guard canvas resize, document no-dep useEffect pattern"
+      },
+      {
+        type: 'feature',
+        "description": "Add EffectVisualizer components — oscilloscope, spectrum, waveshaper curve, GR meter, mini meter"
+      },
+      {
+        type: 'feature',
+        "description": "Add useEffectAnalyser hook — reads pre/post analyser taps at 30fps"
+      },
+      {
+        type: 'feature',
+        "description": "Expose getMasterEffectAnalysers() for visualizer hook"
+      },
+      {
+        type: 'fix',
+        "description": "Fix analyser pre-tap node resolution; remove VinylNoise debug logs"
+      },
+      {
+        type: 'feature',
+        "description": "Add pre/post AnalyserNode taps per master effect for visualizers"
+      },
+      {
+        type: 'fix',
+        "description": "Move DYNAMICS_EFFECTS to module scope, remove SidechainCompressor from set"
+      },
+      {
+        type: 'fix',
+        "description": "Default wet 100 for dynamics effects — wet slider has no audio effect but showing 50 is misleading"
+      },
+      {
+        type: 'fix',
+        "description": "Re-send bits in registry path after worklet ready"
+      },
+      {
+        type: 'fix',
+        "description": "Re-send bits value after AudioWorklet is ready"
+      },
+      {
+        type: 'fix',
+        "description": "Update remaining order:50 defaults in registry and editor fallback"
+      },
+      {
+        type: 'fix',
+        "description": "Change default order from 50 to 2 — order 50 causes extreme distortion"
+      },
       {
         type: 'fix',
         "description": "VinylNoise hiss audibility + tracker Backspace at row 0 + Cmd+Backspace on Mac"
@@ -152,92 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Initialize Ramper in VinylNoise worklet — crackles were never firing"
-      },
-      {
-        type: 'fix',
-        "description": "VinylNoise audit — wrap LFO phase, fix dispose order, document Ramper divergence"
-      },
-      {
-        type: 'feature',
-        "description": "Expose VinylNoise in effect picker"
-      },
-      {
-        type: 'feature',
-        "description": "Add VinylNoise effect UI editor"
-      },
-      {
-        type: 'feature',
-        "description": "Handle VinylNoise parameter updates in ToneEngine"
-      },
-      {
-        type: 'feature',
-        "description": "Wire VinylNoise into InstrumentFactory"
-      },
-      {
-        type: 'feature',
-        "description": "Register VinylNoise AudioEffectType"
-      },
-      {
-        type: 'feature',
-        "description": "Add VinylNoiseEffect Tone.js wrapper"
-      },
-      {
-        type: 'feature',
-        "description": "Add VinylNoise AudioWorklet DSP (viator-rust port)"
-      },
-      {
-        type: 'feature',
-        "description": "Sync DJ pitch slider with W effect commands"
-      },
-      {
-        type: 'feature',
-        "description": "Add smooth W effect (global pitch shift) with DJ-style sliding"
-      },
-      {
-        type: 'improvement',
-        "description": "Add vinyl noise effect design document"
-      },
-      {
-        type: 'fix',
-        "description": "Pattern editor and playback improvements"
-      },
-      {
-        type: 'feature',
-        "description": "Add Audio-to-MIDI conversion in Sample Editor"
-      }
-    ]
-  },
-  {
-    version: '2026-02-18',
-    date: '2026-02-18',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Reduce throttle to 30ms and remove rampTo for more responsive pitch shifting"
-      },
-      {
-        type: 'fix',
-        "description": "Use longer throttle interval and smooth BPM ramping for stutter-free pitch shifting"
-      },
-      {
-        type: 'fix',
-        "description": "Throttle BPM updates during pitch slider drag to prevent audio dropouts"
-      },
-      {
-        type: 'fix',
-        "description": "Update transport store BPM for TrackerReplayer timing sync"
-      },
-      {
-        type: 'fix',
-        "description": "Apply global playback rate in TrackerReplayer for MOD samples"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused variables and add missing engine declaration"
-      },
-      {
-        type: 'feature',
-        "description": "Add global playback rate for true pitch shifting on Amiga MOD samples"
       }
     ]
   }
