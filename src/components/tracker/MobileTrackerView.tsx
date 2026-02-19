@@ -41,7 +41,7 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   const [mobileChannel, setMobileChannel] = useState(0); // For portrait mode: which channel to show
   const [isInputCollapsed, setIsInputCollapsed] = useState(false); // Track MobilePatternInput collapse state
   const { isPlaying, togglePlayPause } = useTransportStore();
-  const { patterns, currentPatternIndex, cursor, setCell, moveCursor, copySelection, cutSelection, paste, applySystemPreset } = useTrackerStore();
+  const { patterns, currentPatternIndex, cursor, setCell, moveCursor, moveCursorToRow, recordMode, editStep, copySelection, cutSelection, paste, applySystemPreset } = useTrackerStore();
   const { instruments, currentInstrumentId, setCurrentInstrument } = useInstrumentStore();
   const pattern = patterns[currentPatternIndex];
   const { isPortrait, isLandscape } = useOrientation();
@@ -72,9 +72,12 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
       note,
       instrument: currentInstrumentId ?? 1,
     });
-    // Advance cursor if in record mode
-    // TODO: Check recordMode and editStep from tracker store
-  }, [cursor, setCell, currentInstrumentId]);
+    // Advance cursor by editStep rows when in record mode
+    if (recordMode && editStep > 0) {
+      const patternLength = patterns[currentPatternIndex]?.length ?? 64;
+      moveCursorToRow((cursor.rowIndex + editStep) % patternLength);
+    }
+  }, [cursor, setCell, currentInstrumentId, recordMode, editStep, patterns, currentPatternIndex, moveCursorToRow]);
 
   // Handle hex input (for effects, volume, instrument)
   const handleHexInput = useCallback((value: number) => {
