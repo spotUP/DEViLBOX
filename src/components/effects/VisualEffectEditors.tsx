@@ -9,6 +9,13 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { EffectConfig } from '@typedefs/instrument';
+import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
+import {
+  EffectOscilloscope,
+  EffectSpectrum,
+  WaveshaperCurve,
+  GainReductionMeter,
+} from './EffectVisualizer';
 import { Knob } from '@components/controls/Knob';
 import { BpmSyncControl } from './BpmSyncControl';
 import { isEffectBpmSynced, getEffectSyncDivision, type SyncDivision } from '@engine/bpmSync';
@@ -86,6 +93,7 @@ export const DistortionEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
+      <WaveshaperCurve type="Distortion" drive={drive} color="#ef4444" height={100} />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#ef4444" title="Distortion" />
         <div className="flex justify-around items-end">
@@ -126,9 +134,11 @@ export const ReverbEditor: React.FC<VisualEffectEditorProps> = ({
 }) => {
   const decay = getParam(effect, 'decay', 1.5);
   const preDelay = getParam(effect, 'preDelay', 0.01);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#6366f1" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#6366f1" title="Reverb" />
         <div className="flex justify-around items-end">
@@ -177,11 +187,13 @@ export const DelayEditor: React.FC<VisualEffectEditorProps> = ({
   const time = getParam(effect, 'time', 0.25);
   const feedback = getParam(effect, 'feedback', 0.5);
   const synced = isEffectBpmSynced(effect.parameters);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   const isPingPong = effect.type === 'PingPongDelay';
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#3b82f6" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#3b82f6" title={isPingPong ? 'Ping Pong Delay' : 'Delay'} />
         <div className="flex justify-around items-end">
@@ -234,9 +246,11 @@ export const ChorusEditor: React.FC<VisualEffectEditorProps> = ({
   const depth = getParam(effect, 'depth', 0.7);
   const delayTime = getParam(effect, 'delayTime', 3.5);
   const synced = isEffectBpmSynced(effect.parameters);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#ec4899" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#ec4899" title="Chorus" />
         <div className="flex justify-around items-end">
@@ -301,9 +315,11 @@ export const PhaserEditor: React.FC<VisualEffectEditorProps> = ({
   const frequency = getParam(effect, 'frequency', 0.5);
   const octaves = getParam(effect, 'octaves', 3);
   const baseFrequency = getParam(effect, 'baseFrequency', 350);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#a855f7" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#a855f7" title="Phaser" />
         <div className="flex justify-around items-end">
@@ -364,9 +380,11 @@ export const TremoloEditor: React.FC<VisualEffectEditorProps> = ({
 }) => {
   const frequency = getParam(effect, 'frequency', 10);
   const depth = getParam(effect, 'depth', 0.5);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#f97316" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#f97316" title="Tremolo" />
         <div className="flex justify-around items-end">
@@ -414,9 +432,11 @@ export const VibratoEditor: React.FC<VisualEffectEditorProps> = ({
 }) => {
   const frequency = getParam(effect, 'frequency', 5);
   const depth = getParam(effect, 'depth', 0.1);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#14b8a6" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#14b8a6" title="Vibrato" />
         <div className="flex justify-around items-end">
@@ -465,9 +485,11 @@ export const AutoFilterEditor: React.FC<VisualEffectEditorProps> = ({
   const frequency = getParam(effect, 'frequency', 1);
   const baseFrequency = getParam(effect, 'baseFrequency', 200);
   const octaves = getParam(effect, 'octaves', 2.6);
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
 
   return (
     <div className="space-y-4">
+      <EffectSpectrum pre={pre} post={post} color="#eab308" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#eab308" title="Auto Filter" />
         <div className="flex justify-around items-end">
@@ -528,9 +550,11 @@ export const AutoPannerEditor: React.FC<VisualEffectEditorProps> = ({
 }) => {
   const frequency = getParam(effect, 'frequency', 1);
   const depth = getParam(effect, 'depth', 1);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#10b981" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#22c55e" title="Auto Panner" />
         <div className="flex justify-around items-end">
@@ -580,9 +604,11 @@ export const AutoWahEditor: React.FC<VisualEffectEditorProps> = ({
   const octaves = getParam(effect, 'octaves', 6);
   const sensitivity = getParam(effect, 'sensitivity', 0);
   const Q = getParam(effect, 'Q', 2);
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
 
   return (
     <div className="space-y-4">
+      <EffectSpectrum pre={pre} post={post} color="#f43f5e" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#f43f5e" title="Auto Wah" />
         <div className="flex justify-around items-end">
@@ -655,9 +681,11 @@ export const BitCrusherEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateWet,
 }) => {
   const bits = getParam(effect, 'bits', 4);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#84cc16" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#84cc16" title="Bit Crusher" />
         <div className="flex justify-around items-end">
@@ -700,6 +728,7 @@ export const ChebyshevEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
+      <WaveshaperCurve type="Chebyshev" order={order} color="#f59e0b" height={100} />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#f59e0b" title="Chebyshev Waveshaper" />
         <div className="flex justify-around items-end">
@@ -739,9 +768,11 @@ export const FrequencyShifterEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateWet,
 }) => {
   const frequency = getParam(effect, 'frequency', 0);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#06b6d4" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#06b6d4" title="Frequency Shifter" />
         <div className="flex justify-around items-end">
@@ -784,9 +815,11 @@ export const PitchShiftEditor: React.FC<VisualEffectEditorProps> = ({
   const pitch = getParam(effect, 'pitch', 0);
   const windowSize = getParam(effect, 'windowSize', 0.1);
   const feedback = getParam(effect, 'feedback', 0);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#8b5cf6" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#8b5cf6" title="Pitch Shift" />
         <div className="flex justify-around items-end">
@@ -850,9 +883,11 @@ export const CompressorEditor: React.FC<VisualEffectEditorProps> = ({
   const ratio = getParam(effect, 'ratio', 12);
   const attack = getParam(effect, 'attack', 0.003);
   const release = getParam(effect, 'release', 0.25);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <GainReductionMeter pre={pre} post={post} />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#10b981" title="Compressor" />
         <div className="flex justify-around items-end">
@@ -929,9 +964,11 @@ export const EQ3Editor: React.FC<VisualEffectEditorProps> = ({
   const high = getParam(effect, 'high', 0);
   const lowFrequency = getParam(effect, 'lowFrequency', 400);
   const highFrequency = getParam(effect, 'highFrequency', 2500);
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
 
   return (
     <div className="space-y-4">
+      <EffectSpectrum pre={pre} post={post} color="#3b82f6" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#3b82f6" title="3-Band EQ" />
         <div className="flex justify-around items-end">
@@ -1018,9 +1055,11 @@ export const FilterEditor: React.FC<VisualEffectEditorProps> = ({
   const frequency = getParam(effect, 'frequency', 350);
   const Q = getParam(effect, 'Q', 1);
   const gain = getParam(effect, 'gain', 0);
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
 
   return (
     <div className="space-y-4">
+      <EffectSpectrum pre={pre} post={post} color="#f97316" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#f97316" title="Filter" />
         <div className="flex justify-around items-end">
@@ -1081,9 +1120,11 @@ export const JCReverbEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateWet,
 }) => {
   const roomSize = getParam(effect, 'roomSize', 0.5);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#6366f1" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#6366f1" title="JC Reverb" />
         <div className="flex justify-around items-end">
@@ -1123,9 +1164,11 @@ export const StereoWidenerEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateWet,
 }) => {
   const width = getParam(effect, 'width', 0.5);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#ec4899" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#ec4899" title="Stereo Widener" />
         <div className="flex justify-around items-end">
@@ -1346,9 +1389,11 @@ export const SpaceyDelayerEditor: React.FC<VisualEffectEditorProps> = ({
   const multiTap = getParam(effect, 'multiTap', 1);
   const tapeFilter = getParam(effect, 'tapeFilter', 0);
   const synced = isEffectBpmSynced(effect.parameters);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#8b5cf6" />
       {/* Delay Controls */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#8b5cf6" title="Spacey Delayer" />
@@ -1445,11 +1490,13 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
   const loopAmount = getParam(effect, 'loopAmount', 0);
   const playheadFilter = getParam(effect, 'playheadFilter', 1);
   const synced = isEffectBpmSynced(effect.parameters);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   const modeLabels = ['Head 1', 'Head 2', 'Both', 'H1+FB', 'H2+FB', 'Both+FB'];
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#dc2626" />
       {/* Main Controls */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#dc2626" title="RE Tape Echo" />
@@ -1596,6 +1643,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateParameter,
   onUpdateWet,
 }) => {
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
   const mode = getParam(effect, 'mode', 4);
   const rate = getParam(effect, 'rate', 300);
   const intensity = getParam(effect, 'intensity', 0.5);
@@ -1607,6 +1655,7 @@ export const SpaceEchoEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#6366f1" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#6366f1" title="Echo" />
         <div className="flex justify-around items-end">
@@ -1718,9 +1767,11 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
   const depthB = getParam(effect, 'depthB', 0.4);
   const feedback = getParam(effect, 'feedback', 0.3);
   const synced = isEffectBpmSynced(effect.parameters);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#a855f7" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#a855f7" title="Routing" />
         <div className="flex gap-2 justify-center mb-2">
@@ -1833,9 +1884,11 @@ export const DubFilterEditor: React.FC<VisualEffectEditorProps> = ({
   const cutoff = getParam(effect, 'cutoff', 20);
   const resonance = getParam(effect, 'resonance', 10);
   const gain = getParam(effect, 'gain', 1);
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
 
   return (
     <div className="space-y-4">
+      <EffectSpectrum pre={pre} post={post} color="#22c55e" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#22c55e" title="Dub Filter" />
         <div className="flex justify-around items-end">
@@ -1899,6 +1952,7 @@ export const TapeSaturationEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
+      <WaveshaperCurve type="TapeSaturation" drive={drive / 100} color="#ef4444" height={100} />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#ef4444" title="Tape Saturation" />
         <div className="flex justify-around items-end">
@@ -2008,6 +2062,7 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
 }) => {
   const configRef = useRef(effect);
   useEffect(() => { configRef.current = effect; }, [effect]);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   const p = (key: string, def: number) => getParam(effect, key, def);
 
@@ -2033,6 +2088,7 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#7c3aed" />
       {/* ── Section 1: Source ─────────────────────────────────────────────── */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#7c3aed" title="Source" />
@@ -2224,6 +2280,7 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateParameter,
   onUpdateWet,
 }) => {
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
   const hiss            = getParam(effect, 'hiss',            50);
   const dust            = getParam(effect, 'dust',            50);
   const age             = getParam(effect, 'age',             50);
@@ -2249,6 +2306,7 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#d97706" />
       {/* ── Section 1: Noise ─────────────────────────────────────────────── */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#d97706" title="Noise" />
@@ -2497,10 +2555,12 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
   const attack = getParam(effect, 'attack', 0.003);
   const release = getParam(effect, 'release', 0.25);
   const knee = getParam(effect, 'knee', 6);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
   const sidechainGain = getParam(effect, 'sidechainGain', 100);
 
   return (
     <div className="space-y-4">
+      <GainReductionMeter pre={pre} post={post} />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#10b981" title="Compressor" />
         <div className="flex justify-around items-end">
@@ -2599,9 +2659,11 @@ export const MoogFilterEditor: React.FC<VisualEffectEditorProps> = ({
   const drive = getParam(effect, 'drive', 1);
   const model = getParam(effect, 'model', 0);
   const filterMode = getParam(effect, 'filterMode', 1);
+  const { pre, post } = useEffectAnalyser(effect.id, 'fft');
 
   return (
     <div className="space-y-4">
+      <EffectSpectrum pre={pre} post={post} color="#f59e0b" />
       {/* Model & Mode */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#f59e0b" title="Model" />
@@ -2710,9 +2772,11 @@ export const MVerbEditor: React.FC<VisualEffectEditorProps> = ({
   const gain = getParam(effect, 'gain', 1.0);
   const mix = getParam(effect, 'mix', 0.4);
   const earlyMix = getParam(effect, 'earlyMix', 0.5);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#7c3aed" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#7c3aed" title="Reverb" />
         <div className="flex justify-around items-end flex-wrap gap-y-4">
@@ -2760,11 +2824,13 @@ export const LeslieEditor: React.FC<VisualEffectEditorProps> = ({
   const doppler = getParam(effect, 'doppler', 0.5);
   const width = getParam(effect, 'width', 0.8);
   const acceleration = getParam(effect, 'acceleration', 0.5);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   const speedIdx = speed < 0.25 ? 0 : speed > 0.75 ? 2 : 1;
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#f97316" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#f97316" title="Speed" />
         <div className="grid grid-cols-3 gap-1 mb-3">
@@ -2821,9 +2887,11 @@ export const SpringReverbEditor: React.FC<VisualEffectEditorProps> = ({
   const springMix = getParam(effect, 'mix', 0.35);
   const drip = getParam(effect, 'drip', 0.5);
   const diffusion = getParam(effect, 'diffusion', 0.7);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#059669" />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#059669" title="Spring Tank" />
         <div className="flex justify-around items-end">
