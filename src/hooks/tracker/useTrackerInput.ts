@@ -713,7 +713,27 @@ export const useTrackerInput = () => {
       // Backspace: Delete previous note/line (requires edit mode)
       if (key === 'Backspace' && recordMode) {
         e.preventDefault();
-        if (e.shiftKey) {
+        if (e.metaKey) {
+          // Cmd+Backspace: Mac-friendly delete-in-place (mirrors Delete key)
+          if (cursor.columnType === 'note') {
+            setCell(cursor.channelIndex, cursor.rowIndex, { note: 0, instrument: 0 });
+          } else if (cursor.columnType === 'instrument') {
+            setCell(cursor.channelIndex, cursor.rowIndex, { instrument: 0 });
+          } else if (cursor.columnType === 'volume') {
+            setCell(cursor.channelIndex, cursor.rowIndex, { volume: 0 });
+          } else if (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam') {
+            setCell(cursor.channelIndex, cursor.rowIndex, { effTyp: 0, eff: 0 });
+          } else if (cursor.columnType === 'effTyp2' || cursor.columnType === 'effParam2') {
+            setCell(cursor.channelIndex, cursor.rowIndex, { effTyp2: 0, eff2: 0 });
+          } else if (cursor.columnType === 'probability') {
+            setCell(cursor.channelIndex, cursor.rowIndex, { probability: undefined });
+          } else {
+            clearCell(cursor.channelIndex, cursor.rowIndex);
+          }
+          if (editStep > 0 && !isPlaying) {
+            moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
+          }
+        } else if (e.shiftKey) {
           // Shift+Backspace: Delete previous line (FT2: shifts rows up)
           if (cursor.rowIndex > 0) {
             moveCursor('up');
@@ -724,6 +744,9 @@ export const useTrackerInput = () => {
           if (cursor.rowIndex > 0) {
             moveCursor('up');
             clearCell(cursor.channelIndex, cursor.rowIndex);
+          } else {
+            // At row 0: nowhere to move up, just clear the current cell
+            clearCell(cursor.channelIndex, 0);
           }
         }
         return;
