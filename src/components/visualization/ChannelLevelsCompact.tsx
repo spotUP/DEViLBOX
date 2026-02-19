@@ -67,9 +67,11 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
       if (canvas && container) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          const dpr = window.devicePixelRatio || 1;
           const actualWidth = container.clientWidth;
-          canvas.width = actualWidth;
-          canvas.height = height;
+          canvas.width = actualWidth * dpr;
+          canvas.height = height * dpr;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
           const bgColor = isCyanTheme ? '#030808' : '#0a0a0b';
           ctx.fillStyle = bgColor;
@@ -119,11 +121,13 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
       const h = heightRef.current;
       const cyan = isCyanThemeRef.current;
 
+      const dpr = window.devicePixelRatio || 1;
       const actualWidth = container.clientWidth;
-      if (canvas.width !== actualWidth || canvas.height !== h) {
-        canvas.width = actualWidth;
-        canvas.height = h;
+      if (canvas.width !== Math.ceil(actualWidth * dpr) || canvas.height !== Math.ceil(h * dpr)) {
+        canvas.width = Math.ceil(actualWidth * dpr);
+        canvas.height = Math.ceil(h * dpr);
       }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       const engine = getToneEngine();
       const triggerLevels = engine.getChannelTriggerLevels(nc);
