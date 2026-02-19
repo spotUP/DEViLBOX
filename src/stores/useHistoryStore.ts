@@ -21,7 +21,22 @@ export type ActionType =
   | 'CLEAR_PATTERN'
   | 'INSERT_ROW'
   | 'DELETE_ROW'
-  | 'RESIZE_PATTERN';
+  | 'RESIZE_PATTERN'
+  | 'CUT_SELECTION'
+  | 'PASTE'
+  | 'PASTE_MIX'
+  | 'PASTE_FLOOD'
+  | 'PASTE_PUSH_FORWARD'
+  | 'CUT_TRACK'
+  | 'PASTE_TRACK'
+  | 'READ_MACRO'
+  | 'TRANSPOSE'
+  | 'INTERPOLATE'
+  | 'HUMANIZE'
+  | 'STRUM'
+  | 'LEGATO'
+  | 'SCALE_VOLUME'
+  | 'FADE_VOLUME';
 
 export interface HistoryAction {
   id: string;
@@ -323,6 +338,21 @@ export const getActionTypeName = (type: ActionType): string => {
     INSERT_ROW: 'Insert Row',
     DELETE_ROW: 'Delete Row',
     RESIZE_PATTERN: 'Resize Pattern',
+    CUT_SELECTION: 'Cut Selection',
+    PASTE: 'Paste',
+    PASTE_MIX: 'Mix Paste',
+    PASTE_FLOOD: 'Flood Paste',
+    PASTE_PUSH_FORWARD: 'Push-Forward Paste',
+    CUT_TRACK: 'Cut Track',
+    PASTE_TRACK: 'Paste Track',
+    READ_MACRO: 'Apply Macro',
+    TRANSPOSE: 'Transpose',
+    INTERPOLATE: 'Interpolate',
+    HUMANIZE: 'Humanize',
+    STRUM: 'Strum',
+    LEGATO: 'Legato',
+    SCALE_VOLUME: 'Scale Volume',
+    FADE_VOLUME: 'Fade Volume',
   };
   return names[type] || type;
 };
@@ -351,6 +381,24 @@ export const getActionTypeColor = (type: ActionType): string => {
     case 'DELETE_ROW':
     case 'RESIZE_PATTERN':
       return 'text-purple-400';
+    case 'CUT_SELECTION':
+    case 'CUT_TRACK':
+      return 'text-green-400';
+    case 'PASTE':
+    case 'PASTE_MIX':
+    case 'PASTE_FLOOD':
+    case 'PASTE_PUSH_FORWARD':
+    case 'PASTE_TRACK':
+      return 'text-green-400';
+    case 'TRANSPOSE':
+    case 'INTERPOLATE':
+    case 'HUMANIZE':
+    case 'STRUM':
+    case 'LEGATO':
+    case 'SCALE_VOLUME':
+    case 'FADE_VOLUME':
+    case 'READ_MACRO':
+      return 'text-yellow-400';
     default:
       return 'text-gray-400';
   }

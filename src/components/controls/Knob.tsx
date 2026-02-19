@@ -253,7 +253,9 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     dragStartY.current = clientY;
     dragStartX.current = clientX;
     dragStartValue.current = getNormalized();
-    document.body.style.cursor = 'ns-resize';
+    const ownerDoc = knobRef.current?.ownerDocument ?? document;
+    const ownerWin = ownerDoc.defaultView ?? window;
+    ownerDoc.body.style.cursor = 'ns-resize';
 
     const handleMouseMove = (ev: MouseEvent | TouchEvent) => {
       // Clear long-press timer on movement
@@ -303,21 +305,21 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     const handleMouseUp = () => {
       clearLongPressTimer();
       setIsDragging(false);
-      document.body.style.cursor = '';
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('touchmove', handleMouseMove);
-      window.removeEventListener('touchend', handleMouseUp);
+      ownerDoc.body.style.cursor = '';
+      ownerWin.removeEventListener('mousemove', handleMouseMove);
+      ownerWin.removeEventListener('mouseup', handleMouseUp);
+      ownerWin.removeEventListener('touchmove', handleMouseMove);
+      ownerWin.removeEventListener('touchend', handleMouseUp);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('touchmove', handleMouseMove, { passive: false });
-    window.addEventListener('touchend', handleMouseUp);
+    ownerWin.addEventListener('mousemove', handleMouseMove);
+    ownerWin.addEventListener('mouseup', handleMouseUp);
+    ownerWin.addEventListener('touchmove', handleMouseMove, { passive: false });
+    ownerWin.addEventListener('touchend', handleMouseUp);
   }, [getNormalized, disabled, handleTap, handleLongPressStart, clearLongPressTimer]);
 
   // Handle double-click to reset
@@ -563,7 +565,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
       >
         {formatValueDisplay(displayValue !== undefined ? displayValue : value)}{unit}
       </div>,
-      document.body
+      knobRef.current?.ownerDocument.body ?? document.body
     )}
 
     {/* Mobile numeric input modal */}
