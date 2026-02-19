@@ -51,12 +51,14 @@ export const EffectOscilloscope: React.FC<EffectOscilloscopeProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // No dep array — Float32Array is mutated in-place by the analyser hook;
+  // React can't diff it by reference, so we redraw on every parent render (30fps).
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.width = width;
-    canvas.height = height;
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -153,12 +155,14 @@ export const EffectSpectrum: React.FC<EffectSpectrumProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // No dep array — Float32Array is mutated in-place by the analyser hook;
+  // React can't diff it by reference, so we redraw on every parent render (30fps).
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.width = width;
-    canvas.height = height;
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -362,6 +366,8 @@ export const GainReductionMeter: React.FC<GainReductionMeterProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // No dep array — Float32Array is mutated in-place by the analyser hook;
+  // React can't diff it by reference, so we redraw on every parent render (30fps).
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -475,6 +481,8 @@ export const MiniOutputMeter: React.FC<MiniOutputMeterProps> = ({
   const W = 48;
   const H = 16;
 
+  // No dep array — Float32Array is mutated in-place by the analyser hook;
+  // React can't diff it by reference, so we redraw on every parent render (30fps).
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
