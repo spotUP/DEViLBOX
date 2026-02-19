@@ -96,7 +96,12 @@ interface TrackerStore {
   keyOnTab: number[];          // FT2: Track which note (XM) is playing on each channel
   keyOffTime: number[];        // FT2: Track keyoff timing for channel allocation
   keyOffCounter: number;       // FT2: Global counter for keyOffTime allocation
-  ptnJumpPos: number[];        // FT2: 4 stored jump positions for F9-F12 (Shift to store, Ctrl to jump)
+  ptnJumpPos: number[];        // 10 stored jump positions (0-9); first 4 map to F9-F12
+  wrapMode: boolean;           // Cursor wraps at pattern boundaries
+  recordQuantize: boolean;     // Quantize recorded notes to step grid
+  autoRecord: boolean;         // Auto-record notes while playing
+  multiChannelRecord: boolean; // Record to multiple channels simultaneously
+  bookmarks: number[];         // Row bookmarks in current pattern
   // FT2: Pattern Order List (Song Position List)
   patternOrder: number[]; // Array of pattern indices for song arrangement
   currentPositionIndex: number; // Current position in pattern order (for editing)
@@ -149,6 +154,24 @@ interface TrackerStore {
   // FT2: Jump position storage
   setPtnJumpPos: (index: number, row: number) => void;
   getPtnJumpPos: (index: number) => number;
+
+  // Feature toggles
+  toggleWrapMode: () => void;
+  toggleRecordQuantize: () => void;
+  toggleAutoRecord: () => void;
+  toggleMultiChannelRecord: () => void;
+  toggleBookmark: (row: number) => void;
+  clearBookmarks: () => void;
+  nextBookmark: () => void;
+  prevBookmark: () => void;
+
+  // Advanced editing
+  amplifySelection: (factor: number) => void;
+  growSelection: () => void;
+  shrinkSelection: () => void;
+  swapChannels: (aIdx: number, bIdx: number) => void;
+  splitPatternAtCursor: () => void;
+  joinPatterns: () => void;
 
   // Block operations
   startSelection: () => void;
@@ -297,7 +320,12 @@ export const useTrackerStore = create<TrackerStore>()(
     keyOnTab: Array(MAX_CHANNELS).fill(0), // 0 = no note playing
     keyOffTime: Array(MAX_CHANNELS).fill(0),
     keyOffCounter: 0,
-    ptnJumpPos: [0, 0, 0, 0], // FT2: 4 stored jump positions (F9-F12)
+    ptnJumpPos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 10 stored jump positions (0-9)
+    wrapMode: false,
+    recordQuantize: false,
+    autoRecord: false,
+    multiChannelRecord: false,
+    bookmarks: [],
     // FT2: Pattern Order List (Song Position List)
     patternOrder: [0], // Start with first pattern in order
     currentPositionIndex: 0, // Start at position 0
@@ -767,14 +795,14 @@ export const useTrackerStore = create<TrackerStore>()(
     // FT2: Jump position storage
     setPtnJumpPos: (index, row) =>
       set((state) => {
-        if (index >= 0 && index < 4) {
+        if (index >= 0 && index < 10) {
           state.ptnJumpPos[index] = row;
         }
       }),
 
     getPtnJumpPos: (index) => {
       const state = get();
-      if (index >= 0 && index < 4) {
+      if (index >= 0 && index < 10) {
         return state.ptnJumpPos[index];
       }
       return 0;
@@ -1852,6 +1880,155 @@ export const useTrackerStore = create<TrackerStore>()(
         });
       });
       useHistoryStore.getState().pushAction('FADE_VOLUME', 'Fade volume', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
+
+    // Feature toggles
+    toggleWrapMode: () =>
+      set((state) => { state.wrapMode = !state.wrapMode; }),
+
+    toggleRecordQuantize: () =>
+      set((state) => { state.recordQuantize = !state.recordQuantize; }),
+
+    toggleAutoRecord: () =>
+      set((state) => { state.autoRecord = !state.autoRecord; }),
+
+    toggleMultiChannelRecord: () =>
+      set((state) => { state.multiChannelRecord = !state.multiChannelRecord; }),
+
+    toggleBookmark: (row) =>
+      set((state) => {
+        const idx = state.bookmarks.indexOf(row);
+        if (idx === -1) {
+          state.bookmarks.push(row);
+          state.bookmarks.sort((a, b) => a - b);
+        } else {
+          state.bookmarks.splice(idx, 1);
+        }
+      }),
+
+    clearBookmarks: () =>
+      set((state) => { state.bookmarks = []; }),
+
+    nextBookmark: () =>
+      set((state) => {
+        const sorted = [...state.bookmarks].sort((a, b) => a - b);
+        const after = sorted.find(r => r > state.cursor.rowIndex);
+        if (after !== undefined) state.cursor.rowIndex = after;
+      }),
+
+    prevBookmark: () =>
+      set((state) => {
+        const sorted = [...state.bookmarks].sort((a, b) => a - b);
+        const before = [...sorted].reverse().find(r => r < state.cursor.rowIndex);
+        if (before !== undefined) state.cursor.rowIndex = before;
+      }),
+
+    // Advanced editing methods
+    amplifySelection: (factor) => {
+      const { selection, currentPatternIndex } = get();
+      if (!selection) return;
+      const beforePattern = get().patterns[currentPatternIndex];
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        const { startChannel, endChannel, startRow, endRow } = selection;
+        const minCh = Math.min(startChannel, endChannel);
+        const maxCh = Math.max(startChannel, endChannel);
+        const minRow = Math.min(startRow, endRow);
+        const maxRow = Math.max(startRow, endRow);
+        for (let ch = minCh; ch <= maxCh; ch++) {
+          for (let r = minRow; r <= maxRow; r++) {
+            const cell = pattern.channels[ch]?.rows[r];
+            if (cell && cell.volume != null && cell.volume > 0) {
+              cell.volume = Math.max(0, Math.min(0x40, Math.round(cell.volume * factor)));
+            }
+          }
+        }
+      });
+      useHistoryStore.getState().pushAction('AMPLIFY', 'Amplify selection', currentPatternIndex, beforePattern, get().patterns[currentPatternIndex]);
+    },
+
+    growSelection: () => {
+      const { patterns, currentPatternIndex } = get();
+      const pattern = patterns[currentPatternIndex];
+      set((state) => {
+        const sel = state.selection;
+        if (!sel) return;
+        sel.startRow = Math.max(0, sel.startRow - 1);
+        sel.endRow = Math.min(pattern.length - 1, sel.endRow + 1);
+        sel.startChannel = Math.max(0, sel.startChannel - 1);
+        sel.endChannel = Math.min(pattern.channels.length - 1, sel.endChannel + 1);
+      });
+    },
+
+    shrinkSelection: () => {
+      const { selection } = get();
+      if (!selection) return;
+      set((state) => {
+        const sel = state.selection;
+        if (!sel) return;
+        const midRow = Math.floor((sel.startRow + sel.endRow) / 2);
+        const midCh = Math.floor((sel.startChannel + sel.endChannel) / 2);
+        sel.startRow = Math.min(sel.startRow + 1, midRow);
+        sel.endRow = Math.max(sel.endRow - 1, midRow);
+        sel.startChannel = Math.min(sel.startChannel + 1, midCh);
+        sel.endChannel = Math.max(sel.endChannel - 1, midCh);
+      });
+    },
+
+    swapChannels: (aIdx, bIdx) => {
+      const { patterns, currentPatternIndex } = get();
+      const pattern = patterns[currentPatternIndex];
+      if (aIdx < 0 || bIdx < 0 || aIdx >= pattern.channels.length || bIdx >= pattern.channels.length) return;
+      const beforePattern = pattern;
+      set((state) => {
+        const pat = state.patterns[state.currentPatternIndex];
+        const tempRows = pat.channels[aIdx].rows.map(r => ({ ...r }));
+        pat.channels[aIdx].rows = pat.channels[bIdx].rows.map(r => ({ ...r }));
+        pat.channels[bIdx].rows = tempRows;
+      });
+      useHistoryStore.getState().pushAction('SWAP_CHANNELS', 'Swap channels', currentPatternIndex, beforePattern, get().patterns[currentPatternIndex]);
+    },
+
+    splitPatternAtCursor: () => {
+      const { patterns, currentPatternIndex, cursor } = get();
+      const pattern = patterns[currentPatternIndex];
+      const splitRow = cursor.rowIndex;
+      if (splitRow <= 0 || splitRow >= pattern.length) return;
+      const newPatternRows = pattern.length - splitRow;
+      set((state) => {
+        const pat = state.patterns[state.currentPatternIndex];
+        const newChannels = pat.channels.map(ch => ({
+          ...ch,
+          id: `${ch.id}-split`,
+          rows: ch.rows.slice(splitRow),
+        }));
+        pat.channels.forEach(ch => { ch.rows = ch.rows.slice(0, splitRow); });
+        pat.length = splitRow;
+        const newPattern: Pattern = {
+          id: idGenerator.generate('pattern'),
+          name: `${pat.name} (split)`,
+          length: newPatternRows,
+          channels: newChannels,
+        };
+        state.patterns.splice(state.currentPatternIndex + 1, 0, newPattern);
+      });
+    },
+
+    joinPatterns: () => {
+      const { patterns, currentPatternIndex } = get();
+      if (currentPatternIndex >= patterns.length - 1) return;
+      const beforeCurrent = patterns[currentPatternIndex];
+      set((state) => {
+        const cur = state.patterns[state.currentPatternIndex];
+        const next = state.patterns[state.currentPatternIndex + 1];
+        const minChannels = Math.min(cur.channels.length, next.channels.length);
+        for (let ch = 0; ch < minChannels; ch++) {
+          cur.channels[ch].rows = [...cur.channels[ch].rows, ...next.channels[ch].rows];
+        }
+        cur.length = cur.channels[0].rows.length;
+        state.patterns.splice(state.currentPatternIndex + 1, 1);
+      });
+      useHistoryStore.getState().pushAction('JOIN_PATTERNS', 'Join patterns', currentPatternIndex, beforeCurrent, get().patterns[currentPatternIndex]);
     },
 
     addPattern: (length = DEFAULT_PATTERN_LENGTH) =>

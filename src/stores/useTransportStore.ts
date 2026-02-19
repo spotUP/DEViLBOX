@@ -44,6 +44,10 @@ interface TransportStore extends TransportState {
   // Global pitch shift (DJ pitch slider / W effect)
   globalPitch: number; // Semitones (-16 to +16)
 
+  // Count-in feature
+  countInEnabled: boolean;
+  toggleCountIn: () => void;
+
   // Actions
   setBPM: (bpm: number) => void;
   setGlobalPitch: (pitch: number) => void;
@@ -116,6 +120,7 @@ export const useTransportStore = create<TransportStore>()(
     useMpcScale: false,
     currentGlobalRow: 0,
     globalPitch: 0, // Default to no pitch shift
+    countInEnabled: false,
 
     // Actions
     setBPM: (bpm) =>
@@ -329,6 +334,11 @@ export const useTransportStore = create<TransportStore>()(
     toggleMetronome: () =>
       set((state) => {
         state.metronomeEnabled = !state.metronomeEnabled;
+      }),
+
+    toggleCountIn: () =>
+      set((state) => {
+        state.countInEnabled = !state.countInEnabled;
       }),
 
     setSpeed: (speed) =>
