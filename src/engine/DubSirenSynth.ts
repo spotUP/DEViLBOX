@@ -115,7 +115,6 @@ export class DubSirenSynth implements DevilboxSynth {
    * Apply a full configuration to the synth
    */
   applyConfig(config: DubSirenConfig) {
-    console.log('[DubSirenSynth] Applying config:', config);
     this.osc.type = config.oscillator.type;
     this.setFrequency(config.oscillator.frequency);
     

@@ -130,12 +130,9 @@ export function usePianoRollData(channelIndex?: number) {
   const pattern = useTrackerStore((state) => state.patterns[state.currentPatternIndex]);
   const setCell = useTrackerStore((state) => state.setCell);
 
-  console.log('[usePianoRollData] Render - pattern ref changed:', pattern?.length, 'notes will be recomputed');
-
   // Convert pattern to notes (support multi-channel when channelIndex is undefined)
   const notes = useMemo(() => {
     if (!pattern) return [];
-    console.log('[usePianoRollData] useMemo recomputing notes, pattern length:', pattern.length, 'channelIndex:', channelIndex);
     return patternToPianoRollNotes(pattern, channelIndex);
   }, [pattern, channelIndex]);
 
@@ -148,25 +145,20 @@ export function usePianoRollData(channelIndex?: number) {
         return;
       }
 
-      console.log('[usePianoRollData] addNote:', { midiNote, startRow, duration, velocity, targetChannel });
-
       const beforeState = saveForUndo(pattern);
 
       // Convert MIDI note to XM note number
       const xmNote = midiToXMNote(midiNote);
-      console.log('[usePianoRollData] Converted MIDI', midiNote, 'to XM note', xmNote);
 
       // Convert velocity to volume (0-127 -> 0x10-0x50, XM set volume range)
       const volumeValue = Math.round((velocity / 127) * 64);
       const volume = 0x10 + volumeValue; // 0x10-0x50 = set volume 0-64
 
       // Set the note
-      console.log('[usePianoRollData] Setting cell:', { channel: targetChannel, row: startRow, xmNote, volume });
       setCell(targetChannel, startRow, { note: xmNote, volume });
 
       // Add note-off at end if within pattern
       if (startRow + duration < (pattern?.length || 64)) {
-        console.log('[usePianoRollData] Adding note-off at row', startRow + duration);
         setCell(targetChannel, startRow + duration, { note: 97 }); // 97 = note off
       }
 
@@ -175,7 +167,6 @@ export function usePianoRollData(channelIndex?: number) {
       if (afterPattern) {
         recordEdit(beforeState, afterPattern, currentPatternIndex, 'Add note');
       }
-      console.log('[usePianoRollData] Note added successfully');
     },
     [channelIndex, pattern, currentPatternIndex, setCell]
   );

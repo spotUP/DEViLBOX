@@ -583,19 +583,11 @@ export class WAMSynth implements DevilboxSynth {
     }
 
     const inst = this._wamInstance!;
-    const descriptor = inst.descriptor as Record<string, unknown> | undefined;
-    const pluginName = descriptor?.name || (inst.constructor as { name?: string })?.name || 'unknown';
-    console.log(`[WAMSynth] createGui for "${pluginName}": hasMethod=${typeof inst.createGui === 'function'}, guiModuleUrl=${(inst._guiModuleUrl as string) || 'none'}`);
-
     // 1. Try the standard WAM 2.0 createGui()
     if (typeof inst.createGui === 'function') {
       try {
         const gui = await (inst.createGui as () => Promise<HTMLElement | null>)();
-        if (gui) {
-          console.log(`[WAMSynth] createGui returned element: <${gui.tagName?.toLowerCase()}>`);
-          return gui;
-        }
-        console.log('[WAMSynth] createGui returned null/undefined');
+        if (gui) return gui;
       } catch (err) {
         console.warn('[WAMSynth] createGui threw:', err);
       }
@@ -608,14 +600,10 @@ export class WAMSynth implements DevilboxSynth {
       for (const guiFile of guiCandidates) {
         const guiUrl = baseUrl + guiFile;
         try {
-          console.log(`[WAMSynth] Trying fallback GUI module: ${guiUrl}`);
           const guiModule = await import(/* @vite-ignore */ guiUrl);
           if (typeof guiModule.createElement === 'function') {
             const gui = await guiModule.createElement(inst);
-            if (gui) {
-              console.log(`[WAMSynth] Fallback GUI loaded from ${guiFile}: <${gui.tagName?.toLowerCase()}>`);
-              return gui as HTMLElement;
-            }
+            if (gui) return gui as HTMLElement;
           }
         } catch {
           // This candidate doesn't exist, try next
@@ -623,7 +611,6 @@ export class WAMSynth implements DevilboxSynth {
       }
     }
 
-    console.log(`[WAMSynth] No GUI available for "${pluginName}"`);
     return null;
   }
 
