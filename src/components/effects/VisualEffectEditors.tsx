@@ -2025,34 +2025,52 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
           ))}
         </div>
 
-        <div className="flex justify-around items-end">
-          <Knob
-            value={hiss}
-            min={0}
-            max={100}
-            onChange={(v) => onUpdateParameter('hiss', v)}
-            label="Hiss"
-            color="#d97706"
-            formatValue={(v) => `${Math.round(v)}%`}
-          />
-          <Knob
-            value={dust}
-            min={0}
-            max={100}
-            onChange={(v) => onUpdateParameter('dust', v)}
-            label="Dust"
-            color="#d97706"
-            formatValue={(v) => `${Math.round(v)}%`}
-          />
-          <Knob
-            value={age}
-            min={0}
-            max={100}
-            onChange={(v) => onUpdateParameter('age', v)}
-            label="Age"
-            color="#b45309"
-            formatValue={(v) => `${Math.round(v)}%`}
-          />
+        {/* Individual volume controls */}
+        <div className="flex gap-3">
+          {/* Hiss section */}
+          <div className="flex-1 rounded-lg bg-black/20 border border-amber-900/30 p-2">
+            <div className="text-xs font-mono text-amber-600/80 mb-2 text-center tracking-widest uppercase">Hiss</div>
+            <div className="flex justify-center">
+              <Knob
+                value={hiss}
+                min={0}
+                max={100}
+                onChange={(v) => onUpdateParameter('hiss', v)}
+                label="Volume"
+                color="#d97706"
+                formatValue={(v) => `${Math.round(v)}%`}
+              />
+            </div>
+          </div>
+
+          {/* Crackle section */}
+          <div className="flex-1 rounded-lg bg-black/20 border border-amber-900/30 p-2">
+            <div className="text-xs font-mono text-amber-600/80 mb-2 text-center tracking-widest uppercase">Crackle</div>
+            <div className="flex justify-around">
+              <Knob
+                value={dust}
+                min={0}
+                max={100}
+                onChange={(v) => onUpdateParameter('dust', v)}
+                label="Volume"
+                color="#d97706"
+                formatValue={(v) => `${Math.round(v)}%`}
+              />
+              <Knob
+                value={age}
+                min={0}
+                max={100}
+                onChange={(v) => onUpdateParameter('age', v)}
+                label="Warmth"
+                color="#b45309"
+                formatValue={(v) => `${Math.round(v)}%`}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Flutter */}
+        <div className="flex justify-center pt-1">
           <Knob
             value={speed}
             min={0}
