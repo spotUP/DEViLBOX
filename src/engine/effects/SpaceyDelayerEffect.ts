@@ -59,8 +59,10 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
     this.output = new Tone.Gain(1);
 
     // Dry/wet mixing via parallel paths
-    // WASM outputs wet-only signal; we mix externally
-    this.dryGain = new Tone.Gain(1 - this._options.wet);
+    // WASM outputs wet-only signal; we mix externally.
+    // Use a minimum dry floor of 0.2 until WASM is confirmed ready — ensures
+    // audio passes through even at 100% wet before the worklet produces output.
+    this.dryGain = new Tone.Gain(Math.max(0.2, 1 - this._options.wet));
     this.wetGain = new Tone.Gain(this._options.wet);
 
     // Dry path: input → dryGain → output (always connected)
@@ -92,13 +94,14 @@ export class SpaceyDelayerEffect extends Tone.ToneAudioNode {
 
       this.workletNode.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
-          // WASM module ready
-          // Send all initial parameters
+          // WASM ready — send params and apply the true dry level
           this.sendParam('firstTap', this._options.firstTap);
           this.sendParam('tapSize', this._options.tapSize);
           this.sendParam('feedback', this._options.feedback);
           this.sendParam('multiTap', this._options.multiTap);
           this.sendParam('tapeFilter', this._options.tapeFilter);
+          // Remove the dry floor now that WASM is producing output
+          this.dryGain.gain.value = 1 - this._options.wet;
         } else if (event.data.type === 'error') {
           console.error('[SpaceyDelayer] Worklet error:', event.data.message);
         }

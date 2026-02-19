@@ -9,7 +9,7 @@ import type { EffectDescriptor } from '../EffectDescriptor';
 import { EffectRegistry } from '../EffectRegistry';
 
 /** Helper: create a WAM effect descriptor */
-function wamEffect(id: string, name: string, group: string): EffectDescriptor {
+function wamEffect(id: string, name: string, group: string, defaults: Record<string, number> = {}): EffectDescriptor {
   return {
     id, name, category: 'wam', group, loadMode: 'lazy',
     create: async (c: EffectConfig) => {
@@ -23,15 +23,20 @@ function wamEffect(id: string, name: string, group: string): EffectDescriptor {
       }
       const wamNode = new WAMEffectNode({ moduleUrl: wamUrl, wet: c.wet / 100 });
       await wamNode.ensureInitialized();
+      // Apply stored parameters (persisted user settings override defaults)
+      for (const [key, value] of Object.entries(c.parameters)) {
+        await wamNode.setParameter(key, Number(value));
+      }
       return wamNode;
     },
-    getDefaultParameters: () => ({}),
+    getDefaultParameters: () => ({ ...defaults }),
   };
 }
 
 EffectRegistry.register([
   // Distortion
-  wamEffect('WAMBigMuff', 'Big Muff Pi', 'Distortion'),
+  // BigMuff: Sustain=moderate, Tone=neutral, Volume=unity (Faust param naming)
+  wamEffect('WAMBigMuff', 'Big Muff Pi', 'Distortion', { Sustain: 0.4, Tone: 0.5, Volume: 0.7 }),
   wamEffect('WAMTS9', 'TS-9 Overdrive', 'Distortion'),
   wamEffect('WAMDistoMachine', 'Disto Machine', 'Distortion'),
   wamEffect('WAMQuadraFuzz', 'QuadraFuzz', 'Distortion'),
