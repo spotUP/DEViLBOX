@@ -644,3 +644,15 @@ export function getModelCategories(): string[] {
   const categories = new Set(GUITARML_MODEL_REGISTRY.map(model => model.category));
   return Array.from(categories).sort();
 }
+
+/**
+ * Map GuitarML model characteristics to sensible default parameters (0-100 scale).
+ * Used when first adding a neural effect so each model starts with its own character.
+ */
+export function getModelCharacteristicDefaults(gain: string, tone: string): Record<string, number> {
+  const driveMap: Record<string, number> = { low: 30, medium: 50, high: 65, extreme: 75 };
+  const drive = driveMap[gain] ?? 50;
+  const treble = tone === 'bright' ? 60 : tone === 'dark' ? 40 : 50;
+  const bass   = tone === 'dark'   ? 60 : tone === 'bright' ? 40 : 50;
+  return { drive, level: 70, treble, bass };
+}
