@@ -83,7 +83,7 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
     const newEffect: EffectConfig = {
       id: `effect-${++idCounterRef.current}`,
       category: availableEffect.category,
-      type: (availableEffect.type as EffectType) || 'Distortion', // Default to Distortion for neural
+      type: (availableEffect.type as EffectType) || 'Distortion',
       enabled: true,
       wet: 100,
       parameters: {},

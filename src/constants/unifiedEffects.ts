@@ -355,6 +355,7 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
   // ===== NEURAL EFFECTS (37 GuitarML models) =====
   ...GUITARML_MODEL_REGISTRY.map((model) => ({
     category: 'neural' as const,
+    type: 'Neural',           // Required so modals don't fall back to 'Distortion'
     neuralModelIndex: model.index,
     label: model.name,
     group: model.category === 'overdrive' ? 'Neural Overdrive'
