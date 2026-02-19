@@ -226,6 +226,13 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     group: 'Texture',
     description: 'Vinyl crackle & hiss synthesizer — DSP-generated pops, dust noise, and mid-range warmth (viator-rust port)',
   },
+  {
+    category: 'wasm',
+    type: 'Tumult',
+    label: 'Tumult',
+    group: 'Texture',
+    description: 'Noise & ambience generator — 5 synth modes + 95 bundled samples, 5-band SVF EQ, Duck/Follow sidechain (Tumult port)',
+  },
 
   // ===== PITCH (Tone.js) =====
   {

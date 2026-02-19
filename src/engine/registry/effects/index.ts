@@ -10,6 +10,7 @@ import { EffectRegistry } from '../EffectRegistry';
 // ── Eager registrations ───────────────────────────────────────────────────
 import './tonejs';
 import './wasm';
+import './tumult';
 
 // ── Lazy: Buzzmachine effects (23 effects) ────────────────────────────────
 EffectRegistry.registerLazy(
