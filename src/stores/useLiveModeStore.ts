@@ -69,7 +69,6 @@ export const useLiveModeStore = create<LiveModeStore>()(
     toggleLiveMode: () => {
       const currentMode = get().isLiveMode;
       const newMode = !currentMode;
-      console.log('[LiveMode] Toggling:', currentMode, '->', newMode);
       set((state) => {
         state.isLiveMode = newMode;
         // Clear queues when switching to edit mode

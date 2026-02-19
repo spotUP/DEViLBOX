@@ -305,19 +305,6 @@ class MIDIManager {
 
     const statusByte = data[0];
 
-    // Skip verbose logging for clock messages (they come 24 times per beat)
-    if (statusByte !== 0xf8) {
-      // Log with hex values for easier debugging
-      const hexBytes = Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(' ');
-      const msgType = data[0] >= 0xF0 ? 'SysEx/System' :
-                      (data[0] & 0xF0) === 0xB0 ? 'CC' :
-                      (data[0] & 0xF0) === 0x90 ? 'NoteOn' :
-                      (data[0] & 0xF0) === 0x80 ? 'NoteOff' :
-                      (data[0] & 0xF0) === 0xE0 ? 'PitchBend' :
-                      (data[0] & 0xF0) === 0xC0 ? 'ProgChange' : 'Other';
-      console.log(`[MIDI ${msgType}] ${hexBytes} (${data.length} bytes)`);
-    }
-
     this.lastActivityTimestamp = Date.now();
 
     const message = this.parseMIDIMessage(statusByte, data, event.timeStamp);
