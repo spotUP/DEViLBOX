@@ -359,11 +359,14 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
    * Side effect: advances _lfoPhase — must run before _processAudio().
    */
   _synthesizeCrackle(outL, outR, numSamples) {
-    // map 0-1 params to dB, matching viator-rust formula
-    const hissDB   = this._hissVolume * 60 - 30; // -30..+30 dB
-    const dustDB   = this._dustVolume * 60 - 30;
-    const hissGain = VinylNoiseProcessor._dBToGain(hissDB + 5.0);
-    const dustGain = VinylNoiseProcessor._dBToGain(dustDB - 6.0);
+    // Gain curves: -12..+12 dB range so default (0.5) gives 0 dB (unity), max gives +12 dB.
+    // The original +60/-30 range with ×0.01 attenuation produced noise at -53 dBFS at
+    // default settings — completely inaudible. This range gives -21 dBFS at max,
+    // which is a realistic and audible vinyl hiss level.
+    const hissDB   = this._hissVolume * 24 - 12; // -12..+12 dB
+    const dustDB   = this._dustVolume * 24 - 12;
+    const hissGain = VinylNoiseProcessor._dBToGain(hissDB);
+    const dustGain = VinylNoiseProcessor._dBToGain(dustDB);
 
     // LFO frequency = exact turntable rotation rate (RPM/60 Hz).
     // At 33 RPM: 0.55 Hz, 45 RPM: 0.75 Hz, 78 RPM: 1.3 Hz.
@@ -412,7 +415,7 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
 
       // Hiss + dust mix (only when ramp is in progress, i.e. rampedValue < 1.0)
       if (this._rampedValue < 1.0) {
-        const hiss = this._noiseLowpass.process(noise) * 0.01;
+        const hiss = this._noiseLowpass.process(noise);
         const dust = this._hissHighpass.process(signal);
 
         // Hiss is a constant noise floor (stylus always in groove — no LFO).
