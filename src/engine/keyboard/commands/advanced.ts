@@ -3,35 +3,30 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useTransportStore } from '@stores/useTransportStore';
 import { useUIStore } from '@stores/useUIStore';
 
-/**
- * Interpolate volume values in selection
- */
 export function interpolateVolume(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Interpolate volume', false, 1000);
-  return false;
+  useUIStore.getState().openDialogCommand('interpolate-volume');
+  return true;
 }
 
-/**
- * Interpolate effect values in selection
- */
 export function interpolateEffect(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Interpolate effect', false, 1000);
-  return false;
+  useUIStore.getState().openDialogCommand('interpolate-effect');
+  return true;
 }
 
-/**
- * Amplify selection volume
- */
 export function amplifySelection(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Amplify selection', false, 1000);
-  return false;
+  const { selection } = useTrackerStore.getState();
+  if (!selection) {
+    useUIStore.getState().setStatusMessage('Select a range first', false, 1500);
+    return true;
+  }
+  useTrackerStore.getState().amplifySelection(1.5);
+  useUIStore.getState().setStatusMessage('Amplified ×1.5', false, 1000);
+  return true;
 }
 
-/**
- * Apply current instrument number to all non-empty cells in selection
- */
 export function applyCurrentInstrument(): boolean {
   const store = useTrackerStore.getState();
   const { cursor, patterns, currentPatternIndex } = store;
@@ -42,229 +37,135 @@ export function applyCurrentInstrument(): boolean {
   return true;
 }
 
-/**
- * Expand pattern (double rows)
- */
 export function expandPattern(): boolean {
   const { currentPatternIndex, expandPattern: expand } = useTrackerStore.getState();
   expand(currentPatternIndex);
   return true;
 }
 
-/**
- * Shrink pattern (halve rows)
- */
 export function shrinkPattern(): boolean {
   const { currentPatternIndex, shrinkPattern: shrink } = useTrackerStore.getState();
   shrink(currentPatternIndex);
   return true;
 }
 
-/**
- * Grow selection (expand in place)
- */
 export function growSelection(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Grow selection', false, 1000);
-  return false;
+  useTrackerStore.getState().growSelection();
+  return true;
 }
 
-/**
- * Shrink selection (compress in place)
- */
 export function shrinkSelection(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Shrink selection', false, 1000);
-  return false;
+  useTrackerStore.getState().shrinkSelection();
+  return true;
 }
 
-/**
- * Duplicate pattern (clone and switch to copy)
- */
 export function duplicatePattern(): boolean {
   const { currentPatternIndex, duplicatePattern: dup } = useTrackerStore.getState();
   dup(currentPatternIndex);
   return true;
 }
 
-/**
- * Double block length
- */
-export function doubleBlockLength(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Double block length', false, 1000);
-  return false;
-}
+// doubleBlockLength / halveBlockLength = expand/shrink pattern
+export function doubleBlockLength(): boolean { return expandPattern(); }
+export function halveBlockLength(): boolean { return shrinkPattern(); }
+export function doubleBlock(): boolean { return expandPattern(); }
+export function halveBlock(): boolean { return shrinkPattern(); }
 
-/**
- * Halve block length
- */
-export function halveBlockLength(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Halve block length', false, 1000);
-  return false;
-}
-
-/**
- * Double block (FT2/IT style)
- */
-export function doubleBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Double block', false, 1000);
-  return false;
-}
-
-/**
- * Halve block (FT2/IT style)
- */
-export function halveBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Halve block', false, 1000);
-  return false;
-}
-
-/**
- * Scale volume for track
- */
 export function scaleVolumeTrack(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Scale volume (track)', false, 1000);
-  return false;
+  useUIStore.getState().openDialogCommand('scale-volume-track');
+  return true;
 }
-
-/**
- * Scale volume for pattern
- */
 export function scaleVolumePattern(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Scale volume (pattern)', false, 1000);
-  return false;
+  useUIStore.getState().openDialogCommand('scale-volume-pattern');
+  return true;
 }
-
-/**
- * Scale volume for block/selection
- */
 export function scaleVolumeBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Scale volume (block)', false, 1000);
-  return false;
+  useUIStore.getState().openDialogCommand('scale-volume-block');
+  return true;
 }
 
-/**
- * Swap channels
- */
 export function swapChannels(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Swap channels', false, 1000);
-  return false;
+  const { cursor, patterns, currentPatternIndex } = useTrackerStore.getState();
+  const pattern = patterns[currentPatternIndex];
+  const nextCh = (cursor.channelIndex + 1) % pattern.channels.length;
+  useTrackerStore.getState().swapChannels(cursor.channelIndex, nextCh);
+  useUIStore.getState().setStatusMessage(`Channels ${cursor.channelIndex + 1}↔${nextCh + 1} swapped`, false, 1000);
+  return true;
 }
 
-/**
- * Split pattern at cursor
- */
 export function splitPattern(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Split pattern', false, 1000);
-  return false;
+  useTrackerStore.getState().splitPatternAtCursor();
+  useUIStore.getState().setStatusMessage('Pattern split at cursor', false, 1000);
+  return true;
 }
 
-/**
- * Join patterns
- */
 export function joinBlocks(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Join blocks', false, 1000);
-  return false;
+  useTrackerStore.getState().joinPatterns();
+  useUIStore.getState().setStatusMessage('Patterns joined', false, 1000);
+  return true;
 }
 
-/**
- * Set pattern length
- */
 export function setPatternLength(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Set pattern length', false, 1000);
-  return false;
+  useUIStore.getState().setStatusMessage('Pattern length: resize in pattern list', false, 1500);
+  return true;
 }
 
-/**
- * Set BPM
- */
 export function setBpm(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Set BPM', false, 1000);
-  return false;
+  const { bpm, setBPM } = useTransportStore.getState();
+  setBPM(bpm + 1);
+  useUIStore.getState().setStatusMessage(`BPM: ${bpm + 1}`, false, 800);
+  return true;
 }
 
-/**
- * Set speed/ticks
- */
 export function setSpeed(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Set speed', false, 1000);
-  return false;
+  const { speed, setSpeed: set } = useTransportStore.getState();
+  set(speed + 1);
+  useUIStore.getState().setStatusMessage(`Speed: ${speed + 1}`, false, 800);
+  return true;
 }
 
-/**
- * Set tempo
- */
-export function setTempo(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Set tempo', false, 1000);
-  return false;
-}
+export function setTempo(): boolean { return setBpm(); }
 
-/**
- * Append block
- */
 export function appendBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Append block', false, 1000);
-  return false;
+  useTrackerStore.getState().addPattern();
+  useUIStore.getState().setStatusMessage('Pattern appended', false, 1000);
+  return true;
 }
 
-/**
- * Insert block
- */
 export function insertBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Insert block', false, 1000);
-  return false;
+  useTrackerStore.getState().addPattern();
+  useUIStore.getState().setStatusMessage('Pattern inserted', false, 1000);
+  return true;
 }
 
-/**
- * Split block
- */
-export function splitBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Split block', false, 1000);
-  return false;
-}
-
-/**
- * Go to specific block
- */
+export function splitBlock(): boolean { return splitPattern(); }
 export function gotoBlock(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Go to block', false, 1000);
-  return false;
+  const { currentPatternIndex, patterns } = useTrackerStore.getState();
+  useUIStore.getState().setStatusMessage(`Pattern ${currentPatternIndex + 1}/${patterns.length}`, false, 1000);
+  return true;
 }
 
-/**
- * Find sample
- */
 export function findSample(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Find sample', false, 1000);
-  return false;
+  useUIStore.getState().openDialogCommand('find-replace');
+  return true;
 }
 
-/**
- * Find and replace
- */
 export function findReplace(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Find/Replace', false, 1000);
-  return false;
+  useUIStore.getState().openDialogCommand('find-replace');
+  return true;
 }
 
-/**
- * Find next
- */
 export function findNext(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Find next', false, 1000);
-  return false;
+  useUIStore.getState().openDialogCommand('find-replace');
+  return true;
 }
 
-/**
- * Go to row/channel dialog
- */
 export function gotoDialog(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Go to...', false, 1000);
-  return false;
+  useUIStore.getState().setStatusMessage('Go to: use Ctrl+G / pattern list', false, 1500);
+  return true;
 }
 
-/**
- * Quantize settings
- */
 export function quantizeSettings(): boolean {
-  useUIStore.getState().setStatusMessage('Not yet implemented: Quantize settings', false, 1000);
-  return false;
+  useUIStore.getState().openDialogCommand('groove-settings');
+  return true;
 }

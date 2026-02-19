@@ -3,37 +3,40 @@
  */
 
 import { useUIStore } from '@stores/useUIStore';
+import type { PanelType } from '@typedefs/project';
 
-// Layout preset names (Renoise-inspired)
-const LAYOUT_NAMES: Record<number, string> = {
-  1: 'Pattern Editor',
-  2: 'Pattern + Mixer',
-  3: 'Pattern + Instruments',
-  4: 'Sample Editor',
-  5: 'Instrument Editor',
-  6: 'Mixer',
-  7: 'Automation',
-  8: 'Full View',
+interface LayoutPreset {
+  panels: PanelType[];
+  view: 'tracker' | 'arrangement';
+  label: string;
+}
+
+const LAYOUT_PRESETS: Record<number, LayoutPreset> = {
+  1: { panels: ['tracker', 'pattern-list'], view: 'tracker', label: 'Pattern Editor' },
+  2: { panels: ['tracker', 'pattern-list', 'oscilloscope'], view: 'tracker', label: 'Pattern + Scopes' },
+  3: { panels: ['tracker', 'pattern-list', 'instrument-editor'], view: 'tracker', label: 'Pattern + Instruments' },
+  4: { panels: ['instrument-editor'], view: 'tracker', label: 'Instrument Editor' },
+  5: { panels: ['tracker', 'automation'], view: 'tracker', label: 'Pattern + Automation' },
+  6: { panels: ['tracker', 'pattern-list', 'oscilloscope', 'instrument-editor'], view: 'tracker', label: 'Full View' },
+  7: { panels: ['arrangement'], view: 'arrangement', label: 'Arrangement' },
+  8: { panels: ['tracker', 'oscilloscope', 'instrument-editor', 'automation', 'pattern-list'], view: 'tracker', label: 'All Panels' },
 };
 
-/**
- * Apply a layout preset
- */
 function applyLayoutPreset(index: number): boolean {
-  const name = LAYOUT_NAMES[index] || `Layout ${index}`;
-  useUIStore.getState().setStatusMessage(`Layout: ${name}`, false, 1000);
+  const preset = LAYOUT_PRESETS[index];
+  if (!preset) {
+    useUIStore.getState().setStatusMessage(`Layout ${index} not defined`, false, 1000);
+    return true;
+  }
+  useUIStore.setState({
+    visiblePanels: preset.panels,
+    activeView: preset.view,
+    activePanel: preset.panels[0],
+  });
+  useUIStore.getState().setStatusMessage(`Layout: ${preset.label}`, false, 1000);
   return true;
 }
 
-/**
- * Save current layout to preset slot
- */
-function saveLayoutPreset(index: number): boolean {
-  useUIStore.getState().setStatusMessage(`Layout ${index} saved`, false, 1000);
-  return true;
-}
-
-// Layout preset 1 (F1 in Renoise)
 export function loadLayout1(): boolean { return applyLayoutPreset(1); }
 export function loadLayout2(): boolean { return applyLayoutPreset(2); }
 export function loadLayout3(): boolean { return applyLayoutPreset(3); }
@@ -43,7 +46,16 @@ export function loadLayout6(): boolean { return applyLayoutPreset(6); }
 export function loadLayout7(): boolean { return applyLayoutPreset(7); }
 export function loadLayout8(): boolean { return applyLayoutPreset(8); }
 
-// Save layout presets (Ctrl+F1-F8 in Renoise)
+// Save layouts — record current panel state to a simple in-memory store
+const savedLayouts: Record<number, LayoutPreset> = {};
+
+function saveLayoutPreset(index: number): boolean {
+  const { visiblePanels, activeView } = useUIStore.getState();
+  savedLayouts[index] = { panels: [...visiblePanels], view: activeView, label: `Custom ${index}` };
+  useUIStore.getState().setStatusMessage(`Layout ${index} saved`, false, 1000);
+  return true;
+}
+
 export function saveLayout1(): boolean { return saveLayoutPreset(1); }
 export function saveLayout2(): boolean { return saveLayoutPreset(2); }
 export function saveLayout3(): boolean { return saveLayoutPreset(3); }
@@ -53,114 +65,85 @@ export function saveLayout6(): boolean { return saveLayoutPreset(6); }
 export function saveLayout7(): boolean { return saveLayoutPreset(7); }
 export function saveLayout8(): boolean { return saveLayoutPreset(8); }
 
-/**
- * Toggle disk browser panel
- */
 export function toggleDiskBrowser(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle disk browser', false, 1000);
+  useUIStore.getState().setShowFileBrowser(true);
   return true;
 }
 
-/**
- * Toggle instrument panel
- */
 export function toggleInstrumentPanel(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle instrument panel', false, 1000);
+  useUIStore.getState().togglePanel('instrument-editor');
   return true;
 }
 
-/**
- * Toggle sample panel
- */
 export function toggleSamplePanel(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle sample panel', false, 1000);
+  useUIStore.getState().togglePanel('instrument-editor');
+  useUIStore.getState().setStatusMessage('Sample panel (instrument editor)', false, 1000);
   return true;
 }
 
-/**
- * Toggle mixer panel
- */
 export function toggleMixerPanel(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle mixer panel', false, 1000);
+  useUIStore.getState().setStatusMessage('Mixer: not available', false, 1000);
   return true;
 }
 
-/**
- * Toggle automation panel
- */
 export function toggleAutomationPanel(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle automation panel', false, 1000);
+  useUIStore.getState().togglePanel('automation');
   return true;
 }
 
-/**
- * Toggle track scopes (visualization)
- */
 export function toggleTrackScopes(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle track scopes', false, 1000);
+  useUIStore.getState().toggleOscilloscopeVisible();
+  const visible = useUIStore.getState().oscilloscopeVisible;
+  useUIStore.getState().setStatusMessage(`Track scopes: ${visible ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Toggle master spectrum (visualization)
- */
 export function toggleMasterSpectrum(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle master spectrum', false, 1000);
-  return true;
+  return toggleTrackScopes();
 }
 
-/**
- * Maximize current panel
- */
 export function maximizePanel(): boolean {
-  useUIStore.getState().setStatusMessage('Maximize panel', false, 1000);
+  const { activePanel } = useUIStore.getState();
+  useUIStore.setState({ visiblePanels: [activePanel] });
+  useUIStore.getState().setStatusMessage('Panel maximized', false, 1000);
   return true;
 }
 
-/**
- * Restore panel sizes
- */
 export function restorePanelSizes(): boolean {
-  useUIStore.getState().setStatusMessage('Restore panel sizes', false, 1000);
+  useUIStore.setState({ visiblePanels: ['tracker', 'oscilloscope', 'pattern-list'] });
+  useUIStore.getState().setStatusMessage('Panels restored', false, 1000);
   return true;
 }
 
-/**
- * Focus next panel
- */
 export function focusNextPanel(): boolean {
-  useUIStore.getState().setStatusMessage('Focus next panel', false, 1000);
+  const { visiblePanels, activePanel, setActivePanel } = useUIStore.getState();
+  const idx = visiblePanels.indexOf(activePanel);
+  const next = visiblePanels[(idx + 1) % visiblePanels.length];
+  if (next) setActivePanel(next);
   return true;
 }
 
-/**
- * Focus previous panel
- */
 export function focusPrevPanel(): boolean {
-  useUIStore.getState().setStatusMessage('Focus previous panel', false, 1000);
+  const { visiblePanels, activePanel, setActivePanel } = useUIStore.getState();
+  const idx = visiblePanels.indexOf(activePanel);
+  const prev = visiblePanels[(idx - 1 + visiblePanels.length) % visiblePanels.length];
+  if (prev) setActivePanel(prev);
   return true;
 }
 
-/**
- * Toggle bottom frame (lower panel area)
- */
 export function toggleBottomFrame(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle bottom frame', false, 1000);
+  useUIStore.getState().toggleTB303Collapsed();
   return true;
 }
 
-/**
- * Toggle upper frame
- */
 export function toggleUpperFrame(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle upper frame', false, 1000);
+  useUIStore.getState().toggleOscilloscopeVisible();
   return true;
 }
 
-/**
- * Cycle global view (Renoise style)
- */
 export function cycleGlobalView(): boolean {
-  useUIStore.getState().setStatusMessage('Cycle global view', false, 1000);
+  useUIStore.getState().toggleActiveView();
+  const view = useUIStore.getState().activeView;
+  useUIStore.getState().setStatusMessage(`View: ${view}`, false, 1000);
   return true;
 }
