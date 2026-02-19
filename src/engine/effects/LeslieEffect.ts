@@ -130,6 +130,10 @@ export class LeslieEffect extends Tone.ToneAudioNode {
           this.sendParam(PARAM_MIX, 1.0);
           this.sendParam(PARAM_WIDTH, this._options.width);
           this.sendParam(PARAM_ACCELERATION, this._options.acceleration);
+          for (const { paramId, value } of this.pendingParams) {
+            this.sendParam(paramId, value);
+          }
+          this.pendingParams = [];
           this.swapToWasm();
         } else if (event.data.type === 'error') {
           console.warn('[Leslie] WASM worklet error:', event.data.error);

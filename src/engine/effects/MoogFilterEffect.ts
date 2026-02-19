@@ -191,6 +191,10 @@ export class MoogFilterEffect extends Tone.ToneAudioNode {
           this.sendParam(PARAM_FILTER_MODE, this._options.filterMode);
           // WASM always runs at 100% wet; dry/wet handled by TS gain nodes
           this.sendParam(PARAM_WET, 1.0);
+          for (const { paramId, value } of this.pendingParams) {
+            this.sendParam(paramId, value);
+          }
+          this.pendingParams = [];
           // Hot-swap from fallback to WASM
           this.swapToWasm();
         } else if (event.data.type === 'error') {

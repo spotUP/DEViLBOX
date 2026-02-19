@@ -115,6 +115,10 @@ export class SpringReverbEffect extends Tone.ToneAudioNode {
           this.sendParam(PARAM_MIX, 1.0); // WASM always 100% wet
           this.sendParam(PARAM_DRIP, this._options.drip);
           this.sendParam(PARAM_DIFFUSION, this._options.diffusion);
+          for (const { paramId, value } of this.pendingParams) {
+            this.sendParam(paramId, value);
+          }
+          this.pendingParams = [];
           this.swapToWasm();
         } else if (event.data.type === 'error') {
           console.warn('[SpringReverb] WASM worklet error:', event.data.error);
