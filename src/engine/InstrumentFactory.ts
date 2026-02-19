@@ -174,7 +174,7 @@ export function getDefaultEffectParameters(type: string): Record<string, number 
     case 'SpringReverb':
       return { decay: 0.6, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.7 };
     case 'VinylNoise':
-      return { hiss: 50, dust: 50, age: 50, speed: 20 };
+      return { hiss: 50, dust: 50, age: 50, speed: 0 };
     default:
       return {};
   }

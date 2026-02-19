@@ -49,7 +49,7 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
     this._hiss  = options.hiss  ?? 0.5;
     this._dust  = options.dust  ?? 0.5;
     this._age   = options.age   ?? 0.5;
-    this._speed = options.speed ?? 0.2;
+    this._speed = options.speed ?? 0.0;
     this._wet   = options.wet   ?? 1.0;
 
     this.input  = new Tone.Gain(1);

@@ -96,7 +96,7 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
     this._hissVolume = 0.5;  // maps to [-30, +30] dB
     this._dustVolume = 0.5;  // maps to [-30, +30] dB
     this._age        = 0.5;  // maps to [0, 30] dB drive
-    this._speed      = 0.2;  // maps to [0, 10] Hz LFO freq
+    this._speed      = 0.0;  // maps to [0, 10] Hz LFO freq (0 = no LFO modulation, matches C++ default)
     this._sourceMode = true; // true=add to input, false=replace
 
     // ─── Crackle synthesis state ─────────────────────────────────────────────
@@ -127,6 +127,11 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
     this._hissHighpass.setHighpass(100, sr);
     this._noiseLowpass.setLowpass(7000, sr);
     this._updateBpFilter();
+    // Initialize the crackle ramper: ramp from 0 → 1 over 20ms (matches C++ prepareToPlay).
+    // Without this, stepDelta stays 0, rampedValue never reaches 1, and no crackles fire.
+    this._ramper.setTarget(0.0, 1.0, Math.round(sr * 0.02));
+    this._rampRef[0] = 0.0;
+    this._rampedValue = 0.0;
   }
 
   _updateBpFilter() {
