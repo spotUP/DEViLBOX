@@ -28,6 +28,9 @@ import { AVAILABLE_EFFECTS, type AvailableEffect } from '@constants/unifiedEffec
 import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 
+// Dynamics effects have no wet/dry mixing — default to 100 to avoid misleading UI
+const DYNAMICS_EFFECTS = new Set<string>(['Compressor', 'EQ3']);
+
 interface SortableEffectItemProps {
   effect: EffectConfig;
   onToggle: () => void;
@@ -268,7 +271,6 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
       }
     }
 
-    const DYNAMICS_EFFECTS = new Set(['Compressor', 'SidechainCompressor']);
     const defaultWet = DYNAMICS_EFFECTS.has(type) ? 100 : 50;
 
     addMasterEffectConfig({
