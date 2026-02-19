@@ -149,7 +149,6 @@ export const useTransportStore = create<TransportStore>()(
           state.swing = Math.max(0, Math.min(200, swing));
         }
         
-        console.log('[TransportStore] Swing changed to:', state.swing);
       }),
 
     setJitter: (jitter) =>
@@ -352,7 +351,6 @@ export const useTransportStore = create<TransportStore>()(
           state.grooveTemplateId = templateId;
           // Swing is now independent and acts as a multiplier
           
-          console.log('[TransportStore] Groove template changed to:', templateId);
         }
       }),
 
