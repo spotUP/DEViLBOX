@@ -161,7 +161,7 @@ export class TumultEffect extends Tone.ToneAudioNode {
       duckAttack: options.duckAttack ?? 0, duckRelease: options.duckRelease ?? 15.0,
       followThreshold: options.followThreshold ?? -20.0,
       followAttack: options.followAttack ?? 0, followRelease: options.followRelease ?? 15.0,
-      followAmount: options.followAmount ?? 0.104,
+      followAmount: options.followAmount ?? 0.7,
       clipAmount: options.clipAmount ?? 0.497,
       hpEnable: options.hpEnable ?? 0, hpFreq: options.hpFreq ?? 888.5, hpQ: options.hpQ ?? 0.7,
       peak1Enable: options.peak1Enable ?? 0, peak1Type: options.peak1Type ?? 0,
@@ -211,6 +211,9 @@ export class TumultEffect extends Tone.ToneAudioNode {
         if (k !== 'wet') this._send(k, v);
       }
 
+      // Send playing state — may have been set before workletNode was ready
+      this._send('playing', this._playingState ? 1 : 0);
+
       // Load sample if sourceMode needs one
       if (p.sourceMode === 2 || p.sourceMode === 3) {
         void this._loadSample(p.sampleIndex);
@@ -255,7 +258,7 @@ export class TumultEffect extends Tone.ToneAudioNode {
       const bufR = (buf.numberOfChannels > 1 ? buf.getChannelData(1) : buf.getChannelData(0)).slice();
 
       this.workletNode?.port.postMessage(
-        { type: 'sample', bufferL: bufL.buffer, bufferR: bufR.buffer, length: bufL.length },
+        { type: 'sample', bufferL: bufL.buffer, bufferR: bufR.buffer, length: bufL.length, sampleRate: buf.sampleRate },
         [bufL.buffer, bufR.buffer],
       );
       this._loadedSampleIndex = index;
@@ -270,6 +273,12 @@ export class TumultEffect extends Tone.ToneAudioNode {
   // Expose it as a plain number accessor that delegates to setParam.
   get wet(): number { return this._params.wet; }
   set wet(value: number) { this.setParam('wet', value); }
+
+  private _playingState = false;
+  setPlaying(playing: boolean) {
+    this._playingState = playing;
+    this._send('playing', playing ? 1 : 0);
+  }
 
   setParam(param: keyof TumultOptions, value: number) {
     (this._params as Record<string, number>)[param] = value;

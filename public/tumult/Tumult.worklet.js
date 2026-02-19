@@ -1189,16 +1189,21 @@ class LoopFadePlayer {
     this.bufL      = null;    // Float32Array, left channel
     this.bufR      = null;    // Float32Array, right channel
     this.len       = 0;
+    this.delta     = 1.0;     // fileSampleRate / engineSampleRate (loopfadeplayer.h: delta = data.sampleRate / sr)
     this.uptime    = 0;       // current read position (float samples)
     this.uptimeFade = 0;      // fade-in read head
     this.currentFade = 0;     // crossfade gain 0→1
     this.isInFade  = false;
   }
 
-  setBuffer(bufL, bufR) {
-    this.bufL = bufL;
-    this.bufR = bufR;
-    this.len  = bufL.length;
+  setBuffer(bufL, bufR, bufferSampleRate) {
+    this.bufL  = bufL;
+    this.bufR  = bufR;
+    this.len   = bufL.length;
+    // Match loopfadeplayer.h: delta = data.sampleRate / sr
+    // If decodeAudioData resampled properly, bufferSampleRate == sampleRate and delta == 1.
+    // If not (or for any SR mismatch), delta compensates so playback pitch is correct.
+    this.delta = (bufferSampleRate ?? sampleRate) / sampleRate;
     this.uptime    = 0;
     this.uptimeFade = 0;
     this.currentFade = 0;
@@ -1240,11 +1245,11 @@ class LoopFadePlayer {
       const fR = readSample(this.bufR, fadePos);
       L = Math.sqrt(1 - g) * L + Math.sqrt(g) * fL;
       R = Math.sqrt(1 - g) * R + Math.sqrt(g) * fR;
-      this.uptimeFade++;
-      this.currentFade++;
+      this.uptimeFade  += this.delta;
+      this.currentFade += this.delta;
     }
 
-    this.uptime++;
+    this.uptime += this.delta;
     if (this.uptime >= range) {
       this.uptime      = this.uptimeFade;
       this.uptimeFade  = 0;
@@ -1309,7 +1314,7 @@ class TumultProcessor extends AudioWorkletProcessor {
     this.p = {
       noiseGain: -10.0, mix: 0.5, noiseMode: 0, sourceMode: 0, switchBranch: 0,
       duckThreshold: -20.0, duckAttack: 0, duckRelease: 15.0,
-      followThreshold: -20.0, followAttack: 0, followRelease: 15.0, followAmount: 0.104,
+      followThreshold: -20.0, followAttack: 0, followRelease: 15.0, followAmount: 0.7,
       clipAmount: 0.497,
       hpEnable: 0, hpFreq: 888.5, hpQ: 0.7,
       peak1Enable: 0, peak1Type: 0, peak1Freq: 20, peak1Gain: -0.19, peak1Q: 0.7,
@@ -1323,13 +1328,26 @@ class TumultProcessor extends AudioWorkletProcessor {
     this._updateBands();
     this._updateFollower();
 
+    // Playback gate — silence noise when tracker is idle, 4-second cooldown
+    this._playing        = false;
+    this._cooldownTotal  = Math.round(sampleRate * 4);
+    this._cooldownRemain = 0;
+
     this.port.onmessage = (e) => {
-      const { type, param, value, bufferL, bufferR } = e.data;
+      const { type, param, value, bufferL, bufferR, sampleRate: bufferSampleRate } = e.data;
       if (type === 'sample') {
         this.samplePlayer.setBuffer(
           new Float32Array(bufferL),
           new Float32Array(bufferR),
+          bufferSampleRate,
         );
+      } else if (param === 'playing') {
+        this._playing = !!value;
+        if (this._playing) {
+          this._cooldownRemain = 0;
+        } else {
+          this._cooldownRemain = this._cooldownTotal;
+        }
       } else if (param !== undefined) {
         this.p[param] = value;
         if (param === 'clipAmount') {
@@ -1378,6 +1396,18 @@ class TumultProcessor extends AudioWorkletProcessor {
     const noiseGainLin = Math.pow(10, p.noiseGain / 20);
     const pGain = p.sourceMode === 3 ? Math.pow(10, p.playerGain / 20) : 1;
 
+    // Playback gate with 4-second cooldown (same as VinylNoise)
+    let playGate = 1.0;
+    if (!this._playing) {
+      if (this._cooldownRemain <= 0) {
+        playGate = 0.0;
+      } else {
+        playGate = this._cooldownRemain / this._cooldownTotal;
+        this._cooldownRemain -= (outL?.length ?? 128);
+        if (this._cooldownRemain < 0) this._cooldownRemain = 0;
+      }
+    }
+
     for (let i = 0; i < (outL?.length ?? 128); i++) {
       // ── Dry signal ──────────────────────────────────────────────────────
       const dryL = inL ? inL[i] : 0;
@@ -1411,9 +1441,9 @@ class TumultProcessor extends AudioWorkletProcessor {
       }
       // switchBranch === 2 (Raw): gateAmt = 1
 
-      // ── Apply noise gain + gate ───────────────────────────────────────────
-      noiseL *= noiseGainLin * gateAmt;
-      noiseR *= noiseGainLin * gateAmt;
+      // ── Apply noise gain + gate + playback gate ───────────────────────────
+      noiseL *= noiseGainLin * gateAmt * playGate;
+      noiseR *= noiseGainLin * gateAmt * playGate;
 
       // ── Clipper (hardSoftClipper.h) ───────────────────────────────────────
       noiseL = clipSample(noiseL, p.clipAmount, this._clipInvAmt);
