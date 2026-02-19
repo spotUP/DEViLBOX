@@ -266,7 +266,7 @@ export class TumultEffect extends Tone.ToneAudioNode {
 
   // ─── Parameter setters ─────────────────────────────────────────────────────
 
-  set(param: keyof TumultOptions, value: number) {
+  setParam(param: keyof TumultOptions, value: number) {
     (this._params as Record<string, number>)[param] = value;
     if (param === 'wet') {
       this.wetGain.gain.value = value;

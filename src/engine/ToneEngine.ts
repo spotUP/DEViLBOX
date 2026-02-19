@@ -30,6 +30,7 @@ import { MVerbEffect } from './effects/MVerbEffect';
 import { LeslieEffect } from './effects/LeslieEffect';
 import { SpringReverbEffect } from './effects/SpringReverbEffect';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
+import { TumultEffect, type TumultOptions } from './effects/TumultEffect';
 import { WAMEffectNode } from './wam/WAMEffectNode';
 import { SidechainCompressor } from './effects/SidechainCompressor';
 import { TapeSaturation } from './effects/TapeSaturation';
@@ -5237,6 +5238,14 @@ export class ToneEngine {
           if ('dropout'         in changed) node.setDropout        (Number(changed.dropout)         / 100);
           if ('warp'            in changed) node.setWarp           (Number(changed.warp)            / 100);
           if ('eccentricity'    in changed) node.setEccentricity   (Number(changed.eccentricity)    / 100);
+        }
+        break;
+
+      case 'Tumult':
+        if (node instanceof TumultEffect) {
+          for (const key of Object.keys(changed)) {
+            node.setParam(key as keyof TumultOptions, Number(changed[key]));
+          }
         }
         break;
 
