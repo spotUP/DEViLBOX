@@ -345,25 +345,11 @@ export class TrackerReplayer {
     if (song.speed2 !== undefined && song.speed2 !== song.initialSpeed) {
       this.speed2 = song.speed2;
       this.speedAB = true; // true = after row 0 (speed1), next will be speed2
-      console.log(`[TrackerReplayer] Furnace speed alternation: speed1=${song.initialSpeed}, speed2=${song.speed2}`);
     } else {
       this.speed2 = null;
       this.speedAB = false;
     }
 
-    console.log(`[TrackerReplayer] Loaded: ${song.name} (${song.format}), ${song.numChannels}ch, ${song.patterns.length} patterns`);
-    console.log(`[TrackerReplayer] Song positions: [${song.songPositions.join(', ')}], length: ${song.songLength}`);
-    console.log(`[TrackerReplayer] Pattern lengths: ${song.patterns.map((p, i) => `${i}:${p?.length ?? 'null'}`).join(', ')}`);
-    console.log(`[TrackerReplayer] Pattern channel counts:`, song.patterns.map((p, i) => `${i}:${p?.channels?.length ?? 0}ch`).join(', '));
-    // DEBUG: Note distribution per channel for first pattern
-    if (song.patterns[0]?.channels) {
-      const noteCounts = song.patterns[0].channels.map((ch, idx) => {
-        const count = ch.rows?.filter(r => r.note > 0 && r.note < 97).length ?? 0;
-        return `ch${idx}:${count}`;
-      });
-      console.log(`[TrackerReplayer] Pattern 0 note distribution:`, noteCounts.join(', '));
-    }
-    console.log(`[TrackerReplayer] Instruments:`, song.instruments.map(i => ({ id: i.id, name: i.name, hasSample: !!i.sample?.url })));
   }
 
   private createChannel(index: number, totalChannels: number): ChannelState {
@@ -459,7 +445,6 @@ export class TrackerReplayer {
     const rawCtx = Tone.context.rawContext;
     const getState = () => rawCtx.state as string;
     if (getState() !== 'running') {
-      console.log(`[TrackerReplayer] Context state after Tone.start(): ${getState()}, waiting...`);
       await Tone.context.resume();
       // Poll for running state with timeout
       const maxWait = 2000;
@@ -471,7 +456,6 @@ export class TrackerReplayer {
         console.error(`[TrackerReplayer] AudioContext failed to start: ${getState()}`);
         return;
       }
-      console.log(`[TrackerReplayer] Context now running after ${Date.now() - startTime}ms`);
     }
 
     // Ensure WASM synths (Open303, etc.) are initialized before starting playback.
@@ -484,8 +468,6 @@ export class TrackerReplayer {
     this.lastSwingAmount = transportState.swing;
     this.lastGrooveSteps = transportState.grooveSteps;
     this.startScheduler();
-
-    console.log(`[TrackerReplayer] Playing at ${this.bpm} BPM, speed ${this.speed} (lookahead=${this.scheduleAheadTime}s)`);
   }
 
   stop(): void {
@@ -519,8 +501,6 @@ export class TrackerReplayer {
 
     // Cancel any pending throttled row updates
     cancelPendingRowUpdate();
-
-    console.log('[TrackerReplayer] Stopped');
   }
 
   pause(): void {
@@ -571,7 +551,6 @@ export class TrackerReplayer {
 
       // Sync BPM from UI (takes effect on next tick naturally)
       if (Math.abs(transportState.bpm - this.bpm) > 0.1) {
-        console.log(`[Replayer] BPM sync from UI: ${this.bpm} -> ${transportState.bpm}`);
         this.bpm = transportState.bpm;
       }
       // Note: speed is NOT synced from UI — it's controlled by Fxx effects
@@ -832,7 +811,7 @@ export class TrackerReplayer {
         // Apply volume immediately
         ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
       } else {
-        console.log(`[TrackerReplayer] Instrument ${instNum} not found! Available IDs:`, this.song.instruments.map(i => i.id).sort((a,b) => a-b));
+        console.warn(`[TrackerReplayer] Instrument ${instNum} not found! Available IDs:`, this.song.instruments.map(i => i.id).sort((a,b) => a-b));
       }
     }
 
@@ -922,7 +901,6 @@ export class TrackerReplayer {
         if (is303Synth && isSamePitchSlide) {
           // Same pitch slide on 303: trigger with slide=true to cancel pending release
           // The synth will receive noteOn for the same pitch with slide, which sustains the note
-          console.log(`[TrackerReplayer] Same-pitch slide on 303: ${newNoteName} → ${newNoteName}, sustaining with slide=true`);
         }
 
         // Update last played note name for next comparison
@@ -1097,11 +1075,9 @@ export class TrackerReplayer {
           // F00 = stop in some trackers
         } else if (param < 0x20) {
           if (this.speed !== param) {
-            console.log(`[TrackerReplayer] Fxx effect: setting speed to ${param} (was ${this.speed})`);
             this.speed = param;
             // Fxx disables Furnace speed alternation (sets both speeds to same value)
             if (this.speed2 !== null) {
-              console.log(`[TrackerReplayer] Fxx disabled speed alternation`);
               this.speed2 = null;
             }
             // Update UI to reflect the speed change from the module
@@ -1109,7 +1085,6 @@ export class TrackerReplayer {
           }
         } else {
           if (this.bpm !== param) {
-            console.log(`[TrackerReplayer] Fxx effect: setting BPM to ${param} (was ${this.bpm})`);
             this.bpm = param;
             // Update UI to reflect the BPM change from the module
             useTransportStore.getState().setBPM(param);
@@ -1555,7 +1530,7 @@ export class TrackerReplayer {
 
     // Update PatternScheduler to stay in sync
     const scheduler = getPatternScheduler();
-    (scheduler as any).globalPitchOffset = this.globalPitchCurrent;
+    scheduler.setGlobalPitchOffset(this.globalPitchCurrent);
   }
 
   /**
@@ -1615,10 +1590,7 @@ export class TrackerReplayer {
     const macros = ch.instrument.furnace.macros as FurnaceMacro[];
     if (macros.length === 0) return;
 
-    // Log macro processing on first tick only (avoid spam)
-    if (this.currentTick === 0 && this.pattPos % 16 === 0) {
-      console.log(`[Macros] inst=${ch.instrument.id} "${ch.instrument.name}" macros=${macros.length} types=[${macros.map(m => m.type).join(',')}]`);
-    }
+
 
     for (const macro of macros) {
       if (!macro.data || macro.data.length === 0) continue;
@@ -1650,10 +1622,6 @@ export class TrackerReplayer {
       }
 
       const value = macro.data[pos] ?? 0;
-      // Log macro value changes (every 16 rows to reduce spam)
-      if (this.pattPos % 16 === 0 && this.currentTick === 0) {
-        console.log(`[Macro] type=${macro.type} pos=${pos} val=${value} loop=${macro.loop} rel=${macro.release}`);
-      }
       this.applyMacroValue(ch, macro.type, value, time);
     }
 
@@ -1777,13 +1745,13 @@ export class TrackerReplayer {
     if (!ch.instrument) {
       // No instrument assigned - try to use the first available instrument
       if (this.song && this.song.instruments.length > 0) {
-        console.log(`[TrackerReplayer] No instrument on ch${channelIndex}, assigning default instrument ${this.song.instruments[0].id}`);
+        // No instrument assigned - assign default instrument silently
         ch.instrument = this.song.instruments[0];
         ch.sampleNum = this.song.instruments[0].id;
         ch.volume = 64;
         ch.finetune = ch.instrument.metadata?.modPlayback?.finetune ?? 0;
       } else {
-        console.log('[TrackerReplayer] No instrument assigned to channel and no instruments available');
+        console.warn('[TrackerReplayer] No instrument assigned to channel and no instruments available');
         return;
       }
     }
@@ -1868,7 +1836,7 @@ export class TrackerReplayer {
 
 
     if (!decodedBuffer) {
-      console.log('[TrackerReplayer] No decoded buffer for instrument:', ch.instrument.id, ch.instrument.name);
+      console.warn('[TrackerReplayer] No decoded buffer for instrument:', ch.instrument.id, ch.instrument.name);
       return;
     }
 
@@ -1876,7 +1844,7 @@ export class TrackerReplayer {
 
     // Check if period is valid (non-zero)
     if (!ch.period || ch.period <= 0) {
-      console.log('[TrackerReplayer] Invalid period, skipping playback:', ch.period);
+      console.warn('[TrackerReplayer] Invalid period, skipping playback:', ch.period);
       return;
     }
 
@@ -1951,7 +1919,7 @@ export class TrackerReplayer {
       const startOffset = offset > 0 ? offset / originalSampleRate : 0;
       player.start(safeTime, Math.min(startOffset, duration - 0.0001));
     } catch (e) {
-      console.log('[TrackerReplayer] Playback start failed:', e);
+      console.error('[TrackerReplayer] Playback start failed:', e);
     }
   }
 
@@ -2155,7 +2123,6 @@ export class TrackerReplayer {
 
     // Song end
     if (this.songPos >= this.song.songLength) {
-      console.log(`[TrackerReplayer] Song end, restarting at position ${this.song.restartPosition}`);
       this.songPos = this.song.restartPosition < this.song.songLength
         ? this.song.restartPosition
         : 0;
@@ -2168,21 +2135,6 @@ export class TrackerReplayer {
       this.onRowChange(this.pattPos, pattNum, this.songPos);
     }
 
-    // Timing drift diagnostics — log at every position boundary (row 0)
-    if (this.pattPos === 0 && this.playbackStartWallTime > 0) {
-      const schedElapsed = this.lastScheduledTime - this.playbackStartWallTime;
-      const tickInterval = 2.5 / this.bpm;
-      const expectedFromTicks = this.totalTicksProcessed * tickInterval;
-      const schedDriftMs = (schedElapsed - expectedFromTicks) * 1000;
-      const rowsThisPattern = this.totalRowsProcessed - this.lastPatternRowCount;
-      console.log(
-        `[Replayer Drift] Pos ${this.songPos} | ${rowsThisPattern} rows | ` +
-        `${this.totalTicksProcessed} ticks | ` +
-        `schedDrift=${schedDriftMs.toFixed(1)}ms | ` +
-        `BPM=${this.bpm} speed=${this.speed}`
-      );
-      this.lastPatternRowCount = this.totalRowsProcessed;
-    }
     this.totalRowsProcessed++;
   }
 
@@ -2244,7 +2196,6 @@ export class TrackerReplayer {
         this.onRowChange(this.pattPos, patternNum, this.songPos);
       }
 
-      console.log(`[TrackerReplayer] Live-seeked to songPos=${this.songPos}, pattPos=${this.pattPos}`);
       return;
     }
 
@@ -2288,7 +2239,6 @@ export class TrackerReplayer {
       this.onRowChange(this.pattPos, patternNum, this.songPos);
     }
 
-    console.log(`[TrackerReplayer] Seeked to songPos=${this.songPos}, pattPos=${this.pattPos}`);
   }
 
   /**
@@ -2307,7 +2257,7 @@ export class TrackerReplayer {
       // Pattern not in song order - just update the display state
       // Clear the state queue so old states don't override
       this.clearStateQueue();
-      console.log(`[TrackerReplayer] Pattern ${patternIndex} not in song order, clearing state queue`);
+      // Pattern not in song order — just clear the state queue, don't seek
     }
   }
 

@@ -8,6 +8,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useTransportStore, useInstrumentStore } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore } from '@stores/useUIStore';
+import { useHistoryStore } from '@stores/useHistoryStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { stringNoteToXM } from '@/lib/xmConversions';
@@ -163,6 +164,7 @@ export const useTrackerInput = () => {
   const setPtnJumpPos = useTrackerStore((state) => state.setPtnJumpPos);
   const getPtnJumpPos = useTrackerStore((state) => state.getPtnJumpPos);
   const interpolateSelection = useTrackerStore((state) => state.interpolateSelection);
+  const replacePattern = useTrackerStore((state) => state.replacePattern);
 
   const {
     isPlaying,
@@ -535,6 +537,58 @@ export const useTrackerInput = () => {
       }
 
       // ============================================
+      // Undo / Redo (Ctrl+Z / Ctrl+Y, Ctrl+Shift+Z)
+      // ============================================
+
+      if ((e.ctrlKey || e.metaKey) && keyLower === 'z' && !e.altKey) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          // Ctrl+Shift+Z: Redo
+          const histStore = useHistoryStore.getState();
+          if (histStore.canRedo()) {
+            const afterState = histStore.redo();
+            if (afterState) {
+              const action = histStore.getLastAction();
+              replacePattern(action?.patternIndex ?? currentPatternIndex, afterState);
+              useUIStore.getState().setStatusMessage(`REDO: ${action?.description ?? ''}`);
+            }
+          } else {
+            useUIStore.getState().setStatusMessage('NOTHING TO REDO');
+          }
+        } else {
+          // Ctrl+Z: Undo
+          const histStore = useHistoryStore.getState();
+          if (histStore.canUndo()) {
+            const action = histStore.getLastAction();
+            const beforeState = histStore.undo();
+            if (beforeState && action) {
+              replacePattern(action.patternIndex, beforeState);
+              useUIStore.getState().setStatusMessage(`UNDO: ${action.description}`);
+            }
+          } else {
+            useUIStore.getState().setStatusMessage('NOTHING TO UNDO');
+          }
+        }
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && keyLower === 'y' && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        const histStore = useHistoryStore.getState();
+        if (histStore.canRedo()) {
+          const afterState = histStore.redo();
+          if (afterState) {
+            const action = histStore.getLastAction();
+            replacePattern(action?.patternIndex ?? currentPatternIndex, afterState);
+            useUIStore.getState().setStatusMessage(`REDO: ${action?.description ?? ''}`);
+          }
+        } else {
+          useUIStore.getState().setStatusMessage('NOTHING TO REDO');
+        }
+        return;
+      }
+
+      // ============================================
       // FT2: Macro Slots (Ctrl+1-8)
       // ============================================
 
@@ -562,8 +616,10 @@ export const useTrackerInput = () => {
         e.preventDefault();
         if (recordMode) {
           if (e.shiftKey) {
-            // Shift+Insert: Insert line (all channels) - shifts all rows down
-            handleInsertRow();
+            // Shift+Insert: Insert line (all channels) - insert on every channel
+            for (let ch = 0; ch < pattern.channels.length; ch++) {
+              insertRow(ch, cursor.rowIndex);
+            }
           } else {
             // Insert: Insert row on current channel only
             handleInsertRow();
@@ -633,7 +689,10 @@ export const useTrackerInput = () => {
 
       if (key === 'ArrowLeft') {
         e.preventDefault();
-        if (e.altKey || e.shiftKey) {
+        if (e.shiftKey && !e.altKey) {
+          // Shift+Left: Switch to previous pattern
+          if (currentPatternIndex > 0) setCurrentPattern(currentPatternIndex - 1);
+        } else if (e.altKey) {
           if (!selection) startSelection();
           moveCursor('left');
           endSelection();
@@ -645,7 +704,10 @@ export const useTrackerInput = () => {
 
       if (key === 'ArrowRight') {
         e.preventDefault();
-        if (e.altKey || e.shiftKey) {
+        if (e.shiftKey && !e.altKey) {
+          // Shift+Right: Switch to next pattern
+          if (currentPatternIndex < patterns.length - 1) setCurrentPattern(currentPatternIndex + 1);
+        } else if (e.altKey) {
           if (!selection) startSelection();
           moveCursor('right');
           endSelection();
@@ -1028,44 +1090,6 @@ export const useTrackerInput = () => {
         e.preventDefault();
         if (currentOctave > 1) {
           setCurrentOctave(currentOctave - 1);
-        }
-        return;
-      }
-
-      // Shift+Left/Right: Change pattern number (song position)
-      if (e.shiftKey && key === 'ArrowLeft') {
-        e.preventDefault();
-        if (currentPatternIndex > 0) {
-          setCurrentPattern(currentPatternIndex - 1);
-        }
-        return;
-      }
-      if (e.shiftKey && key === 'ArrowRight') {
-        e.preventDefault();
-        if (currentPatternIndex < patterns.length - 1) {
-          setCurrentPattern(currentPatternIndex + 1);
-        }
-        return;
-      }
-
-      // ============================================
-      // 5.5 Instrument Select
-      // ============================================
-
-      // Shift+Up/Down: Select previous/next instrument
-      if (e.shiftKey && key === 'ArrowUp') {
-        e.preventDefault();
-        if (currentInstrumentId !== null && currentInstrumentId > 0) {
-          const prevInst = instruments.find(i => i.id === currentInstrumentId - 1);
-          if (prevInst) setCurrentInstrument(prevInst.id);
-        }
-        return;
-      }
-      if (e.shiftKey && key === 'ArrowDown') {
-        e.preventDefault();
-        if (currentInstrumentId !== null) {
-          const nextInst = instruments.find(i => i.id === currentInstrumentId + 1);
-          if (nextInst) setCurrentInstrument(nextInst.id);
         }
         return;
       }

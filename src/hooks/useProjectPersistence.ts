@@ -140,6 +140,9 @@ export function saveProjectToStorage(): boolean {
       // QuotaExceededError: project too large for localStorage (usually 5-10 MB limit)
       // This can happen with many large sample-based instruments
       console.warn('[Persistence] localStorage quota exceeded, project not saved:', storageError);
+      import('@stores/useNotificationStore').then(({ notify }) => {
+        notify.error('Project too large to save — remove some samples to free space.');
+      });
       return false;
     }
     projectState.markAsSaved();
