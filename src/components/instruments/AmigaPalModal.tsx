@@ -150,9 +150,12 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
     // Use parent container width for responsive sizing
     const width = canvas.parentElement?.clientWidth || 300;
     const height = 60;
-    canvas.width = width;
-    canvas.height = height;
-
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
     const channelData = buffer.getChannelData(0);
