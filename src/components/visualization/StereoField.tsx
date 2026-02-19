@@ -37,10 +37,12 @@ export const StereoField: React.FC<StereoFieldProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Make it square based on height
+    // Make it square based on height — DPR-aware for retina screens
+    const dpr = window.devicePixelRatio || 1;
     const actualSize = Math.min(container.clientWidth, height);
-    canvas.width = actualSize;
-    canvas.height = actualSize;
+    canvas.width = actualSize * dpr;
+    canvas.height = actualSize * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const centerX = actualSize / 2;
     const centerY = actualSize / 2;
