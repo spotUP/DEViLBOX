@@ -1017,15 +1017,19 @@ export class InstrumentFactory {
         break;
 
       case 'BitCrusher': {
-        const crusher = new Tone.BitCrusher(Number(p.bits) || 4);
+        const bitsValue = Number(p.bits) || 4;
+        const crusher = new Tone.BitCrusher(bitsValue);
         crusher.wet.value = wetValue;
-        // BitCrusher uses an AudioWorklet that loads async — wait for it
+        // BitCrusher uses an AudioWorklet that loads async.
+        // Wait up to 1s for the worklet node to be created, then re-set bits.
         const crusherWorklet = (crusher as unknown as { _bitCrusherWorklet: { _worklet?: AudioWorkletNode } })._bitCrusherWorklet;
         if (crusherWorklet) {
           for (let attempt = 0; attempt < 50; attempt++) {
             if (crusherWorklet._worklet) break;
             await new Promise(r => setTimeout(r, 20));
           }
+          // Re-set bits after worklet is confirmed ready (param may not have been received during init)
+          crusher.bits.value = bitsValue;
         }
         node = crusher;
         break;
