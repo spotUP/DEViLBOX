@@ -40,9 +40,11 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
   // Ref-based counter for unique IDs (avoids impure Date.now() during render)
   const idCounterRef = useRef(0);
 
-  // CRITICAL: Use ref for editingEffect to prevent stale closures in knob onChange handlers
+  // CRITICAL: Use ref for editingEffect to prevent stale closures in knob onChange handlers.
+  // useLayoutEffect fires synchronously after DOM update (before paint) so the ref is
+  // always current before any pointer events that follow a state change.
   const editingEffectRef = useRef<EffectConfig | null>(null);
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     editingEffectRef.current = editingEffect;
   }, [editingEffect]);
 
