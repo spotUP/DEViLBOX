@@ -1185,15 +1185,18 @@ function App() {
                   }
                   const { loadPatterns: loadPats, setCurrentPattern: setCurPat, setPatternOrder: setPO } = useTrackerStore.getState();
                   const { setBPM: setB, reset: resetTransport } = useTransportStore.getState();
-                  const { reset: resetInstruments } = useInstrumentStore.getState();
+                  const { reset: resetInstruments, loadInstruments: loadInst } = useInstrumentStore.getState();
                   resetTransport();
                   resetInstruments();
                   getToneEngine().disposeAllInstruments();
+                  if (result.instruments.length > 0) {
+                    loadInst(result.instruments);
+                  }
                   loadPats(result.patterns);
                   setPO(result.patterns.map((_: unknown, i: number) => i));
                   setCurPat(0);
                   setB(result.bpm);
-                  notify.success(`Imported: ${result.metadata.name}`);
+                  notify.success(`Imported: ${result.metadata.name} — ${result.instruments.length} instrument(s), BPM: ${result.bpm}`);
                 } else {
                   // Load other tracker modules (.fur, .mod, .xm, etc.)
                   const { loadModuleFile } = await import('@lib/import/ModuleLoader');
