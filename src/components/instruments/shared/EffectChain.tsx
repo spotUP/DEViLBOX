@@ -60,6 +60,7 @@ const AVAILABLE_EFFECTS: EffectType[] = [
   'MVerb',
   'Leslie',
   'SpringReverb',
+  'VinylNoise',
 ];
 
 interface SortableEffectProps {

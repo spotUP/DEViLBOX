@@ -219,6 +219,13 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
     group: 'Reverb & Delay',
     description: 'Classic dub spring tank — allpass diffusion, comb bank, metallic drip transients, tension control (WASM)',
   },
+  {
+    category: 'wasm',
+    type: 'VinylNoise',
+    label: 'Vinyl Noise',
+    group: 'Texture',
+    description: 'Vinyl crackle & hiss synthesizer — DSP-generated pops, dust noise, and mid-range warmth (viator-rust port)',
+  },
 
   // ===== PITCH (Tone.js) =====
   {
