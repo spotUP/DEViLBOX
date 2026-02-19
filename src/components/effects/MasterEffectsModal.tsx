@@ -3,7 +3,7 @@
  * Now supports both Tone.js and Neural effects in a single unified list
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, Search, ExternalLink, Plus } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { focusPopout } from '@components/ui/PopOutWindow';
@@ -69,6 +69,13 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
     () => masterEffects.find(e => e.id === editingEffectId) ?? null,
     [masterEffects, editingEffectId]
   );
+
+  // Auto-select first effect when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setEditingEffectId(masterEffects[0]?.id ?? null);
+    }
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -722,7 +729,7 @@ function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, 
         </div>
 
         {/* Controls */}
-        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5">
           {/* Wet/Dry slider */}
           <input
             type="range"

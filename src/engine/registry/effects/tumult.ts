@@ -29,7 +29,7 @@ EffectRegistry.register({
       followThreshold: Number(p.followThreshold ?? -20.0),
       followAttack:    Number(p.followAttack    ?? 0),
       followRelease:   Number(p.followRelease   ?? 15.0),
-      followAmount:    Number(p.followAmount    ?? 0.104),
+      followAmount:    Number(p.followAmount    ?? 0.7),
       clipAmount:      Number(p.clipAmount      ?? 0.497),
       hpEnable:        Number(p.hpEnable        ?? 0),
       hpFreq:          Number(p.hpFreq          ?? 888.5),
@@ -63,7 +63,7 @@ EffectRegistry.register({
   getDefaultParameters: () => ({
     noiseGain: -10.0, mix: 0.5, noiseMode: 0, sourceMode: 0, switchBranch: 0,
     duckThreshold: -20.0, duckAttack: 0, duckRelease: 15.0,
-    followThreshold: -20.0, followAttack: 0, followRelease: 15.0, followAmount: 0.104,
+    followThreshold: -20.0, followAttack: 0, followRelease: 15.0, followAmount: 0.7,
     clipAmount: 0.497,
     hpEnable: 0, hpFreq: 888.5, hpQ: 0.7,
     peak1Enable: 0, peak1Type: 0, peak1Freq: 20, peak1Gain: -0.19, peak1Q: 0.7,
