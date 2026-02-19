@@ -130,11 +130,13 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
   }
 
   dispose(): this {
-    super.dispose();
     try { this.workletNode?.disconnect(); } catch { /* */ }
     this.workletNode = null;
     this.dryGain.dispose();
     this.wetGain.dispose();
+    this.input.dispose();
+    this.output.dispose();
+    super.dispose();
     return this;
   }
 }

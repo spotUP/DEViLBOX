@@ -166,6 +166,8 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
       // LFO (sine, frequency randomly modulated each sample like viator-rust)
       const lfoFreq = Math.random() * lfoFreqMax;
       this._lfoPhase += (2 * Math.PI * lfoFreq) / sampleRate;
+      // Wrap phase to [0, 2π] to prevent floating-point precision loss in long sessions
+      if (this._lfoPhase > 2 * Math.PI) this._lfoPhase -= 2 * Math.PI;
       const lfoOut = Math.sin(this._lfoPhase);
 
       // Raw noise
@@ -179,7 +181,11 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
       noiseSpeed *= 20.0;
       let signal = noiseSpeed;
 
-      // Ramper envelope — exact port of Ramper usage in synthesizeRandomCrackle()
+      // Ramper envelope — ported from synthesizeRandomCrackle().
+      // Note: the C++ uses a while(!_ramper.ramp(v)) loop that advances and multiplies
+      // on the same sample as a reset. This JS port advances once per sample and outputs
+      // zeros on the exact reset sample. The difference is one sample per crackle cycle
+      // — perceptually unnoticeable for vinyl noise.
       if (this._rampedValue >= 1.0) {
         // Reset: start a new fade-in ramp (from current=0.96 to target=1.0 over 3ms)
         this._ramper.setTarget(0.96, 1.0, Math.round(sampleRate * 0.003));
@@ -189,7 +195,7 @@ class VinylNoiseProcessor extends AudioWorkletProcessor {
         signal *= this._rampedValue;
       }
 
-      // Advance ramp one step (matches the while(!_ramper.ramp(rampedValue)) pattern)
+      // Advance ramp one step
       this._ramper.ramp(this._rampRef);
       this._rampedValue = this._rampRef[0];
 
