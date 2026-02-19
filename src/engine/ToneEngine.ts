@@ -117,6 +117,7 @@ export class ToneEngine {
   private masterEffectsNodes: Tone.ToneAudioNode[] = [];
   private masterEffectConfigs: Map<string, { node: Tone.ToneAudioNode; config: EffectConfig }> = new Map();
   private masterEffectsRebuildVersion = 0;
+  private _isPlaying = false;
 
   // Per-channel audio routing (volume, pan, mute/solo, metering)
   private channelOutputs: Map<number, {
@@ -848,6 +849,8 @@ export class ToneEngine {
       await Tone.start();
     }
 
+    this._isPlaying = true;
+    this._notifyNoiseEffectsPlaying(true);
     Tone.getTransport().start();
   }
 
@@ -857,6 +860,8 @@ export class ToneEngine {
   public stop(): void {
     // Release all active notes before stopping to prevent hanging notes
     this.releaseAll();
+    this._isPlaying = false;
+    this._notifyNoiseEffectsPlaying(false);
 
     // Kill master effects tails (delay, reverb) by temporarily muting output
     // then restoring after the effect buffers have cleared
@@ -869,6 +874,17 @@ export class ToneEngine {
     }, 50);
 
     Tone.getTransport().stop();
+  }
+
+  /** Notify noise-generating master effects (VinylNoise, Tumult) of playback state. */
+  private _notifyNoiseEffectsPlaying(playing: boolean): void {
+    this.masterEffectConfigs.forEach(({ node }) => {
+      if (node instanceof VinylNoiseEffect) {
+        node.setPlaying(playing);
+      } else if (node instanceof TumultEffect) {
+        node.setPlaying(playing);
+      }
+    });
   }
 
   /**
@@ -4799,7 +4815,8 @@ export class ToneEngine {
     // console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' connected chain OK, nodes:',
     //   this.masterEffectsNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
 
-
+    // Sync playback state into freshly created noise-generating nodes
+    this._notifyNoiseEffectsPlaying(this._isPlaying);
   }
 
   /**

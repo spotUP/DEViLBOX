@@ -84,8 +84,9 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
     this.input  = new Tone.Gain(1);
     this.output = new Tone.Gain(1);
 
-    // Dry path (input → dryGain → output)
-    this.dryGain = new Tone.Gain(1 - this._wet);
+    // Dry path always at full volume — VinylNoise is a noise adder, not a processor.
+    // The wet/mix knob controls noise amplitude only, never cuts the dry signal.
+    this.dryGain = new Tone.Gain(1);
     this.wetGain = new Tone.Gain(this._wet);
 
     this.input.connect(this.dryGain);
@@ -126,6 +127,8 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
       this._send('dropout',         this._dropout);
       this._send('warp',            this._warp);
       this._send('eccentricity',    this._eccentricity);
+      // Send playing state — may have been set before workletNode was ready
+      this._send('playing', this._playingState ? 1 : 0);
 
     } catch (err) {
       console.warn('[VinylNoise] Worklet init failed:', err);
@@ -168,12 +171,17 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
   setDropout(v: number)         { this._dropout         = clamp01(v); this._send('dropout',         this._dropout);         }
   setWarp(v: number)            { this._warp            = clamp01(v); this._send('warp',            this._warp);            }
   setEccentricity(v: number)    { this._eccentricity    = clamp01(v); this._send('eccentricity',    this._eccentricity);    }
+  private _playingState = false;
+  setPlaying(playing: boolean)  {
+    this._playingState = playing;
+    this._send('playing', playing ? 1 : 0);
+  }
 
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = clamp01(value);
     this.wetGain.gain.value = this._wet;
-    this.dryGain.gain.value = 1 - this._wet;
+    // dryGain stays at 1.0 always — dry signal is never attenuated
   }
 
   dispose(): this {
