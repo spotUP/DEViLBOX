@@ -2224,6 +2224,7 @@ export type AudioEffectType =
   | 'MVerb'            // MVerb plate reverb (WASM, GPL v3)
   | 'Leslie'           // Leslie rotary speaker (WASM)
   | 'SpringReverb'     // Spring reverb with drip (WASM)
+  | 'VinylNoise'       // Vinyl crackle & hiss synthesizer
   // WAM 2.0 effects (external Web Audio Module plugins)
   | 'WAMBigMuff'        // Big Muff Pi fuzz
   | 'WAMTS9'            // TS-9 Overdrive
