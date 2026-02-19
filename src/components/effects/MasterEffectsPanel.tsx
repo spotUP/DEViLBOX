@@ -24,50 +24,9 @@ import type { EffectConfig, AudioEffectType as EffectType } from '../../types/in
 import { useAudioStore } from '@stores/useAudioStore';
 import { Settings, Volume2, X, GripVertical, Power, Sliders, ChevronDown, Save } from 'lucide-react';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
-
-const AVAILABLE_EFFECTS: { type: EffectType; label: string; category: string }[] = [
-  // Dynamics
-  { type: 'Compressor', label: 'Compressor', category: 'Dynamics' },
-  { type: 'EQ3', label: '3-Band EQ', category: 'Dynamics' },
-
-  // Distortion
-  { type: 'Distortion', label: 'Distortion', category: 'Distortion' },
-  { type: 'BitCrusher', label: 'Bit Crusher', category: 'Distortion' },
-  { type: 'Chebyshev', label: 'Chebyshev', category: 'Distortion' },
-
-  // Time-based
-  { type: 'Reverb', label: 'Reverb', category: 'Time' },
-  { type: 'JCReverb', label: 'JC Reverb', category: 'Time' },
-  { type: 'Delay', label: 'Delay', category: 'Time' },
-  { type: 'FeedbackDelay', label: 'Feedback Delay', category: 'Time' },
-  { type: 'PingPongDelay', label: 'Ping Pong Delay', category: 'Time' },
-  { type: 'SpaceEcho', label: 'Space Echo', category: 'Time' },
-  { type: 'SpaceyDelayer', label: 'Spacey Delayer', category: 'Time' },
-  { type: 'RETapeEcho', label: 'RE Tape Echo', category: 'Time' },
-  { type: 'MVerb', label: 'MVerb Plate', category: 'Time' },
-  { type: 'SpringReverb', label: 'Spring Reverb', category: 'Time' },
-
-  // Modulation
-  { type: 'Leslie', label: 'Leslie Speaker', category: 'Modulation' },
-  { type: 'BiPhase', label: 'Bi-Phase', category: 'Modulation' },
-  { type: 'Chorus', label: 'Chorus', category: 'Modulation' },
-  { type: 'Phaser', label: 'Phaser', category: 'Modulation' },
-  { type: 'Tremolo', label: 'Tremolo', category: 'Modulation' },
-  { type: 'Vibrato', label: 'Vibrato', category: 'Modulation' },
-  { type: 'AutoFilter', label: 'Auto Filter', category: 'Modulation' },
-  { type: 'AutoPanner', label: 'Auto Panner', category: 'Modulation' },
-  { type: 'AutoWah', label: 'Auto Wah', category: 'Modulation' },
-
-  // Pitch/Filter
-  { type: 'DubFilter', label: 'Dub Filter', category: 'Filter' },
-  { type: 'MoogFilter', label: 'Moog Filter', category: 'Filter' },
-  { type: 'Filter', label: 'Filter', category: 'Filter' },
-  { type: 'PitchShift', label: 'Pitch Shift', category: 'Pitch' },
-  { type: 'FrequencyShifter', label: 'Freq Shifter', category: 'Pitch' },
-
-  // Stereo
-  { type: 'StereoWidener', label: 'Stereo Widener', category: 'Stereo' },
-];
+import { AVAILABLE_EFFECTS, type AvailableEffect } from '@constants/unifiedEffects';
+import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
+import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 
 interface SortableEffectItemProps {
   effect: EffectConfig;
@@ -193,7 +152,7 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
   const [presetName, setPresetName] = useState('');
   const {
     masterEffects,
-    addMasterEffect,
+    addMasterEffectConfig,
     removeMasterEffect,
     updateMasterEffect,
     reorderMasterEffects,
@@ -296,8 +255,31 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
     }
   };
 
-  const handleAddEffect = (effectType: EffectType) => {
-    addMasterEffect(effectType);
+  const handleAddEffect = (availableEffect: AvailableEffect) => {
+    const type = (availableEffect.type as EffectType) || 'Distortion';
+    const params: Record<string, number | string> = { ...getDefaultEffectParameters(type) };
+
+    if (availableEffect.category === 'neural' && availableEffect.neuralModelIndex !== undefined) {
+      const model = GUITARML_MODEL_REGISTRY[availableEffect.neuralModelIndex];
+      if (model?.parameters) {
+        Object.entries(model.parameters).forEach(([key, param]) => {
+          if (param) params[key] = param.default;
+        });
+      }
+    }
+
+    const DYNAMICS_EFFECTS = new Set(['Compressor', 'SidechainCompressor']);
+    const defaultWet = DYNAMICS_EFFECTS.has(type) ? 100 : 50;
+
+    addMasterEffectConfig({
+      category: availableEffect.category,
+      type,
+      enabled: true,
+      wet: defaultWet,
+      parameters: params,
+      neuralModelIndex: availableEffect.neuralModelIndex,
+      neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
+    });
     setShowAddMenu(false);
   };
 
@@ -322,14 +304,12 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
     }
   };
 
-  // Group effects by category for the add menu
+  // Group effects by group for the add menu
   const effectsByCategory = AVAILABLE_EFFECTS.reduce((acc, effect) => {
-    if (!acc[effect.category]) {
-      acc[effect.category] = [];
-    }
-    acc[effect.category].push(effect);
+    if (!acc[effect.group]) acc[effect.group] = [];
+    acc[effect.group].push(effect);
     return acc;
-  }, {} as Record<string, typeof AVAILABLE_EFFECTS>);
+  }, {} as Record<string, AvailableEffect[]>);
 
   return (
     <div className="bg-dark-bg border border-dark-border rounded-lg overflow-hidden">
@@ -471,15 +451,15 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
               <div key={category}>
                 <div className="text-xs text-text-muted mb-1.5 uppercase tracking-wide">{category}</div>
                 <div className="flex flex-wrap gap-1">
-                  {effects.map(({ type, label }) => (
+                  {effects.map((effect) => (
                     <button
-                      key={type}
-                      onClick={() => handleAddEffect(type)}
+                      key={effect.type ?? `neural-${effect.neuralModelIndex}`}
+                      onClick={() => handleAddEffect(effect)}
                       className="px-2 py-1 text-xs rounded border border-dark-border bg-dark-bg
                                hover:bg-accent-primary hover:text-white hover:border-accent-primary
                                transition-colors"
                     >
-                      {label}
+                      {effect.label}
                     </button>
                   ))}
                 </div>
