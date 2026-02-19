@@ -182,10 +182,15 @@ describe('MODParser', () => {
       });
       const result = await parseMOD(buffer);
 
-      expect(result.patterns[0][0][0].effect).toBe('A0F');
-      expect(result.patterns[0][1][0].effect).toBe('320');
-      expect(result.patterns[0][2][0].effect).toBe('C40');
-      expect(result.patterns[0][3][0].effect).toBe('ED2');
+      // MODNote.effect is a number (the effect nibble), effectParam is the parameter byte
+      expect(result.patterns[0][0][0].effect).toBe(0xA);
+      expect(result.patterns[0][0][0].effectParam).toBe(0x0F);
+      expect(result.patterns[0][1][0].effect).toBe(0x3);
+      expect(result.patterns[0][1][0].effectParam).toBe(0x20);
+      expect(result.patterns[0][2][0].effect).toBe(0xC);
+      expect(result.patterns[0][2][0].effectParam).toBe(0x40);
+      expect(result.patterns[0][3][0].effect).toBe(0xE);
+      expect(result.patterns[0][3][0].effectParam).toBe(0xD2);
     });
 
     it('should handle multiple patterns', async () => {
@@ -200,8 +205,8 @@ describe('MODParser', () => {
       const result = await parseMOD(buffer);
 
       expect(result.header.songLength).toBe(4);
-      // Pattern order should be preserved in metadata
-      expect(result.metadata.modData?.patternOrderTable).toEqual([0, 2, 1, 0]);
+      // Pattern order table has 128 entries; compare only the first songLength
+      expect(result.metadata.modData?.patternOrderTable.slice(0, 4)).toEqual([0, 2, 1, 0]);
     });
   });
 
@@ -318,6 +323,13 @@ describe('MODParser', () => {
 });
 
 // Helper functions to create test MOD data
+
+/** Write a big-endian uint16 into a Uint8Array */
+function writeUint16BE(view: Uint8Array, offset: number, value: number): void {
+  view[offset] = (value >> 8) & 0xFF;
+  view[offset + 1] = value & 0xFF;
+}
+
 function createMinimalMOD(options: {
   title?: string;
   formatTag?: string;
@@ -325,36 +337,25 @@ function createMinimalMOD(options: {
 } = {}): ArrayBuffer {
   const { title = 'Test Module', formatTag = 'M.K.', patternCount = 1 } = options;
 
-  // MOD file structure:
-  // - 20 bytes: title
-  // - 31 * 30 bytes: sample headers (930 bytes)
-  // - 1 byte: song length
-  // - 1 byte: restart position
-  // - 128 bytes: pattern order table
-  // - 4 bytes: format tag
-  // - Pattern data
-  // - Sample data
+  // Channel count from format tag
+  const FORMAT_MAP: Record<string, number> = { 'M.K.': 4, 'FLT4': 4, 'FLT8': 8, '6CHN': 6, '8CHN': 8 };
+  const channelCount = FORMAT_MAP[formatTag] ?? 4;
 
-  const headerSize = 20 + 31 * 30 + 1 + 1 + 128 + 4;
-  const patternSize = patternCount * 1024; // 64 rows * 4 channels * 4 bytes
-  const totalSize = headerSize + patternSize;
-
-  const buffer = new ArrayBuffer(totalSize);
+  const headerSize = 20 + 31 * 30 + 1 + 1 + 128 + 4; // = 1084
+  const patternSize = patternCount * 64 * channelCount * 4;
+  const buffer = new ArrayBuffer(headerSize + patternSize);
   const view = new Uint8Array(buffer);
-  // DataView available for word-aligned writes if needed
 
   // Title (20 bytes)
   for (let i = 0; i < 20 && i < title.length; i++) {
     view[i] = title.charCodeAt(i);
   }
 
-  // 31 sample headers (skip for minimal test)
   let offset = 20 + 31 * 30;
 
-  // Song length (1 byte)
+  // Song length
   view[offset++] = patternCount;
-
-  // Restart position (1 byte)
+  // Restart position
   view[offset++] = 0;
 
   // Pattern order table (128 bytes)
@@ -371,29 +372,180 @@ function createMinimalMOD(options: {
 }
 
 function createInvalidMOD(): ArrayBuffer {
-  const buffer = new ArrayBuffer(1084);
+  // 1084 header + 1024 bytes of pattern data so parser doesn't throw OOB
+  const buffer = new ArrayBuffer(1084 + 1024);
   const view = new Uint8Array(buffer);
-  // Write invalid format tag
+  // Write invalid (unknown) format tag — results in 4-channel default
   view[1080] = 'X'.charCodeAt(0);
   view[1081] = 'X'.charCodeAt(0);
   view[1082] = 'X'.charCodeAt(0);
   view[1083] = 'X'.charCodeAt(0);
+  // Song length = 1, order table entry 0 = pattern 0
+  view[20 + 31 * 30] = 1; // songLength
   return buffer;
 }
 
-function createMODWithSamples(samples: unknown[]): ArrayBuffer {
-  void samples;
-  // Simplified - would need full MOD structure
-  return createMinimalMOD();
+interface SampleOptions {
+  name?: string;
+  length?: number; // in bytes (will be halved to words for header)
+  finetune?: number;
+  volume?: number;
+  loopStart?: number; // in samples (halved to words for header)
+  loopLength?: number; // in samples (halved to words for header)
+  pcmData?: Int8Array;
 }
 
-function createMODWithPattern(options: { rows: unknown[] }): ArrayBuffer {
-  void options;
-  // Simplified - would need full MOD structure
-  return createMinimalMOD();
+function createMODWithSamples(samples: SampleOptions[]): ArrayBuffer {
+  const formatTag = 'M.K.';
+  const channelCount = 4;
+  const patternCount = 1;
+  const headerSize = 1084;
+  const patternSize = patternCount * 64 * channelCount * 4;
+
+  // Compute total sample data size (default 2 bytes per sample when not specified)
+  const sampleBytes = samples.map(s => (s.length ?? 2));
+  const totalSampleSize = sampleBytes.reduce((a, b) => a + b, 0);
+
+  const buffer = new ArrayBuffer(headerSize + patternSize + totalSampleSize);
+  const view = new Uint8Array(buffer);
+
+  // Title
+  const title = 'Test Module';
+  for (let i = 0; i < title.length; i++) view[i] = title.charCodeAt(i);
+
+  let offset = 20;
+
+  // 31 sample headers (30 bytes each)
+  for (let i = 0; i < 31; i++) {
+    if (i < samples.length) {
+      const s = samples[i];
+      const name = s.name ?? '';
+      for (let j = 0; j < 22 && j < name.length; j++) view[offset + j] = name.charCodeAt(j);
+      // length in words (big-endian)
+      // Default to 2 bytes (1 word) so the parser doesn't skip the sample
+      const lengthWords = Math.floor((s.length ?? 2) / 2);
+      writeUint16BE(view, offset + 22, lengthWords);
+      // finetune: -8 to 7, stored as 0-15
+      const ft = s.finetune ?? 0;
+      view[offset + 24] = ft < 0 ? ft + 16 : ft;
+      // volume
+      view[offset + 25] = s.volume ?? 64;
+      // loopStart in words
+      writeUint16BE(view, offset + 26, Math.floor((s.loopStart ?? 0) / 2));
+      // loopLength in words (1 = no loop per convention; default 1)
+      const ll = s.loopLength ?? 1;
+      writeUint16BE(view, offset + 28, Math.floor(ll / 2) || 1);
+    }
+    offset += 30;
+  }
+
+  // Song length (1) + restart (0)
+  view[offset++] = patternCount;
+  view[offset++] = 0;
+
+  // Pattern order table
+  for (let i = 0; i < 128; i++) view[offset++] = i < patternCount ? i : 0;
+
+  // Format tag
+  for (let i = 0; i < 4; i++) view[offset + i] = formatTag.charCodeAt(i);
+
+  // Pattern data (zeros = empty cells) at offset 1084
+  // Sample data follows
+  let sampleOffset = headerSize + patternSize;
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i];
+    const len = s.length ?? 0;
+    if (s.pcmData) {
+      for (let j = 0; j < len; j++) view[sampleOffset + j] = s.pcmData[j] & 0xFF;
+    }
+    sampleOffset += len;
+  }
+
+  return buffer;
+}
+
+/** Note name to Amiga period */
+const NOTE_TO_PERIOD: Record<string, number> = {
+  'C-2': 428, 'C#2': 404, 'D-2': 381, 'D#2': 360,
+  'E-2': 339, 'F-2': 320, 'F#2': 302, 'G-2': 285,
+  'G#2': 269, 'A-2': 254, 'A#2': 240, 'B-2': 226,
+  'C-3': 214, 'C#3': 202, 'D-3': 190,
+};
+
+interface RowOptions {
+  note?: string;
+  period?: number;
+  instrument?: number;
+  effect?: string; // e.g. 'A0F'
+}
+
+function createMODWithPattern(options: { rows: RowOptions[] }): ArrayBuffer {
+  const formatTag = 'M.K.';
+  const channelCount = 4;
+  const patternCount = 1;
+  const headerSize = 1084;
+  const patternSize = 64 * channelCount * 4;
+
+  const buffer = new ArrayBuffer(headerSize + patternSize);
+  const view = new Uint8Array(buffer);
+
+  // Title
+  const title = 'Test Module';
+  for (let i = 0; i < title.length; i++) view[i] = title.charCodeAt(i);
+
+  let offset = 20 + 31 * 30;
+  view[offset++] = patternCount;
+  view[offset++] = 0;
+  for (let i = 0; i < 128; i++) view[offset++] = i < patternCount ? i : 0;
+  for (let i = 0; i < 4; i++) view[offset + i] = formatTag.charCodeAt(i);
+
+  // Write pattern cells
+  const patBase = headerSize;
+  for (let row = 0; row < Math.min(options.rows.length, 64); row++) {
+    const r = options.rows[row];
+    const period = r.period ?? (r.note ? (NOTE_TO_PERIOD[r.note] ?? 0) : 0);
+    const inst = r.instrument ?? 0;
+    // Parse effect string like 'A0F' → effect=0xA, param=0x0F
+    let eff = 0, param = 0;
+    if (r.effect && r.effect.length >= 3) {
+      eff = parseInt(r.effect[0], 16);
+      param = parseInt(r.effect.slice(1), 16);
+    }
+
+    // Channel 0 of row
+    const cellOffset = patBase + (row * channelCount + 0) * 4;
+    view[cellOffset]     = ((inst & 0xF0)) | ((period >> 8) & 0x0F);
+    view[cellOffset + 1] = period & 0xFF;
+    view[cellOffset + 2] = ((inst & 0x0F) << 4) | (eff & 0x0F);
+    view[cellOffset + 3] = param & 0xFF;
+  }
+
+  return buffer;
 }
 
 function createMODWithPatternOrder(order: number[]): ArrayBuffer {
-  // Simplified - would need full MOD structure
-  return createMinimalMOD({ patternCount: Math.max(...order) + 1 });
+  const formatTag = 'M.K.';
+  const channelCount = 4;
+  const patternCount = Math.max(...order) + 1;
+  const headerSize = 1084;
+  const patternSize = patternCount * 64 * channelCount * 4;
+
+  const buffer = new ArrayBuffer(headerSize + patternSize);
+  const view = new Uint8Array(buffer);
+
+  const title = 'Test Module';
+  for (let i = 0; i < title.length; i++) view[i] = title.charCodeAt(i);
+
+  let offset = 20 + 31 * 30;
+  view[offset++] = order.length; // songLength = number of entries in order
+  view[offset++] = 0;
+
+  // Pattern order table (128 bytes)
+  for (let i = 0; i < 128; i++) {
+    view[offset++] = i < order.length ? order[i] : 0;
+  }
+
+  for (let i = 0; i < 4; i++) view[offset + i] = formatTag.charCodeAt(i);
+
+  return buffer;
 }

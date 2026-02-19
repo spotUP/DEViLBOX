@@ -854,10 +854,11 @@ export class TrackerReplayer {
       // Store the original XM note for synth instruments (avoids period table issues)
       ch.xmNote = noteValue;
       
-      // Derive period from the note number (user's intent), falling back to rawPeriod
-      // for pure MOD rows that have a period but no XM note.
-      // Priority: noteValue → rawPeriod (fixes stale rawPeriod when user edits a MOD note)
-      const usePeriod = this.noteToPeriod(noteValue, ch.finetune) || rawPeriod || 0;
+      // Derive period for playback.
+      // Priority: rawPeriod (accurate Amiga period from MOD import) → noteToPeriod (XM/user notes).
+      // MOD import stores both note (2-octave-shifted XM number) and period (original Amiga period).
+      // Using noteToPeriod first would double-shift the pitch — period 428 → XM 49 → period 107.
+      const usePeriod = rawPeriod || this.noteToPeriod(noteValue, ch.finetune) || 0;
 
       // Check for tone portamento (3xx or 5xx) - don't trigger, just set target
       if (effect === 3 || effect === 5) {

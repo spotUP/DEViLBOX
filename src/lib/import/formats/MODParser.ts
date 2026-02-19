@@ -427,6 +427,8 @@ export function periodToNote(period: number): string | null {
 
   // Amiga period table (linearized for accuracy)
   const PERIOD_TABLE: { [key: number]: string } = {
+    1712: 'C-0', 1616: 'C#0', 1525: 'D-0', 1440: 'D#0', 1357: 'E-0', 1281: 'F-0',
+    1209: 'F#0', 1141: 'G-0', 1077: 'G#0', 1017: 'A-0', 960: 'A#0', 907: 'B-0',
     856: 'C-1', 808: 'C#1', 762: 'D-1', 720: 'D#1', 678: 'E-1', 640: 'F-1',
     604: 'F#1', 570: 'G-1', 538: 'G#1', 508: 'A-1', 480: 'A#1', 453: 'B-1',
     428: 'C-2', 404: 'C#2', 381: 'D-2', 360: 'D#2', 339: 'E-2', 320: 'F-2',
@@ -447,6 +449,9 @@ export function periodToNote(period: number): string | null {
       closest = note;
     }
   }
+
+  // Reject wildly invalid periods (threshold: 100 semitones off nearest)
+  if (minDiff > 100) return null;
 
   return closest;
 }

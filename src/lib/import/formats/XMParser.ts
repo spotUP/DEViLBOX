@@ -115,7 +115,9 @@ export async function parseXM(buffer: ArrayBuffer): Promise<{
 
   // Read header
   const header = readXMHeader(view, offset);
-  offset += header.headerSize;
+  // headerSize is measured from byte 60 (after the 60-byte fixed header prefix),
+  // so patterns start at 60 + headerSize, not 0 + headerSize.
+  offset = 60 + header.headerSize;
 
   // Read patterns
   const patterns: XMNote[][][] = [];

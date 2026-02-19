@@ -22,7 +22,7 @@ describe('playRow command', () => {
     vi.clearAllMocks();
   });
 
-  it('plays all notes in current row across all channels', () => {
+  it('plays all notes in current row across all channels', async () => {
     const mockPattern = {
       channels: [
         { rows: [{ note: 49, instrument: 1 }] }, // C-4
@@ -32,7 +32,8 @@ describe('playRow command', () => {
 
     const mockCursor = { rowIndex: 0, channelIndex: 0, columnType: 'note' };
     const mockEngine = {
-      triggerNoteAttack: vi.fn()
+      triggerNoteAttack: vi.fn(),
+      ensureInstrumentReady: vi.fn().mockResolvedValue(undefined),
     };
     const mockInstrument = { id: 1, name: 'Test' };
 
@@ -48,13 +49,13 @@ describe('playRow command', () => {
       instruments: [mockInstrument]
     } as any);
 
-    playRow();
+    await playRow();
 
     // Should trigger 2 notes (one per channel)
     expect(mockEngine.triggerNoteAttack).toHaveBeenCalledTimes(2);
   });
 
-  it('skips empty cells when playing row', () => {
+  it('skips empty cells when playing row', async () => {
     const mockPattern = {
       channels: [
         { rows: [{ note: 49, instrument: 1 }] },
@@ -63,7 +64,10 @@ describe('playRow command', () => {
     };
 
     const mockCursor = { rowIndex: 0, channelIndex: 0, columnType: 'note' };
-    const mockEngine = { triggerNoteAttack: vi.fn() };
+    const mockEngine = {
+      triggerNoteAttack: vi.fn(),
+      ensureInstrumentReady: vi.fn().mockResolvedValue(undefined),
+    };
     const mockInstrument = { id: 1, name: 'Test' };
 
     vi.mocked(useTrackerStore.getState).mockReturnValue({
@@ -78,13 +82,13 @@ describe('playRow command', () => {
       instruments: [mockInstrument]
     } as any);
 
-    playRow();
+    await playRow();
 
     // Should only trigger 1 note
     expect(mockEngine.triggerNoteAttack).toHaveBeenCalledTimes(1);
   });
 
-  it('returns true when successful', () => {
+  it('returns true when successful', async () => {
     const mockPattern = {
       channels: [
         { rows: [{ note: 0, instrument: 0 }] }
@@ -92,7 +96,10 @@ describe('playRow command', () => {
     };
 
     const mockCursor = { rowIndex: 0, channelIndex: 0, columnType: 'note' };
-    const mockEngine = { triggerNoteAttack: vi.fn() };
+    const mockEngine = {
+      triggerNoteAttack: vi.fn(),
+      ensureInstrumentReady: vi.fn().mockResolvedValue(undefined),
+    };
 
     vi.mocked(useTrackerStore.getState).mockReturnValue({
       cursor: mockCursor,
@@ -106,7 +113,7 @@ describe('playRow command', () => {
       instruments: []
     } as any);
 
-    const result = playRow();
+    const result = await playRow();
     expect(result).toBe(true);
   });
 });

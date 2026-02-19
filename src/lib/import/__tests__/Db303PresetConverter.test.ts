@@ -86,21 +86,21 @@ describe('Db303PresetConverter', () => {
     const config = parseDb303Preset(samplePreset);
 
     // Oscillator
-    expect(config.oscillator?.pulseWidth).toBe(0); // 0 * 100
-    expect(config.oscillator?.subOscBlend).toBe(100); // 1 * 100
+    expect(config.oscillator?.pulseWidth).toBe(0);
+    expect(config.oscillator?.subOscBlend).toBe(1); // 0-1 normalized
 
-    // Filter - 0.5 normalized values
-    expect(config.filter?.resonance).toBe(50); // 0.5 * 100
-    expect(config.filterEnvelope?.envMod).toBe(50); // 0.5 * 100
-    expect(config.accent?.amount).toBe(50); // 0.5 * 100
+    // Filter - 0.5 normalized values (not multiplied to 0-100)
+    expect(config.filter?.resonance).toBe(0.5);
+    expect(config.filterEnvelope?.envMod).toBe(0.5);
+    expect(config.accent?.amount).toBe(0.5);
 
     // LFO - all 0
     expect(config.lfo?.rate).toBe(0);
     expect(config.lfo?.pitchDepth).toBe(0);
 
-    // Chorus - 0.5 mix = 50%
-    expect(config.chorus?.mix).toBe(50);
-    expect(config.chorus?.enabled).toBe(true); // mix > 1%
+    // Chorus - mode=0 means Off, so enabled=false and mix=0
+    expect(config.chorus?.mix).toBe(0);
+    expect(config.chorus?.enabled).toBe(false); // mode=0 means Off
   });
 
   test('convertToDb303Preset should generate valid XML', () => {
@@ -126,7 +126,7 @@ describe('Db303PresetConverter', () => {
 
     // Check key values are preserved (within rounding tolerance)
     expect(reparsed.oscillator?.type).toBe(parsed.oscillator?.type);
-    expect(reparsed.filter?.resonance).toBeCloseTo(parsed.filter?.resonance ?? 50, 1);
+    expect(reparsed.filter?.resonance).toBeCloseTo(parsed.filter?.resonance ?? 0.5, 3);
     expect(reparsed.lfo?.waveform).toBe(parsed.lfo?.waveform);
   });
 

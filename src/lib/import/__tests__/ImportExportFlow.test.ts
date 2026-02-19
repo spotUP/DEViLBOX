@@ -374,85 +374,51 @@ function createTestXM(options: { channelCount?: number } = {}): ArrayBuffer {
   // Create minimal valid XM for testing
   const { channelCount = 4 } = options;
 
-  // XM header is 60 bytes minimum + header size field + pattern order + patterns + instruments
-  const headerSize = 60 + 256; // Fixed header + pattern order table
-  const patternDataSize = 9 + channelCount * 64 * 5; // Pattern header + pattern data
-  const instrumentSize = 263; // Minimal instrument with no samples
+  // XM format layout:
+  //   bytes 0-59:  fixed 60-byte prefix (signature, names, version)
+  //   bytes 60-63: headerSize field = 276 (size of header data from byte 60)
+  //   bytes 64-335: header fields + pattern order table (276 bytes total from byte 60)
+  //   byte 336+:   pattern data (= 60 + 276)
+  const patternStart = 336; // 60 + 276
+  const packedSize = channelCount * 64; // 1 empty-flag byte per cell
+  const patternDataSize = 9 + packedSize;
+  const instrumentSize = 263;
 
-  const buffer = new ArrayBuffer(headerSize + patternDataSize + instrumentSize);
+  const buffer = new ArrayBuffer(patternStart + patternDataSize + instrumentSize);
   const view = new DataView(buffer);
   const encoder = new TextEncoder();
 
-  // Write "Extended Module: " at offset 0
-  const idText = encoder.encode('Extended Module: ');
-  new Uint8Array(buffer, 0, 17).set(idText);
-
-  // Module name (20 bytes at offset 17)
-  const name = encoder.encode('Test Module');
-  new Uint8Array(buffer, 17, 20).set(name.slice(0, 20));
-
-  // $1a at offset 37
+  new Uint8Array(buffer, 0, 17).set(encoder.encode('Extended Module: '));
+  new Uint8Array(buffer, 17, 20).set(encoder.encode('Test Module').slice(0, 20));
   view.setUint8(37, 0x1a);
-
-  // Tracker name (20 bytes at offset 38)
-  const tracker = encoder.encode('DEViLBOX');
-  new Uint8Array(buffer, 38, 20).set(tracker.slice(0, 20));
-
-  // Version (2 bytes at offset 58) - 0x0104 for FT2
+  new Uint8Array(buffer, 38, 20).set(encoder.encode('DEViLBOX').slice(0, 20));
   view.setUint16(58, 0x0104, true);
-
-  // Header size (4 bytes at offset 60) - size from this point
-  view.setUint32(60, 256 + 16, true); // Header extension size
-
-  // Song length (2 bytes at offset 64)
-  view.setUint16(64, 1, true);
-
-  // Restart position (2 bytes at offset 66)
-  view.setUint16(66, 0, true);
-
-  // Channel count (2 bytes at offset 68)
+  view.setUint32(60, 276, true); // headerSize = 276 (measured from byte 60)
+  view.setUint16(64, 1, true);   // song length
+  view.setUint16(66, 0, true);   // restart
   view.setUint16(68, channelCount, true);
+  view.setUint16(70, 1, true);   // pattern count
+  view.setUint16(72, 1, true);   // instrument count
+  view.setUint16(74, 1, true);   // flags (linear)
+  view.setUint16(76, 6, true);   // tempo
+  view.setUint16(78, 125, true); // BPM
+  view.setUint8(80, 0);          // pattern order[0] = 0
 
-  // Pattern count (2 bytes at offset 70)
-  view.setUint16(70, 1, true);
-
-  // Instrument count (2 bytes at offset 72)
-  view.setUint16(72, 1, true);
-
-  // Flags (2 bytes at offset 74) - linear frequency table
-  view.setUint16(74, 1, true);
-
-  // Default tempo (2 bytes at offset 76)
-  view.setUint16(76, 6, true);
-
-  // Default BPM (2 bytes at offset 78)
-  view.setUint16(78, 125, true);
-
-  // Pattern order table starts at offset 80
-  view.setUint8(80, 0); // Pattern 0
-
-  // Pattern header at offset headerSize
-  let offset = headerSize;
-  view.setUint32(offset, 9, true); // Pattern header length
-  view.setUint8(offset + 4, 0); // Packing type
-  view.setUint16(offset + 5, 64, true); // Number of rows
-  const packedSize = channelCount * 64; // 1 byte per cell (empty flag)
-  view.setUint16(offset + 7, packedSize, true); // Packed pattern data size
-
-  // Empty pattern data - all cells are 0x80 (empty note flag)
+  // Pattern at offset 336
+  let offset = patternStart;
+  view.setUint32(offset, 9, true);
+  view.setUint8(offset + 4, 0);
+  view.setUint16(offset + 5, 64, true);
+  view.setUint16(offset + 7, packedSize, true);
   offset += 9;
-  for (let i = 0; i < channelCount * 64; i++) {
-    view.setUint8(offset + i, 0x80);
-  }
+  for (let i = 0; i < packedSize; i++) view.setUint8(offset + i, 0x80);
+  offset += packedSize;
 
-  // Instrument header
-  offset = headerSize + 9 + packedSize;
-  view.setUint32(offset, 263, true); // Instrument header size
-  // Instrument name (22 bytes)
-  const instName = encoder.encode('Test Instrument');
-  new Uint8Array(buffer, offset + 4, 22).set(instName.slice(0, 22));
-  view.setUint8(offset + 26, 0); // Instrument type
-  view.setUint16(offset + 27, 0, true); // Number of samples = 0
+  // Instrument
+  view.setUint32(offset, instrumentSize, true);
+  new Uint8Array(buffer, offset + 4, 22).set(encoder.encode('Test Instrument').slice(0, 22));
+  view.setUint8(offset + 26, 0);
+  view.setUint16(offset + 27, 0, true); // 0 samples
 
   return buffer;
 }
@@ -547,7 +513,7 @@ function createXMWithEffects(
   view.setUint8(37, 0x1a);
   new Uint8Array(buffer, 38, 20).set(encoder.encode('DEViLBOX').slice(0, 20));
   view.setUint16(58, 0x0104, true);
-  view.setUint32(60, patternStart, true); // headerSize — parser jumps here
+  view.setUint32(60, 276, true); // headerSize = 276 (measured from byte 60; patterns start at 60+276=336)
   view.setUint16(64, 1, true); // Song length
   view.setUint16(66, 0, true); // Restart
   view.setUint16(68, channelCount, true);

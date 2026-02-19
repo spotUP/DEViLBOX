@@ -204,7 +204,8 @@ describe('XMParser', () => {
       });
       const result = await parseXM(buffer);
 
-      const preserved = result.metadata.originalSamples?.[0];
+      // XM samples get id = instrument index + 1 (1-indexed), so first instrument → key 1
+      const preserved = result.metadata.originalSamples?.[1];
       expect(preserved).toBeDefined();
       expect(preserved?.name).toBe('Sample 1');
       expect(preserved?.length).toBe(500);
@@ -370,16 +371,246 @@ function createMinimalXM(options: {
   return buffer;
 }
 
-function createXMWithPattern(options: { rows: unknown[] }): ArrayBuffer {
-  void options;
-  // Simplified - would need full XM structure
-  return createMinimalXM();
+interface XMRowOptions {
+  note?: number;
+  instrument?: number;
+  volume?: number;
+  effect?: string; // e.g. 'A0F'
 }
 
-function createXMWithInstrument(options: unknown): ArrayBuffer {
-  void options;
-  // Simplified - would need full XM structure with instrument data
-  return createMinimalXM();
+function createXMWithPattern(options: { rows: XMRowOptions[] }): ArrayBuffer {
+  const channelCount = 4;
+  const rowCount = 64;
+
+  // Build uncompressed pattern data: 5 bytes per cell per row
+  // Row 0 = provided rows[0] (channel 0), all other cells are empty 5-byte sequences
+  const cellsPerRow = channelCount;
+  const patternData = new Uint8Array(rowCount * cellsPerRow * 5);
+
+  for (let row = 0; row < Math.min(options.rows.length, rowCount); row++) {
+    const r = options.rows[row];
+    let eff = 0, param = 0;
+    if (r.effect && r.effect.length >= 3) {
+      eff = parseInt(r.effect[0], 16);
+      param = parseInt(r.effect.slice(1), 16);
+    }
+    const base = (row * cellsPerRow + 0) * 5;
+    patternData[base]     = r.note ?? 0;
+    patternData[base + 1] = r.instrument ?? 0;
+    patternData[base + 2] = r.volume ?? 0;
+    patternData[base + 3] = eff;
+    patternData[base + 4] = param;
+  }
+
+  const headerSize = 336; // 60 + 276
+  const patHeaderSize = 9;
+  const instrumentSize = 29;
+
+  const buffer = new ArrayBuffer(headerSize + patHeaderSize + patternData.length + instrumentSize);
+  const view = new Uint8Array(buffer);
+  const dv = new DataView(buffer);
+
+  // Copy minimal XM header
+  const minXM = createMinimalXM({ patternCount: 0, instrumentCount: 1 });
+  const minView = new Uint8Array(minXM);
+  // Copy just the 336-byte header portion
+  for (let i = 0; i < 336; i++) view[i] = minView[i];
+
+  // Pattern count = 1
+  dv.setUint16(70, 1, true);
+
+  // Write pattern header at offset 336
+  let off = 336;
+  dv.setUint32(off, patHeaderSize, true);     // headerLength
+  view[off + 4] = 0;                          // packingType
+  dv.setUint16(off + 5, rowCount, true);      // rowCount
+  dv.setUint16(off + 7, patternData.length, true); // packedDataSize
+  off += patHeaderSize;
+
+  // Write pattern data
+  for (let i = 0; i < patternData.length; i++) view[off + i] = patternData[i];
+  off += patternData.length;
+
+  // Minimal instrument (0 samples)
+  dv.setUint32(off, instrumentSize, true);
+  const instName = 'Instrument 1';
+  for (let i = 0; i < instName.length; i++) view[off + 4 + i] = instName.charCodeAt(i);
+
+  return buffer;
+}
+
+interface XMSampleOptions {
+  length?: number;
+  loopStart?: number;
+  loopLength?: number;
+  volume?: number;
+  finetune?: number;
+  loopType?: 'none' | 'forward' | 'pingpong';
+  panning?: number;
+  relativeNote?: number;
+  bitDepth?: 8 | 16;
+  name?: string;
+}
+
+interface XMInstrumentOptions {
+  name?: string;
+  sampleCount?: number;
+  samples?: XMSampleOptions[];
+  volumeEnvelope?: {
+    enabled: boolean;
+    points: Array<{ tick: number; value: number }>;
+    sustainPoint: number | null;
+    loopStartPoint: number | null;
+    loopEndPoint: number | null;
+  };
+  autoVibrato?: {
+    type: 'sine' | 'square' | 'rampDown' | 'rampUp';
+    sweep: number;
+    depth: number;
+    rate: number;
+  };
+}
+
+function createXMWithInstrument(options: XMInstrumentOptions): ArrayBuffer {
+  const instName = options.name ?? 'Test Instrument';
+  const explicitSamples = options.samples ?? [];
+  const volEnv = options.volumeEnvelope;
+  const vib = options.autoVibrato;
+
+  // XM parser only reads envelope/vibrato when sampleCount > 0, so force at least
+  // 1 sample when caller requests envelope or vibrato data without explicit samples.
+  const needSampleBlock = volEnv !== undefined || vib !== undefined || explicitSamples.length > 0;
+  const sampleCount = options.sampleCount ?? (needSampleBlock ? Math.max(1, explicitSamples.length) : 0);
+  const samples: XMSampleOptions[] = explicitSamples.length > 0 ? explicitSamples
+    : sampleCount > 0 ? [{ length: 0 }]
+    : [];
+
+  // XM instrument header layout (when sampleCount > 0):
+  // offset 0:  headerSize uint32 = 263 (points to start of sample headers)
+  // offset 4:  name 22 bytes
+  // offset 26: type uint8
+  // offset 27: sampleCount uint16
+  // offset 29: sampleHeaderSize uint32 = 40
+  // offset 33: sampleMap 96 bytes
+  // offset 129: vol env points 48 bytes (12 × {uint16 tick, uint16 value})
+  // offset 177: pan env points 48 bytes
+  // offset 225: numVolPoints uint8  ← readEnvelope reads offset+48 for this
+  // offset 226: volSustainPoint uint8
+  // offset 227: vibratoType uint8
+  // offset 228: vibratoSweep uint8
+  // offset 229: vibratoDepth uint8
+  // offset 230: vibratoRate uint8
+  // offset 231: fadeout uint16
+  // offset 233: reserved 22 bytes
+  // offset 255: numPanPoints uint8 — NOT USED (parser reads from offset 177+48=225)
+  // offset 256: panSustainPoint uint8
+  // Total instrument header = 263 bytes, then 40-byte sample headers follow
+
+  const instHeaderSize = sampleCount > 0 ? 263 : 29;
+  const sampleHeaderSize = 40;
+
+  // Compute per-sample data sizes
+  const sampleDataSizes = samples.map(s => s.length ?? 0);
+  const totalSampleData = sampleDataSizes.reduce((a, b) => a + b, 0);
+
+  const instTotalSize = instHeaderSize + sampleCount * sampleHeaderSize + totalSampleData;
+  const xmHeaderSize = 336;
+  // 1 minimal pattern
+  const patDataSize = 4 * 64; // 4 channels × 64 rows × 1-byte compressed empty
+  const patTotalSize = 9 + patDataSize;
+
+  const totalSize = xmHeaderSize + patTotalSize + instTotalSize;
+  const buffer = new ArrayBuffer(totalSize);
+  const view = new Uint8Array(buffer);
+  const dv = new DataView(buffer);
+
+  // Copy minimal XM header base (we'll overwrite some fields)
+  const minXM = createMinimalXM({ patternCount: 1, instrumentCount: 0 });
+  const minView = new Uint8Array(minXM);
+  for (let i = 0; i < 336; i++) view[i] = minView[i];
+
+  // Set instrumentCount = 1
+  dv.setUint16(72, 1, true);
+
+  // Pattern (copy from minimal XM starting at 336)
+  const minPatStart = 336;
+  for (let i = 0; i < patTotalSize; i++) view[xmHeaderSize + i] = minView[minPatStart + i];
+
+  // Instrument header starts at xmHeaderSize + patTotalSize
+  let off = xmHeaderSize + patTotalSize;
+  const instBase = off;
+
+  dv.setUint32(off, instHeaderSize, true); // headerSize
+  off += 4;
+  for (let i = 0; i < 22 && i < instName.length; i++) view[off + i] = instName.charCodeAt(i);
+  off += 22;
+  view[off++] = 0; // type
+  dv.setUint16(off, sampleCount, true); off += 2;
+
+  if (sampleCount > 0) {
+    dv.setUint32(off, sampleHeaderSize, true); off += 4; // sampleHeaderSize
+    // sampleMap: 96 bytes (all zeros → all notes use sample 0)
+    off += 96;
+
+    // Volume envelope points at instBase+129
+    if (volEnv) {
+      const envBase = instBase + 129;
+      for (let i = 0; i < Math.min(volEnv.points.length, 12); i++) {
+        dv.setUint16(envBase + i * 4, volEnv.points[i].tick, true);
+        dv.setUint16(envBase + i * 4 + 2, volEnv.points[i].value, true);
+      }
+      // numVolPoints is read from instBase+129+48 = instBase+177
+      view[instBase + 177] = volEnv.points.length;
+      view[instBase + 178] = volEnv.sustainPoint ?? 0;
+    }
+
+    // Pan envelope: instBase+177 (48 bytes). numPanPoints read from instBase+177+48=instBase+225
+    // volumeType read from instBase+225 — bit0=1 enables vol envelope
+    if (volEnv?.enabled) {
+      view[instBase + 225] = 1; // volumeType bit0
+    }
+
+    // Vibrato settings at instBase+227..230
+    if (vib) {
+      const vibTypes = ['sine', 'square', 'rampDown', 'rampUp'];
+      view[instBase + 227] = vibTypes.indexOf(vib.type);
+      view[instBase + 228] = vib.sweep;
+      view[instBase + 229] = vib.depth;
+      view[instBase + 230] = vib.rate;
+    }
+
+    // Align to instHeaderSize
+    off = instBase + instHeaderSize;
+
+    // Sample headers
+    for (let i = 0; i < sampleCount; i++) {
+      const s = samples[i] ?? {};
+      const loopTypeBits = s.loopType === 'forward' ? 1 : s.loopType === 'pingpong' ? 2 : 0;
+      const is16Bit = s.bitDepth === 16;
+      const byteLen = s.length ?? 0;
+
+      dv.setUint32(off, byteLen, true);          // length in bytes
+      dv.setUint32(off + 4, s.loopStart ?? 0, true);
+      dv.setUint32(off + 8, s.loopLength ?? 0, true);
+      view[off + 12] = s.volume ?? 64;
+      view[off + 13] = s.finetune ?? 0;
+      view[off + 14] = loopTypeBits | (is16Bit ? 0x10 : 0);
+      view[off + 15] = s.panning ?? 128;
+      view[off + 16] = s.relativeNote ?? 0;
+      const sName = s.name ?? instName;
+      for (let j = 0; j < 22 && j < sName.length; j++) view[off + 18 + j] = sName.charCodeAt(j);
+      off += sampleHeaderSize;
+    }
+
+    // Sample data (delta-encoded zeros = silence)
+    for (let i = 0; i < sampleCount; i++) {
+      const len = samples[i]?.length ?? 0;
+      // All zeros → PCM is all-zero after delta decode
+      off += len;
+    }
+  }
+
+  return buffer;
 }
 
 function createXMWithCompressedPattern(): ArrayBuffer {
@@ -387,5 +618,8 @@ function createXMWithCompressedPattern(): ArrayBuffer {
 }
 
 function createXMWithDeltaEncodedSample(): ArrayBuffer {
-  return createMinimalXM();
+  return createXMWithInstrument({
+    name: 'Delta Sample',
+    samples: [{ length: 10, bitDepth: 8 }],
+  });
 }
