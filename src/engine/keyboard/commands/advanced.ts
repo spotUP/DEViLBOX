@@ -34,29 +34,11 @@ export function amplifySelection(): boolean {
  */
 export function applyCurrentInstrument(): boolean {
   const store = useTrackerStore.getState();
-  const { cursor, selection, patterns, currentPatternIndex } = store;
+  const { cursor, patterns, currentPatternIndex } = store;
   const pattern = patterns[currentPatternIndex];
   const currentInstrument = pattern.channels[cursor.channelIndex].rows[cursor.rowIndex].instrument;
   if (!currentInstrument) return true;
-
-  const range = selection ? {
-    minCh: Math.min(selection.startChannel, selection.endChannel),
-    maxCh: Math.max(selection.startChannel, selection.endChannel),
-    minRow: Math.min(selection.startRow, selection.endRow),
-    maxRow: Math.max(selection.startRow, selection.endRow),
-  } : {
-    minCh: cursor.channelIndex, maxCh: cursor.channelIndex,
-    minRow: cursor.rowIndex, maxRow: cursor.rowIndex,
-  };
-
-  for (let ch = range.minCh; ch <= range.maxCh; ch++) {
-    for (let row = range.minRow; row <= range.maxRow; row++) {
-      const cell = pattern.channels[ch]?.rows[row];
-      if (cell && cell.note && cell.note !== 0) {
-        store.setCell(ch, row, { instrument: currentInstrument });
-      }
-    }
-  }
+  store.applyInstrumentToSelection(currentInstrument);
   return true;
 }
 
