@@ -37,7 +37,8 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      const crusher = new Tone.BitCrusher(Number(p.bits) || 4);
+      const bitsValue = Number(p.bits) || 4;
+      const crusher = new Tone.BitCrusher(bitsValue);
       crusher.wet.value = c.wet / 100;
       // Wait for AudioWorklet
       const crusherWorklet = (crusher as unknown as { _bitCrusherWorklet: { _worklet?: AudioWorkletNode } })._bitCrusherWorklet;
@@ -46,6 +47,8 @@ const tonejs: EffectDescriptor[] = [
           if (crusherWorklet._worklet) break;
           await new Promise(r => setTimeout(r, 20));
         }
+        // Re-set bits after worklet is confirmed ready (param may not have been received during init)
+        crusher.bits.value = bitsValue;
       }
       return crusher;
     },
