@@ -36,7 +36,10 @@ export type ActionType =
   | 'STRUM'
   | 'LEGATO'
   | 'SCALE_VOLUME'
-  | 'FADE_VOLUME';
+  | 'FADE_VOLUME'
+  | 'AMPLIFY'
+  | 'SWAP_CHANNELS'
+  | 'JOIN_PATTERNS';
 
 export interface HistoryAction {
   id: string;
@@ -353,6 +356,9 @@ export const getActionTypeName = (type: ActionType): string => {
     LEGATO: 'Legato',
     SCALE_VOLUME: 'Scale Volume',
     FADE_VOLUME: 'Fade Volume',
+    AMPLIFY: 'Amplify Selection',
+    SWAP_CHANNELS: 'Swap Channels',
+    JOIN_PATTERNS: 'Join Patterns',
   };
   return names[type] || type;
 };
