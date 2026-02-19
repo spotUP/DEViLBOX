@@ -5,6 +5,8 @@
 import { Midi, Track } from '@tonejs/midi';
 import type { Pattern, TrackerCell } from '@typedefs/tracker';
 import { midiToXMNote } from '../xmConversions';
+import { gmProgramToInstrument } from './GMSoundBank';
+import type { InstrumentConfig } from '@typedefs/instrument';
 
 // Generate unique ID
 function generateId(prefix: string = 'id'): string {
@@ -27,6 +29,7 @@ const DEFAULT_OPTIONS: MIDIImportOptions = {
 
 export interface MIDIImportResult {
   patterns: Pattern[];
+  instruments: InstrumentConfig[];
   bpm: number;
   timeSignature: [number, number];
   metadata: {
@@ -74,30 +77,62 @@ export async function importMIDIFile(
   const patterns: Pattern[] = [];
 
   if (opts.mergeChannels) {
+    // Build trackToInstId map (trackIndex → 1-based instId for non-empty tracks)
+    const trackToInstId = new Map<number, number>();
+    const instruments: InstrumentConfig[] = [];
+    let instId = 1;
+    midi.tracks.forEach((track, ti) => {
+      if (track.notes.length === 0) return;
+      trackToInstId.set(ti, instId);
+      instruments.push(
+        gmProgramToInstrument(track.instrument.number, instId, track.instrument.percussion)
+      );
+      instId++;
+    });
     // Merge all MIDI tracks into a single pattern with multiple channels
-    const pattern = createPatternFromMIDI(midi, opts, ppq, rowsPerBeat);
+    const pattern = createPatternFromMIDI(midi, opts, ppq, rowsPerBeat, trackToInstId);
     patterns.push(pattern);
+
+    return {
+      patterns,
+      instruments,
+      bpm,
+      timeSignature,
+      metadata: {
+        name: midi.name || file.name.replace(/\.[^/.]+$/, ''),
+        tracks: midi.tracks.length,
+        totalTicks: midi.durationTicks,
+      },
+    };
   } else {
     // Create separate patterns for each MIDI track
+    const instruments: InstrumentConfig[] = [];
+    let nonEmptyIndex = 0;
     for (let trackIndex = 0; trackIndex < midi.tracks.length; trackIndex++) {
       const track = midi.tracks[trackIndex];
       if (track.notes.length === 0) continue; // Skip empty tracks
 
-      const pattern = createPatternFromTrack(track, trackIndex, opts, ppq, rowsPerBeat);
+      const thisInstId = nonEmptyIndex + 1;
+      instruments.push(
+        gmProgramToInstrument(track.instrument.number, thisInstId, track.instrument.percussion)
+      );
+      const pattern = createPatternFromTrack(track, trackIndex, thisInstId, opts, ppq, rowsPerBeat);
       patterns.push(pattern);
+      nonEmptyIndex++;
     }
-  }
 
-  return {
-    patterns,
-    bpm,
-    timeSignature,
-    metadata: {
-      name: midi.name || file.name.replace(/\.[^/.]+$/, ''),
-      tracks: midi.tracks.length,
-      totalTicks: midi.durationTicks,
-    },
-  };
+    return {
+      patterns,
+      instruments,
+      bpm,
+      timeSignature,
+      metadata: {
+        name: midi.name || file.name.replace(/\.[^/.]+$/, ''),
+        tracks: midi.tracks.length,
+        totalTicks: midi.durationTicks,
+      },
+    };
+  }
 }
 
 /**
@@ -107,7 +142,8 @@ function createPatternFromMIDI(
   midi: Midi,
   options: MIDIImportOptions,
   ppq: number,
-  rowsPerBeat: number
+  rowsPerBeat: number,
+  trackToInstId: Map<number, number>,
 ): Pattern {
   // Calculate pattern length from MIDI duration
   const durationInBeats = midi.duration * (midi.header.tempos[0]?.bpm || 120) / 60;
@@ -137,7 +173,9 @@ function createPatternFromMIDI(
   // Create channels
   const channels = Array.from(channelNotes.entries())
     .sort((a, b) => a[0] - b[0])
-    .map(([channelIndex, notes]) => {
+    .map(([trackIndex, notes]) => {
+      const instId = trackToInstId.get(trackIndex) ?? 1;
+
       const rows: TrackerCell[] = Array.from({ length: patternLength }, () => ({
         note: 0,
         instrument: 0,
@@ -157,6 +195,7 @@ function createPatternFromMIDI(
         if (!xmNote) return;
 
         rows[row].note = xmNote;
+        rows[row].instrument = instId;
 
         if (options.velocityToVolume) {
           const volumeValue = velocityToVolume(note.velocity * 127); // tonejs uses 0-1, convert to 0-127
@@ -172,8 +211,8 @@ function createPatternFromMIDI(
 
       return {
         id: generateId('channel'),
-        name: `Ch ${channelIndex + 1}`,
-        instrumentId: null,
+        name: `Ch ${trackIndex + 1}`,
+        instrumentId: instId,
         color: null,
         muted: false,
         solo: false,
@@ -198,9 +237,10 @@ function createPatternFromMIDI(
 function createPatternFromTrack(
   track: Track,
   trackIndex: number,
+  instId: number,
   options: MIDIImportOptions,
   ppq: number,
-  rowsPerBeat: number
+  rowsPerBeat: number,
 ): Pattern {
   // Calculate pattern length from track duration
   const lastNote = track.notes.length > 0 ? track.notes[track.notes.length - 1] : null;
@@ -234,6 +274,7 @@ function createPatternFromTrack(
     if (!xmNote) return;
 
     rows[row].note = xmNote;
+    rows[row].instrument = instId;
 
     if (options.velocityToVolume) {
       // tonejs/midi uses 0-1 range, convert to 0-127 then to tracker volume
@@ -256,7 +297,7 @@ function createPatternFromTrack(
       {
         id: generateId('channel'),
         name: 'Channel 1',
-        instrumentId: null,
+        instrumentId: instId,
         color: null,
         muted: false,
         solo: false,
