@@ -90,7 +90,7 @@ function pianoPreset(program: number, id: number): InstrumentConfig {
     name: GM2_NAMES[program],
     synthType: 'PolySynth',
     oscillator: osc(program < 4 ? 'triangle' : 'sine'),
-    envelope: env(2, 1500, 0.3, 500),
+    envelope: env(2, 1500, 30, 500),
     filter: lpf(4000, 0.5),
   };
 }
@@ -113,19 +113,19 @@ function organPreset(program: number, id: number): InstrumentConfig {
     name: GM2_NAMES[program],
     synthType: 'Organ',
     oscillator: osc(program === 18 ? 'square' : 'sine'), // Rock Organ → square
-    envelope: env(10, 100, 1, 100),
+    envelope: env(10, 100, 100, 100),
   };
 }
 
 /** Guitar (24–31): PolySynth with sawtooth, plucky envelope */
 function guitarPreset(program: number, id: number): InstrumentConfig {
-  const isDistorted = program === 30 || program === 31; // Overdriven / Distortion
+  const isDistorted = program === 29 || program === 30; // Overdriven / Distortion Guitar
   return {
     ...BASE, id,
     name: GM2_NAMES[program],
     synthType: 'PolySynth',
     oscillator: osc(isDistorted ? 'square' : 'sawtooth'),
-    envelope: env(1, isDistorted ? 600 : 350, 0.1, 200),
+    envelope: env(1, isDistorted ? 600 : 350, 10, 200),
     filter: lpf(isDistorted ? 1500 : 3500),
   };
 }
@@ -138,7 +138,7 @@ function bassPreset(program: number, id: number): InstrumentConfig {
     name: GM2_NAMES[program],
     synthType: 'MonoSynth',
     oscillator: osc(isSynth ? 'square' : 'sawtooth', -1),
-    envelope: env(5, isSynth ? 400 : 200, 0.2, 100),
+    envelope: env(5, isSynth ? 400 : 200, 20, 100),
     filter: lpf(isSynth ? 800 : 1500, isSynth ? 4 : 1),
     monophonic: true,
   };
@@ -171,7 +171,7 @@ function stringsPreset(program: number, id: number): InstrumentConfig {
     name: GM2_NAMES[program],
     synthType: 'StringMachine',
     oscillator: osc('sawtooth'),
-    envelope: env(program === 44 ? 5 : 60, 2000, 0.8, 600), // Tremolo fast, others slow
+    envelope: env(program === 44 ? 5 : 60, 2000, 80, 600), // Tremolo fast, others slow
   };
 }
 
@@ -183,7 +183,7 @@ function ensemblePreset(program: number, id: number): InstrumentConfig {
     name: GM2_NAMES[program],
     synthType: 'PolySynth',
     oscillator: osc(isOrchHit ? 'square' : 'sine'),
-    envelope: env(isOrchHit ? 1 : 80, isOrchHit ? 200 : 3000, isOrchHit ? 0 : 0.7, 800),
+    envelope: env(isOrchHit ? 1 : 80, isOrchHit ? 200 : 3000, isOrchHit ? 0 : 70, 800),
     filter: lpf(2000, 0.5),
   };
 }
@@ -196,7 +196,7 @@ function brassPreset(program: number, id: number): InstrumentConfig {
     name: GM2_NAMES[program],
     synthType: 'PolySynth',
     oscillator: osc(isSynth ? 'sawtooth' : 'square'),
-    envelope: env(isSynth ? 5 : 15, 500, 0.6, 200),
+    envelope: env(isSynth ? 5 : 15, 500, 60, 200),
     filter: lpf(isSynth ? 2000 : 3000),
   };
 }
@@ -208,7 +208,7 @@ function reedPreset(program: number, id: number): InstrumentConfig {
     name: GM2_NAMES[program],
     synthType: 'PolySynth',
     oscillator: osc('sawtooth'),
-    envelope: env(20, 1000, 0.7, 300),
+    envelope: env(20, 1000, 70, 300),
     filter: lpf(2500, 2),
   };
 }
@@ -220,7 +220,7 @@ function pipePreset(program: number, id: number): InstrumentConfig {
     name: GM2_NAMES[program],
     synthType: 'PolySynth',
     oscillator: osc(program < 74 ? 'sine' : 'triangle'), // Piccolo/Flute=sine, rest=triangle
-    envelope: env(30, 2000, 0.8, 400),
+    envelope: env(30, 2000, 80, 400),
     filter: lpf(5000),
   };
 }
@@ -233,7 +233,7 @@ function synthLeadPreset(program: number, id: number): InstrumentConfig {
     name: GM2_NAMES[program],
     synthType: 'FMSynth',
     oscillator: osc(isSaw ? 'sawtooth' : 'sine'),
-    envelope: env(1, 500, 0.5, 200),
+    envelope: env(1, 500, 50, 200),
   };
 }
 
@@ -243,8 +243,8 @@ function synthPadPreset(program: number, id: number): InstrumentConfig {
     ...BASE, id,
     name: GM2_NAMES[program],
     synthType: 'PolySynth',
-    oscillator: osc(program === 91 ? 'triangle' : 'sine'), // Bowed Glass = triangle
-    envelope: env(200, 3000, 0.8, 1500),
+    oscillator: osc(program >= 91 ? 'triangle' : 'sine'), // Space Voice (91) onward = triangle
+    envelope: env(200, 3000, 80, 1500),
     filter: lpf(1500, 0.5),
   };
 }
@@ -256,19 +256,19 @@ function synthFXPreset(program: number, id: number): InstrumentConfig {
     name: GM2_NAMES[program],
     synthType: 'FMSynth',
     oscillator: osc('sine'),
-    envelope: env(100, 2000, 0.5, 1000),
+    envelope: env(100, 2000, 50, 1000),
   };
 }
 
 /** Ethnic (104–111): PolySynth, plucked/bowed */
 function ethnicPreset(program: number, id: number): InstrumentConfig {
-  const isBowed = program === 109; // Koto
+  const isSustained = program === 109 || program === 110; // Bagpipe, Fiddle — sustained character
   return {
     ...BASE, id,
     name: GM2_NAMES[program],
     synthType: 'PolySynth',
     oscillator: osc('triangle'),
-    envelope: env(isBowed ? 30 : 1, isBowed ? 1500 : 500, isBowed ? 0.5 : 0, 200),
+    envelope: env(isSustained ? 30 : 1, isSustained ? 1500 : 500, isSustained ? 50 : 0, 200),
     filter: lpf(3000),
   };
 }
@@ -291,7 +291,7 @@ function soundFXPreset(program: number, id: number): InstrumentConfig {
     name: GM2_NAMES[program],
     synthType: 'FMSynth',
     oscillator: osc('sine'),
-    envelope: env(50, 1000, 0.3, 500),
+    envelope: env(50, 1000, 30, 500),
   };
 }
 
