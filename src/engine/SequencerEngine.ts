@@ -54,7 +54,6 @@ export class SequencerEngine {
     // Set up event handling
     this.sequencer.setEventCallback((event) => this.handleSequencerEvent(event));
 
-    console.log('[SequencerEngine] Initialized');
   }
 
   /**
@@ -62,7 +61,6 @@ export class SequencerEngine {
    */
   connectToTB303(tb303: TB303Engine): void {
     this.tb303Engine = tb303;
-    console.log('[SequencerEngine] Connected to TB-303 engine');
   }
 
   /**
@@ -91,8 +89,6 @@ export class SequencerEngine {
 
     this.sequencer.start();
     this.isRunning = true;
-
-    console.log('[SequencerEngine] Started');
   }
 
   /**
@@ -115,8 +111,6 @@ export class SequencerEngine {
     }
 
     this.isRunning = false;
-
-    console.log('[SequencerEngine] Stopped');
   }
 
   /**
@@ -243,6 +237,5 @@ export class SequencerEngine {
    */
   dispose(): void {
     this.stop();
-    console.log('[SequencerEngine] Disposed');
   }
 }

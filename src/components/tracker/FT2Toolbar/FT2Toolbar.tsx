@@ -374,18 +374,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
             order: patternOrder.length > 0 ? patternOrder : [0],
             instrumentNames,
           };
-          console.log(`[Import] ${format} patterns converted:`, result.patterns.length, 'patterns, first pattern has', result.patterns[0]?.channels?.length, 'channels');
-          
-          // Debug: Check if notes are on different channels
-          const firstPattern = result.patterns[0];
-          if (firstPattern) {
-            console.log(`[Import] DEBUG Pattern 0 channel 0 notes:`, firstPattern.channels[0]?.rows.filter(r => r.note > 0).length, 'notes');
-            console.log(`[Import] DEBUG Pattern 0 channel 1 notes:`, firstPattern.channels[1]?.rows.filter(r => r.note > 0).length, 'notes');
-            console.log(`[Import] DEBUG Pattern 0 channel 2 notes:`, firstPattern.channels[2]?.rows.filter(r => r.note > 0).length, 'notes');
-            console.log(`[Import] DEBUG First 5 notes on ch0:`, firstPattern.channels[0]?.rows.filter(r => r.note > 0).slice(0, 5).map(r => r.note));
-            console.log(`[Import] DEBUG First 5 notes on ch1:`, firstPattern.channels[1]?.rows.filter(r => r.note > 0).slice(0, 5).map(r => r.note));
-            console.log(`[Import] DEBUG First 5 notes on ch2:`, firstPattern.channels[2]?.rows.filter(r => r.note > 0).slice(0, 5).map(r => r.note));
-          }
         } else {
           notify.error(`Unsupported native format: ${format}`);
           return;

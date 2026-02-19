@@ -66,7 +66,6 @@ export const useBlockOperations = () => {
       blockEndMarked: false,
       isBlockSelected: false,
     }));
-    console.log('Block start marked at row', cursor.rowIndex, 'channel', cursor.channelIndex);
   }, [startSelection, cursor]);
 
   /**
@@ -79,7 +78,6 @@ export const useBlockOperations = () => {
       blockEndMarked: true,
       isBlockSelected: true,
     }));
-    console.log('Block end marked at row', cursor.rowIndex, 'channel', cursor.channelIndex);
   }, [endSelection, cursor]);
 
   /**
@@ -92,7 +90,6 @@ export const useBlockOperations = () => {
     }
 
     copySelection();
-    console.log('Block copied:', selection);
   }, [selection, copySelection]);
 
   /**
@@ -105,7 +102,6 @@ export const useBlockOperations = () => {
     }
 
     paste();
-    console.log('Block pasted at row', cursor.rowIndex, 'channel', cursor.channelIndex);
   }, [clipboard, paste, cursor]);
 
   /**
@@ -123,7 +119,6 @@ export const useBlockOperations = () => {
       blockEndMarked: false,
       isBlockSelected: false,
     });
-    console.log('Block cut:', selection);
   }, [selection, cutSelection]);
 
   /**
@@ -136,7 +131,6 @@ export const useBlockOperations = () => {
       blockEndMarked: false,
       isBlockSelected: false,
     });
-    console.log('Block selection cleared');
   }, [clearSelection]);
 
   /**
@@ -204,7 +198,6 @@ export const useBlockOperations = () => {
         }
       }
 
-      console.log(`Block transposed by ${semitones} semitones`);
     },
     [getBlockBounds, pattern, setCell]
   );
@@ -227,7 +220,6 @@ export const useBlockOperations = () => {
         }
       }
 
-      console.log(`Block amplified by ${factor}x`);
     },
     [getBlockBounds, pattern, setCell]
   );
@@ -258,7 +250,6 @@ export const useBlockOperations = () => {
         }
       }
 
-      console.log(`Block interpolated for ${columnType}`);
     },
     [getBlockBounds, pattern, setCell]
   );
@@ -302,7 +293,6 @@ export const useBlockOperations = () => {
       }
     }
 
-    console.log('Block reversed');
   }, [getBlockBounds, pattern, setCell]);
 
   /**
@@ -364,10 +354,6 @@ export const useBlockOperations = () => {
       }
     }
 
-    if (rowCount * 2 > patternLength - bounds.startRow) {
-      console.warn(`Block expand: content clipped at pattern end (${patternLength} rows)`);
-    }
-    console.log('Block expanded');
   }, [getBlockBounds, pattern, setCell]);
 
   /**
@@ -426,7 +412,6 @@ export const useBlockOperations = () => {
       }
     }
 
-    console.log('Block shrunk');
   }, [getBlockBounds, pattern, setCell]);
 
   /**
@@ -457,7 +442,6 @@ export const useBlockOperations = () => {
         }
       }
 
-      console.log(`Block math: ${op} ${value} on ${column}`);
     },
     [getBlockBounds, pattern, setCell]
   );
@@ -504,7 +488,6 @@ export const useBlockOperations = () => {
       writeRow++;
     }
 
-    console.log(`Block duplicated (${rowCount} rows repeated to end)`);
   }, [getBlockBounds, pattern, setCell]);
 
   /**
