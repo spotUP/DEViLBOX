@@ -272,11 +272,9 @@ export const useUIStore = create<UIStore>()(
           // Version 7: Force TB-303 collapsed even if already at v6
           // Version 8: Nuclear option - force collapse no matter what
           if (state.uiVersion < 8) {
-            console.log('[UIStore] Migration v8: Forcing TB-303 collapsed (was:', state.tb303Collapsed, ')');
             state.uiVersion = 8;
             state.tb303Collapsed = true; // FORCE collapse TB-303 panel
             state.compactToolbar = false; // Expand FT2 toolbar
-            console.log('[UIStore] Migration v8: TB-303 now collapsed:', state.tb303Collapsed);
           }
 
           // Only apply once per session
