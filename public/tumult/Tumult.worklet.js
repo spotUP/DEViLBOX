@@ -1176,10 +1176,10 @@ class SVFBand {
 
 // ─── Arctan Clipper (1:1 from hardSoftClipper.h) ──────────────────────────────
 // amount: 0.05–1.0. At 1.0 = soft arctan; at 0.05 = near-hard.
-function clipSample(x, amount) {
+function clipSample(x, amount, invAmount) {
   const ax = Math.abs(x);
   if (ax < 1e-9) return x;
-  return Math.sign(x) * Math.pow(Math.atan(Math.pow(ax, 1 / amount)), amount);
+  return Math.sign(x) * Math.pow(Math.atan(Math.pow(ax, invAmount)), amount);
 }
 
 // ─── Loop-Fade Sample Player (1:1 from loopfadeplayer.h) ──────────────────────
@@ -1257,32 +1257,38 @@ class LoopFadePlayer {
 }
 
 // ─── Envelope Follower (AR gate, used for Duck / Follow modes) ─────────────────
+// ─── Envelope Follower (AR gate, used for Duck / Follow modes) ─────────────────
 class EnvFollower {
   constructor(sr) {
     this.sr    = sr;
     this.level = 0;
     this.gate  = 0;
+    // Cached computed values (updated via setParams)
+    this._thresh  = Math.pow(10, -17.2 / 20);
+    this._attack  = 1 - Math.exp(-1 / (Math.max(0.001, 0)  * sr / 1000));
+    this._release = 1 - Math.exp(-1 / (Math.max(0.001, 21.5) * sr / 1000));
   }
-  // attackMs, releaseMs: milliseconds
-  // threshold: dB (-100..0)
-  // Returns smoothed gate signal 0..1
-  tick(input, threshold, attackMs, releaseMs) {
-    const threshLinear = Math.pow(10, threshold / 20);
-    const attackCoeff  = 1 - Math.exp(-1 / (Math.max(0.001, attackMs)  * this.sr / 1000));
-    const releaseCoeff = 1 - Math.exp(-1 / (Math.max(0.001, releaseMs) * this.sr / 1000));
+
+  setParams(thresholdDb, attackMs, releaseMs) {
+    this._thresh  = Math.pow(10, thresholdDb / 20);
+    this._attack  = 1 - Math.exp(-1 / (Math.max(0.001, attackMs)  * this.sr / 1000));
+    this._release = 1 - Math.exp(-1 / (Math.max(0.001, releaseMs) * this.sr / 1000));
+  }
+
+  tick(input) {
     const absIn = Math.abs(input);
     // Envelope detect
     if (absIn > this.level) {
-      this.level += (absIn - this.level) * attackCoeff;
+      this.level += (absIn - this.level) * this._attack;
     } else {
-      this.level += (absIn - this.level) * releaseCoeff;
+      this.level += (absIn - this.level) * this._release;
     }
     // Gate signal
-    const gateTarget = this.level > threshLinear ? 1 : 0;
+    const gateTarget = this.level > this._thresh ? 1 : 0;
     if (gateTarget > this.gate) {
-      this.gate += (gateTarget - this.gate) * attackCoeff;
+      this.gate += (gateTarget - this.gate) * this._attack;
     } else {
-      this.gate += (gateTarget - this.gate) * releaseCoeff;
+      this.gate += (gateTarget - this.gate) * this._release;
     }
     return this.gate;
   }
@@ -1313,7 +1319,9 @@ class TumultProcessor extends AudioWorkletProcessor {
       sampleIndex: 0, playerStart: 0, playerEnd: 1, playerFade: 0.01, playerGain: 0,
     };
 
+    this._clipInvAmt = 1 / this.p.clipAmount;
     this._updateBands();
+    this._updateFollower();
 
     this.port.onmessage = (e) => {
       const { type, param, value, bufferL, bufferR } = e.data;
@@ -1324,8 +1332,14 @@ class TumultProcessor extends AudioWorkletProcessor {
         );
       } else if (param !== undefined) {
         this.p[param] = value;
+        if (param === 'clipAmount') {
+          this._clipInvAmt = 1 / value;
+        }
         if (param.startsWith('hp') || param.startsWith('peak') || param.startsWith('lp')) {
           this._updateBands();
+        }
+        if (param.startsWith('duck') || param.startsWith('follow') || param === 'switchBranch') {
+          this._updateFollower();
         }
       }
     };
@@ -1345,6 +1359,15 @@ class TumultProcessor extends AudioWorkletProcessor {
     this.bands[4].setParams('lp', p.lpFreq, p.lpQ, 0, !!p.lpEnable);
   }
 
+  _updateFollower() {
+    const p = this.p;
+    if (p.switchBranch === 0) {
+      this.envFollower.setParams(p.duckThreshold, p.duckAttack, p.duckRelease);
+    } else {
+      this.envFollower.setParams(p.followThreshold, p.followAttack, p.followRelease);
+    }
+  }
+
   process(inputs, outputs) {
     const out0   = outputs[0];
     const outL   = out0[0];
@@ -1353,6 +1376,7 @@ class TumultProcessor extends AudioWorkletProcessor {
     const inR    = inputs[0]?.[1] ?? inputs[0]?.[0];
     const p      = this.p;
     const noiseGainLin = Math.pow(10, p.noiseGain / 20);
+    const pGain = p.sourceMode === 3 ? Math.pow(10, p.playerGain / 20) : 1;
 
     for (let i = 0; i < (outL?.length ?? 128); i++) {
       // ── Dry signal ──────────────────────────────────────────────────────
@@ -1367,7 +1391,6 @@ class TumultProcessor extends AudioWorkletProcessor {
         noiseL = noiseR = n;
       } else if (p.sourceMode === 2 || p.sourceMode === 3) {
         // Sample playback (same player for both modes)
-        const pGain = p.sourceMode === 3 ? Math.pow(10, p.playerGain / 20) : 1;
         const [sL, sR] = this.samplePlayer.tick(p.playerStart, p.playerEnd, p.playerFade);
         noiseL = sL * pGain;
         noiseR = sR * pGain;
@@ -1379,11 +1402,11 @@ class TumultProcessor extends AudioWorkletProcessor {
       let gateAmt = 1;
       if (p.switchBranch === 0) {
         // Duck: noise fades when signal is loud
-        const g = this.envFollower.tick(sidechainIn, p.duckThreshold, p.duckAttack, p.duckRelease);
+        const g = this.envFollower.tick(sidechainIn);
         gateAmt = 1 - g * p.followAmount;
       } else if (p.switchBranch === 1) {
         // Follow: noise plays when signal is present
-        const g = this.envFollower.tick(sidechainIn, p.followThreshold, p.followAttack, p.followRelease);
+        const g = this.envFollower.tick(sidechainIn);
         gateAmt = g * p.followAmount;
       }
       // switchBranch === 2 (Raw): gateAmt = 1
@@ -1393,8 +1416,8 @@ class TumultProcessor extends AudioWorkletProcessor {
       noiseR *= noiseGainLin * gateAmt;
 
       // ── Clipper (hardSoftClipper.h) ───────────────────────────────────────
-      noiseL = clipSample(noiseL, p.clipAmount);
-      noiseR = clipSample(noiseR, p.clipAmount);
+      noiseL = clipSample(noiseL, p.clipAmount, this._clipInvAmt);
+      noiseR = clipSample(noiseR, p.clipAmount, this._clipInvAmt);
 
       // ── 5-band SVF EQ ─────────────────────────────────────────────────────
       let [eqL, eqR] = [noiseL, noiseR];
