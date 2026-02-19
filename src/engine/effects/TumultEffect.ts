@@ -266,6 +266,11 @@ export class TumultEffect extends Tone.ToneAudioNode {
 
   // ─── Parameter setters ─────────────────────────────────────────────────────
 
+  // ToneEngine's updateMasterEffectParams checks `node.wet` to update dry/wet.
+  // Expose it as a plain number accessor that delegates to setParam.
+  get wet(): number { return this._params.wet; }
+  set wet(value: number) { this.setParam('wet', value); }
+
   setParam(param: keyof TumultOptions, value: number) {
     (this._params as Record<string, number>)[param] = value;
     if (param === 'wet') {
