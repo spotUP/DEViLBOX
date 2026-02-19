@@ -1264,9 +1264,9 @@ class EnvFollower {
     this.level = 0;
     this.gate  = 0;
     // Cached computed values (updated via setParams)
-    this._thresh  = Math.pow(10, -17.2 / 20);
-    this._attack  = 1 - Math.exp(-1 / (Math.max(0.001, 0)  * sr / 1000));
-    this._release = 1 - Math.exp(-1 / (Math.max(0.001, 21.5) * sr / 1000));
+    this._thresh  = Math.pow(10, -20.0 / 20);
+    this._attack  = 1 - Math.exp(-1 / (Math.max(0.001, 0)   * sr / 1000));
+    this._release = 1 - Math.exp(-1 / (Math.max(0.001, 15.0) * sr / 1000));
   }
 
   setParams(thresholdDb, attackMs, releaseMs) {
@@ -1307,13 +1307,13 @@ class TumultProcessor extends AudioWorkletProcessor {
 
     // Default params (match TumultEffect defaults)
     this.p = {
-      noiseGain: -10.6, mix: 1.0, noiseMode: 0, sourceMode: 0, switchBranch: 1,
-      duckThreshold: -17.2, duckAttack: 0, duckRelease: 21.5,
-      followThreshold: -10.7, followAttack: 0, followRelease: 76.9, followAmount: 0.104,
+      noiseGain: -10.0, mix: 0.5, noiseMode: 0, sourceMode: 0, switchBranch: 0,
+      duckThreshold: -20.0, duckAttack: 0, duckRelease: 15.0,
+      followThreshold: -20.0, followAttack: 0, followRelease: 15.0, followAmount: 0.104,
       clipAmount: 0.497,
       hpEnable: 0, hpFreq: 888.5, hpQ: 0.7,
-      peak1Enable: 1, peak1Type: 0, peak1Freq: 20, peak1Gain: -0.19, peak1Q: 0.7,
-      peak2Enable: 1, peak2Freq: 600, peak2Gain: 1.0, peak2Q: 1.0,
+      peak1Enable: 0, peak1Type: 0, peak1Freq: 20, peak1Gain: -0.19, peak1Q: 0.7,
+      peak2Enable: 0, peak2Freq: 600, peak2Gain: 1.0, peak2Q: 1.0,
       peak3Enable: 0, peak3Type: 1, peak3Freq: 2500, peak3Gain: 1.0, peak3Q: 1.0,
       lpEnable: 0, lpFreq: 8500, lpQ: 0.7,
       sampleIndex: 0, playerStart: 0, playerEnd: 1, playerFade: 0.01, playerGain: 0,
