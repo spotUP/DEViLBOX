@@ -126,18 +126,18 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      const reverb = new Tone.Reverb({ decay: Number(p.decay) || 1.5, preDelay: Number(p.preDelay) || 0.01, wet: c.wet / 100 });
+      const reverb = new Tone.Reverb({ decay: Number(p.decay) || 8.6, preDelay: Number(p.preDelay) || 0.4, wet: c.wet / 100 });
       await reverb.ready;
       return reverb;
     },
-    getDefaultParameters: () => ({ decay: 1.5, preDelay: 0.01 }),
+    getDefaultParameters: () => ({ decay: 8.6, preDelay: 0.4 }),
   },
   {
     id: 'JCReverb', name: 'JC Reverb', category: 'tonejs', group: 'Reverb & Delay',
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      const jcr = new Tone.JCReverb({ roomSize: Number(p.roomSize) || 0.5, wet: c.wet / 100 });
+      const jcr = new Tone.JCReverb({ roomSize: Math.min(0.9, Number(p.roomSize) || 0.7), wet: c.wet / 100 });
       const combFilters = (jcr as unknown as { _feedbackCombFilters: { _worklet?: AudioWorkletNode }[] })._feedbackCombFilters;
       if (combFilters?.length) {
         for (let attempt = 0; attempt < 50; attempt++) {
@@ -183,13 +183,13 @@ const tonejs: EffectDescriptor[] = [
       const { SpaceEchoEffect } = await import('@engine/effects/SpaceEchoEffect');
       const p = c.parameters;
       return new SpaceEchoEffect({
-        mode: Number(p.mode) || 4, rate: Number(p.rate) || 300,
-        intensity: Number(p.intensity) || 0.5, echoVolume: Number(p.echoVolume) || 0.8,
-        reverbVolume: Number(p.reverbVolume) || 0.3, bass: Number(p.bass) || 0,
-        treble: Number(p.treble) || 0, wet: c.wet / 100,
+        mode: Number(p.mode) || 8, rate: Number(p.rate) || 300,
+        intensity: Number(p.intensity) || 0.74, echoVolume: Number(p.echoVolume) || 0.8,
+        reverbVolume: Number(p.reverbVolume) || 0.4, bass: Number(p.bass) || 4,
+        treble: Number(p.treble) || 4, wet: c.wet / 100,
       });
     },
-    getDefaultParameters: () => ({ mode: 4, rate: 300, intensity: 0.5, echoVolume: 0.8, reverbVolume: 0.3, bass: 0, treble: 0 }),
+    getDefaultParameters: () => ({ mode: 8, rate: 300, intensity: 0.74, echoVolume: 0.8, reverbVolume: 0.4, bass: 4, treble: 4, bpmSync: 1, syncDivision: '1/8' }),
   },
   {
     id: 'SpaceyDelayer', name: 'Spacey Delayer', category: 'tonejs', group: 'Reverb & Delay',
@@ -345,7 +345,7 @@ const tonejs: EffectDescriptor[] = [
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
       const p = c.parameters;
-      return new Tone.StereoWidener({ width: Number(p.width) || 0.5 });
+      return new Tone.StereoWidener({ width: Math.min(0.85, Number(p.width) || 0.5), wet: c.wet / 100 });
     },
     getDefaultParameters: () => ({ width: 0.5 }),
   },

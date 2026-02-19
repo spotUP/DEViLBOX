@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-19T20:32:34.809Z
+ * Generated: 2026-02-19T20:49:04.428Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.948';
-export const BUILD_NUMBER = '948';
-export const BUILD_HASH = 'bc75afcc';
+export const BUILD_VERSION = '1.0.953';
+export const BUILD_NUMBER = '953';
+export const BUILD_HASH = '433db49a';
 export const BUILD_DATE = '2026-02-19';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,29 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.948',
+    version: '1.0.953',
     date: '2026-02-19',
     changes: [
+      {
+        type: 'fix',
+        "description": "Atomic applyInstrument + clearSelection preserves clipboard"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve all npm run type-check errors (tsc -b --force)"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: regenerate changelog, gitignore WASM build artifacts"
+      },
+      {
+        type: 'fix',
+        "description": "Implement paste/edit commands + patternOrder + console cleanup"
+      },
+      {
+        type: 'fix',
+        "description": "5 user-reported bugs — MIDI loading, TD-3 demos, reset localStorage, popup knobs, popup height"
+      },
       {
         type: 'fix',
         "description": "Wire undo history + fix clonePattern + console cleanup"
@@ -212,26 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Master effects browser — widen chain column, narrow browser column"
-      },
-      {
-        type: 'feature',
-        "description": "VinylNoise — individual Hiss and Crackle volume controls"
-      },
-      {
-        type: 'fix',
-        "description": "VinylNoise hiss is now constant — LFO no longer modulates it"
-      },
-      {
-        type: 'feature',
-        "description": "VinylNoise presets + fix hiss LFO modulation depth"
-      },
-      {
-        type: 'feature',
-        "description": "Fix VinylNoise LFO to rotate at exact turntable speed (RPM presets)"
-      },
-      {
-        type: 'fix',
-        "description": "Initialize Ramper in VinylNoise worklet — crackles were never firing"
       }
     ]
   }
