@@ -2555,8 +2555,8 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
   const attack = getParam(effect, 'attack', 0.003);
   const release = getParam(effect, 'release', 0.25);
   const knee = getParam(effect, 'knee', 6);
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
   const sidechainGain = getParam(effect, 'sidechainGain', 100);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
