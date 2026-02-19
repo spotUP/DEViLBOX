@@ -57,11 +57,14 @@ export const EffectOscilloscope: React.FC<EffectOscilloscopeProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    if (canvas.width !== width) canvas.width = width;
-    if (canvas.height !== height) canvas.height = height;
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== width * dpr) canvas.width = width * dpr;
+    if (canvas.height !== height * dpr) canvas.height = height * dpr;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
     ctx.fillStyle = '#0a0a0f';
@@ -161,11 +164,14 @@ export const EffectSpectrum: React.FC<EffectSpectrumProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    if (canvas.width !== width) canvas.width = width;
-    if (canvas.height !== height) canvas.height = height;
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== width * dpr) canvas.width = width * dpr;
+    if (canvas.height !== height * dpr) canvas.height = height * dpr;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
     ctx.fillStyle = '#0a0a0f';
@@ -261,11 +267,14 @@ export const WaveshaperCurve: React.FC<WaveshaperCurveProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.width = width;
-    canvas.height = height;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
     ctx.fillStyle = '#0a0a0f';
@@ -372,11 +381,14 @@ export const GainReductionMeter: React.FC<GainReductionMeterProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.width = width;
-    canvas.height = height;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
     ctx.fillStyle = '#0a0a0f';
@@ -487,11 +499,14 @@ export const MiniOutputMeter: React.FC<MiniOutputMeterProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.width = W;
-    canvas.height = H;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
     ctx.fillStyle = '#111';
