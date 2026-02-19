@@ -176,6 +176,7 @@ interface TrackerStore {
   readMacroSlot: (slotIndex: number) => void;   // Paste macro
 
   // Advanced editing
+  applyInstrumentToSelection: (instrumentId: number) => void;
   transposeSelection: (semitones: number, currentInstrumentOnly?: boolean) => void;
   remapInstrument: (oldId: number, newId: number, scope: 'block' | 'track' | 'pattern' | 'song') => void;
   interpolateSelection: (column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'effParam' | 'effParam2', startValue: number, endValue: number, curve?: 'linear' | 'log' | 'exp' | 'scurve') => void;
@@ -1446,6 +1447,38 @@ export const useTrackerStore = create<TrackerStore>()(
       useHistoryStore.getState().pushAction('READ_MACRO', 'Apply macro', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
 
+    // Advanced editing - Apply instrument number to all notes in selection
+    applyInstrumentToSelection: (instrumentId) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        let minChannel: number, maxChannel: number, minRow: number, maxRow: number;
+        if (state.selection) {
+          minChannel = Math.min(state.selection.startChannel, state.selection.endChannel);
+          maxChannel = Math.max(state.selection.startChannel, state.selection.endChannel);
+          minRow = Math.min(state.selection.startRow, state.selection.endRow);
+          maxRow = Math.max(state.selection.startRow, state.selection.endRow);
+        } else {
+          minChannel = state.cursor.channelIndex;
+          maxChannel = state.cursor.channelIndex;
+          minRow = state.cursor.rowIndex;
+          maxRow = state.cursor.rowIndex;
+        }
+        for (let ch = minChannel; ch <= maxChannel; ch++) {
+          if (ch >= pattern.channels.length) continue;
+          for (let row = minRow; row <= maxRow; row++) {
+            if (row >= pattern.length) continue;
+            const cell = pattern.channels[ch].rows[row];
+            if (cell.note && cell.note !== 0) {
+              cell.instrument = instrumentId;
+            }
+          }
+        }
+      });
+      useHistoryStore.getState().pushAction('EDIT_CELL', 'Apply instrument to selection', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
+
     // Advanced editing - Transpose selection by semitones
     transposeSelection: (semitones, currentInstrumentOnly = false) => {
       const patternIndex = get().currentPatternIndex;
@@ -1535,6 +1568,38 @@ export const useTrackerStore = create<TrackerStore>()(
           state.patterns.forEach(p => processPattern(p));
         }
       }),
+
+    // Apply a given instrument ID to all non-empty cells in the selection (atomic undo)
+    applyInstrumentToSelection: (instrumentId) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        const pattern = state.patterns[state.currentPatternIndex];
+        const { selection: sel, cursor: cur } = state;
+        const range = sel
+          ? {
+              minCh: Math.min(sel.startChannel, sel.endChannel),
+              maxCh: Math.max(sel.startChannel, sel.endChannel),
+              minRow: Math.min(sel.startRow, sel.endRow),
+              maxRow: Math.max(sel.startRow, sel.endRow),
+            }
+          : {
+              minCh: cur.channelIndex, maxCh: cur.channelIndex,
+              minRow: cur.rowIndex, maxRow: cur.rowIndex,
+            };
+        for (let ch = range.minCh; ch <= range.maxCh; ch++) {
+          if (ch >= pattern.channels.length) continue;
+          for (let row = range.minRow; row <= range.maxRow; row++) {
+            if (row >= pattern.length) continue;
+            const cell = pattern.channels[ch].rows[row];
+            if (cell && cell.note && cell.note !== 0) {
+              cell.instrument = instrumentId;
+            }
+          }
+        }
+      });
+      useHistoryStore.getState().pushAction('APPLY_INSTRUMENT', 'Apply instrument', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     // Advanced editing - Interpolate values in selection
     interpolateSelection: (column, startValue, endValue, curve = 'linear') => {
