@@ -1951,13 +1951,13 @@ const VINYL_RPM_PRESETS = [
   { label: '78', rpm: 78, speed: 13.0 },
 ] as const;
 
-// Condition presets — set hiss/dust/age independently of RPM.
+// Condition presets — set all 12 params (hiss/dust/age + 9 emulator) independently of RPM.
 // Mix and match: e.g. "78 RPM + New" or "33 RPM + Shellac".
 const VINYL_CONDITION_PRESETS = [
-  { label: 'New',     hiss:  8, dust:  5, age:  4 },  // fresh from the sleeve
-  { label: 'Played',  hiss: 20, dust: 30, age: 18 },  // well-loved but cared for
-  { label: 'Worn',    hiss: 38, dust: 52, age: 44 },  // garage-sale find
-  { label: 'Shellac', hiss: 68, dust: 62, age: 70 },  // classic 78 rpm shellac
+  { label: 'New',     hiss:  8, dust:  5, age:  4, riaa: 25, stylusResonance: 20, wornStylus:  0, pinch: 10, innerGroove:  0, ghostEcho:  0, dropout:  0, warp:  0, eccentricity:  5 },
+  { label: 'Played',  hiss: 20, dust: 30, age: 18, riaa: 35, stylusResonance: 30, wornStylus: 15, pinch: 20, innerGroove: 10, ghostEcho: 10, dropout:  5, warp:  5, eccentricity: 10 },
+  { label: 'Worn',    hiss: 38, dust: 52, age: 44, riaa: 50, stylusResonance: 45, wornStylus: 45, pinch: 35, innerGroove: 35, ghostEcho: 25, dropout: 20, warp: 15, eccentricity: 20 },
+  { label: 'Shellac', hiss: 68, dust: 62, age: 70, riaa: 70, stylusResonance: 60, wornStylus: 70, pinch: 55, innerGroove: 60, ghostEcho: 40, dropout: 45, warp: 30, eccentricity: 35 },
 ] as const;
 
 export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
@@ -1965,10 +1965,19 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateParameter,
   onUpdateWet,
 }) => {
-  const hiss  = getParam(effect, 'hiss',  50);
-  const dust  = getParam(effect, 'dust',  50);
-  const age   = getParam(effect, 'age',   50);
-  const speed = getParam(effect, 'speed', 0);
+  const hiss            = getParam(effect, 'hiss',            50);
+  const dust            = getParam(effect, 'dust',            50);
+  const age             = getParam(effect, 'age',             50);
+  const speed           = getParam(effect, 'speed',           0);
+  const riaa            = getParam(effect, 'riaa',            30);
+  const stylusResonance = getParam(effect, 'stylusResonance', 25);
+  const wornStylus      = getParam(effect, 'wornStylus',      0);
+  const pinch           = getParam(effect, 'pinch',           15);
+  const innerGroove     = getParam(effect, 'innerGroove',     0);
+  const ghostEcho       = getParam(effect, 'ghostEcho',       0);
+  const dropout         = getParam(effect, 'dropout',         0);
+  const warp            = getParam(effect, 'warp',            0);
+  const eccentricity    = getParam(effect, 'eccentricity',    0);
 
   const activeRpm  = VINYL_RPM_PRESETS.find(
     (p) => Math.abs(speed - p.speed) < 0.5
@@ -1976,12 +1985,14 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
 
   const activeCond = VINYL_CONDITION_PRESETS.find(
     (p) => p.hiss === Math.round(hiss) && p.dust === Math.round(dust) && p.age === Math.round(age)
+      && p.riaa === Math.round(riaa)
   )?.label ?? null;
 
   return (
     <div className="space-y-4">
+      {/* ── Section 1: Noise ─────────────────────────────────────────────── */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
-        <SectionHeader color="#d97706" title="Vinyl Noise" />
+        <SectionHeader color="#d97706" title="Noise" />
 
         {/* RPM selector — sets rotation speed (LFO frequency) only */}
         <div className="flex gap-2 mb-2">
@@ -2002,16 +2013,25 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
           ))}
         </div>
 
-        {/* Condition selector — sets hiss/dust/age (record condition) independently */}
+        {/* Condition selector — sets all 12 emulator params (speed excluded) */}
         <div className="flex gap-2 mb-4">
           <span className="text-xs text-text-muted self-center w-16 shrink-0">Condition</span>
           {VINYL_CONDITION_PRESETS.map((p) => (
             <button
               key={p.label}
               onClick={() => {
-                onUpdateParameter('hiss', p.hiss);
-                onUpdateParameter('dust', p.dust);
-                onUpdateParameter('age',  p.age);
+                onUpdateParameter('hiss',            p.hiss);
+                onUpdateParameter('dust',            p.dust);
+                onUpdateParameter('age',             p.age);
+                onUpdateParameter('riaa',            p.riaa);
+                onUpdateParameter('stylusResonance', p.stylusResonance);
+                onUpdateParameter('wornStylus',      p.wornStylus);
+                onUpdateParameter('pinch',           p.pinch);
+                onUpdateParameter('innerGroove',     p.innerGroove);
+                onUpdateParameter('ghostEcho',       p.ghostEcho);
+                onUpdateParameter('dropout',         p.dropout);
+                onUpdateParameter('warp',            p.warp);
+                onUpdateParameter('eccentricity',    p.eccentricity);
               }}
               className={[
                 'flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all',
@@ -2025,7 +2045,7 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
           ))}
         </div>
 
-        {/* Individual volume controls */}
+        {/* Individual noise volume controls */}
         <div className="flex gap-3">
           {/* Hiss section */}
           <div className="flex-1 rounded-lg bg-black/20 border border-amber-900/30 p-2">
@@ -2082,7 +2102,112 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
           />
         </div>
       </section>
+
+      {/* ── Section 2: Tone ──────────────────────────────────────────────── */}
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader color="#ca8a04" title="Tone" />
+        <div className="flex justify-around items-end">
+          <Knob
+            value={riaa}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('riaa', v)}
+            label="RIAA"
+            color="#d97706"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={stylusResonance}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('stylusResonance', v)}
+            label="Resonance"
+            color="#d97706"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={wornStylus}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('wornStylus', v)}
+            label="Worn"
+            color="#b45309"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+        </div>
+      </section>
+
+      {/* ── Section 3: Distortion ────────────────────────────────────────── */}
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader color="#b45309" title="Distortion" />
+        <div className="flex justify-around items-end">
+          <Knob
+            value={pinch}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('pinch', v)}
+            label="Pinch"
+            color="#b45309"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={innerGroove}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('innerGroove', v)}
+            label="Inner"
+            color="#92400e"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+        </div>
+      </section>
+
+      {/* ── Section 4: Time / Space ──────────────────────────────────────── */}
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader color="#78350f" title="Time / Space" />
+        <div className="flex justify-around items-end">
+          <Knob
+            value={ghostEcho}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('ghostEcho', v)}
+            label="Echo"
+            color="#d97706"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={dropout}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('dropout', v)}
+            label="Dropout"
+            color="#d97706"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={warp}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('warp', v)}
+            label="Warp"
+            color="#b45309"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+          <Knob
+            value={eccentricity}
+            min={0}
+            max={100}
+            onChange={(v) => onUpdateParameter('eccentricity', v)}
+            label="Eccent."
+            color="#92400e"
+            formatValue={(v) => `${Math.round(v)}%`}
+          />
+        </div>
+      </section>
+
+      {/* ── Section 5: Output ────────────────────────────────────────────── */}
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
+        <SectionHeader color="#d97706" title="Output" />
         <div className="flex justify-center">
           <Knob
             value={effect.wet}
