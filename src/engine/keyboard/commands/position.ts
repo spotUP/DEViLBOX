@@ -5,23 +5,21 @@
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useUIStore } from '@stores/useUIStore';
 
-/**
- * Go to saved position
- */
-function gotoPosition(index: number): boolean {
-  useUIStore.getState().setStatusMessage(`Position ${index}`, false, 1000);
-  return true;
-}
-
-/**
- * Save current position to marker slot
- */
 function savePosition(index: number): boolean {
-  useUIStore.getState().setStatusMessage(`Saved position ${index}`, false, 1000);
+  const { cursor, setPtnJumpPos } = useTrackerStore.getState();
+  setPtnJumpPos(index, cursor.rowIndex);
+  useUIStore.getState().setStatusMessage(`Position ${index} saved (row ${cursor.rowIndex})`, false, 1000);
   return true;
 }
 
-// Save position marker 0
+function gotoPosition(index: number): boolean {
+  const { getPtnJumpPos, moveCursorToRow } = useTrackerStore.getState();
+  const row = getPtnJumpPos(index);
+  moveCursorToRow(row);
+  useUIStore.getState().setStatusMessage(`Position ${index}: row ${row}`, false, 1000);
+  return true;
+}
+
 export function savePosition0(): boolean { return savePosition(0); }
 export function savePosition1(): boolean { return savePosition(1); }
 export function savePosition2(): boolean { return savePosition(2); }
@@ -33,7 +31,6 @@ export function savePosition7(): boolean { return savePosition(7); }
 export function savePosition8(): boolean { return savePosition(8); }
 export function savePosition9(): boolean { return savePosition(9); }
 
-// Go to position marker 0
 export function gotoPosition0(): boolean { return gotoPosition(0); }
 export function gotoPosition1(): boolean { return gotoPosition(1); }
 export function gotoPosition2(): boolean { return gotoPosition(2); }
@@ -45,136 +42,88 @@ export function gotoPosition7(): boolean { return gotoPosition(7); }
 export function gotoPosition8(): boolean { return gotoPosition(8); }
 export function gotoPosition9(): boolean { return gotoPosition(9); }
 
-/**
- * Go to start of pattern
- */
 export function gotoPatternStart(): boolean {
   useTrackerStore.getState().moveCursorToRow(0);
-  useUIStore.getState().setStatusMessage('Pattern start', false, 1000);
   return true;
 }
 
-/**
- * Go to end of pattern
- */
 export function gotoPatternEnd(): boolean {
   const { patterns, currentPatternIndex, moveCursorToRow } = useTrackerStore.getState();
   const pattern = patterns[currentPatternIndex];
-  if (pattern) {
-    moveCursorToRow(pattern.length - 1);
-    useUIStore.getState().setStatusMessage('Pattern end', false, 1000);
-  }
+  if (pattern) moveCursorToRow(pattern.length - 1);
   return true;
 }
 
-/**
- * Go to start of song
- */
 export function gotoSongStart(): boolean {
-  const { patterns, moveCursorToRow } = useTrackerStore.getState();
-  // Navigate to pattern 0, row 0
-  if (patterns.length > 0) {
-    moveCursorToRow(0);
-  }
-  useUIStore.getState().setStatusMessage('Song start', false, 1000);
+  useTrackerStore.getState().moveCursorToRow(0);
+  useUIStore.getState().setStatusMessage('Song start', false, 800);
   return true;
 }
 
-/**
- * Go to end of song
- */
 export function gotoSongEnd(): boolean {
   const { patterns, moveCursorToRow } = useTrackerStore.getState();
-  const lastPattern = patterns[patterns.length - 1];
-  if (lastPattern) {
-    moveCursorToRow(lastPattern.length - 1);
-  }
-  useUIStore.getState().setStatusMessage('Song end', false, 1000);
+  const last = patterns[patterns.length - 1];
+  if (last) moveCursorToRow(last.length - 1);
+  useUIStore.getState().setStatusMessage('Song end', false, 800);
   return true;
 }
 
-/**
- * Go to first channel
- */
 export function gotoFirstChannel(): boolean {
   useTrackerStore.getState().moveCursorToChannel(0);
-  useUIStore.getState().setStatusMessage('First channel', false, 1000);
   return true;
 }
 
-/**
- * Go to last channel
- */
 export function gotoLastChannel(): boolean {
   const { patterns, currentPatternIndex, moveCursorToChannel } = useTrackerStore.getState();
   const pattern = patterns[currentPatternIndex];
-  if (pattern && pattern.channels) {
-    moveCursorToChannel(pattern.channels.length - 1);
-    useUIStore.getState().setStatusMessage('Last channel', false, 1000);
-  }
+  if (pattern?.channels) moveCursorToChannel(pattern.channels.length - 1);
   return true;
 }
 
-/**
- * Go to specific row
- */
 export function gotoRow(): boolean {
-  useUIStore.getState().setStatusMessage('Go to row...', false, 1000);
+  useUIStore.getState().setStatusMessage('Go to row: type row number', false, 1500);
   return true;
 }
 
-/**
- * Go to specific pattern
- */
 export function gotoPattern(): boolean {
-  useUIStore.getState().setStatusMessage('Go to pattern...', false, 1000);
+  useUIStore.getState().setStatusMessage('Go to pattern: use pattern list', false, 1500);
   return true;
 }
 
-/**
- * Go to specific order position
- */
 export function gotoOrderPosition(): boolean {
-  useUIStore.getState().setStatusMessage('Go to order...', false, 1000);
+  useUIStore.getState().setStatusMessage('Go to order: use pattern list', false, 1500);
   return true;
 }
 
-/**
- * Go to time position (in song)
- */
 export function gotoTime(): boolean {
-  useUIStore.getState().setStatusMessage('Go to time...', false, 1000);
+  useUIStore.getState().setStatusMessage('Go to time: not yet available', false, 1500);
   return true;
 }
 
-/**
- * Jump to next bookmark
- */
 export function jumpToNextBookmark(): boolean {
-  useUIStore.getState().setStatusMessage('Next bookmark', false, 1000);
+  useTrackerStore.getState().nextBookmark();
+  const { cursor } = useTrackerStore.getState();
+  useUIStore.getState().setStatusMessage(`Bookmark: row ${cursor.rowIndex}`, false, 800);
   return true;
 }
 
-/**
- * Jump to previous bookmark
- */
 export function jumpToPrevBookmark(): boolean {
-  useUIStore.getState().setStatusMessage('Previous bookmark', false, 1000);
+  useTrackerStore.getState().prevBookmark();
+  const { cursor } = useTrackerStore.getState();
+  useUIStore.getState().setStatusMessage(`Bookmark: row ${cursor.rowIndex}`, false, 800);
   return true;
 }
 
-/**
- * Toggle bookmark at current position
- */
 export function toggleBookmark(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle bookmark', false, 1000);
+  const { cursor, toggleBookmark: toggle } = useTrackerStore.getState();
+  toggle(cursor.rowIndex);
+  const added = useTrackerStore.getState().bookmarks.includes(cursor.rowIndex);
+  useUIStore.getState().setStatusMessage(`Bookmark row ${cursor.rowIndex}: ${added ? 'set' : 'cleared'}`, false, 1000);
   return true;
 }
 
-/**
- * Clear all bookmarks
- */
 export function clearAllBookmarks(): boolean {
+  useTrackerStore.getState().clearBookmarks();
   useUIStore.getState().setStatusMessage('Bookmarks cleared', false, 1000);
   return true;
 }

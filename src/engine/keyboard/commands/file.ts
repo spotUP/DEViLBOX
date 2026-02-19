@@ -3,107 +3,42 @@
  */
 
 import { useUIStore } from '@stores/useUIStore';
+import { useTrackerStore } from '@stores/useTrackerStore';
+import { useTransportStore } from '@stores/useTransportStore';
+import { saveProjectToStorage } from '@hooks/useProjectPersistence';
 
-/**
- * Create new file/project
- */
-export function newFile(): boolean {
-  useUIStore.getState().setStatusMessage('New Project (use File menu)', false, 1000);
+function openFileBrowser(): boolean {
+  useUIStore.getState().setShowFileBrowser(true);
   return true;
 }
 
-/**
- * Open file/project
- */
-export function openFile(): boolean {
-  useUIStore.getState().setStatusMessage('Open Project (use File menu)', false, 1000);
+function doSave(): boolean {
+  const ok = saveProjectToStorage();
+  useUIStore.getState().setStatusMessage(ok ? 'Project saved' : 'Save failed', false, 1500);
   return true;
 }
 
-/**
- * Close current file
- */
+function doNew(): boolean {
+  if (!confirm('Start a new project? Unsaved changes will be lost.')) return true;
+  useTrackerStore.getState().reset();
+  useTransportStore.getState().reset();
+  useUIStore.getState().setStatusMessage('New project', false, 1500);
+  return true;
+}
+
+export function newFile(): boolean { return doNew(); }
+export function openFile(): boolean { return openFileBrowser(); }
 export function closeFile(): boolean {
-  useUIStore.getState().setStatusMessage('Close file', false, 1000);
+  useUIStore.getState().setStatusMessage('Close: use browser refresh', false, 1500);
   return true;
 }
-
-/**
- * Save file
- */
-export function saveFile(): boolean {
-  useUIStore.getState().setStatusMessage('Save (use File menu or Toolbar)', false, 1000);
-  return true;
-}
-
-/**
- * Save file as
- */
-export function saveAs(): boolean {
-  useUIStore.getState().setStatusMessage('Save As (use File menu)', false, 1000);
-  return true;
-}
-
-/**
- * New project
- */
-export function newProject(): boolean {
-  useUIStore.getState().setStatusMessage('New Project (use File menu)', false, 1000);
-  return true;
-}
-
-/**
- * Open project
- */
-export function openProject(): boolean {
-  useUIStore.getState().setStatusMessage('Open Project (use File menu)', false, 1000);
-  return true;
-}
-
-/**
- * Save project
- */
-export function saveProject(): boolean {
-  useUIStore.getState().setStatusMessage('Save Project (use File menu)', false, 1000);
-  return true;
-}
-
-/**
- * New song
- */
-export function newSong(): boolean {
-  useUIStore.getState().setStatusMessage('New Song', false, 1000);
-  return true;
-}
-
-/**
- * Load song
- */
-export function loadSong(): boolean {
-  useUIStore.getState().setStatusMessage('Load Song (use File menu)', false, 1000);
-  return true;
-}
-
-/**
- * Save song
- */
-export function saveSong(): boolean {
-  useUIStore.getState().setStatusMessage('Save Song (use File menu)', false, 1000);
-  return true;
-}
-
-/**
- * Load module
- */
-export function loadModule(): boolean {
-  useUIStore.getState().setStatusMessage('Load Module (use File menu)', false, 1000);
-  return true;
-}
-
-/**
- * Save module
- */
-export function saveModule(): boolean {
-  useUIStore.getState().setStatusMessage('Save Module (use File menu)', false, 1000);
-  return true;
-}
+export function saveFile(): boolean { return doSave(); }
+export function saveAs(): boolean { return doSave(); }
+export function newProject(): boolean { return doNew(); }
+export function openProject(): boolean { return openFileBrowser(); }
+export function saveProject(): boolean { return doSave(); }
+export function newSong(): boolean { return doNew(); }
+export function loadSong(): boolean { return openFileBrowser(); }
+export function saveSong(): boolean { return doSave(); }
+export function loadModule(): boolean { return openFileBrowser(); }
+export function saveModule(): boolean { return doSave(); }

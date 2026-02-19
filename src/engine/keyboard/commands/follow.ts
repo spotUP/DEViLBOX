@@ -2,140 +2,112 @@
  * Follow Commands - Follow song, loop pattern, continuous scroll modes
  */
 
+import { useTrackerStore } from '@stores/useTrackerStore';
+import { useTransportStore } from '@stores/useTransportStore';
 import { useUIStore } from '@stores/useUIStore';
+import { muteChannel, soloChannel } from './channel';
 
-/**
- * Toggle follow song mode (cursor follows playback)
- */
 export function toggleFollowSong(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle follow song', false, 1000);
+  const { followPlayback, setFollowPlayback } = useTrackerStore.getState();
+  setFollowPlayback(!followPlayback);
+  useUIStore.getState().setStatusMessage(`Follow: ${!followPlayback ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Toggle pattern loop mode
- */
 export function toggleLoopPattern(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle loop pattern', false, 1000);
+  const { isLooping, setIsLooping } = useTransportStore.getState();
+  setIsLooping(!isLooping);
+  useUIStore.getState().setStatusMessage(`Loop: ${!isLooping ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Toggle continuous scroll mode (Renoise)
- */
 export function toggleContinuousScroll(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle continuous scroll', false, 1000);
+  const { smoothScrolling, setSmoothScrolling } = useTransportStore.getState();
+  setSmoothScrolling(!smoothScrolling);
+  useUIStore.getState().setStatusMessage(`Smooth scroll: ${!smoothScrolling ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Toggle metronome
- */
 export function toggleMetronome(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle metronome', false, 1000);
+  const { metronomeEnabled, toggleMetronome: toggle } = useTransportStore.getState();
+  toggle();
+  useUIStore.getState().setStatusMessage(`Metronome: ${!metronomeEnabled ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Toggle count-in before recording
- */
 export function toggleCountIn(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle count-in', false, 1000);
+  const { countInEnabled, toggleCountIn: toggle } = useTransportStore.getState();
+  toggle();
+  useUIStore.getState().setStatusMessage(`Count-in: ${!countInEnabled ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Toggle MIDI input
- */
 export function toggleMidiInput(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle MIDI input', false, 1000);
+  useUIStore.getState().setStatusMessage('MIDI input: configure in MIDI settings', false, 2000);
   return true;
 }
 
-/**
- * Toggle record quantize
- */
 export function toggleRecordQuantize(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle record quantize', false, 1000);
+  const { recordQuantize, toggleRecordQuantize: toggle } = useTrackerStore.getState();
+  toggle();
+  useUIStore.getState().setStatusMessage(`Record quantize: ${!recordQuantize ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Toggle chord mode
- */
 export function toggleChordMode(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle chord mode', false, 1000);
+  const { chordEntryMode, toggleChordEntryMode } = useUIStore.getState();
+  toggleChordEntryMode();
+  useUIStore.getState().setStatusMessage(`Chord mode: ${!chordEntryMode ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Toggle wrap mode (cursor wraps around pattern)
- */
 export function toggleWrapMode(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle wrap mode', false, 1000);
+  const { wrapMode, toggleWrapMode: toggle } = useTrackerStore.getState();
+  toggle();
+  useUIStore.getState().setStatusMessage(`Wrap mode: ${!wrapMode ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Toggle auto-record (insert notes while playing)
- */
 export function toggleAutoRecord(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle auto-record', false, 1000);
+  const { autoRecord, toggleAutoRecord: toggle } = useTrackerStore.getState();
+  toggle();
+  useUIStore.getState().setStatusMessage(`Auto-record: ${!autoRecord ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Toggle multi-channel recording
- */
 export function toggleMultiChannelRecord(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle multi-channel record', false, 1000);
+  const { multiChannelRecord, toggleMultiChannelRecord: toggle } = useTrackerStore.getState();
+  toggle();
+  useUIStore.getState().setStatusMessage(`Multi-ch record: ${!multiChannelRecord ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
-/**
- * Toggle pattern editor focus
- */
 export function togglePatternFocus(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle pattern focus', false, 1000);
+  useUIStore.getState().setStatusMessage('Pattern focus: click pattern editor', false, 1500);
   return true;
 }
 
-/**
- * Toggle column type visibility
- */
 export function toggleColumnVisibility(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle column visibility', false, 1000);
+  const { blankEmptyCells, setBlankEmptyCells } = useUIStore.getState();
+  setBlankEmptyCells(!blankEmptyCells);
+  useUIStore.getState().setStatusMessage(`Empty cells: ${blankEmptyCells ? 'visible' : 'hidden'}`, false, 1000);
   return true;
 }
 
-/**
- * Solo current channel toggle
- */
 export function toggleSoloChannel(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle solo', false, 1000);
-  return true;
+  return soloChannel();
 }
 
-/**
- * Mute current channel toggle
- */
 export function toggleMuteChannel(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle mute', false, 1000);
-  return true;
+  return muteChannel();
 }
 
-/**
- * Toggle sample playback preview
- */
 export function toggleSamplePreview(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle sample preview', false, 1000);
+  useUIStore.getState().setStatusMessage('Sample preview: click in instrument list', false, 1500);
   return true;
 }
 
-/**
- * Toggle plugin editor visibility
- */
 export function togglePluginEditor(): boolean {
-  useUIStore.getState().setStatusMessage('Toggle plugin editor', false, 1000);
+  useUIStore.getState().togglePanel('instrument-editor');
   return true;
 }
