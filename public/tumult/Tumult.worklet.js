@@ -1425,10 +1425,10 @@ class TumultProcessor extends AudioWorkletProcessor {
         [eqL, eqR] = band.tick(eqL, eqR);
       }
 
-      // ── Mix dry + wet ─────────────────────────────────────────────────────
+      // ── Mix: additive blend (Tumult is an ambience adder, not a crossfader)
       const mix = p.mix;
-      outL[i] = dryL * (1 - mix) + eqL * mix;
-      outR[i] = dryR * (1 - mix) + eqR * mix;
+      outL[i] = dryL + eqL * mix;
+      outR[i] = dryR + eqR * mix;
     }
 
     return true;
