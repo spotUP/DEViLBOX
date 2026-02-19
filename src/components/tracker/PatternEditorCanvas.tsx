@@ -929,15 +929,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Get the note canvas from cache or create it
   const getNoteCanvas = useCallback((note: number, isActive = false): HTMLCanvasElement => {
-    const key = `${note}-${isActive ? 'a' : 'n'}`;
+    const dpr = window.devicePixelRatio || 1;
+    const key = `${note}-${isActive ? 'a' : 'n'}-dpr${dpr}`;
     if (noteCacheRef.current[key]) {
       return noteCacheRef.current[key];
     }
 
     const canvas = document.createElement('canvas');
-    canvas.width = CHAR_WIDTH * 3 + 4;
-    canvas.height = ROW_HEIGHT;
+    canvas.width = (CHAR_WIDTH * 3 + 4) * dpr;
+    canvas.height = ROW_HEIGHT * dpr;
     const ctx = canvas.getContext('2d')!;
+    ctx.scale(dpr, dpr);
 
     ctx.font = '14px "JetBrains Mono", "Fira Code", monospace';
     ctx.textBaseline = 'middle';
@@ -974,7 +976,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       effectKey += `-ex${effects.slice(2).map(e => `${e.type}:${e.param}`).join('-')}`;
     }
     
-    const key = `${instrument}-${volume}-${effectKey}-f1${flag1 ?? 'x'}-f2${flag2 ?? 'x'}-p${probability ?? 'x'}-${blankEmpty ? 'B' : ''}-ec${numEffectCols}`;
+    const dpr = window.devicePixelRatio || 1;
+    const key = `${instrument}-${volume}-${effectKey}-f1${flag1 ?? 'x'}-f2${flag2 ?? 'x'}-p${probability ?? 'x'}-${blankEmpty ? 'B' : ''}-ec${numEffectCols}-dpr${dpr}`;
     if (paramCacheRef.current[key]) {
       return paramCacheRef.current[key];
     }
@@ -985,9 +988,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const canvas = document.createElement('canvas');
     // inst(2)+4 vol(2)+4 + numEffectCols*(3+4)
     const effectWidth = numEffectCols * (CHAR_WIDTH * 3 + 4);
-    canvas.width = CHAR_WIDTH * 4 + 8 + effectWidth + (hasFlagColumns ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
-    canvas.height = ROW_HEIGHT;
+    const logicalW = CHAR_WIDTH * 4 + 8 + effectWidth + (hasFlagColumns ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
+    canvas.width = logicalW * dpr;
+    canvas.height = ROW_HEIGHT * dpr;
     const ctx = canvas.getContext('2d')!;
+    ctx.scale(dpr, dpr);
 
     ctx.font = '14px "JetBrains Mono", "Fira Code", monospace';
     ctx.textBaseline = 'middle';
@@ -1100,16 +1105,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Get line number canvas from cache or create it
   const getLineNumberCanvas = useCallback((lineNum: number, useHex: boolean): HTMLCanvasElement => {
+    const dpr = window.devicePixelRatio || 1;
     const isHighlight = lineNum % 4 === 0;
-    const key = `${lineNum}-${useHex}-${isHighlight}`;
+    const key = `${lineNum}-${useHex}-${isHighlight}-dpr${dpr}`;
     if (lineNumberCacheRef.current[key]) {
       return lineNumberCacheRef.current[key];
     }
 
     const canvas = document.createElement('canvas');
-    canvas.width = LINE_NUMBER_WIDTH;
-    canvas.height = ROW_HEIGHT;
+    canvas.width = LINE_NUMBER_WIDTH * dpr;
+    canvas.height = ROW_HEIGHT * dpr;
     const ctx = canvas.getContext('2d')!;
+    ctx.scale(dpr, dpr);
 
     ctx.font = isHighlight ? 'bold 12px "JetBrains Mono", monospace' : '12px "JetBrains Mono", monospace';
     ctx.textBaseline = 'middle';
@@ -1132,6 +1139,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Get state directly (no React re-render)
     const state = useTrackerStore.getState();
@@ -1441,7 +1451,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       // Line number
       const lineNumCanvas = getLineNumberCanvas(rowIndex, useHex);
-      ctx.drawImage(lineNumCanvas, 4, y);
+      ctx.drawImage(lineNumCanvas, 4, y, LINE_NUMBER_WIDTH, ROW_HEIGHT);
       
       // Apply ghost opacity for content (not background/line numbers)
       if (isGhostRow) {
@@ -1487,7 +1497,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         // Collapsed: show only note column, skip parameter columns
         if (isCollapsed) {
           const noteCanvas = getNoteCanvas(cell.note ?? 0, false);
-          ctx.drawImage(noteCanvas, x, y);
+          ctx.drawImage(noteCanvas, x, y, CHAR_WIDTH * 3 + 4, ROW_HEIGHT);
           continue;
         }
 
@@ -1497,7 +1507,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         // Blank empty cells: skip drawing "---" for note=0
         if (!blankEmpty || cellNote !== 0) {
           const noteCanvas = getNoteCanvas(cellNote, isCurrentPlayingRow && cellNote > 0);
-          ctx.drawImage(noteCanvas, x, y);
+          ctx.drawImage(noteCanvas, x, y, CHAR_WIDTH * 3 + 4, ROW_HEIGHT);
         }
 
         // Parameters (including TB-303 accent/slide if present)
@@ -1519,7 +1529,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           effectCols,
           undefined
         );
-        ctx.drawImage(paramCanvas, x + noteWidth + 4, y);
+        const dprLocal = window.devicePixelRatio || 1;
+        ctx.drawImage(paramCanvas, x + noteWidth + 4, y, paramCanvas.width / dprLocal, ROW_HEIGHT);
 
         // Draw selection highlight
         if (hasSelection && !isGhostRow && ch >= minSelCh && ch <= maxSelCh && rowIndex >= minSelRow && rowIndex <= maxSelRow) {
@@ -1804,8 +1815,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.width = dimensions.width;
-    canvas.height = dimensions.height;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = dimensions.width * dpr;
+    canvas.height = dimensions.height * dpr;
+    canvas.style.width = `${dimensions.width}px`;
+    canvas.style.height = `${dimensions.height}px`;
 
     // Clear caches when size changes
     noteCacheRef.current = {};
