@@ -29,7 +29,7 @@ import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPrese
 import { EffectParameterEditor } from './EffectParameterEditor';
 import { ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
 import { getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
-import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
+import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 
 // User preset storage key
@@ -176,6 +176,13 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
         Object.entries(model.parameters).forEach(([key, param]) => {
           if (param) params[key] = param.default;
         });
+        // Override schema defaults with model-characteristic values so each amp
+        // starts with its own drive/tone character rather than a uniform 50
+        const charDefaults = getModelCharacteristicDefaults(
+          model.characteristics.gain,
+          model.characteristics.tone,
+        );
+        Object.assign(params, charDefaults);
       }
     }
 

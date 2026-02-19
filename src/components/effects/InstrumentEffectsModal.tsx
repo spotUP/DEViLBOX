@@ -12,7 +12,7 @@ import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/inst
 import { useInstrumentStore, notify } from '@stores';
 import { EffectParameterEditor } from './EffectParameterEditor';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
-import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
+import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 
 interface InstrumentEffectsModalProps {
@@ -91,15 +91,20 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
       neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
     };
 
-    // Get default parameters from neural model schema
+    // Get default parameters from neural model schema + characteristic overrides
     if (availableEffect.category === 'neural' && availableEffect.neuralModelIndex !== undefined) {
       const model = GUITARML_MODEL_REGISTRY[availableEffect.neuralModelIndex];
       if (model?.parameters) {
         Object.entries(model.parameters).forEach(([key, param]) => {
-          if (param) {
-            newEffect.parameters[key] = param.default;
-          }
+          if (param) newEffect.parameters[key] = param.default;
         });
+        // Override schema defaults with model-characteristic values so each amp
+        // starts with its own drive/tone character rather than a uniform 50
+        const charDefaults = getModelCharacteristicDefaults(
+          model.characteristics.gain,
+          model.characteristics.tone,
+        );
+        Object.assign(newEffect.parameters, charDefaults);
       }
     }
 

@@ -428,21 +428,17 @@ function App() {
 
   const handleUpdateEffectParameter = (key: string, value: number | string) => {
     if (!editingEffect) return;
-    const updatedParams = { ...editingEffect.effect.parameters, [key]: value };
+    // Read fresh params from store to avoid stale closure losing concurrent knob moves
+    const current = useAudioStore.getState().masterEffects.find(e => e.id === editingEffect.effect.id);
+    const updatedParams = { ...(current?.parameters ?? editingEffect.effect.parameters), [key]: value };
     updateMasterEffect(editingEffect.effect.id, { parameters: updatedParams });
-    setEditingEffect({
-      ...editingEffect,
-      effect: { ...editingEffect.effect, parameters: updatedParams }
-    });
+    setEditingEffect(prev => prev ? { ...prev, effect: { ...prev.effect, parameters: updatedParams } } : null);
   };
 
   const handleUpdateEffectWet = (wet: number) => {
     if (!editingEffect) return;
     updateMasterEffect(editingEffect.effect.id, { wet });
-    setEditingEffect({
-      ...editingEffect,
-      effect: { ...editingEffect.effect, wet }
-    });
+    setEditingEffect(prev => prev ? { ...prev, effect: { ...prev.effect, wet } } : null);
   };
 
   useEffect(() => {

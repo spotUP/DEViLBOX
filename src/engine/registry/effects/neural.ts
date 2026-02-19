@@ -9,15 +9,6 @@ import type { EffectConfig } from '@typedefs/instrument';
 import type { EffectDescriptor } from '../EffectDescriptor';
 import { EffectRegistry } from '../EffectRegistry';
 
-/** Map GuitarML model characteristics to sensible default parameters (0-100 scale) */
-function getModelDefaults(gain: string, tone: string): Record<string, number> {
-  const driveMap: Record<string, number> = { low: 30, medium: 50, high: 65, extreme: 75 };
-  const drive = driveMap[gain] ?? 50;
-  const treble = tone === 'bright' ? 60 : tone === 'dark' ? 40 : 50;
-  const bass   = tone === 'dark'   ? 60 : tone === 'bright' ? 40 : 50;
-  return { drive, level: 70, treble, bass };
-}
-
 const neuralEffect: EffectDescriptor = {
   id: 'Neural', name: 'Neural Amp Model', category: 'neural', group: 'Distortion',
   description: 'AI-modeled guitar amp and pedal tones',
@@ -33,16 +24,19 @@ const neuralEffect: EffectDescriptor = {
       wet: c.wet / 100,
     });
     await wrapper.loadModel();
-    // Apply model-characteristic defaults first so each model has its own starting tone
-    const modelInfo = GUITARML_MODEL_REGISTRY.find(m => m.index === c.neuralModelIndex);
-    if (modelInfo) {
-      const defaults = getModelDefaults(modelInfo.characteristics.gain, modelInfo.characteristics.tone);
-      Object.entries(defaults).forEach(([key, value]) => wrapper.setParameter(key, value));
-    }
-    // Stored user params override the characteristic defaults
+    // Apply stored user params (which include characteristic defaults when first added)
     Object.entries(c.parameters).forEach(([key, value]) => {
       wrapper.setParameter(key, value as number);
     });
+    // Fallback: if params were not seeded (edge case), apply characteristic defaults
+    if (Object.keys(c.parameters).length === 0) {
+      const { getModelCharacteristicDefaults } = await import('@/constants/guitarMLRegistry');
+      const modelInfo = GUITARML_MODEL_REGISTRY.find(m => m.index === c.neuralModelIndex);
+      if (modelInfo) {
+        const defaults = getModelCharacteristicDefaults(modelInfo.characteristics.gain, modelInfo.characteristics.tone);
+        Object.entries(defaults).forEach(([key, value]) => wrapper.setParameter(key, value));
+      }
+    }
     return wrapper;
   },
   getDefaultParameters: () => ({}),
