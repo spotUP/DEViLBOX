@@ -20,6 +20,7 @@ import { useTransportStore } from './useTransportStore';
 import { idGenerator } from '../utils/idGenerator';
 import { DEFAULT_PATTERN_LENGTH, DEFAULT_NUM_CHANNELS, MAX_PATTERN_LENGTH, MAX_CHANNELS, MIN_CHANNELS, MIN_PATTERN_LENGTH } from '../constants/trackerConstants';
 import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
+import { useHistoryStore } from './useHistoryStore';
 
 // FT2-style bitwise mask system for copy/paste/transpose operations
 // Bit 0: Note
@@ -498,7 +499,9 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
-    setCell: (channelIndex, rowIndex, cellUpdate) =>
+    setCell: (channelIndex, rowIndex, cellUpdate) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         if (
@@ -512,9 +515,13 @@ export const useTrackerStore = create<TrackerStore>()(
             ...cellUpdate,
           };
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('EDIT_CELL', 'Edit cell', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
-    clearCell: (channelIndex, rowIndex) =>
+    clearCell: (channelIndex, rowIndex) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         if (
@@ -525,25 +532,37 @@ export const useTrackerStore = create<TrackerStore>()(
         ) {
           pattern.channels[channelIndex].rows[rowIndex] = { ...EMPTY_CELL };
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('CLEAR_CELL', 'Clear cell', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
-    clearChannel: (channelIndex) =>
+    clearChannel: (channelIndex) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
           pattern.channels[channelIndex].rows = pattern.channels[channelIndex].rows.map(() => ({ ...EMPTY_CELL }));
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('CLEAR_CHANNEL', 'Clear channel', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
-    clearPattern: () =>
+    clearPattern: () => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         pattern.channels.forEach((channel) => {
           channel.rows = channel.rows.map(() => ({ ...EMPTY_CELL }));
         });
-      }),
+      });
+      useHistoryStore.getState().pushAction('CLEAR_PATTERN', 'Clear pattern', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
-    insertRow: (channelIndex, rowIndex) =>
+    insertRow: (channelIndex, rowIndex) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         if (
@@ -560,9 +579,13 @@ export const useTrackerStore = create<TrackerStore>()(
           // Clear inserted row
           rows[rowIndex] = { ...EMPTY_CELL };
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('INSERT_ROW', 'Insert row', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
-    deleteRow: (channelIndex, rowIndex) =>
+    deleteRow: (channelIndex, rowIndex) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         if (
@@ -579,7 +602,9 @@ export const useTrackerStore = create<TrackerStore>()(
           // Clear last row
           rows[pattern.length - 1] = { ...EMPTY_CELL };
         }
-      }),
+      });
+      useHistoryStore.getState().pushAction('DELETE_ROW', 'Delete row', patternIndex, beforePattern, get().patterns[patternIndex]);
+    },
 
     setFollowPlayback: (enabled) =>
       set((state) => {
@@ -1214,9 +1239,15 @@ export const useTrackerStore = create<TrackerStore>()(
             targetCell.eff = 0;
             targetCell.effTyp2 = 0;
             targetCell.eff2 = 0;
+            targetCell.flag1 = 0;
+            targetCell.flag2 = 0;
+            targetCell.probability = 0;
 
             if (hasMaskBit(pasteMask, MASK_NOTE)) {
               targetCell.note = sourceCell.note;
+              targetCell.flag1 = sourceCell.flag1 ?? 0;
+              targetCell.flag2 = sourceCell.flag2 ?? 0;
+              targetCell.probability = sourceCell.probability ?? 0;
             }
             if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
               targetCell.instrument = sourceCell.instrument;
@@ -1739,6 +1770,14 @@ export const useTrackerStore = create<TrackerStore>()(
           state.patterns.splice(index, 1);
           if (state.currentPatternIndex >= state.patterns.length) {
             state.currentPatternIndex = state.patterns.length - 1;
+          }
+          // Update patternOrder: remove references to deleted index, decrement higher indices
+          state.patternOrder = state.patternOrder
+            .filter((p) => p !== index)
+            .map((p) => (p > index ? p - 1 : p));
+          if (state.patternOrder.length === 0) state.patternOrder = [0];
+          if (state.currentPositionIndex >= state.patternOrder.length) {
+            state.currentPositionIndex = state.patternOrder.length - 1;
           }
           // Add status message
           if (typeof window !== 'undefined') {

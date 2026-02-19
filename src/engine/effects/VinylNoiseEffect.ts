@@ -131,7 +131,7 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
       this._send('playing', this._playingState ? 1 : 0);
 
     } catch (err) {
-      console.warn('[VinylNoise] Worklet init failed:', err);
+      console.error('[VinylNoise] Worklet init FAILED:', err);
       // Fallback: just pass input through wetGain
       this.input.connect(this.wetGain);
     }
@@ -153,7 +153,8 @@ export class VinylNoiseEffect extends Tone.ToneAudioNode {
   }
 
   private _send(param: string, value: number) {
-    this.workletNode?.port.postMessage({ param, value });
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ param, value });
   }
 
   // ─── Parameter setters ────────────────────────────────────────────────────
