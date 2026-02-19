@@ -1009,3 +1009,167 @@ class TumultNoise {
     return output;
   }
 }
+
+// ─── SVF Band (1:1 from svf_lp/hp/peak/ls/hs.cpp — Faust 2.74.5) ─────────────
+// All 5 filter types share the same TPT state variable topology.
+// Smoothing: one-pole IIR at 10 Hz (44.1/SR alpha), matching Faust fConst1/fConst2.
+class SVFBand {
+  constructor(sr) {
+    // Smoothing constants (from svf_lp.cpp instanceConstants):
+    // fConst1 = 44.1/SR, fConst2 = 1 - 44.1/SR, fConst3 = π/SR
+    this.alpha  = 44.1 / sr;        // fConst1
+    this.oneMA  = 1 - 44.1 / sr;   // fConst2
+    this.piOverSr = Math.PI / sr;   // fConst3
+
+    // Smoothed parameter states (freq, Q, gain)
+    this.freqS = 1000;   // fRec3 (or fRec5)
+    this.qS    = 0.7;    // fRec4 (or fRec0/fRec1/fRec6)
+    this.gainS = 0;      // fRec0 (peak/shelf only)
+
+    // Filter state: two integrators, stereo (L and R)
+    this.s1L = 0; this.s2L = 0;  // fRec0[2], fRec1[2] for L
+    this.s1R = 0; this.s2R = 0;  // fRec5[2], fRec6[2] for R
+
+    // Target values (set by setParams)
+    this.freqTarget = 1000;
+    this.qTarget    = 0.7;
+    this.gainTarget = 0;
+    this.type = 'lp';  // 'lp' | 'hp' | 'peak' | 'ls' | 'hs'
+    this.enabled = false;
+  }
+
+  setParams(type, freq, q, gainDb, enabled) {
+    this.type        = type;
+    this.freqTarget  = Math.max(20, Math.min(20000, freq));
+    this.qTarget     = Math.max(0.7, Math.min(10, q));
+    this.gainTarget  = Math.max(-24, Math.min(24, gainDb ?? 0));
+    this.enabled     = enabled;
+  }
+
+  // Process one stereo sample pair. Returns [outL, outR].
+  // Ported verbatim from each svf_*.cpp compute() loop body.
+  tick(inL, inR) {
+    if (!this.enabled) return [inL, inR];
+
+    // ── Smooth parameters (one-pole IIR, matching Faust fConst1/fConst2) ──
+    // fSlow = alpha * target
+    // fRec = fSlow + oneMA * fRec_prev
+    this.freqS = this.alpha * this.freqTarget + this.oneMA * this.freqS;
+    this.qS    = this.alpha * this.qTarget    + this.oneMA * this.qS;
+    this.gainS = this.alpha * this.gainTarget + this.oneMA * this.gainS;
+
+    const g = Math.tan(this.piOverSr * this.freqS);
+
+    let outL, outR;
+
+    if (this.type === 'lp') {
+      // svf_lp.cpp lines 165–183
+      const den = g * (g + 1 / this.qS) + 1;
+      // L:
+      const t3L  = this.s1L + g * (inL - this.s2L);
+      const v1L  = t3L / den;
+      this.s1L   = 2 * v1L - this.s1L;
+      const t5L  = this.s2L + g * t3L / den;
+      this.s2L   = 2 * t5L - this.s2L;
+      outL = t5L;
+      // R:
+      const t3R  = this.s1R + g * (inR - this.s2R);
+      const v1R  = t3R / den;
+      this.s1R   = 2 * v1R - this.s1R;
+      const t5R  = this.s2R + g * t3R / den;
+      this.s2R   = 2 * t5R - this.s2R;
+      outR = t5R;
+
+    } else if (this.type === 'hp') {
+      // svf_hp.cpp lines 163–185
+      // Note: Q is smoothed as fRec0, freq as fRec5 (order swapped vs LP)
+      const den = g * (g + 1 / this.qS) + 1;
+      // L:
+      const t3L  = this.s1L + g * (inL - this.s2L);
+      const v1L  = t3L / den;
+      this.s1L   = 2 * v1L - this.s1L;
+      const t5L  = this.s2L + g * t3L / den;
+      this.s2L   = 2 * t5L - this.s2L;
+      outL = inL - (t5L + v1L / this.qS);
+      // R:
+      const t3R  = this.s1R + g * (inR - this.s2R);
+      const v1R  = t3R / den;
+      this.s1R   = 2 * v1R - this.s1R;
+      const t5R  = this.s2R + g * t3R / den;
+      this.s2R   = 2 * t5R - this.s2R;
+      outR = inR - (t5R + v1R / this.qS);
+
+    } else if (this.type === 'peak') {
+      // svf_peak.cpp lines 174–205
+      // A = 10^(gain/40) = 10^(0.025*gain)
+      const A   = Math.pow(10, 0.025 * this.gainS);
+      const Aq  = this.qS * A;              // fTemp1 = Q*A
+      const A2m1 = A * A - 1;               // fTemp2 = A²-1
+      const den = g * (g + 1 / Aq) + 1;
+      // L:
+      const t6L  = this.s1L + g * (inL - this.s2L);
+      const v1L  = t6L / den;               // fRec4 = fTemp7
+      this.s1L   = 2 * v1L - this.s1L;
+      const t8L  = this.s2L + g * t6L / den;
+      this.s2L   = 2 * t8L - this.s2L;
+      outL = inL + v1L * A2m1 / Aq;
+      // R:
+      const t6R  = this.s1R + g * (inR - this.s2R);
+      const v1R  = t6R / den;
+      this.s1R   = 2 * v1R - this.s1R;
+      const t8R  = this.s2R + g * t6R / den;
+      this.s2R   = 2 * t8R - this.s2R;
+      outR = inR + v1R * A2m1 / Aq;
+
+    } else if (this.type === 'ls') {
+      // svf_ls.cpp lines 174–206
+      const A    = Math.pow(10, 0.025 * this.gainS);
+      const sqA  = Math.sqrt(A);
+      const A2m1 = A * A - 1;               // fTemp1
+      const Am1  = A - 1;                   // fTemp10
+      // Modified denominator using g/sqrt(A) (svf_ls.cpp line 182)
+      const den  = g * (1 / this.qS + g / sqA) / sqA + 1;
+      const gden = sqA * den;
+      // L:
+      const t6L  = this.s1L + g * (inL - this.s2L) / sqA;
+      const v1L  = t6L / den;
+      this.s1L   = 2 * v1L - this.s1L;
+      const t9L  = this.s2L + g * t6L / gden;
+      this.s2L   = 2 * t9L - this.s2L;
+      outL = inL + v1L * Am1 / this.qS + t9L * A2m1;
+      // R:
+      const t6R  = this.s1R + g * (inR - this.s2R) / sqA;
+      const v1R  = t6R / den;
+      this.s1R   = 2 * v1R - this.s1R;
+      const t9R  = this.s2R + g * t6R / gden;
+      this.s2R   = 2 * t9R - this.s2R;
+      outR = inR + v1R * Am1 / this.qS + t9R * A2m1;
+
+    } else {
+      // svf_hs.cpp lines 174–206
+      const A    = Math.pow(10, 0.025 * this.gainS);
+      const sqA  = Math.sqrt(A);
+      const A2m1 = 1 - A * A;               // fTemp1 = 1-A²
+      const Am1  = 1 - A;                   // fTemp8 = 1-A
+      // Modified g: tan * sqrt(A) (svf_hs.cpp line 179)
+      const gmod = g * sqA;
+      const den  = gmod * (gmod + 1 / this.qS) + 1;
+      // L:
+      const t5L  = this.s1L + gmod * (inL - this.s2L);
+      const v1L  = t5L / den;
+      this.s1L   = 2 * v1L - this.s1L;
+      const t7L  = this.s2L + gmod * t5L / den;
+      this.s2L   = 2 * t7L - this.s2L;
+      outL = A * (inL * A + v1L * Am1 / this.qS) + t7L * A2m1;
+      // R:
+      const t5R  = this.s1R + gmod * (inR - this.s2R);
+      const v1R  = t5R / den;
+      this.s1R   = 2 * v1R - this.s1R;
+      const t7R  = this.s2R + gmod * t5R / den;
+      this.s2R   = 2 * t7R - this.s2R;
+      outR = A * (inR * A + v1R * Am1 / this.qS) + t7R * A2m1;
+    }
+
+    return [outL, outR];
+  }
+}
