@@ -57,9 +57,11 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas resolution
-    canvas.width = actualWidth;
-    canvas.height = height;
+    // Set canvas resolution — DPR-aware for retina screens
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = actualWidth * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // PERF: Don't run animation loop when not playing - just draw static background
     if (!isPlaying) {
