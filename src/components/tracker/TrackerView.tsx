@@ -21,7 +21,7 @@ import { RemapInstrumentDialog } from './RemapInstrumentDialog';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 import { RandomizeDialog } from '@components/dialogs/RandomizeDialog';
 import { PatternOrderModal } from '@components/dialogs/PatternOrderModal';
-import { SYSTEM_PRESETS, DivChanType } from '@/constants/systemPresets';
+import { SYSTEM_PRESETS, DivChanType, getGroupedPresets } from '@/constants/systemPresets';
 import { CHANNEL_COLORS } from '@typedefs';
 import { StrumDialog } from '@components/dialogs/StrumDialog';
 import { AdvancedEditModal } from '@components/dialogs/AdvancedEditModal';
@@ -1020,8 +1020,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               title="Select Hardware System Preset (NES, SMS, Genesis, etc.)"
             >
               <option value="none" disabled>SELECT HARDWARE...</option>
-              {SYSTEM_PRESETS.map(preset => (
-                <option key={preset.id} value={preset.id} className="bg-dark-bgPrimary text-text-primary">{preset.name.toUpperCase()}</option>
+              {getGroupedPresets().map(group => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.presets.map(preset => (
+                    <option key={preset.id} value={preset.id} className="bg-dark-bgPrimary text-text-primary">{preset.name.toUpperCase()}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

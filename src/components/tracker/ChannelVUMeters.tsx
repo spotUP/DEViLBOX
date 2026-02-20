@@ -1,10 +1,11 @@
 /**
- * ChannelVUMeters - LED-style segmented VU meters
+ * ChannelVUMeters - Canvas-based LED-style segmented VU meters
  * Bars extend UP from edit bar with sectioned segments
- * Gradient from bright cyan at top to deep blue at bottom
+ * Green → Yellow → Red gradient from bottom to top
  *
- * PERFORMANCE: Uses refs and direct DOM manipulation instead of React state
- * to avoid 60+ state updates per second during animation.
+ * PERFORMANCE: Single <canvas> element replaces 104+ DOM nodes.
+ * All rendering is done via Canvas 2D — zero per-frame DOM mutations,
+ * no forced reflows, no style recalculations.
  */
 
 import React, { useEffect, useRef, memo } from 'react';
@@ -13,29 +14,19 @@ import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
 
 // VU meter timing constants - ProTracker style
-const DECAY_RATE = 0.92;  // Smooth decay for falloff
-const SWING_RANGE = 25;   // Reduced from 50 to stay within channel bounds
+const DECAY_RATE = 0.92;
+const SWING_RANGE = 25;
 const SWING_SPEED = 0.8;
 const NUM_SEGMENTS = 26;
 const SEGMENT_GAP = 4;
+const SEGMENT_HEIGHT = 4;
+const METER_WIDTH = 28;
+const LINE_NUMBER_WIDTH = 40;
 
-// Get segment color based on position (0 = bottom, 1 = top)
-const getSegmentColor = (ratio: number, isLit: boolean): { bg: string; glow: string } => {
-  if (!isLit) {
-    return { bg: 'transparent', glow: 'none' };
-  }
-  
-  let color: string;
-  if (ratio < 0.6) {
-    color = '#22c55e'; // Green
-  } else if (ratio < 0.85) {
-    color = '#eab308'; // Yellow
-  } else {
-    color = '#ef4444'; // Red
-  }
-  
-  return { bg: color, glow: `0 0 6px ${color}80` };
-};
+// Segment colors
+const COLOR_GREEN = '#22c55e';
+const COLOR_YELLOW = '#eab308';
+const COLOR_RED = '#ef4444';
 
 interface MeterState {
   level: number;
@@ -44,12 +35,11 @@ interface MeterState {
 }
 
 interface ChannelVUMetersProps {
-  channelOffsets?: number[]; // Explicit offsets from parent
-  channelWidths?: number[];  // Explicit widths from parent
-  scrollLeft?: number;       // Explicit scroll offset from parent
+  channelOffsets?: number[];
+  channelWidths?: number[];
+  scrollLeft?: number;
 }
 
-// PERFORMANCE: Memoize to prevent re-renders on every scroll step
 export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOffsets = [], channelWidths = [], scrollLeft: scrollLeftProp = 0 }) => {
   const { patterns, currentPatternIndex } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
@@ -59,48 +49,54 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
   const pattern = patterns[currentPatternIndex];
   const numChannels = pattern?.channels.length || 4;
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const meterRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const segmentRefs = useRef<(HTMLDivElement | null)[][]>([]);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const meterStates = useRef<MeterState[]>([]);
   const animationRef = useRef<number | null>(null);
-  const containerHeightRef = useRef(200);
+
+  // Refs for values needed inside the animation loop
+  const numChannelsRef = useRef(numChannels);
+  const scrollLeftRef = useRef(scrollLeftProp);
+  const channelOffsetsRef = useRef(channelOffsets);
+  const channelWidthsRef = useRef(channelWidths);
+
+  useEffect(() => { numChannelsRef.current = numChannels; }, [numChannels]);
+  useEffect(() => { scrollLeftRef.current = scrollLeftProp; }, [scrollLeftProp]);
+  useEffect(() => { channelOffsetsRef.current = channelOffsets; }, [channelOffsets]);
+  useEffect(() => { channelWidthsRef.current = channelWidths; }, [channelWidths]);
 
   // Initialize meter states
   useEffect(() => {
-    meterStates.current = Array(numChannels).fill(null).map((_, i) => ({
+    meterStates.current = Array.from({ length: numChannels }, (_, i) => ({
       level: 0,
       position: (i % 2 === 0 ? -1 : 1) * SWING_RANGE * 0.5,
       direction: i % 2 === 0 ? 1 : -1
     }));
-    meterRefs.current = Array(numChannels).fill(null);
-    segmentRefs.current = Array(numChannels).fill(null).map(() => Array(NUM_SEGMENTS).fill(null));
   }, [numChannels]);
 
-  // Measure container height
+  // Canvas resize via ResizeObserver — no clientHeight read/write loop
   useEffect(() => {
-    const updateHeight = () => {
-      if (containerRef.current) {
-        containerHeightRef.current = containerRef.current.clientHeight;
-        // Update meter heights directly
-        meterRefs.current.forEach(ref => {
-          if (ref) ref.style.height = `${containerHeightRef.current - 4}px`;
-        });
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      const bw = Math.round(width * dpr);
+      const bh = Math.round(height * dpr);
+      if (canvas.width !== bw || canvas.height !== bh) {
+        canvas.width = bw;
+        canvas.height = bh;
       }
-    };
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
-    if (containerRef.current) observer.observe(containerRef.current);
+    });
+    observer.observe(parent);
     return () => observer.disconnect();
   }, []);
 
-  // Refs for values needed inside the animation loop
-  const numChannelsRef = useRef(numChannels);
-  const scrollLeftPropRef = useRef(scrollLeftProp);
-  useEffect(() => { numChannelsRef.current = numChannels; }, [numChannels]);
-  useEffect(() => { scrollLeftPropRef.current = scrollLeftProp; }, [scrollLeftProp]);
-
-  // Start/stop animation - loop defined inside effect to avoid self-referencing
+  // Animation loop
   useEffect(() => {
     if (performanceQuality === 'low') {
       if (animationRef.current) {
@@ -111,23 +107,43 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
     }
 
     const tick = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        animationRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        animationRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      const dpr = window.devicePixelRatio || 1;
+      const cw = canvas.width / dpr;
+      const ch = canvas.height / dpr;
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, cw, ch);
+
       const engine = getToneEngine();
       const nc = numChannelsRef.current;
       const triggerLevels = engine.getChannelTriggerLevels(nc);
-
-      // Apply scroll offset to container from PROP
-      if (containerRef.current) {
-        containerRef.current.style.transform = `translateX(${-scrollLeftPropRef.current}px)`;
-      }
+      const sl = scrollLeftRef.current;
+      const offsets = channelOffsetsRef.current;
+      const widths = channelWidthsRef.current;
 
       for (let i = 0; i < nc; i++) {
         const meter = meterStates.current[i];
         if (!meter) continue;
 
+        // Skip collapsed channels
+        if (widths[i] && widths[i] < 20) continue;
+
         const trigger = triggerLevels[i] || 0;
         const staggerOffset = i * 0.012;
 
-        // Update level - ProTracker style: instant jump to full on trigger, smooth decay
+        // Update level - instant jump on trigger, smooth decay
         if (trigger > 0) {
           meter.level = trigger;
         } else {
@@ -152,27 +168,59 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
           }
         }
 
-        // Direct DOM updates - no React re-render
-        const meterEl = meterRefs.current[i];
-        if (meterEl) {
-          meterEl.style.transform = `translateX(${meter.position}px)`;
+        // Calculate channel center X
+        let centerX: number;
+        if (offsets[i] && widths[i]) {
+          const offset = offsets[i] - LINE_NUMBER_WIDTH;
+          centerX = offset + widths[i] / 2;
+        } else {
+          centerX = i * 260 + 130;
         }
 
+        // Apply scroll and swing
+        const meterX = centerX - METER_WIDTH / 2 - sl + meter.position;
+
+        // Draw segments bottom-to-top
         const activeSegments = Math.round(meter.level * NUM_SEGMENTS);
-        const segments = segmentRefs.current[i];
-        if (segments) {
-          for (let s = 0; s < NUM_SEGMENTS; s++) {
-            const segEl = segments[s];
-            if (!segEl) continue;
 
-            const isLit = s < activeSegments;
-            const ratio = s / (NUM_SEGMENTS - 1);
-            const { bg, glow } = getSegmentColor(ratio, isLit);
+        for (let s = 0; s < activeSegments; s++) {
+          const ratio = s / (NUM_SEGMENTS - 1);
+          const segY = ch - 2 - (s * (SEGMENT_HEIGHT + SEGMENT_GAP)) - SEGMENT_HEIGHT;
 
-            segEl.style.backgroundColor = bg;
-            segEl.style.boxShadow = glow;
+          // Determine color
+          let color: string;
+          if (ratio < 0.6) {
+            color = COLOR_GREEN;
+          } else if (ratio < 0.85) {
+            color = COLOR_YELLOW;
+          } else {
+            color = COLOR_RED;
           }
+
+          // Draw segment with glow
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 6;
+          ctx.fillStyle = color;
+
+          // Rounded rect
+          const r = 1;
+          ctx.beginPath();
+          ctx.moveTo(meterX + r, segY);
+          ctx.lineTo(meterX + METER_WIDTH - r, segY);
+          ctx.quadraticCurveTo(meterX + METER_WIDTH, segY, meterX + METER_WIDTH, segY + r);
+          ctx.lineTo(meterX + METER_WIDTH, segY + SEGMENT_HEIGHT - r);
+          ctx.quadraticCurveTo(meterX + METER_WIDTH, segY + SEGMENT_HEIGHT, meterX + METER_WIDTH - r, segY + SEGMENT_HEIGHT);
+          ctx.lineTo(meterX + r, segY + SEGMENT_HEIGHT);
+          ctx.quadraticCurveTo(meterX, segY + SEGMENT_HEIGHT, meterX, segY + SEGMENT_HEIGHT - r);
+          ctx.lineTo(meterX, segY + r);
+          ctx.quadraticCurveTo(meterX, segY, meterX + r, segY);
+          ctx.closePath();
+          ctx.fill();
         }
+
+        // Reset shadow after each meter
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
       }
 
       animationRef.current = requestAnimationFrame(tick);
@@ -187,71 +235,22 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
     };
   }, [performanceQuality]);
 
-  // Disable VU meters on low quality
   if (performanceQuality === 'low') {
     return null;
   }
 
-  // Note: ROW_NUM_WIDTH is handled by the parent container's left offset
-  // These widths MUST match PatternEditorCanvas rendering exactly
-  const LINE_NUMBER_WIDTH = 40;
-  const METER_WIDTH = 28;
-
-  // Calculate channel center X accounting for collapsed channels
-  const getChannelCenterX = (index: number) => {
-    if (!channelOffsets[index] || !channelWidths[index]) {
-      return index * 260 + 130;
-    }
-
-    // Use passed metrics from parent (PatternEditorCanvas)
-    const offset = channelOffsets[index] - LINE_NUMBER_WIDTH;
-    const width = channelWidths[index];
-
-    // Add half of this channel's width to get center
-    return offset + width / 2;
-  };
-
   return (
-    <div ref={containerRef} className="vu-meters-overlay">
-      {Array(numChannels).fill(0).map((_, index) => {
-        // Skip if channel is collapsed (too narrow for swing)
-        if (channelWidths[index] && channelWidths[index] < 20) return null;
-
-        const centerX = getChannelCenterX(index);
-
-        return (
-          <div
-            key={index}
-            ref={el => { meterRefs.current[index] = el; }}
-            className="vu-meter-vertical"
-            style={{
-              left: `${centerX - METER_WIDTH / 2}px`,
-              width: `${METER_WIDTH}px`,
-              height: 'calc(100% - 4px)',
-              display: 'flex',
-              flexDirection: 'column-reverse',
-              alignItems: 'stretch',
-              gap: `${SEGMENT_GAP}px`,
-            }}
-          >
-            {Array.from({ length: NUM_SEGMENTS }, (_, segIndex) => (
-              <div
-                key={segIndex}
-                ref={el => {
-                  if (!segmentRefs.current[index]) segmentRefs.current[index] = [];
-                  segmentRefs.current[index][segIndex] = el;
-                }}
-                style={{
-                  height: '4px',
-                  backgroundColor: 'transparent',
-                  borderRadius: '1px',
-                }}
-              />
-            ))}
-          </div>
-        );
-      })}
-    </div>
+    <canvas
+      ref={canvasRef}
+      className="vu-meters-canvas"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+      }}
+    />
   );
 });
 

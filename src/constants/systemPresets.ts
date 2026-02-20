@@ -1112,3 +1112,48 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     channelDefs: genSimple(8, DivChanType.NOISE)
   }
 ];
+
+/** Grouped presets for optgroup rendering in SELECT dropdowns */
+export interface PresetGroup {
+  label: string;
+  presets: SystemPreset[];
+}
+
+export function getGroupedPresets(): PresetGroup[] {
+  // Build groups by scanning the array — categories match the comment order
+  const groupDefs: { label: string; startId: string }[] = [
+    { label: 'Yamaha FM', startId: 'ymu759' },
+    { label: 'Yamaha OPL', startId: 'opl' },
+    { label: 'Console', startId: 'nes' },
+    { label: 'Commodore', startId: 'sid6581' },
+    { label: 'Atari', startId: 'pokey' },
+    { label: 'AY/PSG', startId: 'ay8910' },
+    { label: 'Sampler', startId: 'amiga' },
+    { label: 'Famicom Expansion', startId: 'vrc6' },
+    { label: 'Konami', startId: 'scc' },
+    { label: 'Namco', startId: 'n163' },
+    { label: 'OKI', startId: 'msm6258' },
+    { label: 'Other', startId: 'dave' },
+    { label: 'Fantasy', startId: 'tildearrow_sound_unit' },
+    { label: 'Compound', startId: 'genesis' },
+    { label: 'Debug/Test', startId: 'pong' },
+  ];
+
+  const groups: PresetGroup[] = [];
+  const idToIndex = new Map<string, number>();
+  SYSTEM_PRESETS.forEach((p, i) => idToIndex.set(p.id, i));
+
+  for (let g = 0; g < groupDefs.length; g++) {
+    const startIdx = idToIndex.get(groupDefs[g].startId);
+    if (startIdx === undefined) continue;
+    const endIdx = g + 1 < groupDefs.length
+      ? idToIndex.get(groupDefs[g + 1].startId) ?? SYSTEM_PRESETS.length
+      : SYSTEM_PRESETS.length;
+    const presets = SYSTEM_PRESETS.slice(startIdx, endIdx);
+    if (presets.length > 0) {
+      groups.push({ label: groupDefs[g].label, presets });
+    }
+  }
+
+  return groups;
+}
