@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-20T00:24:58.302Z
+ * Generated: 2026-02-20T10:05:41.921Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.991';
-export const BUILD_NUMBER = '991';
-export const BUILD_HASH = '6ff4f312';
+export const BUILD_VERSION = '1.0.999';
+export const BUILD_NUMBER = '999';
+export const BUILD_HASH = '3e095967';
 export const BUILD_DATE = '2026-02-20';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,41 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.991',
+    version: '1.0.999',
     date: '2026-02-20',
     changes: [
+      {
+        type: 'fix',
+        "description": "Use CSS zoom instead of transform:scale for WAM plugin GUIs"
+      },
+      {
+        type: 'feature',
+        "description": "Add DJ Mixer option to view switcher dropdowns"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update plan docs and generated files"
+      },
+      {
+        type: 'feature',
+        "description": "Chore(midi): add reggae/ska/rocksteady MIDI song pack, remove old test patterns"
+      },
+      {
+        type: 'feature',
+        "description": "Per-note percussion channels + pattern length fix + cleanup consistency"
+      },
+      {
+        type: 'feature',
+        "description": "DJ mixing mode with dual-deck playback and mixer"
+      },
+      {
+        type: 'fix',
+        "description": "BitCrusher WaveShaper fallback, NeuralEffect drive improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Route chip engine audio through master effects chain"
+      },
       {
         type: 'feature',
         "description": "Load GM2 instruments in App.tsx MIDI handler"
@@ -206,38 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Implement paste/edit commands + patternOrder + console cleanup"
-      },
-      {
-        type: 'fix',
-        "description": "5 user-reported bugs — MIDI loading, TD-3 demos, reset localStorage, popup knobs, popup height"
-      },
-      {
-        type: 'fix',
-        "description": "Wire undo history + fix clonePattern + console cleanup"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: remove debug console.logs from UIStore migration, add plan docs"
-      },
-      {
-        type: 'fix',
-        "description": "Syntax errors in useHistoryStore/PatternScheduler, remove dead diagnostic fields in TrackerReplayer"
-      },
-      {
-        type: 'fix',
-        "description": "Beta readiness — console cleanup, undo/redo, bug fixes"
-      },
-      {
-        type: 'feature',
-        "description": "Add MiniOutputMeter to effect chain cards — live RMS bar for each effect"
-      },
-      {
-        type: 'fix',
-        "description": "Consistency pass — hook after getParam calls in 3 editors, fix AutoPanner color"
-      },
-      {
-        type: 'improvement',
-        "description": "Move useEffectAnalyser call to after all getParam reads for consistency"
       }
     ]
   }

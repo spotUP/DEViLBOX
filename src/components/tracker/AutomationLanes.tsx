@@ -73,6 +73,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   const allCurves = useAutomationStore((state) => state.curves);
   const addPoint = useAutomationStore((state) => state.addPoint);
   const removePoint = useAutomationStore((state) => state.removePoint);
+  const channelLanes = useAutomationStore((state) => state.channelLanes);
 
   // Drag state
   const [dragState, setDragState] = useState<{
@@ -82,55 +83,73 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = ({
   } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Resolve per-channel active parameter: use the store's channelLanes state,
+  // falling back to the prop (which may be a legacy default like "cutoff")
+  const channelParameters = useMemo(() => {
+    const result: string[] = [];
+    for (let i = 0; i < channelCount; i++) {
+      const lane = channelLanes.get(i);
+      // Use the per-channel active parameter if set, otherwise fall back to prop
+      result.push(lane?.activeParameter || parameter);
+    }
+    return result;
+  }, [channelCount, channelLanes, parameter]);
+
   // Get automation curves for all channels (current pattern)
   const curves = useMemo(() => {
     const result: (AutomationCurve | null)[] = [];
     for (let i = 0; i < channelCount; i++) {
-      // Find curve matching this pattern, channel, and parameter
+      const chParam = channelParameters[i];
+      // Find curve matching this pattern, channel, and per-channel parameter
       const curve = allCurves.find(
         (c) =>
           c.patternId === patternId &&
           c.channelIndex === i &&
-          c.parameter === parameter
+          c.parameter === chParam
       );
       result.push(curve && curve.points.length > 0 ? curve : null);
     }
     return result;
-  }, [patternId, channelCount, parameter, allCurves]);
+  }, [patternId, channelCount, channelParameters, allCurves]);
 
   // Get automation curves for previous pattern
   const prevCurves = useMemo(() => {
     if (!prevPatternId) return [];
     const result: (AutomationCurve | null)[] = [];
     for (let i = 0; i < channelCount; i++) {
+      const chParam = channelParameters[i];
       const curve = allCurves.find(
         (c) =>
           c.patternId === prevPatternId &&
           c.channelIndex === i &&
-          c.parameter === parameter
+          c.parameter === chParam
       );
       result.push(curve && curve.points.length > 0 ? curve : null);
     }
     return result;
-  }, [prevPatternId, channelCount, parameter, allCurves]);
+  }, [prevPatternId, channelCount, channelParameters, allCurves]);
 
   // Get automation curves for next pattern
   const nextCurves = useMemo(() => {
     if (!nextPatternId) return [];
     const result: (AutomationCurve | null)[] = [];
     for (let i = 0; i < channelCount; i++) {
+      const chParam = channelParameters[i];
       const curve = allCurves.find(
         (c) =>
           c.patternId === nextPatternId &&
           c.channelIndex === i &&
-          c.parameter === parameter
+          c.parameter === chParam
       );
       result.push(curve && curve.points.length > 0 ? curve : null);
     }
     return result;
-  }, [nextPatternId, channelCount, parameter, allCurves]);
+  }, [nextPatternId, channelCount, channelParameters, allCurves]);
 
-  const color = useParameterColor(parameter);
+  // Use the first channel's active parameter for color (cosmetic — each channel
+  // could theoretically have its own parameter but one color is sufficient for overlay)
+  const colorParam = channelParameters.find(p => p !== parameter) || parameter;
+  const color = useParameterColor(colorParam);
   const prevLen = prevPatternId ? (prevPatternLength || patternLength) : 0;
   const nextLen = nextPatternId ? (nextPatternLength || patternLength) : 0;
 

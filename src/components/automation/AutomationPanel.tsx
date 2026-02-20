@@ -10,7 +10,7 @@ import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
 
 export const AutomationPanel: React.FC = () => {
   const { patterns, currentPatternIndex } = useTrackerStore();
-  const { getAutomation, setAutomation } = useAutomationStore();
+  const { getAutomation, setAutomation, setActiveParameter, setShowLane } = useAutomationStore();
   const [selectedParameter, setSelectedParameter] = useState<string | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<number>(0);
 
@@ -53,6 +53,11 @@ export const AutomationPanel: React.FC = () => {
 
   const handleCurveChange = (curve: typeof automationCurve) => {
     setAutomation(pattern.id, channelIndex, activeParam, curve);
+    // Sync to shared store so AutomationLanes in the tracker view can show this curve
+    setActiveParameter(channelIndex, activeParam);
+    if (curve.points.length > 0) {
+      setShowLane(channelIndex, true);
+    }
   };
 
   return (
@@ -117,7 +122,11 @@ export const AutomationPanel: React.FC = () => {
                     return (
                       <button
                         key={param.key}
-                        onClick={() => setSelectedParameter(param.key)}
+                        onClick={() => {
+                          setSelectedParameter(param.key);
+                          setActiveParameter(channelIndex, param.key);
+                          setShowLane(channelIndex, true);
+                        }}
                         className={`
                           relative px-3 py-1.5 text-xs rounded-md border transition-all duration-150
                           ${
