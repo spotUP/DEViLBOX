@@ -11,6 +11,7 @@ import { useKeyboardStore } from '@stores/useKeyboardStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { Toggle } from '@components/controls/Toggle';
 import { KeyboardShortcutSheet } from '@components/tracker/KeyboardShortcutSheet';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
 const KEYBOARD_SCHEMES = [
   { id: 'fasttracker2', name: 'FastTracker 2', description: 'Classic FT2 layout (DOS/PC) - from ft2-clone source' },
@@ -47,8 +48,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setLinearInterpolation,
     useBLEP,
     setUseBLEP,
+    stereoSeparation,
+    setStereoSeparation,
     midiPolyphonic,
-    setMidiPolyphonic
+    setMidiPolyphonic,
+    trackerVisualBg,
+    setTrackerVisualBg,
+    trackerVisualMode,
+    setTrackerVisualMode,
   } = useSettingsStore();
 
   const {
@@ -148,6 +155,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   size="sm"
                 />
               </div>
+
+              {/* Visual Background */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">Visual Background:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">WebGL audio-reactive effects behind tracker</span>
+                </div>
+                <Toggle
+                  label=""
+                  value={trackerVisualBg}
+                  onChange={setTrackerVisualBg}
+                  size="sm"
+                />
+              </div>
+
+              {/* Visual Background Mode (only shown when enabled) */}
+              {trackerVisualBg && (
+                <div className="flex items-center justify-between">
+                  <label className="text-ft2-text text-xs font-mono">Visual Mode:</label>
+                  <select
+                    value={trackerVisualMode}
+                    onChange={(e) => setTrackerVisualMode(Number(e.target.value))}
+                    className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
+                  >
+                    <option value={0} className="bg-ft2-bg text-ft2-text">Spectrum Bars</option>
+                    <option value={1} className="bg-ft2-bg text-ft2-text">Radial</option>
+                    <option value={2} className="bg-ft2-bg text-ft2-text">Terrain</option>
+                    <option value={3} className="bg-ft2-bg text-ft2-text">Plasma</option>
+                    <option value={4} className="bg-ft2-bg text-ft2-text">Starfield</option>
+                    <option value={5} className="bg-ft2-bg text-ft2-text">Particles</option>
+                  </select>
+                </div>
+              )}
             </div>
           </section>
 
@@ -383,6 +423,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   onChange={setUseBLEP}
                   size="sm"
                 />
+              </div>
+
+              {/* Stereo Separation */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">Stereo Separation:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">0% mono, 20% Amiga, 100% full</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={stereoSeparation}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setStereoSeparation(v);
+                      getTrackerReplayer().setStereoSeparation(v);
+                    }}
+                    className="w-20 accent-ft2-cursor"
+                  />
+                  <span className="text-ft2-text text-[10px] font-mono w-8 text-right">{stereoSeparation}%</span>
+                </div>
               </div>
             </div>
           </section>
