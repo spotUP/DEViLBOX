@@ -11,7 +11,7 @@
 
 import React, { useRef, useCallback, useLayoutEffect } from 'react';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
-import { useVisualizationStore } from '@stores/useVisualizationStore';
+import { getVisualizationData } from '@stores/useVisualizationStore';
 
 interface LiveADSRVisualizerProps {
   instrumentId: number;
@@ -43,12 +43,10 @@ export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
 
-  // Subscribe to visualization store for active stage and progress
-  const adsrStages = useVisualizationStore((state) => state.adsrStages);
-  const adsrProgress = useVisualizationStore((state) => state.adsrProgress);
-
-  const activeStage = adsrStages.get(instrumentId) || 'idle';
-  const stageProgress = adsrProgress.get(instrumentId) || 0;
+  // Read visualization data directly (no Zustand subscription for high-frequency data)
+  const vizData = getVisualizationData();
+  const activeStage = vizData.adsrStages.get(instrumentId) || 'idle';
+  const stageProgress = vizData.adsrProgress.get(instrumentId) || 0;
 
   // Setup High-DPI canvas size and context scaling
   useLayoutEffect(() => {

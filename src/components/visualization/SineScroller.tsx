@@ -6,12 +6,13 @@ import React, { useRef, useEffect, useState } from 'react';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useTransportStore } from '@stores';
 
+
 interface SineScrollerProps {
   height?: number;
   text?: string;
 }
 
-export const SineScroller: React.FC<SineScrollerProps> = ({ 
+export const SineScroller: React.FC<SineScrollerProps> = ({
   height = 100,
   text = "*** GREETINGS FLIES OUT TO....     AEROSOL   AFRIKA   ANDROMEDA   ATE BIT   ATLANTIS   BLACK MAIDEN   BOOZE DESIGN   BOOZOHOLICS   BYTERAPERS   CENSOR DESIGN   DA JORMAS  DCS   DEKADENCE   DEPTH   DESIRE   DIVINE STYLERS   DUREX   ELCREW   ELUDE   EPHIDRENA   EPSILON DESIGN   FAIRLIGHT   FATZONE   FIT   FLUSH  FUNKTION   GENESIS PROJECT   HACK N TRADE   HAUJOBB   HARD BOYLING BOYS   HOAXERS   LFT  IMPURE ASCII 1940  INSANE   INSTINCT   IRIS  JOSSYSTEM   JUDAS   KESO   LA PAZ   LAXATIVE EFFECTS   LEMON  LOONIES     MAHONEY   MANKIND  MAWI   MOODS PLATEAU   NATURE  NONAMENO   NUKLEUS   OFFENCE  ONSALA SECTOR     ONSLAUGHT   OUTBREAK   OXYRON   PACIF!C   PANDA DESIGN   PARADOX   PERFOMERS   PLANET JAZZ   POWERLINE   RAZOR 1911   REALITY   RELAPSE  RNO   RESISTANCE SCARAB   SCENESAT   SCOOPEX   SHARE AND ENJOY   SHAPE   SIGFLUP   SPACEBALLS   STRUTS SUBSPACE   STYLE   THE ELECTRONIC KNIGHTS   THE BLACK LOTUS   THE GANG   TITAN   TPOLM   TRAKTOR   TRIAD   TRSI   TULOU   UK SCENE ALLSTARS   UNIQUE   UNSTABLE LABEL   Y-CREW   AND   ZENON ***"
 }) => {
@@ -19,7 +20,6 @@ export const SineScroller: React.FC<SineScrollerProps> = ({
   const animationRef = useRef<number | undefined>(undefined);
   const scrollOffsetRef = useRef(0);
   const [width, setWidth] = useState(800);
-  const { bpm, isPlaying } = useTransportStore();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -81,10 +81,6 @@ export const SineScroller: React.FC<SineScrollerProps> = ({
     const baseSineFrequency = 0.035;
     const baseScrollSpeed = 2;
 
-    // BPM-synced scroll speed (scale based on BPM - 125 is baseline)
-    const bpmFactor = isPlaying ? bpm / 125 : 1;
-    const scrollSpeed = baseScrollSpeed * bpmFactor;
-
     // Rainbow gradient animation
     let gradientOffset = 0;
     let gradientAnimSpeed = 1;
@@ -95,6 +91,10 @@ export const SineScroller: React.FC<SineScrollerProps> = ({
     // Create repeating text
     const repeatingText = (text + "     ").repeat(5);
 
+    // Cached gradient (reused across characters per frame)
+    let cachedGradient: CanvasGradient | null = null;
+    let cachedGradientKey = '';
+
     const animate = () => {
       if (!mounted) return;
 
@@ -103,12 +103,15 @@ export const SineScroller: React.FC<SineScrollerProps> = ({
         return;
       }
 
+      // Read transport state fresh each frame (no stale closure)
+      const { bpm: currentBpm, isPlaying: playing } = useTransportStore.getState();
+
       // Get audio data for reactivity
       const engine = getToneEngine();
       const waveform = engine.getWaveform();
-      
+
       let audioLevel = 0;
-      if (waveform && waveform.length > 0 && isPlaying) {
+      if (waveform && waveform.length > 0 && playing) {
         // Calculate RMS level
         const rms = Math.sqrt(waveform.reduce((sum, val) => sum + val * val, 0) / waveform.length);
         audioLevel = Math.min(1, rms * 10);
@@ -164,6 +167,10 @@ export const SineScroller: React.FC<SineScrollerProps> = ({
       const sineAmplitude = baseSineAmplitude;
       const sineFrequency = baseSineFrequency;
 
+      // BPM-synced scroll speed (read fresh each frame)
+      const bpmFactor = playing ? currentBpm / 125 : 1;
+      const scrollSpeed = baseScrollSpeed * bpmFactor;
+
       // Update scroll
       scrollOffsetRef.current += scrollSpeed;
       if (scrollOffsetRef.current > charSpacing * (text.length + 5)) {
@@ -174,13 +181,28 @@ export const SineScroller: React.FC<SineScrollerProps> = ({
       ctx.font = `bold ${fontSize}px monospace`;
       ctx.textBaseline = 'middle';
 
+      // Cache gradient per frame (same for all characters — based on time, not position)
+      const hue1 = (time * 30 * gradientAnimSpeed) % 360;
+      const gradientKey = `${Math.round(gradientOffset)}:${Math.round(hue1)}`;
+      if (gradientKey !== cachedGradientKey) {
+        cachedGradient = ctx.createLinearGradient(0, gradientOffset, 0, height + gradientOffset);
+        cachedGradient.addColorStop(0, `hsl(${hue1}, 100%, 60%)`);
+        cachedGradient.addColorStop(0.25, `hsl(${(hue1 + 60) % 360}, 100%, 70%)`);
+        cachedGradient.addColorStop(0.5, `hsl(${(hue1 + 120) % 360}, 100%, 70%)`);
+        cachedGradient.addColorStop(0.75, `hsl(${(hue1 + 180) % 360}, 100%, 70%)`);
+        cachedGradient.addColorStop(1, `hsl(${(hue1 + 240) % 360}, 100%, 60%)`);
+        cachedGradientKey = gradientKey;
+      }
+
+      const glowIntensity = 10 + smoothedAudioLevel * 8;
+
       for (let i = 0; i < repeatingText.length; i++) {
         const char = repeatingText[i];
         if (char === ' ') continue;
 
         // Calculate position
         const x = width + (i * charSpacing) - scrollOffsetRef.current;
-        
+
         // Skip if off screen (with margin)
         if (x < -charSpacing || x > width + charSpacing) continue;
 
@@ -188,21 +210,11 @@ export const SineScroller: React.FC<SineScrollerProps> = ({
         const sinePhase = (scrollOffsetRef.current + (i * charSpacing)) * sineFrequency;
         const y = (height / 2) + Math.sin(sinePhase) * sineAmplitude;
 
-        // Fixed rainbow gradient (stencil effect) - based on screen position, not character
-        const gradient = ctx.createLinearGradient(0, gradientOffset, 0, height + gradientOffset);
-        const hue1 = (time * 30 * gradientAnimSpeed) % 360; // Hue rotation speed reacts to audio
-        gradient.addColorStop(0, `hsl(${hue1}, 100%, 60%)`);
-        gradient.addColorStop(0.25, `hsl(${(hue1 + 60) % 360}, 100%, 70%)`);
-        gradient.addColorStop(0.5, `hsl(${(hue1 + 120) % 360}, 100%, 70%)`);
-        gradient.addColorStop(0.75, `hsl(${(hue1 + 180) % 360}, 100%, 70%)`);
-        gradient.addColorStop(1, `hsl(${(hue1 + 240) % 360}, 100%, 60%)`);
-
         // Draw character with shadow for depth (audio-reactive glow)
         const charHue = (hue1 + (x * 0.3)) % 360;
-        const glowIntensity = 10 + smoothedAudioLevel * 8; // Glow pulses with audio
         ctx.shadowColor = `hsla(${charHue}, 100%, 50%, ${0.5 + smoothedAudioLevel * 0.3})`;
         ctx.shadowBlur = glowIntensity;
-        ctx.fillStyle = gradient;
+        ctx.fillStyle = cachedGradient!;
         ctx.fillText(char, x, y);
         
         // Draw outline for classic look
@@ -215,7 +227,7 @@ export const SineScroller: React.FC<SineScrollerProps> = ({
       animationRef.current = requestAnimationFrame(animate);
     };
 
-    animate();
+    animationRef.current = requestAnimationFrame(animate);
 
     return () => {
       mounted = false;

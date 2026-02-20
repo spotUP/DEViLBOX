@@ -11,7 +11,7 @@
 
 import React, { useRef, useCallback, useLayoutEffect } from 'react';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
-import { useVisualizationStore } from '@stores/useVisualizationStore';
+import { getVisualizationData } from '@stores/useVisualizationStore';
 
 type FilterType = 'lowpass' | 'highpass' | 'bandpass' | 'notch';
 
@@ -48,14 +48,11 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const modulatedCutoffRef = useRef(cutoff);
 
-  // Subscribe to visualization store for LFO phase
-  const lfoPhases = useVisualizationStore((state) => state.lfoPhases);
-  const adsrStages = useVisualizationStore((state) => state.adsrStages);
-  const adsrProgress = useVisualizationStore((state) => state.adsrProgress);
-
-  const lfoPhase = lfoPhases.get(instrumentId);
-  const adsrStage = adsrStages.get(instrumentId) || 'idle';
-  const stageProgress = adsrProgress.get(instrumentId) || 0;
+  // Read visualization data directly (no Zustand subscription for high-frequency data)
+  const vizData = getVisualizationData();
+  const lfoPhase = vizData.lfoPhases.get(instrumentId);
+  const adsrStage = vizData.adsrStages.get(instrumentId) || 'idle';
+  const stageProgress = vizData.adsrProgress.get(instrumentId) || 0;
 
   // Padding and dimensions
   const padding = { top: 8, right: 8, bottom: 20, left: 32 };

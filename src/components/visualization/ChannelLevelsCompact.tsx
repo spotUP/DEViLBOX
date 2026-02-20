@@ -166,6 +166,25 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
       const barMaxWidth = actualWidth - 40;
       const startY = 12;
 
+      // Cache gradient per theme (reuse across all channels in this frame)
+      const barGradient = ctx.createLinearGradient(20, 0, 20 + barMaxWidth, 0);
+      if (cyan) {
+        barGradient.addColorStop(0, 'rgba(0, 200, 200, 0.8)');
+        barGradient.addColorStop(0.7, 'rgba(0, 255, 255, 1)');
+        barGradient.addColorStop(1, 'rgba(255, 100, 100, 1)');
+      } else {
+        barGradient.addColorStop(0, 'rgba(0, 180, 140, 0.8)');
+        barGradient.addColorStop(0.7, 'rgba(0, 212, 170, 1)');
+        barGradient.addColorStop(1, 'rgba(255, 80, 80, 1)');
+      }
+
+      const labelColor = cyan ? 'rgba(0, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.4)';
+      const bgBarColor = cyan ? 'rgba(0, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+      const peakColor = cyan ? '#00ffff' : '#ff4444';
+
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'left';
+
       for (let i = 0; i < nc; i++) {
         const y = startY + i * (barHeight + 3);
         const level = levelStatesRef.current[i];
@@ -173,31 +192,19 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
         const barWidth = level * barMaxWidth;
         const peakX = 20 + peak.level * barMaxWidth;
 
-        ctx.fillStyle = cyan ? 'rgba(0, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.4)';
-        ctx.font = '9px monospace';
-        ctx.textAlign = 'left';
+        ctx.fillStyle = labelColor;
         ctx.fillText(`${i + 1}`, 4, y + barHeight - 1);
 
-        ctx.fillStyle = cyan ? 'rgba(0, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+        ctx.fillStyle = bgBarColor;
         ctx.fillRect(20, y, barMaxWidth, barHeight);
 
         if (barWidth > 0) {
-          const gradient = ctx.createLinearGradient(20, 0, 20 + barMaxWidth, 0);
-          if (cyan) {
-            gradient.addColorStop(0, 'rgba(0, 200, 200, 0.8)');
-            gradient.addColorStop(0.7, 'rgba(0, 255, 255, 1)');
-            gradient.addColorStop(1, 'rgba(255, 100, 100, 1)');
-          } else {
-            gradient.addColorStop(0, 'rgba(0, 180, 140, 0.8)');
-            gradient.addColorStop(0.7, 'rgba(0, 212, 170, 1)');
-            gradient.addColorStop(1, 'rgba(255, 80, 80, 1)');
-          }
-          ctx.fillStyle = gradient;
+          ctx.fillStyle = barGradient;
           ctx.fillRect(20, y, barWidth, barHeight);
         }
 
         if (peak.level > 0.02) {
-          ctx.fillStyle = cyan ? '#00ffff' : '#ff4444';
+          ctx.fillStyle = peakColor;
           ctx.fillRect(peakX - 1, y, 2, barHeight);
         }
       }

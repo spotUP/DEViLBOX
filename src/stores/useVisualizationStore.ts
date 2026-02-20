@@ -8,8 +8,10 @@
  * - Sample playback positions (for SamplePlaybackCursor)
  *
  * PERFORMANCE:
- * - Uses refs for high-frequency data to avoid React re-renders
- * - Only triggers re-renders for UI state changes
+ * - High-frequency audio data is stored in module-level Maps mutated in-place.
+ * - A single `version` counter in Zustand state is bumped to notify subscribers.
+ * - Visualizer RAF loops read data via getVisualizationData() — no Map cloning.
+ * - This eliminates hundreds of Map copies/sec that were causing GC pressure.
  */
 
 import { create } from 'zustand';
@@ -32,23 +34,40 @@ export interface LFOPhase {
   rate: number;    // Current rate in Hz
 }
 
+// ── Module-level mutable data (never cloned, read directly by visualizers) ──
+const _activeNotes = new Map<number, ActiveNote[]>();
+const _adsrStages = new Map<number, ADSRStage>();
+const _adsrProgress = new Map<number, number>();
+const _lfoPhases = new Map<number, LFOPhase>();
+const _samplePositions = new Map<number, number>();
+
+/** Direct access for RAF loops — no Zustand subscription overhead */
+export function getVisualizationData() {
+  return {
+    activeNotes: _activeNotes,
+    adsrStages: _adsrStages,
+    adsrProgress: _adsrProgress,
+    lfoPhases: _lfoPhases,
+    samplePositions: _samplePositions,
+  };
+}
+
+// Throttle Zustand notifications to max ~30Hz to avoid excessive React re-renders
+let _notifyPending = false;
+function notifySubscribers() {
+  if (_notifyPending) return;
+  _notifyPending = true;
+  queueMicrotask(() => {
+    _notifyPending = false;
+    useVisualizationStore.setState((s) => ({ version: s.version + 1 }));
+  });
+}
+
 interface VisualizationState {
-  // Active notes per channel (channelIndex -> notes)
-  activeNotes: Map<number, ActiveNote[]>;
+  /** Incremented when data changes — subscribe to this to know when to re-read */
+  version: number;
 
-  // ADSR stages per instrument (instrumentId -> stage)
-  adsrStages: Map<number, ADSRStage>;
-
-  // ADSR progress per instrument (instrumentId -> 0-1 progress within current stage)
-  adsrProgress: Map<number, number>;
-
-  // LFO phases per instrument (instrumentId -> phases)
-  lfoPhases: Map<number, LFOPhase>;
-
-  // Sample playback positions per instrument (instrumentId -> 0-1 position)
-  samplePositions: Map<number, number>;
-
-  // Actions
+  // Actions (mutate module-level Maps in place, then bump version)
   setActiveNote: (channelIndex: number, note: ActiveNote) => void;
   clearActiveNote: (channelIndex: number, note: string) => void;
   clearChannelNotes: (channelIndex: number) => void;
@@ -63,109 +82,76 @@ interface VisualizationState {
   clearSamplePosition: (instrumentId: number) => void;
 }
 
-export const useVisualizationStore = create<VisualizationState>((set) => ({
-  activeNotes: new Map(),
-  adsrStages: new Map(),
-  adsrProgress: new Map(),
-  lfoPhases: new Map(),
-  samplePositions: new Map(),
+export const useVisualizationStore = create<VisualizationState>(() => ({
+  version: 0,
 
-  // Note management
+  // Note management — mutate in place, no Map cloning
   setActiveNote: (channelIndex: number, note: ActiveNote) => {
-    set((state) => {
-      const notes = new Map(state.activeNotes);
-      const channelNotes = notes.get(channelIndex) || [];
-
-      // Check if this note already exists (update it)
+    const channelNotes = _activeNotes.get(channelIndex);
+    if (channelNotes) {
       const existingIndex = channelNotes.findIndex((n) => n.note === note.note);
       if (existingIndex >= 0) {
         channelNotes[existingIndex] = note;
       } else {
         channelNotes.push(note);
       }
-
-      notes.set(channelIndex, channelNotes);
-      return { activeNotes: notes };
-    });
+    } else {
+      _activeNotes.set(channelIndex, [note]);
+    }
+    notifySubscribers();
   },
 
   clearActiveNote: (channelIndex: number, noteName: string) => {
-    set((state) => {
-      const notes = new Map(state.activeNotes);
-      const channelNotes = notes.get(channelIndex) || [];
-      const filtered = channelNotes.filter((n) => n.note !== noteName);
-
-      if (filtered.length === 0) {
-        notes.delete(channelIndex);
-      } else {
-        notes.set(channelIndex, filtered);
-      }
-
-      return { activeNotes: notes };
-    });
+    const channelNotes = _activeNotes.get(channelIndex);
+    if (!channelNotes) return;
+    const filtered = channelNotes.filter((n) => n.note !== noteName);
+    if (filtered.length === 0) {
+      _activeNotes.delete(channelIndex);
+    } else {
+      _activeNotes.set(channelIndex, filtered);
+    }
+    notifySubscribers();
   },
 
   clearChannelNotes: (channelIndex: number) => {
-    set((state) => {
-      const notes = new Map(state.activeNotes);
-      notes.delete(channelIndex);
-      return { activeNotes: notes };
-    });
+    _activeNotes.delete(channelIndex);
+    notifySubscribers();
   },
 
   clearAllNotes: () => {
-    set({ activeNotes: new Map() });
+    _activeNotes.clear();
+    notifySubscribers();
   },
 
   // ADSR management
   setADSRStage: (instrumentId: number, stage: ADSRStage, progress: number = 0) => {
-    set((state) => {
-      const stages = new Map(state.adsrStages);
-      const progressMap = new Map(state.adsrProgress);
-      stages.set(instrumentId, stage);
-      progressMap.set(instrumentId, progress);
-      return { adsrStages: stages, adsrProgress: progressMap };
-    });
+    _adsrStages.set(instrumentId, stage);
+    _adsrProgress.set(instrumentId, progress);
+    notifySubscribers();
   },
 
   setADSRProgress: (instrumentId: number, progress: number) => {
-    set((state) => {
-      const progressMap = new Map(state.adsrProgress);
-      progressMap.set(instrumentId, progress);
-      return { adsrProgress: progressMap };
-    });
+    _adsrProgress.set(instrumentId, progress);
+    notifySubscribers();
   },
 
   // LFO management
   setLFOPhase: (instrumentId: number, phase: LFOPhase) => {
-    set((state) => {
-      const phases = new Map(state.lfoPhases);
-      phases.set(instrumentId, phase);
-      return { lfoPhases: phases };
-    });
+    _lfoPhases.set(instrumentId, phase);
+    notifySubscribers();
   },
 
   // Sample position management
   setSamplePosition: (instrumentId: number, position: number) => {
-    set((state) => {
-      const positions = new Map(state.samplePositions);
-      positions.set(instrumentId, Math.max(0, Math.min(1, position)));
-      return { samplePositions: positions };
-    });
+    _samplePositions.set(instrumentId, Math.max(0, Math.min(1, position)));
+    notifySubscribers();
   },
 
   clearSamplePosition: (instrumentId: number) => {
-    set((state) => {
-      const positions = new Map(state.samplePositions);
-      positions.delete(instrumentId);
-      return { samplePositions: positions };
-    });
+    _samplePositions.delete(instrumentId);
+    notifySubscribers();
   },
 }));
 
 // Selectors for efficient subscriptions
-export const selectActiveNotes = (state: VisualizationState) => state.activeNotes;
-export const selectADSRStages = (state: VisualizationState) => state.adsrStages;
-export const selectADSRProgress = (state: VisualizationState) => state.adsrProgress;
-export const selectLFOPhases = (state: VisualizationState) => state.lfoPhases;
-export const selectSamplePositions = (state: VisualizationState) => state.samplePositions;
+export const selectVersion = (state: VisualizationState) => state.version;

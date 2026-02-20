@@ -10,7 +10,7 @@
 
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useHighFpsAnimation } from '@hooks/useVisualizationAnimation';
-import { useVisualizationStore } from '@stores/useVisualizationStore';
+import { getVisualizationData } from '@stores/useVisualizationStore';
 
 interface SamplePlaybackCursorProps {
   instrumentId: number;
@@ -45,9 +45,8 @@ export const SamplePlaybackCursor: React.FC<SamplePlaybackCursorProps> = ({
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
-  // Subscribe to visualization store
-  const samplePositions = useVisualizationStore((state) => state.samplePositions);
-  const position = samplePositions.get(instrumentId);
+  // Read visualization data directly (no Zustand subscription for high-frequency data)
+  const position = getVisualizationData().samplePositions.get(instrumentId);
 
   // Initialize canvas
   useEffect(() => {
