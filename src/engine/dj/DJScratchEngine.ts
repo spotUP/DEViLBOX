@@ -291,6 +291,7 @@ export class ScratchPlayback {
   private patternElapsedMs = 0;
   private patternLastTick = 0;
   private patternDurationMs = 0;
+  private pendingStop = false; // set by finishCurrentCycle() to stop after this cycle completes
 
   constructor(
     getDeck: () => DeckEngine,
@@ -358,11 +359,12 @@ export class ScratchPlayback {
     this.patternElapsedMs += now - this.patternLastTick;
     this.patternLastTick = now;
 
-    if (pattern.loop && this.patternElapsedMs >= this.patternDurationMs) {
+    if (this.patternElapsedMs >= this.patternDurationMs) {
+      if (!pattern.loop || this.pendingStop) {
+        this.stopPattern();
+        return;
+      }
       this.patternElapsedMs = this.patternElapsedMs % this.patternDurationMs;
-    } else if (!pattern.loop && this.patternElapsedMs >= this.patternDurationMs) {
-      this.stopPattern();
-      return;
     }
 
     // Scan backward from end to find current frame
@@ -403,6 +405,7 @@ export class ScratchPlayback {
     }
     this.activePattern = null;
     this.patternElapsedMs = 0;
+    this.pendingStop = false;
 
     if (!this.faderLFOActive) {
       try {
@@ -420,6 +423,21 @@ export class ScratchPlayback {
 
   isWaiting(): boolean {
     return this.patternTimeoutId !== null && this.activePattern === null;
+  }
+
+  /**
+   * Let the current cycle complete then stop (tap/one-shot mode).
+   * If the pattern is waiting for a quantize beat, cancel it immediately.
+   */
+  finishCurrentCycle(): void {
+    if (this.patternTimeoutId !== null) {
+      // Waiting for beat boundary — cancel the queued start
+      clearTimeout(this.patternTimeoutId);
+      this.patternTimeoutId = null;
+      this.activePattern = null;
+    } else if (this.activePattern !== null) {
+      this.pendingStop = true;
+    }
   }
 
   // --------------------------------------------------------------------------

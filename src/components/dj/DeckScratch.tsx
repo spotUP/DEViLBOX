@@ -13,7 +13,7 @@
  * changes by > 2% (handled in DJDeck RAF via deck.notifyBPMChange).
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { SCRATCH_PATTERNS } from '@/engine/dj/DJScratchEngine';
@@ -38,6 +38,10 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
 
   const [waitingPattern, setWaitingPattern] = useState<string | null>(null);
 
+  // Hold vs tap: >= TAP_MS held → stop immediately on release; < TAP_MS → finish current cycle
+  const TAP_MS = 300;
+  const pressTimeRef = useRef<number>(0);
+
   const isB = deckId === 'B';
   const deckColor = isB ? 'text-red-400' : 'text-blue-400';
   const deckActiveBg = isB ? 'bg-red-900/40 border-red-500/60' : 'bg-blue-900/40 border-blue-500/60';
@@ -47,31 +51,21 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
 
   // ── Pattern buttons ──────────────────────────────────────────────────────
 
-  const handlePatternClick = useCallback((patternName: string) => {
+  const handlePatternPointerDown = useCallback((patternName: string, e: React.PointerEvent) => {
+    // Capture pointer so pointerup fires on this element even if cursor leaves
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+
+    // Ignore if any routine is already running (including this one)
+    if (activePatternName !== null) return;
+
+    pressTimeRef.current = performance.now();
     const store = useDJStore.getState();
 
-    if (activePatternName === patternName) {
-      // Toggle off
-      try { getDeck().stopPattern(); } catch { /* engine not ready */ }
-      store.setDeckPattern(deckId, null);
-      setWaitingPattern(null);
-      return;
-    }
-
-    // Stop any existing pattern
-    if (activePatternName) {
-      try { getDeck().stopPattern(); } catch { /* engine not ready */ }
-      store.setDeckPattern(deckId, null);
-    }
-
     setWaitingPattern(patternName);
-
-    // Track whether the onWaiting callback fired synchronously
     let quantizeWaitMs = 0;
 
     try {
       getDeck().playPattern(patternName, (waitMs) => {
-        // Pattern is waiting for beat boundary
         quantizeWaitMs = waitMs;
         setTimeout(() => {
           setWaitingPattern(null);
@@ -83,12 +77,24 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
       return;
     }
 
-    // If no quantize delay (immediate start), update state right away
     if (quantizeWaitMs === 0) {
       setWaitingPattern(null);
       store.setDeckPattern(deckId, patternName);
     }
   }, [deckId, activePatternName, getDeck]);
+
+  const handlePatternPointerUp = useCallback((_patternName: string) => {
+    const held = performance.now() - pressTimeRef.current;
+    if (held < TAP_MS) {
+      // Tap: let current cycle finish then stop (store cleared by DJDeck RAF)
+      try { getDeck().finishPatternCycle(); } catch { /* engine not ready */ }
+    } else {
+      // Hold release: stop immediately
+      try { getDeck().stopPattern(); } catch { /* engine not ready */ }
+      useDJStore.getState().setDeckPattern(deckId, null);
+      setWaitingPattern(null);
+    }
+  }, [deckId, getDeck]);
 
   // ── Fader LFO buttons ────────────────────────────────────────────────────
 
@@ -116,14 +122,18 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
           return (
             <button
               key={pattern.name}
-              onClick={() => handlePatternClick(pattern.name)}
+              onPointerDown={(e) => handlePatternPointerDown(pattern.name, e)}
+              onPointerUp={() => handlePatternPointerUp(pattern.name)}
+              onContextMenu={(e) => e.preventDefault()}
               className={`
-                px-2 py-0.5 rounded border font-mono text-xs tracking-wider transition-all
+                px-2 py-0.5 rounded border font-mono text-xs tracking-wider transition-all select-none
                 ${isActive
                   ? `${deckActiveBg} ${deckColor}`
                   : isWaiting
                     ? `${deckWaitBg} ${deckColor} animate-pulse`
-                    : 'bg-transparent border-white/10 text-white/40 hover:border-white/30 hover:text-white/70'
+                    : activePatternName !== null
+                      ? 'bg-transparent border-white/5 text-white/20 cursor-not-allowed'
+                      : 'bg-transparent border-white/10 text-white/40 hover:border-white/30 hover:text-white/70'
                 }
               `}
               title={pattern.name}
