@@ -4,7 +4,7 @@
  * Falls back to dynamic bitmap fonts generated from system fonts when MSDF files aren't available.
  */
 
-import { Assets, BitmapFontManager } from 'pixi.js';
+import { Assets, BitmapFontManager, Cache } from 'pixi.js';
 
 /** Font family names used throughout the PixiJS UI */
 export const PIXI_FONTS = {
@@ -16,18 +16,29 @@ export const PIXI_FONTS = {
   SANS_BOLD: 'Inter-Bold',
 } as const;
 
-/** Whether fonts have been loaded */
-let fontsLoaded = false;
+/**
+ * Shared promise for font loading — ensures React Strict Mode double-invocation
+ * waits for the same loading operation instead of racing.
+ */
+let fontLoadPromise: Promise<void> | null = null;
 
 /**
  * Load all MSDF bitmap fonts. Call once during app initialization.
- * Safe to call multiple times — subsequent calls are no-ops.
+ * Safe to call multiple times — subsequent calls await the same promise.
  */
-export async function loadPixiFonts(): Promise<void> {
-  if (fontsLoaded) return;
-  // Set immediately to prevent double-entry from React Strict Mode
-  fontsLoaded = true;
+export function loadPixiFonts(): Promise<void> {
+  if (!fontLoadPromise) {
+    fontLoadPromise = doLoadFonts();
+  }
+  return fontLoadPromise;
+}
 
+async function doLoadFonts(): Promise<void> {
+  // Install fallback fonts FIRST so they're available immediately
+  // when the Application renders and BitmapText instances are created.
+  installFallbackFonts();
+
+  // Then try to load MSDF font atlases (which would override the fallbacks)
   const fontDefs = [
     { name: PIXI_FONTS.MONO, path: '/fonts/msdf/JetBrainsMono-Regular.json' },
     { name: PIXI_FONTS.MONO_BOLD, path: '/fonts/msdf/JetBrainsMono-Bold.json' },
@@ -41,16 +52,10 @@ export async function loadPixiFonts(): Promise<void> {
     Assets.add({ alias: def.name, src: def.path });
   }
 
-  let msdfLoaded = false;
   try {
     await Assets.load(fontDefs.map(d => d.name));
-    msdfLoaded = true;
   } catch {
-    // MSDF font atlas files not available — install dynamic fallback fonts
-  }
-
-  if (!msdfLoaded) {
-    installFallbackFonts();
+    // MSDF font atlas files not available — fallback fonts already installed above
   }
 }
 
@@ -72,6 +77,9 @@ function installFallbackFonts(): void {
   ];
 
   for (const fb of fallbacks) {
+    const cacheKey = `${fb.name}-bitmap`;
+    // Skip if already installed (avoids [Cache] "already has key" warning)
+    if (Cache.has(cacheKey)) continue;
     try {
       BitmapFontManager.install({
         name: fb.name,
@@ -84,7 +92,7 @@ function installFallbackFonts(): void {
         chars: BitmapFontManager.ASCII,
       });
     } catch {
-      // Font already installed or install failed — continue
+      // Font install failed — continue with remaining fonts
     }
   }
 }
