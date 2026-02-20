@@ -35,7 +35,7 @@ export type TB303Parameter =
   | 'filterTracking'
   | 'filterFM';
 
-export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Mixer' | 'Furnace' | 'V2' | 'Synare' | 'Dexed' | 'OBXd' | 'SpaceLaser' | 'SAM' | 'Organ' | 'Melodica';
+export type KnobBankMode = '303' | 'Siren' | 'FX' | 'Mixer' | 'Furnace' | 'V2' | 'Synare' | 'Dexed' | 'OBXd' | 'SpaceLaser' | 'SAM' | 'Organ' | 'Melodica' | 'MasterFX';
 
 export type MappableParameter =
   | TB303Parameter
@@ -186,7 +186,16 @@ export type MappableParameter =
   | 'melodica.detune'
   | 'melodica.portamento'
   | 'melodica.attack'
-  | 'melodica.volume';
+  | 'melodica.volume'
+  // Master FX
+  | 'masterFx.slot0.wet'
+  | 'masterFx.slot0.param0'
+  | 'masterFx.slot1.wet'
+  | 'masterFx.slot1.param0'
+  | 'masterFx.slot2.wet'
+  | 'masterFx.slot2.param0'
+  | 'masterFx.masterVolume'
+  | 'masterFx.limiterCeiling';
 
 export interface CCMapping {
   ccNumber: number;

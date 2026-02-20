@@ -21,6 +21,7 @@ import { updateNKSDisplay } from '../midi/performance/AkaiMIDIProtocol';
 import type { NKSParameter } from '../midi/performance/types';
 import { isDJContext } from '../midi/MIDIContextRouter';
 import { DJ_KNOB_BANKS } from '../midi/djKnobBanks';
+import { midiToXMNote } from '../lib/xmConversions';
 
 // Guard against double handler registration (e.g., React StrictMode or HMR)
 let midiNoteHandlerRegistered = false;
@@ -339,6 +340,37 @@ export const useMIDIStore = create<MIDIStore>()(
                 } else {
                   console.warn('[useMIDIStore] No instruments available for MIDI playback');
                 }
+
+                // Step recording: write MIDI note into pattern when in record/edit mode
+                try {
+                  const trackerStore = require('./useTrackerStore').useTrackerStore.getState();
+                  const transportStore = require('./useTransportStore').useTransportStore.getState();
+
+                  if (trackerStore.recordMode && !transportStore.isPlaying) {
+                    const xmNote = midiToXMNote(transposedNote);
+                    if (xmNote >= 1 && xmNote <= 96) {
+                      const { cursor, setCell, moveCursor, editStep } = trackerStore;
+                      const instrumentId = targetInstrument?.id ?? instrumentStore.currentInstrumentId ?? 0;
+                      // Map velocity to volume column (0-64 in XM convention, stored as 0x10-0x50)
+                      const vol = Math.round((message.velocity / 127) * 64);
+                      const volumeCol = vol > 0 ? 0x10 + Math.min(vol, 64) : 0;
+
+                      setCell(cursor.channelIndex, cursor.rowIndex, {
+                        note: xmNote,
+                        instrument: instrumentId,
+                        volume: volumeCol,
+                      });
+
+                      // Advance cursor by edit step
+                      for (let i = 0; i < editStep; i++) {
+                        moveCursor('down');
+                      }
+                    }
+                  }
+                } catch {
+                  // Tracker store not available — skip step recording
+                }
+
                 return;
               }
 

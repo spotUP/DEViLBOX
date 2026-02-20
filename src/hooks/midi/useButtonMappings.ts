@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import { getButtonMapManager } from '../../midi/ButtonMapManager';
 import { useTransportStore, useTrackerStore } from '../../stores';
+import { useMIDIStore } from '../../stores/useMIDIStore';
 
 /**
  * Register all editor action handlers for MIDI button control
@@ -111,6 +112,56 @@ export function useButtonMappings(): void {
         }
       })
     );
+
+    // DJ Transport actions (lazy-import DJEngine to avoid loading it eagerly)
+    const registerDJActions = () => {
+      try {
+        const { getDJEngine } = require('../../engine/dj/DJEngine');
+        const dj = getDJEngine();
+
+        cleanups.push(manager.registerAction('dj.deckA.play', () => { dj.deckA.play(); }));
+        cleanups.push(manager.registerAction('dj.deckA.pause', () => { dj.deckA.pause(); }));
+        cleanups.push(manager.registerAction('dj.deckA.stop', () => { dj.deckA.stop(); }));
+        cleanups.push(manager.registerAction('dj.deckA.cue', () => { dj.deckA.cue(0); }));
+        cleanups.push(manager.registerAction('dj.deckB.play', () => { dj.deckB.play(); }));
+        cleanups.push(manager.registerAction('dj.deckB.pause', () => { dj.deckB.pause(); }));
+        cleanups.push(manager.registerAction('dj.deckB.stop', () => { dj.deckB.stop(); }));
+        cleanups.push(manager.registerAction('dj.deckB.cue', () => { dj.deckB.cue(0); }));
+        cleanups.push(manager.registerAction('dj.killAll', () => { dj.killAll(); }));
+
+        // EQ kills (toggle on/off)
+        cleanups.push(manager.registerAction('dj.deckA.eqKillLow', () => {
+          dj.deckA.setEQKill('low', !dj.deckA.getEQKill('low'));
+        }));
+        cleanups.push(manager.registerAction('dj.deckA.eqKillMid', () => {
+          dj.deckA.setEQKill('mid', !dj.deckA.getEQKill('mid'));
+        }));
+        cleanups.push(manager.registerAction('dj.deckA.eqKillHi', () => {
+          dj.deckA.setEQKill('high', !dj.deckA.getEQKill('high'));
+        }));
+        cleanups.push(manager.registerAction('dj.deckB.eqKillLow', () => {
+          dj.deckB.setEQKill('low', !dj.deckB.getEQKill('low'));
+        }));
+        cleanups.push(manager.registerAction('dj.deckB.eqKillMid', () => {
+          dj.deckB.setEQKill('mid', !dj.deckB.getEQKill('mid'));
+        }));
+        cleanups.push(manager.registerAction('dj.deckB.eqKillHi', () => {
+          dj.deckB.setEQKill('high', !dj.deckB.getEQKill('high'));
+        }));
+      } catch {
+        // DJEngine not available — DJ actions won't be registered until it is
+      }
+    };
+
+    // DJ knob page switching
+    cleanups.push(manager.registerAction('dj.knobPage.next', () => {
+      useMIDIStore.getState().nextDJKnobPage();
+    }));
+    cleanups.push(manager.registerAction('dj.knobPage.prev', () => {
+      useMIDIStore.getState().prevDJKnobPage();
+    }));
+
+    registerDJActions();
 
     return () => {
       cleanups.forEach((cleanup) => cleanup());

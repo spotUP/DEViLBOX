@@ -226,6 +226,19 @@ const PARAMETER_ROUTES: Record<string, ParameterRoute> = {
   // ── Mixer ─────────────────────────────────────────────────────────
   'mixer.volume': { type: 'config', path: 'volume', transform: n => -60 + (n * 60) },
   'mixer.pan':    { type: 'config', path: 'pan',    transform: n => -100 + (n * 200) },
+
+  // ── Master FX (placeholder — routed via routeMasterFXParameter) ──
+  // These are handled specially since they target the master effects chain
+  // rather than per-instrument config. The route entries exist so hasRoute()
+  // returns true for them.
+  'masterFx.slot0.wet':      { type: 'config', path: '__masterFx__' },
+  'masterFx.slot0.param0':   { type: 'config', path: '__masterFx__' },
+  'masterFx.slot1.wet':      { type: 'config', path: '__masterFx__' },
+  'masterFx.slot1.param0':   { type: 'config', path: '__masterFx__' },
+  'masterFx.slot2.wet':      { type: 'config', path: '__masterFx__' },
+  'masterFx.slot2.param0':   { type: 'config', path: '__masterFx__' },
+  'masterFx.masterVolume':   { type: 'config', path: '__masterFx__' },
+  'masterFx.limiterCeiling': { type: 'config', path: '__masterFx__' },
 };
 
 // ============================================================================
@@ -426,6 +439,12 @@ export function routeParameterToEngine(
   normalizedValue: number,
   instrumentId?: number,
 ): void {
+  // Master FX parameters are routed separately (not per-instrument)
+  if (param.startsWith('masterFx.')) {
+    routeMasterFXParameter(param, normalizedValue);
+    return;
+  }
+
   const route = PARAMETER_ROUTES[param];
   if (!route) {
     console.warn(`[parameterRouter] No route for parameter: ${param}`);
@@ -519,6 +538,69 @@ export function getRouteKeys(): string[] {
  */
 export function registerRoute(param: string, route: ParameterRoute): void {
   PARAMETER_ROUTES[param] = route;
+}
+
+// ============================================================================
+// Master FX Parameter Router
+// Routes master effect parameters to the ToneEngine master effects chain.
+// ============================================================================
+
+function routeMasterFXParameter(param: string, normalizedValue: number): void {
+  try {
+    const { useAudioStore } = require('../../stores/useAudioStore');
+    const audioStore = useAudioStore.getState();
+    const engine = getToneEngine();
+
+    // Parse param: 'masterFx.slot0.wet', 'masterFx.slot0.param0', 'masterFx.masterVolume', etc.
+    if (param === 'masterFx.masterVolume') {
+      // Master channel volume: 0-1 → -60..0 dB
+      const dB = -60 + normalizedValue * 60;
+      engine.masterChannel.volume.rampTo(dB, 0.02);
+      return;
+    }
+
+    if (param === 'masterFx.limiterCeiling') {
+      // Limiter ceiling: 0-1 → -20..0 dB
+      const dB = -20 + normalizedValue * 20;
+      engine.masterChannel.volume.rampTo(Math.min(0, dB), 0.02);
+      return;
+    }
+
+    // Parse slot index and param type: 'masterFx.slot0.wet' → slot=0, subParam='wet'
+    const match = param.match(/^masterFx\.slot(\d+)\.(\w+)$/);
+    if (!match) return;
+
+    const slotIndex = parseInt(match[1]);
+    const subParam = match[2];
+    const effects = audioStore.masterEffects;
+
+    if (slotIndex >= effects.length) return;
+
+    const effect = effects[slotIndex];
+    if (!effect) return;
+
+    if (subParam === 'wet') {
+      // Wet: 0-1 → 0-100 (EffectConfig uses 0-100 for wet)
+      const wetValue = Math.round(normalizedValue * 100);
+      audioStore.updateMasterEffect(effect.id, { wet: wetValue });
+    } else if (subParam === 'param0') {
+      // Generic first parameter: find the first numeric parameter key
+      const paramKeys = Object.keys(effect.parameters).filter(
+        k => typeof effect.parameters[k] === 'number'
+      );
+      if (paramKeys.length > 0) {
+        const firstParam = paramKeys[0];
+        const currentVal = effect.parameters[firstParam] as number;
+        // Scale to reasonable range — assume 0-1 if current value is ≤ 1, else 0-100
+        const maxVal = (typeof currentVal === 'number' && currentVal > 1) ? 100 : 1;
+        audioStore.updateMasterEffect(effect.id, {
+          parameters: { ...effect.parameters, [firstParam]: normalizedValue * maxVal },
+        });
+      }
+    }
+  } catch {
+    // Audio store not available
+  }
 }
 
 // ============================================================================

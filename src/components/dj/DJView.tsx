@@ -5,7 +5,7 @@
  * Inspired by Pioneer DJM-900 hardware mixer aesthetic.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine, disposeDJEngine } from '@/engine/dj/DJEngine';
 import { clearSongCache } from '@/engine/dj/DJSongCache';
@@ -17,9 +17,11 @@ import { DJMixer } from './DJMixer';
 import { DJFileBrowser } from './DJFileBrowser';
 import { DJPlaylistPanel } from './DJPlaylistPanel';
 import { DJModlandBrowser } from './DJModlandBrowser';
+import { DJSeratoBrowser } from './DJSeratoBrowser';
 import { MasterEffectsModal } from '@/components/effects';
 import { DJFxQuickPresets } from './DJFxQuickPresets';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
+import type { SeratoTrack } from '@/lib/serato';
 
 // ============================================================================
 // MAIN DJ VIEW
@@ -35,6 +37,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [showPlaylists, setShowPlaylists] = useState(false);
   const [showModland, setShowModland] = useState(false);
+  const [showSerato, setShowSerato] = useState(false);
   const [showMasterFX, setShowMasterFX] = useState(false);
 
   // Initialize DJEngine on mount, silence tracker + dispose on unmount
@@ -57,6 +60,48 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
 
   // DJ keyboard shortcuts
   useDJKeyboardHandler(true);
+
+  // Handle loading a Serato track to a deck
+  // For now this reads the audio file via Electron fs — future: also parse Serato metadata
+  const handleSeratoTrackLoad = useCallback(async (track: SeratoTrack, deckId: 'A' | 'B') => {
+    const fs = window.electron?.fs;
+    if (!fs) {
+      console.warn('[DJView] Electron fs not available for Serato track loading');
+      return;
+    }
+
+    try {
+      const buffer = await fs.readFile(track.filePath);
+      const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+      const { detectBPM } = await import('@/engine/dj/DJBeatDetector');
+      const { cacheSong } = await import('@/engine/dj/DJSongCache');
+
+      const filename = track.filePath.split(/[/\\]/).pop() || track.title;
+      const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+      const song = await parseModuleToSong(blob);
+      const bpmResult = detectBPM(song);
+
+      const cacheKey = `serato:${track.filePath}`;
+      cacheSong(cacheKey, song);
+
+      const engine = getDJEngine();
+      await engine.loadToDeck(deckId, song);
+
+      useDJStore.getState().setDeckState(deckId, {
+        fileName: cacheKey,
+        trackName: song.name || track.title || filename,
+        detectedBPM: track.bpm > 0 ? track.bpm : bpmResult.bpm,
+        effectiveBPM: track.bpm > 0 ? track.bpm : bpmResult.bpm,
+        totalPositions: song.songLength,
+        songPos: 0,
+        pattPos: 0,
+        elapsedMs: 0,
+        isPlaying: false,
+      });
+    } catch (err) {
+      console.error(`[DJView] Failed to load Serato track ${track.title}:`, err);
+    }
+  }, []);
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden select-none bg-dark-bg font-mono">
@@ -146,19 +191,31 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
           >
             Modland
           </button>
+          <button
+            onClick={() => setShowSerato(!showSerato)}
+            className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
+              ${showSerato
+                ? 'border-purple-500 bg-purple-900/20 text-purple-400'
+                : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+              }`}
+          >
+            Serato
+          </button>
         </div>
       </div>
 
       {/* ================================================================== */}
       {/* FILE BROWSER / PLAYLISTS / MODLAND (collapsible)                  */}
       {/* ================================================================== */}
-      {(showFileBrowser || showPlaylists || showModland) && (() => {
-        const panelCount = [showFileBrowser, showPlaylists, showModland].filter(Boolean).length;
-        const gridClass = panelCount >= 3
-          ? 'grid grid-cols-3 gap-2'
-          : panelCount === 2
-            ? 'grid grid-cols-2 gap-2'
-            : '';
+      {(showFileBrowser || showPlaylists || showModland || showSerato) && (() => {
+        const panelCount = [showFileBrowser, showPlaylists, showModland, showSerato].filter(Boolean).length;
+        const gridClass = panelCount >= 4
+          ? 'grid grid-cols-4 gap-2'
+          : panelCount === 3
+            ? 'grid grid-cols-3 gap-2'
+            : panelCount === 2
+              ? 'grid grid-cols-2 gap-2'
+              : '';
         return (
           <div className={`shrink-0 px-2 pt-2 ${gridClass}`}>
             {showFileBrowser && (
@@ -169,6 +226,12 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
             )}
             {showModland && (
               <DJModlandBrowser onClose={() => setShowModland(false)} />
+            )}
+            {showSerato && (
+              <DJSeratoBrowser
+                onClose={() => setShowSerato(false)}
+                onLoadTrackToDevice={handleSeratoTrackLoad}
+              />
             )}
           </div>
         );
