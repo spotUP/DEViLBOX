@@ -6,7 +6,6 @@
     "pc": {
       "Space": "play_stop_toggle",
       "NumpadEnter": "swap_instrument_bank",
-      
       "F1": "set_octave_0",
       "F2": "set_octave_1",
       "F3": "set_octave_2",
@@ -15,7 +14,6 @@
       "F6": "set_octave_5",
       "F7": "set_octave_6",
       "F8": "set_octave_6",
-      
       "Shift+F1": "transpose_track_down",
       "Shift+F2": "transpose_track_up",
       "Ctrl+F1": "transpose_down",
@@ -28,7 +26,6 @@
       "Ctrl+F8": "transpose_up",
       "Alt+F7": "transpose_block_down",
       "Alt+F8": "transpose_block_up",
-      
       "Shift+F3": "cut_track",
       "Ctrl+F3": "cut_selection",
       "Alt+F3": "cut_block",
@@ -38,7 +35,6 @@
       "Shift+F5": "paste_track",
       "Ctrl+F5": "paste_selection",
       "Alt+F5": "paste_block",
-      
       "F9": "jump_to_row_0",
       "F10": "jump_to_row_16",
       "F11": "jump_to_row_32",
@@ -51,7 +47,6 @@
       "Ctrl+F10": "play_from_marker_2",
       "Ctrl+F11": "play_from_marker_3",
       "Ctrl+F12": "play_from_marker_4",
-      
       "Tab": "next_channel",
       "Shift+Tab": "prev_channel",
       "Up": "cursor_up",
@@ -62,20 +57,16 @@
       "PageDown": "cursor_page_down",
       "Home": "cursor_pattern_start",
       "End": "cursor_pattern_end",
-      
       "Shift+Up": "prev_instrument",
       "Shift+Down": "next_instrument",
       "Shift+Left": "prev_pattern",
       "Shift+Right": "next_pattern",
-      
       "Alt+Up": "mark_block_up",
       "Alt+Down": "mark_block_down",
       "Alt+Left": "mark_block_left",
       "Alt+Right": "mark_block_right",
-      
       "Ctrl+Left": "prev_pattern",
       "Ctrl+Right": "next_pattern",
-      
       "Numpad0": "set_instrument_0",
       "Numpad1": "set_instrument_1",
       "Numpad2": "set_instrument_2",
@@ -85,16 +76,13 @@
       "Numpad6": "set_instrument_6",
       "Numpad7": "set_instrument_7",
       "Numpad8": "set_instrument_8",
-      
       "Insert": "insert_row",
       "Shift+Insert": "insert_line",
       "Backspace": "delete_note",
       "Shift+Backspace": "delete_and_pull",
       "Delete": "delete_note",
-      
       "Grave": "increase_edit_step",
       "Shift+Grave": "decrease_edit_step",
-      
       "Alt+Q": "set_track_1",
       "Alt+W": "set_track_2",
       "Alt+E": "set_track_3",
@@ -111,7 +99,6 @@
       "Alt+H": "set_track_14",
       "Alt+J": "set_track_15",
       "Alt+K": "set_track_16",
-      
       "Ctrl+A": "show_advanced_edit",
       "Ctrl+B": "show_about",
       "Ctrl+C": "show_config",
@@ -127,7 +114,6 @@
       "Ctrl+T": "show_transpose",
       "Ctrl+Z": "toggle_extended_pattern",
       "Ctrl+X": "close_all_screens",
-      
       "Alt+1": "macro_1",
       "Alt+2": "macro_2",
       "Alt+3": "macro_3",
@@ -148,20 +134,26 @@
       "Shift+Alt+8": "save_macro_8",
       "Shift+Alt+9": "save_macro_9",
       "Shift+Alt+0": "save_macro_10",
-      
       "Ctrl+1": "show_config_audio",
       "Ctrl+2": "show_config_layout",
       "Ctrl+3": "show_config_misc",
       "Ctrl+4": "show_config_midi",
-      
       "Alt+C": "select_channel",
-      
       "Shift+V": "scale_volume_track",
       "Ctrl+V": "scale_volume_pattern",
       "Alt+V": "scale_volume_block",
-      
       "Escape": "stop",
-      "Alt+Enter": "toggle_fullscreen"
+      "Alt+Enter": "toggle_fullscreen",
+      "Ctrl+Alt+1": "dj_scratch_baby",
+      "Ctrl+Alt+2": "dj_scratch_trans",
+      "Ctrl+Alt+3": "dj_scratch_flare",
+      "Ctrl+Alt+4": "dj_scratch_hydro",
+      "Ctrl+Alt+5": "dj_scratch_crab",
+      "Ctrl+Alt+6": "dj_scratch_orbit",
+      "Ctrl+Alt+0": "dj_scratch_stop",
+      "Ctrl+Alt+7": "dj_fader_lfo_14",
+      "Ctrl+Alt+8": "dj_fader_lfo_18",
+      "Ctrl+Alt+9": "dj_fader_lfo_116"
     },
     "mac": {
       "Space": "play_stop_toggle",
@@ -228,14 +220,12 @@
       "Cmd+Shift+Z": "redo",
       "Escape": "stop",
       "Cmd+Ctrl+F": "toggle_fullscreen",
-
       "Shift+F7": "transpose_track_down",
       "Shift+F8": "transpose_track_up",
       "Cmd+F7": "transpose_down",
       "Cmd+F8": "transpose_up",
       "Alt+F7": "transpose_block_down",
       "Alt+F8": "transpose_block_up",
-
       "Shift+F9": "set_position_marker_1",
       "Shift+F10": "set_position_marker_2",
       "Shift+F11": "set_position_marker_3",
@@ -244,20 +234,16 @@
       "Cmd+F10": "play_from_marker_2",
       "Cmd+F11": "play_from_marker_3",
       "Cmd+F12": "play_from_marker_4",
-
       "Shift+Left": "prev_pattern",
       "Shift+Right": "next_pattern",
-
       "Alt+Up": "mark_block_up",
       "Alt+Down": "mark_block_down",
       "Alt+Left": "mark_block_left",
       "Alt+Right": "mark_block_right",
-
       "Shift+Fn+Backspace": "insert_line",
       "Shift+Backspace": "delete_and_pull",
       "Grave": "increase_edit_step",
       "Shift+Grave": "decrease_edit_step",
-
       "Alt+A": "set_track_9",
       "Alt+S": "set_track_10",
       "Alt+D": "set_track_11",
@@ -266,7 +252,6 @@
       "Alt+H": "set_track_14",
       "Alt+J": "set_track_15",
       "Alt+K": "set_track_16",
-
       "Cmd+B": "show_about",
       "Cmd+E": "show_sample_editor_ext",
       "Cmd+M": "show_instrument_editor_ext",
@@ -275,12 +260,10 @@
       "Cmd+T": "show_transpose",
       "Cmd+Alt+Z": "toggle_extended_pattern",
       "Cmd+Alt+X": "close_all_screens",
-
       "Ctrl+1": "show_config_audio",
       "Ctrl+2": "show_config_layout",
       "Ctrl+3": "show_config_misc",
       "Ctrl+4": "show_config_midi",
-
       "Alt+1": "macro_1",
       "Alt+2": "macro_2",
       "Alt+3": "macro_3",
@@ -301,12 +284,10 @@
       "Shift+Alt+8": "save_macro_8",
       "Shift+Alt+9": "save_macro_9",
       "Shift+Alt+0": "save_macro_10",
-
       "Cmd+Alt+C": "select_channel",
       "Shift+V": "scale_volume_track",
       "Cmd+V": "scale_volume_pattern",
       "Alt+V": "scale_volume_block",
-
       "Numpad0": "set_instrument_0",
       "Numpad1": "set_instrument_1",
       "Numpad2": "set_instrument_2",
@@ -316,7 +297,17 @@
       "Numpad6": "set_instrument_6",
       "Numpad7": "set_instrument_7",
       "Numpad8": "set_instrument_8",
-      "Cmd+C": "show_config"
+      "Cmd+C": "show_config",
+      "Ctrl+Alt+1": "dj_scratch_baby",
+      "Ctrl+Alt+2": "dj_scratch_trans",
+      "Ctrl+Alt+3": "dj_scratch_flare",
+      "Ctrl+Alt+4": "dj_scratch_hydro",
+      "Ctrl+Alt+5": "dj_scratch_crab",
+      "Ctrl+Alt+6": "dj_scratch_orbit",
+      "Ctrl+Alt+0": "dj_scratch_stop",
+      "Ctrl+Alt+7": "dj_fader_lfo_14",
+      "Ctrl+Alt+8": "dj_fader_lfo_18",
+      "Ctrl+Alt+9": "dj_fader_lfo_116"
     }
   }
 }
