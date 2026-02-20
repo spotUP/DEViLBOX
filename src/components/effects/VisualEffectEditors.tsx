@@ -1295,20 +1295,78 @@ const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
         };
         const effectMinScale = WAM_MIN_SCALE[effect.type] ?? 0;
 
-        // Cache natural (unscaled) dimensions to avoid re-measuring after zoom
+        // Try to directly resize canvas-based WAM plugins through their Shadow DOM.
+        // This is the ONLY correct approach for canvas plugins that use
+        // getBoundingClientRect() + event.clientX to compute mouse coordinates —
+        // CSS transform/zoom changes the visual rect without updating the canvas
+        // internal dimensions, making all click/drag coordinates wrong.
+        const tryResizeCanvasPlugin = (container: HTMLDivElement): boolean => {
+          const shadow = gui.shadowRoot;
+          if (!shadow) return false;
+          const canvas = shadow.querySelector('canvas') as HTMLCanvasElement | null;
+          if (!canvas) return false;
+
+          const guiAny = gui as any;
+          const cw = container.clientWidth;
+          if (!cw || !guiAny.width) return false;
+
+          // Calculate new dimensions maintaining original aspect ratio
+          const origW = 430; // Default WAM graphic EQ width
+          const origH = 250; // Default WAM graphic EQ height
+          const aspectRatio = origH / origW;
+          const newWidth = cw;
+          const newHeight = Math.round(newWidth * aspectRatio);
+
+          // Resize primary canvas (interactive layer)
+          canvas.width = newWidth;
+          canvas.height = newHeight;
+
+          // Resize secondary canvas (frequency analyzer) if present
+          const canvas2 = shadow.querySelectorAll('canvas')[1] as HTMLCanvasElement | null;
+          if (canvas2) {
+            canvas2.width = newWidth;
+            canvas2.height = newHeight;
+          }
+
+          // Update plugin's internal coordinate mapping
+          guiAny.width = newWidth;
+          guiAny.height = newHeight;
+          guiAny.pixelsPerDb = (0.5 * newHeight) / (guiAny.dbScale || 60);
+
+          // Resize the canvas parent div to match
+          const canvasParent = shadow.querySelector('#DivFilterBank') as HTMLElement | null;
+          if (canvasParent) {
+            canvasParent.style.width = `${newWidth}px`;
+            canvasParent.style.height = `${newHeight}px`;
+          }
+
+          container.style.height = `${newHeight + 20}px`;
+
+          // Trigger plugin redraw
+          if (typeof guiAny.draw === 'function') guiAny.draw();
+          return true;
+        };
+
+        // Cache natural (unscaled) dimensions for CSS zoom fallback
         let naturalW = 0;
         let naturalH = 0;
+        let isCanvasPlugin = false;
 
-        // Auto-scale plugin GUI to fill container width using CSS zoom.
-        // IMPORTANT: Uses zoom instead of transform: scale() because CSS transforms
-        // don't affect the coordinate system — canvas-based WAM plugin GUIs (e.g.
-        // Graphic EQ grid) receive misaligned mouse coordinates with transform: scale(),
-        // making them unclickable/undraggable. CSS zoom properly scales layout and coordinates.
         const scaleToFit = () => {
           const container = guiContainerRef.current;
           if (!container || !gui) return;
 
-          // Capture natural dimensions once before any zoom is applied
+          // For canvas-based plugins, directly resize canvases (no CSS scaling)
+          if (isCanvasPlugin || tryResizeCanvasPlugin(container)) {
+            isCanvasPlugin = true;
+            // Clear any previous CSS scaling
+            (gui.style as any).zoom = '';
+            gui.style.transform = '';
+            tryResizeCanvasPlugin(container);
+            return;
+          }
+
+          // Fallback: CSS zoom for non-canvas WAM plugins
           if (!naturalW || !naturalH) {
             (gui.style as any).zoom = '';
             gui.style.transform = '';
@@ -1323,7 +1381,6 @@ const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
           const cw = container.clientWidth;
           if (!cw) return;
 
-          // Scale to fill container width (height follows proportionally)
           const scale = Math.max(effectMinScale, cw / naturalW);
           const scaledH = naturalH * scale;
 
@@ -3031,6 +3088,90 @@ const KOS_PRESETS = [
   { label: 'Worn',     drive: 80, character: 70, bias: 80, shame: 80, hiss: 75 },
 ];
 
+// ============================================================================
+// TONEARM EDITOR — physics-based vinyl playback simulation
+// ============================================================================
+
+const TONEARM_RPM_PRESETS = [
+  { label: '33 RPM', value: 33.333 },
+  { label: '45 RPM', value: 45 },
+  { label: '78 RPM', value: 78 },
+];
+
+export const ToneArmEditor: React.FC<VisualEffectEditorProps> = ({
+  effect,
+  onUpdateParameter,
+  onUpdateWet,
+}) => {
+  const wow     = getParam(effect, 'wow',     20) / 100;
+  const coil    = getParam(effect, 'coil',    50) / 100;
+  const flutter = getParam(effect, 'flutter', 15) / 100;
+  const riaa    = getParam(effect, 'riaa',    50) / 100;
+  const stylus  = getParam(effect, 'stylus',  30) / 100;
+  const hiss    = getParam(effect, 'hiss',    20) / 100;
+  const pops    = getParam(effect, 'pops',    15) / 100;
+  const rpm     = getParam(effect, 'rpm', 33.333);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
+  const activeRpm = TONEARM_RPM_PRESETS.find(p => Math.abs(rpm - p.value) < 1)?.label ?? null;
+
+  return (
+    <div className="flex flex-col items-center space-y-4 w-full">
+      <EffectOscilloscope pre={pre} post={post} color="#a3e635" />
+
+      {/* RPM selector */}
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
+        <SectionHeader color="#a3e635" title="Record Speed" />
+        <div className="flex gap-2">
+          {TONEARM_RPM_PRESETS.map((p) => (
+            <button
+              key={p.label}
+              onClick={() => onUpdateParameter('rpm', p.value)}
+              className={[
+                'flex-1 py-1.5 rounded-lg text-xs font-mono font-bold border transition-all',
+                activeRpm === p.label
+                  ? 'bg-lime-700/70 border-lime-500 text-lime-100'
+                  : 'bg-black/40 border-border text-text-muted hover:border-lime-700 hover:text-lime-300',
+              ].join(' ')}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Cartridge */}
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
+        <SectionHeader color="#a3e635" title="Cartridge" />
+        <div className="flex justify-center gap-8 items-end">
+          <Knob value={coil}    min={0} max={1} onChange={(v) => onUpdateParameter('coil',    Math.round(v * 100))} label="Coil"    color="#a3e635" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={riaa}    min={0} max={1} onChange={(v) => onUpdateParameter('riaa',    Math.round(v * 100))} label="RIAA"    color="#84cc16" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={stylus}  min={0} max={1} onChange={(v) => onUpdateParameter('stylus',  Math.round(v * 100))} label="Stylus"  color="#65a30d" formatValue={(v) => `${Math.round(v * 100)}%`} />
+        </div>
+      </section>
+
+      {/* Turntable mechanics */}
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
+        <SectionHeader color="#bef264" title="Turntable" />
+        <div className="flex justify-center gap-8 items-end">
+          <Knob value={wow}     min={0} max={1} onChange={(v) => onUpdateParameter('wow',     Math.round(v * 100))} label="Wow"     color="#bef264" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={flutter} min={0} max={1} onChange={(v) => onUpdateParameter('flutter', Math.round(v * 100))} label="Flutter" color="#bef264" formatValue={(v) => `${Math.round(v * 100)}%`} />
+        </div>
+      </section>
+
+      {/* Surface noise */}
+      <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark w-full">
+        <SectionHeader color="#d9f99d" title="Surface" />
+        <div className="flex justify-center gap-8 items-end">
+          <Knob value={hiss}    min={0} max={1} onChange={(v) => onUpdateParameter('hiss',    Math.round(v * 100))} label="Hiss"    color="#d9f99d" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={pops}    min={0} max={1} onChange={(v) => onUpdateParameter('pops',    Math.round(v * 100))} label="Pops"    color="#d9f99d" formatValue={(v) => `${Math.round(v * 100)}%`} />
+          <Knob value={effect.wet / 100} min={0} max={1} onChange={(v) => onUpdateWet(Math.round(v * 100))} label="Wet" color="#ecfccb" formatValue={(v) => `${Math.round(v * 100)}%`} />
+        </div>
+      </section>
+    </div>
+  );
+};
+
 export const KissOfShameEditor: React.FC<VisualEffectEditorProps> = ({
   effect,
   onUpdateParameter,
@@ -3306,6 +3447,7 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   TapeSaturation: TapeSaturationEditor,
   Tumult: TumultEditor,
   VinylNoise: VinylNoiseEditor,
+  ToneArm: ToneArmEditor,
   TapeSimulator: KissOfShameEditor,
   SidechainCompressor: SidechainCompressorEditor,
   SpaceyDelayer: SpaceyDelayerEditor,
@@ -3378,6 +3520,7 @@ export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accen
   TapeSaturation:      { bg: '#2a1008', bgEnd: '#1a0a04', accent: '#ef4444', border: '#3a1a0a' },
   Tumult:              { bg: '#0d0a1a', bgEnd: '#080612', accent: '#7c3aed', border: '#1a1030' },
   VinylNoise:          { bg: '#1a1008', bgEnd: '#120a04', accent: '#d97706', border: '#2a1a08' },
+  ToneArm:             { bg: '#0a1a04', bgEnd: '#061204', accent: '#a3e635', border: '#102a08' },
   SidechainCompressor: { bg: '#081a10', bgEnd: '#04120a', accent: '#10b981', border: '#0a2a18' },
   RETapeEcho:          { bg: '#2a0808', bgEnd: '#1a0404', accent: '#dc2626', border: '#3a1010' },
   TapeSimulator:       { bg: '#1a1208', bgEnd: '#120e04', accent: '#b45309', border: '#2a1e08' },
@@ -3449,6 +3592,7 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
     TapeSaturation: <Zap size={18} className="text-white" />,
     Tumult: <Radio size={18} className="text-white" />,
     VinylNoise: <Disc size={18} className="text-white" />,
+    ToneArm: <Disc size={18} className="text-white" />,
     SidechainCompressor: <Gauge size={18} className="text-white" />,
     RETapeEcho: <Disc size={18} className="text-white" />,
     TapeSimulator: <Disc size={18} className="text-white" />,

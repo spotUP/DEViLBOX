@@ -40,6 +40,7 @@ import { MVerbEffect } from './effects/MVerbEffect';
 import { LeslieEffect } from './effects/LeslieEffect';
 import { SpringReverbEffect } from './effects/SpringReverbEffect';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
+import { ToneArmEffect } from './effects/ToneArmEffect';
 import { isEffectBpmSynced, getEffectSyncDivision, computeSyncedValue, SYNCABLE_EFFECT_PARAMS } from './bpmSync';
 import { SidechainCompressor } from './effects/SidechainCompressor';
 import { ArpeggioEngine } from './ArpeggioEngine';
@@ -178,6 +179,8 @@ export function getDefaultEffectParameters(type: string): Record<string, number 
                riaa: 52, stylusResonance: 50, wornStylus: 28,
                pinch: 35, innerGroove: 25, ghostEcho: 20,
                dropout: 10, warp: 10, eccentricity: 18 };  // "Played" condition at 33 RPM
+    case 'ToneArm':
+      return { wow: 20, coil: 50, flutter: 15, riaa: 50, stylus: 30, hiss: 20, pops: 15, rpm: 33.333 };
     default:
       return {};
   }
@@ -1535,6 +1538,22 @@ export class InstrumentFactory {
           wet: wetValue,
         });
         break;
+
+      case 'ToneArm': {
+        const node = new ToneArmEffect({
+          wow:     (p.wow     != null ? Number(p.wow)     : 20) / 100,
+          coil:    (p.coil    != null ? Number(p.coil)    : 50) / 100,
+          flutter: (p.flutter != null ? Number(p.flutter) : 15) / 100,
+          riaa:    (p.riaa    != null ? Number(p.riaa)    : 50) / 100,
+          stylus:  (p.stylus  != null ? Number(p.stylus)  : 30) / 100,
+          hiss:    (p.hiss    != null ? Number(p.hiss)    : 20) / 100,
+          pops:    (p.pops    != null ? Number(p.pops)    : 15) / 100,
+          rpm:     (p.rpm     != null ? Number(p.rpm)     : 33.333),
+          wet:     wetValue,
+        });
+        (node as Tone.ToneAudioNode & { _fxType?: string })._fxType = 'ToneArm';
+        return node;
+      }
 
       case 'VinylNoise': {
         const node = new VinylNoiseEffect({

@@ -13,7 +13,7 @@ import { useInstrumentStore, notify } from '@stores';
 import { EffectParameterEditor } from './EffectParameterEditor';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
-import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
+import { INSTRUMENT_FX_PRESETS, type InstrumentFxPreset } from '@constants/instrumentFxPresets';
 
 interface InstrumentEffectsModalProps {
   isOpen: boolean;
@@ -49,7 +49,7 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
   }, [editingEffect]);
 
   // Load a factory preset
-  const handleLoadPreset = useCallback((preset: MasterFxPreset) => {
+  const handleLoadPreset = useCallback((preset: InstrumentFxPreset) => {
     if (currentInstrumentId === null) return;
 
     const effects: EffectConfig[] = preset.effects.map((fx, index) => ({
@@ -186,11 +186,11 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
               {showPresetMenu && (
                 <div className="absolute left-0 top-full mt-2 w-72 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-50 max-h-[60vh] overflow-y-auto scrollbar-modern">
                   {/* Factory Presets by Category */}
-                  {Object.entries(MASTER_FX_PRESETS.reduce((acc, preset) => {
+                  {Object.entries(INSTRUMENT_FX_PRESETS.reduce((acc, preset) => {
                     if (!acc[preset.category]) acc[preset.category] = [];
                     acc[preset.category].push(preset);
                     return acc;
-                  }, {} as Record<string, MasterFxPreset[]>)).map(([category, presets]) => (
+                  }, {} as Record<string, InstrumentFxPreset[]>)).map(([category, presets]) => (
                     <div key={category}>
                       <div className="px-4 py-2 text-xs text-text-muted font-medium uppercase tracking-wide bg-dark-bgTertiary sticky top-0">
                         {category}

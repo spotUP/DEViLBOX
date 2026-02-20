@@ -235,6 +235,13 @@ export const AVAILABLE_EFFECTS: AvailableEffect[] = [
   },
   {
     category: 'wasm',
+    type: 'ToneArm',
+    label: 'ToneArm',
+    group: 'Texture',
+    description: 'Physics-based vinyl playback simulation — Faraday cartridge distortion, wow/flutter, RIAA EQ, stylus rolloff, hiss & pops (ToneArm port)',
+  },
+  {
+    category: 'wasm',
     type: 'Tumult',
     label: 'Tumult',
     group: 'Texture',

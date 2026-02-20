@@ -196,6 +196,15 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
     }
   }, []);
 
+  // Sync user presets to server (uses centralized cloudSync)
+  const syncPresetsToServer = useCallback((presets: UserMasterFxPreset[]) => {
+    import('@/lib/cloudSync').then(({ pushToCloud }) => {
+      import('@/hooks/useCloudSync').then(({ SYNC_KEYS }) => {
+        pushToCloud(SYNC_KEYS.MASTER_FX_PRESETS, presets).catch(() => {});
+      });
+    });
+  }, []);
+
   // Save current settings as user preset
   const handleSavePreset = useCallback(() => {
     if (!presetName.trim()) return;
@@ -206,10 +215,11 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
       effects: masterEffects.map(fx => ({ ...fx })), // Clone the effects
     });
     localStorage.setItem(USER_MASTER_FX_PRESETS_KEY, JSON.stringify(userPresets));
+    syncPresetsToServer(userPresets);
 
     setPresetName('');
     setShowSaveDialog(false);
-  }, [presetName, masterEffects, getUserPresets]);
+  }, [presetName, masterEffects, getUserPresets, syncPresetsToServer]);
 
   // Load a factory preset
   const handleLoadPreset = useCallback((preset: MasterFxPreset) => {
@@ -237,7 +247,8 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
   const handleDeleteUserPreset = useCallback((name: string) => {
     const userPresets = getUserPresets().filter(p => p.name !== name);
     localStorage.setItem(USER_MASTER_FX_PRESETS_KEY, JSON.stringify(userPresets));
-  }, [getUserPresets]);
+    syncPresetsToServer(userPresets);
+  }, [getUserPresets, syncPresetsToServer]);
 
   const userPresets = getUserPresets();
 
