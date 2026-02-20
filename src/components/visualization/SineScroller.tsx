@@ -98,6 +98,11 @@ export const SineScroller: React.FC<SineScrollerProps> = ({
     const animate = () => {
       if (!mounted) return;
 
+      if (document.hidden) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
       // Get audio data for reactivity
       const engine = getToneEngine();
       const waveform = engine.getWaveform();

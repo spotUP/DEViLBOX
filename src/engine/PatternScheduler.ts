@@ -23,6 +23,17 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 import type { AutomationCurve } from '@typedefs/automation';
 import { getGrooveOffset, getGrooveVelocity } from '@typedefs/audio';
 
+// Module-level frequency cache: avoids creating transient Tone.Frequency objects on every call.
+const _freqCache = new Map<string, number>();
+function cachedFrequency(note: string): number {
+  let freq = _freqCache.get(note);
+  if (freq === undefined) {
+    freq = Tone.Frequency(note).toFrequency();
+    _freqCache.set(note, freq);
+  }
+  return freq;
+}
+
 interface AutomationData {
   [patternId: string]: {
     [channelIndex: number]: {
@@ -187,13 +198,12 @@ export class PatternScheduler {
                 newBPM = param;
               }
             }
-            // Check for row delay (EE1 format)
-            const effect1 = (cell.effTyp !== undefined && cell.effTyp !== 0)
-              ? xmEffectToString(cell.effTyp, cell.eff ?? 0)
-              : null;
-            if (effect1) {
-              if (effect1.toUpperCase().startsWith('EE') || effect1.toUpperCase().startsWith('SE')) {
-                rowDelay = parseInt(effect1[2], 16);
+            // Check for row delay: EEx (effTyp=0x0E, sub-cmd 0xE) or SEx (effTyp=0x13, sub-cmd 0xE)
+            // Direct numeric comparison avoids xmEffectToString string allocation
+            const eff = cell.eff ?? 0;
+            if (cell.effTyp !== undefined && cell.effTyp !== 0) {
+              if ((cell.effTyp === 0x0E || cell.effTyp === 0x13) && (eff >> 4) === 0xE) {
+                rowDelay = eff & 0xF;
               }
             }
           });
@@ -250,15 +260,12 @@ export class PatternScheduler {
           else if (param >= 0x20) currentBPM = param;
         }
 
-        // Check for EEx (MOD/XM) or SEx (S3M/IT)
-        const effect1 = (cell.effTyp !== undefined && cell.effTyp !== 0)
-          ? xmEffectToString(cell.effTyp, cell.eff ?? 0)
-          : null;
-        if (effect1) {
-          if (effect1.toUpperCase().startsWith('EE')) {
-            rowDelay = parseInt(effect1[2], 16);
-          } else if (effect1.toUpperCase().startsWith('SE')) {
-            rowDelay = parseInt(effect1[2], 16);
+        // Check for EEx (MOD/XM, effTyp=0x0E) or SEx (S3M/IT, effTyp=0x13)
+        // Direct numeric comparison avoids xmEffectToString string allocation
+        const eff = cell.eff ?? 0;
+        if (cell.effTyp !== undefined && cell.effTyp !== 0) {
+          if ((cell.effTyp === 0x0E || cell.effTyp === 0x13) && (eff >> 4) === 0xE) {
+            rowDelay = eff & 0xF;
           }
         }
       });
@@ -455,6 +462,12 @@ export class PatternScheduler {
     const currentBPM = Tone.getTransport().bpm.value;
     const rowTimings = this.computeRowTimings(pattern, currentSpeed, currentBPM);
 
+    // Pre-build instrument lookup map (avoids O(n) find() on every row/channel)
+    const instrumentMap = new Map<number, InstrumentConfig>();
+    for (let i = 0; i < instruments.length; i++) {
+      instrumentMap.set(instruments[i].id, instruments[i]);
+    }
+
     for (let row = 0; row < pattern.length; row++) {
       const rowTiming = rowTimings[row];
       const rowSecondsPerTick = 2.5 / rowTiming.bpm;
@@ -500,7 +513,7 @@ export class PatternScheduler {
               const state = localHandler.getChannelState(channelIndex);
               
               // Hardware Quirk: ensure handler has access to sample metadata if available
-              const instrument = instruments.find(i => i.id === instrumentId);
+              const instrument = instrumentMap.get(instrumentId);
               if (instrument?.metadata?.modPlayback) {
                 (state as ChannelState & { sampleDefaultVolume?: number; sampleDefaultFinetune?: number }).sampleDefaultVolume = instrument.metadata.modPlayback.defaultVolume;
                 (state as ChannelState & { sampleDefaultFinetune?: number }).sampleDefaultFinetune = instrument.metadata.modPlayback.finetune;
@@ -592,7 +605,8 @@ export class PatternScheduler {
 
                     try {
                       const triggerPeriod = (effectResult.setPeriod || cell.period || 0) as number;
-                      
+
+
                       engine.triggerNote(
                         instrumentId,
                         toneNote,
@@ -626,11 +640,11 @@ export class PatternScheduler {
                   baseFrequency = periodMult / activePeriod;
                 } else {
                   const toneNote = xmNoteToToneJS(cell.note);
-                  baseFrequency = toneNote ? Tone.Frequency(toneNote).toFrequency() : 0;
+                  baseFrequency = toneNote ? cachedFrequency(toneNote) : 0;
                 }
 
                 if (baseFrequency > 0) {
-                  engine.initChannelPitch(channelIndex, `${instrumentId}-${channelIndex}`, baseFrequency, 1);
+                  engine.initChannelPitch(channelIndex, (instrumentId << 16) | (channelIndex & 0xFFFF), baseFrequency, 1);
                 }
               }
 

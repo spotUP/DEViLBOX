@@ -976,7 +976,7 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
    * Diagnostic: bypass Tone.js routing and test worklet audio directly.
    *
    * Call from browser console:
-   *   window._toneEngine.instruments.get("0--1").debugTestAudio()
+   *   window._toneEngine.instruments.get((0 << 16) | 0xFFFF).debugTestAudio()
    *
    * If you hear sound → routing chain is broken (worklet is fine).
    * If silence → worklet/WASM is the issue.
@@ -1050,7 +1050,7 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   /**
    * Diagnostic: dump the full audio routing state for this synth.
    * Call from browser console:
-   *   window._toneEngine.instruments.get("0--1").debugDumpRouting()
+   *   window._toneEngine.instruments.get((0 << 16) | 0xFFFF).debugDumpRouting()
    */
   debugDumpRouting(): void {
     const ctx = getDevilboxAudioContext();

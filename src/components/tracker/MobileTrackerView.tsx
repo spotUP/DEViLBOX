@@ -13,6 +13,7 @@ import { FT2Toolbar } from './FT2Toolbar';
 import { MobilePatternInput } from './mobile/MobilePatternInput';
 import { Play, Square, ChevronLeft, ChevronRight, Music2, SlidersHorizontal, Cpu } from 'lucide-react';
 import { useTransportStore, useTrackerStore, useInstrumentStore } from '@stores';
+import { useShallow } from 'zustand/react/shallow';
 import { SYSTEM_PRESETS } from '@/constants/systemPresets';
 import { useOrientation } from '@/hooks/useOrientation';
 import { haptics } from '@/utils/haptics';
@@ -40,9 +41,29 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   const [activeTab, setActiveTab] = useState<'pattern' | 'instruments'>('pattern');
   const [mobileChannel, setMobileChannel] = useState(0); // For portrait mode: which channel to show
   const [isInputCollapsed, setIsInputCollapsed] = useState(false); // Track MobilePatternInput collapse state
-  const { isPlaying, togglePlayPause } = useTransportStore();
-  const { patterns, currentPatternIndex, cursor, setCell, moveCursor, moveCursorToRow, recordMode, editStep, copySelection, cutSelection, paste, applySystemPreset } = useTrackerStore();
-  const { instruments, currentInstrumentId, setCurrentInstrument } = useInstrumentStore();
+  const { isPlaying, togglePlayPause } = useTransportStore(useShallow((s) => ({
+    isPlaying: s.isPlaying,
+    togglePlayPause: s.togglePlayPause,
+  })));
+  const { patterns, currentPatternIndex, cursor, setCell, moveCursor, moveCursorToRow, recordMode, editStep, copySelection, cutSelection, paste, applySystemPreset } = useTrackerStore(useShallow((s) => ({
+    patterns: s.patterns,
+    currentPatternIndex: s.currentPatternIndex,
+    cursor: s.cursor,
+    setCell: s.setCell,
+    moveCursor: s.moveCursor,
+    moveCursorToRow: s.moveCursorToRow,
+    recordMode: s.recordMode,
+    editStep: s.editStep,
+    copySelection: s.copySelection,
+    cutSelection: s.cutSelection,
+    paste: s.paste,
+    applySystemPreset: s.applySystemPreset,
+  })));
+  const { instruments, currentInstrumentId, setCurrentInstrument } = useInstrumentStore(useShallow((s) => ({
+    instruments: s.instruments,
+    currentInstrumentId: s.currentInstrumentId,
+    setCurrentInstrument: s.setCurrentInstrument,
+  })));
   const pattern = patterns[currentPatternIndex];
   const { isPortrait, isLandscape } = useOrientation();
 

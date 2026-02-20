@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { useTrackerStore } from '@stores';
+import { useShallow } from 'zustand/react/shallow';
 import { MacroSlotsPanel } from './MacroSlotsPanel';
 import { Sliders, Shuffle, Download, ArrowUpDown, Maximize2, Minimize2, Copy, Calculator } from 'lucide-react';
 
@@ -33,7 +34,9 @@ export const AdvancedEditPanel: React.FC<AdvancedEditPanelProps> = ({
   onDuplicate,
   onMath,
 }) => {
-  const { selection } = useTrackerStore();
+  const { selection } = useTrackerStore(useShallow((s) => ({
+    selection: s.selection,
+  })));
   const [expandedSection, setExpandedSection] = useState<string | null>('macros');
   const [mathValue, setMathValue] = useState(1);
   const [mathColumn, setMathColumn] = useState<'volume' | 'eff'>('volume');

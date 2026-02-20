@@ -85,9 +85,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const bottomScrollRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [scrollLeft, setScrollLeft] = useState(0);
-  const [scrollY, setScrollY] = useState(0);
-  const [visibleStart, setVisibleStart] = useState(0);
-  const [renderCounter, setRenderCounter] = useState(0);
+  // PERF: Use refs for scroll/visible state to avoid React re-renders during playback.
+  // The canvas render loop updates these every frame — React state would cause 60Hz re-renders.
+  // Overlay elements (MacroLanes) are positioned via direct DOM manipulation.
+  const scrollYRef = useRef(0);
+  const visibleStartRef = useRef(0);
+  const macroOverlayRef = useRef<HTMLDivElement>(null);
   
   // Cell context menu
   const cellContextMenu = useCellContextMenu();
@@ -349,8 +352,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    e.stopPropagation();
-    
+
+    // Show cell highlight for internal instrument drags
     const cell = getCellFromCoords(e.clientX, e.clientY);
     if (cell) {
       setDragOverCell({ channelIndex: cell.channelIndex, rowIndex: cell.rowIndex });
@@ -365,23 +368,25 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
+    setDragOverCell(null);
+
+    // Only handle internal instrument drags — let file drops propagate to GlobalDragDropHandler
+    const dragData = e.dataTransfer.getData('application/x-devilbox-instrument');
+    if (!dragData) return;
+
     e.preventDefault();
     e.stopPropagation();
-    setDragOverCell(null);
 
     const cell = getCellFromCoords(e.clientX, e.clientY);
     if (!cell) return;
 
     try {
-      const dragData = e.dataTransfer.getData('application/x-devilbox-instrument');
-      if (dragData) {
-        const { id } = JSON.parse(dragData);
-        // Set instrument at this cell
-        useTrackerStore.getState().setCell(cell.channelIndex, cell.rowIndex, { 
-          instrument: id 
-        });
-        haptics.success();
-      }
+      const { id } = JSON.parse(dragData);
+      // Set instrument at this cell
+      useTrackerStore.getState().setCell(cell.channelIndex, cell.rowIndex, {
+        instrument: id
+      });
+      haptics.success();
     } catch (err) {
       console.error('[PatternEditor] Drop failed:', err);
     }
@@ -1249,11 +1254,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Channel count is global across all patterns (enforced by addChannel/removeChannel)
     const numChannels = pattern.channels.length;
     
-    // Update scroll position for AutomationLanes (throttled to avoid excessive re-renders)
-    if (Math.abs(baseY - scrollY) > 0.5 || vStart !== visibleStart) {
-      setScrollY(baseY);
-      setVisibleStart(vStart);
-      setRenderCounter(c => c + 1);
+    // Update scroll refs and overlay DOM positions directly (no React state = no re-renders)
+    scrollYRef.current = baseY;
+    visibleStartRef.current = vStart;
+    if (macroOverlayRef.current) {
+      macroOverlayRef.current.style.top = `${baseY}px`;
     }
 
     const noteWidth = CHAR_WIDTH * 3 + 4;
@@ -1320,7 +1325,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const minSelRow = hasSelection ? Math.min(sel.startRow, sel.endRow) : -1;
     const maxSelRow = hasSelection ? Math.max(sel.startRow, sel.endRow) : -1;
 
-    for (let i = visibleStart; i < visibleEnd; i++) {
+    for (let i = vStart; i < visibleEnd; i++) {
       let rowIndex: number;
       let isGhostRow = false;
       let ghostPattern = null;
@@ -1767,7 +1772,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         }
       }
     }
-  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, currentTheme, visibleStart, instruments, currentPatternIndex, patterns, scrollY, channelOffsets, channelWidths, numChannels, cursor, selection, columnVisibility]);
+  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, currentTheme, instruments, currentPatternIndex, patterns, channelOffsets, channelWidths, numChannels, columnVisibility]);
 
   // Ref to keep render callback up to date for the animation loop
   const renderRef = useRef(render);
@@ -1777,7 +1782,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Defined inside effect to avoid self-referencing
   useEffect(() => {
     const tick = () => {
-      renderRef.current();
+      if (!document.hidden) {
+        renderRef.current();
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
 
@@ -2229,7 +2236,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         {pattern && (
           <>
             <AutomationLanes
-              key={`automation-${pattern.id}-${renderCounter}`}
+              key={`automation-${pattern.id}`}
               patternId={pattern.id}
               patternLength={pattern.length}
               rowHeight={ROW_HEIGHT}
@@ -2237,8 +2244,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               channelOffsets={channelOffsets}
               channelWidths={channelWidths}
               rowNumWidth={LINE_NUMBER_WIDTH}
-              scrollOffset={scrollY}
-              visibleStart={visibleStart}
+              scrollOffset={scrollYRef.current}
+              visibleStart={visibleStartRef.current}
               /* parameter is resolved per-channel from useAutomationStore.channelLanes */
               prevPatternId={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.id : (patterns.length > 1 ? patterns[patterns.length - 1]?.id : undefined)) : undefined}
               prevPatternLength={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length > 1 ? patterns[patterns.length - 1]?.length : undefined)) : undefined}
@@ -2246,12 +2253,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               nextPatternLength={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : undefined)) : undefined}
             />
             {/* Internal Macro Columns Overlay (only when visible) */}
-            <div 
-              style={{ 
-                position: 'absolute', 
-                top: scrollY, 
-                left: 0, 
-                right: 0, 
+            <div
+              ref={macroOverlayRef}
+              style={{
+                position: 'absolute',
+                top: scrollYRef.current,
+                left: 0,
+                right: 0,
                 height: pattern.length * ROW_HEIGHT,
                 pointerEvents: 'none',
                 transform: `translateX(${-scrollLeft}px)`

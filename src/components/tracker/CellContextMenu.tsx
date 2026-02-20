@@ -3,6 +3,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Scissors,
   Copy,
@@ -86,7 +87,21 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     transposeSelection,
     interpolateSelection,
     clearSelection,
-  } = useTrackerStore();
+  } = useTrackerStore(useShallow((s) => ({
+    patterns: s.patterns,
+    currentPatternIndex: s.currentPatternIndex,
+    setCell: s.setCell,
+    cursor: s.cursor,
+    selection: s.selection,
+    selectColumn: s.selectColumn,
+    selectChannel: s.selectChannel,
+    copySelection: s.copySelection,
+    cutSelection: s.cutSelection,
+    paste: s.paste,
+    transposeSelection: s.transposeSelection,
+    interpolateSelection: s.interpolateSelection,
+    clearSelection: s.clearSelection,
+  })));
 
   const pattern = patterns[currentPatternIndex];
   const hasSelection = !!selection;

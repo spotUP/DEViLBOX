@@ -8,17 +8,30 @@
  */
 
 import { useEffect, useMemo, useRef } from 'react';
-import { useTrackerStore, useTransportStore, useInstrumentStore, useAutomationStore, useAudioStore } from '@stores';
+import { useShallow } from 'zustand/react/shallow';
+import { useTrackerStore, useTransportStore, useInstrumentStore, useAudioStore, useSettingsStore } from '@stores';
 import { useArrangementStore } from '@stores/useArrangementStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer';
 import { resolveArrangement } from '@lib/arrangement/resolveArrangement';
 
 export const usePatternPlayback = () => {
-  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition } = useTrackerStore();
-  const { isPlaying, isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore();
+  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition } = useTrackerStore(useShallow((s) => ({
+    patterns: s.patterns,
+    currentPatternIndex: s.currentPatternIndex,
+    setCurrentPattern: s.setCurrentPattern,
+    patternOrder: s.patternOrder,
+    currentPositionIndex: s.currentPositionIndex,
+    setCurrentPosition: s.setCurrentPosition,
+  })));
+  const { isPlaying, isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
+    isPlaying: s.isPlaying,
+    isLooping: s.isLooping,
+    bpm: s.bpm,
+    setCurrentRow: s.setCurrentRow,
+    setCurrentRowThrottled: s.setCurrentRowThrottled,
+  })));
   const { instruments } = useInstrumentStore();
-  useAutomationStore();
   const { masterEffects } = useAudioStore();
   const isArrangementMode = useArrangementStore((state) => state.isArrangementMode);
 
@@ -49,10 +62,19 @@ export const usePatternPlayback = () => {
   // re-trigger on every cell edit (transpose, fill, humanize, etc.)
   const patternRef = useRef(pattern);
   const patternsRef = useRef(patterns);
+  const bpmRef = useRef(bpm);
   useEffect(() => {
     patternRef.current = pattern;
     patternsRef.current = patterns;
+    bpmRef.current = bpm;
   });
+
+  // Ref for instruments — prevents the main playback effect from restarting
+  // on every instrument knob change (which would cause full song reloads)
+  const instrumentsRef = useRef(instruments);
+  useEffect(() => {
+    instrumentsRef.current = instruments;
+  }, [instruments]);
 
   // Structural fingerprint — changes only when the pattern structure changes
   // (add/remove channels, change length, different module format), NOT on cell
@@ -111,6 +133,11 @@ export const usePatternPlayback = () => {
       replayer.updatePatterns(patterns);
     }
   }, [patterns]);
+
+  // When in loop mode, track which pattern is being looped so that position
+  // changes (clicking position buttons) trigger a reload with the new pattern.
+  // In song mode this is -1 so it doesn't interfere with patternStructureKey.
+  const loopTargetKey = isLooping ? currentPatternIndex : -1;
 
   // Handle playback start/stop and structural changes (channel count, format, etc.)
   // NOTE: uses patternStructureKey instead of pattern/patterns to avoid full reloads
@@ -188,13 +215,13 @@ export const usePatternPlayback = () => {
           name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
           format,
           patterns: effectivePatterns,
-          instruments,
+          instruments: instrumentsRef.current,
           songPositions: effectiveSongPositions,
           songLength: effectiveSongLength,
           restartPosition: 0,
           numChannels: effectiveNumChannels,
           initialSpeed: modData?.initialSpeed ?? 6,
-          initialBPM: modData?.initialBPM ?? bpm,
+          initialBPM: modData?.initialBPM ?? bpmRef.current,
           // Furnace-specific timing data (only set for .fur imports)
           speed2: furnaceData?.speed2,
           hz: furnaceData?.hz,
@@ -204,10 +231,27 @@ export const usePatternPlayback = () => {
           grooves: furnaceData?.grooves,
         });
 
+        // Apply stored stereo separation (overrides format default from loadSong)
+        replayer.setStereoSeparation(useSettingsStore.getState().stereoSeparation);
+
         if (needsReload) {
-          // Restore position after reload
-          // If the position is out of bounds (e.g. pattern order shrunk), seekTo handles clamping
-          replayer.seekTo(currentSongPos, currentRow);
+          if (isLooping) {
+            // Loop-mode position change: the song is always a 1-entry list,
+            // so start the new pattern from the top.
+            replayer.seekTo(0, 0);
+          } else {
+            // Restore position after structural reload in song mode.
+            // If the position is out of bounds (e.g. pattern order shrunk), seekTo handles clamping.
+            replayer.seekTo(currentSongPos, currentRow);
+          }
+        } else {
+          // Initial start: seek to the current cursor position so playback
+          // begins where the user is looking, not from the top of the song.
+          const startPos = currentPositionIndexRef.current;
+          const startRow = useTransportStore.getState().currentRow;
+          if (startPos > 0 || startRow > 0) {
+            replayer.seekTo(startPos, startRow);
+          }
         }
 
         // Set callbacks for UI updates
@@ -268,7 +312,7 @@ export const usePatternPlayback = () => {
         replayerRef.current.onSongEnd = null;
       }
     };
-  }, [isPlaying, isLooping, patternStructureKey, instruments, patternOrder, bpm, setCurrentPattern, setCurrentPosition, setCurrentRow, setCurrentRowThrottled, isArrangementMode]);
+  }, [isPlaying, isLooping, loopTargetKey, patternStructureKey, patternOrder, setCurrentPattern, setCurrentPosition, setCurrentRow, setCurrentRowThrottled, isArrangementMode]);
 
   return {
     isPlaying,

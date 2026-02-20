@@ -12,6 +12,8 @@ interface CircularVUProps {
 export const CircularVU: React.FC<CircularVUProps> = ({ height = 100 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
+  const lastFrameTimeRef = useRef(0);
+  const gradientCacheRef = useRef<CanvasGradient[]>([]);
   const [width, setWidth] = useState(300);
 
   useEffect(() => {
@@ -45,7 +47,36 @@ export const CircularVU: React.FC<CircularVUProps> = ({ height = 100 }) => {
     const centerY = height / 2;
     const maxRadius = Math.min(width, height) * 0.4;
 
+    // Cache gradients for each ring (only recreated on canvas resize)
+    const numRings = 3;
+    gradientCacheRef.current = [];
+    for (let i = 0; i < numRings; i++) {
+      const radius = maxRadius * (0.4 + (i * 0.2));
+      const gradient = ctx.createLinearGradient(
+        centerX - radius, centerY,
+        centerX + radius, centerY
+      );
+      gradient.addColorStop(0, '#00d4aa');
+      gradient.addColorStop(0.5, '#00ffff');
+      gradient.addColorStop(1, '#00d4aa');
+      gradientCacheRef.current.push(gradient);
+    }
+
+    const FRAME_INTERVAL = 1000 / 30;
+
     const animate = () => {
+      if (document.hidden) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
+      const now = performance.now();
+      if (now - lastFrameTimeRef.current < FRAME_INTERVAL) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      lastFrameTimeRef.current = now;
+
       ctx.clearRect(0, 0, width, height);
 
       const engine = getToneEngine();
@@ -65,23 +96,14 @@ export const CircularVU: React.FC<CircularVUProps> = ({ height = 100 }) => {
       ctx.stroke();
 
       // Draw level arcs (multiple rings)
-      const numRings = 3;
       for (let i = 0; i < numRings; i++) {
         const radius = maxRadius * (0.4 + (i * 0.2));
         const intensity = Math.max(0, level - (i * 0.3));
-        
+
         if (intensity > 0) {
           const angle = Math.PI * 2 * Math.min(intensity * 2, 1);
-          
-          const gradient = ctx.createLinearGradient(
-            centerX - radius, centerY,
-            centerX + radius, centerY
-          );
-          gradient.addColorStop(0, '#00d4aa');
-          gradient.addColorStop(0.5, '#00ffff');
-          gradient.addColorStop(1, '#00d4aa');
 
-          ctx.strokeStyle = gradient;
+          ctx.strokeStyle = gradientCacheRef.current[i];
           ctx.lineWidth = 8;
           ctx.lineCap = 'round';
           ctx.beginPath();

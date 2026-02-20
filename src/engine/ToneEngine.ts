@@ -48,6 +48,18 @@ import { BlepManager } from './blep/BlepManager';
 import { SynthRegistry } from './registry/SynthRegistry';
 import { VoiceAllocator } from './audio/VoiceAllocator';
 
+// Module-level frequency cache: avoids creating transient Tone.Frequency objects on every call.
+// Note name strings (e.g. "C4", "D#3") are finite and reused, so this cache stays small.
+const _freqCache = new Map<string, number>();
+function cachedFrequency(note: string): number {
+  let freq = _freqCache.get(note);
+  if (freq === undefined) {
+    freq = Tone.Frequency(note).toFrequency();
+    _freqCache.set(note, freq);
+  }
+  return freq;
+}
+
 interface VoiceState {
   instrument: Tone.ToneAudioNode | DevilboxSynth;
   note: string;
@@ -73,11 +85,12 @@ export class ToneEngine {
   private static itFilterWorkletPromise: Promise<void> | null = null; // Promise for ITFilter loading
 
   // Master routing chain:
-  // - Tracker instruments → masterInput → amigaFilter ─→ masterEffectsInput → [master fx?] → masterChannel → destination
-  // - DevilboxSynths → synthBus ───────────────────────→ masterEffectsInput → [master fx?] → masterChannel → destination
+  // - Tracker instruments → masterInput → amigaFilter ─→ masterEffectsInput → [master fx?] → blepInput → [BLEP?] → masterChannel → destination
+  // - DevilboxSynths → synthBus ───────────────────────→ masterEffectsInput → [master fx?] → blepInput → [BLEP?] → masterChannel → destination
   public masterInput: Tone.Gain; // Where tracker instruments connect
   public synthBus: Tone.Gain; // Bypass bus for DevilboxSynths (skips AmigaFilter)
   public masterEffectsInput: Tone.Gain; // Merge point for master effects (both paths feed in here)
+  private blepInput: Tone.Gain; // BLEP insertion point — isolates BLEP routing from effects chain rebuilds
   public masterChannel: Tone.Channel; // Final output with volume/pan
   public analyser: Tone.Analyser;
   // FFT for frequency visualization
@@ -99,12 +112,12 @@ export class ToneEngine {
   // Global detune in cents for pitch shifting synths (Wxx effect / DJ slider)
   private globalDetuneCents: number = 0;
 
-  // Instruments keyed by "instrumentId-channelIndex" for per-channel independence
-  public instruments: Map<string, Tone.ToneAudioNode | DevilboxSynth>;
+  // Instruments keyed by numeric composite key (instrumentId<<16 | channelIndex) for per-channel independence
+  public instruments: Map<number, Tone.ToneAudioNode | DevilboxSynth>;
   // Track synth types for proper release handling
-  private instrumentSynthTypes: Map<string, string> = new Map();
+  private instrumentSynthTypes: Map<number, string> = new Map();
   // Track loading promises for samplers/players (keyed by instrument key)
-  private instrumentLoadingPromises: Map<string, Promise<void>> = new Map();
+  private instrumentLoadingPromises: Map<number, Promise<void>> = new Map();
   // Store decoded AudioBuffers for TrackerReplayer access (keyed by instrument ID)
   private decodedAudioBuffers: Map<number, AudioBuffer> = new Map();
 
@@ -144,7 +157,7 @@ export class ToneEngine {
   // Per-channel pitch state for ProTracker effects (arpeggio, portamento, vibrato)
   // Tracks: active instrument key, base playback rate, current pitch offset
   private channelPitchState: Map<number, {
-    instrumentKey: string;
+    instrumentKey: number;
     basePlaybackRate: number;  // For samplers/players
     baseFrequency: number;     // For synths (Hz)
     currentPitchMult: number;  // Current pitch multiplier (1.0 = no change)
@@ -207,8 +220,8 @@ export class ToneEngine {
   private amigaFilter: AmigaFilter;
   private amigaFilterEnabled: boolean = true; // Default: filter ON (like real Amiga)
 
-  // Per-instrument effect chains (keyed by composite string "instrumentId-channelIndex")
-  private instrumentEffectChains: Map<string | number, {
+  // Per-instrument effect chains (keyed by numeric composite key instrumentId<<16 | channelIndex)
+  private instrumentEffectChains: Map<number, {
     effects: Tone.ToneAudioNode[];
     output: Tone.Gain;
     bridge?: Tone.Gain;
@@ -227,7 +240,7 @@ export class ToneEngine {
 
   // Track pending releaseAll gain-restore timeouts per instrument key
   // Prevents race condition where double-releaseAll captures gain=0 and restores to 0
-  private releaseRestoreTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private releaseRestoreTimeouts: Map<number, ReturnType<typeof setTimeout>> = new Map();
 
   // Guard against concurrent preloadInstruments calls
   private preloadGeneration = 0;
@@ -267,12 +280,17 @@ export class ToneEngine {
     // Master effects merge point — both tracker and synth audio meet here
     this.masterEffectsInput = new Tone.Gain(1);
 
+    // BLEP insertion point — sits between effects chain end and masterChannel.
+    // This node is never disconnected by rebuildMasterEffects, so BLEP routing stays stable.
+    this.blepInput = new Tone.Gain(1);
+
     // Default routing:
-    //   masterInput → amigaFilter → masterEffectsInput → masterChannel
-    //   synthBus ──────────────────→ masterEffectsInput → masterChannel
+    //   masterInput → amigaFilter → masterEffectsInput → blepInput → masterChannel
+    //   synthBus ──────────────────→ masterEffectsInput → blepInput → masterChannel
     this.masterInput.connect(this.amigaFilter);
     this.amigaFilter.connect(this.masterEffectsInput);
-    this.masterEffectsInput.connect(this.masterChannel);
+    this.masterEffectsInput.connect(this.blepInput);
+    this.blepInput.connect(this.masterChannel);
 
     // Synth bus bypasses AmigaFilter for native synths (DB303, Vital, etc.)
     this.synthBus = new Tone.Gain(1);
@@ -604,19 +622,20 @@ export class ToneEngine {
   }
 
   /**
-   * Reconnect the BLEP audio chain based on current settings
-   * Called when BLEP is enabled/disabled or when the engine initializes
+   * Reconnect the BLEP audio chain based on current settings.
+   * Routes through: blepInput → [BLEP worklet?] → masterChannel
+   * The blepInput node is never touched by rebuildMasterEffects, so this is stable.
    */
   private reconnectBlepChain(): void {
-    // Disconnect existing connection
+    // Disconnect blepInput → masterChannel (and any native worklet connections)
     try {
-      this.masterEffectsInput.disconnect(this.masterChannel);
-    } catch (e) {
+      this.blepInput.disconnect(this.masterChannel);
+    } catch {
       // Ignore if not connected
     }
 
     // Reconnect with or without BLEP
-    this.blepManager.connect(this.masterEffectsInput, this.masterChannel);
+    this.blepManager.connect(this.blepInput, this.masterChannel);
   }
 
   /**
@@ -1049,9 +1068,10 @@ export class ToneEngine {
   /**
    * Generate composite key for per-channel instrument instances
    */
-  private getInstrumentKey(instrumentId: number, channelIndex?: number): string {
-    // If no channel specified, use -1 as default (backwards compatibility)
-    return `${instrumentId}-${channelIndex ?? -1}`;
+  private getInstrumentKey(instrumentId: number, channelIndex?: number): number {
+    // Numeric composite key: instrumentId in upper 16 bits, channelIndex in lower 16.
+    // Avoids string allocation on every call (~512/sec).
+    return (instrumentId << 16) | ((channelIndex ?? -1) & 0xFFFF);
   }
 
   private getInstrumentOutputDestination(instrumentId: number, isNativeSynth: boolean): Tone.ToneAudioNode {
@@ -1834,7 +1854,7 @@ export class ToneEngine {
     // Determine if this instrument is a DevilboxSynth to pick the right output bus
     let isNative = false;
     for (const [key, inst] of this.instruments) {
-      if (key.startsWith(`${instrumentId}-`)) {
+      if ((key >> 16) === instrumentId) {
         if (isDevilboxSynth(inst)) isNative = true;
         break;
       }
@@ -1844,8 +1864,7 @@ export class ToneEngine {
     // Redirect ALL existing effect chains for this instrument to the analyser
     let foundChains = 0;
     this.instrumentEffectChains.forEach((chain, key) => {
-      const [idPart] = String(key).split('-');
-      if (idPart === String(instrumentId)) {
+      if ((key >> 16) === instrumentId) {
         // Disconnect from all possible destinations, then connect to analyser
         try { chain.output.disconnect(this.masterInput); } catch { /* May not be connected */ }
         try { chain.output.disconnect(this.synthBus); } catch { /* May not be connected */ }
@@ -1877,7 +1896,7 @@ export class ToneEngine {
 
     if (!instrument) {
       for (const [key, inst] of this.instruments) {
-        if (key.startsWith(`${instrumentId}-`)) {
+        if ((key >> 16) === instrumentId) {
           instrument = inst;
           break;
         }
@@ -2230,8 +2249,8 @@ export class ToneEngine {
             // No period provided (keyboard playback) - calculate playback rate from note
             // The sample's base note is the pitch at playbackRate 1.0
             const baseNote = config.sample?.baseNote || 'C4';
-            const baseFreq = Tone.Frequency(baseNote).toFrequency();
-            const targetFreq = Tone.Frequency(note).toFrequency();
+            const baseFreq = cachedFrequency(baseNote);
+            const targetFreq = cachedFrequency(note);
             const playbackRate = targetFreq / baseFreq;
 
             // Apply global playback rate multiplier for pitch shifting
@@ -2274,8 +2293,8 @@ export class ToneEngine {
                 slicePlayer.connect(this.getInstrumentOutputDestination(instrumentId, false));
 
                 // Calculate pitch adjustment for the note (relative to base note)
-                const baseFreq = Tone.Frequency(baseNote).toFrequency();
-                const targetFreq = Tone.Frequency(note).toFrequency();
+                const baseFreq = cachedFrequency(baseNote);
+                const targetFreq = cachedFrequency(note);
                 const playbackRate = targetFreq / baseFreq;
 
                 // Apply global playback rate multiplier for pitch shifting
@@ -2339,8 +2358,8 @@ export class ToneEngine {
         } else {
           // No period provided (keyboard playback) - calculate playback rate from note
           const baseNote = config.sample?.baseNote || 'C4';
-          const baseFreq = Tone.Frequency(baseNote).toFrequency();
-          const targetFreq = Tone.Frequency(note).toFrequency();
+          const baseFreq = cachedFrequency(baseNote);
+          const targetFreq = cachedFrequency(note);
           const playbackRate = targetFreq / baseFreq;
           player.playbackRate = playbackRate;
         }
@@ -2380,7 +2399,7 @@ export class ToneEngine {
           instrument.setChannel(chipChannel);
         }
         // Standard synths - apply slide/accent for 303-style effects
-        const targetFreq = Tone.Frequency(note).toFrequency();
+        const targetFreq = cachedFrequency(note);
         const finalVelocity = this.applySlideAndAccent(
           instrument, targetFreq, safeTime, velocity,
           accent, slide, channelIndex, instrumentId
@@ -2780,23 +2799,26 @@ export class ToneEngine {
       if (nnaAction === 0) { // CUT (Standard MOD/XM/S3M behavior)
         // IMPORTANT: Don't stop voices that use the same instrument instance as the new note
         // This prevents mono synths (like FurnaceSynth) from having keyOff called right after keyOn
-        voices.forEach(v => {
-          if (v.instrument !== instrument) {
-            this.stopVoice(v, safeTime);
+        // Stop non-matching voices and compact in-place (avoids filter() allocation)
+        let writeIdx = 0;
+        for (let i = 0; i < voices.length; i++) {
+          if (voices[i].instrument === instrument) {
+            voices[writeIdx++] = voices[i];
+          } else {
+            this.stopVoice(voices[i], safeTime);
           }
-        });
-        // Filter out voices that were stopped, keep those using the same instrument
-        voices = voices.filter(v => v.instrument === instrument);
+        }
+        voices.length = writeIdx;
       } else {
         // IT NNA: Continue, Note Off, or Fade
-        voices.forEach(v => {
-          if (nnaAction === 2) v.volumeEnv.keyOff(); // Note Off
+        for (let i = 0; i < voices.length; i++) {
+          if (nnaAction === 2) voices[i].volumeEnv.keyOff(); // Note Off
           if (nnaAction === 3) {
-            v.isKeyOff = true; // Start fadeout
+            voices[i].isKeyOff = true; // Start fadeout
             // Use instrument's fadeout rate if available
-            if (v.fadeoutStep === 0) v.fadeoutStep = 1024; // Default approx 1/64
+            if (voices[i].fadeoutStep === 0) voices[i].fadeoutStep = 1024; // Default approx 1/64
           }
-        });
+        }
       }
 
       // 2. Create independent playback node for this voice
@@ -2849,8 +2871,8 @@ export class ToneEngine {
           } else {
             // FIX: Handle non-period playback for voice nodes (matches triggerNoteAttack)
             const baseNote = config.sample?.baseNote || 'C4';
-            const baseFreq = Tone.Frequency(baseNote).toFrequency();
-            const targetFreq = Tone.Frequency(note).toFrequency();
+            const baseFreq = cachedFrequency(baseNote);
+            const targetFreq = cachedFrequency(note);
             const playbackRate = targetFreq / baseFreq;
             // Apply global playback rate multiplier for pitch shifting
             (voiceNode as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
@@ -2867,6 +2889,7 @@ export class ToneEngine {
               offset = Math.min(sampleOffset / origRate, bufferDuration - 0.001);
             }
             // else: offset >= sample length → play from beginning (pt2-clone behavior)
+            console.log(`[9xx:voice] sampleOffset=${sampleOffset} origRate=${origRate} bufferDur=${bufferDuration.toFixed(4)}s bufferFrames=${Math.round(bufferFrames)} → timeOffset=${offset.toFixed(4)}s ${sampleOffset >= bufferFrames ? '(CLAMPED TO 0 — offset >= length!)' : ''}`);
           }
           voiceNode.start(safeTime, offset);
         } else if ((voiceNode as any).triggerAttack) {
@@ -2898,7 +2921,7 @@ export class ToneEngine {
             voiceNode.triggerAttack(note, safeTime, velocity, accent, slide);
           } else {
             // Standard synths - apply slide/accent for 303-style effects
-            const targetFreq = Tone.Frequency(note).toFrequency();
+            const targetFreq = cachedFrequency(note);
             const finalVelocity = this.applySlideAndAccent(
               voiceNode, targetFreq, safeTime, velocity,
               accent, slide, channelIndex, instrumentId
@@ -2980,8 +3003,8 @@ export class ToneEngine {
             (grainPlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * (config.granular?.playbackRate || 1) * this.globalPlaybackRate;
           } else {
             // Calculate pitch shift from note (C4 = base pitch)
-            const baseNote = Tone.Frequency('C4').toFrequency();
-            const targetFreq = Tone.Frequency(note).toFrequency();
+            const baseNote = cachedFrequency('C4');
+            const targetFreq = cachedFrequency(note);
             const playbackRate = targetFreq / baseNote;
             // Apply global playback rate multiplier for pitch shifting
             (grainPlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * (config.granular?.playbackRate || 1) * this.globalPlaybackRate;
@@ -3030,8 +3053,8 @@ export class ToneEngine {
             console.warn('[ToneEngine] MOD/XM sample expects period but none provided');
           } else {
             // Normal (non-period) playback - calculate pitch from note
-            const baseNote = Tone.Frequency('C4').toFrequency();
-            const targetFreq = Tone.Frequency(note).toFrequency();
+            const baseNote = cachedFrequency('C4');
+            const targetFreq = cachedFrequency(note);
             const playbackRate = targetFreq / baseNote;
             // Apply global playback rate multiplier for pitch shifting
             (player as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
@@ -3049,6 +3072,7 @@ export class ToneEngine {
               startOffset = Math.min(sampleOffset / origSampleRate, player.buffer.duration - 0.001);
             }
             // else: offset >= sample length → play from beginning (pt2-clone behavior)
+            console.log(`[9xx:player] sampleOffset=${sampleOffset} origRate=${origSampleRate} bufferDur=${player.buffer.duration.toFixed(4)}s bufferFrames=${Math.round(bufferFrames)} → startOffset=${startOffset.toFixed(4)}s loop=${player.loop} ${sampleOffset >= bufferFrames ? '(CLAMPED TO 0 — offset >= length!)' : ''}`);
           }
 
           // For looping samples: DON'T schedule a stop - let them loop until new note or stop button
@@ -3105,8 +3129,8 @@ export class ToneEngine {
                 slicePlayer.connect(this.getInstrumentOutputDestination(instrumentId, false));
 
                 // Calculate pitch adjustment for the note (relative to base note)
-                const baseFreq = Tone.Frequency(baseNote).toFrequency();
-                const targetFreq = Tone.Frequency(note).toFrequency();
+                const baseFreq = cachedFrequency(baseNote);
+                const targetFreq = cachedFrequency(note);
                 const playbackRate = targetFreq / baseFreq;
 
                 // Apply global playback rate multiplier for pitch shifting
@@ -3142,6 +3166,7 @@ export class ToneEngine {
               // buffer.sampleRate is the decoded AudioContext rate — do NOT use it here.
               const origRate = config.sample?.sampleRate || 8363;
               const timeOffset = sampleOffset / origRate;
+              console.log(`[9xx:sampler] sampleOffset=${sampleOffset} origRate=${origRate} bufferDur=${buffer.duration.toFixed(4)}s → timeOffset=${timeOffset.toFixed(4)}s baseNote=${baseNote} note=${note}`);
 
               // Clamp offset to buffer duration
               const clampedOffset = Math.min(timeOffset, buffer.duration - 0.001);
@@ -3155,8 +3180,8 @@ export class ToneEngine {
                 offsetPlayer.connect(this.getInstrumentOutputDestination(instrumentId, false));
 
                 // Calculate pitch adjustment for the note (relative to base note)
-                const baseFreq = Tone.Frequency(baseNote).toFrequency();
-                const targetFreq = Tone.Frequency(note).toFrequency();
+                const baseFreq = cachedFrequency(baseNote);
+                const targetFreq = cachedFrequency(note);
                 const playbackRate = targetFreq / baseFreq;
 
                 // Apply global playback rate multiplier for pitch shifting
@@ -3198,7 +3223,7 @@ export class ToneEngine {
         // New synths with triggerAttackRelease interface
         // Apply slide/accent for mono synths (PolySynth can't slide between notes)
         if ((instrument as any).triggerAttackRelease) {
-          const targetFreq = Tone.Frequency(note).toFrequency();
+          const targetFreq = cachedFrequency(note);
           const finalVelocity = this.applySlideAndAccent(
             instrument, targetFreq, safeTime, velocity,
             accent, slide, channelIndex, instrumentId
@@ -3217,7 +3242,7 @@ export class ToneEngine {
       } else if ((instrument as any).triggerAttackRelease) {
         // Standard synths (Synth, MonoSynth, FMSynth, AMSynth, PluckSynth, DuoSynth, PolySynth)
         // Apply slide/accent for 303-style effects on all synths
-        const targetFreq = Tone.Frequency(note).toFrequency();
+        const targetFreq = cachedFrequency(note);
         const finalVelocity = this.applySlideAndAccent(
           instrument, targetFreq, safeTime, velocity,
           accent, slide, channelIndex, instrumentId
@@ -3772,7 +3797,7 @@ export class ToneEngine {
     }
     // Also check channel-specific keys
     for (const [k, inst] of this.instruments) {
-      if (k.startsWith(`${instrumentId}-`) && inst instanceof MAMEBaseSynth) {
+      if ((k >> 16) === instrumentId && inst instanceof MAMEBaseSynth) {
         return inst;
       }
     }
@@ -4447,7 +4472,7 @@ export class ToneEngine {
     // Find all channel instances of this instrument
     const synths: JC303Synth[] = [];
     this.instruments.forEach((instrument, key) => {
-      if (key.startsWith(`${instrumentId}-`) && (instrument instanceof JC303Synth)) {
+      if ((key >> 16) === instrumentId && (instrument instanceof JC303Synth)) {
         synths.push(instrument);
       }
     });
@@ -4500,7 +4525,7 @@ export class ToneEngine {
 
     // Find all channel instances of this instrument
     this.instruments.forEach((instrument, key) => {
-      if (key.startsWith(`${instrumentId}-`) && (instrument as any).updateArpeggio) {
+      if ((key >> 16) === instrumentId && (instrument as any).updateArpeggio) {
         (instrument as any).updateArpeggio(arpeggioConfig);
       }
     });
@@ -4514,7 +4539,7 @@ export class ToneEngine {
   public getChipSynthArpeggioStep(instrumentId: number): number {
     // Find first channel instance with arpeggio engine
     for (const [key, instrument] of this.instruments.entries()) {
-      if (key.startsWith(`${instrumentId}-`) && (instrument as any).getCurrentArpeggioStep) {
+      if ((key >> 16) === instrumentId && (instrument as any).getCurrentArpeggioStep) {
         return (instrument as any).getCurrentArpeggioStep();
       }
     }
@@ -4529,7 +4554,7 @@ export class ToneEngine {
   public isChipSynthArpeggioPlaying(instrumentId: number): boolean {
     // Find first channel instance with arpeggio engine
     for (const [key, instrument] of this.instruments.entries()) {
-      if (key.startsWith(`${instrumentId}-`) && (instrument as any).isArpeggioPlaying) {
+      if ((key >> 16) === instrumentId && (instrument as any).isArpeggioPlaying) {
         return (instrument as any).isArpeggioPlaying();
       }
     }
@@ -4705,6 +4730,7 @@ export class ToneEngine {
     this.amigaFilter.dispose();
     this.synthBus.dispose();
     this.masterEffectsInput.dispose();
+    this.blepInput.dispose();
     this.masterInput.dispose();
     this.masterChannel.dispose();
 
@@ -4722,7 +4748,7 @@ export class ToneEngine {
    * @param key - Composite key (instrumentId-channelIndex) for per-channel chains
    */
   private async buildInstrumentEffectChain(
-    key: string | number,
+    key: number,
     effects: EffectConfig[],
     instrument: Tone.ToneAudioNode | DevilboxSynth
   ): Promise<void> {
@@ -4895,8 +4921,7 @@ export class ToneEngine {
     // or iterate all channels if it's a live instrument
     const chains: Array<{ effects: Tone.ToneAudioNode[]; output: Tone.Gain }> = [];
     this.instrumentEffectChains.forEach((chain, chainKey) => {
-      const [idPart] = String(chainKey).split('-');
-      if (idPart === String(instrumentId)) {
+      if ((chainKey >> 16) === instrumentId) {
         chains.push(chain);
       }
     });
@@ -4926,7 +4951,7 @@ export class ToneEngine {
   /**
    * Dispose instrument effect chain
    */
-  private disposeInstrumentEffectChain(key: string | number): void {
+  private disposeInstrumentEffectChain(key: number): void {
     const chain = this.instrumentEffectChains.get(key);
     if (chain) {
       chain.effects.forEach((fx) => {
@@ -4991,8 +5016,8 @@ export class ToneEngine {
     const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
 
     if (enabledEffects.length === 0) {
-      // No effects - direct connection to master channel
-      this.masterEffectsInput.connect(this.masterChannel);
+      // No effects - direct connection to BLEP input (which routes to masterChannel)
+      this.masterEffectsInput.connect(this.blepInput);
       return;
     }
 
@@ -5037,8 +5062,8 @@ export class ToneEngine {
     }
 
     if (successNodes.length === 0) {
-      // All effects failed — direct connection to master channel
-      this.masterEffectsInput.connect(this.masterChannel);
+      // All effects failed — direct connection to BLEP input
+      this.masterEffectsInput.connect(this.blepInput);
       return;
     }
 
@@ -5048,7 +5073,7 @@ export class ToneEngine {
       this.masterEffectConfigs.set(successConfigs[index].id, { node, config: successConfigs[index] });
     });
 
-    // Connect chain: masterEffectsInput → effects[0] → effects[n] → masterChannel
+    // Connect chain: masterEffectsInput → effects[0] → effects[n] → blepInput → [BLEP?] → masterChannel
     // Both tracker audio (via amigaFilter) and synth audio (via synthBus) feed masterEffectsInput
     this.masterEffectsInput.connect(this.masterEffectsNodes[0]);
 
@@ -5056,7 +5081,7 @@ export class ToneEngine {
       this.masterEffectsNodes[i].connect(this.masterEffectsNodes[i + 1]);
     }
 
-    this.masterEffectsNodes[this.masterEffectsNodes.length - 1].connect(this.masterChannel);
+    this.masterEffectsNodes[this.masterEffectsNodes.length - 1].connect(this.blepInput);
     // Debug: Success
     // console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' connected chain OK, nodes:',
     //   this.masterEffectsNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
@@ -5687,8 +5712,8 @@ export class ToneEngine {
       const instruments = useInstrumentStore.getState().instruments;
 
       this.instrumentEffectChains.forEach((chain, key) => {
-        // key format: "instrumentId-channelIndex" or just instrumentId
-        const instrumentId = typeof key === 'number' ? key : Number(String(key).split('-')[0]);
+        // key format: numeric composite (instrumentId << 16 | channelIndex)
+        const instrumentId = key >> 16;
         const instrument = instruments.find((inst: { id: number }) => inst.id === instrumentId);
         if (!instrument?.effects) return;
 
@@ -6086,7 +6111,7 @@ export class ToneEngine {
   /**
    * Helper to apply pitch multiplier to a specific Tone node
    */
-  private applyPitchToNode(node: Tone.ToneAudioNode | DevilboxSynth, pitchMultiplier: number, baseRate: number, instrumentKey: string): void {
+  private applyPitchToNode(node: Tone.ToneAudioNode | DevilboxSynth, pitchMultiplier: number, baseRate: number, instrumentKey: number): void {
     const synthType = this.instrumentSynthTypes.get(instrumentKey);
     const cents = 1200 * Math.log2(pitchMultiplier);
 
@@ -6130,7 +6155,7 @@ export class ToneEngine {
    */
   public initChannelPitch(
     channelIndex: number,
-    instrumentKey: string,
+    instrumentKey: number,
     baseFrequency: number,
     basePlaybackRate: number = 1
   ): void {

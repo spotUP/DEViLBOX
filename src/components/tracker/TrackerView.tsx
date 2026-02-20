@@ -298,10 +298,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const { isMobile, width: windowWidth } = useResponsive();
 
   // PERFORMANCE OPTIMIZATION: Group selectors with useShallow to reduce re-render overhead
-  const { 
-    patterns, 
-    currentPatternIndex, 
-    cursor, 
+  const {
+    patterns,
+    currentPatternIndex,
     showGhostPatterns,
     loadPatterns,
     setPatternOrder,
@@ -314,7 +313,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   } = useTrackerStore(useShallow((state) => ({
     patterns: state.patterns,
     currentPatternIndex: state.currentPatternIndex,
-    cursor: state.cursor,
     showGhostPatterns: state.showGhostPatterns,
     loadPatterns: state.loadPatterns,
     setPatternOrder: state.setPatternOrder,
@@ -325,6 +323,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     remapInstrument: state.remapInstrument,
     applySystemPreset: state.applySystemPreset
   })));
+  // Fine-grained selector for cursor.channelIndex only — avoids re-rendering
+  // the entire TrackerView on every cursor row/column move
+  const cursorChannelIndex = useTrackerStore((state) => state.cursor.channelIndex);
 
   const { loadInstruments } = useInstrumentStore(useShallow(s => ({ loadInstruments: s.loadInstruments })));
   const { setMetadata } = useProjectStore(useShallow(s => ({ setMetadata: s.setMetadata })));
@@ -456,10 +457,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   useEffect(() => {
     if (viewMode === 'grid') {
       requestAnimationFrame(() => {
-        setGridChannelIndex(cursor.channelIndex);
+        setGridChannelIndex(cursorChannelIndex);
       });
     }
-  }, [viewMode, cursor.channelIndex]);
+  }, [viewMode, cursorChannelIndex]);
 
   // Keyboard shortcuts for dialogs
   const handleDialogShortcuts = useCallback((e: KeyboardEvent) => {
@@ -1361,7 +1362,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           }}
           onExportTrack={() => {
             const pattern = patterns[currentPatternIndex];
-            downloadTrack(cursor.channelIndex, pattern);
+            downloadTrack(useTrackerStore.getState().cursor.channelIndex, pattern);
           }}
           onReverse={blockOps.reverseBlock}
           onExpand={blockOps.expandBlock}

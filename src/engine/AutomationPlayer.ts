@@ -152,18 +152,18 @@ export class AutomationPlayer {
 
     const engine = getToneEngine();
 
-    // Try composite key first (instrumentId-channelIndex), then fall back to instrumentId-(-1)
+    // Try composite key first (instrumentId<<16 | channelIndex), then fall back to instrumentId<<16 | 0xFFFF (-1)
     let instrument = null;
     if (channelIndex !== undefined) {
-      instrument = engine.instruments.get(`${instrumentId}-${channelIndex}`);
+      instrument = engine.instruments.get((instrumentId << 16) | (channelIndex & 0xFFFF));
     }
     if (!instrument) {
-      instrument = engine.instruments.get(`${instrumentId}-${-1}`);
+      instrument = engine.instruments.get((instrumentId << 16) | 0xFFFF);
     }
     // Also try iterating to find any matching TB303/Buzz3o3 for this instrumentId
     if (!instrument) {
       for (const [key, inst] of engine.instruments.entries()) {
-        if (key.startsWith(`${instrumentId}-`) &&
+        if ((key >> 16) === instrumentId &&
             (inst instanceof JC303Synth || inst.constructor.name === 'BuzzmachineGenerator')) {
           instrument = inst;
           break;

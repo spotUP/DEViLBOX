@@ -12,6 +12,7 @@ interface FrequencyBarsProps {
 export const FrequencyBars: React.FC<FrequencyBarsProps> = ({ height = 100 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
+  const lastFrameTimeRef = useRef(0);
   const [width, setWidth] = useState(300);
   const gradientCacheRef = useRef<CanvasGradient[]>([]);
 
@@ -60,7 +61,21 @@ export const FrequencyBars: React.FC<FrequencyBarsProps> = ({ height = 100 }) =>
     const engine = getToneEngine();
     engine.enableAnalysers();
 
+    const FRAME_INTERVAL = 1000 / 30;
+
     const animate = () => {
+      if (document.hidden) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
+      const now = performance.now();
+      if (now - lastFrameTimeRef.current < FRAME_INTERVAL) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      lastFrameTimeRef.current = now;
+
       ctx.fillStyle = '#0a0a0b';
       ctx.fillRect(0, 0, width, height);
 
