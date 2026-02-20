@@ -1295,31 +1295,40 @@ const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
         };
         const effectMinScale = WAM_MIN_SCALE[effect.type] ?? 0;
 
-        // Auto-scale plugin GUI to fill container (centered)
+        // Cache natural (unscaled) dimensions to avoid re-measuring after zoom
+        let naturalW = 0;
+        let naturalH = 0;
+
+        // Auto-scale plugin GUI to fill container width using CSS zoom.
+        // IMPORTANT: Uses zoom instead of transform: scale() because CSS transforms
+        // don't affect the coordinate system — canvas-based WAM plugin GUIs (e.g.
+        // Graphic EQ grid) receive misaligned mouse coordinates with transform: scale(),
+        // making them unclickable/undraggable. CSS zoom properly scales layout and coordinates.
         const scaleToFit = () => {
           const container = guiContainerRef.current;
           if (!container || !gui) return;
-          gui.style.transform = '';
-          gui.style.position = '';
-          gui.style.left = '';
-          gui.style.top = '';
-          const w = gui.offsetWidth || gui.scrollWidth || gui.clientWidth;
-          const h = gui.offsetHeight || gui.scrollHeight || gui.clientHeight;
-          if (!w || !h) return;
+
+          // Capture natural dimensions once before any zoom is applied
+          if (!naturalW || !naturalH) {
+            (gui.style as any).zoom = '';
+            gui.style.transform = '';
+            gui.style.position = '';
+            gui.style.left = '';
+            gui.style.top = '';
+            naturalW = gui.offsetWidth || gui.scrollWidth || gui.clientWidth;
+            naturalH = gui.offsetHeight || gui.scrollHeight || gui.clientHeight;
+            if (!naturalW || !naturalH) return;
+          }
+
           const cw = container.clientWidth;
-          const ch = container.clientHeight || 300;
           if (!cw) return;
-          const naturalScale = Math.min(cw / w, ch / h);
-          const scale = Math.max(effectMinScale, naturalScale);
-          const scaledW = w * scale;
-          const scaledH = h * scale;
-          // Update container height to match scaled GUI height (no empty space below)
-          container.style.height = `${Math.max(scaledH, 300)}px`;
-          gui.style.position = 'absolute';
-          gui.style.transformOrigin = 'top left';
-          gui.style.transform = `scale(${scale})`;
-          gui.style.left = `${Math.max(0, (cw - scaledW) / 2)}px`;
-          gui.style.top = `${Math.max(0, (ch - scaledH) / 2)}px`;
+
+          // Scale to fill container width (height follows proportionally)
+          const scale = Math.max(effectMinScale, cw / naturalW);
+          const scaledH = naturalH * scale;
+
+          container.style.height = `${Math.max(scaledH, 200)}px`;
+          (gui.style as any).zoom = `${scale}`;
         };
 
         resizeObserver = new ResizeObserver(scaleToFit);
@@ -1351,8 +1360,8 @@ const WAMEffectEditor: React.FC<VisualEffectEditorProps> = ({
       {/* Native WAM GUI */}
       <div
         ref={guiContainerRef}
-        className="bg-black rounded-lg border border-border overflow-hidden relative"
-        style={{ minHeight: hasGui ? 300 : 0, display: hasGui || isLoading ? 'block' : 'none' }}
+        className="bg-black rounded-lg border border-border overflow-visible relative"
+        style={{ minHeight: hasGui ? 200 : 0, display: hasGui || isLoading ? 'block' : 'none' }}
       />
       {isLoading && (
         <div className="flex items-center justify-center py-8 text-text-muted text-xs">
