@@ -39,7 +39,9 @@ export const ArrangementToolbar: React.FC = () => {
     zoomToFit, addTrack,
   } = useArrangementStore();
 
-  const { isPlaying, togglePlayPause, stop } = useTransportStore();
+  const isPlaying = useTransportStore(s => s.isPlaying);
+  const togglePlayPause = useTransportStore(s => s.togglePlayPause);
+  const stop = useTransportStore(s => s.stop);
 
   const handleZoomIn = () => setPixelsPerRow(Math.min(32, view.pixelsPerRow * 1.5));
   const handleZoomOut = () => setPixelsPerRow(Math.max(0.5, view.pixelsPerRow / 1.5));

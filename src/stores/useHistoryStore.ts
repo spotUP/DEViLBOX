@@ -97,8 +97,8 @@ export const useHistoryStore = create<HistoryStore>()(
           timestamp: Date.now(),
           description,
           patternIndex,
-          beforeState: JSON.parse(JSON.stringify(beforeState)), // Deep clone
-          afterState: JSON.parse(JSON.stringify(afterState)), // Deep clone
+          beforeState: structuredClone(beforeState), // Deep clone
+          afterState: structuredClone(afterState), // Deep clone
         };
 
         // Add to undo stack

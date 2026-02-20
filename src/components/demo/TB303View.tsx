@@ -8,6 +8,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { TB303Sequencer, type TB303Step } from '@components/sequencer/TB303Sequencer';
 import { Knob } from '@components/controls/Knob';
 import { useTrackerStore, useInstrumentStore, useTransportStore } from '@stores';
+import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 import { Shuffle, Trash2, Wand2 } from 'lucide-react';
@@ -78,10 +79,16 @@ interface TB303ViewProps {
 
 export const TB303View: React.FC<TB303ViewProps> = ({ channelIndex = 0 }) => {
   // Get tracker store and instrument store
-  const { patterns, currentPatternIndex, setCell } = useTrackerStore();
-  const { instruments, updateInstrument, addInstrument } = useInstrumentStore();
+  const { patterns, currentPatternIndex, setCell } = useTrackerStore(
+    useShallow((s) => ({ patterns: s.patterns, currentPatternIndex: s.currentPatternIndex, setCell: s.setCell }))
+  );
+  const { instruments, updateInstrument, addInstrument } = useInstrumentStore(
+    useShallow((s) => ({ instruments: s.instruments, updateInstrument: s.updateInstrument, addInstrument: s.addInstrument }))
+  );
   // Use global transport for playback state (TrackerReplayer handles actual playback)
-  const { isPlaying, currentRow, bpm } = useTransportStore();
+  const isPlaying = useTransportStore((s) => s.isPlaying);
+  const currentRow = useTransportStore((s) => s.currentRow);
+  const bpm = useTransportStore((s) => s.bpm);
   const currentPattern = patterns[currentPatternIndex];
   const channel = currentPattern?.channels[channelIndex];
 

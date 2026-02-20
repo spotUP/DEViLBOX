@@ -53,7 +53,9 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     clearAll,
   } = useGridPattern(channelIndex);
 
-  const { currentRow, isPlaying, smoothScrolling } = useTransportStore();
+  const currentRow = useTransportStore((s) => s.currentRow);
+  const isPlaying = useTransportStore((s) => s.isPlaying);
+  const smoothScrolling = useTransportStore((s) => s.smoothScrolling);
 
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;

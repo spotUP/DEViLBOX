@@ -90,7 +90,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
     const connect = async () => {
       try {
         const engine = getToneEngine();
-        const key = `${instrument.id}--1`;
+        const key = engine.getInstrumentKey(instrument.id, -1);
         const synth = engine.instruments?.get(key) as VSTBridgeSynth | null;
         if (!synth || !('setParameter' in synth)) {
           setTimeout(() => { if (!cancelled) connect(); }, 500);
