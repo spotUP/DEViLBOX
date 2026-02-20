@@ -26,6 +26,8 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
   const animationRef = useRef<number | null>(null);
   const levelStatesRef = useRef<number[]>([]);
   const peakHoldsRef = useRef<{ level: number; frames: number }[]>([]);
+  // PERF: Cache gradient to avoid createLinearGradient every frame
+  const gradientCacheRef = useRef<{ gradient: CanvasGradient; width: number; cyan: boolean } | null>(null);
 
   const { patterns, currentPatternIndex } = useTrackerStore(
     useShallow((state) => ({
@@ -166,16 +168,23 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
       const barMaxWidth = actualWidth - 40;
       const startY = 12;
 
-      // Cache gradient per theme (reuse across all channels in this frame)
-      const barGradient = ctx.createLinearGradient(20, 0, 20 + barMaxWidth, 0);
-      if (cyan) {
-        barGradient.addColorStop(0, 'rgba(0, 200, 200, 0.8)');
-        barGradient.addColorStop(0.7, 'rgba(0, 255, 255, 1)');
-        barGradient.addColorStop(1, 'rgba(255, 100, 100, 1)');
+      // PERF: Reuse cached gradient — only recreate when width or theme changes
+      const gc = gradientCacheRef.current;
+      let barGradient: CanvasGradient;
+      if (gc && gc.width === barMaxWidth && gc.cyan === cyan) {
+        barGradient = gc.gradient;
       } else {
-        barGradient.addColorStop(0, 'rgba(0, 180, 140, 0.8)');
-        barGradient.addColorStop(0.7, 'rgba(0, 212, 170, 1)');
-        barGradient.addColorStop(1, 'rgba(255, 80, 80, 1)');
+        barGradient = ctx.createLinearGradient(20, 0, 20 + barMaxWidth, 0);
+        if (cyan) {
+          barGradient.addColorStop(0, 'rgba(0, 200, 200, 0.8)');
+          barGradient.addColorStop(0.7, 'rgba(0, 255, 255, 1)');
+          barGradient.addColorStop(1, 'rgba(255, 100, 100, 1)');
+        } else {
+          barGradient.addColorStop(0, 'rgba(0, 180, 140, 0.8)');
+          barGradient.addColorStop(0.7, 'rgba(0, 212, 170, 1)');
+          barGradient.addColorStop(1, 'rgba(255, 80, 80, 1)');
+        }
+        gradientCacheRef.current = { gradient: barGradient, width: barMaxWidth, cyan };
       }
 
       const labelColor = cyan ? 'rgba(0, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.4)';
