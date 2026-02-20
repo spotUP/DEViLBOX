@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-20T11:41:19.210Z
+ * Generated: 2026-02-20T15:54:08.741Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1018';
-export const BUILD_NUMBER = '1018';
-export const BUILD_HASH = '3547fbc5';
+export const BUILD_VERSION = '1.0.1029';
+export const BUILD_NUMBER = '1029';
+export const BUILD_HASH = '05aba58c';
 export const BUILD_DATE = '2026-02-20';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,53 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1018',
+    version: '1.0.1029',
     date: '2026-02-20',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add local IndexedDB song revision history"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove 30fps cap from visualization components"
+      },
+      {
+        type: 'improvement',
+        "description": "Comprehensive performance optimization across engine, React, and canvas"
+      },
+      {
+        type: 'fix',
+        "description": "Display song/pattern numbers in decimal instead of hex"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update yarn.lock"
+      },
+      {
+        type: 'fix',
+        "description": "Debug(dj): add verbose logging to scratch playback engine"
+      },
+      {
+        type: 'feature',
+        "description": "Add stereo separation control to TrackerReplayer"
+      },
+      {
+        type: 'fix',
+        "description": "Show pattern display when loading songs from Modland"
+      },
+      {
+        type: 'fix',
+        "description": "Sync package-lock.json with @spotify/basic-pitch and tensorflow deps"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'feature',
+        "description": "Hold-to-loop, tap-once, and ignore-second scratch interaction"
+      },
       {
         type: 'feature',
         "description": "Add Serato library parsers (database V2, crates, ID3 tags)"
@@ -194,50 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "AmigaPalModal drawWaveform — scale canvas by devicePixelRatio"
-      },
-      {
-        type: 'feature',
-        "description": "Replace placeholder commands with real implementations"
-      },
-      {
-        type: 'feature',
-        "description": "Implement all stubbed keyboard commands"
-      },
-      {
-        type: 'feature',
-        "description": "Wire App.tsx + TrackerView to UIStore dialog bridge"
-      },
-      {
-        type: 'feature',
-        "description": "Add store state for keyboard commands"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve 4 TypeScript errors — ActionType union + triggerNoteAttack time arg"
-      },
-      {
-        type: 'fix',
-        "description": "ChannelLevelsCompact — scale canvas by devicePixelRatio"
-      },
-      {
-        type: 'fix',
-        "description": "StereoField — scale canvas by devicePixelRatio"
-      },
-      {
-        type: 'fix',
-        "description": "Use useLayoutEffect for editingEffectRef in InstrumentEffectsModal"
-      },
-      {
-        type: 'fix',
-        "description": "Oscilloscope — scale canvas by devicePixelRatio"
-      },
-      {
-        type: 'fix',
-        "description": "Rebuild guitarMLRegistry to match actual GuitarML model indices"
-      },
-      {
-        type: 'fix',
-        "description": "Set type='Neural' in unifiedEffects so correct node is created"
       }
     ]
   }

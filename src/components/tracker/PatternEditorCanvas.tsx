@@ -25,6 +25,8 @@ import { haptics } from '@/utils/haptics';
 import { getTrackerReplayer, type DisplayState } from '@engine/TrackerReplayer';
 import * as Tone from 'tone';
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
+import { useSettingsStore } from '@stores/useSettingsStore';
+import { TrackerVisualBackground } from './TrackerVisualBackground';
 import type { CursorPosition } from '@typedefs';
 
 const ROW_HEIGHT = 24;
@@ -160,6 +162,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const { instruments } = useInstrumentStore(useShallow((state) => ({
     instruments: state.instruments
   })));
+
+  const trackerVisualBg = useSettingsStore((s) => s.trackerVisualBg);
 
   // B/D Animation handlers
   const bdAnimations = useBDAnimations();
@@ -1229,8 +1233,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const pattern = state.patterns[activePatternIndex];
     
     if (!pattern) {
-      ctx.fillStyle = colors.bg;
-      ctx.fillRect(0, 0, dimensions.width, dimensions.height);
+      const visualBgActive = useSettingsStore.getState().trackerVisualBg;
+      if (visualBgActive) {
+        ctx.clearRect(0, 0, dimensions.width, dimensions.height);
+      } else {
+        ctx.fillStyle = colors.bg;
+        ctx.fillRect(0, 0, dimensions.width, dimensions.height);
+      }
       ctx.fillStyle = colors.textMuted;
       ctx.font = '16px sans-serif';
       ctx.textAlign = 'center';
@@ -1271,9 +1280,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
     const contentWidth = noteWidth + 4 + paramWidth;
 
-    // Clear canvas
-    ctx.fillStyle = colors.bg;
-    ctx.fillRect(0, 0, width, height);
+    // Clear canvas — transparent when WebGL visual background is active
+    const visualBgActive = useSettingsStore.getState().trackerVisualBg;
+    if (visualBgActive) {
+      ctx.clearRect(0, 0, width, height);
+    } else {
+      ctx.fillStyle = colors.bg;
+      ctx.fillRect(0, 0, width, height);
+    }
 
     // Draw full-height channel elements (backgrounds, separators, stripes)
     for (let ch = 0; ch < numChannels; ch++) {
@@ -1448,8 +1462,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         ctx.globalAlpha = 0.35;
       }
       
-      ctx.fillStyle = isHighlight ? colors.rowHighlight : colors.rowNormal;
-      ctx.fillRect(0, y, width, ROW_HEIGHT);
+      if (!visualBgActive) {
+        ctx.fillStyle = isHighlight ? colors.rowHighlight : colors.rowNormal;
+        ctx.fillRect(0, y, width, ROW_HEIGHT);
+      }
       
       // Reset alpha for line number (so it's readable)
       if (isGhostRow) {
@@ -1609,8 +1625,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
 
     // Draw center line highlight
+    if (visualBgActive) {
+      ctx.globalAlpha = 0.5;
+    }
     ctx.fillStyle = colors.centerLine;
     ctx.fillRect(0, centerLineTop, width, ROW_HEIGHT);
+    if (visualBgActive) {
+      ctx.globalAlpha = 1.0;
+    }
 
     // Draw cursor — visible in all modes with mode-dependent color
     // FT2: Each digit is a separate cursor stop, always CHAR_WIDTH wide (except note)
@@ -2223,12 +2245,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         onDrop={handleDrop}
         {...patternGestures}
       >
+        {trackerVisualBg && (
+          <TrackerVisualBackground width={dimensions.width} height={dimensions.height} />
+        )}
         <canvas
           ref={canvasRef}
           style={{
             width: dimensions.width,
             height: dimensions.height,
             display: 'block',
+            position: trackerVisualBg ? 'relative' : undefined,
+            zIndex: trackerVisualBg ? 1 : undefined,
           }}
         />
 
