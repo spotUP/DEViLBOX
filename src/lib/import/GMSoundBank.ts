@@ -7,7 +7,7 @@
  * Reference: https://en.wikipedia.org/wiki/General_MIDI_Level_2
  */
 
-import type { InstrumentConfig, OscillatorConfig, EnvelopeConfig, FilterConfig } from '@typedefs/instrument';
+import type { InstrumentConfig, OscillatorConfig, EnvelopeConfig, FilterConfig, DrumType, DrumMachineType } from '@typedefs/instrument';
 
 // ─── Shared building blocks ─────────────────────────────────────────────────
 
@@ -295,12 +295,85 @@ function soundFXPreset(program: number, id: number): InstrumentConfig {
   };
 }
 
-/** Percussion channel (MIDI ch 9): DrumMachine */
-function percussionPreset(id: number): InstrumentConfig {
+// ─── GM Percussion note map (MIDI channel 10) ────────────────────────────────
+
+export interface PercussionEntry {
+  name: string;
+  drumType: DrumType;
+  machineType: DrumMachineType;
+}
+
+export const GM_PERCUSSION_MAP: Partial<Record<number, PercussionEntry>> = {
+  35: { name: 'Acoustic Bass Drum', drumType: 'kick',    machineType: '808' },
+  36: { name: 'Bass Drum 1',        drumType: 'kick',    machineType: '808' },
+  37: { name: 'Side Stick',         drumType: 'rimshot', machineType: '808' },
+  38: { name: 'Acoustic Snare',     drumType: 'snare',   machineType: '808' },
+  39: { name: 'Hand Clap',          drumType: 'clap',    machineType: '808' },
+  40: { name: 'Electric Snare',     drumType: 'snare',   machineType: '808' },
+  41: { name: 'Low Floor Tom',      drumType: 'tom',     machineType: '808' },
+  42: { name: 'Closed Hi-Hat',      drumType: 'hihat',   machineType: '808' },
+  43: { name: 'High Floor Tom',     drumType: 'tom',     machineType: '808' },
+  44: { name: 'Pedal Hi-Hat',       drumType: 'hihat',   machineType: '808' },
+  45: { name: 'Low Tom',            drumType: 'tom',     machineType: '808' },
+  46: { name: 'Open Hi-Hat',        drumType: 'hihat',   machineType: '808' },
+  47: { name: 'Low-Mid Tom',        drumType: 'tom',     machineType: '808' },
+  48: { name: 'Hi-Mid Tom',         drumType: 'tom',     machineType: '808' },
+  49: { name: 'Crash Cymbal 1',     drumType: 'cymbal',  machineType: '808' },
+  50: { name: 'High Tom',           drumType: 'tom',     machineType: '808' },
+  51: { name: 'Ride Cymbal 1',      drumType: 'cymbal',  machineType: '808' },
+  52: { name: 'Chinese Cymbal',     drumType: 'cymbal',  machineType: '808' },
+  53: { name: 'Ride Bell',          drumType: 'cowbell', machineType: '808' },
+  54: { name: 'Tambourine',         drumType: 'maracas', machineType: '808' },
+  55: { name: 'Splash Cymbal',      drumType: 'cymbal',  machineType: '808' },
+  56: { name: 'Cowbell',            drumType: 'cowbell', machineType: '808' },
+  57: { name: 'Crash Cymbal 2',     drumType: 'cymbal',  machineType: '808' },
+  58: { name: 'Vibraslap',          drumType: 'maracas', machineType: '808' },
+  59: { name: 'Ride Cymbal 2',      drumType: 'cymbal',  machineType: '808' },
+  60: { name: 'Hi Bongo',           drumType: 'conga',   machineType: '808' },
+  61: { name: 'Low Bongo',          drumType: 'conga',   machineType: '808' },
+  62: { name: 'Mute Hi Conga',      drumType: 'conga',   machineType: '808' },
+  63: { name: 'Open Hi Conga',      drumType: 'conga',   machineType: '808' },
+  64: { name: 'Low Conga',          drumType: 'conga',   machineType: '808' },
+  65: { name: 'High Timbale',       drumType: 'tom',     machineType: '808' },
+  66: { name: 'Low Timbale',        drumType: 'tom',     machineType: '808' },
+  67: { name: 'High Agogo',         drumType: 'cowbell', machineType: '808' },
+  68: { name: 'Low Agogo',          drumType: 'cowbell', machineType: '808' },
+  69: { name: 'Cabasa',             drumType: 'maracas', machineType: '808' },
+  70: { name: 'Maracas',            drumType: 'maracas', machineType: '808' },
+  71: { name: 'Short Whistle',      drumType: 'hihat',   machineType: '808' },
+  72: { name: 'Long Whistle',       drumType: 'hihat',   machineType: '808' },
+  73: { name: 'Short Guiro',        drumType: 'clave',   machineType: '808' },
+  74: { name: 'Long Guiro',         drumType: 'clave',   machineType: '808' },
+  75: { name: 'Claves',             drumType: 'clave',   machineType: '808' },
+  76: { name: 'Hi Wood Block',      drumType: 'rimshot', machineType: '808' },
+  77: { name: 'Low Wood Block',     drumType: 'rimshot', machineType: '808' },
+  78: { name: 'Mute Cuica',         drumType: 'conga',   machineType: '808' },
+  79: { name: 'Open Cuica',         drumType: 'conga',   machineType: '808' },
+  80: { name: 'Mute Triangle',      drumType: 'hihat',   machineType: '808' },
+  81: { name: 'Open Triangle',      drumType: 'hihat',   machineType: '808' },
+};
+
+/**
+ * Create an InstrumentConfig for a single GM percussion note (MIDI channel 10).
+ * Each unique MIDI note number gets its own DrumMachine instrument (kick, snare, hihat…).
+ *
+ * @param midiNote  MIDI percussion note number (35–81)
+ * @param id        1-based instrument slot number
+ */
+export function gmPercussionNoteToInstrument(midiNote: number, id: number): InstrumentConfig {
+  const entry = GM_PERCUSSION_MAP[midiNote] ?? {
+    name: `Perc ${midiNote}`,
+    drumType: 'snare' as DrumType,
+    machineType: '808' as DrumMachineType,
+  };
   return {
     ...BASE, id,
-    name: 'GM Drums',
+    name: entry.name,
     synthType: 'DrumMachine',
+    drumMachine: {
+      drumType: entry.drumType,
+      machineType: entry.machineType,
+    },
   };
 }
 
@@ -318,7 +391,7 @@ export function gmProgramToInstrument(
   id: number,
   isPercussion: boolean,
 ): InstrumentConfig {
-  if (isPercussion) return percussionPreset(id);
+  if (isPercussion) return gmPercussionNoteToInstrument(36, id); // generic kick fallback (unused in practice)
 
   const p = Math.max(0, Math.min(127, program));
 
