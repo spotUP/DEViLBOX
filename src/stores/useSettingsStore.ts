@@ -15,9 +15,14 @@ interface SettingsStore {
   // Audio Settings
   performanceQuality: 'high' | 'medium' | 'low';
   useBLEP: boolean;          // Enable BLEP (Band-Limited Step) synthesis to reduce aliasing
+  stereoSeparation: number;  // 0-100% stereo separation (20 = Amiga default, 100 = full)
 
   // MIDI Settings
   midiPolyphonic: boolean;   // Enable polyphonic MIDI playback (multiple simultaneous notes)
+
+  // Visual Settings
+  trackerVisualBg: boolean;  // Enable WebGL visual background behind tracker pattern
+  trackerVisualMode: number; // Current visualizer mode index (0-5)
 
   // Actions
   setAmigaLimits: (enabled: boolean) => void;
@@ -25,7 +30,10 @@ interface SettingsStore {
   setMasterTuning: (hz: number) => void;
   setPerformanceQuality: (quality: 'high' | 'medium' | 'low') => void;
   setUseBLEP: (enabled: boolean) => void;
+  setStereoSeparation: (percent: number) => void;
   setMidiPolyphonic: (enabled: boolean) => void;
+  setTrackerVisualBg: (enabled: boolean) => void;
+  setTrackerVisualMode: (mode: number) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -36,8 +44,11 @@ export const useSettingsStore = create<SettingsStore>()(
       linearInterpolation: true,
       masterTuning: 440,
       performanceQuality: 'high',
-      useBLEP: false,  // Default: BLEP disabled (audio routing needs Tone.js integration work)
+      useBLEP: false,  // Default: BLEP disabled (enable in Settings for band-limited synthesis)
+      stereoSeparation: 20,  // Default: 20% (classic Amiga-style narrow separation)
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
+      trackerVisualBg: false,  // Default: off
+      trackerVisualMode: 0,    // Default: spectrum bars
 
     // Actions
     setAmigaLimits: (amigaLimits) =>
@@ -65,9 +76,24 @@ export const useSettingsStore = create<SettingsStore>()(
           state.useBLEP = useBLEP;
         }),
 
+      setStereoSeparation: (stereoSeparation) =>
+        set((state) => {
+          state.stereoSeparation = Math.max(0, Math.min(100, stereoSeparation));
+        }),
+
       setMidiPolyphonic: (midiPolyphonic) =>
         set((state) => {
           state.midiPolyphonic = midiPolyphonic;
+        }),
+
+      setTrackerVisualBg: (trackerVisualBg) =>
+        set((state) => {
+          state.trackerVisualBg = trackerVisualBg;
+        }),
+
+      setTrackerVisualMode: (trackerVisualMode) =>
+        set((state) => {
+          state.trackerVisualMode = trackerVisualMode;
         }),
     })),
     {
@@ -78,7 +104,10 @@ export const useSettingsStore = create<SettingsStore>()(
         masterTuning: state.masterTuning,
         performanceQuality: state.performanceQuality,
         useBLEP: state.useBLEP,
+        stereoSeparation: state.stereoSeparation,
         midiPolyphonic: state.midiPolyphonic,
+        trackerVisualBg: state.trackerVisualBg,
+        trackerVisualMode: state.trackerVisualMode,
       }),
     }
   )
