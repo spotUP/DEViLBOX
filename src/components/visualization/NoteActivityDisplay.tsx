@@ -11,7 +11,7 @@
 
 import React, { useRef, useCallback, useEffect } from 'react';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
-import { useVisualizationStore } from '@stores/useVisualizationStore';
+import { getVisualizationData } from '@stores/useVisualizationStore';
 
 interface NoteActivityDisplayProps {
   channelIndex?: number; // Optional: filter to specific channel
@@ -60,8 +60,8 @@ export const NoteActivityDisplay: React.FC<NoteActivityDisplayProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
 
-  // Subscribe to visualization store
-  const activeNotes = useVisualizationStore((state) => state.activeNotes);
+  // Read visualization data directly (no Zustand subscription for high-frequency data)
+  const activeNotes = getVisualizationData().activeNotes;
 
   // Calculate key dimensions
   const numOctaves = octaveEnd - octaveStart;
