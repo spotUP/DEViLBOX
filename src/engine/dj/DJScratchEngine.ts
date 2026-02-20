@@ -320,6 +320,7 @@ export class ScratchPlayback {
   // --------------------------------------------------------------------------
 
   play(pattern: ScratchPattern, onWaiting?: (ms: number) => void): void {
+    console.log(`[ScratchPlayback] play("${pattern.name}") — stopping previous first`);
     this.stopPattern();
 
     const bpm = this.getEffectiveBPM();
@@ -327,7 +328,10 @@ export class ScratchPlayback {
       ? (60000 / bpm) * pattern.durationBeats
       : (pattern.durationMs ?? 400);
 
+    console.log(`[ScratchPlayback] play: bpm=${bpm}, durationMs=${this.patternDurationMs}, loop=${pattern.loop}, quantize=${pattern.quantize}`);
+
     const startLoop = () => {
+      console.log(`[ScratchPlayback] startLoop() — pattern "${pattern.name}" now active`);
       this.activePattern = pattern;
       this.patternElapsedMs = 0;
       this.patternLastTick = performance.now();
@@ -336,6 +340,7 @@ export class ScratchPlayback {
 
     if (pattern.quantize) {
       const delay = this.msUntilNextBeat(pattern.quantize);
+      console.log(`[ScratchPlayback] quantize=${pattern.quantize}, delay=${delay}ms`);
       if (delay > 20) {
         onWaiting?.(delay);
         this.patternTimeoutId = setTimeout(startLoop, delay);
@@ -361,6 +366,7 @@ export class ScratchPlayback {
 
     if (this.patternElapsedMs >= this.patternDurationMs) {
       if (!pattern.loop || this.pendingStop) {
+        console.log(`[ScratchPlayback] _tickPattern: cycle ended — loop=${pattern.loop} pendingStop=${this.pendingStop} → stopPattern()`);
         this.stopPattern();
         return;
       }
@@ -387,10 +393,11 @@ export class ScratchPlayback {
         gain.cancelScheduledValues(ctx.currentTime);
         gain.setValueAtTime(frame.faderGain, ctx.currentTime);
       }
-    } catch { /* engine not ready */ }
+    } catch (err) { console.error('[ScratchPlayback] _tickPattern error:', err); }
   }
 
   stopPattern(): void {
+    console.log(`[ScratchPlayback] stopPattern() — activePattern=${this.activePattern?.name ?? 'null'}, faderLFOActive=${this.faderLFOActive}`);
     if (this.patternTimeoutId !== null) {
       clearTimeout(this.patternTimeoutId);
       this.patternTimeoutId = null;
@@ -413,7 +420,7 @@ export class ScratchPlayback {
         const ctx  = Tone.getContext().rawContext as AudioContext;
         gain.cancelScheduledValues(ctx.currentTime);
         gain.setValueAtTime(1, ctx.currentTime);
-      } catch { /* engine not ready */ }
+      } catch (err) { console.error('[ScratchPlayback] stopPattern gain reset error:', err); }
     }
   }
 
@@ -430,13 +437,16 @@ export class ScratchPlayback {
    * If the pattern is waiting for a quantize beat, cancel it immediately.
    */
   finishCurrentCycle(): void {
+    console.log(`[ScratchPlayback] finishCurrentCycle() — patternTimeoutId=${this.patternTimeoutId !== null}, activePattern=${this.activePattern?.name ?? 'null'}`);
     if (this.patternTimeoutId !== null) {
       // Waiting for beat boundary — cancel the queued start
       clearTimeout(this.patternTimeoutId);
       this.patternTimeoutId = null;
       this.activePattern = null;
+      console.log(`[ScratchPlayback] finishCurrentCycle: cancelled queued start`);
     } else if (this.activePattern !== null) {
       this.pendingStop = true;
+      console.log(`[ScratchPlayback] finishCurrentCycle: set pendingStop=true for "${this.activePattern.name}"`);
     }
   }
 
@@ -445,6 +455,7 @@ export class ScratchPlayback {
   // --------------------------------------------------------------------------
 
   startFaderLFO(bpm: number, division: FaderLFODivision): void {
+    console.log(`[ScratchPlayback] startFaderLFO(bpm=${bpm}, division=${division})`);
     this.stopFaderLFO();
     this.faderLFOActive = true;
     this.currentLFODivision = division;
@@ -478,6 +489,7 @@ export class ScratchPlayback {
   }
 
   stopFaderLFO(): void {
+    console.log(`[ScratchPlayback] stopFaderLFO() — was active=${this.faderLFOActive}, division=${this.currentLFODivision}`);
     this.faderLFOActive = false;
     this.currentLFODivision = null;
     if (this.faderLFOTimeoutId !== null) {
@@ -489,7 +501,8 @@ export class ScratchPlayback {
       const ctx  = Tone.getContext().rawContext as AudioContext;
       gain.cancelScheduledValues(ctx.currentTime);
       gain.linearRampToValueAtTime(1, ctx.currentTime + 0.02);
-    } catch { /* engine not ready */ }
+      console.log(`[ScratchPlayback] stopFaderLFO: gain reset to 1`);
+    } catch (err) { console.error('[ScratchPlayback] stopFaderLFO gain reset error:', err); }
   }
 
   onBPMChange(newBPM: number): void {
