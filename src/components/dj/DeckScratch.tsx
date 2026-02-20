@@ -55,13 +55,8 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
     // Capture pointer so pointerup fires on this element even if cursor leaves
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
-    console.log(`[DeckScratch ${deckId}] pointerDown: pattern="${patternName}" activePatternName=${activePatternName}`);
-
     // Ignore if any routine is already running (including this one)
-    if (activePatternName !== null) {
-      console.log(`[DeckScratch ${deckId}] BLOCKED — activePatternName is "${activePatternName}"`);
-      return;
-    }
+    if (activePatternName !== null) return;
 
     pressTimeRef.current = performance.now();
     const store = useDJStore.getState();
@@ -72,20 +67,17 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
     try {
       getDeck().playPattern(patternName, (waitMs) => {
         quantizeWaitMs = waitMs;
-        console.log(`[DeckScratch ${deckId}] quantize callback: waitMs=${waitMs}`);
         setTimeout(() => {
           setWaitingPattern(null);
           store.setDeckPattern(deckId, patternName);
         }, waitMs);
       });
-    } catch (err) {
-      console.error(`[DeckScratch ${deckId}] playPattern THREW:`, err);
+    } catch {
       setWaitingPattern(null);
       return;
     }
 
     if (quantizeWaitMs === 0) {
-      console.log(`[DeckScratch ${deckId}] no quantize wait — activating immediately`);
       setWaitingPattern(null);
       store.setDeckPattern(deckId, patternName);
     }
@@ -93,15 +85,12 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
 
   const handlePatternPointerUp = useCallback((_patternName: string) => {
     const held = performance.now() - pressTimeRef.current;
-    console.log(`[DeckScratch ${deckId}] pointerUp: held=${held.toFixed(0)}ms (TAP_MS=${TAP_MS})`);
     if (held < TAP_MS) {
       // Tap: let current cycle finish then stop (store cleared by DJDeck RAF)
-      console.log(`[DeckScratch ${deckId}] TAP — calling finishPatternCycle()`);
-      try { getDeck().finishPatternCycle(); } catch (err) { console.error(`[DeckScratch ${deckId}] finishPatternCycle THREW:`, err); }
+      try { getDeck().finishPatternCycle(); } catch { /* engine not ready */ }
     } else {
       // Hold release: stop immediately
-      console.log(`[DeckScratch ${deckId}] HOLD RELEASE — calling stopPattern()`);
-      try { getDeck().stopPattern(); } catch (err) { console.error(`[DeckScratch ${deckId}] stopPattern THREW:`, err); }
+      try { getDeck().stopPattern(); } catch { /* engine not ready */ }
       useDJStore.getState().setDeckPattern(deckId, null);
       setWaitingPattern(null);
     }
@@ -112,18 +101,14 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
   const handleLFOClick = useCallback((division: FaderLFODivision | null) => {
     const store = useDJStore.getState();
 
-    console.log(`[DeckScratch ${deckId}] LFO click: division=${division}, faderLFOActive=${faderLFOActive}, faderLFODivision=${faderLFODivision}`);
-
     if (division === null || (faderLFOActive && faderLFODivision === division)) {
       // Turn off
-      console.log(`[DeckScratch ${deckId}] LFO → OFF`);
-      try { getDeck().stopFaderLFO(); } catch (err) { console.error(`[DeckScratch ${deckId}] stopFaderLFO THREW:`, err); }
+      try { getDeck().stopFaderLFO(); } catch { /* engine not ready */ }
       store.setDeckFaderLFO(deckId, false);
       return;
     }
 
-    console.log(`[DeckScratch ${deckId}] LFO → START ${division}`);
-    try { getDeck().startFaderLFO(division); } catch (err) { console.error(`[DeckScratch ${deckId}] startFaderLFO THREW:`, err); }
+    try { getDeck().startFaderLFO(division); } catch { /* engine not ready */ }
     store.setDeckFaderLFO(deckId, true, division);
   }, [deckId, faderLFOActive, faderLFODivision, getDeck]);
 

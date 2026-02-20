@@ -57,7 +57,7 @@ const BABY_SCRATCH: ScratchPattern = {
   quantize: '1/4',
   frames: [
     { timeMs: 0,   velocity: 2.8,  faderGain: 1 },  // strong forward push
-    { timeMs: 210, velocity: 0.04, faderGain: 1 },  // drag back (audible)
+    { timeMs: 210, velocity: 0.15, faderGain: 1 },  // drag back (audible)
   ],
 };
 
@@ -94,7 +94,7 @@ const FLARE: ScratchPattern = {
     { timeMs: 105, velocity: 2.2,  faderGain: 1 },  // click 1 — open
     { timeMs: 215, velocity: 2.2,  faderGain: 0 },  // click 2 — close
     { timeMs: 245, velocity: 2.2,  faderGain: 1 },  // click 2 — open
-    { timeMs: 310, velocity: 0.04, faderGain: 0 },  // return — silent
+    { timeMs: 310, velocity: 0.15, faderGain: 0 },  // return — silent
   ],
 };
 
@@ -111,9 +111,9 @@ const HYDROPLANE: ScratchPattern = {
   quantize: '1/8',
   frames: [
     { timeMs: 0,   velocity: 3.8,  faderGain: 1 },
-    { timeMs: 40,  velocity: 0.04, faderGain: 1 },
+    { timeMs: 40,  velocity: 0.15, faderGain: 1 },
     { timeMs: 80,  velocity: 3.8,  faderGain: 1 },
-    { timeMs: 120, velocity: 0.04, faderGain: 1 },
+    { timeMs: 120, velocity: 0.15, faderGain: 1 },
     { timeMs: 160, velocity: 3.8,  faderGain: 1 },
   ],
 };
@@ -147,8 +147,8 @@ const ORBIT: ScratchPattern = {
   quantize: '1/4',
   frames: [
     { timeMs: 0,   velocity: 2.4,  faderGain: 1 },  // forward push, open
-    { timeMs: 200, velocity: 0.04, faderGain: 0 },  // drag back, silent
-    { timeMs: 380, velocity: 0.04, faderGain: 0 },  // hold return
+    { timeMs: 200, velocity: 0.15, faderGain: 0 },  // drag back, silent
+    { timeMs: 380, velocity: 0.15, faderGain: 0 },  // hold return
   ],
 };
 
@@ -166,7 +166,7 @@ const CHIRP: ScratchPattern = {
   frames: [
     { timeMs: 0,   velocity: 2.0,  faderGain: 1 },  // forward, fader open
     { timeMs: 115, velocity: 2.0,  faderGain: 0 },  // snap closed mid-stroke
-    { timeMs: 195, velocity: 0.04, faderGain: 0 },  // return — silent
+    { timeMs: 195, velocity: 0.15, faderGain: 0 },  // return — silent
   ],
 };
 
@@ -183,7 +183,7 @@ const STAB: ScratchPattern = {
   quantize: '1/8',
   frames: [
     { timeMs: 0,  velocity: 4.0,  faderGain: 1 },  // max-speed burst
-    { timeMs: 60, velocity: 0.04, faderGain: 0 },  // instant cut + return
+    { timeMs: 60, velocity: 0.15, faderGain: 0 },  // instant cut + return
   ],
 };
 
@@ -201,13 +201,13 @@ const SCRIBBLE: ScratchPattern = {
   quantize: '1/8',
   frames: [
     { timeMs: 0,   velocity: 3.2,  faderGain: 1 },
-    { timeMs: 30,  velocity: 0.06, faderGain: 1 },
+    { timeMs: 30,  velocity: 0.15, faderGain: 1 },
     { timeMs: 60,  velocity: 3.2,  faderGain: 1 },
-    { timeMs: 90,  velocity: 0.06, faderGain: 1 },
+    { timeMs: 90,  velocity: 0.15, faderGain: 1 },
     { timeMs: 120, velocity: 3.2,  faderGain: 1 },
-    { timeMs: 150, velocity: 0.06, faderGain: 1 },
+    { timeMs: 150, velocity: 0.15, faderGain: 1 },
     { timeMs: 180, velocity: 3.2,  faderGain: 1 },
-    { timeMs: 210, velocity: 0.06, faderGain: 1 },
+    { timeMs: 210, velocity: 0.15, faderGain: 1 },
   ],
 };
 
@@ -224,9 +224,9 @@ const TEAR: ScratchPattern = {
   quantize: '1/4',
   frames: [
     { timeMs: 0,   velocity: 2.8,  faderGain: 1 },  // fast forward
-    { timeMs: 125, velocity: 0.05, faderGain: 1 },  // stutter — catch
+    { timeMs: 125, velocity: 0.15, faderGain: 1 },  // stutter — catch
     { timeMs: 175, velocity: 2.8,  faderGain: 1 },  // surge forward again
-    { timeMs: 295, velocity: 0.04, faderGain: 0 },  // return — silent
+    { timeMs: 295, velocity: 0.15, faderGain: 0 },  // return — silent
   ],
 };
 
@@ -293,6 +293,10 @@ export class ScratchPlayback {
   private patternDurationMs = 0;
   private pendingStop = false; // set by finishCurrentCycle() to stop after this cycle completes
 
+  /** Callback fired when a pattern ends internally (cycle complete + pendingStop, or non-looping end).
+   *  DeckEngine wires this to _decayToRest() so pitch/tempo gets restored. */
+  onPatternEnd?: () => void;
+
   constructor(
     getDeck: () => DeckEngine,
     getEffectiveBPM: () => number,
@@ -307,12 +311,16 @@ export class ScratchPlayback {
 
   msUntilNextBeat(quantize: '1/4' | '1/8'): number {
     const bpm = this.getEffectiveBPM();
+    // At very low BPMs (< 30), skip quantization — delay would be absurdly long
+    if (bpm < 30) return 0;
     const msPerBeat = 60000 / bpm;
     const msPer = quantize === '1/8' ? msPerBeat / 2 : msPerBeat;
     let elapsed = 0;
     try { elapsed = this.getDeck().replayer.getElapsedMs(); } catch { return 0; }
     const posInDiv = elapsed % msPer;
-    return posInDiv < 20 ? 0 : msPer - posInDiv;
+    const delay = posInDiv < 20 ? 0 : msPer - posInDiv;
+    // Cap at 500ms — if BPM is weird, don't make the user wait forever
+    return Math.min(delay, 500);
   }
 
   // --------------------------------------------------------------------------
@@ -320,7 +328,6 @@ export class ScratchPlayback {
   // --------------------------------------------------------------------------
 
   play(pattern: ScratchPattern, onWaiting?: (ms: number) => void): void {
-    console.log(`[ScratchPlayback] play("${pattern.name}") — stopping previous first`);
     this.stopPattern();
 
     const bpm = this.getEffectiveBPM();
@@ -328,10 +335,7 @@ export class ScratchPlayback {
       ? (60000 / bpm) * pattern.durationBeats
       : (pattern.durationMs ?? 400);
 
-    console.log(`[ScratchPlayback] play: bpm=${bpm}, durationMs=${this.patternDurationMs}, loop=${pattern.loop}, quantize=${pattern.quantize}`);
-
     const startLoop = () => {
-      console.log(`[ScratchPlayback] startLoop() — pattern "${pattern.name}" now active`);
       this.activePattern = pattern;
       this.patternElapsedMs = 0;
       this.patternLastTick = performance.now();
@@ -340,7 +344,6 @@ export class ScratchPlayback {
 
     if (pattern.quantize) {
       const delay = this.msUntilNextBeat(pattern.quantize);
-      console.log(`[ScratchPlayback] quantize=${pattern.quantize}, delay=${delay}ms`);
       if (delay > 20) {
         onWaiting?.(delay);
         this.patternTimeoutId = setTimeout(startLoop, delay);
@@ -366,8 +369,9 @@ export class ScratchPlayback {
 
     if (this.patternElapsedMs >= this.patternDurationMs) {
       if (!pattern.loop || this.pendingStop) {
-        console.log(`[ScratchPlayback] _tickPattern: cycle ended — loop=${pattern.loop} pendingStop=${this.pendingStop} → stopPattern()`);
         this.stopPattern();
+        // Notify DeckEngine to decay pitch/tempo back to rest (pitch slider value)
+        this.onPatternEnd?.();
         return;
       }
       this.patternElapsedMs = this.patternElapsedMs % this.patternDurationMs;
@@ -393,11 +397,10 @@ export class ScratchPlayback {
         gain.cancelScheduledValues(ctx.currentTime);
         gain.setValueAtTime(frame.faderGain, ctx.currentTime);
       }
-    } catch (err) { console.error('[ScratchPlayback] _tickPattern error:', err); }
+    } catch { /* engine not ready */ }
   }
 
   stopPattern(): void {
-    console.log(`[ScratchPlayback] stopPattern() — activePattern=${this.activePattern?.name ?? 'null'}, faderLFOActive=${this.faderLFOActive}`);
     if (this.patternTimeoutId !== null) {
       clearTimeout(this.patternTimeoutId);
       this.patternTimeoutId = null;
@@ -420,7 +423,7 @@ export class ScratchPlayback {
         const ctx  = Tone.getContext().rawContext as AudioContext;
         gain.cancelScheduledValues(ctx.currentTime);
         gain.setValueAtTime(1, ctx.currentTime);
-      } catch (err) { console.error('[ScratchPlayback] stopPattern gain reset error:', err); }
+      } catch { /* engine not ready */ }
     }
   }
 
@@ -437,17 +440,9 @@ export class ScratchPlayback {
    * If the pattern is waiting for a quantize beat, cancel it immediately.
    */
   finishCurrentCycle(): void {
-    console.log(`[ScratchPlayback] finishCurrentCycle() — patternTimeoutId=${this.patternTimeoutId !== null}, activePattern=${this.activePattern?.name ?? 'null'}`);
-    if (this.patternTimeoutId !== null) {
-      // Waiting for beat boundary — cancel the queued start
-      clearTimeout(this.patternTimeoutId);
-      this.patternTimeoutId = null;
-      this.activePattern = null;
-      console.log(`[ScratchPlayback] finishCurrentCycle: cancelled queued start`);
-    } else if (this.activePattern !== null) {
-      this.pendingStop = true;
-      console.log(`[ScratchPlayback] finishCurrentCycle: set pendingStop=true for "${this.activePattern.name}"`);
-    }
+    // Set pendingStop so the pattern stops after the current (or first) cycle completes.
+    // If the pattern is still in quantize-wait, let it start — it will play one cycle then stop.
+    this.pendingStop = true;
   }
 
   // --------------------------------------------------------------------------
@@ -455,7 +450,6 @@ export class ScratchPlayback {
   // --------------------------------------------------------------------------
 
   startFaderLFO(bpm: number, division: FaderLFODivision): void {
-    console.log(`[ScratchPlayback] startFaderLFO(bpm=${bpm}, division=${division})`);
     this.stopFaderLFO();
     this.faderLFOActive = true;
     this.currentLFODivision = division;
@@ -489,7 +483,6 @@ export class ScratchPlayback {
   }
 
   stopFaderLFO(): void {
-    console.log(`[ScratchPlayback] stopFaderLFO() — was active=${this.faderLFOActive}, division=${this.currentLFODivision}`);
     this.faderLFOActive = false;
     this.currentLFODivision = null;
     if (this.faderLFOTimeoutId !== null) {
@@ -501,8 +494,7 @@ export class ScratchPlayback {
       const ctx  = Tone.getContext().rawContext as AudioContext;
       gain.cancelScheduledValues(ctx.currentTime);
       gain.linearRampToValueAtTime(1, ctx.currentTime + 0.02);
-      console.log(`[ScratchPlayback] stopFaderLFO: gain reset to 1`);
-    } catch (err) { console.error('[ScratchPlayback] stopFaderLFO gain reset error:', err); }
+    } catch { /* engine not ready */ }
   }
 
   onBPMChange(newBPM: number): void {
