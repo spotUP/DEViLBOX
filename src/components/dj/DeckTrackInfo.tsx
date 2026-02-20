@@ -17,14 +17,19 @@ const BPM_MATCH_THRESHOLD = 0.5; // BPM within 0.5 = "matched"
 export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
   const trackName = useDJStore((s) => s.decks[deckId].trackName);
   const effectiveBPM = useDJStore((s) => s.decks[deckId].effectiveBPM);
+  const detectedBPM = useDJStore((s) => s.decks[deckId].detectedBPM);
   const elapsedMs = useDJStore((s) => s.decks[deckId].elapsedMs);
+  const playbackMode = useDJStore((s) => s.decks[deckId].playbackMode);
+  const durationMs = useDJStore((s) => s.decks[deckId].durationMs);
 
   const otherDeckId = deckId === 'A' ? 'B' : 'A';
   const otherBPM = useDJStore((s) => s.decks[otherDeckId].effectiveBPM);
 
+  const displayBPM = playbackMode === 'audio' ? detectedBPM : effectiveBPM;
+
   const isBPMMatched = useMemo(() => {
-    return Math.abs(effectiveBPM - otherBPM) < BPM_MATCH_THRESHOLD;
-  }, [effectiveBPM, otherBPM]);
+    return Math.abs(displayBPM - otherBPM) < BPM_MATCH_THRESHOLD;
+  }, [displayBPM, otherBPM]);
 
   // Format elapsed time as MM:SS
   const formattedTime = useMemo(() => {
@@ -33,6 +38,16 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
     const seconds = totalSeconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   }, [elapsedMs]);
+
+  // Format remaining time for audio mode
+  const formattedRemaining = useMemo(() => {
+    if (playbackMode !== 'audio' || durationMs <= 0) return null;
+    const remainMs = Math.max(0, durationMs - elapsedMs);
+    const totalSeconds = Math.floor(remainMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `-${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }, [playbackMode, durationMs, elapsedMs]);
 
   return (
     <div className="flex flex-col gap-1 min-w-0">
@@ -50,7 +65,7 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
         <span
           className={`font-mono text-2xl font-bold tabular-nums ${isBPMMatched ? 'text-accent-success' : 'text-text-primary'}`}
         >
-          {effectiveBPM.toFixed(1)}
+          {displayBPM > 0 ? displayBPM.toFixed(1) : '---.-'}
         </span>
         <span className="text-xs text-text-muted uppercase tracking-wider">
           BPM
@@ -60,6 +75,13 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
         <span className="font-mono text-sm text-text-secondary tabular-nums">
           {formattedTime}
         </span>
+
+        {/* Remaining time (audio mode only) */}
+        {formattedRemaining && (
+          <span className="font-mono text-sm text-text-muted tabular-nums">
+            {formattedRemaining}
+          </span>
+        )}
       </div>
     </div>
   );

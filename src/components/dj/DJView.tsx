@@ -20,6 +20,7 @@ import { DJModlandBrowser } from './DJModlandBrowser';
 import { DJSeratoBrowser } from './DJSeratoBrowser';
 import { MasterEffectsModal } from '@/components/effects';
 import { DJFxQuickPresets } from './DJFxQuickPresets';
+import { DJControllerSelector } from './DJControllerSelector';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
 
@@ -62,7 +63,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
   useDJKeyboardHandler(true);
 
   // Handle loading a Serato track to a deck
-  // For now this reads the audio file via Electron fs — future: also parse Serato metadata
+  // Detects audio files vs tracker modules, and parses Serato metadata (cue points, beatgrid)
   const handleSeratoTrackLoad = useCallback(async (track: SeratoTrack, deckId: 'A' | 'B') => {
     const fs = window.electron?.fs;
     if (!fs) {
@@ -72,32 +73,74 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
 
     try {
       const buffer = await fs.readFile(track.filePath);
-      const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-      const { detectBPM } = await import('@/engine/dj/DJBeatDetector');
-      const { cacheSong } = await import('@/engine/dj/DJSongCache');
-
       const filename = track.filePath.split(/[/\\]/).pop() || track.title;
-      const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-      const song = await parseModuleToSong(blob);
-      const bpmResult = detectBPM(song);
-
-      const cacheKey = `serato:${track.filePath}`;
-      cacheSong(cacheKey, song);
-
       const engine = getDJEngine();
-      await engine.loadToDeck(deckId, song);
+      const cacheKey = `serato:${track.filePath}`;
 
-      useDJStore.getState().setDeckState(deckId, {
-        fileName: cacheKey,
-        trackName: song.name || track.title || filename,
-        detectedBPM: track.bpm > 0 ? track.bpm : bpmResult.bpm,
-        effectiveBPM: track.bpm > 0 ? track.bpm : bpmResult.bpm,
-        totalPositions: song.songLength,
-        songPos: 0,
-        pattPos: 0,
-        elapsedMs: 0,
-        isPlaying: false,
-      });
+      const { isAudioFile } = await import('@/lib/audioFileUtils');
+
+      if (isAudioFile(filename)) {
+        // Audio file mode (MP3, WAV, FLAC, etc.)
+        const info = await engine.loadAudioToDeck(deckId, buffer.slice(0), filename);
+
+        // Parse Serato metadata from the file (cue points, beatgrid, BPM)
+        const { readSeratoMetadata } = await import('@/lib/serato/seratoMetadata');
+        const metadata = readSeratoMetadata(buffer);
+
+        const bpm = metadata.bpm ?? (track.bpm > 0 ? track.bpm : 0);
+
+        useDJStore.getState().setDeckState(deckId, {
+          fileName: cacheKey,
+          trackName: track.title || filename.replace(/\.[^.]+$/, ''),
+          detectedBPM: bpm,
+          effectiveBPM: bpm,
+          totalPositions: 0,
+          songPos: 0,
+          pattPos: 0,
+          elapsedMs: 0,
+          isPlaying: false,
+          playbackMode: 'audio',
+          durationMs: info.duration * 1000,
+          audioPosition: 0,
+          waveformPeaks: info.waveformPeaks,
+          seratoCuePoints: metadata.cuePoints,
+          seratoLoops: metadata.loops,
+          seratoBeatGrid: metadata.beatGrid,
+          seratoKey: track.key || metadata.key,
+        });
+      } else {
+        // Tracker module mode (MOD, XM, IT, S3M, etc.)
+        const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+        const { detectBPM } = await import('@/engine/dj/DJBeatDetector');
+        const { cacheSong } = await import('@/engine/dj/DJSongCache');
+
+        const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+        const song = await parseModuleToSong(blob);
+        const bpmResult = detectBPM(song);
+
+        cacheSong(cacheKey, song);
+        await engine.loadToDeck(deckId, song);
+
+        useDJStore.getState().setDeckState(deckId, {
+          fileName: cacheKey,
+          trackName: song.name || track.title || filename,
+          detectedBPM: track.bpm > 0 ? track.bpm : bpmResult.bpm,
+          effectiveBPM: track.bpm > 0 ? track.bpm : bpmResult.bpm,
+          totalPositions: song.songLength,
+          songPos: 0,
+          pattPos: 0,
+          elapsedMs: 0,
+          isPlaying: false,
+          playbackMode: 'tracker',
+          durationMs: 0,
+          audioPosition: 0,
+          waveformPeaks: null,
+          seratoCuePoints: [],
+          seratoLoops: [],
+          seratoBeatGrid: [],
+          seratoKey: null,
+        });
+      }
     } catch (err) {
       console.error(`[DJView] Failed to load Serato track ${track.title}:`, err);
     }
@@ -141,6 +184,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
         </div>
 
         <div className="flex items-center gap-2">
+          <DJControllerSelector />
           <DJFxQuickPresets />
           <button
             onClick={() => setShowMasterFX(!showMasterFX)}
