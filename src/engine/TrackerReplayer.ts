@@ -282,6 +282,7 @@ export class TrackerReplayer {
   // Cache for ToneAudioBuffer wrappers (keyed by instrument ID)
   // Avoids re-wrapping the same decoded AudioBuffer on every note trigger
   private bufferCache: Map<number, Tone.ToneAudioBuffer> = new Map();
+  private _warnedMissingInstruments: Set<number> | undefined;
 
   // Callbacks
   public onRowChange: ((row: number, pattern: number, position: number) => void) | null = null;
@@ -311,6 +312,13 @@ export class TrackerReplayer {
   // Bit N = 1 means channel N is ENABLED, 0 means MUTED.
   // Kept separate from ToneEngine's global mute states so each deck is independent.
   private channelMuteMask = 0xFFFF;   // All 16 channels enabled by default
+
+  /**
+   * Optional callback set by DeckEngine to handle DJ scratch effect commands (Xnn).
+   * High nibble 0: scratch pattern (0=stop, 1=Baby, 2=Trans, 3=Flare, 4=Hydro, 5=Crab, 6=Orbit)
+   * High nibble 1: fader LFO (0=off, 1=¼, 2=⅛, 3=⅟₁₆, 4=⅟₃₂)
+   */
+  onScratchEffect?: (param: number) => void;
 
   constructor(outputNode?: Tone.ToneAudioNode) {
     // Connect to provided output node (for DJ decks) or default to
@@ -490,6 +498,7 @@ export class TrackerReplayer {
     this.stop();
     this.song = song;
     this.bufferCache.clear(); // New song = new samples, invalidate cache
+    this._warnedMissingInstruments = undefined;
 
     // Dispose old channels before creating new ones (prevent Web Audio node leaks)
     for (const ch of this.channels) {
@@ -992,7 +1001,12 @@ export class TrackerReplayer {
         // Apply volume immediately
         ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
       } else {
-        console.warn(`[TrackerReplayer] Instrument ${instNum} not found! Available IDs:`, this.song.instruments.map(i => i.id).sort((a,b) => a-b));
+        // Throttle: only warn once per missing instrument ID per song
+        if (!this._warnedMissingInstruments) this._warnedMissingInstruments = new Set();
+        if (!this._warnedMissingInstruments.has(instNum)) {
+          this._warnedMissingInstruments.add(instNum);
+          console.warn(`[TrackerReplayer] Instrument ${instNum} not found (empty slot). Available IDs: (${this.song.instruments.length})`, this.song.instruments.map(i => i.id).sort((a,b) => a-b));
+        }
       }
     }
 
@@ -1297,6 +1311,14 @@ export class TrackerReplayer {
         // W00 = -12 semitones, W80 = 0 semitones, WFF = +12 semitones
         // Set target - actual slide happens on ticks 1+
         this.globalPitchTarget = ((param - 128) / 128) * 12;
+        break;
+
+      case 0x21: // DJ Scratch (Xnn)
+        // High nibble 0: scratch pattern (X00=stop, X01=Baby, X02=Trans, X03=Flare, X04=Hydro, X05=Crab, X06=Orbit)
+        // High nibble 1: fader LFO (X10=off, X11=¼, X12=⅛, X13=⅟₁₆, X14=⅟₃₂)
+        if (this.onScratchEffect) {
+          this.onScratchEffect(param);
+        }
         break;
     }
   }
