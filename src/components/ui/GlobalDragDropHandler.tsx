@@ -91,10 +91,10 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
     setIsDragging(false);
     setDragCount(0);
 
-    // If a child component (e.g. SampleEditor) has its own drop handler and already
-    // processed this file, skip the app-level handler to avoid double-handling.
+    // If a child component (e.g. SampleEditor, DJ deck) has its own drop handler and
+    // already processed this file, skip the app-level handler to avoid double-handling.
     const target = e.target as HTMLElement;
-    if (target.closest('[data-sample-drop-zone]')) return;
+    if (target.closest('[data-sample-drop-zone]') || target.closest('[data-dj-deck-drop]')) return;
 
     const files = Array.from(e.dataTransfer.files);
 

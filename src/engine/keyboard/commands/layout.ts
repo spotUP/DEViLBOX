@@ -7,7 +7,7 @@ import type { PanelType } from '@typedefs/project';
 
 interface LayoutPreset {
   panels: PanelType[];
-  view: 'tracker' | 'arrangement';
+  view: 'tracker' | 'arrangement' | 'dj';
   label: string;
 }
 

@@ -2236,7 +2236,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               rowNumWidth={LINE_NUMBER_WIDTH}
               scrollOffset={scrollY}
               visibleStart={visibleStart}
-              parameter="cutoff"
+              /* parameter is resolved per-channel from useAutomationStore.channelLanes */
               prevPatternId={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.id : (patterns.length > 1 ? patterns[patterns.length - 1]?.id : undefined)) : undefined}
               prevPatternLength={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length > 1 ? patterns[patterns.length - 1]?.length : undefined)) : undefined}
               nextPatternId={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.id : (patterns.length > 1 ? patterns[0]?.id : undefined)) : undefined}
