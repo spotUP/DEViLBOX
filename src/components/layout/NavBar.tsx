@@ -5,11 +5,13 @@
 import React, { useState, useEffect } from 'react';
 import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, themes } from '@stores';
 import { useAuthStore } from '@stores/useAuthStore';
+import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Palette, Download, LogIn, LogOut, Cloud } from 'lucide-react';
+import { Plus, X, Palette, Download, LogIn, LogOut, Cloud, Users } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
 import { AuthModal } from '@components/dialogs/AuthModal';
+import { CollaborationModal } from '@components/collaboration/CollaborationModal';
 import { Button } from '@components/ui/Button';
 import { isElectron } from '@utils/electron';
 
@@ -37,6 +39,26 @@ const NavBarComponent: React.FC = () => {
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showCollabModal, setShowCollabModal] = useState(false);
+
+  // Collab state
+  const collabStatus = useCollaborationStore((s) => s.status);
+  const collabViewMode = useCollaborationStore((s) => s.viewMode);
+  const setCollabViewMode = useCollaborationStore((s) => s.setViewMode);
+
+  const handleCollabClick = () => {
+    if (collabStatus === 'connected' && collabViewMode === 'split') {
+      // Already in split view — just focus it (no-op)
+      return;
+    }
+    if (collabStatus === 'connected') {
+      // Switch to split view
+      setCollabViewMode('split');
+    } else {
+      // Show modal to create/join room
+      setShowCollabModal(true);
+    }
+  };
 
   // Auth state
   const user = useAuthStore((state) => state.user);
@@ -174,6 +196,23 @@ const NavBarComponent: React.FC = () => {
             </div>
           )}
 
+          {/* Collab Button */}
+          <Button
+            variant={collabStatus === 'connected' ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={handleCollabClick}
+            icon={<Users size={14} />}
+            iconPosition="left"
+            title={collabStatus === 'connected' ? 'Collaboration active' : 'Start live collaboration'}
+          >
+            <span className="hidden sm:inline">
+              {collabStatus === 'connected' ? 'Collab' : 'Collab'}
+            </span>
+            {collabStatus === 'connected' && (
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-success animate-pulse ml-1" />
+            )}
+          </Button>
+
           {/* Download Button (Web only) */}
           {!isElectron() && (
             <Button
@@ -300,6 +339,14 @@ const NavBarComponent: React.FC = () => {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
       />
+
+      {/* Collaboration Modal */}
+      {showCollabModal && (
+        <CollaborationModal
+          isOpen={showCollabModal}
+          onClose={() => setShowCollabModal(false)}
+        />
+      )}
     </div>
   );
 };
