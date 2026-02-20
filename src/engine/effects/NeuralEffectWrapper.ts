@@ -19,6 +19,7 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
 
   private guitarML: GuitarMLEngine;
   private _wet: number;
+  private _level: number = 1.0;  // Tracked separately so level and wet compose correctly
   private dryGain: Tone.Gain;
   private wetGain: Tone.Gain;
   private modelIndex: number;
@@ -115,22 +116,38 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
     const normalizedValue = Math.max(0, Math.min(100, value)) / 100;
 
     switch (param) {
-      // Primary drive/gain control -> GuitarML condition
+      // Primary drive/gain control
+      // - Conditioned models (2-input LSTM, filename contains 'Knob'): condition is the
+      //   second LSTM input and directly controls saturation character.
+      // - Non-conditioned models (1-input LSTM, fixed-state captures): condition is ignored
+      //   by the worklet. Instead we control input gain (dB) so Drive reduces/increases
+      //   how hard the signal hits the LSTM, giving useful distortion control.
       case 'drive':
       case 'gain':
-      case 'condition':
-        this.guitarML.setCondition(normalizedValue);
+      case 'condition': {
+        const model = GuitarMLEngine.BUILT_IN_MODELS[this.modelIndex];
+        const isConditioned = model?.fileName.includes('Knob') ?? false;
+        if (isConditioned) {
+          this.guitarML.setCondition(normalizedValue);
+        } else {
+          // Drive 0→50→100 maps to worklet gain -12→0→+12 dB.
+          // At gain=0 the worklet applies its built-in -12 dB input correction.
+          // Turning Drive down cleans up the distortion; turning it up adds saturation.
+          this.guitarML.setGain(normalizedValue * 24 - 12);
+        }
         break;
+      }
 
       // Dry/wet mix
       case 'dryWet':
         this.guitarML.setDryWet(normalizedValue);
         break;
 
-      // Output level (via wet gain)
+      // Output level — tracked separately so changing wet doesn't reset level
       case 'level':
       case 'output':
-        this.wetGain.gain.value = normalizedValue * this._wet;
+        this._level = normalizedValue;
+        this.wetGain.gain.value = this._level * this._wet;
         break;
 
       // Tone control (high-frequency roll-off)
@@ -179,7 +196,7 @@ export class NeuralEffectWrapper extends Tone.ToneAudioNode {
    */
   set wet(value: number) {
     this._wet = Math.max(0, Math.min(1, value));
-    this.wetGain.gain.value = this._wet;
+    this.wetGain.gain.value = this._wet * this._level;  // preserve level
     this.dryGain.gain.value = 1 - this._wet;
   }
 

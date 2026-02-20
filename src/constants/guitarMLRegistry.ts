@@ -17,7 +17,7 @@ const PEDAL_OVERDRIVE_SCHEMA: EffectParameterSchema = {
   drive: { ...DEFAULT_PARAMETERS.drive },
   tone: { ...DEFAULT_PARAMETERS.tone },
   level: { ...DEFAULT_PARAMETERS.level },
-  dryWet: { ...DEFAULT_PARAMETERS.dryWet },
+  dryWet: { ...DEFAULT_PARAMETERS.dryWet, name: 'Neural' },
 };
 
 // Amplifier models - Drive, Presence, Level, Mix
@@ -25,7 +25,7 @@ const AMP_SCHEMA: EffectParameterSchema = {
   drive: { ...DEFAULT_PARAMETERS.drive },
   presence: { ...DEFAULT_PARAMETERS.presence },
   level: { ...DEFAULT_PARAMETERS.level },
-  dryWet: { ...DEFAULT_PARAMETERS.dryWet },
+  dryWet: { ...DEFAULT_PARAMETERS.dryWet, name: 'Neural' },
 };
 
 // Bass amp with EQ - Drive, Bass, Mid, Treble, Presence, Level, Mix
@@ -36,7 +36,7 @@ const AMP_EQ_SCHEMA: EffectParameterSchema = {
   treble: { ...DEFAULT_PARAMETERS.treble },
   presence: { ...DEFAULT_PARAMETERS.presence },
   level: { ...DEFAULT_PARAMETERS.level },
-  dryWet: { ...DEFAULT_PARAMETERS.dryWet },
+  dryWet: { ...DEFAULT_PARAMETERS.dryWet, name: 'Neural' },
 };
 
 /**
@@ -671,8 +671,10 @@ export function getModelCategories(): string[] {
  */
 export function getModelCharacteristicDefaults(gain: string, tone: string): Record<string, number> {
   const driveMap: Record<string, number> = { low: 30, medium: 50, high: 65, extreme: 75 };
-  const drive = driveMap[gain] ?? 50;
+  const levelMap: Record<string, number> = { low: 80, medium: 70, high: 55, extreme: 45 };
+  const drive  = driveMap[gain] ?? 50;
+  const level  = levelMap[gain] ?? 70;
   const treble = tone === 'bright' ? 60 : tone === 'dark' ? 40 : 50;
   const bass   = tone === 'dark'   ? 60 : tone === 'bright' ? 40 : 50;
-  return { drive, level: 70, treble, bass };
+  return { drive, level, treble, bass };
 }
