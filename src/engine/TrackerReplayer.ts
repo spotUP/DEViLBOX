@@ -288,12 +288,136 @@ export class TrackerReplayer {
   public onSongEnd: (() => void) | null = null;
   public onTickProcess: ((tick: number, row: number) => void) | null = null;
 
-  constructor() {
-    // Connect to ToneEngine's masterInput so TrackerReplayer audio flows through
-    // the Amiga filter and master effects chain, not directly to destination.
-    const engine = getToneEngine();
+  // DJ mode state
+  private nudgeOffset = 0;            // Temporary BPM offset for DJ nudge
+  private nudgeTicksRemaining = 0;    // Auto-reset counter for nudge
+  private lineLoopStart = -1;         // Line loop start row (-1 = off)
+  private lineLoopEnd = -1;           // Line loop end row
+  private lineLoopActive = false;
+  private patternLoopStartPos = -1;   // Pattern loop start song position
+  private patternLoopEndPos = -1;     // Pattern loop end song position
+  private patternLoopActive = false;
+  private slipEnabled = false;
+  private slipSongPos = 0;            // Ghost position (advances while looping)
+  private slipPattPos = 0;
+
+  constructor(outputNode?: Tone.ToneAudioNode) {
+    // Connect to provided output node (for DJ decks) or default to
+    // ToneEngine's masterInput (existing behavior for tracker view).
     this.masterGain = new Tone.Gain(1);
-    this.masterGain.connect(engine.masterInput);
+    if (outputNode) {
+      this.masterGain.connect(outputNode);
+    } else {
+      const engine = getToneEngine();
+      this.masterGain.connect(engine.masterInput);
+    }
+  }
+
+  // ==========================================================================
+  // DJ MODE METHODS
+  // ==========================================================================
+
+  /** Get the master gain node for external routing (DJ mixer, etc.) */
+  getMasterGain(): Tone.Gain {
+    return this.masterGain;
+  }
+
+  /** Get current song position */
+  getSongPos(): number { return this.songPos; }
+
+  /** Get current pattern row position */
+  getPattPos(): number { return this.pattPos; }
+
+  /** Get total song positions */
+  getTotalPositions(): number { return this.song?.songLength ?? 0; }
+
+  /** Get loaded song data */
+  getSong(): TrackerSong | null { return this.song; }
+
+  /** Jump to a specific position while playing */
+  jumpToPosition(songPos: number, pattPos: number = 0): void {
+    this.seekTo(songPos, pattPos);
+  }
+
+  /** Set BPM directly without going through transport store */
+  setBPMDirect(bpm: number): void {
+    this.bpm = Math.max(32, Math.min(255, bpm));
+  }
+
+  /** Temporary BPM offset for DJ nudge — auto-resets after tickCount ticks */
+  setNudge(offset: number, tickCount: number = 8): void {
+    this.nudgeOffset = offset;
+    this.nudgeTicksRemaining = tickCount;
+  }
+
+  /** Set line-level loop (quantized to rows within current pattern) */
+  setLineLoop(startRow: number, size: number): void {
+    this.lineLoopStart = startRow;
+    this.lineLoopEnd = startRow + size - 1;
+    this.lineLoopActive = true;
+    // Save ghost position for slip mode
+    if (this.slipEnabled) {
+      this.slipSongPos = this.songPos;
+      this.slipPattPos = this.pattPos;
+    }
+  }
+
+  /** Clear line loop */
+  clearLineLoop(): void {
+    this.lineLoopActive = false;
+    this.lineLoopStart = -1;
+    this.lineLoopEnd = -1;
+    // If slip mode, jump to ghost position
+    if (this.slipEnabled) {
+      this.seekTo(this.slipSongPos, this.slipPattPos);
+    }
+  }
+
+  /** Set pattern-level loop (loop between song positions) */
+  setPatternLoop(startPos: number, endPos: number): void {
+    this.patternLoopStartPos = startPos;
+    this.patternLoopEndPos = endPos;
+    this.patternLoopActive = true;
+    if (this.slipEnabled) {
+      this.slipSongPos = this.songPos;
+      this.slipPattPos = this.pattPos;
+    }
+  }
+
+  /** Clear pattern loop */
+  clearPatternLoop(): void {
+    this.patternLoopActive = false;
+    this.patternLoopStartPos = -1;
+    this.patternLoopEndPos = -1;
+    if (this.slipEnabled) {
+      this.seekTo(this.slipSongPos, this.slipPattPos);
+    }
+  }
+
+  /** Enable/disable slip mode */
+  setSlipEnabled(enabled: boolean): void {
+    this.slipEnabled = enabled;
+    if (enabled) {
+      this.slipSongPos = this.songPos;
+      this.slipPattPos = this.pattPos;
+    }
+  }
+
+  /** Get slip (ghost) position state */
+  getSlipState(): { enabled: boolean; songPos: number; pattPos: number } {
+    return {
+      enabled: this.slipEnabled,
+      songPos: this.slipSongPos,
+      pattPos: this.slipPattPos,
+    };
+  }
+
+  /** Get elapsed time in milliseconds based on rows processed */
+  getElapsedMs(): number {
+    if (!this.song) return 0;
+    // Approximate: each row takes (speed * 2.5 / BPM) seconds
+    const tickDuration = 2.5 / this.bpm;
+    return this.totalRowsProcessed * this.speed * tickDuration * 1000;
   }
 
   // ==========================================================================
@@ -559,7 +683,9 @@ export class TrackerReplayer {
         // Advance timeline by one tick interval.
         // If BPM changed during processTick (Fxx effect), the new interval
         // takes effect immediately for the next tick — no reset needed.
-        const tickInterval = 2.5 / this.bpm;
+        // DJ nudge: apply temporary BPM offset for beat matching
+        const effectiveBPM = this.bpm + this.nudgeOffset;
+        const tickInterval = 2.5 / effectiveBPM;
         this.nextScheduleTime += tickInterval;
       }
     };
@@ -1505,12 +1631,15 @@ export class TrackerReplayer {
     // Apply the new pitch shift
     const playbackRate = Math.pow(2, this.globalPitchCurrent / 12);
 
-    // Update global playback rate for new notes
+    // Update global playback rate for new sample notes
     const engine = getToneEngine();
     engine.setGlobalPlaybackRate(playbackRate);
 
     // Update all currently playing samples
     this.updateAllPlaybackRates();
+
+    // Update all currently playing synths (detune in cents = semitones * 100)
+    engine.setGlobalDetune(this.globalPitchCurrent * 100);
 
     // Update BPM to reflect pitch shift
     const effectiveBPM = Math.round(this.bpm * playbackRate * 100) / 100;
@@ -2084,6 +2213,45 @@ export class TrackerReplayer {
   private advanceRow(): void {
     if (!this.song) return;
 
+    // DJ nudge: apply temporary BPM offset and decrement counter
+    if (this.nudgeTicksRemaining > 0) {
+      this.nudgeTicksRemaining--;
+      if (this.nudgeTicksRemaining === 0) {
+        this.nudgeOffset = 0;
+      }
+    }
+
+    // DJ slip mode: advance ghost position even while looping
+    if (this.slipEnabled && (this.lineLoopActive || this.patternLoopActive)) {
+      this.slipPattPos++;
+      const slipPatternNum = this.song.songPositions[this.slipSongPos];
+      const slipPattern = this.song.patterns[slipPatternNum];
+      const slipLength = slipPattern?.length ?? 64;
+      if (this.slipPattPos >= slipLength) {
+        this.slipPattPos = 0;
+        this.slipSongPos++;
+        if (this.slipSongPos >= this.song.songLength) {
+          this.slipSongPos = this.song.restartPosition < this.song.songLength
+            ? this.song.restartPosition : 0;
+        }
+      }
+    }
+
+    // DJ line loop: if active, wrap within loop boundaries
+    if (this.lineLoopActive && this.lineLoopStart >= 0) {
+      this.pattPos++;
+      if (this.pattPos > this.lineLoopEnd) {
+        this.pattPos = this.lineLoopStart;
+      }
+      // Notify and return early — don't do normal advancement
+      if (this.onRowChange && this.song) {
+        const pattNum = this.song.songPositions[this.songPos];
+        this.onRowChange(this.pattPos, pattNum, this.songPos);
+      }
+      this.totalRowsProcessed++;
+      return;
+    }
+
     // Pattern break
     if (this.pBreakFlag) {
       this.pattPos = this.pBreakPos;
@@ -2111,6 +2279,14 @@ export class TrackerReplayer {
     if (this.pattPos >= patternLength) {
       this.pattPos = 0;
       this.songPos++;
+    }
+
+    // DJ pattern loop: wrap song position within loop boundaries
+    if (this.patternLoopActive && this.patternLoopStartPos >= 0) {
+      if (this.songPos > this.patternLoopEndPos) {
+        this.songPos = this.patternLoopStartPos;
+        this.pattPos = 0;
+      }
     }
 
     // Song end
@@ -2259,6 +2435,18 @@ export class TrackerReplayer {
   getCurrentRow(): number { return this.pattPos; }
   getCurrentPosition(): number { return this.songPos; }
   getCurrentTick(): number { return this.currentTick; }
+
+  /**
+   * Hot-swap pattern data without stopping playback.
+   * The scheduler reads this.song.patterns on every tick, so updating the
+   * reference is enough for edits (transpose, cell edits, fills) to take
+   * effect immediately — no stop/reload/play cycle needed.
+   */
+  updatePatterns(patterns: Pattern[]): void {
+    if (this.song) {
+      this.song.patterns = patterns;
+    }
+  }
 
   // ==========================================================================
   // CLEANUP

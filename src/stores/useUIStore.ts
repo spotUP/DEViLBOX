@@ -45,8 +45,8 @@ interface UIStore {
   // Performance settings
   performanceQuality: PerformanceQuality; // Auto-adjusted based on FPS
 
-  // View switching (tracker vs arrangement)
-  activeView: 'tracker' | 'arrangement';
+  // View switching (tracker vs arrangement vs DJ)
+  activeView: 'tracker' | 'arrangement' | 'dj';
 
   // Pop-out window state
   tb303PoppedOut: boolean;
@@ -91,7 +91,7 @@ interface UIStore {
   setPerformanceQuality: (quality: PerformanceQuality) => void;
 
   // View switching actions
-  setActiveView: (view: 'tracker' | 'arrangement') => void;
+  setActiveView: (view: 'tracker' | 'arrangement' | 'dj') => void;
   toggleActiveView: () => void;
 
   // Pop-out window actions
