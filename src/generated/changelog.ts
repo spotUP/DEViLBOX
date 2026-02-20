@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-20T11:35:26.981Z
+ * Generated: 2026-02-20T11:41:19.210Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1015';
-export const BUILD_NUMBER = '1015';
-export const BUILD_HASH = '42f37e2a';
+export const BUILD_VERSION = '1.0.1018';
+export const BUILD_NUMBER = '1018';
+export const BUILD_HASH = '3547fbc5';
 export const BUILD_DATE = '2026-02-20';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,21 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1015',
+    version: '1.0.1018',
     date: '2026-02-20',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add Serato library parsers (database V2, crates, ID3 tags)"
+      },
+      {
+        type: 'feature',
+        "description": "Expand DJ controls, button mapping, controller profiles, and master FX routing"
+      },
+      {
+        type: 'feature',
+        "description": "Upgrade scratch engine with 10 patterns and indefinite fader scheduling"
+      },
       {
         type: 'feature',
         "description": "Add general-purpose Randomize dialog for pattern editor"
@@ -226,18 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Set type='Neural' in unifiedEffects so correct node is created"
-      },
-      {
-        type: 'fix',
-        "description": "Differentiate amp models and fix stuck knobs"
-      },
-      {
-        type: 'fix',
-        "description": "Phaser — raise baseFrequency default to 1000Hz, add Q=10"
-      },
-      {
-        type: 'fix',
-        "description": "Use getRawNode() for SpaceyDelayer and RETapeEcho worklet connections"
       }
     ]
   }
