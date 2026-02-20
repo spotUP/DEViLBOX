@@ -352,6 +352,12 @@ export class TrackerReplayer {
   private pitchMultiplier = 1.0;      // Sample playback rate multiplier
   private deckDetuneCents = 0;        // Per-deck synth detune
 
+  // Scratch note suppression: when true, the sequencer advances (position tracking)
+  // but processRow/processEffectTick are skipped so no new notes trigger.
+  // Used by DeckEngine during pattern scratches to prevent "extra notes" while
+  // still allowing the pattern view to follow the scratch position.
+  private _suppressNotes = false;
+
   // Per-deck channel mute mask (DJ mode only)
   // Bit N = 1 means channel N is ENABLED, 0 means MUTED.
   // Kept separate from ToneEngine's global mute states so each deck is independent.
@@ -480,6 +486,15 @@ export class TrackerReplayer {
       songPos: this.slipSongPos,
       pattPos: this.slipPattPos,
     };
+  }
+
+  /**
+   * Suppress note/effect processing while still advancing the sequencer.
+   * Used during DJ scratch patterns so the pattern view follows the scratch
+   * without triggering new note events.
+   */
+  setSuppressNotes(suppress: boolean): void {
+    this._suppressNotes = suppress;
   }
 
   // ==========================================================================
@@ -956,26 +971,29 @@ export class TrackerReplayer {
       this.queueDisplayState(safeTime, this.pattPos, patternNum, this.songPos, 0);
     }
 
-    // Process all channels
-    for (let ch = 0; ch < this.channels.length; ch++) {
-      const channel = this.channels[ch];
-      const row = pattern.channels[ch]?.rows[this.pattPos];
-      if (!row) continue;
+    // Process all channels (skipped during scratch note suppression —
+    // sequencer still advances for visual tracking but no audio events fire)
+    if (!this._suppressNotes) {
+      for (let ch = 0; ch < this.channels.length; ch++) {
+        const channel = this.channels[ch];
+        const row = pattern.channels[ch]?.rows[this.pattPos];
+        if (!row) continue;
 
-      if (this.currentTick === 0) {
-        // Tick 0: Read new row data
-        this.processRow(ch, channel, row, safeTime);
-      } else {
-        // Ticks 1+: Process continuous effects
-        this.processEffectTick(ch, channel, row, safeTime + (this.currentTick * tickInterval));
+        if (this.currentTick === 0) {
+          // Tick 0: Read new row data
+          this.processRow(ch, channel, row, safeTime);
+        } else {
+          // Ticks 1+: Process continuous effects
+          this.processEffectTick(ch, channel, row, safeTime + (this.currentTick * tickInterval));
+        }
+
+        // Process Furnace macros every tick
+        this.processMacros(channel, safeTime + (this.currentTick * tickInterval));
       }
 
-      // Process Furnace macros every tick
-      this.processMacros(channel, safeTime + (this.currentTick * tickInterval));
+      // Process global pitch shift slide (Wxx effect) - once per tick
+      this.doGlobalPitchSlide(safeTime);
     }
-
-    // Process global pitch shift slide (Wxx effect) - once per tick
-    this.doGlobalPitchSlide(safeTime);
 
     // Notify tick processing
     if (this.onTickProcess) {
