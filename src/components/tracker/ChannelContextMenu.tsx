@@ -57,6 +57,7 @@ interface ChannelContextMenuProps {
   onHumanize: (channelIndex: number) => void;
   onInterpolate: (channelIndex: number) => void;
   onAcidGenerator: (channelIndex: number) => void;
+  onRandomize: (channelIndex: number) => void;
   onToggleCollapse?: (channelIndex: number) => void;
   onReverseVisual?: (channelIndex: number) => void;
   onPolyrhythm?: (channelIndex: number) => void;
@@ -85,6 +86,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   onHumanize,
   onInterpolate,
   onAcidGenerator,
+  onRandomize,
   onToggleCollapse,
   onReverseVisual,
   onPolyrhythm,
@@ -337,6 +339,12 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
             label: '🎛️ Acid Generator...',
             icon: <Wand2 size={14} />,
             onClick: () => onAcidGenerator(channelIndex),
+          },
+          {
+            id: 'fill-randomize',
+            label: '🎲 Randomize...',
+            icon: <Shuffle size={14} />,
+            onClick: () => onRandomize(channelIndex),
           },
           { type: 'divider' },
           // Bass category
@@ -639,6 +647,7 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
     onHumanize,
     onInterpolate,
     onAcidGenerator,
+    onRandomize,
     onToggleCollapse,
     onReverseVisual,
     onPolyrhythm,

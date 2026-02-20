@@ -58,6 +58,7 @@ interface ChannelTrigger {
 
 interface PatternEditorCanvasProps {
   onAcidGenerator?: (channelIndex: number) => void;
+  onRandomize?: (channelIndex: number) => void;
   visibleChannels?: number; // For mobile: how many channels to show
   startChannel?: number; // For mobile portrait: which channel to start from
   onSwipeLeft?: () => void; // For mobile: move cursor left
@@ -69,6 +70,7 @@ interface PatternEditorCanvasProps {
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
 export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.memo(({
   onAcidGenerator,
+  onRandomize,
   visibleChannels: _visibleChannels, // Handled internally: canvas clips channels outside viewport
   startChannel: _startChannel = 0,   // Handled internally: canvas scrolls to cursor channel on mobile
   onSwipeLeft: _onSwipeLeft,   // Reserved - using internal handler instead
@@ -2106,6 +2108,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                           onHumanize={handleHumanize}
                           onInterpolate={handleInterpolate}
                           onAcidGenerator={onAcidGenerator || (() => {})}
+                          onRandomize={onRandomize || (() => {})}
                           onReverseVisual={handleReverseVisual}
                           onPolyrhythm={handlePolyrhythm}
                           onFibonacci={handleFibonacci}

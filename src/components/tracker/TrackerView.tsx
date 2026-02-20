@@ -19,6 +19,7 @@ import { ScaleVolumeDialog } from './ScaleVolumeDialog';
 import { FadeVolumeDialog } from './FadeVolumeDialog';
 import { RemapInstrumentDialog } from './RemapInstrumentDialog';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
+import { RandomizeDialog } from '@components/dialogs/RandomizeDialog';
 import { PatternOrderModal } from '@components/dialogs/PatternOrderModal';
 import { SYSTEM_PRESETS, DivChanType } from '@/constants/systemPresets';
 import { CHANNEL_COLORS } from '@typedefs';
@@ -384,6 +385,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Acid generator dialog
   const [showAcidGenerator, setShowAcidGenerator] = useState(false);
   const [acidGeneratorChannel, setAcidGeneratorChannel] = useState(0);
+  // Randomize dialog
+  const [showRandomize, setShowRandomize] = useState(false);
+  const [randomizeChannel, setRandomizeChannel] = useState(0);
   // Pattern order modal
   const [showPatternOrder, setShowPatternOrder] = useState(false);
 
@@ -842,6 +846,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     setShowAcidGenerator(true);
   }, []);
 
+  // Randomize handler
+  const handleRandomize = useCallback((channelIndex: number) => {
+    setRandomizeChannel(channelIndex);
+    setShowRandomize(true);
+  }, []);
+
   const pattern = patterns[currentPatternIndex];
 
   // Mobile view with tabbed interface
@@ -926,6 +936,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           <AcidPatternGeneratorDialog
             channelIndex={acidGeneratorChannel}
             onClose={() => setShowAcidGenerator(false)}
+          />
+        )}
+        {showRandomize && (
+          <RandomizeDialog
+            channelIndex={randomizeChannel}
+            onClose={() => setShowRandomize(false)}
           />
         )}
       </>
@@ -1202,6 +1218,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           {viewMode === 'tracker' ? (
             <PatternEditorCanvas
               onAcidGenerator={handleAcidGenerator}
+              onRandomize={handleRandomize}
               onSwipeLeft={handleSwipeLeft}
               onSwipeRight={handleSwipeRight}
             />
@@ -1357,6 +1374,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         <AcidPatternGeneratorDialog
           channelIndex={acidGeneratorChannel}
           onClose={() => setShowAcidGenerator(false)}
+        />
+      )}
+      {showRandomize && (
+        <RandomizeDialog
+          channelIndex={randomizeChannel}
+          onClose={() => setShowRandomize(false)}
         />
       )}
       {showAutomation && (
