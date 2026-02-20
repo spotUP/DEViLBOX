@@ -105,6 +105,18 @@ export function getUserInstrumentsDirectory(userId: string): string {
 }
 
 /**
+ * Get user's presets directory
+ */
+export function getUserPresetsDirectory(userId: string): string {
+  const dir = path.join(getUsersDir(), userId, 'presets');
+  // Auto-create if missing (presets dir was added after initial user creation)
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
+
+/**
  * List files in a directory
  */
 export function listDirectory(dirPath: string): { name: string; isDirectory: boolean; size: number }[] {
