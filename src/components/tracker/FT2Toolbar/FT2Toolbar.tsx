@@ -14,6 +14,7 @@ import * as Tone from 'tone';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore, useTabsStore } from '@stores';
+import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -173,7 +174,22 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     reset: resetTracker,
     duplicatePosition,
     removeFromOrder,
-  } = useTrackerStore();
+  } = useTrackerStore(useShallow((s) => ({
+    patterns: s.patterns,
+    currentPatternIndex: s.currentPatternIndex,
+    setCurrentPattern: s.setCurrentPattern,
+    resizePattern: s.resizePattern,
+    loadPatterns: s.loadPatterns,
+    setPatternOrder: s.setPatternOrder,
+    patternOrder: s.patternOrder,
+    currentPositionIndex: s.currentPositionIndex,
+    setCurrentPosition: s.setCurrentPosition,
+    editStep: s.editStep,
+    setEditStep: s.setEditStep,
+    reset: s.reset,
+    duplicatePosition: s.duplicatePosition,
+    removeFromOrder: s.removeFromOrder,
+  })));
 
   const {
     isPlaying,
@@ -192,14 +208,48 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
     jitter,
     useMpcScale,
     reset: resetTransport,
-  } = useTransportStore();
+  } = useTransportStore(useShallow((s) => ({
+    isPlaying: s.isPlaying,
+    isLooping: s.isLooping,
+    bpm: s.bpm,
+    setBPM: s.setBPM,
+    speed: s.speed,
+    setSpeed: s.setSpeed,
+    setIsLooping: s.setIsLooping,
+    play: s.play,
+    stop: s.stop,
+    setCurrentRow: s.setCurrentRow,
+    grooveTemplateId: s.grooveTemplateId,
+    setGrooveTemplate: s.setGrooveTemplate,
+    swing: s.swing,
+    jitter: s.jitter,
+    useMpcScale: s.useMpcScale,
+    reset: s.reset,
+  })));
 
-  const { isDirty, setMetadata, metadata } = useProjectStore();
-  const { instruments, loadInstruments, updateInstrument, addInstrument, reset: resetInstruments } = useInstrumentStore();
-  const { masterEffects } = useAudioStore();
-  const { oscilloscopeVisible } = useUIStore();
+  const { isDirty, setMetadata, metadata } = useProjectStore(useShallow((s) => ({
+    isDirty: s.isDirty,
+    setMetadata: s.setMetadata,
+    metadata: s.metadata,
+  })));
+  const { instruments, loadInstruments, updateInstrument, addInstrument, reset: resetInstruments } = useInstrumentStore(useShallow((s) => ({
+    instruments: s.instruments,
+    loadInstruments: s.loadInstruments,
+    updateInstrument: s.updateInstrument,
+    addInstrument: s.addInstrument,
+    reset: s.reset,
+  })));
+  const { masterEffects } = useAudioStore(useShallow((s) => ({
+    masterEffects: s.masterEffects,
+  })));
+  const { oscilloscopeVisible } = useUIStore(useShallow((s) => ({
+    oscilloscopeVisible: s.oscilloscopeVisible,
+  })));
   const compactToolbar = false;
-  const { curves, reset: resetAutomation } = useAutomationStore();
+  const { curves, reset: resetAutomation } = useAutomationStore(useShallow((s) => ({
+    curves: s.curves,
+    reset: s.reset,
+  })));
   const addTab = useTabsStore((state) => state.addTab);
 
   const engine = getToneEngine();

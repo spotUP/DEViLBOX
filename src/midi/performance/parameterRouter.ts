@@ -247,7 +247,7 @@ const PARAMETER_ROUTES: Record<string, ParameterRoute> = {
 
 function getVSTBridgeSynth(instrumentId: number): unknown {
   const engine = getToneEngine();
-  const key = `${instrumentId}--1`;
+  const key = (instrumentId << 16) | 0xFFFF;
   return engine.instruments.get(key);
 }
 

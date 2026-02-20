@@ -21,6 +21,7 @@ import { getToneEngine } from './ToneEngine';
 import { getPatternScheduler } from './PatternScheduler';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/audio';
+import type { GrooveTemplate } from '@/types/audio';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 
 // ============================================================================
@@ -102,25 +103,53 @@ const PERIOD_TABLE = [
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 const NOTE_NAMES_CLEAN = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
+// Pre-computed XM note → note name lookup (avoids string allocation per call)
+// Index 0 = invalid/unused, indices 1-96 = valid note names
+const XM_NOTE_NAMES: string[] = new Array(97);
+XM_NOTE_NAMES[0] = 'C4'; // Default for invalid note
+for (let i = 1; i <= 96; i++) {
+  const midi = i + 11;
+  const octave = Math.floor(midi / 12) - 1;
+  const semitone = midi % 12;
+  XM_NOTE_NAMES[i] = `${NOTE_NAMES_CLEAN[semitone]}${octave}`;
+}
+
+// Pre-computed Amiga period → note name lookup (avoids iteration + string alloc per call)
+const PERIOD_NOTE_MAP = new Map<number, string>();
+for (let oct = 0; oct < 3; oct++) {
+  for (let note = 0; note < 12; note++) {
+    const idx = oct * 12 + note;
+    if (idx < 36) {
+      const period = PERIOD_TABLE[idx];
+      if (!PERIOD_NOTE_MAP.has(period)) {
+        PERIOD_NOTE_MAP.set(period, `${NOTE_NAMES[note].replace('-', '')}${oct + 1}`);
+      }
+    }
+  }
+}
+
 /** Convert XM note number to note name (e.g. "C2")
  * XM note format: 1 = C-0, 13 = C-1, 25 = C-2, etc.
  * Maps to MIDI: XM + 11 = MIDI (so XM 25 = MIDI 36 = C2)
  */
 function xmNoteToNoteName(xmNote: number): string {
-  if (xmNote <= 0 || xmNote > 96) return 'C4'; // Invalid note, return default
-  const midi = xmNote + 11; // Convert XM to MIDI
-  const octave = Math.floor(midi / 12) - 1; // MIDI 12 = C0, MIDI 24 = C1, MIDI 36 = C2
-  const semitone = midi % 12;
-  return `${NOTE_NAMES_CLEAN[semitone]}${octave}`;
+  return XM_NOTE_NAMES[xmNote] || 'C4';
 }
 
 /** Convert Amiga period to note name (e.g. "C4") */
 function periodToNoteName(period: number): string {
+  // Fast path: exact match in pre-computed map
+  const cached = PERIOD_NOTE_MAP.get(period);
+  if (cached) return cached;
+  // Slow path: find closest period (rarely hit — only for non-standard periods)
   for (let oct = 0; oct < 8; oct++) {
     for (let note = 0; note < 12; note++) {
       const idx = oct * 12 + note;
       if (idx < 36 && PERIOD_TABLE[idx] <= period) {
-        return `${NOTE_NAMES[note].replace('-', '')}${oct + 1}`;
+        const name = `${NOTE_NAMES[note].replace('-', '')}${oct + 1}`;
+        // Cache for next hit
+        PERIOD_NOTE_MAP.set(period, name);
+        return name;
       }
     }
   }
@@ -132,6 +161,9 @@ const VIBRATO_TABLE = [
   0, 24, 49, 74, 97, 120, 141, 161, 180, 197, 212, 224, 235, 244, 250, 253,
   255, 253, 250, 244, 235, 224, 212, 197, 180, 161, 141, 120, 97, 74, 49, 24
 ];
+
+// Pre-computed groove template lookup (avoids linear scan per call)
+const GROOVE_MAP = new Map<string, GrooveTemplate>(GROOVE_TEMPLATES.map(t => [t.id, t]));
 
 // ============================================================================
 // TYPES
@@ -273,17 +305,28 @@ export class TrackerReplayer {
   // Master output
   private masterGain: Tone.Gain;
 
-  // Audio-synced state queue for smooth scrolling (BassoonTracker pattern)
+  // Audio-synced state ring buffer for smooth scrolling (BassoonTracker pattern)
   // States are queued with Web Audio timestamps during scheduling,
-  // then dequeued in render loop as audioContext.currentTime advances
-  private stateQueue: DisplayState[] = [];
-  private lastDequeuedState: DisplayState | null = null;
+  // then dequeued in render loop as audioContext.currentTime advances.
+  // Ring buffer avoids O(n) shift() and per-push object allocation.
   private static readonly MAX_STATE_QUEUE_SIZE = 256; // ~5 seconds at 50Hz
+  private stateRing: DisplayState[] = Array.from({ length: 256 }, () => ({ time: 0, row: 0, pattern: 0, position: 0, tick: 0 }));
+  private stateRingHead = 0;   // Next write index
+  private stateRingTail = 0;   // Next read index
+  private stateRingCount = 0;  // Number of items in ring
+  private lastDequeuedState: DisplayState | null = null;
 
   // Cache for ToneAudioBuffer wrappers (keyed by instrument ID)
   // Avoids re-wrapping the same decoded AudioBuffer on every note trigger
   private bufferCache: Map<number, Tone.ToneAudioBuffer> = new Map();
   private _warnedMissingInstruments: Set<number> | undefined;
+
+  // Instrument lookup map (keyed by instrument ID) — avoids linear scan per note
+  private instrumentMap: Map<number, InstrumentConfig> = new Map();
+
+  // Per-channel meter staging + reusable callbacks (avoids closure allocation per note)
+  private meterStaging: Float64Array = new Float64Array(64);
+  private meterCallbacks: ((time: number) => void)[] | null = null;
 
   // Callbacks
   public onRowChange: ((row: number, pattern: number, position: number) => void) | null = null;
@@ -554,6 +597,7 @@ export class TrackerReplayer {
     this.song = song;
     this.bufferCache.clear(); // New song = new samples, invalidate cache
     this._warnedMissingInstruments = undefined;
+    this.instrumentMap = new Map(song.instruments.map(i => [i.id, i]));
 
     // Dispose old channels before creating new ones (prevent Web Audio node leaks)
     for (const ch of this.channels) {
@@ -837,7 +881,7 @@ export class TrackerReplayer {
   }
 
   private calculateGrooveOffset(row: number, rowDuration: number, state: { grooveTemplateId: string; swing: number; grooveSteps: number }): number {
-    const grooveTemplate = GROOVE_TEMPLATES.find(t => t.id === state.grooveTemplateId);
+    const grooveTemplate = GROOVE_MAP.get(state.grooveTemplateId);
 
     if (grooveTemplate && grooveTemplate.id !== 'straight') {
       // For TEMPLATES: swing is 0-200 where 100 = full template effect
@@ -960,17 +1004,22 @@ export class TrackerReplayer {
 
   /**
    * Queue a display state for audio-synced UI updates.
-   * States are queued with Web Audio timestamps and dequeued in render loop.
+   * Ring buffer: O(1) enqueue, reuses pre-allocated DisplayState objects.
    */
   private queueDisplayState(time: number, row: number, pattern: number, position: number, tick: number): void {
-    const state: DisplayState = { time, row, pattern, position, tick };
-
-    // Limit queue size to prevent memory issues
-    if (this.stateQueue.length >= TrackerReplayer.MAX_STATE_QUEUE_SIZE) {
-      this.stateQueue.shift(); // Remove oldest
+    const s = this.stateRing[this.stateRingHead];
+    s.time = time;
+    s.row = row;
+    s.pattern = pattern;
+    s.position = position;
+    s.tick = tick;
+    this.stateRingHead = (this.stateRingHead + 1) % TrackerReplayer.MAX_STATE_QUEUE_SIZE;
+    if (this.stateRingCount < TrackerReplayer.MAX_STATE_QUEUE_SIZE) {
+      this.stateRingCount++;
+    } else {
+      // Overwrite oldest — advance tail
+      this.stateRingTail = (this.stateRingTail + 1) % TrackerReplayer.MAX_STATE_QUEUE_SIZE;
     }
-
-    this.stateQueue.push(state);
   }
 
   /**
@@ -986,11 +1035,14 @@ export class TrackerReplayer {
     }
 
     if (peek) {
-      // Just find the state matching the time in the queue
+      // Just find the state matching the time in the ring
       let best = this.lastDequeuedState;
-      for (const state of this.stateQueue) {
+      let idx = this.stateRingTail;
+      for (let i = 0; i < this.stateRingCount; i++) {
+        const state = this.stateRing[idx];
         if (state.time <= time) best = state;
         else break;
+        idx = (idx + 1) % TrackerReplayer.MAX_STATE_QUEUE_SIZE;
       }
       return best;
     }
@@ -998,11 +1050,13 @@ export class TrackerReplayer {
     // Dequeue states that are past the requested time
     let result = this.lastDequeuedState;
 
-    while (this.stateQueue.length > 0) {
-      const state = this.stateQueue[0];
+    while (this.stateRingCount > 0) {
+      const state = this.stateRing[this.stateRingTail];
       if (state.time <= time) {
-        result = this.stateQueue.shift()!;
+        result = state;
         this.lastDequeuedState = result;
+        this.stateRingTail = (this.stateRingTail + 1) % TrackerReplayer.MAX_STATE_QUEUE_SIZE;
+        this.stateRingCount--;
       } else {
         break;
       }
@@ -1015,7 +1069,9 @@ export class TrackerReplayer {
    * Clear the state queue (called on stop/reset)
    */
   private clearStateQueue(): void {
-    this.stateQueue = [];
+    this.stateRingHead = 0;
+    this.stateRingTail = 0;
+    this.stateRingCount = 0;
     this.lastDequeuedState = null;
   }
 
@@ -1060,7 +1116,7 @@ export class TrackerReplayer {
     // Handle instrument change
     const instNum = row.instrument ?? 0;
     if (instNum > 0) {
-      const instrument = this.song.instruments.find(i => i.id === instNum);
+      const instrument = this.instrumentMap.get(instNum);
       if (instrument) {
         ch.instrument = instrument;
         ch.sampleNum = instNum;
@@ -1119,6 +1175,9 @@ export class TrackerReplayer {
         if (effect === 9) {
           offset = param > 0 ? param * 256 : ch.sampleOffset * 256;
           ch.sampleOffset = param > 0 ? param : ch.sampleOffset;
+          /* eslint-disable no-console */
+          console.log('[9xx] row=' + this.pattPos + ' ch=' + chIndex + ' param=0x' + param.toString(16).padStart(2, '0') + ' offset=' + offset + ' period=' + usePeriod + ' xmNote=' + noteValue + ' finetune=' + ch.finetune + ' inst=' + (ch.instrument?.id ?? '?') + ':' + (ch.instrument?.name || '?') + ' sampleRate=' + (ch.instrument?.sample?.sampleRate || '?') + ' pcmLen=' + ((ch.instrument?.sample as any)?.pcmData?.length || '?'));
+          /* eslint-enable no-console */
         }
 
         // TB-303 SLIDE SEMANTICS:
@@ -2056,7 +2115,7 @@ export class TrackerReplayer {
     // --- Groove Velocity/Dynamics ---
     const transportState = useTransportStore.getState();
     const grooveTemplateId = transportState.grooveTemplateId;
-    const grooveTemplate = GROOVE_TEMPLATES.find(t => t.id === grooveTemplateId);
+    const grooveTemplate = GROOVE_MAP.get(grooveTemplateId);
     const intensity = transportState.swing / 100;
     
     let velocityOffset = 0;
@@ -2072,11 +2131,20 @@ export class TrackerReplayer {
       console.log(`[Groove] row=${String(this.pattPos).padStart(2)} ch=${channelIndex} velOffset=${velocityOffset >= 0 ? '+' : ''}${velocityOffset.toFixed(3)} velocity=${velocity.toFixed(3)}`);
     }
 
-    // Schedule VU meter trigger at exact audio playback time for tight sync
+    // Schedule VU meter trigger at exact audio playback time for tight sync.
+    // Uses pre-allocated per-channel callbacks to avoid closure allocation per note.
     if (channelIndex !== undefined) {
-      Tone.Draw.schedule(() => {
-        engine.triggerChannelMeter(channelIndex, velocity);
-      }, safeTime);
+      if (!this.meterCallbacks) {
+        this.meterCallbacks = [];
+        for (let i = 0; i < 64; i++) {
+          const ch = i;
+          this.meterCallbacks[i] = () => {
+            engine.triggerChannelMeter(ch, this.meterStaging[ch]);
+          };
+        }
+      }
+      this.meterStaging[channelIndex] = velocity;
+      Tone.Draw.schedule(this.meterCallbacks[channelIndex], safeTime);
     }
 
     // Check if this is a synth instrument (has synthType) or sample-based
@@ -2166,10 +2234,10 @@ export class TrackerReplayer {
 
     // Safety: ensure the next pool player is stopped before reuse.
     // With fast retrigger (E91) + lookahead, the pool can cycle back to a player
-    // that's still in 'started' state from a previously scheduled note.
-    if (player.state === 'started') {
-      try { player.stop(safeTime); } catch { /* ignored */ }
-    }
+    // that has future-scheduled events from a previously scheduled note.
+    // Always call stop() — Source.stop() handles all cases internally via
+    // getNextState(), including future-scheduled starts that player.state misses.
+    try { player.stop(safeTime); } catch { /* ignored */ }
 
     // Configure the pooled player (no allocation, no connect - already done)
     player.buffer = toneBuffer;
@@ -2213,6 +2281,9 @@ export class TrackerReplayer {
           startOffset = Math.min(offset / originalSampleRate, duration - 0.0001);
         }
         // else: offset >= sample length → play from beginning (pt2-clone behavior)
+        /* eslint-disable no-console */
+        console.log('[9xx:play] offset=' + offset + ' origRate=' + originalSampleRate + ' bufferDur=' + duration.toFixed(4) + 's bufferFrames=' + Math.round(durationFrames) + ' period=' + ch.period + ' rate=' + player.playbackRate.toFixed(4) + ' startOffset=' + startOffset.toFixed(4) + 's loop=' + player.loop + (offset >= durationFrames ? ' (CLAMPED TO 0!)' : ''));
+        /* eslint-enable no-console */
       }
       player.start(safeTime, startOffset);
     } catch (e) {
@@ -2222,9 +2293,17 @@ export class TrackerReplayer {
 
   private stopChannel(ch: ChannelState, channelIndex?: number, time?: number): void {
     // Stop all pooled players (no disposal - they're reused)
+    // Always call stop() without checking player.state first — Source.stop()
+    // internally handles future-scheduled starts via getNextState().
+    // The old guard `if (player.state === 'started')` checked state at Tone.now(),
+    // missing players started in the lookahead window (future-scheduled events).
     for (const player of ch.playerPool) {
       try {
-        if (player.state === 'started') player.stop();
+        if (time !== undefined) {
+          player.stop(time);
+        } else {
+          player.stop();
+        }
       } catch { /* ignored */ }
     }
     ch.player = null;

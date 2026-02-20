@@ -4,6 +4,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Music,
   Trash2,
@@ -102,9 +103,24 @@ export const ChannelContextMenu: React.FC<ChannelContextMenuProps> = ({
   onChaos,
 }) => {
   const { isLiveMode, queueChannelAction } = useLiveModeStore();
-  const { toggleChannelMute, toggleChannelSolo, removeChannel, setChannelColor, toggleChannelCollapse, patterns } = useTrackerStore();
-  const { setActiveParameter, setShowLane, getShowLane, removeCurve, getCurvesForPattern } = useAutomationStore();
-  const { updateInstrument } = useInstrumentStore();
+  const { toggleChannelMute, toggleChannelSolo, removeChannel, setChannelColor, toggleChannelCollapse, patterns } = useTrackerStore(useShallow((s) => ({
+    toggleChannelMute: s.toggleChannelMute,
+    toggleChannelSolo: s.toggleChannelSolo,
+    removeChannel: s.removeChannel,
+    setChannelColor: s.setChannelColor,
+    toggleChannelCollapse: s.toggleChannelCollapse,
+    patterns: s.patterns,
+  })));
+  const { setActiveParameter, setShowLane, getShowLane, removeCurve, getCurvesForPattern } = useAutomationStore(useShallow((s) => ({
+    setActiveParameter: s.setActiveParameter,
+    setShowLane: s.setShowLane,
+    getShowLane: s.getShowLane,
+    removeCurve: s.removeCurve,
+    getCurvesForPattern: s.getCurvesForPattern,
+  })));
+  const { updateInstrument } = useInstrumentStore(useShallow((s) => ({
+    updateInstrument: s.updateInstrument,
+  })));
 
   const handleApplyChannelFxPreset = useCallback((presetName: string) => {
     const preset = MASTER_FX_PRESETS.find(p => p.name === presetName);

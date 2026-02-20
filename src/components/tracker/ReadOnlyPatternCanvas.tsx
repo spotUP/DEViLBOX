@@ -352,16 +352,24 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
   }, [pattern, currentRow, numChannels, isPlaying, dimensions, channelOffsets, channelWidths,
       getNoteCanvas, getParamCanvas, getLineNumberCanvas, noteWidth, contentWidth]);
 
-  // RAF render loop
+  // Ref to keep render callback up to date for the animation loop
+  const renderRef = useRef(render);
+  useEffect(() => {
+    renderRef.current = render;
+  });
+
+  // RAF render loop - stable loop that never restarts
   useEffect(() => {
     let frameId: number;
     const loop = () => {
-      render();
+      if (!document.hidden) {
+        renderRef.current();
+      }
       frameId = requestAnimationFrame(loop);
     };
     frameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameId);
-  }, [render]);
+  }, []);
 
   return (
     <div ref={containerRef} className="w-full h-full" style={heightProp ? { height: heightProp } : undefined}>

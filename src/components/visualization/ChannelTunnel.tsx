@@ -14,6 +14,7 @@ interface ChannelTunnelProps {
 export const ChannelTunnel: React.FC<ChannelTunnelProps> = ({ height = 100 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
+  const lastFrameTimeRef = useRef(0);
   const [width, setWidth] = useState(300);
   const { patterns, currentPatternIndex } = useTrackerStore(
     useShallow((state) => ({
@@ -58,9 +59,23 @@ export const ChannelTunnel: React.FC<ChannelTunnelProps> = ({ height = 100 }) =>
     const cellWidth = width / channelsPerRow;
     const cellHeight = height / rows;
 
+    const FRAME_INTERVAL = 1000 / 30;
+
     const animate = () => {
       if (!mounted) return;
-      
+
+      if (document.hidden) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
+      const now = performance.now();
+      if (now - lastFrameTimeRef.current < FRAME_INTERVAL) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      lastFrameTimeRef.current = now;
+
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, width, height);
 

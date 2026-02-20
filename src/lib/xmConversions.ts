@@ -58,6 +58,18 @@ export function stringNoteToXM(note: string | null): number {
   return xmNote;
 }
 
+// Pre-computed XM note → display string lookup (avoids template literal per call)
+// Index 0 = '...', 1-96 = note strings, 97 = '==='
+const XM_NOTE_STRING_LOOKUP: string[] = new Array(98);
+XM_NOTE_STRING_LOOKUP[0] = '...';
+XM_NOTE_STRING_LOOKUP[97] = '===';
+for (let i = 1; i <= 96; i++) {
+  const noteIndex = i - 1;
+  const octave = Math.floor(noteIndex / 12);
+  const semitone = noteIndex % 12;
+  XM_NOTE_STRING_LOOKUP[i] = `${NOTE_NAMES[semitone]}${octave}`;
+}
+
 /**
  * Convert XM note number to string note
  *
@@ -65,25 +77,7 @@ export function stringNoteToXM(note: string | null): number {
  * @returns String note ("C-4", "D#5", "===", "...")
  */
 export function xmNoteToString(xmNote: number): string {
-  if (xmNote === 0) {
-    return '...'; // Empty
-  }
-
-  if (xmNote === 97) {
-    return '==='; // Note off
-  }
-
-  if (xmNote < 1 || xmNote > 96) {
-    console.warn(`Invalid XM note: ${xmNote}`);
-    return '...';
-  }
-
-  // Decode: note = (octave * 12) + semitone + 1
-  const noteIndex = xmNote - 1; // 0-95
-  const octave = Math.floor(noteIndex / 12); // 0-7
-  const semitone = noteIndex % 12; // 0-11
-
-  return `${NOTE_NAMES[semitone]}${octave}`;
+  return XM_NOTE_STRING_LOOKUP[xmNote] || '...';
 }
 
 /**
@@ -191,6 +185,12 @@ export function effectStringToXM(effectStr: string | null): [number, number] {
   return [effTyp, eff];
 }
 
+// Pre-computed hex strings for effect parameters (avoids toString+toUpperCase+padStart per call)
+const HEX_BYTE: string[] = new Array(256);
+for (let i = 0; i < 256; i++) {
+  HEX_BYTE[i] = i.toString(16).toUpperCase().padStart(2, '0');
+}
+
 /**
  * Convert XM effect type and parameter to effect string
  *
@@ -204,9 +204,7 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   }
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
-  const paramHex = eff.toString(16).toUpperCase().padStart(2, '0');
-
-  return `${typeChar}${paramHex}`;
+  return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;
 }
 
 /**
@@ -222,7 +220,7 @@ export function formatInstrument(instrument: number, format: 'hex' | 'decimal' =
   }
 
   if (format === 'hex') {
-    return instrument.toString(16).toUpperCase().padStart(2, '0');
+    return HEX_BYTE[instrument] ?? instrument.toString(16).toUpperCase().padStart(2, '0');
   } else {
     return instrument.toString(10).padStart(2, '0');
   }
@@ -381,6 +379,16 @@ export function xmNoteToPeriod(xmNote: number, finetune: number = 0): number {
   return Math.max(28, Math.min(1712, Math.round(period)));
 }
 
+// Pre-computed XM note → Tone.js note string lookup (avoids string alloc + replace per call)
+// Index 0 = null (no note), 1-96 = note strings, 97 = null (note off)
+const TONE_NOTE_LOOKUP: (string | null)[] = new Array(98).fill(null);
+for (let i = 1; i <= 96; i++) {
+  const noteIndex = i - 1;
+  const octave = Math.floor(noteIndex / 12);
+  const semitone = noteIndex % 12;
+  TONE_NOTE_LOOKUP[i] = `${NOTE_NAMES[semitone].replace('-', '')}${octave}`;
+}
+
 /**
  * Convert XM note number to Tone.js note format
  *
@@ -388,27 +396,8 @@ export function xmNoteToPeriod(xmNote: number, finetune: number = 0): number {
  * @returns Tone.js note string ("C4", "D#5", etc.) or null
  */
 export function xmNoteToToneJS(xmNote: number): string | null {
-  if (xmNote === 0) {
-    return null; // No note
-  }
-
-  if (xmNote === 97) {
-    return null; // Note off (handled separately)
-  }
-
-  if (xmNote < 1 || xmNote > 96) {
-    console.warn(`Invalid XM note: ${xmNote}`);
-    return null;
-  }
-
-  // Decode: note = (octave * 12) + semitone + 1
-  const noteIndex = xmNote - 1; // 0-95
-  const octave = Math.floor(noteIndex / 12); // 0-7
-  const semitone = noteIndex % 12; // 0-11
-
-  // Tone.js uses format like "C4", "D#5" (no dash)
-  const noteName = NOTE_NAMES[semitone].replace('-', '');
-  return `${noteName}${octave}`;
+  if (xmNote < 1 || xmNote > 96) return null;
+  return TONE_NOTE_LOOKUP[xmNote];
 }
 
 /**
