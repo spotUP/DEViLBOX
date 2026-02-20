@@ -75,9 +75,10 @@ export class DeckEngine {
   private backwardPauseTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private decayRafId: number | null = null;
 
-  // Pattern scratch state — when a scratch preset button is active, we only modulate
-  // pitch (not tempo), so the tracker doesn't advance faster and trigger extra notes.
-  // On pattern end we seek back to the saved position so the song resumes seamlessly.
+  // Pattern scratch state — when a scratch preset button is active, the tracker's
+  // note processing is suppressed so no new notes trigger during the scratch.
+  // Both pitch AND tempo multipliers are modulated so the pattern view follows
+  // the scratch movement. On pattern end we seek back to the saved position.
   private patternScratchActive = false;
   private patternStartSongPos = 0;
   private patternStartPattPos = 0;
@@ -354,11 +355,12 @@ export class DeckEngine {
   setScratchVelocity(velocity: number): void {
     const v = Math.max(-4, Math.min(4, velocity));
 
-    // Pattern scratch mode: only modulate pitch, don't change tempo.
-    // This prevents the sequencer from advancing faster and triggering extra notes.
+    // Pattern scratch mode: modulate both pitch AND tempo so the pattern view
+    // follows the scratch. Note suppression in the replayer prevents new note triggers.
     if (this.patternScratchActive) {
       const rate = Math.max(0.15, Math.abs(v));
       this.replayer.setPitchMultiplier(rate);
+      this.replayer.setTempoMultiplier(rate);
       return;
     }
 
@@ -531,6 +533,10 @@ export class DeckEngine {
     this.patternStartPattPos = this.replayer.getPattPos();
     this.patternScratchActive = true;
 
+    // Suppress note/effect processing in the replayer so the sequencer advances
+    // (for visual tracking) but no new notes are triggered during the scratch.
+    this.replayer.setSuppressNotes(true);
+
     // Special handling for BPM-synced patterns with custom fader scheduling
     const bpm = this.getEffectiveBPM();
     if (pattern.name === 'Transformer') {
@@ -556,6 +562,8 @@ export class DeckEngine {
   private _endPatternScratch(): void {
     if (!this.patternScratchActive) return;
     this.patternScratchActive = false;
+    // Re-enable note processing before seeking so the replayer resumes normally
+    this.replayer.setSuppressNotes(false);
     // Seek replayer back to where the scratch started so the song resumes seamlessly
     this.replayer.seekTo(this.patternStartSongPos, this.patternStartPattPos);
   }
