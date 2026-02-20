@@ -128,6 +128,9 @@ export class PatternScheduler {
     const replayer = getTrackerReplayer();
     replayer.updateAllPlaybackRates();
 
+    // Update synth detune (cents = semitones * 100)
+    engine.setGlobalDetune((this.pitchShiftSemitones + this.globalPitchOffset) * 100);
+
     // Debounce BPM updates - only update when slider hasn't moved for 200ms
     // This prevents scheduler breakage during active drag
     if (this.bpmUpdateTimer) {
@@ -373,6 +376,9 @@ export class PatternScheduler {
       // Update already-playing samples immediately
       const replayer = getTrackerReplayer();
       replayer.updateAllPlaybackRates();
+
+      // Update synth detune (cents = semitones * 100)
+      engine.setGlobalDetune((this.pitchShiftSemitones + this.globalPitchOffset) * 100);
 
       // Update BPM (rounded to avoid float noise)
       const effectiveBPM = Math.round(this.baseBPM * playbackRate * 100) / 100;

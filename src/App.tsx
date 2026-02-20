@@ -54,6 +54,7 @@ const InstrumentEditorPopout = lazy(() => import('./components/instruments/Instr
 const PianoRoll = lazy(() => import('./components/pianoroll/PianoRoll').then(m => ({ default: m.PianoRoll })));
 const OscilloscopePopout = lazy(() => import('./components/visualization/OscilloscopePopout').then(m => ({ default: m.OscilloscopePopout })));
 const ArrangementView = lazy(() => import('./components/arrangement').then(m => ({ default: m.ArrangementView })));
+const DJView = lazy(() => import('./components/dj/DJView').then(m => ({ default: m.DJView })));
 const FileBrowser = lazy(() => import('@components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser })));
 const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => ({ default: m.AuthModal })));
 
@@ -360,6 +361,14 @@ function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'A') {
         e.preventDefault();
         toggleActiveView();
+        return;
+      }
+
+      // Ctrl+Shift+D: Toggle DJ Mode
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        const uiStore = useUIStore.getState();
+        uiStore.setActiveView(uiStore.activeView === 'dj' ? 'tracker' : 'dj');
         return;
       }
 
@@ -1068,6 +1077,12 @@ function App() {
             {activeView === 'arrangement' && (
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading arrangement...</div>}>
                 <ArrangementView />
+              </Suspense>
+            )}
+
+            {activeView === 'dj' && (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading DJ mode...</div>}>
+                <DJView />
               </Suspense>
             )}
           </div>
