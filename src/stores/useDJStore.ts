@@ -6,6 +6,7 @@
  */
 
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { SeratoCuePoint, SeratoLoop, SeratoBeatMarker } from '@/lib/serato/seratoMetadata';
 
@@ -204,7 +205,7 @@ interface DJActions {
 type DJStore = DJState & DJActions;
 
 export const useDJStore = create<DJStore>()(
-  immer((set) => ({
+  subscribeWithSelector(immer((set) => ({
     // Initial state
     djModeActive: false,
     crossfaderPosition: 0.5,
@@ -365,7 +366,7 @@ export const useDJStore = create<DJStore>()(
       set((state) => {
         state.cueVolume = Math.max(0, Math.min(1.5, volume));
       }),
-  }))
+  })))
 );
 
 // ============================================================================

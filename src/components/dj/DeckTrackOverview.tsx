@@ -1,236 +1,168 @@
 /**
  * DeckTrackOverview - Horizontal track overview bar showing song position
  *
- * Canvas-based rendering for performance. Shows pattern segments with alternating
- * colors, current position marker, cue point indicator, loop region overlay,
- * and near-end warning pulse.
+ * Canvas rendering runs on a background thread via OffscreenCanvas.
+ * Click-to-seek interaction stays on the main thread.
  */
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { useThemeStore } from '@stores';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
+import OverviewWorkerFactory from '@/workers/dj-overview.worker.ts?worker';
 
 interface DeckTrackOverviewProps {
   deckId: 'A' | 'B';
 }
 
-// Colors — resolved from CSS variables at render time via getComputedStyle
-// Fallbacks match the design system defaults for --color-* tokens
-const POSITION_COLOR = '#ef4444';  // accent
-const CUE_COLOR = '#f59e0b';       // warning
-const LOOP_COLOR = 'rgba(6, 182, 212, 0.25)';
-const LOOP_BORDER_COLOR = 'rgba(6, 182, 212, 0.6)';
+interface DeckColors {
+  bg: string;
+  bgSecondary: string;
+  bgTertiary: string;
+  border: string;
+}
+
+interface OverviewState {
+  playbackMode: string;
+  songPos: number;
+  totalPositions: number;
+  cuePoint: number;
+  loopActive: boolean;
+  patternLoopStart: number;
+  patternLoopEnd: number;
+  audioPosition: number;
+  durationMs: number;
+  waveformPeaks: number[] | null;
+}
+
+type OverviewMsg =
+  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; colors: DeckColors } & OverviewState
+  | { type: 'state' } & OverviewState
+  | { type: 'resize'; w: number; h: number; dpr: number }
+  | { type: 'colors'; colors: DeckColors };
 
 const BAR_HEIGHT = 24;
 
+function snapshotColors(el: HTMLElement): DeckColors {
+  const cs = getComputedStyle(el);
+  return {
+    bg:          cs.getPropertyValue('--color-bg').trim()           || '#0b0909',
+    bgSecondary: cs.getPropertyValue('--color-bg-secondary').trim() || '#131010',
+    bgTertiary:  cs.getPropertyValue('--color-bg-tertiary').trim()  || '#1d1818',
+    border:      cs.getPropertyValue('--color-border').trim()       || '#2f2525',
+  };
+}
+
+function snapshotDeck(d: ReturnType<typeof useDJStore.getState>['decks']['A']): OverviewState {
+  return {
+    playbackMode:     d.playbackMode,
+    songPos:          d.songPos,
+    totalPositions:   d.totalPositions,
+    cuePoint:         d.cuePoint,
+    loopActive:       d.loopActive,
+    patternLoopStart: d.patternLoopStart,
+    patternLoopEnd:   d.patternLoopEnd,
+    audioPosition:    d.audioPosition,
+    durationMs:       d.durationMs,
+    // Convert Float32Array → plain number[] for structured clone
+    waveformPeaks:    d.waveformPeaks ? Array.from(d.waveformPeaks) : null,
+  };
+}
+
 export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef    = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const animFrameRef = useRef<number>(0);
-  const pulsePhaseRef = useRef(0);
+  const bridgeRef    = useRef<OffscreenBridge<OverviewMsg, { type: string }> | null>(null);
 
-  // Subscribe to relevant store slices
-  const playbackMode = useDJStore((s) => s.decks[deckId].playbackMode);
-  const songPos = useDJStore((s) => s.decks[deckId].songPos);
-  const totalPositions = useDJStore((s) => s.decks[deckId].totalPositions);
-  const cuePoint = useDJStore((s) => s.decks[deckId].cuePoint);
-  const loopActive = useDJStore((s) => s.decks[deckId].loopActive);
-  const patternLoopStart = useDJStore((s) => s.decks[deckId].patternLoopStart);
-  const patternLoopEnd = useDJStore((s) => s.decks[deckId].patternLoopEnd);
-  const audioPosition = useDJStore((s) => s.decks[deckId].audioPosition);
-  const durationMs = useDJStore((s) => s.decks[deckId].durationMs);
-  const waveformPeaks = useDJStore((s) => s.decks[deckId].waveformPeaks);
-
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const width = container.clientWidth;
-    const height = BAR_HEIGHT;
-
-    // Resize canvas if needed
-    if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-    }
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // Read CSS variables for design system colors
-    const cs = getComputedStyle(container);
-    const bgColor = cs.getPropertyValue('--color-bg').trim() || '#0b0909';
-    const bgSecondary = cs.getPropertyValue('--color-bg-secondary').trim() || '#131010';
-    const bgTertiary = cs.getPropertyValue('--color-bg-tertiary').trim() || '#1d1818';
-    const borderColor = cs.getPropertyValue('--color-border').trim() || '#2f2525';
-
-    // Background
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, width, height);
-
-    if (playbackMode === 'audio') {
-      // ── Audio file mode — draw waveform overview ──
-      const durationSec = durationMs / 1000;
-
-      if (waveformPeaks && waveformPeaks.length > 0 && durationSec > 0) {
-        // Draw waveform peaks
-        const numBins = waveformPeaks.length;
-        const binWidth = width / numBins;
-        const midY = height / 2;
-
-        for (let i = 0; i < numBins; i++) {
-          const amp = waveformPeaks[i];
-          const barH = amp * midY * 0.9;
-          const x = i * binWidth;
-
-          ctx.fillStyle = 'rgba(100, 160, 255, 0.5)';
-          ctx.fillRect(x, midY - barH, Math.max(1, binWidth - 0.5), barH * 2);
-        }
-      } else {
-        // No waveform data — show empty bar
-        ctx.fillStyle = bgSecondary;
-        ctx.fillRect(0, 0, width, height);
-      }
-
-      // Near-end warning pulse (> 85%)
-      const progress = durationSec > 0 ? audioPosition / durationSec : 0;
-      if (progress > 0.85 && durationSec > 0) {
-        pulsePhaseRef.current += 0.08;
-        const alpha = 0.15 + 0.15 * Math.sin(pulsePhaseRef.current);
-        ctx.fillStyle = `rgba(239, 68, 68, ${alpha})`;
-        ctx.fillRect(0, 0, width, height);
-      } else {
-        pulsePhaseRef.current = 0;
-      }
-
-      // Current position marker
-      if (durationSec > 0) {
-        const posX = (audioPosition / durationSec) * width;
-
-        ctx.fillStyle = POSITION_COLOR;
-        ctx.fillRect(posX - 1, 0, 2, height);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(posX, 0, 1, height);
-      }
-    } else {
-      // ── Tracker module mode — draw pattern segments ──
-      const total = Math.max(totalPositions, 1);
-
-      const segmentWidth = width / total;
-      for (let i = 0; i < total; i++) {
-        ctx.fillStyle = i % 2 === 0 ? bgSecondary : bgTertiary;
-        const x = Math.floor(i * segmentWidth);
-        const w = Math.ceil(segmentWidth);
-        ctx.fillRect(x, 0, w, height);
-
-        if (i > 0) {
-          ctx.fillStyle = borderColor;
-          ctx.fillRect(x, 0, 1, height);
-        }
-      }
-
-      // Near-end warning pulse (> 85% of total)
-      const progress = songPos / total;
-      if (progress > 0.85 && total > 0) {
-        pulsePhaseRef.current += 0.08;
-        const alpha = 0.15 + 0.15 * Math.sin(pulsePhaseRef.current);
-        ctx.fillStyle = `rgba(239, 68, 68, ${alpha})`;
-        ctx.fillRect(0, 0, width, height);
-      } else {
-        pulsePhaseRef.current = 0;
-      }
-
-      // Loop region overlay
-      if (loopActive && patternLoopEnd > patternLoopStart) {
-        const loopStartX = (patternLoopStart / total) * width;
-        const loopEndX = (patternLoopEnd / total) * width;
-        const loopWidth = loopEndX - loopStartX;
-
-        ctx.fillStyle = LOOP_COLOR;
-        ctx.fillRect(loopStartX, 0, loopWidth, height);
-
-        ctx.fillStyle = LOOP_BORDER_COLOR;
-        ctx.fillRect(loopStartX, 0, 1, height);
-        ctx.fillRect(loopEndX - 1, 0, 1, height);
-      }
-
-      // Cue point marker (small orange triangle below)
-      if (cuePoint >= 0 && cuePoint < total) {
-        const cueX = ((cuePoint + 0.5) / total) * width;
-        ctx.fillStyle = CUE_COLOR;
-        ctx.beginPath();
-        ctx.moveTo(cueX - 4, height);
-        ctx.lineTo(cueX + 4, height);
-        ctx.lineTo(cueX, height - 6);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // Current position marker (bright vertical line)
-      if (total > 0) {
-        const posX = ((songPos + 0.5) / total) * width;
-
-        ctx.fillStyle = POSITION_COLOR;
-        ctx.fillRect(posX - 1, 0, 2, height);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(posX, 0, 1, height);
-      }
-    }
-
-    // Border
-    ctx.strokeStyle = borderColor;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
-
-    // Request next frame for smooth animation (especially for warning pulse)
-    animFrameRef.current = requestAnimationFrame(draw);
-  }, [playbackMode, songPos, totalPositions, cuePoint, loopActive, patternLoopStart, patternLoopEnd, audioPosition, durationMs, waveformPeaks]);
+  // ── Bridge init ────────────────────────────────────────────────────────────
+  // Canvas created imperatively — prevents StrictMode double-transferControlToOffscreen error.
 
   useEffect(() => {
-    animFrameRef.current = requestAnimationFrame(draw);
-    return () => {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-      }
-    };
-  }, [draw]);
+    const container = containerRef.current;
+    if (!container || !('transferControlToOffscreen' in HTMLCanvasElement.prototype)) return;
 
-  // Click to seek (audio mode)
+    const canvas = document.createElement('canvas');
+    canvas.className = 'block rounded-sm';
+    canvas.style.cssText = `display:block;width:100%;height:${BAR_HEIGHT}px;border-radius:2px;`;
+    container.appendChild(canvas);
+    canvasRef.current = canvas;
+
+    const dpr    = window.devicePixelRatio || 1;
+    const w      = Math.max(1, container.clientWidth);
+    const colors = snapshotColors(container);
+    const deck   = useDJStore.getState().decks[deckId];
+    const offscreen = canvas.transferControlToOffscreen();
+
+    const bridge = new OffscreenBridge<OverviewMsg, { type: string }>(
+      OverviewWorkerFactory, { onReady: () => {} },
+    );
+    bridgeRef.current = bridge;
+
+    bridge.post({
+      type: 'init', canvas: offscreen, dpr,
+      width: w, height: BAR_HEIGHT, colors,
+      ...snapshotDeck(deck),
+    }, [offscreen]);
+
+    // Deck state subscription
+    const unsub = useDJStore.subscribe(
+      (s) => s.decks[deckId],
+      (deck) => bridgeRef.current?.post({ type: 'state', ...snapshotDeck(deck) }),
+    );
+
+    // Theme subscription
+    const unsubTheme = useThemeStore.subscribe(() => {
+      if (containerRef.current) {
+        bridgeRef.current?.post({ type: 'colors', colors: snapshotColors(containerRef.current) });
+      }
+    });
+
+    // Resize observer
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const w = Math.floor(entry.contentRect.width);
+      if (w > 0) {
+        bridgeRef.current?.post({ type: 'resize', w, h: BAR_HEIGHT, dpr: window.devicePixelRatio || 1 });
+      }
+    });
+    observer.observe(container);
+
+    return () => {
+      unsub();
+      unsubTheme();
+      observer.disconnect();
+      bridge.dispose();
+      bridgeRef.current = null;
+      canvas.remove();
+      canvasRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deckId]);
+
+  // ── Click to seek ──────────────────────────────────────────────────────────
+
   const handleClick = useCallback((e: React.MouseEvent) => {
     const container = containerRef.current;
     if (!container) return;
-    const rect = container.getBoundingClientRect();
+    const rect     = container.getBoundingClientRect();
     const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
 
     try {
-      const engine = getDJEngine();
-      const deck = engine.getDeck(deckId);
+      const deck = getDJEngine().getDeck(deckId);
       if (deck.playbackMode === 'audio') {
-        const seekSec = fraction * (durationMs / 1000);
+        const seekSec = fraction * (useDJStore.getState().decks[deckId].durationMs / 1000);
         deck.audioPlayer.seek(seekSec);
-        useDJStore.getState().setDeckState(deckId, {
-          audioPosition: seekSec,
-          elapsedMs: seekSec * 1000,
-        });
+        useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
       } else {
-        // Tracker mode: jump to song position
-        const total = Math.max(totalPositions, 1);
+        const total = Math.max(useDJStore.getState().decks[deckId].totalPositions, 1);
         const targetPos = Math.floor(fraction * total);
         deck.cue(targetPos, 0);
         useDJStore.getState().setDeckPosition(deckId, targetPos, 0);
       }
-    } catch {
-      // Engine not ready
-    }
-  }, [deckId, playbackMode, durationMs, totalPositions]);
+    } catch { /* Engine not ready */ }
+  }, [deckId]);
 
   return (
     <div
@@ -238,12 +170,6 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
       className="w-full cursor-pointer"
       style={{ height: BAR_HEIGHT }}
       onClick={handleClick}
-    >
-      <canvas
-        ref={canvasRef}
-        className="block rounded-sm"
-        style={{ width: '100%', height: BAR_HEIGHT }}
-      />
-    </div>
+    />
   );
 };

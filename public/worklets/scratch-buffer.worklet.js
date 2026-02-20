@@ -4,8 +4,14 @@
  * Two AudioWorklet processors sharing module-level ring buffers (one per deck).
  * Deck A → bufferId 0, Deck B → bufferId 1.
  *
- * ScratchCaptureProcessor: taps the audio chain and writes to the ring buffer
- * ScratchReverseProcessor: reads the ring buffer backward at a given rate
+ * ScratchCaptureProcessor: taps the audio chain and writes to the ring buffer.
+ *   Supports freeze/unfreeze — when frozen, writing stops and the buffer becomes
+ *   a fixed "record" that the playback processor can scrub through freely.
+ *
+ * ScratchPlaybackProcessor: reads the ring buffer at a signed rate with LINEAR
+ *   INTERPOLATION (ported from SoundRenderer.cpp reference implementation).
+ *   Rate is controlled via both AudioParam (sample-accurate) and postMessage
+ *   (fallback). AudioParam takes priority when non-default.
  *
  * Ring buffer size: 45 s × sampleRate × 2 ch interleaved (L/R)
  */
@@ -15,6 +21,7 @@ const BUFFER_SECONDS = 45;
 // Module-level shared state (one AudioWorkletGlobalScope per context)
 const rings     = [];      // Float32Array per bufferId, lazy-initialized
 const writePoss = [0, 0];  // Current write position per bufferId
+const frozen    = [false, false]; // Per-buffer freeze state
 
 function getOrCreateRing(bufferId, sr) {
   if (!rings[bufferId]) {
@@ -37,6 +44,15 @@ class ScratchCaptureProcessor extends AudioWorkletProcessor {
     // Report write position to main thread every ~50ms
     this._reportEvery       = Math.round(sampleRate * 0.05);
     this._framesSinceReport = 0;
+
+    this.port.onmessage = (e) => {
+      const d = e.data;
+      if (d.type === 'freeze') {
+        frozen[this.bufferId] = true;
+      } else if (d.type === 'unfreeze') {
+        frozen[this.bufferId] = false;
+      }
+    };
   }
 
   process(inputs, outputs) {
@@ -45,25 +61,32 @@ class ScratchCaptureProcessor extends AudioWorkletProcessor {
     const frames = (out[0] && out[0].length) ? out[0].length : 128;
     const ring   = this.ring;
     const bf     = this.bufferFrames;
+    const isFrozen = frozen[this.bufferId];
     let   wp     = writePoss[this.bufferId];
 
     for (let i = 0; i < frames; i++) {
       const L = (inp[0] && inp[0][i] !== undefined) ? inp[0][i] : 0;
       const R = (inp[1] && inp[1][i] !== undefined) ? inp[1][i] : 0;
-      ring[wp * 2]     = L;
-      ring[wp * 2 + 1] = R;
-      // Pass through to output (output not connected in the plan, but harmless)
+
+      if (!isFrozen) {
+        ring[wp * 2]     = L;
+        ring[wp * 2 + 1] = R;
+        wp = (wp + 1) % bf;
+      }
+
+      // Pass through to output (output not connected, but harmless)
       if (out[0]) out[0][i] = L;
       if (out[1]) out[1][i] = R;
-      wp = (wp + 1) % bf;
     }
 
-    writePoss[this.bufferId] = wp;
+    if (!isFrozen) {
+      writePoss[this.bufferId] = wp;
+    }
 
     this._framesSinceReport += frames;
     if (this._framesSinceReport >= this._reportEvery) {
       this._framesSinceReport = 0;
-      this.port.postMessage({ type: 'writePos', pos: wp });
+      this.port.postMessage({ type: 'writePos', pos: writePoss[this.bufferId] });
     }
 
     return true;
@@ -71,9 +94,32 @@ class ScratchCaptureProcessor extends AudioWorkletProcessor {
 }
 
 // ---------------------------------------------------------------------------
-// ScratchReverseProcessor — reads ring buffer backward
+// ScratchPlaybackProcessor — reads ring buffer at a signed rate
+//
+// LINEAR INTERPOLATION ported from DJ-Scratch-Sample SoundRenderer.cpp:
+//   pos1 = floor(position), pos2 = pos1+1
+//   output = sample[pos1] + (sample[pos2] - sample[pos1]) * frac
+//
+// DUAL RATE CONTROL:
+//   - AudioParam 'rate' (a-rate): sample-accurate, zero latency, smooth ramps.
+//     Main thread sets via linearRampToValueAtTime. (Inspired by reference's
+//     InterlockedExchange for lock-free atomic speed updates.)
+//   - postMessage 'setRate': fallback for compatibility / cached worklets.
+//   - process() uses AudioParam when available & non-zero, else message rate.
 // ---------------------------------------------------------------------------
 class ScratchReverseProcessor extends AudioWorkletProcessor {
+  static get parameterDescriptors() {
+    return [
+      {
+        name: 'rate',
+        defaultValue: 0,
+        minValue: -8,
+        maxValue: 8,
+        automationRate: 'a-rate',
+      },
+    ];
+  }
+
   constructor(options) {
     super();
     this.bufferId     = (options.processorOptions && options.processorOptions.bufferId) ?? 0;
@@ -81,9 +127,9 @@ class ScratchReverseProcessor extends AudioWorkletProcessor {
     this.ring         = getOrCreateRing(this.bufferId, sampleRate);
 
     this.active    = false;
-    this.readPosF  = 0;   // float — sub-frame precision
-    this.rate      = 1.0; // always positive; direction is always backward
-    this.startPos  = 0;   // writePos snapshot when backward started
+    this.readPosF  = 0;   // float — sub-frame precision for interpolation
+    this.rate      = 0;   // message-based rate (fallback when AudioParam unavailable)
+    this.startPos  = 0;   // position snapshot when playback started
 
     // Report read position every ~100ms
     this._reportEvery       = Math.round(sampleRate * 0.1);
@@ -98,17 +144,17 @@ class ScratchReverseProcessor extends AudioWorkletProcessor {
           this.bufferFrames = Math.round(sampleRate * BUFFER_SECONDS);
           this.startPos     = d.startPos;
           this.readPosF     = d.startPos;
-          this.rate         = Math.max(0.02, d.rate);
+          this.rate         = d.rate ?? this.rate;
           this.active       = true;
           break;
 
         case 'setRate':
-          this.rate = Math.max(0.02, d.rate);
+          this.rate = d.rate;
           break;
 
         case 'stop': {
           this.active = false;
-          const bf        = this.bufferFrames;
+          const bf = this.bufferFrames;
           const framesBack = Math.round(
             ((this.startPos - this.readPosF) + bf) % bf
           );
@@ -119,7 +165,7 @@ class ScratchReverseProcessor extends AudioWorkletProcessor {
     };
   }
 
-  process(_inputs, outputs) {
+  process(_inputs, outputs, parameters) {
     const out    = outputs[0];
     const frames = (out[0] && out[0].length) ? out[0].length : 128;
 
@@ -132,12 +178,48 @@ class ScratchReverseProcessor extends AudioWorkletProcessor {
     const ring = this.ring;
     const bf   = this.bufferFrames;
 
+    // Determine rate source: AudioParam (sample-accurate) or message-based fallback.
+    // AudioParam 'rate' defaults to 0; if it's been driven to a non-zero value
+    // by the main thread, use it. Otherwise fall back to the message-based rate.
+    const rateArr = parameters.rate;
+    const hasAudioParam = rateArr && rateArr.length > 0;
+    // Check if AudioParam is being actively driven (non-zero or multi-sample)
+    const audioParamActive = hasAudioParam && (rateArr.length > 1 || rateArr[0] !== 0);
+    const rateConst = hasAudioParam && rateArr.length === 1;
+
     for (let i = 0; i < frames; i++) {
-      this.readPosF -= this.rate;
-      if (this.readPosF < 0) this.readPosF += bf;
-      const idx = Math.floor(this.readPosF);
-      if (out[0]) out[0][i] = ring[idx * 2];
-      if (out[1]) out[1][i] = ring[idx * 2 + 1];
+      // Get rate: prefer AudioParam, fall back to message-based this.rate
+      let r;
+      if (audioParamActive) {
+        r = rateConst ? rateArr[0] : rateArr[i];
+      } else {
+        r = this.rate;
+      }
+
+      // Advance read position by signed rate
+      this.readPosF += r;
+
+      // Wrap around the circular buffer (while loops for extreme rates)
+      while (this.readPosF < 0) this.readPosF += bf;
+      while (this.readPosF >= bf) this.readPosF -= bf;
+
+      // ── LINEAR INTERPOLATION (from SoundRenderer.cpp DoRenderThread) ──
+      const pos1 = Math.floor(this.readPosF);
+      const pos2 = (pos1 + 1) % bf;
+      const frac = this.readPosF - pos1;
+
+      // Interpolate left channel
+      const L1 = ring[pos1 * 2];
+      const L2 = ring[pos2 * 2];
+      const outL = L1 + (L2 - L1) * frac;
+
+      // Interpolate right channel
+      const R1 = ring[pos1 * 2 + 1];
+      const R2 = ring[pos2 * 2 + 1];
+      const outR = R1 + (R2 - R1) * frac;
+
+      if (out[0]) out[0][i] = outL;
+      if (out[1]) out[1][i] = outR;
     }
 
     this._framesSinceReport += frames;

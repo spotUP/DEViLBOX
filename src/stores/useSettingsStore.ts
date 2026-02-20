@@ -24,6 +24,9 @@ interface SettingsStore {
   trackerVisualBg: boolean;  // Enable WebGL visual background behind tracker pattern
   trackerVisualMode: number; // Current visualizer mode index (0-5)
 
+  // Render Mode
+  renderMode: 'dom' | 'webgl';  // UI rendering: 'dom' = React/Tailwind, 'webgl' = PixiJS
+
   // Actions
   setAmigaLimits: (enabled: boolean) => void;
   setLinearInterpolation: (enabled: boolean) => void;
@@ -34,6 +37,7 @@ interface SettingsStore {
   setMidiPolyphonic: (enabled: boolean) => void;
   setTrackerVisualBg: (enabled: boolean) => void;
   setTrackerVisualMode: (mode: number) => void;
+  setRenderMode: (mode: 'dom' | 'webgl') => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -49,6 +53,7 @@ export const useSettingsStore = create<SettingsStore>()(
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
       trackerVisualBg: false,  // Default: off
       trackerVisualMode: 0,    // Default: spectrum bars
+      renderMode: 'dom' as const,  // Default: DOM rendering
 
     // Actions
     setAmigaLimits: (amigaLimits) =>
@@ -95,6 +100,11 @@ export const useSettingsStore = create<SettingsStore>()(
         set((state) => {
           state.trackerVisualMode = trackerVisualMode;
         }),
+
+      setRenderMode: (renderMode) =>
+        set((state) => {
+          state.renderMode = renderMode;
+        }),
     })),
     {
       name: 'devilbox-settings',
@@ -108,6 +118,7 @@ export const useSettingsStore = create<SettingsStore>()(
         midiPolyphonic: state.midiPolyphonic,
         trackerVisualBg: state.trackerVisualBg,
         trackerVisualMode: state.trackerVisualMode,
+        renderMode: state.renderMode,
       }),
     }
   )

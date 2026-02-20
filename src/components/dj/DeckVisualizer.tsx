@@ -13,10 +13,13 @@ import { DeckPatternDisplay } from './DeckPatternDisplay';
 import {
   VISUALIZER_MODES,
   MODE_LABELS,
+  AM_PRESET_MAP,
+  isAudioMotionMode,
   createVisualizerState,
-  type VisualizerMode,
+  type WebGLVisualizerMode,
   type AudioData,
 } from './visualizers/types';
+import { AudioMotionVisualizer } from '@/components/visualization/AudioMotionVisualizer';
 import {
   createRendererCache,
   destroyRendererCache,
@@ -45,6 +48,7 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
 
   const mode = VISUALIZER_MODES[modeIndex];
   const isPatternMode = mode === 'pattern';
+  const isAMMode = isAudioMotionMode(mode);
 
   // Reset to pattern mode when a new song is dropped (parent bumps resetKey)
   const prevResetKeyRef = useRef(resetKey);
@@ -87,9 +91,9 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
   }, []);
 
-  // Initialize WebGL when entering a visualizer mode
+  // Initialize WebGL when entering a WebGL visualizer mode
   useEffect(() => {
-    if (isPatternMode) return;
+    if (isPatternMode || isAMMode) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -145,7 +149,7 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
         const time = performance.now() / 1000 - startTimeRef.current;
 
         // Dispatch to renderer
-        const renderer = RENDERERS[mode as Exclude<VisualizerMode, 'pattern'>];
+        const renderer = RENDERERS[mode as WebGLVisualizerMode];
         if (renderer) {
           renderer(cache, audio, state, time, drawW, drawH);
         }
@@ -160,7 +164,7 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
       running = false;
       cancelAnimationFrame(rafRef.current);
     };
-  }, [deckId, mode, isPatternMode]);
+  }, [deckId, mode, isPatternMode, isAMMode]);
 
   // Cleanup WebGL on unmount
   useEffect(() => {
@@ -187,11 +191,21 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
       {/* Pattern display (mode 0) */}
       {isPatternMode && <DeckPatternDisplay deckId={deckId} />}
 
-      {/* WebGL canvas (all other modes) */}
+      {/* audioMotion analyzer overlay */}
+      {isAMMode && (
+        <div className="absolute inset-0 w-full h-full">
+          <AudioMotionVisualizer
+            preset={AM_PRESET_MAP[mode] ?? 'ledBars'}
+            audioSource={deckId === 'A' ? 'deckA' : 'deckB'}
+          />
+        </div>
+      )}
+
+      {/* WebGL canvas (WebGL modes only) */}
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
-        style={{ display: isPatternMode ? 'none' : 'block' }}
+        style={{ display: (isPatternMode || isAMMode) ? 'none' : 'block' }}
       />
 
       {/* Pattern overlay on top of visualizer */}

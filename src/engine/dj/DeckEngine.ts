@@ -355,12 +355,14 @@ export class DeckEngine {
   setScratchVelocity(velocity: number): void {
     const v = Math.max(-4, Math.min(4, velocity));
 
-    // Pattern scratch mode: modulate both pitch AND tempo so the pattern view
-    // follows the scratch. Note suppression in the replayer prevents new note triggers.
+    // Pattern scratch mode: ALL audio comes from the ring buffer (the "vinyl record").
+    // The signed velocity is the playback rate — positive = forward, negative = backward.
+    // The tracker's direct output is muted; we only update tempoMultiplier for visual tracking.
     if (this.patternScratchActive) {
-      const rate = Math.max(0.15, Math.abs(v));
-      this.replayer.setPitchMultiplier(rate);
-      this.replayer.setTempoMultiplier(rate);
+      // Update ring buffer playback rate (signed: the worklet handles direction)
+      this.scratchBuffer?.setScratchRate(v);
+      // Update sequencer speed for visual pattern tracking only (no audio effect)
+      this.replayer.setTempoMultiplier(Math.max(0.05, Math.abs(v)));
       return;
     }
 
@@ -527,15 +529,20 @@ export class DeckEngine {
     }
 
     // Save replayer position so we can return here when the scratch ends.
-    // This way the song continues from where it was, not from wherever the
-    // sequencer advanced to during the scratch.
     this.patternStartSongPos = this.replayer.getSongPos();
     this.patternStartPattPos = this.replayer.getPattPos();
     this.patternScratchActive = true;
 
-    // Suppress note/effect processing in the replayer so the sequencer advances
-    // (for visual tracking) but no new notes are triggered during the scratch.
+    // Suppress note/effect processing so the sequencer advances
+    // (for visual tracking) but no new notes trigger.
     this.replayer.setSuppressNotes(true);
+
+    // Mute the tracker's direct audio and start ring buffer playback.
+    // The ring buffer IS the vinyl record — all scratch audio comes from it.
+    if (this.scratchBufferReady && this.scratchBuffer) {
+      this.deckGain.gain.rampTo(0, 0.005);  // mute tracker
+      this.scratchBuffer.startScratchPlayback(1.0);  // start at normal speed
+    }
 
     // Special handling for BPM-synced patterns with custom fader scheduling
     const bpm = this.getEffectiveBPM();
@@ -558,10 +565,17 @@ export class DeckEngine {
     }
   }
 
-  /** Clean up pattern scratch state: seek back to the saved position and restore pitch. */
+  /** Clean up pattern scratch state: stop ring buffer, unmute tracker, seek back. */
   private _endPatternScratch(): void {
     if (!this.patternScratchActive) return;
     this.patternScratchActive = false;
+
+    // Stop ring buffer playback and unmute the tracker's direct output
+    if (this.scratchBufferReady && this.scratchBuffer) {
+      this.scratchBuffer.stopScratchPlayback();
+      this.deckGain.gain.rampTo(1, 0.005);
+    }
+
     // Re-enable note processing before seeking so the replayer resumes normally
     this.replayer.setSuppressNotes(false);
     // Seek replayer back to where the scratch started so the song resumes seamlessly
