@@ -326,7 +326,7 @@ export class TrackerReplayer {
 
   // Per-channel meter staging + reusable callbacks (avoids closure allocation per note)
   private meterStaging: Float64Array = new Float64Array(64);
-  private meterCallbacks: ((time: number) => void)[] | null = null;
+  private meterCallbacks: (() => void)[] | null = null;
 
   // Callbacks
   public onRowChange: ((row: number, pattern: number, position: number) => void) | null = null;

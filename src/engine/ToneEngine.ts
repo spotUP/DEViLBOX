@@ -1068,10 +1068,15 @@ export class ToneEngine {
   /**
    * Generate composite key for per-channel instrument instances
    */
-  private getInstrumentKey(instrumentId: number, channelIndex?: number): number {
+  public getInstrumentKey(instrumentId: number, channelIndex?: number): number {
     // Numeric composite key: instrumentId in upper 16 bits, channelIndex in lower 16.
     // Avoids string allocation on every call (~512/sec).
     return (instrumentId << 16) | ((channelIndex ?? -1) & 0xFFFF);
+  }
+
+  /** Extract instrumentId from a composite key (upper 16 bits, unsigned). */
+  private instrumentIdFromKey(key: number): number {
+    return key >>> 16;
   }
 
   private getInstrumentOutputDestination(instrumentId: number, isNativeSynth: boolean): Tone.ToneAudioNode {
@@ -3398,8 +3403,12 @@ export class ToneEngine {
    * Chip engines share a single outputGain that isn't the individual synth's .output,
    * so releaseAll()'s per-instrument GainNode ramp doesn't affect them.
    */
+  // Sentinel keys for chip engine timeout entries in releaseRestoreTimeouts
+  private static readonly CHIP_ENGINE_KEY = -1;
+  private static readonly DISPATCH_ENGINE_KEY = -2;
+
   private muteChipEngineOutputs(now: number): void {
-    const muteAndRestore = (engineKey: string, getGain: () => GainNode | null) => {
+    const muteAndRestore = (engineKey: number, getGain: () => GainNode | null) => {
       const gain = getGain();
       if (!gain) return;
       const prevTimeout = this.releaseRestoreTimeouts.get(engineKey);
@@ -3418,17 +3427,17 @@ export class ToneEngine {
     };
 
     if (this.nativeEngineRouting.has('FurnaceChipEngine')) {
-      muteAndRestore('__FurnaceChipEngine__', () => FurnaceChipEngine.getInstance().getNativeOutput());
+      muteAndRestore(ToneEngine.CHIP_ENGINE_KEY, () => FurnaceChipEngine.getInstance().getNativeOutput());
     }
     if (this.nativeEngineRouting.has('FurnaceDispatchEngine')) {
-      muteAndRestore('__FurnaceDispatchEngine__', () => FurnaceDispatchEngine.getInstance().getOrCreateSharedGain());
+      muteAndRestore(ToneEngine.DISPATCH_ENGINE_KEY, () => FurnaceDispatchEngine.getInstance().getOrCreateSharedGain());
     }
   }
 
   /**
    * Internal helper to dispose an instrument by its internal Map key
    */
-  private disposeInstrumentByKey(key: string): void {
+  private disposeInstrumentByKey(key: number): void {
     const instrument = this.instruments.get(key);
     if (instrument) {
       // Remove from maps IMMEDIATELY so future triggers don't find it
@@ -3464,11 +3473,9 @@ export class ToneEngine {
    * Dispose instrument by ID
    */
   public disposeInstrument(instrumentId: number): void {
-    const keysToRemove: string[] = [];
+    const keysToRemove: number[] = [];
     this.instruments.forEach((_instrument, key) => {
-      // Split key (format: "id-channel") and check exact ID match
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId)) {
+      if (this.instrumentIdFromKey(key) === instrumentId) {
         keysToRemove.push(key);
       }
     });
@@ -3661,8 +3668,7 @@ export class ToneEngine {
   public updateWAMParameters(instrumentId: number, wamConfig: NonNullable<InstrumentConfig['wam']>): void {
     const synths: WAMSynth[] = [];
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId) && instrument instanceof WAMSynth) {
+      if (this.instrumentIdFromKey(key) === instrumentId && instrument instanceof WAMSynth) {
         synths.push(instrument);
       }
     });
@@ -3694,8 +3700,7 @@ export class ToneEngine {
     // Find all DB303Synth instances for this instrument
     const synths: DB303Synth[] = [];
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId) && instrument instanceof DB303Synth) {
+      if (this.instrumentIdFromKey(key) === instrumentId && instrument instanceof DB303Synth) {
         synths.push(instrument);
       }
     });
@@ -3724,8 +3729,7 @@ export class ToneEngine {
     // Find all FurnaceDispatchSynth instances for this instrument
     const synths: Array<{ uploadInstrumentData: (data: Uint8Array) => void }> = [];
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId) && (instrument as unknown as { uploadInstrumentData?: unknown }).uploadInstrumentData) {
+      if (this.instrumentIdFromKey(key) === instrumentId && (instrument as unknown as { uploadInstrumentData?: unknown }).uploadInstrumentData) {
         synths.push(instrument as unknown as { uploadInstrumentData: (data: Uint8Array) => void });
       }
     });
@@ -3757,8 +3761,7 @@ export class ToneEngine {
   public updateHarmonicSynthParameters(instrumentId: number, harmonicConfig: NonNullable<InstrumentConfig['harmonicSynth']>): void {
     const synths: Array<{ applyConfig: (config: typeof harmonicConfig) => void }> = [];
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId) && (instrument as unknown as { applyConfig?: unknown }).applyConfig) {
+      if (this.instrumentIdFromKey(key) === instrumentId && (instrument as unknown as { applyConfig?: unknown }).applyConfig) {
         synths.push(instrument as unknown as { applyConfig: (config: typeof harmonicConfig) => void });
       }
     });
@@ -3942,8 +3945,7 @@ export class ToneEngine {
   public updateDubSirenParameters(instrumentId: number, config: NonNullable<InstrumentConfig['dubSiren']>): void {
     let found = false;
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId)) {
+      if (this.instrumentIdFromKey(key) === instrumentId) {
         // Use feature detection for more reliable check across HMR/bundling
         if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
           (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
@@ -3961,8 +3963,7 @@ export class ToneEngine {
    */
   public updateSpaceLaserParameters(instrumentId: number, config: NonNullable<InstrumentConfig['spaceLaser']>): void {
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId)) {
+      if (this.instrumentIdFromKey(key) === instrumentId) {
         if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
           (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
         }
@@ -3975,8 +3976,7 @@ export class ToneEngine {
    */
   public updateV2Parameters(instrumentId: number, config: NonNullable<InstrumentConfig['v2']>): void {
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId)) {
+      if (this.instrumentIdFromKey(key) === instrumentId) {
         if (instrument && (instrument as unknown as { name?: string }).name === 'V2Synth') {
           const v2 = instrument as unknown as { setParameter: (index: number, value: number) => void };
           
@@ -4062,8 +4062,7 @@ export class ToneEngine {
    */
   public updateSynareParameters(instrumentId: number, config: NonNullable<InstrumentConfig['synare']>): void {
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId)) {
+      if (this.instrumentIdFromKey(key) === instrumentId) {
         if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
           (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
         }
@@ -4077,8 +4076,7 @@ export class ToneEngine {
   public updateFurnaceParameters(instrumentId: number, config: NonNullable<InstrumentConfig['furnace']>): void {
     void config; // Reserved for future direct parameter update support
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId)) {
+      if (this.instrumentIdFromKey(key) === instrumentId) {
         if (instrument && typeof (instrument as unknown as { updateParameters?: unknown }).updateParameters === 'function') {
           (instrument as unknown as { updateParameters: () => void }).updateParameters();
         }
@@ -4097,15 +4095,14 @@ export class ToneEngine {
    */
   public applyFurnaceEffect(instrumentId: number, effect: number, param: number, channel: number = 0): boolean {
     // Get the synth type for this instrument
-    const synthType = this.instrumentSynthTypes.get(String(instrumentId));
+    const synthType = this.instrumentSynthTypes.get(this.getInstrumentKey(instrumentId, -1));
     if (!synthType || !synthType.startsWith('Furnace')) {
       return false;
     }
 
     // Find the synth instance(s) for this instrument
     for (const [key, instrument] of this.instruments) {
-      const [idPart] = key.split('-');
-      if (idPart !== String(instrumentId)) continue;
+      if (this.instrumentIdFromKey(key) !== instrumentId) continue;
 
       // Handle FurnaceDispatchSynth (has full effect routing via FurnaceEffectRouter)
       if (instrument instanceof FurnaceDispatchSynth) {
@@ -4133,14 +4130,13 @@ export class ToneEngine {
    * @returns true if effect was applied
    */
   public applyFurnaceExtendedEffect(instrumentId: number, x: number, y: number, channel: number = 0): boolean {
-    const synthType = this.instrumentSynthTypes.get(String(instrumentId));
+    const synthType = this.instrumentSynthTypes.get(this.getInstrumentKey(instrumentId, -1));
     if (!synthType || !synthType.startsWith('Furnace')) {
       return false;
     }
 
     for (const [key, instrument] of this.instruments) {
-      const [idPart] = key.split('-');
-      if (idPart !== String(instrumentId)) continue;
+      if (this.instrumentIdFromKey(key) !== instrumentId) continue;
 
       if (instrument instanceof FurnaceDispatchSynth) {
         instrument.applyExtendedEffect(x, y, channel);
@@ -4336,8 +4332,7 @@ export class ToneEngine {
    */
   public updateDexedParameters(instrumentId: number, config: NonNullable<InstrumentConfig['dexed']>): void {
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId)) {
+      if (this.instrumentIdFromKey(key) === instrumentId) {
         if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
           (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
         }
@@ -4350,8 +4345,7 @@ export class ToneEngine {
    */
   public updateOBXdParameters(instrumentId: number, config: NonNullable<InstrumentConfig['obxd']>): void {
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId)) {
+      if (this.instrumentIdFromKey(key) === instrumentId) {
         if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
           (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
         }
@@ -4364,8 +4358,7 @@ export class ToneEngine {
    */
   public updateComplexSynthParameters(instrumentId: number, config: unknown): void {
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId)) {
+      if (this.instrumentIdFromKey(key) === instrumentId) {
         if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
           (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
         }
@@ -4380,8 +4373,7 @@ export class ToneEngine {
   public updateToneJsSynthInPlace(instrumentId: number, config: InstrumentConfig): void {
     const R = ToneEngine.EFFECT_RAMP_TIME;
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart !== String(instrumentId)) return;
+      if (this.instrumentIdFromKey(key) !== instrumentId) return;
       const inst = instrument as any;
 
       // Update oscillator type (discrete, no ramp needed)
@@ -4450,8 +4442,7 @@ export class ToneEngine {
    */
   public updateBuzzmachineParameters(instrumentId: number, buzzmachine: NonNullable<InstrumentConfig['buzzmachine']>): void {
     this.instruments.forEach((instrument, key) => {
-      const [idPart] = key.split('-');
-      if (idPart === String(instrumentId)) {
+      if (this.instrumentIdFromKey(key) === instrumentId) {
         const inst = instrument as unknown as { setParameter?: (index: number, value: number) => void };
         if (instrument && typeof inst.setParameter === 'function') {
           Object.entries(buzzmachine.parameters).forEach(([index, value]) => {
@@ -4806,8 +4797,7 @@ export class ToneEngine {
       connectInstrumentTo(output);
 
       // Determine destination: use instrument analyser if active, otherwise master input
-      const [idPart] = String(key).split('-');
-      const instrumentId = parseInt(idPart);
+      const instrumentId = key >>> 16;
       const activeAnalyser = this.instrumentAnalysers.get(instrumentId);
 
       if (activeAnalyser) {
@@ -4848,14 +4838,13 @@ export class ToneEngine {
     }
 
     // Determine destination: use instrument analyser if active, otherwise master input
-    const [idPart] = String(key).split('-');
-    const instrumentId = parseInt(idPart);
-    const activeAnalyser = this.instrumentAnalysers.get(instrumentId);
+    const instrumentId2 = key >>> 16;
+    const activeAnalyser = this.instrumentAnalysers.get(instrumentId2);
 
     if (activeAnalyser) {
       output.connect(activeAnalyser.input);
     } else {
-      output.connect(this.getInstrumentOutputDestination(instrumentId, isNativeSynth));
+      output.connect(this.getInstrumentOutputDestination(instrumentId2, isNativeSynth));
     }
 
     this.instrumentEffectChains.set(key, { effects: effectNodes as Tone.ToneAudioNode[], output, bridge });
@@ -6367,7 +6356,7 @@ export class ToneEngine {
     // For PolySynths, we need to track which ones need recreation
     // Store configs so we can recreate them with new polyphony settings
     const polySynthsToRecreate: Array<{
-      key: string;
+      key: number;
       instrumentId: number;
       channelIndex: number | undefined;
       config: { synthType: string };
@@ -6377,9 +6366,9 @@ export class ToneEngine {
       // Check if it's a PolySynth (has maxPolyphony property)
       if (instrument && typeof instrument === 'object' && 'maxPolyphony' in instrument) {
         // Parse key to get instrumentId and channelIndex
-        const parts = key.split('-');
-        const instrumentId = parseInt(parts[0], 10);
-        const channelIndex = parts[1] === '-1' ? undefined : parseInt(parts[1], 10);
+        const instrumentId = key >>> 16;
+        const rawChannel = key & 0xFFFF;
+        const channelIndex = rawChannel === 0xFFFF ? undefined : rawChannel;
 
         // Get synth type from instrumentSynthTypes map
         const synthType = this.instrumentSynthTypes.get(key);

@@ -3,98 +3,133 @@
  *
  * Manages the BLEP AudioWorklet for band-limited synthesis.
  * Integrates with ToneEngine to provide global BLEP processing.
+ *
+ * Bridges Tone.js and native Web Audio by using getNativeAudioNode()
+ * to unwrap Tone.js wrappers and connect the native AudioWorkletNode.
  */
 
 import * as Tone from 'tone';
+import { getNativeAudioNode, getNativeContext } from '@/utils/audio-context';
 
 export class BlepManager {
   private workletNode: AudioWorkletNode | null = null;
   private enabled = false;
   private initialized = false;
 
+  // Track native nodes for clean disconnection
+  private connectedNativeSource: AudioNode | null = null;
+  private connectedNativeDest: AudioNode | null = null;
+
   /**
    * Initialize BLEP processing
    */
   async init(): Promise<void> {
     if (this.initialized) {
-      console.log('BLEP already initialized');
       return;
     }
 
     try {
-      const audioContext = Tone.getContext().rawContext as AudioContext;
+      const audioContext = getNativeContext(Tone.getContext());
 
       // Load the worklet module
       await audioContext.audioWorklet.addModule('/blep/blep-processor.worklet.js');
 
-      // Create the worklet node
+      // Create the worklet node on the native context
       this.workletNode = new AudioWorkletNode(audioContext, 'blep-processor', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
-        channelCount: 2, // Stereo
+        channelCount: 2,
         channelCountMode: 'explicit',
         channelInterpretation: 'speakers'
       });
 
       this.initialized = true;
-      console.log('BLEP Manager initialized');
+      console.log('[BLEP] Initialized');
     } catch (error) {
-      console.error('Failed to initialize BLEP:', error);
+      console.error('[BLEP] Init failed:', error);
       throw error;
     }
   }
 
   /**
-   * Connect BLEP processing to audio chain
-   * Insert BLEP between source and destination
+   * Connect BLEP processing between source and destination.
    *
-   * Note: This is complex because we're mixing Tone.js and native AudioNodes.
-   * For now, BLEP is disabled by default to avoid connection issues.
-   * A future implementation could use Tone.js's native node wrapping.
+   * When enabled: unwraps Tone.js nodes to native AudioNodes and routes
+   *   nativeSource → workletNode → nativeDestination
+   * When disabled: connects via Tone.js directly (source → destination)
    */
   connect(source: Tone.ToneAudioNode, destination: Tone.ToneAudioNode): void {
-    // For now, always bypass BLEP to avoid connection errors
-    // TODO: Properly wrap AudioWorkletNode in Tone.js ToneAudioNode
-    try {
-      source.connect(destination);
-    } catch (e) {
-      // Ignore if already connected
-    }
+    // Disconnect any previous native BLEP routing
+    this.disconnectNative();
 
-    console.warn('BLEP audio routing disabled - requires Tone.js native node wrapping');
-    return;
-
-    /* Disabled until proper Tone.js integration
-    if (!this.workletNode || !this.initialized) {
-      console.warn('BLEP not initialized, bypassing');
+    if (!this.workletNode || !this.initialized || !this.enabled) {
+      // Bypass: direct Tone.js connection
       try {
         source.connect(destination);
-      } catch (e) {
+      } catch {
         // Ignore if already connected
       }
       return;
     }
 
-    if (this.enabled) {
-      // Route through BLEP: source -> worklet -> destination
-      try {
-        source.disconnect(destination);
-      } catch (e) {
-        // Ignore if not connected
-      }
+    // Unwrap Tone.js nodes to get real native AudioNodes
+    const nativeSource = getNativeAudioNode(source);
+    const nativeDest = getNativeAudioNode(destination);
 
-      // This needs proper Tone.js node wrapping
-      source.connect(this.workletNode as any);
-      this.workletNode.connect(destination as any);
-    } else {
-      // Bypass BLEP: source -> destination directly
+    if (!nativeSource || !nativeDest) {
+      console.warn('[BLEP] Could not unwrap native audio nodes, bypassing');
       try {
         source.connect(destination);
-      } catch (e) {
+      } catch {
         // Ignore if already connected
       }
+      return;
     }
-    */
+
+    // Route through BLEP: nativeSource → workletNode → nativeDestination
+    try {
+      nativeSource.connect(this.workletNode);
+      this.workletNode.connect(nativeDest);
+
+      // Track for later disconnection
+      this.connectedNativeSource = nativeSource;
+      this.connectedNativeDest = nativeDest;
+
+      console.log('[BLEP] Audio chain connected');
+    } catch (error) {
+      console.warn('[BLEP] Native connection failed, falling back to bypass:', error);
+      this.disconnectNative();
+      try {
+        source.connect(destination);
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
+  /**
+   * Disconnect native BLEP routing (worklet from source/destination)
+   */
+  private disconnectNative(): void {
+    if (!this.workletNode) return;
+
+    if (this.connectedNativeSource) {
+      try {
+        this.connectedNativeSource.disconnect(this.workletNode);
+      } catch {
+        // Not connected
+      }
+      this.connectedNativeSource = null;
+    }
+
+    if (this.connectedNativeDest) {
+      try {
+        this.workletNode.disconnect(this.connectedNativeDest);
+      } catch {
+        // Not connected
+      }
+      this.connectedNativeDest = null;
+    }
   }
 
   /**
@@ -112,7 +147,7 @@ export class BlepManager {
       });
     }
 
-    console.log(`BLEP ${enabled ? 'enabled' : 'disabled'}`);
+    console.log(`[BLEP] ${enabled ? 'Enabled' : 'Disabled'}`);
   }
 
   /**
@@ -131,16 +166,10 @@ export class BlepManager {
     return this.workletNode;
   }
 
-  /**
-   * Check if BLEP is initialized
-   */
   isInitialized(): boolean {
     return this.initialized;
   }
 
-  /**
-   * Check if BLEP is enabled
-   */
   isEnabled(): boolean {
     return this.enabled;
   }
@@ -149,6 +178,7 @@ export class BlepManager {
    * Dispose BLEP resources
    */
   dispose(): void {
+    this.disconnectNative();
     if (this.workletNode) {
       this.workletNode.disconnect();
       this.workletNode = null;
