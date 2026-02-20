@@ -410,6 +410,7 @@ export class DeckEngine {
   /** Play a named scratch pattern (with optional beat quantization) */
   playPattern(name: string, onWaiting?: (ms: number) => void): void {
     const pattern = getPatternByName(name);
+    console.log(`[DeckEngine] playPattern("${name}") → pattern=${pattern ? pattern.shortName : 'NOT FOUND'}`);
     if (!pattern) return;
 
     // Cancel any restore-to-rest animation so the pattern can freely set the multipliers
@@ -420,6 +421,7 @@ export class DeckEngine {
 
     // Special handling for BPM-synced patterns with custom fader scheduling
     const bpm = this.getEffectiveBPM();
+    console.log(`[DeckEngine] playPattern: bpm=${bpm}, loop=${pattern.loop}, quantize=${pattern.quantize}, durationBeats=${pattern.durationBeats}, durationMs=${pattern.durationMs}`);
     if (pattern.name === 'Transformer') {
       this.scratchPlayback.scheduleTransformerFader(bpm);
     } else if (pattern.name === 'Crab') {
@@ -431,6 +433,7 @@ export class DeckEngine {
 
   /** Stop the currently looping scratch pattern and restore speed to the pitch-slider value */
   stopPattern(): void {
+    console.log(`[DeckEngine] stopPattern() called, isScratchActive=${this.isScratchActive}`);
     this.scratchPlayback.stopPattern();
     // Only restore if the jog wheel isn't actively being held (it has its own restore path)
     if (!this.isScratchActive) {
@@ -450,6 +453,7 @@ export class DeckEngine {
 
   /** Let the current pattern cycle finish then stop (tap/one-shot mode). */
   finishPatternCycle(): void {
+    console.log(`[DeckEngine] finishPatternCycle() called, isPatternActive=${this.scratchPlayback.isPatternActive()}`);
     this.scratchPlayback.finishCurrentCycle();
   }
 
