@@ -71,6 +71,12 @@ export interface DeckState {
   faderLFODivision: '1/4' | '1/8' | '1/16' | '1/32' | null;
   activePatternName: string | null;
 
+  // Audio file playback mode
+  playbackMode: 'tracker' | 'audio';
+  durationMs: number;             // total duration for audio files (ms)
+  audioPosition: number;          // current position in seconds
+  waveformPeaks: Float32Array | null;  // for waveform display
+
   // Serato metadata (populated when loading Serato-analyzed tracks)
   seratoCuePoints: SeratoCuePoint[];
   seratoLoops: SeratoLoop[];
@@ -125,6 +131,12 @@ const defaultDeckState: DeckState = {
   faderLFOActive: false,
   faderLFODivision: null,
   activePatternName: null,
+
+  // Audio file playback
+  playbackMode: 'tracker',
+  durationMs: 0,
+  audioPosition: 0,
+  waveformPeaks: null,
 
   // Serato metadata
   seratoCuePoints: [],

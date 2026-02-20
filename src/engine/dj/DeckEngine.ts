@@ -12,6 +12,21 @@ import { getToneEngine } from '@/engine/ToneEngine';
 import { getNativeAudioNode } from '@/utils/audio-context';
 import { ScratchPlayback, getPatternByName } from './DJScratchEngine';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
+import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
+
+export type PlaybackMode = 'tracker' | 'audio';
+
+// Monkey-patch Tone.Player._onSourceEnd to suppress StateTimeline assertion errors.
+// When scratch patterns change playback rates dramatically, sample buffers can end at
+// times that violate Tone.js's chronological ordering requirement. The assertion is
+// purely bookkeeping — swallowing it has no functional impact on audio output.
+const _origOnSourceEnd = (Tone.Player.prototype as any)._onSourceEnd;
+if (_origOnSourceEnd && !(Tone.Player.prototype as any).__scratchPatched) {
+  (Tone.Player.prototype as any).__scratchPatched = true;
+  (Tone.Player.prototype as any)._onSourceEnd = function (...args: any[]) {
+    try { return _origOnSourceEnd.apply(this, args); } catch { /* suppress */ }
+  };
+}
 
 type FaderLFODivision = '1/4' | '1/8' | '1/16' | '1/32';
 
@@ -25,6 +40,8 @@ export interface DeckEngineOptions {
 export class DeckEngine {
   readonly id: DeckId;
   readonly replayer: TrackerReplayer;
+  readonly audioPlayer: DeckAudioPlayer;
+  private _playbackMode: PlaybackMode = 'tracker';
 
   // Audio chain nodes
   private deckGain: Tone.Gain;
@@ -55,7 +72,15 @@ export class DeckEngine {
    */
   private restMultiplier = 1;
   private isScratchActive = false;   // true while jog wheel is physically held
+  private backwardPauseTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private decayRafId: number | null = null;
+
+  // Pattern scratch state — when a scratch preset button is active, we only modulate
+  // pitch (not tempo), so the tracker doesn't advance faster and trigger extra notes.
+  // On pattern end we seek back to the saved position so the song resumes seamlessly.
+  private patternScratchActive = false;
+  private patternStartSongPos = 0;
+  private patternStartPattPos = 0;
 
   // Reverse scratch state
   private scratchBuffer: DeckScratchBuffer | null = null;
@@ -98,11 +123,28 @@ export class DeckEngine {
     // Create TrackerReplayer connected to our deckGain input
     this.replayer = new TrackerReplayer(this.deckGain);
 
+    // Create AudioPlayer for audio file playback (MP3/WAV/FLAC etc.)
+    this.audioPlayer = new DeckAudioPlayer(this.deckGain);
+
     // Create ScratchPlayback (per-deck scratch pattern + fader LFO engine)
     this.scratchPlayback = new ScratchPlayback(
       () => this,
       () => this.getEffectiveBPM(),
     );
+    // When a pattern ends internally (pendingStop / non-loop), snap pitch/tempo to rest immediately.
+    // Using _decayToRest (animated) here causes Tone.js StateTimeline errors because the gradual
+    // rate ramp from 0.04x → 1.0x confuses sample buffer end-time tracking.
+    this.scratchPlayback.onPatternEnd = () => {
+      this._endPatternScratch();
+      if (!this.isScratchActive) {
+        if (this.decayRafId !== null) {
+          cancelAnimationFrame(this.decayRafId);
+          this.decayRafId = null;
+        }
+        this.replayer.setPitchMultiplier(this.restMultiplier);
+        this.replayer.setTempoMultiplier(this.restMultiplier);
+      }
+    };
 
     // Wire TrackerReplayer scratch effect callback (Xnn pattern effect)
     this.replayer.onScratchEffect = (param: number) => this._handleScratchEffect(param);
@@ -133,6 +175,10 @@ export class DeckEngine {
   // ==========================================================================
 
   async loadSong(song: TrackerSong): Promise<void> {
+    // Stop any audio file playback and switch to tracker mode
+    this.audioPlayer.stop();
+    this._playbackMode = 'tracker';
+
     this.unregisterOutputOverrides();
     this.restoreFurnaceRouting();
 
@@ -167,23 +213,59 @@ export class DeckEngine {
     }
   }
 
+  /**
+   * Load an audio file (MP3, WAV, FLAC, etc.) for playback.
+   * Switches the deck to 'audio' playback mode.
+   */
+  async loadAudioFile(buffer: ArrayBuffer, filename: string): Promise<AudioFileInfo> {
+    // Stop any current playback
+    this.replayer.stop();
+    this.audioPlayer.stop();
+    this._playbackMode = 'audio';
+
+    return this.audioPlayer.loadAudioFile(buffer, filename);
+  }
+
+  get playbackMode(): PlaybackMode {
+    return this._playbackMode;
+  }
+
   async play(): Promise<void> {
-    await this.replayer.play();
+    if (this._playbackMode === 'audio') {
+      this.audioPlayer.play();
+    } else {
+      await this.replayer.play();
+    }
   }
 
   pause(): void {
-    this.replayer.pause();
+    if (this._playbackMode === 'audio') {
+      this.audioPlayer.pause();
+    } else {
+      this.replayer.pause();
+    }
   }
 
   resume(): void {
-    this.replayer.resume();
+    if (this._playbackMode === 'audio') {
+      this.audioPlayer.play();
+    } else {
+      this.replayer.resume();
+    }
   }
 
   stop(): void {
-    this.replayer.stop();
+    if (this._playbackMode === 'audio') {
+      this.audioPlayer.stop();
+    } else {
+      this.replayer.stop();
+    }
   }
 
   isPlaying(): boolean {
+    if (this._playbackMode === 'audio') {
+      return this.audioPlayer.isCurrentlyPlaying();
+    }
     return this.replayer.isPlaying();
   }
 
@@ -192,7 +274,12 @@ export class DeckEngine {
   // ==========================================================================
 
   cue(songPos: number, pattPos: number = 0): void {
-    this.replayer.jumpToPosition(songPos, pattPos);
+    if (this._playbackMode === 'audio') {
+      // In audio mode, songPos is treated as seconds
+      this.audioPlayer.seek(songPos);
+    } else {
+      this.replayer.jumpToPosition(songPos, pattPos);
+    }
   }
 
   // ==========================================================================
@@ -203,10 +290,15 @@ export class DeckEngine {
   setPitch(semitones: number): void {
     const multiplier = Math.pow(2, semitones / 12);
     this.restMultiplier = multiplier;                // Always track — scratch/pattern restore target
-    // Per-deck isolation: only touches this replayer's state, not ToneEngine globals
-    this.replayer.setTempoMultiplier(multiplier);   // Changes scheduler speed
-    this.replayer.setPitchMultiplier(multiplier);    // Changes sample playback rates
-    this.replayer.setDetuneCents(semitones * 100);   // Changes synth pitch
+
+    if (this._playbackMode === 'audio') {
+      this.audioPlayer.setPlaybackRate(multiplier);
+    } else {
+      // Per-deck isolation: only touches this replayer's state, not ToneEngine globals
+      this.replayer.setTempoMultiplier(multiplier);   // Changes scheduler speed
+      this.replayer.setPitchMultiplier(multiplier);    // Changes sample playback rates
+      this.replayer.setDetuneCents(semitones * 100);   // Changes synth pitch
+    }
   }
 
   /** Temporary BPM bump for beat matching */
@@ -261,12 +353,25 @@ export class DeckEngine {
    */
   setScratchVelocity(velocity: number): void {
     const v = Math.max(-4, Math.min(4, velocity));
+
+    // Pattern scratch mode: only modulate pitch, don't change tempo.
+    // This prevents the sequencer from advancing faster and triggering extra notes.
+    if (this.patternScratchActive) {
+      const rate = Math.max(0.15, Math.abs(v));
+      this.replayer.setPitchMultiplier(rate);
+      return;
+    }
+
+    // Jog wheel scratch: full pitch + tempo control
     if (v >= 0) {
+      // Floor at 0.15 — lower values cause Tone.js StateTimeline errors because
+      // the huge rate ratio (e.g. 0.02→1.0 = 50×) confuses sample buffer end-time tracking.
+      // 0.15 still sounds like a slow drag-back while keeping the ratio ≤ ~7×.
       if (this.scratchDirection === -1) {
         // Transitioning from backward → forward
-        void this._switchToForward(Math.max(0.02, v));
+        void this._switchToForward(Math.max(0.15, v));
       } else {
-        const fwdRate = Math.max(0.02, v);
+        const fwdRate = Math.max(0.15, v);
         this.replayer.setPitchMultiplier(fwdRate);
         this.replayer.setTempoMultiplier(fwdRate);
       }
@@ -320,7 +425,8 @@ export class DeckEngine {
     this.scratchDirection = -1;
 
     // Pause replayer after fade so new note events are silent
-    setTimeout(() => {
+    this.backwardPauseTimeoutId = setTimeout(() => {
+      this.backwardPauseTimeoutId = null;
       if (this.scratchDirection === -1) this.replayer.pause();
     }, 25);
   }
@@ -410,7 +516,6 @@ export class DeckEngine {
   /** Play a named scratch pattern (with optional beat quantization) */
   playPattern(name: string, onWaiting?: (ms: number) => void): void {
     const pattern = getPatternByName(name);
-    console.log(`[DeckEngine] playPattern("${name}") → pattern=${pattern ? pattern.shortName : 'NOT FOUND'}`);
     if (!pattern) return;
 
     // Cancel any restore-to-rest animation so the pattern can freely set the multipliers
@@ -419,9 +524,15 @@ export class DeckEngine {
       this.decayRafId = null;
     }
 
+    // Save replayer position so we can return here when the scratch ends.
+    // This way the song continues from where it was, not from wherever the
+    // sequencer advanced to during the scratch.
+    this.patternStartSongPos = this.replayer.getSongPos();
+    this.patternStartPattPos = this.replayer.getPattPos();
+    this.patternScratchActive = true;
+
     // Special handling for BPM-synced patterns with custom fader scheduling
     const bpm = this.getEffectiveBPM();
-    console.log(`[DeckEngine] playPattern: bpm=${bpm}, loop=${pattern.loop}, quantize=${pattern.quantize}, durationBeats=${pattern.durationBeats}, durationMs=${pattern.durationMs}`);
     if (pattern.name === 'Transformer') {
       this.scratchPlayback.scheduleTransformerFader(bpm);
     } else if (pattern.name === 'Crab') {
@@ -433,12 +544,20 @@ export class DeckEngine {
 
   /** Stop the currently looping scratch pattern and restore speed to the pitch-slider value */
   stopPattern(): void {
-    console.log(`[DeckEngine] stopPattern() called, isScratchActive=${this.isScratchActive}`);
     this.scratchPlayback.stopPattern();
+    this._endPatternScratch();
     // Only restore if the jog wheel isn't actively being held (it has its own restore path)
     if (!this.isScratchActive) {
       this._decayToRest(300);
     }
+  }
+
+  /** Clean up pattern scratch state: seek back to the saved position and restore pitch. */
+  private _endPatternScratch(): void {
+    if (!this.patternScratchActive) return;
+    this.patternScratchActive = false;
+    // Seek replayer back to where the scratch started so the song resumes seamlessly
+    this.replayer.seekTo(this.patternStartSongPos, this.patternStartPattPos);
   }
 
   /** Is a pattern waiting for quantize? */
@@ -453,7 +572,6 @@ export class DeckEngine {
 
   /** Let the current pattern cycle finish then stop (tap/one-shot mode). */
   finishPatternCycle(): void {
-    console.log(`[DeckEngine] finishPatternCycle() called, isPatternActive=${this.scratchPlayback.isPatternActive()}`);
     this.scratchPlayback.finishCurrentCycle();
   }
 
@@ -651,7 +769,12 @@ export class DeckEngine {
       cancelAnimationFrame(this.decayRafId);
       this.decayRafId = null;
     }
+    if (this.backwardPauseTimeoutId !== null) {
+      clearTimeout(this.backwardPauseTimeoutId);
+      this.backwardPauseTimeoutId = null;
+    }
     this.replayer.dispose();
+    this.audioPlayer.dispose();
     this.fftAnalyser.dispose();
     this.waveformAnalyser.dispose();
     this.meter.dispose();
