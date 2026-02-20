@@ -67,7 +67,7 @@ export const PatternOrderList: React.FC = React.memo(() => {
   // Handle adding current pattern to order
   const handleAddCurrent = () => {
     addToOrder(currentPatternIndex);
-    notify.success(`Added Pattern ${currentPatternIndex.toString(16).padStart(2, '0').toUpperCase()}`, 2000);
+    notify.success(`Added Pattern ${currentPatternIndex}`, 2000);
   };
 
   // Handle removing position
@@ -179,13 +179,13 @@ export const PatternOrderList: React.FC = React.memo(() => {
                 }
                 ${draggedIndex === positionIndex ? 'opacity-50' : ''}
               `}
-              title={`Position ${positionIndex.toString(16).padStart(2, '0').toUpperCase()}: Pattern ${patternIndex.toString(16).padStart(2, '0').toUpperCase()}\nClick to select\nShift+Click to duplicate\nCtrl+Click to remove\nDrag to reorder`}
+              title={`Position ${positionIndex}: Pattern ${patternIndex}\nClick to select\nShift+Click to duplicate\nCtrl+Click to remove\nDrag to reorder`}
             >
               <div className="text-[10px] text-center leading-none">
-                {positionIndex.toString(16).padStart(2, '0').toUpperCase()}
+                {positionIndex}
               </div>
               <div className="text-xs text-center font-mono leading-none mt-0.5">
-                {patternIndex.toString(16).padStart(2, '0').toUpperCase()}
+                {patternIndex}
               </div>
             </div>
           ))}

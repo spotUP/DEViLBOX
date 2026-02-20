@@ -590,7 +590,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         <div className="flex-shrink min-w-0">
           <div className="ft2-toolbar-row">
             <div className="ft2-section ft2-col-1">
-              <FT2NumericInput label="Position" value={currentPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} format="hex" />
+              <FT2NumericInput label="Position" value={currentPositionIndex} onChange={handlePositionChange} min={0} max={patternOrder.length - 1} />
               <div className="flex gap-1 ml-auto">
                 <Button
                   variant={tapActive ? 'primary' : 'default'}
@@ -616,10 +616,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               />
             </div>
             <div className="ft2-section ft2-col-3">
-              <FT2NumericInput label="Pattern" value={patternOrder[currentPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} format="hex" />
+              <FT2NumericInput label="Pattern" value={patternOrder[currentPositionIndex] ?? currentPatternIndex} onChange={handlePatternChange} min={0} max={patterns.length - 1} />
             </div>
             <div className="ft2-section ft2-col-4">
-              <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} format="hex" />
+              <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} />
             </div>
             <div className="ft2-section ft2-section-playback">
               <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm" onClick={handlePlaySong} className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
@@ -629,10 +629,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
 
           <div className="ft2-toolbar-row">
               <div className="ft2-section ft2-col-1">
-                <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} format="hex" />
+                <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
               </div>
               <div className="ft2-section ft2-col-2">
-                <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} format="hex" />
+                <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} />
                 <Button
                   variant="default"
                   size="sm"
@@ -651,7 +651,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   onChange={handleLengthChange}
                   min={1}
                   max={256}
-                  format="hex"
                   presets={[
                     { label: '16 rows', value: 16 },
                     { label: '32 rows', value: 32 },
@@ -665,7 +664,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 />
               </div>
               <div className="ft2-section ft2-col-4">
-                <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} format="hex" />
+                <FT2NumericInput label="Song Len" value={songLength} onChange={handleSongLengthChange} min={1} max={256} />
               </div>
             </div>
         </div>
@@ -1099,7 +1098,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                   resetInstruments();
                   resetTracker();
                   resetTransport();
-                  clearSavedProject();
+                  void clearSavedProject();
                   setShowClearModal(false);
                   notify.success('Reset to defaults');
                 }}
