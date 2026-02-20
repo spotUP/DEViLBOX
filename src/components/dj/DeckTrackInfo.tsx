@@ -48,13 +48,7 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
       <div className="flex items-baseline gap-3">
         {/* BPM display - LED style */}
         <span
-          className="font-mono text-2xl font-bold tabular-nums"
-          style={{
-            color: isBPMMatched ? '#22c55e' : '#e2e8f0',
-            textShadow: isBPMMatched
-              ? '0 0 8px #22c55e'
-              : '0 0 8px currentColor',
-          }}
+          className={`font-mono text-2xl font-bold tabular-nums ${isBPMMatched ? 'text-accent-success' : 'text-text-primary'}`}
         >
           {effectiveBPM.toFixed(1)}
         </span>
@@ -63,10 +57,7 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
         </span>
 
         {/* Elapsed time */}
-        <span
-          className="font-mono text-sm text-text-secondary tabular-nums"
-          style={{ textShadow: '0 0 4px rgba(148,163,184,0.3)' }}
-        >
+        <span className="font-mono text-sm text-text-secondary tabular-nums">
           {formattedTime}
         </span>
       </div>

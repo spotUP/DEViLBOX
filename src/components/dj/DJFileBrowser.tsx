@@ -1,15 +1,18 @@
 /**
  * DJFileBrowser - File browser for loading tracker modules to DJ decks.
  *
- * Shows a list of available module files with BPM detection results.
- * Each entry has "Load A" and "Load B" buttons.
+ * Parses module files (MOD, XM, IT, S3M, Furnace) into TrackerSong objects
+ * and loads them to the selected deck. Each entry shows BPM and duration.
  */
 
 import React, { useState, useCallback, useRef } from 'react';
-import { Upload, Music, X } from 'lucide-react';
+import { Upload, Music, X, Loader2, ListPlus } from 'lucide-react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
+import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
+import { cacheSong } from '@/engine/dj/DJSongCache';
+import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 interface LoadedFile {
@@ -27,6 +30,7 @@ interface DJFileBrowserProps {
 export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
   const [files, setFiles] = useState<LoadedFile[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'name' | 'bpm' | 'format'>('name');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,29 +39,35 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
     if (!selectedFiles) return;
 
     setLoading(true);
+    setError(null);
 
-    // Process files through the existing import pipeline
-    // For now, this is a placeholder that just records file metadata.
-    // The actual import would go through the same MOD/XM/IT/S3M import
-    // pipeline used by the tracker view.
     const newFiles: LoadedFile[] = [];
 
     for (const file of Array.from(selectedFiles)) {
-      // TODO: Wire into actual tracker import pipeline (MIDIImporter, MODHandler, etc.)
-      // For now, create a placeholder entry
-      newFiles.push({
-        name: file.name,
-        song: null as unknown as TrackerSong, // Placeholder
-        bpm: 0,
-        duration: 0,
-        format: file.name.split('.').pop()?.toUpperCase() ?? 'MOD',
-      });
+      try {
+        const song = await parseModuleToSong(file);
+        const bpmResult = detectBPM(song);
+        const duration = estimateSongDuration(song);
+
+        // Cache the parsed song for playlist deck-loading
+        cacheSong(file.name, song);
+
+        newFiles.push({
+          name: file.name,
+          song,
+          bpm: bpmResult.bpm,
+          duration,
+          format: file.name.split('.').pop()?.toUpperCase() ?? 'MOD',
+        });
+      } catch (err) {
+        console.error(`[DJFileBrowser] Failed to parse ${file.name}:`, err);
+        setError(`Failed to load ${file.name}: ${err instanceof Error ? err.message : 'unknown error'}`);
+      }
     }
 
     setFiles(prev => [...prev, ...newFiles]);
     setLoading(false);
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -71,14 +81,12 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
 
     try {
       await engine.loadToDeck(deckId, file.song);
-      const bpmResult = detectBPM(file.song);
-      const duration = estimateSongDuration(file.song);
 
       store.setDeckState(deckId, {
         fileName: file.name,
         trackName: file.song.name || file.name,
-        detectedBPM: bpmResult.bpm,
-        effectiveBPM: bpmResult.bpm,
+        detectedBPM: file.bpm,
+        effectiveBPM: file.bpm,
         totalPositions: file.song.songLength,
         songPos: 0,
         pattPos: 0,
@@ -87,6 +95,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
       });
     } catch (err) {
       console.error(`[DJFileBrowser] Failed to load ${file.name} to deck ${deckId}:`, err);
+      setError(`Failed to load to deck: ${err instanceof Error ? err.message : 'unknown error'}`);
     }
   }, []);
 
@@ -118,12 +127,13 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-bgTertiary border border-dark-borderLight
                        rounded text-text-secondary text-xs font-mono hover:bg-dark-bgHover hover:text-text-primary
-                       transition-colors"
+                       transition-colors disabled:opacity-50"
           >
-            <Upload size={12} />
-            Add Files
+            {loading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+            {loading ? 'Loading...' : 'Add Files'}
           </button>
           {onClose && (
             <button onClick={onClose} className="text-text-muted hover:text-text-primary p-1">
@@ -135,11 +145,18 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
           ref={fileInputRef}
           type="file"
           multiple
-          accept=".mod,.xm,.it,.s3m,.fur"
+          accept="*/*"
           onChange={handleFileSelect}
           className="hidden"
         />
       </div>
+
+      {/* Error display */}
+      {error && (
+        <div className="text-red-400 text-[10px] font-mono px-2 py-1 bg-red-900/20 rounded border border-red-900/30">
+          {error}
+        </div>
+      )}
 
       {/* Sort buttons */}
       <div className="flex gap-1 text-[10px] font-mono">
@@ -160,7 +177,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
 
       {/* File list */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {sortedFiles.length === 0 ? (
+        {sortedFiles.length === 0 && !loading ? (
           <div className="flex flex-col items-center justify-center py-8 text-text-muted">
             <Music size={24} className="mb-2 opacity-40" />
             <p className="text-xs font-mono">Drop modules here or click Add Files</p>
@@ -183,6 +200,27 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
                   </div>
                 </div>
 
+                {/* Add to playlist */}
+                <button
+                  onClick={() => {
+                    const playlistId = useDJPlaylistStore.getState().activePlaylistId;
+                    if (!playlistId) return;
+                    useDJPlaylistStore.getState().addTrack(playlistId, {
+                      fileName: file.name,
+                      trackName: file.song.name || file.name,
+                      format: file.format,
+                      bpm: file.bpm,
+                      duration: file.duration,
+                      addedAt: Date.now(),
+                    });
+                  }}
+                  className="p-1 text-text-muted hover:text-amber-400 transition-colors
+                             opacity-0 group-hover:opacity-100"
+                  title="Add to active playlist"
+                >
+                  <ListPlus size={12} />
+                </button>
+
                 {/* Load buttons */}
                 <button
                   onClick={() => loadToDeck(file, 'A')}
@@ -191,7 +229,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
                              hover:bg-blue-800/40 hover:text-blue-300 transition-colors
                              opacity-0 group-hover:opacity-100"
                 >
-                  A
+                  1
                 </button>
                 <button
                   onClick={() => loadToDeck(file, 'B')}
@@ -200,7 +238,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
                              hover:bg-red-800/40 hover:text-red-300 transition-colors
                              opacity-0 group-hover:opacity-100"
                 >
-                  B
+                  2
                 </button>
                 <button
                   onClick={() => removeFile(i)}
@@ -214,12 +252,6 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
           </div>
         )}
       </div>
-
-      {loading && (
-        <div className="text-center text-text-muted text-xs font-mono py-2">
-          Loading files...
-        </div>
-      )}
     </div>
   );
 };

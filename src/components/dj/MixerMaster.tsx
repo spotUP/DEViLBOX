@@ -12,20 +12,20 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 
 const VU_SEGMENTS = 12;
 
-/** Map a dB level to 0-12 segment count */
+/** Map a dB level to 0-VU_SEGMENTS segment count */
 function levelToSegments(dBLevel: number): number {
   if (dBLevel <= -60) return 0;
-  if (dBLevel >= 0) return 12;
+  if (dBLevel >= 0) return VU_SEGMENTS;
   const normalized = (dBLevel + 60) / 60;
-  return Math.round(normalized * 12);
+  return Math.round(normalized * VU_SEGMENTS);
 }
 
 /** Get LED color for a given segment index (0=bottom, 11=top) */
 function getSegmentColor(index: number, lit: boolean): string {
-  if (!lit) return '#1a1a1a';
-  if (index >= 10) return '#ef4444'; // Red (top 2)
-  if (index >= 7) return '#eab308';  // Yellow (mid 3)
-  return '#22c55e';                   // Green (bottom 7)
+  if (!lit) return 'var(--color-bg-tertiary)';
+  if (index >= 10) return 'var(--color-error)';
+  if (index >= 7) return 'var(--color-warning)';
+  return 'var(--color-success)';
 }
 
 export const MixerMaster: React.FC = () => {
@@ -84,7 +84,7 @@ export const MixerMaster: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-1" title="Master output">
       <Knob
         value={masterVolume}
         min={0}
@@ -95,10 +95,11 @@ export const MixerMaster: React.FC = () => {
         color="#ffffff"
         defaultValue={1}
         formatValue={formatMaster}
+        title="Master volume — controls overall output level"
       />
 
       {/* Stereo VU meter (compact) */}
-      <div className="flex gap-[2px]">
+      <div className="flex gap-[2px]" title="Master stereo level meter (L/R)">
         {/* L channel */}
         <div className="flex flex-col items-center">
           <span className="text-text-muted text-[7px] font-mono leading-none mb-0.5">L</span>
@@ -111,7 +112,6 @@ export const MixerMaster: React.FC = () => {
                   width: 5,
                   height: 4,
                   backgroundColor: getSegmentColor(Math.round(i * 12 / 8), i < Math.round(segmentsL * 8 / 12)),
-                  boxShadow: i < Math.round(segmentsL * 8 / 12) ? `0 0 3px ${getSegmentColor(Math.round(i * 12 / 8), true)}80` : 'none',
                   transition: 'background-color 0.05s',
                 }}
               />
@@ -131,7 +131,6 @@ export const MixerMaster: React.FC = () => {
                   width: 5,
                   height: 4,
                   backgroundColor: getSegmentColor(Math.round(i * 12 / 8), i < Math.round(segmentsR * 8 / 12)),
-                  boxShadow: i < Math.round(segmentsR * 8 / 12) ? `0 0 3px ${getSegmentColor(Math.round(i * 12 / 8), true)}80` : 'none',
                   transition: 'background-color 0.05s',
                 }}
               />
@@ -141,14 +140,13 @@ export const MixerMaster: React.FC = () => {
       </div>
 
       {/* Limiter indicator */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-0.5" title="Limiter — lights red when output is clipping">
         <div
           className="rounded-full"
           style={{
             width: 5,
             height: 5,
-            backgroundColor: limiterActive ? '#ef4444' : '#333',
-            boxShadow: limiterActive ? '0 0 6px rgba(239,68,68,0.7)' : 'none',
+            backgroundColor: limiterActive ? 'var(--color-error)' : 'var(--color-bg-tertiary)',
             transition: 'background-color 0.1s',
           }}
         />

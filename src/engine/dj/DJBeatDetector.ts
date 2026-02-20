@@ -82,25 +82,22 @@ function scanPatternForBPM(
   bpmCounts: Map<number, number>,
   _speed: number,
 ): void {
-  for (const row of pattern.rows) {
-    for (const cell of row.cells) {
-      if (!cell.effectType && !cell.effectParam) continue;
-
-      // Fxx effect
-      const effectType = cell.effectType ?? 0;
-      const effectParam = cell.effectParam ?? 0;
+  for (const channel of pattern.channels) {
+    for (const cell of channel.rows) {
+      const effTyp = cell.effTyp ?? 0;
+      const eff = cell.eff ?? 0;
+      if (!effTyp && !eff) continue;
 
       // MOD/XM: effect F (0x0F)
       // IT/S3M: effect T (tempo) has different numbering, but in our
       // normalized format it's also stored as the appropriate effect type.
       const isFxx =
-        (format === 'MOD' || format === 'XM') && effectType === 0x0F ||
-        (format === 'IT' || format === 'S3M') && effectType === 0x14; // Txx
+        (format === 'MOD' || format === 'XM') && effTyp === 0x0F ||
+        (format === 'IT' || format === 'S3M') && effTyp === 0x14; // Txx
 
-      if (isFxx && effectParam >= 0x20) {
+      if (isFxx && eff >= 0x20) {
         // Direct BPM setting
-        const bpm = effectParam;
-        bpmCounts.set(bpm, (bpmCounts.get(bpm) ?? 0) + 1);
+        bpmCounts.set(eff, (bpmCounts.get(eff) ?? 0) + 1);
       }
     }
   }

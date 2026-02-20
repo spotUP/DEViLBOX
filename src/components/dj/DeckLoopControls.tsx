@@ -69,35 +69,34 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
   }, [deckId, slipEnabled, setDeckSlip]);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-1 min-w-0">
       {/* Loop ON/OFF toggle */}
       <button
         onClick={handleLoopToggle}
         className={`
           relative flex items-center justify-center font-mono text-xs font-bold
-          rounded-sm transition-all duration-100 select-none
-          shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]
-          active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] active:translate-y-[0.5px]
+          rounded-sm transition-all duration-100 select-none border border-dark-border
+          active:translate-y-[0.5px]
           ${
             loopActive
-              ? 'bg-cyan-600 text-white shadow-[inset_0_1px_2px_rgba(0,0,0,0.3),0_0_12px_rgba(6,182,212,0.5)]'
-              : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-borderLight'
+              ? 'bg-cyan-600 text-white'
+              : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
           }
         `}
-        style={{ width: 40, height: 28 }}
+        style={{ width: 40, height: 40 }}
         title={loopActive ? 'Disable loop' : 'Enable loop'}
       >
         {/* LED indicator dot */}
         <div
           className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${
-            loopActive ? 'bg-cyan-300 shadow-[0_0_4px_rgba(6,182,212,0.8)]' : 'bg-dark-border'
+            loopActive ? 'bg-cyan-300' : 'bg-dark-border'
           }`}
         />
         LOOP
       </button>
 
       {/* Loop size selector */}
-      <div className="flex items-center gap-px">
+      <div className="flex items-center gap-px flex-1 min-w-0">
         {LOOP_SIZES.map((size) => {
           const isActive = lineLoopSize === size && loopActive;
           const isSelected = lineLoopSize === size;
@@ -106,19 +105,19 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
               key={size}
               onClick={() => handleSizeChange(size)}
               className={`
-                flex items-center justify-center font-mono font-bold
+                flex-1 flex items-center justify-center font-mono font-bold
                 transition-all duration-75 select-none
                 ${
                   isActive
-                    ? 'bg-cyan-700/80 text-cyan-100 shadow-[0_0_6px_rgba(6,182,212,0.4)]'
+                    ? 'bg-cyan-700/80 text-cyan-100'
                     : isSelected
                       ? 'bg-dark-borderLight text-text-primary'
-                      : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-borderLight hover:text-text-secondary'
+                      : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
                 }
                 ${size === LOOP_SIZES[0] ? 'rounded-l-sm' : ''}
                 ${size === LOOP_SIZES[LOOP_SIZES.length - 1] ? 'rounded-r-sm' : ''}
               `}
-              style={{ width: 24, height: 24, fontSize: size >= 10 ? 8 : 10 }}
+              style={{ height: 40, fontSize: size >= 10 ? 9 : 11, minWidth: 24 }}
               title={`Loop ${size} rows`}
             >
               {size}
@@ -132,22 +131,21 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
         onClick={handleSlipToggle}
         className={`
           relative flex items-center justify-center font-mono text-xs font-bold
-          rounded-sm transition-all duration-100 select-none
-          shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]
-          active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] active:translate-y-[0.5px]
+          rounded-sm transition-all duration-100 select-none border border-dark-border
+          active:translate-y-[0.5px]
           ${
             slipEnabled
-              ? 'bg-amber-600 text-white shadow-[inset_0_1px_2px_rgba(0,0,0,0.3),0_0_10px_rgba(245,158,11,0.4)]'
-              : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-borderLight'
+              ? 'bg-amber-600 text-white'
+              : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
           }
         `}
-        style={{ width: 38, height: 28 }}
+        style={{ width: 40, height: 40 }}
         title={slipEnabled ? 'Disable slip mode' : 'Enable slip mode'}
       >
         {/* LED indicator dot */}
         <div
           className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${
-            slipEnabled ? 'bg-amber-300 shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'bg-dark-border'
+            slipEnabled ? 'bg-amber-300' : 'bg-dark-border'
           }`}
         />
         SLIP

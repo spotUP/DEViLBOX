@@ -3,6 +3,7 @@
  *
  * Range: -16 to +16 semitones with center detent mark at 0.
  * Double-click to reset to center.
+ * Stretches vertically to fill its parent container.
  */
 
 import React, { useCallback, useRef, useEffect, useState } from 'react';
@@ -14,7 +15,6 @@ interface DeckPitchSliderProps {
 
 const PITCH_MIN = -16;
 const PITCH_MAX = 16;
-const SLIDER_HEIGHT = 200; // px - height of the track
 const HANDLE_HEIGHT = 24;  // px - height of the rectangular handle
 
 export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
@@ -29,20 +29,33 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
 
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [trackHeight, setTrackHeight] = useState(200);
+
+  // Observe track container height
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const h = entries[0]?.contentRect.height;
+      if (h && h > 0) setTrackHeight(h);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Convert pitch value (-16 to +16) to pixel offset from top of track
-  const pitchToY = (pitch: number): number => {
+  const pitchToY = useCallback((pitch: number): number => {
     // Top = +16, Bottom = -16 (inverted: pushing fader up = higher pitch)
     const normalized = (PITCH_MAX - pitch) / (PITCH_MAX - PITCH_MIN);
-    return normalized * (SLIDER_HEIGHT - HANDLE_HEIGHT);
-  };
+    return normalized * (trackHeight - HANDLE_HEIGHT);
+  }, [trackHeight]);
 
   // Convert pixel offset from top of track to pitch value
-  const yToPitch = (y: number): number => {
-    const clamped = Math.max(0, Math.min(SLIDER_HEIGHT - HANDLE_HEIGHT, y));
-    const normalized = clamped / (SLIDER_HEIGHT - HANDLE_HEIGHT);
+  const yToPitch = useCallback((y: number): number => {
+    const clamped = Math.max(0, Math.min(trackHeight - HANDLE_HEIGHT, y));
+    const normalized = clamped / (trackHeight - HANDLE_HEIGHT);
     return PITCH_MAX - normalized * (PITCH_MAX - PITCH_MIN);
-  };
+  }, [trackHeight]);
 
   const updatePitch = useCallback(
     (clientY: number) => {
@@ -52,7 +65,7 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
       const newPitch = Math.round(yToPitch(y) * 10) / 10; // 0.1 resolution
       setDeckPitch(deckId, newPitch);
     },
-    [deckId, setDeckPitch]
+    [deckId, setDeckPitch, yToPitch]
   );
 
   const handleMouseDown = useCallback(
@@ -98,21 +111,21 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
         : '0.0';
 
   return (
-    <div className="flex flex-col items-center gap-2 select-none">
-      {/* Slider track container */}
+    <div className="flex flex-col items-center gap-2 select-none h-full">
+      {/* Slider track container — fills available height */}
       <div
         ref={trackRef}
-        className="relative cursor-pointer"
-        style={{ width: 32, height: SLIDER_HEIGHT }}
+        className="relative cursor-pointer flex-1 min-h-0"
+        style={{ width: 32 }}
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
+        onContextMenu={(e) => { e.preventDefault(); setDeckPitch(deckId, 0); }}
       >
         {/* Groove track */}
         <div
-          className="absolute left-1/2 -translate-x-1/2 rounded-sm"
+          className="absolute left-1/2 -translate-x-1/2 rounded-sm top-0 bottom-0"
           style={{
             width: 6,
-            height: SLIDER_HEIGHT,
             backgroundColor: '#1a1a2e',
             boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.6)',
           }}
@@ -156,7 +169,7 @@ export const DeckPitchSlider: React.FC<DeckPitchSliderProps> = ({ deckId }) => {
 
       {/* Pitch value readout */}
       <div
-        className="font-mono text-xs text-text-secondary text-center"
+        className="font-mono text-xs text-text-secondary text-center shrink-0"
         style={{ minWidth: 48 }}
       >
         {displayValue} st

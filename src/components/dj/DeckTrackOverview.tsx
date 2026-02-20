@@ -13,16 +13,12 @@ interface DeckTrackOverviewProps {
   deckId: 'A' | 'B';
 }
 
-// Colors
-const SEGMENT_COLOR_A = '#1e1e2e'; // dark-bgSecondary-ish
-const SEGMENT_COLOR_B = '#2a2a3a'; // dark-bgTertiary-ish
-const POSITION_COLOR = '#3b82f6';  // bright accent blue
-const CUE_COLOR = '#f59e0b';       // amber/orange
-const LOOP_COLOR = 'rgba(6, 182, 212, 0.25)'; // semi-transparent cyan
+// Colors — resolved from CSS variables at render time via getComputedStyle
+// Fallbacks match the design system defaults for --color-* tokens
+const POSITION_COLOR = '#ef4444';  // accent
+const CUE_COLOR = '#f59e0b';       // warning
+const LOOP_COLOR = 'rgba(6, 182, 212, 0.25)';
 const LOOP_BORDER_COLOR = 'rgba(6, 182, 212, 0.6)';
-const WARNING_COLOR = 'rgba(239, 68, 68, 0.3)'; // red pulse
-const BAR_BG = '#0f0f1a';
-const BORDER_COLOR = '#333344';
 
 const BAR_HEIGHT = 24;
 
@@ -62,8 +58,15 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+    // Read CSS variables for design system colors
+    const cs = getComputedStyle(container);
+    const bgColor = cs.getPropertyValue('--color-bg').trim() || '#0b0909';
+    const bgSecondary = cs.getPropertyValue('--color-bg-secondary').trim() || '#131010';
+    const bgTertiary = cs.getPropertyValue('--color-bg-tertiary').trim() || '#1d1818';
+    const borderColor = cs.getPropertyValue('--color-border').trim() || '#2f2525';
+
     // Background
-    ctx.fillStyle = BAR_BG;
+    ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, width, height);
 
     const total = Math.max(totalPositions, 1);
@@ -71,14 +74,14 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
     // Draw pattern segments with alternating colors
     const segmentWidth = width / total;
     for (let i = 0; i < total; i++) {
-      ctx.fillStyle = i % 2 === 0 ? SEGMENT_COLOR_A : SEGMENT_COLOR_B;
+      ctx.fillStyle = i % 2 === 0 ? bgSecondary : bgTertiary;
       const x = Math.floor(i * segmentWidth);
       const w = Math.ceil(segmentWidth);
       ctx.fillRect(x, 0, w, height);
 
       // Thin separator line between segments
       if (i > 0) {
-        ctx.fillStyle = BORDER_COLOR;
+        ctx.fillStyle = borderColor;
         ctx.fillRect(x, 0, 1, height);
       }
     }
@@ -125,12 +128,8 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
     if (total > 0) {
       const posX = ((songPos + 0.5) / total) * width;
 
-      // Glow effect
-      ctx.shadowColor = POSITION_COLOR;
-      ctx.shadowBlur = 6;
       ctx.fillStyle = POSITION_COLOR;
       ctx.fillRect(posX - 1, 0, 2, height);
-      ctx.shadowBlur = 0;
 
       // Bright center line
       ctx.fillStyle = '#ffffff';
@@ -138,7 +137,7 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
     }
 
     // Border
-    ctx.strokeStyle = BORDER_COLOR;
+    ctx.strokeStyle = borderColor;
     ctx.lineWidth = 1;
     ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
 

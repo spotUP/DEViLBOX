@@ -44,7 +44,7 @@ export class DJMixerEngine {
       release: 0.1,
     });
 
-    this.masterMeter = new Tone.Meter({ smoothing: 0.8, channels: 2 });
+    this.masterMeter = new Tone.Meter({ smoothing: 0.8 });
 
     // Wire: inputs → masterGain → limiter → destination + meter
     this.inputA.connect(this.masterGain);

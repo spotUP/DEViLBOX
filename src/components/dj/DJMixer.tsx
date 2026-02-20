@@ -2,7 +2,7 @@
  * DJMixer - Center mixer panel composing all mixer sub-components
  *
  * Layout (top to bottom):
- *   1. EQ(A) | Filter(A) | Filter(B) | EQ(B)
+ *   1. EQ(A) | VU(A) | Filter(A) | Filter(B) | VU(B) | EQ(B)
  *   2. ChannelStrip(A) | gap | ChannelStrip(B)
  *   3. Crossfader
  *   4. Master | CueSection
@@ -11,6 +11,7 @@
 import React from 'react';
 import { MixerEQ } from '@/components/dj/MixerEQ';
 import { MixerFilter } from '@/components/dj/MixerFilter';
+import { MixerVUMeter } from '@/components/dj/MixerVUMeter';
 import { MixerChannelStrip } from '@/components/dj/MixerChannelStrip';
 import { MixerCrossfader } from '@/components/dj/MixerCrossfader';
 import { MixerMaster } from '@/components/dj/MixerMaster';
@@ -23,20 +24,23 @@ export const DJMixer: React.FC = () => {
         flex flex-col items-center gap-2 p-2
         bg-dark-bg border border-dark-border rounded-lg h-full
       "
-      style={{
-        backgroundImage:
-          'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,255,255,0.01) 3px, rgba(255,255,255,0.01) 4px)',
-      }}
     >
-      {/* Row 1: EQ + Filters */}
-      <div className="flex items-start justify-center gap-1 w-full border-b border-dark-border pb-2">
-        <MixerEQ deckId="A" />
+      {/* Row 1: Filters */}
+      <div className="flex items-center justify-center gap-4 w-full border-b border-dark-border pb-2">
         <MixerFilter deckId="A" />
-
-        {/* Center divider */}
-        <div className="w-px bg-dark-borderLight self-stretch mx-0.5" />
-
         <MixerFilter deckId="B" />
+      </div>
+
+      {/* Row 2: EQ + VU meters */}
+      <div className="flex items-end justify-center gap-1 w-full border-b border-dark-border pb-2">
+        <MixerEQ deckId="A" />
+
+        {/* Center VU meters — aligned to bottom, tall */}
+        <div className="flex gap-1 items-end mx-0.5">
+          <MixerVUMeter deckId="A" />
+          <MixerVUMeter deckId="B" />
+        </div>
+
         <MixerEQ deckId="B" />
       </div>
 

@@ -19,8 +19,6 @@ export class DJCueEngine {
   // Multi-output mode
   private mediaStreamDest: MediaStreamAudioDestinationNode | null = null;
   private audioElement: HTMLAudioElement | null = null;
-  private cueDeviceId: string | null = null;
-
   // Split-stereo mode
   private merger: ChannelMergerNode | null = null;
   private mainSplitGain: GainNode | null = null;
@@ -88,19 +86,17 @@ export class DJCueEngine {
     const ctx = Tone.getContext().rawContext;
 
     // Create MediaStreamDestination from the cue mix
-    this.mediaStreamDest = ctx.createMediaStreamDestination();
+    this.mediaStreamDest = (ctx as AudioContext).createMediaStreamDestination();
     this.cueGain.connect(this.mediaStreamDest as unknown as AudioNode);
 
     // Create an <audio> element to play the stream
     this.audioElement = new Audio();
-    this.audioElement.srcObject = this.mediaStreamDest.stream;
+    this.audioElement.srcObject = this.mediaStreamDest!.stream;
     this.audioElement.autoplay = true;
   }
 
   /** Set the output device for cue/headphone monitoring */
   async setCueDevice(deviceId: string): Promise<void> {
-    this.cueDeviceId = deviceId;
-
     if (this.cueMode === 'multi-output' && this.audioElement) {
       try {
         // setSinkId routes the audio element's output to a specific device
