@@ -36,9 +36,12 @@ export class SignalingClient {
         }
       };
 
-      this.ws.onerror = (event) => {
-        console.error('[SignalingClient] WebSocket error:', event);
-        reject(new Error('WebSocket connection failed'));
+      this.ws.onerror = () => {
+        // Browser already logs the low-level error; don't double-log
+        reject(new Error(
+          `Cannot reach signaling server at ${this.url}. ` +
+          `Start it with: cd server && npm run collab`
+        ));
       };
 
       this.ws.onclose = () => {
