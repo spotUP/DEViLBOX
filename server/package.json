@@ -10,6 +10,7 @@
     "migrate": "node dist/db/migrate.js"
   },
   "dependencies": {
+    "adm-zip": "^0.5.16",
     "bcrypt": "^5.1.1",
     "better-sqlite3": "^12.6.2",
     "cors": "^2.8.5",
@@ -20,6 +21,7 @@
     "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/bcrypt": "^5.0.2",
     "@types/better-sqlite3": "^7.6.8",
     "@types/cors": "^2.8.17",

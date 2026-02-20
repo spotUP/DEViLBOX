@@ -8,8 +8,10 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import filesRoutes from './routes/files';
+import modlandRoutes from './routes/modland';
 import { initDatabase } from './db/database';
 import { initDataDirectories } from './utils/fileSystem';
+import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
 
 // Load environment variables
 dotenv.config();
@@ -40,9 +42,18 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/', authLimiter);
 
+// Higher rate limit for modland browsing (public catalog search)
+const modlandLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  message: 'Too many requests from this IP'
+});
+app.use('/api/modland/', modlandLimiter);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/files', filesRoutes);
+app.use('/api/modland', modlandRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -113,6 +124,12 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Initialize database and file system
 initDatabase();
 initDataDirectories();
+
+// Initialize Modland index (non-blocking — runs in background)
+initModlandIndex().catch((err) => {
+  console.error('[Modland] Init failed:', err);
+});
+scheduleModlandUpdates();
 
 // Start server
 app.listen(PORT, () => {

@@ -10,6 +10,7 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 import {
   getUserSongsDirectory,
   getUserInstrumentsDirectory,
+  getUserPresetsDirectory,
   listDirectory,
   readFile as fsReadFile,
   writeFile as fsWriteFile,
@@ -20,6 +21,13 @@ import {
 import db from '../db/database';
 
 const router = Router();
+
+/** Resolve file type to user directory */
+function getTypedDirectory(userId: string, type: string): string {
+  if (type === 'instruments') return getUserInstrumentsDirectory(userId);
+  if (type === 'presets') return getUserPresetsDirectory(userId);
+  return getUserSongsDirectory(userId);
+}
 
 // Maximum revisions to keep per file
 const MAX_REVISIONS = 10;
@@ -169,11 +177,9 @@ function reconstructRevision(fileId: string, targetRevision: number, currentData
 router.get('/', authenticateToken, (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const type = req.query.type as string || 'songs'; // 'songs' or 'instruments'
+    const type = req.query.type as string || 'songs';
 
-    const dirPath = type === 'instruments'
-      ? getUserInstrumentsDirectory(userId)
-      : getUserSongsDirectory(userId);
+    const dirPath = getTypedDirectory(userId, type);
 
     const files = listDirectory(dirPath);
 
@@ -230,15 +236,14 @@ router.post('/', authenticateToken, (req: AuthRequest, res: Response) => {
     const now = Date.now();
 
     // Save to database
+    const fileType = type || 'songs';
     db.prepare(`
-      INSERT INTO files (id, user_id, filename, data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(fileId, userId, filename, JSON.stringify(data), now, now);
+      INSERT INTO files (id, user_id, filename, data, type, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(fileId, userId, filename, JSON.stringify(data), fileType, now, now);
 
     // Also save to filesystem
-    const dirPath = type === 'instruments'
-      ? getUserInstrumentsDirectory(userId)
-      : getUserSongsDirectory(userId);
+    const dirPath = getTypedDirectory(userId, type || 'songs');
 
     const filePath = path.join(dirPath, filename);
 
@@ -324,7 +329,7 @@ router.delete('/:id', authenticateToken, (req: AuthRequest, res: Response) => {
 
     // Try to delete from filesystem
     try {
-      const dirPath = getUserSongsDirectory(userId); // TODO: determine type
+      const dirPath = getTypedDirectory(userId, file.type || 'songs');
       const filePath = path.join(dirPath, file.filename);
       if (isPathSafe(getUserDirectory(userId), filePath)) {
         fsDeleteFile(filePath);

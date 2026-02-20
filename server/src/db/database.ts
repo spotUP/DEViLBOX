@@ -53,7 +53,45 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
     CREATE INDEX IF NOT EXISTS idx_revisions_file_id ON file_revisions(file_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_revisions_file_revision ON file_revisions(file_id, revision_number);
+
+    -- Modland file index (ftp.modland.com catalog)
+    CREATE TABLE IF NOT EXISTS modland_files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      format TEXT NOT NULL,
+      author TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      full_path TEXT NOT NULL UNIQUE,
+      extension TEXT NOT NULL
+    );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS modland_fts USING fts5(
+      author, filename, format,
+      content=modland_files, content_rowid=id,
+      tokenize='unicode61 remove_diacritics 2'
+    );
+
+    -- Triggers to keep FTS in sync
+    CREATE TRIGGER IF NOT EXISTS modland_ai AFTER INSERT ON modland_files BEGIN
+      INSERT INTO modland_fts(rowid, author, filename, format)
+        VALUES (new.id, new.author, new.filename, new.format);
+    END;
+    CREATE TRIGGER IF NOT EXISTS modland_ad AFTER DELETE ON modland_files BEGIN
+      INSERT INTO modland_fts(modland_fts, rowid, author, filename, format)
+        VALUES ('delete', old.id, old.author, old.filename, old.format);
+    END;
+
+    CREATE TABLE IF NOT EXISTS modland_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
+
+  // Migration: add type column to files table
+  const cols = db.prepare("PRAGMA table_info(files)").all() as { name: string }[];
+  if (!cols.some(c => c.name === 'type')) {
+    db.exec("ALTER TABLE files ADD COLUMN type TEXT NOT NULL DEFAULT 'songs'");
+    console.log('[DB] Migration: added type column to files table');
+  }
 
   console.log('[DB] Database initialized at:', DB_PATH);
 }
