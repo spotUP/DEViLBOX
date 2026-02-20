@@ -140,6 +140,10 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   // Manual double-tap detection for touch devices (iOS)
   const lastClickRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
 
+  // Quick-nav: press 0-9 or a-z to jump to matching file
+  const fileListRef = useRef<HTMLDivElement>(null);
+  const jumpRef = useRef<{ key: string; index: number; time: number }>({ key: '', index: -1, time: 0 });
+
   // Auth state
   const user = useAuthStore((state) => state.user);
   const isServerAvailable = useAuthStore((state) => state.isServerAvailable);
@@ -163,6 +167,66 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       checkAccess();
     }
   }, [isOpen]);
+
+  // Quick-nav keyboard handler: 0-9, a-z jump to matching file
+  useEffect(() => {
+    if (!isOpen || fileSource === 'modland') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if an input/select/textarea is focused
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+      const key = e.key.toLowerCase();
+      if (!/^[a-z0-9]$/.test(key)) return;
+
+      e.preventDefault();
+
+      // Find all files matching this key (skip directories for letter matching — include them too for consistency)
+      const matches: number[] = [];
+      files.forEach((file, i) => {
+        if (file.name.toLowerCase().startsWith(key)) {
+          matches.push(i);
+        }
+      });
+      if (matches.length === 0) return;
+
+      const now = Date.now();
+      let targetIndex: number;
+
+      // If same key pressed within 1s, cycle to next match
+      if (jumpRef.current.key === key && now - jumpRef.current.time < 1000) {
+        const currentPos = matches.indexOf(jumpRef.current.index);
+        const nextPos = currentPos >= 0 ? (currentPos + 1) % matches.length : 0;
+        targetIndex = matches[nextPos];
+      } else {
+        targetIndex = matches[0];
+      }
+
+      jumpRef.current = { key, index: targetIndex, time: now };
+
+      // Select the file
+      const file = files[targetIndex];
+      if (file && !file.isDirectory) {
+        setSelectedFile(file);
+      }
+
+      // Scroll into view — account for the "..(back)" row offset
+      const hasBackRow = currentPath !== '' && fileSource === 'demo';
+      const rowIndex = hasBackRow ? targetIndex + 1 : targetIndex;
+      const container = fileListRef.current;
+      if (container) {
+        const rows = container.querySelectorAll('[data-file-row]');
+        const row = rows[rowIndex];
+        if (row) {
+          row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, fileSource, files, currentPath]);
 
   // Load files based on view mode
   const loadFiles = useCallback(async () => {
@@ -812,7 +876,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         )}
 
         {/* File List */}
-        <div className="flex-1 overflow-auto p-4">
+        <div ref={fileListRef} className="flex-1 overflow-auto p-4">
           {error && (
             <div className="bg-red-900/30 border border-red-500 text-red-300 px-4 py-2 rounded mb-4 select-text">
               {error}
@@ -981,6 +1045,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                     }
                     setSelectedFile(null);
                   }}
+                  data-file-row
                   className="flex items-center gap-3 p-3 rounded cursor-pointer transition-colors bg-dark-bgSecondary hover:bg-dark-bgHover border border-dark-border"
                 >
                   <ArrowLeft size={18} className="text-text-muted" />
@@ -992,6 +1057,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
               {files.map((file) => (
                 <div
                   key={file.id}
+                  data-file-row
                   onClick={() => {
                     // Directories: open on single tap (standard file browser behavior)
                     if (file.isDirectory) {
