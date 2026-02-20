@@ -40,7 +40,7 @@ function getAuthHeaders(): HeadersInit {
 /**
  * List user's files
  */
-export async function listUserFiles(type: 'songs' | 'instruments' = 'songs'): Promise<ServerFile[]> {
+export async function listUserFiles(type: 'songs' | 'instruments' | 'presets' = 'songs'): Promise<ServerFile[]> {
   if (!isAuthenticated()) {
     throw new Error('Not authenticated');
   }
@@ -84,7 +84,7 @@ export async function getFile(fileId: string): Promise<ServerFileWithData> {
 export async function saveFile(
   filename: string,
   data: object,
-  type: 'songs' | 'instruments' = 'songs'
+  type: 'songs' | 'instruments' | 'presets' = 'songs'
 ): Promise<{ id: string; filename: string }> {
   if (!isAuthenticated()) {
     throw new Error('Not authenticated');
