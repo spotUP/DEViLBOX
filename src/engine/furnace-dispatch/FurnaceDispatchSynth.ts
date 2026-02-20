@@ -17,6 +17,7 @@ import {
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { encodeFurnaceInstrument } from '@lib/export/FurnaceInstrumentEncoder';
 import type { FurnaceConfig } from '@typedefs/instrument';
+import { getToneEngine } from '@engine/ToneEngine';
 
 /** Channel names for each platform */
 const PLATFORM_CHANNELS: Record<number, string[]> = {
@@ -249,10 +250,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       await this.engine.waitForChipCreated(this.platformType);
 
       // Connect worklet output through a shared native GainNode.
-      // The worklet lives in the engine's true native AudioContext. Tone.js uses
-      // standardized-audio-context (SAC) which wraps native nodes — cross-context
-      // connect() calls fail or silently don't route audio. We route entirely
-      // through native nodes: worklet → sharedGain → destination.
+      // The worklet lives in the engine's true native AudioContext.
+      // Audio routing: worklet → sharedGain → (routed by ToneEngine to synthBus)
+      // → masterEffectsInput → [master fx] → masterChannel → destination.
       // Multiple FurnaceDispatchSynths share one chip/worklet, so only one
       // audio route should exist (managed by the engine).
       const sharedGain = this.engine.getOrCreateSharedGain();
@@ -267,6 +267,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
       // Set up default instrument for this platform
       this.setupDefaultInstrument();
+
+      // Ensure chip engine audio is routed through master effects chain
+      try { getToneEngine().routeNativeEngineOutput(this); } catch { /* ToneEngine not ready yet */ }
 
       this._isReady = true;
       this._resolveReady();

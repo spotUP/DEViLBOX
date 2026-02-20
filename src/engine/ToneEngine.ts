@@ -17,6 +17,7 @@ import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
 import { FurnaceChipEngine, FurnaceChipType } from './chips/FurnaceChipEngine';
 import { FurnaceDispatchSynth } from './furnace-dispatch/FurnaceDispatchSynth';
+import { FurnaceDispatchEngine } from './furnace-dispatch/FurnaceDispatchEngine';
 import { FurnaceSynth } from './FurnaceSynth';
 import { normalizeUrl } from '@utils/urlUtils';
 import { getNativeAudioNode, setDevilboxAudioContext } from '@utils/audio-context';
@@ -94,6 +95,8 @@ export class ToneEngine {
 
   // Global playback rate multiplier for pitch shifting (DJ slider, etc.)
   private globalPlaybackRate: number = 1.0;
+  // Global detune in cents for pitch shifting synths (Wxx effect / DJ slider)
+  private globalDetuneCents: number = 0;
 
   // Instruments keyed by "instrumentId-channelIndex" for per-channel independence
   public instruments: Map<string, Tone.ToneAudioNode | DevilboxSynth>;
@@ -122,6 +125,10 @@ export class ToneEngine {
   // Pre/post AnalyserNode taps for each master effect (for visualizers)
   private masterEffectAnalysers: Map<string, { pre: AnalyserNode; post: AnalyserNode }> = new Map();
   private _isPlaying = false;
+
+  // Track which native chip engines have been routed to synthBus
+  // (prevents duplicate connections for shared singleton engines)
+  private routedNativeEngines: Set<string> = new Set();
 
   // Per-channel audio routing (volume, pan, mute/solo, metering)
   private channelOutputs: Map<number, {
@@ -334,6 +341,42 @@ export class ToneEngine {
           synthOutput.connect(destWithInput.input);
         } catch (e) {
           console.error('[ToneEngine] connectNativeSynth fallback also failed:', e);
+        }
+      }
+    }
+  }
+
+  /**
+   * Route a native chip engine's audio output to synthBus so it goes through the
+   * master effects chain. Chip engines (FurnaceChipEngine, FurnaceDispatchEngine)
+   * have their own native AudioWorklets whose output needs to feed into synthBus
+   * instead of going directly to destination. Only routes each engine once.
+   */
+  public routeNativeEngineOutput(instrument: Tone.ToneAudioNode | DevilboxSynth): void {
+    const nativeSynthBus = getNativeAudioNode(this.synthBus as any);
+    if (!nativeSynthBus) return;
+
+    if (instrument instanceof FurnaceSynth) {
+      const engineKey = 'FurnaceChipEngine';
+      if (!this.routedNativeEngines.has(engineKey)) {
+        const chipEngine = FurnaceChipEngine.getInstance();
+        if (chipEngine.isInitialized()) {
+          chipEngine.routeOutputTo(nativeSynthBus);
+          this.routedNativeEngines.add(engineKey);
+          console.log('[ToneEngine] Routed FurnaceChipEngine output → synthBus');
+        } else {
+          // Engine not ready yet — route will happen when synth initializes and triggers a re-check
+          // FurnaceSynth.initEngine() is async, so we retry on next getInstrument() call
+        }
+      }
+    } else if (instrument instanceof FurnaceDispatchSynth) {
+      const engineKey = 'FurnaceDispatchEngine';
+      if (!this.routedNativeEngines.has(engineKey)) {
+        const dispatchEngine = FurnaceDispatchEngine.getInstance();
+        if (dispatchEngine.isInitialized) {
+          dispatchEngine.routeOutputTo(nativeSynthBus);
+          this.routedNativeEngines.add(engineKey);
+          console.log('[ToneEngine] Routed FurnaceDispatchEngine output → synthBus');
         }
       }
     }
@@ -839,6 +882,44 @@ export class ToneEngine {
   }
 
   /**
+   * Set global detune in cents for synth instruments (Wxx effect / DJ slider).
+   * Sample-based instruments use playback rate instead; this handles synths that
+   * use triggerAttack(note) and need real-time pitch adjustment.
+   */
+  public setGlobalDetune(cents: number): void {
+    this.globalDetuneCents = cents;
+    // Apply to all currently active synth voices
+    this.applyGlobalDetuneToActiveVoices();
+  }
+
+  /**
+   * Get current global detune in cents
+   */
+  public getGlobalDetune(): number {
+    return this.globalDetuneCents;
+  }
+
+  /**
+   * Apply global detune to all currently active synth voices.
+   * Iterates activeVoices and sets detune on Tone.js synths that support it.
+   */
+  private applyGlobalDetuneToActiveVoices(): void {
+    this.activeVoices.forEach((voices) => {
+      for (const voice of voices) {
+        const inst = voice.instrument;
+        // Tone.js synths (Synth, FMSynth, MonoSynth, etc.) have a detune signal
+        if (!isDevilboxSynth(inst) && (inst as any).detune?.value !== undefined) {
+          (inst as any).detune.value = this.globalDetuneCents;
+        }
+        // PolySynth wraps individual voices — set detune on each
+        if ((inst as any).set && (inst as any)._voices) {
+          try { (inst as any).set({ detune: this.globalDetuneCents }); } catch { /* not all synths support detune */ }
+        }
+      }
+    });
+  }
+
+  /**
    * Start transport (also ensures audio context is running)
    */
   public async start(): Promise<void> {
@@ -1013,7 +1094,14 @@ export class ToneEngine {
     const isLiveVoiceChannel = channelIndex !== undefined && channelIndex >= ToneEngine.LIVE_VOICE_BASE_CHANNEL;
     const legacyKey = this.getInstrumentKey(instrumentId, -1);
     if (!isSharedType && !isLiveVoiceChannel && this.instruments.has(legacyKey)) {
-      return this.instruments.get(legacyKey) ?? null;
+      // Verify the stored type matches what's requested — if not, dispose the stale instance
+      const storedLegacyType = this.instrumentSynthTypes.get(legacyKey);
+      if (config.synthType && storedLegacyType && storedLegacyType !== config.synthType) {
+        console.warn(`[ToneEngine] STALE LEGACY INSTRUMENT: key=${legacyKey} stored as ${storedLegacyType} but config wants ${config.synthType} — disposing and recreating`);
+        this.disposeInstrumentByKey(legacyKey);
+      } else {
+        return this.instruments.get(legacyKey) ?? null;
+      }
     }
 
     // Create new instrument based on config
@@ -1649,6 +1737,12 @@ export class ToneEngine {
       console.error('[ToneEngine] Failed to build initial effect chain:', error);
     });
 
+    // Route native chip engine output to synthBus for master effects processing.
+    // Chip engines (FurnaceChipEngine, FurnaceDispatchEngine) use native AudioWorklets
+    // that output to a shared GainNode. We connect that GainNode to synthBus so the
+    // audio flows through the master effects chain instead of going directly to destination.
+    this.routeNativeEngineOutput(instrument);
+
     return instrument;
   }
 
@@ -2113,7 +2207,8 @@ export class ToneEngine {
                 const slicePlayer = new Tone.Player({
                   url: buffer,
                   volume: Tone.gainToDb(velocity) + (config.volume || -12),
-                }).toDestination();
+                });
+                slicePlayer.connect(this.masterInput);
 
                 // Calculate pitch adjustment for the note (relative to base note)
                 const baseFreq = Tone.Frequency(baseNote).toFrequency();
@@ -2739,6 +2834,16 @@ export class ToneEngine {
       } catch (e) {
         console.error(`[ToneEngine] Voice trigger error:`, e);
       }
+
+      // Apply global detune to newly triggered synth voices (Wxx pitch slide)
+      if (this.globalDetuneCents !== 0 && !isDevilboxSynth(voiceNode)) {
+        if ((voiceNode as any).detune?.value !== undefined) {
+          (voiceNode as any).detune.value = this.globalDetuneCents;
+        } else if ((voiceNode as any).set) {
+          try { (voiceNode as any).set({ detune: this.globalDetuneCents }); } catch { /* */ }
+        }
+      }
+
       return; // Handled via voice system
     }
 
@@ -2912,7 +3017,8 @@ export class ToneEngine {
                 const slicePlayer = new Tone.Player({
                   url: buffer,
                   volume: Tone.gainToDb(velocity) + (config.volume || -12),
-                }).toDestination();
+                });
+                slicePlayer.connect(this.masterInput);
 
                 // Calculate pitch adjustment for the note (relative to base note)
                 const baseFreq = Tone.Frequency(baseNote).toFrequency();
@@ -2960,7 +3066,8 @@ export class ToneEngine {
                 const offsetPlayer = new Tone.Player({
                   url: buffer,
                   volume: Tone.gainToDb(velocity) + (config.volume || -12),
-                }).toDestination();
+                });
+                offsetPlayer.connect(this.masterInput);
 
                 // Calculate pitch adjustment for the note (relative to base note)
                 const baseFreq = Tone.Frequency(baseNote).toFrequency();
@@ -3142,6 +3249,21 @@ export class ToneEngine {
       }
     });
 
+    // Stop all active voice clones (critical for 'Synth' type which creates per-note clones
+    // that aren't in this.instruments — without this, cloned voices keep playing forever)
+    this.activeVoices.forEach((voices) => {
+      for (const voice of voices) {
+        try {
+          this.stopVoice(voice, now);
+        } catch { /* ignored */ }
+      }
+    });
+    this.activeVoices.clear();
+
+    // Silence Furnace chip engine outputs — their audio flows through the shared
+    // engine outputGain, not through individual synth .output GainNodes
+    this.muteChipEngineOutputs(now);
+
     // Also clear pitch state and active player tracking for all channels
     this.channelPitchState.clear();
     this.channelActivePlayer.clear();
@@ -3159,6 +3281,38 @@ export class ToneEngine {
     });
     this.slicePlayersMap.clear();
 
+  }
+
+  /**
+   * Mute Furnace chip engine outputs for immediate silence on stop.
+   * Chip engines share a single outputGain that isn't the individual synth's .output,
+   * so releaseAll()'s per-instrument GainNode ramp doesn't affect them.
+   */
+  private muteChipEngineOutputs(now: number): void {
+    const muteAndRestore = (engineKey: string, getGain: () => GainNode | null) => {
+      const gain = getGain();
+      if (!gain) return;
+      const prevTimeout = this.releaseRestoreTimeouts.get(engineKey);
+      if (prevTimeout) clearTimeout(prevTimeout);
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value || 1, now);
+      gain.gain.linearRampToValueAtTime(0, now + 0.05);
+      const timeout = setTimeout(() => {
+        this.releaseRestoreTimeouts.delete(engineKey);
+        try {
+          gain.gain.cancelScheduledValues(0);
+          gain.gain.value = 1;
+        } catch { /* engine may be disposed */ }
+      }, 100);
+      this.releaseRestoreTimeouts.set(engineKey, timeout);
+    };
+
+    if (this.routedNativeEngines.has('FurnaceChipEngine')) {
+      muteAndRestore('__FurnaceChipEngine__', () => FurnaceChipEngine.getInstance().getNativeOutput());
+    }
+    if (this.routedNativeEngines.has('FurnaceDispatchEngine')) {
+      muteAndRestore('__FurnaceDispatchEngine__', () => FurnaceDispatchEngine.getInstance().getOrCreateSharedGain());
+    }
   }
 
   /**
@@ -5090,11 +5244,23 @@ export class ToneEngine {
         }
         break;
 
-      case 'BitCrusher':
-        if (node instanceof Tone.BitCrusher) {
-          if ('bits' in changed) node.bits.rampTo(changed.bits as number, R);
+      case 'BitCrusher': {
+        // BitCrusher is implemented as a Distortion with a staircase WaveShaper curve
+        const crusherNode = node as unknown as {
+          _isBitCrusher?: boolean;
+          _bitsValue?: number;
+          _shaper?: { setMap: (fn: (v: number) => number, len?: number) => void };
+        };
+        if (crusherNode._isBitCrusher && 'bits' in changed) {
+          const newBits = Number(changed.bits) || 4;
+          crusherNode._bitsValue = newBits;
+          const step = Math.pow(0.5, newBits - 1);
+          crusherNode._shaper?.setMap(
+            (val: number) => step * Math.floor(val / step + 0.5), 4096
+          );
         }
         break;
+      }
 
       case 'PingPongDelay':
         if (node instanceof Tone.PingPongDelay) {

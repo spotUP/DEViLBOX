@@ -963,9 +963,32 @@ export class FurnaceDispatchEngine {
     if (!workletNode || !engineCtx) return null;
     this._sharedGain = engineCtx.createGain();
     workletNode.connect(this._sharedGain);
-    this._sharedGain.connect(engineCtx.destination);
+    // NOTE: Output is NOT connected to destination here — ToneEngine.routeNativeEngineOutput()
+    // connects it to synthBus so audio flows through the master effects chain.
+    // A zero-gain keepalive ensures the worklet keeps processing.
+    try {
+      const keepalive = engineCtx.createGain();
+      keepalive.gain.value = 0;
+      workletNode.connect(keepalive);
+      keepalive.connect(engineCtx.destination);
+    } catch { /* keepalive failed */ }
     this._audioRouted = true;
     return this._sharedGain;
+  }
+
+  /**
+   * Route the engine's audio output to a native AudioNode (e.g. synthBus).
+   * Called by ToneEngine to ensure chip audio goes through the master effects chain.
+   */
+  routeOutputTo(target: AudioNode): void {
+    const gain = this.getOrCreateSharedGain();
+    if (gain) {
+      try {
+        gain.connect(target);
+      } catch (e) {
+        console.warn('[FurnaceDispatchEngine] routeOutputTo failed:', e);
+      }
+    }
   }
 
   /**

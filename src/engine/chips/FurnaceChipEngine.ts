@@ -339,17 +339,21 @@ export class FurnaceChipEngine {
         this.rawContext = ctxForWorklet;
         console.log('[FurnaceChipEngine] ✓ WASM chips initialized successfully');
 
-        // CRITICAL: Create native audio routing - all connections stay in native context.
-        // workletNode → outputGain → destination (all native AudioNodes)
-        // This avoids the native→SAC connection issue that causes silent failures.
-        // FurnaceSynth controls volume via setOutputGain() instead of connecting to SAC nodes.
+        // Create native audio routing - workletNode → outputGain (unconnected).
+        // The output is NOT connected to destination here — ToneEngine.routeNativeEngineOutput()
+        // connects it to synthBus so the audio flows through the master effects chain.
+        // A zero-gain keepalive to destination ensures the worklet keeps processing.
         try {
           const gain = ctxForWorklet.createGain();
           gain.gain.value = 1; // Full volume by default
           this.workletNode!.connect(gain);
-          gain.connect(ctxForWorklet.destination);
           this.outputGain = gain;
-          // Debug: console.log('[FurnaceChipEngine] ✓ Worklet → outputGain → destination (native audio path)');
+
+          // Keepalive: silent connection to destination to force worklet process() calls
+          const keepalive = ctxForWorklet.createGain();
+          keepalive.gain.value = 0;
+          this.workletNode!.connect(keepalive);
+          keepalive.connect(ctxForWorklet.destination);
         } catch (destErr) {
           console.warn('[FurnaceChipEngine] Native connection failed:', destErr);
           // Fallback: try nativeCtx
@@ -358,9 +362,12 @@ export class FurnaceChipEngine {
               const gain = nativeCtx.createGain();
               gain.gain.value = 1;
               this.workletNode!.connect(gain);
-              gain.connect(nativeCtx.destination);
               this.outputGain = gain;
-              console.log('[FurnaceChipEngine] ✓ Worklet → outputGain → native destination (fallback)');
+
+              const keepalive = nativeCtx.createGain();
+              keepalive.gain.value = 0;
+              this.workletNode!.connect(keepalive);
+              keepalive.connect(nativeCtx.destination);
             }
           } catch (nativeErr) {
             console.warn('[FurnaceChipEngine] Native fallback also failed:', nativeErr);
@@ -501,6 +508,21 @@ export class FurnaceChipEngine {
    */
   public getNativeOutput(): GainNode | null {
     return this.outputGain;
+  }
+
+  /**
+   * Route the engine's audio output to a native AudioNode (e.g. synthBus).
+   * Called by ToneEngine to ensure chip audio goes through the master effects chain
+   * instead of directly to destination.
+   */
+  public routeOutputTo(target: AudioNode): void {
+    if (this.outputGain) {
+      try {
+        this.outputGain.connect(target);
+      } catch (e) {
+        console.warn('[FurnaceChipEngine] routeOutputTo failed:', e);
+      }
+    }
   }
 
   /**

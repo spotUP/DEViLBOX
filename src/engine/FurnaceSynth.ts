@@ -5,6 +5,7 @@ import { getDevilboxAudioContext, audioNow, noteToFrequency } from '../utils/aud
 import { FurnaceChipEngine, FurnaceChipType } from './chips/FurnaceChipEngine';
 import { FurnaceRegisterMapper } from '../lib/import/formats/FurnaceRegisterMapper';
 import { FurnacePitchUtils } from '../lib/import/formats/FurnacePitchUtils';
+import { getToneEngine } from './ToneEngine';
 import { reportSynthError } from '../stores/useSynthErrorStore';
 
 /**
@@ -191,19 +192,20 @@ export class FurnaceSynth implements DevilboxSynth {
 
       // Check if WASM engine is actually available
       if (this.chipEngine.isInitialized()) {
-        // Audio routing is handled entirely in FurnaceChipEngine at the native level:
-        // workletNode → engineOutputGain → destination (all native AudioNodes)
-        // This avoids native→SAC connection issues that cause silent failures.
+        // Audio routing: workletNode → engineOutputGain → (routed by ToneEngine to synthBus)
+        // → masterEffectsInput → [master fx] → masterChannel → destination.
+        // ToneEngine.routeNativeEngineOutput() handles connecting the engine output
+        // to synthBus so audio flows through the master effects chain.
         // FurnaceSynth controls volume via chipEngine.setOutputGain().
-        //
-        // NOTE: This means Tone.js effects/metering on this.output won't receive
-        // the Furnace audio. For effects support, we'd need a different approach.
         this.useWasmEngine = true;
         // Apply any pending volume normalization offset
         if (this._volumeOffsetDb !== 0) {
           this.chipEngine.setOutputGain(Math.pow(10, this._volumeOffsetDb / 20));
         }
         console.log('[FurnaceSynth] ✓ WASM chip engine ready, chipType:', this.config.chipType);
+
+        // Ensure chip engine audio is routed through master effects chain
+        try { getToneEngine().routeNativeEngineOutput(this); } catch { /* ToneEngine not ready yet */ }
 
         // Write parameters to WASM
         this.updateParameters();
