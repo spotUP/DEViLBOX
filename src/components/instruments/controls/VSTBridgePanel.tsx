@@ -76,7 +76,7 @@ export const VSTBridgePanel: React.FC<VSTBridgePanelProps> = ({
         const engine = getToneEngine();
         // Look up the synth from the engine's instrument map
         // VSTBridge synths use shared instance key: ${id}--1
-        const key = `${instrument.id}--1`;
+        const key = engine.getInstrumentKey(instrument.id, -1);
         const synth = engine.instruments?.get(key) as VSTBridgeSynth | null;
         if (!synth || !('getParams' in synth)) {
           // Synth not yet available — retry after a delay

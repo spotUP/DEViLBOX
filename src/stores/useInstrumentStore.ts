@@ -1514,6 +1514,10 @@ export const useInstrumentStore = create<InstrumentStore>()(
             fromType: 'Sampler',
             toType: synthType,
           });
+          // Cap transform history to prevent unbounded growth
+          if (inst.metadata.transformHistory.length > 20) {
+            inst.metadata.transformHistory = inst.metadata.transformHistory.slice(-20);
+          }
         });
 
         // Invalidate instrument in audio engine

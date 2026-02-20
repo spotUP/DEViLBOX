@@ -41,10 +41,8 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   const [activeTab, setActiveTab] = useState<'pattern' | 'instruments'>('pattern');
   const [mobileChannel, setMobileChannel] = useState(0); // For portrait mode: which channel to show
   const [isInputCollapsed, setIsInputCollapsed] = useState(false); // Track MobilePatternInput collapse state
-  const { isPlaying, togglePlayPause } = useTransportStore(useShallow((s) => ({
-    isPlaying: s.isPlaying,
-    togglePlayPause: s.togglePlayPause,
-  })));
+  const isPlaying = useTransportStore((s) => s.isPlaying);
+  const togglePlayPause = useTransportStore((s) => s.togglePlayPause);
   const { patterns, currentPatternIndex, cursor, setCell, moveCursor, moveCursorToRow, recordMode, editStep, copySelection, cutSelection, paste, applySystemPreset } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,

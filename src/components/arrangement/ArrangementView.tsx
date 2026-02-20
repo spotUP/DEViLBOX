@@ -26,7 +26,7 @@ export const ArrangementView: React.FC = () => {
     isArrangementMode,
     setIsArrangementMode,
   } = useArrangementStore();
-  const transport = useTransportStore();
+  const isPlaying = useTransportStore(s => s.isPlaying);
   const hasMigratedRef = useRef(false);
   const hasZoomedRef = useRef(false);
 
@@ -60,11 +60,11 @@ export const ArrangementView: React.FC = () => {
 
   // Sync playback position with arrangement
   useEffect(() => {
-    if (!transport.isPlaying || !isArrangementMode) return;
+    if (!isPlaying || !isArrangementMode) return;
 
     const rafId = requestAnimationFrame(function updatePlayback() {
-      // Get current global row from transport
-      const globalRow = transport.currentGlobalRow;
+      // Read current global row from store state (not reactive — avoids 50Hz re-renders)
+      const globalRow = useTransportStore.getState().currentGlobalRow;
 
       // Update arrangement playback position
       useArrangementStore.getState().setPlaybackRow(globalRow);
@@ -76,7 +76,7 @@ export const ArrangementView: React.FC = () => {
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [transport.isPlaying, transport.currentGlobalRow, isArrangementMode]);
+  }, [isPlaying, isArrangementMode]);
 
   const layoutEntries = useMemo(() => {
     const sorted = tracks

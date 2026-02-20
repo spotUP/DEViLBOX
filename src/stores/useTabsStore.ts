@@ -57,12 +57,12 @@ const captureCurrentState = (): TabState => {
   const transportState = useTransportStore.getState();
 
   return {
-    patterns: JSON.parse(JSON.stringify(trackerState.patterns)),
+    patterns: structuredClone(trackerState.patterns),
     currentPatternIndex: trackerState.currentPatternIndex,
-    instruments: JSON.parse(JSON.stringify(instrumentState.instruments)),
+    instruments: structuredClone(instrumentState.instruments),
     currentInstrumentId: instrumentState.currentInstrumentId,
-    automationCurves: JSON.parse(JSON.stringify(automationState.curves)),
-    metadata: JSON.parse(JSON.stringify(projectState.metadata)),
+    automationCurves: structuredClone(automationState.curves),
+    metadata: structuredClone(projectState.metadata),
     bpm: transportState.bpm,
   };
 };

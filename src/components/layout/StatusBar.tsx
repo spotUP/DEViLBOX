@@ -102,7 +102,8 @@ const TrackerStatusContent: React.FC = () => {
   const insertMode = useTrackerStore((state) => state.insertMode);
   const recordMode = useTrackerStore((state) => state.recordMode);
   const patternLength = useTrackerStore((state) => state.patterns[state.currentPatternIndex]?.length || 64);
-  const { isPlaying, currentRow } = useTransportStore();
+  const isPlaying = useTransportStore((s) => s.isPlaying);
+  const currentRow = useTransportStore((s) => s.currentRow);
 
   const displayRow = isPlaying ? currentRow : cursor.rowIndex;
   const rowDisplay = `${String(displayRow).padStart(2, '0')}/${String(patternLength - 1).padStart(2, '0')}`;
