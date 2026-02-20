@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import type { DrumPad, FilterType, OutputBus } from '../../types/drumpad';
+import type { DrumPad, FilterType, OutputBus, ScratchActionId } from '../../types/drumpad';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 
 interface PadEditorProps {
@@ -11,7 +11,23 @@ interface PadEditorProps {
   onClose?: () => void;
 }
 
-type TabName = 'main' | 'adsr' | 'filter' | 'layers';
+type TabName = 'main' | 'adsr' | 'filter' | 'layers' | 'dj';
+
+const SCRATCH_ACTION_OPTIONS: { value: ScratchActionId | ''; label: string }[] = [
+  { value: '',             label: 'None' },
+  { value: 'scratch_baby', label: 'Baby Scratch' },
+  { value: 'scratch_trans',label: 'Transformer' },
+  { value: 'scratch_flare',label: 'Flare' },
+  { value: 'scratch_hydro',label: 'Hydroplane' },
+  { value: 'scratch_crab', label: 'Crab' },
+  { value: 'scratch_orbit',label: 'Orbit' },
+  { value: 'scratch_stop', label: 'Stop Scratch' },
+  { value: 'lfo_off',      label: 'Fader LFO: Off' },
+  { value: 'lfo_14',       label: 'Fader LFO: ¼' },
+  { value: 'lfo_18',       label: 'Fader LFO: ⅛' },
+  { value: 'lfo_116',      label: 'Fader LFO: ⅟₁₆' },
+  { value: 'lfo_132',      label: 'Fader LFO: ⅟₃₂' },
+];
 
 export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
   const [activeTab, setActiveTab] = useState<TabName>('main');
@@ -72,6 +88,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
     { id: 'adsr', label: 'ADSR' },
     { id: 'filter', label: 'Filter' },
     { id: 'layers', label: 'Layers' },
+    { id: 'dj', label: 'DJ' },
   ];
 
   return (
@@ -334,6 +351,45 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
             <button className="w-full px-4 py-2 bg-accent-primary hover:bg-accent-primary/80 text-white text-xs font-bold rounded transition-colors">
               + Add Layer
             </button>
+          </div>
+        )}
+
+        {activeTab === 'dj' && (
+          <div className="space-y-4">
+            <div className="text-xs text-text-muted">
+              Assign a DJ scratch action to this pad. It fires on every hit, in addition to any loaded sample.
+            </div>
+
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Scratch / Fader Action</label>
+              <select
+                value={pad.scratchAction ?? ''}
+                onChange={(e) => handleUpdate({ scratchAction: (e.target.value as ScratchActionId) || undefined })}
+                className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
+              >
+                {SCRATCH_ACTION_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            {pad.scratchAction && (
+              <div className="p-3 bg-dark-surface border border-dark-border rounded text-xs font-mono">
+                <div className="text-text-muted mb-1">Active action:</div>
+                <div className="text-accent-primary">
+                  {SCRATCH_ACTION_OPTIONS.find(o => o.value === pad.scratchAction)?.label ?? pad.scratchAction}
+                </div>
+                <div className="text-text-muted mt-2">
+                  Targets the active playing DJ deck (prefers A over B).
+                </div>
+              </div>
+            )}
+
+            {!pad.scratchAction && (
+              <div className="p-3 bg-dark-surface border border-dark-border/50 rounded text-xs text-text-muted font-mono">
+                No DJ action assigned. This pad will only trigger its sample (if loaded).
+              </div>
+            )}
           </div>
         )}
       </div>
