@@ -11,6 +11,7 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
+import { isAudioFile } from '@/lib/audioFileUtils';
 import { DeckTransport } from './DeckTransport';
 import { DeckPitchSlider } from './DeckPitchSlider';
 import { DeckNudge } from './DeckNudge';
@@ -21,6 +22,9 @@ import { DeckTurntable } from './DeckTurntable';
 import { DeckLoopControls } from './DeckLoopControls';
 import { DeckScopes } from './DeckScopes';
 import { DeckScratch } from './DeckScratch';
+import { DeckCuePoints } from './DeckCuePoints';
+import { DeckBeatGrid } from './DeckBeatGrid';
+import { DeckAudioWaveform } from './DeckAudioWaveform';
 
 interface DJDeckProps {
   deckId: 'A' | 'B';
@@ -33,7 +37,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
   const [vizResetKey, setVizResetKey] = useState(0);
   const dragCountRef = useRef(0);
 
-  // Poll replayer position and update store at ~30fps
+  // Poll playback position and update store at ~30fps
   useEffect(() => {
     let running = true;
 
@@ -43,24 +47,42 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       try {
         const engine = getDJEngine();
         const deck = engine.getDeck(deckId);
-        const replayer = deck.replayer;
         const store = useDJStore.getState();
 
-        if (replayer.isPlaying()) {
-          store.setDeckPosition(deckId, replayer.getSongPos(), replayer.getPattPos());
-          // Update elapsed time + live effective BPM (accounts for Fxx mid-song changes + pitch multiplier)
-          const liveBPM = Math.round(replayer.getBPM() * replayer.getTempoMultiplier() * 100) / 100;
-          store.setDeckState(deckId, {
-            elapsedMs: replayer.getElapsedMs(),
-            effectiveBPM: liveBPM,
-          });
-          // Relay BPM changes to ScratchPlayback for LFO resync
-          try { deck.notifyBPMChange(liveBPM); } catch { /* engine not ready */ }
-        }
+        if (deck.playbackMode === 'audio') {
+          // Audio file mode — poll audio player position
+          if (deck.audioPlayer.isCurrentlyPlaying()) {
+            const pos = deck.audioPlayer.getPosition();
+            const dur = deck.audioPlayer.getDuration();
+            store.setDeckState(deckId, {
+              audioPosition: pos,
+              elapsedMs: pos * 1000,
+              durationMs: dur * 1000,
+            });
+          }
+          // Detect end of audio playback
+          if (!deck.audioPlayer.isCurrentlyPlaying() && store.decks[deckId].isPlaying) {
+            store.setDeckPlaying(deckId, false);
+          }
+        } else {
+          // Tracker module mode — poll replayer position
+          const replayer = deck.replayer;
+          if (replayer.isPlaying()) {
+            store.setDeckPosition(deckId, replayer.getSongPos(), replayer.getPattPos());
+            // Update elapsed time + live effective BPM (accounts for Fxx mid-song changes + pitch multiplier)
+            const liveBPM = Math.round(replayer.getBPM() * replayer.getTempoMultiplier() * 100) / 100;
+            store.setDeckState(deckId, {
+              elapsedMs: replayer.getElapsedMs(),
+              effectiveBPM: liveBPM,
+            });
+            // Relay BPM changes to ScratchPlayback for LFO resync
+            try { deck.notifyBPMChange(liveBPM); } catch { /* engine not ready */ }
+          }
 
-        // Auto-clear activePatternName when a one-shot pattern finishes naturally
-        if (!deck.isPatternActive() && store.decks[deckId].activePatternName !== null) {
-          store.setDeckPattern(deckId, null);
+          // Auto-clear activePatternName when a one-shot pattern finishes naturally
+          if (!deck.isPatternActive() && store.decks[deckId].activePatternName !== null) {
+            store.setDeckPattern(deckId, null);
+          }
         }
       } catch {
         // Engine might not be initialized yet
@@ -164,24 +186,72 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
     setVizResetKey((k) => k + 1);
     setIsLoadingDrop(true);
     try {
-      const song = await parseModuleToSong(file);
-      cacheSong(file.name, song);
-      const bpmResult = detectBPM(song);
-
       const engine = getDJEngine();
-      await engine.loadToDeck(deckId, song);
 
-      useDJStore.getState().setDeckState(deckId, {
-        fileName: file.name,
-        trackName: song.name || file.name,
-        detectedBPM: bpmResult.bpm,
-        effectiveBPM: bpmResult.bpm,
-        totalPositions: song.songLength,
-        songPos: 0,
-        pattPos: 0,
-        elapsedMs: 0,
-        isPlaying: false,
-      });
+      if (isAudioFile(file.name)) {
+        // Audio file mode (MP3, WAV, FLAC, etc.)
+        const buffer = await file.arrayBuffer();
+        const info = await engine.loadAudioToDeck(deckId, buffer, file.name);
+
+        // Try to parse Serato metadata (cue points, beatgrid, BPM)
+        let seratoBPM = 0;
+        let seratoCues: import('@/lib/serato/seratoMetadata').SeratoCuePoint[] = [];
+        let seratoLoops: import('@/lib/serato/seratoMetadata').SeratoLoop[] = [];
+        let seratoBeatGrid: import('@/lib/serato/seratoMetadata').SeratoBeatMarker[] = [];
+        let seratoKey: string | null = null;
+        try {
+          const { readSeratoMetadata } = await import('@/lib/serato/seratoMetadata');
+          const meta = readSeratoMetadata(buffer);
+          seratoBPM = meta.bpm ?? 0;
+          seratoCues = meta.cuePoints;
+          seratoLoops = meta.loops;
+          seratoBeatGrid = meta.beatGrid;
+          seratoKey = meta.key;
+        } catch { /* Not a Serato-analyzed file */ }
+
+        useDJStore.getState().setDeckState(deckId, {
+          fileName: file.name,
+          trackName: file.name.replace(/\.[^.]+$/, ''),
+          detectedBPM: seratoBPM,
+          effectiveBPM: seratoBPM,
+          totalPositions: 0,
+          songPos: 0,
+          pattPos: 0,
+          elapsedMs: 0,
+          isPlaying: false,
+          playbackMode: 'audio',
+          durationMs: info.duration * 1000,
+          audioPosition: 0,
+          waveformPeaks: info.waveformPeaks,
+          seratoCuePoints: seratoCues,
+          seratoLoops: seratoLoops,
+          seratoBeatGrid: seratoBeatGrid,
+          seratoKey: seratoKey,
+        });
+      } else {
+        // Tracker module mode (MOD, XM, IT, S3M, etc.)
+        const song = await parseModuleToSong(file);
+        cacheSong(file.name, song);
+        const bpmResult = detectBPM(song);
+
+        await engine.loadToDeck(deckId, song);
+
+        useDJStore.getState().setDeckState(deckId, {
+          fileName: file.name,
+          trackName: song.name || file.name,
+          detectedBPM: bpmResult.bpm,
+          effectiveBPM: bpmResult.bpm,
+          totalPositions: song.songLength,
+          songPos: 0,
+          pattPos: 0,
+          elapsedMs: 0,
+          isPlaying: false,
+          playbackMode: 'tracker',
+          durationMs: 0,
+          audioPosition: 0,
+          waveformPeaks: null,
+        });
+      }
     } catch (err) {
       console.error(`[DJDeck] Failed to load ${file.name} to deck ${deckId}:`, err);
     } finally {
@@ -234,12 +304,18 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         <DeckTurntable deckId={deckId} />
       </div>
 
-      {/* Track overview bar */}
-      <DeckTrackOverview deckId={deckId} />
+      {/* Track overview bar (with beatgrid overlay for audio mode) */}
+      <div className="relative">
+        <DeckTrackOverview deckId={deckId} />
+        <DeckBeatGrid deckId={deckId} />
+      </div>
+
+      {/* Scrolling audio waveform (audio mode only, shown above the visualizer) */}
+      <DeckAudioWaveform deckId={deckId} />
 
       {/* Main controls area: pattern display + pitch slider */}
       <div className={`flex gap-2 flex-1 min-h-0 ${isB ? 'flex-row-reverse' : ''}`}>
-        {/* Pattern display */}
+        {/* Pattern display / Visualizer */}
         <div className="flex-1 min-w-0 min-h-0">
           <DeckVisualizer deckId={deckId} resetKey={vizResetKey} />
         </div>
@@ -249,6 +325,9 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
           <DeckPitchSlider deckId={deckId} />
         </div>
       </div>
+
+      {/* Cue points (audio mode only) */}
+      <DeckCuePoints deckId={deckId} />
 
       {/* Transport + Nudge + Loop */}
       <div className="flex items-center gap-2">

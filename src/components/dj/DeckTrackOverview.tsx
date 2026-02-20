@@ -8,6 +8,7 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { getDJEngine } from '@/engine/dj/DJEngine';
 
 interface DeckTrackOverviewProps {
   deckId: 'A' | 'B';
@@ -29,12 +30,16 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
   const pulsePhaseRef = useRef(0);
 
   // Subscribe to relevant store slices
+  const playbackMode = useDJStore((s) => s.decks[deckId].playbackMode);
   const songPos = useDJStore((s) => s.decks[deckId].songPos);
   const totalPositions = useDJStore((s) => s.decks[deckId].totalPositions);
   const cuePoint = useDJStore((s) => s.decks[deckId].cuePoint);
   const loopActive = useDJStore((s) => s.decks[deckId].loopActive);
   const patternLoopStart = useDJStore((s) => s.decks[deckId].patternLoopStart);
   const patternLoopEnd = useDJStore((s) => s.decks[deckId].patternLoopEnd);
+  const audioPosition = useDJStore((s) => s.decks[deckId].audioPosition);
+  const durationMs = useDJStore((s) => s.decks[deckId].durationMs);
+  const waveformPeaks = useDJStore((s) => s.decks[deckId].waveformPeaks);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -69,71 +74,115 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, width, height);
 
-    const total = Math.max(totalPositions, 1);
+    if (playbackMode === 'audio') {
+      // ── Audio file mode — draw waveform overview ──
+      const durationSec = durationMs / 1000;
 
-    // Draw pattern segments with alternating colors
-    const segmentWidth = width / total;
-    for (let i = 0; i < total; i++) {
-      ctx.fillStyle = i % 2 === 0 ? bgSecondary : bgTertiary;
-      const x = Math.floor(i * segmentWidth);
-      const w = Math.ceil(segmentWidth);
-      ctx.fillRect(x, 0, w, height);
+      if (waveformPeaks && waveformPeaks.length > 0 && durationSec > 0) {
+        // Draw waveform peaks
+        const numBins = waveformPeaks.length;
+        const binWidth = width / numBins;
+        const midY = height / 2;
 
-      // Thin separator line between segments
-      if (i > 0) {
-        ctx.fillStyle = borderColor;
-        ctx.fillRect(x, 0, 1, height);
+        for (let i = 0; i < numBins; i++) {
+          const amp = waveformPeaks[i];
+          const barH = amp * midY * 0.9;
+          const x = i * binWidth;
+
+          ctx.fillStyle = 'rgba(100, 160, 255, 0.5)';
+          ctx.fillRect(x, midY - barH, Math.max(1, binWidth - 0.5), barH * 2);
+        }
+      } else {
+        // No waveform data — show empty bar
+        ctx.fillStyle = bgSecondary;
+        ctx.fillRect(0, 0, width, height);
       }
-    }
 
-    // Near-end warning pulse (> 85% of total)
-    const progress = songPos / total;
-    if (progress > 0.85 && total > 0) {
-      pulsePhaseRef.current += 0.08;
-      const alpha = 0.15 + 0.15 * Math.sin(pulsePhaseRef.current);
-      ctx.fillStyle = `rgba(239, 68, 68, ${alpha})`;
-      ctx.fillRect(0, 0, width, height);
+      // Near-end warning pulse (> 85%)
+      const progress = durationSec > 0 ? audioPosition / durationSec : 0;
+      if (progress > 0.85 && durationSec > 0) {
+        pulsePhaseRef.current += 0.08;
+        const alpha = 0.15 + 0.15 * Math.sin(pulsePhaseRef.current);
+        ctx.fillStyle = `rgba(239, 68, 68, ${alpha})`;
+        ctx.fillRect(0, 0, width, height);
+      } else {
+        pulsePhaseRef.current = 0;
+      }
+
+      // Current position marker
+      if (durationSec > 0) {
+        const posX = (audioPosition / durationSec) * width;
+
+        ctx.fillStyle = POSITION_COLOR;
+        ctx.fillRect(posX - 1, 0, 2, height);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(posX, 0, 1, height);
+      }
     } else {
-      pulsePhaseRef.current = 0;
-    }
+      // ── Tracker module mode — draw pattern segments ──
+      const total = Math.max(totalPositions, 1);
 
-    // Loop region overlay
-    if (loopActive && patternLoopEnd > patternLoopStart) {
-      const loopStartX = (patternLoopStart / total) * width;
-      const loopEndX = (patternLoopEnd / total) * width;
-      const loopWidth = loopEndX - loopStartX;
+      const segmentWidth = width / total;
+      for (let i = 0; i < total; i++) {
+        ctx.fillStyle = i % 2 === 0 ? bgSecondary : bgTertiary;
+        const x = Math.floor(i * segmentWidth);
+        const w = Math.ceil(segmentWidth);
+        ctx.fillRect(x, 0, w, height);
 
-      ctx.fillStyle = LOOP_COLOR;
-      ctx.fillRect(loopStartX, 0, loopWidth, height);
+        if (i > 0) {
+          ctx.fillStyle = borderColor;
+          ctx.fillRect(x, 0, 1, height);
+        }
+      }
 
-      // Loop region borders
-      ctx.fillStyle = LOOP_BORDER_COLOR;
-      ctx.fillRect(loopStartX, 0, 1, height);
-      ctx.fillRect(loopEndX - 1, 0, 1, height);
-    }
+      // Near-end warning pulse (> 85% of total)
+      const progress = songPos / total;
+      if (progress > 0.85 && total > 0) {
+        pulsePhaseRef.current += 0.08;
+        const alpha = 0.15 + 0.15 * Math.sin(pulsePhaseRef.current);
+        ctx.fillStyle = `rgba(239, 68, 68, ${alpha})`;
+        ctx.fillRect(0, 0, width, height);
+      } else {
+        pulsePhaseRef.current = 0;
+      }
 
-    // Cue point marker (small orange triangle below)
-    if (cuePoint >= 0 && cuePoint < total) {
-      const cueX = ((cuePoint + 0.5) / total) * width;
-      ctx.fillStyle = CUE_COLOR;
-      ctx.beginPath();
-      ctx.moveTo(cueX - 4, height);
-      ctx.lineTo(cueX + 4, height);
-      ctx.lineTo(cueX, height - 6);
-      ctx.closePath();
-      ctx.fill();
-    }
+      // Loop region overlay
+      if (loopActive && patternLoopEnd > patternLoopStart) {
+        const loopStartX = (patternLoopStart / total) * width;
+        const loopEndX = (patternLoopEnd / total) * width;
+        const loopWidth = loopEndX - loopStartX;
 
-    // Current position marker (bright vertical line)
-    if (total > 0) {
-      const posX = ((songPos + 0.5) / total) * width;
+        ctx.fillStyle = LOOP_COLOR;
+        ctx.fillRect(loopStartX, 0, loopWidth, height);
 
-      ctx.fillStyle = POSITION_COLOR;
-      ctx.fillRect(posX - 1, 0, 2, height);
+        ctx.fillStyle = LOOP_BORDER_COLOR;
+        ctx.fillRect(loopStartX, 0, 1, height);
+        ctx.fillRect(loopEndX - 1, 0, 1, height);
+      }
 
-      // Bright center line
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(posX, 0, 1, height);
+      // Cue point marker (small orange triangle below)
+      if (cuePoint >= 0 && cuePoint < total) {
+        const cueX = ((cuePoint + 0.5) / total) * width;
+        ctx.fillStyle = CUE_COLOR;
+        ctx.beginPath();
+        ctx.moveTo(cueX - 4, height);
+        ctx.lineTo(cueX + 4, height);
+        ctx.lineTo(cueX, height - 6);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Current position marker (bright vertical line)
+      if (total > 0) {
+        const posX = ((songPos + 0.5) / total) * width;
+
+        ctx.fillStyle = POSITION_COLOR;
+        ctx.fillRect(posX - 1, 0, 2, height);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(posX, 0, 1, height);
+      }
     }
 
     // Border
@@ -143,7 +192,7 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
 
     // Request next frame for smooth animation (especially for warning pulse)
     animFrameRef.current = requestAnimationFrame(draw);
-  }, [songPos, totalPositions, cuePoint, loopActive, patternLoopStart, patternLoopEnd]);
+  }, [playbackMode, songPos, totalPositions, cuePoint, loopActive, patternLoopStart, patternLoopEnd, audioPosition, durationMs, waveformPeaks]);
 
   useEffect(() => {
     animFrameRef.current = requestAnimationFrame(draw);
@@ -154,8 +203,42 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
     };
   }, [draw]);
 
+  // Click to seek (audio mode)
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+
+    try {
+      const engine = getDJEngine();
+      const deck = engine.getDeck(deckId);
+      if (deck.playbackMode === 'audio') {
+        const seekSec = fraction * (durationMs / 1000);
+        deck.audioPlayer.seek(seekSec);
+        useDJStore.getState().setDeckState(deckId, {
+          audioPosition: seekSec,
+          elapsedMs: seekSec * 1000,
+        });
+      } else {
+        // Tracker mode: jump to song position
+        const total = Math.max(totalPositions, 1);
+        const targetPos = Math.floor(fraction * total);
+        deck.cue(targetPos, 0);
+        useDJStore.getState().setDeckPosition(deckId, targetPos, 0);
+      }
+    } catch {
+      // Engine not ready
+    }
+  }, [deckId, playbackMode, durationMs, totalPositions]);
+
   return (
-    <div ref={containerRef} className="w-full" style={{ height: BAR_HEIGHT }}>
+    <div
+      ref={containerRef}
+      className="w-full cursor-pointer"
+      style={{ height: BAR_HEIGHT }}
+      onClick={handleClick}
+    >
       <canvas
         ref={canvasRef}
         className="block rounded-sm"

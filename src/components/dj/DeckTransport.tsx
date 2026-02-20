@@ -47,11 +47,25 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       const engine = getDJEngine();
       const thisDeck = engine.getDeck(deckId);
       const otherDeck = engine.getDeck(otherDeckId);
-      if (!otherDeck.replayer.getSong()) return; // Other deck has no song loaded
+      const otherState = useDJStore.getState().decks[otherDeckId];
 
-      const semitones = DJBeatSync.syncBPM(otherDeck, thisDeck);
-      useDJStore.getState().setDeckPitch(deckId, semitones);
-      // Store subscription in DJDeck.tsx propagates to engine automatically
+      // Check if other deck has a track loaded (either mode)
+      if (!otherState.fileName) return;
+
+      if (otherDeck.playbackMode === 'audio' || thisDeck.playbackMode === 'audio') {
+        // For audio mode, match BPM via the detected values in the store
+        const targetBPM = otherState.detectedBPM;
+        const thisBPMBase = useDJStore.getState().decks[deckId].detectedBPM;
+        if (targetBPM > 0 && thisBPMBase > 0) {
+          const ratio = targetBPM / thisBPMBase;
+          const semitones = 12 * Math.log2(ratio);
+          useDJStore.getState().setDeckPitch(deckId, semitones);
+        }
+      } else {
+        if (!otherDeck.replayer.getSong()) return;
+        const semitones = DJBeatSync.syncBPM(otherDeck, thisDeck);
+        useDJStore.getState().setDeckPitch(deckId, semitones);
+      }
     } catch {
       // Engine might not be initialized yet
     }
