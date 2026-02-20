@@ -6,6 +6,7 @@
 import React from 'react';
 import { useTrackerStore, useTransportStore, useAudioStore, useMIDIStore, useUIStore } from '@stores';
 import { useDJStore } from '@/stores/useDJStore';
+import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { KNOB_BANKS, type KnobAssignment } from '@/midi/knobBanks';
 import type { KnobBankMode } from '@/midi/types';
 import { Lightbulb, Disc, Activity, Settings, Sliders, Waves, ChevronDown, ChevronUp } from 'lucide-react';
@@ -139,6 +140,8 @@ const TrackerStatusContent: React.FC = () => {
 export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) => {
   const activeView = useUIStore((s) => s.activeView);
   const { contextState } = useAudioStore();
+  const collabStatus = useCollaborationStore((s) => s.status);
+  const collabRoomCode = useCollaborationStore((s) => s.roomCode);
 
   // MIDI state
   const { knobBank, setKnobBank, isInitialized, inputDevices, selectedInputId, showKnobBar, setShowKnobBar } = useMIDIStore();
@@ -240,6 +243,18 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) =
                 <span className="text-[10px] font-bold uppercase tracking-tight">Tips</span>
               </button>
               <div className="w-px h-3 bg-border opacity-50"></div>
+            </>
+          )}
+
+          {/* Collab connected badge */}
+          {collabStatus === 'connected' && collabRoomCode && (
+            <>
+              <span className="flex items-center gap-1.5 text-accent-success">
+                <span className="w-2 h-2 rounded-full bg-accent-success animate-pulse" />
+                <span className="font-bold">Collab</span>
+                <span className="font-mono text-[10px] text-text-muted">{collabRoomCode}</span>
+              </span>
+              <div className="w-px h-3 bg-border opacity-50" />
             </>
           )}
 

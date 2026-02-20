@@ -37,6 +37,7 @@ import { notify } from '@stores/useNotificationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useProjectStore } from '@stores/useProjectStore';
+import { useCollaborationStore } from '@stores/useCollaborationStore';
 import type { Pattern } from '@typedefs';
 
 // Lazy-loaded components for better startup performance
@@ -59,6 +60,7 @@ const DJView = lazy(() => import('./components/dj/DJView').then(m => ({ default:
 const FileBrowser = lazy(() => import('@components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser })));
 const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => ({ default: m.AuthModal })));
 const PixiApp = lazy(() => import('./pixi/PixiApp').then(m => ({ default: m.PixiApp })));
+const CollaborationSplitView = lazy(() => import('@components/collaboration/CollaborationSplitView').then(m => ({ default: m.CollaborationSplitView })));
 
 function App() {
   // Check for application updates
@@ -87,6 +89,9 @@ function App() {
     arrangementPoppedOut, setArrangementPoppedOut,
     showFileBrowser, setShowFileBrowser,
   } = useUIStore();
+  const collabStatus = useCollaborationStore((s) => s.status);
+  const collabViewMode = useCollaborationStore((s) => s.viewMode);
+  const isCollabSplit = collabStatus === 'connected' && collabViewMode === 'split';
   const [initError, setInitError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -716,7 +721,7 @@ function App() {
           <span className="text-text-muted font-mono text-sm">Loading WebGL UI...</span>
         </div>
       }>
-        <PixiApp onSwitchToDom={() => useSettingsStore.getState().setRenderMode('dom')} />
+        <PixiApp />
       </Suspense>
     );
   }
@@ -862,7 +867,29 @@ function App() {
         <div className="flex flex-1 min-h-0 min-w-0 overflow-y-hidden">
           {/* Left side - Pattern Editor or Arrangement View */}
           <div className="flex flex-col min-h-0 min-w-0 flex-1">
-            {activeView === 'tracker' && (
+            {/* Collab split view — takes over the tracker view when active */}
+            {isCollabSplit && activeView === 'tracker' && (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading collab...</div>}>
+                <CollaborationSplitView
+                  onShowPatterns={() => setShowPatterns(!showPatterns)}
+                  onShowExport={() => setShowExport(true)}
+                  onShowHelp={(tab) => {
+                    if (tab) setHelpInitialTab(tab as any);
+                    else setHelpInitialTab('shortcuts');
+                    setShowHelp(true);
+                  }}
+                  onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
+                  onShowInstrumentFX={() => setShowInstrumentFX(!showInstrumentFX)}
+                  onShowInstruments={() => setShowInstrumentModal(true)}
+                  onShowDrumpads={() => setShowDrumpads(true)}
+                  showPatterns={showPatterns}
+                  showMasterFX={showMasterFX}
+                  showInstrumentFX={showInstrumentFX}
+                />
+              </Suspense>
+            )}
+
+            {activeView === 'tracker' && !isCollabSplit && (
               <>
                 {/* Pattern Management (optional) */}
                 {showPatterns && (
