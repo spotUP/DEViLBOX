@@ -1,6 +1,12 @@
 /**
  * Master Effects Presets
- * Pre-configured effect chains for common mixing scenarios
+ *
+ * These are MIX-BUS / MASTERING presets — subtle, cohesive processing
+ * that enhances the full mix. They should never drastically alter the
+ * character of individual sounds. Think: what a mastering engineer
+ * would put across the stereo bus.
+ *
+ * For creative sound-design presets, see instrumentFxPresets.ts.
  */
 
 import type { EffectConfig } from '@typedefs/instrument';
@@ -8,24 +14,19 @@ import type { EffectConfig } from '@typedefs/instrument';
 export interface MasterFxPreset {
   name: string;
   description: string;
-  category: 'Clean' | 'Club' | 'Lo-Fi' | 'Ambient' | 'Aggressive' | 'Dub' | 'Genre';
+  category: 'Clean' | 'Warm' | 'Loud' | 'Wide' | 'Vinyl' | 'Genre' | 'DJ';
   effects: Omit<EffectConfig, 'id'>[];
 }
 
 export const MASTER_FX_PRESETS: MasterFxPreset[] = [
-  // === CLEAN ===
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CLEAN — Transparent mastering, minimal coloration
+  // ═══════════════════════════════════════════════════════════════════════════
   {
     name: 'Clean Master',
-    description: 'Subtle compression and EQ for polished output',
+    description: 'Gentle glue compression + tonal balance — transparent finishing',
     category: 'Clean',
     effects: [
-      {
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -18, ratio: 3, attack: 0.01, release: 0.2 },
-      },
       {
         category: 'tonejs',
         type: 'EQ3',
@@ -33,11 +34,18 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
         wet: 100,
         parameters: { low: 1, mid: 0, high: 0.5 },
       },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -18, ratio: 2.5, attack: 0.01, release: 0.2 },
+      },
     ],
   },
   {
     name: 'Transparent',
-    description: 'Very light processing, preserves dynamics',
+    description: 'Barely-there bus compression — preserves full dynamics',
     category: 'Clean',
     effects: [
       {
@@ -45,14 +53,208 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
         type: 'Compressor',
         enabled: true,
         wet: 100,
-        parameters: { threshold: -12, ratio: 2, attack: 0.02, release: 0.3 },
+        parameters: { threshold: -12, ratio: 1.5, attack: 0.03, release: 0.3 },
       },
     ],
   },
   {
-    name: 'Stereo Wide',
-    description: 'Clean stereo enhancement for wider soundstage',
+    name: 'Balanced',
+    description: 'EQ sculpting + light compression for a polished, even mix',
     category: 'Clean',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 1.5, mid: -0.5, high: 1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -16, ratio: 2, attack: 0.015, release: 0.25 },
+      },
+      {
+        category: 'tonejs',
+        type: 'StereoWidener',
+        enabled: true,
+        wet: 100,
+        parameters: { width: 0.55 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // WARM — Analog-flavored mastering with saturation and tape color
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Analog Warmth',
+    description: 'Tape saturation + compression — the sound of a warm analog mix bus',
+    category: 'Warm',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'TapeSaturation',
+        enabled: true,
+        wet: 30,
+        parameters: { drive: 35, tone: 10000 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -16, ratio: 3, attack: 0.01, release: 0.2 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 1.5, mid: 0, high: -0.5 },
+      },
+    ],
+  },
+  {
+    name: 'Tape Machine',
+    description: 'Tape simulator for subtle wow, saturation, and head-bump warmth',
+    category: 'Warm',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'TapeSimulator',
+        enabled: true,
+        wet: 40,
+        parameters: { drive: 25, character: 35, bias: 45, shame: 15, hiss: 5, speed: 1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -18, ratio: 2.5, attack: 0.015, release: 0.25 },
+      },
+    ],
+  },
+  {
+    name: 'Tube Console',
+    description: 'Chebyshev harmonics + EQ shaping — tube mixing desk vibe',
+    category: 'Warm',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'Chebyshev',
+        enabled: true,
+        wet: 12,
+        parameters: { order: 2 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 2, mid: 0.5, high: -1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -15, ratio: 3, attack: 0.008, release: 0.18 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LOUD — Aggressive bus processing for maximum impact
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Club Ready',
+    description: 'Punchy compression with sub boost — loud and dancefloor-ready',
+    category: 'Loud',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 3, mid: -1, high: 2 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -14, ratio: 4, attack: 0.005, release: 0.12 },
+      },
+      {
+        category: 'tonejs',
+        type: 'TapeSaturation',
+        enabled: true,
+        wet: 18,
+        parameters: { drive: 40, tone: 11000 },
+      },
+    ],
+  },
+  {
+    name: 'Brick Wall',
+    description: 'Hard limiting for maximum loudness — squashed but punchy',
+    category: 'Loud',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 2, mid: 0, high: 1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -8, ratio: 12, attack: 0.001, release: 0.05 },
+      },
+    ],
+  },
+  {
+    name: 'Pumping',
+    description: 'Aggressive sidechain-style compression — obvious pump for EDM',
+    category: 'Loud',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 4, mid: -2, high: 1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -10, ratio: 8, attack: 0.001, release: 0.15 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Distortion',
+        enabled: true,
+        wet: 10,
+        parameters: { distortion: 0.1 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // WIDE — Stereo enhancement and spatial mastering
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Stereo Wide',
+    description: 'Subtle stereo widening + glue compression for an expansive mix',
+    category: 'Wide',
     effects: [
       {
         category: 'tonejs',
@@ -70,33 +272,158 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
       },
     ],
   },
-
-  // === CLUB ===
   {
-    name: 'Club Ready',
-    description: 'Punchy compression with subs, ready for the dancefloor',
-    category: 'Club',
+    name: 'Room Glue',
+    description: 'Short plate reverb to glue the mix in a shared acoustic space',
+    category: 'Wide',
     effects: [
       {
-        category: 'tonejs',
-        type: 'EQ3',
+        category: 'wasm',
+        type: 'MVerb',
         enabled: true,
-        wet: 100,
-        parameters: { low: 3, mid: -1, high: 2 },
+        wet: 15,
+        parameters: { damping: 0.6, density: 0.5, bandwidth: 0.7, decay: 0.3, predelay: 0.0, size: 0.4, gain: 1.0, mix: 0.3, earlyMix: 0.7 },
       },
       {
         category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
-        parameters: { threshold: -15, ratio: 4, attack: 0.005, release: 0.15 },
+        parameters: { threshold: -16, ratio: 2.5, attack: 0.01, release: 0.2 },
       },
     ],
   },
   {
-    name: 'Techno Master',
-    description: 'Hard compression and subs for driving techno',
-    category: 'Club',
+    name: 'Immersive',
+    description: 'Plate reverb + widener + chorus shimmer — large, immersive soundstage',
+    category: 'Wide',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'Chorus',
+        enabled: true,
+        wet: 10,
+        parameters: { frequency: 0.2, depth: 0.15 },
+      },
+      {
+        category: 'wasm',
+        type: 'MVerb',
+        enabled: true,
+        wet: 12,
+        parameters: { damping: 0.5, density: 0.6, bandwidth: 0.6, decay: 0.4, predelay: 0.01, size: 0.6, gain: 1.0, mix: 0.35, earlyMix: 0.6 },
+      },
+      {
+        category: 'tonejs',
+        type: 'StereoWidener',
+        enabled: true,
+        wet: 100,
+        parameters: { width: 0.6 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -16, ratio: 2, attack: 0.02, release: 0.25 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VINYL — Analog character and vintage coloration on the bus
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Vinyl Press',
+    description: 'ToneArm vinyl simulation — RIAA EQ, rolloff, and subtle crackle on the master',
+    category: 'Vinyl',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'ToneArm',
+        enabled: true,
+        wet: 35,
+        parameters: { wow: 8, coil: 40, flutter: 5, riaa: 60, stylus: 25, hiss: 10, pops: 8, rpm: 33.333 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -16, ratio: 2.5, attack: 0.015, release: 0.25 },
+      },
+    ],
+  },
+  {
+    name: 'Dusty Grooves',
+    description: 'Vinyl noise + tape warmth — dusty crate-digger character',
+    category: 'Vinyl',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'VinylNoise',
+        enabled: true,
+        wet: 25,
+        parameters: { hiss: 30, dust: 40, age: 35, speed: 5.5, riaa: 45, stylusResonance: 40, wornStylus: 20, pinch: 25, innerGroove: 15, ghostEcho: 10, dropout: 5, warp: 5, eccentricity: 10 },
+      },
+      {
+        category: 'tonejs',
+        type: 'TapeSaturation',
+        enabled: true,
+        wet: 20,
+        parameters: { drive: 30, tone: 9000 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -18, ratio: 2.5, attack: 0.015, release: 0.25 },
+      },
+    ],
+  },
+  {
+    name: 'Lo-Fi Master',
+    description: 'Tape sim + vinyl + gentle rolloff — nostalgic warmth across the whole mix',
+    category: 'Vinyl',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'TapeSimulator',
+        enabled: true,
+        wet: 30,
+        parameters: { drive: 20, character: 30, bias: 40, shame: 12, hiss: 8, speed: 1 },
+      },
+      {
+        category: 'wasm',
+        type: 'ToneArm',
+        enabled: true,
+        wet: 20,
+        parameters: { wow: 10, coil: 35, flutter: 8, riaa: 55, stylus: 20, hiss: 5, pops: 3, rpm: 33.333 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Filter',
+        enabled: true,
+        wet: 100,
+        parameters: { frequency: 12000, type: 'lowpass', Q: 0.5 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -18, ratio: 2.5, attack: 0.02, release: 0.3 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GENRE — Mix-bus mastering tuned for specific genres (BPM-synced where useful)
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Techno',
+    description: 'Hard-hitting sub boost + brick compression + subtle grit',
+    category: 'Genre',
     effects: [
       {
         category: 'tonejs',
@@ -107,510 +434,10 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
       },
       {
         category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -12, ratio: 5, attack: 0.003, release: 0.1 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Distortion',
+        type: 'TapeSaturation',
         enabled: true,
         wet: 15,
-        parameters: { distortion: 0.15 },
-      },
-    ],
-  },
-  {
-    name: 'Acid House',
-    description: 'Warm compression with subtle room reverb',
-    category: 'Club',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -18, ratio: 3.5, attack: 0.01, release: 0.2 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Reverb',
-        enabled: true,
-        wet: 12,
-        parameters: { decay: 1.5, preDelay: 0.01 },
-      },
-      {
-        category: 'tonejs',
-        type: 'EQ3',
-        enabled: true,
-        wet: 100,
-        parameters: { low: 2, mid: 0, high: 1 },
-      },
-    ],
-  },
-  {
-    name: 'Deep House',
-    description: 'Smooth and warm with controlled dynamics',
-    category: 'Club',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'EQ3',
-        enabled: true,
-        wet: 100,
-        parameters: { low: 2, mid: 1, high: -1 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -20, ratio: 2.5, attack: 0.02, release: 0.3 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Chorus',
-        enabled: true,
-        wet: 15,
-        parameters: { frequency: 0.5, depth: 0.3 },
-      },
-    ],
-  },
-
-  // === LO-FI ===
-  {
-    name: 'Lo-Fi Crunch',
-    description: 'Bit-crushed and filtered for retro vibes',
-    category: 'Lo-Fi',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'BitCrusher',
-        enabled: true,
-        wet: 40,
-        parameters: { bits: 8 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Filter',
-        enabled: true,
-        wet: 100,
-        parameters: { frequency: 8000, type: 'lowpass', Q: 1 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -15, ratio: 4, attack: 0.01, release: 0.2 },
-      },
-    ],
-  },
-  {
-    name: 'Tape Warmth',
-    description: 'Subtle saturation and filtering like vintage tape',
-    category: 'Lo-Fi',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'Distortion',
-        enabled: true,
-        wet: 20,
-        parameters: { distortion: 0.2 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Filter',
-        enabled: true,
-        wet: 100,
-        parameters: { frequency: 12000, type: 'lowpass', Q: 0.7 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Chorus',
-        enabled: true,
-        wet: 8,
-        parameters: { frequency: 0.2, depth: 0.15 },
-      },
-    ],
-  },
-  {
-    name: 'VHS Vibe',
-    description: 'Wobbly and degraded like old VHS audio',
-    category: 'Lo-Fi',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'BitCrusher',
-        enabled: true,
-        wet: 25,
-        parameters: { bits: 12 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Vibrato',
-        enabled: true,
-        wet: 30,
-        parameters: { frequency: 4, depth: 0.08 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Filter',
-        enabled: true,
-        wet: 100,
-        parameters: { frequency: 6000, type: 'lowpass', Q: 0.5 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Reverb',
-        enabled: true,
-        wet: 15,
-        parameters: { decay: 1.2, preDelay: 0.02 },
-      },
-    ],
-  },
-
-  // === AMBIENT ===
-  {
-    name: 'Ambient Space',
-    description: 'Lush reverb and delay for atmospheric soundscapes',
-    category: 'Ambient',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'Reverb',
-        enabled: true,
-        wet: 45,
-        parameters: { decay: 5, preDelay: 0.05 },
-      },
-      {
-        category: 'tonejs',
-        type: 'PingPongDelay',
-        enabled: true,
-        wet: 30,
-        parameters: { delayTime: 0.4, feedback: 0.5 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -20, ratio: 2, attack: 0.05, release: 0.4 },
-      },
-    ],
-  },
-  {
-    name: 'Dreamy Haze',
-    description: 'Soft and floaty with modulated delays',
-    category: 'Ambient',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'Chorus',
-        enabled: true,
-        wet: 35,
-        parameters: { frequency: 0.3, depth: 0.5 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Reverb',
-        enabled: true,
-        wet: 55,
-        parameters: { decay: 6, preDelay: 0.08 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Filter',
-        enabled: true,
-        wet: 100,
-        parameters: { frequency: 5000, type: 'lowpass', Q: 0.5 },
-      },
-    ],
-  },
-  {
-    name: 'Cathedral',
-    description: 'Massive reverb for epic, cavernous sound',
-    category: 'Ambient',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'JCReverb',
-        enabled: true,
-        wet: 60,
-        parameters: { roomSize: 0.9 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Delay',
-        enabled: true,
-        wet: 20,
-        parameters: { delayTime: 0.25, feedback: 0.3 },
-      },
-    ],
-  },
-  {
-    name: 'Underwater',
-    description: 'Filtered and submerged atmospheric effect',
-    category: 'Ambient',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'Filter',
-        enabled: true,
-        wet: 100,
-        parameters: { frequency: 1200, type: 'lowpass', Q: 2 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Chorus',
-        enabled: true,
-        wet: 40,
-        parameters: { frequency: 0.4, depth: 0.6 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Reverb',
-        enabled: true,
-        wet: 50,
-        parameters: { decay: 4, preDelay: 0.03 },
-      },
-    ],
-  },
-
-  // === AGGRESSIVE ===
-  {
-    name: 'Industrial',
-    description: 'Harsh distortion and compression for aggressive sound',
-    category: 'Aggressive',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'Distortion',
-        enabled: true,
-        wet: 45,
-        parameters: { distortion: 0.6 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -10, ratio: 8, attack: 0.001, release: 0.08 },
-      },
-      {
-        category: 'tonejs',
-        type: 'EQ3',
-        enabled: true,
-        wet: 100,
-        parameters: { low: 3, mid: 2, high: 4 },
-      },
-    ],
-  },
-  {
-    name: 'Crushed',
-    description: 'Heavy bit-crushing and distortion',
-    category: 'Aggressive',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'BitCrusher',
-        enabled: true,
-        wet: 60,
-        parameters: { bits: 6 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Distortion',
-        enabled: true,
-        wet: 35,
-        parameters: { distortion: 0.5 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -8, ratio: 10, attack: 0.001, release: 0.05 },
-      },
-    ],
-  },
-  {
-    name: 'Hardstyle',
-    description: 'Punchy kick-focused processing for hard dance',
-    category: 'Aggressive',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'EQ3',
-        enabled: true,
-        wet: 100,
-        parameters: { low: 5, mid: -1, high: 3 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -10, ratio: 6, attack: 0.002, release: 0.08 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Distortion',
-        enabled: true,
-        wet: 20,
-        parameters: { distortion: 0.3 },
-      },
-    ],
-  },
-  {
-    name: 'Gabber',
-    description: 'Extreme compression and saturation for hardcore',
-    category: 'Aggressive',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'Chebyshev',
-        enabled: true,
-        wet: 50,
-        parameters: { order: 8 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -6, ratio: 20, attack: 0.0005, release: 0.03 },
-      },
-      {
-        category: 'tonejs',
-        type: 'EQ3',
-        enabled: true,
-        wet: 100,
-        parameters: { low: 6, mid: 0, high: 5 },
-      },
-    ],
-  },
-
-  // === DUB & REGGAE ===
-  {
-    name: 'Dub Station',
-    description: 'Space Echo and Bi-Phase for authentic dub vibes',
-    category: 'Dub',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'SpaceEcho',
-        enabled: true,
-        wet: 40,
-        parameters: { mode: 4, rate: 300, intensity: 0.6, echoVolume: 0.8, reverbVolume: 0.2 },
-      },
-      {
-        category: 'tonejs',
-        type: 'BiPhase',
-        enabled: true,
-        wet: 30,
-        parameters: { rateA: 0.5, depthA: 0.6, rateB: 4.0, depthB: 0.4, feedback: 0.3, routing: 0 },
-      },
-    ],
-  },
-  {
-    name: 'Sound System',
-    description: 'Heavy subs and performance filtering',
-    category: 'Dub',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'EQ3',
-        enabled: true,
-        wet: 100,
-        parameters: { low: 6, mid: -2, high: 1 },
-      },
-      {
-        category: 'tonejs',
-        type: 'DubFilter',
-        enabled: true,
-        wet: 100,
-        parameters: { cutoff: 20, resonance: 15, gain: 1.2 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -15, ratio: 4, attack: 0.01, release: 0.2 },
-      },
-    ],
-  },
-
-  // === GENRE (BPM-Synced) ===
-  {
-    name: 'Reggae',
-    description: 'Dotted-eighth skank echo with warm bass — auto-syncs to BPM',
-    category: 'Genre',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'SpaceEcho',
-        enabled: true,
-        wet: 25,
-        parameters: { mode: 4, rate: 375, intensity: 0.4, echoVolume: 0.7, reverbVolume: 0.15, bpmSync: 1, syncDivision: '1/8d' },
-      },
-      {
-        category: 'tonejs',
-        type: 'EQ3',
-        enabled: true,
-        wet: 100,
-        parameters: { low: 4, mid: 0, high: -1 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -18, ratio: 3, attack: 0.01, release: 0.25 },
-      },
-    ],
-  },
-  {
-    name: 'Dub',
-    description: 'Heavy quarter-note echo with phaser swirl — auto-syncs to BPM',
-    category: 'Genre',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'SpaceEcho',
-        enabled: true,
-        wet: 45,
-        parameters: { mode: 4, rate: 500, intensity: 0.7, echoVolume: 0.85, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' },
-      },
-      {
-        category: 'tonejs',
-        type: 'BiPhase',
-        enabled: true,
-        wet: 30,
-        parameters: { rateA: 0.5, depthA: 0.6, rateB: 4.0, depthB: 0.4, feedback: 0.3, routing: 0, bpmSync: 1, syncDivision: '1/2' },
-      },
-      {
-        category: 'tonejs',
-        type: 'Reverb',
-        enabled: true,
-        wet: 25,
-        parameters: { decay: 3, preDelay: 0.03 },
-      },
-    ],
-  },
-  {
-    name: 'Techno',
-    description: 'Driving eighth-note delay with hard compression — auto-syncs to BPM',
-    category: 'Genre',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'Delay',
-        enabled: true,
-        wet: 20,
-        parameters: { time: 0.25, feedback: 0.35, bpmSync: 1, syncDivision: '1/8' },
+        parameters: { drive: 40, tone: 11000 },
       },
       {
         category: 'tonejs',
@@ -618,138 +445,40 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
         enabled: true,
         wet: 100,
         parameters: { threshold: -12, ratio: 5, attack: 0.003, release: 0.1 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Distortion',
-        enabled: true,
-        wet: 12,
-        parameters: { distortion: 0.15 },
-      },
-      {
-        category: 'tonejs',
-        type: 'EQ3',
-        enabled: true,
-        wet: 100,
-        parameters: { low: 3, mid: -1, high: 2 },
       },
     ],
   },
   {
     name: 'House',
-    description: 'Ping-pong delay and chorus groove — auto-syncs to BPM',
+    description: 'Warm low-end + smooth tops + glue comp — classic house mastering',
     category: 'Genre',
     effects: [
-      {
-        category: 'tonejs',
-        type: 'PingPongDelay',
-        enabled: true,
-        wet: 18,
-        parameters: { time: 0.25, feedback: 0.4, bpmSync: 1, syncDivision: '1/8' },
-      },
-      {
-        category: 'tonejs',
-        type: 'Chorus',
-        enabled: true,
-        wet: 20,
-        parameters: { frequency: 1.0, depth: 0.4, bpmSync: 1, syncDivision: '1/4' },
-      },
-      {
-        category: 'tonejs',
-        type: 'Compressor',
-        enabled: true,
-        wet: 100,
-        parameters: { threshold: -16, ratio: 3.5, attack: 0.008, release: 0.18 },
-      },
       {
         category: 'tonejs',
         type: 'EQ3',
         enabled: true,
         wet: 100,
-        parameters: { low: 2, mid: 0, high: 1 },
-      },
-    ],
-  },
-  {
-    name: 'Ambient',
-    description: 'Long reverb with dotted-quarter ping-pong — auto-syncs to BPM',
-    category: 'Genre',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'Reverb',
-        enabled: true,
-        wet: 50,
-        parameters: { decay: 6, preDelay: 0.06 },
-      },
-      {
-        category: 'tonejs',
-        type: 'PingPongDelay',
-        enabled: true,
-        wet: 30,
-        parameters: { time: 0.375, feedback: 0.5, bpmSync: 1, syncDivision: '1/4d' },
-      },
-      {
-        category: 'tonejs',
-        type: 'Chorus',
-        enabled: true,
-        wet: 25,
-        parameters: { frequency: 0.25, depth: 0.5, bpmSync: 1, syncDivision: '1/1' },
-      },
-      {
-        category: 'tonejs',
-        type: 'Filter',
-        enabled: true,
-        wet: 100,
-        parameters: { frequency: 6000, type: 'lowpass', Q: 0.5 },
-      },
-    ],
-  },
-  {
-    name: 'Lo-Fi Hip Hop',
-    description: 'Lazy swing delay with vinyl crunch — auto-syncs to BPM',
-    category: 'Genre',
-    effects: [
-      {
-        category: 'tonejs',
-        type: 'BitCrusher',
-        enabled: true,
-        wet: 20,
-        parameters: { bits: 10 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Filter',
-        enabled: true,
-        wet: 100,
-        parameters: { frequency: 7000, type: 'lowpass', Q: 0.8 },
-      },
-      {
-        category: 'tonejs',
-        type: 'Delay',
-        enabled: true,
-        wet: 22,
-        parameters: { time: 0.375, feedback: 0.3, bpmSync: 1, syncDivision: '1/8d' },
-      },
-      {
-        category: 'tonejs',
-        type: 'Vibrato',
-        enabled: true,
-        wet: 15,
-        parameters: { frequency: 4, depth: 0.06 },
+        parameters: { low: 2, mid: 0.5, high: 1 },
       },
       {
         category: 'tonejs',
         type: 'Compressor',
         enabled: true,
         wet: 100,
-        parameters: { threshold: -18, ratio: 3, attack: 0.015, release: 0.25 },
+        parameters: { threshold: -16, ratio: 3, attack: 0.008, release: 0.18 },
+      },
+      {
+        category: 'tonejs',
+        type: 'StereoWidener',
+        enabled: true,
+        wet: 100,
+        parameters: { width: 0.5 },
       },
     ],
   },
   {
     name: 'Drum & Bass',
-    description: 'Tight sixteenth-note delay with sub boost — auto-syncs to BPM',
+    description: 'Tight transients + sub weight + air — fast and heavy',
     category: 'Genre',
     effects: [
       {
@@ -766,19 +495,289 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
         wet: 100,
         parameters: { threshold: -10, ratio: 5, attack: 0.002, release: 0.08 },
       },
+    ],
+  },
+  {
+    name: 'Hip Hop',
+    description: 'Fat low-end + warm saturation + controlled dynamics',
+    category: 'Genre',
+    effects: [
       {
         category: 'tonejs',
-        type: 'PingPongDelay',
+        type: 'EQ3',
         enabled: true,
-        wet: 15,
-        parameters: { time: 0.125, feedback: 0.3, bpmSync: 1, syncDivision: '1/16' },
+        wet: 100,
+        parameters: { low: 3, mid: 1, high: 0 },
       },
       {
         category: 'tonejs',
-        type: 'Reverb',
+        type: 'TapeSaturation',
+        enabled: true,
+        wet: 20,
+        parameters: { drive: 30, tone: 8000 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -16, ratio: 3.5, attack: 0.01, release: 0.2 },
+      },
+    ],
+  },
+  {
+    name: 'Dub / Reggae',
+    description: 'Heavy subs + warm mids + spring tank glue',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 5, mid: -1, high: -1 },
+      },
+      {
+        category: 'wasm',
+        type: 'SpringReverb',
+        enabled: true,
+        wet: 10,
+        parameters: { decay: 0.3, damping: 0.5, tension: 0.4, mix: 0.25, drip: 0.2, diffusion: 0.6 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -18, ratio: 3, attack: 0.01, release: 0.25 },
+      },
+    ],
+  },
+  {
+    name: 'Ambient',
+    description: 'Spacious plate + gentle compression — ethereal finishing',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'MVerb',
+        enabled: true,
+        wet: 20,
+        parameters: { damping: 0.4, density: 0.7, bandwidth: 0.5, decay: 0.6, predelay: 0.04, size: 0.85, gain: 1.0, mix: 0.4, earlyMix: 0.4 },
+      },
+      {
+        category: 'tonejs',
+        type: 'StereoWidener',
+        enabled: true,
+        wet: 100,
+        parameters: { width: 0.6 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -20, ratio: 2, attack: 0.03, release: 0.4 },
+      },
+    ],
+  },
+  {
+    name: 'Hardstyle',
+    description: 'Maximum sub impact + hard limiting + grit — loud and aggressive',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 5, mid: -1, high: 3 },
+      },
+      {
+        category: 'tonejs',
+        type: 'TapeSaturation',
+        enabled: true,
+        wet: 20,
+        parameters: { drive: 50, tone: 12000 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -8, ratio: 8, attack: 0.002, release: 0.08 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DJ — Performance-oriented master processing for live DJ sets
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'DJ Booth',
+    description: 'Club-standard bus compression + EQ + tape warmth — ready to mix',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 2, mid: 0, high: 1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'TapeSaturation',
+        enabled: true,
+        wet: 15,
+        parameters: { drive: 30, tone: 11000 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -14, ratio: 3.5, attack: 0.005, release: 0.12 },
+      },
+    ],
+  },
+  {
+    name: 'Dub Sirens Live',
+    description: 'Space Echo + spring reverb on the master — live dub FX send',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'SpaceEcho',
+        enabled: true,
+        wet: 35,
+        parameters: { mode: 4, rate: 300, intensity: 0.55, echoVolume: 0.75, reverbVolume: 0.2, bpmSync: 1, syncDivision: '1/4' },
+      },
+      {
+        category: 'wasm',
+        type: 'SpringReverb',
+        enabled: true,
+        wet: 20,
+        parameters: { decay: 0.5, damping: 0.4, tension: 0.45, mix: 0.3, drip: 0.5, diffusion: 0.6 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 4, mid: -1, high: 0 },
+      },
+    ],
+  },
+  {
+    name: 'Big Room',
+    description: 'Plate reverb + wide stereo + punchy comp — festival main stage',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'MVerb',
         enabled: true,
         wet: 12,
-        parameters: { decay: 0.8, preDelay: 0.01 },
+        parameters: { damping: 0.5, density: 0.6, bandwidth: 0.7, decay: 0.35, predelay: 0.0, size: 0.5, gain: 1.0, mix: 0.35, earlyMix: 0.7 },
+      },
+      {
+        category: 'tonejs',
+        type: 'StereoWidener',
+        enabled: true,
+        wet: 100,
+        parameters: { width: 0.6 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -12, ratio: 4, attack: 0.005, release: 0.12 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 3, mid: -1, high: 2 },
+      },
+    ],
+  },
+  {
+    name: 'Vinyl DJ',
+    description: 'ToneArm simulation + warmth — vinyl turntable character on the output',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'ToneArm',
+        enabled: true,
+        wet: 30,
+        parameters: { wow: 6, coil: 35, flutter: 4, riaa: 55, stylus: 20, hiss: 8, pops: 5, rpm: 33.333 },
+      },
+      {
+        category: 'tonejs',
+        type: 'TapeSaturation',
+        enabled: true,
+        wet: 15,
+        parameters: { drive: 25, tone: 10000 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -16, ratio: 3, attack: 0.01, release: 0.2 },
+      },
+    ],
+  },
+  {
+    name: 'Echo Out',
+    description: 'BPM-synced tape echo for live transitions — wash to echo and back',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'RETapeEcho',
+        enabled: true,
+        wet: 40,
+        parameters: { mode: 3, repeatRate: 0.5, intensity: 0.55, echoVolume: 0.8, wow: 0.15, flutter: 0.1, dirt: 0.1, inputBleed: 0.05, loopAmount: 0, playheadFilter: 1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -14, ratio: 3, attack: 0.008, release: 0.15 },
+      },
+    ],
+  },
+  {
+    name: 'Warehouse Rave',
+    description: 'Gritty tape saturation + hard compression — raw warehouse energy',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'TapeSimulator',
+        enabled: true,
+        wet: 35,
+        parameters: { drive: 40, character: 45, bias: 40, shame: 20, hiss: 10, speed: 1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 4, mid: -2, high: 2 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -10, ratio: 6, attack: 0.003, release: 0.1 },
       },
     ],
   },

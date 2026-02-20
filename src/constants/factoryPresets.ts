@@ -23,6 +23,7 @@ import { AMI_PRESETS } from './amiPresets';
 import { BUZZMACHINE_FACTORY_PRESETS } from './buzzmachineFactoryPresets';
 import { MAKK_FACTORY_PRESETS } from './makkPresets';
 import { HARMONIC_PRESETS } from './harmonicPresets';
+import { DJ_ONE_SHOT_PRESETS } from './djOneShotPresets';
 
 // BASS PRESETS (18)
 
@@ -2779,6 +2780,7 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...WAVETABLE_PACK_PRESETS,
   ...BUZZMACHINE_FACTORY_PRESETS,
   ...MAKK_FACTORY_PRESETS,
+  ...DJ_ONE_SHOT_PRESETS,
   // Player Init
   {
     type: 'synth' as const,
@@ -2822,6 +2824,7 @@ export const PRESET_CATEGORIES = {
   Buzz: BUZZMACHINE_FACTORY_PRESETS,
   Makk: MAKK_FACTORY_PRESETS,
   Harmonic: HARMONIC_PRESETS,
+  'DJ FX': DJ_ONE_SHOT_PRESETS,
 };
 
 export type PresetCategory = keyof typeof PRESET_CATEGORIES;
