@@ -87,6 +87,10 @@ export function djScratchFlare(): boolean { return triggerPattern(SCRATCH_PATTER
 export function djScratchHydro(): boolean { return triggerPattern(SCRATCH_PATTERNS[3].name); }
 export function djScratchCrab():  boolean { return triggerPattern(SCRATCH_PATTERNS[4].name); }
 export function djScratchOrbit(): boolean { return triggerPattern(SCRATCH_PATTERNS[5].name); }
+export function djScratchChirp(): boolean { return triggerPattern(SCRATCH_PATTERNS[6].name); }
+export function djScratchStab():  boolean { return triggerPattern(SCRATCH_PATTERNS[7].name); }
+export function djScratchScrbl(): boolean { return triggerPattern(SCRATCH_PATTERNS[8].name); }
+export function djScratchTear():  boolean { return triggerPattern(SCRATCH_PATTERNS[9].name); }
 
 export function djScratchStop(): boolean {
   const deckId = getActiveDeck();

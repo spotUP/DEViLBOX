@@ -120,6 +120,7 @@ import { setStep10, setStep11, setStep12, setStep13, setStep14, setStep15, setSt
 } from '@engine/keyboard/commands/edit';
 import {
   djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
+  djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
   djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132
 } from '@engine/keyboard/commands/djScratch';
 
@@ -130,6 +131,14 @@ import { getToneEngine } from '@engine/ToneEngine';
 // Singleton registry - populated once with all available commands
 const globalRegistry = new CommandRegistry();
 let registryInitialized = false;
+
+/**
+ * Get the global command registry for use outside React hooks.
+ * Used by MIDI button mapping to execute any registered command.
+ */
+export function getGlobalRegistry(): CommandRegistry {
+  return globalRegistry;
+}
 
 function setVolumeInCell(volume: number): boolean {
   const { cursor, setCell } = useTrackerStore.getState();
@@ -664,6 +673,10 @@ function initializeRegistry() {
     { name: 'dj_scratch_hydro',  contexts: ['global'], handler: djScratchHydro, description: 'DJ Scratch: Hydroplane' },
     { name: 'dj_scratch_crab',   contexts: ['global'], handler: djScratchCrab,  description: 'DJ Scratch: Crab' },
     { name: 'dj_scratch_orbit',  contexts: ['global'], handler: djScratchOrbit, description: 'DJ Scratch: Orbit' },
+    { name: 'dj_scratch_chirp', contexts: ['global'], handler: djScratchChirp, description: 'DJ Scratch: Chirp' },
+    { name: 'dj_scratch_stab',  contexts: ['global'], handler: djScratchStab,  description: 'DJ Scratch: Stab' },
+    { name: 'dj_scratch_scrbl', contexts: ['global'], handler: djScratchScrbl, description: 'DJ Scratch: Scribble' },
+    { name: 'dj_scratch_tear',  contexts: ['global'], handler: djScratchTear,  description: 'DJ Scratch: Tear' },
     { name: 'dj_scratch_stop',   contexts: ['global'], handler: djScratchStop,  description: 'DJ Scratch: Stop pattern' },
     { name: 'dj_fader_lfo_off',  contexts: ['global'], handler: djFaderLFOOff,  description: 'DJ Fader LFO: Off' },
     { name: 'dj_fader_lfo_14',   contexts: ['global'], handler: djFaderLFO14,   description: 'DJ Fader LFO: 1/4 note' },
