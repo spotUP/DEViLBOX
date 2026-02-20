@@ -20,7 +20,7 @@ import { routeParameterToEngine, routeDJParameter } from '../midi/performance/pa
 import { updateNKSDisplay } from '../midi/performance/AkaiMIDIProtocol';
 import type { NKSParameter } from '../midi/performance/types';
 import { isDJContext } from '../midi/MIDIContextRouter';
-import { DJ_KNOB_BANKS, DJ_KNOB_PAGE_NAMES } from '../midi/djKnobBanks';
+import { DJ_KNOB_BANKS } from '../midi/djKnobBanks';
 
 // Guard against double handler registration (e.g., React StrictMode or HMR)
 let midiNoteHandlerRegistered = false;

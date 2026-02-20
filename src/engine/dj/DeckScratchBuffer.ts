@@ -25,10 +25,13 @@ export class DeckScratchBuffer {
   private static loadedCtxs   = new WeakSet<AudioContext>();
   private static initPromises = new WeakMap<AudioContext, Promise<void>>();
 
-  constructor(
-    private readonly ctx: AudioContext,
-    private readonly bufferId: 0 | 1,
-  ) {}
+  private readonly ctx: AudioContext;
+  private readonly bufferId: 0 | 1;
+
+  constructor(ctx: AudioContext, bufferId: 0 | 1) {
+    this.ctx = ctx;
+    this.bufferId = bufferId;
+  }
 
   async init(): Promise<void> {
     if (!DeckScratchBuffer.loadedCtxs.has(this.ctx)) {
