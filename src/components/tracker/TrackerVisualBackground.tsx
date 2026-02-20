@@ -1,8 +1,9 @@
 /**
- * TrackerVisualBackground — WebGL audio-reactive visuals behind the pattern editor.
+ * TrackerVisualBackground — Audio-reactive visuals behind the pattern editor.
  *
  * Reuses the DJ view's 6 WebGL renderers (spectrum, radial, terrain, plasma,
- * starfield, particles) rendered at reduced opacity so pattern text remains readable.
+ * starfield, particles) plus 2 audioMotion-analyzer presets, all rendered at
+ * reduced opacity so pattern text remains readable.
  * Connects to ToneEngine analysers on mount and tears down on unmount.
  */
 
@@ -14,7 +15,7 @@ import {
   MODE_LABELS,
   createVisualizerState,
   type AudioData,
-  type VisualizerMode,
+  type WebGLVisualizerMode,
 } from '@/components/dj/visualizers/types';
 import {
   createRendererCache,
@@ -22,9 +23,47 @@ import {
   RENDERERS,
   type RendererCache,
 } from '@/components/dj/visualizers/renderers';
+import { AudioMotionVisualizer } from '@/components/visualization/AudioMotionVisualizer';
 
-// The 6 WebGL modes (skip 'pattern' which is DJ-only)
-const GL_MODES = VISUALIZER_MODES.filter((m) => m !== 'pattern') as Exclude<VisualizerMode, 'pattern'>[];
+// Background mode = WebGL mode name or audioMotion preset key
+type BgMode =
+  | { type: 'webgl'; mode: WebGLVisualizerMode }
+  | { type: 'am'; preset: string; label: string };
+
+export const BG_MODES: BgMode[] = [
+  // 6 WebGL modes (skip 'pattern' and audioMotion from VISUALIZER_MODES)
+  ...VISUALIZER_MODES
+    .filter((m): m is WebGLVisualizerMode => m !== 'pattern' && !m.startsWith('am'))
+    .map((mode) => ({ type: 'webgl' as const, mode })),
+  // audioMotion presets
+  { type: 'am', preset: 'ledBars',         label: 'LED BARS' },
+  { type: 'am', preset: 'smoothBars',      label: 'SMOOTH BARS' },
+  { type: 'am', preset: 'mirrorBars',      label: 'MIRROR BARS' },
+  { type: 'am', preset: 'graphLine',       label: 'GRAPH LINE' },
+  { type: 'am', preset: 'radialSpectrum',  label: 'RADIAL SPIN' },
+  { type: 'am', preset: 'radialGraph',     label: 'RADIAL GRAPH' },
+  { type: 'am', preset: 'dualStereo',      label: 'DUAL STEREO' },
+  { type: 'am', preset: 'lumiBars',        label: 'LUMI BARS' },
+  { type: 'am', preset: 'alphaBars',       label: 'GHOST BARS' },
+  { type: 'am', preset: 'outlineBars',     label: 'OUTLINE' },
+  { type: 'am', preset: 'dualVertical',    label: 'DUAL VERTICAL' },
+  { type: 'am', preset: 'dualOverlay',     label: 'DUAL OVERLAY' },
+  { type: 'am', preset: 'barkSpectrum',    label: 'BARK' },
+  { type: 'am', preset: 'melGraph',        label: 'MEL GRAPH' },
+  { type: 'am', preset: 'octaveBands',     label: 'OCTAVE BANDS' },
+  { type: 'am', preset: 'noteLabels',      label: 'NOTE LABELS' },
+  { type: 'am', preset: 'mirrorReflex',    label: 'MIRROR REFLEX' },
+  { type: 'am', preset: 'radialInvert',    label: 'RADIAL INVERT' },
+  { type: 'am', preset: 'radialLED',       label: 'RADIAL LED' },
+  { type: 'am', preset: 'linearBars',      label: 'LINEAR' },
+  { type: 'am', preset: 'aWeighted',       label: 'A-WEIGHTED' },
+  { type: 'am', preset: 'lumiMirror',      label: 'LUMI MIRROR' },
+];
+
+export function getBgModeLabel(bg: BgMode): string {
+  if (bg.type === 'am') return bg.label;
+  return MODE_LABELS[bg.mode] ?? bg.mode;
+}
 
 const EMPTY_WAVE = new Float32Array(256);
 const EMPTY_FFT = new Float32Array(1024);
@@ -36,6 +75,10 @@ const EMPTY_AUDIO: AudioData = {
 function getTrackerAudioData(): AudioData {
   try {
     const engine = getToneEngine();
+    // Ensure analysers stay connected every frame — other viz components
+    // can call disableAnalysers() on unmount, killing our connection.
+    // The engine's method no-ops if already connected.
+    engine.enableAnalysers();
     const waveform = engine.getWaveform();
     const fft = engine.getFFT();
 
@@ -90,15 +133,18 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
   const modeIndex = useSettingsStore((s) => s.trackerVisualMode);
   const setTrackerVisualMode = useSettingsStore((s) => s.setTrackerVisualMode);
 
-  // Use ref so RAF loop always reads current mode without restarting the effect
-  const modeRef = useRef(GL_MODES[modeIndex % GL_MODES.length]);
-  modeRef.current = GL_MODES[modeIndex % GL_MODES.length];
+  const currentBg = BG_MODES[modeIndex % BG_MODES.length];
+  const isAMMode = currentBg.type === 'am';
 
-  const modeLabel = MODE_LABELS[modeRef.current];
+  // Use ref so RAF loop always reads current mode without restarting the effect
+  const modeRef = useRef(currentBg);
+  modeRef.current = currentBg;
+
+  const modeLabel = getBgModeLabel(currentBg);
 
   // Cycle mode on click
   const handleCycleMode = useCallback(() => {
-    setTrackerVisualMode((modeIndex + 1) % GL_MODES.length);
+    setTrackerVisualMode((modeIndex + 1) % BG_MODES.length);
   }, [modeIndex, setTrackerVisualMode]);
 
   // Single effect: connect analysers + WebGL init + RAF loop
@@ -106,19 +152,6 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || width === 0 || height === 0) return;
-
-    // Enable analysers — retry until engine is ready
-    let analysersEnabled = false;
-    const ensureAnalysers = () => {
-      if (analysersEnabled) return;
-      try {
-        getToneEngine().enableAnalysers();
-        analysersEnabled = true;
-      } catch {
-        // Engine not ready yet — will retry next frame
-      }
-    };
-    ensureAnalysers();
 
     // Init WebGL context (reuse across mode changes)
     if (!glRef.current) {
@@ -154,19 +187,18 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
     const frame = () => {
       if (!running) return;
 
-      // Retry analyser connection if it failed on mount
-      ensureAnalysers();
+      // Skip WebGL rendering when in audioMotion mode
+      const bg = modeRef.current;
+      if (bg.type === 'webgl') {
+        gl.viewport(0, 0, drawW, drawH);
 
-      gl.viewport(0, 0, drawW, drawH);
+        const audio = getTrackerAudioData();
+        const time = performance.now() / 1000 - startTimeRef.current;
 
-      const audio = getTrackerAudioData();
-      const time = performance.now() / 1000 - startTimeRef.current;
-
-      // Read current mode from ref (no effect restart needed)
-      const currentMode = modeRef.current;
-      const renderer = RENDERERS[currentMode];
-      if (renderer) {
-        renderer(cache, audio, vizState, time, drawW, drawH);
+        const renderer = RENDERERS[bg.mode];
+        if (renderer) {
+          renderer(cache, audio, vizState, time, drawW, drawH);
+        }
       }
 
       rafRef.current = requestAnimationFrame(frame);
@@ -196,6 +228,7 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
 
   return (
     <>
+      {/* WebGL canvas — hidden when audioMotion mode is active */}
       <canvas
         ref={canvasRef}
         style={{
@@ -206,8 +239,28 @@ export const TrackerVisualBackground: React.FC<TrackerVisualBackgroundProps> = R
           zIndex: 0,
           pointerEvents: 'none',
           opacity: 0.45,
+          display: isAMMode ? 'none' : 'block',
         }}
       />
+      {/* audioMotion overlay — shown only for AM modes */}
+      {isAMMode && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width,
+            height,
+            zIndex: 0,
+            pointerEvents: 'none',
+            opacity: 0.45,
+          }}
+        >
+          <AudioMotionVisualizer
+            preset={currentBg.type === 'am' ? currentBg.preset : 'ledBars'}
+            audioSource="master"
+          />
+        </div>
+      )}
       {/* Mode label / cycle button */}
       <button
         onClick={handleCycleMode}

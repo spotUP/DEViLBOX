@@ -1,158 +1,116 @@
 /**
  * DeckAudioWaveform - Scrolling waveform display for audio files
  *
- * Shows a zoomed-in waveform centered on the current playback position.
- * Cue points shown as colored vertical lines.
- * Falls back to the standard DeckVisualizer when no waveform data exists.
+ * Canvas rendering runs on a background thread via OffscreenCanvas.
+ * Falls back to null when no waveform data exists (unchanged behaviour).
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
+import WaveformWorkerFactory from '@/workers/dj-waveform.worker.ts?worker';
 import type { SeratoCuePoint } from '@/lib/serato/seratoMetadata';
 
 interface DeckAudioWaveformProps {
   deckId: 'A' | 'B';
 }
 
+type WaveformMsg =
+  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; waveformPeaks: number[] | null; durationMs: number; audioPosition: number; cuePoints: SeratoCuePoint[] }
+  | { type: 'waveformPeaks'; peaks: number[] | null; durationMs: number }
+  | { type: 'position'; audioPosition: number }
+  | { type: 'cuePoints'; cuePoints: SeratoCuePoint[] }
+  | { type: 'resize'; w: number; h: number; dpr: number };
+
 export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef    = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number>(0);
+  const bridgeRef    = useRef<OffscreenBridge<WaveformMsg, { type: string }> | null>(null);
 
-  const waveformPeaks = useDJStore((s) => s.decks[deckId].waveformPeaks);
-  const durationMs = useDJStore((s) => s.decks[deckId].durationMs);
-  const audioPosition = useDJStore((s) => s.decks[deckId].audioPosition);
-  const cuePoints = useDJStore((s) => s.decks[deckId].seratoCuePoints);
-
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container || !waveformPeaks || waveformPeaks.length === 0) return;
-
-    const dpr = Math.min(window.devicePixelRatio, 2);
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    const drawW = Math.round(width * dpr);
-    const drawH = Math.round(height * dpr);
-
-    if (canvas.width !== drawW || canvas.height !== drawH) {
-      canvas.width = drawW;
-      canvas.height = drawH;
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-    }
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // Background
-    ctx.fillStyle = '#0b0909';
-    ctx.fillRect(0, 0, width, height);
-
-    const durationSec = durationMs / 1000;
-    if (durationSec <= 0) return;
-
-    const numBins = waveformPeaks.length;
-    const midY = height / 2;
-
-    // Zoomed scrolling view: show ~10 seconds centered on playhead
-    const windowSec = 10;
-    const startSec = audioPosition - windowSec / 2;
-    const endSec = audioPosition + windowSec / 2;
-
-    // Map each pixel column to a waveform bin
-    for (let px = 0; px < width; px++) {
-      const timeSec = startSec + (px / width) * windowSec;
-      const fraction = timeSec / durationSec;
-      const binIndex = Math.floor(fraction * numBins);
-
-      if (binIndex < 0 || binIndex >= numBins) continue;
-
-      const amp = waveformPeaks[binIndex];
-      const barH = amp * midY * 0.85;
-
-      // Color by position relative to playhead (played = dimmer, upcoming = brighter)
-      const isPast = timeSec < audioPosition;
-      ctx.fillStyle = isPast
-        ? 'rgba(80, 130, 220, 0.4)'
-        : 'rgba(100, 170, 255, 0.7)';
-
-      ctx.fillRect(px, midY - barH, 1, barH * 2);
-    }
-
-    // Draw cue point markers
-    drawCueMarkers(ctx, cuePoints, startSec, endSec, windowSec, width, height);
-
-    // Center playhead line
-    const centerX = width / 2;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(centerX - 1, 0, 2, height);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.fillRect(centerX - 1, 0, 2, height);
-
-    // Time display at bottom-left
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.font = '10px monospace';
-    const min = Math.floor(audioPosition / 60);
-    const sec = Math.floor(audioPosition % 60);
-    const cs = Math.floor((audioPosition % 1) * 100);
-    ctx.fillText(`${min}:${String(sec).padStart(2, '0')}.${String(cs).padStart(2, '0')}`, 4, height - 4);
-
-    rafRef.current = requestAnimationFrame(draw);
-  }, [waveformPeaks, durationMs, audioPosition, cuePoints]);
+  // ── Bridge init ────────────────────────────────────────────────────────────
+  // Canvas created imperatively — prevents StrictMode double-transferControlToOffscreen error.
 
   useEffect(() => {
-    rafRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [draw]);
+    const container = containerRef.current;
+    if (!container || !('transferControlToOffscreen' in HTMLCanvasElement.prototype)) return;
 
+    const canvas = document.createElement('canvas');
+    canvas.className = 'block w-full h-full';
+    container.appendChild(canvas);
+    canvasRef.current = canvas;
+
+    const dpr  = Math.min(window.devicePixelRatio, 2);
+    const w    = Math.max(1, container.clientWidth);
+    const h    = Math.max(1, container.clientHeight);
+    const deck = useDJStore.getState().decks[deckId];
+    const offscreen = canvas.transferControlToOffscreen();
+
+    const bridge = new OffscreenBridge<WaveformMsg, { type: string }>(
+      WaveformWorkerFactory, { onReady: () => {} },
+    );
+    bridgeRef.current = bridge;
+
+    bridge.post({
+      type: 'init',
+      canvas: offscreen,
+      dpr, width: w, height: h,
+      waveformPeaks:  deck.waveformPeaks ? Array.from(deck.waveformPeaks) : null,
+      durationMs:     deck.durationMs,
+      audioPosition:  deck.audioPosition,
+      cuePoints:      deck.seratoCuePoints,
+    }, [offscreen]);
+
+    // Position (high-frequency, 30fps from DJDeck poller)
+    const unsubPos = useDJStore.subscribe(
+      (s) => s.decks[deckId].audioPosition,
+      (audioPosition) => bridgeRef.current?.post({ type: 'position', audioPosition }),
+    );
+
+    // Waveform peaks (on track load)
+    const unsubPeaks = useDJStore.subscribe(
+      (s) => s.decks[deckId].waveformPeaks,
+      (peaks) => bridgeRef.current?.post({
+        type: 'waveformPeaks',
+        peaks: peaks ? Array.from(peaks) : null,
+        durationMs: useDJStore.getState().decks[deckId].durationMs,
+      }),
+    );
+
+    // Cue points (on track load)
+    const unsubCues = useDJStore.subscribe(
+      (s) => s.decks[deckId].seratoCuePoints,
+      (cuePoints) => bridgeRef.current?.post({ type: 'cuePoints', cuePoints }),
+    );
+
+    // Resize observer
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const w = Math.floor(entry.contentRect.width);
+      const h = Math.floor(entry.contentRect.height);
+      if (w > 0 && h > 0) {
+        bridgeRef.current?.post({ type: 'resize', w, h, dpr: Math.min(window.devicePixelRatio, 2) });
+      }
+    });
+    observer.observe(container);
+
+    return () => {
+      unsubPos();
+      unsubPeaks();
+      unsubCues();
+      observer.disconnect();
+      bridge.dispose();
+      bridgeRef.current = null;
+      canvas.remove();
+      canvasRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deckId]);
+
+  const waveformPeaks = useDJStore((s) => s.decks[deckId].waveformPeaks);
   if (!waveformPeaks || waveformPeaks.length === 0) return null;
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-dark-bg border border-dark-border rounded-sm overflow-hidden">
-      <canvas
-        ref={canvasRef}
-        className="block w-full h-full"
-      />
-    </div>
+    <div ref={containerRef} className="w-full h-full bg-dark-bg border border-dark-border rounded-sm overflow-hidden" />
   );
 };
-
-function drawCueMarkers(
-  ctx: CanvasRenderingContext2D,
-  cuePoints: SeratoCuePoint[],
-  startSec: number,
-  endSec: number,
-  windowSec: number,
-  width: number,
-  height: number,
-): void {
-  for (const cue of cuePoints) {
-    const cueSec = cue.position / 1000;
-    if (cueSec < startSec || cueSec > endSec) continue;
-
-    const x = ((cueSec - startSec) / windowSec) * width;
-
-    // Vertical line
-    ctx.fillStyle = cue.color + '80';
-    ctx.fillRect(Math.round(x), 0, 1, height);
-
-    // Small triangle at top
-    ctx.fillStyle = cue.color;
-    ctx.beginPath();
-    ctx.moveTo(x - 3, 0);
-    ctx.lineTo(x + 3, 0);
-    ctx.lineTo(x, 5);
-    ctx.closePath();
-    ctx.fill();
-
-    // Label
-    if (cue.name) {
-      ctx.fillStyle = cue.color;
-      ctx.font = 'bold 8px monospace';
-      ctx.fillText(cue.name, x + 3, 10);
-    }
-  }
-}

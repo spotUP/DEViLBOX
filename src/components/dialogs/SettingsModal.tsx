@@ -12,6 +12,7 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { Toggle } from '@components/controls/Toggle';
 import { KeyboardShortcutSheet } from '@components/tracker/KeyboardShortcutSheet';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
 
 const KEYBOARD_SCHEMES = [
   { id: 'fasttracker2', name: 'FastTracker 2', description: 'Classic FT2 layout (DOS/PC) - from ft2-clone source' },
@@ -179,12 +180,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     onChange={(e) => setTrackerVisualMode(Number(e.target.value))}
                     className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
                   >
-                    <option value={0} className="bg-ft2-bg text-ft2-text">Spectrum Bars</option>
-                    <option value={1} className="bg-ft2-bg text-ft2-text">Radial</option>
-                    <option value={2} className="bg-ft2-bg text-ft2-text">Terrain</option>
-                    <option value={3} className="bg-ft2-bg text-ft2-text">Plasma</option>
-                    <option value={4} className="bg-ft2-bg text-ft2-text">Starfield</option>
-                    <option value={5} className="bg-ft2-bg text-ft2-text">Particles</option>
+                    {BG_MODES.map((bg, i) => (
+                      <option key={i} value={i} className="bg-ft2-bg text-ft2-text">
+                        {getBgModeLabel(bg)}
+                      </option>
+                    ))}
                   </select>
                 </div>
               )}

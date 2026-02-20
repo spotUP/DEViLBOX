@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-20T15:54:08.741Z
+ * Generated: 2026-02-20T17:16:13.628Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1029';
-export const BUILD_NUMBER = '1029';
-export const BUILD_HASH = '05aba58c';
+export const BUILD_VERSION = '1.0.1039';
+export const BUILD_NUMBER = '1039';
+export const BUILD_HASH = '2610880b';
 export const BUILD_DATE = '2026-02-20';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,49 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1029',
+    version: '1.0.1039',
     date: '2026-02-20',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add note suppression to TrackerReplayer for scratch mode"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update changelog and improve PatternEditorCanvas rendering"
+      },
+      {
+        type: 'feature',
+        "description": "Add MIDI DJ controller presets and auto-mapping"
+      },
+      {
+        type: 'feature',
+        "description": "Improve scratch engine for tracker and audio modes"
+      },
+      {
+        type: 'feature',
+        "description": "Add Serato metadata display — cue points, beatgrid, waveform"
+      },
+      {
+        type: 'feature',
+        "description": "Add audio file playback engine with dual tracker/audio mode"
+      },
+      {
+        type: 'feature',
+        "description": "Add stereo separation control"
+      },
+      {
+        type: 'fix',
+        "description": "Improve ToneEngine cleanup, BlepManager routing, and TrackerReplayer timing"
+      },
+      {
+        type: 'improvement',
+        "description": "Rewrite visualization store with individual selectors"
+      },
+      {
+        type: 'improvement',
+        "description": "Optimize Zustand selectors to prevent unnecessary re-renders"
+      },
       {
         type: 'feature',
         "description": "Add local IndexedDB song revision history"
@@ -192,52 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Load GM2 instruments into instrument slots on MIDI file import"
-      },
-      {
-        type: 'improvement',
-        "description": "Consolidate importMIDIFile return to single statement"
-      },
-      {
-        type: 'feature',
-        "description": "Auto-create GM2 instruments from track program numbers on import"
-      },
-      {
-        type: 'fix',
-        "description": "Correct sustain scale, guitar/ethnic program mappings in GMSoundBank"
-      },
-      {
-        type: 'feature',
-        "description": "Add GM2 sound bank — 128 programs mapped to DEViLBOX synths"
-      }
-    ]
-  },
-  {
-    version: '2026-02-19',
-    date: '2026-02-19',
-    changes: [
-      {
-        type: 'feature',
-        "description": "Wire up MIDI file import to tracker pattern loader"
-      },
-      {
-        type: 'feature',
-        "description": "Mac shortcuts parity across all 6 keyboard schemes"
-      },
-      {
-        type: 'fix',
-        "description": "EffectVisualizer — scale canvas by devicePixelRatio"
-      },
-      {
-        type: 'fix',
-        "description": "PatternEditorCanvas — scale main canvas and glyph caches by devicePixelRatio"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused createPlaceholderCommands function"
-      },
-      {
-        type: 'fix',
-        "description": "AmigaPalModal drawWaveform — scale canvas by devicePixelRatio"
       }
     ]
   }

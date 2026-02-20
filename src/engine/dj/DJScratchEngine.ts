@@ -46,18 +46,18 @@ export interface ScratchPattern {
 
 /**
  * Baby Scratch — strong forward push, audible drag back. Both directions open.
- * The most fundamental scratch; doubled velocity for snap.
+ * The most fundamental scratch: forward push at ~2× speed, then true reverse drag-back.
  */
 const BABY_SCRATCH: ScratchPattern = {
   name: 'Baby Scratch',
   shortName: 'Baby',
   durationBeats: null,
-  durationMs: 320,
+  durationMs: 360,
   loop: true,
   quantize: '1/4',
   frames: [
-    { timeMs: 0,   velocity: 2.8,  faderGain: 1 },  // strong forward push
-    { timeMs: 210, velocity: 0.15, faderGain: 1 },  // drag back (audible)
+    { timeMs: 0,   velocity: 2.4,   faderGain: 1 },  // strong forward push
+    { timeMs: 180, velocity: -1.0,  faderGain: 1 },  // true reverse drag back
   ],
 };
 
@@ -78,7 +78,7 @@ const TRANSFORMER: ScratchPattern = {
 };
 
 /**
- * Flare — 2-click flare: forward stroke with two tight fader closes, silent return.
+ * Flare — 2-click flare: forward stroke with two tight fader closes, reverse return.
  * The classic DJ battle technique for melodic phrases.
  */
 const FLARE: ScratchPattern = {
@@ -89,32 +89,32 @@ const FLARE: ScratchPattern = {
   loop: true,
   quantize: '1/4',
   frames: [
-    { timeMs: 0,   velocity: 2.2,  faderGain: 1 },  // forward, open
-    { timeMs: 75,  velocity: 2.2,  faderGain: 0 },  // click 1 — close
-    { timeMs: 105, velocity: 2.2,  faderGain: 1 },  // click 1 — open
-    { timeMs: 215, velocity: 2.2,  faderGain: 0 },  // click 2 — close
-    { timeMs: 245, velocity: 2.2,  faderGain: 1 },  // click 2 — open
-    { timeMs: 310, velocity: 0.15, faderGain: 0 },  // return — silent
+    { timeMs: 0,   velocity: 2.2,   faderGain: 1 },  // forward, open
+    { timeMs: 75,  velocity: 2.2,   faderGain: 0 },  // click 1 — close
+    { timeMs: 105, velocity: 2.2,   faderGain: 1 },  // click 1 — open
+    { timeMs: 215, velocity: 2.2,   faderGain: 0 },  // click 2 — close
+    { timeMs: 245, velocity: 2.2,   faderGain: 1 },  // click 2 — open
+    { timeMs: 310, velocity: -0.8,  faderGain: 0 },  // reverse return — silent
   ],
 };
 
 /**
- * Hydroplane — extreme velocity swings between 3.8× and 0.04×.
+ * Hydroplane — extreme velocity swings between fast forward and reverse.
  * Very fast cycle creates an intense wah/pitch-surge effect.
  */
 const HYDROPLANE: ScratchPattern = {
   name: 'Hydroplane',
   shortName: 'Hydro',
   durationBeats: null,
-  durationMs: 200,
+  durationMs: 250,
   loop: true,
   quantize: '1/8',
   frames: [
-    { timeMs: 0,   velocity: 3.8,  faderGain: 1 },
-    { timeMs: 40,  velocity: 0.15, faderGain: 1 },
-    { timeMs: 80,  velocity: 3.8,  faderGain: 1 },
-    { timeMs: 120, velocity: 0.15, faderGain: 1 },
-    { timeMs: 160, velocity: 3.8,  faderGain: 1 },
+    { timeMs: 0,   velocity: 3.5,   faderGain: 1 },
+    { timeMs: 50,  velocity: -1.5,  faderGain: 1 },
+    { timeMs: 100, velocity: 3.5,   faderGain: 1 },
+    { timeMs: 150, velocity: -1.5,  faderGain: 1 },
+    { timeMs: 200, velocity: 3.5,   faderGain: 1 },
   ],
 };
 
@@ -135,7 +135,7 @@ const CRAB: ScratchPattern = {
 };
 
 /**
- * Orbit — strong forward push open, then close fader and drag back silently.
+ * Orbit — strong forward push open, then close fader and reverse drag back silently.
  * Creates the classic "wop" sound — one hit per cycle.
  */
 const ORBIT: ScratchPattern = {
@@ -146,15 +146,15 @@ const ORBIT: ScratchPattern = {
   loop: true,
   quantize: '1/4',
   frames: [
-    { timeMs: 0,   velocity: 2.4,  faderGain: 1 },  // forward push, open
-    { timeMs: 200, velocity: 0.15, faderGain: 0 },  // drag back, silent
-    { timeMs: 380, velocity: 0.15, faderGain: 0 },  // hold return
+    { timeMs: 0,   velocity: 2.4,   faderGain: 1 },  // forward push, open
+    { timeMs: 200, velocity: -0.8,  faderGain: 0 },  // reverse drag back, silent
+    { timeMs: 380, velocity: -0.3,  faderGain: 0 },  // hold return
   ],
 };
 
 /**
  * Chirp — open fader at the top of the forward stroke, then snap closed
- * before the return. The signature 1990s hip-hop chirp.
+ * before the reverse return. The signature 1990s hip-hop chirp.
  */
 const CHIRP: ScratchPattern = {
   name: 'Chirp',
@@ -164,14 +164,14 @@ const CHIRP: ScratchPattern = {
   loop: true,
   quantize: '1/8',
   frames: [
-    { timeMs: 0,   velocity: 2.0,  faderGain: 1 },  // forward, fader open
-    { timeMs: 115, velocity: 2.0,  faderGain: 0 },  // snap closed mid-stroke
-    { timeMs: 195, velocity: 0.15, faderGain: 0 },  // return — silent
+    { timeMs: 0,   velocity: 2.0,   faderGain: 1 },  // forward, fader open
+    { timeMs: 115, velocity: 2.0,   faderGain: 0 },  // snap closed mid-stroke
+    { timeMs: 195, velocity: -0.8,  faderGain: 0 },  // reverse return — silent
   ],
 };
 
 /**
- * Stab — explosive short burst at 4× speed then instant cut.
+ * Stab — explosive short burst at 4× speed then instant cut and reverse return.
  * Rhythmic punctuation; can be synced to kick/snare placement.
  */
 const STAB: ScratchPattern = {
@@ -182,14 +182,14 @@ const STAB: ScratchPattern = {
   loop: true,
   quantize: '1/8',
   frames: [
-    { timeMs: 0,  velocity: 4.0,  faderGain: 1 },  // max-speed burst
-    { timeMs: 60, velocity: 0.15, faderGain: 0 },  // instant cut + return
+    { timeMs: 0,  velocity: 4.0,   faderGain: 1 },  // max-speed burst
+    { timeMs: 60, velocity: -1.0,  faderGain: 0 },  // instant cut + reverse return
   ],
 };
 
 /**
- * Scribble — 8 rapid velocity oscillations between 3× and near-zero per cycle.
- * Fader stays open — the pitch surge/drop creates the signature scribble texture.
+ * Scribble — 8 rapid velocity oscillations between forward and reverse per cycle.
+ * Fader stays open — the back-and-forth creates the signature scribble texture.
  * Quantizes to 1/8 so it locks to the bar.
  */
 const SCRIBBLE: ScratchPattern = {
@@ -200,19 +200,19 @@ const SCRIBBLE: ScratchPattern = {
   loop: true,
   quantize: '1/8',
   frames: [
-    { timeMs: 0,   velocity: 3.2,  faderGain: 1 },
-    { timeMs: 30,  velocity: 0.15, faderGain: 1 },
-    { timeMs: 60,  velocity: 3.2,  faderGain: 1 },
-    { timeMs: 90,  velocity: 0.15, faderGain: 1 },
-    { timeMs: 120, velocity: 3.2,  faderGain: 1 },
-    { timeMs: 150, velocity: 0.15, faderGain: 1 },
-    { timeMs: 180, velocity: 3.2,  faderGain: 1 },
-    { timeMs: 210, velocity: 0.15, faderGain: 1 },
+    { timeMs: 0,   velocity: 2.8,   faderGain: 1 },
+    { timeMs: 30,  velocity: -1.5,  faderGain: 1 },
+    { timeMs: 60,  velocity: 2.8,   faderGain: 1 },
+    { timeMs: 90,  velocity: -1.5,  faderGain: 1 },
+    { timeMs: 120, velocity: 2.8,   faderGain: 1 },
+    { timeMs: 150, velocity: -1.5,  faderGain: 1 },
+    { timeMs: 180, velocity: 2.8,   faderGain: 1 },
+    { timeMs: 210, velocity: -1.5,  faderGain: 1 },
   ],
 };
 
 /**
- * Tear — fast forward, brief stutter/catch, fast forward again, silent return.
+ * Tear — fast forward, brief reverse stutter/catch, fast forward again, reverse return.
  * The "tear" or "rip" — gives a hiccup mid-stroke that sounds like a snag on vinyl.
  */
 const TEAR: ScratchPattern = {
@@ -223,10 +223,10 @@ const TEAR: ScratchPattern = {
   loop: true,
   quantize: '1/4',
   frames: [
-    { timeMs: 0,   velocity: 2.8,  faderGain: 1 },  // fast forward
-    { timeMs: 125, velocity: 0.15, faderGain: 1 },  // stutter — catch
-    { timeMs: 175, velocity: 2.8,  faderGain: 1 },  // surge forward again
-    { timeMs: 295, velocity: 0.15, faderGain: 0 },  // return — silent
+    { timeMs: 0,   velocity: 2.8,   faderGain: 1 },  // fast forward
+    { timeMs: 125, velocity: -0.6,  faderGain: 1 },  // reverse stutter — catch
+    { timeMs: 175, velocity: 2.8,   faderGain: 1 },  // surge forward again
+    { timeMs: 295, velocity: -0.8,  faderGain: 0 },  // reverse return — silent
   ],
 };
 

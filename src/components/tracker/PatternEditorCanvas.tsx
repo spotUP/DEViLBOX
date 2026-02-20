@@ -22,36 +22,30 @@ import { Plus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'l
 import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { haptics } from '@/utils/haptics';
-import { getTrackerReplayer, type DisplayState } from '@engine/TrackerReplayer';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import * as Tone from 'tone';
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { TrackerVisualBackground } from './TrackerVisualBackground';
 import type { CursorPosition } from '@typedefs';
+// OffscreenCanvas + WebGL2 worker bridge
+import { TrackerOffscreenBridge } from '@engine/renderer/OffscreenBridge';
+import type {
+  PatternSnapshot,
+  ThemeSnapshot,
+  UIStateSnapshot,
+  ChannelLayoutSnapshot,
+  ChannelSnapshot,
+  CellSnapshot,
+} from '@engine/renderer/worker-types';
+import TrackerWorkerFactory from '@/workers/tracker-render.worker.ts?worker';
 
 const ROW_HEIGHT = 24;
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
 // Channel width is computed dynamically in render() based on acid/prob columns
 
-// XM note names
-const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-
-function noteToString(note: number): string {
-  if (note === 0) return '---';
-  if (note === 97) return 'OFF';
-  const noteIndex = (note - 1) % 12;
-  const octave = Math.floor((note - 1) / 12);
-  return `${NOTE_NAMES[noteIndex]}${octave}`;
-}
-
-function hexByte(value: number): string {
-  return value.toString(16).toUpperCase().padStart(2, '0');
-}
-
-interface NoteCache {
-  [key: string]: HTMLCanvasElement;
-}
+// NOTE_NAMES, noteToString and hexByte moved to TrackerGLRenderer (WebGL worker)
 
 interface ChannelTrigger {
   level: number;
@@ -81,7 +75,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   onSwipeDown: _onSwipeDown, // Reserved - currently allows native scroll
 }) => {
   const { isMobile } = useResponsiveSafe();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Mutable ref — set imperatively in useEffect to avoid StrictMode double-transferControlToOffscreen
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const bottomScrollRef = useRef<HTMLDivElement>(null);
@@ -100,21 +95,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // PERF: Use ref instead of state for channel triggers to avoid re-renders
   const channelTriggersRef = useRef<ChannelTrigger[]>([]);
 
-  // Caches for rendered elements (Bassoon Tracker style)
-  const noteCacheRef = useRef<NoteCache>({});
-  const instCacheRef = useRef<NoteCache>({});
-  const volCacheRef = useRef<NoteCache>({});
-  const effCacheRef = useRef<NoteCache>({});
-  const flagCacheRef = useRef<NoteCache>({});
-  const probCacheRef = useRef<NoteCache>({});
-  const paramCacheRef = useRef<NoteCache>({}); // Effect parameters cache
-  const lineNumberCacheRef = useRef<NoteCache>({});
-  
   // Accumulator for horizontal scroll resistance
   const scrollAccumulatorRef = useRef(0);
 
-  // Animation frame ref for smooth updates
-  const rafRef = useRef<number | null>(null);
+  // Bridge to the OffscreenCanvas worker
+  const bridgeRef = useRef<TrackerOffscreenBridge | null>(null);
+  // Ref-tracked scroll for immediate worker updates (avoids React re-renders on scroll)
+  const scrollLeftRef = useRef(0);
 
   // Get pattern and actions (moved BEFORE callbacks that use them)
   const {
@@ -352,7 +339,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, [pattern, dimensions.height, scrollLeft, cursor.rowIndex, channelOffsets, channelWidths, numChannels]);
 
   const [isDragging, setIsDragging] = useState(false);
-  const [dragOverCell, setDragOverCell] = useState<{ channelIndex: number; rowIndex: number } | null>(null);
+  const [, setDragOverCell] = useState<{ channelIndex: number; rowIndex: number } | null>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -361,18 +348,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const cell = getCellFromCoords(e.clientX, e.clientY);
     if (cell) {
       setDragOverCell({ channelIndex: cell.channelIndex, rowIndex: cell.rowIndex });
+      bridgeRef.current?.post({ type: 'dragOver', cell: { channelIndex: cell.channelIndex, rowIndex: cell.rowIndex } });
       e.dataTransfer.dropEffect = 'copy';
     } else {
       setDragOverCell(null);
+      bridgeRef.current?.post({ type: 'dragOver', cell: null });
     }
   }, [getCellFromCoords]);
 
   const handleDragLeave = useCallback(() => {
     setDragOverCell(null);
+    bridgeRef.current?.post({ type: 'dragOver', cell: null });
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     setDragOverCell(null);
+    bridgeRef.current?.post({ type: 'dragOver', cell: null });
 
     // Only handle internal instrument drags — let file drops propagate to GlobalDragDropHandler
     const dragData = e.dataTransfer.getData('application/x-devilbox-instrument');
@@ -668,18 +659,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     enabled: isMobile,
   });
 
-  // Audio-synced display state ref (BassoonTracker pattern)
-  // This stores the last state retrieved from TrackerReplayer.getStateAtTime()
-  const lastAudioStateRef = useRef<DisplayState | null>(null);
-  // Fallback refs for when audio sync is not available
-  const lastRowValueRef = useRef<number>(-1);
-  const lastSmoothOffsetRef = useRef<number>(0);
-
-  // Track theme for cache invalidation
+  // Theme — only needed for the 'ready' init message
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const getCurrentTheme = useThemeStore((state) => state.getCurrentTheme);
-  const currentTheme = getCurrentTheme();
-  const lastThemeRef = useRef(currentThemeId);
 
   // Visual Parameter Editor state
   const [parameterEditorState, setParameterEditorState] = useState<{
@@ -708,14 +690,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     cellContextMenu.closeMenu();
   }, [cellContextMenu, cursor, selection, pattern]);
 
-  // Clear caches when theme changes
+  // Notify worker when theme changes
   useEffect(() => {
-    if (lastThemeRef.current !== currentThemeId) {
-      noteCacheRef.current = {};
-      paramCacheRef.current = {};
-      lineNumberCacheRef.current = {};
-      lastThemeRef.current = currentThemeId;
-    }
+    bridgeRef.current?.post({ type: 'theme', theme: snapshotTheme() });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentThemeId]);
 
   // Center current channel on mobile
@@ -733,30 +711,83 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       
       // Calculate target scroll to center the channel
       const targetScroll = mobileChannelIndex * channelWidth;
+      scrollLeftRef.current = targetScroll;
+      bridgeRef.current?.post({ type: 'scroll', x: targetScroll });
       setScrollLeft(targetScroll);
     }
   }, [isMobile, mobileChannelIndex, pattern]);
 
-  // Colors based on theme
-  const colors = useMemo(() => ({
-    bg: '#0a0a0b',
-    rowNormal: '#0d0d0e',
-    rowHighlight: '#111113', // More subtle highlight (was #151518)
-    centerLine: currentTheme.colors.accentGlow, // Use theme accent with transparency
-    cursor: currentTheme.colors.accent, // Use theme accent color
-    cursorBg: currentTheme.colors.accentGlow, // Use theme accent glow (transparent)
-    text: '#e0e0e0',
-    textMuted: '#505050',
-    textNote: '#909090',  // Grey by default, flashes white on current row
-    textNoteActive: '#ffffff',  // White for currently playing notes
-    textInstrument: '#4ade80',
-    textVolume: '#60a5fa',
-    textEffect: '#f97316',
-    border: '#252530',
-    lineNumber: '#707070',
-    lineNumberHighlight: '#f97316',
-    selection: 'rgba(59, 130, 246, 0.3)', // Semi-transparent blue for selection
-  }), [currentTheme]);
+  // Snapshot helpers — produce serializable snapshots from stores for the worker
+  const snapshotTheme = useCallback((): ThemeSnapshot => {
+    const theme = getCurrentTheme();
+    return {
+      accent:              theme.colors.accent,
+      accentSecondary:     theme.colors.accentSecondary,
+      accentGlow:          theme.colors.accentGlow,
+      bg:                  '#0a0a0b',
+      rowNormal:           '#0d0d0e',
+      rowHighlight:        '#111113',
+      border:              '#252530',
+      textNote:            '#909090',
+      textNoteActive:      '#ffffff',
+      textMuted:           '#505050',
+      textInstrument:      '#4ade80',
+      textVolume:          '#60a5fa',
+      textEffect:          '#f97316',
+      lineNumber:          '#707070',
+      lineNumberHighlight: '#f97316',
+      selection:           'rgba(59, 130, 246, 0.3)',
+    };
+  }, [getCurrentTheme]);
+
+  const snapshotUI = useCallback((): UIStateSnapshot => {
+    const ui = useUIStore.getState();
+    const settings = useSettingsStore.getState();
+    const tracker = useTrackerStore.getState();
+    return {
+      useHex:             ui.useHexNumbers,
+      blankEmpty:         ui.blankEmptyCells,
+      showGhostPatterns:  tracker.showGhostPatterns,
+      columnVisibility:   tracker.columnVisibility,
+      trackerVisualBg:    settings.trackerVisualBg,
+      recordMode:         tracker.recordMode,
+    };
+  }, []);
+
+  const snapshotPatterns = useCallback((): PatternSnapshot[] => {
+    const state = useTrackerStore.getState();
+    return state.patterns.map((p) => ({
+      id: p.id,
+      length: p.length,
+      channels: p.channels.map((ch): ChannelSnapshot => ({
+        id: ch.id,
+        name: ch.name,
+        color: ch.color ?? undefined,
+        muted: ch.muted,
+        solo: ch.solo,
+        collapsed: ch.collapsed,
+        effectCols: ch.channelMeta?.effectCols ?? 2,
+        rows: ch.rows.map((cell): CellSnapshot => ({
+          note: cell.note ?? 0,
+          instrument: cell.instrument ?? 0,
+          volume: cell.volume ?? 0,
+          effTyp: cell.effTyp ?? 0,
+          eff: cell.eff ?? 0,
+          effTyp2: cell.effTyp2 ?? 0,
+          eff2: cell.eff2 ?? 0,
+          flag1: cell.flag1,
+          flag2: cell.flag2,
+          probability: cell.probability,
+        })),
+      })),
+    }));
+  }, []);
+
+  const snapshotLayout = useCallback((): ChannelLayoutSnapshot => ({
+    offsets: channelOffsets,
+    widths:  channelWidths,
+    totalWidth: totalChannelsWidth,
+  }), [channelOffsets, channelWidths, totalChannelsWidth]);
 
   // Channel context menu handlers
   const handleFillPattern = useCallback((channelIndex: number, generatorType: GeneratorType) => {
@@ -938,885 +969,201 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
   }, [pattern?.channels.length]);
 
-  // Get the note canvas from cache or create it
-  const getNoteCanvas = useCallback((note: number, isActive = false): HTMLCanvasElement => {
-    const dpr = window.devicePixelRatio || 1;
-    const key = `${note}-${isActive ? 'a' : 'n'}-dpr${dpr}`;
-    if (noteCacheRef.current[key]) {
-      return noteCacheRef.current[key];
-    }
+  // ─── Worker bridge initialisation ──────────────────────────────────────────
+  // Runs once after the canvas mounts. Transfers control to the worker,
+  // sends the initial snapshot, then subscribes to stores to forward deltas.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = (CHAR_WIDTH * 3 + 4) * dpr;
-    canvas.height = ROW_HEIGHT * dpr;
-    const ctx = canvas.getContext('2d')!;
-    ctx.scale(dpr, dpr);
-
-    ctx.font = '14px "JetBrains Mono", "Fira Code", monospace';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = note === 0 ? colors.textMuted :
-                    note === 97 ? colors.textEffect :
-                    (isActive ? colors.textNoteActive : colors.textNote);
-    ctx.fillText(noteToString(note), 0, ROW_HEIGHT / 2);
-
-    noteCacheRef.current[key] = canvas;
-    return canvas;
-  }, [colors.textMuted, colors.textEffect, colors.textNote, colors.textNoteActive]);
-
-  // Get parameter canvas from cache or create it
-  const getParamCanvas = useCallback((
-    instrument: number,
-    volume: number,
-    effTyp: number,
-    eff: number,
-    effTyp2: number,
-    eff2: number,
-    flag1?: number,
-    flag2?: number,
-    probability?: number,
-    blankEmpty?: boolean,
-    effectCols?: number,
-    effects?: { type: number; param: number }[]
-  ): HTMLCanvasElement => {
-    // Use effectCols to determine how many columns to render (default 2)
-    const numEffectCols = effectCols ?? 2;
-    
-    // Build effect key for caching
-    let effectKey = `${effTyp}-${eff}-${effTyp2}-${eff2}`;
-    if (effects && effects.length > 2) {
-      effectKey += `-ex${effects.slice(2).map(e => `${e.type}:${e.param}`).join('-')}`;
-    }
-    
-    const dpr = window.devicePixelRatio || 1;
-    const key = `${instrument}-${volume}-${effectKey}-f1${flag1 ?? 'x'}-f2${flag2 ?? 'x'}-p${probability ?? 'x'}-${blankEmpty ? 'B' : ''}-ec${numEffectCols}-dpr${dpr}`;
-    if (paramCacheRef.current[key]) {
-      return paramCacheRef.current[key];
-    }
-
-    // Flag columns (flag1/flag2) - 2 flexible columns that can be accent or slide
-    const hasFlagColumns = flag1 !== undefined || flag2 !== undefined;
-    const hasProb = probability !== undefined && probability > 0;
-    const canvas = document.createElement('canvas');
-    // inst(2)+4 vol(2)+4 + numEffectCols*(3+4)
-    const effectWidth = numEffectCols * (CHAR_WIDTH * 3 + 4);
-    const logicalW = CHAR_WIDTH * 4 + 8 + effectWidth + (hasFlagColumns ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
-    canvas.width = logicalW * dpr;
-    canvas.height = ROW_HEIGHT * dpr;
-    const ctx = canvas.getContext('2d')!;
-    ctx.scale(dpr, dpr);
-
-    ctx.font = '14px "JetBrains Mono", "Fira Code", monospace';
-    ctx.textBaseline = 'middle';
-
-    let x = 0;
-    const y = ROW_HEIGHT / 2;
-
-    // Instrument (2 hex digits)
-    if (instrument !== 0) {
-      ctx.fillStyle = colors.textInstrument;
-      ctx.fillText(hexByte(instrument), x, y);
-    } else if (!blankEmpty) {
-      ctx.fillStyle = colors.textMuted;
-      ctx.fillText('..', x, y);
-    }
-    x += CHAR_WIDTH * 2 + 4;
-
-    // Volume (2 hex digits)
-    const hasVolume = volume >= 0x10 && volume <= 0x50;
-    if (hasVolume) {
-      ctx.fillStyle = colors.textVolume;
-      ctx.fillText(hexByte(volume), x, y);
-    } else if (!blankEmpty) {
-      ctx.fillStyle = colors.textMuted;
-      ctx.fillText('..', x, y);
-    }
-    x += CHAR_WIDTH * 2 + 4;
-
-    // Render effect columns (variable 1-8)
-    for (let col = 0; col < numEffectCols; col++) {
-      let colEffTyp = 0;
-      let colEff = 0;
-      
-      if (col === 0) {
-        colEffTyp = effTyp;
-        colEff = eff;
-      } else if (col === 1) {
-        colEffTyp = effTyp2;
-        colEff = eff2;
-      } else if (effects && col < effects.length) {
-        colEffTyp = effects[col].type;
-        colEff = effects[col].param;
-      }
-      
-      const hasEffect = colEffTyp !== 0 || colEff !== 0;
-      if (hasEffect) {
-        ctx.fillStyle = colors.textEffect;
-        // Convert effect type to character: 0-9 stay as digits, 10+ become A-Z
-        const effChar = colEffTyp < 10 ? colEffTyp.toString() : String.fromCharCode(55 + colEffTyp);
-        ctx.fillText(effChar + hexByte(colEff), x, y);
-      } else if (!blankEmpty) {
-        ctx.fillStyle = colors.textMuted;
-        ctx.fillText('...', x, y);
-      }
-      x += CHAR_WIDTH * 3 + 4;
-    }
-
-    // Flag columns (if present) - can be accent (1), slide (2), mute (3), hammer (4)
-    if (hasFlagColumns) {
-      // Flag 1 - yellow/orange for accent, cyan for slide, yellow for mute, cyan for hammer
-      if (flag1 === 1) {
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillText('A', x, y);
-      } else if (flag1 === 2) {
-        ctx.fillStyle = '#06b6d4';
-        ctx.fillText('S', x, y);
-      } else if (flag1 === 3) {
-        ctx.fillStyle = '#facc15'; // yellow-400 for mute
-        ctx.fillText('M', x, y);
-      } else if (flag1 === 4) {
-        ctx.fillStyle = '#22d3ee'; // cyan-400 for hammer
-        ctx.fillText('H', x, y);
-      } else if (!blankEmpty) {
-        ctx.fillStyle = colors.textMuted;
-        ctx.fillText('.', x, y);
-      }
-      x += CHAR_WIDTH + 4;
-
-      // Flag 2 - yellow/orange for accent, cyan for slide, yellow for mute, cyan for hammer
-      if (flag2 === 1) {
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillText('A', x, y);
-      } else if (flag2 === 2) {
-        ctx.fillStyle = '#06b6d4';
-        ctx.fillText('S', x, y);
-      } else if (flag2 === 3) {
-        ctx.fillStyle = '#facc15'; // yellow-400 for mute
-        ctx.fillText('M', x, y);
-      } else if (flag2 === 4) {
-        ctx.fillStyle = '#22d3ee'; // cyan-400 for hammer
-        ctx.fillText('H', x, y);
-      } else if (!blankEmpty) {
-        ctx.fillStyle = colors.textMuted;
-        ctx.fillText('.', x, y);
-      }
-      x += CHAR_WIDTH + 4;
-    }
-
-    // Probability column (if present)
-    if (hasProb) {
-      const clampedProb = Math.min(99, Math.max(0, probability!));
-      const probColor = clampedProb >= 75 ? '#4ade80' : clampedProb >= 50 ? '#facc15' : clampedProb >= 25 ? '#fb923c' : '#f87171';
-      ctx.fillStyle = probColor;
-      ctx.fillText(clampedProb.toString(10).padStart(2, '0'), x, y);
-    }
-
-    paramCacheRef.current[key] = canvas;
-    return canvas;
-  }, [colors.textMuted, colors.textInstrument, colors.textVolume, colors.textEffect]);
-
-  // Get line number canvas from cache or create it
-  const getLineNumberCanvas = useCallback((lineNum: number, useHex: boolean): HTMLCanvasElement => {
-    const dpr = window.devicePixelRatio || 1;
-    const isHighlight = lineNum % 4 === 0;
-    const key = `${lineNum}-${useHex}-${isHighlight}-dpr${dpr}`;
-    if (lineNumberCacheRef.current[key]) {
-      return lineNumberCacheRef.current[key];
-    }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = LINE_NUMBER_WIDTH * dpr;
-    canvas.height = ROW_HEIGHT * dpr;
-    const ctx = canvas.getContext('2d')!;
-    ctx.scale(dpr, dpr);
-
-    ctx.font = isHighlight ? 'bold 12px "JetBrains Mono", monospace' : '12px "JetBrains Mono", monospace';
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = isHighlight ? colors.lineNumberHighlight : colors.lineNumber;
-
-    const text = useHex
-      ? lineNum.toString(16).toUpperCase().padStart(2, '0')
-      : lineNum.toString(10).padStart(2, '0');
-    ctx.fillText(text, LINE_NUMBER_WIDTH / 2, ROW_HEIGHT / 2);
-
-    lineNumberCacheRef.current[key] = canvas;
-    return canvas;
-  }, [colors.lineNumber, colors.lineNumberHighlight]);
-
-  // Main render function
-  const render = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // Get state directly (no React re-render)
-    const state = useTrackerStore.getState();
-    const transportState = useTransportStore.getState();
-    const uiState = useUIStore.getState();
-
-    const cursor = state.cursor;
-    const isPlaying = transportState.isPlaying;
-    const useHex = uiState.useHexNumbers;
-    const blankEmpty = uiState.blankEmptyCells;
-    const audioSpeed = transportState.speed;
-    const audioBpm = transportState.bpm;
-    const smoothScrolling = transportState.smoothScrolling;
-    const showGhostPatterns = state.showGhostPatterns;
-
-    const { width, height } = dimensions;
-
-    // Audio-synced scrolling (BassoonTracker pattern)
-    // Get state from audio context time, NOT from wall-clock or store updates
-    let currentRow: number;
-    let smoothOffset = 0;
-    let activePatternIndex = state.currentPatternIndex;
-
-    if (isPlaying) {
-      const replayer = getTrackerReplayer();
-
-      // Get current Web Audio time with 10ms lookahead for latency compensation
-      const audioTime = Tone.now() + 0.01;
-      const audioState = replayer.getStateAtTime(audioTime);
-
-      if (audioState) {
-        lastAudioStateRef.current = audioState;
-        currentRow = audioState.row;
-        // CRITICAL: Use pattern index from audio state, not store!
-        // This ensures visual matches audio during pattern jumps, loops, and reloads.
-        activePatternIndex = audioState.pattern;
-
-        if (smoothScrolling) {
-          // ACCURATE SMOOTH SCROLLING:
-          // The replayer provides the exact 'time' when each row was triggered.
-          // To calculate progress, we need the start time of the NEXT row.
-          const nextState = replayer.getStateAtTime(audioTime + 0.5, true); // Peek ahead using the new parameter
-          
-          let effectiveRowDuration: number;
-          if (nextState && nextState.row !== audioState.row) {
-            // We have the next row start time, so we know exactly how long this row lasted
-            effectiveRowDuration = nextState.time - audioState.time;
-          } else {
-            // Fallback: use grid duration
-            effectiveRowDuration = (2.5 / audioBpm) * audioSpeed;
-          }
-
-          // Calculate progress (0 to 1) based on actual duration
-          const timeSinceRowStart = audioTime - audioState.time;
-          const progress = Math.min(Math.max(timeSinceRowStart / effectiveRowDuration, 0), 1);
-          smoothOffset = progress * ROW_HEIGHT;
-        } else {
-          smoothOffset = 0;
-        }
-
-        // Store for fallback
-        lastRowValueRef.current = currentRow;
-        lastSmoothOffsetRef.current = smoothOffset;
-      } else {
-        // Fallback to store state if no audio state available yet
-        currentRow = transportState.currentRow;
-      }
-    } else {
-      // Not playing - use cursor position
-      currentRow = cursor.rowIndex;
-      // Reset all tracking
-      lastAudioStateRef.current = null;
-      lastRowValueRef.current = -1;
-      lastSmoothOffsetRef.current = 0;
-    }
-
-    // Use the audio-synced pattern index for visual display
-    const pattern = state.patterns[activePatternIndex];
-    
-    if (!pattern) {
-      const visualBgActive = useSettingsStore.getState().trackerVisualBg;
-      if (visualBgActive) {
-        ctx.clearRect(0, 0, dimensions.width, dimensions.height);
-      } else {
-        ctx.fillStyle = colors.bg;
-        ctx.fillRect(0, 0, dimensions.width, dimensions.height);
-      }
-      ctx.fillStyle = colors.textMuted;
-      ctx.font = '16px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('No pattern loaded', dimensions.width / 2, dimensions.height / 2);
+    // Feature-detect OffscreenCanvas transfer support
+    if (!('transferControlToOffscreen' in HTMLCanvasElement.prototype)) {
+      console.warn('[PatternEditorCanvas] OffscreenCanvas not supported, skipping worker');
       return;
     }
 
-    const patternLength = pattern.length;
+    // Create canvas imperatively — prevents StrictMode double-transferControlToOffscreen error
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = `display:block;width:${dimensions.width}px;height:${dimensions.height}px;`;
+    container.appendChild(canvas);
+    canvasRef.current = canvas;
 
-    // Calculate visible lines
-    const visibleLines = Math.ceil(height / ROW_HEIGHT) + 2;
-    const topLines = Math.floor(visibleLines / 2);
-    const vStart = currentRow - topLines;
-    const visibleEnd = vStart + visibleLines;
+    const bridge = new TrackerOffscreenBridge(TrackerWorkerFactory, {
+      onReady: () => {
+        // Worker is ready — send layout so it can start rendering
+        bridge.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
+      },
+      onMessage: () => {
+        // Future: handle click replies from worker (currently hit-tested on main thread)
+      },
+    });
+    bridgeRef.current = bridge;
 
-    // Center line position - apply smooth offset
-    const centerLineTop = Math.floor(height / 2) - ROW_HEIGHT / 2;
-    const baseY = centerLineTop - (topLines * ROW_HEIGHT) - smoothOffset;
-    
-    // Channel count is global across all patterns (enforced by addChannel/removeChannel)
-    const numChannels = pattern.channels.length;
-    
-    // Update scroll refs and overlay DOM positions directly (no React state = no re-renders)
-    scrollYRef.current = baseY;
-    visibleStartRef.current = vStart;
-    if (macroOverlayRef.current) {
-      macroOverlayRef.current.style.top = `${baseY}px`;
-    }
+    const dpr   = window.devicePixelRatio || 1;
+    const w     = Math.max(1, container.clientWidth);
+    const h     = Math.max(1, container.clientHeight);
+    const state = useTrackerStore.getState();
 
-    const noteWidth = CHAR_WIDTH * 3 + 4;
-    
-    // Calculate content width for centering
-    const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
-    const showProb = columnVisibility.probability;
-    const paramWidth = CHAR_WIDTH * 10 + 16
-      + (showAcid ? CHAR_WIDTH * 2 + 8 : 0)
-      + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
-    const contentWidth = noteWidth + 4 + paramWidth;
+    // Transfer canvas — after this the main thread cannot draw to it
+    const offscreen = canvas.transferControlToOffscreen();
 
-    // Clear canvas — transparent when WebGL visual background is active
-    const visualBgActive = useSettingsStore.getState().trackerVisualBg;
-    if (visualBgActive) {
-      ctx.clearRect(0, 0, width, height);
-    } else {
-      ctx.fillStyle = colors.bg;
-      ctx.fillRect(0, 0, width, height);
-    }
+    bridge.post(
+      {
+        type:               'init',
+        canvas:             offscreen,
+        dpr,
+        width:              w,
+        height:             h,
+        theme:              snapshotTheme(),
+        uiState:            snapshotUI(),
+        patterns:           snapshotPatterns(),
+        currentPatternIndex: state.currentPatternIndex,
+        cursor: {
+          rowIndex:    state.cursor.rowIndex,
+          channelIndex: state.cursor.channelIndex,
+          columnType:  state.cursor.columnType,
+          digitIndex:  state.cursor.digitIndex,
+        },
+        selection:          state.selection ? {
+          startChannel: state.selection.startChannel,
+          endChannel:   state.selection.endChannel,
+          startRow:     state.selection.startRow,
+          endRow:       state.selection.endRow,
+          columnTypes:  state.selection.columnTypes,
+        } : null,
+        channelLayout: snapshotLayout(),
+      },
+      [offscreen],
+    );
 
-    // Draw full-height channel elements (backgrounds, separators, stripes)
-    for (let ch = 0; ch < numChannels; ch++) {
-      const colX = channelOffsets[ch] - scrollLeft;
-      const channelWidth = channelWidths[ch];
-      const isCollapsed = pattern.channels[ch]?.collapsed;
-      const chColor = pattern.channels[ch]?.color;
-
-      // Skip if outside visible area
-      if (colX + channelWidth < 0 || colX > width) continue;
-
-      // Active channel highlight (very subtle)
-      if (ch === cursor.channelIndex) {
-        const prevAlpha = ctx.globalAlpha;
-        ctx.globalAlpha = 0.02;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(colX, 0, channelWidth, height);
-        ctx.globalAlpha = prevAlpha;
+    // Subscribe to tracker store — post pattern/cursor/selection deltas
+    const unsubTracker = useTrackerStore.subscribe((s, prev) => {
+      const b = bridgeRef.current;
+      if (!b) return;
+      if (s.patterns !== prev.patterns || s.currentPatternIndex !== prev.currentPatternIndex) {
+        b.post({ type: 'patterns', patterns: snapshotPatterns(), currentPatternIndex: s.currentPatternIndex });
       }
-
-      // Channel background tint
-      if (chColor) {
-        const prevAlpha = ctx.globalAlpha;
-        ctx.globalAlpha = 0.03;
-        ctx.fillStyle = chColor;
-        ctx.fillRect(colX, 0, channelWidth, height);
-        ctx.globalAlpha = prevAlpha;
+      if (s.cursor !== prev.cursor) {
+        b.post({ type: 'cursor', cursor: {
+          rowIndex:    s.cursor.rowIndex,
+          channelIndex: s.cursor.channelIndex,
+          columnType:  s.cursor.columnType,
+          digitIndex:  s.cursor.digitIndex,
+        }});
       }
-
-      // Channel separator
-      ctx.fillStyle = colors.border;
-      ctx.fillRect(colX + channelWidth, 0, 1, height);
-
-      // Colored left stripe
-      if (chColor) {
-        const prevAlpha = ctx.globalAlpha;
-        ctx.globalAlpha = 0.4;
-        ctx.fillStyle = chColor;
-        ctx.fillRect(colX, 0, isCollapsed ? 4 : 2, height);
-        ctx.globalAlpha = prevAlpha;
+      if (s.selection !== prev.selection) {
+        b.post({ type: 'selection', selection: s.selection ? {
+          startChannel: s.selection.startChannel,
+          endChannel:   s.selection.endChannel,
+          startRow:     s.selection.startRow,
+          endRow:       s.selection.endRow,
+          columnTypes:  s.selection.columnTypes,
+        } : null });
       }
-    }
-
-    // Draw rows
-    const sel = state.selection;
-    const hasSelection = !!sel;
-    const minSelCh = hasSelection ? Math.min(sel.startChannel, sel.endChannel) : -1;
-    const maxSelCh = hasSelection ? Math.max(sel.startChannel, sel.endChannel) : -1;
-    const minSelRow = hasSelection ? Math.min(sel.startRow, sel.endRow) : -1;
-    const maxSelRow = hasSelection ? Math.max(sel.startRow, sel.endRow) : -1;
-
-    for (let i = vStart; i < visibleEnd; i++) {
-      let rowIndex: number;
-      let isGhostRow = false;
-      let ghostPattern = null;
-      
-      if (isPlaying) {
-        // During playback, show sequential flow through patterns
-        // Use activePatternIndex (from audio state) instead of currentPatternIndex (from store)
-        if (showGhostPatterns && i < 0) {
-          // Previous pattern
-          if (activePatternIndex > 0) {
-            ghostPattern = patterns[activePatternIndex - 1];
-            rowIndex = ghostPattern.length + i; // i is negative
-            // Validate rowIndex is within pattern bounds
-            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
-              continue;
-            }
-            isGhostRow = true;
-          } else if (patterns.length > 1) {
-            // Wraparound to last pattern
-            ghostPattern = patterns[patterns.length - 1];
-            rowIndex = ghostPattern.length + i;
-            // Validate rowIndex is within pattern bounds
-            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
-              continue;
-            }
-            isGhostRow = true;
-          } else {
-            continue;
-          }
-        } else if (showGhostPatterns && i >= patternLength) {
-          // Next pattern
-          if (activePatternIndex < patterns.length - 1) {
-            ghostPattern = patterns[activePatternIndex + 1];
-            rowIndex = i - patternLength;
-            // Validate rowIndex is within pattern bounds
-            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
-              continue;
-            }
-            isGhostRow = true;
-          } else if (patterns.length > 1) {
-            // Wraparound to first pattern
-            ghostPattern = patterns[0];
-            rowIndex = i - patternLength;
-            // Validate rowIndex is within pattern bounds
-            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
-              continue;
-            }
-            isGhostRow = true;
-          } else {
-            continue;
-          }
-        } else if (i < 0 || i >= patternLength) {
-          // Ghost patterns disabled - skip out of range rows
-          continue;
-        } else {
-          rowIndex = i;
-        }
-      } else {
-        // Allow ghost rows from adjacent patterns in edit mode
-        if (showGhostPatterns && i < 0) {
-          // Previous pattern (with wraparound)
-          if (currentPatternIndex > 0) {
-            ghostPattern = patterns[currentPatternIndex - 1];
-            rowIndex = ghostPattern.length + i; // i is negative, so this wraps
-            // Validate rowIndex is within pattern bounds
-            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
-              continue;
-            }
-            isGhostRow = true;
-          } else if (patterns.length > 1) {
-            // Wraparound to last pattern
-            ghostPattern = patterns[patterns.length - 1];
-            rowIndex = ghostPattern.length + i; // i is negative, so this wraps
-            // Validate rowIndex is within pattern bounds
-            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
-              continue;
-            }
-            isGhostRow = true;
-          } else {
-            continue; // Only one pattern
-          }
-        } else if (showGhostPatterns && i >= patternLength) {
-          // Next pattern (with wraparound)
-          if (currentPatternIndex < patterns.length - 1) {
-            ghostPattern = patterns[currentPatternIndex + 1];
-            rowIndex = i - patternLength;
-            // Validate rowIndex is within pattern bounds
-            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
-              continue;
-            }
-            isGhostRow = true;
-          } else if (patterns.length > 1) {
-            // Wraparound to first pattern
-            ghostPattern = patterns[0];
-            rowIndex = i - patternLength;
-            // Validate rowIndex is within pattern bounds
-            if (rowIndex < 0 || rowIndex >= ghostPattern.length) {
-              continue;
-            }
-            isGhostRow = true;
-          } else {
-            continue; // Only one pattern
-          }
-        } else if (i < 0 || i >= patternLength) {
-          // Ghost patterns disabled - skip out of range rows
-          continue;
-        } else {
-          rowIndex = i;
-        }
+      if (s.columnVisibility !== prev.columnVisibility || s.showGhostPatterns !== prev.showGhostPatterns || s.recordMode !== prev.recordMode) {
+        b.post({ type: 'uiState', uiState: snapshotUI() });
       }
+    });
 
-      const y = baseY + ((i - vStart) * ROW_HEIGHT);
-      if (y < -ROW_HEIGHT || y > height + ROW_HEIGHT) continue;
-
-      // Row background
-      const isHighlight = rowIndex % 4 === 0;
-      
-      // Apply ghost opacity to background if needed
-      if (isGhostRow) {
-        ctx.globalAlpha = 0.35;
+    // Subscribe to UI store
+    const unsubUI = useUIStore.subscribe((s, prev) => {
+      if (s.useHexNumbers !== prev.useHexNumbers || s.blankEmptyCells !== prev.blankEmptyCells) {
+        bridgeRef.current?.post({ type: 'uiState', uiState: snapshotUI() });
       }
-      
-      if (!visualBgActive) {
-        ctx.fillStyle = isHighlight ? colors.rowHighlight : colors.rowNormal;
-        ctx.fillRect(0, y, width, ROW_HEIGHT);
+    });
+
+    // Subscribe to settings store
+    const unsubSettings = useSettingsStore.subscribe((s, prev) => {
+      if (s.trackerVisualBg !== prev.trackerVisualBg) {
+        bridgeRef.current?.post({ type: 'uiState', uiState: snapshotUI() });
       }
-      
-      // Reset alpha for line number (so it's readable)
-      if (isGhostRow) {
-        ctx.globalAlpha = 1.0;
-      }
+    });
 
-      // Line number
-      const lineNumCanvas = getLineNumberCanvas(rowIndex, useHex);
-      ctx.drawImage(lineNumCanvas, 4, y, LINE_NUMBER_WIDTH, ROW_HEIGHT);
-      
-      // Apply ghost opacity for content (not background/line numbers)
-      if (isGhostRow) {
-        ctx.globalAlpha = 0.35;
-      }
-
-      // Draw each channel (use ghost pattern if available)
-      const sourcePattern = ghostPattern || pattern;
-      for (let ch = 0; ch < numChannels; ch++) {
-        const colX = channelOffsets[ch] - scrollLeft;
-        const channelWidth = channelWidths[ch];
-        const isCollapsed = pattern.channels[ch]?.collapsed;
-
-        // Skip if outside visible area
-        if (colX + channelWidth < 0 || colX > width) continue;
-
-        // Use noteWidth for collapsed channels, full contentWidth for expanded
-        const currentContentWidth = isCollapsed ? noteWidth : contentWidth;
-        const x = colX + Math.floor((channelWidth - currentContentWidth) / 2);
-
-        // Active channel highlight (re-draw over row background)
-        if (ch === cursor.channelIndex && !isGhostRow) {
-          const prevAlpha = ctx.globalAlpha;
-          ctx.globalAlpha = 0.02;
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(colX, y, channelWidth, ROW_HEIGHT);
-          ctx.globalAlpha = prevAlpha;
-        }
-
-        // Check if this channel exists in the source pattern (ghost patterns might have different channel counts)
-        if (!sourcePattern.channels[ch]) {
-          continue;
-        }
-
-        // Get cell from source pattern
-        const cell = sourcePattern.channels[ch].rows[rowIndex];
-
-        // Safety check: skip if row doesn't exist (can happen with ghost patterns of different lengths)
-        if (!cell) {
-          continue;
-        }
-
-        // Collapsed: show only note column, skip parameter columns
-        if (isCollapsed) {
-          const noteCanvas = getNoteCanvas(cell.note ?? 0, false);
-          ctx.drawImage(noteCanvas, x, y, CHAR_WIDTH * 3 + 4, ROW_HEIGHT);
-          continue;
-        }
-
-        // Note - flash white on current playing row (but not ghost rows)
-        const isCurrentPlayingRow = isPlaying && !isGhostRow && rowIndex === currentRow;
-        const cellNote = cell.note || 0;
-        // Blank empty cells: skip drawing "---" for note=0
-        if (!blankEmpty || cellNote !== 0) {
-          const noteCanvas = getNoteCanvas(cellNote, isCurrentPlayingRow && cellNote > 0);
-          ctx.drawImage(noteCanvas, x, y, CHAR_WIDTH * 3 + 4, ROW_HEIGHT);
-        }
-
-        // Parameters (including TB-303 accent/slide if present)
-        // Get effectCols from channel meta (default 2 for backward compatibility)
-        const channelMeta = sourcePattern.channels[ch]?.channelMeta;
-        const effectCols = channelMeta?.effectCols ?? 2;
-        
-        const paramCanvas = getParamCanvas(
-          cell.instrument || 0,
-          cell.volume || 0,
-          cell.effTyp || 0,
-          cell.eff || 0,
-          cell.effTyp2 || 0,
-          cell.eff2 || 0,
-          cell.flag1,
-          cell.flag2,
-          cell.probability,
-          blankEmpty,
-          effectCols,
-          undefined
-        );
-        const dprLocal = window.devicePixelRatio || 1;
-        ctx.drawImage(paramCanvas, x + noteWidth + 4, y, paramCanvas.width / dprLocal, ROW_HEIGHT);
-
-        // Draw selection highlight
-        if (hasSelection && !isGhostRow && ch >= minSelCh && ch <= maxSelCh && rowIndex >= minSelRow && rowIndex <= maxSelRow) {
-          ctx.fillStyle = colors.selection;
-          
-          const isMinCh = ch === minSelCh;
-          const isMaxCh = ch === maxSelCh;
-          const isSingleCh = isMinCh && isMaxCh;
-          
-          // If selecting across multiple channels, standard behavior is to select ALL columns
-          // for the "inner" channels. For start/end channels, we could be specific, 
-          // but for now let's just use the columnTypes if it's a single channel selection.
-          if (isSingleCh && sel.columnTypes && sel.columnTypes.length > 0 && sel.columnTypes.length < 9) {
-            const paramBase = 8 + noteWidth + 4;
-            sel.columnTypes.forEach(t => {
-              let cX = 0;
-              let cW = 0;
-              
-              if (t === 'note') {
-                cX = 0; // Note column starts at x (centered position)
-                cW = noteWidth;
-              } else {
-                cX = paramBase;
-                if (t === 'instrument') {
-                  cW = CHAR_WIDTH * 2 + 4;
-                } else if (t === 'volume') {
-                  cX += CHAR_WIDTH * 2 + 4;
-                  cW = CHAR_WIDTH * 2 + 4;
-                } else if (t === 'effTyp' || t === 'effParam') {
-                  cX += (CHAR_WIDTH * 2 + 4) * 2;
-                  cW = CHAR_WIDTH * 3 + 4;
-                } else if (t === 'effTyp2' || t === 'effParam2') {
-                  cX += (CHAR_WIDTH * 2 + 4) * 2 + (CHAR_WIDTH * 3 + 4);
-                  cW = CHAR_WIDTH * 3 + 4;
-                } else if (t === 'flag1') {
-                  cX += (CHAR_WIDTH * 2 + 4) * 2 + (CHAR_WIDTH * 3 + 4) * 2;
-                  cW = CHAR_WIDTH + 4;
-                } else if (t === 'flag2') {
-                  cX += (CHAR_WIDTH * 2 + 4) * 2 + (CHAR_WIDTH * 3 + 4) * 2 + (CHAR_WIDTH + 4);
-                  cW = CHAR_WIDTH + 4;
-                } else if (t === 'probability') {
-                  cX += (CHAR_WIDTH * 2 + 4) * 2 + (CHAR_WIDTH * 3 + 4) * 2 + (CHAR_WIDTH + 4) * 2;
-                  cW = CHAR_WIDTH * 2 + 4;
-                }
-              }
-              if (cW > 0) ctx.fillRect(x + cX, y, cW, ROW_HEIGHT); // Use x (centered) instead of colX
-            });
-          } else {
-            // Full channel highlight
-            ctx.fillRect(colX, y, channelWidth, ROW_HEIGHT);
-          }
-        }
-
-        // Draw drag-over highlight (breadcrumb)
-        if (dragOverCell && !isGhostRow && ch === dragOverCell.channelIndex && rowIndex === dragOverCell.rowIndex) {
-          ctx.fillStyle = currentTheme.colors.accent + '66'; // 40% opacity accent
-          ctx.fillRect(colX, y, channelWidth, ROW_HEIGHT);
-          // Add a border to make it pop
-          ctx.strokeStyle = currentTheme.colors.accent;
-          ctx.lineWidth = 1;
-          ctx.strokeRect(colX + 0.5, y + 0.5, channelWidth - 1, ROW_HEIGHT - 1);
-        }
-      }
-      
-      // Reset alpha after ghost row
-      if (isGhostRow) {
-        ctx.globalAlpha = 1.0;
-      }
-    }
-
-    // Draw center line highlight
-    if (visualBgActive) {
-      ctx.globalAlpha = 0.5;
-    }
-    ctx.fillStyle = colors.centerLine;
-    ctx.fillRect(0, centerLineTop, width, ROW_HEIGHT);
-    if (visualBgActive) {
-      ctx.globalAlpha = 1.0;
-    }
-
-    // Draw cursor — visible in all modes with mode-dependent color
-    // FT2: Each digit is a separate cursor stop, always CHAR_WIDTH wide (except note)
-    if (!pattern.channels[cursor.channelIndex]?.collapsed) {
-      // Calculate centering offset to match centered content (same as line 1457)
-      const colX = channelOffsets[cursor.channelIndex] - scrollLeft;
-      const channelWidth = channelWidths[cursor.channelIndex];
-      const cursorX = colX + Math.floor((channelWidth - contentWidth) / 2);
-      let cursorOffsetX = 0;
-      let caretWidth = CHAR_WIDTH; // Single char width for all except note
-
-      // Param canvas layout offsets (matches getParamCanvas layout exactly):
-      // inst(2) +4gap  vol(2) +4gap  eff(3) +4gap  eff2(3) +4gap  [accent +4gap  slide +4gap]  [prob(2)]
-      const paramBase = noteWidth + 4;
-      // Fixed column positions
-      const instOff = 0;
-      const volOff = CHAR_WIDTH * 2 + 4;
-      const eff1Off = CHAR_WIDTH * 4 + 8;
-      const eff2Off = CHAR_WIDTH * 7 + 12;
-      
-      // Current channel's schema for cursor positioning
-      const cellForCursor = pattern.channels[cursor.channelIndex]?.rows[0];
-      const hasAcidC = cellForCursor?.flag1 !== undefined || cellForCursor?.flag2 !== undefined;
-      
-      // Optional column positions depend on which columns exist
-      const acidOff = CHAR_WIDTH * 10 + 16;
-      const probOff = acidOff + (hasAcidC ? CHAR_WIDTH * 2 + 8 : 0);
-
-      switch (cursor.columnType) {
-        case 'note':
-          caretWidth = noteWidth;
-          break;
-        case 'instrument':
-          cursorOffsetX = paramBase + instOff + cursor.digitIndex * CHAR_WIDTH;
-          break;
-        case 'volume':
-          cursorOffsetX = paramBase + volOff + cursor.digitIndex * CHAR_WIDTH;
-          break;
-        case 'effTyp':
-          cursorOffsetX = paramBase + eff1Off;
-          break;
-        case 'effParam':
-          cursorOffsetX = paramBase + eff1Off + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH;
-          break;
-        case 'effTyp2':
-          cursorOffsetX = paramBase + eff2Off;
-          break;
-        case 'effParam2':
-          cursorOffsetX = paramBase + eff2Off + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH;
-          break;
-        case 'flag1':
-          cursorOffsetX = paramBase + acidOff;
-          break;
-        case 'flag2':
-          cursorOffsetX = paramBase + acidOff + CHAR_WIDTH + 4;
-          break;
-        case 'probability':
-          cursorOffsetX = paramBase + probOff + cursor.digitIndex * CHAR_WIDTH;
-          break;
-        default:
-          cursorOffsetX = paramBase + eff1Off;
-          break;
-      }
-
-      // Mode-dependent caret color
-      const isRecording = state.recordMode;
-      let caretBg: string;
-      if (isRecording) {
-        caretBg = currentTheme.colors.accent; // Theme accent for record mode
-      } else if (isPlaying) {
-        caretBg = currentTheme.colors.accentSecondary; // Secondary accent for playback
-      } else {
-        caretBg = currentTheme.colors.accent; // Theme accent for idle
-      }
-
-      // Caret dimensions: same height as the row highlight bar
-      const caretH = ROW_HEIGHT;
-      const caretY = centerLineTop;
-      const caretX = cursorX + cursorOffsetX;
-
-      // Clear any existing content (antialiased text edges bleed through otherwise)
-      ctx.clearRect(caretX, caretY, caretWidth, caretH);
-      // Draw solid caret background (inverted style)
-      ctx.fillStyle = caretBg;
-      ctx.fillRect(caretX, caretY, caretWidth, caretH);
-
-      // Extract and redraw the character(s) under the cursor in white (inverted text)
-      const cursorRow = isPlaying ? currentRow : cursor.rowIndex;
-      const cell = pattern.channels[cursor.channelIndex]?.rows[cursorRow];
-      if (cell) {
-        let charStr = '';
-        const col = cursor.columnType;
-        const di = cursor.digitIndex;
-
-        if (col === 'note') {
-          charStr = noteToString(cell.note ?? 0);
-        } else if (col === 'instrument') {
-          const instStr = hexByte(cell.instrument ?? 0);
-          charStr = (cell.instrument ?? 0) === 0 ? '..' : instStr;
-          charStr = charStr[di] ?? '.';
-        } else if (col === 'volume') {
-          const vol = cell.volume ?? 0;
-          const hasVol = vol >= 0x10 && vol <= 0x50;
-          const volStr = hasVol ? hexByte(vol) : '..';
-          charStr = volStr[di] ?? '.';
-        } else if (col === 'effTyp') {
-          const et = cell.effTyp ?? 0;
-          const ep = cell.eff ?? 0;
-          charStr = (et !== 0 || ep !== 0) ? et.toString(16).toUpperCase() : '.';
-        } else if (col === 'effParam') {
-          const et = cell.effTyp ?? 0;
-          const ep = cell.eff ?? 0;
-          const effStr = (et !== 0 || ep !== 0) ? hexByte(ep) : '..';
-          charStr = effStr[di] ?? '.';
-        } else if (col === 'effTyp2') {
-          const et2 = cell.effTyp2 ?? 0;
-          const ep2 = cell.eff2 ?? 0;
-          charStr = (et2 !== 0 || ep2 !== 0) ? et2.toString(16).toUpperCase() : '.';
-        } else if (col === 'effParam2') {
-          const et2 = cell.effTyp2 ?? 0;
-          const ep2 = cell.eff2 ?? 0;
-          const effStr = (et2 !== 0 || ep2 !== 0) ? hexByte(ep2) : '..';
-          charStr = effStr[di] ?? '.';
-        } else if (col === 'flag1') {
-          charStr = cell.flag1 === 1 ? 'A' : cell.flag1 === 2 ? 'S' : '.';
-        } else if (col === 'flag2') {
-          charStr = cell.flag2 === 1 ? 'A' : cell.flag2 === 2 ? 'S' : '.';
-        } else if (col === 'probability') {
-          const prob = cell.probability ?? 0;
-          const probStr = prob > 0 ? prob.toString(10).padStart(2, '0') : '..';
-          charStr = probStr[di] ?? '.';
-        }
-
-        // Draw inverted text (white on colored background)
-        ctx.font = '14px "JetBrains Mono", "Fira Code", monospace';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(charStr, caretX, caretY + caretH / 2);
-      }
-
-      // Final pass: Redraw channel separators to ensure they sit on top of row backgrounds
-      for (let ch = 0; ch < numChannels; ch++) {
-        const colX = channelOffsets[ch] - scrollLeft;
-        const channelWidth = channelWidths[ch];
-        if (colX + channelWidth >= 0 && colX <= width) {
-          // Separator
-          ctx.fillStyle = colors.border;
-          ctx.fillRect(colX + channelWidth, 0, 1, height);
-
-          // Colored stripe
-          const chColor = pattern.channels[ch]?.color;
-          if (chColor) {
-            const isCollapsed = pattern.channels[ch]?.collapsed;
-            ctx.globalAlpha = 0.4;
-            ctx.fillStyle = chColor;
-            ctx.fillRect(colX, 0, isCollapsed ? 4 : 2, height);
-            ctx.globalAlpha = 1.0;
-          }
-        }
-      }
-    }
-  }, [dimensions, colors, getNoteCanvas, getParamCanvas, getLineNumberCanvas, scrollLeft, currentTheme, instruments, currentPatternIndex, patterns, channelOffsets, channelWidths, numChannels, columnVisibility]);
-
-  // Ref to keep render callback up to date for the animation loop
-  const renderRef = useRef(render);
-  useEffect(() => { renderRef.current = render; }, [render]);
-
-  // Animation loop - unlocked framerate for maximum smoothness
-  // Defined inside effect to avoid self-referencing
-  useEffect(() => {
-    const tick = () => {
-      if (!document.hidden) {
-        renderRef.current();
-      }
-      rafRef.current = requestAnimationFrame(tick);
-    };
-
-    rafRef.current = requestAnimationFrame(tick);
     return () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-      }
+      unsubTracker();
+      unsubUI();
+      unsubSettings();
+      bridge.dispose();
+      bridgeRef.current = null;
+      canvas.remove();
+      canvasRef.current = null;
     };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only on mount
+
+  // Forward layout changes to worker when channel widths/offsets change
+  useEffect(() => {
+    bridgeRef.current?.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
+  }, [snapshotLayout]);
+
+  // ─── Thin overlay RAF (updates macroOverlayRef + posts playback state) ─────
+  // This replaces the heavy Canvas 2D render loop. It runs on the main thread
+  // to update overlay DOM positions (macroLanes) synchronously with audio.
+  useEffect(() => {
+    let rafId: number;
+    const audioBpm = useTransportStore.getState().bpm;
+    const audioSpeed = useTransportStore.getState().speed;
+
+    const tick = () => {
+      const transportState = useTransportStore.getState();
+      const trackerState   = useTrackerStore.getState();
+      const isPlaying      = transportState.isPlaying;
+      const smoothScrolling = transportState.smoothScrolling;
+
+      let currentRow   = trackerState.cursor.rowIndex;
+      let smoothOffset = 0;
+      let activePatternIdx = trackerState.currentPatternIndex;
+
+      if (isPlaying) {
+        const replayer  = getTrackerReplayer();
+        const audioTime = Tone.now() + 0.01;
+        const audioState = replayer.getStateAtTime(audioTime);
+
+        if (audioState) {
+          currentRow       = audioState.row;
+          activePatternIdx = audioState.pattern;
+
+          if (smoothScrolling) {
+            const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
+            const effectiveDuration = (nextState && nextState.row !== audioState.row)
+              ? nextState.time - audioState.time
+              : (2.5 / audioBpm) * audioSpeed;
+            const progress = Math.min(Math.max((audioTime - audioState.time) / effectiveDuration, 0), 1);
+            smoothOffset = progress * ROW_HEIGHT;
+          }
+        }
+      }
+
+      // Post playback state to worker
+      bridgeRef.current?.post({
+        type:         'playback',
+        row:          currentRow,
+        smoothOffset,
+        patternIndex: activePatternIdx,
+        isPlaying,
+      });
+
+      // Update overlay positions (macroLanes) — same math as the old render loop
+      const h = dimensions.height;
+      const visibleLines = Math.ceil(h / ROW_HEIGHT) + 2;
+      const topLines     = Math.floor(visibleLines / 2);
+      const vStart       = currentRow - topLines;
+      const centerLineTop = Math.floor(h / 2) - ROW_HEIGHT / 2;
+      const baseY        = centerLineTop - topLines * ROW_HEIGHT - smoothOffset;
+
+      scrollYRef.current       = baseY;
+      visibleStartRef.current  = vStart;
+      if (macroOverlayRef.current) {
+        macroOverlayRef.current.style.top = `${baseY}px`;
+      }
+
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [dimensions.height]); // re-run if height changes
+
 
   // Handle resize
   useEffect(() => {
@@ -1841,30 +1188,30 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Update canvas size when dimensions change
+  // Notify worker when dimensions change (worker owns canvas.width/height)
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = dimensions.width * dpr;
-    canvas.height = dimensions.height * dpr;
-    canvas.style.width = `${dimensions.width}px`;
-    canvas.style.height = `${dimensions.height}px`;
-
-    // Clear caches when size changes
-    noteCacheRef.current = {};
-    instCacheRef.current = {};
-    volCacheRef.current = {};
-    effCacheRef.current = {};
-    flagCacheRef.current = {};
-    probCacheRef.current = {};
-    lineNumberCacheRef.current = {};
+    bridgeRef.current?.post({ type: 'resize', w: dimensions.width, h: dimensions.height, dpr });
+    // Keep canvas CSS size in sync (canvas is created imperatively, not via JSX)
+    if (canvasRef.current) {
+      canvasRef.current.style.width  = `${dimensions.width}px`;
+      canvasRef.current.style.height = `${dimensions.height}px`;
+    }
   }, [dimensions]);
+
+  // Sync canvas z-index when trackerVisualBg overlay is toggled
+  useEffect(() => {
+    if (canvasRef.current) {
+      canvasRef.current.style.position = trackerVisualBg ? 'relative' : '';
+      canvasRef.current.style.zIndex   = trackerVisualBg ? '1' : '';
+    }
+  }, [trackerVisualBg]);
 
   // Reset horizontal scroll when all channels fit in viewport
   useEffect(() => {
     if (allChannelsFit && scrollLeft > 0) {
+      scrollLeftRef.current = 0;
+      bridgeRef.current?.post({ type: 'scroll', x: 0 });
       setScrollLeft(0);
     }
   }, [allChannelsFit, scrollLeft]);
@@ -1925,6 +1272,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             
             const newScrollLeft = Math.max(0, Math.min(maxScroll, channelOffsets[nextCh] - LINE_NUMBER_WIDTH));
 
+            // Post directly to worker — no React re-render needed for canvas
+            scrollLeftRef.current = newScrollLeft;
+            bridgeRef.current?.post({ type: 'scroll', x: newScrollLeft });
+
             setScrollLeft(newScrollLeft);
             if (headerScrollRef.current) {
               headerScrollRef.current.scrollLeft = newScrollLeft;
@@ -1941,16 +1292,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     return () => container.removeEventListener('wheel', handleWheel);
   }, [scrollLeft, totalChannelsWidth, dimensions.width, channelOffsets]);
 
-  // Handle header scroll sync
+  // Handle header scroll sync — post to worker immediately (no React delay)
   const handleHeaderScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const left = e.currentTarget.scrollLeft;
+    scrollLeftRef.current = left;
+    bridgeRef.current?.post({ type: 'scroll', x: left });
     setScrollLeft(left);
     if (bottomScrollRef.current) bottomScrollRef.current.scrollLeft = left;
   }, []);
 
-  // Handle bottom scroll sync
+  // Handle bottom scroll sync — post to worker immediately
   const handleBottomScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const left = e.currentTarget.scrollLeft;
+    scrollLeftRef.current = left;
+    bridgeRef.current?.post({ type: 'scroll', x: left });
     setScrollLeft(left);
     if (headerScrollRef.current) headerScrollRef.current.scrollLeft = left;
   }, []);
@@ -2248,16 +1603,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         {trackerVisualBg && (
           <TrackerVisualBackground width={dimensions.width} height={dimensions.height} />
         )}
-        <canvas
-          ref={canvasRef}
-          style={{
-            width: dimensions.width,
-            height: dimensions.height,
-            display: 'block',
-            position: trackerVisualBg ? 'relative' : undefined,
-            zIndex: trackerVisualBg ? 1 : undefined,
-          }}
-        />
+        {/* Canvas is created imperatively in useEffect to support OffscreenCanvas transfer */}
 
         {/* Automation Lanes Overlay */}
         {pattern && (

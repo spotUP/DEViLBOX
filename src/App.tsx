@@ -58,6 +58,7 @@ const ArrangementView = lazy(() => import('./components/arrangement').then(m => 
 const DJView = lazy(() => import('./components/dj/DJView').then(m => ({ default: m.DJView })));
 const FileBrowser = lazy(() => import('@components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser })));
 const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => ({ default: m.AuthModal })));
+const PixiApp = lazy(() => import('./pixi/PixiApp').then(m => ({ default: m.PixiApp })));
 
 function App() {
   // Check for application updates
@@ -705,6 +706,20 @@ function App() {
       setInitError(error instanceof Error ? error.message : 'Unknown error');
     }
   };
+
+  // WebGL render mode — render PixiJS UI instead of DOM
+  const renderMode = useSettingsStore(state => state.renderMode);
+  if (renderMode === 'webgl') {
+    return (
+      <Suspense fallback={
+        <div className="h-screen w-screen flex items-center justify-center bg-dark-bg">
+          <span className="text-text-muted font-mono text-sm">Loading WebGL UI...</span>
+        </div>
+      }>
+        <PixiApp onSwitchToDom={() => useSettingsStore.getState().setRenderMode('dom')} />
+      </Suspense>
+    );
+  }
 
   if (initError) {
     return (

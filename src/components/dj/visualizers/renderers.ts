@@ -764,7 +764,7 @@ export function renderParticleBurst(
 // Renderer dispatch
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import type { VisualizerMode } from './types';
+import type { WebGLVisualizerMode } from './types';
 
 type RendererFn = (
   cache: RendererCache,
@@ -775,7 +775,7 @@ type RendererFn = (
   h: number,
 ) => void;
 
-export const RENDERERS: Record<Exclude<VisualizerMode, 'pattern'>, RendererFn> = {
+export const RENDERERS: Record<WebGLVisualizerMode, RendererFn> = {
   spectrumBars: renderSpectrumBars,
   circularSpectrum: renderCircularSpectrum,
   waveformTerrain: renderWaveformTerrain,

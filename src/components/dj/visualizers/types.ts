@@ -10,9 +10,43 @@ export const VISUALIZER_MODES = [
   'plasmaField',
   'starfield',
   'particleBurst',
+  // audioMotion modes
+  'amLED',
+  'amBars',
+  'amMirror',
+  'amGraphLine',
+  'amRadial',
+  'amRadialGraph',
+  'amStereo',
+  'amLumi',
+  'amAlpha',
+  'amOutline',
+  'amDualVert',
+  'amDualOverlay',
+  'amBark',
+  'amMel',
+  'amOctave',
+  'amNotes',
+  'amMirrorReflex',
+  'amRadialInvert',
+  'amRadialLED',
+  'amLinear',
+  'amAWeighted',
+  'amLumiMirror',
 ] as const;
 
 export type VisualizerMode = (typeof VISUALIZER_MODES)[number];
+
+/** WebGL-only modes (excludes 'pattern' and audioMotion 'am*' modes) */
+export type WebGLVisualizerMode = Exclude<VisualizerMode,
+  | 'pattern'
+  | 'amLED' | 'amBars' | 'amMirror' | 'amGraphLine'
+  | 'amRadial' | 'amRadialGraph' | 'amStereo' | 'amLumi'
+  | 'amAlpha' | 'amOutline' | 'amDualVert' | 'amDualOverlay'
+  | 'amBark' | 'amMel' | 'amOctave' | 'amNotes'
+  | 'amMirrorReflex' | 'amRadialInvert' | 'amRadialLED'
+  | 'amLinear' | 'amAWeighted' | 'amLumiMirror'
+>;
 
 export const MODE_LABELS: Record<VisualizerMode, string> = {
   pattern: 'PATTERN',
@@ -22,7 +56,60 @@ export const MODE_LABELS: Record<VisualizerMode, string> = {
   plasmaField: 'PLASMA',
   starfield: 'STARFIELD',
   particleBurst: 'PARTICLES',
+  amLED: 'LED BARS',
+  amBars: 'SMOOTH BARS',
+  amMirror: 'MIRROR BARS',
+  amGraphLine: 'GRAPH LINE',
+  amRadial: 'RADIAL SPIN',
+  amRadialGraph: 'RADIAL GRAPH',
+  amStereo: 'DUAL STEREO',
+  amLumi: 'LUMI BARS',
+  amAlpha: 'GHOST BARS',
+  amOutline: 'OUTLINE',
+  amDualVert: 'DUAL VERTICAL',
+  amDualOverlay: 'DUAL OVERLAY',
+  amBark: 'BARK',
+  amMel: 'MEL GRAPH',
+  amOctave: 'OCTAVE BANDS',
+  amNotes: 'NOTE LABELS',
+  amMirrorReflex: 'MIRROR REFLEX',
+  amRadialInvert: 'RADIAL INVERT',
+  amRadialLED: 'RADIAL LED',
+  amLinear: 'LINEAR',
+  amAWeighted: 'A-WEIGHTED',
+  amLumiMirror: 'LUMI MIRROR',
 };
+
+/** Map audioMotion mode names to preset keys */
+export const AM_PRESET_MAP: Partial<Record<VisualizerMode, string>> = {
+  amLED: 'ledBars',
+  amBars: 'smoothBars',
+  amMirror: 'mirrorBars',
+  amGraphLine: 'graphLine',
+  amRadial: 'radialSpectrum',
+  amRadialGraph: 'radialGraph',
+  amStereo: 'dualStereo',
+  amLumi: 'lumiBars',
+  amAlpha: 'alphaBars',
+  amOutline: 'outlineBars',
+  amDualVert: 'dualVertical',
+  amDualOverlay: 'dualOverlay',
+  amBark: 'barkSpectrum',
+  amMel: 'melGraph',
+  amOctave: 'octaveBands',
+  amNotes: 'noteLabels',
+  amMirrorReflex: 'mirrorReflex',
+  amRadialInvert: 'radialInvert',
+  amRadialLED: 'radialLED',
+  amLinear: 'linearBars',
+  amAWeighted: 'aWeighted',
+  amLumiMirror: 'lumiMirror',
+};
+
+/** Check whether a mode is an audioMotion mode */
+export function isAudioMotionMode(mode: VisualizerMode): boolean {
+  return mode.startsWith('am');
+}
 
 export interface AudioData {
   waveform: Float32Array;
