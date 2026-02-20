@@ -148,6 +148,7 @@ interface ChannelState {
   period: number;                // Current period (after effects)
   volume: number;                // Current volume (0-64)
   panning: number;               // Current panning (0-255, 128=center)
+  basePan: number;               // Original LRRL pan position (-1 to +1) before separation
 
   // Sample state
   sampleNum: number;             // Current sample/instrument number
@@ -313,6 +314,12 @@ export class TrackerReplayer {
   // Kept separate from ToneEngine's global mute states so each deck is independent.
   private channelMuteMask = 0xFFFF;   // All 16 channels enabled by default
 
+  // Stereo separation (0-100): controls how wide the stereo image is.
+  // 100 = full Amiga hard-pan (LRRL), 0 = mono, 20 = pt2-clone default for MOD.
+  // Based on per-channel pan narrowing: actual_pan = basePan * (separation / 100)
+  // Reference: pt2-clone (8bitbubsy), MilkyTracker, Schism Tracker
+  private stereoSeparation = 100;
+
   /**
    * Optional callback set by DeckEngine to handle DJ scratch effect commands (Xnn).
    * High nibble 0: scratch pattern (0=stop, 1=Baby, 2=Trans, 3=Flare, 4=Hydro, 5=Crab, 6=Orbit)
@@ -471,6 +478,54 @@ export class TrackerReplayer {
     this.channelMuteMask = mask;
   }
 
+  // ==========================================================================
+  // STEREO SEPARATION
+  // ==========================================================================
+
+  /**
+   * Set stereo separation percentage (0-100).
+   * 0 = mono (all channels center), 100 = full Amiga hard-pan.
+   * Default: 20 for MOD (matching pt2-clone), 100 for XM/IT/S3M.
+   *
+   * Applies per-channel pan narrowing: actual_pan = basePan * (separation / 100)
+   * This matches MilkyTracker and Schism Tracker's approach.
+   */
+  setStereoSeparation(percent: number): void {
+    this.stereoSeparation = Math.max(0, Math.min(100, percent));
+    // Update all existing channel pan positions
+    for (const ch of this.channels) {
+      this.applyChannelPan(ch);
+    }
+  }
+
+  getStereoSeparation(): number {
+    return this.stereoSeparation;
+  }
+
+  /**
+   * Apply stereo separation to a channel's pan node.
+   * Uses the channel's basePan (original LRRL position) scaled by separation.
+   */
+  private applyChannelPan(ch: ChannelState): void {
+    const factor = this.stereoSeparation / 100;
+    const actualPan = ch.basePan * factor;
+    ch.panNode.pan.rampTo(actualPan, 0.02);
+  }
+
+  /**
+   * Apply a panning value (0-255 tracker range) to a channel,
+   * taking stereo separation into account.
+   * Used by 8xx (set panning) and Pxx (pan slide) effects.
+   */
+  private applyPanEffect(ch: ChannelState, pan255: number, time: number): void {
+    // Convert 0-255 tracker panning to -1..+1 range
+    const normalizedPan = (pan255 - 128) / 128;
+    ch.basePan = normalizedPan;
+    const factor = this.stereoSeparation / 100;
+    const actualPan = normalizedPan * factor;
+    ch.panNode.pan.setValueAtTime(actualPan, time);
+  }
+
   /** Get effective playback rate for sample pitch (per-deck in DJ mode, global otherwise) */
   getEffectivePlaybackRate(): number {
     if (this.isDJDeck) {
@@ -515,6 +570,12 @@ export class TrackerReplayer {
       this.channels.push(this.createChannel(i, song.numChannels));
     }
 
+    // Set stereo separation default based on format:
+    // MOD (Amiga) = 20% (matching pt2-clone default — the Amiga's hard LRRL
+    // sounds harsh on headphones; 20% gives pleasant width without hard panning)
+    // XM/IT/S3M = 100% (these formats have their own per-channel panning)
+    this.stereoSeparation = song.format === 'MOD' ? 20 : 100;
+
     // Set initial playback state
     this.songPos = 0;
     this.pattPos = 0;
@@ -545,14 +606,21 @@ export class TrackerReplayer {
   }
 
   private createChannel(index: number, totalChannels: number): ChannelState {
-    // Amiga-style panning: 0,3 = left, 1,2 = right (for 4ch)
-    let panValue = 0;
-    if (totalChannels === 4) {
-      panValue = (index === 0 || index === 3) ? -0.7 : 0.7;
+    // Amiga LRRL panning: channels 0,3 = hard left, 1,2 = hard right
+    // Uses the Schism Tracker formula: (((n+1)>>1) & 1) gives 0,1,1,0 pattern
+    // basePan stores the original position; stereoSeparation scales it for output.
+    let basePan: number;
+    if (totalChannels <= 4) {
+      // Classic 4-channel Amiga: LRRL at full ±1.0
+      basePan = (((index + 1) >> 1) & 1) ? 1.0 : -1.0;
     } else {
-      // For >4 channels, alternate L/R
-      panValue = (index % 2 === 0) ? -0.5 : 0.5;
+      // >4 channels: LRRL repeating pattern at full ±1.0
+      basePan = (((index + 1) >> 1) & 1) ? 1.0 : -1.0;
     }
+
+    // Apply stereo separation: actual pan = basePan * (separation / 100)
+    const factor = this.stereoSeparation / 100;
+    const panValue = basePan * factor;
 
     const panNode = new Tone.Panner(panValue);
     const gainNode = new Tone.Gain(1);
@@ -572,6 +640,7 @@ export class TrackerReplayer {
       period: 0,
       volume: 64,
       panning: 128,
+      basePan,
       sampleNum: 0,
       sampleOffset: 0,
       finetune: 0,
@@ -1227,7 +1296,7 @@ export class TrackerReplayer {
 
       case 0x8: // Set panning
         ch.panning = param;
-        ch.panNode.pan.setValueAtTime((param - 128) / 128, time);
+        this.applyPanEffect(ch, param, time);
         break;
 
       case 0x9: // Sample offset - handled in note processing
@@ -1759,7 +1828,7 @@ export class TrackerReplayer {
       ch.panning = Math.max(0, ch.panning - y);
     }
 
-    ch.panNode.pan.setValueAtTime((ch.panning - 128) / 128, time);
+    this.applyPanEffect(ch, ch.panning, time);
   }
 
   /**
@@ -1902,12 +1971,12 @@ export class TrackerReplayer {
 
       case FurnaceMacroType.PAN_L: // Pan left
         ch.panning = Math.max(0, 128 - value * 8);
-        ch.panNode.pan.setValueAtTime((ch.panning - 128) / 128, time);
+        this.applyPanEffect(ch, ch.panning, time);
         break;
 
       case FurnaceMacroType.PAN_R: // Pan right
         ch.panning = Math.min(255, 128 + value * 8);
-        ch.panNode.pan.setValueAtTime((ch.panning - 128) / 128, time);
+        this.applyPanEffect(ch, ch.panning, time);
         break;
 
       case FurnaceMacroType.PHASE_RESET: // Phase reset
