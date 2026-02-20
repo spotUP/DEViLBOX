@@ -104,6 +104,9 @@ export class DB303Synth implements DevilboxSynth {
   private _pendingParams: Array<{ paramId: string; value: number }> = [];
   // Track pending release timeout so slides can cancel it
   private _releaseTimeout: ReturnType<typeof setTimeout> | null = null;
+  // Cache last-sent values for DSP-reinitializing parameters to avoid redundant sends
+  private _lastOversamplingOrder: number | undefined = undefined;
+  private _lastFilterSelect: number | undefined = undefined;
 
   constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -651,6 +654,9 @@ export class DB303Synth implements DevilboxSynth {
 
   setFilterSelect(mode: number): void {
     // 0-255 (filter mode/topology selection)
+    // Guard: skip redundant sends — changing filter select may reinitialize DSP state
+    if (mode === this._lastFilterSelect) return;
+    this._lastFilterSelect = mode;
     this.setParameterByName(DB303Param.FILTER_SELECT, mode);
   }
 
@@ -769,6 +775,9 @@ export class DB303Synth implements DevilboxSynth {
 
   setOversamplingOrder(order: number): void {
     // 0-4 oversampling
+    // Guard: skip redundant sends — changing oversampling order reinitializes DSP state
+    if (order === this._lastOversamplingOrder) return;
+    this._lastOversamplingOrder = order;
     this.setParameterByName(DB303Param.OVERSAMPLING_ORDER, order);
   }
 
@@ -976,27 +985,19 @@ export class DB303Synth implements DevilboxSynth {
    * Called by both InstrumentFactory (init) and useInstrumentStore (runtime updates).
    */
   applyConfig(tb: TB303Config): void {
-    // Always log critical params so we can verify correct values reach WASM
     const df = tb.devilFish;
-    console.log('[DB303:applyConfig] CRITICAL PARAMS (app state → WASM):', {
-      filterSelect: df?.filterSelect,
-      accentDecay: df?.accentDecay,
-      normalDecay: df?.normalDecay,
-      accentSoftAttack: df?.accentSoftAttack,
-      filterInputDrive: df?.filterInputDrive,
-      diodeCharacter: df?.diodeCharacter,
-      duffingAmount: df?.duffingAmount,
-      'passbandComp (app→WASM)': `${df?.passbandCompensation} → ${df?.passbandCompensation !== undefined ? 1 - df.passbandCompensation : '?'}`,
-      'resTracking (app→WASM)': `${df?.resTracking} → ${df?.resTracking !== undefined ? 1 - df.resTracking : '?'}`,
-      cutoff: tb.filter?.cutoff,
-      resonance: tb.filter?.resonance,
-      envMod: tb.filterEnvelope?.envMod,
-      decay: tb.filterEnvelope?.decay,
-      accent: tb.accent?.amount,
-    });
     if (db303TraceEnabled()) {
       const keys = Object.keys(tb).filter(k => (tb as unknown as Record<string, unknown>)[k] !== undefined);
-      console.log('[DB303:applyConfig]', keys);
+      console.log('[DB303:applyConfig]', keys, {
+        filterSelect: df?.filterSelect,
+        cutoff: tb.filter?.cutoff,
+        resonance: tb.filter?.resonance,
+        envMod: tb.filterEnvelope?.envMod,
+        decay: tb.filterEnvelope?.decay,
+        accent: tb.accent?.amount,
+        'passbandComp (app→WASM)': `${df?.passbandCompensation} → ${df?.passbandCompensation !== undefined ? 1 - df.passbandCompensation : '?'}`,
+        'resTracking (app→WASM)': `${df?.resTracking} → ${df?.resTracking !== undefined ? 1 - df.resTracking : '?'}`,
+      });
     }
     // --- Core parameters ---
     if (tb.tuning !== undefined) this.setTuning(tb.tuning);
