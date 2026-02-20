@@ -153,11 +153,13 @@ async function parseTrackerModule(buffer: ArrayBuffer, fileName: string): Promis
     }
 
     if (nativeInstruments) {
-      let nextId = 1;
-      for (const parsedInst of nativeInstruments) {
-        const converted = convertToInstrument(parsedInst, nextId, format);
+      for (let i = 0; i < nativeInstruments.length; i++) {
+        // Use original 1-based slot index as instrument ID so pattern data
+        // references (which use original module slot numbers) match correctly.
+        // Empty slots return [] and are skipped, but non-empty ones keep their slot ID.
+        const slotId = i + 1;
+        const converted = convertToInstrument(nativeInstruments[i], slotId, format);
         instruments.push(...converted);
-        nextId += converted.length;
       }
     }
   } else if (moduleInfo.metadata.song) {

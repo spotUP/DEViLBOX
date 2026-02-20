@@ -56,25 +56,22 @@ export class DJEngine {
    * Mutates the song in-place (instruments array, pattern cells, channel instrumentId).
    */
   private remapInstrumentIds(song: TrackerSong, offset: number): void {
-    // Build a map of original → remapped IDs
-    const idMap = new Map<number, number>();
+    // Remap instrument config IDs
     for (const inst of song.instruments) {
-      const newId = inst.id + offset;
-      idMap.set(inst.id, newId);
-      inst.id = newId;
+      inst.id = inst.id + offset;
     }
 
-    // Remap pattern cell instrument references
+    // Remap ALL pattern cell instrument references by adding the offset directly.
+    // This handles instruments that exist in pattern data but not in song.instruments
+    // (e.g. empty MOD instrument slots 25-31 that have no samples).
     for (const pattern of song.patterns) {
       for (const channel of pattern.channels) {
-        // Channel-level instrument assignment
-        if (channel.instrumentId && idMap.has(channel.instrumentId)) {
-          channel.instrumentId = idMap.get(channel.instrumentId)!;
+        if (channel.instrumentId && channel.instrumentId > 0) {
+          channel.instrumentId = channel.instrumentId + offset;
         }
-        // Per-cell instrument references
         for (const cell of channel.rows) {
-          if (cell.instrument && idMap.has(cell.instrument)) {
-            cell.instrument = idMap.get(cell.instrument)!;
+          if (cell.instrument && cell.instrument > 0) {
+            cell.instrument = cell.instrument + offset;
           }
         }
       }
