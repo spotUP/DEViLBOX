@@ -13,8 +13,9 @@ function openFileBrowser(): boolean {
 }
 
 function doSave(): boolean {
-  const ok = saveProjectToStorage();
-  useUIStore.getState().setStatusMessage(ok ? 'Project saved' : 'Save failed', false, 1500);
+  void saveProjectToStorage().then(ok => {
+    useUIStore.getState().setStatusMessage(ok ? 'Project saved' : 'Save failed', false, 1500);
+  });
   return true;
 }
 

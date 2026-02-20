@@ -214,8 +214,9 @@ export function tempoTap(): boolean {
 // ====== SAVE / QUICK SAVE ======
 
 export function quickSave(): boolean {
-  const ok = saveProjectToStorage();
-  useUIStore.getState().setStatusMessage(ok ? 'Saved' : 'Save failed', false, 1500);
+  void saveProjectToStorage().then(ok => {
+    useUIStore.getState().setStatusMessage(ok ? 'Saved' : 'Save failed', false, 1500);
+  });
   return true;
 }
 
