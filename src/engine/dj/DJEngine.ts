@@ -8,6 +8,7 @@
 import { DeckEngine, type DeckId } from './DeckEngine';
 import { DJMixerEngine, type CrossfaderCurve } from './DJMixerEngine';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import type { AudioFileInfo } from './DeckAudioPlayer';
 
 // Instrument ID offsets to avoid collisions with the tracker view (IDs 1-999)
 // and between decks. Each deck gets a 10000-wide namespace.
@@ -76,6 +77,15 @@ export class DJEngine {
         }
       }
     }
+  }
+
+  /**
+   * Load an audio file (MP3, WAV, FLAC, etc.) to a deck.
+   * Switches the deck to audio playback mode.
+   */
+  async loadAudioToDeck(id: DeckId, buffer: ArrayBuffer, filename: string): Promise<AudioFileInfo> {
+    const deck = this.getDeck(id);
+    return deck.loadAudioFile(buffer, filename);
   }
 
   // ==========================================================================
