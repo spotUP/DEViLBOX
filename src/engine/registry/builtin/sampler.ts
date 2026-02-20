@@ -92,9 +92,10 @@ const samplerDescs: SynthDescriptor[] = [
         });
       }
 
-      // Priority 2: Single sample URL
+      // Priority 2: Single sample URL (sample.url wins over parameters.sampleUrl
+      // to match SampleEditor's display priority and avoid stale data URLs)
       const params = config.parameters as Record<string, string | number> | undefined;
-      const sampleUrl = params?.sampleUrl as string | undefined || config.sample?.url;
+      const sampleUrl = config.sample?.url || params?.sampleUrl as string | undefined;
       const baseNote = config.sample?.baseNote || 'C4';
 
       if (sampleUrl) {
