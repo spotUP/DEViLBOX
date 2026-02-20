@@ -6256,8 +6256,8 @@ export class ToneEngine {
 
   // Channel trigger levels for VU meters (set when notes trigger)
   private channelTriggerLevels: Map<number, number> = new Map();
-  // PERF: Reusable array for getChannelTriggerLevels to avoid GC pressure
-  private triggerLevelsCache: number[] = [];
+  // PERF: Pre-allocated array for getChannelTriggerLevels — never reallocated
+  private triggerLevelsCache: number[] = new Array(16).fill(0);
 
   /**
    * Trigger a channel's VU meter (called when a note plays on that channel)
@@ -6271,9 +6271,11 @@ export class ToneEngine {
    * PERF: Reuses internal array to avoid allocations every frame
    */
   public getChannelTriggerLevels(numChannels: number): number[] {
-    // Resize cache array if needed (only allocates when channel count changes)
-    if (this.triggerLevelsCache.length !== numChannels) {
-      this.triggerLevelsCache = new Array(numChannels).fill(0);
+    // Grow cache if needed (never shrinks — avoids reallocation)
+    if (this.triggerLevelsCache.length < numChannels) {
+      const old = this.triggerLevelsCache;
+      this.triggerLevelsCache = new Array(Math.max(numChannels, 16)).fill(0);
+      for (let j = 0; j < old.length; j++) this.triggerLevelsCache[j] = old[j];
     }
 
     for (let i = 0; i < numChannels; i++) {

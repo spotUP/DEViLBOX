@@ -31,6 +31,13 @@ import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 const AMIGA_PAL_FREQUENCY = 3546895;
 const PLAYERS_PER_CHANNEL = 2; // Double-buffered pool for overlap-free note transitions
 
+// PERF: Pre-computed finetune multipliers (finetune -8..+7 = 16 values)
+// Avoids Math.pow() per note trigger. finetune in 1/8 semitone units.
+const FINETUNE_MULTIPLIERS: number[] = new Array(16);
+for (let ft = -8; ft <= 7; ft++) {
+  FINETUNE_MULTIPLIERS[ft + 8] = Math.pow(2, ft / (8 * 12));
+}
+
 // Complete period table with all 16 finetune variations
 const PERIOD_TABLE = [
   // Finetune 0
@@ -1193,9 +1200,6 @@ export class TrackerReplayer {
         if (effect === 9) {
           offset = param > 0 ? param * 256 : ch.sampleOffset * 256;
           ch.sampleOffset = param > 0 ? param : ch.sampleOffset;
-          /* eslint-disable no-console */
-          console.log('[9xx] row=' + this.pattPos + ' ch=' + chIndex + ' param=0x' + param.toString(16).padStart(2, '0') + ' offset=' + offset + ' period=' + usePeriod + ' xmNote=' + noteValue + ' finetune=' + ch.finetune + ' inst=' + (ch.instrument?.id ?? '?') + ':' + (ch.instrument?.name || '?') + ' sampleRate=' + (ch.instrument?.sample?.sampleRate || '?') + ' pcmLen=' + ((ch.instrument?.sample as any)?.pcmData?.length || '?'));
-          /* eslint-enable no-console */
         }
 
         // TB-303 SLIDE SEMANTICS:
@@ -2235,7 +2239,7 @@ export class TrackerReplayer {
     // Using finetune: each finetune unit shifts by ~1/8 semitone
     const basePeriod = 428; // C-2 base period
     const finetune = ch.finetune;
-    const finetuneMultiplier = Math.pow(2, finetune / (8 * 12)); // finetune in 1/8 semitones
+    const finetuneMultiplier = FINETUNE_MULTIPLIERS[Math.min(15, Math.max(0, finetune + 8))] ?? 1;
     const playbackRate = (basePeriod / ch.period) * finetuneMultiplier;
 
     // Get or create cached ToneAudioBuffer wrapper (avoids re-wrapping per note)
@@ -2299,9 +2303,6 @@ export class TrackerReplayer {
           startOffset = Math.min(offset / originalSampleRate, duration - 0.0001);
         }
         // else: offset >= sample length → play from beginning (pt2-clone behavior)
-        /* eslint-disable no-console */
-        console.log('[9xx:play] offset=' + offset + ' origRate=' + originalSampleRate + ' bufferDur=' + duration.toFixed(4) + 's bufferFrames=' + Math.round(durationFrames) + ' period=' + ch.period + ' rate=' + player.playbackRate.toFixed(4) + ' startOffset=' + startOffset.toFixed(4) + 's loop=' + player.loop + (offset >= durationFrames ? ' (CLAMPED TO 0!)' : ''));
-        /* eslint-enable no-console */
       }
       player.start(safeTime, startOffset);
     } catch (e) {

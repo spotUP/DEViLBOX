@@ -1043,7 +1043,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       if (s.patterns !== prev.patterns || s.currentPatternIndex !== prev.currentPatternIndex) {
         b.post({ type: 'patterns', patterns: snapshotPatterns(), currentPatternIndex: s.currentPatternIndex });
       }
-      if (s.cursor !== prev.cursor) {
+      // PERF: Skip cursor posts during playback — the RAF loop sends 'playback' messages
+      // at animation frame rate which the worker uses for row highlighting instead.
+      if (s.cursor !== prev.cursor && !useTransportStore.getState().isPlaying) {
         b.post({ type: 'cursor', cursor: {
           rowIndex:    s.cursor.rowIndex,
           channelIndex: s.cursor.channelIndex,
