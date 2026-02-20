@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardDrive, History, RotateCcw } from 'lucide-react';
+import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardDrive, History, RotateCcw, Globe, Search, Loader2, Download, AlertCircle } from 'lucide-react';
 import '@cubone/react-file-manager/dist/style.css';
 import {
   isFileSystemAccessSupported,
@@ -45,6 +45,15 @@ import {
   type ServerFile,
   type FileRevision,
 } from '@/lib/serverFilesApi';
+import {
+  searchModland,
+  getModlandFormats,
+  downloadModlandFile,
+  getModlandStatus,
+  type ModlandFile,
+  type ModlandFormat,
+  type ModlandStatus,
+} from '@/lib/modlandApi';
 
 interface FileBrowserProps {
   isOpen: boolean;
@@ -103,9 +112,24 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   const [hasServerFS, setHasServerFS] = useState(false);
   const [currentPath, setCurrentPath] = useState<string>('');
   const [electronDirectory, setElectronDirectory] = useState<string | null>(null);
-  const [fileSource, setFileSource] = useState<'demo' | 'cloud'>('demo');
+  const [fileSource, setFileSource] = useState<'demo' | 'cloud' | 'modland'>('demo');
   const [cloudFiles, setCloudFiles] = useState<ServerFile[]>([]);
-  
+
+  // Modland state
+  const [modlandQuery, setModlandQuery] = useState('');
+  const [modlandFormat, setModlandFormat] = useState('');
+  const [modlandResults, setModlandResults] = useState<ModlandFile[]>([]);
+  const [modlandFormats, setModlandFormats] = useState<ModlandFormat[]>([]);
+  const [modlandStatus, setModlandStatus] = useState<ModlandStatus | null>(null);
+  const [modlandLoading, setModlandLoading] = useState(false);
+  const [modlandError, setModlandError] = useState<string | null>(null);
+  const [modlandOffset, setModlandOffset] = useState(0);
+  const [modlandHasMore, setModlandHasMore] = useState(false);
+  const [modlandDownloading, setModlandDownloading] = useState<Set<string>>(new Set());
+  const modlandSearchTimer = useRef<ReturnType<typeof setTimeout>>(null);
+  const modlandSearchRef = useRef<HTMLInputElement>(null);
+  const MODLAND_LIMIT = 50;
+
   // Revision history state
   const [showRevisions, setShowRevisions] = useState(false);
   const [revisions, setRevisions] = useState<FileRevision[]>([]);
@@ -142,6 +166,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
 
   // Load files based on view mode
   const loadFiles = useCallback(async () => {
+    // Modland tab handles its own data loading
+    if (fileSource === 'modland') return;
+
     setIsLoading(true);
     setError(null);
 
@@ -545,6 +572,85 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     }
   };
 
+  // ── Modland search ──────────────────────────────────────────────────────
+
+  // Fetch modland status + formats when tab activates
+  useEffect(() => {
+    if (!isOpen || fileSource !== 'modland') return;
+    getModlandStatus().then(setModlandStatus).catch(() => {});
+    getModlandFormats().then(setModlandFormats).catch(() => {});
+    setTimeout(() => modlandSearchRef.current?.focus(), 100);
+  }, [isOpen, fileSource]);
+
+  const doModlandSearch = useCallback(
+    async (q: string, fmt: string, newOffset: number, append: boolean) => {
+      if (!q && !fmt) {
+        if (!append) setModlandResults([]);
+        return;
+      }
+      setModlandLoading(true);
+      setModlandError(null);
+      try {
+        const data = await searchModland({
+          q: q || undefined,
+          format: fmt || undefined,
+          limit: MODLAND_LIMIT,
+          offset: newOffset,
+        });
+        if (append) {
+          setModlandResults((prev) => [...prev, ...data.results]);
+        } else {
+          setModlandResults(data.results);
+        }
+        setModlandHasMore(data.results.length === MODLAND_LIMIT);
+        setModlandOffset(newOffset);
+      } catch (err) {
+        setModlandError(err instanceof Error ? err.message : 'Search failed');
+      } finally {
+        setModlandLoading(false);
+      }
+    },
+    [],
+  );
+
+  // Debounced search trigger
+  useEffect(() => {
+    if (fileSource !== 'modland') return;
+    if (modlandSearchTimer.current) clearTimeout(modlandSearchTimer.current);
+    modlandSearchTimer.current = setTimeout(() => {
+      doModlandSearch(modlandQuery, modlandFormat, 0, false);
+    }, 300);
+    return () => {
+      if (modlandSearchTimer.current) clearTimeout(modlandSearchTimer.current);
+    };
+  }, [modlandQuery, modlandFormat, doModlandSearch, fileSource]);
+
+  const modlandLoadMore = useCallback(() => {
+    doModlandSearch(modlandQuery, modlandFormat, modlandOffset + MODLAND_LIMIT, true);
+  }, [modlandQuery, modlandFormat, modlandOffset, doModlandSearch]);
+
+  const handleModlandLoad = useCallback(
+    async (file: ModlandFile) => {
+      if (!onLoadTrackerModule) return;
+      setModlandDownloading((prev) => new Set(prev).add(file.full_path));
+      setModlandError(null);
+      try {
+        const buffer = await downloadModlandFile(file.full_path);
+        await onLoadTrackerModule(buffer, file.filename);
+        onClose();
+      } catch (err) {
+        setModlandError(err instanceof Error ? err.message : 'Failed to download');
+      } finally {
+        setModlandDownloading((prev) => {
+          const next = new Set(prev);
+          next.delete(file.full_path);
+          return next;
+        });
+      }
+    },
+    [onLoadTrackerModule, onClose],
+  );
+
   if (!isOpen) return null;
 
   return (
@@ -604,9 +710,27 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             </button>
           )}
 
+          {/* Modland Tab - only in load mode */}
+          {mode === 'load' && onLoadTrackerModule && (
+            <button
+              onClick={() => {
+                setFileSource('modland');
+                setSelectedFile(null);
+              }}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                fileSource === 'modland'
+                  ? 'text-green-400 border-b-2 border-green-400 bg-dark-bgSecondary'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              <Globe size={14} />
+              Modland
+            </button>
+          )}
+
           {/* Spacer */}
           <div className="flex-1" />
-          
+
           {/* Browse Files button - opens native file picker */}
           {mode === 'load' && (
             <button
@@ -646,6 +770,47 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           </div>
         )}
 
+        {/* Modland search bar */}
+        {fileSource === 'modland' && (
+          <div className="px-4 py-2 bg-dark-bgTertiary border-b border-dark-border flex gap-2 items-center">
+            <div className="flex items-center gap-2 text-xs text-text-muted font-mono">
+              {modlandStatus?.status === 'ready' && (
+                <span>{modlandStatus.totalFiles.toLocaleString()} files</span>
+              )}
+              {modlandStatus?.status === 'indexing' && (
+                <span className="text-amber-400 flex items-center gap-1">
+                  <Loader2 size={10} className="animate-spin" /> Indexing...
+                </span>
+              )}
+            </div>
+            <div className="flex-1 relative">
+              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
+              <input
+                ref={modlandSearchRef}
+                value={modlandQuery}
+                onChange={(e) => setModlandQuery(e.target.value)}
+                placeholder="Search modules..."
+                className="w-full pl-7 pr-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight
+                           rounded text-text-primary placeholder:text-text-muted/40
+                           focus:border-green-600 focus:outline-none transition-colors"
+              />
+            </div>
+            <select
+              value={modlandFormat}
+              onChange={(e) => setModlandFormat(e.target.value)}
+              className="px-2 py-1.5 text-[11px] font-mono bg-dark-bg border border-dark-borderLight
+                         rounded text-text-secondary cursor-pointer hover:bg-dark-bgHover transition-colors"
+            >
+              <option value="">All formats</option>
+              {modlandFormats.map((f) => (
+                <option key={f.format} value={f.format}>
+                  {f.format} ({f.count.toLocaleString()})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* File List */}
         <div className="flex-1 overflow-auto p-4">
           {error && (
@@ -654,7 +819,89 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             </div>
           )}
 
-          {isLoading ? (
+          {/* Modland results */}
+          {fileSource === 'modland' ? (
+            <div className="flex flex-col gap-1">
+              {modlandError && (
+                <div className="flex items-center gap-1.5 text-red-400 text-xs font-mono px-3 py-2 mb-2 bg-red-900/20 rounded border border-red-900/30">
+                  <AlertCircle size={12} />
+                  {modlandError}
+                </div>
+              )}
+
+              {modlandResults.length === 0 && !modlandLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 text-text-muted">
+                  <Globe size={32} className="mb-3 opacity-40" />
+                  <p className="text-sm font-mono">
+                    {modlandQuery || modlandFormat ? 'No results found' : 'Search the modland archive'}
+                  </p>
+                  <p className="text-xs text-text-muted/60 mt-1">
+                    165K+ tracker modules from ftp.modland.com
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {modlandResults.map((file) => (
+                    <div
+                      key={file.full_path}
+                      className="flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary rounded border border-transparent
+                                 hover:bg-dark-bgHover hover:border-dark-border transition-colors group"
+                    >
+                      <FileAudio size={16} className="text-text-muted flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-text-primary text-sm font-mono truncate">
+                          {file.filename}
+                        </div>
+                        <div className="flex gap-3 text-xs text-text-muted">
+                          <span className="text-green-400/70">{file.format}</span>
+                          <span>{file.author}</span>
+                        </div>
+                      </div>
+
+                      {modlandDownloading.has(file.full_path) ? (
+                        <Loader2 size={14} className="animate-spin text-green-400 flex-shrink-0" />
+                      ) : (
+                        <button
+                          onClick={() => handleModlandLoad(file)}
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded
+                                     bg-green-900/30 text-green-400 border border-green-800/50
+                                     hover:bg-green-800/40 hover:text-green-300 transition-colors
+                                     opacity-0 group-hover:opacity-100 flex-shrink-0"
+                        >
+                          <Download size={12} />
+                          Load
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  {modlandHasMore && (
+                    <button
+                      onClick={modlandLoadMore}
+                      disabled={modlandLoading}
+                      className="mt-2 py-2 text-xs font-mono text-text-secondary bg-dark-bgTertiary
+                                 border border-dark-borderLight rounded hover:bg-dark-bgHover
+                                 hover:text-text-primary transition-colors disabled:opacity-50"
+                    >
+                      {modlandLoading ? (
+                        <span className="flex items-center justify-center gap-1">
+                          <Loader2 size={12} className="animate-spin" /> Loading...
+                        </span>
+                      ) : (
+                        'Load more results'
+                      )}
+                    </button>
+                  )}
+                </>
+              )}
+
+              {modlandLoading && modlandResults.length === 0 && (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 size={20} className="animate-spin text-green-400" />
+                </div>
+              )}
+            </div>
+          ) : isLoading ? (
             <div className="flex items-center justify-center h-full text-text-muted">
               Loading...
             </div>
@@ -828,7 +1075,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
 
         {/* Footer */}
         <div className="flex items-center gap-4 px-4 py-3 border-t border-dark-border">
-          {mode === 'save' && (
+          {mode === 'save' && fileSource !== 'modland' && (
             <input
               type="text"
               value={saveFilename}
@@ -842,20 +1089,22 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             onClick={onClose}
             className="px-4 py-2 text-text-muted hover:text-text-primary"
           >
-            Cancel
+            {fileSource === 'modland' ? 'Close' : 'Cancel'}
           </button>
-          <button
-            onClick={mode === 'load' ? handleLoad : handleSave}
-            disabled={mode === 'load' && (!selectedFile || selectedFile.isDirectory)}
-            className={`flex items-center gap-2 px-6 py-2 rounded font-medium ${
-              (mode === 'load' && (!selectedFile || selectedFile.isDirectory))
-                ? 'bg-dark-bgTertiary text-text-muted cursor-not-allowed'
-                : 'bg-accent-primary text-white hover:bg-accent-primaryHover'
-            }`}
-          >
-            {fileSource === 'cloud' && <Cloud size={16} />}
-            {mode === 'load' ? 'Load' : (fileSource === 'cloud' ? 'Save to Cloud' : 'Save')}
-          </button>
+          {fileSource !== 'modland' && (
+            <button
+              onClick={mode === 'load' ? handleLoad : handleSave}
+              disabled={mode === 'load' && (!selectedFile || selectedFile.isDirectory)}
+              className={`flex items-center gap-2 px-6 py-2 rounded font-medium ${
+                (mode === 'load' && (!selectedFile || selectedFile.isDirectory))
+                  ? 'bg-dark-bgTertiary text-text-muted cursor-not-allowed'
+                  : 'bg-accent-primary text-white hover:bg-accent-primaryHover'
+              }`}
+            >
+              {fileSource === 'cloud' && <Cloud size={16} />}
+              {mode === 'load' ? 'Load' : (fileSource === 'cloud' ? 'Save to Cloud' : 'Save')}
+            </button>
+          )}
         </div>
       </div>
 
