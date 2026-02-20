@@ -3,7 +3,7 @@
  *
  * Provides:
  *  - ScratchFrame / ScratchPattern types
- *  - 6 built-in scratch patterns (Baby, Transformer, Flare, Hydroplane, Crab, Orbit)
+ *  - 10 built-in scratch patterns
  *  - ScratchPlayback class: JS-timer-based pattern loop + AudioParam fader LFO
  *
  * Architecture:
@@ -11,6 +11,8 @@
  *    JS setInterval — sufficient for scratch feel without audio glitches.
  *  - Fader chops are scheduled via AudioParam.setValueAtTime() for sub-millisecond
  *    accuracy, completely independent of JS timer jitter.
+ *  - Transformer/Crab use 128-chop lookahead + auto-reschedule so they play
+ *    indefinitely without expiring.
  *  - Beat quantization snaps pattern triggers to the next beat/half-beat boundary
  *    using replayer.getElapsedMs() and the current effective BPM.
  */
@@ -24,7 +26,7 @@ import type { DeckEngine } from './DeckEngine';
 
 export interface ScratchFrame {
   timeMs: number;
-  velocity: number;   // playback rate multiplier (≥ 0.02 in v1; 1.0 = normal speed)
+  velocity: number;   // playback rate multiplier (positive for patterns; jog wheel supports negative for true reverse)
   faderGain: number;  // 0–1 channel gain
 }
 
@@ -43,25 +45,25 @@ export interface ScratchPattern {
 // ============================================================================
 
 /**
- * Baby Scratch — forward push then drag back with fader open throughout.
- * Classic beginner scratch: 2 strokes per cycle (400ms).
+ * Baby Scratch — strong forward push, audible drag back. Both directions open.
+ * The most fundamental scratch; doubled velocity for snap.
  */
 const BABY_SCRATCH: ScratchPattern = {
   name: 'Baby Scratch',
   shortName: 'Baby',
   durationBeats: null,
-  durationMs: 400,
+  durationMs: 320,
   loop: true,
   quantize: '1/4',
   frames: [
-    { timeMs: 0,   velocity: 1.5,  faderGain: 1 },  // forward push
-    { timeMs: 200, velocity: 0.03, faderGain: 1 },  // drag back
+    { timeMs: 0,   velocity: 2.8,  faderGain: 1 },  // strong forward push
+    { timeMs: 210, velocity: 0.04, faderGain: 1 },  // drag back (audible)
   ],
 };
 
 /**
- * Transformer — constant rate, rapid fader open/close at 1/8 note intervals.
- * durationBeats = 1 beat, 4 chops per beat (BPM-synced).
+ * Transformer — fader rapid-fires 4× per beat at constant forward speed.
+ * Fader scheduled via AudioParam (128-chop lookahead, auto-rescheduled).
  */
 const TRANSFORMER: ScratchPattern = {
   name: 'Transformer',
@@ -71,54 +73,54 @@ const TRANSFORMER: ScratchPattern = {
   loop: true,
   quantize: '1/8',
   frames: [
-    { timeMs: 0,    velocity: 1.0, faderGain: 1 },
-    // fader timing computed dynamically in ScratchPlayback based on BPM
+    { timeMs: 0, velocity: 1.3, faderGain: 1 },
   ],
 };
 
 /**
- * Flare — forward stroke with 2 fader closes mid-stroke, then drag back.
+ * Flare — 2-click flare: forward stroke with two tight fader closes, silent return.
+ * The classic DJ battle technique for melodic phrases.
  */
 const FLARE: ScratchPattern = {
   name: 'Flare',
   shortName: 'Flare',
   durationBeats: null,
-  durationMs: 600,
+  durationMs: 480,
   loop: true,
   quantize: '1/4',
   frames: [
-    { timeMs: 0,   velocity: 1.2,  faderGain: 1 },  // forward, fader open
-    { timeMs: 100, velocity: 1.2,  faderGain: 0 },  // fader close #1
-    { timeMs: 150, velocity: 1.2,  faderGain: 1 },  // fader open #1
-    { timeMs: 250, velocity: 1.2,  faderGain: 0 },  // fader close #2
-    { timeMs: 300, velocity: 1.2,  faderGain: 1 },  // fader open #2
-    { timeMs: 350, velocity: 0.04, faderGain: 1 },  // drag back (fader open)
+    { timeMs: 0,   velocity: 2.2,  faderGain: 1 },  // forward, open
+    { timeMs: 75,  velocity: 2.2,  faderGain: 0 },  // click 1 — close
+    { timeMs: 105, velocity: 2.2,  faderGain: 1 },  // click 1 — open
+    { timeMs: 215, velocity: 2.2,  faderGain: 0 },  // click 2 — close
+    { timeMs: 245, velocity: 2.2,  faderGain: 1 },  // click 2 — open
+    { timeMs: 310, velocity: 0.04, faderGain: 0 },  // return — silent
   ],
 };
 
 /**
- * Hydroplane — rapid velocity oscillation between fast and slow; fader open.
+ * Hydroplane — extreme velocity swings between 3.8× and 0.04×.
+ * Very fast cycle creates an intense wah/pitch-surge effect.
  */
 const HYDROPLANE: ScratchPattern = {
   name: 'Hydroplane',
   shortName: 'Hydro',
   durationBeats: null,
-  durationMs: 300,
+  durationMs: 200,
   loop: true,
   quantize: '1/8',
   frames: [
-    { timeMs: 0,   velocity: 2.0,  faderGain: 1 },
-    { timeMs: 50,  velocity: 0.2,  faderGain: 1 },
-    { timeMs: 100, velocity: 2.0,  faderGain: 1 },
-    { timeMs: 150, velocity: 0.2,  faderGain: 1 },
-    { timeMs: 200, velocity: 2.0,  faderGain: 1 },
-    { timeMs: 250, velocity: 0.2,  faderGain: 1 },
+    { timeMs: 0,   velocity: 3.8,  faderGain: 1 },
+    { timeMs: 40,  velocity: 0.04, faderGain: 1 },
+    { timeMs: 80,  velocity: 3.8,  faderGain: 1 },
+    { timeMs: 120, velocity: 0.04, faderGain: 1 },
+    { timeMs: 160, velocity: 3.8,  faderGain: 1 },
   ],
 };
 
 /**
- * Crab — 4 rapid fader taps per beat at normal playback speed.
- * durationBeats = 1 beat (BPM-synced).
+ * Crab — 4 rapid finger-tap fader hits per beat at constant speed.
+ * Fader scheduled via AudioParam (128-chop lookahead, auto-rescheduled).
  */
 const CRAB: ScratchPattern = {
   name: 'Crab',
@@ -128,35 +130,118 @@ const CRAB: ScratchPattern = {
   loop: true,
   quantize: '1/8',
   frames: [
-    { timeMs: 0,   velocity: 1.0, faderGain: 1 },
-    // fader timing computed dynamically in ScratchPlayback based on BPM
+    { timeMs: 0, velocity: 1.3, faderGain: 1 },
   ],
 };
 
 /**
- * Orbit — forward with fader open, then slow drag back with fader closed.
+ * Orbit — strong forward push open, then close fader and drag back silently.
+ * Creates the classic "wop" sound — one hit per cycle.
  */
 const ORBIT: ScratchPattern = {
   name: 'Orbit',
   shortName: 'Orbit',
   durationBeats: null,
-  durationMs: 500,
+  durationMs: 400,
   loop: true,
   quantize: '1/4',
   frames: [
-    { timeMs: 0,   velocity: 1.3,  faderGain: 1 },  // forward push, open
-    { timeMs: 200, velocity: 0.04, faderGain: 0 },  // drag back, closed
-    { timeMs: 450, velocity: 0.04, faderGain: 0 },  // hold back, closed
+    { timeMs: 0,   velocity: 2.4,  faderGain: 1 },  // forward push, open
+    { timeMs: 200, velocity: 0.04, faderGain: 0 },  // drag back, silent
+    { timeMs: 380, velocity: 0.04, faderGain: 0 },  // hold return
   ],
 };
 
+/**
+ * Chirp — open fader at the top of the forward stroke, then snap closed
+ * before the return. The signature 1990s hip-hop chirp.
+ */
+const CHIRP: ScratchPattern = {
+  name: 'Chirp',
+  shortName: 'Chirp',
+  durationBeats: null,
+  durationMs: 280,
+  loop: true,
+  quantize: '1/8',
+  frames: [
+    { timeMs: 0,   velocity: 2.0,  faderGain: 1 },  // forward, fader open
+    { timeMs: 115, velocity: 2.0,  faderGain: 0 },  // snap closed mid-stroke
+    { timeMs: 195, velocity: 0.04, faderGain: 0 },  // return — silent
+  ],
+};
+
+/**
+ * Stab — explosive short burst at 4× speed then instant cut.
+ * Rhythmic punctuation; can be synced to kick/snare placement.
+ */
+const STAB: ScratchPattern = {
+  name: 'Stab',
+  shortName: 'Stab',
+  durationBeats: null,
+  durationMs: 180,
+  loop: true,
+  quantize: '1/8',
+  frames: [
+    { timeMs: 0,  velocity: 4.0,  faderGain: 1 },  // max-speed burst
+    { timeMs: 60, velocity: 0.04, faderGain: 0 },  // instant cut + return
+  ],
+};
+
+/**
+ * Scribble — 8 rapid velocity oscillations between 3× and near-zero per cycle.
+ * Fader stays open — the pitch surge/drop creates the signature scribble texture.
+ * Quantizes to 1/8 so it locks to the bar.
+ */
+const SCRIBBLE: ScratchPattern = {
+  name: 'Scribble',
+  shortName: 'Scrbl',
+  durationBeats: null,
+  durationMs: 240,
+  loop: true,
+  quantize: '1/8',
+  frames: [
+    { timeMs: 0,   velocity: 3.2,  faderGain: 1 },
+    { timeMs: 30,  velocity: 0.06, faderGain: 1 },
+    { timeMs: 60,  velocity: 3.2,  faderGain: 1 },
+    { timeMs: 90,  velocity: 0.06, faderGain: 1 },
+    { timeMs: 120, velocity: 3.2,  faderGain: 1 },
+    { timeMs: 150, velocity: 0.06, faderGain: 1 },
+    { timeMs: 180, velocity: 3.2,  faderGain: 1 },
+    { timeMs: 210, velocity: 0.06, faderGain: 1 },
+  ],
+};
+
+/**
+ * Tear — fast forward, brief stutter/catch, fast forward again, silent return.
+ * The "tear" or "rip" — gives a hiccup mid-stroke that sounds like a snag on vinyl.
+ */
+const TEAR: ScratchPattern = {
+  name: 'Tear',
+  shortName: 'Tear',
+  durationBeats: null,
+  durationMs: 480,
+  loop: true,
+  quantize: '1/4',
+  frames: [
+    { timeMs: 0,   velocity: 2.8,  faderGain: 1 },  // fast forward
+    { timeMs: 125, velocity: 0.05, faderGain: 1 },  // stutter — catch
+    { timeMs: 175, velocity: 2.8,  faderGain: 1 },  // surge forward again
+    { timeMs: 295, velocity: 0.04, faderGain: 0 },  // return — silent
+  ],
+};
+
+/** Original 6 at front (indices 0–5) for backward-compatible keyboard commands */
 export const SCRATCH_PATTERNS: ScratchPattern[] = [
-  BABY_SCRATCH,
-  TRANSFORMER,
-  FLARE,
-  HYDROPLANE,
-  CRAB,
-  ORBIT,
+  BABY_SCRATCH,  // 0
+  TRANSFORMER,   // 1
+  FLARE,         // 2
+  HYDROPLANE,    // 3
+  CRAB,          // 4
+  ORBIT,         // 5
+  CHIRP,         // 6
+  STAB,          // 7
+  SCRIBBLE,      // 8
+  TEAR,          // 9
 ];
 
 export function getPatternByName(name: string): ScratchPattern | undefined {
@@ -177,16 +262,25 @@ const LFO_DIVISION_BEATS: Record<FaderLFODivision, number> = {
 };
 
 /**
+ * Number of AudioParam events to pre-schedule for Transformer/Crab.
+ * At 120 BPM, 128 chops × 0.125 s/chop = 16 seconds of look-ahead.
+ * Auto-reschedule fires 300ms before expiry so playback is seamless.
+ */
+const PATTERN_FADER_LOOKAHEAD = 128;
+
+/**
  * ScratchPlayback — one instance per deck, owned by DeckEngine.
  *
  * Manages:
  *  - Pattern playback loop (JS interval, 10ms tick, applies rate changes)
  *  - Fader LFO (AudioParam scheduling, rescheduled every 4 bars)
+ *  - Transformer/Crab special fader scheduling (128-chop lookahead, auto-reschedule)
  *  - Beat quantization for pattern start
  */
 export class ScratchPlayback {
   private patternIntervalId: ReturnType<typeof setInterval> | null = null;
   private patternTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private patternFaderTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private readonly getDeck: () => DeckEngine;
   private readonly getEffectiveBPM: () => number;
   private faderLFOTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -196,7 +290,7 @@ export class ScratchPlayback {
   private activePattern: ScratchPattern | null = null;
   private patternElapsedMs = 0;
   private patternLastTick = 0;
-  private patternDurationMs = 0; // resolved duration for current pattern invocation
+  private patternDurationMs = 0;
 
   constructor(
     getDeck: () => DeckEngine,
@@ -210,21 +304,12 @@ export class ScratchPlayback {
   // BEAT QUANTIZATION
   // --------------------------------------------------------------------------
 
-  /**
-   * Returns ms until the next beat boundary (based on quantize division).
-   * Uses the deck's elapsed time + effective BPM to find current position in bar.
-   * Returns 0 if already within 20ms of a boundary.
-   */
   msUntilNextBeat(quantize: '1/4' | '1/8'): number {
     const bpm = this.getEffectiveBPM();
     const msPerBeat = 60000 / bpm;
     const msPer = quantize === '1/8' ? msPerBeat / 2 : msPerBeat;
     let elapsed = 0;
-    try {
-      elapsed = this.getDeck().replayer.getElapsedMs();
-    } catch {
-      return 0;
-    }
+    try { elapsed = this.getDeck().replayer.getElapsedMs(); } catch { return 0; }
     const posInDiv = elapsed % msPer;
     return posInDiv < 20 ? 0 : msPer - posInDiv;
   }
@@ -233,21 +318,13 @@ export class ScratchPlayback {
   // PATTERN PLAYBACK
   // --------------------------------------------------------------------------
 
-  /**
-   * Start playing a scratch pattern (optionally with beat quantization).
-   * If pattern.quantize is set, delays start to the next beat boundary.
-   */
   play(pattern: ScratchPattern, onWaiting?: (ms: number) => void): void {
     this.stopPattern();
 
     const bpm = this.getEffectiveBPM();
-
-    // Resolve duration
-    if (pattern.durationBeats !== null) {
-      this.patternDurationMs = (60000 / bpm) * pattern.durationBeats;
-    } else {
-      this.patternDurationMs = pattern.durationMs ?? 400;
-    }
+    this.patternDurationMs = pattern.durationBeats !== null
+      ? (60000 / bpm) * pattern.durationBeats
+      : (pattern.durationMs ?? 400);
 
     const startLoop = () => {
       this.activePattern = pattern;
@@ -269,14 +346,8 @@ export class ScratchPlayback {
   }
 
   private _startPatternInterval(): void {
-    if (this.patternIntervalId !== null) {
-      clearInterval(this.patternIntervalId);
-    }
-
-    const TICK_MS = 10;
-    this.patternIntervalId = setInterval(() => {
-      this._tickPattern();
-    }, TICK_MS);
+    if (this.patternIntervalId !== null) clearInterval(this.patternIntervalId);
+    this.patternIntervalId = setInterval(() => this._tickPattern(), 10);
   }
 
   private _tickPattern(): void {
@@ -284,11 +355,9 @@ export class ScratchPlayback {
     if (!pattern) return;
 
     const now = performance.now();
-    const dt = now - this.patternLastTick;
+    this.patternElapsedMs += now - this.patternLastTick;
     this.patternLastTick = now;
-    this.patternElapsedMs += dt;
 
-    // Wrap elapsed within pattern duration (loop)
     if (pattern.loop && this.patternElapsedMs >= this.patternDurationMs) {
       this.patternElapsedMs = this.patternElapsedMs % this.patternDurationMs;
     } else if (!pattern.loop && this.patternElapsedMs >= this.patternDurationMs) {
@@ -296,33 +365,27 @@ export class ScratchPlayback {
       return;
     }
 
-    // Find current frame based on elapsed time
+    // Scan backward from end to find current frame
     const frames = pattern.frames;
     let frameIdx = 0;
     for (let i = frames.length - 1; i >= 0; i--) {
-      if (this.patternElapsedMs >= frames[i].timeMs) {
-        frameIdx = i;
-        break;
-      }
+      if (this.patternElapsedMs >= frames[i]!.timeMs) { frameIdx = i; break; }
     }
-    const frame = frames[frameIdx];
+    const frame = frames[frameIdx]!;
 
-    // Apply velocity (pitch + tempo multiplier)
     try {
       const deck = this.getDeck();
       deck.setScratchVelocity(frame.velocity);
 
-      // Apply fader gain via AudioParam for precise timing
-      // (Only for fixed-fader patterns; Transformer/Crab use fader LFO scheduling)
-      if (pattern !== TRANSFORMER && pattern !== CRAB) {
+      // Apply fader — skip for Transformer/Crab (AudioParam-scheduled)
+      // and skip when fader LFO is active to avoid clobbering its schedule.
+      if (pattern !== TRANSFORMER && pattern !== CRAB && !this.faderLFOActive) {
         const gain = deck.getChannelGainParam();
-        const ctx = Tone.getContext().rawContext as AudioContext;
+        const ctx  = Tone.getContext().rawContext as AudioContext;
         gain.cancelScheduledValues(ctx.currentTime);
         gain.setValueAtTime(frame.faderGain, ctx.currentTime);
       }
-    } catch {
-      // Engine not ready
-    }
+    } catch { /* engine not ready */ }
   }
 
   stopPattern(): void {
@@ -334,28 +397,27 @@ export class ScratchPlayback {
       clearInterval(this.patternIntervalId);
       this.patternIntervalId = null;
     }
+    if (this.patternFaderTimeoutId !== null) {
+      clearTimeout(this.patternFaderTimeoutId);
+      this.patternFaderTimeoutId = null;
+    }
     this.activePattern = null;
     this.patternElapsedMs = 0;
 
-    // Restore fader to full if no LFO running
     if (!this.faderLFOActive) {
       try {
         const gain = this.getDeck().getChannelGainParam();
-        const ctx = Tone.getContext().rawContext as AudioContext;
+        const ctx  = Tone.getContext().rawContext as AudioContext;
         gain.cancelScheduledValues(ctx.currentTime);
         gain.setValueAtTime(1, ctx.currentTime);
-      } catch {
-        // Engine not ready
-      }
+      } catch { /* engine not ready */ }
     }
   }
 
-  /** Is a pattern currently queued or playing? */
   isPatternActive(): boolean {
     return this.activePattern !== null || this.patternTimeoutId !== null;
   }
 
-  /** Is a pattern currently waiting for beat quantize? */
   isWaiting(): boolean {
     return this.patternTimeoutId !== null && this.activePattern === null;
   }
@@ -364,11 +426,6 @@ export class ScratchPlayback {
   // FADER LFO
   // --------------------------------------------------------------------------
 
-  /**
-   * Schedule a fader LFO (square wave) at the given beat division.
-   * Uses AudioParam scheduling for sub-millisecond accuracy.
-   * Automatically rescheduled every 4 bars (200ms before end).
-   */
   startFaderLFO(bpm: number, division: FaderLFODivision): void {
     this.stopFaderLFO();
     this.faderLFOActive = true;
@@ -379,68 +436,50 @@ export class ScratchPlayback {
 
   private _scheduleFaderLFO(bpm: number, division: FaderLFODivision): void {
     try {
-      const deck = this.getDeck();
-      const gain = deck.getChannelGainParam();
-      const ctx = Tone.getContext().rawContext as AudioContext;
-
-      const beatsPerDiv = LFO_DIVISION_BEATS[division];
-      const periodSec = (60 / bpm) * beatsPerDiv;
+      const gain = this.getDeck().getChannelGainParam();
+      const ctx  = Tone.getContext().rawContext as AudioContext;
+      const periodSec = (60 / bpm) * LFO_DIVISION_BEATS[division];
       const now = ctx.currentTime;
 
-      // Cancel any existing scheduled values
+      // 4 bars look-ahead
+      const totalDivisions = Math.round(16 / LFO_DIVISION_BEATS[division]);
       gain.cancelScheduledValues(now);
-
-      // Schedule 4 bars = 16 quarter notes
-      const totalBeats = 16;
-      const totalDivisions = Math.round(totalBeats / beatsPerDiv);
       for (let i = 0; i < totalDivisions; i++) {
         const t = now + i * periodSec;
         gain.setValueAtTime(1, t);
         gain.setValueAtTime(0, t + periodSec * 0.5);
       }
 
-      // Reschedule 200ms before end
-      const totalDurationMs = totalDivisions * periodSec * 1000;
-      const rescheduleDelay = Math.max(50, totalDurationMs - 200);
-
+      const totalMs = totalDivisions * periodSec * 1000;
       this.faderLFOTimeoutId = setTimeout(() => {
         if (this.faderLFOActive && this.currentLFODivision === division) {
           this._scheduleFaderLFO(bpm, division);
         }
-      }, rescheduleDelay);
-    } catch {
-      // Engine not ready
-    }
+      }, Math.max(50, totalMs - 200));
+    } catch { /* engine not ready */ }
   }
 
   stopFaderLFO(): void {
     this.faderLFOActive = false;
     this.currentLFODivision = null;
-
     if (this.faderLFOTimeoutId !== null) {
       clearTimeout(this.faderLFOTimeoutId);
       this.faderLFOTimeoutId = null;
     }
-
-    // Restore fader to full
     try {
       const gain = this.getDeck().getChannelGainParam();
-      const ctx = Tone.getContext().rawContext as AudioContext;
+      const ctx  = Tone.getContext().rawContext as AudioContext;
       gain.cancelScheduledValues(ctx.currentTime);
       gain.linearRampToValueAtTime(1, ctx.currentTime + 0.02);
-    } catch {
-      // Engine not ready
-    }
+    } catch { /* engine not ready */ }
   }
 
-  /** Called by DJDeck RAF when effectiveBPM changes by > 2% */
   onBPMChange(newBPM: number): void {
     if (
       this.faderLFOActive &&
       this.currentLFODivision !== null &&
       Math.abs(newBPM - this.scheduledLFOBPM) / this.scheduledLFOBPM > 0.02
     ) {
-      // Reschedule immediately at new BPM
       if (this.faderLFOTimeoutId !== null) {
         clearTimeout(this.faderLFOTimeoutId);
         this.faderLFOTimeoutId = null;
@@ -451,51 +490,64 @@ export class ScratchPlayback {
   }
 
   // --------------------------------------------------------------------------
-  // SPECIAL PATTERN SCHEDULING (Transformer / Crab)
+  // SPECIAL PATTERN FADER SCHEDULING (Transformer / Crab)
+  //
+  // 128-chop lookahead + auto-reschedule so the patterns play indefinitely.
+  // Called by DeckEngine.playPattern() before handing off to play().
   // --------------------------------------------------------------------------
 
-  /**
-   * Schedule Transformer or Crab fader automation for one bar.
-   * These patterns have BPM-synced fader chops that must be computed at trigger time.
-   */
   scheduleTransformerFader(bpm: number): void {
+    if (this.patternFaderTimeoutId !== null) {
+      clearTimeout(this.patternFaderTimeoutId);
+      this.patternFaderTimeoutId = null;
+    }
     try {
-      const deck = this.getDeck();
-      const gain = deck.getChannelGainParam();
-      const ctx = Tone.getContext().rawContext as AudioContext;
-      const msPerBeat = 60000 / bpm;
-      const chopPeriodSec = msPerBeat / 1000 / 4; // 4 chops per beat = 1/8 note width
+      const gain = this.getDeck().getChannelGainParam();
+      const ctx  = Tone.getContext().rawContext as AudioContext;
+      // 4 chops per beat, 40% open duty cycle (crisper than 50%)
+      const chopPeriodSec = (60 / bpm) / 4;
       const now = ctx.currentTime;
       gain.cancelScheduledValues(now);
-      // 4 beats, 4 chops each = 16 chops
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < PATTERN_FADER_LOOKAHEAD; i++) {
         const t = now + i * chopPeriodSec;
         gain.setValueAtTime(1, t);
-        gain.setValueAtTime(0, t + chopPeriodSec * 0.5);
+        gain.setValueAtTime(0, t + chopPeriodSec * 0.40);
       }
-    } catch {
-      // Engine not ready
-    }
+      const totalMs = PATTERN_FADER_LOOKAHEAD * chopPeriodSec * 1000;
+      this.patternFaderTimeoutId = setTimeout(() => {
+        this.patternFaderTimeoutId = null;
+        if (this.activePattern === TRANSFORMER) {
+          this.scheduleTransformerFader(this.getEffectiveBPM());
+        }
+      }, Math.max(50, totalMs - 300));
+    } catch { /* engine not ready */ }
   }
 
   scheduleCrabFader(bpm: number): void {
+    if (this.patternFaderTimeoutId !== null) {
+      clearTimeout(this.patternFaderTimeoutId);
+      this.patternFaderTimeoutId = null;
+    }
     try {
-      const deck = this.getDeck();
-      const gain = deck.getChannelGainParam();
-      const ctx = Tone.getContext().rawContext as AudioContext;
-      const msPerBeat = 60000 / bpm;
-      // 4 rapid taps per beat
-      const tapPeriodSec = msPerBeat / 1000 / 4;
+      const gain = this.getDeck().getChannelGainParam();
+      const ctx  = Tone.getContext().rawContext as AudioContext;
+      // 4 finger taps per beat, 28% open duty cycle (very staccato)
+      const tapPeriodSec = (60 / bpm) / 4;
       const now = ctx.currentTime;
       gain.cancelScheduledValues(now);
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < PATTERN_FADER_LOOKAHEAD; i++) {
         const t = now + i * tapPeriodSec;
         gain.setValueAtTime(1, t);
-        gain.setValueAtTime(0, t + tapPeriodSec * 0.4); // slightly less than 50% duty cycle
+        gain.setValueAtTime(0, t + tapPeriodSec * 0.28);
       }
-    } catch {
-      // Engine not ready
-    }
+      const totalMs = PATTERN_FADER_LOOKAHEAD * tapPeriodSec * 1000;
+      this.patternFaderTimeoutId = setTimeout(() => {
+        this.patternFaderTimeoutId = null;
+        if (this.activePattern === CRAB) {
+          this.scheduleCrabFader(this.getEffectiveBPM());
+        }
+      }, Math.max(50, totalMs - 300));
+    } catch { /* engine not ready */ }
   }
 
   // --------------------------------------------------------------------------
