@@ -17,6 +17,8 @@ import {
   batchImportNKSF,
 } from '@/midi/performance/presetIntegration';
 import { writeNKSF } from '@/midi/performance/NKSFileFormat';
+import { pushToCloud } from '@/lib/cloudSync';
+import { SYNC_KEYS } from '@/hooks/useCloudSync';
 
 export type PresetCategory = 'Bass' | 'Lead' | 'Pad' | 'Drum' | 'FX' | 'User';
 
@@ -282,3 +284,16 @@ export const usePresetStore = create<PresetStore>()(
     }
   )
 );
+
+// ── Cloud sync: push presets to server on any mutation (debounced) ────────────
+
+let presetSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+usePresetStore.subscribe((state, prevState) => {
+  if (state.userPresets !== prevState.userPresets) {
+    if (presetSyncTimer) clearTimeout(presetSyncTimer);
+    presetSyncTimer = setTimeout(() => {
+      pushToCloud(SYNC_KEYS.INSTRUMENT_PRESETS, state.userPresets).catch(() => {});
+    }, 2000);
+  }
+});
