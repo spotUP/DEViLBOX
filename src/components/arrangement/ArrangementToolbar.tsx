@@ -64,7 +64,11 @@ export const ArrangementToolbar: React.FC = () => {
       <select
         value="arrangement"
         onChange={(e) => {
-          if (e.target.value !== 'arrangement') {
+          const val = e.target.value;
+          if (val === 'dj') {
+            useUIStore.getState().setActiveView('dj');
+          } else if (val !== 'arrangement') {
+            // Tracker, Grid, Piano Roll, TB-303 are all sub-views of the tracker view
             useUIStore.getState().setActiveView('tracker');
           }
         }}
@@ -72,7 +76,11 @@ export const ArrangementToolbar: React.FC = () => {
         title="Switch view"
       >
         <option value="tracker">Tracker</option>
+        <option value="grid">Grid</option>
+        <option value="pianoroll">Piano Roll</option>
+        <option value="tb303">TB-303</option>
         <option value="arrangement">Arrangement</option>
+        <option value="dj">DJ Mixer</option>
       </select>
 
       <div className="w-px h-5 bg-border opacity-50" />
