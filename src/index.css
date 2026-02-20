@@ -2139,27 +2139,8 @@
    Bars extend UP from edit bar and swing horizontally with staggered easing
    ============================================================================ */
 
-.vu-meters-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  overflow: visible;
-}
-
-.vu-meter-vertical {
-  position: absolute;
-  bottom: 0;
-  will-change: transform;
-}
-
-.vu-meter-bar-vertical {
-  width: 24px;
-  border-radius: 3px 3px 0 0;
-  opacity: 0.6;
-  transition: height 50ms ease-out;
+.vu-meters-canvas {
+  image-rendering: auto;
 }
 
 /* ============================================================================

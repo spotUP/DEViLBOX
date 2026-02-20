@@ -14,7 +14,7 @@ import { MobilePatternInput } from './mobile/MobilePatternInput';
 import { Play, Square, ChevronLeft, ChevronRight, Music2, SlidersHorizontal, Cpu } from 'lucide-react';
 import { useTransportStore, useTrackerStore, useInstrumentStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
-import { SYSTEM_PRESETS } from '@/constants/systemPresets';
+import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
 import { useOrientation } from '@/hooks/useOrientation';
 import { haptics } from '@/utils/haptics';
 import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
@@ -249,8 +249,12 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
                 defaultValue="none"
               >
                 <option value="none" disabled>HW...</option>
-                {SYSTEM_PRESETS.map(preset => (
-                  <option key={preset.id} value={preset.id}>{preset.name.split(' ')[0].toUpperCase()}</option>
+                {getGroupedPresets().map(group => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.presets.map(preset => (
+                      <option key={preset.id} value={preset.id}>{preset.name.split(' ')[0].toUpperCase()}</option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
