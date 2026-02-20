@@ -118,6 +118,10 @@ import { increaseSpacing, decreaseSpacing, cursorUpByHighlight, cursorDownByHigh
 import { setStep10, setStep11, setStep12, setStep13, setStep14, setStep15, setStep16,
   increaseStep, decreaseStep, setOctave8, setOctave9
 } from '@engine/keyboard/commands/edit';
+import {
+  djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
+  djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132
+} from '@engine/keyboard/commands/djScratch';
 
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useUIStore } from '@stores/useUIStore';
@@ -652,6 +656,20 @@ function initializeRegistry() {
     { name: 'set_hold_1', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Hold: OctaMED only', false, 1000); return true; }, description: 'Set hold 1' },
     { name: 'set_hold_2', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Hold: OctaMED only', false, 1000); return true; }, description: 'Set hold 2' },
     { name: 'set_hold_3', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Hold: OctaMED only', false, 1000); return true; }, description: 'Set hold 3' },
+
+    // === DJ SCRATCH ===
+    { name: 'dj_scratch_baby',   contexts: ['global'], handler: djScratchBaby,  description: 'DJ Scratch: Baby Scratch' },
+    { name: 'dj_scratch_trans',  contexts: ['global'], handler: djScratchTrans, description: 'DJ Scratch: Transformer' },
+    { name: 'dj_scratch_flare',  contexts: ['global'], handler: djScratchFlare, description: 'DJ Scratch: Flare' },
+    { name: 'dj_scratch_hydro',  contexts: ['global'], handler: djScratchHydro, description: 'DJ Scratch: Hydroplane' },
+    { name: 'dj_scratch_crab',   contexts: ['global'], handler: djScratchCrab,  description: 'DJ Scratch: Crab' },
+    { name: 'dj_scratch_orbit',  contexts: ['global'], handler: djScratchOrbit, description: 'DJ Scratch: Orbit' },
+    { name: 'dj_scratch_stop',   contexts: ['global'], handler: djScratchStop,  description: 'DJ Scratch: Stop pattern' },
+    { name: 'dj_fader_lfo_off',  contexts: ['global'], handler: djFaderLFOOff,  description: 'DJ Fader LFO: Off' },
+    { name: 'dj_fader_lfo_14',   contexts: ['global'], handler: djFaderLFO14,   description: 'DJ Fader LFO: 1/4 note' },
+    { name: 'dj_fader_lfo_18',   contexts: ['global'], handler: djFaderLFO18,   description: 'DJ Fader LFO: 1/8 note' },
+    { name: 'dj_fader_lfo_116',  contexts: ['global'], handler: djFaderLFO116,  description: 'DJ Fader LFO: 1/16 note' },
+    { name: 'dj_fader_lfo_132',  contexts: ['global'], handler: djFaderLFO132,  description: 'DJ Fader LFO: 1/32 note' },
   ];
 
   commands.forEach(cmd => globalRegistry.register(cmd));

@@ -20,6 +20,7 @@ import { DeckVisualizer } from './DeckVisualizer';
 import { DeckTurntable } from './DeckTurntable';
 import { DeckLoopControls } from './DeckLoopControls';
 import { DeckScopes } from './DeckScopes';
+import { DeckScratch } from './DeckScratch';
 
 interface DJDeckProps {
   deckId: 'A' | 'B';
@@ -53,6 +54,8 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
             elapsedMs: replayer.getElapsedMs(),
             effectiveBPM: liveBPM,
           });
+          // Relay BPM changes to ScratchPlayback for LFO resync
+          try { deck.notifyBPMChange(liveBPM); } catch { /* engine not ready */ }
         }
       } catch {
         // Engine might not be initialized yet
@@ -248,6 +251,9 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         <DeckNudge deckId={deckId} />
         <DeckLoopControls deckId={deckId} />
       </div>
+
+      {/* Scratch presets + Fader LFO */}
+      <DeckScratch deckId={deckId} />
     </div>
   );
 };

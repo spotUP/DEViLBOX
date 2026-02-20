@@ -7,6 +7,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import type { SeratoCuePoint, SeratoLoop, SeratoBeatMarker } from '@/lib/serato/seratoMetadata';
 
 // ============================================================================
 // TYPES
@@ -63,6 +64,18 @@ export interface DeckState {
 
   // Channel mutes (bitmask: bit N = channel N+1 enabled)
   channelMask: number;
+
+  // Scratch
+  scratchActive: boolean;
+  faderLFOActive: boolean;
+  faderLFODivision: '1/4' | '1/8' | '1/16' | '1/32' | null;
+  activePatternName: string | null;
+
+  // Serato metadata (populated when loading Serato-analyzed tracks)
+  seratoCuePoints: SeratoCuePoint[];
+  seratoLoops: SeratoLoop[];
+  seratoBeatGrid: SeratoBeatMarker[];
+  seratoKey: string | null;
 }
 
 type DeckId = 'A' | 'B';
@@ -106,6 +119,18 @@ const defaultDeckState: DeckState = {
   slipSongPos: 0,
   slipPattPos: 0,
   channelMask: 0xFFFF, // All channels enabled (16 bits)
+
+  // Scratch
+  scratchActive: false,
+  faderLFOActive: false,
+  faderLFODivision: null,
+  activePatternName: null,
+
+  // Serato metadata
+  seratoCuePoints: [],
+  seratoLoops: [],
+  seratoBeatGrid: [],
+  seratoKey: null,
 };
 
 // ============================================================================
@@ -152,6 +177,11 @@ interface DJActions {
   toggleDeckChannel: (deck: DeckId, channel: number) => void;
   setAllDeckChannels: (deck: DeckId, enabled: boolean) => void;
   resetDeck: (deck: DeckId) => void;
+
+  // Scratch
+  setDeckScratchActive: (deck: DeckId, active: boolean) => void;
+  setDeckFaderLFO: (deck: DeckId, active: boolean, division?: '1/4' | '1/8' | '1/16' | '1/32') => void;
+  setDeckPattern: (deck: DeckId, name: string | null) => void;
 
   // Headphone cueing
   setCueMode: (mode: CueMode) => void;
@@ -287,6 +317,26 @@ export const useDJStore = create<DJStore>()(
     resetDeck: (deck) =>
       set((state) => {
         state.decks[deck] = { ...defaultDeckState };
+      }),
+
+    setDeckScratchActive: (deck, active) =>
+      set((state) => {
+        state.decks[deck].scratchActive = active;
+      }),
+
+    setDeckFaderLFO: (deck, active, division) =>
+      set((state) => {
+        state.decks[deck].faderLFOActive = active;
+        if (division !== undefined) {
+          state.decks[deck].faderLFODivision = active ? division : null;
+        } else if (!active) {
+          state.decks[deck].faderLFODivision = null;
+        }
+      }),
+
+    setDeckPattern: (deck, name) =>
+      set((state) => {
+        state.decks[deck].activePatternName = name;
       }),
 
     setCueMode: (mode) =>
