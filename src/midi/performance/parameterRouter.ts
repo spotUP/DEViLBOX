@@ -520,3 +520,83 @@ export function getRouteKeys(): string[] {
 export function registerRoute(param: string, route: ParameterRoute): void {
   PARAMETER_ROUTES[param] = route;
 }
+
+// ============================================================================
+// DJ Parameter Router
+// Routes DJ-specific parameters to the DJEngine subsystem.
+// Called from useMIDIStore when isDJContext() is true.
+// ============================================================================
+
+type DJRouteHandler = (value: number) => void;
+
+let _djRouteCache: Record<string, DJRouteHandler> | null = null;
+
+function getDJRoutes(): Record<string, DJRouteHandler> {
+  if (_djRouteCache) return _djRouteCache;
+
+  // Lazy import to avoid circular dependency — DJEngine may not be initialized at module load
+  const { getDJEngine } = require('../../engine/dj/DJEngine');
+
+  _djRouteCache = {
+    // Crossfader: 0-1 maps directly
+    'dj.crossfader': (v) => getDJEngine().setCrossfader(v),
+
+    // Deck volumes: 0-1 maps to 0-1.5 (allows slight boost)
+    'dj.deckA.volume': (v) => getDJEngine().deckA.setVolume(v * 1.5),
+    'dj.deckB.volume': (v) => getDJEngine().deckB.setVolume(v * 1.5),
+
+    // Master volume: 0-1 maps to 0-1.5
+    'dj.masterVolume': (v) => getDJEngine().mixer.setMasterVolume(v * 1.5),
+
+    // EQ: 0-1 maps to -24dB to +6dB range
+    'dj.deckA.eqHi': (v) => getDJEngine().deckA.setEQ('high', -24 + v * 30),
+    'dj.deckA.eqMid': (v) => getDJEngine().deckA.setEQ('mid', -24 + v * 30),
+    'dj.deckA.eqLow': (v) => getDJEngine().deckA.setEQ('low', -24 + v * 30),
+    'dj.deckB.eqHi': (v) => getDJEngine().deckB.setEQ('high', -24 + v * 30),
+    'dj.deckB.eqMid': (v) => getDJEngine().deckB.setEQ('mid', -24 + v * 30),
+    'dj.deckB.eqLow': (v) => getDJEngine().deckB.setEQ('low', -24 + v * 30),
+
+    // Filter: 0-1 maps to -1..+1 (center = off, left = HPF, right = LPF)
+    'dj.deckA.filter': (v) => getDJEngine().deckA.setFilterPosition(-1 + v * 2),
+    'dj.deckB.filter': (v) => getDJEngine().deckB.setFilterPosition(-1 + v * 2),
+
+    // Filter resonance: 0-1 maps to Q 0.5-15
+    'dj.deckA.filterQ': (v) => getDJEngine().deckA.setFilterResonance(0.5 + v * 14.5),
+    'dj.deckB.filterQ': (v) => getDJEngine().deckB.setFilterResonance(0.5 + v * 14.5),
+
+    // Pitch: 0-1 maps to -6..+6 semitones
+    'dj.deckA.pitch': (v) => getDJEngine().deckA.setPitch(-6 + v * 12),
+    'dj.deckB.pitch': (v) => getDJEngine().deckB.setPitch(-6 + v * 12),
+
+    // Scratch velocity: 0-1 maps to -4..+4 (center = stopped)
+    'dj.deckA.scratchVelocity': (v) => getDJEngine().deckA.setScratchVelocity(-4 + v * 8),
+    'dj.deckB.scratchVelocity': (v) => getDJEngine().deckB.setScratchVelocity(-4 + v * 8),
+  };
+
+  return _djRouteCache;
+}
+
+/**
+ * Route a DJ parameter change to the DJ engine.
+ *
+ * @param param - DJ parameter path (e.g., 'dj.crossfader')
+ * @param normalizedValue - 0-1 normalized value from MIDI CC
+ */
+export function routeDJParameter(param: string, normalizedValue: number): void {
+  const routes = getDJRoutes();
+  const handler = routes[param];
+  if (handler) {
+    try {
+      handler(normalizedValue);
+    } catch {
+      // DJ engine not initialized — ignore silently
+    }
+  }
+}
+
+/**
+ * Reset DJ route cache (call when DJ engine is disposed/recreated).
+ */
+export function resetDJRouteCache(): void {
+  _djRouteCache = null;
+}
