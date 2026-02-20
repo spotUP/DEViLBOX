@@ -24,7 +24,7 @@ interface ChannelParticlesProps {
 export const ChannelParticles: React.FC<ChannelParticlesProps> = ({ height = 100 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
-  const lastFrameTimeRef = useRef(0);
+
   const particlesRef = useRef<Particle[][]>([]);
   const [width, setWidth] = useState(300);
   const { patterns, currentPatternIndex } = useTrackerStore(
@@ -72,8 +72,6 @@ export const ChannelParticles: React.FC<ChannelParticlesProps> = ({ height = 100
     // Initialize particle arrays for each channel
     particlesRef.current = Array(channelCount).fill(0).map(() => []);
 
-    const FRAME_INTERVAL = 1000 / 30;
-
     const animate = () => {
       if (!mounted) return;
 
@@ -81,13 +79,6 @@ export const ChannelParticles: React.FC<ChannelParticlesProps> = ({ height = 100
         animationRef.current = requestAnimationFrame(animate);
         return;
       }
-
-      const now = performance.now();
-      if (now - lastFrameTimeRef.current < FRAME_INTERVAL) {
-        animationRef.current = requestAnimationFrame(animate);
-        return;
-      }
-      lastFrameTimeRef.current = now;
 
       ctx.fillStyle = '#0a0a0b';
       ctx.fillRect(0, 0, width, height);

@@ -14,7 +14,7 @@ interface ChannelCircularVUProps {
 export const ChannelCircularVU: React.FC<ChannelCircularVUProps> = ({ height = 100 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
-  const lastFrameTimeRef = useRef(0);
+
   const [width, setWidth] = useState(300);
   const { patterns, currentPatternIndex } = useTrackerStore(
     useShallow((state) => ({
@@ -58,8 +58,6 @@ export const ChannelCircularVU: React.FC<ChannelCircularVUProps> = ({ height = 1
     const cellWidth = width / channelsPerRow;
     const cellHeight = height / rows;
 
-    const FRAME_INTERVAL = 1000 / 30;
-
     const animate = () => {
       if (!mounted) return;
 
@@ -67,13 +65,6 @@ export const ChannelCircularVU: React.FC<ChannelCircularVUProps> = ({ height = 1
         animationRef.current = requestAnimationFrame(animate);
         return;
       }
-
-      const now = performance.now();
-      if (now - lastFrameTimeRef.current < FRAME_INTERVAL) {
-        animationRef.current = requestAnimationFrame(animate);
-        return;
-      }
-      lastFrameTimeRef.current = now;
 
       ctx.fillStyle = '#0a0a0b';
       ctx.fillRect(0, 0, width, height);

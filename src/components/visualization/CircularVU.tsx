@@ -12,7 +12,7 @@ interface CircularVUProps {
 export const CircularVU: React.FC<CircularVUProps> = ({ height = 100 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
-  const lastFrameTimeRef = useRef(0);
+
   const gradientCacheRef = useRef<CanvasGradient[]>([]);
   const [width, setWidth] = useState(300);
 
@@ -62,20 +62,11 @@ export const CircularVU: React.FC<CircularVUProps> = ({ height = 100 }) => {
       gradientCacheRef.current.push(gradient);
     }
 
-    const FRAME_INTERVAL = 1000 / 30;
-
     const animate = () => {
       if (document.hidden) {
         animationRef.current = requestAnimationFrame(animate);
         return;
       }
-
-      const now = performance.now();
-      if (now - lastFrameTimeRef.current < FRAME_INTERVAL) {
-        animationRef.current = requestAnimationFrame(animate);
-        return;
-      }
-      lastFrameTimeRef.current = now;
 
       ctx.clearRect(0, 0, width, height);
 
