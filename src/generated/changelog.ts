@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-20T10:05:41.921Z
+ * Generated: 2026-02-20T11:13:12.774Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.999';
-export const BUILD_NUMBER = '999';
-export const BUILD_HASH = '3e095967';
+export const BUILD_VERSION = '1.0.1009';
+export const BUILD_NUMBER = '1009';
+export const BUILD_HASH = 'c286f198';
 export const BUILD_DATE = '2026-02-20';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,49 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.999',
+    version: '1.0.1009',
     date: '2026-02-20',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add true reverse scratch with ring-buffer AudioWorklet"
+      },
+      {
+        type: 'fix',
+        "description": "Fix instrument ID mismatch for empty module slots in DJ mode"
+      },
+      {
+        type: 'feature',
+        "description": "Add quick-nav keyboard shortcut (0-9, a-z) to file browser"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate modland.com browser into main file browser"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract module parser from App.tsx, improve status bar and layout"
+      },
+      {
+        type: 'feature',
+        "description": "Major DJ mode overhaul with per-deck routing, visualizers, and playlists"
+      },
+      {
+        type: 'fix',
+        "description": "Guard DB303 against redundant DSP-reinitializing param sends"
+      },
+      {
+        type: 'feature',
+        "description": "Add ToneArm vinyl simulation and instrument FX presets"
+      },
+      {
+        type: 'feature',
+        "description": "Add client-side cloud sync for presets and settings"
+      },
+      {
+        type: 'feature',
+        "description": "Add cloud sync API and modland proxy"
+      },
       {
         type: 'fix',
         "description": "Use CSS zoom instead of transform:scale for WAM plugin GUIs"
@@ -198,46 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "VinylNoise/Tumult — audio only when playing or editor open"
-      },
-      {
-        type: 'fix',
-        "description": "Unimplemented commands no longer swallow keypresses"
-      },
-      {
-        type: 'fix',
-        "description": "Use actual current instrument when entering notes"
-      },
-      {
-        type: 'fix',
-        "description": "Gracefully handle IT format in sample extractor"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: purge debug console.logs from production code"
-      },
-      {
-        type: 'fix',
-        "description": "WASM effects param queue + WAM UI + TapeSimulator"
-      },
-      {
-        type: 'fix',
-        "description": "Partial master FX fixes — MVerb pending params, better defaults"
-      },
-      {
-        type: 'fix',
-        "description": "Atomic applyInstrument + clearSelection preserves clipboard"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve all npm run type-check errors (tsc -b --force)"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: regenerate changelog, gitignore WASM build artifacts"
-      },
-      {
-        type: 'fix',
-        "description": "Implement paste/edit commands + patternOrder + console cleanup"
       }
     ]
   }
