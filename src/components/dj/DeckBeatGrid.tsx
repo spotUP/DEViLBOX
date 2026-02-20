@@ -15,16 +15,7 @@ interface DeckBeatGridProps {
   height?: number;
 }
 
-interface BeatMarker {
-  position: number;
-  beatsUntilNextMarker: number;
-}
-
-type BeatGridMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; beatGrid: BeatMarker[]; durationMs: number; audioPosition: number }
-  | { type: 'beatGrid'; beatGrid: BeatMarker[]; durationMs: number }
-  | { type: 'position'; audioPosition: number }
-  | { type: 'resize'; w: number; h: number; dpr: number };
+import type { BeatGridMsg } from '@engine/renderer/worker-types';
 
 export const DeckBeatGrid: React.FC<DeckBeatGridProps> = ({ deckId, height = 24 }) => {
   const canvasRef    = useRef<HTMLCanvasElement | null>(null);

@@ -15,29 +15,7 @@ const INSTRUMENT_COLORS = [
 ];
 const DEFAULT_COLOR = '#64748b';
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
-
-interface SerializedNote {
-  id: string;
-  startRow: number;
-  endRow: number;
-  velocity: number;
-  instrument: number | null;
-}
-
-interface VelocityState {
-  notes: SerializedNote[];
-  horizontalZoom: number;
-  scrollX: number;
-  selectedNotes: string[];
-  containerWidth: number;
-}
-
-type VelocityMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; state: VelocityState }
-  | { type: 'state'; state: VelocityState }
-  | { type: 'hover'; noteId: string | null }
-  | { type: 'resize'; w: number; dpr: number };
+import type { VelocityMsg, SerializedNote } from '../engine/renderer/worker-types';
 
 // ─── Worker state ──────────────────────────────────────────────────────────────
 

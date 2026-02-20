@@ -6,35 +6,9 @@
  * are forwarded here via postMessage.
  */
 
-interface DeckColors {
-  bg: string;
-  bgSecondary: string;
-  bgTertiary: string;
-  border: string;
-  borderLight: string;
-}
+import type { TurntableMsg, DeckColorsExt } from '../engine/renderer/worker-types';
 
-interface TurntableInitMsg {
-  type: 'init';
-  canvas: OffscreenCanvas;
-  dpr: number;
-  width: number;
-  height: number;
-  colors: DeckColors;
-  deckId: 'A' | 'B';
-  isPlaying: boolean;
-  effectiveBPM: number;
-}
-
-interface TurntablePlaybackMsg    { type: 'playback'; isPlaying: boolean; effectiveBPM: number }
-interface TurntableVelocityMsg    { type: 'velocity'; v: number }
-interface TurntableScratchMsg     { type: 'scratchActive'; active: boolean }
-interface TurntableResizeMsg      { type: 'resize'; w: number; h: number; dpr: number }
-interface TurntableColorsMsg      { type: 'colors'; colors: DeckColors }
-
-type TurntableMsg =
-  | TurntableInitMsg | TurntablePlaybackMsg | TurntableVelocityMsg
-  | TurntableScratchMsg | TurntableResizeMsg | TurntableColorsMsg;
+type DeckColors = DeckColorsExt;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -56,7 +30,7 @@ let colors: DeckColors = {
 let deckId: 'A' | 'B' = 'A';
 let isPlaying = false, effectiveBPM = 120;
 let scratchVelocity = 1, isScratchActive = false;
-let angle = 0, lastTimestamp = 0;
+let angle = 0, lastTimestamp = 0, dirty = true;
 
 // ─── Message handler ──────────────────────────────────────────────────────────
 
@@ -76,12 +50,15 @@ self.onmessage = (e: MessageEvent<TurntableMsg>) => {
       break;
     case 'playback':
       isPlaying = msg.isPlaying; effectiveBPM = msg.effectiveBPM;
+      dirty = true;
       break;
     case 'velocity':
       scratchVelocity = msg.v;
+      dirty = true;
       break;
     case 'scratchActive':
       isScratchActive = msg.active;
+      dirty = true;
       break;
     case 'resize':
       dpr = msg.dpr; width = msg.w; height = msg.h;
@@ -89,9 +66,11 @@ self.onmessage = (e: MessageEvent<TurntableMsg>) => {
         offCanvas.width  = Math.round(width  * dpr);
         offCanvas.height = Math.round(height * dpr);
       }
+      dirty = true;
       break;
     case 'colors':
       colors = msg.colors;
+      dirty = true;
       break;
   }
 };
@@ -99,12 +78,18 @@ self.onmessage = (e: MessageEvent<TurntableMsg>) => {
 // ─── RAF loop ─────────────────────────────────────────────────────────────────
 
 function startRAF(): void {
-  const tick = (ts: number) => { renderFrame(ts); requestAnimationFrame(tick); };
+  const tick = (ts: number) => {
+    // Always advance rotation while playing; only redraw when dirty or animating
+    if (isPlaying || dirty) renderFrame(ts);
+    else lastTimestamp = ts;
+    requestAnimationFrame(tick);
+  };
   requestAnimationFrame(tick);
 }
 
 function renderFrame(timestamp: number): void {
   if (!ctx) return;
+  dirty = false;
 
   if (lastTimestamp > 0 && isPlaying) {
     const dt = (timestamp - lastTimestamp) / 1000;

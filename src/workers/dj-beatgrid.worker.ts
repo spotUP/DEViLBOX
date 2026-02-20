@@ -4,27 +4,7 @@
  * Transparent overlay showing beat tick marks from the Serato beatgrid.
  */
 
-interface BeatMarker {
-  position: number;         // seconds from start
-  beatsUntilNextMarker: number;
-}
-
-interface BeatGridInitMsg {
-  type: 'init';
-  canvas: OffscreenCanvas;
-  dpr: number;
-  width: number;
-  height: number;
-  beatGrid: BeatMarker[];
-  durationMs: number;
-  audioPosition: number;
-}
-
-interface BeatGridGridMsg     { type: 'beatGrid'; beatGrid: BeatMarker[]; durationMs: number }
-interface BeatGridPositionMsg { type: 'position'; audioPosition: number }
-interface BeatGridResizeMsg   { type: 'resize'; w: number; h: number; dpr: number }
-
-type BeatGridMsg = BeatGridInitMsg | BeatGridGridMsg | BeatGridPositionMsg | BeatGridResizeMsg;
+import type { BeatGridMsg, BeatMarker } from '../engine/renderer/worker-types';
 
 // ─── Worker state ─────────────────────────────────────────────────────────────
 
@@ -35,6 +15,7 @@ let dpr = 1, width = 400, height = 24;
 let beatGrid: BeatMarker[] = [];
 let durationMs    = 0;
 let audioPosition = 0;
+let dirty         = true;
 
 // ─── Message handler ──────────────────────────────────────────────────────────
 
@@ -56,9 +37,11 @@ self.onmessage = (e: MessageEvent<BeatGridMsg>) => {
     case 'beatGrid':
       beatGrid   = msg.beatGrid;
       durationMs = msg.durationMs;
+      dirty = true;
       break;
     case 'position':
       audioPosition = msg.audioPosition;
+      dirty = true;
       break;
     case 'resize':
       dpr = msg.dpr; width = msg.w; height = msg.h;
@@ -66,6 +49,7 @@ self.onmessage = (e: MessageEvent<BeatGridMsg>) => {
         offCanvas.width  = Math.round(width  * dpr);
         offCanvas.height = Math.round(height * dpr);
       }
+      dirty = true;
       break;
   }
 };
@@ -73,12 +57,16 @@ self.onmessage = (e: MessageEvent<BeatGridMsg>) => {
 // ─── RAF loop ─────────────────────────────────────────────────────────────────
 
 function startRAF(): void {
-  const tick = () => { renderFrame(); requestAnimationFrame(tick); };
+  const tick = () => {
+    if (dirty) renderFrame();
+    requestAnimationFrame(tick);
+  };
   requestAnimationFrame(tick);
 }
 
 function renderFrame(): void {
   if (!ctx) return;
+  dirty = false;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);

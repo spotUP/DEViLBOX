@@ -9,18 +9,11 @@ import React, { useRef, useEffect } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import WaveformWorkerFactory from '@/workers/dj-waveform.worker.ts?worker';
-import type { SeratoCuePoint } from '@/lib/serato/seratoMetadata';
+import type { WaveformMsg } from '@engine/renderer/worker-types';
 
 interface DeckAudioWaveformProps {
   deckId: 'A' | 'B';
 }
-
-type WaveformMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; waveformPeaks: number[] | null; durationMs: number; audioPosition: number; cuePoints: SeratoCuePoint[] }
-  | { type: 'waveformPeaks'; peaks: number[] | null; durationMs: number }
-  | { type: 'position'; audioPosition: number }
-  | { type: 'cuePoints'; cuePoints: SeratoCuePoint[] }
-  | { type: 'resize'; w: number; h: number; dpr: number };
 
 export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) => {
   const canvasRef    = useRef<HTMLCanvasElement | null>(null);

@@ -5,51 +5,7 @@
  * loop region, cue marker, position marker, near-end warning pulse.
  */
 
-interface DeckColors {
-  bg: string;
-  bgSecondary: string;
-  bgTertiary: string;
-  border: string;
-}
-
-interface OverviewInitMsg {
-  type: 'init';
-  canvas: OffscreenCanvas;
-  dpr: number;
-  width: number;
-  height: number;
-  colors: DeckColors;
-  // Initial deck state
-  playbackMode: string;
-  songPos: number;
-  totalPositions: number;
-  cuePoint: number;
-  loopActive: boolean;
-  patternLoopStart: number;
-  patternLoopEnd: number;
-  audioPosition: number;
-  durationMs: number;
-  waveformPeaks: number[] | null;
-}
-
-interface OverviewStateMsg {
-  type: 'state';
-  playbackMode: string;
-  songPos: number;
-  totalPositions: number;
-  cuePoint: number;
-  loopActive: boolean;
-  patternLoopStart: number;
-  patternLoopEnd: number;
-  audioPosition: number;
-  durationMs: number;
-  waveformPeaks: number[] | null;
-}
-
-interface OverviewResizeMsg { type: 'resize'; w: number; h: number; dpr: number }
-interface OverviewColorsMsg { type: 'colors'; colors: DeckColors }
-
-type OverviewMsg = OverviewInitMsg | OverviewStateMsg | OverviewResizeMsg | OverviewColorsMsg;
+import type { OverviewMsg, OverviewState, DeckColors } from '../engine/renderer/worker-types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -77,6 +33,7 @@ let audioPosition   = 0;
 let durationMs      = 0;
 let waveformPeaks: number[] | null = null;
 let pulsePhase      = 0;
+let dirty           = true;
 
 // ─── Message handler ──────────────────────────────────────────────────────────
 
@@ -96,6 +53,7 @@ self.onmessage = (e: MessageEvent<OverviewMsg>) => {
       break;
     case 'state':
       applyStateMsg(msg);
+      dirty = true;
       break;
     case 'resize':
       dpr = msg.dpr; width = msg.w; height = msg.h;
@@ -103,14 +61,16 @@ self.onmessage = (e: MessageEvent<OverviewMsg>) => {
         offCanvas.width  = Math.round(width  * dpr);
         offCanvas.height = Math.round(height * dpr);
       }
+      dirty = true;
       break;
     case 'colors':
       colors = msg.colors;
+      dirty = true;
       break;
   }
 };
 
-function applyStateMsg(msg: OverviewInitMsg | OverviewStateMsg): void {
+function applyStateMsg(msg: OverviewState): void {
   playbackMode     = msg.playbackMode;
   songPos          = msg.songPos;
   totalPositions   = msg.totalPositions;
@@ -126,12 +86,16 @@ function applyStateMsg(msg: OverviewInitMsg | OverviewStateMsg): void {
 // ─── RAF loop ─────────────────────────────────────────────────────────────────
 
 function startRAF(): void {
-  const tick = () => { renderFrame(); requestAnimationFrame(tick); };
+  const tick = () => {
+    if (dirty || pulsePhase > 0) renderFrame();
+    requestAnimationFrame(tick);
+  };
   requestAnimationFrame(tick);
 }
 
 function renderFrame(): void {
   if (!ctx) return;
+  dirty = false;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   // Background

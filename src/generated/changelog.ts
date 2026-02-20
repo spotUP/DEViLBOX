@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-20T17:16:13.628Z
+ * Generated: 2026-02-20T20:32:29.624Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1039';
-export const BUILD_NUMBER = '1039';
-export const BUILD_HASH = '2610880b';
+export const BUILD_VERSION = '1.0.1041';
+export const BUILD_NUMBER = '1041';
+export const BUILD_HASH = 'bb84dd60';
 export const BUILD_DATE = '2026-02-20';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1039',
+    version: '1.0.1041',
     date: '2026-02-20',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add UI component scaffolding"
+      },
+      {
+        type: 'feature',
+        "description": "Add audioMotion visualizer presets across DJ, tracker, and FT2 views"
+      },
       {
         type: 'feature',
         "description": "Add note suppression to TrackerReplayer for scratch mode"
@@ -224,14 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Route chip engine audio through master effects chain"
-      },
-      {
-        type: 'feature',
-        "description": "Load GM2 instruments in App.tsx MIDI handler"
-      },
-      {
-        type: 'feature',
-        "description": "Load GM2 instruments into instrument slots on MIDI file import"
       }
     ]
   }

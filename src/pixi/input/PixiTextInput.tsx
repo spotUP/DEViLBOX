@@ -6,11 +6,9 @@
  * The PixiJS proxy handles visual rendering.
  */
 
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useApplication } from '@pixi/react';
-import { PIXI_FONTS } from '../fonts';
-import { usePixiTheme, type PixiColor } from '../theme';
+import { usePixiTheme } from '../theme';
 
 interface PixiTextInputProps {
   /** Current text value */

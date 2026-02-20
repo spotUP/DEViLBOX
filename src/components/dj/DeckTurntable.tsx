@@ -17,27 +17,13 @@ interface DeckTurntableProps {
   deckId: 'A' | 'B';
 }
 
-interface DeckColors {
-  bg: string;
-  bgSecondary: string;
-  bgTertiary: string;
-  border: string;
-  borderLight: string;
-}
-
-type TurntableMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; colors: DeckColors; deckId: 'A' | 'B'; isPlaying: boolean; effectiveBPM: number }
-  | { type: 'playback'; isPlaying: boolean; effectiveBPM: number }
-  | { type: 'velocity'; v: number }
-  | { type: 'scratchActive'; active: boolean }
-  | { type: 'resize'; w: number; h: number; dpr: number }
-  | { type: 'colors'; colors: DeckColors };
+import type { TurntableMsg, DeckColorsExt } from '@engine/renderer/worker-types';
 
 const SIZE = 96;
 const MOMENTUM_DECAY_MS  = 500;
 const SCRATCH_SENSITIVITY = 0.06;
 
-function snapshotColors(el: HTMLElement): DeckColors {
+function snapshotColors(el: HTMLElement): DeckColorsExt {
   const cs = getComputedStyle(el);
   return {
     bg:          cs.getPropertyValue('--color-bg').trim()            || '#0b0909',

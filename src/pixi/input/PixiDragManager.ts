@@ -104,7 +104,7 @@ export function attachDrag(
     callbacks.onDragStart?.(cfg.value);
 
     // Listen on the stage for move/up so drag continues outside the target
-    const stage = target.stage;
+    const stage = (target as any).stage;
     if (stage) {
       stage.on('pointermove', onPointerMove);
       stage.on('pointerup', onPointerUp);
@@ -148,7 +148,7 @@ export function attachDrag(
     const cfg = getActiveConfig();
     callbacks.onDragEnd?.(cfg.value);
 
-    const stage = target.stage;
+    const stage = (target as any).stage;
     if (stage) {
       stage.off('pointermove', onPointerMove);
       stage.off('pointerup', onPointerUp);
@@ -164,7 +164,7 @@ export function attachDrag(
   // Cleanup function
   return () => {
     target.off('pointerdown', onPointerDown);
-    const stage = target.stage;
+    const stage = (target as any).stage;
     if (stage) {
       stage.off('pointermove', onPointerMove);
       stage.off('pointerup', onPointerUp);
