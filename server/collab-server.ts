@@ -156,6 +156,16 @@ wss.on('connection', (ws: WebSocket) => {
   });
 });
 
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[collab] Port ${PORT} already in use — is the server already running?`);
+    console.error(`[collab] Kill it with: lsof -ti:${PORT} | xargs kill`);
+  } else {
+    console.error('[collab] Server error:', err);
+  }
+  process.exit(1);
+});
+
 server.listen(PORT, () => {
   console.log(`[collab] Signaling server listening on ws://localhost:${PORT}`);
 });
