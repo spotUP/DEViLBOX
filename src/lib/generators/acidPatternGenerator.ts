@@ -111,7 +111,7 @@ function getNoteInScale(
 /**
  * Convert note name to MIDI number
  */
-function noteNameToMidi(noteName: string): number {
+export function noteNameToMidi(noteName: string): number {
   const noteMap: Record<string, number> = {
     'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,
     'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8,
