@@ -33,19 +33,27 @@ export const MixerCrossfader: React.FC = () => {
   const handlePositionChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
     useDJStore.getState().setCrossfader(value);
-    getDJEngine().mixer.setCrossfader(value);
+    try {
+      getDJEngine().mixer.setCrossfader(value);
+    } catch {
+      // Engine might not be initialized yet
+    }
   }, []);
 
   const handleCurveChange = useCallback((newCurve: CrossfaderCurve) => {
     useDJStore.getState().setCrossfaderCurve(newCurve);
-    getDJEngine().mixer.setCurve(newCurve);
+    try {
+      getDJEngine().mixer.setCurve(newCurve);
+    } catch {
+      // Engine might not be initialized yet
+    }
   }, []);
 
   return (
-    <div className="flex flex-col items-center gap-1 w-full px-2">
+    <div className="flex flex-col items-center gap-1 w-full px-2" title="Crossfader">
       {/* A / B labels + slider */}
       <div className="flex items-center gap-3 w-full">
-        <span className="text-text-secondary text-xs font-mono font-bold">A</span>
+        <span className="text-text-secondary text-xs font-mono font-bold" title="Deck 1">1</span>
 
         <div className="flex-1 relative">
           <input
@@ -56,6 +64,7 @@ export const MixerCrossfader: React.FC = () => {
             value={position}
             onChange={handlePositionChange}
             className="crossfader-slider w-full"
+            title={`Crossfader — blend between Deck 1 and Deck 2`}
             style={{
               appearance: 'none',
               WebkitAppearance: 'none',
@@ -66,66 +75,72 @@ export const MixerCrossfader: React.FC = () => {
           />
         </div>
 
-        <span className="text-text-secondary text-xs font-mono font-bold">B</span>
+        <span className="text-text-secondary text-xs font-mono font-bold" title="Deck 2">2</span>
       </div>
 
       {/* Curve selector */}
       <div className="flex gap-1">
-        {CURVES.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => handleCurveChange(key)}
-            className={`
-              px-2 py-0.5 text-[10px] font-mono rounded transition-colors
-              ${
-                curve === key
-                  ? 'bg-accent-primary text-text-inverse'
-                  : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
-              }
-            `}
-          >
-            {label}
-          </button>
-        ))}
+        {CURVES.map(({ key, label }) => {
+          const curveDescriptions: Record<CrossfaderCurve, string> = {
+            linear: 'Linear — equal crossfade, smooth blend',
+            cut: 'Cut — hard switch, no blending',
+            smooth: 'Smooth — constant-power crossfade',
+          };
+          return (
+            <button
+              key={key}
+              onClick={() => handleCurveChange(key)}
+              className={`
+                px-2 py-0.5 text-[10px] font-mono rounded transition-colors
+                ${
+                  curve === key
+                    ? 'bg-accent-primary text-text-inverse'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
+                }
+              `}
+              title={curveDescriptions[key]}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Slider styles */}
       <style>{`
         .crossfader-slider::-webkit-slider-runnable-track {
           height: 6px;
-          background: #2a2a2a;
+          background: var(--color-bg-tertiary);
           border-radius: 3px;
-          border: 1px solid #333;
+          border: 1px solid var(--color-border);
         }
         .crossfader-slider::-webkit-slider-thumb {
           -webkit-appearance: none;
           width: 32px;
           height: 18px;
-          background: linear-gradient(to bottom, #ccc, #999);
-          border: 1px solid #666;
+          background: var(--color-border-light);
+          border: 1px solid var(--color-border);
           border-radius: 3px;
           cursor: grab;
           margin-top: -7px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.5);
         }
         .crossfader-slider::-webkit-slider-thumb:active {
           cursor: grabbing;
-          background: linear-gradient(to bottom, #ddd, #aaa);
+          background: var(--color-text-muted);
         }
         .crossfader-slider::-moz-range-track {
           height: 6px;
-          background: #2a2a2a;
+          background: var(--color-bg-tertiary);
           border-radius: 3px;
-          border: 1px solid #333;
+          border: 1px solid var(--color-border);
         }
         .crossfader-slider::-moz-range-thumb {
           width: 32px;
           height: 18px;
-          background: linear-gradient(to bottom, #ccc, #999);
-          border: 1px solid #666;
+          background: var(--color-border-light);
+          border: 1px solid var(--color-border);
           border-radius: 3px;
           cursor: grab;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.5);
         }
       `}</style>
     </div>

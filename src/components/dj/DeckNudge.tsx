@@ -38,10 +38,9 @@ export const DeckNudge: React.FC<DeckNudgeProps> = ({ deckId }) => {
         onClick={(e) => handleNudge(-1, e)}
         className="
           flex items-center justify-center w-10 h-10 rounded-lg
-          bg-dark-bgTertiary text-text-secondary
-          shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]
-          hover:bg-dark-borderLight hover:text-text-primary
-          active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] active:translate-y-[1px]
+          bg-dark-bgTertiary text-text-secondary border border-dark-border
+          hover:bg-dark-bgHover hover:text-text-primary
+          active:translate-y-[1px]
           transition-all duration-100
         "
         title="Nudge slower (Shift = hard nudge)"
@@ -54,10 +53,9 @@ export const DeckNudge: React.FC<DeckNudgeProps> = ({ deckId }) => {
         onClick={(e) => handleNudge(1, e)}
         className="
           flex items-center justify-center w-10 h-10 rounded-lg
-          bg-dark-bgTertiary text-text-secondary
-          shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]
-          hover:bg-dark-borderLight hover:text-text-primary
-          active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] active:translate-y-[1px]
+          bg-dark-bgTertiary text-text-secondary border border-dark-border
+          hover:bg-dark-bgHover hover:text-text-primary
+          active:translate-y-[1px]
           transition-all duration-100
         "
         title="Nudge faster (Shift = hard nudge)"

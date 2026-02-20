@@ -408,6 +408,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
             }
           });
 
+          // When a new sample.url is provided (e.g. from preset), clear stale
+          // parameters.sampleUrl so the engine doesn't use the old URL instead
+          if (updates.sample && (updates.sample as Record<string, unknown>).url) {
+            const params = instrument.parameters as Record<string, unknown> | undefined;
+            if (params?.sampleUrl) {
+              delete params.sampleUrl;
+            }
+          }
+
           // Auto-initialize furnace config when synthType changes to a Furnace type
           // BUT skip this when loading a preset — the preset already provides
           // the correct furnace config with its unique c64/gb/etc. chip data.

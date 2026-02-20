@@ -28,8 +28,10 @@ export const MixerFilter: React.FC<MixerFilterProps> = ({ deckId }) => {
     return 'LPF';
   }, []);
 
+  const deckNum = deckId === 'A' ? '1' : '2';
+
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center" title={`Deck ${deckNum} Filter`}>
       <Knob
         value={filterPosition}
         min={-1}
@@ -41,6 +43,7 @@ export const MixerFilter: React.FC<MixerFilterProps> = ({ deckId }) => {
         bipolar
         defaultValue={0}
         formatValue={formatFilter}
+        title={`Deck ${deckNum} Filter — left: high-pass, center: off, right: low-pass`}
       />
     </div>
   );

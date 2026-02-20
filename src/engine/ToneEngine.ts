@@ -33,6 +33,7 @@ import { SpringReverbEffect } from './effects/SpringReverbEffect';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
 import { TumultEffect, type TumultOptions } from './effects/TumultEffect';
 import { TapeSimulatorEffect } from './effects/TapeSimulatorEffect';
+import { ToneArmEffect } from './effects/ToneArmEffect';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
 import { WAMEffectNode } from './wam/WAMEffectNode';
 import { SidechainCompressor } from './effects/SidechainCompressor';
@@ -126,9 +127,9 @@ export class ToneEngine {
   private masterEffectAnalysers: Map<string, { pre: AnalyserNode; post: AnalyserNode }> = new Map();
   private _isPlaying = false;
 
-  // Track which native chip engines have been routed to synthBus
-  // (prevents duplicate connections for shared singleton engines)
-  private routedNativeEngines: Set<string> = new Set();
+  // Track native engine routing destinations (engine key → gain node + connected destinations)
+  // Supports dynamic re-routing for DJ mode (deck-specific routing) vs tracker mode (synthBus)
+  private nativeEngineRouting: Map<string, { gain: GainNode; destinations: Set<AudioNode> }> = new Map();
 
   // Per-channel audio routing (volume, pan, mute/solo, metering)
   private channelOutputs: Map<number, {
@@ -219,6 +220,10 @@ export class ToneEngine {
   // Per-instrument analysers for visualization (keyed by instrumentId)
   // Lazy-created: only exists when visualization requests it
   private instrumentAnalysers: Map<number, InstrumentAnalyser> = new Map();
+
+  // Output overrides for DJ mode: routes instrument effect chain output
+  // to a deck's deckGain instead of masterInput/synthBus
+  private instrumentOutputOverrides: Map<number, Tone.ToneAudioNode> = new Map();
 
   // Track pending releaseAll gain-restore timeouts per instrument key
   // Prevents race condition where double-releaseAll captures gain=0 and restores to 0
@@ -350,36 +355,90 @@ export class ToneEngine {
    * Route a native chip engine's audio output to synthBus so it goes through the
    * master effects chain. Chip engines (FurnaceChipEngine, FurnaceDispatchEngine)
    * have their own native AudioWorklets whose output needs to feed into synthBus
-   * instead of going directly to destination. Only routes each engine once.
+   * instead of going directly to destination. Only routes each engine once (to synthBus
+   * by default). Use rerouteNativeEngine() to redirect to a different destination (e.g. DJ deck).
    */
   public routeNativeEngineOutput(instrument: Tone.ToneAudioNode | DevilboxSynth): void {
     const nativeSynthBus = getNativeAudioNode(this.synthBus as any);
     if (!nativeSynthBus) return;
 
+    let engineKey: string;
+    let engineGain: GainNode | null = null;
+
     if (instrument instanceof FurnaceSynth) {
-      const engineKey = 'FurnaceChipEngine';
-      if (!this.routedNativeEngines.has(engineKey)) {
-        const chipEngine = FurnaceChipEngine.getInstance();
-        if (chipEngine.isInitialized()) {
-          chipEngine.routeOutputTo(nativeSynthBus);
-          this.routedNativeEngines.add(engineKey);
-          console.log('[ToneEngine] Routed FurnaceChipEngine output → synthBus');
-        } else {
-          // Engine not ready yet — route will happen when synth initializes and triggers a re-check
-          // FurnaceSynth.initEngine() is async, so we retry on next getInstrument() call
-        }
-      }
+      engineKey = 'FurnaceChipEngine';
+      const chipEngine = FurnaceChipEngine.getInstance();
+      if (!chipEngine.isInitialized()) return;
+      engineGain = chipEngine.getNativeOutput();
     } else if (instrument instanceof FurnaceDispatchSynth) {
-      const engineKey = 'FurnaceDispatchEngine';
-      if (!this.routedNativeEngines.has(engineKey)) {
-        const dispatchEngine = FurnaceDispatchEngine.getInstance();
-        if (dispatchEngine.isInitialized) {
-          dispatchEngine.routeOutputTo(nativeSynthBus);
-          this.routedNativeEngines.add(engineKey);
-          console.log('[ToneEngine] Routed FurnaceDispatchEngine output → synthBus');
-        }
-      }
+      engineKey = 'FurnaceDispatchEngine';
+      const dispatchEngine = FurnaceDispatchEngine.getInstance();
+      if (!dispatchEngine.isInitialized) return;
+      engineGain = dispatchEngine.getOrCreateSharedGain();
+    } else {
+      return;
     }
+
+    if (!engineGain) return;
+
+    let routing = this.nativeEngineRouting.get(engineKey);
+    if (!routing) {
+      routing = { gain: engineGain, destinations: new Set() };
+      this.nativeEngineRouting.set(engineKey, routing);
+    }
+
+    // Default: connect to synthBus if not connected to anything yet
+    if (routing.destinations.size === 0) {
+      engineGain.connect(nativeSynthBus);
+      routing.destinations.add(nativeSynthBus);
+      console.log(`[ToneEngine] Routed ${engineKey} output → synthBus`);
+    }
+  }
+
+  /**
+   * Redirect a native engine's audio output to a new destination (e.g. a DJ deck's deckGain).
+   * Disconnects from all current destinations and connects to the new one.
+   */
+  public rerouteNativeEngine(engineKey: string, newDestination: AudioNode): void {
+    const routing = this.nativeEngineRouting.get(engineKey);
+    if (!routing?.gain) return;
+
+    // Disconnect from all current destinations
+    for (const dest of routing.destinations) {
+      try { routing.gain.disconnect(dest); } catch { /* not connected */ }
+    }
+    routing.destinations.clear();
+
+    // Connect to new destination
+    routing.gain.connect(newDestination);
+    routing.destinations.add(newDestination);
+    console.log(`[ToneEngine] Rerouted ${engineKey} output → DJ deck`);
+  }
+
+  /**
+   * Restore a native engine's audio output back to synthBus (default routing).
+   * Called when a DJ deck unloads a Furnace song or disposes.
+   */
+  public restoreNativeEngineRouting(engineKey: string): void {
+    const routing = this.nativeEngineRouting.get(engineKey);
+    if (!routing?.gain) return;
+
+    const nativeSynthBus = getNativeAudioNode(this.synthBus as any);
+    if (!nativeSynthBus) return;
+
+    // Already connected to synthBus only? Nothing to do.
+    if (routing.destinations.has(nativeSynthBus) && routing.destinations.size === 1) return;
+
+    // Disconnect from all current destinations
+    for (const dest of routing.destinations) {
+      try { routing.gain.disconnect(dest); } catch { /* not connected */ }
+    }
+    routing.destinations.clear();
+
+    // Reconnect to synthBus
+    routing.gain.connect(nativeSynthBus);
+    routing.destinations.add(nativeSynthBus);
+    console.log(`[ToneEngine] Restored ${engineKey} output → synthBus`);
   }
 
   /**
@@ -995,6 +1054,12 @@ export class ToneEngine {
     return `${instrumentId}-${channelIndex ?? -1}`;
   }
 
+  private getInstrumentOutputDestination(instrumentId: number, isNativeSynth: boolean): Tone.ToneAudioNode {
+    const override = this.instrumentOutputOverrides.get(instrumentId);
+    if (override) return override;
+    return isNativeSynth ? this.synthBus : this.masterInput;
+  }
+
   // Track the last trigger time to ensure strictly increasing times
   private lastTriggerTime: number = 0;
 
@@ -1316,8 +1381,9 @@ export class ToneEngine {
 
       case 'Sampler': {
         // Sample-based instrument - loads a sample URL and pitches it
-        // Check both parameters.sampleUrl (legacy) and sample.url (new standard)
-        let sampleUrl = (config.parameters?.sampleUrl || config.sample?.url) as string | undefined;
+        // sample.url (new standard) takes priority over parameters.sampleUrl (legacy)
+        // to match SampleEditor's display priority and ensure preset changes take effect
+        let sampleUrl = (config.sample?.url || config.parameters?.sampleUrl) as string | undefined;
         // CRITICAL FIX: Use the actual base note from the sample config, not hardcoded C4
         const baseNote = config.sample?.baseNote || 'C4';
         const hasLoop = config.sample?.loop === true;
@@ -1766,27 +1832,25 @@ export class ToneEngine {
     analyser = new InstrumentAnalyser();
 
     // Determine if this instrument is a DevilboxSynth to pick the right output bus
-    let analyserDest: Tone.ToneAudioNode = this.masterInput;
+    let isNative = false;
     for (const [key, inst] of this.instruments) {
       if (key.startsWith(`${instrumentId}-`)) {
-        if (isDevilboxSynth(inst)) analyserDest = this.synthBus;
+        if (isDevilboxSynth(inst)) isNative = true;
         break;
       }
     }
-    analyser.output.connect(analyserDest);
+    analyser.output.connect(this.getInstrumentOutputDestination(instrumentId, isNative));
 
     // Redirect ALL existing effect chains for this instrument to the analyser
     let foundChains = 0;
     this.instrumentEffectChains.forEach((chain, key) => {
       const [idPart] = String(key).split('-');
       if (idPart === String(instrumentId)) {
-        // Disconnect from both possible destinations, then connect to analyser
-        try {
-          chain.output.disconnect(this.masterInput);
-        } catch { /* May not be connected */ }
-        try {
-          chain.output.disconnect(this.synthBus);
-        } catch { /* May not be connected */ }
+        // Disconnect from all possible destinations, then connect to analyser
+        try { chain.output.disconnect(this.masterInput); } catch { /* May not be connected */ }
+        try { chain.output.disconnect(this.synthBus); } catch { /* May not be connected */ }
+        const override = this.instrumentOutputOverrides.get(instrumentId);
+        if (override) try { chain.output.disconnect(override); } catch { /* May not be connected */ }
         chain.output.connect(analyser.input);
         foundChains++;
       }
@@ -1851,10 +1915,9 @@ export class ToneEngine {
         // Reconnect effect chain output back to the correct bus
         // (it was disconnected from synthBus/masterInput when the analyser was created)
         try { effectChain.output.disconnect(analyser.input); } catch { /* not connected */ }
-        const dest = isNative ? this.synthBus : this.masterInput;
-        effectChain.output.connect(dest);
+        effectChain.output.connect(this.getInstrumentOutputDestination(instrumentId, isNative));
       } else {
-        connectTo(isNative ? this.synthBus : this.masterInput);
+        connectTo(this.getInstrumentOutputDestination(instrumentId, isNative));
       }
     }
 
@@ -2208,7 +2271,7 @@ export class ToneEngine {
                   url: buffer,
                   volume: Tone.gainToDb(velocity) + (config.volume || -12),
                 });
-                slicePlayer.connect(this.masterInput);
+                slicePlayer.connect(this.getInstrumentOutputDestination(instrumentId, false));
 
                 // Calculate pitch adjustment for the note (relative to base note)
                 const baseFreq = Tone.Frequency(baseNote).toFrequency();
@@ -2792,7 +2855,19 @@ export class ToneEngine {
             // Apply global playback rate multiplier for pitch shifting
             (voiceNode as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
           }
-          const offset = sampleOffset ? sampleOffset / (voiceNode.buffer.sampleRate || 44100) : 0;
+          // sampleOffset is in frames at the ORIGINAL sample rate (8363 Hz for MOD/XM).
+          // The decoded buffer runs at the AudioContext rate (44100 Hz) — do NOT use that.
+          // pt2-clone bounds check: if sampleOffset >= total sample length, play from beginning.
+          const origRate = config.sample?.sampleRate || 8363;
+          const bufferDuration = voiceNode.buffer?.duration ?? 0;
+          let offset = 0;
+          if (sampleOffset && sampleOffset > 0 && bufferDuration > 0) {
+            const bufferFrames = bufferDuration * origRate;
+            if (sampleOffset < bufferFrames) {
+              offset = Math.min(sampleOffset / origRate, bufferDuration - 0.001);
+            }
+            // else: offset >= sample length → play from beginning (pt2-clone behavior)
+          }
           voiceNode.start(safeTime, offset);
         } else if ((voiceNode as any).triggerAttack) {
           // Safety: ensure DevilboxSynth output gain isn't stuck at 0
@@ -2962,10 +3037,19 @@ export class ToneEngine {
             (player as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
           }
 
-          // Apply sample offset (9xx command) if present
-          const startOffset = sampleOffset && sampleOffset > 0
-            ? sampleOffset / (player.buffer?.sampleRate || Tone.getContext().sampleRate)
-            : 0;
+          // Apply sample offset (9xx command) if present.
+          // sampleOffset is in frames at the ORIGINAL sample rate (8363 Hz for MOD/XM).
+          // The decoded buffer runs at the AudioContext rate — do NOT use player.buffer.sampleRate.
+          // pt2-clone bounds check: if sampleOffset >= total sample length, play from beginning.
+          const origSampleRate = config.sample?.sampleRate || 8363;
+          let startOffset = 0;
+          if (sampleOffset && sampleOffset > 0 && player.buffer) {
+            const bufferFrames = player.buffer.duration * origSampleRate;
+            if (sampleOffset < bufferFrames) {
+              startOffset = Math.min(sampleOffset / origSampleRate, player.buffer.duration - 0.001);
+            }
+            // else: offset >= sample length → play from beginning (pt2-clone behavior)
+          }
 
           // For looping samples: DON'T schedule a stop - let them loop until new note or stop button
           // For non-looping samples: Stop after duration
@@ -3018,7 +3102,7 @@ export class ToneEngine {
                   url: buffer,
                   volume: Tone.gainToDb(velocity) + (config.volume || -12),
                 });
-                slicePlayer.connect(this.masterInput);
+                slicePlayer.connect(this.getInstrumentOutputDestination(instrumentId, false));
 
                 // Calculate pitch adjustment for the note (relative to base note)
                 const baseFreq = Tone.Frequency(baseNote).toFrequency();
@@ -3054,9 +3138,10 @@ export class ToneEngine {
                            samplerInternal._buffers?._buffers?.[baseNote];
 
             if (buffer && buffer.duration) {
-              const sampleRate = buffer.sampleRate || Tone.getContext().sampleRate;
-              // Sample offset in MOD format is in 256-byte units, convert to seconds
-              const timeOffset = (sampleOffset * 256) / sampleRate;
+              // sampleOffset is in frames at the ORIGINAL sample rate (8363 Hz for MOD/XM).
+              // buffer.sampleRate is the decoded AudioContext rate — do NOT use it here.
+              const origRate = config.sample?.sampleRate || 8363;
+              const timeOffset = sampleOffset / origRate;
 
               // Clamp offset to buffer duration
               const clampedOffset = Math.min(timeOffset, buffer.duration - 0.001);
@@ -3067,7 +3152,7 @@ export class ToneEngine {
                   url: buffer,
                   volume: Tone.gainToDb(velocity) + (config.volume || -12),
                 });
-                offsetPlayer.connect(this.masterInput);
+                offsetPlayer.connect(this.getInstrumentOutputDestination(instrumentId, false));
 
                 // Calculate pitch adjustment for the note (relative to base note)
                 const baseFreq = Tone.Frequency(baseNote).toFrequency();
@@ -3307,10 +3392,10 @@ export class ToneEngine {
       this.releaseRestoreTimeouts.set(engineKey, timeout);
     };
 
-    if (this.routedNativeEngines.has('FurnaceChipEngine')) {
+    if (this.nativeEngineRouting.has('FurnaceChipEngine')) {
       muteAndRestore('__FurnaceChipEngine__', () => FurnaceChipEngine.getInstance().getNativeOutput());
     }
-    if (this.routedNativeEngines.has('FurnaceDispatchEngine')) {
+    if (this.nativeEngineRouting.has('FurnaceDispatchEngine')) {
       muteAndRestore('__FurnaceDispatchEngine__', () => FurnaceDispatchEngine.getInstance().getOrCreateSharedGain());
     }
   }
@@ -3377,6 +3462,7 @@ export class ToneEngine {
     // firing on new instruments and restoring wrong volume values
     this.releaseRestoreTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.releaseRestoreTimeouts.clear();
+    this.instrumentOutputOverrides.clear();
 
     const allKeys = Array.from(this.instruments.keys());
     allKeys.forEach((key) => {
@@ -4701,7 +4787,7 @@ export class ToneEngine {
       if (activeAnalyser) {
         output.connect(activeAnalyser.input);
       } else {
-        output.connect(isNativeSynth ? this.synthBus : this.masterInput);
+        output.connect(this.getInstrumentOutputDestination(instrumentId, isNativeSynth));
       }
 
       this.instrumentEffectChains.set(key, { effects: [], output });
@@ -4743,7 +4829,7 @@ export class ToneEngine {
     if (activeAnalyser) {
       output.connect(activeAnalyser.input);
     } else {
-      output.connect(isNativeSynth ? this.synthBus : this.masterInput);
+      output.connect(this.getInstrumentOutputDestination(instrumentId, isNativeSynth));
     }
 
     this.instrumentEffectChains.set(key, { effects: effectNodes as Tone.ToneAudioNode[], output, bridge });
@@ -4779,6 +4865,20 @@ export class ToneEngine {
 
     // Build new effect chain (await for neural effects)
     await this.buildInstrumentEffectChain(key, effects, instrument);
+  }
+
+  /**
+   * Override the output destination for an instrument's effect chain and voice routing.
+   * Used by DJ mode to route audio through deck gain → EQ → filter → crossfader.
+   * Must be called BEFORE the instrument is created/preloaded, as existing
+   * effect chains are not re-routed.
+   */
+  public setInstrumentOutputOverride(instrumentId: number, destination: Tone.ToneAudioNode): void {
+    this.instrumentOutputOverrides.set(instrumentId, destination);
+  }
+
+  public removeInstrumentOutputOverride(instrumentId: number): void {
+    this.instrumentOutputOverrides.delete(instrumentId);
   }
 
   /**
@@ -5496,6 +5596,19 @@ export class ToneEngine {
         }
         break;
 
+      case 'ToneArm':
+        if (node instanceof ToneArmEffect) {
+          if ('wow'     in changed) node.setWow    (Number(changed.wow)     / 100);
+          if ('coil'    in changed) node.setCoil   (Number(changed.coil)    / 100);
+          if ('flutter' in changed) node.setFlutter(Number(changed.flutter) / 100);
+          if ('riaa'    in changed) node.setRiaa   (Number(changed.riaa)    / 100);
+          if ('stylus'  in changed) node.setStylus (Number(changed.stylus)  / 100);
+          if ('hiss'    in changed) node.setHiss   (Number(changed.hiss)    / 100);
+          if ('pops'    in changed) node.setPops   (Number(changed.pops)    / 100);
+          if ('rpm'     in changed) node.setRpm    (Number(changed.rpm)); // raw value, not /100
+        }
+        break;
+
       case 'AutoWah':
         if (node instanceof Tone.AutoWah) {
           if ('baseFrequency' in changed) node.baseFrequency = changed.baseFrequency as number;
@@ -5722,7 +5835,13 @@ export class ToneEngine {
       Tone.connect(filter, panner);
     }
     
-    panner.connect(channelOutput.input);
+    // In DJ mode, route voices through deck audio chain instead of per-channel masterInput
+    const voiceOverride = this.instrumentOutputOverrides.get(config.id);
+    if (voiceOverride) {
+      panner.connect(voiceOverride);
+    } else {
+      panner.connect(channelOutput.input);
+    }
 
     const envs = config.metadata?.envelopes?.[config.id];
     const volEnv = new TrackerEnvelope();

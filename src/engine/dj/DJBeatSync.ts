@@ -13,10 +13,13 @@ export class DJBeatSync {
   /**
    * Instantly match target deck's BPM to source deck.
    * Calculates the required pitch offset in semitones.
+   * Accounts for source deck's tempo multiplier (pitch slider position).
    */
   static syncBPM(source: DeckEngine, target: DeckEngine): number {
-    const sourceBPM = source.replayer.getBPM();
-    const targetBaseBPM = target.replayer.getSong()?.initialBPM ?? 125;
+    // Source effective BPM = base BPM * tempo multiplier (includes its pitch offset)
+    const sourceBPM = source.replayer.getBPM() * source.replayer.getTempoMultiplier();
+    // Target base BPM = raw BPM without multiplier — we're computing what multiplier to apply
+    const targetBaseBPM = target.replayer.getBPM();
 
     if (targetBaseBPM <= 0 || sourceBPM <= 0) return 0;
 
@@ -62,10 +65,13 @@ export class DJBeatSync {
   }
 
   /**
-   * Calculate the BPM difference between two decks.
+   * Calculate the effective BPM difference between two decks.
+   * Accounts for tempo multipliers (pitch slider positions).
    */
   static getBPMDifference(deckA: DeckEngine, deckB: DeckEngine): number {
-    return deckA.replayer.getBPM() - deckB.replayer.getBPM();
+    const aBPM = deckA.replayer.getBPM() * deckA.replayer.getTempoMultiplier();
+    const bBPM = deckB.replayer.getBPM() * deckB.replayer.getTempoMultiplier();
+    return aBPM - bBPM;
   }
 
   /**

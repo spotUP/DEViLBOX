@@ -37,7 +37,7 @@ export const MixerCueSection: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-1" title="Headphone cue section">
       {/* Cue volume knob */}
       <Knob
         value={cueVolume}
@@ -48,6 +48,7 @@ export const MixerCueSection: React.FC = () => {
         size="sm"
         color="#ffcc00"
         defaultValue={1}
+        title="Cue volume — headphone pre-fader listen level"
       />
 
       {/* PFL buttons */}
@@ -55,29 +56,31 @@ export const MixerCueSection: React.FC = () => {
         <Headphones size={10} className="text-text-muted flex-shrink-0" />
         <button
           onClick={() => handlePFLToggle('A')}
+          title={`PFL Deck 1 — ${pflA ? 'disable' : 'enable'} headphone monitoring`}
           className={`
             px-1.5 py-0.5 text-[9px] font-mono font-bold rounded transition-colors
             ${
               pflA
-                ? 'bg-yellow-500 text-black shadow-[0_0_8px_rgba(234,179,8,0.5)]'
+                ? 'bg-accent-warning text-text-inverse'
                 : 'bg-dark-bgTertiary text-text-muted border border-dark-borderLight hover:text-text-secondary'
             }
           `}
         >
-          A
+          1
         </button>
         <button
           onClick={() => handlePFLToggle('B')}
+          title={`PFL Deck 2 — ${pflB ? 'disable' : 'enable'} headphone monitoring`}
           className={`
             px-1.5 py-0.5 text-[9px] font-mono font-bold rounded transition-colors
             ${
               pflB
-                ? 'bg-yellow-500 text-black shadow-[0_0_8px_rgba(234,179,8,0.5)]'
+                ? 'bg-accent-warning text-text-inverse'
                 : 'bg-dark-bgTertiary text-text-muted border border-dark-borderLight hover:text-text-secondary'
             }
           `}
         >
-          B
+          2
         </button>
       </div>
     </div>

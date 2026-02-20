@@ -9,6 +9,7 @@
 import * as Tone from 'tone';
 import { TrackerReplayer, type TrackerSong } from '@/engine/TrackerReplayer';
 import { getToneEngine } from '@/engine/ToneEngine';
+import { getNativeAudioNode } from '@/utils/audio-context';
 
 export type DeckId = 'A' | 'B';
 
@@ -30,6 +31,18 @@ export class DeckEngine {
   // Meter for VU display
   readonly meter: Tone.Meter;
 
+  // Waveform analyser for scope display
+  readonly waveformAnalyser: Tone.Analyser;
+
+  // FFT analyser for visualizer display
+  readonly fftAnalyser: Tone.FFT;
+
+  // Instrument IDs from the currently loaded song (for output override cleanup)
+  private currentSongInstrumentIds: number[] = [];
+
+  // Track which Furnace engine keys this deck has rerouted (for cleanup)
+  private routedFurnaceEngines: Set<string> = new Set();
+
   // EQ kill state (stored separately from gain values)
   private eqKillState = { low: false, mid: false, high: false };
   private eqValues = { low: 0, mid: 0, high: 0 }; // dB values before kill
@@ -47,13 +60,17 @@ export class DeckEngine {
     this.filter = new Tone.Filter({ type: 'lowpass', frequency: 20000, Q: 1 });
     this.channelGain = new Tone.Gain(1);
     this.meter = new Tone.Meter({ smoothing: 0.8 });
+    this.waveformAnalyser = new Tone.Analyser('waveform', 256);
+    this.fftAnalyser = new Tone.FFT(1024);
 
-    // Wire: deckGain → EQ3 → filter → channelGain → [output + meter]
+    // Wire: deckGain → EQ3 → filter → channelGain → [output + meter + analyser]
     this.deckGain.connect(this.eq3);
     this.eq3.connect(this.filter);
     this.filter.connect(this.channelGain);
     this.channelGain.connect(options.outputNode);
     this.channelGain.connect(this.meter);
+    this.channelGain.connect(this.waveformAnalyser);
+    this.channelGain.connect(this.fftAnalyser);
 
     // Create TrackerReplayer connected to our deckGain input
     this.replayer = new TrackerReplayer(this.deckGain);
@@ -64,10 +81,37 @@ export class DeckEngine {
   // ==========================================================================
 
   async loadSong(song: TrackerSong): Promise<void> {
-    this.replayer.loadSong(song);
-    // Ensure WASM synths are ready for this song's instruments
+    this.unregisterOutputOverrides();
+    this.restoreFurnaceRouting();
+
     const engine = getToneEngine();
+
+    // Register output overrides BEFORE preloadInstruments so effect chains
+    // route through the deck's audio chain on first build
+    this.currentSongInstrumentIds = song.instruments.map(inst => inst.id);
+    for (const id of this.currentSongInstrumentIds) {
+      engine.setInstrumentOutputOverride(id, this.deckGain);
+    }
+
+    this.replayer.loadSong(song);
+    await engine.preloadInstruments(song.instruments);
     await engine.ensureWASMSynthsReady(song.instruments);
+
+    // Reroute Furnace singleton engine output to this deck's deckGain
+    // so Furnace audio goes through the deck's EQ, filter, and crossfader
+    const nativeDeckGain = getNativeAudioNode(this.deckGain as any);
+    if (nativeDeckGain) {
+      for (const inst of song.instruments) {
+        const synthType = inst.synthType || '';
+        if (synthType.startsWith('Furnace')) {
+          engine.rerouteNativeEngine('FurnaceChipEngine', nativeDeckGain);
+          engine.rerouteNativeEngine('FurnaceDispatchEngine', nativeDeckGain);
+          this.routedFurnaceEngines.add('FurnaceChipEngine');
+          this.routedFurnaceEngines.add('FurnaceDispatchEngine');
+          break; // Only need to detect once
+        }
+      }
+    }
   }
 
   async play(): Promise<void> {
@@ -102,15 +146,13 @@ export class DeckEngine {
   // PITCH / NUDGE
   // ==========================================================================
 
-  /** Set pitch offset in semitones. Updates playback rate and detune. */
+  /** Set pitch offset in semitones. Updates per-deck tempo and sample playback rates. */
   setPitch(semitones: number): void {
-    const playbackRate = Math.pow(2, semitones / 12);
-    const engine = getToneEngine();
-    // For DJ decks, we set the playback rate per-deck via the replayer
-    // The replayer's updateAllPlaybackRates will handle currently playing samples
-    engine.setGlobalPlaybackRate(playbackRate);
-    engine.setGlobalDetune(semitones * 100);
-    this.replayer.updateAllPlaybackRates();
+    const multiplier = Math.pow(2, semitones / 12);
+    // Per-deck isolation: only touches this replayer's state, not ToneEngine globals
+    this.replayer.setTempoMultiplier(multiplier);   // Changes scheduler speed
+    this.replayer.setPitchMultiplier(multiplier);    // Changes sample playback rates
+    this.replayer.setDetuneCents(semitones * 100);   // Changes synth pitch
   }
 
   /** Temporary BPM bump for beat matching */
@@ -228,8 +270,42 @@ export class DeckEngine {
   // CLEANUP
   // ==========================================================================
 
+  /** Get waveform data (256 samples, -1 to +1) */
+  getWaveform(): Float32Array {
+    return this.waveformAnalyser.getValue() as Float32Array;
+  }
+
+  /** Get FFT data (1024 bins, dB values -100 to 0) */
+  getFFT(): Float32Array {
+    return this.fftAnalyser.getValue() as Float32Array;
+  }
+
+  private unregisterOutputOverrides(): void {
+    if (this.currentSongInstrumentIds.length > 0) {
+      const engine = getToneEngine();
+      for (const id of this.currentSongInstrumentIds) {
+        engine.removeInstrumentOutputOverride(id);
+      }
+      this.currentSongInstrumentIds = [];
+    }
+  }
+
+  private restoreFurnaceRouting(): void {
+    if (this.routedFurnaceEngines.size > 0) {
+      const engine = getToneEngine();
+      for (const key of this.routedFurnaceEngines) {
+        engine.restoreNativeEngineRouting(key);
+      }
+      this.routedFurnaceEngines.clear();
+    }
+  }
+
   dispose(): void {
+    this.unregisterOutputOverrides();
+    this.restoreFurnaceRouting();
     this.replayer.dispose();
+    this.fftAnalyser.dispose();
+    this.waveformAnalyser.dispose();
     this.meter.dispose();
     this.channelGain.dispose();
     this.filter.dispose();

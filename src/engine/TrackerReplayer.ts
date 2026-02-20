@@ -301,12 +301,24 @@ export class TrackerReplayer {
   private slipSongPos = 0;            // Ghost position (advances while looping)
   private slipPattPos = 0;
 
+  // Per-deck pitch isolation (DJ mode only)
+  private isDJDeck = false;           // True when created with outputNode
+  private tempoMultiplier = 1.0;      // Scheduler BPM multiplier (from pitch slider)
+  private pitchMultiplier = 1.0;      // Sample playback rate multiplier
+  private deckDetuneCents = 0;        // Per-deck synth detune
+
+  // Per-deck channel mute mask (DJ mode only)
+  // Bit N = 1 means channel N is ENABLED, 0 means MUTED.
+  // Kept separate from ToneEngine's global mute states so each deck is independent.
+  private channelMuteMask = 0xFFFF;   // All 16 channels enabled by default
+
   constructor(outputNode?: Tone.ToneAudioNode) {
     // Connect to provided output node (for DJ decks) or default to
     // ToneEngine's masterInput (existing behavior for tracker view).
     this.masterGain = new Tone.Gain(1);
     if (outputNode) {
       this.masterGain.connect(outputNode);
+      this.isDJDeck = true;
     } else {
       const engine = getToneEngine();
       this.masterGain.connect(engine.masterInput);
@@ -412,11 +424,61 @@ export class TrackerReplayer {
     };
   }
 
+  // ==========================================================================
+  // PER-DECK PITCH/TEMPO (DJ mode isolation)
+  // ==========================================================================
+
+  /** Set the tempo multiplier (changes scheduler speed without touching ToneEngine globals) */
+  setTempoMultiplier(m: number): void {
+    this.tempoMultiplier = m;
+  }
+
+  /** Get the current tempo multiplier */
+  getTempoMultiplier(): number {
+    return this.tempoMultiplier;
+  }
+
+  /** Set the sample playback rate multiplier + update all currently playing samples */
+  setPitchMultiplier(m: number): void {
+    this.pitchMultiplier = m;
+    this.updateAllPlaybackRates();
+  }
+
+  /** Set per-deck synth detune in cents */
+  setDetuneCents(cents: number): void {
+    this.deckDetuneCents = cents;
+  }
+
+  /** Get per-deck detune cents */
+  getDetuneCents(): number {
+    return this.deckDetuneCents;
+  }
+
+  /**
+   * Set per-deck channel mute mask (DJ mode only).
+   * Bit N = 1 → channel N is audible; bit N = 0 → channel N is muted.
+   * Kept isolated per-replayer so Deck A and Deck B don't interfere.
+   */
+  setChannelMuteMask(mask: number): void {
+    this.channelMuteMask = mask;
+  }
+
+  /** Get effective playback rate for sample pitch (per-deck in DJ mode, global otherwise) */
+  getEffectivePlaybackRate(): number {
+    if (this.isDJDeck) {
+      return this.pitchMultiplier;
+    }
+    const engine = getToneEngine();
+    return engine.getGlobalPlaybackRate();
+  }
+
   /** Get elapsed time in milliseconds based on rows processed */
   getElapsedMs(): number {
     if (!this.song) return 0;
     // Approximate: each row takes (speed * 2.5 / BPM) seconds
-    const tickDuration = 2.5 / this.bpm;
+    // In DJ mode, tempo multiplier affects tick duration
+    const effectiveBPM = this.bpm * this.tempoMultiplier;
+    const tickDuration = 2.5 / effectiveBPM;
     return this.totalRowsProcessed * this.speed * tickDuration * 1000;
   }
 
@@ -684,7 +746,8 @@ export class TrackerReplayer {
         // If BPM changed during processTick (Fxx effect), the new interval
         // takes effect immediately for the next tick — no reset needed.
         // DJ nudge: apply temporary BPM offset for beat matching
-        const effectiveBPM = this.bpm + this.nudgeOffset;
+        // Tempo multiplier: per-deck pitch slider scales BPM (DJ mode)
+        const effectiveBPM = (this.bpm + this.nudgeOffset) * this.tempoMultiplier;
         const tickInterval = 2.5 / effectiveBPM;
         this.nextScheduleTime += tickInterval;
       }
@@ -1631,27 +1694,33 @@ export class TrackerReplayer {
     // Apply the new pitch shift
     const playbackRate = Math.pow(2, this.globalPitchCurrent / 12);
 
-    // Update global playback rate for new sample notes
-    const engine = getToneEngine();
-    engine.setGlobalPlaybackRate(playbackRate);
+    if (this.isDJDeck) {
+      // DJ mode: use per-replayer state only — don't touch ToneEngine globals
+      // (The DJ pitch slider is authoritative; Wxx just adjusts sample rates)
+      this.updateAllPlaybackRates();
+    } else {
+      // Normal tracker mode: write to ToneEngine globals
+      const engine = getToneEngine();
+      engine.setGlobalPlaybackRate(playbackRate);
 
-    // Update all currently playing samples
-    this.updateAllPlaybackRates();
+      // Update all currently playing samples
+      this.updateAllPlaybackRates();
 
-    // Update all currently playing synths (detune in cents = semitones * 100)
-    engine.setGlobalDetune(this.globalPitchCurrent * 100);
+      // Update all currently playing synths (detune in cents = semitones * 100)
+      engine.setGlobalDetune(this.globalPitchCurrent * 100);
 
-    // Update BPM to reflect pitch shift
-    const effectiveBPM = Math.round(this.bpm * playbackRate * 100) / 100;
-    useTransportStore.getState().setBPM(effectiveBPM);
-    Tone.getTransport().bpm.value = effectiveBPM;
+      // Update BPM to reflect pitch shift
+      const effectiveBPM = Math.round(this.bpm * playbackRate * 100) / 100;
+      useTransportStore.getState().setBPM(effectiveBPM);
+      Tone.getTransport().bpm.value = effectiveBPM;
 
-    // Update global pitch in store (makes DJ slider move to reflect W command)
-    useTransportStore.getState().setGlobalPitch(this.globalPitchCurrent);
+      // Update global pitch in store (makes DJ slider move to reflect W command)
+      useTransportStore.getState().setGlobalPitch(this.globalPitchCurrent);
 
-    // Update PatternScheduler to stay in sync
-    const scheduler = getPatternScheduler();
-    scheduler.setGlobalPitchOffset(this.globalPitchCurrent);
+      // Update PatternScheduler to stay in sync
+      const scheduler = getPatternScheduler();
+      scheduler.setGlobalPitchOffset(this.globalPitchCurrent);
+    }
   }
 
   /**
@@ -1837,12 +1906,19 @@ export class TrackerReplayer {
   // ==========================================================================
 
   private triggerNote(ch: ChannelState, time: number, offset: number, channelIndex?: number, accent?: boolean, slideActive?: boolean, currentRowSlide?: boolean, hammer?: boolean): void {
-    // Skip note trigger if channel is muted
+    // Skip note trigger if channel is muted.
     // slideActive = from PREVIOUS row's slide flag, determines pitch glide behavior
     // currentRowSlide = CURRENT row's slide flag, determines gate timing (sustain into next note)
     if (channelIndex !== undefined) {
-      const engine = getToneEngine();
-      if (engine.isChannelMuted(channelIndex)) return;
+      if (this.isDJDeck) {
+        // DJ decks use a per-replayer bitmask so each deck is independent.
+        // Bit N = 1 → channel N audible; bit N = 0 → muted.
+        if ((this.channelMuteMask & (1 << channelIndex)) === 0) return;
+      } else {
+        // Tracker view uses ToneEngine's global mute state.
+        const engine = getToneEngine();
+        if (engine.isChannelMuted(channelIndex)) return;
+      }
     }
 
     const safeTime = time ?? Tone.now();
@@ -2029,16 +2105,25 @@ export class TrackerReplayer {
       player.loop = false;
     }
 
-    // Apply global playback rate multiplier for pitch shifting (DJ slider, etc.)
-    const globalRate = engine.getGlobalPlaybackRate();
-    player.playbackRate = playbackRate * globalRate;
+    // Apply playback rate multiplier for pitch shifting (DJ slider, etc.)
+    // In DJ mode, use per-deck multiplier; otherwise use ToneEngine global
+    const pitchRate = this.getEffectivePlaybackRate();
+    player.playbackRate = playbackRate * pitchRate;
 
     ch.player = player; // Keep reference for updatePeriod compatibility
 
     // Start playback - buffer is already loaded, player already connected
     try {
-      const startOffset = offset > 0 ? offset / originalSampleRate : 0;
-      player.start(safeTime, Math.min(startOffset, duration - 0.0001));
+      // pt2-clone bounds check: if offset >= total sample length, play from beginning.
+      let startOffset = 0;
+      if (offset > 0) {
+        const durationFrames = duration * originalSampleRate;
+        if (offset < durationFrames) {
+          startOffset = Math.min(offset / originalSampleRate, duration - 0.0001);
+        }
+        // else: offset >= sample length → play from beginning (pt2-clone behavior)
+      }
+      player.start(safeTime, startOffset);
     } catch (e) {
       console.error('[TrackerReplayer] Playback start failed:', e);
     }
@@ -2074,10 +2159,10 @@ export class TrackerReplayer {
 
     const sampleRate = ch.instrument?.sample?.sampleRate || 8363;
     const frequency = AMIGA_PAL_FREQUENCY / period;
-    // Apply global playback rate multiplier for pitch shifting (DJ slider, etc.)
-    const engine = getToneEngine();
-    const globalRate = engine.getGlobalPlaybackRate();
-    ch.player.playbackRate = (frequency / sampleRate) * globalRate;
+    // Apply playback rate multiplier for pitch shifting (DJ slider, etc.)
+    // In DJ mode, use per-deck multiplier; otherwise use ToneEngine global
+    const rate = this.getEffectivePlaybackRate();
+    ch.player.playbackRate = (frequency / sampleRate) * rate;
   }
 
   /**
@@ -2085,14 +2170,14 @@ export class TrackerReplayer {
    * Called by DJ pitch slider to apply pitch shift to already-playing samples
    */
   public updateAllPlaybackRates(): void {
-    const engine = getToneEngine();
-    const globalRate = engine.getGlobalPlaybackRate();
+    // In DJ mode, use per-deck multiplier; otherwise use ToneEngine global
+    const rate = this.getEffectivePlaybackRate();
 
     for (const ch of this.channels) {
       if (ch.player && ch.period > 0) {
         const sampleRate = ch.instrument?.sample?.sampleRate || 8363;
         const frequency = AMIGA_PAL_FREQUENCY / ch.period;
-        ch.player.playbackRate = (frequency / sampleRate) * globalRate;
+        ch.player.playbackRate = (frequency / sampleRate) * rate;
       }
     }
   }

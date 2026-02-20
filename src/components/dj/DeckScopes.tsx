@@ -1,130 +1,196 @@
 /**
- * DeckScopes - Per-channel waveform oscilloscope display
+ * DeckScopes - Per-channel waveform oscilloscope display + mute toggles
  *
- * 4 small oscilloscope traces in a 2x2 grid with green phosphor color.
- * Currently renders placeholder static sine wave shapes using SVG paths.
- * Will be connected to actual audio analysis nodes in a later phase.
+ * 4 per-channel scopes + 1 combined "ALL" scope, horizontally stacked.
+ * Click a scope to mute/unmute that channel. Shift+click to solo.
+ * Click ALL to enable all channels. Muted channels dim the waveform.
  */
 
-import React from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
+import { getDJEngine } from '@/engine/dj/DJEngine';
+import { useDJStore } from '@/stores/useDJStore';
 
 interface DeckScopesProps {
   deckId: 'A' | 'B';
+  /** Size of each scope (matches turntable) */
+  size?: number;
 }
 
-const SCOPE_WIDTH = 48;
-const SCOPE_HEIGHT = 32;
-const PHOSPHOR_COLOR = '#00ff44';
-const PHOSPHOR_DIM = '#00aa2e';
-const SCOPE_BG = '#0a0a12';
-const SCOPE_BORDER = '#1a1a2e';
 const NUM_CHANNELS = 4;
 
-/** Generate an SVG polyline path for a sine wave with given frequency multiplier */
-function generateSinePath(freqMultiplier: number, amplitude: number, phase: number): string {
-  const points: string[] = [];
-  const midY = SCOPE_HEIGHT / 2;
-  const steps = 48;
-
-  for (let i = 0; i <= steps; i++) {
-    const x = (i / steps) * SCOPE_WIDTH;
-    const t = (i / steps) * Math.PI * 2 * freqMultiplier + phase;
-    const y = midY - Math.sin(t) * amplitude;
-    points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
-  }
-
-  return points.join(' ');
+interface ScopeCanvasProps {
+  deckId: 'A' | 'B';
+  /** Channel index 0-3, or -1 for ALL */
+  channel: number;
+  size: number;
+  muted: boolean;
+  onClick: (e: React.MouseEvent) => void;
 }
 
-// Pre-generate different wave shapes for visual variety
-const WAVE_SHAPES = [
-  generateSinePath(2, 10, 0),       // CH1: 2-cycle sine
-  generateSinePath(3, 8, 0.5),      // CH2: 3-cycle sine, offset
-  generateSinePath(1.5, 12, 1.0),   // CH3: 1.5-cycle sine, larger
-  generateSinePath(4, 6, 0.25),     // CH4: 4-cycle sine, smaller
-];
+const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted, onClick }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rafRef = useRef<number>(0);
+  const isAll = channel === -1;
 
-const ScopeTrace: React.FC<{ channelIndex: number }> = ({ channelIndex }) => {
-  const label = `CH${channelIndex + 1}`;
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const dpr = window.devicePixelRatio || 1;
+
+    if (canvas.width !== size * dpr || canvas.height !== size * dpr) {
+      canvas.width = size * dpr;
+      canvas.height = size * dpr;
+      canvas.style.width = `${size}px`;
+      canvas.style.height = `${size}px`;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const cs = getComputedStyle(canvas);
+    const bgColor = cs.getPropertyValue('--color-bg').trim() || '#0b0909';
+    const borderColor = cs.getPropertyValue('--color-border').trim() || '#2f2525';
+    const successColor = cs.getPropertyValue('--color-success').trim() || '#10b981';
+    const mutedColor = cs.getPropertyValue('--color-text-muted').trim() || '#686060';
+    const accentColor = cs.getPropertyValue('--color-accent').trim() || '#ef4444';
+
+    // Background
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, size, size);
+
+    // Border — highlight if muted
+    ctx.strokeStyle = muted ? accentColor : borderColor;
+    ctx.lineWidth = muted ? 1 : 0.5;
+    ctx.strokeRect(0.5, 0.5, size - 1, size - 1);
+
+    // Center line
+    const midY = size / 2;
+    ctx.beginPath();
+    ctx.moveTo(1, midY);
+    ctx.lineTo(size - 1, midY);
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Waveform trace
+    let waveform: Float32Array | null = null;
+    try {
+      waveform = getDJEngine().getDeck(deckId).getWaveform();
+    } catch {
+      // Engine not ready
+    }
+
+    if (waveform && waveform.length >= 256) {
+      if (isAll) {
+        // ALL: draw full 256-sample buffer
+        ctx.beginPath();
+        for (let i = 0; i < 256; i++) {
+          const x = 1 + (i / 255) * (size - 2);
+          const sample = waveform[i] || 0;
+          const y = midY - sample * (size / 2 - 2);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = successColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      } else {
+        // Per-channel: 64-sample slice
+        const samplesPerChannel = 64;
+        const offset = channel * samplesPerChannel;
+        ctx.beginPath();
+        for (let i = 0; i < samplesPerChannel; i++) {
+          const x = 1 + (i / (samplesPerChannel - 1)) * (size - 2);
+          const sample = waveform[offset + i] || 0;
+          const y = midY - sample * (size / 2 - 2);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = muted ? mutedColor : successColor;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = muted ? 0.3 : 1;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // Channel label
+    ctx.fillStyle = muted ? accentColor : mutedColor;
+    ctx.globalAlpha = muted ? 0.8 : 0.5;
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(isAll ? 'ALL' : `CH${channel + 1}`, 3, 3);
+    ctx.globalAlpha = 1;
+
+    // Muted indicator
+    if (muted && !isAll) {
+      ctx.fillStyle = accentColor;
+      ctx.globalAlpha = 0.15;
+      ctx.fillRect(0, 0, size, size);
+      ctx.globalAlpha = 1;
+    }
+
+    rafRef.current = requestAnimationFrame(draw);
+  }, [deckId, channel, size, muted, isAll]);
+
+  useEffect(() => {
+    rafRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [draw]);
 
   return (
-    <div
-      className="relative overflow-hidden rounded-sm"
-      style={{
-        width: SCOPE_WIDTH,
-        height: SCOPE_HEIGHT,
-        backgroundColor: SCOPE_BG,
-        border: `1px solid ${SCOPE_BORDER}`,
-      }}
-    >
-      {/* Horizontal center line (zero crossing reference) */}
-      <svg
-        width={SCOPE_WIDTH}
-        height={SCOPE_HEIGHT}
-        className="absolute inset-0"
-        style={{ opacity: 0.2 }}
-      >
-        <line
-          x1={0}
-          y1={SCOPE_HEIGHT / 2}
-          x2={SCOPE_WIDTH}
-          y2={SCOPE_HEIGHT / 2}
-          stroke={PHOSPHOR_DIM}
-          strokeWidth={0.5}
-          strokeDasharray="2,2"
-        />
-      </svg>
-
-      {/* Waveform trace */}
-      <svg
-        width={SCOPE_WIDTH}
-        height={SCOPE_HEIGHT}
-        className="absolute inset-0"
-      >
-        {/* Glow layer */}
-        <polyline
-          points={WAVE_SHAPES[channelIndex]}
-          fill="none"
-          stroke={PHOSPHOR_COLOR}
-          strokeWidth={2}
-          opacity={0.3}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-        {/* Main trace */}
-        <polyline
-          points={WAVE_SHAPES[channelIndex]}
-          fill="none"
-          stroke={PHOSPHOR_COLOR}
-          strokeWidth={1}
-          opacity={0.9}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-      </svg>
-
-      {/* Channel label */}
-      <div
-        className="absolute font-mono text-text-muted/50 select-none"
-        style={{
-          fontSize: 7,
-          top: 1,
-          left: 2,
-          lineHeight: 1,
-        }}
-      >
-        {label}
-      </div>
-    </div>
+    <canvas
+      ref={canvasRef}
+      className="block rounded-sm flex-shrink-0 cursor-pointer"
+      style={{ width: size, height: size }}
+      onClick={onClick}
+      title={isAll ? 'Enable all channels' : `CH${channel + 1} — click to mute/unmute, shift+click to solo`}
+    />
   );
 };
 
-export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId: _deckId }) => {
+export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId, size = 64 }) => {
+  const channelMask = useDJStore((s) => s.decks[deckId].channelMask);
+
+  const isChannelEnabled = (index: number): boolean => (channelMask & (1 << index)) !== 0;
+
+  const handleChannelClick = useCallback((channelIndex: number, e: React.MouseEvent) => {
+    const store = useDJStore.getState();
+    if (e.shiftKey) {
+      // Solo: disable all, enable only this one
+      store.setAllDeckChannels(deckId, false);
+      store.toggleDeckChannel(deckId, channelIndex);
+    } else {
+      store.toggleDeckChannel(deckId, channelIndex);
+    }
+  }, [deckId]);
+
+  const handleAllClick = useCallback(() => {
+    useDJStore.getState().setAllDeckChannels(deckId, true);
+  }, [deckId]);
+
   return (
-    <div className="grid grid-cols-2 gap-1" style={{ width: SCOPE_WIDTH * 2 + 4 }}>
+    <div className="flex gap-1 flex-shrink-0">
       {Array.from({ length: NUM_CHANNELS }, (_, i) => (
-        <ScopeTrace key={i} channelIndex={i} />
+        <ScopeCanvas
+          key={i}
+          deckId={deckId}
+          channel={i}
+          size={size}
+          muted={!isChannelEnabled(i)}
+          onClick={(e) => handleChannelClick(i, e)}
+        />
       ))}
+      <ScopeCanvas
+        deckId={deckId}
+        channel={-1}
+        size={size}
+        muted={false}
+        onClick={handleAllClick}
+      />
     </div>
   );
 };

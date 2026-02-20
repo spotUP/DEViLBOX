@@ -9,6 +9,10 @@ import { DeckEngine, type DeckId } from './DeckEngine';
 import { DJMixerEngine, type CrossfaderCurve } from './DJMixerEngine';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
+// Instrument ID offsets to avoid collisions with the tracker view (IDs 1-999)
+// and between decks. Each deck gets a 10000-wide namespace.
+const DECK_ID_OFFSETS: Record<DeckId, number> = { A: 10000, B: 20000 };
+
 export class DJEngine {
   readonly deckA: DeckEngine;
   readonly deckB: DeckEngine;
@@ -38,8 +42,43 @@ export class DJEngine {
   // ==========================================================================
 
   async loadToDeck(id: DeckId, song: TrackerSong): Promise<void> {
+    // Remap instrument IDs to a deck-specific range so they don't collide
+    // with the main tracker view or the other deck's instruments.
+    const offset = DECK_ID_OFFSETS[id];
+    this.remapInstrumentIds(song, offset);
+
     const deck = this.getDeck(id);
     await deck.loadSong(song);
+  }
+
+  /**
+   * Shift all instrument IDs in a song by a fixed offset.
+   * Mutates the song in-place (instruments array, pattern cells, channel instrumentId).
+   */
+  private remapInstrumentIds(song: TrackerSong, offset: number): void {
+    // Build a map of original → remapped IDs
+    const idMap = new Map<number, number>();
+    for (const inst of song.instruments) {
+      const newId = inst.id + offset;
+      idMap.set(inst.id, newId);
+      inst.id = newId;
+    }
+
+    // Remap pattern cell instrument references
+    for (const pattern of song.patterns) {
+      for (const channel of pattern.channels) {
+        // Channel-level instrument assignment
+        if (channel.instrumentId && idMap.has(channel.instrumentId)) {
+          channel.instrumentId = idMap.get(channel.instrumentId)!;
+        }
+        // Per-cell instrument references
+        for (const cell of channel.rows) {
+          if (cell.instrument && idMap.has(cell.instrument)) {
+            cell.instrument = idMap.get(cell.instrument)!;
+          }
+        }
+      }
+    }
   }
 
   // ==========================================================================

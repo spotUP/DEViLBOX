@@ -2227,6 +2227,7 @@ export type AudioEffectType =
   | 'VinylNoise'       // Vinyl crackle & hiss synthesizer
   | 'Tumult'           // Tumult noise/ambience generator (AudioWorklet, 1:1 port)
   | 'TapeSimulator'   // Kiss of Shame tape deck emulator (WASM port)
+  | 'ToneArm'         // Physics-based vinyl playback simulation (AudioWorklet, 1:1 port)
   // WAM 2.0 effects (external Web Audio Module plugins)
   | 'WAMBigMuff'        // Big Muff Pi fuzz
   | 'WAMTS9'            // TS-9 Overdrive
