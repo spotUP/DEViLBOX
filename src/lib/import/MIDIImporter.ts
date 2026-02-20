@@ -3,9 +3,9 @@
  */
 
 import { Midi, Track } from '@tonejs/midi';
-import type { Pattern, TrackerCell } from '@typedefs/tracker';
+import type { Pattern, TrackerCell, ChannelData } from '@typedefs/tracker';
 import { midiToXMNote } from '../xmConversions';
-import { gmProgramToInstrument } from './GMSoundBank';
+import { gmProgramToInstrument, gmPercussionNoteToInstrument } from './GMSoundBank';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
 // Generate unique ID
@@ -79,23 +79,45 @@ export async function importMIDIFile(
 
   if (opts.mergeChannels) {
     const trackToInstId = new Map<number, number>();
-    let instId = 1;
+    let nextInstId = 1;
+
+    // Non-percussion tracks → one instrument each
     midi.tracks.forEach((track, ti) => {
-      if (track.notes.length === 0) return;
-      trackToInstId.set(ti, instId);
-      instruments.push(gmProgramToInstrument(track.instrument.number, instId, track.instrument.percussion));
-      instId++;
+      if (track.notes.length === 0 || track.instrument.percussion) return;
+      trackToInstId.set(ti, nextInstId);
+      instruments.push(gmProgramToInstrument(track.instrument.number, nextInstId, false));
+      nextInstId++;
     });
-    patterns.push(createPatternFromMIDI(midi, opts, ppq, rowsPerBeat, trackToInstId));
+
+    // Build merged pattern from non-percussion tracks
+    const mergedPattern = createPatternFromMIDI(midi, opts, ppq, rowsPerBeat, trackToInstId);
+
+    // Percussion tracks → expand into per-note channels appended to merged pattern
+    midi.tracks.forEach((track, ti) => {
+      if (track.notes.length === 0 || !track.instrument.percussion) return;
+      const perc = createPercussionPattern(track, ti, opts, ppq, rowsPerBeat, nextInstId);
+      mergedPattern.channels.push(...perc.pattern.channels);
+      instruments.push(...perc.instruments);
+      nextInstId += perc.instruments.length;
+    });
+
+    patterns.push(mergedPattern);
   } else {
-    let nonEmptyIndex = 0;
+    let nextInstId = 1;
     for (let trackIndex = 0; trackIndex < midi.tracks.length; trackIndex++) {
       const track = midi.tracks[trackIndex];
       if (track.notes.length === 0) continue;
-      const thisInstId = nonEmptyIndex + 1;
-      instruments.push(gmProgramToInstrument(track.instrument.number, thisInstId, track.instrument.percussion));
-      patterns.push(createPatternFromTrack(track, trackIndex, thisInstId, opts, ppq, rowsPerBeat));
-      nonEmptyIndex++;
+
+      if (track.instrument.percussion) {
+        const perc = createPercussionPattern(track, trackIndex, opts, ppq, rowsPerBeat, nextInstId);
+        patterns.push(perc.pattern);
+        instruments.push(...perc.instruments);
+        nextInstId += perc.instruments.length;
+      } else {
+        instruments.push(gmProgramToInstrument(track.instrument.number, nextInstId, false));
+        patterns.push(createPatternFromTrack(track, trackIndex, nextInstId, opts, ppq, rowsPerBeat));
+        nextInstId++;
+      }
     }
   }
 
@@ -113,6 +135,88 @@ export async function importMIDIFile(
 }
 
 /**
+ * Create a Pattern from a MIDI percussion track (channel 10).
+ * One channel per unique MIDI note number, each channel has its own DrumMachine instrument.
+ */
+function createPercussionPattern(
+  track: Track,
+  trackIndex: number,
+  options: MIDIImportOptions,
+  ppq: number,
+  rowsPerBeat: number,
+  startInstId: number,
+): { pattern: Pattern; instruments: InstrumentConfig[] } {
+  // Calculate pattern length from actual content, rounded up to nearest 16 rows (1 bar).
+  // Drum hits have near-zero durationTicks so we use the start tick of the latest hit.
+  // Use exact division (no Math.round) so content lengths like 31.7 rows → 32 rows,
+  // never inflated to 64 by coarse rounding.
+  const lastNoteTick = track.notes.reduce((max, n) => Math.max(max, n.ticks), 0);
+  const exactRows = (lastNoteTick / ppq) * rowsPerBeat; // exact, no rounding
+  const patternLength = exactRows > 0
+    ? Math.min(256, Math.ceil(exactRows / 16) * 16)
+    : Math.min(256, options.defaultPatternLength || 16);
+
+  // Group hits by MIDI note number
+  const noteGroups = new Map<number, Array<{ tick: number; velocity: number }>>();
+  track.notes.forEach(note => {
+    if (!noteGroups.has(note.midi)) noteGroups.set(note.midi, []);
+    noteGroups.get(note.midi)!.push({ tick: note.ticks, velocity: note.velocity });
+  });
+
+  const channels: ChannelData[] = [];
+  const instruments: InstrumentConfig[] = [];
+  let instId = startInstId;
+
+  // Sort by MIDI note for consistent channel order (kick first, hi-hats later, etc.)
+  Array.from(noteGroups.entries())
+    .sort((a, b) => a[0] - b[0])
+    .forEach(([midiNote, hits]) => {
+      const instrument = gmPercussionNoteToInstrument(midiNote, instId);
+      instruments.push(instrument);
+
+      const rows: TrackerCell[] = Array.from({ length: patternLength }, () => ({
+        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+      }));
+
+      hits.forEach(({ tick, velocity }) => {
+        const row = tickToRow(tick, ppq, rowsPerBeat, options.quantize);
+        if (row < 0 || row >= patternLength) return;
+        rows[row].note = 1; // trigger — DrumMachine ignores pitch
+        rows[row].instrument = instId;
+        if (options.velocityToVolume) {
+          const vol = velocityToVolume(velocity * 127);
+          rows[row].volume = 0x10 + Math.round((vol / 64) * 64);
+        }
+      });
+
+      channels.push({
+        id: generateId('channel'),
+        name: instrument.name,
+        instrumentId: instId,
+        color: null,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 80,
+        pan: 0,
+        rows,
+      });
+
+      instId++;
+    });
+
+  return {
+    pattern: {
+      id: generateId('pattern'),
+      name: track.name || `Drums ${trackIndex + 1}`,
+      length: patternLength,
+      channels,
+    },
+    instruments,
+  };
+}
+
+/**
  * Create a single pattern from all MIDI tracks (merged)
  */
 function createPatternFromMIDI(
@@ -122,15 +226,11 @@ function createPatternFromMIDI(
   rowsPerBeat: number,
   trackToInstId: Map<number, number>,
 ): Pattern {
-  // Calculate pattern length from MIDI duration
-  const durationInBeats = midi.duration * (midi.header.tempos[0]?.bpm || 120) / 60;
-  const patternLength = Math.min(
-    256,
-    Math.max(
-      options.defaultPatternLength || 64,
-      Math.ceil(durationInBeats * rowsPerBeat)
-    )
-  );
+  // Calculate pattern length from MIDI duration, rounded up to nearest 16 rows (1 bar).
+  const durationRows = midi.duration * (midi.header.tempos[0]?.bpm || 120) / 60 * rowsPerBeat;
+  const patternLength = durationRows > 0
+    ? Math.min(256, Math.ceil(durationRows / 16) * 16)
+    : Math.min(256, options.defaultPatternLength || 16);
 
   // Group notes by track index — each track becomes one tracker channel
   const channelNotes: Map<number, Array<{ tick: number; note: { midi: number; velocity: number; ticks: number; durationTicks: number } }>> = new Map();
@@ -219,17 +319,14 @@ function createPatternFromTrack(
   ppq: number,
   rowsPerBeat: number,
 ): Pattern {
-  // Calculate pattern length from track duration
+  // Calculate pattern length from actual content, rounded up to nearest 16 rows (1 bar).
+  // Do not use defaultPatternLength as a floor — only apply it for empty tracks.
   const lastNote = track.notes.length > 0 ? track.notes[track.notes.length - 1] : null;
   const durationTicks = lastNote ? lastNote.ticks + lastNote.durationTicks : 0;
-  const durationRows = tickToRow(durationTicks, ppq, rowsPerBeat, 0);
-  const patternLength = Math.min(
-    256,
-    Math.max(
-      options.defaultPatternLength || 64,
-      Math.ceil(durationRows / 64) * 64 // Round up to nearest 64
-    )
-  );
+  const durationRows = (durationTicks / ppq) * rowsPerBeat; // exact, no rounding
+  const patternLength = durationRows > 0
+    ? Math.min(256, Math.ceil(durationRows / 16) * 16)
+    : Math.min(256, options.defaultPatternLength || 16);
 
   // Create single channel
   const rows: TrackerCell[] = Array.from({ length: patternLength }, () => ({

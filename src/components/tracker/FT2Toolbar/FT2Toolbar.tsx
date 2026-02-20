@@ -450,10 +450,16 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
         const midiResult = await importMIDIFile(file, {
           quantize: 1, mergeChannels: false, velocityToVolume: true, defaultPatternLength: 64,
         });
+        resetAutomation();
+        resetTransport();
+        resetInstruments();
+        engine.disposeAllInstruments();
         loadPatterns(midiResult.patterns);
         if (midiResult.instruments.length > 0) {
           loadInstruments(midiResult.instruments);
         }
+        setPatternOrder(midiResult.patterns.map((_, i) => i));
+        setCurrentPattern(0);
         setMetadata({
           name: midiResult.metadata.name,
           author: '',
@@ -895,6 +901,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
                 tracks: result.metadata.tracks
               });
 
+              resetAutomation();
+              resetTransport();
+              resetInstruments();
+              engine.disposeAllInstruments();
+
               // Load patterns and set BPM
               loadPatterns(result.patterns);
               if (result.instruments.length > 0) {
@@ -903,6 +914,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = ({
               setBPM(result.bpm);
               setCurrentPattern(0);
               setPatternOrder(result.patterns.map((_, i) => i));
+              setMetadata({
+                name: result.metadata.name,
+                author: '',
+                description: `Imported from ${filename} (${result.metadata.tracks} track${result.metadata.tracks !== 1 ? 's' : ''})`,
+              });
 
               notify.success(
                 `Imported: ${result.metadata.name || filename} — ${result.instruments.length} instrument(s), BPM: ${result.bpm}`
