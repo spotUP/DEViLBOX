@@ -44,9 +44,9 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         const engine = getDJEngine();
         const deck = engine.getDeck(deckId);
         const replayer = deck.replayer;
+        const store = useDJStore.getState();
 
         if (replayer.isPlaying()) {
-          const store = useDJStore.getState();
           store.setDeckPosition(deckId, replayer.getSongPos(), replayer.getPattPos());
           // Update elapsed time + live effective BPM (accounts for Fxx mid-song changes + pitch multiplier)
           const liveBPM = Math.round(replayer.getBPM() * replayer.getTempoMultiplier() * 100) / 100;
@@ -56,6 +56,11 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
           });
           // Relay BPM changes to ScratchPlayback for LFO resync
           try { deck.notifyBPMChange(liveBPM); } catch { /* engine not ready */ }
+        }
+
+        // Auto-clear activePatternName when a one-shot pattern finishes naturally
+        if (!deck.isPatternActive() && store.decks[deckId].activePatternName !== null) {
+          store.setDeckPattern(deckId, null);
         }
       } catch {
         // Engine might not be initialized yet

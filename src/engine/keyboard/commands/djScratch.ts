@@ -30,26 +30,30 @@ function triggerPattern(patternName: string): boolean {
 
   try {
     const deck = getDJEngine().getDeck(deckId);
+
+    // Same pattern running → stop it
     if (current === patternName) {
       deck.stopPattern();
       store.setDeckPattern(deckId, null);
       useUIStore.getState().setStatusMessage(`Scratch: stopped`, false, 800);
-    } else {
-      if (current) {
-        deck.stopPattern();
-        store.setDeckPattern(deckId, null);
-      }
-      let quantizeWaitMs = 0;
-      deck.playPattern(patternName, (waitMs) => {
-        quantizeWaitMs = waitMs;
-        setTimeout(() => store.setDeckPattern(deckId, patternName), waitMs);
-        useUIStore.getState().setStatusMessage(`Scratch: ${patternName} (waiting…)`, false, waitMs + 200);
-      });
-      // onWaiting is synchronous — if not called, pattern started immediately
-      if (quantizeWaitMs === 0) {
-        store.setDeckPattern(deckId, patternName);
-        useUIStore.getState().setStatusMessage(`Scratch: ${patternName}`, false, 1200);
-      }
+      return true;
+    }
+
+    // Different pattern already running → ignore
+    if (current !== null) {
+      return true;
+    }
+
+    // Nothing running → start
+    let quantizeWaitMs = 0;
+    deck.playPattern(patternName, (waitMs) => {
+      quantizeWaitMs = waitMs;
+      setTimeout(() => store.setDeckPattern(deckId, patternName), waitMs);
+      useUIStore.getState().setStatusMessage(`Scratch: ${patternName} (waiting…)`, false, waitMs + 200);
+    });
+    if (quantizeWaitMs === 0) {
+      store.setDeckPattern(deckId, patternName);
+      useUIStore.getState().setStatusMessage(`Scratch: ${patternName}`, false, 1200);
     }
   } catch {
     useUIStore.getState().setStatusMessage('DJ engine not active', false, 1000);

@@ -443,6 +443,16 @@ export class DeckEngine {
     return this.scratchPlayback.isWaiting();
   }
 
+  /** Is a scratch pattern currently playing (or waiting to start)? */
+  isPatternActive(): boolean {
+    return this.scratchPlayback.isPatternActive();
+  }
+
+  /** Let the current pattern cycle finish then stop (tap/one-shot mode). */
+  finishPatternCycle(): void {
+    this.scratchPlayback.finishCurrentCycle();
+  }
+
   /** Start fader LFO at given division (synced to current effective BPM) */
   startFaderLFO(division: FaderLFODivision): void {
     this.scratchPlayback.startFaderLFO(this.getEffectiveBPM(), division);
