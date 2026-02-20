@@ -16,9 +16,11 @@ import { useInstrumentStore } from './useInstrumentStore';
 import { useSettingsStore } from './useSettingsStore';
 import { KNOB_BANKS, JOYSTICK_MAP, getKnobBankForSynth, getKnobAssignmentsForPage, getKnobPageCount } from '../midi/knobBanks';
 import type { KnobAssignment } from '../midi/knobBanks';
-import { routeParameterToEngine } from '../midi/performance/parameterRouter';
+import { routeParameterToEngine, routeDJParameter } from '../midi/performance/parameterRouter';
 import { updateNKSDisplay } from '../midi/performance/AkaiMIDIProtocol';
 import type { NKSParameter } from '../midi/performance/types';
+import { isDJContext } from '../midi/MIDIContextRouter';
+import { DJ_KNOB_BANKS, DJ_KNOB_PAGE_NAMES } from '../midi/djKnobBanks';
 
 // Guard against double handler registration (e.g., React StrictMode or HMR)
 let midiNoteHandlerRegistered = false;
@@ -56,6 +58,10 @@ interface MIDIStore {
 
   // MIDI Note Transpose
   midiOctaveOffset: number;  // Octave offset for MIDI notes (-4 to +4)
+
+  // DJ Knob Paging (context-aware routing for DJ mode)
+  djKnobPage: number;           // 0 = Mixer, 1 = Deck A, 2 = Deck B, 3 = FX
+  djKnobTotalPages: number;     // Always 4
 
   // UI State
   showPatternDialog: boolean;
@@ -99,6 +105,11 @@ interface MIDIStore {
   nextKnobPage: () => void;
   prevKnobPage: () => void;
   setKnobPage: (page: number) => void;
+
+  // DJ Knob Paging actions
+  setDJKnobPage: (page: number) => void;
+  nextDJKnobPage: () => void;
+  prevDJKnobPage: () => void;
 
   // MIDI Output - send CC to external hardware (e.g., TD-3-MO)
   sendCC: (cc: number, value: number, channel?: number) => void;
@@ -184,6 +195,8 @@ export const useMIDIStore = create<MIDIStore>()(
             nksActiveSynthType: null,
             midiOctaveOffset: 0,
         // Default: no octave transpose
+      djKnobPage: 0,
+      djKnobTotalPages: DJ_KNOB_BANKS.length,
       showPatternDialog: false,
       showKnobBar: false, // Start hidden until device connected
       midiOutputEnabled: true, // Send CC to external hardware (TD-3-MO, etc.)
@@ -256,8 +269,14 @@ export const useMIDIStore = create<MIDIStore>()(
                 if (message.note === 39) { store.setKnobBank('Mixer'); return; }
 
                 // Pad Bank B: page switching (notes 40-41)
-                if (message.note === 40) { store.prevKnobPage(); return; }
-                if (message.note === 41) { store.nextKnobPage(); return; }
+                if (message.note === 40) {
+                  if (isDJContext()) { store.prevDJKnobPage(); } else { store.prevKnobPage(); }
+                  return;
+                }
+                if (message.note === 41) {
+                  if (isDJContext()) { store.nextDJKnobPage(); } else { store.nextKnobPage(); }
+                  return;
+                }
 
                 // Apply octave offset (each octave = 12 semitones)
                 const octaveOffset = store.midiOctaveOffset || 0;
@@ -353,6 +372,13 @@ export const useMIDIStore = create<MIDIStore>()(
 
               // Handle Pitch Bend (X-axis on MPK Mini joystick)
               if (message.type === 'pitchBend' && message.pitchBend !== undefined) {
+                // DJ context: pitch bend = crossfader
+                if (isDJContext()) {
+                  const normalized = (message.pitchBend + 8192) / 16383;
+                  routeDJParameter('dj.crossfader', normalized);
+                  return;
+                }
+                // Tracker context: joystick mapping
                 const joyMap = JOYSTICK_MAP[store.knobBank];
                 if (joyMap?.x) {
                   // Map -8192..8191 to 0..127 for updateBankParameter
@@ -367,6 +393,12 @@ export const useMIDIStore = create<MIDIStore>()(
 
                 // Handle Mod Wheel (CC 1) -> Y-axis on MPK Mini joystick
                 if (message.cc === 1) {
+                  // DJ context: mod wheel = master filter sweep
+                  if (isDJContext()) {
+                    routeDJParameter('dj.deckA.filter', message.value / 127);
+                    return;
+                  }
+                  // Tracker context: joystick mapping
                   const joyMap = JOYSTICK_MAP[store.knobBank];
                   if (joyMap?.y) {
                     updateBankParameter(joyMap.y.param, message.value);
@@ -382,7 +414,17 @@ export const useMIDIStore = create<MIDIStore>()(
                 // Handle Bank Knobs (CC 70-77)
                 if (message.cc >= 70 && message.cc <= 77) {
                   const knobIndex = message.cc - 70;
-                  // NKS2 dynamic assignments take priority
+
+                  // DJ context: route to DJ knob bank
+                  if (isDJContext()) {
+                    const djAssignment = DJ_KNOB_BANKS[store.djKnobPage]?.[knobIndex];
+                    if (djAssignment) {
+                      routeDJParameter(djAssignment.param, message.value / 127);
+                      return;
+                    }
+                  }
+
+                  // Tracker context: NKS2 dynamic assignments take priority
                   const nksAssignment = store.nksKnobAssignments[knobIndex];
                   if (nksAssignment) {
                     updateBankParameter(nksAssignment.param, message.value);
@@ -706,6 +748,30 @@ export const useMIDIStore = create<MIDIStore>()(
         updateNKSDisplay(nksActiveSynthType, page, nksKnobTotalPages, displayParams);
       },
 
+      // DJ Knob Paging
+      setDJKnobPage: (page) => {
+        if (page < 0 || page >= DJ_KNOB_BANKS.length) return;
+        set((state) => {
+          state.djKnobPage = page;
+        });
+      },
+
+      nextDJKnobPage: () => {
+        const { djKnobPage } = get();
+        const nextPage = (djKnobPage + 1) % DJ_KNOB_BANKS.length;
+        set((state) => {
+          state.djKnobPage = nextPage;
+        });
+      },
+
+      prevDJKnobPage: () => {
+        const { djKnobPage } = get();
+        const prevPage = (djKnobPage - 1 + DJ_KNOB_BANKS.length) % DJ_KNOB_BANKS.length;
+        set((state) => {
+          state.djKnobPage = prevPage;
+        });
+      },
+
       setShowKnobBar: (show) => {
         set((state) => {
           state.showKnobBar = show;
@@ -801,6 +867,7 @@ export const useMIDIStore = create<MIDIStore>()(
         controlledInstrumentId: state.controlledInstrumentId,
         knobBank: state.knobBank,
         showKnobBar: state.showKnobBar,
+        djKnobPage: state.djKnobPage,
         midiOutputEnabled: state.midiOutputEnabled,
         midiOctaveOffset: state.midiOctaveOffset,
         gridMappings: state.gridMappings,
