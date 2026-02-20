@@ -9,26 +9,57 @@ import { getMIDIManager } from './MIDIManager';
 import type { MIDIMessage } from './types';
 
 /**
- * Available editor actions that can be triggered by buttons
+ * Available editor actions that can be triggered by buttons.
+ * Includes legacy tracker actions, DJ transport, and a `cmd:` prefix
+ * that bridges to any command in the global CommandRegistry.
  */
 export type EditorAction =
+  // Tracker transport
   | 'transport.play'
   | 'transport.stop'
   | 'transport.playFromStart'
   | 'transport.toggleRecord'
+  // Pattern navigation
   | 'pattern.next'
   | 'pattern.previous'
   | 'pattern.first'
   | 'pattern.last'
+  // Octave / channel
   | 'octave.up'
   | 'octave.down'
   | 'channel.next'
   | 'channel.previous'
+  // Edit
   | 'edit.undo'
   | 'edit.redo'
+  // View
   | 'view.togglePianoRoll'
   | 'view.toggleGrid'
-  | 'automation.toggleRecord';
+  // Automation
+  | 'automation.toggleRecord'
+  // DJ transport
+  | 'dj.deckA.play'
+  | 'dj.deckA.pause'
+  | 'dj.deckA.stop'
+  | 'dj.deckA.cue'
+  | 'dj.deckB.play'
+  | 'dj.deckB.pause'
+  | 'dj.deckB.stop'
+  | 'dj.deckB.cue'
+  | 'dj.sync'
+  | 'dj.killAll'
+  // DJ knob pages
+  | 'dj.knobPage.next'
+  | 'dj.knobPage.prev'
+  // DJ EQ kills
+  | 'dj.deckA.eqKillLow'
+  | 'dj.deckA.eqKillMid'
+  | 'dj.deckA.eqKillHi'
+  | 'dj.deckB.eqKillLow'
+  | 'dj.deckB.eqKillMid'
+  | 'dj.deckB.eqKillHi'
+  // CommandRegistry bridge - any command name (e.g., 'cmd:play_stop_toggle')
+  | `cmd:${string}`;
 
 /**
  * Button mapping configuration
@@ -142,6 +173,16 @@ class ButtonMapManager {
       const handler = this.actionHandlers.get(mapping.action);
       if (handler) {
         handler();
+      } else if (mapping.action.startsWith('cmd:')) {
+        // Bridge to CommandRegistry — execute any registered command
+        try {
+          const commandName = mapping.action.slice(4);
+          const { getGlobalRegistry } = require('../hooks/useGlobalKeyboardHandler');
+          const registry = getGlobalRegistry();
+          registry.execute(commandName, 'global');
+        } catch (e) {
+          console.warn('[ButtonMapManager] Failed to execute command:', mapping.action, e);
+        }
       }
       return;
     }
@@ -350,30 +391,72 @@ export function getButtonMapManager(): ButtonMapManager {
 export { ButtonMapManager };
 
 /**
- * Human-readable action names
+ * Human-readable action names for all built-in actions.
+ * For `cmd:*` actions, the display name is derived from the command name at runtime.
  */
-export const ACTION_DISPLAY_NAMES: Record<EditorAction, string> = {
+export const ACTION_DISPLAY_NAMES: Record<string, string> = {
+  // Tracker transport
   'transport.play': 'Play/Pause',
   'transport.stop': 'Stop',
   'transport.playFromStart': 'Play from Start',
   'transport.toggleRecord': 'Toggle Record',
+  // Pattern
   'pattern.next': 'Next Pattern',
   'pattern.previous': 'Previous Pattern',
   'pattern.first': 'First Pattern',
   'pattern.last': 'Last Pattern',
+  // Navigation
   'octave.up': 'Octave Up',
   'octave.down': 'Octave Down',
   'channel.next': 'Next Channel',
   'channel.previous': 'Previous Channel',
+  // Edit
   'edit.undo': 'Undo',
   'edit.redo': 'Redo',
+  // View
   'view.togglePianoRoll': 'Toggle Piano Roll',
   'view.toggleGrid': 'Toggle Grid View',
+  // Automation
   'automation.toggleRecord': 'Toggle Automation Record',
+  // DJ Transport
+  'dj.deckA.play': 'DJ Deck A Play',
+  'dj.deckA.pause': 'DJ Deck A Pause',
+  'dj.deckA.stop': 'DJ Deck A Stop',
+  'dj.deckA.cue': 'DJ Deck A Cue',
+  'dj.deckB.play': 'DJ Deck B Play',
+  'dj.deckB.pause': 'DJ Deck B Pause',
+  'dj.deckB.stop': 'DJ Deck B Stop',
+  'dj.deckB.cue': 'DJ Deck B Cue',
+  'dj.sync': 'DJ Sync B to A',
+  'dj.killAll': 'DJ Kill All',
+  // DJ Knob Pages
+  'dj.knobPage.next': 'DJ Next Knob Page',
+  'dj.knobPage.prev': 'DJ Prev Knob Page',
+  // DJ EQ Kills
+  'dj.deckA.eqKillLow': 'DJ Kill Lo A',
+  'dj.deckA.eqKillMid': 'DJ Kill Mid A',
+  'dj.deckA.eqKillHi': 'DJ Kill Hi A',
+  'dj.deckB.eqKillLow': 'DJ Kill Lo B',
+  'dj.deckB.eqKillMid': 'DJ Kill Mid B',
+  'dj.deckB.eqKillHi': 'DJ Kill Hi B',
 };
 
 /**
- * All available actions grouped by category
+ * Get display name for an action, including dynamic `cmd:` actions.
+ */
+export function getActionDisplayName(action: EditorAction): string {
+  if (action in ACTION_DISPLAY_NAMES) {
+    return ACTION_DISPLAY_NAMES[action];
+  }
+  if (action.startsWith('cmd:')) {
+    // Convert command name to display: 'play_stop_toggle' → 'Play Stop Toggle'
+    return action.slice(4).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+  return action;
+}
+
+/**
+ * All available actions grouped by category (for MIDI mapping UI)
  */
 export const ACTIONS_BY_CATEGORY: Record<string, EditorAction[]> = {
   Transport: ['transport.play', 'transport.stop', 'transport.playFromStart', 'transport.toggleRecord'],
@@ -382,4 +465,14 @@ export const ACTIONS_BY_CATEGORY: Record<string, EditorAction[]> = {
   Edit: ['edit.undo', 'edit.redo'],
   View: ['view.togglePianoRoll', 'view.toggleGrid'],
   Automation: ['automation.toggleRecord'],
+  'DJ Transport': [
+    'dj.deckA.play', 'dj.deckA.pause', 'dj.deckA.stop', 'dj.deckA.cue',
+    'dj.deckB.play', 'dj.deckB.pause', 'dj.deckB.stop', 'dj.deckB.cue',
+    'dj.sync', 'dj.killAll',
+  ],
+  'DJ Knob Pages': ['dj.knobPage.next', 'dj.knobPage.prev'],
+  'DJ EQ Kill': [
+    'dj.deckA.eqKillLow', 'dj.deckA.eqKillMid', 'dj.deckA.eqKillHi',
+    'dj.deckB.eqKillLow', 'dj.deckB.eqKillMid', 'dj.deckB.eqKillHi',
+  ],
 };

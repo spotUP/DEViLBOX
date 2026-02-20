@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-20T11:13:12.774Z
+ * Generated: 2026-02-20T11:35:26.981Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1009';
-export const BUILD_NUMBER = '1009';
-export const BUILD_HASH = 'c286f198';
+export const BUILD_VERSION = '1.0.1015';
+export const BUILD_NUMBER = '1015';
+export const BUILD_HASH = '42f37e2a';
 export const BUILD_DATE = '2026-02-20';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,33 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1009',
+    version: '1.0.1015',
     date: '2026-02-20',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add general-purpose Randomize dialog for pattern editor"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve erasableSyntaxOnly and unused import errors"
+      },
+      {
+        type: 'feature',
+        "description": "Context-aware DJ routing for knobs, pitch bend, and mod wheel"
+      },
+      {
+        type: 'feature',
+        "description": "Add per-pad DJ scratch action with editor UI"
+      },
+      {
+        type: 'feature',
+        "description": "Add scratch preset UI, fader LFO, and keyboard commands"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(keyboard-schemes): strip trailing blank lines from JSON scheme files"
+      },
       {
         type: 'feature',
         "description": "Add true reverse scratch with ring-buffer AudioWorklet"
@@ -214,30 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Use getRawNode() for SpaceyDelayer and RETapeEcho worklet connections"
-      },
-      {
-        type: 'fix',
-        "description": "Remaining master FX bugs — 100% wet silence, WAM params, neural defaults"
-      },
-      {
-        type: 'fix',
-        "description": "Address known beta limitations"
-      },
-      {
-        type: 'fix',
-        "description": "Center SpringReverb editor knob panels with flex layout"
-      },
-      {
-        type: 'fix',
-        "description": "Flush pendingParams on WASM ready in all 4 WASM effects"
-      },
-      {
-        type: 'fix',
-        "description": "Advance cursor after note entry when record mode is on"
-      },
-      {
-        type: 'fix',
-        "description": "VinylNoise/Tumult — audio only when playing or editor open"
       }
     ]
   }
