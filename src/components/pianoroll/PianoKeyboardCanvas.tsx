@@ -7,24 +7,29 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
+import { useThemeStore } from '@stores';
 import KeyboardWorkerFactory from '@/workers/piano-keyboard.worker.ts?worker';
+
+import type { KeyboardMsg, KeyboardState, KeyboardColors } from '@engine/renderer/worker-types';
 
 const KEYBOARD_WIDTH = 72;
 
-interface KeyboardState {
-  verticalZoom: number;
-  scrollY: number;
-  containerHeight: number;
-  activeNotes: number[];
-  scaleNotes: number[] | null;
-  dragTargetMidi: number | null;
+function snapshotKeyboardColors(el: HTMLElement): KeyboardColors {
+  const cs = getComputedStyle(el);
+  const accent = cs.getPropertyValue('--color-accent').trim() || '#06b6d4';
+  return {
+    bg: cs.getPropertyValue('--color-bg').trim() || '#111',
+    whiteKey: '#e8e8ec',
+    blackKey: cs.getPropertyValue('--color-bg-secondary').trim() || '#22242a',
+    whiteKeyDimmed: '#333338',
+    blackKeyDimmed: '#1a1a1c',
+    activeKey: accent,
+    divider: '#888',
+    dividerLight: '#333',
+    labelDark: '#333',
+    labelLight: '#888',
+  };
 }
-
-type KeyboardMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; state: KeyboardState }
-  | { type: 'state'; state: KeyboardState }
-  | { type: 'hover'; midi: number | null }
-  | { type: 'resize'; h: number; dpr: number };
 
 interface PianoKeyboardCanvasProps {
   verticalZoom: number;
@@ -78,7 +83,18 @@ const PianoKeyboardCanvasComponent: React.FC<PianoKeyboardCanvasProps> = ({
       state: snapshotState(),
     }, [offscreen]);
 
+    // Send initial colors
+    bridge.post({ type: 'colors', colors: snapshotKeyboardColors(container) });
+
+    // Subscribe to theme changes
+    const unsubTheme = useThemeStore.subscribe(() => {
+      if (containerRef.current) {
+        bridgeRef.current?.post({ type: 'colors', colors: snapshotKeyboardColors(containerRef.current) });
+      }
+    });
+
     return () => {
+      unsubTheme();
       bridge.dispose();
       bridgeRef.current = null;
       canvas.remove();

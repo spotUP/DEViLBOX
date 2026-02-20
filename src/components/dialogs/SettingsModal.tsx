@@ -57,6 +57,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setTrackerVisualBg,
     trackerVisualMode,
     setTrackerVisualMode,
+    renderMode,
+    setRenderMode,
   } = useSettingsStore();
 
   const {
@@ -127,6 +129,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       {theme.name}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              {/* UI Render Mode */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">UI Render Mode:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Switch between DOM and WebGL rendering</span>
+                </div>
+                <select
+                  value={renderMode}
+                  onChange={(e) => setRenderMode(e.target.value as 'dom' | 'webgl')}
+                  className="bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
+                >
+                  <option value="dom" className="bg-ft2-bg text-ft2-text">DOM (React + Tailwind)</option>
+                  <option value="webgl" className="bg-ft2-bg text-ft2-text">WebGL (PixiJS v8)</option>
                 </select>
               </div>
 

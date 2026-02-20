@@ -10,29 +10,9 @@ import type { PianoRollNote } from '../../types/pianoRoll';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import VelocityWorkerFactory from '@/workers/velocity-lane.worker.ts?worker';
 
+import type { VelocityMsg, VelocityState } from '@engine/renderer/worker-types';
+
 const LANE_HEIGHT = 80;
-
-interface SerializedNote {
-  id: string;
-  startRow: number;
-  endRow: number;
-  velocity: number;
-  instrument: number | null;
-}
-
-interface VelocityState {
-  notes: SerializedNote[];
-  horizontalZoom: number;
-  scrollX: number;
-  selectedNotes: string[];
-  containerWidth: number;
-}
-
-type VelocityMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; state: VelocityState }
-  | { type: 'state'; state: VelocityState }
-  | { type: 'hover'; noteId: string | null }
-  | { type: 'resize'; w: number; dpr: number };
 
 interface VelocityLaneCanvasProps {
   notes: PianoRollNote[];

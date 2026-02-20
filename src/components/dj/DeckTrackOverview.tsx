@@ -16,31 +16,7 @@ interface DeckTrackOverviewProps {
   deckId: 'A' | 'B';
 }
 
-interface DeckColors {
-  bg: string;
-  bgSecondary: string;
-  bgTertiary: string;
-  border: string;
-}
-
-interface OverviewState {
-  playbackMode: string;
-  songPos: number;
-  totalPositions: number;
-  cuePoint: number;
-  loopActive: boolean;
-  patternLoopStart: number;
-  patternLoopEnd: number;
-  audioPosition: number;
-  durationMs: number;
-  waveformPeaks: number[] | null;
-}
-
-type OverviewMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; colors: DeckColors } & OverviewState
-  | { type: 'state' } & OverviewState
-  | { type: 'resize'; w: number; h: number; dpr: number }
-  | { type: 'colors'; colors: DeckColors };
+import type { OverviewMsg, OverviewState, DeckColors } from '@engine/renderer/worker-types';
 
 const BAR_HEIGHT = 24;
 

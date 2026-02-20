@@ -1,9 +1,10 @@
 /**
  * MSDF Font Loading for PixiJS
  * Loads pre-generated MSDF bitmap font atlases for resolution-independent text rendering.
+ * Falls back to dynamic bitmap fonts generated from system fonts when MSDF files aren't available.
  */
 
-import { Assets, BitmapFont } from 'pixi.js';
+import { Assets, BitmapFontManager } from 'pixi.js';
 
 /** Font family names used throughout the PixiJS UI */
 export const PIXI_FONTS = {
@@ -24,6 +25,8 @@ let fontsLoaded = false;
  */
 export async function loadPixiFonts(): Promise<void> {
   if (fontsLoaded) return;
+  // Set immediately to prevent double-entry from React Strict Mode
+  fontsLoaded = true;
 
   const fontDefs = [
     { name: PIXI_FONTS.MONO, path: '/fonts/msdf/JetBrainsMono-Regular.json' },
@@ -34,69 +37,54 @@ export async function loadPixiFonts(): Promise<void> {
     { name: PIXI_FONTS.SANS_BOLD, path: '/fonts/msdf/Inter-Bold.json' },
   ];
 
-  // Register all font assets
   for (const def of fontDefs) {
     Assets.add({ alias: def.name, src: def.path });
   }
 
-  // Load all in parallel
+  let msdfLoaded = false;
   try {
     await Assets.load(fontDefs.map(d => d.name));
-    fontsLoaded = true;
-  } catch (e) {
-    console.warn('[PixiFonts] MSDF fonts not available, falling back to default BitmapFont generation.');
-    // Generate fallback bitmap fonts from system fonts
-    await generateFallbackFonts();
-    fontsLoaded = true;
+    msdfLoaded = true;
+  } catch {
+    // MSDF font atlas files not available — install dynamic fallback fonts
+  }
+
+  if (!msdfLoaded) {
+    installFallbackFonts();
   }
 }
 
 /**
- * Generate fallback bitmap fonts when MSDF atlases aren't available.
- * Uses PixiJS v8's built-in BitmapFont.install() with canvas-rendered glyphs.
+ * Install dynamic bitmap fonts as fallbacks when MSDF files aren't available.
+ * These use system fonts rendered via Canvas, which works but isn't as crisp as MSDF.
  */
-async function generateFallbackFonts(): Promise<void> {
-  const chars = BitmapFont.ALPHANUMERIC.concat(
-    BitmapFont.ASCII,
-    [' ', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '+', '=',
-     '[', ']', '{', '}', '|', '\\', '/', ':', ';', '"', "'", '<', '>',
-     ',', '.', '?', '~', '`', '_']
-  );
+function installFallbackFonts(): void {
+  const monoFamily = 'JetBrains Mono, Menlo, Consolas, monospace';
+  const sansFamily = 'Inter, -apple-system, BlinkMacSystemFont, sans-serif';
 
-  // Install minimal fallback fonts
-  BitmapFont.install({
-    name: PIXI_FONTS.MONO,
-    style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fill: 0xffffff },
-    chars,
-  });
+  const fallbacks = [
+    { name: PIXI_FONTS.MONO, family: monoFamily, weight: 'normal' },
+    { name: PIXI_FONTS.MONO_BOLD, family: monoFamily, weight: 'bold' },
+    { name: PIXI_FONTS.SANS, family: sansFamily, weight: 'normal' },
+    { name: PIXI_FONTS.SANS_MEDIUM, family: sansFamily, weight: '500' },
+    { name: PIXI_FONTS.SANS_SEMIBOLD, family: sansFamily, weight: '600' },
+    { name: PIXI_FONTS.SANS_BOLD, family: sansFamily, weight: 'bold' },
+  ];
 
-  BitmapFont.install({
-    name: PIXI_FONTS.MONO_BOLD,
-    style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 'bold', fill: 0xffffff },
-    chars,
-  });
-
-  BitmapFont.install({
-    name: PIXI_FONTS.SANS,
-    style: { fontFamily: 'Inter, sans-serif', fontSize: 14, fill: 0xffffff },
-    chars,
-  });
-
-  BitmapFont.install({
-    name: PIXI_FONTS.SANS_MEDIUM,
-    style: { fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: '500', fill: 0xffffff },
-    chars,
-  });
-
-  BitmapFont.install({
-    name: PIXI_FONTS.SANS_SEMIBOLD,
-    style: { fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: '600', fill: 0xffffff },
-    chars,
-  });
-
-  BitmapFont.install({
-    name: PIXI_FONTS.SANS_BOLD,
-    style: { fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 'bold', fill: 0xffffff },
-    chars,
-  });
+  for (const fb of fallbacks) {
+    try {
+      BitmapFontManager.install({
+        name: fb.name,
+        style: {
+          fontFamily: fb.family,
+          fontWeight: fb.weight,
+          fontSize: 32,
+          fill: 0xffffff,
+        },
+        chars: BitmapFontManager.ASCII,
+      });
+    } catch {
+      // Font already installed or install failed — continue
+    }
+  }
 }

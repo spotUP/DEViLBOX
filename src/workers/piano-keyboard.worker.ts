@@ -8,6 +8,8 @@
 const KEYBOARD_WIDTH = 72;
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
+import type { KeyboardMsg, KeyboardColors, KeyboardState } from '../engine/renderer/worker-types';
+
 function isBlackKey(midi: number): boolean {
   return [1, 3, 6, 8, 10].includes(midi % 12);
 }
@@ -30,25 +32,14 @@ let activeNotes   = new Set<number>();
 let scaleNotes: Set<number> | null = null;
 let dragTargetMidi: number | null = null;
 let hoveredMidi: number | null = null;
+let colors: KeyboardColors = {
+  bg: '#111', whiteKey: '#e8e8ec', blackKey: '#22242a',
+  whiteKeyDimmed: '#333338', blackKeyDimmed: '#1a1a1c',
+  activeKey: '#06b6d4', divider: '#888', dividerLight: '#333',
+  labelDark: '#333', labelLight: '#888',
+};
 
 let dirty = true;
-
-// ─── Message types ─────────────────────────────────────────────────────────────
-
-interface KeyboardState {
-  verticalZoom: number;
-  scrollY: number;
-  containerHeight: number;
-  activeNotes: number[];
-  scaleNotes: number[] | null;
-  dragTargetMidi: number | null;
-}
-
-type KeyboardMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; state: KeyboardState }
-  | { type: 'state'; state: KeyboardState }
-  | { type: 'hover'; midi: number | null }
-  | { type: 'resize'; h: number; dpr: number };
 
 // ─── Message handler ───────────────────────────────────────────────────────────
 
@@ -96,6 +87,11 @@ self.onmessage = (e: MessageEvent<KeyboardMsg>) => {
       }
       dirty = true;
       break;
+
+    case 'colors':
+      colors = msg.colors;
+      dirty = true;
+      break;
   }
 };
 
@@ -124,7 +120,7 @@ function renderFrame(): void {
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  ctx.fillStyle = '#111';
+  ctx.fillStyle = colors.bg;
   ctx.fillRect(0, 0, KEYBOARD_WIDTH, containerHeight);
 
   const noteCenter = 60;
@@ -147,15 +143,15 @@ function renderFrame(): void {
     const keyWidth     = black ? Math.floor(KEYBOARD_WIDTH * 0.66) : KEYBOARD_WIDTH;
 
     if (isActive || isDragTarget) {
-      ctx.fillStyle = '#06b6d4';
+      ctx.fillStyle = colors.activeKey;
     } else if (black) {
-      ctx.fillStyle = outOfScale ? '#1a1a1c' : '#22242a';
+      ctx.fillStyle = outOfScale ? colors.blackKeyDimmed : colors.blackKey;
     } else {
-      ctx.fillStyle = outOfScale ? '#333338' : '#e8e8ec';
+      ctx.fillStyle = outOfScale ? colors.whiteKeyDimmed : colors.whiteKey;
     }
     ctx.fillRect(0, y, keyWidth, h);
 
-    ctx.fillStyle = black ? '#333' : '#888';
+    ctx.fillStyle = black ? colors.dividerLight : colors.divider;
     ctx.fillRect(0, y + h - 0.5, keyWidth, 0.5);
 
     if (outOfScale && !isActive && !isDragTarget) {
@@ -173,7 +169,7 @@ function renderFrame(): void {
     const showAllLabels = verticalZoom >= 14;
     if (isC || (showAllLabels && !black)) {
       const name = isC ? getNoteNameFromMidi(midi) : NOTE_NAMES[noteInOctave];
-      ctx.fillStyle = isActive || isDragTarget ? '#fff' : (black ? '#888' : '#333');
+      ctx.fillStyle = isActive || isDragTarget ? '#fff' : (black ? colors.labelLight : colors.labelDark);
       ctx.font = `${isC ? 'bold ' : ''}${Math.min(10, h - 2)}px Inter, system-ui, sans-serif`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';

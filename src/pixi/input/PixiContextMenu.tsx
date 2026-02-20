@@ -3,7 +3,7 @@
  * Complex menus with nested submenus stay DOM for practicality.
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 export interface ContextMenuItem {

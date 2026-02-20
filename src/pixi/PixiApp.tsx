@@ -4,33 +4,42 @@
  * and renders the PixiRoot layout container.
  */
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Application, extend, useApplication } from '@pixi/react';
 import { Container, Graphics, BitmapText, Sprite, Text } from 'pixi.js';
 import '@pixi/layout'; // Side-effect: registers layout mixin on Container
+import { setYoga, setYogaConfig } from '@pixi/layout';
+import { loadYoga } from 'yoga-layout/load';
 import { loadPixiFonts } from './fonts';
 import { usePixiTheme } from './theme';
 import { PixiRoot } from './PixiRoot';
+import { attachFPSLimiter } from './performance';
 
 // Register PixiJS classes for use in @pixi/react JSX
 extend({ Container, Graphics, BitmapText, Sprite, Text });
 
-/** Props for PixiApp */
-interface PixiAppProps {
-  /** Callback to switch back to DOM mode */
-  onSwitchToDom?: () => void;
-}
-
-export const PixiApp: React.FC<PixiAppProps> = ({ onSwitchToDom }) => {
-  const [fontsReady, setFontsReady] = useState(false);
+export const PixiApp: React.FC = () => {
+  const [ready, setReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Load MSDF fonts on mount
+  // Pre-initialize Yoga WASM and load fonts before rendering any layout nodes
   useEffect(() => {
-    loadPixiFonts().then(() => setFontsReady(true));
+    let cancelled = false;
+    (async () => {
+      // Initialize Yoga WASM — must complete before any @pixi/layout node is created
+      const yoga = await loadYoga();
+      setYoga(yoga);
+      setYogaConfig(yoga.Config.create());
+
+      // Load MSDF bitmap fonts
+      await loadPixiFonts();
+
+      if (!cancelled) setReady(true);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  if (!fontsReady) {
+  if (!ready) {
     return (
       <div
         ref={containerRef}
@@ -53,10 +62,11 @@ export const PixiApp: React.FC<PixiAppProps> = ({ onSwitchToDom }) => {
         antialias
         autoDensity
         resolution={window.devicePixelRatio || 1}
-        resizeTo={containerRef}
+        resizeTo={window}
         roundPixels
+        className="pixi-canvas"
       >
-        <PixiAppContent onSwitchToDom={onSwitchToDom} />
+        <PixiAppContent />
       </Application>
     </div>
   );
@@ -66,7 +76,7 @@ export const PixiApp: React.FC<PixiAppProps> = ({ onSwitchToDom }) => {
  * Inner content component — rendered inside the Application context,
  * so it has access to useApplication().
  */
-const PixiAppContent: React.FC<{ onSwitchToDom?: () => void }> = ({ onSwitchToDom }) => {
+const PixiAppContent: React.FC = () => {
   const { app } = useApplication();
   const theme = usePixiTheme();
 
@@ -77,5 +87,11 @@ const PixiAppContent: React.FC<{ onSwitchToDom?: () => void }> = ({ onSwitchToDo
     }
   }, [app, theme.bg.color]);
 
-  return <PixiRoot onSwitchToDom={onSwitchToDom} />;
+  // Attach FPS limiter — drops to 10fps when idle
+  useEffect(() => {
+    if (!app) return;
+    return attachFPSLimiter(app);
+  }, [app]);
+
+  return <PixiRoot />;
 };

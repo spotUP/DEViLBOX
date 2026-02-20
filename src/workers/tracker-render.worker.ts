@@ -132,6 +132,24 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
     case 'dragOver':
       dragOver = msg.cell;
       break;
+
+    case 'hitTest': {
+      const result = hitTest(msg.relX, msg.relY);
+      if (result) {
+        const reply: TrackerWorkerReply = {
+          type: 'hitTestResult',
+          id: msg.id,
+          row: result.row,
+          channel: result.channel,
+          columnType: result.columnType,
+        };
+        (self as unknown as Worker).postMessage(reply);
+      } else {
+        const reply: TrackerWorkerReply = { type: 'hitTestMiss', id: msg.id };
+        (self as unknown as Worker).postMessage(reply);
+      }
+      break;
+    }
   }
 };
 
@@ -165,21 +183,14 @@ function renderFrame(): void {
 // ─── Hit testing (worker → main) ──────────────────────────────────────────────
 
 /**
- * Called by main thread via a click event posted as a message.
- * We compute which cell was clicked and reply.
- *
- * This is NOT wired up via onmessage above because clicks are currently
- * handled in PatternEditorCanvas.tsx's getCellFromCoords() directly.
- * The worker exposes this for future use.
+ * Compute which cell was clicked from coordinates relative to the container.
+ * scrollX is applied here since the worker owns it.
  */
 function hitTest(
-  clientX: number,
-  clientY: number,
-  containerLeft: number,
-  containerTop: number,
+  relX: number,
+  relY: number,
 ): { row: number; channel: number; columnType: string } | null {
-  const relX = clientX - containerLeft + scrollX;
-  const relY = clientY - containerTop;
+  const adjX = relX + scrollX;
 
   const pattern = patterns[currentPatternIndex];
   if (!pattern) return null;
@@ -196,16 +207,16 @@ function hitTest(
   for (let ch = 0; ch < layout.offsets.length; ch++) {
     const off = layout.offsets[ch];
     const w   = layout.widths[ch];
-    if (relX >= off && relX < off + w) {
+    if (adjX >= off && adjX < off + w) {
       channelIndex = ch;
-      localX = relX - off - 8;
+      localX = adjX - off - 8;
       found = true;
       break;
     }
   }
 
   if (!found) {
-    if (relX < LINE_NUMBER_WIDTH) {
+    if (adjX < LINE_NUMBER_WIDTH) {
       channelIndex = 0;
       localX = -1;
     } else {

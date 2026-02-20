@@ -5,31 +5,7 @@
  * Cue point markers overlaid.
  */
 
-interface SerializedCuePoint {
-  index: number;
-  position: number;   // ms
-  color: string;
-  name: string;
-}
-
-interface WaveformInitMsg {
-  type: 'init';
-  canvas: OffscreenCanvas;
-  dpr: number;
-  width: number;
-  height: number;
-  waveformPeaks: number[] | null;
-  durationMs: number;
-  audioPosition: number;
-  cuePoints: SerializedCuePoint[];
-}
-
-interface WaveformPeaksMsg    { type: 'waveformPeaks'; peaks: number[] | null; durationMs: number }
-interface WaveformPositionMsg { type: 'position'; audioPosition: number }
-interface WaveformCueMsg      { type: 'cuePoints'; cuePoints: SerializedCuePoint[] }
-interface WaveformResizeMsg   { type: 'resize'; w: number; h: number; dpr: number }
-
-type WaveformMsg = WaveformInitMsg | WaveformPeaksMsg | WaveformPositionMsg | WaveformCueMsg | WaveformResizeMsg;
+import type { WaveformMsg, SerializedCuePoint } from '../engine/renderer/worker-types';
 
 // ─── Worker state ─────────────────────────────────────────────────────────────
 
@@ -41,6 +17,7 @@ let waveformPeaks: number[] | null = null;
 let durationMs    = 0;
 let audioPosition = 0;
 let cuePoints: SerializedCuePoint[] = [];
+let dirty         = true;
 
 // ─── Message handler ──────────────────────────────────────────────────────────
 
@@ -63,12 +40,15 @@ self.onmessage = (e: MessageEvent<WaveformMsg>) => {
     case 'waveformPeaks':
       waveformPeaks = msg.peaks;
       durationMs    = msg.durationMs;
+      dirty = true;
       break;
     case 'position':
       audioPosition = msg.audioPosition;
+      dirty = true;
       break;
     case 'cuePoints':
       cuePoints = msg.cuePoints;
+      dirty = true;
       break;
     case 'resize':
       dpr = msg.dpr; width = msg.w; height = msg.h;
@@ -76,6 +56,7 @@ self.onmessage = (e: MessageEvent<WaveformMsg>) => {
         offCanvas.width  = Math.round(width  * dpr);
         offCanvas.height = Math.round(height * dpr);
       }
+      dirty = true;
       break;
   }
 };
@@ -83,12 +64,16 @@ self.onmessage = (e: MessageEvent<WaveformMsg>) => {
 // ─── RAF loop ─────────────────────────────────────────────────────────────────
 
 function startRAF(): void {
-  const tick = () => { renderFrame(); requestAnimationFrame(tick); };
+  const tick = () => {
+    if (dirty) renderFrame();
+    requestAnimationFrame(tick);
+  };
   requestAnimationFrame(tick);
 }
 
 function renderFrame(): void {
   if (!ctx || !waveformPeaks || waveformPeaks.length === 0) return;
+  dirty = false;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
