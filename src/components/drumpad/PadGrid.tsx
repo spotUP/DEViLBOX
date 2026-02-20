@@ -8,6 +8,26 @@ import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
 import { getAudioContext, resumeAudioContext } from '../../audio/AudioContextSingleton';
 import { useOrientation } from '@hooks/useOrientation';
+import type { ScratchActionId } from '../../types/drumpad';
+import {
+  djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
+  djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132,
+} from '../../engine/keyboard/commands/djScratch';
+
+const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, () => boolean> = {
+  scratch_baby:  djScratchBaby,
+  scratch_trans: djScratchTrans,
+  scratch_flare: djScratchFlare,
+  scratch_hydro: djScratchHydro,
+  scratch_crab:  djScratchCrab,
+  scratch_orbit: djScratchOrbit,
+  scratch_stop:  djScratchStop,
+  lfo_off:       djFaderLFOOff,
+  lfo_14:        djFaderLFO14,
+  lfo_18:        djFaderLFO18,
+  lfo_116:       djFaderLFO116,
+  lfo_132:       djFaderLFO132,
+};
 
 interface PadGridProps {
   onPadSelect: (padId: number) => void;
@@ -53,11 +73,17 @@ export const PadGrid: React.FC<PadGridProps> = ({
     // Ensure AudioContext is resumed (browser autoplay policy)
     await resumeAudioContext();
 
-    // Trigger audio playback
     if (currentProgram && engineRef.current) {
       const pad = currentProgram.pads.find(p => p.id === padId);
       if (pad) {
-        engineRef.current.triggerPad(pad, velocity);
+        // Fire DJ scratch action if assigned (in addition to any sample)
+        if (pad.scratchAction) {
+          SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
+        }
+        // Trigger audio playback if sample is loaded
+        if (pad.sample) {
+          engineRef.current.triggerPad(pad, velocity);
+        }
       }
     }
 

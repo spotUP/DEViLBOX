@@ -19,6 +19,12 @@ export interface SampleLayer {
   levelOffset: number;               // dB adjustment (-24 to +24)
 }
 
+export type ScratchActionId =
+  | 'scratch_baby' | 'scratch_trans' | 'scratch_flare'
+  | 'scratch_hydro' | 'scratch_crab'  | 'scratch_orbit'
+  | 'scratch_stop'
+  | 'lfo_off' | 'lfo_14' | 'lfo_18' | 'lfo_116' | 'lfo_132';
+
 export interface DrumPad {
   id: number;              // 1-16
   sample: SampleData | null;
@@ -43,6 +49,9 @@ export interface DrumPad {
 
   // Layers (velocity switching)
   layers: SampleLayer[];
+
+  // DJ scratch action (optional — fires in addition to any sample)
+  scratchAction?: ScratchActionId;
 }
 
 export interface DrumProgram {
