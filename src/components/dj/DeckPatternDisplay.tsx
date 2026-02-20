@@ -19,6 +19,7 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
   const songPos = useDJStore((s) => s.decks[deckId].songPos);
   const pattPos = useDJStore((s) => s.decks[deckId].pattPos);
   const isPlaying = useDJStore((s) => s.decks[deckId].isPlaying);
+  const fileName = useDJStore((s) => s.decks[deckId].fileName);
 
   const { patternData, numChannels } = useMemo(() => {
     try {
@@ -36,7 +37,7 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
     } catch {
       return { patternData: null, numChannels: 4 };
     }
-  }, [deckId, songPos]);
+  }, [deckId, songPos, fileName]);
 
   return (
     <div className="bg-dark-bg border border-dark-border rounded-sm overflow-hidden w-full h-full">
