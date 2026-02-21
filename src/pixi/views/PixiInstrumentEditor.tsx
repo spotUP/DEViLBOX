@@ -94,12 +94,13 @@ export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
           >
             <pixiBitmapText
               text={`No PixiJS layout for "${synthType}"`}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12 }}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
               tint={theme.textMuted.color}
+              layout={{}}
             />
             <pixiBitmapText
               text="Add layout config to src/pixi/views/instruments/layouts/"
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{ marginTop: 4 }}
             />

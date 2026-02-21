@@ -69,14 +69,46 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
           const replayer = deck.replayer;
           if (replayer.isPlaying()) {
             store.setDeckPosition(deckId, replayer.getSongPos(), replayer.getPattPos());
-            // Update elapsed time + live effective BPM (accounts for Fxx mid-song changes + pitch multiplier)
-            const liveBPM = Math.round(replayer.getBPM() * replayer.getTempoMultiplier() * 100) / 100;
-            store.setDeckState(deckId, {
-              elapsedMs: replayer.getElapsedMs(),
-              effectiveBPM: liveBPM,
-            });
-            // Relay BPM changes to ScratchPlayback for LFO resync
-            try { deck.notifyBPMChange(liveBPM); } catch { /* engine not ready */ }
+
+            // During pattern scratch the sequencer is frozen (tempoMultiplier ≈ 0)
+            // so effectiveBPM would read near-zero. Skip BPM/elapsed updates to
+            // keep the pre-scratch values visible and prevent sync indicator flickering.
+            if (deck.isPatternActive()) {
+              // Push scratch velocity + fader gain to store so UI reacts
+              const { velocity, faderGain } = deck.getScratchState();
+              const prevV = store.decks[deckId].scratchVelocity;
+              const prevF = store.decks[deckId].scratchFaderGain;
+              const update: Partial<typeof store.decks.A> = {};
+              if (Math.abs(velocity - prevV) > 0.05) update.scratchVelocity = velocity;
+              if (faderGain !== prevF) update.scratchFaderGain = faderGain;
+              if (Object.keys(update).length > 0) {
+                store.setDeckState(deckId, update);
+              }
+            } else {
+              const liveBPM = Math.round(replayer.getBPM() * replayer.getTempoMultiplier() * 100) / 100;
+              store.setDeckState(deckId, {
+                elapsedMs: replayer.getElapsedMs(),
+                effectiveBPM: liveBPM,
+              });
+              // Relay BPM changes to ScratchPlayback for LFO resync
+              try { deck.notifyBPMChange(liveBPM); } catch { /* engine not ready */ }
+
+              // Fader LFO without pattern: estimate visual fader state from timing
+              const lfoDiv = store.decks[deckId].faderLFODivision;
+              if (store.decks[deckId].faderLFOActive && lfoDiv) {
+                const divBeats: Record<string, number> = { '1/4': 1, '1/8': 0.5, '1/16': 0.25, '1/32': 0.125 };
+                const periodMs = (60000 / liveBPM) * (divBeats[lfoDiv] ?? 1);
+                const elapsed = replayer.getElapsedMs();
+                const posInPeriod = elapsed % periodMs;
+                const lfoFaderGain = posInPeriod < periodMs * 0.5 ? 1 : 0;
+                if (lfoFaderGain !== store.decks[deckId].scratchFaderGain) {
+                  store.setDeckState(deckId, { scratchFaderGain: lfoFaderGain });
+                }
+              } else if (store.decks[deckId].scratchVelocity !== 0 || store.decks[deckId].scratchFaderGain !== 1) {
+                // Clear scratch state when not scratching
+                store.setDeckState(deckId, { scratchVelocity: 0, scratchFaderGain: 1 });
+              }
+            }
           }
 
           // Auto-clear activePatternName when a one-shot pattern finishes naturally

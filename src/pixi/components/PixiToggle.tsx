@@ -104,6 +104,7 @@ export const PixiToggle: React.FC<PixiToggleProps> = ({
         style={{
           fontFamily: PIXI_FONTS.MONO,
           fontSize: config.fontSize - 1,
+          fill: 0xffffff,
         }}
         tint={theme.textMuted.color}
         layout={{ height: labelHeight }}

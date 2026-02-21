@@ -16,12 +16,26 @@ const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun1.l.google.com:19302' },
 ];
 
+/** Internal envelope for chunked large messages */
+interface ChunkEnvelope {
+  __chunk: true;
+  id: string;
+  index: number;
+  total: number;
+  data: string;
+}
+
 export class CollaborationClient {
+  /** Max bytes per data-channel send — well under Chrome's negotiated SCTP limit */
+  private static readonly CHUNK_SIZE = 16_384; // 16 KB
+
   private pc: RTCPeerConnection;
   private dataChannel: RTCDataChannel | null = null;
   private localStream: MediaStream | null = null;
   private remoteAudio: HTMLAudioElement;
   private _localAudioMuted = false;
+  /** Reassembly buffer for incoming chunked messages */
+  private _pendingChunks = new Map<string, { total: number; received: number; chunks: string[] }>();
 
   /** Called when the data channel opens */
   onConnected: (() => void) | null = null;
@@ -55,9 +69,18 @@ export class CollaborationClient {
 
     this.pc.onconnectionstatechange = () => {
       const state = this.pc.connectionState;
-      if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+      console.log('[CollaborationClient] Connection state:', state);
+      if (state === 'failed' || state === 'closed') {
         this.onDisconnected?.();
       }
+    };
+
+    this.pc.oniceconnectionstatechange = () => {
+      console.log('[CollaborationClient] ICE state:', this.pc.iceConnectionState);
+    };
+
+    this.pc.onicegatheringstatechange = () => {
+      console.log('[CollaborationClient] ICE gathering:', this.pc.iceGatheringState);
     };
   }
 
@@ -102,7 +125,7 @@ export class CollaborationClient {
 
   private _setupDataChannel(channel: RTCDataChannel): void {
     channel.onopen = () => {
-      console.log('[CollaborationClient] Data channel open');
+      console.log('[CollaborationClient] Data channel open, maxMessageSize:', (channel as unknown as Record<string, unknown>)['maxMessageSize']);
       this.onConnected?.();
     };
 
@@ -113,22 +136,65 @@ export class CollaborationClient {
 
     channel.onmessage = (event: MessageEvent) => {
       try {
-        const msg = JSON.parse(event.data as string) as DataChannelMsg;
-        this.onPatch?.(msg);
+        const raw = JSON.parse(event.data as string) as DataChannelMsg | ChunkEnvelope;
+        if ('__chunk' in raw && raw.__chunk) {
+          const assembled = this._receiveChunk(raw);
+          if (assembled) {
+            console.log('[CollaborationClient] Received (assembled):', assembled.type);
+            this.onPatch?.(assembled);
+          }
+          return;
+        }
+        console.log('[CollaborationClient] Received:', (raw as DataChannelMsg).type);
+        this.onPatch?.(raw as DataChannelMsg);
       } catch {
-        console.error('[CollaborationClient] Failed to parse data channel message:', event.data);
+        console.error('[CollaborationClient] Failed to parse data channel message');
       }
     };
 
     channel.onerror = (event) => {
-      console.error('[CollaborationClient] Data channel error:', event);
+      const rtcError = (event as RTCErrorEvent).error;
+      console.error('[CollaborationClient] Data channel error:', rtcError?.errorDetail, rtcError?.message ?? event);
     };
   }
 
+  /** Send a message, automatically splitting into 16 KB chunks if needed. */
   send(msg: DataChannelMsg): void {
-    if (this.dataChannel?.readyState === 'open') {
-      this.dataChannel.send(JSON.stringify(msg));
+    if (this.dataChannel?.readyState !== 'open') {
+      console.warn('[CollaborationClient] send() skipped — readyState:', this.dataChannel?.readyState);
+      return;
     }
+    const json = JSON.stringify(msg);
+    if (json.length <= CollaborationClient.CHUNK_SIZE) {
+      console.log('[CollaborationClient] Sending:', msg.type);
+      this.dataChannel.send(json);
+      return;
+    }
+    // Large message — split into chunks and send each individually
+    const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const total = Math.ceil(json.length / CollaborationClient.CHUNK_SIZE);
+    console.log(`[CollaborationClient] Chunking ${msg.type}: ${json.length} bytes → ${total} chunks`);
+    for (let i = 0; i < total; i++) {
+      const data = json.slice(i * CollaborationClient.CHUNK_SIZE, (i + 1) * CollaborationClient.CHUNK_SIZE);
+      this.dataChannel.send(JSON.stringify({ __chunk: true, id, index: i, total, data } satisfies ChunkEnvelope));
+    }
+  }
+
+  private _receiveChunk(chunk: ChunkEnvelope): DataChannelMsg | null {
+    let entry = this._pendingChunks.get(chunk.id);
+    if (!entry) {
+      // Fill with empty strings so join() works correctly even for out-of-order arrival
+      entry = { total: chunk.total, received: 0, chunks: new Array(chunk.total).fill('') };
+      this._pendingChunks.set(chunk.id, entry);
+    }
+    if (!entry.chunks[chunk.index]) {
+      entry.chunks[chunk.index] = chunk.data;
+      entry.received++;
+    }
+    if (entry.received < entry.total) return null;
+
+    this._pendingChunks.delete(chunk.id);
+    return JSON.parse(entry.chunks.join('')) as DataChannelMsg;
   }
 
   // ─── Voice Chat ─────────────────────────────────────────────────────────────
@@ -172,10 +238,32 @@ export class CollaborationClient {
   // ─── Cleanup ────────────────────────────────────────────────────────────────
 
   destroy(): void {
+    console.log('[CollaborationClient] destroy() called');
+    // Null all callbacks first — closing the data channel and peer connection
+    // fires async events (onclose, onconnectionstatechange) that would otherwise
+    // re-enter teardown via onDisconnected → disconnect() → _teardown() → destroy().
+    this.onConnected = null;
+    this.onDisconnected = null;
+    this.onPatch = null;
+    this.onIceCandidate = null;
+    this._pendingChunks.clear();
+
+    if (this.dataChannel) {
+      this.dataChannel.onopen = null;
+      this.dataChannel.onclose = null;
+      this.dataChannel.onmessage = null;
+      this.dataChannel.onerror = null;
+      this.dataChannel.close();
+      this.dataChannel = null;
+    }
+
+    this.pc.onicecandidate = null;
+    this.pc.ontrack = null;
+    this.pc.onconnectionstatechange = null;
+    this.pc.ondatachannel = null;
+
     this.localStream?.getTracks().forEach((t) => t.stop());
     this.localStream = null;
-    this.dataChannel?.close();
-    this.dataChannel = null;
     this.remoteAudio.srcObject = null;
     this.pc.close();
   }

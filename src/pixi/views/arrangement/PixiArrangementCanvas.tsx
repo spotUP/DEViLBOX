@@ -106,7 +106,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         <pixiBitmapText
           key={text}
           text={text}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ position: 'absolute', left: x + 3, top: 3 }}
         />

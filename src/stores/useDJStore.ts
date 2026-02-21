@@ -68,6 +68,8 @@ export interface DeckState {
 
   // Scratch
   scratchActive: boolean;
+  scratchVelocity: number;  // current scratch velocity for UI feedback (turntable, pattern scroll)
+  scratchFaderGain: number; // current scratch fader gain (0-1) for visual feedback on channel strip
   faderLFOActive: boolean;
   faderLFODivision: '1/4' | '1/8' | '1/16' | '1/32' | null;
   activePatternName: string | null;
@@ -129,6 +131,8 @@ const defaultDeckState: DeckState = {
 
   // Scratch
   scratchActive: false,
+  scratchVelocity: 0,
+  scratchFaderGain: 1,
   faderLFOActive: false,
   faderLFODivision: null,
   activePatternName: null,

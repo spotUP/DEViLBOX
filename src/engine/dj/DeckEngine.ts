@@ -10,6 +10,7 @@ import * as Tone from 'tone';
 import { TrackerReplayer, type TrackerSong } from '@/engine/TrackerReplayer';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { getNativeAudioNode } from '@/utils/audio-context';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 import { ScratchPlayback, getPatternByName } from './DJScratchEngine';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
@@ -75,11 +76,12 @@ export class DeckEngine {
   private backwardPauseTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private decayRafId: number | null = null;
 
-  // Pattern scratch state — when a scratch preset button is active, the tracker's
-  // note processing is suppressed so no new notes trigger during the scratch.
-  // Both pitch AND tempo multipliers are modulated so the pattern view follows
-  // the scratch movement. On pattern end we seek back to the saved position.
+  // Pattern scratch state — when a scratch preset button is active, the tracker
+  // plays live at scratch speed during forward phases (full audio quality) and
+  // switches to ring-buffer reverse playback for backward phases.
+  // On pattern end we seek back to the saved position.
   private patternScratchActive = false;
+  private patternScratchDir: 1 | -1 = 1;  // current direction in pattern scratch
   private patternStartSongPos = 0;
   private patternStartPattPos = 0;
 
@@ -193,6 +195,9 @@ export class DeckEngine {
     }
 
     this.replayer.loadSong(song);
+    // Apply the user's stereo separation setting (loadSong sets format default;
+    // this overrides it with the user's preference, matching tracker view behavior)
+    this.replayer.setStereoSeparation(useSettingsStore.getState().stereoSeparation);
     this.songTimeIndex = this._buildTimeIndex(song);
     await engine.preloadInstruments(song.instruments);
     await engine.ensureWASMSynthsReady(song.instruments);
@@ -355,14 +360,53 @@ export class DeckEngine {
   setScratchVelocity(velocity: number): void {
     const v = Math.max(-4, Math.min(4, velocity));
 
-    // Pattern scratch mode: ALL audio comes from the ring buffer (the "vinyl record").
-    // The signed velocity is the playback rate — positive = forward, negative = backward.
-    // The tracker's direct output is muted; we only update tempoMultiplier for visual tracking.
+    // Pattern scratch: forward phases use LIVE tracker audio (full quality),
+    // backward phases use ring-buffer reverse playback.
+    // Dead zone (±0.1) around zero prevents rapid direction switching during
+    // smooth velocity interpolation zero-crossings.
     if (this.patternScratchActive) {
-      // Update ring buffer playback rate (signed: the worklet handles direction)
-      this.scratchBuffer?.setScratchRate(v);
-      // Update sequencer speed for visual pattern tracking only (no audio effect)
-      this.replayer.setTempoMultiplier(Math.max(0.05, Math.abs(v)));
+      const absV = Math.abs(v);
+
+      if (absV < 0.1) {
+        // Dead zone: hold current direction at minimum rate.
+        // During interpolated zero-crossings the velocity passes smoothly through
+        // this zone, so both the tracker and ring buffer are near-silent here.
+        if (this.patternScratchDir === 1) {
+          this.replayer.setTempoMultiplier(0.15);
+          this.replayer.setPitchMultiplier(0.15);
+        } else {
+          this.scratchBuffer?.setRate(0.05);
+        }
+        return;
+      }
+
+      if (v > 0) {
+        // ── FORWARD: live tracker audio at scratch speed ──
+        const fwdRate = Math.max(0.15, v);
+        if (this.patternScratchDir === -1) {
+          // Transition backward → forward
+          this.scratchBuffer?.silenceAndStop();
+          this.scratchBuffer?.unfreezeCapture();
+          this.deckGain.gain.rampTo(1, 0.005);
+          this.patternScratchDir = 1;
+        }
+        this.replayer.setTempoMultiplier(fwdRate);
+        this.replayer.setPitchMultiplier(fwdRate);
+      } else {
+        // ── BACKWARD: ring-buffer reverse playback ──
+        if (this.patternScratchDir === 1) {
+          // Transition forward → backward: freeze capture, mute tracker,
+          // start ring buffer backward from the exact worklet write position.
+          this.scratchBuffer?.freezeCapture();
+          this.deckGain.gain.rampTo(0, 0.005);
+          this.scratchBuffer?.startReverseFromWritePos(absV);
+          this.replayer.setTempoMultiplier(0.001);
+          this.replayer.setPitchMultiplier(0.001);
+          this.patternScratchDir = -1;
+        } else {
+          this.scratchBuffer?.setRate(absV);
+        }
+      }
       return;
     }
 
@@ -532,17 +576,13 @@ export class DeckEngine {
     this.patternStartSongPos = this.replayer.getSongPos();
     this.patternStartPattPos = this.replayer.getPattPos();
     this.patternScratchActive = true;
+    this.patternScratchDir = 1;  // start in forward mode
 
-    // Suppress note/effect processing so the sequencer advances
-    // (for visual tracking) but no new notes trigger.
-    this.replayer.setSuppressNotes(true);
-
-    // Mute the tracker's direct audio and start ring buffer playback.
-    // The ring buffer IS the vinyl record — all scratch audio comes from it.
-    if (this.scratchBufferReady && this.scratchBuffer) {
-      this.deckGain.gain.rampTo(0, 0.005);  // mute tracker
-      this.scratchBuffer.startScratchPlayback(1.0);  // start at normal speed
-    }
+    // Forward scratch phases play the tracker LIVE at scratch speed — full audio
+    // quality, no ring-buffer gaps. Backward phases switch to the ring buffer
+    // (which continuously captures the forward audio). The tracker stays unmuted
+    // and note processing stays enabled so forward phases produce the full mix.
+    // deckGain stays at 1 until the first backward phase.
 
     // Special handling for BPM-synced patterns with custom fader scheduling
     const bpm = this.getEffectiveBPM();
@@ -570,16 +610,20 @@ export class DeckEngine {
     if (!this.patternScratchActive) return;
     this.patternScratchActive = false;
 
-    // Stop ring buffer playback and unmute the tracker's direct output
-    if (this.scratchBufferReady && this.scratchBuffer) {
-      this.scratchBuffer.stopScratchPlayback();
+    // If we ended in a backward phase, stop ring buffer and unmute tracker
+    if (this.patternScratchDir === -1 && this.scratchBufferReady && this.scratchBuffer) {
+      this.scratchBuffer.silenceAndStop();
+      this.scratchBuffer.unfreezeCapture();
       this.deckGain.gain.rampTo(1, 0.005);
     }
 
-    // Re-enable note processing before seeking so the replayer resumes normally
-    this.replayer.setSuppressNotes(false);
     // Seek replayer back to where the scratch started so the song resumes seamlessly
     this.replayer.seekTo(this.patternStartSongPos, this.patternStartPattPos);
+
+    // Snap multipliers back to the pitch-slider value immediately.
+    this.replayer.setTempoMultiplier(this.restMultiplier);
+    this.replayer.setPitchMultiplier(this.restMultiplier);
+    this.patternScratchDir = 1;
   }
 
   /** Is a pattern waiting for quantize? */
@@ -610,6 +654,15 @@ export class DeckEngine {
   /** Called by DJDeck RAF when effectiveBPM changes — relays to ScratchPlayback for LFO resync */
   notifyBPMChange(bpm: number): void {
     this.scratchPlayback.onBPMChange(bpm);
+  }
+
+  /** Get current scratch state for UI feedback (turntable spin, pattern scroll, fader indicators).
+   *  Returns velocity (signed rate multiplier) and faderGain (0-1). */
+  getScratchState(): { velocity: number; faderGain: number } {
+    return {
+      velocity: this.scratchPlayback.currentVelocity,
+      faderGain: this.scratchPlayback.currentFaderGain,
+    };
   }
 
   /**

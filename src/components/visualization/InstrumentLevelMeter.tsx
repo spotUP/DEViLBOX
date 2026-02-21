@@ -12,6 +12,7 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { getToneEngine } from '@engine/ToneEngine';
+import { useTransportStore } from '@stores/useTransportStore';
 
 interface InstrumentLevelMeterProps {
   instrumentId: number;
@@ -112,11 +113,15 @@ export const InstrumentLevelMeter: React.FC<InstrumentLevelMeterProps> = ({
       const engine = getToneEngine();
       const analyser = engine.getInstrumentAnalyser(instrumentId);
 
-      // Get current level
-      const currentLevel = analyser ? analyser.getLevel() : 0;
+      // Get current level — zero instantly when not playing
+      const isPlaying = useTransportStore.getState().isPlaying;
+      const currentLevel = (isPlaying && analyser) ? analyser.getLevel() : 0;
 
-      // Update level with decay
-      if (currentLevel > levelRef.current) {
+      if (!isPlaying) {
+        // Instant kill on stop — no lingering decay
+        levelRef.current = 0;
+        peakRef.current = 0;
+      } else if (currentLevel > levelRef.current) {
         levelRef.current = currentLevel;
       } else {
         levelRef.current *= DECAY_RATE;
@@ -125,15 +130,16 @@ export const InstrumentLevelMeter: React.FC<InstrumentLevelMeterProps> = ({
         }
       }
 
-      // Update peak hold
-      if (currentLevel > peakRef.current) {
-        peakRef.current = currentLevel;
-        peakHoldTimeRef.current = timestamp;
-      } else if (timestamp - peakHoldTimeRef.current > PEAK_HOLD_MS) {
-        // Decay peak after hold time
-        peakRef.current *= PEAK_DECAY_RATE;
-        if (peakRef.current < 0.001) {
-          peakRef.current = 0;
+      // Update peak hold (only while playing)
+      if (isPlaying) {
+        if (currentLevel > peakRef.current) {
+          peakRef.current = currentLevel;
+          peakHoldTimeRef.current = timestamp;
+        } else if (timestamp - peakHoldTimeRef.current > PEAK_HOLD_MS) {
+          peakRef.current *= PEAK_DECAY_RATE;
+          if (peakRef.current < 0.001) {
+            peakRef.current = 0;
+          }
         }
       }
 

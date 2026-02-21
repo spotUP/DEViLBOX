@@ -59,6 +59,8 @@ export const NoteActivityDisplay: React.FC<NoteActivityDisplayProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  // PERF: Reuse Map to avoid per-frame allocation
+  const activeMapRef = useRef(new Map<number, number>());
 
   // Read visualization data directly (no Zustand subscription for high-frequency data)
   const activeNotes = getVisualizationData().activeNotes;
@@ -91,8 +93,9 @@ export const NoteActivityDisplay: React.FC<NoteActivityDisplayProps> = ({
     const ctx = contextRef.current;
     if (!canvas || !ctx) return false;
 
-    // Collect active MIDI notes with velocities
-    const activeMap = new Map<number, number>(); // MIDI note -> velocity
+    // PERF: Reuse Map — clear instead of creating new one every frame
+    const activeMap = activeMapRef.current;
+    activeMap.clear();
 
     if (channelIndex !== undefined) {
       // Single channel
@@ -217,11 +220,11 @@ export const NoteActivityDisplay: React.FC<NoteActivityDisplayProps> = ({
     octaveEnd,
   ]);
 
-  // Start animation
+  // Start animation (30fps is sufficient for note activity display)
   useVisualizationAnimation({
     onFrame,
     enabled: true,
-    fps: 60,
+    fps: 30,
   });
 
   return (

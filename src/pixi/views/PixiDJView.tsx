@@ -67,16 +67,18 @@ const PixiDJTopBar: React.FC = () => {
 
       <pixiBitmapText
         text="DEViLBOX DJ"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12 }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
         tint={theme.accent.color}
+        layout={{}}
       />
 
       <pixiContainer layout={{ flex: 1 }} />
 
       <pixiBitmapText
         text="Browser | FX | Controller"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9 }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
         tint={theme.textMuted.color}
+        layout={{}}
       />
     </pixiContainer>
   );

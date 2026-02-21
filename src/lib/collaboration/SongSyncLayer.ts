@@ -103,6 +103,9 @@ export function applyRemotePatch(msg: DataChannelMsg): void {
     } else if (msg.type === 'full_pattern') {
       store.replacePattern(msg.pi, msg.pattern);
 
+    } else if (msg.type === 'pattern_add') {
+      store.importPattern(msg.pattern);
+
     } else if (msg.type === 'bpm') {
       useTransportStore.getState().setBPM(msg.value);
     }
@@ -122,6 +125,7 @@ export function startSongSync(client: CollaborationClient): void {
     for (let pi = 0; pi < state.patterns.length; pi++) {
       if (state.patterns[pi] === prev.patterns[pi]) continue;
 
+      console.log('[SongSync] Pattern change detected at pi:', pi);
       const pat = state.patterns[pi];
       const prevPat = prev.patterns[pi];
 

@@ -7,7 +7,7 @@
 import { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
-import { usePixiTheme } from '../theme';
+import { usePixiTheme, usePixiThemeId, getDeckColors } from '../theme';
 import { useUIStore, useTransportStore, useAudioStore } from '@stores';
 import { useTrackerStore } from '@stores';
 import { useDJStore } from '@/stores/useDJStore';
@@ -43,12 +43,13 @@ const TrackerStatus: React.FC = () => {
       {/* Row */}
       <pixiBitmapText
         text="Row"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={theme.text.color}
+        layout={{}}
       />
       <pixiBitmapText
         text={rowStr}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10 }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
         tint={theme.accent.color}
         layout={{ marginLeft: 4 }}
       />
@@ -58,8 +59,9 @@ const TrackerStatus: React.FC = () => {
       {/* Channel */}
       <pixiBitmapText
         text={`Ch ${cursor.channelIndex + 1}`}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={theme.text.color}
+        layout={{}}
       />
 
       <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 8, marginRight: 8 }} />
@@ -67,8 +69,9 @@ const TrackerStatus: React.FC = () => {
       {/* Column type */}
       <pixiBitmapText
         text={cursor.columnType}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={theme.text.color}
+        layout={{}}
       />
 
       <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 8, marginRight: 8 }} />
@@ -76,12 +79,13 @@ const TrackerStatus: React.FC = () => {
       {/* Octave */}
       <pixiBitmapText
         text="Oct"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={theme.text.color}
+        layout={{}}
       />
       <pixiBitmapText
         text={String(currentOctave)}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10 }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
         tint={theme.accent.color}
         layout={{ marginLeft: 4 }}
       />
@@ -91,8 +95,9 @@ const TrackerStatus: React.FC = () => {
       {/* Insert/Overwrite mode */}
       <pixiBitmapText
         text={insertMode ? 'INS' : 'OVR'}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10 }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
         tint={insertMode ? theme.warning.color : theme.accent.color}
+        layout={{}}
       />
 
       <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 8, marginRight: 8 }} />
@@ -100,8 +105,9 @@ const TrackerStatus: React.FC = () => {
       {/* Record/Edit mode */}
       <pixiBitmapText
         text={recordMode ? 'REC' : 'EDIT'}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10 }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
         tint={recordMode ? theme.error.color : theme.text.color}
+        layout={{}}
       />
     </>
   );
@@ -119,41 +125,42 @@ const DJStatus: React.FC = () => {
   const deck2Name = useDJStore(s => s.decks.B.trackName);
   const crossfader = useDJStore(s => s.crossfaderPosition);
 
+  const themeId = usePixiThemeId();
+  const { deckA, deckB } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
+
   const sep = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 4, 1, STATUS_HEIGHT - 8);
     g.fill({ color: theme.border.color, alpha: 0.4 });
   }, [theme]);
 
-  const BLUE = 0x60a5fa;
-  const RED = 0xf87171;
-
   return (
     <>
       {/* Deck 1 */}
       <pixiBitmapText
         text="D1"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10 }}
-        tint={BLUE}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+        tint={deckA}
+        layout={{}}
       />
       <pixiBitmapText
         text={deck1Playing ? 'PLAY' : 'STOP'}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={deck1Playing ? theme.success.color : theme.textMuted.color}
         layout={{ marginLeft: 4 }}
       />
       {deck1Name ? (
         <pixiBitmapText
           text={deck1Name.length > 15 ? deck1Name.substring(0, 15) + '..' : deck1Name}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ marginLeft: 6 }}
         />
       ) : null}
       <pixiBitmapText
         text={`${deck1BPM.toFixed(1)} BPM`}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
-        tint={BLUE}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+        tint={deckA}
         layout={{ marginLeft: 6 }}
       />
 
@@ -162,12 +169,13 @@ const DJStatus: React.FC = () => {
       {/* Crossfader */}
       <pixiBitmapText
         text="X-Fade"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={theme.text.color}
+        layout={{}}
       />
       <pixiBitmapText
         text={`${(crossfader * 100).toFixed(0)}%`}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10 }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
         tint={theme.accent.color}
         layout={{ marginLeft: 4 }}
       />
@@ -177,27 +185,28 @@ const DJStatus: React.FC = () => {
       {/* Deck 2 */}
       <pixiBitmapText
         text="D2"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10 }}
-        tint={RED}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+        tint={deckB}
+        layout={{}}
       />
       <pixiBitmapText
         text={deck2Playing ? 'PLAY' : 'STOP'}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={deck2Playing ? theme.success.color : theme.textMuted.color}
         layout={{ marginLeft: 4 }}
       />
       {deck2Name ? (
         <pixiBitmapText
           text={deck2Name.length > 15 ? deck2Name.substring(0, 15) + '..' : deck2Name}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ marginLeft: 6 }}
         />
       ) : null}
       <pixiBitmapText
         text={`${deck2BPM.toFixed(1)} BPM`}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
-        tint={RED}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+        tint={deckB}
         layout={{ marginLeft: 6 }}
       />
     </>
@@ -258,8 +267,9 @@ export const PixiStatusBar: React.FC = () => {
         />
         <pixiBitmapText
           text={isAudioActive ? 'Audio Active' : 'Audio Off'}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
           tint={isAudioActive ? theme.success.color : theme.textMuted.color}
+          layout={{}}
         />
       </pixiContainer>
     </pixiContainer>

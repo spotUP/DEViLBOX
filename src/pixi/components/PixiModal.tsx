@@ -131,8 +131,9 @@ export const PixiModal: React.FC<PixiModalProps> = ({
             />
             <pixiBitmapText
               text={title}
-              style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13 }}
+              style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }}
               tint={theme.text.color}
+              layout={{}}
             />
           </pixiContainer>
         )}
@@ -182,17 +183,19 @@ export const PixiModalHeader: React.FC<PixiModalHeaderProps> = ({
     >
       <pixiBitmapText
         text={title}
-        style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13 }}
+        style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }}
         tint={theme.text.color}
+        layout={{}}
       />
       {onClose && (
         <pixiBitmapText
           text="X"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
           tint={theme.textMuted.color}
           eventMode="static"
           cursor="pointer"
           onPointerUp={onClose}
+          layout={{}}
         />
       )}
     </pixiContainer>

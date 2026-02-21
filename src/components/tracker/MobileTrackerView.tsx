@@ -14,7 +14,7 @@ import { MobilePatternInput } from './mobile/MobilePatternInput';
 import { Play, Square, ChevronLeft, ChevronRight, Music2, SlidersHorizontal, Cpu } from 'lucide-react';
 import { useTransportStore, useTrackerStore, useInstrumentStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
-import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
+import { getGroupedPresets } from '@/constants/systemPresets';
 import { useOrientation } from '@/hooks/useOrientation';
 import { haptics } from '@/utils/haptics';
 import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';

@@ -19,6 +19,7 @@ import { useGridPattern } from '../../hooks/useGridPattern';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useTrackerStore } from '../../stores/useTrackerStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
+import { useShallow } from 'zustand/react/shallow';
 import { GridControls } from './GridControls';
 import { NoteGridCell } from './GridCell';
 import { SCALES, isNoteInScale } from '../../lib/scales';
@@ -53,9 +54,9 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
     clearAll,
   } = useGridPattern(channelIndex);
 
-  const currentRow = useTransportStore((s) => s.currentRow);
-  const isPlaying = useTransportStore((s) => s.isPlaying);
-  const smoothScrolling = useTransportStore((s) => s.smoothScrolling);
+  const { currentRow, isPlaying, smoothScrolling } = useTransportStore(
+    useShallow((s) => ({ currentRow: s.currentRow, isPlaying: s.isPlaying, smoothScrolling: s.smoothScrolling }))
+  );
 
   // Current playback step (only show when playing)
   const currentStep = isPlaying ? currentRow % maxSteps : -1;

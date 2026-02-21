@@ -1020,6 +1020,9 @@ export class ToneEngine {
     this._isPlaying = false;
     this._notifyNoiseEffectsPlaying(false);
 
+    // Clear VU meter trigger levels so meters die instantly on stop
+    this.clearChannelTriggerLevels();
+
     // Kill master effects tails (delay, reverb) by temporarily muting output
     // then restoring after the effect buffers have cleared
     const currentVolume = this.masterChannel.volume.value;
@@ -6264,6 +6267,13 @@ export class ToneEngine {
    */
   public triggerChannelMeter(channelIndex: number, velocity: number): void {
     this.channelTriggerLevels.set(channelIndex, Math.min(1, velocity * 1.2));
+  }
+
+  /**
+   * Clear all channel trigger levels (called on playback stop for instant VU silence)
+   */
+  public clearChannelTriggerLevels(): void {
+    this.channelTriggerLevels.clear();
   }
 
   /**

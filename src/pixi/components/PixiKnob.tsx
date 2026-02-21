@@ -379,6 +379,7 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
             style={{
               fontFamily: PIXI_FONTS.MONO,
               fontSize: config.fontSize - 1,
+              fill: 0xffffff,
             }}
             tint={theme.textMuted.color}
             layout={{ height: labelHeight }}
@@ -398,6 +399,7 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
           style={{
             fontFamily: PIXI_FONTS.MONO,
             fontSize: config.fontSize,
+            fill: 0xffffff,
           }}
           tint={isActive ? accent : theme.textSecondary.color}
           layout={{ height: valueHeight }}

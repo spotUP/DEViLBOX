@@ -5,6 +5,7 @@
 import * as Tone from 'tone';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 
 /**
@@ -14,6 +15,7 @@ export function playStopToggle(): boolean {
   const { isPlaying, stop, setCurrentRow } = useTransportStore.getState();
   
   if (isPlaying) {
+    getTrackerReplayer().stop();
     stop();
     getToneEngine().stop();
   } else {
@@ -40,8 +42,9 @@ export function playStopToggle(): boolean {
  */
 export function playPattern(): boolean {
   const { setCurrentRow, play, isPlaying, stop } = useTransportStore.getState();
-  
+
   if (isPlaying) {
+    getTrackerReplayer().stop();
     stop();
   }
   
@@ -66,8 +69,9 @@ export function playPattern(): boolean {
  */
 export function playSong(): boolean {
   const { setCurrentRow, setCurrentPattern, play, isPlaying, stop } = useTransportStore.getState();
-  
+
   if (isPlaying) {
+    getTrackerReplayer().stop();
     stop();
   }
   
@@ -92,6 +96,7 @@ export function playSong(): boolean {
  * Stop playback
  */
 export function stopPlayback(): boolean {
+  getTrackerReplayer().stop();
   const { stop } = useTransportStore.getState();
   stop();
   getToneEngine().stop();

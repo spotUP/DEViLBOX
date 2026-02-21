@@ -137,6 +137,11 @@ export function getDJEngine(): DJEngine {
   return djEngineInstance;
 }
 
+/** Returns the existing DJEngine instance or null (does NOT create one). */
+export function getDJEngineIfActive(): DJEngine | null {
+  return djEngineInstance;
+}
+
 export function disposeDJEngine(): void {
   if (djEngineInstance) {
     djEngineInstance.dispose();

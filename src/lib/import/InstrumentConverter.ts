@@ -87,18 +87,52 @@ export function convertToInstrument(
   }
 
   // Standard sample-based conversion for MOD/XM/IT/S3M
-  // XM instruments can have multiple samples
-  // Create one DEViLBOX instrument per sample (simplest approach)
-  // Use sequential IDs: instrumentId, instrumentId+1, instrumentId+2, etc.
+  // XM instruments can have multiple samples.
+  // The primary instrument keeps the original slot ID (matches pattern references).
+  // All sample configs are stored in metadata.multiSamples for note-to-sample lookup.
   for (let i = 0; i < parsed.samples.length; i++) {
     const sample = parsed.samples[i];
     const instrument = convertSampleToInstrument(
       sample,
       parsed,
-      instrumentId + i, // Sequential ID (1-128 XM-compatible range)
+      instrumentId, // All samples share the parent instrument ID
       sourceFormat
     );
-    instruments.push(instrument);
+    // Only push the first sample as the main instrument config.
+    // Additional samples are stored in multiSamples on the first instrument.
+    if (i === 0) {
+      instruments.push(instrument);
+    }
+  }
+
+  // For multi-sample instruments, build the multiSamples array on the primary instrument
+  if (parsed.samples.length > 1 && instruments.length > 0) {
+    const primary = instruments[0];
+    if (primary.metadata) {
+      primary.metadata.multiSamples = parsed.samples.map((sample) => {
+        const { audioBuffer, blobUrl, loopStart: unrolledLoopStart, loopEnd: unrolledLoopEnd } = convertPCMToAudioBuffer(sample);
+        const baseNote = calculateBaseNote(sample.relativeNote, sample.finetune);
+        const detune = (sample.finetune * 100) / 128;
+        const sampleRate = sample.sampleRate || 8363;
+        return {
+          sample: {
+            audioBuffer,
+            url: blobUrl,
+            baseNote,
+            detune,
+            loop: sample.loopType !== 'none',
+            loopStart: unrolledLoopStart,
+            loopEnd: unrolledLoopEnd,
+            sampleRate,
+            reverse: false,
+            playbackRate: 1.0,
+          },
+          finetune: sample.finetune,
+          relativeNote: sample.relativeNote,
+          defaultVolume: sample.volume,
+        };
+      });
+    }
   }
 
   return instruments;
@@ -317,7 +351,7 @@ function convertSampleToInstrument(
   sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'DMF'
 ): InstrumentConfig {
   // Convert sample PCM data to AudioBuffer and blob URL
-  const { audioBuffer, blobUrl } = convertPCMToAudioBuffer(sample);
+  const { audioBuffer, blobUrl, loopStart: unrolledLoopStart, loopEnd: unrolledLoopEnd } = convertPCMToAudioBuffer(sample);
 
   // Debug logging for sample conversion
   const logRate = sample.sampleRate || 8363;
@@ -338,6 +372,8 @@ function convertSampleToInstrument(
   // Create sample config
   // IMPORTANT: loopStart/loopEnd are in sample units, not seconds
   // ToneEngine will convert using sampleRate
+  // For ping-pong loops, convertPCMToAudioBuffer unrolls the data and returns
+  // adjusted loop points that produce a forward loop equivalent.
   const sampleRate = sample.sampleRate || 8363; // Amiga C-2 rate
   const sampleConfig: SampleConfig = {
     audioBuffer,
@@ -345,8 +381,8 @@ function convertSampleToInstrument(
     baseNote,
     detune,
     loop: sample.loopType !== 'none',
-    loopStart: sample.loopStart,
-    loopEnd: sample.loopStart + sample.loopLength,
+    loopStart: unrolledLoopStart,
+    loopEnd: unrolledLoopEnd,
     sampleRate: sampleRate, // For converting loop points to seconds
     reverse: false,
     playbackRate: 1.0,
@@ -356,7 +392,10 @@ function convertSampleToInstrument(
   const metadata: InstrumentMetadata = {
     importedFrom: sourceFormat === 'FUR' || sourceFormat === 'DMF' ? 'FUR' : sourceFormat,
     originalEnvelope: parentInstrument.volumeEnvelope,
+    panningEnvelope: parentInstrument.panningEnvelope,
     autoVibrato: parentInstrument.autoVibrato,
+    fadeout: parentInstrument.fadeout,
+    sampleMap: parentInstrument.sampleMap,
     preservedSample: {
       audioBuffer: sampleConfig.audioBuffer!, // Non-null assertion: we just created this
       url: sampleConfig.url,
@@ -371,8 +410,10 @@ function convertSampleToInstrument(
     modPlayback: {
       usePeriodPlayback: true, // Use period-based playback for accuracy
       periodMultiplier: 3546895, // AMIGA_PALFREQUENCY_HALF (PAL Amiga)
-      finetune: sample.finetune, // Store original finetune
+      finetune: sample.finetune, // Store original finetune (-128 to +127 for XM)
+      relativeNote: sample.relativeNote, // XM sample relative note (-96 to +95)
       defaultVolume: sample.volume, // Sample's default volume (0-64) for channel init
+      fadeout: parentInstrument.fadeout, // XM fadeout speed (0-4095)
     },
   };
 
@@ -409,7 +450,7 @@ function convertSampleToInstrument(
  * - Data URLs embed the audio data directly, surviving serialization
  * - This allows samples to persist across browser sessions
  */
-function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuffer; blobUrl: string } {
+function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuffer; blobUrl: string; loopStart: number; loopEnd: number } {
   const sampleRate = sample.sampleRate || 8363; // Default to Amiga C-2 rate
   // Guard against zero-length samples (empty Furnace sample slots):
   // decodeAudioData() rejects WAV files with 0 data bytes, so use at least 1 sample of silence
@@ -446,13 +487,41 @@ function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuff
     }
   }
 
+  // Ping-pong loop unrolling: Web Audio only supports forward loops,
+  // so we unroll bidirectional loops by appending the reversed loop interior.
+  // Original ping-pong cycle: loopStart→loopEnd-1→loopStart (2*len - 2 samples)
+  // Unrolled: loopStart→loopEnd-1→(reversed interior)→loopStart+1 as forward loop
+  let finalSamples = samples16bit;
+  let finalLoopStart = sample.loopStart;
+  let finalLoopLength = sample.loopLength;
+
+  if (sample.loopType === 'pingpong' && sample.loopLength > 2) {
+    const ls = sample.loopStart;
+    const ll = sample.loopLength;
+    const le = ls + ll; // loop end (exclusive)
+    const reverseLen = ll - 2; // interior samples to reverse (exclude endpoints)
+    const newLength = Math.max(length, le) + reverseLen;
+
+    finalSamples = new Int16Array(newLength);
+    // Copy original data up to loop end
+    for (let i = 0; i < Math.min(le, length); i++) {
+      finalSamples[i] = samples16bit[i];
+    }
+    // Append reversed loop interior: samples[loopEnd-2] through samples[loopStart+1]
+    for (let i = 0; i < reverseLen; i++) {
+      finalSamples[le + i] = samples16bit[le - 2 - i];
+    }
+
+    finalLoopLength = ll + reverseLen; // = 2*ll - 2
+  }
+
   // Create WAV file directly with proper sample rate header
   const loopInfo = sample.loopType !== 'none' ? {
-    start: sample.loopStart,
-    end: sample.loopStart + sample.loopLength,
+    start: finalLoopStart,
+    end: finalLoopStart + finalLoopLength,
   } : undefined;
 
-  const wavArrayBuffer = createWavFile(samples16bit, sampleRate, loopInfo);
+  const wavArrayBuffer = createWavFile(finalSamples, sampleRate, loopInfo);
 
   // Convert to base64 data URL (survives page refresh unlike blob URLs)
   const base64 = arrayBufferToBase64(wavArrayBuffer);
@@ -462,6 +531,8 @@ function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuff
     // Return WAV buffer (not raw PCM) so ToneEngine.decodeAudioData can decode it
     audioBuffer: wavArrayBuffer,
     blobUrl: dataUrl,
+    loopStart: finalLoopStart,
+    loopEnd: finalLoopStart + finalLoopLength,
   };
 }
 

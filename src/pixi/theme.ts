@@ -102,3 +102,17 @@ export function usePixiTheme(): PixiTheme {
   const theme = useThemeStore(state => state.getCurrentTheme());
   return useMemo(() => themeColorsToPixi(theme.colors), [theme.id]);
 }
+
+/** Returns the current theme ID string for conditional logic */
+export function usePixiThemeId(): string {
+  return useThemeStore(state => state.currentThemeId);
+}
+
+/** Deck accent colors — cyan-lineart collapses both to cyan shades */
+export function getDeckColors(themeId: string, accent: PixiColor, accentSecondary: PixiColor): { deckA: number; deckB: number } {
+  if (themeId === 'cyan-lineart') {
+    return { deckA: accent.color, deckB: accentSecondary.color };
+  }
+  // Standard deck colors (blue/red) for all other themes
+  return { deckA: 0x60a5fa, deckB: 0xf87171 };
+}

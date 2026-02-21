@@ -48,6 +48,7 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
   const momentumStartVelRef     = useRef(1);
 
   const [isScratchActive, setIsScratchActive] = useState(false);
+  const jogActiveRef = useRef(false); // Ref mirror of isScratchActive for subscription closures
 
   // ── Bridge init ────────────────────────────────────────────────────────────
   // Canvas created imperatively — prevents StrictMode double-transferControlToOffscreen error.
@@ -86,6 +87,29 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
       { equalityFn: (a, b) => a.isPlaying === b.isPlaying && a.effectiveBPM === b.effectiveBPM },
     );
 
+    // Pattern scratch velocity → turntable spin.
+    // When a scratch pattern is active, forward velocity to the worker so the
+    // vinyl spins forward/backward matching the scratch. When not scratching,
+    // the worker uses default velocity (1.0).
+    const unsubScratch = useDJStore.subscribe(
+      (s) => ({
+        scratchVelocity: s.decks[deckId].scratchVelocity,
+        activePatternName: s.decks[deckId].activePatternName,
+      }),
+      ({ scratchVelocity, activePatternName }) => {
+        if (activePatternName && !jogActiveRef.current) {
+          // Pattern scratch active (and jog wheel not held) — forward velocity to worker
+          bridgeRef.current?.post({ type: 'velocity', v: scratchVelocity });
+          bridgeRef.current?.post({ type: 'scratchActive', active: true });
+        } else if (!activePatternName && !jogActiveRef.current) {
+          // No scratch pattern and no jog — reset to normal spin
+          bridgeRef.current?.post({ type: 'velocity', v: 1 });
+          bridgeRef.current?.post({ type: 'scratchActive', active: false });
+        }
+      },
+      { equalityFn: (a, b) => a.scratchVelocity === b.scratchVelocity && a.activePatternName === b.activePatternName },
+    );
+
     // Theme / CSS var subscription
     const unsubTheme = useThemeStore.subscribe(() => {
       if (containerRef.current) {
@@ -95,6 +119,7 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
 
     return () => {
       unsub();
+      unsubScratch();
       unsubTheme();
       bridge.dispose();
       bridgeRef.current = null;
@@ -133,6 +158,7 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
 
     lastPointerRef.current     = { x: e.clientX, y: e.clientY };
     scratchVelocityRef.current = 1;
+    jogActiveRef.current = true;
     setIsScratchActive(true);
     useDJStore.getState().setDeckScratchActive(deckId, true);
     bridgeRef.current?.post({ type: 'scratchActive', active: true });
@@ -166,6 +192,7 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
     e.currentTarget.releasePointerCapture(e.pointerId);
     lastPointerRef.current = null;
     const fromVelocity = scratchVelocityRef.current;
+    jogActiveRef.current = false;
     setIsScratchActive(false);
     useDJStore.getState().setDeckScratchActive(deckId, false);
     bridgeRef.current?.post({ type: 'scratchActive', active: false });

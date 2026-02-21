@@ -5,7 +5,7 @@
 
 import { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
-import { usePixiTheme } from '../../theme';
+import { usePixiTheme, usePixiThemeId, getDeckColors } from '../../theme';
 import { useDJStore } from '@/stores/useDJStore';
 
 interface PixiDeckTurntableProps {
@@ -18,7 +18,9 @@ export const PixiDeckTurntable: React.FC<PixiDeckTurntableProps> = ({ deckId, si
   const isPlaying = useDJStore(s => s.decks[deckId].isPlaying);
   const position = useDJStore(s => s.decks[deckId].audioPosition);
 
-  const DECK_COLOR = deckId === 'A' ? 0x60a5fa : 0xf87171;
+  const themeId = usePixiThemeId();
+  const { deckA, deckB } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
+  const DECK_COLOR = deckId === 'A' ? deckA : deckB;
   const cx = size / 2;
   const cy = size / 2;
   const outerR = size / 2 - 4;

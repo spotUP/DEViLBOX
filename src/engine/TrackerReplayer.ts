@@ -23,6 +23,7 @@ import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransport
 import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/audio';
 import type { GrooveTemplate } from '@/types/audio';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
+import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate, ft2ArpeggioPeriod, FT2_ARPEGGIO_TAB } from './effects/FT2Tables';
 
 // ============================================================================
 // CONSTANTS
@@ -37,6 +38,36 @@ const FINETUNE_MULTIPLIERS: number[] = new Array(16);
 for (let ft = -8; ft <= 7; ft++) {
   FINETUNE_MULTIPLIERS[ft + 8] = Math.pow(2, ft / (8 * 12));
 }
+
+// PERF: Pre-computed semitone ratios for arpeggio macro and pitch slide
+// Covers -128..+127 semitones (full signed byte range). Index = semitones + 128.
+const SEMITONE_RATIOS: number[] = new Array(256);
+for (let s = -128; s <= 127; s++) {
+  SEMITONE_RATIOS[s + 128] = Math.pow(2, s / 12);
+}
+
+// PERF: Pre-computed octave multipliers for period conversion
+// Covers octave shifts 0..10 (more than enough for any tracker format)
+const OCTAVE_UP: number[] = new Array(11);
+const OCTAVE_DOWN: number[] = new Array(11);
+for (let o = 0; o <= 10; o++) {
+  OCTAVE_UP[o] = Math.pow(2, o);
+  OCTAVE_DOWN[o] = Math.pow(2, -o);
+}
+
+// FT2 auto-vibrato sine table (256 entries, -64..+64)
+// From ft2_replayer.c: autoVibSineTab[256]
+const AUTO_VIB_SINE_TAB: Int8Array = new Int8Array(256);
+for (let i = 0; i < 256; i++) {
+  AUTO_VIB_SINE_TAB[i] = Math.round(Math.sin((i * 2 * Math.PI) / 256) * 64);
+}
+
+// PERF: Module-level constants to avoid per-call allocation
+const DEBUG_NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const NOTE_STRING_MAP: { [key: string]: number } = {
+  'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
+  'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11,
+};
 
 // Complete period table with all 16 finetune variations
 const PERIOD_TABLE = [
@@ -192,21 +223,36 @@ interface ChannelState {
   // Sample state
   sampleNum: number;             // Current sample/instrument number
   sampleOffset: number;          // Sample offset memory (9xx)
-  finetune: number;              // Finetune (-8 to +7)
+  finetune: number;              // Finetune: -8 to +7 (MOD) or -128 to +127 (XM)
+  relativeNote: number;          // XM sample relative note (-96 to +95)
 
   // Effect memory
-  portaSpeed: number;            // Portamento speed (1xx, 2xx)
+  portaSpeed: number;            // Portamento speed (1xx, 2xx) - MOD shared
+  portaUpSpeed: number;          // FT2: separate portamento up speed memory
+  portaDownSpeed: number;        // FT2: separate portamento down speed memory
+  fPortaUpSpeed: number;         // FT2: fine portamento up speed memory (E1x)
+  fPortaDownSpeed: number;       // FT2: fine portamento down speed memory (E2x)
   portaTarget: number;           // Tone portamento target (3xx)
   tonePortaSpeed: number;        // Tone portamento speed
   vibratoPos: number;            // Vibrato position
   vibratoCmd: number;            // Vibrato speed/depth
   tremoloPos: number;            // Tremolo position
-  tremoloCmd: number;            // Tremolo speed/depth
+  tremoloCmd: number;            // Tremolo speed/depth (MOD)
+  tremoloSpeed: number;          // FT2: stored separately, = (param & 0xF0) >> 2
+  tremoloDepth: number;          // FT2: stored separately
   waveControl: number;           // Waveform control
   retrigCount: number;           // Retrigger counter
   retrigVolSlide: number;        // Retrigger volume slide (IT Rxy)
   patternLoopRow: number;        // Pattern loop start row
   patternLoopCount: number;      // Pattern loop counter
+  glissandoMode: boolean;        // E3x: true = semitone portamento
+  tremorPos: number;             // Tremor state: bit 7 = on/off, bits 0-6 = counter
+  tremorParam: number;           // Tremor parameter memory (Txy)
+  efPitchSlideUpSpeed: number;   // Extra fine porta up speed memory (X1x)
+  efPitchSlideDownSpeed: number; // Extra fine porta down speed memory (X2x)
+  volSlideSpeed: number;         // FT2: volume slide speed memory (Axx)
+  fVolSlideUpSpeed: number;      // FT2: fine volume slide up memory (EAx)
+  fVolSlideDownSpeed: number;    // FT2: fine volume slide down memory (EBx)
   globalVolSlide: number;        // Global volume slide memory (Hxx)
   panSlide: number;              // Pan slide memory (Pxx)
 
@@ -217,6 +263,27 @@ interface ChannelState {
   macroArpNote: number;          // Current arpeggio note offset
   macroDuty: number;             // Current duty cycle from macro
   macroWaveform: number;         // Current waveform from macro
+
+  // XM envelope state (FT2's fixaEnvelopeVibrato)
+  keyOff: boolean;               // Key-off flag — triggers fadeout + envelope release
+  fadeoutVol: number;            // Fadeout volume (0-32768, starts at 32768 on note trigger)
+  fadeoutSpeed: number;          // Fadeout speed from instrument (0-4095)
+  volEnvTick: number;            // Volume envelope tick counter
+  volEnvPos: number;             // Volume envelope point index
+  fVolEnvValue: number;          // Volume envelope interpolated value (0-64)
+  fVolEnvDelta: number;          // Volume envelope per-tick delta
+  panEnvTick: number;            // Panning envelope tick counter
+  panEnvPos: number;             // Panning envelope point index
+  fPanEnvValue: number;          // Panning envelope interpolated value (0-64)
+  fPanEnvDelta: number;          // Panning envelope per-tick delta
+  autoVibPos: number;            // Auto-vibrato position (0-255 wrapping)
+  autoVibAmp: number;            // Auto-vibrato amplitude (fixed point, upper 8 bits = depth)
+  autoVibSweep: number;         // Auto-vibrato sweep increment
+  outVol: number;                // FT2 output volume = ch.volume (0-64)
+  outPan: number;                // FT2 output panning (0-255)
+  fFinalVol: number;             // Final computed volume after envelopes (0-1)
+  finalPan: number;              // Final computed panning after envelopes (0-255)
+  finalPeriod: number;           // Final period after auto-vibrato
 
   // TB-303 specific state
   previousSlideFlag: boolean;    // Previous row's slide flag (for proper 303 slide semantics)
@@ -249,6 +316,8 @@ export interface TrackerSong {
   numChannels: number;
   initialSpeed: number;
   initialBPM: number;
+  // XM frequency mode: true = linear periods (most XMs), false = amiga periods
+  linearPeriods?: boolean;
   // Furnace-specific timing/compat (optional)
   speed2?: number;
   hz?: number;
@@ -277,6 +346,10 @@ export class TrackerReplayer {
   // Song data
   private song: TrackerSong | null = null;
 
+  // PERF: Cached transport state — set once per scheduler interval (15ms),
+  // reused by processTick() and triggerNote() to avoid repeated getState() calls
+  private _cachedTransportState: ReturnType<typeof useTransportStore.getState> | null = null;
+
   // Playback state
   private playing = false;
   private songPos = 0;           // Current position in song order
@@ -285,6 +358,12 @@ export class TrackerReplayer {
   private speed = 6;             // Ticks per row
   private bpm = 125;             // Beats per minute
   private globalVolume = 64;     // Global volume (0-64)
+
+  // FT2 XM period mode: true = linear periods, false = amiga periods
+  // Set from song.linearPeriods when loading. MOD always uses amiga.
+  private linearPeriods = false;
+  // Whether to use FT2's period system (true for XM, false for MOD)
+  private useXMPeriods = false;
 
   // Global pitch shift (Wxx effect) - DJ-style smooth sliding
   private globalPitchTarget = 0;      // Target semitones (-12 to +12)
@@ -304,7 +383,10 @@ export class TrackerReplayer {
   private pBreakFlag = false;
   private posJumpFlag = false;
   private posJumpPos = 0;
-  private patternDelay = 0;      // EEx pattern delay
+  private patternDelay = 0;      // EEx pattern delay (legacy, non-XM)
+  // FT2 two-stage pattern delay
+  private pattDelTime = 0;       // Set by EEx on tick 0, copied to pattDelTime2 at row boundary
+  private pattDelTime2 = 0;      // Decremented each row; while > 0, row repeats (no new notes read)
 
   // Channels
   private channels: ChannelState[] = [];
@@ -326,6 +408,8 @@ export class TrackerReplayer {
   // Cache for ToneAudioBuffer wrappers (keyed by instrument ID)
   // Avoids re-wrapping the same decoded AudioBuffer on every note trigger
   private bufferCache: Map<number, Tone.ToneAudioBuffer> = new Map();
+  // Cache for multi-sample decoded AudioBuffers (keyed by "instId:sampleIdx")
+  private multiSampleBufferCache: Map<string, AudioBuffer> = new Map();
   private _warnedMissingInstruments: Set<number> | undefined;
 
   // Instrument lookup map (keyed by instrument ID) — avoids linear scan per note
@@ -617,7 +701,8 @@ export class TrackerReplayer {
   loadSong(song: TrackerSong): void {
     this.stop();
     this.song = song;
-    this.bufferCache.clear(); // New song = new samples, invalidate cache
+    this.bufferCache.clear();
+    this.multiSampleBufferCache.clear(); // New song = new samples, invalidate cache
     this._warnedMissingInstruments = undefined;
     this.instrumentMap = new Map(song.instruments.map(i => [i.id, i]));
 
@@ -642,6 +727,10 @@ export class TrackerReplayer {
     // XM/IT/S3M = 100% (these formats have their own per-channel panning)
     this.stereoSeparation = song.format === 'MOD' ? 20 : 100;
 
+    // FT2 XM period system: use for XM files, not for MOD
+    this.useXMPeriods = song.format === 'XM';
+    this.linearPeriods = song.linearPeriods ?? (song.format === 'XM'); // Default XM to linear
+
     // Set initial playback state
     this.songPos = 0;
     this.pattPos = 0;
@@ -654,6 +743,27 @@ export class TrackerReplayer {
     this.posJumpFlag = false;
     this.posJumpPos = 0;
     this.patternDelay = 0;
+    this.pattDelTime = 0;
+    this.pattDelTime2 = 0;
+
+    // Reset per-deck pitch/tempo state (prevents carry-over between songs & views)
+    this.globalPitchCurrent = 0;
+    this.globalPitchTarget = 0;
+    this.tempoMultiplier = 1.0;
+    this.pitchMultiplier = 1.0;
+    this.deckDetuneCents = 0;
+
+    // For the global tracker replayer, also reset ToneEngine globals
+    // (Wxx effects modify these, and they persist across song loads otherwise)
+    if (!this.isDJDeck) {
+      const engine = getToneEngine();
+      engine.setGlobalPlaybackRate(1.0);
+      engine.setGlobalDetune(0);
+      // Reset Tone.js transport BPM and store display to match the new song
+      Tone.getTransport().bpm.value = song.initialBPM;
+      useTransportStore.getState().setBPM(song.initialBPM);
+      useTransportStore.getState().setGlobalPitch(0);
+    }
 
     // Clear stale callbacks from previous song
     this.onRowChange = null;
@@ -710,18 +820,33 @@ export class TrackerReplayer {
       sampleNum: 0,
       sampleOffset: 0,
       finetune: 0,
+      relativeNote: 0,
       portaSpeed: 0,
+      portaUpSpeed: 0,
+      portaDownSpeed: 0,
+      fPortaUpSpeed: 0,
+      fPortaDownSpeed: 0,
       portaTarget: 0,
       tonePortaSpeed: 0,
       vibratoPos: 0,
       vibratoCmd: 0,
       tremoloPos: 0,
       tremoloCmd: 0,
+      tremoloSpeed: 0,
+      tremoloDepth: 0,
       waveControl: 0,
       retrigCount: 0,
       retrigVolSlide: 0,
       patternLoopRow: 0,
       patternLoopCount: 0,
+      glissandoMode: false,
+      tremorPos: 0,
+      tremorParam: 0,
+      efPitchSlideUpSpeed: 0,
+      efPitchSlideDownSpeed: 0,
+      volSlideSpeed: 0,
+      fVolSlideUpSpeed: 0,
+      fVolSlideDownSpeed: 0,
       globalVolSlide: 0,
       panSlide: 0,
       macroPos: 0,
@@ -730,6 +855,25 @@ export class TrackerReplayer {
       macroArpNote: 0,
       macroDuty: 0,
       macroWaveform: 0,
+      keyOff: false,
+      fadeoutVol: 32768,
+      fadeoutSpeed: 0,
+      volEnvTick: 0,
+      volEnvPos: 0,
+      fVolEnvValue: 0,
+      fVolEnvDelta: 0,
+      panEnvTick: 0,
+      panEnvPos: 0,
+      fPanEnvValue: 0,
+      fPanEnvDelta: 0,
+      autoVibPos: 0,
+      autoVibAmp: 0,
+      autoVibSweep: 0,
+      outVol: 64,
+      outPan: 128,
+      fFinalVol: 1.0,
+      finalPan: 128,
+      finalPeriod: 0,
       previousSlideFlag: false,
       gateHigh: false,
       lastPlayedNoteName: null,
@@ -817,6 +961,18 @@ export class TrackerReplayer {
       engine.releaseAll();
     } catch { /* ignored */ }
 
+    // Cancel any scheduled VU meter triggers (look-ahead scheduling enqueues callbacks
+    // into Tone.Draw that would otherwise fire after stop, causing lingering VU bouncing)
+    try {
+      Tone.Draw.cancel(0);
+    } catch { /* ignored */ }
+
+    // Clear all pending channel trigger levels so VU meters read zero immediately
+    try {
+      const engine = getToneEngine();
+      engine.clearChannelTriggerLevels();
+    } catch { /* ignored */ }
+
     // Keep position — don't reset songPos/pattPos so playback resumes where it stopped
     this.currentTick = 0;
     this.lastGrooveTemplateId = 'straight';
@@ -860,6 +1016,8 @@ export class TrackerReplayer {
 
       const scheduleUntil = Tone.now() + this.scheduleAheadTime;
       const transportState = useTransportStore.getState();
+      // PERF: Cache for reuse in processTick/triggerNote (avoids 3-4 extra getState calls)
+      this._cachedTransportState = transportState;
 
       // Sync groove/swing parameters (never touches timeline)
       if (transportState.grooveTemplateId !== this.lastGrooveTemplateId ||
@@ -936,15 +1094,21 @@ export class TrackerReplayer {
 
     this.totalTicksProcessed++;
 
-    // Handle pattern delay
-    if (this.patternDelay > 0) {
+    // Handle pattern delay (legacy MOD behavior — skips entire tick)
+    if (!this.useXMPeriods && this.patternDelay > 0) {
       this.patternDelay--;
       return;
     }
 
+    // FT2 pattern delay: determine if we should read new notes this tick
+    // pattDelTime2 > 0 means we're repeating the row — effects still process
+    // but no new note data is read
+    const readNewNote = this.currentTick === 0 && this.pattDelTime2 === 0;
+
     // --- Groove & Swing Support ---
-    const transportState = useTransportStore.getState();
-    
+    // PERF: Use cached state from scheduler tick (avoids redundant getState())
+    const transportState = this._cachedTransportState ?? useTransportStore.getState();
+
     // BPM sync from UI is handled by the grooveChanged detector in schedulerTick
     // (checks every 15ms with >0.1 threshold). We do NOT sync here because
     // any mismatch triggers bpmBefore !== this.bpm in the while loop, causing
@@ -986,16 +1150,20 @@ export class TrackerReplayer {
         const row = pattern.channels[ch]?.rows[this.pattPos];
         if (!row) continue;
 
-        if (this.currentTick === 0) {
-          // Tick 0: Read new row data
+        if (readNewNote) {
+          // Tick 0 + no pattern delay: Read new row data
           this.processRow(ch, channel, row, safeTime);
-        } else {
+        } else if (this.currentTick !== 0) {
           // Ticks 1+: Process continuous effects
           this.processEffectTick(ch, channel, row, safeTime + (this.currentTick * tickInterval));
         }
+        // When pattDelTime2 > 0 and tick == 0: skip note reading but effects still run on subsequent ticks
 
         // Process Furnace macros every tick
         this.processMacros(channel, safeTime + (this.currentTick * tickInterval));
+
+        // Process XM envelopes + auto-vibrato every tick (FT2's fixaEnvelopeVibrato)
+        this.processEnvelopesAndVibrato(channel, safeTime + (this.currentTick * tickInterval));
       }
 
       // Process global pitch shift slide (Wxx effect) - once per tick
@@ -1145,8 +1313,11 @@ export class TrackerReplayer {
       if (instrument) {
         ch.instrument = instrument;
         ch.sampleNum = instNum;
-        ch.volume = 64; // Reset volume on instrument change
+        // FT2: reset volume to sample's default volume (not hardcoded 64)
+        const sampleVol = instrument.metadata?.modPlayback?.defaultVolume;
+        ch.volume = sampleVol !== undefined ? Math.min(64, sampleVol) : 64;
         ch.finetune = instrument.metadata?.modPlayback?.finetune ?? 0;
+        ch.relativeNote = instrument.metadata?.modPlayback?.relativeNote ?? 0;
 
         // Apply volume immediately
         ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
@@ -1158,6 +1329,15 @@ export class TrackerReplayer {
           console.warn(`[TrackerReplayer] Instrument ${instNum} not found (empty slot). Available IDs: (${this.song.instruments.length})`, this.song.instruments.map(i => i.id).sort((a,b) => a-b));
         }
       }
+    }
+
+    // FT2: Note delay (EDx, y >= 1) — defer ALL processing to the delay tick.
+    // Only the instrument number is stored above; note trigger, volume column,
+    // and tick-0 effects are processed later in processEffectTick when the delay fires.
+    if (this.useXMPeriods && effect === 0xE && (param & 0xF0) === 0xD0 && (param & 0x0F) >= 1) {
+      // Still process tick-0 effects that aren't note-related
+      // (FT2 skips handleEffects_TickZero entirely on EDx early return)
+      return;
     }
 
     // Handle note
@@ -1177,18 +1357,47 @@ export class TrackerReplayer {
     if (noteValue && noteValue !== 0 && noteValue !== 97 && !probabilitySkip) {
       // Store the original XM note for synth instruments (avoids period table issues)
       ch.xmNote = noteValue;
-      
-      // Derive period for playback.
-      // Priority: rawPeriod (accurate Amiga period from MOD import) → noteToPeriod (XM/user notes).
-      // MOD import stores both note (2-octave-shifted XM number) and period (original Amiga period).
-      // Using noteToPeriod first would double-shift the pitch — period 428 → XM 49 → period 107.
-      const usePeriod = rawPeriod || this.noteToPeriod(noteValue, ch.finetune) || 0;
 
-      // Check for tone portamento (3xx or 5xx) - don't trigger, just set target
-      if (effect === 3 || effect === 5) {
+      // XM multi-sample lookup: resolve which sample to use via sampleMap
+      if (this.useXMPeriods && ch.instrument?.metadata?.sampleMap && ch.instrument.metadata.multiSamples) {
+        // XM note range: 1-96, sampleMap is 0-indexed by note-1
+        const noteIdx = Math.max(0, Math.min(95, noteValue - 1));
+        const sampleIdx = ch.instrument.metadata.sampleMap[noteIdx] ?? 0;
+        const multiSamples = ch.instrument.metadata.multiSamples;
+        if (sampleIdx < multiSamples.length) {
+          const ms = multiSamples[sampleIdx];
+          // Swap sample config and per-sample properties
+          ch.instrument = { ...ch.instrument, sample: ms.sample };
+          ch.finetune = ms.finetune;
+          ch.relativeNote = ms.relativeNote;
+          const sampleVol = ms.defaultVolume;
+          ch.volume = sampleVol !== undefined ? Math.min(64, sampleVol) : 64;
+        }
+      }
+
+      // FT2: E5x effect overrides finetune for this note
+      if (effect === 0xE && (param & 0xF0) === 0x50) {
+        ch.finetune = ((param & 0x0F) * 16) - 128; // FT2 formula: nibble * 16 - 128
+      }
+
+      // Derive period for playback.
+      const usePeriod = this.noteToPlaybackPeriod(noteValue, rawPeriod, ch);
+
+      // FT2: Volume column Fxy (tone portamento) checked BEFORE normal 3xx/5xx.
+      // This takes priority: note becomes a portamento target.
+      const volCol = row.volume ?? 0;
+      const hasVolPorta = this.useXMPeriods && (volCol & 0xF0) === 0xF0;
+
+      // Check for tone portamento (vol column Fxy, 3xx or 5xx) - don't trigger, just set target
+      if (hasVolPorta || effect === 3 || effect === 5) {
         ch.portaTarget = usePeriod;
+        // FT2: vol column porta speed = (param << 4) * 4 = param * 64
+        if (hasVolPorta) {
+          const volPortaParam = volCol & 0x0F;
+          if (volPortaParam > 0) ch.tonePortaSpeed = volPortaParam * 64;
+        }
         if (param !== 0 && effect === 3) {
-          ch.tonePortaSpeed = param;
+          ch.tonePortaSpeed = this.useXMPeriods ? param * 4 : param;
         }
       } else {
         // Normal note - trigger
@@ -1215,11 +1424,10 @@ export class TrackerReplayer {
 
         // DEBUG LOGGING - Enable with window.TB303_DEBUG_ENABLED = true in browser console
         if (typeof window !== 'undefined' && (window as unknown as { TB303_DEBUG_ENABLED?: boolean }).TB303_DEBUG_ENABLED && is303Synth) {
-          const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
           const midi = noteValue ? noteValue + 11 : 0;
           const octave = Math.floor(midi / 12) - 1;
           const semitone = midi % 12;
-          const noteName = noteValue ? `${noteNames[semitone]}${octave}` : '...';
+          const noteName = noteValue ? `${DEBUG_NOTE_NAMES[semitone]}${octave}` : '...';
           console.log(
             `%c[Row ${this.pattPos.toString().padStart(2)}] %c${noteName.padEnd(5)} %c${accent ? '●ACC' : '    '} %c${slideActive ? '►SLD' : '    '} %c[prev:${ch.previousSlideFlag ? '1' : '0'} curr:${slide ? '1' : '0'}] %c→ ${slideActive ? 'SLIDE' : 'TRIGGER'}`,
             'color: #888',
@@ -1262,9 +1470,15 @@ export class TrackerReplayer {
         // NOTE: For same-pitch slides, slideActive=true ensures the synth doesn't retrigger
         this.triggerNote(ch, time, offset, chIndex, accent, slideActive, effectiveSlide, hammer);
 
-        // Reset vibrato/tremolo positions
+        // Reset vibrato/tremolo positions (FT2's triggerInstrument)
         if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
         if ((ch.waveControl & 0x40) === 0) ch.tremoloPos = 0;
+
+        // Reset XM envelopes on note trigger
+        this.triggerEnvelopes(ch);
+        // FT2: outVol = channel volume, outPan = channel panning
+        ch.outVol = ch.volume;
+        ch.outPan = ch.panning;
       }
     }
 
@@ -1283,7 +1497,7 @@ export class TrackerReplayer {
     if (noteValue === 97) {
       // Clear slide flag - note-off breaks the slide chain
       ch.previousSlideFlag = false;
-      
+
       // DEBUG LOGGING for note-off
       const is303ForLog = ch.instrument?.synthType === 'TB303' || ch.instrument?.synthType === 'Buzz3o3';
       if (typeof window !== 'undefined' && (window as unknown as { TB303_DEBUG_ENABLED?: boolean }).TB303_DEBUG_ENABLED && is303ForLog) {
@@ -1296,22 +1510,57 @@ export class TrackerReplayer {
         );
       }
       this.releaseMacros(ch);
-      this.stopChannel(ch, chIndex, time);
+
+      // XM: Use envelope-based key-off (fadeout + release)
+      // Non-XM or synth instruments: hard stop
+      if (this.useXMPeriods && ch.instrument?.metadata?.originalEnvelope?.enabled) {
+        this.xmKeyOff(ch);
+      } else {
+        this.stopChannel(ch, chIndex, time);
+      }
     }
 
-    // Handle volume column (XM)
-    if (row.volume !== undefined && row.volume >= 0x10 && row.volume <= 0x50) {
-      ch.volume = row.volume - 0x10;
-      ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+    // Handle volume column (XM) — FT2 tick-0 volume column dispatch
+    if (row.volume !== undefined && row.volume > 0) {
+      const vc = row.volume;
+      const vcType = vc >> 4;
+      const vcParam = vc & 0x0F;
+
+      if (vcType >= 1 && vcType <= 5) {
+        // 0x10-0x50: Set volume (vol = vc - 0x10, clamp 0-64)
+        const vol = vc - 0x10;
+        ch.volume = vol > 64 ? 64 : vol;
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+      } else if (vcType === 8) {
+        // 0x80-0x8F: Fine volume slide down (tick 0 only)
+        ch.volume = Math.max(0, ch.volume - vcParam);
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+      } else if (vcType === 9) {
+        // 0x90-0x9F: Fine volume slide up (tick 0 only)
+        ch.volume = Math.min(64, ch.volume + vcParam);
+        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+      } else if (vcType === 0xA) {
+        // 0xA0-0xAF: Set vibrato speed (tick 0 only)
+        // FT2: ch->vibratoSpeed = (vol & 0x0F) * 4
+        // We store in high nibble of vibratoCmd, doVibrato multiplies by 4
+        if (vcParam !== 0) ch.vibratoCmd = (ch.vibratoCmd & 0x0F) | (vcParam << 4);
+      } else if (vcType === 0xC) {
+        // 0xC0-0xCF: Set panning (tick 0 only)
+        // FT2: outPan = (vol & 0x0F) << 4
+        ch.panning = vcParam << 4;
+        this.applyPanEffect(ch, ch.panning, time);
+      }
+      // 0x60-0x7F, 0xB0-0xFF: handled on ticks 1+ only (see processEffectTick)
     }
 
     // Process tick-0 effects
     this.processEffect0(chIndex, ch, effect, param, time);
 
-    // Process second effect column (effTyp2/eff2)
+    // Process second effect column (effTyp2/eff2) — skip if derived from volume column
     const effect2 = row.effTyp2 ?? 0;
     const param2 = row.eff2 ?? 0;
-    if (effect2 !== 0 || param2 !== 0) {
+    const volColDerived = (row.volume ?? 0) >= 0x60; // effTyp2/eff2 was generated from volume column
+    if ((effect2 !== 0 || param2 !== 0) && !volColDerived) {
       this.processEffect0(chIndex, ch, effect2, param2, time);
     }
   }
@@ -1348,15 +1597,21 @@ export class TrackerReplayer {
         break;
 
       case 0x1: // Portamento up - store speed
-        if (param !== 0) ch.portaSpeed = param;
+        if (param !== 0) {
+          ch.portaSpeed = param;
+          ch.portaUpSpeed = param; // FT2: separate memory
+        }
         break;
 
       case 0x2: // Portamento down - store speed
-        if (param !== 0) ch.portaSpeed = param;
+        if (param !== 0) {
+          ch.portaSpeed = param;
+          ch.portaDownSpeed = param; // FT2: separate memory
+        }
         break;
 
       case 0x3: // Tone portamento - store speed
-        if (param !== 0) ch.tonePortaSpeed = param;
+        if (param !== 0) ch.tonePortaSpeed = this.useXMPeriods ? param * 4 : param;
         break;
 
       case 0x4: // Vibrato - store params
@@ -1373,6 +1628,9 @@ export class TrackerReplayer {
       case 0x7: // Tremolo
         if (x !== 0) ch.tremoloCmd = (ch.tremoloCmd & 0x0F) | (x << 4);
         if (y !== 0) ch.tremoloCmd = (ch.tremoloCmd & 0xF0) | y;
+        // FT2: store speed/depth separately; speed = (param & 0xF0) >> 2 (not >> 4)
+        if (y !== 0) ch.tremoloDepth = y;
+        if (x !== 0) ch.tremoloSpeed = x << 2; // FT2: (param >> 4) << 2 = shift right 2 total
         break;
 
       case 0x8: // Set panning
@@ -1399,13 +1657,13 @@ export class TrackerReplayer {
         break;
 
       case 0xD: // Pattern break
-        // MOD uses BCD (binary-coded decimal), XM/IT/S3M/FUR use hex
-        if (this.song?.format === 'MOD') {
-          this.pBreakPos = x * 10 + y; // BCD: 0x15 = row 15
+        // MOD and XM both use BCD (binary-coded decimal): 0x15 = row 15
+        // IT/S3M use hex, Furnace uses hex
+        if (this.song?.format === 'MOD' || this.song?.format === 'XM') {
+          this.pBreakPos = x * 10 + y; // BCD decode
           if (this.pBreakPos > 63) this.pBreakPos = 0;
         } else {
-          this.pBreakPos = param; // Hex: 0x10 = row 16
-          // XM/Furnace patterns can be up to 256 rows
+          this.pBreakPos = param; // Hex for IT/S3M/Furnace
           if (this.pBreakPos > 255) this.pBreakPos = 0;
         }
         this.pBreakFlag = true;
@@ -1463,10 +1721,28 @@ export class TrackerReplayer {
         this.globalPitchTarget = ((param - 128) / 128) * 12;
         break;
 
-      case 0x21: // DJ Scratch (Xnn)
-        // High nibble 0: scratch pattern (X00=stop, X01=Baby, X02=Trans, X03=Flare, X04=Hydro, X05=Crab, X06=Orbit)
-        // High nibble 1: fader LFO (X10=off, X11=¼, X12=⅛, X13=⅟₁₆, X14=⅟₃₂)
-        if (this.onScratchEffect) {
+      case 0x21: // FT2: Extra fine portamento (X1x up, X2x down) / DJ Scratch (Xnn)
+        if (this.useXMPeriods) {
+          // FT2 extra fine portamento — tick 0 only
+          const slideType = (param >> 4) & 0x0F;
+          const slideParam = param & 0x0F;
+          if (slideType === 1) {
+            // X1x: Extra fine porta up
+            const spd = slideParam !== 0 ? slideParam : ch.efPitchSlideUpSpeed;
+            ch.efPitchSlideUpSpeed = spd;
+            ch.period -= spd;
+            if (ch.period < 1) ch.period = 1;
+            this.updatePeriod(ch);
+          } else if (slideType === 2) {
+            // X2x: Extra fine porta down
+            const spd = slideParam !== 0 ? slideParam : ch.efPitchSlideDownSpeed;
+            ch.efPitchSlideDownSpeed = spd;
+            ch.period += spd;
+            if (ch.period > 31999) ch.period = 31999;
+            this.updatePeriod(ch);
+          }
+        } else if (this.onScratchEffect) {
+          // DJ Scratch (non-XM mode)
           this.onScratchEffect(param);
         }
         break;
@@ -1476,13 +1752,31 @@ export class TrackerReplayer {
   private processExtendedEffect0(_chIndex: number, ch: ChannelState, x: number, y: number, time: number): void {
     switch (x) {
       case 0x1: // Fine porta up
-        ch.period = Math.max(113, ch.period - y);
+        if (this.useXMPeriods) {
+          // FT2: uses speed memory, param * 4
+          if (y !== 0) ch.fPortaUpSpeed = y;
+          ch.period -= ch.fPortaUpSpeed * 4;
+          if (ch.period < 1) ch.period = 1;
+        } else {
+          ch.period = Math.max(113, ch.period - y);
+        }
         this.updatePeriod(ch);
         break;
 
       case 0x2: // Fine porta down
-        ch.period = Math.min(856, ch.period + y);
+        if (this.useXMPeriods) {
+          // FT2: uses speed memory, param * 4
+          if (y !== 0) ch.fPortaDownSpeed = y;
+          ch.period += ch.fPortaDownSpeed * 4;
+          if (ch.period > 31999) ch.period = 31999;
+        } else {
+          ch.period = Math.min(856, ch.period + y);
+        }
         this.updatePeriod(ch);
+        break;
+
+      case 0x3: // Glissando control (E3x) — semitone portamento mode
+        ch.glissandoMode = y !== 0;
         break;
 
       case 0x4: // Vibrato waveform
@@ -1490,7 +1784,13 @@ export class TrackerReplayer {
         break;
 
       case 0x5: // Set finetune
-        ch.finetune = y > 7 ? y - 16 : y;
+        if (this.useXMPeriods) {
+          // FT2: finetune = (nibble * 16) - 128, range -128 to +112
+          ch.finetune = (y * 16) - 128;
+        } else {
+          // MOD: finetune -8 to +7
+          ch.finetune = y > 7 ? y - 16 : y;
+        }
         break;
 
       case 0x6: // Pattern loop
@@ -1517,18 +1817,32 @@ export class TrackerReplayer {
         ch.retrigCount = y;
         break;
 
-      case 0xA: // Fine volume up
-        ch.volume = Math.min(64, ch.volume + y);
+      case 0xA: { // Fine volume up (FT2: speed memory)
+        const fvUp = y !== 0 ? y : ch.fVolSlideUpSpeed;
+        ch.fVolSlideUpSpeed = fvUp;
+        ch.volume = Math.min(64, ch.volume + fvUp);
         ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
         break;
+      }
 
-      case 0xB: // Fine volume down
-        ch.volume = Math.max(0, ch.volume - y);
+      case 0xB: { // Fine volume down (FT2: speed memory)
+        const fvDn = y !== 0 ? y : ch.fVolSlideDownSpeed;
+        ch.fVolSlideDownSpeed = fvDn;
+        ch.volume = Math.max(0, ch.volume - fvDn);
         ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
         break;
+      }
 
       case 0xE: // Pattern delay
-        this.patternDelay = y * this.speed;
+        if (this.useXMPeriods) {
+          // FT2 two-stage: only set if pattDelTime2 is not active
+          if (this.pattDelTime2 === 0) {
+            this.pattDelTime = y + 1; // FT2: param + 1
+          }
+        } else {
+          // Legacy MOD behavior
+          this.patternDelay = y * this.speed;
+        }
         break;
     }
   }
@@ -1557,10 +1871,52 @@ export class TrackerReplayer {
     const x = (param >> 4) & 0x0F;
     const y = param & 0x0F;
 
-    // Process second effect column
+    // FT2: Volume column effects (ticks 1+)
+    const vc = row.volume ?? 0;
+    if (this.useXMPeriods && vc >= 0x60) {
+      const vcType = vc >> 4;
+      const vcParam = vc & 0x0F;
+      switch (vcType) {
+        case 0x6: // Volume slide down
+          ch.volume = Math.max(0, ch.volume - vcParam);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+          break;
+        case 0x7: // Volume slide up
+          ch.volume = Math.min(64, ch.volume + vcParam);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+          break;
+        case 0xB: { // Vibrato (depth only, then run vibrato)
+          if (vcParam > 0) ch.vibratoCmd = (ch.vibratoCmd & 0xF0) | vcParam;
+          this.doVibrato(ch);
+          break;
+        }
+        case 0xD: { // Panning slide left (FT2 bug: slide of 0 = set pan to 0)
+          // FT2: uint16_t tmp = outPan + (uint8_t)(0 - param); if (tmp < 256) tmp = 0;
+          // When param=0: (uint8_t)(0-0)=0, outPan+0 < 256 always, so pan=0 (the bug)
+          // When param>0: (uint8_t)(0-x) = 256-x, so tmp = outPan+256-x
+          //   If outPan >= x: tmp >= 256, result = (uint8_t)tmp = outPan-x (correct slide)
+          //   If outPan < x: tmp < 256, result = 0 (clamped)
+          const negParam = (256 - vcParam) & 0xFF; // (uint8_t)(0 - param)
+          const panTmp = ch.panning + negParam;
+          ch.panning = panTmp < 256 ? 0 : (panTmp & 0xFF);
+          this.applyPanEffect(ch, ch.panning, time);
+          break;
+        }
+        case 0xE: // Panning slide right
+          ch.panning = Math.min(255, ch.panning + vcParam);
+          this.applyPanEffect(ch, ch.panning, time);
+          break;
+        case 0xF: // Tone portamento (uses existing speed)
+          this.doTonePortamento(ch);
+          break;
+      }
+    }
+
+    // Process second effect column — skip if derived from volume column
     const effect2 = row.effTyp2 ?? 0;
     const param2 = row.eff2 ?? 0;
-    if (effect2 !== 0 || param2 !== 0) {
+    const volColDerived = vc >= 0x60;
+    if ((effect2 !== 0 || param2 !== 0) && !volColDerived) {
       this.processEffectTickSingle(chIndex, ch, row, effect2, param2, time);
     }
 
@@ -1575,13 +1931,25 @@ export class TrackerReplayer {
         if (param !== 0) this.doArpeggio(ch, param);
         break;
 
-      case 0x1: // Portamento up
-        ch.period = Math.max(113, ch.period - ch.portaSpeed);
+      case 0x1: // Portamento up (decrease period = raise pitch)
+        if (this.useXMPeriods) {
+          // FT2: separate speed memory, speed * 4, clamp to min 1
+          ch.period -= ch.portaUpSpeed * 4;
+          if (ch.period < 1) ch.period = 1;
+        } else {
+          ch.period = Math.max(113, ch.period - ch.portaSpeed);
+        }
         this.updatePeriod(ch);
         break;
 
-      case 0x2: // Portamento down
-        ch.period = Math.min(856, ch.period + ch.portaSpeed);
+      case 0x2: // Portamento down (increase period = lower pitch)
+        if (this.useXMPeriods) {
+          // FT2: separate speed memory, speed * 4, clamp to max 31999
+          ch.period += ch.portaDownSpeed * 4;
+          if (ch.period > 31999) ch.period = 31999;
+        } else {
+          ch.period = Math.min(856, ch.period + ch.portaSpeed);
+        }
         this.updatePeriod(ch);
         break;
 
@@ -1673,8 +2041,24 @@ export class TrackerReplayer {
 
     switch (effect) {
       case 0x0: if (param !== 0) this.doArpeggio(ch, param); break;
-      case 0x1: ch.period = Math.max(113, ch.period - ch.portaSpeed); this.updatePeriod(ch); break;
-      case 0x2: ch.period = Math.min(856, ch.period + ch.portaSpeed); this.updatePeriod(ch); break;
+      case 0x1: // Portamento up
+        if (this.useXMPeriods) {
+          ch.period -= ch.portaUpSpeed * 4;
+          if (ch.period < 1) ch.period = 1;
+        } else {
+          ch.period = Math.max(113, ch.period - ch.portaSpeed);
+        }
+        this.updatePeriod(ch);
+        break;
+      case 0x2: // Portamento down
+        if (this.useXMPeriods) {
+          ch.period += ch.portaDownSpeed * 4;
+          if (ch.period > 31999) ch.period = 31999;
+        } else {
+          ch.period = Math.min(856, ch.period + ch.portaSpeed);
+        }
+        this.updatePeriod(ch);
+        break;
       case 0x3: this.doTonePortamento(ch); break;
       case 0x4: this.doVibrato(ch); break;
       case 0x5: this.doTonePortamento(ch); this.doVolumeSlide(ch, param, time); break;
@@ -1697,6 +2081,22 @@ export class TrackerReplayer {
         }
         break;
       case 0x11: this.doGlobalVolumeSlide(ch.globalVolSlide, time); break;
+
+      case 0x14: { // Kxx - Key-off at tick (FT2: effect 20)
+        // FT2: triggers keyOff when (speed - tick) == (param & 31)
+        if (this.useXMPeriods) {
+          if ((this.speed - this.currentTick) === (param & 31)) {
+            this.xmKeyOff(ch);
+          }
+        } else {
+          // Fallback: key-off at the specified tick
+          if (this.currentTick === (param & 31)) {
+            this.stopChannel(ch, chIndex, time);
+          }
+        }
+        break;
+      }
+
       case 0x19: this.doPanSlide(ch, ch.panSlide, time); break;
       case 0x1B:
         if (ch.retrigCount > 0) {
@@ -1708,6 +2108,33 @@ export class TrackerReplayer {
           }
         }
         break;
+
+      case 0x1D: { // Txx - Tremor (FT2: effect 29)
+        // FT2: alternates between volume on/off over time
+        // x = on-time ticks, y = off-time ticks
+        const tp = param !== 0 ? param : ch.tremorParam;
+        ch.tremorParam = tp;
+
+        let tremorSign = ch.tremorPos & 0x80; // bit 7: on/off state
+        let tremorData = ch.tremorPos & 0x7F; // bits 0-6: counter
+
+        tremorData--;
+        if (tremorData < 0 || (tremorData & 0x80) !== 0) {
+          // Counter underflow — toggle state
+          if (tremorSign === 0x80) {
+            tremorSign = 0x00; // switch to OFF
+            tremorData = tp & 0x0F; // off-time = low nibble
+          } else {
+            tremorSign = 0x80; // switch to ON
+            tremorData = (tp >> 4) & 0x0F; // on-time = high nibble
+          }
+        }
+
+        ch.tremorPos = tremorSign | (tremorData & 0x7F);
+        const tremorVol = tremorSign === 0x80 ? ch.volume : 0;
+        ch.gainNode.gain.setValueAtTime(tremorVol / 64, time);
+        break;
+      }
     }
   }
 
@@ -1732,19 +2159,32 @@ export class TrackerReplayer {
   // ==========================================================================
 
   private doArpeggio(ch: ChannelState, param: number): void {
-    const x = (param >> 4) & 0x0F;
-    const y = param & 0x0F;
+    if (this.useXMPeriods) {
+      // FT2 arpeggio: uses arpeggioTab to select tick offset, then binary search on LUT
+      const tick = FT2_ARPEGGIO_TAB[this.currentTick & 31];
+      if (tick === 0) {
+        this.updatePeriodDirect(ch, ch.period);
+      } else {
+        const noteOffset = tick === 1 ? (param >> 4) & 0x0F : param & 0x0F;
+        const newPeriod = ft2ArpeggioPeriod(ch.period, noteOffset, ch.finetune, this.linearPeriods);
+        this.updatePeriodDirect(ch, newPeriod);
+      }
+    } else {
+      // MOD arpeggio: simple tick % 3 cycle with period table lookup
+      const x = (param >> 4) & 0x0F;
+      const y = param & 0x0F;
 
-    const tick = this.currentTick % 3;
-    let period = ch.note;
+      const tick = this.currentTick % 3;
+      let period = ch.note;
 
-    if (tick === 1) {
-      period = this.periodPlusSemitones(ch.note, x, ch.finetune);
-    } else if (tick === 2) {
-      period = this.periodPlusSemitones(ch.note, y, ch.finetune);
+      if (tick === 1) {
+        period = this.periodPlusSemitones(ch.note, x, ch.finetune);
+      } else if (tick === 2) {
+        period = this.periodPlusSemitones(ch.note, y, ch.finetune);
+      }
+
+      this.updatePeriodDirect(ch, period);
     }
-
-    this.updatePeriodDirect(ch, period);
   }
 
   private doTonePortamento(ch: ChannelState): void {
@@ -1765,51 +2205,112 @@ export class TrackerReplayer {
     const speed = (ch.vibratoCmd >> 4) & 0x0F;
     const depth = ch.vibratoCmd & 0x0F;
 
-    const waveform = ch.waveControl & 0x03;
-    let value: number;
+    if (this.useXMPeriods) {
+      // FT2 vibrato: phase is uint8_t (0-255), extracted as (pos>>2) & 0x1F
+      const waveform = ch.waveControl & 0x03;
+      let tmpVib = (ch.vibratoPos >> 2) & 0x1F;
 
-    if (waveform === 0) {
-      value = VIBRATO_TABLE[ch.vibratoPos & 31];
-    } else if (waveform === 1) {
-      value = (ch.vibratoPos & 31) * 8;
-      if (ch.vibratoPos >= 32) value = 255 - value;
+      if (waveform === 0) {
+        tmpVib = VIBRATO_TABLE[tmpVib];
+      } else if (waveform === 1) {
+        tmpVib <<= 3;
+        if ((ch.vibratoPos & 0x80) !== 0) tmpVib = ~tmpVib & 0xFF;
+      } else {
+        tmpVib = 255;
+      }
+
+      tmpVib = (tmpVib * depth) >> 5; // FT2 uses >> 5 (not >> 7)
+
+      if ((ch.vibratoPos & 0x80) !== 0)
+        this.updatePeriodDirect(ch, ch.period - tmpVib);
+      else
+        this.updatePeriodDirect(ch, ch.period + tmpVib);
+
+      // FT2 stores vibratoSpeed as (param >> 4) << 2, i.e. 4x our extracted speed
+      ch.vibratoPos = (ch.vibratoPos + (speed * 4)) & 0xFF; // uint8_t wrapping
     } else {
-      value = 255;
+      // MOD vibrato: original ProTracker style
+      const waveform = ch.waveControl & 0x03;
+      let value: number;
+
+      if (waveform === 0) {
+        value = VIBRATO_TABLE[ch.vibratoPos & 31];
+      } else if (waveform === 1) {
+        value = (ch.vibratoPos & 31) * 8;
+        if (ch.vibratoPos >= 32) value = 255 - value;
+      } else {
+        value = 255;
+      }
+
+      let delta = (value * depth) >> 7;
+      if (ch.vibratoPos >= 32) delta = -delta;
+
+      this.updatePeriodDirect(ch, ch.period + delta);
+      ch.vibratoPos = (ch.vibratoPos + speed) & 63;
     }
-
-    let delta = (value * depth) >> 7;
-    if (ch.vibratoPos >= 32) delta = -delta;
-
-    this.updatePeriodDirect(ch, ch.period + delta);
-    ch.vibratoPos = (ch.vibratoPos + speed) & 63;
   }
 
   private doTremolo(ch: ChannelState, time: number): void {
-    const speed = (ch.tremoloCmd >> 4) & 0x0F;
-    const depth = ch.tremoloCmd & 0x0F;
+    if (this.useXMPeriods) {
+      // FT2 tremolo: phase is uint8_t (0-255), same extraction as vibrato
+      const waveform = (ch.waveControl >> 4) & 0x03;
+      let tmpTrem = (ch.tremoloPos >> 2) & 0x1F;
 
-    const waveform = (ch.waveControl >> 4) & 0x03;
-    let value: number;
+      if (waveform === 0) {
+        tmpTrem = VIBRATO_TABLE[tmpTrem];
+      } else if (waveform === 1) {
+        tmpTrem <<= 3;
+        // FT2 BUG: checks vibratoPos instead of tremoloPos for ramp direction
+        if ((ch.vibratoPos & 0x80) !== 0) tmpTrem = ~tmpTrem & 0xFF;
+      } else {
+        tmpTrem = 255;
+      }
 
-    if (waveform === 0) {
-      value = VIBRATO_TABLE[ch.tremoloPos & 31];
-    } else if (waveform === 1) {
-      value = (ch.tremoloPos & 31) * 8;
-      if (ch.tremoloPos >= 32) value = 255 - value;
+      tmpTrem = (tmpTrem * ch.tremoloDepth) >> 6;
+
+      let tremVol: number;
+      if ((ch.tremoloPos & 0x80) !== 0) {
+        tremVol = ch.volume - tmpTrem;
+        if (tremVol < 0) tremVol = 0;
+      } else {
+        tremVol = ch.volume + tmpTrem;
+        if (tremVol > 64) tremVol = 64;
+      }
+
+      ch.gainNode.gain.setValueAtTime(tremVol / 64, time);
+      ch.tremoloPos = (ch.tremoloPos + ch.tremoloSpeed) & 0xFF;
     } else {
-      value = 255;
+      // MOD tremolo: original ProTracker style
+      const speed = (ch.tremoloCmd >> 4) & 0x0F;
+      const depth = ch.tremoloCmd & 0x0F;
+
+      const waveform = (ch.waveControl >> 4) & 0x03;
+      let value: number;
+
+      if (waveform === 0) {
+        value = VIBRATO_TABLE[ch.tremoloPos & 31];
+      } else if (waveform === 1) {
+        value = (ch.tremoloPos & 31) * 8;
+        if (ch.tremoloPos >= 32) value = 255 - value;
+      } else {
+        value = 255;
+      }
+
+      let delta = (value * depth) >> 6;
+      if (ch.tremoloPos >= 32) delta = -delta;
+
+      const newVol = Math.max(0, Math.min(64, ch.volume + delta));
+      ch.gainNode.gain.setValueAtTime(newVol / 64, time);
+
+      ch.tremoloPos = (ch.tremoloPos + speed) & 63;
     }
-
-    let delta = (value * depth) >> 6;
-    if (ch.tremoloPos >= 32) delta = -delta;
-
-    const newVol = Math.max(0, Math.min(64, ch.volume + delta));
-    ch.gainNode.gain.setValueAtTime(newVol / 64, time);
-
-    ch.tremoloPos = (ch.tremoloPos + speed) & 63;
   }
 
   private doVolumeSlide(ch: ChannelState, param: number, time: number): void {
+    // FT2: use speed memory when param is 0
+    if (param === 0) param = ch.volSlideSpeed;
+    ch.volSlideSpeed = param;
+
     const x = (param >> 4) & 0x0F;
     const y = param & 0x0F;
 
@@ -1864,7 +2365,8 @@ export class TrackerReplayer {
     }
 
     // Apply the new pitch shift
-    const playbackRate = Math.pow(2, this.globalPitchCurrent / 12);
+    const pitchIdx = Math.min(255, Math.max(0, Math.round(this.globalPitchCurrent) + 128));
+    const playbackRate = SEMITONE_RATIOS[pitchIdx];
 
     if (this.isDJDeck) {
       // DJ mode: use per-replayer state only — don't touch ToneEngine globals
@@ -1942,6 +2444,351 @@ export class TrackerReplayer {
   // MACRO PROCESSING (Furnace instruments)
   // ==========================================================================
 
+  // ==========================================================================
+  // FT2 ENVELOPE + AUTO-VIBRATO PROCESSING (fixaEnvelopeVibrato)
+  // Called every tick for every channel. Handles:
+  // - Fadeout on key-off
+  // - Volume envelope (interpolated, with sustain + loop)
+  // - Panning envelope (interpolated, with sustain + loop)
+  // - Auto-vibrato (with sweep ramp-up)
+  // Reference: ft2_replayer.c lines 1440-1755
+  // ==========================================================================
+
+  /**
+   * Reset envelope state on note trigger (FT2's triggerInstrument)
+   * Called from processRow when a new note is triggered.
+   */
+  private triggerEnvelopes(ch: ChannelState): void {
+    if (!ch.instrument?.metadata) return;
+    const meta = ch.instrument.metadata;
+
+    ch.keyOff = false;
+
+    // Reset volume envelope
+    const volEnv = meta.originalEnvelope;
+    if (volEnv?.enabled) {
+      ch.volEnvTick = 65535; // Will be incremented to 0 on first envelope tick
+      ch.volEnvPos = 0;
+    }
+
+    // Reset panning envelope
+    const panEnv = meta.panningEnvelope;
+    if (panEnv?.enabled) {
+      ch.panEnvTick = 65535;
+      ch.panEnvPos = 0;
+    }
+
+    // Reset fadeout
+    ch.fadeoutSpeed = meta.fadeout ?? meta.modPlayback?.fadeout ?? 0;
+    ch.fadeoutVol = 32768;
+
+    // Reset auto-vibrato
+    const av = meta.autoVibrato;
+    if (av && av.depth > 0) {
+      ch.autoVibPos = 0;
+      if (av.sweep > 0) {
+        ch.autoVibAmp = 0;
+        ch.autoVibSweep = ((av.depth << 8) / av.sweep) | 0;
+      } else {
+        ch.autoVibAmp = av.depth << 8;
+        ch.autoVibSweep = 0;
+      }
+    }
+  }
+
+  /**
+   * Handle key-off for XM (FT2's keyOff)
+   * Sets keyOff flag and adjusts envelope position.
+   * With volume envelope: continues playing through release.
+   * Without volume envelope: cuts volume to 0.
+   */
+  private xmKeyOff(ch: ChannelState): void {
+    ch.keyOff = true;
+
+    const meta = ch.instrument?.metadata;
+    if (!meta) return;
+
+    const volEnv = meta.originalEnvelope;
+    if (volEnv?.enabled) {
+      // Clamp envelope tick to current point's x value (FT2 behavior)
+      const points = volEnv.points;
+      if (points && ch.volEnvPos < points.length) {
+        const pointTick = points[ch.volEnvPos].tick;
+        if (ch.volEnvTick >= pointTick) {
+          ch.volEnvTick = pointTick > 0 ? pointTick - 1 : 0;
+        }
+      }
+    } else {
+      // No volume envelope: hard-cut volume
+      ch.outVol = 0;
+      ch.volume = 0;
+    }
+
+    // FT2 BUG: panEnvFlags check is inverted in the original source!
+    // The condition is: if (!(ins->panEnvFlags & ENV_ENABLED))
+    // This means pan envelope tick adjustment only runs when pan env is DISABLED.
+    // We replicate this bug for FT2 binary compatibility.
+    const panEnv = meta.panningEnvelope;
+    if (!panEnv?.enabled) {
+      const points = panEnv?.points;
+      if (points && ch.panEnvPos < points.length) {
+        const pointTick = points[ch.panEnvPos].tick;
+        if (ch.panEnvTick >= pointTick) {
+          ch.panEnvTick = pointTick > 0 ? pointTick - 1 : 0;
+        }
+      }
+    }
+  }
+
+  /**
+   * Process envelopes and auto-vibrato for a channel (FT2's fixaEnvelopeVibrato)
+   * Called every tick for every channel during XM playback.
+   */
+  private processEnvelopesAndVibrato(ch: ChannelState, time: number): void {
+    if (!this.useXMPeriods) return; // Only for XM format
+    if (!ch.instrument?.metadata) return;
+    const meta = ch.instrument.metadata;
+
+    // Sync outVol/outPan from current effect-modified values
+    ch.outVol = ch.volume;
+    ch.outPan = ch.panning;
+
+    // *** FADEOUT ON KEY OFF ***
+    if (ch.keyOff) {
+      if (ch.fadeoutSpeed > 0) {
+        ch.fadeoutVol -= ch.fadeoutSpeed;
+        if (ch.fadeoutVol <= 0) {
+          ch.fadeoutVol = 0;
+          ch.fadeoutSpeed = 0;
+        }
+      }
+    }
+
+    // *** VOLUME ENVELOPE ***
+    const volEnv = meta.originalEnvelope;
+    let fEnvVal = 0;
+
+    if (volEnv?.enabled && volEnv.points && volEnv.points.length > 0) {
+      let envDidInterpolate = false;
+      let envPos = ch.volEnvPos;
+
+      ch.volEnvTick++;
+
+      if (ch.volEnvTick === volEnv.points[envPos]?.tick) {
+        ch.fVolEnvValue = (volEnv.points[envPos].value ?? 0) & 0xFF;
+
+        envPos++;
+
+        // Loop handling
+        if (volEnv.loopEndPoint !== null && volEnv.loopStartPoint !== null) {
+          envPos--;
+          if (envPos === volEnv.loopEndPoint) {
+            // FT2: if no sustain at this point OR keyOff is set, jump to loop start
+            if (volEnv.sustainPoint === null || envPos !== volEnv.sustainPoint || ch.keyOff) {
+              envPos = volEnv.loopStartPoint;
+              ch.volEnvTick = volEnv.points[envPos].tick;
+              ch.fVolEnvValue = (volEnv.points[envPos].value ?? 0) & 0xFF;
+            }
+          }
+          envPos++;
+        }
+
+        if (envPos < volEnv.points.length) {
+          let envInterpolateFlag = true;
+
+          // Sustain handling: hold at sustain point while note is held
+          if (volEnv.sustainPoint !== null && !ch.keyOff) {
+            if (envPos - 1 === volEnv.sustainPoint) {
+              envPos--;
+              ch.fVolEnvDelta = 0;
+              envInterpolateFlag = false;
+            }
+          }
+
+          if (envInterpolateFlag) {
+            ch.volEnvPos = envPos;
+
+            const x0 = volEnv.points[envPos - 1].tick;
+            const x1 = volEnv.points[envPos].tick;
+            const xDiff = x1 - x0;
+
+            if (xDiff > 0) {
+              const y0 = (volEnv.points[envPos - 1].value ?? 0) & 0xFF;
+              const y1 = (volEnv.points[envPos].value ?? 0) & 0xFF;
+              ch.fVolEnvDelta = (y1 - y0) / xDiff;
+              fEnvVal = ch.fVolEnvValue;
+              envDidInterpolate = true;
+            } else {
+              ch.fVolEnvDelta = 0;
+            }
+          }
+        } else {
+          ch.fVolEnvDelta = 0;
+        }
+      }
+
+      if (!envDidInterpolate) {
+        ch.fVolEnvValue += ch.fVolEnvDelta;
+        fEnvVal = ch.fVolEnvValue;
+        if (fEnvVal < 0 || fEnvVal > 64) {
+          fEnvVal = fEnvVal < 0 ? 0 : 64;
+          ch.fVolEnvDelta = 0;
+        }
+      }
+
+      // FT2 volume formula: (globalVol * outVol * fadeoutVol) / (64 * 64 * 32768) * (envVal / 64)
+      const vol = this.globalVolume * ch.outVol * ch.fadeoutVol;
+      let fVol = vol * (1.0 / (64 * 64 * 32768));
+      fVol *= fEnvVal * (1.0 / 64);
+      ch.fFinalVol = Math.max(0, Math.min(1, fVol));
+    } else {
+      // No volume envelope — still apply fadeout
+      const vol = this.globalVolume * ch.outVol * ch.fadeoutVol;
+      ch.fFinalVol = Math.max(0, Math.min(1, vol * (1.0 / (64 * 64 * 32768))));
+    }
+
+    // Apply final volume to gain node
+    try {
+      ch.gainNode.gain.setValueAtTime(ch.fFinalVol, time);
+    } catch { /* ignored */ }
+
+    // *** PANNING ENVELOPE ***
+    const panEnv = meta.panningEnvelope;
+    let fPanEnvVal = 0;
+
+    if (panEnv?.enabled && panEnv.points && panEnv.points.length > 0) {
+      let envDidInterpolate = false;
+      let envPos = ch.panEnvPos;
+
+      ch.panEnvTick++;
+
+      if (ch.panEnvTick === panEnv.points[envPos]?.tick) {
+        ch.fPanEnvValue = (panEnv.points[envPos].value ?? 0) & 0xFF;
+
+        envPos++;
+
+        // Loop handling
+        if (panEnv.loopEndPoint !== null && panEnv.loopStartPoint !== null) {
+          envPos--;
+          if (envPos === panEnv.loopEndPoint) {
+            if (panEnv.sustainPoint === null || envPos !== panEnv.sustainPoint || ch.keyOff) {
+              envPos = panEnv.loopStartPoint;
+              ch.panEnvTick = panEnv.points[envPos].tick;
+              ch.fPanEnvValue = (panEnv.points[envPos].value ?? 0) & 0xFF;
+            }
+          }
+          envPos++;
+        }
+
+        if (envPos < panEnv.points.length) {
+          let envInterpolateFlag = true;
+
+          if (panEnv.sustainPoint !== null && !ch.keyOff) {
+            if (envPos - 1 === panEnv.sustainPoint) {
+              envPos--;
+              ch.fPanEnvDelta = 0;
+              envInterpolateFlag = false;
+            }
+          }
+
+          if (envInterpolateFlag) {
+            ch.panEnvPos = envPos;
+            const x0 = panEnv.points[envPos - 1].tick;
+            const x1 = panEnv.points[envPos].tick;
+            const xDiff = x1 - x0;
+
+            if (xDiff > 0) {
+              const y0 = (panEnv.points[envPos - 1].value ?? 0) & 0xFF;
+              const y1 = (panEnv.points[envPos].value ?? 0) & 0xFF;
+              ch.fPanEnvDelta = (y1 - y0) / xDiff;
+              fPanEnvVal = ch.fPanEnvValue;
+              envDidInterpolate = true;
+            } else {
+              ch.fPanEnvDelta = 0;
+            }
+          }
+        } else {
+          ch.fPanEnvDelta = 0;
+        }
+      }
+
+      if (!envDidInterpolate) {
+        ch.fPanEnvValue += ch.fPanEnvDelta;
+        fPanEnvVal = ch.fPanEnvValue;
+        if (fPanEnvVal < 0 || fPanEnvVal > 64) {
+          fPanEnvVal = fPanEnvVal < 0 ? 0 : 64;
+          ch.fPanEnvDelta = 0;
+        }
+      }
+
+      // Center envelope value: 0..64 → -32..+32
+      fPanEnvVal -= 32;
+      const pan = 128 - Math.abs(ch.outPan - 128);
+      const fPanAdd = (pan * fPanEnvVal) / 32;
+      ch.finalPan = Math.max(0, Math.min(255, (ch.outPan + fPanAdd) | 0));
+
+      // Apply panning
+      this.applyPanEffect(ch, ch.finalPan, time);
+    } else {
+      ch.finalPan = ch.outPan;
+    }
+
+    // *** AUTO VIBRATO ***
+    const av = meta.autoVibrato;
+    if (av && av.depth > 0) {
+      let autoVibAmp: number;
+
+      if (ch.autoVibSweep > 0) {
+        autoVibAmp = ch.autoVibSweep;
+        if (!ch.keyOff) {
+          autoVibAmp += ch.autoVibAmp;
+          if ((autoVibAmp >> 8) > av.depth) {
+            autoVibAmp = av.depth << 8;
+            ch.autoVibSweep = 0;
+          }
+          ch.autoVibAmp = autoVibAmp;
+        }
+      } else {
+        autoVibAmp = ch.autoVibAmp;
+      }
+
+      ch.autoVibPos = (ch.autoVibPos + av.rate) & 0xFF;
+
+      let autoVibVal: number;
+      if (av.type === 'square') {
+        autoVibVal = ch.autoVibPos > 127 ? 64 : -64;
+      } else if (av.type === 'rampUp') {
+        autoVibVal = (((ch.autoVibPos >> 1) + 64) & 127) - 64;
+      } else if (av.type === 'rampDown') {
+        autoVibVal = (((-(ch.autoVibPos >> 1)) + 64) & 127) - 64;
+      } else {
+        // sine (default)
+        autoVibVal = AUTO_VIB_SINE_TAB[ch.autoVibPos & 0xFF];
+      }
+
+      // Scale: (autoVibVal * autoVibAmp) >> (6+8) = >> 14
+      autoVibVal = (autoVibVal * autoVibAmp) >> 14;
+
+      let tmpPeriod = ch.period + autoVibVal;
+      if (tmpPeriod < 0) tmpPeriod = 0;
+      if (tmpPeriod >= 32000) tmpPeriod = 0;
+
+      ch.finalPeriod = tmpPeriod;
+
+      // Apply the vibrato-modified period
+      if (ch.player && tmpPeriod > 0) {
+        this.updatePeriodDirect(ch, tmpPeriod);
+      }
+    } else {
+      ch.finalPeriod = ch.period;
+    }
+
+    // If fadeout has reached 0, stop the channel (note has fully faded out)
+    if (ch.keyOff && ch.fadeoutVol === 0 && ch.fadeoutSpeed === 0) {
+      this.stopChannel(ch, undefined, time);
+    }
+  }
+
   /**
    * Process Furnace instrument macros for a channel
    * Called every tick to apply macro values
@@ -2005,7 +2852,7 @@ export class TrackerReplayer {
         ch.macroArpNote = value > 127 ? value - 256 : value; // Handle signed
         if (ch.period > 0) {
           // Apply arpeggio as period change
-          const semitoneRatio = Math.pow(2, ch.macroArpNote / 12);
+          const semitoneRatio = SEMITONE_RATIOS[Math.min(255, Math.max(0, ch.macroArpNote + 128))];
           const newPeriod = Math.round(ch.note / semitoneRatio);
           this.updatePeriodDirect(ch, newPeriod);
         }
@@ -2028,7 +2875,9 @@ export class TrackerReplayer {
           // Apply as small period adjustment
           const pitchAdjust = ch.macroPitchOffset / 64; // Scale to reasonable range
           const newPeriod = Math.round(ch.period * (1 - pitchAdjust * 0.01));
-          this.updatePeriodDirect(ch, Math.max(113, Math.min(856, newPeriod)));
+          const minP = this.useXMPeriods ? 1 : 113;
+          const maxP = this.useXMPeriods ? 31999 : 856;
+          this.updatePeriodDirect(ch, Math.max(minP, Math.min(maxP, newPeriod)));
         }
         break;
 
@@ -2135,7 +2984,8 @@ export class TrackerReplayer {
       : periodToNoteName(ch.period);
     
     // --- Groove Velocity/Dynamics ---
-    const transportState = useTransportStore.getState();
+    // PERF: Use cached state from scheduler tick (avoids redundant getState())
+    const transportState = this._cachedTransportState ?? useTransportStore.getState();
     const grooveTemplateId = transportState.grooveTemplateId;
     const grooveTemplate = GROOVE_MAP.get(grooveTemplateId);
     const intensity = transportState.swing / 100;
@@ -2209,16 +3059,40 @@ export class TrackerReplayer {
     }
 
     // Sample-based playback (MOD/XM imports with embedded samples)
-    // Get decoded AudioBuffer from ToneEngine (which decodes WAV to AudioBuffer during loading)
-    const decodedBuffer = engine.getDecodedBuffer(ch.instrument.id);
+    // Get decoded AudioBuffer — either from ToneEngine cache (primary sample)
+    // or from multiSampleBufferCache (multi-sample XM instruments)
+    let decodedBuffer = engine.getDecodedBuffer(ch.instrument.id);
 
+    // For multi-sample instruments: if the sample config has an audioBuffer
+    // but getDecodedBuffer returned a different one (or none), decode from the sample's ArrayBuffer.
+    // This handles when sampleMap resolved to a non-primary sample.
+    const sample = ch.instrument.sample;
+    if (!decodedBuffer && sample?.audioBuffer) {
+      // Check multi-sample cache first
+      const cacheKey = `${ch.instrument.id}:${sample.url}`;
+      decodedBuffer = this.multiSampleBufferCache.get(cacheKey) ?? undefined;
+      if (!decodedBuffer) {
+        // Synchronous fallback: create AudioBuffer from raw PCM data
+        // The audioBuffer is already an ArrayBuffer of 16-bit PCM data
+        // We need to decode it through the AudioContext
+        try {
+          const ctx = Tone.getContext().rawContext;
+          if (ctx instanceof AudioContext) {
+            // Decode asynchronously — for this tick, skip playback
+            // Buffer will be ready for next trigger
+            ctx.decodeAudioData(sample.audioBuffer.slice(0)).then(ab => {
+              this.multiSampleBufferCache.set(cacheKey, ab);
+            }).catch(() => { /* ignored */ });
+          }
+        } catch { /* ignored */ }
+        return; // Skip this trigger — buffer will be ready next time
+      }
+    }
 
     if (!decodedBuffer) {
       console.warn('[TrackerReplayer] No decoded buffer for instrument:', ch.instrument.id, ch.instrument.name);
       return;
     }
-
-    const sample = ch.instrument.sample;
 
     // Check if period is valid (non-zero)
     if (!ch.period || ch.period <= 0) {
@@ -2227,24 +3101,28 @@ export class TrackerReplayer {
     }
 
     // Calculate playback rate from period
-    //
-    // MOD samples are recorded at 8363 Hz for C-2 (period 428)
-    // The WAV file has sample rate 8363 in its header
-    // Browser decodes WAV to 44100 Hz but PRESERVES PITCH
-    // So playing at rate 1.0 = original pitch (C-2, period 428)
-    //
-    // For other periods: rate = basePeriod / currentPeriod
-    // Example: C-3 (period 214) = 428/214 = 2.0x (one octave up)
-    //
-    // Using finetune: each finetune unit shifts by ~1/8 semitone
-    const basePeriod = 428; // C-2 base period
-    const finetune = ch.finetune;
-    const finetuneMultiplier = FINETUNE_MULTIPLIERS[Math.min(15, Math.max(0, finetune + 8))] ?? 1;
-    const playbackRate = (basePeriod / ch.period) * finetuneMultiplier;
+    let playbackRate: number;
+    if (this.useXMPeriods) {
+      // XM mode: FT2 period→Hz, then divide by C-4 sample rate
+      // This gives us the ratio needed to pitch the sample correctly.
+      // c4Rate = Hz that C-4 + relativeNote + finetune plays at.
+      // playbackRate = desiredHz / c4Rate
+      const hz = ft2Period2Hz(ch.period, this.linearPeriods);
+      const c4Rate = ft2GetSampleC4Rate(ch.relativeNote, ch.finetune, this.linearPeriods);
+      playbackRate = c4Rate > 0 ? hz / c4Rate : 1.0;
+    } else {
+      // MOD mode: basePeriod / currentPeriod * finetuneMultiplier
+      // MOD samples are recorded at ~8363 Hz for C-2 (period 428)
+      const basePeriod = 428;
+      const finetune = ch.finetune;
+      const finetuneMultiplier = FINETUNE_MULTIPLIERS[Math.min(15, Math.max(0, finetune + 8))] ?? 1;
+      playbackRate = (basePeriod / ch.period) * finetuneMultiplier;
+    }
 
     // Get or create cached ToneAudioBuffer wrapper (avoids re-wrapping per note)
+    // For multi-sample instruments, check if the cached buffer matches the current decodedBuffer
     let toneBuffer = this.bufferCache.get(ch.instrument.id);
-    if (!toneBuffer) {
+    if (!toneBuffer || toneBuffer.get() !== decodedBuffer) {
       toneBuffer = new Tone.ToneAudioBuffer(decodedBuffer);
       this.bufferCache.set(ch.instrument.id, toneBuffer);
     }
@@ -2271,16 +3149,21 @@ export class TrackerReplayer {
     const originalSampleRate = sample?.sampleRate || 8363;
     const duration = decodedBuffer.duration;
 
-    const hasLoop = sample?.loop && (sample.loopEnd ?? 0) > (sample.loopStart ?? 0);
+    // FT2/PT2 loop validation: if loop points exceed sample length, disable loop entirely
+    // (reference implementations never clamp — they reset to no-loop)
+    const loopStartSmp = sample?.loopStart ?? 0;
+    const loopEndSmp = sample?.loopEnd ?? 0;
+    const hasLoop = sample?.loop && loopEndSmp > loopStartSmp && loopEndSmp <= (decodedBuffer.length + 1);
     if (hasLoop) {
-      player.loop = true;
-      // Loop points are in samples, convert to seconds using original sample rate
-      // Clamp to duration to avoid Tone.js RangeError
-      player.loopStart = Math.min((sample.loopStart ?? 0) / originalSampleRate, duration - 0.0001);
-      player.loopEnd = Math.min((sample.loopEnd ?? 0) / originalSampleRate, duration);
-
-      if (player.loopEnd <= player.loopStart) {
-        player.loopEnd = duration;
+      const lsTime = loopStartSmp / originalSampleRate;
+      const leTime = loopEndSmp / originalSampleRate;
+      // Validate converted times against buffer duration
+      if (lsTime >= 0 && lsTime < duration && leTime > lsTime && leTime <= duration + 0.001) {
+        player.loop = true;
+        player.loopStart = Math.max(0, Math.min(lsTime, duration));
+        player.loopEnd = Math.min(leTime, duration);
+      } else {
+        player.loop = false;
       }
     } else {
       player.loop = false;
@@ -2292,6 +3175,13 @@ export class TrackerReplayer {
     player.playbackRate = playbackRate * pitchRate;
 
     ch.player = player; // Keep reference for updatePeriod compatibility
+
+    // Quick volume ramp on note start (FT2-style click prevention)
+    // Start at 0, ramp to target volume over ~2ms
+    try {
+      ch.gainNode.gain.setValueAtTime(0, safeTime);
+      ch.gainNode.gain.linearRampToValueAtTime(ch.fFinalVol > 0 ? ch.fFinalVol : ch.volume / 64, safeTime + 0.002);
+    } catch { /* ignored */ }
 
     // Start playback - buffer is already loaded, player already connected
     try {
@@ -2311,21 +3201,38 @@ export class TrackerReplayer {
   }
 
   private stopChannel(ch: ChannelState, channelIndex?: number, time?: number): void {
+    // Quick volume ramp down before stop (click prevention, ~2ms)
+    if (time !== undefined && time > 0) {
+      try {
+        ch.gainNode.gain.setValueAtTime(ch.gainNode.gain.value, time);
+        ch.gainNode.gain.linearRampToValueAtTime(0, time + 0.002);
+      } catch { /* ignored */ }
+    }
+
     // Stop all pooled players (no disposal - they're reused)
-    // Always call stop() without checking player.state first — Source.stop()
-    // internally handles future-scheduled starts via getNextState().
-    // The old guard `if (player.state === 'started')` checked state at Tone.now(),
-    // missing players started in the lookahead window (future-scheduled events).
+    // Break loop FIRST to prevent looped samples from continuing after stop.
+    // Then call stop(). Always call without checking player.state first —
+    // Source.stop() internally handles future-scheduled starts via getNextState().
+    const stopTime = time !== undefined ? time + 0.003 : undefined; // Stop slightly after ramp
     for (const player of ch.playerPool) {
       try {
-        if (time !== undefined) {
-          player.stop(time);
+        player.loop = false;
+        if (stopTime !== undefined) {
+          player.stop(stopTime);
         } else {
           player.stop();
         }
       } catch { /* ignored */ }
     }
     ch.player = null;
+
+    // Zero the gain node (after ramp or immediately if no time)
+    try {
+      if (time === undefined || time <= 0) {
+        ch.gainNode.gain.cancelScheduledValues(0);
+        ch.gainNode.gain.setValueAtTime(0, 0);
+      }
+    } catch { /* ignored */ }
 
     // Release any active synth notes on this channel
     // Use the scheduled time so NOTE_OFF arrives at the correct moment
@@ -2343,15 +3250,36 @@ export class TrackerReplayer {
     this.updatePeriodDirect(ch, ch.period);
   }
 
+  /**
+   * Convert period to playback rate and apply to the channel's player.
+   *
+   * For XM: Uses ft2Period2Hz() to get Hz, then rate = Hz / c4Rate
+   *   where c4Rate is the sample's natural C-4 frequency.
+   * For MOD: Uses AMIGA_PAL_FREQUENCY / period to get Hz, then rate = Hz / sampleRate
+   */
   private updatePeriodDirect(ch: ChannelState, period: number): void {
     if (!ch.player || period === 0) return;
 
-    const sampleRate = ch.instrument?.sample?.sampleRate || 8363;
-    const frequency = AMIGA_PAL_FREQUENCY / period;
-    // Apply playback rate multiplier for pitch shifting (DJ slider, etc.)
-    // In DJ mode, use per-deck multiplier; otherwise use ToneEngine global
     const rate = this.getEffectivePlaybackRate();
-    ch.player.playbackRate = (frequency / sampleRate) * rate;
+
+    if (this.useXMPeriods) {
+      // XM mode: use FT2's period→Hz conversion
+      const hz = ft2Period2Hz(period, this.linearPeriods);
+      if (hz <= 0) return;
+      // c4Rate = the Hz that C-4 with this sample's relativeNote+finetune produces.
+      // playbackRate = desiredHz / c4Rate gives us the correct pitch relative to the sample's natural pitch.
+      const c4Rate = ft2GetSampleC4Rate(
+        ch.relativeNote,
+        ch.finetune,
+        this.linearPeriods,
+      );
+      ch.player.playbackRate = (hz / c4Rate) * rate;
+    } else {
+      // MOD mode: original Amiga conversion
+      const sampleRate = ch.instrument?.sample?.sampleRate || 8363;
+      const frequency = AMIGA_PAL_FREQUENCY / period;
+      ch.player.playbackRate = (frequency / sampleRate) * rate;
+    }
   }
 
   /**
@@ -2359,14 +3287,20 @@ export class TrackerReplayer {
    * Called by DJ pitch slider to apply pitch shift to already-playing samples
    */
   public updateAllPlaybackRates(): void {
-    // In DJ mode, use per-deck multiplier; otherwise use ToneEngine global
     const rate = this.getEffectivePlaybackRate();
 
     for (const ch of this.channels) {
       if (ch.player && ch.period > 0) {
-        const sampleRate = ch.instrument?.sample?.sampleRate || 8363;
-        const frequency = AMIGA_PAL_FREQUENCY / ch.period;
-        ch.player.playbackRate = (frequency / sampleRate) * rate;
+        if (this.useXMPeriods) {
+          const hz = ft2Period2Hz(ch.period, this.linearPeriods);
+          if (hz <= 0) continue;
+          const c4Rate = ft2GetSampleC4Rate(ch.relativeNote, ch.finetune, this.linearPeriods);
+          ch.player.playbackRate = (hz / c4Rate) * rate;
+        } else {
+          const sampleRate = ch.instrument?.sample?.sampleRate || 8363;
+          const frequency = AMIGA_PAL_FREQUENCY / ch.period;
+          ch.player.playbackRate = (frequency / sampleRate) * rate;
+        }
       }
     }
   }
@@ -2386,6 +3320,30 @@ export class TrackerReplayer {
   // ==========================================================================
   // HELPERS
   // ==========================================================================
+
+  /**
+   * Unified note-to-period conversion that handles both MOD and XM formats.
+   *
+   * For XM files: Uses FT2's 1936-entry period LUTs with relativeNote support.
+   * For MOD files: Uses ProTracker's 3-octave period table with rawPeriod priority.
+   */
+  private noteToPlaybackPeriod(noteValue: number, rawPeriod: number | undefined, ch: ChannelState): number {
+    if (this.useXMPeriods && noteValue > 0 && noteValue < 97) {
+      // XM mode: Use FT2 period system
+      // Add relativeNote to note BEFORE period lookup (FT2 triggerNote behavior)
+      let note = noteValue + ch.relativeNote;
+
+      // FT2: if note >= 10*12 (120), it's out of range — return 0
+      if (note < 1 || note >= 10 * 12) return 0;
+
+      return ft2NoteToPeriod(note, ch.finetune, this.linearPeriods);
+    }
+
+    // MOD mode: Priority rawPeriod → old noteToPeriod
+    // MOD import stores both note (2-octave-shifted XM number) and period (original Amiga period).
+    // Using noteToPeriod first would double-shift the pitch — period 428 → XM 49 → period 107.
+    return rawPeriod || this.noteToPeriod(noteValue, ch.finetune) || 0;
+  }
 
   private noteToPeriod(note: number | string, finetune: number): number {
     if (typeof note === 'number' && note > 0) {
@@ -2425,9 +3383,9 @@ export class TrackerReplayer {
 
           // Adjust for octaves: period halves for each octave up, doubles for each octave down
           if (octaveShift > 0) {
-            period = Math.round(period / Math.pow(2, octaveShift));
+            period = Math.round(period / (OCTAVE_UP[Math.min(10, octaveShift)] ?? Math.pow(2, octaveShift)));
           } else if (octaveShift < 0) {
-            period = Math.round(period * Math.pow(2, -octaveShift));
+            period = Math.round(period * (OCTAVE_UP[Math.min(10, -octaveShift)] ?? Math.pow(2, -octaveShift)));
           }
 
           return period;
@@ -2441,15 +3399,11 @@ export class TrackerReplayer {
   }
 
   private noteStringToPeriod(note: string, finetune: number): number {
-    const noteMap: { [key: string]: number } = {
-      'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
-      'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11,
-    };
 
     const match = note.match(/^([A-G][#]?)-?(\d)$/);
     if (!match) return 0;
 
-    const noteIndex = noteMap[match[1]] ?? 0;
+    const noteIndex = NOTE_STRING_MAP[match[1]] ?? 0;
     const octave = parseInt(match[2], 10);
     const absIndex = (octave - 1) * 12 + noteIndex;
 
@@ -2539,6 +3493,20 @@ export class TrackerReplayer {
       this.pattPos++;
     }
 
+    // FT2 two-stage pattern delay (after row increment, before position checks)
+    if (this.useXMPeriods) {
+      if (this.pattDelTime > 0) {
+        this.pattDelTime2 = this.pattDelTime;
+        this.pattDelTime = 0;
+      }
+      if (this.pattDelTime2 > 0) {
+        this.pattDelTime2--;
+        if (this.pattDelTime2 > 0) {
+          this.pattPos--; // Repeat the same row
+        }
+      }
+    }
+
     // Position jump
     if (this.posJumpFlag) {
       this.songPos = this.posJumpPos;
@@ -2612,6 +3580,8 @@ export class TrackerReplayer {
       this.pBreakFlag = false;
       this.posJumpFlag = false;
       this.patternDelay = 0;
+    this.pattDelTime = 0;
+    this.pattDelTime2 = 0;
 
       // Re-sync speed alternation to match target row parity
       if (this.speed2 !== null) {
@@ -2675,6 +3645,8 @@ export class TrackerReplayer {
     this.pBreakFlag = false;
     this.posJumpFlag = false;
     this.patternDelay = 0;
+    this.pattDelTime = 0;
+    this.pattDelTime2 = 0;
 
     // Notify UI
     if (this.onRowChange) {
@@ -2738,6 +3710,7 @@ export class TrackerReplayer {
     }
     // Clear buffer cache
     this.bufferCache.clear();
+    this.multiSampleBufferCache.clear();
     this.masterGain.dispose();
     this.channels = [];
     this.song = null;

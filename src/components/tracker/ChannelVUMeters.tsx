@@ -12,6 +12,7 @@ import React, { useEffect, useRef, memo } from 'react';
 import { useTrackerStore, useUIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
+import { useTransportStore } from '@stores/useTransportStore';
 
 // VU meter timing constants - ProTracker style
 const DECAY_RATE = 0.92;
@@ -58,7 +59,6 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
   const scrollLeftRef = useRef(scrollLeftProp);
   const channelOffsetsRef = useRef(channelOffsets);
   const channelWidthsRef = useRef(channelWidths);
-
   useEffect(() => { numChannelsRef.current = numChannels; }, [numChannels]);
   useEffect(() => { scrollLeftRef.current = scrollLeftProp; }, [scrollLeftProp]);
   useEffect(() => { channelOffsetsRef.current = channelOffsets; }, [channelOffsets]);
@@ -144,7 +144,10 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         const staggerOffset = i * 0.012;
 
         // Update level - instant jump on trigger, smooth decay
-        if (trigger > 0) {
+        // When playback is stopped, kill meters instantly (no lingering bounce)
+        if (!useTransportStore.getState().isPlaying) {
+          meter.level = 0;
+        } else if (trigger > 0) {
           meter.level = trigger;
         } else {
           const decayRate = DECAY_RATE - staggerOffset;

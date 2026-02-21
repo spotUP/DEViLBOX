@@ -34,6 +34,7 @@ export const CollaborationToolbar: React.FC = () => {
   }, [showListenMenu]);
 
   const listenModeLabel: Record<ListenMode, string> = {
+    shared: 'Shared',
     mine: 'Mine only',
     both: 'Both',
     theirs: 'Friend only',
@@ -101,7 +102,7 @@ export const CollaborationToolbar: React.FC = () => {
 
         {showListenMenu && (
           <div className="absolute top-full left-0 mt-1 py-1 min-w-[130px] bg-dark-bgPrimary border border-dark-border rounded-lg shadow-lg z-50">
-            {(['mine', 'both', 'theirs'] as ListenMode[]).map((m) => (
+            {(['shared', 'mine', 'both', 'theirs'] as ListenMode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => { setListenMode(m); setShowListenMenu(false); }}

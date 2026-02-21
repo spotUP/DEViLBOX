@@ -460,6 +460,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       const v = Number(e.target.value);
                       setStereoSeparation(v);
                       getTrackerReplayer().setStereoSeparation(v);
+                      // Also update DJ deck replayers if DJ engine is active
+                      try {
+                        const { getDJEngineIfActive } = require('@/engine/dj/DJEngine');
+                        const djEngine = getDJEngineIfActive();
+                        if (djEngine) {
+                          djEngine.deckA.replayer.setStereoSeparation(v);
+                          djEngine.deckB.replayer.setStereoSeparation(v);
+                        }
+                      } catch { /* DJ engine not initialized */ }
                     }}
                     className="w-20 accent-ft2-cursor"
                   />

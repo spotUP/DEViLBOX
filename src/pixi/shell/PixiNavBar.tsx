@@ -77,7 +77,7 @@ export const PixiNavBar: React.FC = () => {
       {/* App title */}
       <pixiBitmapText
         text="DEViLBOX"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13 }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
         tint={theme.accent.color}
         layout={{ marginRight: 8 }}
       />
@@ -125,8 +125,10 @@ export const PixiNavBar: React.FC = () => {
               style={{
                 fontFamily: PIXI_FONTS.MONO,
                 fontSize: 11,
+                fill: 0xffffff,
               }}
               tint={isActive ? theme.accent.color : theme.textMuted.color}
+              layout={{}}
             />
           </pixiContainer>
         );
@@ -138,7 +140,7 @@ export const PixiNavBar: React.FC = () => {
       {/* Project name */}
       <pixiBitmapText
         text={projectName}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11 }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
         tint={theme.textSecondary.color}
         layout={{ marginRight: 12 }}
       />
@@ -166,8 +168,9 @@ export const PixiNavBar: React.FC = () => {
         />
         <pixiBitmapText
           text="THEME"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
           tint={theme.textMuted.color}
+          layout={{}}
         />
       </pixiContainer>
 
@@ -197,8 +200,9 @@ export const PixiNavBar: React.FC = () => {
         />
         <pixiBitmapText
           text="DOM"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
           tint={theme.accent.color}
+          layout={{}}
         />
       </pixiContainer>
     </pixiContainer>

@@ -56,6 +56,17 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
       disposeDJEngine();
       clearSongCache();
       engineRef.current = null;
+
+      // Reset global audio state that DJ mode may have left stale.
+      // ToneEngine globals affect ALL sample playback rates and synth detune;
+      // if not reset here, the tracker view plays at wrong pitch/BPM.
+      const engine = getToneEngine();
+      engine.setGlobalPlaybackRate(1.0);
+      engine.setGlobalDetune(0);
+      engine.releaseAll();
+
+      // Reset transport store pitch display
+      useTransportStore.getState().setGlobalPitch(0);
     };
   }, [setDJModeActive]);
 

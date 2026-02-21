@@ -9,8 +9,12 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
 import { PixiButton, PixiNumericInput } from '../../components';
-import { useTrackerStore, useTransportStore } from '@stores';
+import { useTrackerStore, useTransportStore, useUIStore } from '@stores';
 import { useProjectStore } from '@stores/useProjectStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
+import { getToneEngine } from '@engine/ToneEngine';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import * as Tone from 'tone';
 
 const TOOLBAR_HEIGHT = 80;
 const MENUBAR_HEIGHT = 28;
@@ -56,6 +60,43 @@ const PixiFT2MainRow: React.FC = () => {
     const pat = s.patterns[s.currentPatternIndex];
     return pat?.length || 64;
   });
+  const resizePattern = useTrackerStore(s => s.resizePattern);
+
+  const handlePlaySong = useCallback(async () => {
+    Tone.start();
+    const engine = getToneEngine();
+    const { isPlaying, isLooping, play, stop, setIsLooping, setCurrentRow } = useTransportStore.getState();
+    if (isPlaying && !isLooping) {
+      getTrackerReplayer().stop(); stop(); engine.releaseAll();
+    } else {
+      if (isPlaying) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
+      setIsLooping(false);
+      setCurrentRow(0);
+      await engine.init();
+      await play();
+    }
+  }, []);
+
+  const handlePlayPattern = useCallback(async () => {
+    Tone.start();
+    const engine = getToneEngine();
+    const { isPlaying, isLooping, play, stop, setIsLooping, setCurrentRow } = useTransportStore.getState();
+    if (isPlaying && isLooping) {
+      getTrackerReplayer().stop(); stop(); engine.releaseAll();
+    } else {
+      if (isPlaying) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
+      setIsLooping(true);
+      setCurrentRow(0);
+      await engine.init();
+      await play();
+    }
+  }, []);
+
+  const handleLengthChange = useCallback((newLength: number) => {
+    if (newLength >= 1 && newLength <= 256) {
+      resizePattern(useTrackerStore.getState().currentPatternIndex, newLength);
+    }
+  }, [resizePattern]);
 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -64,6 +105,9 @@ const PixiFT2MainRow: React.FC = () => {
     g.rect(0, TOOLBAR_HEIGHT - 1, 4000, 1);
     g.fill({ color: theme.border.color, alpha: theme.border.alpha });
   }, [theme]);
+
+  const isPlayingSong = isPlaying && !isLooping;
+  const isPlayingPattern = isPlaying && isLooping;
 
   return (
     <pixiContainer
@@ -151,7 +195,7 @@ const PixiFT2MainRow: React.FC = () => {
           value={patternLength}
           min={1}
           max={256}
-          onChange={() => {}} // Placeholder — resizePattern needs wiring in Phase 4 detail
+          onChange={handleLengthChange}
           width={44}
         />
       </PixiToolbarSection>
@@ -161,16 +205,20 @@ const PixiFT2MainRow: React.FC = () => {
       {/* Transport buttons */}
       <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
         <PixiButton
-          label={isPlaying && !isLooping ? 'STOP' : 'PLAY'}
-          variant={isPlaying && !isLooping ? 'ft2' : 'ft2'}
+          label={isPlayingSong ? 'STOP' : 'PLAY'}
+          variant="ft2"
+          color={isPlayingSong ? 'red' : 'green'}
           size="sm"
-          onClick={() => {}} // Placeholder — engine play/stop in Phase 4 detail
+          active={isPlayingSong}
+          onClick={handlePlaySong}
         />
         <PixiButton
-          label={isPlaying && isLooping ? 'STOP' : 'PAT'}
+          label={isPlayingPattern ? 'STOP' : 'PAT'}
           variant="ft2"
+          color={isPlayingPattern ? 'red' : 'blue'}
           size="sm"
-          onClick={() => {}} // Placeholder
+          active={isPlayingPattern}
+          onClick={handlePlayPattern}
         />
       </pixiContainer>
 
@@ -198,8 +246,9 @@ const PixiFT2MainRow: React.FC = () => {
         />
         <pixiBitmapText
           text="VIZ"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
           tint={theme.textMuted.color}
+          layout={{}}
         />
       </pixiContainer>
     </pixiContainer>
@@ -212,6 +261,58 @@ const PixiFT2MenuBar: React.FC = () => {
   const theme = usePixiTheme();
   const isDirty = useProjectStore(s => s.isDirty);
 
+  const handleSave = useCallback(() => {
+    // Trigger save via keyboard command (Ctrl+S handler in useGlobalKeyboardHandler)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true }));
+  }, []);
+
+  const handleNew = useCallback(() => {
+    if (confirm('Create new project? Unsaved changes will be lost.')) {
+      const { resetPatterns } = useTrackerStore.getState();
+      resetPatterns();
+      useProjectStore.getState().setMetadata({ name: 'Untitled', author: '', description: '' });
+    }
+  }, []);
+
+  const handleClear = useCallback(() => {
+    if (confirm('Clear current pattern?')) {
+      const { currentPatternIndex, clearPattern } = useTrackerStore.getState();
+      clearPattern(currentPatternIndex);
+    }
+  }, []);
+
+  const handleLoad = useCallback(() => {
+    useUIStore.getState().setShowFileBrowser(true);
+  }, []);
+
+  const handleSettings = useCallback(() => {
+    useUIStore.getState().openModal('settings');
+  }, []);
+
+  const handleExport = useCallback(() => {
+    useUIStore.getState().openModal('export');
+  }, []);
+
+  const handleInstruments = useCallback(() => {
+    useUIStore.getState().openModal('instruments');
+  }, []);
+
+  const handleHelp = useCallback(() => {
+    useUIStore.getState().openModal('help');
+  }, []);
+
+  const handleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      document.documentElement.requestFullscreen();
+    }
+  }, []);
+
+  const handleSwitchToDOM = useCallback(() => {
+    useSettingsStore.getState().setRenderMode('dom');
+  }, []);
+
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, 4000, MENUBAR_HEIGHT);
@@ -220,9 +321,18 @@ const PixiFT2MenuBar: React.FC = () => {
     g.fill({ color: theme.border.color, alpha: theme.border.alpha });
   }, [theme]);
 
-  const menuItems = [
-    'Load', isDirty ? 'Save*' : 'Save', 'Export', 'New', 'Clear',
-    'Order', 'Instruments', 'Pads', 'Master FX', 'Help', 'Settings',
+  // Menu items with their handlers
+  const menuItems: { label: string; onClick: () => void }[] = [
+    { label: 'Load', onClick: handleLoad },
+    { label: isDirty ? 'Save*' : 'Save', onClick: handleSave },
+    { label: 'New', onClick: handleNew },
+    { label: 'Clear', onClick: handleClear },
+    { label: 'Export', onClick: handleExport },
+    { label: 'Instr', onClick: handleInstruments },
+    { label: 'Settings', onClick: handleSettings },
+    { label: 'Help', onClick: handleHelp },
+    { label: 'Fullscr', onClick: handleFullscreen },
+    { label: 'DOM Mode', onClick: handleSwitchToDOM },
   ];
 
   return (
@@ -240,11 +350,11 @@ const PixiFT2MenuBar: React.FC = () => {
 
       {menuItems.map(item => (
         <PixiButton
-          key={item}
-          label={item}
+          key={item.label}
+          label={item.label}
           variant="ghost"
           size="sm"
-          onClick={() => {}} // Placeholder — wire to callbacks in Phase 4 detail
+          onClick={item.onClick}
         />
       ))}
     </pixiContainer>
@@ -259,8 +369,9 @@ const PixiToolbarSection: React.FC<{ label: string; children: React.ReactNode }>
     <pixiContainer layout={{ flexDirection: 'column', gap: 2, alignItems: 'center' }}>
       <pixiBitmapText
         text={label}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8 }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
+        layout={{}}
       />
       {children}
     </pixiContainer>
