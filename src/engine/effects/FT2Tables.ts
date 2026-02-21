@@ -234,3 +234,45 @@ export function ft2ArpeggioPeriod(period: number, offset: number, finetune: numb
   if (idx < 0 || idx >= 1936) return period;
   return lut[idx];
 }
+
+/**
+ * FT2 period2NotePeriod — quantize period to nearest note period (for glissando E3x)
+ * Uses binary search matching FT2's period2NotePeriod (ft2_replayer.c lines 1758-1790)
+ *
+ * @param period   Current real period
+ * @param finetune Channel finetune (-128..+127)
+ * @param linear   Linear periods flag
+ * @returns        Period quantized to nearest note boundary
+ */
+export function ft2Period2NotePeriod(period: number, finetune: number, linear: boolean): number {
+  if (period === 0) return 0;
+
+  const lut = linear ? FT2_LINEAR_PERIOD_LUT : FT2_AMIGA_PERIOD_LUT;
+  const fineTune = ((finetune << 24) >> 27) + 16; // FT2: ((int8_t)ch->finetune >> 3) + 16
+
+  // FT2 binary search: 8 iterations to find the note index
+  // hiPeriod = 8*12*16, loPeriod = 0
+  let hiPeriod = 8 * 12 * 16;
+  let loPeriod = 0;
+
+  for (let i = 0; i < 8; i++) {
+    const tmpPeriod = (((loPeriod + hiPeriod) >> 1) & ~15) + fineTune;
+    let lookUp = tmpPeriod - 8;
+    if (lookUp < 0) lookUp = 0;
+    if (lookUp >= lut.length) lookUp = lut.length - 1;
+
+    if (period >= lut[lookUp]) {
+      hiPeriod = (tmpPeriod - fineTune) & ~15;
+    } else {
+      loPeriod = (tmpPeriod - fineTune) & ~15;
+    }
+  }
+
+  let tmpPeriod = loPeriod + fineTune; // outputNoteOffset=0 for glissando
+  const maxIdx = (8 * 12 * 16 + 16) - 1; // FT2 bug: should be 10*12*16+16
+  if (tmpPeriod >= maxIdx - 1) tmpPeriod = maxIdx - 1;
+  if (tmpPeriod < 0) tmpPeriod = 0;
+  if (tmpPeriod >= lut.length) tmpPeriod = lut.length - 1;
+
+  return lut[tmpPeriod];
+}

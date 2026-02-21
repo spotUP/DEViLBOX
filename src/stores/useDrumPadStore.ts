@@ -7,10 +7,17 @@ import type {
   DrumPadState,
   DrumProgram,
   DrumPad,
+  SampleLayer,
   MIDIMapping,
   SampleData,
 } from '../types/drumpad';
 import { createEmptyProgram, create808Program, create909Program } from '../types/drumpad';
+import {
+  saveAllPrograms,
+  loadAllPrograms,
+  exportConfig,
+  importConfig,
+} from '../lib/drumpad/drumpadDB';
 
 interface DrumPadStore extends DrumPadState {
   // Program management
@@ -25,14 +32,29 @@ interface DrumPadStore extends DrumPadState {
   loadSampleToPad: (padId: number, sample: SampleData) => void;
   clearPad: (padId: number) => void;
 
+  // Layer management
+  addLayerToPad: (padId: number, sample: SampleData, velocityRange: [number, number]) => void;
+  removeLayerFromPad: (padId: number, layerIndex: number) => void;
+  updateLayerOnPad: (padId: number, layerIndex: number, updates: Partial<SampleLayer>) => void;
+
   // MIDI mapping
   setMIDIMapping: (padId: string, mapping: MIDIMapping) => void;
   clearMIDIMapping: (padId: string) => void;
   getMIDIMapping: (note: number) => string | null;  // Returns padId
 
-  // Persistence
+  // Bus levels (synced to engine by PadGrid)
+  busLevels: Record<string, number>;
+  setBusLevel: (bus: string, level: number) => void;
+
+  // Persistence (localStorage — pad configs, no audio)
   saveToStorage: () => void;
   loadFromStorage: () => void;
+
+  // Persistence (IndexedDB — includes audio samples)
+  saveToIndexedDB: () => Promise<void>;
+  loadFromIndexedDB: (audioContext: BaseAudioContext) => Promise<void>;
+  exportAllConfigs: () => Promise<Blob>;
+  importConfigs: (blob: Blob, audioContext: BaseAudioContext) => Promise<void>;
 
   // Preferences
   setPreference: <K extends keyof DrumPadState['preferences']>(
@@ -57,6 +79,7 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   currentProgramId: 'A-01',
   midiMappings: {},
   preferences: DEFAULT_PREFERENCES,
+  busLevels: {} as Record<string, number>,
 
   // Program management
   loadProgram: (id: string) => {
@@ -164,6 +187,8 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       sample,
       name: sample.name,
     });
+    // Audio data changed — persist to IndexedDB (async, fire-and-forget)
+    get().saveToIndexedDB();
   },
 
   clearPad: (padId: number) => {
@@ -171,6 +196,48 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       sample: null,
       name: `Pad ${padId}`,
     });
+  },
+
+  // Layer management
+  addLayerToPad: (padId: number, sample: SampleData, velocityRange: [number, number]) => {
+    const { programs, currentProgramId } = get();
+    const program = programs.get(currentProgramId);
+    const pad = program?.pads.find(p => p.id === padId);
+    if (!pad) return;
+
+    const newLayer: SampleLayer = { sample, velocityRange, levelOffset: 0 };
+    get().updatePad(padId, { layers: [...pad.layers, newLayer] });
+    get().saveToIndexedDB();
+  },
+
+  removeLayerFromPad: (padId: number, layerIndex: number) => {
+    const { programs, currentProgramId } = get();
+    const program = programs.get(currentProgramId);
+    const pad = program?.pads.find(p => p.id === padId);
+    if (!pad) return;
+
+    const newLayers = pad.layers.filter((_, i) => i !== layerIndex);
+    get().updatePad(padId, { layers: newLayers });
+    get().saveToIndexedDB();
+  },
+
+  updateLayerOnPad: (padId: number, layerIndex: number, updates: Partial<SampleLayer>) => {
+    const { programs, currentProgramId } = get();
+    const program = programs.get(currentProgramId);
+    const pad = program?.pads.find(p => p.id === padId);
+    if (!pad || !pad.layers[layerIndex]) return;
+
+    const newLayers = pad.layers.map((layer, i) =>
+      i === layerIndex ? { ...layer, ...updates } : layer
+    );
+    get().updatePad(padId, { layers: newLayers });
+  },
+
+  // Bus levels
+  setBusLevel: (bus: string, level: number) => {
+    set((state) => ({
+      busLevels: { ...state.busLevels, [bus]: level },
+    }));
   },
 
   // MIDI mapping
@@ -264,6 +331,59 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       }
     } catch (error) {
       console.error('[DrumPadStore] Failed to load from storage:', error);
+    }
+  },
+
+  // IndexedDB persistence (includes audio samples)
+  saveToIndexedDB: async () => {
+    try {
+      const { programs } = get();
+      await saveAllPrograms(programs);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DrumPadStore] Saved to IndexedDB');
+      }
+    } catch (error) {
+      console.error('[DrumPadStore] Failed to save to IndexedDB:', error);
+    }
+  },
+
+  loadFromIndexedDB: async (audioContext: BaseAudioContext) => {
+    try {
+      const programs = await loadAllPrograms(audioContext);
+      if (programs && programs.size > 0) {
+        const state = get();
+        // Merge: keep current program ID if it exists in loaded data
+        const currentId = programs.has(state.currentProgramId)
+          ? state.currentProgramId
+          : Array.from(programs.keys())[0] || 'A-01';
+        set({ programs, currentProgramId: currentId });
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[DrumPadStore] Loaded ${programs.size} programs from IndexedDB`);
+        }
+      }
+    } catch (error) {
+      console.error('[DrumPadStore] Failed to load from IndexedDB:', error);
+    }
+  },
+
+  exportAllConfigs: async () => {
+    const { programs } = get();
+    return exportConfig(programs);
+  },
+
+  importConfigs: async (blob: Blob, audioContext: BaseAudioContext) => {
+    try {
+      const programs = await importConfig(blob, audioContext);
+      set({ programs });
+      // Persist the import to both IndexedDB and localStorage
+      await saveAllPrograms(programs);
+      get().saveToStorage();
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DrumPadStore] Imported ${programs.size} programs`);
+      }
+    } catch (error) {
+      console.error('[DrumPadStore] Failed to import configs:', error);
+      throw error;  // Re-throw so UI can show error
     }
   },
 

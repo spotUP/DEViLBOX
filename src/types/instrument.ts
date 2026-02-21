@@ -2268,6 +2268,7 @@ export interface InstrumentMetadata {
     finetune: number;
     relativeNote: number;
     defaultVolume: number;
+    panning?: number;
   }>; // All samples for this XM instrument (indexed by sampleMap values)
   preservedSample?: {
     audioBuffer: ArrayBuffer;
@@ -2291,6 +2292,7 @@ export interface InstrumentMetadata {
     finetune: number; // -8 to +7 (ProTracker) or -128 to +127 (XM)
     relativeNote?: number; // XM sample relative note (-96 to +95 semitones)
     defaultVolume?: number; // Sample's default volume (0-64) for channel init
+    panning?: number; // Sample default panning (0-255, 128 = center)
     fadeout?: number; // Fadeout rate
   };
   envelopes?: Record<number, {
