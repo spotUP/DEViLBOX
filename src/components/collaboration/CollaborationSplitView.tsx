@@ -2,9 +2,9 @@
  * CollaborationSplitView — Layout for collab mode, driven by listenMode.
  *
  * shared  → both panels, navigation synced (Google Docs style)
- * both    → both panels, independent navigation
+ * both    → two full TrackerViews side by side, independent navigation
  * mine    → only your editor (full width)
- * theirs  → only friend's view (full width)
+ * theirs  → only friend's view (full width, read-only)
  */
 
 import React from 'react';
@@ -44,6 +44,19 @@ export const CollaborationSplitView: React.FC<CollaborationSplitViewProps> = ({
   const showYours = listenMode !== 'theirs';
   const showTheirs = listenMode === 'both' || listenMode === 'theirs';
 
+  const trackerProps = {
+    onShowPatterns,
+    onShowExport,
+    onShowHelp,
+    onShowMasterFX,
+    onShowInstrumentFX,
+    onShowInstruments,
+    onShowDrumpads,
+    showPatterns,
+    showMasterFX,
+    showInstrumentFX,
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Toolbar */}
@@ -53,24 +66,19 @@ export const CollaborationSplitView: React.FC<CollaborationSplitViewProps> = ({
       <div className="flex flex-1 min-h-0 min-w-0">
         {showYours && (
           <div className={`flex flex-col min-h-0 min-w-0 ${showTheirs ? 'flex-1 border-r border-dark-border' : 'flex-1'}`}>
-            <TrackerView
-              onShowPatterns={onShowPatterns}
-              onShowExport={onShowExport}
-              onShowHelp={onShowHelp}
-              onShowMasterFX={onShowMasterFX}
-              onShowInstrumentFX={onShowInstrumentFX}
-              onShowInstruments={onShowInstruments}
-              onShowDrumpads={onShowDrumpads}
-              showPatterns={showPatterns}
-              showMasterFX={showMasterFX}
-              showInstrumentFX={showInstrumentFX}
-            />
+            <TrackerView {...trackerProps} />
           </div>
         )}
 
         {showTheirs && (
           <div className="flex flex-col flex-1 min-h-0 min-w-0">
-            <RemotePatternView />
+            {listenMode === 'both' ? (
+              /* "Both" mode: full TrackerView so friend's side is a complete editor */
+              <TrackerView {...trackerProps} />
+            ) : (
+              /* "Theirs" mode: read-only view of friend's pattern */
+              <RemotePatternView />
+            )}
           </div>
         )}
       </div>
