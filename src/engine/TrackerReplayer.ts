@@ -23,7 +23,7 @@ import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransport
 import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/audio';
 import type { GrooveTemplate } from '@/types/audio';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
-import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate, ft2ArpeggioPeriod, FT2_ARPEGGIO_TAB } from './effects/FT2Tables';
+import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate, ft2ArpeggioPeriod, ft2Period2NotePeriod, FT2_ARPEGGIO_TAB } from './effects/FT2Tables';
 
 // ============================================================================
 // CONSTANTS
@@ -250,6 +250,12 @@ interface ChannelState {
   tremorParam: number;           // Tremor parameter memory (Txy)
   efPitchSlideUpSpeed: number;   // Extra fine porta up speed memory (X1x)
   efPitchSlideDownSpeed: number; // Extra fine porta down speed memory (X2x)
+  prevEffTyp: number;            // Previous row's effect type (for arpeggio/vibrato period reset)
+  prevEffParam: number;          // Previous row's effect parameter
+  noteRetrigSpeed: number;       // FT2 Rxy: retrigger speed memory
+  noteRetrigVol: number;         // FT2 Rxy: retrigger volume slide memory
+  noteRetrigCounter: number;     // FT2 Rxy: retrigger tick counter
+  volColumnVol: number;          // FT2: volume column byte from current row (for Rxy quirk)
   volSlideSpeed: number;         // FT2: volume slide speed memory (Axx)
   fVolSlideUpSpeed: number;      // FT2: fine volume slide up memory (EAx)
   fVolSlideDownSpeed: number;    // FT2: fine volume slide down memory (EBx)
@@ -382,7 +388,6 @@ export class TrackerReplayer {
   private pBreakPos = 0;
   private pBreakFlag = false;
   private posJumpFlag = false;
-  private posJumpPos = 0;
   private patternDelay = 0;      // EEx pattern delay (legacy, non-XM)
   // FT2 two-stage pattern delay
   private pattDelTime = 0;       // Set by EEx on tick 0, copied to pattDelTime2 at row boundary
@@ -741,7 +746,6 @@ export class TrackerReplayer {
     this.pBreakFlag = false;
     this.pBreakPos = 0;
     this.posJumpFlag = false;
-    this.posJumpPos = 0;
     this.patternDelay = 0;
     this.pattDelTime = 0;
     this.pattDelTime2 = 0;
@@ -844,6 +848,12 @@ export class TrackerReplayer {
       tremorParam: 0,
       efPitchSlideUpSpeed: 0,
       efPitchSlideDownSpeed: 0,
+      prevEffTyp: 0,
+      prevEffParam: 0,
+      noteRetrigSpeed: 0,
+      noteRetrigVol: 0,
+      noteRetrigCounter: 0,
+      volColumnVol: 0,
       volSlideSpeed: 0,
       fVolSlideUpSpeed: 0,
       fVolSlideDownSpeed: 0,
@@ -1306,6 +1316,26 @@ export class TrackerReplayer {
     const y = param & 0x0F;
     void x; void y; // Effect parameters used in extended effect handling below
 
+    // FT2: store volume column byte (needed for Rxy quirk)
+    ch.volColumnVol = row.volume ?? 0;
+
+    // FT2: Period reset when arpeggio or vibrato from previous row ends
+    // Reference: ft2_replayer.c getNewNote() lines 1333-1349
+    if (this.useXMPeriods) {
+      if (ch.prevEffTyp === 0) {
+        if (ch.prevEffParam > 0) {
+          // Previous row had arpeggio — reset period
+          this.updatePeriod(ch);
+        }
+      } else if ((ch.prevEffTyp === 4 || ch.prevEffTyp === 6) && effect !== 4 && effect !== 6) {
+        // Previous row had vibrato (4/6), current row doesn't — reset period
+        this.updatePeriod(ch);
+      }
+      // Store current effect for next row's check
+      ch.prevEffTyp = effect;
+      ch.prevEffParam = param;
+    }
+
     // Handle instrument change
     const instNum = row.instrument ?? 0;
     if (instNum > 0) {
@@ -1340,8 +1370,21 @@ export class TrackerReplayer {
       return;
     }
 
+    // FT2: K00 = key-off at tick 0 (handled before note/portamento checks)
+    // Reference: ft2_replayer.c getNewNote() line 1398-1407
+    // K00 triggers keyOff, resets volumes if instrument specified, then
+    // processes handleEffects_TickZero (vol column + effects) but NO note.
+    const isK00 = this.useXMPeriods && effect === 0x14 && param === 0;
+    if (isK00) {
+      this.xmKeyOff(ch);
+      if (instNum > 0) {
+        ch.outVol = ch.volume;
+        ch.outPan = ch.panning;
+      }
+    }
+
     // Handle note
-    const noteValue = row.note;
+    const noteValue = isK00 ? 0 : row.note; // K00 suppresses note processing
     const rawPeriod = row.period;
 
     // Probability/maybe: skip note if random check fails
@@ -1646,9 +1689,11 @@ export class TrackerReplayer {
         break;
 
       case 0xB: // Position jump
-        this.posJumpPos = param;
+        // FT2: songPos = param - 1 (incremented later in advanceRow)
+        // Reference: ft2_replayer.c positionJump() lines 757-772
+        this.songPos = param - 1; // Will be ++songPos in advanceRow
+        this.pBreakPos = 0;
         this.posJumpFlag = true;
-        this.pBreakFlag = true;
         break;
 
       case 0xC: // Set volume
@@ -1666,7 +1711,9 @@ export class TrackerReplayer {
           this.pBreakPos = param; // Hex for IT/S3M/Furnace
           if (this.pBreakPos > 255) this.pBreakPos = 0;
         }
-        this.pBreakFlag = true;
+        // FT2: pattern break sets posJumpFlag (NOT pBreakFlag)
+        // pBreakFlag is reserved for E6x pattern loop
+        this.posJumpFlag = true;
         break;
 
       case 0xE: // Extended effects
@@ -1706,14 +1753,106 @@ export class TrackerReplayer {
         if (param !== 0) ch.globalVolSlide = param;
         break;
 
+      case 0x15: { // Set envelope position (Lxx)
+        // FT2: setEnvelopePos — sets both volume and panning envelope tick/pos with interpolation
+        // Reference: ft2_replayer.c lines 817-960
+        if (!this.useXMPeriods || !ch.instrument?.metadata) break;
+        const meta = ch.instrument.metadata;
+
+        // Volume envelope
+        const volEnv = meta.originalEnvelope;
+        if (volEnv?.enabled && volEnv.points.length > 0) {
+          ch.volEnvTick = param - 1;
+          let point = 0;
+          let tick = param;
+          let envUpdate = true;
+          if (volEnv.points.length > 1) {
+            point = 1;
+            for (let i = 0; i < volEnv.points.length - 1; i++) {
+              if (tick < volEnv.points[point].tick) {
+                point--;
+                tick -= volEnv.points[point].tick;
+                if (tick === 0) { envUpdate = false; break; }
+                const xDiff = volEnv.points[point + 1].tick - volEnv.points[point].tick;
+                if (xDiff <= 0) { envUpdate = true; break; }
+                const y0 = volEnv.points[point].value & 0xFF;
+                const y1 = volEnv.points[point + 1].value & 0xFF;
+                ch.fVolEnvDelta = (y1 - y0) / xDiff;
+                ch.fVolEnvValue = y0 + ch.fVolEnvDelta * (tick - 1);
+                point++;
+                envUpdate = false;
+                break;
+              }
+              point++;
+            }
+            if (envUpdate) point--;
+          }
+          if (envUpdate) {
+            ch.fVolEnvDelta = 0;
+            ch.fVolEnvValue = volEnv.points[Math.max(0, Math.min(point, volEnv.points.length - 1))].value & 0xFF;
+          }
+          ch.volEnvPos = Math.max(0, Math.min(point, volEnv.points.length - 1));
+        }
+
+        // Panning envelope — FT2 BUG: checks volEnvFlags instead of panEnvFlags
+        // Reference: ft2_replayer.c line 897
+        const panEnv = meta.panningEnvelope;
+        if (volEnv?.enabled && panEnv?.enabled && panEnv.points.length > 0) {
+          ch.panEnvTick = param - 1;
+          let point = 0;
+          let tick = param;
+          let envUpdate = true;
+          if (panEnv.points.length > 1) {
+            point = 1;
+            for (let i = 0; i < panEnv.points.length - 1; i++) {
+              if (tick < panEnv.points[point].tick) {
+                point--;
+                tick -= panEnv.points[point].tick;
+                if (tick === 0) { envUpdate = false; break; }
+                const xDiff = panEnv.points[point + 1].tick - panEnv.points[point].tick;
+                if (xDiff <= 0) { envUpdate = true; break; }
+                const y0 = panEnv.points[point].value & 0xFF;
+                const y1 = panEnv.points[point + 1].value & 0xFF;
+                ch.fPanEnvDelta = (y1 - y0) / xDiff;
+                ch.fPanEnvValue = y0 + ch.fPanEnvDelta * (tick - 1);
+                point++;
+                envUpdate = false;
+                break;
+              }
+              point++;
+            }
+            if (envUpdate) point--;
+          }
+          if (envUpdate) {
+            ch.fPanEnvDelta = 0;
+            ch.fPanEnvValue = panEnv.points[Math.max(0, Math.min(point, panEnv.points.length - 1))].value & 0xFF;
+          }
+          ch.panEnvPos = Math.max(0, Math.min(point, panEnv.points.length - 1));
+        }
+        break;
+      }
+
       case 0x19: // Pan slide (Pxx) - also used for Furnace panning effects
         if (param !== 0) ch.panSlide = param;
         break;
 
-      case 0x1B: // Retrigger with volume slide (Rxy) - IT style
-        ch.retrigCount = param & 0x0F;
-        ch.retrigVolSlide = (param >> 4) & 0x0F;
+      case 0x1B: { // Multi note retrigger (Rxy) — FT2 multiNoteRetrig
+        // Reference: ft2_replayer.c lines 1253-1271
+        // FT2: uses speed/vol memories + retriggers on tick 0 when volColumnData == 0
+        let rSpeed = param & 0x0F;
+        if (rSpeed === 0) rSpeed = ch.noteRetrigSpeed;
+        ch.noteRetrigSpeed = rSpeed;
+
+        let rVol = (param >> 4) & 0x0F;
+        if (rVol === 0) rVol = ch.noteRetrigVol;
+        ch.noteRetrigVol = rVol;
+
+        // FT2: retrigger on tick 0 when volume column data is 0 (no volume column effect)
+        if (ch.volColumnVol === 0) {
+          this.doMultiNoteRetrig(ch, chIndex, time);
+        }
         break;
+      }
 
       case 0x20: // Global pitch shift (Wxx) - DJ-style smooth slide
         // W00 = -12 semitones, W80 = 0 semitones, WFF = +12 semitones
@@ -1815,6 +1954,16 @@ export class TrackerReplayer {
 
       case 0x9: // Retrigger
         ch.retrigCount = y;
+        break;
+
+      case 0xC: // Note cut — EC0 handled on tick 0 (param == 0 only)
+        // FT2: noteCut0 only cuts when param is exactly 0
+        // Reference: ft2_replayer.c line 701-709
+        if (y === 0) {
+          ch.volume = 0;
+          ch.outVol = 0;
+          ch.gainNode.gain.setValueAtTime(0, time);
+        }
         break;
 
       case 0xA: { // Fine volume up (FT2: speed memory)
@@ -2067,29 +2216,44 @@ export class TrackerReplayer {
       case 0xA: this.doVolumeSlide(ch, param, time); break;
       case 0xE:
         if (x === 0x9 && y > 0) {
-          ch.retrigCount--;
-          if (ch.retrigCount <= 0) {
-            ch.retrigCount = y;
+          // FT2 retrigNote: uses modulo of currentTick
+          // Reference: ft2_replayer.c line 2124: if ((speed-tick) % param == 0)
+          if (this.currentTick % y === 0) {
             this.triggerNote(ch, time, 0, chIndex, accent, false, false);
           }
         } else if (x === 0xC && y === this.currentTick) {
           ch.volume = 0;
           ch.gainNode.gain.setValueAtTime(0, time);
         } else if (x === 0xD && y === this.currentTick) {
+          // FT2 noteDelay: triggers note, resets volumes, triggers instrument, applies volume column
+          // Reference: ft2_replayer.c lines 2140-2162
           const slideActive = ch.previousSlideFlag;
           this.triggerNote(ch, time, 0, chIndex, accent, slideActive, slide);
+          this.triggerEnvelopes(ch);
+
+          // FT2: apply volume column on delayed trigger (set volume / set panning)
+          const dvc = ch.volColumnVol;
+          if (dvc >= 0x10 && dvc <= 0x50) {
+            ch.outVol = dvc - 0x10;
+            ch.volume = ch.outVol;
+            ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+          } else if (dvc >= 0xC0 && dvc <= 0xCF) {
+            ch.outPan = (dvc & 0x0F) << 4;
+            ch.panning = ch.outPan;
+            this.applyPanEffect(ch, ch.panning, time);
+          }
         }
         break;
       case 0x11: this.doGlobalVolumeSlide(ch.globalVolSlide, time); break;
 
       case 0x14: { // Kxx - Key-off at tick (FT2: effect 20)
         // FT2: triggers keyOff when (speed - tick) == (param & 31)
+        // In FT2 tick model: speed-tick = currentTick in our upward-counting model
         if (this.useXMPeriods) {
-          if ((this.speed - this.currentTick) === (param & 31)) {
+          if (this.currentTick === (param & 31)) {
             this.xmKeyOff(ch);
           }
         } else {
-          // Fallback: key-off at the specified tick
           if (this.currentTick === (param & 31)) {
             this.stopChannel(ch, chIndex, time);
           }
@@ -2098,15 +2262,9 @@ export class TrackerReplayer {
       }
 
       case 0x19: this.doPanSlide(ch, ch.panSlide, time); break;
-      case 0x1B:
-        if (ch.retrigCount > 0) {
-          ch.retrigCount--;
-          if (ch.retrigCount <= 0) {
-            ch.retrigCount = param & 0x0F;
-            this.applyRetrigVolSlide(ch, ch.retrigVolSlide, time);
-            this.triggerNote(ch, time, 0, chIndex, accent, false, false);
-          }
-        }
+      case 0x1B: // Multi note retrigger (Rxy) — tick N
+        // FT2: uses doMultiNoteRetrig with counter
+        this.doMultiNoteRetrig(ch, chIndex, time);
         break;
 
       case 0x1D: { // Txx - Tremor (FT2: effect 29)
@@ -2198,7 +2356,14 @@ export class TrackerReplayer {
       if (ch.period < ch.portaTarget) ch.period = ch.portaTarget;
     }
 
-    this.updatePeriod(ch);
+    // FT2: E3x glissando — quantize output period to nearest note
+    // Reference: ft2_replayer.c portamento() line 1901-1904
+    if (ch.glissandoMode && this.useXMPeriods) {
+      const quantized = ft2Period2NotePeriod(ch.period, ch.finetune, this.linearPeriods);
+      this.updatePeriodDirect(ch, quantized);
+    } else {
+      this.updatePeriod(ch);
+    }
   }
 
   private doVibrato(ch: ChannelState): void {
@@ -2418,6 +2583,55 @@ export class TrackerReplayer {
    * Apply volume slide for IT-style retrigger (Rxy)
    * Based on the y nibble value
    */
+  /**
+   * FT2 doMultiNoteRetrig — counter-based retrigger with volume slide
+   * Reference: ft2_replayer.c lines 1202-1251
+   */
+  private doMultiNoteRetrig(ch: ChannelState, chIndex: number, time: number): void {
+    const cnt = ch.noteRetrigCounter + 1;
+    if (cnt < ch.noteRetrigSpeed) {
+      ch.noteRetrigCounter = cnt;
+      return;
+    }
+    ch.noteRetrigCounter = 0;
+
+    // Apply volume slide
+    let vol = ch.volume;
+    switch (ch.noteRetrigVol) {
+      case 0x1: vol -= 1; break;
+      case 0x2: vol -= 2; break;
+      case 0x3: vol -= 4; break;
+      case 0x4: vol -= 8; break;
+      case 0x5: vol -= 16; break;
+      case 0x6: vol = (vol >> 1) + (vol >> 3) + (vol >> 4); break; // FT2: 11/16 = 0.6875
+      case 0x7: vol >>= 1; break;
+      case 0x8: break;
+      case 0x9: vol += 1; break;
+      case 0xA: vol += 2; break;
+      case 0xB: vol += 4; break;
+      case 0xC: vol += 8; break;
+      case 0xD: vol += 16; break;
+      case 0xE: vol = (vol >> 1) + vol; break; // 1.5x
+      case 0xF: vol += vol; break; // 2x
+      default: break;
+    }
+    if (vol < 0) vol = 0;
+    if (vol > 64) vol = 64;
+    ch.volume = vol;
+    ch.outVol = vol;
+
+    // FT2: apply volume column set-volume / set-panning overrides
+    if (ch.volColumnVol >= 0x10 && ch.volColumnVol <= 0x50) {
+      ch.outVol = ch.volColumnVol - 0x10;
+      ch.volume = ch.outVol;
+    } else if (ch.volColumnVol >= 0xC0 && ch.volColumnVol <= 0xCF) {
+      ch.outPan = (ch.volColumnVol & 0x0F) << 4;
+    }
+
+    ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+    this.triggerNote(ch, time, 0, chIndex, false, false, false);
+  }
+
   private applyRetrigVolSlide(ch: ChannelState, slideType: number, time: number): void {
     switch (slideType) {
       case 0: break; // No change
@@ -2426,7 +2640,7 @@ export class TrackerReplayer {
       case 3: ch.volume = Math.max(0, ch.volume - 4); break;
       case 4: ch.volume = Math.max(0, ch.volume - 8); break;
       case 5: ch.volume = Math.max(0, ch.volume - 16); break;
-      case 6: ch.volume = Math.floor(ch.volume * 2 / 3); break;
+      case 6: ch.volume = (ch.volume >> 1) + (ch.volume >> 3) + (ch.volume >> 4); break; // FT2: 11/16
       case 7: ch.volume = Math.floor(ch.volume / 2); break;
       case 8: break; // No change
       case 9: ch.volume = Math.min(64, ch.volume + 1); break;
@@ -3480,18 +3694,9 @@ export class TrackerReplayer {
       return;
     }
 
-    // Pattern break
-    if (this.pBreakFlag) {
-      this.pattPos = this.pBreakPos;
-      this.pBreakFlag = false;
-      this.pBreakPos = 0;
-
-      if (!this.posJumpFlag) {
-        this.songPos++;
-      }
-    } else {
-      this.pattPos++;
-    }
+    // FT2-accurate row advancement (matches getNextPos in ft2_replayer.c)
+    // Reference: ft2_replayer.c lines 2245-2294
+    this.pattPos++;
 
     // FT2 two-stage pattern delay (after row increment, before position checks)
     if (this.useXMPeriods) {
@@ -3507,20 +3712,33 @@ export class TrackerReplayer {
       }
     }
 
-    // Position jump
-    if (this.posJumpFlag) {
-      this.songPos = this.posJumpPos;
-      this.posJumpFlag = false;
+    // E6x pattern loop: just sets row position, no song position change
+    // FT2: pBreakFlag is ONLY set by E6x (pattern loop), NOT by Dxx
+    if (this.pBreakFlag) {
+      this.pBreakFlag = false;
+      this.pattPos = this.pBreakPos;
     }
 
-    // Pattern end
+    // Pattern end or position jump (Bxx / Dxx / natural end of pattern)
     const patternNum = this.song.songPositions[this.songPos];
     const pattern = this.song.patterns[patternNum];
     const patternLength = pattern?.length ?? 64;
 
-    if (this.pattPos >= patternLength) {
-      this.pattPos = 0;
+    if (this.pattPos >= patternLength || this.posJumpFlag) {
+      this.pattPos = this.pBreakPos; // Dxx target row, or 0 if Bxx/natural
+      this.pBreakPos = 0;
+      this.posJumpFlag = false;
+
+      // FT2: ++song.songPos (Bxx already set songPos = param-1, so net = param)
       this.songPos++;
+
+      // Overflow / song end
+      if (this.songPos >= this.song.songLength) {
+        this.songPos = this.song.restartPosition < this.song.songLength
+          ? this.song.restartPosition
+          : 0;
+        this.onSongEnd?.();
+      }
     }
 
     // DJ pattern loop: wrap song position within loop boundaries
@@ -3529,14 +3747,6 @@ export class TrackerReplayer {
         this.songPos = this.patternLoopStartPos;
         this.pattPos = 0;
       }
-    }
-
-    // Song end
-    if (this.songPos >= this.song.songLength) {
-      this.songPos = this.song.restartPosition < this.song.songLength
-        ? this.song.restartPosition
-        : 0;
-      this.onSongEnd?.();
     }
 
     // Notify
