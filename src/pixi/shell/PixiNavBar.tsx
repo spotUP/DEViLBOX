@@ -9,15 +9,20 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiButton } from '../components';
+import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
 import { useUIStore } from '@stores';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useProjectStore } from '@stores/useProjectStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
+import { useTabsStore } from '@stores/useTabsStore';
+import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
+import { useMIDIStore } from '@stores/useMIDIStore';
 import { APP_VERSION } from '@/constants/version';
 
 const NAV_HEIGHT = 36;
+const TAB_BAR_HEIGHT = 28;
 
 type ViewTab = 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll';
 const VIEW_TABS: { id: ViewTab; label: string }[] = [
@@ -41,6 +46,8 @@ export const PixiNavBar: React.FC = () => {
   const masterMuted = useAudioStore(s => s.masterMuted);
   const collabStatus = useCollaborationStore(s => s.status);
   const openModal = useUIStore(s => s.openModal);
+  const tabs = useTabsStore(s => s.tabs);
+  const hasMIDI = useMIDIStore(s => s.isInitialized && s.inputDevices.length > 0);
 
   // Cycle through themes
   const handleThemeToggle = useCallback(() => {
@@ -91,7 +98,16 @@ export const PixiNavBar: React.FC = () => {
     g.fill({ color: theme.border.color, alpha: theme.border.alpha });
   }, [theme]);
 
+  const showTabBar = tabs.length > 1;
+
   return (
+    <pixiContainer
+      layout={{
+        width: '100%',
+        height: showTabBar ? NAV_HEIGHT + TAB_BAR_HEIGHT : NAV_HEIGHT,
+        flexDirection: 'column',
+      }}
+    >
     <pixiContainer
       layout={{
         width: '100%',
@@ -257,6 +273,16 @@ export const PixiNavBar: React.FC = () => {
         />
       </pixiContainer>
 
+      {/* MIDI toolbar dropdown */}
+      {hasMIDI && (
+        <PixiDOMOverlay
+          layout={{ height: 28, width: 90 }}
+          style={{ overflow: 'visible', zIndex: 100 }}
+        >
+          <MIDIToolbarDropdown />
+        </PixiDOMOverlay>
+      )}
+
       {/* DOM/WebGL toggle */}
       <pixiContainer
         eventMode="static"
@@ -289,5 +315,95 @@ export const PixiNavBar: React.FC = () => {
         />
       </pixiContainer>
     </pixiContainer>
+
+    {/* Tab bar (shown when multiple project tabs open) */}
+    {showTabBar && (
+      <PixiDOMOverlay
+        layout={{ width: '100%', height: TAB_BAR_HEIGHT }}
+        style={{
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '0 8px',
+          background: '#181825',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+        }}
+      >
+        <PixiTabBar />
+      </PixiDOMOverlay>
+    )}
+    </pixiContainer>
+  );
+};
+
+// ─── Tab Bar (DOM) ──────────────────────────────────────────────────────────
+
+const PixiTabBar: React.FC = () => {
+  const tabs = useTabsStore(s => s.tabs);
+  const activeTabId = useTabsStore(s => s.activeTabId);
+  const addTab = useTabsStore(s => s.addTab);
+  const closeTab = useTabsStore(s => s.closeTab);
+  const setActiveTab = useTabsStore(s => s.setActiveTab);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, overflow: 'hidden' }}>
+      {tabs.map(tab => (
+        <button
+          key={tab.id}
+          onClick={() => setActiveTab(tab.id)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '2px 10px',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            background: activeTabId === tab.id ? '#1e1e2e' : '#11111b',
+            color: activeTabId === tab.id ? '#cdd6f4' : '#6c7086',
+            border: activeTabId === tab.id ? '1px solid rgba(255,255,255,0.12)' : '1px solid transparent',
+            borderRadius: '4px 4px 0 0',
+            cursor: 'pointer',
+            maxWidth: '160px',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          <span>{tab.name || 'Untitled'}{tab.isDirty ? ' *' : ''}</span>
+          {tabs.length > 1 && (
+            <span
+              onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
+              style={{
+                padding: '0 2px',
+                borderRadius: '2px',
+                opacity: 0.5,
+                cursor: 'pointer',
+                fontSize: '10px',
+              }}
+              onMouseEnter={(e) => { (e.target as HTMLElement).style.opacity = '1'; }}
+              onMouseLeave={(e) => { (e.target as HTMLElement).style.opacity = '0.5'; }}
+            >
+              ×
+            </span>
+          )}
+        </button>
+      ))}
+      <button
+        onClick={addTab}
+        style={{
+          padding: '2px 6px',
+          fontSize: '14px',
+          background: 'transparent',
+          color: '#6c7086',
+          border: 'none',
+          cursor: 'pointer',
+          borderRadius: '4px',
+        }}
+        title="New project tab"
+      >
+        +
+      </button>
+    </div>
   );
 };

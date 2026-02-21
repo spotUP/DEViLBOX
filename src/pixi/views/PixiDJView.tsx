@@ -3,11 +3,12 @@
  * Layout: Top bar | [Deck A | Mixer | Deck B] (flex row)
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiButton } from '../components';
+import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
 import { PixiDJDeck } from './dj/PixiDJDeck';
 import { PixiDJMixer } from './dj/PixiDJMixer';
 import { useUIStore } from '@stores';
@@ -18,6 +19,13 @@ import { clearSongCache } from '@engine/dj/DJSongCache';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { DJEngine } from '@engine/dj/DJEngine';
 import { useDJKeyboardHandler } from '@components/dj/DJKeyboardHandler';
+import { DJPlaylistPanel } from '@components/dj/DJPlaylistPanel';
+import { DJModlandBrowser } from '@components/dj/DJModlandBrowser';
+import { DJSeratoBrowser } from '@components/dj/DJSeratoBrowser';
+import { DJControllerSelector } from '@components/dj/DJControllerSelector';
+import { DJFxQuickPresets } from '@components/dj/DJFxQuickPresets';
+
+type DJBrowserPanel = 'none' | 'playlists' | 'modland' | 'serato';
 
 export const PixiDJView: React.FC = () => {
   const engineRef = useRef<DJEngine | null>(null);
@@ -49,6 +57,8 @@ export const PixiDJView: React.FC = () => {
     };
   }, [setDJModeActive]);
 
+  const [browserPanel, setBrowserPanel] = useState<DJBrowserPanel>('none');
+
   return (
     <pixiContainer
       layout={{
@@ -58,7 +68,19 @@ export const PixiDJView: React.FC = () => {
       }}
     >
       {/* Top control bar */}
-      <PixiDJTopBar />
+      <PixiDJTopBar browserPanel={browserPanel} onBrowserPanelChange={setBrowserPanel} />
+
+      {/* Browser panel (collapsible) */}
+      {browserPanel !== 'none' && (
+        <PixiDOMOverlay
+          layout={{ width: '100%', height: 280 }}
+          style={{ overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          {browserPanel === 'playlists' && <DJPlaylistPanel onClose={() => setBrowserPanel('none')} />}
+          {browserPanel === 'modland' && <DJModlandBrowser onClose={() => setBrowserPanel('none')} />}
+          {browserPanel === 'serato' && <DJSeratoBrowser onClose={() => setBrowserPanel('none')} />}
+        </PixiDOMOverlay>
+      )}
 
       {/* Main deck area: Deck A | Mixer | Deck B */}
       <pixiContainer
@@ -78,7 +100,12 @@ export const PixiDJView: React.FC = () => {
 
 // ─── Top Bar ────────────────────────────────────────────────────────────────
 
-const PixiDJTopBar: React.FC = () => {
+interface DJTopBarProps {
+  browserPanel: DJBrowserPanel;
+  onBrowserPanelChange: (panel: DJBrowserPanel) => void;
+}
+
+const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelChange }) => {
   const theme = usePixiTheme();
   const modalOpen = useUIStore(s => s.modalOpen);
 
@@ -87,9 +114,17 @@ const PixiDJTopBar: React.FC = () => {
     s.modalOpen === 'fileBrowser' ? s.closeModal() : s.openModal('fileBrowser');
   }, []);
 
+  const togglePanel = useCallback((panel: DJBrowserPanel) => {
+    onBrowserPanelChange(browserPanel === panel ? 'none' : panel);
+  }, [browserPanel, onBrowserPanelChange]);
+
   const handleFX = useCallback(() => {
     const s = useUIStore.getState();
     s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx');
+  }, []);
+
+  const handleDrumpads = useCallback(() => {
+    useUIStore.getState().openModal('drumpads');
   }, []);
 
   const handleSettings = useCallback(() => {
@@ -114,7 +149,7 @@ const PixiDJTopBar: React.FC = () => {
         alignItems: 'center',
         paddingLeft: 12,
         paddingRight: 12,
-        gap: 12,
+        gap: 6,
       }}
     >
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: '100%', height: 40 }} />
@@ -126,10 +161,9 @@ const PixiDJTopBar: React.FC = () => {
         layout={{}}
       />
 
-      <pixiContainer layout={{ flex: 1 }} />
-
+      {/* Browser panels */}
       <PixiButton
-        label="Browser"
+        label="Files"
         variant={modalOpen === 'fileBrowser' ? 'ft2' : 'ghost'}
         color={modalOpen === 'fileBrowser' ? 'blue' : undefined}
         size="sm"
@@ -137,12 +171,61 @@ const PixiDJTopBar: React.FC = () => {
         onClick={handleBrowser}
       />
       <PixiButton
+        label="Playlists"
+        variant={browserPanel === 'playlists' ? 'ft2' : 'ghost'}
+        color={browserPanel === 'playlists' ? 'blue' : undefined}
+        size="sm"
+        active={browserPanel === 'playlists'}
+        onClick={() => togglePanel('playlists')}
+      />
+      <PixiButton
+        label="Modland"
+        variant={browserPanel === 'modland' ? 'ft2' : 'ghost'}
+        color={browserPanel === 'modland' ? 'blue' : undefined}
+        size="sm"
+        active={browserPanel === 'modland'}
+        onClick={() => togglePanel('modland')}
+      />
+      <PixiButton
+        label="Serato"
+        variant={browserPanel === 'serato' ? 'ft2' : 'ghost'}
+        color={browserPanel === 'serato' ? 'blue' : undefined}
+        size="sm"
+        active={browserPanel === 'serato'}
+        onClick={() => togglePanel('serato')}
+      />
+
+      <pixiContainer layout={{ flex: 1 }} />
+
+      {/* Controller selector */}
+      <PixiDOMOverlay
+        layout={{ height: 28, width: 130 }}
+        style={{ overflow: 'visible' }}
+      >
+        <DJControllerSelector />
+      </PixiDOMOverlay>
+
+      {/* FX Quick Presets */}
+      <PixiDOMOverlay
+        layout={{ height: 28, width: 130 }}
+        style={{ overflow: 'visible' }}
+      >
+        <DJFxQuickPresets />
+      </PixiDOMOverlay>
+
+      <PixiButton
         label="FX"
         variant={modalOpen === 'masterFx' ? 'ft2' : 'ghost'}
         color={modalOpen === 'masterFx' ? 'green' : undefined}
         size="sm"
         active={modalOpen === 'masterFx'}
         onClick={handleFX}
+      />
+      <PixiButton
+        label="Pads"
+        variant="ghost"
+        size="sm"
+        onClick={handleDrumpads}
       />
       <PixiButton
         label="Settings"

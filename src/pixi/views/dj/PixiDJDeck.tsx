@@ -7,11 +7,16 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme, usePixiThemeId, getDeckColors } from '../../theme';
 import { PixiButton, PixiLabel, PixiSlider } from '../../components';
+import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
 import { useDJStore } from '@/stores/useDJStore';
 import { PixiDeckTransport } from './PixiDeckTransport';
 import { PixiDeckTurntable } from './PixiDeckTurntable';
 import { PixiDeckWaveform } from './PixiDeckWaveform';
 import { getDJEngine } from '@engine/dj/DJEngine';
+import { DeckScratch } from '@components/dj/DeckScratch';
+import { DeckScopes } from '@components/dj/DeckScopes';
+import { DeckCuePoints } from '@components/dj/DeckCuePoints';
+import { DeckBeatGrid } from '@components/dj/DeckBeatGrid';
 
 /** Format milliseconds as M:SS */
 function formatTime(ms: number): string {
@@ -244,6 +249,38 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         <PixiButton label="<< -" variant="ghost" size="sm" onClick={() => handleNudge(-1)} />
         <PixiButton label="+ >>" variant="ghost" size="sm" onClick={() => handleNudge(1)} />
       </pixiContainer>
+
+      {/* Scratch presets + Fader LFO */}
+      <PixiDOMOverlay
+        layout={{ width: 280, height: 56 }}
+        style={{ overflow: 'hidden' }}
+      >
+        <DeckScratch deckId={deckId} />
+      </PixiDOMOverlay>
+
+      {/* Cue points */}
+      <PixiDOMOverlay
+        layout={{ width: 280, height: 36 }}
+        style={{ overflow: 'hidden' }}
+      >
+        <DeckCuePoints deckId={deckId} />
+      </PixiDOMOverlay>
+
+      {/* Beat grid controls */}
+      <PixiDOMOverlay
+        layout={{ width: 280, height: 32 }}
+        style={{ overflow: 'hidden' }}
+      >
+        <DeckBeatGrid deckId={deckId} />
+      </PixiDOMOverlay>
+
+      {/* Oscilloscope / spectrum scopes */}
+      <PixiDOMOverlay
+        layout={{ width: 280, height: 64 }}
+        style={{ overflow: 'hidden' }}
+      >
+        <DeckScopes deckId={deckId} size={60} />
+      </PixiDOMOverlay>
 
       {/* Spacer */}
       <pixiContainer layout={{ flex: 1 }} />

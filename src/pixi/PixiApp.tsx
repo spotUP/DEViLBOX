@@ -14,6 +14,8 @@ import { loadPixiFonts } from './fonts';
 import { usePixiTheme } from './theme';
 import { PixiRoot } from './PixiRoot';
 import { attachFPSLimiter } from './performance';
+import { useProjectPersistence } from '@/hooks/useProjectPersistence';
+import { useGlobalKeyboardHandler } from '@/hooks/useGlobalKeyboardHandler';
 
 // Register PixiJS classes for use in @pixi/react JSX
 extend({ Container, Graphics, BitmapText, Sprite, Text });
@@ -21,6 +23,12 @@ extend({ Container, Graphics, BitmapText, Sprite, Text });
 export const PixiApp: React.FC = () => {
   const [ready, setReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-save project to localStorage every 30s
+  useProjectPersistence();
+
+  // Global tracker keyboard shortcuts (cursor, transpose, octave, etc.)
+  useGlobalKeyboardHandler();
 
   // Pre-initialize Yoga WASM and load fonts before rendering any layout nodes
   useEffect(() => {
