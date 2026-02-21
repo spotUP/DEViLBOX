@@ -256,6 +256,9 @@ interface ChannelState {
   noteRetrigVol: number;         // FT2 Rxy: retrigger volume slide memory
   noteRetrigCounter: number;     // FT2 Rxy: retrigger tick counter
   volColumnVol: number;          // FT2: volume column byte from current row (for Rxy quirk)
+  oldVol: number;                // FT2: sample default volume from last triggerNote (for resetVolumes)
+  oldPan: number;                // FT2: sample default panning from last triggerNote (for resetVolumes)
+  rowInst: number;               // FT2: instrument number from current row (for EDx noteDelay)
   volSlideSpeed: number;         // FT2: volume slide speed memory (Axx)
   fVolSlideUpSpeed: number;      // FT2: fine volume slide up memory (EAx)
   fVolSlideDownSpeed: number;    // FT2: fine volume slide down memory (EBx)
@@ -854,6 +857,9 @@ export class TrackerReplayer {
       noteRetrigVol: 0,
       noteRetrigCounter: 0,
       volColumnVol: 0,
+      oldVol: 64,
+      oldPan: 128,
+      rowInst: 0,
       volSlideSpeed: 0,
       fVolSlideUpSpeed: 0,
       fVolSlideDownSpeed: 0,
@@ -1336,23 +1342,29 @@ export class TrackerReplayer {
       ch.prevEffParam = param;
     }
 
-    // Handle instrument change
+    // Handle instrument number
+    // FT2 getNewNote: only stores ch->instrNum here, does NOT load samples or set volume.
+    // Volume/finetune/relativeNote are set later by triggerNote (which resolves sampleMap).
+    // resetVolumes uses oldVol/oldPan from the PREVIOUS triggerNote.
     const instNum = row.instrument ?? 0;
+    let inst = 0; // FT2's local `inst` variable: valid instrument number, or 0
     if (instNum > 0) {
       const instrument = this.instrumentMap.get(instNum);
       if (instrument) {
         ch.instrument = instrument;
         ch.sampleNum = instNum;
-        // FT2: reset volume to sample's default volume (not hardcoded 64)
-        const sampleVol = instrument.metadata?.modPlayback?.defaultVolume;
-        ch.volume = sampleVol !== undefined ? Math.min(64, sampleVol) : 64;
-        ch.finetune = instrument.metadata?.modPlayback?.finetune ?? 0;
-        ch.relativeNote = instrument.metadata?.modPlayback?.relativeNote ?? 0;
-
-        // Apply volume immediately
-        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        inst = instNum;
+        if (!this.useXMPeriods) {
+          // MOD: set volume/finetune/relativeNote immediately
+          const sampleVol = instrument.metadata?.modPlayback?.defaultVolume;
+          ch.volume = sampleVol !== undefined ? Math.min(64, sampleVol) : 64;
+          ch.finetune = instrument.metadata?.modPlayback?.finetune ?? 0;
+          ch.relativeNote = instrument.metadata?.modPlayback?.relativeNote ?? 0;
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        }
+        // XM: DON'T set volume/finetune/relativeNote. FT2 defers this to triggerNote.
       } else {
-        // Throttle: only warn once per missing instrument ID per song
+        inst = 0; // Invalid instrument
         if (!this._warnedMissingInstruments) this._warnedMissingInstruments = new Set();
         if (!this._warnedMissingInstruments.has(instNum)) {
           this._warnedMissingInstruments.add(instNum);
@@ -1361,89 +1373,143 @@ export class TrackerReplayer {
       }
     }
 
+    // Store row instrument for EDx noteDelay (FT2's copyOfInstrAndNote >> 8)
+    ch.rowInst = inst;
+
     // FT2: Note delay (EDx, y >= 1) — defer ALL processing to the delay tick.
-    // Only the instrument number is stored above; note trigger, volume column,
-    // and tick-0 effects are processed later in processEffectTick when the delay fires.
+    // FT2 skips handleEffects_TickZero entirely on EDx early return.
     if (this.useXMPeriods && effect === 0xE && (param & 0xF0) === 0xD0 && (param & 0x0F) >= 1) {
-      // Still process tick-0 effects that aren't note-related
-      // (FT2 skips handleEffects_TickZero entirely on EDx early return)
       return;
     }
 
-    // FT2: K00 = key-off at tick 0 (handled before note/portamento checks)
-    // Reference: ft2_replayer.c getNewNote() line 1398-1407
-    // K00 triggers keyOff, resets volumes if instrument specified, then
-    // processes handleEffects_TickZero (vol column + effects) but NO note.
-    const isK00 = this.useXMPeriods && effect === 0x14 && param === 0;
-    if (isK00) {
-      this.xmKeyOff(ch);
-      if (instNum > 0) {
-        ch.outVol = ch.volume;
-        ch.outPan = ch.panning;
-      }
-    }
-
-    // Handle note
-    const noteValue = isK00 ? 0 : row.note; // K00 suppresses note processing
-    const rawPeriod = row.period;
-
     // Probability/maybe: skip note if random check fails
+    const noteValue = row.note;
+    const rawPeriod = row.period;
     const prob = row.probability;
     const probabilitySkip = prob !== undefined && prob > 0 && prob < 100 && Math.random() * 100 >= prob;
 
-    // Hammer: legato without pitch glide (TT-303 extension)
-    // For hammer: gate stays high (like slide) but pitch jumps instantly
-    // effectiveSlide controls gate timing (true for both slide and hammer)
-    // We need to track hammer separately for the synth to skip pitch glide
+    // TB-303 extensions
     const effectiveSlide = slide || hammer; // Gate stays high for both
 
-    if (noteValue && noteValue !== 0 && noteValue !== 97 && !probabilitySkip) {
-      // Store the original XM note for synth instruments (avoids period table issues)
-      ch.xmNote = noteValue;
+    // ========================================================================
+    // FT2 getNewNote flow (XM mode)
+    // Reference: ft2_replayer.c lines 1329-1435
+    // Matches FT2's exact ordering: portamento/K00/no-note early returns,
+    // then note trigger, then instrument handling (resetVolumes + triggerInstrument).
+    // ========================================================================
+    if (this.useXMPeriods) {
+      const isE90 = effect === 0xE && param === 0x90;
 
-      // XM multi-sample lookup: resolve which sample to use via sampleMap
-      if (this.useXMPeriods && ch.instrument?.metadata?.sampleMap && ch.instrument.metadata.multiSamples) {
-        // XM note range: 1-96, sampleMap is 0-indexed by note-1
-        const noteIdx = Math.max(0, Math.min(95, noteValue - 1));
-        const sampleIdx = ch.instrument.metadata.sampleMap[noteIdx] ?? 0;
-        const multiSamples = ch.instrument.metadata.multiSamples;
-        if (sampleIdx < multiSamples.length) {
-          const ms = multiSamples[sampleIdx];
-          // Swap sample config and per-sample properties
-          ch.instrument = { ...ch.instrument, sample: ms.sample };
-          ch.finetune = ms.finetune;
-          ch.relativeNote = ms.relativeNote;
-          const sampleVol = ms.defaultVolume;
-          ch.volume = sampleVol !== undefined ? Math.min(64, sampleVol) : 64;
+      // FT2: Only check portamento/K00/no-note when NOT E90
+      // E90 bypasses these checks, falling through to normal note trigger.
+      if (!isE90) {
+        const volCol = row.volume ?? 0;
+        const hasVolPorta = (volCol & 0xF0) === 0xF0;
+        const hasPortaEffect = effect === 3 || effect === 5;
+
+        // --- Fxy volume column portamento OR 3xx/5xx portamento ---
+        // FT2: preparePortamento handles note target + instrument reset
+        if (hasVolPorta || hasPortaEffect) {
+          // Set portamento speed
+          if (hasVolPorta) {
+            const vp = volCol & 0x0F;
+            if (vp > 0) ch.tonePortaSpeed = vp * 64;
+          }
+          if (hasPortaEffect && effect !== 5 && param !== 0) {
+            ch.tonePortaSpeed = param * 4;
+          }
+          // FT2's preparePortamento: set target from note (using CURRENT finetune/relativeNote,
+          // not the new instrument's, since triggerNote hasn't run)
+          if (noteValue > 0 && !probabilitySkip) {
+            if (noteValue === 97) {
+              // NOTE_OFF during portamento → keyOff (FT2: preparePortamento line 1301)
+              this.xmKeyOff(ch);
+              ch.previousSlideFlag = false;
+              this.releaseMacros(ch);
+            } else {
+              ch.xmNote = noteValue;
+              const usePeriod = this.noteToPlaybackPeriod(noteValue, rawPeriod, ch);
+              ch.portaTarget = usePeriod;
+            }
+          }
+          // FT2 preparePortamento lines 1321-1326: instrument handling
+          // resetVolumes is UNCONDITIONAL (runs even for NOTE_OFF)
+          // triggerInstrument is CONDITIONAL (skipped for NOTE_OFF)
+          if (inst > 0) {
+            this.resetXMVolumes(ch, time);
+            if (noteValue !== 97) {
+              this.triggerEnvelopes(ch);
+            }
+          }
+          this.processAllEffectsTick0(chIndex, ch, row, effect, param, time);
+          return;
+        }
+
+        // --- K00: key-off at tick 0 ---
+        // Reference: ft2_replayer.c getNewNote() lines 1398-1407
+        if (effect === 0x14 && param === 0) {
+          this.xmKeyOff(ch);
+          if (inst > 0) this.resetXMVolumes(ch, time);
+          this.processAllEffectsTick0(chIndex, ch, row, effect, param, time);
+          return;
+        }
+
+        // --- No note (note == 0) ---
+        // FT2: instrument without note → resetVolumes + triggerInstrument
+        if (!noteValue || noteValue === 0) {
+          if (inst > 0) {
+            this.resetXMVolumes(ch, time);
+            this.triggerEnvelopes(ch);
+          }
+          this.processAllEffectsTick0(chIndex, ch, row, effect, param, time);
+          return;
         }
       }
 
-      // FT2: E5x effect overrides finetune for this note
-      if (effect === 0xE && (param & 0xF0) === 0x50) {
-        ch.finetune = ((param & 0x0F) * 16) - 128; // FT2 formula: nibble * 16 - 128
-      }
+      // Falls through: has a note, and either:
+      // - E90 bypassed the checks above, or
+      // - Note is present and not portamento/K00/no-note
 
-      // Derive period for playback.
-      const usePeriod = this.noteToPlaybackPeriod(noteValue, rawPeriod, ch);
+      if (noteValue === 97) {
+        // Note-off: FT2 does keyOff FIRST, then resetVolumes (instrument volume wins)
+        this.xmKeyOff(ch);
+        ch.previousSlideFlag = false;
+        this.releaseMacros(ch);
+      } else if (noteValue > 0 && !probabilitySkip) {
+        // Normal note trigger — resolve sample, calculate period, trigger
+        ch.xmNote = noteValue;
 
-      // FT2: Volume column Fxy (tone portamento) checked BEFORE normal 3xx/5xx.
-      // This takes priority: note becomes a portamento target.
-      const volCol = row.volume ?? 0;
-      const hasVolPorta = this.useXMPeriods && (volCol & 0xF0) === 0xF0;
-
-      // Check for tone portamento (vol column Fxy, 3xx or 5xx) - don't trigger, just set target
-      if (hasVolPorta || effect === 3 || effect === 5) {
-        ch.portaTarget = usePeriod;
-        // FT2: vol column porta speed = (param << 4) * 4 = param * 64
-        if (hasVolPorta) {
-          const volPortaParam = volCol & 0x0F;
-          if (volPortaParam > 0) ch.tonePortaSpeed = volPortaParam * 64;
+        // XM multi-sample lookup: resolve which sample to use via sampleMap
+        // FT2's triggerNote: note2SampleLUT → sets relativeNote, finetune, oldVol, oldPan
+        if (ch.instrument?.metadata?.sampleMap && ch.instrument.metadata.multiSamples) {
+          const noteIdx = Math.max(0, Math.min(95, noteValue - 1));
+          const sampleIdx = ch.instrument.metadata.sampleMap[noteIdx] ?? 0;
+          const multiSamples = ch.instrument.metadata.multiSamples;
+          if (sampleIdx < multiSamples.length) {
+            const ms = multiSamples[sampleIdx];
+            ch.instrument = { ...ch.instrument, sample: ms.sample };
+            ch.finetune = ms.finetune;
+            ch.relativeNote = ms.relativeNote;
+            // FT2's triggerNote: set oldVol/oldPan from resolved sample
+            ch.oldVol = ms.defaultVolume !== undefined ? Math.min(64, ms.defaultVolume) : 64;
+            ch.oldPan = ms.panning ?? 128;
+          }
+        } else {
+          // Single sample: set oldVol/oldPan and finetune/relativeNote from instrument
+          const mp = ch.instrument?.metadata?.modPlayback;
+          ch.finetune = mp?.finetune ?? 0;
+          ch.relativeNote = mp?.relativeNote ?? 0;
+          ch.oldVol = mp?.defaultVolume !== undefined ? Math.min(64, mp.defaultVolume) : 64;
+          ch.oldPan = mp?.panning ?? 128;
         }
-        if (param !== 0 && effect === 3) {
-          ch.tonePortaSpeed = this.useXMPeriods ? param * 4 : param;
+
+        // FT2: E5x effect overrides finetune for this note
+        if (effect === 0xE && (param & 0xF0) === 0x50) {
+          ch.finetune = ((param & 0x0F) * 16) - 128;
         }
-      } else {
-        // Normal note - trigger
+
+        // Derive period for playback
+        const usePeriod = this.noteToPlaybackPeriod(noteValue, rawPeriod, ch);
         ch.note = usePeriod;
         ch.period = ch.note;
 
@@ -1454,18 +1520,12 @@ export class TrackerReplayer {
           ch.sampleOffset = param > 0 ? param : ch.sampleOffset;
         }
 
-        // TB-303 SLIDE SEMANTICS:
-        // "Slide is ON on a step if the PREVIOUSLY played step had Slide AND the current step is a valid Note"
-        // This means the slide flag on step N affects the transition FROM step N TO step N+1
-        // So we check if the PREVIOUS row had slide, not the current row
-        // For hammer: pitch should jump, not glide - use slideActive only if not hammer
+        // TB-303 SLIDE SEMANTICS (preserved from existing code)
         const slideActive = ch.previousSlideFlag && noteValue !== null && !hammer;
-
-        // Check for 303 synth type early (needed for logging and same-pitch slide detection)
         const is303Synth = ch.instrument?.synthType === 'TB303' ||
                            ch.instrument?.synthType === 'Buzz3o3';
 
-        // DEBUG LOGGING - Enable with window.TB303_DEBUG_ENABLED = true in browser console
+        // DEBUG LOGGING - Enable with window.TB303_DEBUG_ENABLED = true
         if (typeof window !== 'undefined' && (window as unknown as { TB303_DEBUG_ENABLED?: boolean }).TB303_DEBUG_ENABLED && is303Synth) {
           const midi = noteValue ? noteValue + 11 : 0;
           const octave = Math.floor(midi / 12) - 1;
@@ -1482,66 +1542,103 @@ export class TrackerReplayer {
           );
         }
 
-        // FIX: Detect same-pitch slides for TB-303 synths
-        // When sliding to the same note, we need to:
-        // 1. Cancel any pending release from the previous note
-        // 2. NOT retrigger the envelope (let note sustain)
-        // We do this by still calling triggerNote with slide=true - the worklet
-        // will just keep the note going without retriggering.
-        // Use xmNoteToNoteName for 303 synths (avoids period table issues)
+        // Same-pitch slide detection for 303 synths
         const newNoteName = is303Synth ? xmNoteToNoteName(noteValue ?? 0) : periodToNoteName(usePeriod);
-        const isSamePitchSlide = slideActive &&
-                                  ch.lastPlayedNoteName !== null &&
-                                  newNoteName === ch.lastPlayedNoteName;
-
-        if (is303Synth && isSamePitchSlide) {
-          // Same pitch slide on 303: trigger with slide=true to cancel pending release
-          // The synth will receive noteOn for the same pitch with slide, which sustains the note
-        }
-
-        // Update last played note name for next comparison
         ch.lastPlayedNoteName = newNoteName;
 
-        // Trigger the note with proper 303 slide semantics
-        // Pass accent directly (accent applies to current note)
-        // Pass slideActive (computed from previous row's slide flag) for pitch glide
-        //   - For hammer: slideActive is forced false so pitch doesn't glide
-        // Pass effectiveSlide for gate timing:
-        //   - slide: gate stays high, pitch glides to next note
-        //   - hammer: gate stays high, but NO pitch glide (just legato)
-        // Pass hammer flag so synth can handle it specially
-        // NOTE: For same-pitch slides, slideActive=true ensures the synth doesn't retrigger
+        // Trigger note
         this.triggerNote(ch, time, offset, chIndex, accent, slideActive, effectiveSlide, hammer);
 
-        // Reset vibrato/tremolo positions (FT2's triggerInstrument)
-        if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
-        if ((ch.waveControl & 0x40) === 0) ch.tremoloPos = 0;
+        // Update slide flag for next row
+        ch.previousSlideFlag = (slide || hammer) ?? false;
+      }
 
-        // Reset XM envelopes on note trigger
+      // FT2: instrument handling AFTER note trigger/keyOff
+      // resetVolumes restores volume/panning from sample defaults (oldVol/oldPan).
+      // triggerInstrument resets envelopes (not on NOTE_OFF).
+      if (inst > 0) {
+        this.resetXMVolumes(ch, time);
+        if (noteValue !== 97) this.triggerEnvelopes(ch);
+      }
+
+      // Process volume column + all effect columns (handleEffects_TickZero)
+      this.processAllEffectsTick0(chIndex, ch, row, effect, param, time);
+      return;
+    }
+
+    // ========================================================================
+    // MOD flow (non-XM, existing behavior preserved)
+    // ========================================================================
+
+    if (noteValue && noteValue !== 0 && noteValue !== 97 && !probabilitySkip) {
+      ch.xmNote = noteValue;
+
+      // E5x finetune override
+      if (effect === 0xE && (param & 0xF0) === 0x50) {
+        ch.finetune = ((param & 0x0F) * 16) - 128;
+      }
+
+      const usePeriod = this.noteToPlaybackPeriod(noteValue, rawPeriod, ch);
+
+      // MOD portamento: 3xx and 5xx set target, don't trigger
+      if (effect === 3 || effect === 5) {
+        ch.portaTarget = usePeriod;
+        if (param !== 0 && effect === 3) {
+          ch.tonePortaSpeed = param;
+        }
+      } else {
+        // Normal note - trigger
+        ch.note = usePeriod;
+        ch.period = ch.note;
+
+        // Handle sample offset (9xx)
+        let offset = 0;
+        if (effect === 9) {
+          offset = param > 0 ? param * 256 : ch.sampleOffset * 256;
+          ch.sampleOffset = param > 0 ? param : ch.sampleOffset;
+        }
+
+        // TB-303 slide semantics
+        const slideActive = ch.previousSlideFlag && noteValue !== null && !hammer;
+        const is303Synth = ch.instrument?.synthType === 'TB303' ||
+                           ch.instrument?.synthType === 'Buzz3o3';
+
+        // DEBUG LOGGING
+        if (typeof window !== 'undefined' && (window as unknown as { TB303_DEBUG_ENABLED?: boolean }).TB303_DEBUG_ENABLED && is303Synth) {
+          const midi = noteValue ? noteValue + 11 : 0;
+          const octave = Math.floor(midi / 12) - 1;
+          const semitone = midi % 12;
+          const noteName = noteValue ? `${DEBUG_NOTE_NAMES[semitone]}${octave}` : '...';
+          console.log(
+            `%c[Row ${this.pattPos.toString().padStart(2)}] %c${noteName.padEnd(5)} %c${accent ? '●ACC' : '    '} %c${slideActive ? '►SLD' : '    '} %c[prev:${ch.previousSlideFlag ? '1' : '0'} curr:${slide ? '1' : '0'}] %c→ ${slideActive ? 'SLIDE' : 'TRIGGER'}`,
+            'color: #888',
+            'color: #0ff; font-weight: bold',
+            accent ? 'color: #f0f' : 'color: #444',
+            slideActive ? 'color: #ff0' : 'color: #444',
+            'color: #666',
+            'color: #0f0'
+          );
+        }
+
+        const newNoteName = is303Synth ? xmNoteToNoteName(noteValue ?? 0) : periodToNoteName(usePeriod);
+        ch.lastPlayedNoteName = newNoteName;
+
+        this.triggerNote(ch, time, offset, chIndex, accent, slideActive, effectiveSlide, hammer);
         this.triggerEnvelopes(ch);
-        // FT2: outVol = channel volume, outPan = channel panning
         ch.outVol = ch.volume;
         ch.outPan = ch.panning;
       }
     }
 
     // Update previous slide flag for next row (TB-303 semantics)
-    // Store current row's slide flag to be used when processing the next note
-    // For hammer: keep gate high (like slide) but don't glide pitch
-    //
-    // DB303 BEHAVIOR: A rest (empty row) breaks the slide chain.
-    // When gate=false, the note is released and previousSlideFlag is cleared.
-    // Only rows with valid notes (not note-off) can have slide flags that affect the next row.
     if (noteValue && noteValue !== 97) {
       ch.previousSlideFlag = (slide || hammer) ?? false;
     }
 
-    // Handle note off
+    // Handle note off (MOD path)
     if (noteValue === 97) {
-      // Clear slide flag - note-off breaks the slide chain
       ch.previousSlideFlag = false;
 
-      // DEBUG LOGGING for note-off
       const is303ForLog = ch.instrument?.synthType === 'TB303' || ch.instrument?.synthType === 'Buzz3o3';
       if (typeof window !== 'undefined' && (window as unknown as { TB303_DEBUG_ENABLED?: boolean }).TB303_DEBUG_ENABLED && is303ForLog) {
         console.log(
@@ -1553,56 +1650,58 @@ export class TrackerReplayer {
         );
       }
       this.releaseMacros(ch);
-
-      // XM: Use envelope-based key-off (fadeout + release)
-      // Non-XM or synth instruments: hard stop
-      if (this.useXMPeriods && ch.instrument?.metadata?.originalEnvelope?.enabled) {
-        this.xmKeyOff(ch);
-      } else {
-        this.stopChannel(ch, chIndex, time);
-      }
+      this.stopChannel(ch, chIndex, time);
     }
 
-    // Handle volume column (XM) — FT2 tick-0 volume column dispatch
-    if (row.volume !== undefined && row.volume > 0) {
-      const vc = row.volume;
-      const vcType = vc >> 4;
-      const vcParam = vc & 0x0F;
+    // Handle volume column + effects (MOD path)
+    this.processAllEffectsTick0(chIndex, ch, row, effect, param, time);
+  }
 
-      if (vcType >= 1 && vcType <= 5) {
-        // 0x10-0x50: Set volume (vol = vc - 0x10, clamp 0-64)
-        const vol = vc - 0x10;
-        ch.volume = vol > 64 ? 64 : vol;
-        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
-      } else if (vcType === 8) {
-        // 0x80-0x8F: Fine volume slide down (tick 0 only)
-        ch.volume = Math.max(0, ch.volume - vcParam);
-        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
-      } else if (vcType === 9) {
-        // 0x90-0x9F: Fine volume slide up (tick 0 only)
-        ch.volume = Math.min(64, ch.volume + vcParam);
-        ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
-      } else if (vcType === 0xA) {
-        // 0xA0-0xAF: Set vibrato speed (tick 0 only)
-        // FT2: ch->vibratoSpeed = (vol & 0x0F) * 4
-        // We store in high nibble of vibratoCmd, doVibrato multiplies by 4
-        if (vcParam !== 0) ch.vibratoCmd = (ch.vibratoCmd & 0x0F) | (vcParam << 4);
-      } else if (vcType === 0xC) {
-        // 0xC0-0xCF: Set panning (tick 0 only)
-        // FT2: outPan = (vol & 0x0F) << 4
-        ch.panning = vcParam << 4;
-        this.applyPanEffect(ch, ch.panning, time);
-      }
-      // 0x60-0x7F, 0xB0-0xFF: handled on ticks 1+ only (see processEffectTick)
+  /**
+   * Process volume column effects on tick 0.
+   * Extracted from processRow for reuse in FT2 getNewNote early-return paths.
+   */
+  private processVolColumnTick0(ch: ChannelState, row: TrackerCell, time: number): void {
+    if (row.volume === undefined || row.volume <= 0) return;
+    const vc = row.volume;
+    const vcType = vc >> 4;
+    const vcParam = vc & 0x0F;
+
+    if (vcType >= 1 && vcType <= 5) {
+      // 0x10-0x50: Set volume (vol = vc - 0x10, clamp 0-64)
+      const vol = vc - 0x10;
+      ch.volume = vol > 64 ? 64 : vol;
+      ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+    } else if (vcType === 8) {
+      // 0x80-0x8F: Fine volume slide down (tick 0 only)
+      ch.volume = Math.max(0, ch.volume - vcParam);
+      ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+    } else if (vcType === 9) {
+      // 0x90-0x9F: Fine volume slide up (tick 0 only)
+      ch.volume = Math.min(64, ch.volume + vcParam);
+      ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+    } else if (vcType === 0xA) {
+      // 0xA0-0xAF: Set vibrato speed (tick 0 only)
+      if (vcParam !== 0) ch.vibratoCmd = (ch.vibratoCmd & 0x0F) | (vcParam << 4);
+    } else if (vcType === 0xC) {
+      // 0xC0-0xCF: Set panning (tick 0 only)
+      ch.panning = vcParam << 4;
+      this.applyPanEffect(ch, ch.panning, time);
     }
+    // 0x60-0x7F, 0xB0-0xFF: handled on ticks 1+ only (see processEffectTick)
+  }
 
-    // Process tick-0 effects
+  /**
+   * Process all tick-0 effects (both effect columns).
+   * Extracted for reuse in FT2 getNewNote early-return paths.
+   */
+  private processAllEffectsTick0(chIndex: number, ch: ChannelState, row: TrackerCell, effect: number, param: number, time: number): void {
+    this.processVolColumnTick0(ch, row, time);
     this.processEffect0(chIndex, ch, effect, param, time);
-
-    // Process second effect column (effTyp2/eff2) — skip if derived from volume column
+    // Second effect column — skip if derived from volume column
     const effect2 = row.effTyp2 ?? 0;
     const param2 = row.eff2 ?? 0;
-    const volColDerived = (row.volume ?? 0) >= 0x60; // effTyp2/eff2 was generated from volume column
+    const volColDerived = (row.volume ?? 0) >= 0x60;
     if ((effect2 !== 0 || param2 !== 0) && !volColDerived) {
       this.processEffect0(chIndex, ch, effect2, param2, time);
     }
@@ -2130,21 +2229,39 @@ export class TrackerReplayer {
 
       case 0xE: // Extended effects
         if (x === 0x9 && y > 0) {
-          // Retrigger - does NOT slide (it's retriggering the same note)
+          // FT2 retrigNote: triggerNote(0,0,0,ch) + triggerInstrument(ch)
+          // Reference: ft2_replayer.c lines 2119-2129
           ch.retrigCount--;
           if (ch.retrigCount <= 0) {
             ch.retrigCount = y;
-            this.triggerNote(ch, time, 0, chIndex, accent, false, false);
+            this.triggerNote(ch, time, 0, chIndex, false, false, false);
+            this.triggerEnvelopes(ch);
           }
         } else if (x === 0xC && y === this.currentTick) {
           // Note cut
           ch.volume = 0;
           ch.gainNode.gain.setValueAtTime(0, time);
         } else if (x === 0xD && y === this.currentTick) {
-          // Note delay - uses the computed slide from processRow (stored in ch.previousSlideFlag context)
-          // Since this is a delayed trigger of the same note, use the slide state computed at row start
+          // FT2 noteDelay: triggers note, resets volumes (if inst), triggers instrument, applies vol column
+          // Reference: ft2_replayer.c lines 2140-2162
           const slideActive = ch.previousSlideFlag;
           this.triggerNote(ch, time, 0, chIndex, accent, slideActive, slide);
+          // FT2: resetVolumes only if instrument was specified on the delayed row
+          if (ch.rowInst > 0) this.resetXMVolumes(ch, time);
+          // FT2: triggerInstrument is ALWAYS called (regardless of instrument)
+          this.triggerEnvelopes(ch);
+
+          // FT2: apply volume column on delayed trigger (set volume / set panning)
+          const dvc = ch.volColumnVol;
+          if (dvc >= 0x10 && dvc <= 0x50) {
+            ch.outVol = dvc - 0x10;
+            ch.volume = ch.outVol;
+            ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+          } else if (dvc >= 0xC0 && dvc <= 0xCF) {
+            ch.outPan = (dvc & 0x0F) << 4;
+            ch.panning = ch.outPan;
+            this.applyPanEffect(ch, ch.panning, time);
+          }
         }
         break;
 
@@ -2157,18 +2274,51 @@ export class TrackerReplayer {
         this.doPanSlide(ch, ch.panSlide, time);
         break;
 
-      case 0x1B: // Retrigger with volume slide (Rxy)
-        if (ch.retrigCount > 0) {
-          ch.retrigCount--;
-          if (ch.retrigCount <= 0) {
-            ch.retrigCount = param & 0x0F;
-            // Apply volume slide based on retrigVolSlide
-            this.applyRetrigVolSlide(ch, ch.retrigVolSlide, time);
-            // Retrigger - does NOT slide (it's retriggering the same note)
-            this.triggerNote(ch, time, 0, chIndex, accent, false, false);
+      case 0x14: { // Kxx - Key-off at tick (FT2: effect 20)
+        // FT2: triggers keyOff when (speed - tick) == (param & 31)
+        if (this.useXMPeriods) {
+          if (this.currentTick === (param & 31)) {
+            this.xmKeyOff(ch);
+          }
+        } else {
+          if (this.currentTick === (param & 31)) {
+            this.stopChannel(ch, chIndex, time);
           }
         }
         break;
+      }
+
+      case 0x1B: // Multi note retrigger (Rxy) — tick N
+        // FT2: uses doMultiNoteRetrig with counter (noteRetrigCounter/Speed/Vol)
+        this.doMultiNoteRetrig(ch, chIndex, time);
+        break;
+
+      case 0x1D: { // Txy - Tremor (FT2: effect 29)
+        // FT2: alternates between volume on/off over time
+        // x = on-time ticks, y = off-time ticks
+        const tp = param !== 0 ? param : ch.tremorParam;
+        ch.tremorParam = tp;
+
+        let tremorSign = ch.tremorPos & 0x80; // bit 7: on/off state
+        let tremorData = ch.tremorPos & 0x7F; // bits 0-6: counter
+
+        tremorData--;
+        if (tremorData < 0 || (tremorData & 0x80) !== 0) {
+          // Counter underflow — toggle state
+          if (tremorSign === 0x80) {
+            tremorSign = 0x00; // switch to OFF
+            tremorData = tp & 0x0F; // off-time = low nibble
+          } else {
+            tremorSign = 0x80; // switch to ON
+            tremorData = (tp >> 4) & 0x0F; // on-time = high nibble
+          }
+        }
+
+        ch.tremorPos = tremorSign | (tremorData & 0x7F);
+        const tremorVol = tremorSign === 0x80 ? ch.volume : 0;
+        ch.gainNode.gain.setValueAtTime(tremorVol / 64, time);
+        break;
+      }
     }
   }
 
@@ -2216,19 +2366,23 @@ export class TrackerReplayer {
       case 0xA: this.doVolumeSlide(ch, param, time); break;
       case 0xE:
         if (x === 0x9 && y > 0) {
-          // FT2 retrigNote: uses modulo of currentTick
-          // Reference: ft2_replayer.c line 2124: if ((speed-tick) % param == 0)
+          // FT2 retrigNote: triggerNote(0,0,0,ch) + triggerInstrument(ch)
+          // Reference: ft2_replayer.c lines 2119-2129
           if (this.currentTick % y === 0) {
-            this.triggerNote(ch, time, 0, chIndex, accent, false, false);
+            this.triggerNote(ch, time, 0, chIndex, false, false, false);
+            this.triggerEnvelopes(ch);
           }
         } else if (x === 0xC && y === this.currentTick) {
           ch.volume = 0;
           ch.gainNode.gain.setValueAtTime(0, time);
         } else if (x === 0xD && y === this.currentTick) {
-          // FT2 noteDelay: triggers note, resets volumes, triggers instrument, applies volume column
+          // FT2 noteDelay: triggers note, resets volumes (if inst), triggers instrument, applies volume column
           // Reference: ft2_replayer.c lines 2140-2162
           const slideActive = ch.previousSlideFlag;
           this.triggerNote(ch, time, 0, chIndex, accent, slideActive, slide);
+          // FT2: resetVolumes only if instrument was specified on the delayed row
+          if (ch.rowInst > 0) this.resetXMVolumes(ch, time);
+          // FT2: triggerInstrument is ALWAYS called (regardless of instrument)
           this.triggerEnvelopes(ch);
 
           // FT2: apply volume column on delayed trigger (set volume / set panning)
@@ -2673,10 +2827,16 @@ export class TrackerReplayer {
    * Called from processRow when a new note is triggered.
    */
   private triggerEnvelopes(ch: ChannelState): void {
-    if (!ch.instrument?.metadata) return;
-    const meta = ch.instrument.metadata;
+    // FT2 triggerInstrument: reset vibrato/tremolo positions (conditional on waveControl)
+    if ((ch.waveControl & 0x04) === 0) ch.vibratoPos = 0;
+    if ((ch.waveControl & 0x40) === 0) ch.tremoloPos = 0;
+    ch.noteRetrigCounter = 0;
+    ch.tremorPos = 0;
 
     ch.keyOff = false;
+
+    if (!ch.instrument?.metadata) return;
+    const meta = ch.instrument.metadata;
 
     // Reset volume envelope
     const volEnv = meta.originalEnvelope;
@@ -2708,6 +2868,20 @@ export class TrackerReplayer {
         ch.autoVibSweep = 0;
       }
     }
+  }
+
+  /**
+   * FT2's resetVolumes(): restore volume and panning from sample defaults (oldVol/oldPan).
+   * Called when instrument is specified in the row: portamento+inst, inst-without-note,
+   * note+inst (after triggerNote sets oldVol/oldPan from the new sample).
+   * Reference: ft2_replayer.c lines 364-371
+   */
+  private resetXMVolumes(ch: ChannelState, time: number): void {
+    ch.volume = ch.oldVol;
+    ch.outVol = ch.oldVol;
+    ch.panning = ch.oldPan;
+    ch.outPan = ch.oldPan;
+    ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
   }
 
   /**
