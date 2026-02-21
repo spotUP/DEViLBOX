@@ -189,6 +189,8 @@ export type SynthType =
   | 'D50'            // Roland D-50 (virtual analog)
   // HivelyTracker / AHX synthesis
   | 'HivelySynth'     // HivelyTracker 16-channel chip synth (WASM)
+  // UADE - Universal Amiga Dead-player (130+ exotic Amiga formats)
+  | 'UADESynth'       // UADE catch-all (playback-only via 68k emulation)
   // Modular Synthesis
   | 'ModularSynth';   // Modular synthesizer with patch editor
 
@@ -662,6 +664,26 @@ export const DEFAULT_HIVELY: HivelyConfig = {
     entries: [{ note: 0, waveform: 2, fixed: false, fx: [0, 0], fxParam: [0, 0] }],
   },
 };
+
+/**
+ * UADE (Universal Amiga Dead-player Engine) configuration.
+ * Stores the raw file bytes + metadata for playback-only exotic Amiga formats.
+ * The UADE WASM module emulates the full Amiga 68000 + Paula chip, running
+ * real eagleplayer binaries (JochenHippel, TFMX, FredEditor, SidMon, etc.).
+ */
+export interface UADEConfig {
+  type: 'uade';
+  filename: string;
+  fileData: ArrayBuffer;
+  subsongCount: number;
+  currentSubsong: number;
+  metadata: {
+    player: string;        // Detected eagleplayer name (e.g. "JochenHippel")
+    formatName: string;    // Human-readable format name
+    minSubsong: number;
+    maxSubsong: number;
+  };
+}
 
 /**
  * SuperSaw Synthesizer Configuration
@@ -2977,6 +2999,8 @@ export interface InstrumentConfig {
   chiptuneModule?: ChiptuneModuleConfig;
   // HivelyTracker / AHX instrument
   hively?: HivelyConfig;
+  // UADE exotic Amiga format (playback-only)
+  uade?: UADEConfig;
   // Modular Synthesis
   modularSynth?: import('./modular').ModularPatchConfig;
   // Sampler config

@@ -217,7 +217,15 @@ const GROOVE_MAP = new Map<string, GrooveTemplate>(GROOVE_TEMPLATES.map(t => [t.
 // TYPES
 // ============================================================================
 
-export type TrackerFormat = 'MOD' | 'XM' | 'IT' | 'S3M' | 'HVL' | 'AHX';
+export type TrackerFormat =
+  | 'MOD' | 'XM' | 'IT' | 'S3M' | 'HVL' | 'AHX'
+  // Exotic Amiga formats (Phase 2 full editing)
+  | 'OKT'   // Oktalyzer
+  | 'MED'   // OctaMED / MED
+  | 'DIGI'  // DigiBooster
+  | 'FC'    // Future Composer 1.3/1.4
+  // UADE catch-all (playback-only, 130+ formats)
+  | 'UADE';
 
 /**
  * Channel state - all the per-channel data needed for playback
