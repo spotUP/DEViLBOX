@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-21T09:22:32.614Z
+ * Generated: 2026-02-21T11:19:46.999Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1066';
-export const BUILD_NUMBER = '1066';
-export const BUILD_HASH = '38617095';
+export const BUILD_VERSION = '1.0.1077';
+export const BUILD_NUMBER = '1077';
+export const BUILD_HASH = 'c541dfcb';
 export const BUILD_DATE = '2026-02-21';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,49 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1066',
+    version: '1.0.1077',
     date: '2026-02-21',
     changes: [
+      {
+        type: 'fix',
+        "description": "Resolve all pre-existing TypeScript errors and code quality issues"
+      },
+      {
+        type: 'fix',
+        "description": "Complete instrument support — operator macros, wavetable/sample upload, old format parsing"
+      },
+      {
+        type: 'feature',
+        "description": "Add ModPlug stereo separation mode toggle and slider to Settings"
+      },
+      {
+        type: 'feature',
+        "description": "Insert StereoSeparationNode into audio chain; add ModPlug mode"
+      },
+      {
+        type: 'feature',
+        "description": "Add stereoSeparationMode and modplugSeparation fields"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unnecessary casts, expand clamp tests, add gain-boost warning"
+      },
+      {
+        type: 'feature',
+        "description": "Add StereoSeparationNode (OpenMPT M-S algorithm)"
+      },
+      {
+        type: 'feature',
+        "description": "Close compatibility gaps — compat flags, macro gating, chip mode flags"
+      },
+      {
+        type: 'feature',
+        "description": "Extend drum pad engine with note repeat and pixi UI improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Add self-view toggle to video chat window"
+      },
       {
         type: 'fix',
         "description": "Camera (mugshot) starts muted by default"
@@ -194,50 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Remove 30fps cap from visualization components"
-      },
-      {
-        type: 'improvement',
-        "description": "Comprehensive performance optimization across engine, React, and canvas"
-      },
-      {
-        type: 'fix',
-        "description": "Display song/pattern numbers in decimal instead of hex"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update yarn.lock"
-      },
-      {
-        type: 'fix',
-        "description": "Debug(dj): add verbose logging to scratch playback engine"
-      },
-      {
-        type: 'feature',
-        "description": "Add stereo separation control to TrackerReplayer"
-      },
-      {
-        type: 'fix',
-        "description": "Show pattern display when loading songs from Modland"
-      },
-      {
-        type: 'fix',
-        "description": "Sync package-lock.json with @spotify/basic-pitch and tensorflow deps"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
-      },
-      {
-        type: 'feature',
-        "description": "Hold-to-loop, tap-once, and ignore-second scratch interaction"
-      },
-      {
-        type: 'feature',
-        "description": "Add Serato library parsers (database V2, crates, ID3 tags)"
-      },
-      {
-        type: 'feature',
-        "description": "Expand DJ controls, button mapping, controller profiles, and master FX routing"
       }
     ]
   }
