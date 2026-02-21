@@ -171,6 +171,8 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
               const val = e.target.value;
               if (val === 'arrangement') {
                 useUIStore.getState().setActiveView('arrangement');
+              } else if (val === 'drumpad') {
+                useUIStore.getState().setActiveView('drumpad');
               } else if (val !== 'dj') {
                 useUIStore.getState().setActiveView('tracker');
               }
@@ -184,6 +186,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
             <option value="tb303">TB-303</option>
             <option value="arrangement">Arrangement</option>
             <option value="dj">DJ Mixer</option>
+            <option value="drumpad">Drum Pads</option>
           </select>
           <div className="h-4 w-px bg-dark-border" />
           <span className="font-mono text-sm font-bold tracking-widest uppercase text-accent-primary">

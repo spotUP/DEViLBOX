@@ -284,19 +284,62 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [programs, currentProgramId, onClose]);
 
-  return (
-    <div className="fixed inset-0 z-50 bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center animate-in fade-in-0 duration-300">
-      <div className="bg-dark-surface border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-8 duration-400">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border">
-          <div>
-            <h2 className="text-xl font-bold text-white">Drum Pad Manager</h2>
-            <p className="text-sm text-text-muted">MPC-inspired 16-pad drum machine</p>
+  // Determine if we're rendered as a full view (no onClose) or as a modal
+  const isViewMode = !onClose;
+
+  const content = (
+    <div className={
+      isViewMode
+        ? 'flex flex-col h-full w-full overflow-hidden select-none bg-dark-bg font-mono'
+        : 'fixed inset-0 z-50 bg-dark-bg/95 backdrop-blur-sm flex items-center justify-center animate-in fade-in-0 duration-300'
+    }>
+      <div className={
+        isViewMode
+          ? 'flex flex-col h-full w-full overflow-hidden'
+          : 'bg-dark-surface border border-dark-border rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-8 duration-400'
+      }>
+        {/* Header / Top Bar */}
+        <div className="flex items-center justify-between px-4 py-2 shrink-0 bg-dark-bgSecondary border-b border-dark-border">
+          <div className="flex items-center gap-3">
+            {isViewMode && (
+              <>
+                <select
+                  value="drumpad"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'dj') {
+                      useUIStore.getState().setActiveView('dj');
+                    } else if (val === 'arrangement') {
+                      useUIStore.getState().setActiveView('arrangement');
+                    } else if (val !== 'drumpad') {
+                      useUIStore.getState().setActiveView('tracker');
+                    }
+                  }}
+                  className="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-dark-bgTertiary text-text-muted border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer"
+                  title="Switch view"
+                >
+                  <option value="tracker">Tracker</option>
+                  <option value="grid">Grid</option>
+                  <option value="pianoroll">Piano Roll</option>
+                  <option value="tb303">TB-303</option>
+                  <option value="arrangement">Arrangement</option>
+                  <option value="dj">DJ Mixer</option>
+                  <option value="drumpad">Drum Pads</option>
+                </select>
+                <div className="h-4 w-px bg-dark-border" />
+              </>
+            )}
+            <span className="font-mono text-sm font-bold tracking-widest uppercase text-accent-primary">
+              DRUM PADS
+            </span>
+            <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider">
+              MPC-inspired 16-pad drum machine
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => useUIStore.getState().openModal('midi-pads')}
-              className="px-3 py-1.5 text-xs font-mono text-text-muted hover:text-white bg-dark-surface border border-dark-border rounded transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 text-xs font-mono text-text-muted hover:text-white bg-dark-bgTertiary border border-dark-border rounded transition-colors flex items-center gap-1.5"
               title="Open MIDI Pad Mapper"
             >
               <Piano className="w-3.5 h-3.5" />
@@ -316,7 +359,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
         {/* Main content area */}
         <ErrorBoundary fallbackMessage="An error occurred in the drum pad interface.">
           <div className="flex-1 overflow-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
             {/* Left: Pad Grid (takes 2 columns on large screens) */}
             <div className="lg:col-span-2">
               <div className="bg-dark-bg border border-dark-border rounded-lg">
@@ -555,4 +598,6 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
       </div>
     </div>
   );
+
+  return content;
 };
