@@ -28,6 +28,7 @@ import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { TrackerVisualBackground } from './TrackerVisualBackground';
 import type { CursorPosition } from '@typedefs';
+import { useCollaborationStore, getCollabClient } from '@stores/useCollaborationStore';
 // OffscreenCanvas + WebGL2 worker bridge
 import { TrackerOffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import type {
@@ -88,7 +89,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const scrollYRef = useRef(0);
   const visibleStartRef = useRef(0);
   const macroOverlayRef = useRef<HTMLDivElement>(null);
-  
+  const peerCursorDivRef = useRef<HTMLDivElement>(null);
+  // Ref-tracked peer cursor so the RAF loop can read it without React re-renders
+  const peerCursorRef = useRef({ row: 0, channel: 0, active: false, patternIndex: -1 });
+  // Peer mouse cursor and selection overlays
+  const peerMouseDivRef = useRef<HTMLDivElement>(null);
+  const peerMouseRef = useRef({ nx: 0, ny: 0, active: false });
+  const peerSelectionDivRef = useRef<HTMLDivElement>(null);
+  const peerSelectionRef = useRef<{ startChannel: number; endChannel: number; startRow: number; endRow: number; patternIndex: number } | null>(null);
+  // Ref-tracked channel layout so the RAF loop always has current values
+  const channelOffsetsRef = useRef<number[]>([]);
+  const channelWidthsRef = useRef<number[]>([]);
+  const lastMouseSendTimeRef = useRef(0);
+
   // Cell context menu
   const cellContextMenu = useCellContextMenu();
 
@@ -151,6 +164,51 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   })));
 
   const trackerVisualBg = useSettingsStore((s) => s.trackerVisualBg);
+
+  // Keep channelOffsetsRef/channelWidthsRef in sync for the RAF loop (selection math)
+  useEffect(() => {
+    channelOffsetsRef.current = channelOffsets;
+    channelWidthsRef.current = channelWidths;
+  }, [channelOffsets, channelWidths]);
+
+  // Keep peerCursorRef, peerMouseRef, and peerSelectionRef in sync with collaboration store (no React re-renders)
+  useEffect(() => {
+    const unsub = useCollaborationStore.subscribe((state) => {
+      peerCursorRef.current = {
+        row: state.peerCursorRow,
+        channel: state.peerCursorChannel,
+        active: state.status === 'connected' && state.listenMode === 'shared',
+        patternIndex: state.peerPatternIndex,
+      };
+      peerMouseRef.current = {
+        nx: state.peerMouseNX, ny: state.peerMouseNY,
+        active: state.peerMouseActive && state.status === 'connected' && state.listenMode === 'shared',
+      };
+      peerSelectionRef.current = (state.status === 'connected' && state.listenMode === 'shared')
+        ? state.peerSelection : null;
+    });
+    return unsub;
+  }, []);
+
+  // Broadcast peer_selection whenever local selection changes
+  useEffect(() => {
+    const unsub = useTrackerStore.subscribe((state, prev) => {
+      if (state.selection === prev.selection) return;
+      if (useCollaborationStore.getState().status !== 'connected') return;
+      const sel = state.selection;
+      if (sel) {
+        getCollabClient()?.send({
+          type: 'peer_selection',
+          patternIndex: state.currentPatternIndex,
+          startChannel: sel.startChannel, endChannel: sel.endChannel,
+          startRow: sel.startRow, endRow: sel.endRow,
+        });
+      } else {
+        getCollabClient()?.send({ type: 'peer_selection_clear' });
+      }
+    });
+    return unsub;
+  }, []);
 
   // B/D Animation handlers
   const bdAnimations = useBDAnimations();
@@ -411,6 +469,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, [isMobile, getCellFromCoords]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    // Broadcast peer mouse position (throttled to ~30fps), regardless of drag state
+    if (!isMobile && containerRef.current) {
+      const now = performance.now();
+      if (now - lastMouseSendTimeRef.current > 33 &&
+          useCollaborationStore.getState().status === 'connected') {
+        lastMouseSendTimeRef.current = now;
+        const rect = containerRef.current.getBoundingClientRect();
+        const nx = (e.clientX - rect.left) / dimensions.width;
+        const ny = (e.clientY - rect.top) / dimensions.height;
+        getCollabClient()?.send({ type: 'peer_mouse', nx: Math.max(0, Math.min(1, nx)), ny: Math.max(0, Math.min(1, ny)) });
+      }
+    }
+
     if (!isDragging || isMobile) return;
 
     const cell = getCellFromCoords(e.clientX, e.clientY);
@@ -418,7 +489,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     const store = useTrackerStore.getState();
     store.updateSelection(cell.channelIndex, cell.rowIndex, cell.columnType as any);
-  }, [isDragging, isMobile, getCellFromCoords]);
+  }, [isDragging, isMobile, getCellFromCoords, dimensions.width, dimensions.height]);
 
   const handleMouseUp = useCallback(() => {
     if (isDragging) {
@@ -724,19 +795,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       accent:              theme.colors.accent,
       accentSecondary:     theme.colors.accentSecondary,
       accentGlow:          theme.colors.accentGlow,
-      bg:                  '#0a0a0b',
-      rowNormal:           '#0d0d0e',
-      rowHighlight:        '#111113',
-      border:              '#252530',
-      textNote:            '#909090',
-      textNoteActive:      '#ffffff',
-      textMuted:           '#505050',
-      textInstrument:      '#4ade80',
-      textVolume:          '#60a5fa',
-      textEffect:          '#f97316',
-      lineNumber:          '#707070',
-      lineNumberHighlight: '#f97316',
-      selection:           'rgba(59, 130, 246, 0.3)',
+      bg:                  theme.colors.trackerRowEven,
+      rowNormal:           theme.colors.trackerRowOdd,
+      rowHighlight:        theme.colors.trackerRowHighlight,
+      border:              theme.colors.border,
+      textNote:            theme.colors.textSecondary,
+      textNoteActive:      theme.colors.text,
+      textMuted:           theme.colors.cellEmpty,
+      textInstrument:      theme.colors.cellInstrument,
+      textVolume:          theme.colors.cellVolume,
+      textEffect:          theme.colors.cellEffect,
+      lineNumber:          theme.colors.textMuted,
+      lineNumberHighlight: theme.colors.accentSecondary,
+      selection:           theme.colors.accentGlow,
     };
   }, [getCurrentTheme]);
 
@@ -1098,6 +1169,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     bridgeRef.current?.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
   }, [snapshotLayout]);
 
+
   // ─── Thin overlay RAF (updates macroOverlayRef + posts playback state) ─────
   // This replaces the heavy Canvas 2D render loop. It runs on the main thread
   // to update overlay DOM positions (macroLanes) synchronously with audio.
@@ -1105,6 +1177,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     let rafId: number;
     const audioBpm = useTransportStore.getState().bpm;
     const audioSpeed = useTransportStore.getState().speed;
+
+    // PERF: Dedup playback messages — only post when values change
+    let prevRow = -1;
+    let prevSmooth = -1;
+    let prevPattern = -1;
+    let prevPlaying = false;
 
     const tick = () => {
       const transportState = useTransportStore.getState();
@@ -1136,14 +1214,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         }
       }
 
-      // Post playback state to worker
-      bridgeRef.current?.post({
-        type:         'playback',
-        row:          currentRow,
-        smoothOffset,
-        patternIndex: activePatternIdx,
-        isPlaying,
-      });
+      // PERF: Only post playback message when values actually change
+      // Reduces 60 msgs/sec → ~15-20 msgs/sec during playback
+      if (currentRow !== prevRow || activePatternIdx !== prevPattern ||
+          isPlaying !== prevPlaying || Math.abs(smoothOffset - prevSmooth) > 0.5) {
+        prevRow = currentRow;
+        prevSmooth = smoothOffset;
+        prevPattern = activePatternIdx;
+        prevPlaying = isPlaying;
+        bridgeRef.current?.post({
+          type:         'playback',
+          row:          currentRow,
+          smoothOffset,
+          patternIndex: activePatternIdx,
+          isPlaying,
+        });
+      }
 
       // Update overlay positions (macroLanes) — same math as the old render loop
       const h = dimensions.height;
@@ -1159,12 +1245,65 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         macroOverlayRef.current.style.top = `${baseY}px`;
       }
 
+      // Peer cursor overlay — full-row highlight matching local cursor style
+      if (peerCursorDivRef.current) {
+        const pc = peerCursorRef.current;
+        const curPatIdx = useTrackerStore.getState().currentPatternIndex;
+        if (pc.active && pc.patternIndex === curPatIdx) {
+          // baseY is the Y of vStart (= currentRow - topLines), not row 0.
+          // Correct position: baseY + (pc.row - vStart) * ROW_HEIGHT
+          const py = baseY + (pc.row - vStart) * ROW_HEIGHT;
+          peerCursorDivRef.current.style.display = 'block';
+          peerCursorDivRef.current.style.transform = `translateY(${py}px)`;
+        } else {
+          peerCursorDivRef.current.style.display = 'none';
+        }
+      }
+
+      // Peer mouse cursor dot
+      if (peerMouseDivRef.current) {
+        const pm = peerMouseRef.current;
+        if (pm.active) {
+          peerMouseDivRef.current.style.display = 'block';
+          peerMouseDivRef.current.style.transform = `translate(${pm.nx * dimensions.width}px, ${pm.ny * dimensions.height}px)`;
+        } else {
+          peerMouseDivRef.current.style.display = 'none';
+        }
+      }
+
+      // Peer selection rectangle
+      if (peerSelectionDivRef.current) {
+        const ps = peerSelectionRef.current;
+        const curPatIdx = useTrackerStore.getState().currentPatternIndex;
+        if (ps && ps.patternIndex === curPatIdx) {
+          const offsets = channelOffsetsRef.current;
+          const widths = channelWidthsRef.current;
+          const startCh = Math.min(ps.startChannel, ps.endChannel);
+          const endCh   = Math.max(ps.startChannel, ps.endChannel);
+          const startRow = Math.min(ps.startRow, ps.endRow);
+          const endRow   = Math.max(ps.startRow, ps.endRow);
+          if (offsets.length > endCh) {
+            const left   = offsets[startCh] + LINE_NUMBER_WIDTH - scrollLeftRef.current;
+            const width  = offsets[endCh] + widths[endCh] - offsets[startCh];
+            const top    = baseY + (startRow - vStart) * ROW_HEIGHT;
+            const height = (endRow - startRow + 1) * ROW_HEIGHT;
+            peerSelectionDivRef.current.style.display = 'block';
+            peerSelectionDivRef.current.style.left = `${left}px`;
+            peerSelectionDivRef.current.style.top = `${top}px`;
+            peerSelectionDivRef.current.style.width = `${width}px`;
+            peerSelectionDivRef.current.style.height = `${height}px`;
+          }
+        } else {
+          peerSelectionDivRef.current.style.display = 'none';
+        }
+      }
+
       rafId = requestAnimationFrame(tick);
     };
 
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [dimensions.height]); // re-run if height changes
+  }, [dimensions.height, dimensions.width]); // re-run if dimensions change
 
 
   // Handle resize
@@ -1651,6 +1790,51 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             </div>
           </>
         )}
+
+        {/* Peer cursor overlay — shown in 'shared' collab mode, full-row fill */}
+        <div
+          ref={peerCursorDivRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: LINE_NUMBER_WIDTH,
+            right: 0,
+            height: ROW_HEIGHT,
+            display: 'none',
+            pointerEvents: 'none',
+            backgroundColor: 'rgba(168, 85, 247, 0.25)',
+            zIndex: 25,
+          }}
+        />
+
+        {/* Peer mouse cursor — floating "Friend" dot */}
+        <div
+          ref={peerMouseDivRef}
+          style={{ position: 'absolute', top: 0, left: 0, display: 'none', pointerEvents: 'none', zIndex: 30 }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, transform: 'translate(-2px, -2px)' }}>
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              backgroundColor: '#a855f7', boxShadow: '0 0 6px #a855f7', flexShrink: 0,
+            }} />
+            <span style={{
+              fontSize: 9, color: '#a855f7', fontFamily: 'JetBrains Mono, monospace',
+              fontWeight: 700, letterSpacing: '0.05em',
+              textShadow: '0 0 4px rgba(168,85,247,0.5)', userSelect: 'none',
+            }}>Friend</span>
+          </div>
+        </div>
+
+        {/* Peer selection rectangle */}
+        <div
+          ref={peerSelectionDivRef}
+          style={{
+            position: 'absolute', display: 'none', pointerEvents: 'none', zIndex: 20,
+            backgroundColor: 'rgba(168, 85, 247, 0.12)',
+            border: '1px solid rgba(168, 85, 247, 0.45)',
+            boxSizing: 'border-box',
+          }}
+        />
 
         {/* VU Meters overlay - moved AFTER canvas and added z-30 */}
         <div

@@ -25,6 +25,8 @@ const SIGNALING_URL =
 let _client: CollaborationClient | null = null;
 let _signaling: SignalingClient | null = null;
 let _isCreator = false;
+/** Suppresses echo peer_view when we apply a remote navigation in 'shared' mode */
+let _applyingRemotePeerView = false;
 
 export function getCollabClient(): CollaborationClient | null {
   return _client;
@@ -33,7 +35,7 @@ export function getCollabClient(): CollaborationClient | null {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type CollabStatus = 'idle' | 'creating' | 'joining' | 'waiting' | 'connected' | 'error';
-export type ListenMode = 'mine' | 'both' | 'theirs';
+export type ListenMode = 'mine' | 'both' | 'theirs' | 'shared';
 export type ViewMode = 'fullscreen' | 'split';
 
 interface CollaborationState {
@@ -47,6 +49,12 @@ interface CollaborationState {
 
   // Peer
   peerPatternIndex: number;
+  peerCursorRow: number;
+  peerCursorChannel: number;
+  peerMouseNX: number;
+  peerMouseNY: number;
+  peerMouseActive: boolean;
+  peerSelection: { startChannel: number; endChannel: number; startRow: number; endRow: number; patternIndex: number } | null;
 
   // Audio
   listenMode: ListenMode;
@@ -70,7 +78,13 @@ export const useCollaborationStore = create<CollaborationState>()(
     errorMessage: null,
     viewMode: 'fullscreen',
     peerPatternIndex: 0,
-    listenMode: 'both',
+    peerCursorRow: 0,
+    peerCursorChannel: 0,
+    peerMouseNX: 0,
+    peerMouseNY: 0,
+    peerMouseActive: false,
+    peerSelection: null,
+    listenMode: 'shared',
     micMuted: false,
 
     createRoom: async () => {
@@ -85,7 +99,9 @@ export const useCollaborationStore = create<CollaborationState>()(
           SIGNALING_URL,
           _onSignalingMessage,
           () => {
-            if (useCollaborationStore.getState().status !== 'connected') {
+            const s0 = useCollaborationStore.getState().status;
+            console.log('[Collab] Signaling WS closed, status was:', s0);
+            if (s0 !== 'connected') {
               set((s) => { s.status = 'error'; s.errorMessage = 'Signaling server disconnected'; });
             }
           },
@@ -115,7 +131,9 @@ export const useCollaborationStore = create<CollaborationState>()(
           SIGNALING_URL,
           _onSignalingMessage,
           () => {
-            if (useCollaborationStore.getState().status !== 'connected') {
+            const s0 = useCollaborationStore.getState().status;
+            console.log('[Collab] Signaling WS closed, status was:', s0);
+            if (s0 !== 'connected') {
               set((s) => { s.status = 'error'; s.errorMessage = 'Signaling server disconnected'; });
             }
           },
@@ -140,7 +158,13 @@ export const useCollaborationStore = create<CollaborationState>()(
         s.errorMessage = null;
         s.viewMode = 'fullscreen';
         s.peerPatternIndex = 0;
-        s.listenMode = 'both';
+        s.peerCursorRow = 0;
+        s.peerCursorChannel = 0;
+        s.peerMouseNX = 0;
+        s.peerMouseNY = 0;
+        s.peerMouseActive = false;
+        s.peerSelection = null;
+        s.listenMode = 'shared';
         s.micMuted = false;
       });
     },
@@ -192,7 +216,20 @@ function _setupClientCallbacks(): void {
     if (!_client) return;
     startSongSync(_client);
 
-    // Room creator sends full project snapshot to the joiner
+    // Broadcast our current cursor position immediately so the peer sees it
+    // without needing to wait for us to move the cursor.
+    setTimeout(() => {
+      const ts = useTrackerStore.getState();
+      _client?.send({
+        type: 'peer_cursor',
+        patternIndex: ts.currentPatternIndex,
+        channelIndex: ts.cursor.channelIndex,
+        rowIndex: ts.cursor.rowIndex,
+      });
+    }, 300);
+
+    // Room creator sends full project snapshot to the joiner.
+    // CollaborationClient.send() automatically chunks large payloads into 16 KB pieces.
     if (_isCreator) {
       setTimeout(() => {
         try {
@@ -212,10 +249,37 @@ function _setupClientCallbacks(): void {
   _client.onPatch = (msg) => {
     if (msg.type === 'peer_view') {
       useCollaborationStore.setState((s) => { s.peerPatternIndex = msg.patternIndex; });
+      // In 'shared' mode, follow the peer's navigation locally
+      if (useCollaborationStore.getState().listenMode === 'shared') {
+        _applyingRemotePeerView = true;
+        useTrackerStore.getState().setCurrentPattern(msg.patternIndex);
+        _applyingRemotePeerView = false;
+      }
       return;
     }
     if (msg.type === 'peer_cursor') {
-      useCollaborationStore.setState((s) => { s.peerPatternIndex = msg.patternIndex; });
+      useCollaborationStore.setState((s) => {
+        s.peerPatternIndex = msg.patternIndex;
+        s.peerCursorRow = msg.rowIndex;
+        s.peerCursorChannel = msg.channelIndex;
+      });
+      return;
+    }
+    if (msg.type === 'peer_mouse') {
+      useCollaborationStore.setState((s) => {
+        s.peerMouseNX = msg.nx; s.peerMouseNY = msg.ny; s.peerMouseActive = true;
+      });
+      return;
+    }
+    if (msg.type === 'peer_selection') {
+      useCollaborationStore.setState((s) => {
+        s.peerSelection = { startChannel: msg.startChannel, endChannel: msg.endChannel,
+          startRow: msg.startRow, endRow: msg.endRow, patternIndex: msg.patternIndex };
+      });
+      return;
+    }
+    if (msg.type === 'peer_selection_clear') {
+      useCollaborationStore.setState((s) => { s.peerSelection = null; });
       return;
     }
     applyRemotePatch(msg);
@@ -253,6 +317,7 @@ const _onSignalingMessage = async (msg: SignalingServerMsg): Promise<void> => {
       break;
 
     case 'peer_left':
+      console.log('[Collab] Received peer_left from signaling server — calling disconnect');
       useCollaborationStore.getState().disconnect();
       break;
 
@@ -268,6 +333,23 @@ const _onSignalingMessage = async (msg: SignalingServerMsg): Promise<void> => {
 // ─── Side effect: broadcast peer_view when local pattern changes ───────────────
 useTrackerStore.subscribe((state, prev) => {
   if (state.currentPatternIndex === prev.currentPatternIndex) return;
+  if (_applyingRemotePeerView) return;
   if (useCollaborationStore.getState().status !== 'connected') return;
   _client?.send({ type: 'peer_view', patternIndex: state.currentPatternIndex });
+});
+
+// ─── Side effect: broadcast peer_cursor when local cursor moves ────────────────
+useTrackerStore.subscribe((state, prev) => {
+  if (
+    state.cursor.rowIndex === prev.cursor.rowIndex &&
+    state.cursor.channelIndex === prev.cursor.channelIndex &&
+    state.currentPatternIndex === prev.currentPatternIndex
+  ) return;
+  if (useCollaborationStore.getState().status !== 'connected') return;
+  _client?.send({
+    type: 'peer_cursor',
+    patternIndex: state.currentPatternIndex,
+    channelIndex: state.cursor.channelIndex,
+    rowIndex: state.cursor.rowIndex,
+  });
 });
