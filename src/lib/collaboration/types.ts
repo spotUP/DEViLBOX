@@ -49,4 +49,7 @@ export type DataChannelMsg =
   | { type: 'pattern_delete'; pi: number }
   | { type: 'bpm'; value: number }
   | { type: 'peer_view'; patternIndex: number }
-  | { type: 'peer_cursor'; patternIndex: number; channelIndex: number; rowIndex: number };
+  | { type: 'peer_cursor'; patternIndex: number; channelIndex: number; rowIndex: number }
+  | { type: 'peer_mouse'; nx: number; ny: number }
+  | { type: 'peer_selection'; patternIndex: number; startChannel: number; endChannel: number; startRow: number; endRow: number }
+  | { type: 'peer_selection_clear' };
