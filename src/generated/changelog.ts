@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-21T00:08:58.686Z
+ * Generated: 2026-02-21T01:32:34.462Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1048';
-export const BUILD_NUMBER = '1048';
-export const BUILD_HASH = '8f3861c2';
+export const BUILD_VERSION = '1.0.1052';
+export const BUILD_NUMBER = '1052';
+export const BUILD_HASH = '1b7f9fae';
 export const BUILD_DATE = '2026-02-21';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,7 +30,29 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1048',
+    version: '1.0.1052',
+    date: '2026-02-21',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Remove unused posJumpPos field in TrackerReplayer"
+      },
+      {
+        type: 'fix',
+        "description": "Move channelOffsetsRef sync after useMemo declaration"
+      },
+      {
+        type: 'improvement',
+        "description": "Wip: save all local changes"
+      },
+      {
+        type: 'feature',
+        "description": "Add peer mouse cursor and selection overlay"
+      }
+    ]
+  },
+  {
+    version: '2026-02-20',
     date: '2026-02-20',
     changes: [
       {
@@ -216,22 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Guard DB303 against redundant DSP-reinitializing param sends"
-      },
-      {
-        type: 'feature',
-        "description": "Add ToneArm vinyl simulation and instrument FX presets"
-      },
-      {
-        type: 'feature',
-        "description": "Add client-side cloud sync for presets and settings"
-      },
-      {
-        type: 'feature',
-        "description": "Add cloud sync API and modland proxy"
-      },
-      {
-        type: 'fix',
-        "description": "Use CSS zoom instead of transform:scale for WAM plugin GUIs"
       }
     ]
   }

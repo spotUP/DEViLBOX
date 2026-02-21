@@ -11,22 +11,42 @@ import { useOrientation } from '@hooks/useOrientation';
 import type { ScratchActionId } from '../../types/drumpad';
 import {
   djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
+  djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
+  djScratchUzi, djScratchTwiddle, djScratch8Crab, djScratch3Flare,
+  djScratchLaser, djScratchPhaser, djScratchTweak, djScratchDrag, djScratchVibrato,
   djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132,
 } from '../../engine/keyboard/commands/djScratch';
 
 const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, () => boolean> = {
-  scratch_baby:  djScratchBaby,
-  scratch_trans: djScratchTrans,
-  scratch_flare: djScratchFlare,
-  scratch_hydro: djScratchHydro,
-  scratch_crab:  djScratchCrab,
-  scratch_orbit: djScratchOrbit,
-  scratch_stop:  djScratchStop,
-  lfo_off:       djFaderLFOOff,
-  lfo_14:        djFaderLFO14,
-  lfo_18:        djFaderLFO18,
-  lfo_116:       djFaderLFO116,
-  lfo_132:       djFaderLFO132,
+  // Basic patterns
+  scratch_baby:     djScratchBaby,
+  scratch_trans:    djScratchTrans,
+  scratch_flare:    djScratchFlare,
+  scratch_hydro:    djScratchHydro,
+  scratch_crab:     djScratchCrab,
+  scratch_orbit:    djScratchOrbit,
+  // Extended patterns
+  scratch_chirp:    djScratchChirp,
+  scratch_stab:     djScratchStab,
+  scratch_scribble: djScratchScrbl,
+  scratch_tear:     djScratchTear,
+  // Advanced patterns
+  scratch_uzi:      djScratchUzi,
+  scratch_twiddle:  djScratchTwiddle,
+  scratch_8crab:    djScratch8Crab,
+  scratch_3flare:   djScratch3Flare,
+  scratch_laser:    djScratchLaser,
+  scratch_phaser:   djScratchPhaser,
+  scratch_tweak:    djScratchTweak,
+  scratch_drag:     djScratchDrag,
+  scratch_vibrato:  djScratchVibrato,
+  // Control
+  scratch_stop:     djScratchStop,
+  lfo_off:          djFaderLFOOff,
+  lfo_14:           djFaderLFO14,
+  lfo_18:           djFaderLFO18,
+  lfo_116:          djFaderLFO116,
+  lfo_132:          djFaderLFO132,
 };
 
 interface PadGridProps {
@@ -56,15 +76,34 @@ export const PadGrid: React.FC<PadGridProps> = ({
   // Grid container ref for keyboard focus
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // Initialize audio engine with singleton AudioContext
+  // Initialize audio engine + load persisted samples from IndexedDB
   useEffect(() => {
     const audioContext = getAudioContext();
     engineRef.current = new DrumPadEngine(audioContext);
+
+    // Load persisted audio samples from IndexedDB
+    useDrumPadStore.getState().loadFromIndexedDB(audioContext);
 
     return () => {
       engineRef.current?.dispose();
     };
   }, []);
+
+  // Sync master level to engine whenever it changes
+  useEffect(() => {
+    if (engineRef.current && currentProgram) {
+      engineRef.current.setMasterLevel(currentProgram.masterLevel);
+    }
+  }, [currentProgram?.masterLevel]);
+
+  // Sync bus levels from store to engine
+  const busLevels = useDrumPadStore(s => s.busLevels);
+  useEffect(() => {
+    if (!engineRef.current || !busLevels) return;
+    for (const [bus, level] of Object.entries(busLevels)) {
+      engineRef.current.setOutputLevel(bus, level);
+    }
+  }, [busLevels]);
 
   const handlePadTrigger = useCallback(async (padId: number, velocity: number) => {
     // Update velocity for visual feedback
@@ -190,14 +229,60 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
   return (
     <div className="flex flex-col gap-2 p-4">
-      {/* Program info */}
+      {/* Program info + export/import */}
       <div className="flex items-center justify-between mb-2">
         <div>
           <div className="text-sm font-bold text-white">{currentProgram.name}</div>
           <div className="text-xs text-text-muted font-mono">{currentProgram.id}</div>
         </div>
-        <div className="text-xs text-text-muted">
-          {currentProgram.pads.filter(p => p.sample !== null).length} / 16 pads loaded
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => engineRef.current?.stopAll()}
+            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-red-400 bg-dark-surface border border-dark-border rounded transition-colors"
+            title="Stop all playing pads"
+          >
+            Stop All
+          </button>
+          <button
+            onClick={async () => {
+              const blob = await useDrumPadStore.getState().exportAllConfigs();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${currentProgram.name || 'drumpad'}.dvbpads`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-white bg-dark-surface border border-dark-border rounded transition-colors"
+            title="Export all programs + samples"
+          >
+            Export
+          </button>
+          <button
+            onClick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = '.dvbpads';
+              input.onchange = async () => {
+                const file = input.files?.[0];
+                if (!file) return;
+                try {
+                  const audioContext = getAudioContext();
+                  await useDrumPadStore.getState().importConfigs(file, audioContext);
+                } catch (err) {
+                  console.error('[PadGrid] Import failed:', err);
+                }
+              };
+              input.click();
+            }}
+            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-white bg-dark-surface border border-dark-border rounded transition-colors"
+            title="Import programs + samples (.dvbpads)"
+          >
+            Import
+          </button>
+          <div className="text-xs text-text-muted">
+            {currentProgram.pads.filter(p => p.sample !== null).length} / 16
+          </div>
         </div>
       </div>
 

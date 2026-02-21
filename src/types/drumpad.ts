@@ -22,6 +22,10 @@ export interface SampleLayer {
 export type ScratchActionId =
   | 'scratch_baby' | 'scratch_trans' | 'scratch_flare'
   | 'scratch_hydro' | 'scratch_crab'  | 'scratch_orbit'
+  | 'scratch_chirp' | 'scratch_stab' | 'scratch_scribble' | 'scratch_tear'
+  | 'scratch_uzi' | 'scratch_twiddle' | 'scratch_8crab'
+  | 'scratch_3flare' | 'scratch_laser' | 'scratch_phaser'
+  | 'scratch_tweak' | 'scratch_drag' | 'scratch_vibrato'
   | 'scratch_stop'
   | 'lfo_off' | 'lfo_14' | 'lfo_18' | 'lfo_116' | 'lfo_132';
 

@@ -44,7 +44,21 @@ export class DrumPadEngine {
    * Trigger a pad with velocity
    */
   triggerPad(pad: DrumPad, velocity: number): void {
-    if (!pad.sample?.audioBuffer) {
+    // Select sample: check velocity layers first, fall back to main sample
+    let sampleBuffer = pad.sample?.audioBuffer ?? null;
+    let layerLevelOffset = 0;
+
+    if (pad.layers.length > 0) {
+      const matchingLayer = pad.layers.find(
+        l => velocity >= l.velocityRange[0] && velocity <= l.velocityRange[1]
+      );
+      if (matchingLayer?.sample?.audioBuffer) {
+        sampleBuffer = matchingLayer.sample.audioBuffer;
+        layerLevelOffset = matchingLayer.levelOffset;
+      }
+    }
+
+    if (!sampleBuffer) {
       console.warn(`[DrumPadEngine] Pad ${pad.id} has no sample`);
       return;
     }
@@ -66,7 +80,7 @@ export class DrumPadEngine {
     const panNode = this.context.createStereoPanner();
 
     // Configure source
-    source.buffer = pad.sample.audioBuffer;
+    source.buffer = sampleBuffer;
     source.playbackRate.value = Math.pow(2, pad.tune / 12); // Semitones to playback rate
 
     // Configure filter
@@ -89,10 +103,11 @@ export class DrumPadEngine {
     // Configure pan
     panNode.pan.value = pad.pan / 64; // -64 to +63 -> -1 to ~1
 
-    // Calculate velocity scaling
+    // Calculate velocity scaling (include layer level offset in dB)
     const velocityScale = velocity / 127;
     const levelScale = pad.level / 127;
-    const targetGain = velocityScale * levelScale;
+    const layerScale = layerLevelOffset !== 0 ? Math.pow(10, layerLevelOffset / 20) : 1;
+    const targetGain = velocityScale * levelScale * layerScale;
 
     // Apply ADSR envelope
     const attackTime = pad.attack / 1000;
@@ -123,7 +138,7 @@ export class DrumPadEngine {
     source.start(now);
 
     // Schedule cleanup using Web Audio (sample-accurate)
-    const duration = pad.sample.audioBuffer.duration / source.playbackRate.value;
+    const duration = sampleBuffer.duration / source.playbackRate.value;
     const cleanupTime = now + duration + releaseTime + 0.1; // Extra 100ms buffer
 
     // Create silent buffer to trigger cleanup at exact time
