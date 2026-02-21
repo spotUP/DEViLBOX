@@ -5,11 +5,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
-import { Minimize2, Copy, Check, Mic, MicOff, Volume2, ChevronDown, X } from 'lucide-react';
+import { Minimize2, Copy, Check, Mic, MicOff, Video, VideoOff, Volume2, ChevronDown, X } from 'lucide-react';
 import type { ListenMode } from '@stores/useCollaborationStore';
 
 export const CollaborationToolbar: React.FC = () => {
-  const { roomCode, micMuted, listenMode, setViewMode, setListenMode, toggleMic, disconnect } = useCollaborationStore();
+  const { roomCode, micMuted, cameraMuted, listenMode, setViewMode, setListenMode, toggleMic, toggleCamera, disconnect } = useCollaborationStore();
   const [copied, setCopied] = useState(false);
   const [showListenMenu, setShowListenMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -84,6 +84,20 @@ export const CollaborationToolbar: React.FC = () => {
       >
         {micMuted ? <MicOff size={13} /> : <Mic size={13} />}
         <span>{micMuted ? 'Muted' : 'Mic'}</span>
+      </button>
+
+      {/* Camera toggle */}
+      <button
+        onClick={toggleCamera}
+        className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors ${
+          cameraMuted
+            ? 'text-accent-error bg-accent-error/10 hover:bg-accent-error/20'
+            : 'text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary'
+        }`}
+        title={cameraMuted ? 'Enable camera' : 'Disable camera'}
+      >
+        {cameraMuted ? <VideoOff size={13} /> : <Video size={13} />}
+        <span>{cameraMuted ? 'Cam Off' : 'Cam'}</span>
       </button>
 
       <div className="w-px h-4 bg-dark-border" />

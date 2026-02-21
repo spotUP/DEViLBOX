@@ -39,6 +39,7 @@ import { useTransportStore } from '@stores/useTransportStore';
 import { useProjectStore } from '@stores/useProjectStore';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { PeerMouseCursor } from '@components/collaboration/PeerMouseCursor';
+import { PeerVideoWindow } from '@components/collaboration/PeerVideoWindow';
 import type { Pattern } from '@typedefs';
 
 // Lazy-loaded components for better startup performance
@@ -734,6 +735,8 @@ function App() {
             />
           )}
           <WebGLModalBridge />
+          <PeerMouseCursor />
+          <PeerVideoWindow />
 
           {/* Effect Parameter Editor Modal */}
           <Suspense fallback={null}>
@@ -1391,6 +1394,9 @@ function App() {
 
       {/* Peer mouse cursor — fixed overlay covering entire UI, visible when in shared collab mode */}
       <PeerMouseCursor />
+
+      {/* Floating video chat window — visible when collaboration is connected */}
+      <PeerVideoWindow />
 
       {/* Toast Notifications */}
       <ToastNotification />
