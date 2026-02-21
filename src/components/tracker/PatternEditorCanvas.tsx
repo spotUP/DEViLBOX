@@ -1245,16 +1245,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         macroOverlayRef.current.style.top = `${baseY}px`;
       }
 
-      // Peer cursor overlay — full-row highlight matching local cursor style
+      // Peer cursor overlay — thin caret at peer's channel + row
       if (peerCursorDivRef.current) {
         const pc = peerCursorRef.current;
         const curPatIdx = useTrackerStore.getState().currentPatternIndex;
-        if (pc.active && pc.patternIndex === curPatIdx) {
-          // baseY is the Y of vStart (= currentRow - topLines), not row 0.
-          // Correct position: baseY + (pc.row - vStart) * ROW_HEIGHT
+        const offsets = channelOffsetsRef.current;
+        if (pc.active && pc.patternIndex === curPatIdx && offsets.length > pc.channel) {
           const py = baseY + (pc.row - vStart) * ROW_HEIGHT;
+          const px = offsets[pc.channel] - scrollLeftRef.current;
           peerCursorDivRef.current.style.display = 'block';
-          peerCursorDivRef.current.style.transform = `translateY(${py}px)`;
+          peerCursorDivRef.current.style.transform = `translate(${px}px, ${py}px)`;
         } else {
           peerCursorDivRef.current.style.display = 'none';
         }
@@ -1791,18 +1791,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           </>
         )}
 
-        {/* Peer cursor overlay — shown in 'shared' collab mode, full-row fill */}
+        {/* Peer cursor overlay — shown in 'shared' collab mode, thin caret at peer's channel */}
         <div
           ref={peerCursorDivRef}
           style={{
             position: 'absolute',
             top: 0,
-            left: LINE_NUMBER_WIDTH,
-            right: 0,
+            left: 0,
+            width: 2,
             height: ROW_HEIGHT,
             display: 'none',
             pointerEvents: 'none',
-            backgroundColor: 'rgba(168, 85, 247, 0.25)',
+            backgroundColor: '#a855f7',
+            boxShadow: '0 0 4px #a855f7',
             zIndex: 25,
           }}
         />
