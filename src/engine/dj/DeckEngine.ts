@@ -590,6 +590,8 @@ export class DeckEngine {
       this.scratchPlayback.scheduleTransformerFader(bpm);
     } else if (pattern.name === 'Crab') {
       this.scratchPlayback.scheduleCrabFader(bpm);
+    } else if (pattern.name === '8-Finger Crab') {
+      this.scratchPlayback.scheduleEightFingerCrabFader(bpm);
     }
 
     this.scratchPlayback.play(pattern, onWaiting);
