@@ -898,6 +898,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Gamepad2',
     color: 'text-lime-400',
   },
+  HivelySynth: {
+    type: 'HivelySynth',
+    name: 'HivelyTracker',
+    shortName: 'HVL',
+    description: 'Amiga HivelyTracker/AHX chip synth with 4 waveforms, filter sweeps, and performance lists',
+    bestFor: ['Chiptune', 'Amiga', 'AHX', 'Chip arpeggios', 'Filter sweeps'],
+    icon: 'Cpu',
+    color: 'text-green-400',
+  },
   WobbleBass: {
     type: 'WobbleBass',
     name: 'Wobble Bass',
@@ -1748,6 +1757,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.FurnaceZXBEEPER,
       SYNTH_INFO.FurnaceAMIGA,
       SYNTH_INFO.FurnacePCSPKR,
+      SYNTH_INFO.HivelySynth,
     ],
   },
   {

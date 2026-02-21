@@ -16,6 +16,7 @@ import {
   DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
+  DEFAULT_HIVELY,
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
@@ -47,6 +48,8 @@ import { MelodicaControls } from '../controls/MelodicaControls';
 import { VitalControls } from '../controls/VitalControls';
 import { Odin2Controls } from '../controls/Odin2Controls';
 import { SurgeControls } from '../controls/SurgeControls';
+import { HivelyControls } from '../controls/HivelyControls';
+import { HivelyHardware } from '../hardware/HivelyHardware';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
 import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
 import { MAMEOscilloscope } from '../../visualization/MAMEOscilloscope';
@@ -66,7 +69,7 @@ import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthE
 import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -127,6 +130,11 @@ function isOBXdType(synthType: SynthType): boolean {
   return synthType === 'OBXd';
 }
 
+/** Check if synth type is HivelyTracker */
+function isHivelyType(synthType: SynthType): boolean {
+  return synthType === 'HivelySynth';
+}
+
 /** Get the editor mode for a synth type */
 function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'TB303' || synthType === 'Buzz3o3') return 'tb303';
@@ -142,6 +150,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isMAMEType(synthType)) return 'mame';
   if (isDexedType(synthType)) return 'dexed';
   if (isOBXdType(synthType)) return 'obxd';
+  if (isHivelyType(synthType)) return 'hively';
   if (synthType === 'HarmonicSynth') return 'harmonicsynth';
   if (synthType === 'ModularSynth') return 'modular';
   if (synthType === 'WAM') return 'wam';
@@ -501,6 +510,19 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     });
   }, [instrument.dubSiren, handleChange]);
 
+  // Handle Hively config updates (partial — for HivelyControls)
+  const handleHivelyChange = useCallback((updates: Partial<typeof instrument.hively>) => {
+    const currentHively = instrument.hively || DEFAULT_HIVELY;
+    handleChange({
+      hively: { ...currentHively, ...updates },
+    });
+  }, [instrument.hively, handleChange]);
+
+  // Handle Hively hardware config updates (full config — for HivelyHardware)
+  const handleHivelyHardwareChange = useCallback((fullConfig: typeof DEFAULT_HIVELY) => {
+    handleChange({ hively: fullConfig });
+  }, [handleChange]);
+
   // Handle Space Laser config updates
   const handleSpaceLaserChange = useCallback((updates: Partial<typeof instrument.spaceLaser>) => {
     const currentSpaceLaser = instrument.spaceLaser || DEFAULT_SPACE_LASER;
@@ -834,6 +856,52 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           instrumentId={instrument.id}
           onChange={handleDubSirenChange}
         />
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // HIVELY TRACKER EDITOR
+  // ============================================================================
+  if (editorMode === 'hively') {
+    const hivelyConfig = deepMerge(DEFAULT_HIVELY, instrument.hively || {});
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0a1a12] to-[#050f08]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          customHeaderControls={
+            <button
+              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                uiMode === 'hardware'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+              onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+              title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+            >
+              {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+              <span className="hidden sm:inline">
+                {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+              </span>
+            </button>
+          }
+        />
+        {uiMode === 'hardware' ? (
+          <HivelyHardware
+            config={hivelyConfig}
+            onChange={handleHivelyHardwareChange}
+          />
+        ) : (
+          <HivelyControls
+            config={hivelyConfig}
+            instrumentId={instrument.id}
+            onChange={handleHivelyChange}
+          />
+        )}
       </div>
     );
   }

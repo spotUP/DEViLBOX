@@ -138,6 +138,7 @@ async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string): Promise
     grooves: furnaceData?.grooves,
     furnaceWavetables: result.wavetables.length > 0 ? result.wavetables : undefined,
     furnaceSamples: result.samples.length > 0 ? result.samples : undefined,
+    furnaceNative: result.furnaceNative,
   };
 }
 
