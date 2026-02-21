@@ -86,8 +86,9 @@ const PixiTransportButton: React.FC<TransportBtnProps> = ({ label, color, isActi
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: BTN_SIZE, height: BTN_SIZE }} />
       <pixiBitmapText
         text={label}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8 }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
         tint={isActive ? color : theme.textMuted.color}
+        layout={{}}
       />
     </pixiContainer>
   );

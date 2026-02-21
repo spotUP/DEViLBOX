@@ -113,8 +113,9 @@ export const PixiSynthPanel: React.FC<PixiSynthPanelProps> = ({ layout: panelLay
               />
               <pixiBitmapText
                 text={tab.label}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9 }}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
                 tint={activeTab === tab.id ? theme.accent.color : theme.textMuted.color}
+                layout={{}}
               />
             </pixiContainer>
           ))}
@@ -157,8 +158,9 @@ const PixiSynthSection: React.FC<SynthSectionProps> = ({ section, getValue, upda
       <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <pixiBitmapText
           text={section.label}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9 }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
           tint={theme.textMuted.color}
+          layout={{}}
         />
         <pixiGraphics draw={drawBorder} layout={{ flex: 1, height: 1 }} />
       </pixiContainer>

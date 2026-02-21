@@ -4,7 +4,7 @@
  * Falls back to dynamic bitmap fonts generated from system fonts when MSDF files aren't available.
  */
 
-import { Assets, BitmapFontManager, Cache } from 'pixi.js';
+import { Assets, BitmapFontManager, Cache, type TextStyleFontWeight } from 'pixi.js';
 
 /** Font family names used throughout the PixiJS UI */
 export const PIXI_FONTS = {
@@ -67,7 +67,7 @@ function installFallbackFonts(): void {
   const monoFamily = 'JetBrains Mono, Menlo, Consolas, monospace';
   const sansFamily = 'Inter, -apple-system, BlinkMacSystemFont, sans-serif';
 
-  const fallbacks = [
+  const fallbacks: { name: string; family: string; weight: TextStyleFontWeight }[] = [
     { name: PIXI_FONTS.MONO, family: monoFamily, weight: 'normal' },
     { name: PIXI_FONTS.MONO_BOLD, family: monoFamily, weight: 'bold' },
     { name: PIXI_FONTS.SANS, family: sansFamily, weight: 'normal' },

@@ -272,6 +272,7 @@ export interface ParsedInstrument {
   panningEnvelope?: EnvelopePoints;
   autoVibrato?: AutoVibrato;
   fadeout: number; // Volume fadeout speed (0-4095)
+  sampleMap?: number[]; // XM note-to-sample mapping (96 entries)
   volumeType: 'envelope' | 'none';
   panningType: 'envelope' | 'none';
 

@@ -101,6 +101,13 @@ const NavBarComponent: React.FC = () => {
     }
   }, [isDirty, activeTabId, markTabDirty]);
 
+  // Auto-close collab modal when connection succeeds
+  useEffect(() => {
+    if (collabStatus === 'connected') {
+      setShowCollabModal(false);
+    }
+  }, [collabStatus]);
+
   // Close theme menu when clicking outside
   useEffect(() => {
     if (!showThemeMenu) return;

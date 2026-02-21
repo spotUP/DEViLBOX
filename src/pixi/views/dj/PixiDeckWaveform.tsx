@@ -6,7 +6,7 @@
 import { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
-import { usePixiTheme } from '../../theme';
+import { usePixiTheme, usePixiThemeId, getDeckColors } from '../../theme';
 import { useDJStore } from '@/stores/useDJStore';
 
 interface PixiDeckWaveformProps {
@@ -21,7 +21,9 @@ export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, widt
   const position = useDJStore(s => s.decks[deckId].audioPosition);
   const duration = useDJStore(s => s.decks[deckId].durationMs);
 
-  const DECK_COLOR = deckId === 'A' ? 0x60a5fa : 0xf87171;
+  const themeId = usePixiThemeId();
+  const { deckA, deckB } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
+  const DECK_COLOR = deckId === 'A' ? deckA : deckB;
 
   const drawWaveform = useCallback((g: GraphicsType) => {
     g.clear();
@@ -72,7 +74,7 @@ export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, widt
       {(!peaks || peaks.length === 0) && (
         <pixiBitmapText
           text="No waveform data"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ position: 'absolute', top: height / 2 - 6, left: width / 2 - 40 }}
         />

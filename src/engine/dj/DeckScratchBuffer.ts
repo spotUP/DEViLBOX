@@ -10,16 +10,13 @@
  *
  * IMPROVEMENTS (inspired by DJ-Scratch-Sample reference implementation):
  *
- * 1. AUDIOPARAM RATE CONTROL: Uses AudioParam ('rate') instead of postMessage
- *    for sample-accurate rate updates with zero message latency.
- *    (reference: InterlockedExchange for lock-free atomic speed updates)
+ * 1. LINEAR INTERPOLATION: handled in the worklet process() loop — eliminates
+ *    staircase artifacts from nearest-neighbor sampling.
+ *    (reference: lerp between floor/ceil samples in SoundRenderer.cpp)
  *
- * 2. SMOOTH RATE TRANSITIONS: linearRampToValueAtTime with 5ms ramp eliminates
- *    clicks at speed change boundaries.
+ * 2. RATE SMOOTHING: 2ms exponential smoothing in the worklet prevents clicks
+ *    at rate/direction transitions (e.g. forward→backward in Baby Scratch).
  *    (reference: smooth position accumulator handles rate changes naturally)
- *
- * 3. LINEAR INTERPOLATION + ANTI-ALIAS: handled in the worklet process() loop.
- *    (reference: lerp between floor/ceil samples + pre-filtered buffer)
  *
  * Audio chain wiring (call wireIntoChain once after init):
  *   filter ──→ captureNode  (taps audio into ring buffer; output unconnected)
@@ -33,16 +30,9 @@ import { getNativeAudioNode } from '@/utils/audio-context';
  *  Gives forward headroom while keeping audio contextually recent. */
 const PATTERN_START_OFFSET_SEC = 3;
 
-/** Duration (seconds) for rate-change ramps. Short enough to feel instant,
- *  long enough to prevent clicks from step discontinuities. */
-const RATE_RAMP_SEC = 0.005;
-
 export class DeckScratchBuffer {
   private captureNode!: AudioWorkletNode;
   private playbackNode!: AudioWorkletNode;
-  /** Direct reference to the 'rate' AudioParam on the playback processor.
-   *  Sample-accurate, eliminates postMessage latency for rate changes. */
-  private rateParam: AudioParam | null = null;
   /** GainNode (0 = silent, 1 = active). Wired to channelGain input. */
   playbackGain!: GainNode;
 
@@ -88,6 +78,12 @@ export class DeckScratchBuffer {
     this.captureNode.port.onmessage = (e: MessageEvent) => {
       if (e.data.type === 'writePos') {
         this.currentWritePos = e.data.pos as number;
+      } else if (e.data.type === 'debug-freeze') {
+        const d = e.data;
+        console.log(
+          `[ScratchCapture ${this.bufferId}] FREEZE writePos=${d.writePos} ` +
+          `nonZero=${d.nonZeroInLast1s}/${d.checkedFrames} peak=${d.peakBeforeFreeze.toFixed(4)}`
+        );
       }
     };
 
@@ -98,8 +94,28 @@ export class DeckScratchBuffer {
       outputChannelCount: [2],
     });
 
-    // Grab the rate AudioParam for sample-accurate rate control
-    this.rateParam = this.playbackNode.parameters.get('rate') ?? null;
+    this.playbackNode.port.onmessage = (e: MessageEvent) => {
+      const d = e.data;
+      if (d.type === 'debug-start') {
+        console.log(
+          `[ScratchPlayback ${this.bufferId}] START pos=${d.startPos} rate=${d.rate} ` +
+          `nonZero=${d.nonZeroAroundStart}/${d.checkedFrames} peak=${d.peakAroundStart.toFixed(4)} ` +
+          `sampleAt0={L:${d.sampleAt0.L.toFixed(6)}, R:${d.sampleAt0.R.toFixed(6)}}`
+        );
+      } else if (d.type === 'debug-playback') {
+        console.log(
+          `[ScratchPlayback ${this.bufferId}] readPos=${Math.floor(d.readPos)} ` +
+          `rate=${d.smoothRate.toFixed(3)} target=${d.targetRate.toFixed(3)} ` +
+          `outPeak=${d.outPeak.toFixed(4)} samples=[${
+            d.samplesAroundPos.map(
+              (s: {L: number; R: number}) => `${s.L.toFixed(4)}`
+            ).join(',')
+          }]`
+        );
+      } else if (d.type === 'stopped') {
+        // Existing handler will catch this via addEventListener if needed
+      }
+    };
 
     this.playbackGain = this.ctx.createGain();
     this.playbackGain.gain.value = 0;
@@ -146,40 +162,6 @@ export class DeckScratchBuffer {
   }
 
   // ==========================================================================
-  // RATE CONTROL — dual path for robustness
-  //
-  // PRIMARY: AudioParam 'rate' (sample-accurate, zero latency, smooth ramps)
-  // FALLBACK: postMessage 'setRate' (always sent, works even if AudioParam
-  //           is unavailable due to worklet caching or browser quirks)
-  //
-  // The worklet process() prefers AudioParam when it's non-zero, otherwise
-  // falls back to the message-based rate.
-  // ==========================================================================
-
-  /** Set rate via AudioParam (smooth ramp) + postMessage (fallback). */
-  private _setRate(rate: number): void {
-    // AudioParam path — sample-accurate with smooth ramp
-    if (this.rateParam) {
-      const now = this.ctx.currentTime;
-      this.rateParam.cancelScheduledValues(now);
-      this.rateParam.setValueAtTime(this.rateParam.value, now);
-      this.rateParam.linearRampToValueAtTime(rate, now + RATE_RAMP_SEC);
-    }
-    // postMessage fallback — always send so worklet works even without AudioParam
-    this.playbackNode.port.postMessage({ type: 'setRate', rate });
-  }
-
-  /** Set rate instantly (no ramp) + postMessage fallback. */
-  private _setRateInstant(rate: number): void {
-    if (this.rateParam) {
-      const now = this.ctx.currentTime;
-      this.rateParam.cancelScheduledValues(now);
-      this.rateParam.setValueAtTime(rate, now);
-    }
-    this.playbackNode.port.postMessage({ type: 'setRate', rate });
-  }
-
-  // ==========================================================================
   // PLAYBACK — bidirectional, signed rate
   // ==========================================================================
 
@@ -198,29 +180,31 @@ export class DeckScratchBuffer {
     const offset = Math.round(this.ctx.sampleRate * PATTERN_START_OFFSET_SEC);
     const startPos = (this.currentWritePos - offset + bufferFrames) % bufferFrames;
 
-    // Set rate via AudioParam BEFORE activating (instant, no ramp for initial start)
-    this._setRateInstant(rate);
+    console.log(
+      `[ScratchBuffer ${this.bufferId}] startScratchPlayback rate=${rate} ` +
+      `writePos=${this.currentWritePos} startPos=${startPos} offset=${offset} ` +
+      `bufferFrames=${bufferFrames} sampleRate=${this.ctx.sampleRate}`
+    );
 
     this.playbackGain.gain.cancelScheduledValues(this.ctx.currentTime);
     this.playbackGain.gain.setValueAtTime(1, this.ctx.currentTime);
-    // Include rate in start message as fallback for worklet
+    // Start message includes rate — worklet snaps to this rate instantly (no ramp)
     this.playbackNode.port.postMessage({ type: 'start', startPos, rate });
   }
 
   /**
    * Update playback rate (signed: positive = forward, negative = backward).
-   * Uses AudioParam with a 5ms ramp for click-free speed transitions.
+   * The worklet applies 2ms exponential smoothing for click-free transitions.
    */
   setScratchRate(rate: number): void {
     if (!this.initialized) return;
-    this._setRate(rate);
+    this.playbackNode.port.postMessage({ type: 'setRate', rate });
   }
 
   /** Stop scratch playback and unfreeze capture. Non-blocking. */
   stopScratchPlayback(): void {
     if (!this.initialized) return;
-    // Zero rate before stopping for clean tail (both paths)
-    this._setRateInstant(0);
+    this.playbackNode.port.postMessage({ type: 'setRate', rate: 0 });
     this.playbackGain.gain.cancelScheduledValues(this.ctx.currentTime);
     this.playbackGain.gain.setValueAtTime(0, this.ctx.currentTime);
     this.playbackNode.port.postMessage({ type: 'stop' });
@@ -235,8 +219,6 @@ export class DeckScratchBuffer {
   startReverse(rate: number): void {
     if (!this.initialized) return;
     const negRate = -Math.abs(rate);
-    // Set rate via AudioParam (instant, no ramp for initial start)
-    this._setRateInstant(negRate);
     this.playbackGain.gain.cancelScheduledValues(this.ctx.currentTime);
     this.playbackGain.gain.setValueAtTime(1, this.ctx.currentTime);
     this.playbackNode.port.postMessage({
@@ -246,16 +228,29 @@ export class DeckScratchBuffer {
     });
   }
 
+  /**
+   * Start backward playback from the worklet's EXACT current write position.
+   * Eliminates main-thread writePos staleness (up to 50ms) by reading the
+   * shared module-level writePoss[] directly in the audio thread.
+   */
+  startReverseFromWritePos(rate: number): void {
+    if (!this.initialized) return;
+    const negRate = -Math.abs(rate);
+    this.playbackGain.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.playbackGain.gain.setValueAtTime(1, this.ctx.currentTime);
+    this.playbackNode.port.postMessage({ type: 'startFromWrite', rate: negRate });
+  }
+
   /** Update rate for jog wheel backward scratch (always negative). */
   setRate(rate: number): void {
     if (!this.initialized) return;
-    this._setRate(-Math.abs(rate));
+    this.playbackNode.port.postMessage({ type: 'setRate', rate: -Math.abs(rate) });
   }
 
   /** Immediately silence and stop. Non-blocking. */
   silenceAndStop(): void {
     if (!this.initialized) return;
-    this._setRateInstant(0);  // zeros both AudioParam + postMessage
+    this.playbackNode.port.postMessage({ type: 'setRate', rate: 0 });
     this.playbackGain.gain.cancelScheduledValues(this.ctx.currentTime);
     this.playbackGain.gain.setValueAtTime(0, this.ctx.currentTime);
     this.playbackNode.port.postMessage({ type: 'stop' });
@@ -265,7 +260,7 @@ export class DeckScratchBuffer {
   stopReverse(): Promise<number> {
     if (!this.initialized) return Promise.resolve(0);
 
-    this._setRateInstant(0);  // zeros both AudioParam + postMessage
+    this.playbackNode.port.postMessage({ type: 'setRate', rate: 0 });
     this.playbackGain.gain.cancelScheduledValues(this.ctx.currentTime);
     this.playbackGain.gain.setValueAtTime(0, this.ctx.currentTime);
 

@@ -33,6 +33,8 @@ const LFO_LABELS: { division: FaderLFODivision; label: string }[] = [
 
 export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
   const activePatternName = useDJStore((s) => s.decks[deckId].activePatternName);
+  const scratchVelocity = useDJStore((s) => s.decks[deckId].scratchVelocity);
+  const scratchFaderGain = useDJStore((s) => s.decks[deckId].scratchFaderGain);
   const faderLFOActive = useDJStore((s) => s.decks[deckId].faderLFOActive);
   const faderLFODivision = useDJStore((s) => s.decks[deckId].faderLFODivision);
 
@@ -143,6 +145,34 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
           );
         })}
       </div>
+
+      {/* Scratch status — velocity direction + fader state when a pattern or LFO is active */}
+      {(activePatternName || faderLFOActive) && (
+        <div className={`flex items-center gap-1 font-mono text-xs ${deckColor}`}>
+          {activePatternName && (
+            <>
+              <span className="opacity-60">
+                {scratchVelocity > 0.1 ? '>' : scratchVelocity < -0.1 ? '<' : '|'}
+              </span>
+              <span className="w-6 text-right tabular-nums opacity-80">
+                {Math.abs(scratchVelocity).toFixed(1)}
+              </span>
+            </>
+          )}
+          {/* Fader state: mini bar showing open/cut */}
+          <div
+            className="rounded-sm border"
+            style={{
+              width: 4,
+              height: 12,
+              borderColor: isB ? 'rgba(248, 113, 113, 0.4)' : 'rgba(96, 165, 250, 0.4)',
+              backgroundColor: scratchFaderGain > 0.5
+                ? (isB ? 'rgba(248, 113, 113, 0.7)' : 'rgba(96, 165, 250, 0.7)')
+                : 'transparent',
+            }}
+          />
+        </div>
+      )}
 
       {/* Divider */}
       <div className="w-px h-4 bg-white/10 flex-shrink-0" />

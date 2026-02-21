@@ -2258,8 +2258,17 @@ export interface EffectConfig {
 
 export interface InstrumentMetadata {
   importedFrom?: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR';
-  originalEnvelope?: EnvelopePoints; // Preserved point-based envelope for future editor
+  originalEnvelope?: EnvelopePoints; // Preserved point-based volume envelope for FT2 processing
+  panningEnvelope?: EnvelopePoints; // Preserved panning envelope for FT2 processing
   autoVibrato?: AutoVibrato; // Preserved auto-vibrato settings
+  fadeout?: number; // XM fadeout speed (0-4095), applied per tick on key-off
+  sampleMap?: number[]; // XM note-to-sample mapping (96 entries, note 0-95 → sample index)
+  multiSamples?: Array<{
+    sample: SampleConfig;
+    finetune: number;
+    relativeNote: number;
+    defaultVolume: number;
+  }>; // All samples for this XM instrument (indexed by sampleMap values)
   preservedSample?: {
     audioBuffer: ArrayBuffer;
     url: string;
@@ -2280,6 +2289,7 @@ export interface InstrumentMetadata {
     usePeriodPlayback: boolean; // If true, use period-based playback (Amiga)
     periodMultiplier: number; // AMIGA_PALFREQUENCY_HALF = 3546895
     finetune: number; // -8 to +7 (ProTracker) or -128 to +127 (XM)
+    relativeNote?: number; // XM sample relative note (-96 to +95 semitones)
     defaultVolume?: number; // Sample's default volume (0-64) for channel init
     fadeout?: number; // Fadeout rate
   };

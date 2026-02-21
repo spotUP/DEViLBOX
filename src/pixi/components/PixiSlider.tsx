@@ -243,7 +243,7 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
       {label && (
         <pixiBitmapText
           text={label}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ height: labelHeight }}
         />
@@ -259,7 +259,7 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
       {showValue && (
         <pixiBitmapText
           text={fmtVal(value)}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
           tint={theme.textSecondary.color}
           layout={{ height: valueHeight }}
         />

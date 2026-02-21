@@ -177,6 +177,11 @@ async function parseTrackerModule(buffer: ArrayBuffer, fileName: string): Promis
   const order = result.order?.length ? result.order : result.patterns.map((_, i) => i);
   const format: TrackerFormat = (result.metadata?.sourceFormat as TrackerFormat) || 'XM';
 
+  // Extract XM linear/amiga frequency mode from pattern metadata
+  // XM flag bit 0: 1 = linear periods (most XMs), 0 = amiga periods
+  const xmFreqType = result.patterns[0]?.importMetadata?.xmData?.frequencyType;
+  const linearPeriods = format === 'XM' ? (xmFreqType === 'linear' || xmFreqType === undefined) : false;
+
   return {
     name: moduleInfo.metadata.title || fileName.replace(/\.[^/.]+$/, ''),
     format,
@@ -188,6 +193,7 @@ async function parseTrackerModule(buffer: ArrayBuffer, fileName: string): Promis
     numChannels: result.channelCount || result.patterns[0]?.channels?.length || 4,
     initialSpeed: modData?.initialSpeed ?? 6,
     initialBPM: modData?.initialBPM ?? 125,
+    linearPeriods,
   };
 }
 

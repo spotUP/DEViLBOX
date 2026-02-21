@@ -117,7 +117,7 @@ export const PixiToast: React.FC = () => {
 
             <pixiBitmapText
               text={notif.message.length > 35 ? notif.message.substring(0, 35) + '...' : notif.message}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11 }}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
               tint={theme.text.color}
               layout={{ marginLeft: 8 }}
             />

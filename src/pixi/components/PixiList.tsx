@@ -144,8 +144,10 @@ export const PixiList: React.FC<PixiListProps> = ({
               style={{
                 fontFamily: PIXI_FONTS.MONO,
                 fontSize: 12,
+                fill: 0xffffff,
               }}
               tint={isSelected ? theme.accent.color : theme.text.color}
+              layout={{}}
             />
 
             {item.sublabel && (
@@ -154,6 +156,7 @@ export const PixiList: React.FC<PixiListProps> = ({
                 style={{
                   fontFamily: PIXI_FONTS.MONO,
                   fontSize: 10,
+                  fill: 0xffffff,
                 }}
                 tint={theme.textMuted.color}
                 layout={{ marginLeft: 8 }}

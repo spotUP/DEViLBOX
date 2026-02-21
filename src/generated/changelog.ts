@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-20T20:32:29.624Z
+ * Generated: 2026-02-21T00:08:58.686Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1041';
-export const BUILD_NUMBER = '1041';
-export const BUILD_HASH = 'bb84dd60';
-export const BUILD_DATE = '2026-02-20';
+export const BUILD_VERSION = '1.0.1048';
+export const BUILD_NUMBER = '1048';
+export const BUILD_HASH = '8f3861c2';
+export const BUILD_DATE = '2026-02-21';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,37 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1041',
+    version: '1.0.1048',
     date: '2026-02-20',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Remove hot-path allocations, debug logs, and redundant worker messages"
+      },
+      {
+        type: 'improvement',
+        "description": "Convert VU meters to canvas, preload fonts, group preset dropdown"
+      },
+      {
+        type: 'fix',
+        "description": "Improve signaling server error handling"
+      },
+      {
+        type: 'improvement',
+        "description": "Add fullscreen canvas CSS class"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent font loading race in React Strict Mode"
+      },
+      {
+        type: 'feature',
+        "description": "Add multi-user live collaboration via WebRTC"
+      },
+      {
+        type: 'feature',
+        "description": "Complete WebGL offscreen canvas UI scaffolding"
+      },
       {
         type: 'feature',
         "description": "Add UI component scaffolding"
@@ -204,34 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Use CSS zoom instead of transform:scale for WAM plugin GUIs"
-      },
-      {
-        type: 'feature',
-        "description": "Add DJ Mixer option to view switcher dropdowns"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update plan docs and generated files"
-      },
-      {
-        type: 'feature',
-        "description": "Chore(midi): add reggae/ska/rocksteady MIDI song pack, remove old test patterns"
-      },
-      {
-        type: 'feature',
-        "description": "Per-note percussion channels + pattern length fix + cleanup consistency"
-      },
-      {
-        type: 'feature',
-        "description": "DJ mixing mode with dual-deck playback and mixer"
-      },
-      {
-        type: 'fix',
-        "description": "BitCrusher WaveShaper fallback, NeuralEffect drive improvements"
-      },
-      {
-        type: 'feature',
-        "description": "Route chip engine audio through master effects chain"
       }
     ]
   }

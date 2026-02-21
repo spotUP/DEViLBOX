@@ -72,7 +72,7 @@ export const PixiVelocityLane: React.FC<PixiVelocityLaneProps> = ({
       {/* Labels */}
       <pixiBitmapText
         text="VEL"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8 }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{ position: 'absolute', left: 4, top: 4 }}
       />

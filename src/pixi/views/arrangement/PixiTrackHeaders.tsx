@@ -75,7 +75,7 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
             {/* Track name */}
             <pixiBitmapText
               text={track.name}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10 }}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
               tint={track.muted ? theme.textMuted.color : theme.text.color}
               layout={{ flex: 1 }}
             />
@@ -84,8 +84,9 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
             {track.muted && (
               <pixiBitmapText
                 text="M"
-                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8 }}
+                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
                 tint={theme.error.color}
+                layout={{}}
               />
             )}
 
@@ -93,8 +94,9 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
             {track.solo && (
               <pixiBitmapText
                 text="S"
-                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8 }}
+                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
                 tint={theme.warning.color}
+                layout={{}}
               />
             )}
 

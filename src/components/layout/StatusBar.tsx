@@ -7,6 +7,7 @@ import React from 'react';
 import { useTrackerStore, useTransportStore, useAudioStore, useMIDIStore, useUIStore } from '@stores';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { KNOB_BANKS, type KnobAssignment } from '@/midi/knobBanks';
 import type { KnobBankMode } from '@/midi/types';
 import { Lightbulb, Disc, Activity, Settings, Sliders, Waves, ChevronDown, ChevronUp } from 'lucide-react';
@@ -18,18 +19,27 @@ interface StatusBarProps {
 // ─── DJ Status Bar Content ────────────────────────────────────────────────────
 
 const DJStatusContent: React.FC = () => {
-  const deck1Playing = useDJStore((s) => s.decks.A.isPlaying);
-  const deck2Playing = useDJStore((s) => s.decks.B.isPlaying);
-  const deck1BPM = useDJStore((s) => s.decks.A.effectiveBPM);
-  const deck2BPM = useDJStore((s) => s.decks.B.effectiveBPM);
-  const deck1Name = useDJStore((s) => s.decks.A.trackName);
-  const deck2Name = useDJStore((s) => s.decks.B.trackName);
-  const deck1Pos = useDJStore((s) => s.decks.A.songPos);
-  const deck1Total = useDJStore((s) => s.decks.A.totalPositions);
-  const deck2Pos = useDJStore((s) => s.decks.B.songPos);
-  const deck2Total = useDJStore((s) => s.decks.B.totalPositions);
-  const crossfader = useDJStore((s) => s.crossfaderPosition);
-  const curve = useDJStore((s) => s.crossfaderCurve);
+  const {
+    deck1Playing, deck2Playing,
+    deck1BPM, deck2BPM,
+    deck1Name, deck2Name,
+    deck1Pos, deck1Total,
+    deck2Pos, deck2Total,
+    crossfader, curve,
+  } = useDJStore(useShallow((s) => ({
+    deck1Playing: s.decks.A.isPlaying,
+    deck2Playing: s.decks.B.isPlaying,
+    deck1BPM: s.decks.A.effectiveBPM,
+    deck2BPM: s.decks.B.effectiveBPM,
+    deck1Name: s.decks.A.trackName,
+    deck2Name: s.decks.B.trackName,
+    deck1Pos: s.decks.A.songPos,
+    deck1Total: s.decks.A.totalPositions,
+    deck2Pos: s.decks.B.songPos,
+    deck2Total: s.decks.B.totalPositions,
+    crossfader: s.crossfaderPosition,
+    curve: s.crossfaderCurve,
+  })));
 
   const sep = <div className="w-px h-3 bg-border opacity-50" />;
 
@@ -98,13 +108,18 @@ const DJStatusContent: React.FC = () => {
 // ─── Tracker Status Bar Content ───────────────────────────────────────────────
 
 const TrackerStatusContent: React.FC = () => {
-  const cursor = useTrackerStore((state) => state.cursor);
-  const currentOctave = useTrackerStore((state) => state.currentOctave);
-  const insertMode = useTrackerStore((state) => state.insertMode);
-  const recordMode = useTrackerStore((state) => state.recordMode);
-  const patternLength = useTrackerStore((state) => state.patterns[state.currentPatternIndex]?.length || 64);
-  const isPlaying = useTransportStore((s) => s.isPlaying);
-  const currentRow = useTransportStore((s) => s.currentRow);
+  const { cursor, currentOctave, insertMode, recordMode, patternLength } = useTrackerStore(
+    useShallow((s) => ({
+      cursor: s.cursor,
+      currentOctave: s.currentOctave,
+      insertMode: s.insertMode,
+      recordMode: s.recordMode,
+      patternLength: s.patterns[s.currentPatternIndex]?.length || 64,
+    }))
+  );
+  const { isPlaying, currentRow } = useTransportStore(
+    useShallow((s) => ({ isPlaying: s.isPlaying, currentRow: s.currentRow }))
+  );
 
   const displayRow = isPlaying ? currentRow : cursor.rowIndex;
   const rowDisplay = `${String(displayRow).padStart(2, '0')}/${String(patternLength - 1).padStart(2, '0')}`;

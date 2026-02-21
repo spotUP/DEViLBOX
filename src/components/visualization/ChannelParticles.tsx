@@ -5,6 +5,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useTrackerStore } from '@stores';
+import { useTransportStore } from '@stores/useTransportStore';
 import { useShallow } from 'zustand/react/shallow';
 
 interface Particle {
@@ -84,12 +85,14 @@ export const ChannelParticles: React.FC<ChannelParticlesProps> = ({ height = 100
       ctx.fillRect(0, 0, width, height);
 
       const engine = getToneEngine();
-      const waveform = engine.getWaveform();
 
       let baseLevel = 0;
-      if (waveform && waveform.length > 0) {
-        const rms = Math.sqrt(waveform.reduce((sum, val) => sum + val * val, 0) / waveform.length);
-        baseLevel = Math.min(1, rms * 10);
+      if (useTransportStore.getState().isPlaying) {
+        const waveform = engine.getWaveform();
+        if (waveform && waveform.length > 0) {
+          const rms = Math.sqrt(waveform.reduce((sum, val) => sum + val * val, 0) / waveform.length);
+          baseLevel = Math.min(1, rms * 10);
+        }
       }
 
       for (let ch = 0; ch < channelCount; ch++) {

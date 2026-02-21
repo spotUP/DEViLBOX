@@ -4,7 +4,7 @@
 
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
-import { usePixiTheme } from '../../theme';
+import { usePixiTheme, usePixiThemeId, getDeckColors } from '../../theme';
 import { PixiLabel, PixiSlider } from '../../components';
 import { useDJStore } from '@/stores/useDJStore';
 import { PixiDeckTransport } from './PixiDeckTransport';
@@ -23,7 +23,9 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
   const pitchOffset = useDJStore(s => s.decks[deckId].pitchOffset);
   const setDeckPitch = useDJStore(s => s.setDeckPitch);
 
-  const DECK_COLOR = deckId === 'A' ? 0x60a5fa : 0xf87171;
+  const themeId = usePixiThemeId();
+  const { deckA, deckB } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
+  const DECK_COLOR = deckId === 'A' ? deckA : deckB;
 
   return (
     <pixiContainer
@@ -39,27 +41,31 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <pixiBitmapText
           text={`DECK ${deckId}`}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13 }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
           tint={DECK_COLOR}
+          layout={{}}
         />
         <pixiBitmapText
           text={isPlaying ? 'PLAYING' : 'STOPPED'}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
           tint={isPlaying ? theme.success.color : theme.textMuted.color}
+          layout={{}}
         />
         <pixiContainer layout={{ flex: 1 }} />
         <pixiBitmapText
           text={`${bpm.toFixed(1)} BPM`}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11 }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
           tint={DECK_COLOR}
+          layout={{}}
         />
       </pixiContainer>
 
       {/* Track name */}
       <pixiBitmapText
         text={trackName || 'No track loaded'}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11 }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
         tint={trackName ? theme.text.color : theme.textMuted.color}
+        layout={{}}
       />
 
       {/* Turntable + Pitch slider row */}
@@ -80,8 +86,9 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
           />
           <pixiBitmapText
             text={`${((pitchOffset ?? 0) * 100).toFixed(1)}%`}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9 }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
             tint={theme.textMuted.color}
+            layout={{}}
           />
         </pixiContainer>
       </pixiContainer>
@@ -103,7 +110,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         />
         <pixiBitmapText
           text="Track Overview"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7 }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ position: 'absolute', left: 4, top: 3 }}
         />

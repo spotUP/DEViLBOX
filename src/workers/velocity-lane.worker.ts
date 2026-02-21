@@ -15,7 +15,7 @@ const INSTRUMENT_COLORS = [
 ];
 const DEFAULT_COLOR = '#64748b';
 
-import type { VelocityMsg, SerializedNote } from '../engine/renderer/worker-types';
+import type { VelocityMsg, VelocityState, SerializedNote } from '../engine/renderer/worker-types';
 
 // ─── Worker state ──────────────────────────────────────────────────────────────
 

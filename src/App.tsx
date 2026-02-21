@@ -60,6 +60,7 @@ const DJView = lazy(() => import('./components/dj/DJView').then(m => ({ default:
 const FileBrowser = lazy(() => import('@components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser })));
 const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => ({ default: m.AuthModal })));
 const PixiApp = lazy(() => import('./pixi/PixiApp').then(m => ({ default: m.PixiApp })));
+const WebGLModalBridge = lazy(() => import('./pixi/WebGLModalBridge').then(m => ({ default: m.WebGLModalBridge })));
 const CollaborationSplitView = lazy(() => import('@components/collaboration/CollaborationSplitView').then(m => ({ default: m.CollaborationSplitView })));
 
 function App() {
@@ -721,7 +722,22 @@ function App() {
           <span className="text-text-muted font-mono text-sm">Loading WebGL UI...</span>
         </div>
       }>
-        <PixiApp />
+        <GlobalDragDropHandler onFileLoaded={handleFileDrop}>
+          <PixiApp />
+          {/* Store-driven overlays — render null when inactive */}
+          <ToastNotification />
+          <SynthErrorDialog />
+          <RomUploadDialog />
+          {updateAvailable && !updateDismissed && (
+            <UpdateNotification
+              onRefresh={refresh}
+              onDismiss={() => setUpdateDismissed(true)}
+              currentVersion={currentVersion.buildNumber}
+              latestVersion={latestVersion?.buildNumber || 'unknown'}
+            />
+          )}
+          <WebGLModalBridge />
+        </GlobalDragDropHandler>
       </Suspense>
     );
   }
@@ -935,7 +951,7 @@ function App() {
           </div>
 
         </div>
-        
+
         {/* Global Status Bar (includes MIDI Knob Bar) */}
         <StatusBar onShowTips={() => setShowTips(true)} />
       </div>

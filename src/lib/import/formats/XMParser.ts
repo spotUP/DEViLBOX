@@ -466,7 +466,7 @@ function readXMInstrument(view: DataView, offset: number): {
       relativeNote: header.relativeNote,
       panning: header.panning,
       bitDepth: (header.type & 0x10) ? 16 : 8,
-      sampleRate: 44100, // XM doesn't store sample rate, use standard
+      sampleRate: 8363, // FT2 C-4 base rate — XM doesn't store sample rate
       length: header.length / (header.type & 0x10 ? 2 : 1),
     });
   }
@@ -480,6 +480,7 @@ function readXMInstrument(view: DataView, offset: number): {
       panningEnvelope,
       autoVibrato,
       fadeout,
+      sampleMap,
       volumeType: 'envelope',
       panningType: 'envelope',
     },

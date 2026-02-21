@@ -5,6 +5,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useTrackerStore } from '@stores';
+import { useTransportStore } from '@stores/useTransportStore';
 import { useShallow } from 'zustand/react/shallow';
 
 interface ChannelRadarProps {
@@ -71,7 +72,7 @@ export const ChannelRadar: React.FC<ChannelRadarProps> = ({ height = 100 }) => {
       ctx.fillRect(0, 0, width, height);
 
       const engine = getToneEngine();
-      const waveform = engine.getWaveform();
+      const waveform = useTransportStore.getState().isPlaying ? engine.getWaveform() : null;
       
       scanAngle.current += 0.05;
 
