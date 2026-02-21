@@ -21,7 +21,8 @@ import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { InstrumentList } from '@/components/instruments/InstrumentList';
 import { useTrackerInput } from '@/hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
-import { useTrackerStore, useTransportStore } from '@stores';
+import { useTrackerStore, useTransportStore, useUIStore } from '@stores';
+import { useAudioStore } from '@stores/useAudioStore';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 
 export const PixiTrackerView: React.FC = () => {
@@ -89,11 +90,17 @@ const PixiEditorControlsBar: React.FC = () => {
     return pat?.length || 64;
   });
   const resizePattern = useTrackerStore(s => s.resizePattern);
+  const recordMode = useTrackerStore(s => s.recordMode);
+  const showGhostPatterns = useTrackerStore(s => s.showGhostPatterns);
   const grooveTemplateId = useTransportStore(s => s.grooveTemplateId);
   const setGrooveTemplate = useTransportStore(s => s.setGrooveTemplate);
+  const smoothScrolling = useTransportStore(s => s.smoothScrolling);
+  const masterMuted = useAudioStore(s => s.masterMuted);
+  const statusMessage = useUIStore(s => s.statusMessage);
 
   const grooveName = GROOVE_TEMPLATES.find(t => t.id === grooveTemplateId)?.name || 'Straight';
   const grooveIndex = GROOVE_TEMPLATES.findIndex(t => t.id === grooveTemplateId);
+  const grooveActive = grooveTemplateId !== 'straight';
 
   const handleInsertPosition = useCallback(() => {
     const { patternOrder, currentPositionIndex, setPatternOrder, setCurrentPosition } = useTrackerStore.getState();
@@ -129,6 +136,28 @@ const PixiEditorControlsBar: React.FC = () => {
       resizePattern(useTrackerStore.getState().currentPatternIndex, newLength);
     }
   }, [resizePattern]);
+
+  const handleToggleRecord = useCallback(() => {
+    useTrackerStore.getState().toggleRecordMode();
+  }, []);
+
+  const handleToggleGhosts = useCallback(() => {
+    const s = useTrackerStore.getState();
+    s.setShowGhostPatterns(!s.showGhostPatterns);
+  }, []);
+
+  const handleToggleMute = useCallback(() => {
+    useAudioStore.getState().toggleMasterMute();
+  }, []);
+
+  const handleToggleSmooth = useCallback(() => {
+    const s = useTransportStore.getState();
+    s.setSmoothScrolling(!s.smoothScrolling);
+  }, []);
+
+  const handleGrooveSettings = useCallback(() => {
+    useUIStore.getState().openModal('grooveSettings');
+  }, []);
 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -194,15 +223,72 @@ const PixiEditorControlsBar: React.FC = () => {
       <PixiControlsSection label="GRV">
         <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
           <PixiButton label="<" variant="ghost" size="sm" onClick={() => handleCycleGroove(-1)} />
-          <pixiBitmapText
-            text={grooveName}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-            tint={theme.textSecondary.color}
-            layout={{}}
+          <PixiButton
+            label={grooveName}
+            variant={grooveActive ? 'ft2' : 'ghost'}
+            color={grooveActive ? 'blue' : undefined}
+            size="sm"
+            active={grooveActive}
+            onClick={handleGrooveSettings}
           />
           <PixiButton label=">" variant="ghost" size="sm" onClick={() => handleCycleGroove(1)} />
         </pixiContainer>
       </PixiControlsSection>
+
+      <PixiControlsSep />
+
+      {/* Ghost Patterns */}
+      <PixiButton
+        label="Ghosts"
+        variant={showGhostPatterns ? 'ft2' : 'ghost'}
+        color={showGhostPatterns ? 'blue' : undefined}
+        size="sm"
+        active={showGhostPatterns}
+        onClick={handleToggleGhosts}
+      />
+
+      {/* REC button */}
+      <PixiButton
+        label="REC"
+        variant={recordMode ? 'ft2' : 'ghost'}
+        color={recordMode ? 'red' : undefined}
+        size="sm"
+        active={recordMode}
+        onClick={handleToggleRecord}
+      />
+
+      {/* Master Mute */}
+      <PixiButton
+        label={masterMuted ? 'Unmute' : 'Mute'}
+        variant={masterMuted ? 'ft2' : 'ghost'}
+        color={masterMuted ? 'red' : undefined}
+        size="sm"
+        active={masterMuted}
+        onClick={handleToggleMute}
+      />
+
+      {/* Smooth / Stepped scrolling */}
+      <PixiButton
+        label={smoothScrolling ? 'Smooth' : 'Stepped'}
+        variant={smoothScrolling ? 'ft2' : 'ghost'}
+        color={smoothScrolling ? 'blue' : undefined}
+        size="sm"
+        active={smoothScrolling}
+        onClick={handleToggleSmooth}
+      />
+
+      {/* Spacer */}
+      <pixiContainer layout={{ flex: 1 }} />
+
+      {/* Status message */}
+      {statusMessage && (
+        <pixiBitmapText
+          text={statusMessage.toUpperCase()}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+          tint={theme.accent.color}
+          layout={{}}
+        />
+      )}
     </pixiContainer>
   );
 };

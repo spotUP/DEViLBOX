@@ -21,6 +21,8 @@ interface PixiTrackHeadersProps {
   trackHeight?: number;
   width?: number;
   scrollY?: number;
+  onToggleMute?: (trackId: string) => void;
+  onToggleSolo?: (trackId: string) => void;
 }
 
 export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
@@ -28,6 +30,8 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
   trackHeight = 40,
   width = 160,
   scrollY = 0,
+  onToggleMute,
+  onToggleSolo,
 }) => {
   const theme = usePixiTheme();
 
@@ -80,25 +84,67 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
               layout={{ flex: 1 }}
             />
 
-            {/* Mute indicator */}
-            {track.muted && (
+            {/* Mute button */}
+            <pixiContainer
+              eventMode="static"
+              cursor="pointer"
+              onPointerUp={() => onToggleMute?.(track.id)}
+              layout={{ width: 16, height: 16, justifyContent: 'center', alignItems: 'center' }}
+            >
+              <pixiGraphics
+                draw={(g: GraphicsType) => {
+                  g.clear();
+                  g.roundRect(0, 0, 16, 16, 3);
+                  if (track.muted) {
+                    g.fill({ color: theme.error.color, alpha: 0.25 });
+                    g.roundRect(0, 0, 16, 16, 3);
+                    g.stroke({ color: theme.error.color, alpha: 0.6, width: 1 });
+                  } else {
+                    g.fill({ color: theme.bgTertiary.color, alpha: 0.5 });
+                    g.roundRect(0, 0, 16, 16, 3);
+                    g.stroke({ color: theme.border.color, alpha: 0.3, width: 1 });
+                  }
+                }}
+                layout={{ position: 'absolute', width: 16, height: 16 }}
+              />
               <pixiBitmapText
                 text="M"
                 style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
-                tint={theme.error.color}
+                tint={track.muted ? theme.error.color : theme.textMuted.color}
                 layout={{}}
               />
-            )}
+            </pixiContainer>
 
-            {/* Solo indicator */}
-            {track.solo && (
+            {/* Solo button */}
+            <pixiContainer
+              eventMode="static"
+              cursor="pointer"
+              onPointerUp={() => onToggleSolo?.(track.id)}
+              layout={{ width: 16, height: 16, justifyContent: 'center', alignItems: 'center' }}
+            >
+              <pixiGraphics
+                draw={(g: GraphicsType) => {
+                  g.clear();
+                  g.roundRect(0, 0, 16, 16, 3);
+                  if (track.solo) {
+                    g.fill({ color: theme.warning.color, alpha: 0.25 });
+                    g.roundRect(0, 0, 16, 16, 3);
+                    g.stroke({ color: theme.warning.color, alpha: 0.6, width: 1 });
+                  } else {
+                    g.fill({ color: theme.bgTertiary.color, alpha: 0.5 });
+                    g.roundRect(0, 0, 16, 16, 3);
+                    g.stroke({ color: theme.border.color, alpha: 0.3, width: 1 });
+                  }
+                }}
+                layout={{ position: 'absolute', width: 16, height: 16 }}
+              />
               <pixiBitmapText
                 text="S"
                 style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
-                tint={theme.warning.color}
+                tint={track.solo ? theme.warning.color : theme.textMuted.color}
                 layout={{}}
               />
-            )}
+            </pixiContainer>
 
             {/* Bottom border */}
             <pixiGraphics

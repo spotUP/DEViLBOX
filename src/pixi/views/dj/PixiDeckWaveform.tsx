@@ -4,10 +4,11 @@
  */
 
 import { useCallback } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
+import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme, usePixiThemeId, getDeckColors } from '../../theme';
 import { useDJStore } from '@/stores/useDJStore';
+import { getDJEngine } from '@/engine/dj/DJEngine';
 
 interface PixiDeckWaveformProps {
   deckId: 'A' | 'B';
@@ -24,6 +25,26 @@ export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, widt
   const themeId = usePixiThemeId();
   const { deckA, deckB } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
   const DECK_COLOR = deckId === 'A' ? deckA : deckB;
+
+  const handleSeek = useCallback((e: FederatedPointerEvent) => {
+    if (!peaks || peaks.length === 0 || duration <= 0) return;
+    // Get click position relative to container
+    const localX = e.getLocalPosition(e.currentTarget).x;
+    const totalPeaks = peaks.length;
+    const progress = duration > 0 ? position / duration : 0;
+    const centerPeak = Math.floor(progress * totalPeaks);
+    const visiblePeaks = width;
+    const startPeak = Math.max(0, centerPeak - Math.floor(visiblePeaks / 2));
+    // Calculate what peak index was clicked
+    const clickedPeak = startPeak + localX;
+    const newProgress = clickedPeak / totalPeaks;
+    const newPosition = newProgress * duration;
+    try {
+      const engine = getDJEngine();
+      const deck = engine.getDeck(deckId);
+      deck.cue(newPosition / 1000); // cue expects seconds in audio mode
+    } catch { /* engine not ready */ }
+  }, [deckId, peaks, position, duration, width]);
 
   const drawWaveform = useCallback((g: GraphicsType) => {
     g.clear();
@@ -69,7 +90,7 @@ export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, widt
   }, [peaks, position, duration, width, height, theme, DECK_COLOR]);
 
   return (
-    <pixiContainer layout={{ width, height }}>
+    <pixiContainer eventMode="static" cursor="pointer" onPointerUp={handleSeek} layout={{ width, height }}>
       <pixiGraphics draw={drawWaveform} layout={{ width, height }} />
       {(!peaks || peaks.length === 0) && (
         <pixiBitmapText

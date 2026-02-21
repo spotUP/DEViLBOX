@@ -2,14 +2,23 @@
  * PixiDJDeck — Complete deck component: track info + turntable + waveform + transport.
  */
 
+import { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme, usePixiThemeId, getDeckColors } from '../../theme';
-import { PixiLabel, PixiSlider } from '../../components';
+import { PixiButton, PixiLabel, PixiSlider } from '../../components';
 import { useDJStore } from '@/stores/useDJStore';
 import { PixiDeckTransport } from './PixiDeckTransport';
 import { PixiDeckTurntable } from './PixiDeckTurntable';
 import { PixiDeckWaveform } from './PixiDeckWaveform';
+
+/** Format milliseconds as M:SS */
+function formatTime(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min}:${String(sec).padStart(2, '0')}`;
+}
 
 interface PixiDJDeckProps {
   deckId: 'A' | 'B';
@@ -22,6 +31,26 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
   const trackName = useDJStore(s => s.decks[deckId].trackName);
   const pitchOffset = useDJStore(s => s.decks[deckId].pitchOffset);
   const setDeckPitch = useDJStore(s => s.setDeckPitch);
+  const loopActive = useDJStore(s => s.decks[deckId].loopActive);
+  const loopMode = useDJStore(s => s.decks[deckId].loopMode);
+  const audioPosition = useDJStore(s => s.decks[deckId].audioPosition);
+  const durationMs = useDJStore(s => s.decks[deckId].durationMs);
+
+  const handleLoopLine = useCallback(() => {
+    const s = useDJStore.getState();
+    const active = s.decks[deckId].loopMode === 'line' && s.decks[deckId].loopActive;
+    s.setDeckLoop(deckId, 'line', !active);
+  }, [deckId]);
+
+  const handleLoopPattern = useCallback(() => {
+    const s = useDJStore.getState();
+    const active = s.decks[deckId].loopMode === 'pattern' && s.decks[deckId].loopActive;
+    s.setDeckLoop(deckId, 'pattern', !active);
+  }, [deckId]);
+
+  const handleLoopOff = useCallback(() => {
+    useDJStore.getState().setDeckLoop(deckId, 'off', false);
+  }, [deckId]);
 
   const themeId = usePixiThemeId();
   const { deckA, deckB } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
@@ -96,24 +125,69 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       {/* Waveform */}
       <PixiDeckWaveform deckId={deckId} width={280} height={60} />
 
-      {/* Track overview bar */}
+      {/* Track overview / progress bar */}
       <pixiContainer layout={{ height: 16, width: 280 }}>
         <pixiGraphics
           draw={(g: GraphicsType) => {
             g.clear();
-            g.roundRect(0, 0, 280, 16, 2);
+            const barW = 280;
+            const barH = 16;
+            // Background
+            g.roundRect(0, 0, barW, barH, 2);
             g.fill({ color: theme.bg.color });
-            g.roundRect(0, 0, 280, 16, 2);
+            // Progress fill
+            const progress = durationMs > 0 ? Math.min(1, audioPosition / durationMs) : 0;
+            if (progress > 0) {
+              const fillW = Math.max(2, progress * (barW - 2));
+              g.roundRect(1, 1, fillW, barH - 2, 2);
+              g.fill({ color: DECK_COLOR, alpha: 0.3 });
+            }
+            // Playhead
+            if (progress > 0) {
+              const px = Math.floor(progress * (barW - 2)) + 1;
+              g.rect(px, 0, 1, barH);
+              g.fill({ color: DECK_COLOR, alpha: 0.9 });
+            }
+            // Border
+            g.roundRect(0, 0, barW, barH, 2);
             g.stroke({ color: theme.border.color, alpha: 0.2, width: 1 });
           }}
           layout={{ width: 280, height: 16 }}
         />
+        {/* Time display */}
         <pixiBitmapText
-          text="Track Overview"
+          text={durationMs > 0
+            ? `${formatTime(audioPosition)} / ${formatTime(durationMs)}`
+            : 'No track loaded'
+          }
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ position: 'absolute', left: 4, top: 3 }}
         />
+      </pixiContainer>
+
+      {/* Loop controls */}
+      <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+        <PixiLabel text="LOOP" size="xs" color="textMuted" />
+        <PixiButton
+          label="Line"
+          variant={loopActive && loopMode === 'line' ? 'ft2' : 'ghost'}
+          color={loopActive && loopMode === 'line' ? 'green' : undefined}
+          size="sm"
+          active={loopActive && loopMode === 'line'}
+          onClick={handleLoopLine}
+        />
+        <PixiButton
+          label="Pattern"
+          variant={loopActive && loopMode === 'pattern' ? 'ft2' : 'ghost'}
+          color={loopActive && loopMode === 'pattern' ? 'blue' : undefined}
+          size="sm"
+          active={loopActive && loopMode === 'pattern'}
+          onClick={handleLoopPattern}
+        />
+        {loopActive && (
+          <PixiButton label="Off" variant="ghost" size="sm" onClick={handleLoopOff} />
+        )}
       </pixiContainer>
 
       {/* Spacer */}
