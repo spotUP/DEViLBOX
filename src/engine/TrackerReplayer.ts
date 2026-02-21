@@ -18,6 +18,7 @@ import type { Pattern, TrackerCell } from '@/types';
 import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
 import { getToneEngine } from './ToneEngine';
+import { StereoSeparationNode } from './StereoSeparationNode';
 import { getPatternScheduler } from './PatternScheduler';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/audio';
@@ -215,7 +216,7 @@ const GROOVE_MAP = new Map<string, GrooveTemplate>(GROOVE_TEMPLATES.map(t => [t.
 // TYPES
 // ============================================================================
 
-export type TrackerFormat = 'MOD' | 'XM' | 'IT' | 'S3M';
+export type TrackerFormat = 'MOD' | 'XM' | 'IT' | 'S3M' | 'HVL' | 'AHX';
 
 /**
  * Channel state - all the per-channel data needed for playback
@@ -342,6 +343,13 @@ export interface TrackerSong {
   virtualTempoD?: number;
   compatFlags?: Record<string, unknown>;
   grooves?: number[][];
+  // HVL/AHX metadata
+  hivelyMeta?: {
+    stereoMode: number;
+    mixGain: number;
+    speedMultiplier: number;
+    version: number;
+  };
 }
 
 // ============================================================================
@@ -409,6 +417,9 @@ export class TrackerReplayer {
 
   // Master output
   private masterGain: Tone.Gain;
+  private readonly separationNode: StereoSeparationNode;
+  private stereoMode: 'pt2' | 'modplug' = 'pt2';
+  private modplugSeparation = 0;
 
   // Audio-synced state ring buffer for smooth scrolling (BassoonTracker pattern)
   // States are queued with Web Audio timestamps during scheduling,
@@ -487,12 +498,15 @@ export class TrackerReplayer {
     // Connect to provided output node (for DJ decks) or default to
     // ToneEngine's masterInput (existing behavior for tracker view).
     this.masterGain = new Tone.Gain(1);
+    this.separationNode = new StereoSeparationNode();
+    // Chain: masterGain → separationNode → destination
+    this.masterGain.connect(this.separationNode.inputTone);
     if (outputNode) {
-      this.masterGain.connect(outputNode);
+      this.separationNode.outputTone.connect(outputNode);
       this.isDJDeck = true;
     } else {
       const engine = getToneEngine();
-      this.masterGain.connect(engine.masterInput);
+      this.separationNode.outputTone.connect(engine.masterInput);
     }
   }
 
@@ -657,9 +671,10 @@ export class TrackerReplayer {
    */
   setStereoSeparation(percent: number): void {
     this.stereoSeparation = Math.max(0, Math.min(100, percent));
-    // Update all existing channel pan positions
-    for (const ch of this.channels) {
-      this.applyChannelPan(ch);
+    if (this.stereoMode === 'pt2') {
+      for (const ch of this.channels) {
+        this.applyChannelPan(ch);
+      }
     }
   }
 
@@ -668,12 +683,54 @@ export class TrackerReplayer {
   }
 
   /**
+   * Switch between PT2-clone and ModPlug stereo separation algorithms.
+   * PT2:    per-channel pan positions are scaled toward center.
+   * ModPlug: mid-side decomposition applied post-mix (OpenMPT algorithm).
+   */
+  setStereoSeparationMode(mode: 'pt2' | 'modplug'): void {
+    this.stereoMode = mode;
+    if (mode === 'pt2') {
+      // Bypass the post-mix node (identity) and restore per-channel pan scaling
+      this.separationNode.setSeparation(100);
+      for (const ch of this.channels) {
+        this.applyChannelPan(ch);
+      }
+    } else {
+      // Activate post-mix node; set all channels to full (unscaled) basePan
+      this.separationNode.setSeparation(this.modplugSeparation);
+      for (const ch of this.channels) {
+        ch.panNode.pan.rampTo(ch.basePan, 0.02);
+      }
+    }
+  }
+
+  /**
+   * Set ModPlug separation percentage (0–200).
+   * Only has effect when stereoMode === 'modplug'.
+   */
+  setModplugSeparation(percent: number): void {
+    this.modplugSeparation = Math.max(0, Math.min(200, percent));
+    if (this.stereoMode === 'modplug') {
+      this.separationNode.setSeparation(this.modplugSeparation);
+    }
+  }
+
+  getModplugSeparation(): number {
+    return this.modplugSeparation;
+  }
+
+  getStereoSeparationMode(): 'pt2' | 'modplug' {
+    return this.stereoMode;
+  }
+
+  /**
    * Apply stereo separation to a channel's pan node.
    * Uses the channel's basePan (original LRRL position) scaled by separation.
    */
   private applyChannelPan(ch: ChannelState): void {
-    const factor = this.stereoSeparation / 100;
-    const actualPan = ch.basePan * factor;
+    const actualPan = this.stereoMode === 'pt2'
+      ? ch.basePan * (this.stereoSeparation / 100)
+      : ch.basePan;
     ch.panNode.pan.rampTo(actualPan, 0.02);
   }
 
@@ -686,8 +743,9 @@ export class TrackerReplayer {
     // Convert 0-255 tracker panning to -1..+1 range
     const normalizedPan = (pan255 - 128) / 128;
     ch.basePan = normalizedPan;
-    const factor = this.stereoSeparation / 100;
-    const actualPan = normalizedPan * factor;
+    const actualPan = this.stereoMode === 'pt2'
+      ? normalizedPan * (this.stereoSeparation / 100)
+      : normalizedPan;
     ch.panNode.pan.setValueAtTime(actualPan, time);
   }
 
@@ -738,12 +796,21 @@ export class TrackerReplayer {
     }
 
     // Set stereo separation default based on format:
-    // MOD (Amiga) = 20% (matching pt2-clone default — the Amiga's hard LRRL
+    // MOD/AHX (Amiga) = 20% (matching pt2-clone default — the Amiga's hard LRRL
     // sounds harsh on headphones; 20% gives pleasant width without hard panning)
+    // HVL = derived from stereo mode in file header (0=center, 1-4=increasing separation)
     // XM/IT/S3M = 100% (these formats have their own per-channel panning)
-    this.stereoSeparation = song.format === 'MOD' ? 20 : 100;
+    if (song.format === 'MOD' || song.format === 'AHX') {
+      this.stereoSeparation = 20; // Amiga LRRL with pt2-clone-style narrowing
+    } else if (song.format === 'HVL') {
+      // HVL stereo mode 0=center, 1-4 = increasing separation
+      this.stereoSeparation = song.hivelyMeta?.stereoMode
+        ? (song.hivelyMeta.stereoMode * 25) : 50;
+    } else {
+      this.stereoSeparation = song.format === 'MOD' ? 20 : 100;
+    }
 
-    // FT2 XM period system: use for XM files, not for MOD
+    // FT2 XM period system: use for XM files, not for MOD/HVL/AHX
     this.useXMPeriods = song.format === 'XM';
     this.linearPeriods = song.linearPeriods ?? (song.format === 'XM'); // Default XM to linear
 
@@ -809,9 +876,9 @@ export class TrackerReplayer {
       basePan = (((index + 1) >> 1) & 1) ? 1.0 : -1.0;
     }
 
-    // Apply stereo separation: actual pan = basePan * (separation / 100)
-    const factor = this.stereoSeparation / 100;
-    const panValue = basePan * factor;
+    const panValue = this.stereoMode === 'pt2'
+      ? basePan * (this.stereoSeparation / 100)
+      : basePan;
 
     const panNode = new Tone.Panner(panValue);
     const gainNode = new Tone.Gain(1);
@@ -4109,6 +4176,7 @@ export class TrackerReplayer {
     // Clear buffer cache
     this.bufferCache.clear();
     this.multiSampleBufferCache.clear();
+    this.separationNode.dispose();
     this.masterGain.dispose();
     this.channels = [];
     this.song = null;
