@@ -195,9 +195,12 @@ export class DeckEngine {
     }
 
     this.replayer.loadSong(song);
-    // Apply the user's stereo separation setting (loadSong sets format default;
-    // this overrides it with the user's preference, matching tracker view behavior)
-    this.replayer.setStereoSeparation(useSettingsStore.getState().stereoSeparation);
+    // Apply the user's stereo separation settings (loadSong sets format default;
+    // these override it with the user's preferences, matching tracker view behavior)
+    const settings = useSettingsStore.getState();
+    this.replayer.setStereoSeparation(settings.stereoSeparation);
+    this.replayer.setStereoSeparationMode(settings.stereoSeparationMode);
+    this.replayer.setModplugSeparation(settings.modplugSeparation);
 
     // Apply Furnace compat flags to the dispatch engine (if this is a .fur song)
     if (song.compatFlags && Object.keys(song.compatFlags).length > 0) {

@@ -10,7 +10,8 @@ export type ModuleFormat =
   | 'DBM' | 'DIGI' | 'MTM' | 'MED'
   | 'OKT' | '669' | 'FAR' | 'ULT'
   | 'STM' | 'STX' | 'PT36' | 'SFX'
-  | 'FUR' | 'NATIVE';
+  | 'FUR' | 'NATIVE'
+  | 'HVL' | 'AHX';
 
 // Format-specific configuration
 export interface FormatConfig {
