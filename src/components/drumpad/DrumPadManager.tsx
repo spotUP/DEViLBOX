@@ -5,7 +5,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { PadGrid } from './PadGrid';
 import { PadEditor } from './PadEditor';
-import { SampleBrowser } from './SampleBrowser';
+import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
@@ -15,7 +15,8 @@ import {
   loadKitSource,
 } from '../../lib/drumpad/defaultKitLoader';
 import { useInstrumentStore, useAllSamplePacks } from '../../stores';
-import { X, Download } from 'lucide-react';
+import { X, Download, Piano } from 'lucide-react';
+import { useUIStore } from '../../stores/useUIStore';
 
 interface DrumPadManagerProps {
   onClose?: () => void;
@@ -51,8 +52,13 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     loadProgram,
     createProgram,
     deleteProgram,
+    copyProgram,
     loadSampleToPad,
     saveProgram,
+    preferences,
+    setPreference,
+    busLevels,
+    setBusLevel,
   } = useDrumPadStore();
 
   // Get all available kit sources (presets + sample packs)
@@ -91,6 +97,22 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     const newId = `${letter}-${String(number).padStart(2, '0')}`;
     createProgram(newId, `New Kit ${letter}${number}`);
   }, [programs, createProgram]);
+
+  const handleCopyProgram = useCallback(() => {
+    const existingIds = Array.from(programs.keys());
+    let letter = 'A';
+    let number = 1;
+    while (existingIds.includes(`${letter}-${String(number).padStart(2, '0')}`)) {
+      number++;
+      if (number > 99) {
+        number = 1;
+        letter = String.fromCharCode(letter.charCodeAt(0) + 1);
+      }
+    }
+    const newId = `${letter}-${String(number).padStart(2, '0')}`;
+    copyProgram(currentProgramId, newId);
+    loadProgram(newId);
+  }, [programs, currentProgramId, copyProgram, loadProgram]);
 
   const handleDeleteProgram = useCallback(() => {
     if (programs.size <= 1) {
@@ -271,14 +293,24 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
             <h2 className="text-xl font-bold text-white">Drum Pad Manager</h2>
             <p className="text-sm text-text-muted">MPC-inspired 16-pad drum machine</p>
           </div>
-          {onClose && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={onClose}
-              className="p-2 hover:bg-dark-border rounded-lg transition-colors"
+              onClick={() => useUIStore.getState().openModal('midi-pads')}
+              className="px-3 py-1.5 text-xs font-mono text-text-muted hover:text-white bg-dark-surface border border-dark-border rounded transition-colors flex items-center gap-1.5"
+              title="Open MIDI Pad Mapper"
             >
-              <X className="w-5 h-5 text-text-muted" />
+              <Piano className="w-3.5 h-3.5" />
+              MIDI Map
             </button>
-          )}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-dark-border rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-text-muted" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Main content area */}
@@ -312,12 +344,18 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                   ))}
                 </select>
 
-                <div className="grid grid-cols-2 gap-2 mt-3">
+                <div className="grid grid-cols-3 gap-2 mt-3">
                   <button
                     onClick={handleNewProgram}
                     className="px-3 py-2 bg-accent-primary hover:bg-accent-primary/80 text-white text-xs font-bold rounded transition-colors"
                   >
                     + New
+                  </button>
+                  <button
+                    onClick={handleCopyProgram}
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded transition-colors"
+                  >
+                    Copy
                   </button>
                   <button
                     onClick={handleDeleteProgram}
@@ -391,6 +429,56 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                 </div>
               </div>
 
+              {/* Output Bus Levels */}
+              {(() => {
+                const currentProg = programs.get(currentProgramId);
+                const busesInUse = ['out1', 'out2', 'out3', 'out4'].filter(
+                  bus => currentProg?.pads.some(p => p.output === bus)
+                );
+                if (busesInUse.length === 0) return null;
+                return (
+                  <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
+                    <div className="text-xs font-mono text-text-muted mb-3">OUTPUT BUSES</div>
+                    <div className="space-y-2">
+                      {busesInUse.map(bus => (
+                        <div key={bus}>
+                          <label className="text-xs text-text-muted">
+                            {bus}: {busLevels[bus] ?? 100}
+                          </label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="127"
+                            value={busLevels[bus] ?? 100}
+                            onChange={(e) => setBusLevel(bus, parseInt(e.target.value))}
+                            className="w-full"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Settings */}
+              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
+                <div className="text-xs font-mono text-text-muted mb-3">SETTINGS</div>
+                <div>
+                  <label className="text-xs text-text-muted">
+                    Velocity Sensitivity: {preferences.velocitySensitivity.toFixed(1)}x
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={preferences.velocitySensitivity}
+                    onChange={(e) => setPreference('velocitySensitivity', parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+
               {/* Selected Pad Info */}
               {selectedPadId !== null && (
                 <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
@@ -434,7 +522,8 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
         {/* Sample Browser Modal */}
         {showSampleBrowser && (
           <div className="animate-in fade-in-0 duration-200">
-            <SampleBrowser
+            <SamplePackBrowser
+              mode="drumpad"
               onSelectSample={handleLoadSample}
               onClose={() => setShowSampleBrowser(false)}
             />

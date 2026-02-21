@@ -7,26 +7,33 @@ import * as Tone from 'tone';
 import { useInstrumentStore, useSamplePackStore, useAllSamplePacks } from '@stores';
 import { SAMPLE_CATEGORY_LABELS } from '@typedefs/samplePack';
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
-import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square, Upload, Folder, Trash2, Zap } from 'lucide-react';
+import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square, Upload, Folder, Trash2, Zap, FileAudio } from 'lucide-react';
 import { normalizeUrl } from '@utils/urlUtils';
 import { getToneEngine } from '@engine/ToneEngine';
+import { getAudioContext } from '../../audio/AudioContextSingleton';
 import type { InstrumentConfig } from '@typedefs/instrument';
+import type { SampleData } from '@typedefs/drumpad';
 
 interface SamplePackBrowserProps {
   onClose: () => void;
+  mode?: 'instrument' | 'drumpad';
+  onSelectSample?: (sample: SampleData) => void;
 }
 
-export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose }) => {
+export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, mode = 'instrument', onSelectSample }) => {
   const { currentInstrumentId, updateInstrument, setPreviewInstrument } = useInstrumentStore();
   const { uploadZip, uploadDirectory, removeUserPack } = useSamplePackStore();
   const allPacks = useAllSamplePacks();
-  
+
+  const isDrumpadMode = mode === 'drumpad';
+
   const [selectedPack, setSelectedPack] = useState<SamplePack | null>(allPacks[0] || null);
   const [activeCategory, setActiveCategory] = useState<SampleCategory>('kicks');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSamples, setSelectedSamples] = useState<Set<string>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDecoding, setIsDecoding] = useState(false);
   const [, setIsPlaying] = useState(false);
   const [playingSample, setPlayingSample] = useState<string | null>(null);
   const playerRef = useRef<Tone.Player | null>(null);
@@ -34,6 +41,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   const isMountedRef = useRef(true); // Track mount state to prevent state updates after unmount
   const zipInputRef = useRef<HTMLInputElement>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
 
   // Get primary selected sample for preview instrument
   const primarySample = React.useMemo(() => {
@@ -72,6 +80,8 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   }, [primarySample]);
 
   useEffect(() => {
+    if (isDrumpadMode) return;
+
     if (previewConfig) {
       setPreviewInstrument(previewConfig);
       // Force engine to reload the new sample for the preview ID
@@ -94,10 +104,12 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
         // Engine may not be available during teardown
       }
     };
-  }, [previewConfig, setPreviewInstrument]);
+  }, [previewConfig, setPreviewInstrument, isDrumpadMode]);
 
-  // Keyboard support for previewing (2 Octaves, Standard Tracker Layout)
+  // Keyboard support for previewing (2 Octaves, Standard Tracker Layout) — instrument mode only
   useEffect(() => {
+    if (isDrumpadMode) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if typing in search
       if (document.activeElement?.tagName === 'INPUT') return;
@@ -150,7 +162,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [primarySample, previewConfig]);
+  }, [primarySample, previewConfig, isDrumpadMode]);
 
   // Cleanup player on unmount and track mount state
   useEffect(() => {
@@ -196,7 +208,12 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
   const handleSampleClick = (sample: SampleInfo, index: number, event: React.MouseEvent) => {
     const newSelection = new Set(selectedSamples);
 
-    if (event.shiftKey && lastSelectedIndex !== null) {
+    if (isDrumpadMode) {
+      // Drumpad mode: always single-select
+      newSelection.clear();
+      newSelection.add(sample.url);
+      previewSample(sample);
+    } else if (event.shiftKey && lastSelectedIndex !== null) {
       // Range selection
       const start = Math.min(lastSelectedIndex, index);
       const end = Math.max(lastSelectedIndex, index);
@@ -393,6 +410,101 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     onClose();
   };
 
+  // Load single sample for drumpad mode — fetch + decode + return SampleData
+  const handleLoadSampleDrumpad = async () => {
+    if (selectedSamples.size === 0 || !selectedPack || !onSelectSample) return;
+
+    const url = Array.from(selectedSamples)[0];
+    // Find sample info
+    let sampleInfo: SampleInfo | undefined;
+    for (const cat of selectedPack.categories) {
+      sampleInfo = selectedPack.samples[cat].find(s => s.url === url);
+      if (sampleInfo) break;
+    }
+    if (!sampleInfo) return;
+
+    setIsDecoding(true);
+    try {
+      const audioContext = getAudioContext();
+      const resp = await fetch(normalizeUrl(sampleInfo.url));
+      if (!resp.ok) throw new Error(`Failed to fetch sample: ${resp.status}`);
+      const arrayBuffer = await resp.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+      const sampleData: SampleData = {
+        id: `pack_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: sampleInfo.name,
+        audioBuffer,
+        duration: audioBuffer.duration,
+        sampleRate: audioBuffer.sampleRate,
+      };
+
+      onSelectSample(sampleData);
+      onClose();
+    } catch (error) {
+      console.error('[SamplePackBrowser] Failed to decode sample:', error);
+      alert('Failed to load sample. Please try again.');
+    } finally {
+      if (isMountedRef.current) setIsDecoding(false);
+    }
+  };
+
+  // Handle single audio file upload (AUDIO button)
+  const handleAudioFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsDecoding(true);
+    try {
+      const audioContext = getAudioContext();
+      const arrayBuffer = await file.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const name = file.name.replace(/\.[^/.]+$/, '');
+
+      if (isDrumpadMode && onSelectSample) {
+        const sampleData: SampleData = {
+          id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          name,
+          audioBuffer,
+          duration: audioBuffer.duration,
+          sampleRate: audioBuffer.sampleRate,
+        };
+        onSelectSample(sampleData);
+        onClose();
+      } else {
+        // Instrument mode: create blob URL + instrument
+        const blob = new Blob([arrayBuffer], { type: file.type || 'audio/wav' });
+        const blobUrl = URL.createObjectURL(blob);
+        const { createInstrument } = useInstrumentStore.getState();
+        createInstrument({
+          type: 'sample',
+          name,
+          synthType: 'Sampler',
+          sample: {
+            url: blobUrl,
+            baseNote: 'C4',
+            detune: 0,
+            loop: false,
+            loopStart: 0,
+            loopEnd: 0,
+            reverse: false,
+            playbackRate: 1,
+          },
+          effects: [],
+          volume: -6,
+          pan: 0,
+        });
+        onClose();
+      }
+    } catch (error) {
+      console.error('[SamplePackBrowser] Failed to load audio file:', error);
+      alert('Failed to load audio file. Ensure it\'s a valid audio format.');
+    } finally {
+      if (isMountedRef.current) setIsDecoding(false);
+      if (audioFileInputRef.current) audioFileInputRef.current.value = '';
+    }
+  };
+
   const handleZipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -491,12 +603,14 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 pt-16">
       <div className="w-full h-full bg-ft2-bg flex flex-col overflow-hidden border-t-2 border-ft2-border relative">
         {/* Loading Overlay */}
-        {isUploading && (
+        {(isUploading || isDecoding) && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
             <div className="p-6 bg-ft2-header border-2 border-ft2-highlight rounded-xl shadow-2xl flex flex-col items-center gap-4">
               <Package size={48} className="text-ft2-highlight animate-bounce" />
               <div className="text-center">
-                <h3 className="text-ft2-highlight font-black text-xl tracking-tighter">PACKING...</h3>
+                <h3 className="text-ft2-highlight font-black text-xl tracking-tighter">
+                  {isDecoding ? 'DECODING...' : 'PACKING...'}
+                </h3>
                 <p className="text-ft2-textDim text-xs font-bold uppercase">Processing audio files</p>
               </div>
             </div>
@@ -508,11 +622,21 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
           <div className="flex items-center gap-3">
             <Package size={20} className="text-ft2-highlight" />
             <div>
-              <h2 className="text-ft2-highlight font-bold text-sm">SAMPLE PACKS</h2>
+              <h2 className="text-ft2-highlight font-bold text-sm">
+                {isDrumpadMode ? 'SELECT SAMPLE' : 'SAMPLE PACKS'}
+              </h2>
               <p className="text-ft2-textDim text-xs">Browse and load samples</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => audioFileInputRef.current?.click()}
+              className="flex items-center gap-2 px-3 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight text-ft2-text rounded transition-colors text-xs font-bold"
+              title="Upload single audio file"
+            >
+              <FileAudio size={14} />
+              AUDIO
+            </button>
             <button
               onClick={() => zipInputRef.current?.click()}
               className="flex items-center gap-2 px-3 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight text-ft2-text rounded transition-colors text-xs font-bold"
@@ -536,8 +660,15 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
               <X size={20} />
             </button>
           </div>
-          
+
           {/* Hidden inputs */}
+          <input
+            ref={audioFileInputRef}
+            type="file"
+            accept="audio/*,.wav,.mp3,.ogg,.flac"
+            className="hidden"
+            onChange={handleAudioFileUpload}
+          />
           <input
             ref={zipInputRef}
             type="file"
@@ -747,10 +878,10 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                             role="button"
                             tabIndex={0}
                             onClick={(e) => handleSampleClick(sample, index, e)}
-                            onDoubleClick={() => handleLoadSamples()}
+                            onDoubleClick={() => isDrumpadMode ? handleLoadSampleDrumpad() : handleLoadSamples()}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
-                                handleLoadSamples();
+                                isDrumpadMode ? handleLoadSampleDrumpad() : handleLoadSamples();
                               }
                             }}
                             className={`
@@ -832,9 +963,9 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
                 </>
               )}
             </div>
-            
-            {/* Jam Indicator */}
-            {primarySample && (
+
+            {/* Jam Indicator — instrument mode only */}
+            {!isDrumpadMode && primarySample && (
               <div className="flex items-center gap-2 px-2 py-1 bg-amber-500/10 border border-amber-500/30 rounded animate-pulse-glow">
                 <Zap size={12} className="text-amber-400 fill-amber-400" />
                 <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">JAM ACTIVE</span>
@@ -849,12 +980,12 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose })
               Cancel
             </button>
             <button
-              onClick={handleLoadSamples}
+              onClick={isDrumpadMode ? handleLoadSampleDrumpad : handleLoadSamples}
               disabled={selectedSamples.size === 0}
               className="flex items-center gap-2 px-4 py-2 bg-ft2-cursor text-ft2-bg font-bold hover:bg-ft2-highlight rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Check size={16} />
-              Load {selectedSamples.size > 1 ? `${selectedSamples.size} Samples` : 'Sample'}
+              {isDrumpadMode ? 'Load Sample' : `Load ${selectedSamples.size > 1 ? `${selectedSamples.size} Samples` : 'Sample'}`}
             </button>
           </div>
         </div>
