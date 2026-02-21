@@ -12,6 +12,7 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { Toggle } from '@components/controls/Toggle';
 import { KeyboardShortcutSheet } from '@components/tracker/KeyboardShortcutSheet';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
 
 const KEYBOARD_SCHEMES = [
@@ -101,26 +102,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
   const applyModeToReplayers = (mode: 'pt2' | 'modplug') => {
     getTrackerReplayer().setStereoSeparationMode(mode);
-    try {
-      const { getDJEngineIfActive } = require('@/engine/dj/DJEngine');
-      const djEngine = getDJEngineIfActive();
-      if (djEngine) {
-        djEngine.deckA.replayer.setStereoSeparationMode(mode);
-        djEngine.deckB.replayer.setStereoSeparationMode(mode);
-      }
-    } catch { /* DJ engine not initialized */ }
+    const djEngine = getDJEngineIfActive();
+    if (djEngine) {
+      djEngine.deckA.replayer.setStereoSeparationMode(mode);
+      djEngine.deckB.replayer.setStereoSeparationMode(mode);
+    }
   };
 
   const applyModplugSeparationToReplayers = (percent: number) => {
     getTrackerReplayer().setModplugSeparation(percent);
-    try {
-      const { getDJEngineIfActive } = require('@/engine/dj/DJEngine');
-      const djEngine = getDJEngineIfActive();
-      if (djEngine) {
-        djEngine.deckA.replayer.setModplugSeparation(percent);
-        djEngine.deckB.replayer.setModplugSeparation(percent);
-      }
-    } catch { /* DJ engine not initialized */ }
+    const djEngine = getDJEngineIfActive();
+    if (djEngine) {
+      djEngine.deckA.replayer.setModplugSeparation(percent);
+      djEngine.deckB.replayer.setModplugSeparation(percent);
+    }
   };
 
   return (
@@ -511,14 +506,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                           const v = Number(e.target.value);
                           setStereoSeparation(v);
                           getTrackerReplayer().setStereoSeparation(v);
-                          try {
-                            const { getDJEngineIfActive } = require('@/engine/dj/DJEngine');
-                            const djEngine = getDJEngineIfActive();
-                            if (djEngine) {
-                              djEngine.deckA.replayer.setStereoSeparation(v);
-                              djEngine.deckB.replayer.setStereoSeparation(v);
-                            }
-                          } catch { /* DJ engine not initialized */ }
+                          const djEng = getDJEngineIfActive();
+                          if (djEng) {
+                            djEng.deckA.replayer.setStereoSeparation(v);
+                            djEng.deckB.replayer.setStereoSeparation(v);
+                          }
                         }}
                         className="w-20 accent-ft2-cursor"
                       />

@@ -36,7 +36,7 @@ export class NoteRepeatEngine {
   setRate(rate: NoteRepeatRate): void {
     this.rate = rate;
     // Restart all active repeats with new rate
-    for (const [padId, state] of this.activePads.entries()) {
+    for (const [, state] of this.activePads.entries()) {
       clearInterval(state.timerId);
       const interval = rateToInterval(this.rate, this.bpm);
       state.timerId = setInterval(() => {

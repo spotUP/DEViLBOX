@@ -55,7 +55,7 @@ export const useSettingsStore = create<SettingsStore>()(
       useBLEP: false,  // Default: BLEP disabled (enable in Settings for band-limited synthesis)
       stereoSeparation: 20,  // Default: 20% (classic Amiga-style narrow separation)
       stereoSeparationMode: 'pt2' as const,
-      modplugSeparation: 0,         // Default: 0% = mono
+      modplugSeparation: 100,       // Default: 100% = normal stereo (identity)
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
       trackerVisualBg: false,  // Default: off
       trackerVisualMode: 0,    // Default: spectrum bars

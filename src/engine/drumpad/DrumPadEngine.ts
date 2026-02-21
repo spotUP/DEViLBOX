@@ -132,7 +132,14 @@ export class DrumPadEngine {
 
     // Configure source
     source.buffer = sampleBuffer;
-    source.playbackRate.value = Math.pow(2, pad.tune / 12); // Semitones to playback rate
+
+    // Pitch: tune is ±120, where 10 units = 1 semitone (MPC-style fine tuning)
+    // Velocity-to-pitch modulation: veloToPitch range ±120
+    const veloFactor = velocity / 127;
+    const inverseVeloFactor = 1 - veloFactor;
+    const pitchMod = (pad.veloToPitch / 100) * veloFactor * 12; // Scale to ±12 semitones
+    const totalTune = pad.tune / 10 + pitchMod; // Convert tune units to semitones
+    source.playbackRate.value = Math.pow(2, totalTune / 12);
 
     // Configure filter
     if (pad.filterType !== 'off') {
@@ -147,21 +154,49 @@ export class DrumPadEngine {
           filterNode.type = 'bandpass';
           break;
       }
-      filterNode.frequency.value = pad.cutoff;
+
+      // Base cutoff + velocity modulation
+      const veloCutoffMod = (pad.veloToFilter / 100) * veloFactor;
+      const baseCutoff = pad.cutoff;
+      // Velocity opens the filter: at high velocity, cutoff goes up
+      const modulatedCutoff = baseCutoff + veloCutoffMod * (20000 - baseCutoff);
+
+      filterNode.frequency.value = Math.min(20000, Math.max(20, modulatedCutoff));
       filterNode.Q.value = (pad.resonance / 100) * 20; // 0-20 Q range
+
+      // Filter envelope sweep (MPC-style)
+      if (pad.filterEnvAmount > 0) {
+        const envDepth = (pad.filterEnvAmount / 100) * (20000 - modulatedCutoff);
+        const fAttackTime = (pad.filterAttack / 100) * 3; // 0-3 seconds
+        const fDecayTime = (pad.filterDecay / 100) * 2.6; // 0-2.6 seconds (MPC max)
+        const peakCutoff = Math.min(20000, modulatedCutoff + envDepth);
+
+        // Filter envelope: attack up, then decay back to base
+        filterNode.frequency.setValueAtTime(modulatedCutoff, now);
+        filterNode.frequency.linearRampToValueAtTime(peakCutoff, now + fAttackTime);
+        filterNode.frequency.exponentialRampToValueAtTime(
+          Math.max(20, modulatedCutoff),
+          now + fAttackTime + fDecayTime
+        );
+      }
     }
 
     // Configure pan
     panNode.pan.value = pad.pan / 64; // -64 to +63 -> -1 to ~1
 
-    // Calculate velocity scaling (include layer level offset in dB)
-    const velocityScale = velocity / 127;
+    // Velocity-to-level: controls how much velocity affects amplitude
+    // veloToLevel=0: fixed level, veloToLevel=100: full velocity range
+    const veloLevelAmount = pad.veloToLevel / 100;
+    const velocityScale = 1 - veloLevelAmount * inverseVeloFactor;
     const levelScale = pad.level / 127;
     const layerScale = layerLevelOffset !== 0 ? Math.pow(10, layerLevelOffset / 20) : 1;
     const targetGain = velocityScale * levelScale * layerScale;
 
-    // Apply ADSR envelope
-    const attackTime = pad.attack / 1000;
+    // Velocity-to-attack modulation: higher velocity = shorter attack
+    const baseAttack = pad.attack / 1000;
+    const veloAttackMod = (pad.veloToAttack / 100) * inverseVeloFactor;
+    const attackTime = baseAttack * (1 + veloAttackMod * 2); // Soft hits get longer attack
+
     const decayTime = pad.decay / 1000;
     const sustainLevel = (pad.sustain / 100) * targetGain;
     const releaseTime = pad.release / 1000;
@@ -186,15 +221,19 @@ export class DrumPadEngine {
     gainNode.connect(outputBus);
 
     // Calculate sample start/end offsets
-    // When reversed, flip the start/end so sampleStart=0 still plays from the "beginning" of the reversed buffer
+    // Velocity-to-start: soft hits start later in the sample (transient softening)
+    const veloStartMod = (pad.veloToStart / 100) * inverseVeloFactor;
+    let effectiveStart = pad.sampleStart + veloStartMod * (pad.sampleEnd - pad.sampleStart);
+    effectiveStart = Math.min(effectiveStart, pad.sampleEnd - 0.01); // Ensure some playback
+
     let startOffset: number;
     let playDuration: number;
     if (pad.reverse) {
       startOffset = (1 - pad.sampleEnd) * sampleBuffer.duration;
-      playDuration = (pad.sampleEnd - pad.sampleStart) * sampleBuffer.duration;
+      playDuration = (pad.sampleEnd - effectiveStart) * sampleBuffer.duration;
     } else {
-      startOffset = pad.sampleStart * sampleBuffer.duration;
-      playDuration = (pad.sampleEnd - pad.sampleStart) * sampleBuffer.duration;
+      startOffset = effectiveStart * sampleBuffer.duration;
+      playDuration = (pad.sampleEnd - effectiveStart) * sampleBuffer.duration;
     }
 
     // Start playback with sample start/end
