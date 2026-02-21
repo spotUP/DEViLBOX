@@ -92,15 +92,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const peerCursorDivRef = useRef<HTMLDivElement>(null);
   // Ref-tracked peer cursor so the RAF loop can read it without React re-renders
   const peerCursorRef = useRef({ row: 0, channel: 0, active: false, patternIndex: -1 });
-  // Peer mouse cursor and selection overlays
-  const peerMouseDivRef = useRef<HTMLDivElement>(null);
-  const peerMouseRef = useRef({ nx: 0, ny: 0, active: false });
+  // Peer selection overlay
   const peerSelectionDivRef = useRef<HTMLDivElement>(null);
   const peerSelectionRef = useRef<{ startChannel: number; endChannel: number; startRow: number; endRow: number; patternIndex: number } | null>(null);
   // Ref-tracked channel layout so the RAF loop always has current values
   const channelOffsetsRef = useRef<number[]>([]);
   const channelWidthsRef = useRef<number[]>([]);
-  const lastMouseSendTimeRef = useRef(0);
 
   // Cell context menu
   const cellContextMenu = useCellContextMenu();
@@ -173,10 +170,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         channel: state.peerCursorChannel,
         active: state.status === 'connected' && state.listenMode === 'shared',
         patternIndex: state.peerPatternIndex,
-      };
-      peerMouseRef.current = {
-        nx: state.peerMouseNX, ny: state.peerMouseNY,
-        active: state.peerMouseActive && state.status === 'connected' && state.listenMode === 'shared',
       };
       peerSelectionRef.current = (state.status === 'connected' && state.listenMode === 'shared')
         ? state.peerSelection : null;
@@ -469,19 +462,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, [isMobile, getCellFromCoords]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    // Broadcast peer mouse position (throttled to ~30fps), regardless of drag state
-    if (!isMobile && containerRef.current) {
-      const now = performance.now();
-      if (now - lastMouseSendTimeRef.current > 33 &&
-          useCollaborationStore.getState().status === 'connected') {
-        lastMouseSendTimeRef.current = now;
-        const rect = containerRef.current.getBoundingClientRect();
-        const nx = (e.clientX - rect.left) / dimensions.width;
-        const ny = (e.clientY - rect.top) / dimensions.height;
-        getCollabClient()?.send({ type: 'peer_mouse', nx: Math.max(0, Math.min(1, nx)), ny: Math.max(0, Math.min(1, ny)) });
-      }
-    }
-
     if (!isDragging || isMobile) return;
 
     const cell = getCellFromCoords(e.clientX, e.clientY);
@@ -489,7 +469,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     const store = useTrackerStore.getState();
     store.updateSelection(cell.channelIndex, cell.rowIndex, cell.columnType as any);
-  }, [isDragging, isMobile, getCellFromCoords, dimensions.width, dimensions.height]);
+  }, [isDragging, isMobile, getCellFromCoords]);
 
   const handleMouseUp = useCallback(() => {
     if (isDragging) {
@@ -1252,22 +1232,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const offsets = channelOffsetsRef.current;
         if (pc.active && pc.patternIndex === curPatIdx && offsets.length > pc.channel) {
           const py = baseY + (pc.row - vStart) * ROW_HEIGHT;
-          const px = offsets[pc.channel] - scrollLeftRef.current;
+          // +8 accounts for the internal channel padding before the note column starts
+          const px = offsets[pc.channel] - scrollLeftRef.current + 8;
           peerCursorDivRef.current.style.display = 'block';
           peerCursorDivRef.current.style.transform = `translate(${px}px, ${py}px)`;
         } else {
           peerCursorDivRef.current.style.display = 'none';
-        }
-      }
-
-      // Peer mouse cursor dot
-      if (peerMouseDivRef.current) {
-        const pm = peerMouseRef.current;
-        if (pm.active) {
-          peerMouseDivRef.current.style.display = 'block';
-          peerMouseDivRef.current.style.transform = `translate(${pm.nx * dimensions.width}px, ${pm.ny * dimensions.height}px)`;
-        } else {
-          peerMouseDivRef.current.style.display = 'none';
         }
       }
 
@@ -1303,7 +1273,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [dimensions.height, dimensions.width]); // re-run if dimensions change
+  }, [dimensions.height]); // re-run if height changes
 
 
   // Handle resize
@@ -1806,24 +1776,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             zIndex: 25,
           }}
         />
-
-        {/* Peer mouse cursor — floating "Friend" dot */}
-        <div
-          ref={peerMouseDivRef}
-          style={{ position: 'absolute', top: 0, left: 0, display: 'none', pointerEvents: 'none', zIndex: 30 }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, transform: 'translate(-2px, -2px)' }}>
-            <div style={{
-              width: 8, height: 8, borderRadius: '50%',
-              backgroundColor: '#a855f7', boxShadow: '0 0 6px #a855f7', flexShrink: 0,
-            }} />
-            <span style={{
-              fontSize: 9, color: '#a855f7', fontFamily: 'JetBrains Mono, monospace',
-              fontWeight: 700, letterSpacing: '0.05em',
-              textShadow: '0 0 4px rgba(168,85,247,0.5)', userSelect: 'none',
-            }}>Friend</span>
-          </div>
-        </div>
 
         {/* Peer selection rectangle */}
         <div
