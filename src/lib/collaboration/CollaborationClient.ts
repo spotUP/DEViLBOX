@@ -34,6 +34,14 @@ export class CollaborationClient {
   private localStream: MediaStream | null = null;
   private remoteAudio: HTMLAudioElement;
   private _localAudioMuted = false;
+  private _localVideoMuted = true;
+  private _remoteVideoStream: MediaStream | null = null;
+
+  /** Called when remote video stream is received */
+  onRemoteVideo: ((stream: MediaStream | null) => void) | null = null;
+
+  /** Called when local video stream is available */
+  onLocalVideo: ((stream: MediaStream | null) => void) | null = null;
   /** Reassembly buffer for incoming chunked messages */
   private _pendingChunks = new Map<string, { total: number; received: number; chunks: string[] }>();
 
@@ -61,10 +69,16 @@ export class CollaborationClient {
     };
 
     this.pc.ontrack = (event) => {
-      this.remoteAudio.srcObject = event.streams[0];
-      this.remoteAudio.play().catch(() => {
-        // Autoplay policy — will start on next user interaction
-      });
+      const track = event.track;
+      if (track.kind === 'audio') {
+        this.remoteAudio.srcObject = event.streams[0];
+        this.remoteAudio.play().catch(() => {
+          // Autoplay policy — will start on next user interaction
+        });
+      } else if (track.kind === 'video') {
+        this._remoteVideoStream = event.streams[0];
+        this.onRemoteVideo?.(this._remoteVideoStream);
+      }
     };
 
     this.pc.onconnectionstatechange = () => {
@@ -197,18 +211,32 @@ export class CollaborationClient {
     return JSON.parse(entry.chunks.join('')) as DataChannelMsg;
   }
 
-  // ─── Voice Chat ─────────────────────────────────────────────────────────────
+  // ─── Voice & Video Chat ─────────────────────────────────────────────────────
 
-  async enableVoice(): Promise<void> {
+  /** Request mic (and optionally camera) and add tracks to the peer connection. */
+  async enableMedia(options: { audio?: boolean; video?: boolean } = { audio: true }): Promise<void> {
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      for (const track of this.localStream.getAudioTracks()) {
+      const constraints: MediaStreamConstraints = {
+        audio: options.audio !== false,
+        video: options.video ? { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15 } } : false,
+      };
+      this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+      for (const track of this.localStream.getTracks()) {
         this.pc.addTrack(track, this.localStream);
+      }
+      // Notify about local video if available
+      if (options.video && this.localStream.getVideoTracks().length > 0) {
+        this.onLocalVideo?.(this.localStream);
       }
     } catch (err) {
       console.error('[CollaborationClient] getUserMedia failed:', err);
       throw err;
     }
+  }
+
+  /** Backwards-compatible alias */
+  async enableVoice(): Promise<void> {
+    return this.enableMedia({ audio: true });
   }
 
   muteVoice(muted: boolean): void {
@@ -220,8 +248,32 @@ export class CollaborationClient {
     }
   }
 
+  muteCamera(muted: boolean): void {
+    this._localVideoMuted = muted;
+    if (this.localStream) {
+      for (const track of this.localStream.getVideoTracks()) {
+        track.enabled = !muted;
+      }
+    }
+  }
+
   get localAudioMuted(): boolean {
     return this._localAudioMuted;
+  }
+
+  get localVideoMuted(): boolean {
+    return this._localVideoMuted;
+  }
+
+  get remoteVideoStream(): MediaStream | null {
+    return this._remoteVideoStream;
+  }
+
+  get localVideoStream(): MediaStream | null {
+    if (!this.localStream) return null;
+    const videoTracks = this.localStream.getVideoTracks();
+    if (videoTracks.length === 0) return null;
+    return this.localStream;
   }
 
   /**
@@ -246,6 +298,8 @@ export class CollaborationClient {
     this.onDisconnected = null;
     this.onPatch = null;
     this.onIceCandidate = null;
+    this.onRemoteVideo = null;
+    this.onLocalVideo = null;
     this._pendingChunks.clear();
 
     if (this.dataChannel) {
@@ -264,6 +318,7 @@ export class CollaborationClient {
 
     this.localStream?.getTracks().forEach((t) => t.stop());
     this.localStream = null;
+    this._remoteVideoStream = null;
     this.remoteAudio.srcObject = null;
     this.pc.close();
   }
