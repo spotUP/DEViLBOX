@@ -8,7 +8,14 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type {
+  Pattern,
+  TrackerCell,
+  InstrumentConfig,
+  HivelyNativeData,
+  HivelyNativeTrack,
+  HivelyNativePosition,
+} from '@/types';
 
 // ── HVL Internal Types ──────────────────────────────────────────────────────
 
@@ -651,6 +658,9 @@ export function convertHivelyToTrackerSong(mod: HivelyModule, fileName: string):
   // ── Determine format-specific settings ──
   const format: TrackerFormat = mod.format as TrackerFormat;
 
+  // Build native HivelyTracker data for format-specific editor
+  const hivelyNative = buildHivelyNativeData(mod);
+
   return {
     name: mod.name || fileName.replace(/\.[^/.]+$/, ''),
     format,
@@ -669,6 +679,41 @@ export function convertHivelyToTrackerSong(mod: HivelyModule, fileName: string):
       speedMultiplier: mod.speedMultiplier,
       version: mod.version,
     },
+    hivelyNative,
+  };
+}
+
+/**
+ * Build HivelyNativeData from parsed module for the format-specific editor.
+ * Preserves reusable track pool and position-level transpose.
+ */
+function buildHivelyNativeData(mod: HivelyModule): HivelyNativeData {
+  // Convert tracks: mod.tracks is HivelyStep[][] (array of track arrays)
+  const tracks: HivelyNativeTrack[] = mod.tracks.map((steps, id) => ({
+    id,
+    steps: steps.map(step => ({
+      note: step.note,
+      instrument: step.instrument,
+      fx: step.fx,
+      fxParam: step.fxParam,
+      fxb: step.fxb,
+      fxbParam: step.fxbParam,
+    })),
+  }));
+
+  // Convert positions: mod.positions is HivelyPosition[]
+  const positions: HivelyNativePosition[] = mod.positions.map(pos => ({
+    track: [...pos.track],
+    transpose: [...pos.transpose],
+  }));
+
+  return {
+    channels: mod.channels,
+    trackLength: mod.trackLength,
+    tracks,
+    positions,
+    tempo: mod.defaultTempo,
+    speedMultiplier: mod.speedMultiplier,
   };
 }
 

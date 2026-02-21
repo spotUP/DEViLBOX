@@ -28,6 +28,7 @@ import {
   DEFAULT_CHIP_SYNTH,
 } from '@/types/instrument';
 import { TapeSaturation } from './effects/TapeSaturation';
+import { HivelySynth } from './hively/HivelySynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
 import { SpaceEchoEffect } from './effects/SpaceEchoEffect';
@@ -409,6 +410,7 @@ export class InstrumentFactory {
     'MAMEC352': 17,        // Measured 2026-02-07: -26.7dB → need +17dB
     'MAMERF5C400': 0,      // Silent (sample-playback chip, needs ROM + mapping)
     'ModularSynth': 0,     // Not yet calibrated
+    'HivelySynth': 0,     // WASM song player — volume managed internally
   };
 
   /**
@@ -829,6 +831,10 @@ export class InstrumentFactory {
         // In a full implementation, this would use libopenmpt WASM
         console.log('[InstrumentFactory] ChiptuneModule - using fallback synth (requires module data)');
         instrument = this.createSynth(config);
+        break;
+
+      case 'HivelySynth':
+        instrument = new HivelySynth();
         break;
 
       default: {

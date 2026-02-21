@@ -350,6 +350,8 @@ export function getSupportedExtensions(): string[] {
     '.symmod', '.ult', '.umx',
     // Furnace tracker format
     '.fur',
+    // HivelyTracker / AHX
+    '.hvl', '.ahx',
     // Compressed/Packed formats
     '.zip', '.lha', '.rar', '.gz', '.mmcmp', '.xpk', '.pp', '.pack'
   ];
