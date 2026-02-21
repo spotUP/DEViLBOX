@@ -51,6 +51,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setUseBLEP,
     stereoSeparation,
     setStereoSeparation,
+    stereoSeparationMode,
+    modplugSeparation,
+    setStereoSeparationMode,
+    setModplugSeparation,
     midiPolyphonic,
     setMidiPolyphonic,
     trackerVisualBg,
@@ -93,6 +97,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     } catch (err) {
       console.error('Failed to toggle fullscreen:', err);
     }
+  };
+
+  const applyModeToReplayers = (mode: 'pt2' | 'modplug') => {
+    getTrackerReplayer().setStereoSeparationMode(mode);
+    try {
+      const { getDJEngineIfActive } = require('@/engine/dj/DJEngine');
+      const djEngine = getDJEngineIfActive();
+      if (djEngine) {
+        djEngine.deckA.replayer.setStereoSeparationMode(mode);
+        djEngine.deckB.replayer.setStereoSeparationMode(mode);
+      }
+    } catch { /* DJ engine not initialized */ }
+  };
+
+  const applyModplugSeparationToReplayers = (percent: number) => {
+    getTrackerReplayer().setModplugSeparation(percent);
+    try {
+      const { getDJEngineIfActive } = require('@/engine/dj/DJEngine');
+      const djEngine = getDJEngineIfActive();
+      if (djEngine) {
+        djEngine.deckA.replayer.setModplugSeparation(percent);
+        djEngine.deckB.replayer.setModplugSeparation(percent);
+      }
+    } catch { /* DJ engine not initialized */ }
   };
 
   return (
@@ -444,36 +472,80 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               </div>
 
               {/* Stereo Separation */}
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
                   <label className="text-ft2-text text-xs font-mono">Stereo Separation:</label>
-                  <span className="text-[9px] text-ft2-textDim font-mono">0% mono, 20% Amiga, 100% full</span>
+                  {/* Algorithm mode toggle */}
+                  <div className="flex gap-1">
+                    {(['pt2', 'modplug'] as const).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => {
+                          setStereoSeparationMode(m);
+                          applyModeToReplayers(m);
+                        }}
+                        className={[
+                          'text-[9px] font-mono px-2 py-0.5 rounded border transition-colors',
+                          stereoSeparationMode === m
+                            ? 'bg-ft2-cursor border-ft2-cursor text-black'
+                            : 'bg-transparent border-ft2-border text-ft2-textDim hover:border-ft2-text',
+                        ].join(' ')}
+                      >
+                        {m === 'pt2' ? 'PT2-Clone' : 'ModPlug'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={5}
-                    value={stereoSeparation}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      setStereoSeparation(v);
-                      getTrackerReplayer().setStereoSeparation(v);
-                      // Also update DJ deck replayers if DJ engine is active
-                      try {
-                        const { getDJEngineIfActive } = require('@/engine/dj/DJEngine');
-                        const djEngine = getDJEngineIfActive();
-                        if (djEngine) {
-                          djEngine.deckA.replayer.setStereoSeparation(v);
-                          djEngine.deckB.replayer.setStereoSeparation(v);
-                        }
-                      } catch { /* DJ engine not initialized */ }
-                    }}
-                    className="w-20 accent-ft2-cursor"
-                  />
-                  <span className="text-ft2-text text-[10px] font-mono w-8 text-right">{stereoSeparation}%</span>
-                </div>
+
+                {stereoSeparationMode === 'pt2' ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-ft2-textDim font-mono">0% mono · 20% Amiga · 100% full</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={stereoSeparation}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setStereoSeparation(v);
+                          getTrackerReplayer().setStereoSeparation(v);
+                          try {
+                            const { getDJEngineIfActive } = require('@/engine/dj/DJEngine');
+                            const djEngine = getDJEngineIfActive();
+                            if (djEngine) {
+                              djEngine.deckA.replayer.setStereoSeparation(v);
+                              djEngine.deckB.replayer.setStereoSeparation(v);
+                            }
+                          } catch { /* DJ engine not initialized */ }
+                        }}
+                        className="w-20 accent-ft2-cursor"
+                      />
+                      <span className="text-ft2-text text-[10px] font-mono w-8 text-right">{stereoSeparation}%</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-ft2-textDim font-mono">0% mono · 100% normal · 200% wide</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={0}
+                        max={200}
+                        step={5}
+                        value={modplugSeparation}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setModplugSeparation(v);
+                          applyModplugSeparationToReplayers(v);
+                        }}
+                        className="w-20 accent-ft2-cursor"
+                      />
+                      <span className="text-ft2-text text-[10px] font-mono w-8 text-right">{modplugSeparation}%</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </section>
