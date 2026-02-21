@@ -56,9 +56,12 @@ interface CollaborationState {
   peerMouseActive: boolean;
   peerSelection: { startChannel: number; endChannel: number; startRow: number; endRow: number; patternIndex: number } | null;
 
-  // Audio
+  // Audio & Video
   listenMode: ListenMode;
   micMuted: boolean;
+  cameraMuted: boolean;
+  localVideoStream: MediaStream | null;
+  remoteVideoStream: MediaStream | null;
 
   // Actions
   createRoom: () => Promise<void>;
@@ -67,6 +70,7 @@ interface CollaborationState {
   setViewMode: (mode: ViewMode) => void;
   setListenMode: (mode: ListenMode) => void;
   toggleMic: () => void;
+  toggleCamera: () => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -86,6 +90,9 @@ export const useCollaborationStore = create<CollaborationState>()(
     peerSelection: null,
     listenMode: 'shared',
     micMuted: false,
+    cameraMuted: true,
+    localVideoStream: null,
+    remoteVideoStream: null,
 
     createRoom: async () => {
       set((s) => { s.status = 'creating'; s.errorMessage = null; });
@@ -166,6 +173,9 @@ export const useCollaborationStore = create<CollaborationState>()(
         s.peerSelection = null;
         s.listenMode = 'shared';
         s.micMuted = false;
+        s.cameraMuted = false;
+        s.localVideoStream = null;
+        s.remoteVideoStream = null;
       });
     },
 
@@ -187,6 +197,12 @@ export const useCollaborationStore = create<CollaborationState>()(
       set((s) => { s.micMuted = muted; });
       _client?.muteVoice(muted);
     },
+
+    toggleCamera: () => {
+      const muted = !get().cameraMuted;
+      set((s) => { s.cameraMuted = muted; });
+      _client?.muteCamera(muted);
+    },
   })),
 );
 
@@ -207,6 +223,14 @@ function _setupClientCallbacks(): void {
     _signaling?.send({ type: 'ice_candidate', candidate });
   };
 
+  _client.onRemoteVideo = (stream) => {
+    useCollaborationStore.setState((s) => { s.remoteVideoStream = stream; });
+  };
+
+  _client.onLocalVideo = (stream) => {
+    useCollaborationStore.setState((s) => { s.localVideoStream = stream; });
+  };
+
   _client.onConnected = () => {
     useCollaborationStore.setState((s) => {
       s.status = 'connected';
@@ -215,6 +239,18 @@ function _setupClientCallbacks(): void {
 
     if (!_client) return;
     startSongSync(_client);
+
+    // Enable voice and video after connection is established
+    _client.enableMedia({ audio: true, video: true }).then(() => {
+      // Camera starts muted by default — user must explicitly enable it
+      _client?.muteCamera(true);
+    }).catch((err) => {
+      console.warn('[Collab] Media access denied, trying audio only:', err);
+      // Fall back to audio-only if camera is denied
+      _client?.enableMedia({ audio: true, video: false }).catch((err2) => {
+        console.warn('[Collab] Audio access also denied:', err2);
+      });
+    });
 
     // Broadcast our current cursor position immediately so the peer sees it
     // without needing to wait for us to move the cursor.
