@@ -29,6 +29,7 @@ import {
 } from '@/types/instrument';
 import { TapeSaturation } from './effects/TapeSaturation';
 import { HivelySynth } from './hively/HivelySynth';
+import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
 import { SpaceEchoEffect } from './effects/SpaceEchoEffect';
@@ -411,6 +412,7 @@ export class InstrumentFactory {
     'MAMERF5C400': 0,      // Silent (sample-playback chip, needs ROM + mapping)
     'ModularSynth': 0,     // Not yet calibrated
     'HivelySynth': 0,     // WASM song player — volume managed internally
+    'UADESynth': 0,       // UADE exotic Amiga player — volume managed internally
   };
 
   /**
@@ -835,6 +837,10 @@ export class InstrumentFactory {
 
       case 'HivelySynth':
         instrument = new HivelySynth();
+        break;
+
+      case 'UADESynth':
+        instrument = new UADESynth();
         break;
 
       default: {

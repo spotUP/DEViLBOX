@@ -2,7 +2,9 @@
  * parseModuleToSong - Shared module file → TrackerSong converter
  *
  * Used by both the main tracker view (App.tsx) and the DJ file browser.
- * Handles all supported formats: MOD, XM, IT, S3M, Furnace, DefleMask, MIDI.
+ * Handles all supported formats: MOD, XM, IT, S3M, Furnace, DefleMask, MIDI,
+ * HivelyTracker/AHX, Oktalyzer, OctaMED, DigiBooster, Future Composer, and
+ * 130+ exotic Amiga formats via UADE catch-all.
  * Returns a self-contained TrackerSong ready for a TrackerReplayer.
  */
 
@@ -11,7 +13,8 @@ import type { Pattern, InstrumentConfig } from '@/types';
 
 /**
  * Parse a tracker module file and return a TrackerSong.
- * Handles .fur, .dmf, .mod, .xm, .it, .s3m, .mid, and other libopenmpt formats.
+ * Handles .fur, .dmf, .mod, .xm, .it, .s3m, .mid, .hvl, .ahx, .okt, .med,
+ * .digi, .fc/.fc14 and many more exotic Amiga formats via UADE.
  */
 export async function parseModuleToSong(file: File): Promise<TrackerSong> {
   const filename = file.name.toLowerCase();
@@ -22,7 +25,7 @@ export async function parseModuleToSong(file: File): Promise<TrackerSong> {
     return parseMIDIFile(file);
   }
 
-  // ── HivelyTracker / AHX ──────────────────────────────────────────────────
+  // ── HivelyTracker / AHX — MUST be before UADE catch-all ─────────────────
   if (filename.endsWith('.hvl') || filename.endsWith('.ahx')) {
     const { parseHivelyFile } = await import('@lib/import/formats/HivelyParser');
     return parseHivelyFile(buffer, file.name);
@@ -31,6 +34,39 @@ export async function parseModuleToSong(file: File): Promise<TrackerSong> {
   // ── Furnace / DefleMask ─────────────────────────────────────────────────
   if (filename.endsWith('.fur') || filename.endsWith('.dmf')) {
     return parseFurnaceFile(buffer, file.name);
+  }
+
+  // ── Oktalyzer ────────────────────────────────────────────────────────────
+  if (filename.endsWith('.okt')) {
+    const { parseOktalyzerFile } = await import('@lib/import/formats/OktalyzerParser');
+    return parseOktalyzerFile(buffer, file.name);
+  }
+
+  // ── OctaMED / MED ────────────────────────────────────────────────────────
+  if (filename.endsWith('.med') || filename.endsWith('.mmd0') || filename.endsWith('.mmd1')
+    || filename.endsWith('.mmd2') || filename.endsWith('.mmd3')) {
+    const { parseMEDFile } = await import('@lib/import/formats/MEDParser');
+    return parseMEDFile(buffer, file.name);
+  }
+
+  // ── DigiBooster ──────────────────────────────────────────────────────────
+  if (filename.endsWith('.digi')) {
+    const { parseDigiBoosterFile } = await import('@lib/import/formats/DigiBoosterParser');
+    return parseDigiBoosterFile(buffer, file.name);
+  }
+
+  // ── Future Composer 1.3 / 1.4 ────────────────────────────────────────────
+  if (filename.endsWith('.fc') || filename.endsWith('.fc13') || filename.endsWith('.fc14')
+    || filename.endsWith('.sfc')) {
+    const { parseFCFile } = await import('@lib/import/formats/FCParser');
+    return parseFCFile(buffer, file.name);
+  }
+
+  // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
+  // Check extension list (non-exhaustive, UADE also auto-detects by magic bytes)
+  const { isUADEFormat, parseUADEFile } = await import('@lib/import/formats/UADEParser');
+  if (isUADEFormat(filename)) {
+    return parseUADEFile(buffer, file.name);
   }
 
   // ── MOD, XM, IT, S3M, and other tracker formats ────────────────────────
