@@ -30,6 +30,11 @@ import type {
   ParsedSample,
   ImportMetadata,
   FurnaceInstrumentData,
+  FurnaceNativeData,
+  FurnaceSubsong,
+  FurnaceChannelData,
+  FurnacePatternData,
+  FurnaceRow,
 } from '../../../types/tracker';
 import type { FurnaceConfig, FurnaceOperatorConfig, SynthType } from '../../../types/instrument';
 import { DEFAULT_FURNACE } from '../../../types/instrument';
@@ -2639,6 +2644,8 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
   /** Module-level samples for WASM dispatch upload */
   samples: Array<{ data: Int16Array | Int8Array; rate: number; depth: number;
     loopStart: number; loopEnd: number; loopMode: number; name: string }>;
+  /** Native Furnace data for format-specific editor */
+  furnaceNative: FurnaceNativeData;
 } {
   // --- Build channel-to-chip mapping for STD instrument remapping ---
   // For compound chips like Genesis (FM + PSG), we need to know which
@@ -2969,6 +2976,9 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
     console.log(`[FurnaceParser] DEBUG Pattern 0 row 4:`, pat0[4]?.map((c,i) => `ch${i}:note=${c.note}`).join(' '));
   }
 
+  // Build native Furnace data for format-specific editor
+  const furnaceNative = buildFurnaceNativeData(module);
+
   return {
     instruments,
     patterns,
@@ -2987,7 +2997,89 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
       loopMode: s.loopDirection ?? 0,
       name: s.name,
     })),
+    furnaceNative,
   };
+}
+
+/**
+ * Build FurnaceNativeData from parsed module for the format-specific editor.
+ * Preserves per-channel pattern pools and 2D order matrix.
+ */
+function buildFurnaceNativeData(module: FurnaceModule): FurnaceNativeData {
+  const subsongs: FurnaceSubsong[] = module.subsongs.map((sub, subIdx) => {
+    const channels: FurnaceChannelData[] = [];
+
+    for (let ch = 0; ch < module.chans; ch++) {
+      const patternPool = new Map<number, FurnacePatternData>();
+
+      // Collect all unique pattern indices for this channel from the order table
+      const usedPatterns = new Set<number>();
+      for (let pos = 0; pos < sub.ordersLen; pos++) {
+        const patIdx = sub.orders[ch]?.[pos];
+        if (patIdx !== undefined) usedPatterns.add(patIdx);
+      }
+
+      // Build pattern data for each used pattern
+      for (const patIdx of usedPatterns) {
+        const key = `${subIdx}_${ch}_${patIdx}`;
+        const pattern = module.patterns.get(key);
+        if (pattern) {
+          const rows: FurnaceRow[] = pattern.rows.map(cell => ({
+            note: convertFurnaceNoteValue(cell),
+            ins: cell.instrument,
+            vol: cell.volume,
+            effects: cell.effects.map(e => ({ cmd: e.type, val: e.value })),
+          }));
+          patternPool.set(patIdx, { rows });
+        }
+      }
+
+      channels.push({
+        name: sub.channelNames?.[ch] || `CH ${ch}`,
+        effectCols: sub.effectColumns?.[ch] || 1,
+        patterns: patternPool,
+      });
+    }
+
+    return {
+      name: sub.name || `Subsong ${subIdx}`,
+      patLen: sub.patLen,
+      ordersLen: sub.ordersLen,
+      orders: sub.orders,
+      channels,
+      speed1: sub.speed1,
+      speed2: sub.speed2,
+      hz: sub.hz,
+      virtualTempoN: sub.virtualTempo,
+      virtualTempoD: sub.virtualTempoD,
+    };
+  });
+
+  return {
+    subsongs,
+    activeSubsong: 0,
+  };
+}
+
+/**
+ * Convert a FurnacePatternCell's note+octave to a flat note value for native data.
+ * Returns: -1=empty, 0-179=notes, 253=off, 254=release, 255=macro-release
+ */
+function convertFurnaceNoteValue(cell: FurnacePatternCell): number {
+  if (cell.note === 0 && cell.octave === 0) return -1; // Empty
+  if (cell.note === 180 || cell.note === 100) return 253; // Note off
+  if (cell.note === 181 || cell.note === 101) return 254; // Release
+  if (cell.note === 182 || cell.note === 102) return 255; // Macro release
+  // Normal note: octave * 12 + (note - 1) for old format, or direct for new format
+  if (cell.note >= 1 && cell.note <= 12) {
+    // Old format: note 1-12 = C#..C, octave is separate
+    return cell.octave * 12 + (cell.note - 1);
+  }
+  // New format note values (0-179)
+  if (cell.note >= 0 && cell.note < 180) {
+    return cell.note;
+  }
+  return -1;
 }
 
 /**

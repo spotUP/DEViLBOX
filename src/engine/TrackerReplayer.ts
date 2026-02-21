@@ -14,9 +14,10 @@
  */
 
 import * as Tone from 'tone';
-import type { Pattern, TrackerCell } from '@/types';
+import type { Pattern, TrackerCell, FurnaceNativeData, HivelyNativeData } from '@/types';
 import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
+import { PatternAccessor } from './PatternAccessor';
 import { getToneEngine } from './ToneEngine';
 import { StereoSeparationNode } from './StereoSeparationNode';
 import { getPatternScheduler } from './PatternScheduler';
@@ -354,6 +355,10 @@ export interface TrackerSong {
     speedMultiplier: number;
     version: number;
   };
+
+  // Native format data (preserved for format-specific editors)
+  furnaceNative?: FurnaceNativeData;
+  hivelyNative?: HivelyNativeData;
 }
 
 // ============================================================================
@@ -374,6 +379,8 @@ export interface DisplayState {
 export class TrackerReplayer {
   // Song data
   private song: TrackerSong | null = null;
+  // Format-dispatching pattern accessor (for native Furnace/Hively data)
+  private accessor = new PatternAccessor();
 
   // PERF: Cached transport state — set once per scheduler interval (15ms),
   // reused by processTick() and triggerNote() to avoid repeated getState() calls
@@ -779,6 +786,16 @@ export class TrackerReplayer {
   loadSong(song: TrackerSong): void {
     this.stop();
     this.song = song;
+
+    // Configure format-dispatching pattern accessor
+    if (song.furnaceNative) {
+      this.accessor.setFurnace(song.furnaceNative, song.patterns, song.songPositions);
+    } else if (song.hivelyNative) {
+      this.accessor.setHively(song.hivelyNative, song.patterns, song.songPositions);
+    } else {
+      this.accessor.setClassic(song.patterns, song.songPositions);
+    }
+
     this.bufferCache.clear();
     this.multiSampleBufferCache.clear(); // New song = new samples, invalidate cache
     this._warnedMissingInstruments = undefined;
@@ -1226,10 +1243,11 @@ export class TrackerReplayer {
       safeTime += jitterOffset;
     }
 
-    // Get current pattern
+    // Get current pattern (classic path) or use accessor for native formats
+    const useNativeAccessor = this.accessor.getMode() !== 'classic';
     const patternNum = this.song.songPositions[this.songPos];
-    const pattern = this.song.patterns[patternNum];
-    if (!pattern) return;
+    const pattern = useNativeAccessor ? null : this.song.patterns[patternNum];
+    if (!useNativeAccessor && !pattern) return;
 
     // Queue display state for audio-synced UI (tick 0 = start of row)
     // Use swung time (safeTime) so visual follows the same timing as audio
@@ -1242,7 +1260,9 @@ export class TrackerReplayer {
     if (!this._suppressNotes) {
       for (let ch = 0; ch < this.channels.length; ch++) {
         const channel = this.channels[ch];
-        const row = pattern.channels[ch]?.rows[this.pattPos];
+        const row = useNativeAccessor
+          ? this.accessor.getRow(this.songPos, this.pattPos, ch)
+          : pattern!.channels[ch]?.rows[this.pattPos];
         if (!row) continue;
 
         if (readNewNote) {
@@ -3958,8 +3978,9 @@ export class TrackerReplayer {
 
     // Pattern end or position jump (Bxx / Dxx / natural end of pattern)
     const patternNum = this.song.songPositions[this.songPos];
-    const pattern = this.song.patterns[patternNum];
-    const patternLength = pattern?.length ?? 64;
+    const patternLength = this.accessor.getMode() !== 'classic'
+      ? this.accessor.getPatternLength(this.songPos)
+      : (this.song.patterns[patternNum]?.length ?? 64);
 
     if (this.pattPos >= patternLength || this.posJumpFlag) {
       this.pattPos = this.pBreakPos; // Dxx target row, or 0 if Bxx/natural
