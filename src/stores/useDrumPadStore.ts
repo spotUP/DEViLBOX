@@ -12,7 +12,7 @@ import type {
   SampleData,
   PadBank,
 } from '../types/drumpad';
-import { createEmptyProgram, create808Program, create909Program, getBankPads } from '../types/drumpad';
+import { createEmptyProgram, createEmptyPad, create808Program, create909Program, getBankPads } from '../types/drumpad';
 import {
   saveAllPrograms,
   loadAllPrograms,
@@ -142,6 +142,15 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       sampleStart: clipboardPad.sampleStart,
       sampleEnd: clipboardPad.sampleEnd,
       reverse: clipboardPad.reverse,
+      decayMode: clipboardPad.decayMode,
+      filterAttack: clipboardPad.filterAttack,
+      filterDecay: clipboardPad.filterDecay,
+      filterEnvAmount: clipboardPad.filterEnvAmount,
+      veloToLevel: clipboardPad.veloToLevel,
+      veloToAttack: clipboardPad.veloToAttack,
+      veloToStart: clipboardPad.veloToStart,
+      veloToFilter: clipboardPad.veloToFilter,
+      veloToPitch: clipboardPad.veloToPitch,
       layers: clipboardPad.layers.map(l => ({ ...l, sample: { ...l.sample } })),
       scratchAction: clipboardPad.scratchAction,
     });
@@ -422,31 +431,19 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
             sampleStart: p.sampleStart ?? 0,
             sampleEnd: p.sampleEnd ?? 1,
             reverse: p.reverse ?? false,
+            decayMode: p.decayMode ?? 'start',
+            filterAttack: p.filterAttack ?? 0,
+            filterDecay: p.filterDecay ?? 50,
+            filterEnvAmount: p.filterEnvAmount ?? 0,
+            veloToLevel: p.veloToLevel ?? 100,
+            veloToAttack: p.veloToAttack ?? 0,
+            veloToStart: p.veloToStart ?? 0,
+            veloToFilter: p.veloToFilter ?? 0,
+            veloToPitch: p.veloToPitch ?? 0,
           }));
           // Expand 16-pad programs to 64
           while (migratedPads.length < 64) {
-            migratedPads.push({
-              id: migratedPads.length + 1,
-              sample: null,
-              name: `Pad ${migratedPads.length + 1}`,
-              level: 100,
-              tune: 0,
-              pan: 0,
-              output: 'stereo',
-              attack: 0,
-              decay: 200,
-              sustain: 80,
-              release: 100,
-              filterType: 'off',
-              cutoff: 20000,
-              resonance: 0,
-              muteGroup: 0,
-              playMode: 'oneshot',
-              sampleStart: 0,
-              sampleEnd: 1,
-              reverse: false,
-              layers: [],
-            });
+            migratedPads.push(createEmptyPad(migratedPads.length + 1));
           }
           programs.set(id, { ...prog, pads: migratedPads });
         });

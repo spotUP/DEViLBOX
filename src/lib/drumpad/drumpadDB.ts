@@ -188,11 +188,20 @@ interface StoredPad {
   output: string;
   attack: number;
   decay: number;
+  decayMode?: string;
   sustain: number;
   release: number;
   filterType: string;
   cutoff: number;
   resonance: number;
+  filterAttack?: number;
+  filterDecay?: number;
+  filterEnvAmount?: number;
+  veloToLevel?: number;
+  veloToAttack?: number;
+  veloToStart?: number;
+  veloToFilter?: number;
+  veloToPitch?: number;
   scratchAction?: string;
   // MPC features
   muteGroup?: number;
@@ -200,7 +209,6 @@ interface StoredPad {
   sampleStart?: number;
   sampleEnd?: number;
   reverse?: boolean;
-  // layers omitted for now (future: array of sampleId + velocityRange)
 }
 
 function programToStored(program: DrumProgram): StoredProgram {
@@ -220,11 +228,20 @@ function programToStored(program: DrumProgram): StoredProgram {
       output: pad.output,
       attack: pad.attack,
       decay: pad.decay,
+      decayMode: pad.decayMode,
       sustain: pad.sustain,
       release: pad.release,
       filterType: pad.filterType,
       cutoff: pad.cutoff,
       resonance: pad.resonance,
+      filterAttack: pad.filterAttack,
+      filterDecay: pad.filterDecay,
+      filterEnvAmount: pad.filterEnvAmount,
+      veloToLevel: pad.veloToLevel,
+      veloToAttack: pad.veloToAttack,
+      veloToStart: pad.veloToStart,
+      veloToFilter: pad.veloToFilter,
+      veloToPitch: pad.veloToPitch,
       scratchAction: pad.scratchAction,
       muteGroup: pad.muteGroup,
       playMode: pad.playMode,
@@ -262,6 +279,16 @@ function storedToProgram(
     sampleStart: sp.sampleStart ?? 0,
     sampleEnd: sp.sampleEnd ?? 1,
     reverse: sp.reverse ?? false,
+    // VMPC fields with backward-compatible defaults
+    decayMode: (sp.decayMode as DrumPad['decayMode']) ?? 'start',
+    filterAttack: sp.filterAttack ?? 0,
+    filterDecay: sp.filterDecay ?? 50,
+    filterEnvAmount: sp.filterEnvAmount ?? 0,
+    veloToLevel: sp.veloToLevel ?? 100,
+    veloToAttack: sp.veloToAttack ?? 0,
+    veloToStart: sp.veloToStart ?? 0,
+    veloToFilter: sp.veloToFilter ?? 0,
+    veloToPitch: sp.veloToPitch ?? 0,
   }));
 
   // Migration: expand 16-pad programs to 64 pads

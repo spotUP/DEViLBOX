@@ -14,7 +14,7 @@ interface PadEditorProps {
   onClose?: () => void;
 }
 
-type TabName = 'main' | 'adsr' | 'filter' | 'layers' | 'dj';
+type TabName = 'main' | 'adsr' | 'filter' | 'velo' | 'layers' | 'dj';
 
 const SCRATCH_ACTION_OPTIONS: { value: ScratchActionId | ''; label: string }[] = [
   { value: '',                label: 'None' },
@@ -155,6 +155,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
     { id: 'main', label: 'Main' },
     { id: 'adsr', label: 'ADSR' },
     { id: 'filter', label: 'Filter' },
+    { id: 'velo', label: 'Velo' },
     { id: 'layers', label: 'Layers' },
     { id: 'dj', label: 'DJ' },
   ];
@@ -250,12 +251,12 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
 
             <div>
               <label className="block text-xs text-text-muted mb-1">
-                Tune: {pad.tune > 0 ? '+' : ''}{pad.tune} st
+                Tune: {pad.tune > 0 ? '+' : ''}{(pad.tune / 10).toFixed(1)} st
               </label>
               <input
                 type="range"
-                min="-36"
-                max="36"
+                min="-120"
+                max="120"
                 value={pad.tune}
                 onChange={(e) => handleUpdate({ tune: parseInt(e.target.value) })}
                 className="w-full"
@@ -428,6 +429,25 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                 onChange={(e) => handleUpdate({ decay: parseInt(e.target.value) })}
                 className="w-full"
               />
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] text-text-muted">Mode:</span>
+                <button
+                  onClick={() => handleUpdate({ decayMode: 'start' })}
+                  className={`px-2 py-0.5 text-[10px] font-mono rounded ${
+                    pad.decayMode === 'start' ? 'bg-accent-primary text-white' : 'bg-dark-surface text-text-muted'
+                  }`}
+                >
+                  START
+                </button>
+                <button
+                  onClick={() => handleUpdate({ decayMode: 'end' })}
+                  className={`px-2 py-0.5 text-[10px] font-mono rounded ${
+                    pad.decayMode === 'end' ? 'bg-accent-primary text-white' : 'bg-dark-surface text-text-muted'
+                  }`}
+                >
+                  END
+                </button>
+              </div>
             </div>
 
             <div>
@@ -508,8 +528,134 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                     className="w-full"
                   />
                 </div>
+
+                {/* Filter Envelope (MPC-style) */}
+                <div className="border-t border-dark-border pt-3 mt-3">
+                  <div className="text-[10px] font-mono text-text-muted mb-2 uppercase">Filter Envelope</div>
+                  <div>
+                    <label className="block text-xs text-text-muted mb-1">
+                      Env Amount: {pad.filterEnvAmount}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={pad.filterEnvAmount}
+                      onChange={(e) => handleUpdate({ filterEnvAmount: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                  {pad.filterEnvAmount > 0 && (
+                    <>
+                      <div className="mt-2">
+                        <label className="block text-xs text-text-muted mb-1">
+                          F.Attack: {pad.filterAttack}
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={pad.filterAttack}
+                          onChange={(e) => handleUpdate({ filterAttack: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="mt-2">
+                        <label className="block text-xs text-text-muted mb-1">
+                          F.Decay: {pad.filterDecay}
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={pad.filterDecay}
+                          onChange={(e) => handleUpdate({ filterDecay: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
               </>
             )}
+          </div>
+        )}
+
+        {activeTab === 'velo' && (
+          <div className="space-y-4">
+            <div className="text-xs text-text-muted">
+              Control how velocity affects each parameter. Higher values = more modulation.
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">
+                Velocity → Level: {pad.veloToLevel}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={pad.veloToLevel}
+                onChange={(e) => handleUpdate({ veloToLevel: parseInt(e.target.value) })}
+                className="w-full"
+              />
+              <div className="text-[10px] text-text-muted">0% = fixed level, 100% = full velocity range</div>
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">
+                Velocity → Attack: {pad.veloToAttack}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={pad.veloToAttack}
+                onChange={(e) => handleUpdate({ veloToAttack: parseInt(e.target.value) })}
+                className="w-full"
+              />
+              <div className="text-[10px] text-text-muted">Soft hits get longer attack (transient softening)</div>
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">
+                Velocity → Start: {pad.veloToStart}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={pad.veloToStart}
+                onChange={(e) => handleUpdate({ veloToStart: parseInt(e.target.value) })}
+                className="w-full"
+              />
+              <div className="text-[10px] text-text-muted">Soft hits start later in sample (skip transient)</div>
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">
+                Velocity → Filter: {pad.veloToFilter}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={pad.veloToFilter}
+                onChange={(e) => handleUpdate({ veloToFilter: parseInt(e.target.value) })}
+                className="w-full"
+              />
+              <div className="text-[10px] text-text-muted">Hard hits open the filter more</div>
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">
+                Velocity → Pitch: {pad.veloToPitch}%
+              </label>
+              <input
+                type="range"
+                min="-100"
+                max="100"
+                value={pad.veloToPitch}
+                onChange={(e) => handleUpdate({ veloToPitch: parseInt(e.target.value) })}
+                className="w-full"
+              />
+              <div className="text-[10px] text-text-muted">Velocity-driven pitch bend</div>
+            </div>
           </div>
         )}
 

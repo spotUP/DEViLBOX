@@ -5,6 +5,7 @@
 export type OutputBus = 'stereo' | 'out1' | 'out2' | 'out3' | 'out4';
 export type FilterType = 'lpf' | 'hpf' | 'bpf' | 'off';
 export type PlayMode = 'oneshot' | 'sustain';
+export type DecayMode = 'start' | 'end';  // Decay from note-on or sample-end
 export type PadBank = 'A' | 'B' | 'C' | 'D';
 
 export interface MpcResampleConfig {
@@ -45,13 +46,14 @@ export interface DrumPad {
 
   // Basic parameters
   level: number;           // 0-127
-  tune: number;            // -36 to +36 semitones
+  tune: number;            // -120 to +120 (10 units = 1 semitone, ±1 octave fine precision)
   pan: number;             // -64 to +63 (0 = center)
   output: OutputBus;       // Output routing
 
-  // Envelope
+  // Amplitude Envelope
   attack: number;          // 0-100ms
   decay: number;           // 0-2000ms
+  decayMode: DecayMode;    // 'start' = decay from note-on, 'end' = from sample end
   sustain: number;         // 0-100%
   release: number;         // 0-5000ms
 
@@ -59,6 +61,18 @@ export interface DrumPad {
   filterType: FilterType;
   cutoff: number;          // 20-20000 Hz
   resonance: number;       // 0-100%
+
+  // Filter Envelope (MPC-style)
+  filterAttack: number;    // 0-100 (scaled to ms internally)
+  filterDecay: number;     // 0-100 (scaled to ms internally)
+  filterEnvAmount: number; // 0-100 (depth of filter envelope sweep)
+
+  // Velocity Modulation (MPC-style, 0-100 each)
+  veloToLevel: number;     // How much velocity affects amplitude (0=fixed, 100=full range)
+  veloToAttack: number;    // Velocity → attack time modulation
+  veloToStart: number;     // Velocity → sample start offset (soft hits start later in sample)
+  veloToFilter: number;    // Velocity → filter cutoff modulation
+  veloToPitch: number;     // Velocity → pitch modulation (-120 to +120)
 
   // MPC features
   muteGroup: number;       // 0 = none, 1-8 = mute group
@@ -114,11 +128,20 @@ export function createEmptyPad(id: number): DrumPad {
     output: 'stereo',
     attack: 0,
     decay: 200,
+    decayMode: 'start',
     sustain: 80,
     release: 100,
     filterType: 'off',
     cutoff: 20000,
     resonance: 0,
+    filterAttack: 0,
+    filterDecay: 50,
+    filterEnvAmount: 0,
+    veloToLevel: 100,
+    veloToAttack: 0,
+    veloToStart: 0,
+    veloToFilter: 0,
+    veloToPitch: 0,
     muteGroup: 0,
     playMode: 'oneshot',
     sampleStart: 0,
