@@ -111,6 +111,26 @@ function boolToU8(val: boolean | number | undefined): number {
  * Our internal chipType values (from getDefaultFurnaceConfig) don't always
  * match DivInstrumentType — e.g. SID_6581=45, SID_8580=46 but DIV_INS_C64=3.
  */
+/**
+ * Map internal DEViLBOX chipType → DivInstrumentType for FM chips.
+ * Internal chipType values (from getDefaultFurnaceConfig) do NOT match
+ * DivInstrumentType — e.g. OPL is chipType=2 but DIV_INS_OPL=14.
+ */
+const CHIPTYPE_TO_DIV_INS: Record<number, number> = {
+  0: DIV_INS_FM,         // OPN → DIV_INS_FM (1)
+  1: DIV_INS_OPM,        // OPM → DIV_INS_OPM (33)
+  2: DIV_INS_OPL,        // OPL → DIV_INS_OPL (14)
+  11: DIV_INS_OPLL,      // OPLL → DIV_INS_OPLL (13)
+  13: DIV_INS_FM,        // OPNA → DIV_INS_FM (1) — same FM engine
+  14: DIV_INS_FM,        // OPNB → DIV_INS_FM (1)
+  22: DIV_INS_OPZ,       // OPZ → DIV_INS_OPZ (19)
+  23: DIV_INS_OPL,       // Y8950 → DIV_INS_OPL (14) — OPL variant
+  26: DIV_INS_OPL,       // OPL4 → DIV_INS_OPL (14)
+  47: DIV_INS_FM,        // OPN2203 → DIV_INS_FM (1)
+  48: DIV_INS_FM,        // OPNBB → DIV_INS_FM (1)
+  49: DIV_INS_ESFM,      // ESFM → DIV_INS_ESFM (55)
+};
+
 function resolveInsType(config: FurnaceConfig): number {
   // If config has chip-specific data, use the corresponding DivInstrumentType
   if (config.c64) return DIV_INS_C64;       // 3
@@ -119,7 +139,10 @@ function resolveInsType(config: FurnaceConfig): number {
   if (config.fds) return DIV_INS_FDS;        // 15
   if (config.snes) return DIV_INS_SNES;      // 29
   if (config.esfm) return DIV_INS_ESFM;      // 55
-  // Fall back to chipType as-is (works for FM types where values coincide)
+  // Map internal chipType to DivInstrumentType for FM and other types
+  const mapped = CHIPTYPE_TO_DIV_INS[config.chipType];
+  if (mapped !== undefined) return mapped;
+  // Fall back to chipType as-is (for types where the values coincide: STD=0, FM=1)
   return config.chipType;
 }
 
@@ -167,7 +190,7 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
   //   [8]=dt2 [9]=rs [10]=dt(signed) [11]=d2r [12]=ssgEnv [13]=dam [14]=dvb [15]=egt
   //   [16]=ksl [17]=sus [18]=vib [19]=ws [20]=ksr [21]=kvs [22-23]=pad
   let fmOffset = 0;
-  if (FM_INSTRUMENT_TYPES.has(config.chipType) && config.operators && config.operators.length > 0) {
+  if (FM_INSTRUMENT_TYPES.has(insType) && config.operators && config.operators.length > 0) {
     fmOffset = writer.getPosition();
 
     writer.writeUint8(config.algorithm || 0);
@@ -259,6 +282,45 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
       } else {
         // Empty macro header (7 bytes, all zero)
         for (let j = 0; j < 7; j++) writer.writeUint8(0);
+      }
+    }
+
+    // Write operator macros: 4 operators × 20 params each = 80 macros
+    // Must match the order expected by C++ reader: op 0-3, param 0-19 per op
+    // Param order: AM(0), AR(1), DR(2), MULT(3), RR(4), SL(5), TL(6), DT2(7),
+    //              RS(8), DT(9), D2R(10), SSG(11), DAM(12), DVB(13), EGT(14),
+    //              KSL(15), SUS(16), VIB(17), WS(18), KSR(19)
+    // Sentinel 0xA0 tells the C++ reader that operator macros follow
+    if (config.opMacroArrays && config.opMacroArrays.length > 0) {
+      writer.writeUint8(0xA0);  // Operator macro sentinel
+      for (let op = 0; op < 4; op++) {
+        const opMacros: FurnaceMacro[] = op < config.opMacroArrays.length ? config.opMacroArrays[op] : [];
+        // Index macros by code (0-19)
+        const macrosByCode: (FurnaceMacro | null)[] = new Array(20).fill(null);
+        for (const macro of opMacros) {
+          const code = macro.code ?? macro.type;
+          if (code !== undefined && code >= 0 && code < 20) {
+            macrosByCode[code] = macro;
+          }
+        }
+
+        for (let p = 0; p < 20; p++) {
+          const macro = macrosByCode[p];
+          if (macro && macro.data && macro.data.length > 0) {
+            writer.writeUint8(macro.data.length);                                   // len
+            writer.writeUint8(macro.delay ?? 0);                                    // delay
+            writer.writeUint8(macro.speed ?? 1);                                    // speed
+            writer.writeUint8(macro.loop !== undefined ? macro.loop : 255);         // loop
+            writer.writeUint8(macro.release !== undefined ? macro.release : 255);   // rel
+            writer.writeUint8(macro.mode ?? 0);                                     // mode
+            writer.writeUint8(macro.open ? 1 : 0);                                 // open
+            for (const value of macro.data) {
+              writer.writeInt32(value);
+            }
+          } else {
+            for (let j = 0; j < 7; j++) writer.writeUint8(0);
+          }
+        }
       }
     }
   }

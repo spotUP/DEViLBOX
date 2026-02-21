@@ -343,6 +343,10 @@ export interface TrackerSong {
   virtualTempoD?: number;
   compatFlags?: Record<string, unknown>;
   grooves?: number[][];
+  // Furnace module-level wavetables/samples for WASM dispatch upload
+  furnaceWavetables?: Array<{ data: number[]; width: number; height: number }>;
+  furnaceSamples?: Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
+    loopStart: number; loopEnd: number; loopMode: number; name: string }>;
   // HVL/AHX metadata
   hivelyMeta?: {
     stereoMode: number;
@@ -807,7 +811,7 @@ export class TrackerReplayer {
       this.stereoSeparation = song.hivelyMeta?.stereoMode
         ? (song.hivelyMeta.stereoMode * 25) : 50;
     } else {
-      this.stereoSeparation = song.format === 'MOD' ? 20 : 100;
+      this.stereoSeparation = 100;
     }
 
     // FT2 XM period system: use for XM files, not for MOD/HVL/AHX
@@ -2859,28 +2863,6 @@ export class TrackerReplayer {
 
     ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
     this.triggerNote(ch, time, 0, chIndex, false, false, false);
-  }
-
-  private applyRetrigVolSlide(ch: ChannelState, slideType: number, time: number): void {
-    switch (slideType) {
-      case 0: break; // No change
-      case 1: ch.volume = Math.max(0, ch.volume - 1); break;
-      case 2: ch.volume = Math.max(0, ch.volume - 2); break;
-      case 3: ch.volume = Math.max(0, ch.volume - 4); break;
-      case 4: ch.volume = Math.max(0, ch.volume - 8); break;
-      case 5: ch.volume = Math.max(0, ch.volume - 16); break;
-      case 6: ch.volume = (ch.volume >> 1) + (ch.volume >> 3) + (ch.volume >> 4); break; // FT2: 11/16
-      case 7: ch.volume = Math.floor(ch.volume / 2); break;
-      case 8: break; // No change
-      case 9: ch.volume = Math.min(64, ch.volume + 1); break;
-      case 10: ch.volume = Math.min(64, ch.volume + 2); break;
-      case 11: ch.volume = Math.min(64, ch.volume + 4); break;
-      case 12: ch.volume = Math.min(64, ch.volume + 8); break;
-      case 13: ch.volume = Math.min(64, ch.volume + 16); break;
-      case 14: ch.volume = Math.min(64, Math.floor(ch.volume * 3 / 2)); break;
-      case 15: ch.volume = Math.min(64, ch.volume * 2); break;
-    }
-    ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
   }
 
   // ==========================================================================

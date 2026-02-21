@@ -260,6 +260,19 @@ export interface FurnaceInstrumentData {
   // Wavetables for wavetable chips
   wavetables: FurnaceWavetableData[];
 
+  // Amiga/sample config (initSample, noteMap, useSample, useWave)
+  amiga?: {
+    initSample: number;
+    useNoteMap: boolean;
+    useSample: boolean;
+    useWave: boolean;
+    waveLen?: number;
+    noteMap?: Array<{ freq: number; map: number }>;
+  };
+
+  // Per-operator macros from Furnace O1-O4 feature blocks [4 operators][N macros each]
+  opMacroArrays?: FurnaceMacroData[][];
+
   // Chip-specific config (optional)
   chipConfig?: Record<string, unknown>;
 }
@@ -286,7 +299,7 @@ export interface ParsedInstrument {
  * Preserves original module data for editing and re-export
  */
 export interface ImportMetadata {
-  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR';
+  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'HVL' | 'AHX';
   sourceFile: string;
   importedAt: string;
   originalChannelCount: number;

@@ -299,6 +299,18 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     const numCh = this.engine.getChannelCount(pt) || 4;
     const maxVol = getMaxVolume(pt);
 
+    // Upload module-level wavetables/samples from .fur file (if available)
+    // These overwrite any test data loaded below, so upload FIRST to let
+    // platform-specific setup below still work (e.g., WAVE command dispatch)
+    const hasModuleWaves = this.engine.getModuleWavetables() !== null;
+    const hasModuleSamples = this.engine.getModuleSamples() !== null;
+    if (hasModuleWaves) {
+      this.engine.uploadModuleWavetablesToPlatform(pt);
+    }
+    if (hasModuleSamples) {
+      this.engine.uploadModuleSamplesToPlatform(pt);
+    }
+
     // Helper: dispatch with platformType
     const disp = (cmd: number, ch: number, v1 = 0, v2 = 0) => this.engine.dispatch(cmd, ch, v1, v2, pt);
     const setIns = (ch: number, ins: number) => this.engine.setInstrument(ch, ins, pt);
@@ -336,45 +348,47 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
         break;
 
       // === Wavetable chips ===
+      // Skip test wavetable when module data was already uploaded above
       case P.PCE:
-        this.setupDefaultWavetable(32, 31);
+        if (!hasModuleWaves) this.setupDefaultWavetable(32, 31);
         for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
       case P.SCC:
       case P.SCC_PLUS:
-        this.setupDefaultWavetable(32, 255);
+        if (!hasModuleWaves) this.setupDefaultWavetable(32, 255);
         for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
       case P.VBOY:
-        this.setupDefaultWavetable(32, 63);
+        if (!hasModuleWaves) this.setupDefaultWavetable(32, 63);
         for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
       case P.NAMCO:
       case P.NAMCO_15XX:
       case P.NAMCO_CUS30:
       case P.BUBSYS_WSG:
-        this.setupDefaultWavetable(32, 15);
+        if (!hasModuleWaves) this.setupDefaultWavetable(32, 15);
         for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
       case P.SWAN:
-        this.setupDefaultWavetable(32, 15);
+        if (!hasModuleWaves) this.setupDefaultWavetable(32, 15);
         for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
       case P.FDS:
-        this.setupDefaultWavetable(64, 63);
+        if (!hasModuleWaves) this.setupDefaultWavetable(64, 63);
         disp(DivCmd.WAVE, 0, 0, 0);
         break;
       case P.N163:
-        this.setupDefaultWavetable(32, 15);
+        if (!hasModuleWaves) this.setupDefaultWavetable(32, 15);
         for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
       case P.X1_010:
       case P.SOUND_UNIT:
-        this.setupDefaultWavetable(32, 255);
+        if (!hasModuleWaves) this.setupDefaultWavetable(32, 255);
         for (let ch = 0; ch < numCh; ch++) disp(DivCmd.WAVE, ch, 0, 0);
         break;
 
       // === Sample-based chips (signed 8-bit PCM) ===
+      // Skip test samples when module data was already uploaded above
       case P.AMIGA:
       case P.SEGAPCM:
       case P.SEGAPCM_COMPAT:
@@ -386,35 +400,30 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       case P.YMZ280B:
       case P.QSOUND:
       case P.MULTIPCM:
-        this.loadTestSample8bit();
-        this.engine.renderSamples(pt);
+        if (!hasModuleSamples) { this.loadTestSample8bit(); this.engine.renderSamples(pt); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
       // === RF5C68 and GA20: standard signed 8-bit (WASM renderSamples converts) ===
       case P.RF5C68:
       case P.GA20:
-        this.loadTestSample8bit();
-        this.engine.renderSamples(pt);
+        if (!hasModuleSamples) { this.loadTestSample8bit(); this.engine.renderSamples(pt); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
       // === VOX ADPCM chips ===
       case P.MSM6258:
       case P.MSM6295:
-        this.loadTestSampleVOX();
-        this.engine.renderSamples(pt);
+        if (!hasModuleSamples) { this.loadTestSampleVOX(); this.engine.renderSamples(pt); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
       case P.ES5506:
       case P.C140:
       case P.C219:
       case P.PCM_DAC:
-        this.loadTestSample16bit();
-        this.engine.renderSamples(pt);
+        if (!hasModuleSamples) { this.loadTestSample16bit(); this.engine.renderSamples(pt); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
       case P.SNES:
-        this.loadTestSampleBRR();
-        this.engine.renderSamples(pt);
+        if (!hasModuleSamples) { this.loadTestSampleBRR(); this.engine.renderSamples(pt); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
     }
@@ -442,20 +451,22 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       this.engine.setVolume(ch, 15, pt);
     }
 
-    // Default wavetable for channel 2 (WAV)
-    const waveLen = 32;
-    const waveMax = 15;
-    const waveData = new Uint8Array(8 + waveLen * 4);
-    const view = new DataView(waveData.buffer);
-    view.setInt32(0, waveLen, true);
-    view.setInt32(4, waveMax, true);
-    for (let i = 0; i < waveLen; i++) {
-      const val = i < waveLen / 2
-        ? Math.round((i / (waveLen / 2)) * waveMax)
-        : Math.round(((waveLen - i) / (waveLen / 2)) * waveMax);
-      view.setInt32(8 + i * 4, val, true);
+    // Default wavetable for channel 2 (WAV) — skip if module wavetables were already uploaded
+    if (!this.engine.getModuleWavetables()) {
+      const waveLen = 32;
+      const waveMax = 15;
+      const waveData = new Uint8Array(8 + waveLen * 4);
+      const view = new DataView(waveData.buffer);
+      view.setInt32(0, waveLen, true);
+      view.setInt32(4, waveMax, true);
+      for (let i = 0; i < waveLen; i++) {
+        const val = i < waveLen / 2
+          ? Math.round((i / (waveLen / 2)) * waveMax)
+          : Math.round(((waveLen - i) / (waveLen / 2)) * waveMax);
+        view.setInt32(8 + i * 4, val, true);
+      }
+      this.engine.setWavetable(0, waveData, pt);
     }
-    this.engine.setWavetable(0, waveData, pt);
   }
 
   /**
