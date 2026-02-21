@@ -8,18 +8,22 @@ import { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
+import { PixiButton } from '../components';
 import { useUIStore } from '@stores';
+import { useAudioStore } from '@stores/useAudioStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useProjectStore } from '@stores/useProjectStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { APP_VERSION } from '@/constants/version';
 
 const NAV_HEIGHT = 36;
 
-type ViewTab = 'tracker' | 'arrangement' | 'dj';
+type ViewTab = 'tracker' | 'arrangement' | 'dj' | 'drumpad';
 const VIEW_TABS: { id: ViewTab; label: string }[] = [
   { id: 'tracker', label: 'TRACKER' },
   { id: 'arrangement', label: 'ARRANGE' },
   { id: 'dj', label: 'DJ' },
+  { id: 'drumpad', label: 'PADS' },
 ];
 
 export const PixiNavBar: React.FC = () => {
@@ -31,6 +35,8 @@ export const PixiNavBar: React.FC = () => {
   const projectName = useProjectStore(s => s.metadata?.name || 'Untitled');
   const currentThemeId = useThemeStore(s => s.currentThemeId);
   const setTheme = useThemeStore(s => s.setTheme);
+  const masterVolume = useAudioStore(s => s.masterVolume);
+  const masterMuted = useAudioStore(s => s.masterMuted);
 
   // Cycle through themes
   const handleThemeToggle = useCallback(() => {
@@ -38,6 +44,21 @@ export const PixiNavBar: React.FC = () => {
     const next = themes[(idx + 1) % themes.length];
     setTheme(next.id);
   }, [currentThemeId, setTheme]);
+
+  // Master volume control
+  const handleVolUp = useCallback(() => {
+    const s = useAudioStore.getState();
+    s.setMasterVolume(Math.min(0, s.masterVolume + 3));
+  }, []);
+
+  const handleVolDown = useCallback(() => {
+    const s = useAudioStore.getState();
+    s.setMasterVolume(Math.max(-60, s.masterVolume - 3));
+  }, []);
+
+  const handleMuteToggle = useCallback(() => {
+    useAudioStore.getState().toggleMasterMute();
+  }, []);
 
   // Switch back to DOM mode
   const handleSwitchToDom = useCallback(() => {
@@ -79,6 +100,14 @@ export const PixiNavBar: React.FC = () => {
         text="DEViLBOX"
         style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
         tint={theme.accent.color}
+        layout={{ marginRight: 4 }}
+      />
+
+      {/* Version badge */}
+      <pixiBitmapText
+        text={APP_VERSION}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+        tint={theme.textMuted.color}
         layout={{ marginRight: 8 }}
       />
 
@@ -144,6 +173,26 @@ export const PixiNavBar: React.FC = () => {
         tint={theme.textSecondary.color}
         layout={{ marginRight: 12 }}
       />
+
+      {/* Master volume */}
+      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginRight: 8 }}>
+        <PixiButton
+          label={masterMuted ? 'MUTED' : 'VOL'}
+          variant={masterMuted ? 'ft2' : 'ghost'}
+          color={masterMuted ? 'red' : undefined}
+          size="sm"
+          active={masterMuted}
+          onClick={handleMuteToggle}
+        />
+        <PixiButton label="-" variant="ghost" size="sm" onClick={handleVolDown} />
+        <pixiBitmapText
+          text={masterMuted ? 'MUTE' : `${masterVolume} dB`}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          tint={masterMuted ? theme.error.color : theme.textSecondary.color}
+          layout={{}}
+        />
+        <PixiButton label="+" variant="ghost" size="sm" onClick={handleVolUp} />
+      </pixiContainer>
 
       {/* Theme toggle */}
       <pixiContainer

@@ -27,6 +27,8 @@ interface UIStore {
   trackerZoom: number; // 80-200%
   activePanel: PanelType;
   modalOpen: string | null;
+  modalData: Record<string, unknown> | null;
+  showPatterns: boolean;
   sidebarCollapsed: boolean;
   useHexNumbers: boolean; // Display numbers in hex (true) or decimal (false)
   rowHighlightInterval: number; // Every N rows gets highlight (default 4, FT2 style)
@@ -45,8 +47,8 @@ interface UIStore {
   // Performance settings
   performanceQuality: PerformanceQuality; // Auto-adjusted based on FPS
 
-  // View switching (tracker vs arrangement vs DJ)
-  activeView: 'tracker' | 'arrangement' | 'dj';
+  // View switching (tracker vs arrangement vs DJ vs drum pads)
+  activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad';
 
   // Pop-out window state
   tb303PoppedOut: boolean;
@@ -66,8 +68,9 @@ interface UIStore {
   togglePanel: (panel: PanelType) => void;
   setActivePanel: (panel: PanelType) => void;
   setTrackerZoom: (zoom: number) => void;
-  openModal: (modalId: string) => void;
+  openModal: (modalId: string, data?: Record<string, unknown>) => void;
   closeModal: () => void;
+  togglePatterns: () => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setUseHexNumbers: (useHex: boolean) => void;
@@ -91,7 +94,7 @@ interface UIStore {
   setPerformanceQuality: (quality: PerformanceQuality) => void;
 
   // View switching actions
-  setActiveView: (view: 'tracker' | 'arrangement' | 'dj') => void;
+  setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad') => void;
   toggleActiveView: () => void;
 
   // Pop-out window actions
@@ -126,6 +129,8 @@ export const useUIStore = create<UIStore>()(
       trackerZoom: 100,
       activePanel: 'tracker',
       modalOpen: null,
+      modalData: null,
+      showPatterns: false,
       sidebarCollapsed: false,
       useHexNumbers: true, // Default to hex numbers (FT2 style)
       rowHighlightInterval: 4, // Highlight every 4th row (FT2 default)
@@ -191,14 +196,21 @@ export const useUIStore = create<UIStore>()(
           state.trackerZoom = Math.max(80, Math.min(200, zoom));
         }),
 
-      openModal: (modalId) =>
+      openModal: (modalId, data) =>
         set((state) => {
           state.modalOpen = modalId;
+          state.modalData = data ?? null;
         }),
 
       closeModal: () =>
         set((state) => {
           state.modalOpen = null;
+          state.modalData = null;
+        }),
+
+      togglePatterns: () =>
+        set((state) => {
+          state.showPatterns = !state.showPatterns;
         }),
 
       toggleSidebar: () =>
@@ -396,6 +408,7 @@ export const useUIStore = create<UIStore>()(
       name: 'devilbox-ui-settings',
       partialize: (state) => ({
         // Only persist layout preferences, not transient UI state
+        showPatterns: state.showPatterns,
         tb303Collapsed: state.tb303Collapsed,
         oscilloscopeVisible: state.oscilloscopeVisible,
         compactToolbar: state.compactToolbar,

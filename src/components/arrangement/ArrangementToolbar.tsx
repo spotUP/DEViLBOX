@@ -69,6 +69,8 @@ export const ArrangementToolbar: React.FC = () => {
           const val = e.target.value;
           if (val === 'dj') {
             useUIStore.getState().setActiveView('dj');
+          } else if (val === 'drumpad') {
+            useUIStore.getState().setActiveView('drumpad');
           } else if (val !== 'arrangement') {
             // Tracker, Grid, Piano Roll, TB-303 are all sub-views of the tracker view
             useUIStore.getState().setActiveView('tracker');
@@ -83,6 +85,7 @@ export const ArrangementToolbar: React.FC = () => {
         <option value="tb303">TB-303</option>
         <option value="arrangement">Arrangement</option>
         <option value="dj">DJ Mixer</option>
+        <option value="drumpad">Drum Pads</option>
       </select>
 
       <div className="w-px h-5 bg-border opacity-50" />

@@ -7,8 +7,10 @@ import { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
+import { PixiButton } from '../components';
 import { PixiDJDeck } from './dj/PixiDJDeck';
 import { PixiDJMixer } from './dj/PixiDJMixer';
+import { useUIStore } from '@stores';
 
 export const PixiDJView: React.FC = () => {
   return (
@@ -42,6 +44,22 @@ export const PixiDJView: React.FC = () => {
 
 const PixiDJTopBar: React.FC = () => {
   const theme = usePixiTheme();
+  const modalOpen = useUIStore(s => s.modalOpen);
+
+  const handleBrowser = useCallback(() => {
+    const s = useUIStore.getState();
+    s.modalOpen === 'fileBrowser' ? s.closeModal() : s.openModal('fileBrowser');
+  }, []);
+
+  const handleFX = useCallback(() => {
+    const s = useUIStore.getState();
+    s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx');
+  }, []);
+
+  const handleSettings = useCallback(() => {
+    const s = useUIStore.getState();
+    s.modalOpen === 'settings' ? s.closeModal() : s.openModal('settings');
+  }, []);
 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -74,11 +92,29 @@ const PixiDJTopBar: React.FC = () => {
 
       <pixiContainer layout={{ flex: 1 }} />
 
-      <pixiBitmapText
-        text="Browser | FX | Controller"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-        tint={theme.textMuted.color}
-        layout={{}}
+      <PixiButton
+        label="Browser"
+        variant={modalOpen === 'fileBrowser' ? 'ft2' : 'ghost'}
+        color={modalOpen === 'fileBrowser' ? 'blue' : undefined}
+        size="sm"
+        active={modalOpen === 'fileBrowser'}
+        onClick={handleBrowser}
+      />
+      <PixiButton
+        label="FX"
+        variant={modalOpen === 'masterFx' ? 'ft2' : 'ghost'}
+        color={modalOpen === 'masterFx' ? 'green' : undefined}
+        size="sm"
+        active={modalOpen === 'masterFx'}
+        onClick={handleFX}
+      />
+      <PixiButton
+        label="Settings"
+        variant={modalOpen === 'settings' ? 'ft2' : 'ghost'}
+        color={modalOpen === 'settings' ? 'blue' : undefined}
+        size="sm"
+        active={modalOpen === 'settings'}
+        onClick={handleSettings}
       />
     </pixiContainer>
   );
