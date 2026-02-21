@@ -2,7 +2,7 @@
  * PadButton - Individual drum pad component with velocity sensitivity
  */
 
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import type { DrumPad } from '../../types/drumpad';
 
 interface PadButtonProps {
@@ -29,6 +29,39 @@ export const PadButton: React.FC<PadButtonProps> = ({
   className = '',
 }) => {
   const [isPressed, setIsPressed] = useState(false);
+  const [triggerIntensity, setTriggerIntensity] = useState(0); // 0-1 animated flash
+  const decayTimerRef = useRef<number | null>(null);
+
+  // Animate velocity flash decay
+  useEffect(() => {
+    return () => {
+      if (decayTimerRef.current) cancelAnimationFrame(decayTimerRef.current);
+    };
+  }, []);
+
+  const flashTrigger = useCallback((vel: number) => {
+    const intensity = vel / 127;
+    setTriggerIntensity(intensity);
+
+    // Decay the flash over ~300ms
+    const startTime = performance.now();
+    const duration = 200 + intensity * 200; // 200-400ms based on velocity
+
+    const decay = () => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Exponential decay curve
+      const remaining = intensity * Math.pow(1 - progress, 2);
+      setTriggerIntensity(remaining);
+
+      if (progress < 1) {
+        decayTimerRef.current = requestAnimationFrame(decay);
+      }
+    };
+
+    if (decayTimerRef.current) cancelAnimationFrame(decayTimerRef.current);
+    decayTimerRef.current = requestAnimationFrame(decay);
+  }, []);
 
   // Calculate velocity based on click/touch position
   const calculateVelocity = useCallback((clientY: number, target: Element): number => {
@@ -48,8 +81,9 @@ export const PadButton: React.FC<PadButtonProps> = ({
     setIsPressed(true);
 
     const vel = calculateVelocity(event.clientY, event.currentTarget);
+    flashTrigger(vel);
     onTrigger(pad.id, vel);
-  }, [pad.id, onTrigger, calculateVelocity]);
+  }, [pad.id, onTrigger, calculateVelocity, flashTrigger]);
 
   const handleMouseUp = useCallback(() => {
     setIsPressed(false);
@@ -70,8 +104,9 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
     const touch = event.touches[0];
     const vel = calculateVelocity(touch.clientY, event.currentTarget);
+    flashTrigger(vel);
     onTrigger(pad.id, vel);
-  }, [pad.id, onTrigger, calculateVelocity]);
+  }, [pad.id, onTrigger, calculateVelocity, flashTrigger]);
 
   const handleTouchEnd = useCallback((event: React.TouchEvent) => {
     event.preventDefault();
@@ -85,44 +120,39 @@ export const PadButton: React.FC<PadButtonProps> = ({
     }
   }, [pad.id, onSelect, onRelease]);
 
-  // Determine pad color based on state (memoized for performance)
-  const padColor = useMemo(() => {
+  // Determine pad style based on state
+  const padStyle = useMemo(() => {
     if (!pad.sample) {
-      return 'bg-dark-border';
-    }
-
-    if (isPressed) {
-      return 'bg-accent-primary';
+      return { className: 'bg-dark-border', overlay: undefined };
     }
 
     if (isSelected) {
-      return 'bg-accent-secondary';
+      return { className: 'bg-emerald-800', overlay: undefined };
     }
 
-    // Use velocity to show intensity
-    const intensity = velocity / 127;
-    if (intensity > 0.7) {
-      return 'bg-emerald-600';
-    } else if (intensity > 0.4) {
-      return 'bg-emerald-700';
-    } else {
-      return 'bg-emerald-800';
-    }
-  }, [pad.sample, isPressed, isSelected, velocity]);
+    return { className: 'bg-emerald-800', overlay: undefined };
+  }, [pad.sample, isSelected]);
+
+  // Flash overlay opacity driven by triggerIntensity (animated)
+  const flashOpacity = triggerIntensity > 0.01 ? triggerIntensity : 0;
 
   return (
     <button
       data-pad-id={pad.id}
       className={`
-        relative rounded-lg transition-all select-none
-        ${padColor}
-        ${!pad.sample ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:brightness-110 active:brightness-125'}
-        ${isPressed ? 'scale-95 duration-75' : 'scale-100 duration-150'}
-        ${isSelected ? 'ring-2 ring-accent-primary ring-offset-2 ring-offset-dark-bg transition-all duration-200' : ''}
-        ${isFocused && !isSelected ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-dark-bg transition-all duration-200' : ''}
+        relative rounded-lg select-none overflow-hidden
+        ${padStyle.className}
+        ${!pad.sample ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+        ${isPressed ? 'scale-95' : 'scale-100'}
+        ${isSelected ? 'ring-2 ring-accent-primary ring-offset-2 ring-offset-dark-bg' : ''}
+        ${isFocused && !isSelected ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-dark-bg' : ''}
         transform-gpu will-change-transform
         ${className}
       `}
+      style={{
+        aspectRatio: '1',
+        transition: isPressed ? 'transform 50ms' : 'transform 120ms',
+      }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -136,10 +166,17 @@ export const PadButton: React.FC<PadButtonProps> = ({
       aria-label={`Drum pad ${pad.id}: ${pad.name}${pad.sample ? '' : ' (empty)'}`}
       aria-pressed={isPressed}
       role="gridcell"
-      style={{
-        aspectRatio: '1',
-      }}
     >
+      {/* Velocity flash overlay — animated decay */}
+      {flashOpacity > 0 && (
+        <div
+          className="absolute inset-0 rounded-lg pointer-events-none"
+          style={{
+            background: `radial-gradient(circle at center, rgba(16, 185, 129, ${flashOpacity * 0.9}) 0%, rgba(52, 211, 153, ${flashOpacity * 0.5}) 60%, transparent 100%)`,
+          }}
+        />
+      )}
+
       {/* Pad number */}
       <div className="absolute top-1 left-1 text-[10px] font-mono text-white/60">
         {pad.id}
@@ -152,8 +189,8 @@ export const PadButton: React.FC<PadButtonProps> = ({
         </span>
       </div>
 
-      {/* Velocity indicator + pad badges */}
-      <div className="absolute bottom-1 right-1 flex items-center gap-0.5">
+      {/* Pad badges */}
+      <div className="absolute bottom-1 left-1 flex items-center gap-0.5">
         {pad.muteGroup > 0 && (
           <span className="text-[8px] font-mono text-amber-400/70">M{pad.muteGroup}</span>
         )}
@@ -163,13 +200,17 @@ export const PadButton: React.FC<PadButtonProps> = ({
         {pad.reverse && (
           <span className="text-[8px] font-mono text-purple-400/70">R</span>
         )}
-        {velocity > 0 && pad.sample && (
-          <div
-            className="w-1.5 h-1.5 rounded-full bg-white"
-            style={{ opacity: velocity / 127 }}
-          />
-        )}
       </div>
+
+      {/* Velocity dot */}
+      {velocity > 0 && pad.sample && (
+        <div className="absolute bottom-1 right-1">
+          <div
+            className="w-1.5 h-1.5 rounded-full bg-emerald-400"
+            style={{ opacity: 0.3 + (velocity / 127) * 0.7 }}
+          />
+        </div>
+      )}
 
       {/* Empty state icon */}
       {!pad.sample && (
