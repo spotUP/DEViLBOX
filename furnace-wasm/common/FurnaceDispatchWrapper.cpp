@@ -3973,6 +3973,59 @@ void furnace_dispatch_set_instrument_full(int handle, int insIndex, unsigned cha
         offset += 4;
       }
     }
+
+    // Parse operator macros if sentinel 0xA0 is present
+    // 4 operators × 20 params each = 80 macros, same binary format as standard macros
+    // Operator macro order: AM(0), AR(1), DR(2), MULT(3), RR(4), SL(5), TL(6),
+    //   DT2(7), RS(8), DT(9), D2R(10), SSG(11), DAM(12), DVB(13), EGT(14),
+    //   KSL(15), SUS(16), VIB(17), WS(18), KSR(19)
+    if (stdOffset + offset < (unsigned int)dataLen && std[offset] == 0xA0) {
+      offset++; // Skip sentinel byte
+
+    DivInstrumentMacro* opMacroList[4][20] = {};
+    for (int op = 0; op < 4; op++) {
+      opMacroList[op][0]  = &ins->std.opMacros[op].amMacro;
+      opMacroList[op][1]  = &ins->std.opMacros[op].arMacro;
+      opMacroList[op][2]  = &ins->std.opMacros[op].drMacro;
+      opMacroList[op][3]  = &ins->std.opMacros[op].multMacro;
+      opMacroList[op][4]  = &ins->std.opMacros[op].rrMacro;
+      opMacroList[op][5]  = &ins->std.opMacros[op].slMacro;
+      opMacroList[op][6]  = &ins->std.opMacros[op].tlMacro;
+      opMacroList[op][7]  = &ins->std.opMacros[op].dt2Macro;
+      opMacroList[op][8]  = &ins->std.opMacros[op].rsMacro;
+      opMacroList[op][9]  = &ins->std.opMacros[op].dtMacro;
+      opMacroList[op][10] = &ins->std.opMacros[op].d2rMacro;
+      opMacroList[op][11] = &ins->std.opMacros[op].ssgMacro;
+      opMacroList[op][12] = &ins->std.opMacros[op].damMacro;
+      opMacroList[op][13] = &ins->std.opMacros[op].dvbMacro;
+      opMacroList[op][14] = &ins->std.opMacros[op].egtMacro;
+      opMacroList[op][15] = &ins->std.opMacros[op].kslMacro;
+      opMacroList[op][16] = &ins->std.opMacros[op].susMacro;
+      opMacroList[op][17] = &ins->std.opMacros[op].vibMacro;
+      opMacroList[op][18] = &ins->std.opMacros[op].wsMacro;
+      opMacroList[op][19] = &ins->std.opMacros[op].ksrMacro;
+    }
+
+    for (int op = 0; op < 4; op++) {
+      for (int p = 0; p < 20 && stdOffset + offset + 7 < (unsigned int)dataLen; p++) {
+        unsigned char* mc = std + offset;
+        int len = mc[0];
+        opMacroList[op][p]->len = len;
+        opMacroList[op][p]->delay = mc[1];
+        opMacroList[op][p]->speed = mc[2];
+        opMacroList[op][p]->loop = mc[3];
+        opMacroList[op][p]->rel = mc[4];
+        opMacroList[op][p]->mode = mc[5];
+        opMacroList[op][p]->open = mc[6];
+
+        offset += 7;
+        for (int v = 0; v < len && v < 256 && stdOffset + offset + 4 <= (unsigned int)dataLen; v++) {
+          opMacroList[op][p]->val[v] = *(int*)(std + offset);
+          offset += 4;
+        }
+      }
+    }
+    } // end sentinel 0xA0 check
   }
 
   // Parse chip-specific data

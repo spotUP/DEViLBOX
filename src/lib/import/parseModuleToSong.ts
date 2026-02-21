@@ -22,6 +22,12 @@ export async function parseModuleToSong(file: File): Promise<TrackerSong> {
     return parseMIDIFile(file);
   }
 
+  // ── HivelyTracker / AHX ──────────────────────────────────────────────────
+  if (filename.endsWith('.hvl') || filename.endsWith('.ahx')) {
+    const { parseHivelyFile } = await import('@lib/import/formats/HivelyParser');
+    return parseHivelyFile(buffer, file.name);
+  }
+
   // ── Furnace / DefleMask ─────────────────────────────────────────────────
   if (filename.endsWith('.fur') || filename.endsWith('.dmf')) {
     return parseFurnaceFile(buffer, file.name);
@@ -101,6 +107,17 @@ async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string): Promise
     })),
   }));
 
+  // Store module-level wavetables/samples on the dispatch engine singleton.
+  // This data is used by FurnaceDispatchSynth.setupDefaultInstrument() to upload
+  // real wavetable/sample data instead of test data when chips are created.
+  // Must be awaited so the data is available before synths initialize.
+  if (result.wavetables.length > 0 || result.samples.length > 0) {
+    const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
+    const engine = FurnaceDispatchEngine.getInstance();
+    engine.setModuleWavetables(result.wavetables.length > 0 ? result.wavetables : null);
+    engine.setModuleSamples(result.samples.length > 0 ? result.samples : null);
+  }
+
   const furnaceData = result.metadata.furnaceData;
   return {
     name: result.metadata.sourceFile.replace(/\.[^/.]+$/, ''),
@@ -119,12 +136,21 @@ async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string): Promise
     virtualTempoD: furnaceData?.virtualTempoD,
     compatFlags: furnaceData?.compatFlags as Record<string, unknown> | undefined,
     grooves: furnaceData?.grooves,
+    furnaceWavetables: result.wavetables.length > 0 ? result.wavetables : undefined,
+    furnaceSamples: result.samples.length > 0 ? result.samples : undefined,
   };
 }
 
 // ─── MOD / XM / IT / S3M / etc. ──────────────────────────────────────────────
 
 async function parseTrackerModule(buffer: ArrayBuffer, fileName: string): Promise<TrackerSong> {
+  // Clear any Furnace module data from previous imports
+  import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
+    const engine = FurnaceDispatchEngine.getInstance();
+    engine.setModuleWavetables(null);
+    engine.setModuleSamples(null);
+  }).catch(() => { /* dispatch engine not available — OK for non-Furnace files */ });
+
   const { loadModuleFile } = await import('@lib/import/ModuleLoader');
   const { convertModule, convertXMModule, convertMODModule } = await import('@lib/import/ModuleConverter');
   const { convertToInstrument } = await import('@lib/import/InstrumentConverter');

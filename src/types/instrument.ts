@@ -187,6 +187,8 @@ export type SynthType =
   // Virtual instruments (aliased MAME)
   | 'VFX'             // Ensoniq VFX (alias for MAMEVFX)
   | 'D50'            // Roland D-50 (virtual analog)
+  // HivelyTracker / AHX synthesis
+  | 'HivelySynth'     // HivelyTracker 16-channel chip synth (WASM)
   // Modular Synthesis
   | 'ModularSynth';   // Modular synthesizer with patch editor
 
@@ -592,6 +594,73 @@ export const DEFAULT_CHIPTUNE_MODULE: ChiptuneModuleConfig = {
   repeatCount: 0,
   stereoSeparation: 100,
   interpolationFilter: 0,
+};
+
+// ── HivelyTracker / AHX Configuration ───────────────────────────────────────
+
+export interface HivelyEnvelopeConfig {
+  aFrames: number;
+  aVolume: number;
+  dFrames: number;
+  dVolume: number;
+  sFrames: number;
+  rFrames: number;
+  rVolume: number;
+}
+
+export interface HivelyPerfEntryConfig {
+  note: number;
+  waveform: number;        // 0=triangle, 1=sawtooth, 2=square, 3=noise (+4 for filtered variants)
+  fixed: boolean;
+  fx: [number, number];
+  fxParam: [number, number];
+}
+
+export interface HivelyConfig {
+  volume: number;              // 0-64
+  waveLength: number;          // 0-5 (maps to 4,8,16,32,64,128 samples)
+  filterLowerLimit: number;    // 0-127
+  filterUpperLimit: number;    // 0-63
+  filterSpeed: number;         // 0-63
+  squareLowerLimit: number;    // 0-255
+  squareUpperLimit: number;    // 0-255
+  squareSpeed: number;         // 0-63
+  vibratoDelay: number;        // 0-255
+  vibratoSpeed: number;        // 0-255
+  vibratoDepth: number;        // 0-15
+  hardCutRelease: boolean;
+  hardCutReleaseFrames: number; // 0-7
+  envelope: HivelyEnvelopeConfig;
+  performanceList: {
+    speed: number;
+    entries: HivelyPerfEntryConfig[];
+  };
+}
+
+export const DEFAULT_HIVELY: HivelyConfig = {
+  volume: 64,
+  waveLength: 3,               // 32-sample square wave
+  filterLowerLimit: 0,
+  filterUpperLimit: 0,
+  filterSpeed: 0,
+  squareLowerLimit: 32,
+  squareUpperLimit: 63,
+  squareSpeed: 1,
+  vibratoDelay: 0,
+  vibratoSpeed: 0,
+  vibratoDepth: 0,
+  hardCutRelease: false,
+  hardCutReleaseFrames: 0,
+  envelope: {
+    aFrames: 1, aVolume: 64,
+    dFrames: 1, dVolume: 64,
+    sFrames: 1,
+    rFrames: 1, rVolume: 0,
+  },
+  performanceList: {
+    speed: 1,
+    entries: [{ note: 0, waveform: 2, fixed: false, fx: [0, 0], fxParam: [0, 0] }],
+  },
 };
 
 /**
@@ -1748,6 +1817,7 @@ export interface FurnaceConfig {
   // Macro system
   macros: FurnaceMacro[];
   opMacros: FurnaceOpMacros[];
+  opMacroArrays?: FurnaceMacro[][];  // Raw operator macros [4 operators][N macros each] — indexed by Furnace code 0-19
 
   // Wavetables
   wavetables: Array<{
@@ -2905,6 +2975,8 @@ export interface InstrumentConfig {
   drumKit?: DrumKitConfig;
   // Module playback (libopenmpt)
   chiptuneModule?: ChiptuneModuleConfig;
+  // HivelyTracker / AHX instrument
+  hively?: HivelyConfig;
   // Modular Synthesis
   modularSynth?: import('./modular').ModularPatchConfig;
   // Sampler config

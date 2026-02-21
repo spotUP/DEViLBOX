@@ -924,6 +924,12 @@ export class FurnaceDispatchEngine {
   // Effect router for translating tracker effects to dispatch commands
   private effectRouter = new FurnaceEffectRouter();
 
+  // Module-level wavetable/sample data from .fur file import
+  // Stored here so FurnaceDispatchSynth can upload to each platform during chip init
+  private _moduleWavetables: Array<{ data: number[]; width: number; height: number }> | null = null;
+  private _moduleSamples: Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
+    loopStart: number; loopEnd: number; loopMode: number; name: string }> | null = null;
+
   private constructor() {}
 
   static getInstance(): FurnaceDispatchEngine {
@@ -1451,6 +1457,103 @@ export class FurnaceDispatchEngine {
   renderSamples(platformType?: number): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ type: 'renderSamples', platformType });
+  }
+
+  // ========== Module-level Wavetable/Sample Data ==========
+
+  /**
+   * Store module-level wavetable data from a .fur file.
+   * Called during song load so FurnaceDispatchSynth can upload them per-platform.
+   */
+  setModuleWavetables(wavetables: Array<{ data: number[]; width: number; height: number }> | null): void {
+    this._moduleWavetables = wavetables;
+  }
+
+  /**
+   * Store module-level sample data from a .fur file.
+   */
+  setModuleSamples(samples: Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
+    loopStart: number; loopEnd: number; loopMode: number; name: string }> | null): void {
+    this._moduleSamples = samples;
+  }
+
+  /** Get stored module wavetables (used by FurnaceDispatchSynth during chip init). */
+  getModuleWavetables(): Array<{ data: number[]; width: number; height: number }> | null {
+    return this._moduleWavetables;
+  }
+
+  /** Get stored module samples (used by FurnaceDispatchSynth during chip init). */
+  getModuleSamples(): Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
+    loopStart: number; loopEnd: number; loopMode: number; name: string }> | null {
+    return this._moduleSamples;
+  }
+
+  /**
+   * Upload all stored module wavetables to a specific platform.
+   * Called by FurnaceDispatchSynth after chip creation.
+   */
+  uploadModuleWavetablesToPlatform(platformType: number): void {
+    if (!this._moduleWavetables || this._moduleWavetables.length === 0) return;
+    console.log(`[FurnaceDispatch] Uploading ${this._moduleWavetables.length} module wavetables to platform ${platformType}`);
+    for (let i = 0; i < this._moduleWavetables.length; i++) {
+      const wt = this._moduleWavetables[i];
+      // Binary format: 4 bytes width (int32 LE) + 4 bytes height (int32 LE) + width * 4 bytes data (int32 LE each)
+      const waveData = new Uint8Array(8 + wt.data.length * 4);
+      const view = new DataView(waveData.buffer);
+      view.setInt32(0, wt.width, true);
+      view.setInt32(4, wt.height, true);
+      for (let j = 0; j < wt.data.length; j++) {
+        view.setInt32(8 + j * 4, wt.data[j], true);
+      }
+      this.setWavetable(i, waveData, platformType);
+    }
+  }
+
+  /**
+   * Upload all stored module samples to a specific platform.
+   * Called by FurnaceDispatchSynth after chip creation.
+   */
+  uploadModuleSamplesToPlatform(platformType: number): void {
+    if (!this._moduleSamples || this._moduleSamples.length === 0) return;
+    console.log(`[FurnaceDispatch] Uploading ${this._moduleSamples.length} module samples to platform ${platformType}`);
+    for (let i = 0; i < this._moduleSamples.length; i++) {
+      const s = this._moduleSamples[i];
+      const headerSize = 32;
+      // Determine sample count based on depth and data type
+      let sampleCount: number;
+      let pcmBytes: number;
+      if (s.depth === 16) {
+        // 16-bit: Int16Array has 1 element per sample, Uint8Array has 2 bytes per sample
+        sampleCount = s.data instanceof Int16Array ? s.data.length : Math.floor(s.data.length / 2);
+        pcmBytes = sampleCount * 2;
+      } else {
+        // 8-bit or other: 1 byte per sample
+        sampleCount = s.data.length;
+        pcmBytes = s.data.length;
+      }
+      const data = new Uint8Array(headerSize + pcmBytes);
+      const header = new DataView(data.buffer);
+      header.setUint32(0, sampleCount, true);     // samples (frame count)
+      header.setInt32(4, s.loopStart, true);       // loopStart
+      header.setInt32(8, s.loopEnd, true);         // loopEnd
+      header.setUint8(12, s.depth);                // depth (DIV_SAMPLE_DEPTH)
+      header.setUint8(13, s.loopMode);             // loopMode (0=fwd, 1=back, 2=pingpong)
+      header.setUint32(16, s.rate, true);          // centerRate (C-4 rate)
+      header.setUint8(22, s.loopEnd > s.loopStart ? 1 : 0); // loop enabled flag
+      // Copy PCM data
+      if (s.data instanceof Int16Array) {
+        // Int16Array → write as little-endian 16-bit samples
+        const pcmView = new DataView(data.buffer, headerSize);
+        for (let j = 0; j < s.data.length; j++) {
+          pcmView.setInt16(j * 2, s.data[j], true);
+        }
+      } else {
+        // Int8Array or Uint8Array → copy bytes directly
+        data.set(new Uint8Array(s.data.buffer, s.data.byteOffset, s.data.byteLength), headerSize);
+      }
+      this.setSample(i, data, platformType);
+    }
+    this.renderSamples(platformType);
   }
 
   // ========== Macro Control ==========

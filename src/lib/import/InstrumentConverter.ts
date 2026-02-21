@@ -201,8 +201,20 @@ function convertFurnaceInstrument(
       speed: m.speed,
     } as FurnaceMacro)),
 
-    // Per-operator macros (empty for now, could be extended)
+    // Per-operator macros
     opMacros: [],
+    opMacroArrays: furnaceData.opMacroArrays?.map(opMacros =>
+      opMacros.map(m => ({
+        code: m.type,
+        type: m.type,
+        data: [...m.data],
+        loop: m.loop,
+        release: m.release,
+        mode: m.mode ?? 0,
+        delay: m.delay,
+        speed: m.speed,
+      } as FurnaceMacro))
+    ),
 
     // Wavetables
     wavetables: furnaceData.wavetables.map(wt => ({
@@ -310,6 +322,23 @@ function convertFurnaceInstrument(
         initModTableWithFirstWave: fds.initModTableWithFirstWave,
       };
     }
+  }
+
+  // Amiga/sample config (initSample, noteMap, useSample, useWave)
+  if (furnaceData.amiga) {
+    const a = furnaceData.amiga;
+    furnaceConfig.amiga = {
+      initSample: a.initSample,
+      useNoteMap: a.useNoteMap,
+      useSample: a.useSample,
+      useWave: a.useWave,
+      waveLen: a.waveLen ?? 0,
+      noteMap: a.noteMap?.map(nm => ({
+        note: 0,
+        sample: nm.map,
+        frequency: nm.freq,
+      })) ?? [],
+    };
   }
 
   // Create the instrument config
