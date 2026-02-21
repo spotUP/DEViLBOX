@@ -3,7 +3,7 @@
  *
  * Provides:
  *  - ScratchFrame / ScratchPattern types
- *  - 10 built-in scratch patterns
+ *  - 19 built-in scratch patterns (sourced from dj.fandom.com/wiki/Scratching diagrams)
  *  - ScratchPlayback class: JS-timer-based pattern loop + AudioParam fader LFO
  *
  * Architecture:
@@ -323,37 +323,295 @@ const TEAR: ScratchPattern = {
 };
 
 /**
- * Debug Ping-Pong — slow, symmetrical forward/backward at 1× speed.
- * Long phases (500ms each) for clearly hearing buffer quality.
- * No fader cuts — everything is audible.
+ * Uzi — "a very, very fast scribble scratch over a very small amount of the
+ * record; it requires muscle tension in the scratching hand."
+ *
+ * Wiki diagram: extremely dense, tiny-amplitude oscillation sitting on top of
+ * a forward-moving record. Much faster and tighter than scribble — the waveform
+ * appears as a thick buzz band with barely visible individual cycles.
+ *
+ * Fader stays open. trueReverse: false (forward-only speed modulation).
+ * 60ms cycle (vs scribble's 160ms), tighter velocity range (1.4/0.6 vs 1.5/0.3).
  */
-const DEBUG_PINGPONG: ScratchPattern = {
-  name: 'Debug PingPong',
-  shortName: 'DBG',
+const UZI: ScratchPattern = {
+  name: 'Uzi',
+  shortName: 'Uzi',
   durationBeats: null,
-  durationMs: 1000,
+  durationMs: 60,
+  loop: true,
+  quantize: false,
+  interpolateVelocity: true,
+  trueReverse: false,
+  frames: [
+    { timeMs: 0,   velocity: 1.4, faderGain: 1 },
+    { timeMs: 8,   velocity: 0.6, faderGain: 1 },
+    { timeMs: 15,  velocity: 1.4, faderGain: 1 },
+    { timeMs: 23,  velocity: 0.6, faderGain: 1 },
+    { timeMs: 30,  velocity: 1.4, faderGain: 1 },
+    { timeMs: 38,  velocity: 0.6, faderGain: 1 },
+    { timeMs: 45,  velocity: 1.4, faderGain: 1 },
+    { timeMs: 53,  velocity: 0.6, faderGain: 1 },
+  ],
+};
+
+/**
+ * Twiddle (Thumb-Twiddle) — "the index and middle finger on the fader hand
+ * are used in conjunction with the thumb to create the cutoffs, or clicks."
+ *
+ * Wiki diagram: baby scratch sine wave underneath with a SQUARE WAVE fader
+ * overlay. ~3 clicks per half-cycle (6 total per full cycle). The uneven
+ * finger timing (thumb → index → middle) creates a syncopated stutter
+ * distinct from the even chops of transformer.
+ *
+ * Record motion: interpolated baby scratch curve.
+ * Fader: frame-driven step function with 3 clicks per stroke.
+ */
+const TWIDDLE: ScratchPattern = {
+  name: 'Twiddle',
+  shortName: 'Twdl',
+  durationBeats: 1,
+  durationMs: null,
   loop: true,
   quantize: false,
   interpolateVelocity: true,
   frames: [
-    { timeMs: 0,   velocity: 1.0,   faderGain: 1 },  // forward at normal speed
-    { timeMs: 500, velocity: -1.0,  faderGain: 1 },  // backward at normal speed
+    // Forward stroke with 3 twiddle clicks (thumb → index → middle)
+    { timeFraction: 0,    velocity: 0,    faderGain: 1 },  // direction change
+    { timeFraction: 0.05, velocity: 1.0,  faderGain: 1 },  // forward, open
+    { timeFraction: 0.09, velocity: 1.5,  faderGain: 0 },  // click 1 (thumb)
+    { timeFraction: 0.12, velocity: 1.8,  faderGain: 1 },  // open
+    { timeFraction: 0.18, velocity: 2.2,  faderGain: 0 },  // click 2 (index)
+    { timeFraction: 0.21, velocity: 2.2,  faderGain: 1 },  // open
+    { timeFraction: 0.30, velocity: 1.8,  faderGain: 0 },  // click 3 (middle)
+    { timeFraction: 0.33, velocity: 1.5,  faderGain: 1 },  // open
+    { timeFraction: 0.45, velocity: 0.3,  faderGain: 1 },  // decelerating
+    // Backward stroke with 3 twiddle clicks
+    { timeFraction: 0.50, velocity: 0,    faderGain: 1 },  // direction change
+    { timeFraction: 0.55, velocity: -0.5, faderGain: 1 },  // backward, open
+    { timeFraction: 0.59, velocity: -0.8, faderGain: 0 },  // click 1 (thumb)
+    { timeFraction: 0.62, velocity: -1.0, faderGain: 1 },  // open
+    { timeFraction: 0.68, velocity: -1.2, faderGain: 0 },  // click 2 (index)
+    { timeFraction: 0.71, velocity: -1.0, faderGain: 1 },  // open
+    { timeFraction: 0.80, velocity: -0.6, faderGain: 0 },  // click 3 (middle)
+    { timeFraction: 0.83, velocity: -0.4, faderGain: 1 },  // open
+    { timeFraction: 0.95, velocity: -0.1, faderGain: 1 },  // decelerating
+  ],
+};
+
+/**
+ * 8-Finger Crab — "the record hand is taken off and used to manipulate the
+ * fader as well as the fader hand, creating more clicks in one movement."
+ *
+ * Wiki diagram: dense vertical bars (fader open bursts) over slowly advancing
+ * record. Both hands on fader = 8 fingers = 8 taps per beat (double regular
+ * crab's 4). Very staccato 20% duty cycle.
+ *
+ * Fader scheduled via AudioParam (128-chop lookahead, auto-rescheduled).
+ */
+const EIGHT_FINGER_CRAB: ScratchPattern = {
+  name: '8-Finger Crab',
+  shortName: '8Crb',
+  durationBeats: 1,
+  durationMs: null,
+  loop: true,
+  quantize: false,
+  frames: [
+    { timeMs: 0, velocity: 1.0, faderGain: 1 },
+  ],
+};
+
+/**
+ * 3-Click Flare — flare variant with 3 clicks on the forward stroke.
+ *
+ * Wiki diagram (progressive flare examples): the rightmost cycles show
+ * denser click patterns. "Multiple clicks can occur... making it a 2-click,
+ * 3-click flare, etc." Same principle: direction changes on OPEN fader,
+ * clicks between direction changes.
+ *
+ * Forward: open → click 1 → open → click 2 → open → click 3 → open → direction change (OPEN)
+ * Backward: continuous open sweep → direction change (OPEN)
+ */
+const FLARE_3CLICK: ScratchPattern = {
+  name: '3-Click Flare',
+  shortName: '3Flr',
+  durationBeats: 1,
+  durationMs: null,
+  loop: true,
+  quantize: false,
+  interpolateVelocity: true,
+  frames: [
+    // Forward stroke with 3 clicks
+    { timeFraction: 0,    velocity: 0,    faderGain: 1 },  // direction change — OPEN
+    { timeFraction: 0.06, velocity: 2.4,  faderGain: 1 },  // forward, open
+    { timeFraction: 0.09, velocity: 2.4,  faderGain: 0 },  // click 1 — close
+    { timeFraction: 0.12, velocity: 2.4,  faderGain: 1 },  // click 1 — open
+    { timeFraction: 0.18, velocity: 2.2,  faderGain: 0 },  // click 2 — close
+    { timeFraction: 0.21, velocity: 2.0,  faderGain: 1 },  // click 2 — open
+    { timeFraction: 0.28, velocity: 1.8,  faderGain: 0 },  // click 3 — close
+    { timeFraction: 0.31, velocity: 1.5,  faderGain: 1 },  // click 3 — open
+    { timeFraction: 0.42, velocity: 0.5,  faderGain: 1 },  // decelerating
+    // Backward stroke — smooth return, no clicks, fader stays open
+    { timeFraction: 0.50, velocity: 0,    faderGain: 1 },  // direction change — OPEN
+    { timeFraction: 0.65, velocity: -1.0, faderGain: 1 },  // backward sweep
+    { timeFraction: 0.90, velocity: -0.3, faderGain: 1 },  // decelerating return
+  ],
+};
+
+/**
+ * Laser — "hitting the record, producing a characteristic sound effect not
+ * unlike a laser in an old video game."
+ *
+ * A very fast forward strike that rapidly decelerates. The descending pitch
+ * sweep from high speed → near-stop creates the classic "pew" laser sound.
+ * Fader closes for silent rewind.
+ */
+const LASER: ScratchPattern = {
+  name: 'Laser',
+  shortName: 'Laser',
+  durationBeats: null,
+  durationMs: 150,
+  loop: true,
+  quantize: false,
+  interpolateVelocity: true,
+  frames: [
+    { timeMs: 0,   velocity: 5.0,  faderGain: 1 },  // sharp hit — very fast forward
+    { timeMs: 30,  velocity: 2.5,  faderGain: 1 },  // rapid deceleration (descending pitch)
+    { timeMs: 60,  velocity: 0.8,  faderGain: 1 },  // slowing further
+    { timeMs: 90,  velocity: 0.2,  faderGain: 1 },  // nearly stopped
+    { timeMs: 110, velocity: -1.0, faderGain: 0 },  // fader cut, silent rewind
+  ],
+};
+
+/**
+ * Phaser — "an extension of the laser technique that makes it completely
+ * faderless, whereby the record is held by a second hand whilst the first
+ * hand performs the hits. Sound comes to a complete stop faster."
+ *
+ * Like laser but the opposing hand catches the record, creating a more
+ * abrupt stop. The faster deceleration produces a shorter, sharper "zap."
+ * Faderless (stays open) — the silence comes from the record actually stopping.
+ */
+const PHASER_SCRATCH: ScratchPattern = {
+  name: 'Phaser',
+  shortName: 'Phasr',
+  durationBeats: null,
+  durationMs: 120,
+  loop: true,
+  quantize: false,
+  interpolateVelocity: true,
+  frames: [
+    { timeMs: 0,   velocity: 5.0,  faderGain: 1 },  // sharp hit forward
+    { timeMs: 20,  velocity: 2.0,  faderGain: 1 },  // rapid decel (opposing hand)
+    { timeMs: 35,  velocity: 0,    faderGain: 1 },  // complete stop (caught by hand)
+    { timeMs: 55,  velocity: 0,    faderGain: 1 },  // held at stop
+    { timeMs: 80,  velocity: -0.8, faderGain: 0 },  // silent reset
+  ],
+};
+
+/**
+ * Tweak (Peaking Tweak) — "the record is set spinning with the motor off
+ * and the fader open, and its speed is tweaked as it rotates. This allows
+ * its pitch to be changed up and down, creating a sort of melody."
+ *
+ * Wiki diagram: gradually rising line (record spinning forward) with +/-
+ * markers indicating periodic pitch tweaks. The DJ creates a melody-like
+ * pitch contour by alternately pushing (speed up) and dragging (slow down).
+ *
+ * 2-beat cycle for the long, flowing feel. trueReverse: false.
+ */
+const TWEAK: ScratchPattern = {
+  name: 'Tweak',
+  shortName: 'Tweak',
+  durationBeats: 2,
+  durationMs: null,
+  loop: true,
+  quantize: false,
+  interpolateVelocity: true,
+  trueReverse: false,
+  frames: [
+    { timeFraction: 0,    velocity: 1.0,  faderGain: 1 },  // normal speed
+    { timeFraction: 0.12, velocity: 1.5,  faderGain: 1 },  // tweak up (+)
+    { timeFraction: 0.25, velocity: 0.6,  faderGain: 1 },  // tweak down (-)
+    { timeFraction: 0.37, velocity: 1.3,  faderGain: 1 },  // tweak up (+)
+    { timeFraction: 0.50, velocity: 0.7,  faderGain: 1 },  // tweak down (-)
+    { timeFraction: 0.62, velocity: 1.6,  faderGain: 1 },  // bigger tweak up (+)
+    { timeFraction: 0.75, velocity: 0.5,  faderGain: 1 },  // tweak down (-)
+    { timeFraction: 0.87, velocity: 1.4,  faderGain: 1 },  // tweak up (+)
+  ],
+};
+
+/**
+ * Drag — "moving the record slowly to reduce pitch."
+ *
+ * Sustained forward motion at gradually decreasing speed, creating a smooth
+ * pitch drop. The record slows from normal speed to near-stop, then releases
+ * back toward normal. Fader stays open. 2-beat cycle.
+ */
+const DRAG: ScratchPattern = {
+  name: 'Drag',
+  shortName: 'Drag',
+  durationBeats: 2,
+  durationMs: null,
+  loop: true,
+  quantize: false,
+  interpolateVelocity: true,
+  trueReverse: false,
+  frames: [
+    { timeFraction: 0,    velocity: 1.0,  faderGain: 1 },  // normal speed
+    { timeFraction: 0.20, velocity: 0.7,  faderGain: 1 },  // slowing (pitch dropping)
+    { timeFraction: 0.40, velocity: 0.4,  faderGain: 1 },  // slower
+    { timeFraction: 0.60, velocity: 0.2,  faderGain: 1 },  // very slow (deep pitch drop)
+    { timeFraction: 0.75, velocity: 0.15, faderGain: 1 },  // near-stop
+    { timeFraction: 0.90, velocity: 0.8,  faderGain: 1 },  // release back toward normal
+  ],
+};
+
+/**
+ * Vibrato — "wobbling pitch around the main note through record or pitch
+ * control manipulation."
+ *
+ * Small, rapid oscillations centered around normal playing speed (1.0).
+ * Like a vocalist's vibrato: ±25% speed variation at ~10 Hz. Fader stays
+ * open. trueReverse: false (forward-only modulation).
+ */
+const VIBRATO: ScratchPattern = {
+  name: 'Vibrato',
+  shortName: 'Vibr',
+  durationBeats: null,
+  durationMs: 100,
+  loop: true,
+  quantize: false,
+  interpolateVelocity: true,
+  trueReverse: false,
+  frames: [
+    { timeMs: 0,   velocity: 1.25, faderGain: 1 },
+    { timeMs: 25,  velocity: 0.75, faderGain: 1 },
+    { timeMs: 50,  velocity: 1.25, faderGain: 1 },
+    { timeMs: 75,  velocity: 0.75, faderGain: 1 },
   ],
 };
 
 /** Original 6 at front (indices 0–5) for backward-compatible keyboard commands */
 export const SCRATCH_PATTERNS: ScratchPattern[] = [
-  BABY_SCRATCH,  // 0
-  TRANSFORMER,   // 1
-  FLARE,         // 2
-  HYDROPLANE,    // 3
-  CRAB,          // 4
-  ORBIT,         // 5
-  CHIRP,         // 6
-  STAB,          // 7
-  SCRIBBLE,      // 8
-  TEAR,          // 9
-  DEBUG_PINGPONG, // 10 — debug: slow ping-pong for buffer quality testing
+  BABY_SCRATCH,       // 0
+  TRANSFORMER,        // 1
+  FLARE,              // 2
+  HYDROPLANE,         // 3
+  CRAB,               // 4
+  ORBIT,              // 5
+  CHIRP,              // 6
+  STAB,               // 7
+  SCRIBBLE,           // 8
+  TEAR,               // 9
+  UZI,                // 10
+  TWIDDLE,            // 11
+  EIGHT_FINGER_CRAB,  // 12
+  FLARE_3CLICK,       // 13
+  LASER,              // 14
+  PHASER_SCRATCH,     // 15
+  TWEAK,              // 16
+  DRAG,               // 17
+  VIBRATO,            // 18
 ];
 
 export function getPatternByName(name: string): ScratchPattern | undefined {
@@ -533,11 +791,12 @@ export class ScratchPlayback {
 
     // Expose current state for UI (turntable spin, pattern display, fader indicators)
     this.currentVelocity = velocity;
-    // For Transformer/Crab, estimate fader from chop timing (AudioParam-scheduled, not frame-driven)
-    if (pattern === TRANSFORMER || pattern === CRAB) {
+    // For Transformer/Crab/8-Finger Crab, estimate fader from chop timing (AudioParam-scheduled, not frame-driven)
+    if (pattern === TRANSFORMER || pattern === CRAB || pattern === EIGHT_FINGER_CRAB) {
       const bpm = this.getEffectiveBPM();
-      const chopPeriodMs = (60000 / bpm) / 4;
-      const duty = pattern === TRANSFORMER ? 0.40 : 0.28;
+      const chopsPerBeat = pattern === EIGHT_FINGER_CRAB ? 8 : 4;
+      const chopPeriodMs = (60000 / bpm) / chopsPerBeat;
+      const duty = pattern === TRANSFORMER ? 0.40 : pattern === CRAB ? 0.28 : 0.20;
       const posInChop = this.patternElapsedMs % chopPeriodMs;
       this.currentFaderGain = posInChop < chopPeriodMs * duty ? 1 : 0;
     } else if (!this.faderLFOActive) {
@@ -559,8 +818,8 @@ export class ScratchPlayback {
       deck.setScratchVelocity(velocity);
 
       // Apply fader gain (step function — NOT interpolated, for sharp DJ cuts).
-      // Skip for Transformer/Crab (AudioParam-scheduled) and when fader LFO is active.
-      if (pattern !== TRANSFORMER && pattern !== CRAB && !this.faderLFOActive) {
+      // Skip for Transformer/Crab/8-Finger Crab (AudioParam-scheduled) and when fader LFO is active.
+      if (pattern !== TRANSFORMER && pattern !== CRAB && pattern !== EIGHT_FINGER_CRAB && !this.faderLFOActive) {
         const gain = deck.getChannelGainParam();
         const ctx  = Tone.getContext().rawContext as AudioContext;
         gain.cancelScheduledValues(ctx.currentTime);
@@ -739,6 +998,33 @@ export class ScratchPlayback {
         this.patternFaderTimeoutId = null;
         if (this.activePattern === CRAB) {
           this.scheduleCrabFader(this.getEffectiveBPM());
+        }
+      }, Math.max(50, totalMs - 300));
+    } catch { /* engine not ready */ }
+  }
+
+  scheduleEightFingerCrabFader(bpm: number): void {
+    if (this.patternFaderTimeoutId !== null) {
+      clearTimeout(this.patternFaderTimeoutId);
+      this.patternFaderTimeoutId = null;
+    }
+    try {
+      const gain = this.getDeck().getChannelGainParam();
+      const ctx  = Tone.getContext().rawContext as AudioContext;
+      // 8 taps per beat (both hands), 20% open duty cycle (very rapid staccato)
+      const tapPeriodSec = (60 / bpm) / 8;
+      const now = ctx.currentTime;
+      gain.cancelScheduledValues(now);
+      for (let i = 0; i < PATTERN_FADER_LOOKAHEAD; i++) {
+        const t = now + i * tapPeriodSec;
+        gain.setValueAtTime(1, t);
+        gain.setValueAtTime(0, t + tapPeriodSec * 0.20);
+      }
+      const totalMs = PATTERN_FADER_LOOKAHEAD * tapPeriodSec * 1000;
+      this.patternFaderTimeoutId = setTimeout(() => {
+        this.patternFaderTimeoutId = null;
+        if (this.activePattern === EIGHT_FINGER_CRAB) {
+          this.scheduleEightFingerCrabFader(this.getEffectiveBPM());
         }
       }, Math.max(50, totalMs - 300));
     } catch { /* engine not ready */ }

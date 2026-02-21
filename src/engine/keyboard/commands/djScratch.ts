@@ -96,6 +96,17 @@ export function djScratchStab():  boolean { return triggerPattern(SCRATCH_PATTER
 export function djScratchScrbl(): boolean { return triggerPattern(SCRATCH_PATTERNS[8].name); }
 export function djScratchTear():  boolean { return triggerPattern(SCRATCH_PATTERNS[9].name); }
 
+// ── Advanced pattern commands (10-18) ────────────────────────────────────────
+export function djScratchUzi():     boolean { return triggerPattern(SCRATCH_PATTERNS[10].name); }
+export function djScratchTwiddle(): boolean { return triggerPattern(SCRATCH_PATTERNS[11].name); }
+export function djScratch8Crab():   boolean { return triggerPattern(SCRATCH_PATTERNS[12].name); }
+export function djScratch3Flare():  boolean { return triggerPattern(SCRATCH_PATTERNS[13].name); }
+export function djScratchLaser():   boolean { return triggerPattern(SCRATCH_PATTERNS[14].name); }
+export function djScratchPhaser():  boolean { return triggerPattern(SCRATCH_PATTERNS[15].name); }
+export function djScratchTweak():   boolean { return triggerPattern(SCRATCH_PATTERNS[16].name); }
+export function djScratchDrag():    boolean { return triggerPattern(SCRATCH_PATTERNS[17].name); }
+export function djScratchVibrato(): boolean { return triggerPattern(SCRATCH_PATTERNS[18].name); }
+
 export function djScratchStop(): boolean {
   const deckId = getActiveDeck();
   const store = useDJStore.getState();
