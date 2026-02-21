@@ -38,6 +38,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useProjectStore } from '@stores/useProjectStore';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
+import { PeerMouseCursor } from '@components/collaboration/PeerMouseCursor';
 import type { Pattern } from '@typedefs';
 
 // Lazy-loaded components for better startup performance
@@ -49,6 +50,7 @@ const InstrumentEffectsModal = lazy(() => import('@components/effects').then(m =
 const EffectParameterEditor = lazy(() => import('@components/effects').then(m => ({ default: m.EffectParameterEditor })));
 const TD3PatternDialog = lazy(() => import('@components/midi/TD3PatternDialog').then(m => ({ default: m.TD3PatternDialog })));
 const DrumpadEditorModal = lazy(() => import('@components/midi/DrumpadEditorModal').then(m => ({ default: m.DrumpadEditorModal })));
+const DrumPadManager = lazy(() => import('@components/drumpad/DrumPadManager').then(m => ({ default: m.DrumPadManager })));
 const TipOfTheDay = lazy(() => import('@components/dialogs/TipOfTheDay').then(m => ({ default: m.TipOfTheDay })));
 const PatternManagement = lazy(() => import('@components/pattern/PatternManagement').then(m => ({ default: m.PatternManagement })));
 const SamplePackBrowser = lazy(() => import('@components/instruments/SamplePackBrowser').then(m => ({ default: m.SamplePackBrowser })));
@@ -95,21 +97,15 @@ function App() {
   const isCollabSplit = collabStatus === 'connected' && collabViewMode === 'split';
   const [initError, setInitError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
-  const [helpInitialTab, setHelpInitialTab] = useState<'shortcuts' | 'effects' | 'chip-effects' | 'tutorial'>('shortcuts');
-  const [showExport, setShowExport] = useState(false);
-  const [showPatterns, setShowPatterns] = useState(false);
-  const [showMasterFX, setShowMasterFX] = useState(false);
-  const [showInstrumentFX, setShowInstrumentFX] = useState(false);
-  const [showDrumpads, setShowDrumpads] = useState(false);
-  const [showTips, setShowTips] = useState(false);
-  const [tipsInitialTab, setTipsInitialTab] = useState<'tips' | 'changelog'>('tips');
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
-  const [showInstrumentModal, setShowInstrumentModal] = useState(false);
   const [pendingSongFile, setPendingSongFile] = useState<File | null>(null);
   const [showSongLoadConfirm, setShowSongLoadConfirm] = useState(false);
-  // showFileBrowser is now in UIStore (moved for keyboard command access)
-  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Modal state from store (single source of truth for DOM + WebGL)
+  const modalOpen = useUIStore(s => s.modalOpen);
+  const modalData = useUIStore(s => s.modalData);
+  const showPatterns = useUIStore(s => s.showPatterns);
+  const { openModal, closeModal, togglePatterns } = useUIStore();
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog, showKnobBar, setShowKnobBar } = useMIDIStore();
 
@@ -123,14 +119,12 @@ function App() {
 
     if (hasNewVersion) {
       // Prioritize Changelog for new versions
-      setTipsInitialTab('changelog');
-      setShowTips(true);
+      openModal('tips', { initialTab: 'changelog' });
     } else if (showTipsAtStartup) {
       // Otherwise show Tips if enabled
-      setTipsInitialTab('tips');
-      setShowTips(true);
+      openModal('tips', { initialTab: 'tips' });
     }
-  }, [currentVersion.buildNumber]);
+  }, [currentVersion.buildNumber, openModal]);
 
   // Cloud sync: pull on login, push on local mutations
   useCloudSync();
@@ -253,30 +247,30 @@ function App() {
       // Escape: Close modals (highest priority)
       if (e.key === 'Escape') {
         e.preventDefault();
-        if (showHelp) setShowHelp(false);
-        else if (showExport) setShowExport(false);
-        else if (showPatterns) setShowPatterns(false);
+        const state = useUIStore.getState();
+        if (state.modalOpen) state.closeModal();
+        else if (state.showPatterns) state.togglePatterns();
         return;
       }
 
       // Shift+/: Help (? key)
       if (e.shiftKey && e.key === '?') {
         e.preventDefault();
-        setShowHelp(true);
+        useUIStore.getState().openModal('help');
         return;
       }
 
       // Ctrl+Shift+E: Export (changed to avoid conflict with common editor shortcuts)
       if (e.ctrlKey && e.shiftKey && e.key === 'E') {
         e.preventDefault();
-        setShowExport(true);
+        useUIStore.getState().openModal('export');
         return;
       }
 
       // Ctrl+Shift+P: Patterns (changed to avoid conflict with browser commands)
       if (e.ctrlKey && e.shiftKey && e.key === 'P') {
         e.preventDefault();
-        setShowPatterns(!showPatterns);
+        useUIStore.getState().togglePatterns();
         return;
       }
 
@@ -305,21 +299,24 @@ function App() {
       // Ctrl+I: Instrument editor
       if ((e.ctrlKey || e.metaKey) && e.key === 'i' && !e.shiftKey) {
         e.preventDefault();
-        setShowInstrumentModal(!showInstrumentModal);
+        const s = useUIStore.getState();
+        s.modalOpen === 'instruments' ? s.closeModal() : s.openModal('instruments');
         return;
       }
 
       // Ctrl+M: Master effects
       if ((e.ctrlKey || e.metaKey) && e.key === 'm' && !e.shiftKey) {
         e.preventDefault();
-        setShowMasterFX(!showMasterFX);
+        const s = useUIStore.getState();
+        s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx');
         return;
       }
 
       // Ctrl+Shift+F: Instrument effects
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
         e.preventDefault();
-        setShowInstrumentFX(!showInstrumentFX);
+        const s = useUIStore.getState();
+        s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx');
         return;
       }
 
@@ -357,7 +354,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showPatterns, showHelp, showExport, showInstrumentModal, showMasterFX, showInstrumentFX, handleUndo, handleRedo, saveProject, toggleActiveView]);
+  }, [handleUndo, handleRedo, saveProject, toggleActiveView]);
 
   const handleUpdateEffectParameter = (key: string, value: number | string) => {
     if (!editingEffect) return;
@@ -688,7 +685,7 @@ function App() {
         notify.info(`Audio sample: ${file.name}. Opening instrument editor...`);
         // TODO: Create new instrument with this sample
         // For now just show the instrument modal
-        setShowInstrumentModal(true);
+        useUIStore.getState().openModal('instruments');
         
       } else {
         notify.warning(`Unsupported file format: ${file.name}`);
@@ -737,6 +734,144 @@ function App() {
             />
           )}
           <WebGLModalBridge />
+
+          {/* Effect Parameter Editor Modal */}
+          <Suspense fallback={null}>
+            {editingEffect && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+                <div className="max-w-md w-full mx-4 animate-slide-in-up">
+                  <EffectParameterEditor
+                    effect={editingEffect.effect}
+                    onUpdateParameter={handleUpdateEffectParameter}
+                    onUpdateWet={handleUpdateEffectWet}
+                    onClose={() => setEditingEffect(null)}
+                  />
+                </div>
+              </div>
+            )}
+          </Suspense>
+
+          {/* Song Load Confirmation Dialog */}
+          {showSongLoadConfirm && pendingSongFile && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in">
+              <div className="bg-dark-bgPrimary border-2 border-accent-primary rounded-xl p-6 max-w-md mx-4 animate-slide-in-up shadow-2xl">
+                <h2 className="text-xl font-bold text-white mb-4">Load Song File?</h2>
+                <p className="text-text-secondary mb-6">
+                  Loading <span className="text-accent-primary font-mono">{pendingSongFile.name}</span> will replace your current project.
+                </p>
+                <p className="text-text-muted text-sm mb-6">
+                  Make sure you've saved any unsaved changes before continuing.
+                </p>
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setShowSongLoadConfirm(false);
+                      setPendingSongFile(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={async () => {
+                      if (pendingSongFile) {
+                        await loadSongFile(pendingSongFile);
+                      }
+                      setShowSongLoadConfirm(false);
+                      setPendingSongFile(null);
+                    }}
+                  >
+                    Load File
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Pop-out windows — rendered outside WebGL canvas as separate browser windows */}
+          {instrumentEditorPoppedOut && (
+            <Suspense fallback={null}>
+              <PopOutWindow
+                isOpen={true}
+                onClose={() => setInstrumentEditorPoppedOut(false)}
+                title="DEViLBOX — Instrument Editor"
+                width={1000}
+                height={800}
+              >
+                <InstrumentEditorPopout />
+              </PopOutWindow>
+            </Suspense>
+          )}
+          {masterEffectsPoppedOut && (
+            <Suspense fallback={null}>
+              <PopOutWindow
+                isOpen={true}
+                onClose={() => setMasterEffectsPoppedOut(false)}
+                title="DEViLBOX — Master Effects"
+                width={1000}
+                height={800}
+              >
+                <MasterEffectsModal isOpen={true} onClose={() => setMasterEffectsPoppedOut(false)} />
+              </PopOutWindow>
+            </Suspense>
+          )}
+          {instrumentEffectsPoppedOut && (
+            <Suspense fallback={null}>
+              <PopOutWindow
+                isOpen={true}
+                onClose={() => setInstrumentEffectsPoppedOut(false)}
+                title="DEViLBOX — Instrument Effects"
+                width={1000}
+                height={800}
+              >
+                <InstrumentEffectsModal isOpen={true} onClose={() => setInstrumentEffectsPoppedOut(false)} />
+              </PopOutWindow>
+            </Suspense>
+          )}
+          {pianoRollPoppedOut && (
+            <Suspense fallback={null}>
+              <PopOutWindow
+                isOpen={true}
+                onClose={() => setPianoRollPoppedOut(false)}
+                title="DEViLBOX — Piano Roll"
+                width={1200}
+                height={600}
+              >
+                <div className="h-screen w-screen bg-dark-bgSecondary">
+                  <PianoRoll />
+                </div>
+              </PopOutWindow>
+            </Suspense>
+          )}
+          {arrangementPoppedOut && (
+            <Suspense fallback={null}>
+              <PopOutWindow
+                isOpen={true}
+                onClose={() => setArrangementPoppedOut(false)}
+                title="DEViLBOX — Arrangement"
+                width={1400}
+                height={700}
+              >
+                <div className="h-screen w-screen bg-dark-bg">
+                  <ArrangementView />
+                </div>
+              </PopOutWindow>
+            </Suspense>
+          )}
+          {oscilloscopePoppedOut && (
+            <Suspense fallback={null}>
+              <PopOutWindow
+                isOpen={true}
+                onClose={() => setOscilloscopePoppedOut(false)}
+                title="DEViLBOX — Visualizer"
+                width={800}
+                height={500}
+              >
+                <OscilloscopePopout />
+              </PopOutWindow>
+            </Suspense>
+          )}
         </GlobalDragDropHandler>
       </Suspense>
     );
@@ -773,13 +908,13 @@ function App() {
   if (showWelcome && contextState !== 'running') {
     return (
       <AppLayout
-        onShowExport={() => setShowExport(true)}
-        onShowHelp={() => setShowHelp(true)}
-        onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
-        onShowPatterns={() => setShowPatterns(!showPatterns)}
-        onShowInstruments={() => setShowInstrumentModal(true)}
+        onShowExport={() => openModal('export')}
+        onShowHelp={() => openModal('help')}
+        onShowMasterFX={() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }}
+        onShowPatterns={() => togglePatterns()}
+        onShowInstruments={() => openModal('instruments')}
         onLoad={() => setShowFileBrowser(true)}
-        onShowDrumpads={() => setShowDrumpads(true)}
+        onShowDrumpads={() => openModal('drumpads')}
       >
         <div className="flex-1 flex flex-col items-center justify-center px-4">
           <div className="text-center max-w-2xl">
@@ -869,14 +1004,14 @@ function App() {
   return (
     <GlobalDragDropHandler onFileLoaded={handleFileDrop}>
       <AppLayout
-        onShowExport={() => setShowExport(true)}
-        onShowHelp={() => setShowHelp(true)}
-        onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
-        onShowPatterns={() => setShowPatterns(!showPatterns)}
-        onShowInstruments={() => setShowInstrumentModal(true)}
+        onShowExport={() => openModal('export')}
+        onShowHelp={() => openModal('help')}
+        onShowMasterFX={() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }}
+        onShowPatterns={() => togglePatterns()}
+        onShowInstruments={() => openModal('instruments')}
         onLoad={() => setShowFileBrowser(true)}
-        onShowDrumpads={() => setShowDrumpads(true)}
-        onShowAuth={() => setShowAuthModal(true)}
+        onShowDrumpads={() => openModal('drumpads')}
+        onShowAuth={() => openModal('auth')}
       >
         <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-y-hidden">
         {/* Top: Main workspace */}
@@ -887,20 +1022,16 @@ function App() {
             {isCollabSplit && activeView === 'tracker' && (
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading collab...</div>}>
                 <CollaborationSplitView
-                  onShowPatterns={() => setShowPatterns(!showPatterns)}
-                  onShowExport={() => setShowExport(true)}
-                  onShowHelp={(tab) => {
-                    if (tab) setHelpInitialTab(tab as any);
-                    else setHelpInitialTab('shortcuts');
-                    setShowHelp(true);
-                  }}
-                  onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
-                  onShowInstrumentFX={() => setShowInstrumentFX(!showInstrumentFX)}
-                  onShowInstruments={() => setShowInstrumentModal(true)}
-                  onShowDrumpads={() => setShowDrumpads(true)}
+                  onShowPatterns={() => togglePatterns()}
+                  onShowExport={() => openModal('export')}
+                  onShowHelp={(tab) => openModal('help', { initialTab: tab || 'shortcuts' })}
+                  onShowMasterFX={() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }}
+                  onShowInstrumentFX={() => { const s = useUIStore.getState(); s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx'); }}
+                  onShowInstruments={() => openModal('instruments')}
+                  onShowDrumpads={() => openModal('drumpads')}
                   showPatterns={showPatterns}
-                  showMasterFX={showMasterFX}
-                  showInstrumentFX={showInstrumentFX}
+                  showMasterFX={modalOpen === 'masterFx'}
+                  showInstrumentFX={modalOpen === 'instrumentFx'}
                 />
               </Suspense>
             )}
@@ -918,20 +1049,16 @@ function App() {
                 {/* Pattern Editor */}
                 <div className="flex-1 min-h-0 min-w-0 flex flex-col">
                   <TrackerView
-                    onShowPatterns={() => setShowPatterns(!showPatterns)}
-                    onShowExport={() => setShowExport(true)}
-                    onShowHelp={(tab) => {
-                      if (tab) setHelpInitialTab(tab as any);
-                      else setHelpInitialTab('shortcuts');
-                      setShowHelp(true);
-                    }}
-                    onShowMasterFX={() => setShowMasterFX(!showMasterFX)}
-                    onShowInstrumentFX={() => setShowInstrumentFX(!showInstrumentFX)}
-                    onShowInstruments={() => setShowInstrumentModal(true)}
-                    onShowDrumpads={() => setShowDrumpads(true)}
+                    onShowPatterns={() => togglePatterns()}
+                    onShowExport={() => openModal('export')}
+                    onShowHelp={(tab) => openModal('help', { initialTab: tab || 'shortcuts' })}
+                    onShowMasterFX={() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }}
+                    onShowInstrumentFX={() => { const s = useUIStore.getState(); s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx'); }}
+                    onShowInstruments={() => openModal('instruments')}
+                    onShowDrumpads={() => openModal('drumpads')}
                     showPatterns={showPatterns}
-                    showMasterFX={showMasterFX}
-                    showInstrumentFX={showInstrumentFX}
+                    showMasterFX={modalOpen === 'masterFx'}
+                    showInstrumentFX={modalOpen === 'instrumentFx'}
                   />
                 </div>
               </>
@@ -945,7 +1072,13 @@ function App() {
 
             {activeView === 'dj' && (
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading DJ mode...</div>}>
-                <DJView onShowDrumpads={() => setShowDrumpads(true)} />
+                <DJView onShowDrumpads={() => openModal('drumpads')} />
+              </Suspense>
+            )}
+
+            {activeView === 'drumpad' && (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading drum pads...</div>}>
+                <DrumPadManager />
               </Suspense>
             )}
           </div>
@@ -953,18 +1086,19 @@ function App() {
         </div>
 
         {/* Global Status Bar (includes MIDI Knob Bar) */}
-        <StatusBar onShowTips={() => setShowTips(true)} />
+        <StatusBar onShowTips={() => openModal('tips', { initialTab: 'tips' })} />
       </div>
 
       {/* Modals */}
       <Suspense fallback={null}>
-        {showHelp && <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} initialTab={helpInitialTab} />}
-        {showExport && <ExportDialog isOpen={showExport} onClose={() => setShowExport(false)} />}
-        {showInstrumentModal && <EditInstrumentModal isOpen={showInstrumentModal} onClose={() => setShowInstrumentModal(false)} />}
-        {showMasterFX && <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />}
-        {showInstrumentFX && <InstrumentEffectsModal isOpen={showInstrumentFX} onClose={() => setShowInstrumentFX(false)} />}
+        {modalOpen === 'help' && <HelpModal isOpen={true} onClose={closeModal} initialTab={(modalData?.initialTab as any) || 'shortcuts'} />}
+        {modalOpen === 'export' && <ExportDialog isOpen={true} onClose={closeModal} />}
+        {modalOpen === 'instruments' && <EditInstrumentModal isOpen={true} onClose={closeModal} />}
+        {modalOpen === 'masterFx' && <MasterEffectsModal isOpen={true} onClose={closeModal} />}
+        {modalOpen === 'instrumentFx' && <InstrumentEffectsModal isOpen={true} onClose={closeModal} />}
         {showTD3Pattern && <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />}
-        {showDrumpads && <DrumpadEditorModal isOpen={showDrumpads} onClose={() => setShowDrumpads(false)} />}
+        {modalOpen === 'drumpads' && <DrumPadManager onClose={closeModal} />}
+        {modalOpen === 'midi-pads' && <DrumpadEditorModal isOpen={true} onClose={closeModal} />}
         {showFileBrowser && (
           <FileBrowser
             isOpen={showFileBrowser}
@@ -1100,11 +1234,11 @@ function App() {
           />
         )}
         {showSamplePackModal && <SamplePackBrowser onClose={() => setShowSamplePackModal(false)} />}
-        {showTips && (
-          <TipOfTheDay 
-            isOpen={showTips} 
-            onClose={() => setShowTips(false)} 
-            initialTab={tipsInitialTab}
+        {modalOpen === 'tips' && (
+          <TipOfTheDay
+            isOpen={true}
+            onClose={closeModal}
+            initialTab={(modalData?.initialTab as 'tips' | 'changelog') || 'tips'}
           />
         )}
 
@@ -1255,6 +1389,9 @@ function App() {
         </Suspense>
       )}
 
+      {/* Peer mouse cursor — fixed overlay covering entire UI, visible when in shared collab mode */}
+      <PeerMouseCursor />
+
       {/* Toast Notifications */}
       <ToastNotification />
 
@@ -1275,12 +1412,14 @@ function App() {
       )}
 
       {/* Auth Modal */}
-      <Suspense fallback={null}>
-        <AuthModal
-          isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
-        />
-      </Suspense>
+      {modalOpen === 'auth' && (
+        <Suspense fallback={null}>
+          <AuthModal
+            isOpen={true}
+            onClose={closeModal}
+          />
+        </Suspense>
+      )}
     </AppLayout>
     </GlobalDragDropHandler>
   );
