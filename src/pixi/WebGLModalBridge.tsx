@@ -9,7 +9,8 @@
  * All modals render null when inactive, so there's zero cost when idle.
  */
 
-import { lazy, Suspense, useCallback, useEffect } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useUIStore } from '@stores';
 import { useTrackerStore } from '@stores';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
@@ -128,6 +129,26 @@ export const WebGLModalBridge: React.FC = () => {
   const activeView = useUIStore(s => s.activeView);
   const showTD3Pattern = useMIDIStore(s => s.showPatternDialog);
   const closePatternDialog = useMIDIStore(s => s.closePatternDialog);
+
+  // Portal container on document.body — ensures modals render above
+  // PixiDOMOverlay divs (z-index 10) which are also direct body children.
+  // Without this, modals inside the React root div sit at stacking layer 0,
+  // below the PixiDOMOverlay divs.
+  const portalRef = useRef<HTMLDivElement | null>(null);
+  if (!portalRef.current) {
+    const div = document.createElement('div');
+    div.id = 'webgl-modal-portal';
+    div.style.position = 'relative';
+    div.style.zIndex = '100';
+    document.body.appendChild(div);
+    portalRef.current = div;
+  }
+  useEffect(() => {
+    return () => {
+      portalRef.current?.remove();
+      portalRef.current = null;
+    };
+  }, []);
 
   // Bridge dialogOpen commands (from keyboard shortcuts) to modalOpen state.
   // In DOM mode, TrackerView handles this. In WebGL mode, this bridge does it.
@@ -319,7 +340,7 @@ export const WebGLModalBridge: React.FC = () => {
     }
   }, []);
 
-  return (
+  return createPortal(
     <Suspense fallback={null}>
       {modalOpen === 'settings' && (
         <LazySettingsModal onClose={closeModal} />
@@ -462,6 +483,7 @@ export const WebGLModalBridge: React.FC = () => {
       {activeView === 'drumpad' && (
         <LazyDrumPadManager />
       )}
-    </Suspense>
+    </Suspense>,
+    portalRef.current!,
   );
 };

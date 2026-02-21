@@ -101,7 +101,11 @@ const PixiFT2MainRow: React.FC = () => {
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, 4000, TOOLBAR_HEIGHT);
-    g.fill({ color: theme.bgSecondary.color });
+    g.fill({ color: theme.bgHover.color });
+    // Top border
+    g.rect(0, 0, 4000, 1);
+    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
+    // Bottom border
     g.rect(0, TOOLBAR_HEIGHT - 1, 4000, 1);
     g.fill({ color: theme.border.color, alpha: theme.border.alpha });
   }, [theme]);
@@ -352,7 +356,7 @@ const PixiFT2MenuBar: React.FC = () => {
     useSettingsStore.getState().setRenderMode('dom');
   }, []);
 
-  const drawBg = useCallback((g: GraphicsType) => {
+  const drawMenuBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, 4000, MENUBAR_HEIGHT);
     g.fill({ color: theme.bgTertiary.color });
@@ -394,7 +398,7 @@ const PixiFT2MenuBar: React.FC = () => {
         gap: 4,
       }}
     >
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: '100%', height: MENUBAR_HEIGHT }} />
+      <pixiGraphics draw={drawMenuBg} layout={{ position: 'absolute', width: '100%', height: MENUBAR_HEIGHT }} />
 
       {menuItems.map(item => (
         <PixiButton
@@ -420,7 +424,7 @@ const PixiToolbarSection: React.FC<{ label: string; children: React.ReactNode }>
       <pixiBitmapText
         text={label}
         style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-        tint={theme.textMuted.color}
+        tint={theme.textSecondary.color}
         layout={{}}
       />
       {children}
@@ -435,7 +439,7 @@ const PixiToolbarSep: React.FC = () => {
       draw={(g: GraphicsType) => {
         g.clear();
         g.rect(0, 8, 1, TOOLBAR_HEIGHT - 16);
-        g.fill({ color: theme.border.color, alpha: 0.25 });
+        g.fill({ color: theme.border.color, alpha: 0.5 });
       }}
       layout={{ width: 1, height: TOOLBAR_HEIGHT }}
     />
