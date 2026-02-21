@@ -165,12 +165,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   const trackerVisualBg = useSettingsStore((s) => s.trackerVisualBg);
 
-  // Keep channelOffsetsRef/channelWidthsRef in sync for the RAF loop (selection math)
-  useEffect(() => {
-    channelOffsetsRef.current = channelOffsets;
-    channelWidthsRef.current = channelWidths;
-  }, [channelOffsets, channelWidths]);
-
   // Keep peerCursorRef, peerMouseRef, and peerSelectionRef in sync with collaboration store (no React re-renders)
   useEffect(() => {
     const unsub = useCollaborationStore.subscribe((state) => {
@@ -268,6 +262,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       totalChannelsWidth: currentX - LINE_NUMBER_WIDTH
     };
   }, [pattern, instruments, columnVisibility]);
+
+  // Keep channelOffsetsRef/channelWidthsRef in sync for the RAF loop (selection math)
+  useEffect(() => {
+    channelOffsetsRef.current = channelOffsets;
+    channelWidthsRef.current = channelWidths;
+  }, [channelOffsets, channelWidths]);
 
   // Calculate if all channels fit in viewport (for disabling horizontal scroll)
   const allChannelsFit = useMemo(() => {
