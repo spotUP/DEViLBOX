@@ -991,6 +991,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   setActiveView('arrangement');
                 } else if (val === 'dj') {
                   setActiveView('dj');
+                } else if (val === 'drumpad') {
+                  setActiveView('drumpad');
                 } else {
                   setViewMode(val as ViewMode);
                 }
@@ -1004,6 +1006,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               <option value="tb303">TB-303</option>
               <option value="arrangement">Arrangement</option>
               <option value="dj">DJ Mixer</option>
+              <option value="drumpad">Drum Pads</option>
             </select>
           </div>
 
