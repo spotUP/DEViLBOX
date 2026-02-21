@@ -3,7 +3,7 @@
  * Layout: Top bar | [Deck A | Mixer | Deck B] (flex row)
  */
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -11,8 +11,44 @@ import { PixiButton } from '../components';
 import { PixiDJDeck } from './dj/PixiDJDeck';
 import { PixiDJMixer } from './dj/PixiDJMixer';
 import { useUIStore } from '@stores';
+import { useDJStore } from '@stores/useDJStore';
+import { useTransportStore } from '@stores/useTransportStore';
+import { getDJEngine, disposeDJEngine } from '@engine/dj/DJEngine';
+import { clearSongCache } from '@engine/dj/DJSongCache';
+import { getToneEngine } from '@engine/ToneEngine';
+import type { DJEngine } from '@engine/dj/DJEngine';
+import { useDJKeyboardHandler } from '@components/dj/DJKeyboardHandler';
 
 export const PixiDJView: React.FC = () => {
+  const engineRef = useRef<DJEngine | null>(null);
+  const setDJModeActive = useDJStore(s => s.setDJModeActive);
+
+  // DJ keyboard shortcuts
+  useDJKeyboardHandler(true);
+
+  // Initialize DJ engine on mount, clean up on unmount
+  useEffect(() => {
+    const { isPlaying, stop } = useTransportStore.getState();
+    if (isPlaying) stop();
+    getToneEngine().releaseAll();
+
+    engineRef.current = getDJEngine();
+    setDJModeActive(true);
+
+    return () => {
+      setDJModeActive(false);
+      disposeDJEngine();
+      clearSongCache();
+      engineRef.current = null;
+
+      const engine = getToneEngine();
+      engine.setGlobalPlaybackRate(1.0);
+      engine.setGlobalDetune(0);
+      engine.releaseAll();
+      useTransportStore.getState().setGlobalPitch(0);
+    };
+  }, [setDJModeActive]);
+
   return (
     <pixiContainer
       layout={{

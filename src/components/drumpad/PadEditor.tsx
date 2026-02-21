@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import type { DrumPad, FilterType, OutputBus, ScratchActionId } from '../../types/drumpad';
+import type { DrumPad, FilterType, OutputBus, ScratchActionId, PlayMode } from '../../types/drumpad';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
 import { getMIDIManager } from '../../midi/MIDIManager';
@@ -59,6 +59,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
     programs, currentProgramId, updatePad, clearPad,
     midiMappings, setMIDIMapping, clearMIDIMapping,
     addLayerToPad, removeLayerFromPad, updateLayerOnPad,
+    clipboardPad, copyPad, pastePad,
   } = useDrumPadStore();
   const currentProgram = programs.get(currentProgramId);
   const pad = currentProgram?.pads.find(p => p.id === padId);
@@ -168,14 +169,35 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
             {pad.sample ? 'Sample loaded' : 'No sample'}
           </div>
         </div>
-        {onClose && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={onClose}
-            className="text-xs text-text-muted hover:text-white"
+            onClick={() => copyPad(padId)}
+            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-white bg-dark-surface border border-dark-border rounded transition-colors"
+            title="Copy pad settings"
           >
-            Close
+            Copy
           </button>
-        )}
+          <button
+            onClick={() => pastePad(padId)}
+            disabled={!clipboardPad}
+            className={`px-2 py-1 text-[10px] font-mono rounded transition-colors ${
+              clipboardPad
+                ? 'text-text-muted hover:text-white bg-dark-surface border border-dark-border'
+                : 'text-text-muted/30 bg-dark-surface/50 border border-dark-border/50 cursor-not-allowed'
+            }`}
+            title={clipboardPad ? `Paste from Pad ${clipboardPad.id}` : 'Nothing to paste'}
+          >
+            Paste
+          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-xs text-text-muted hover:text-white"
+            >
+              Close
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -267,6 +289,76 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                 <option value="out3">Output 3</option>
                 <option value="out4">Output 4</option>
               </select>
+            </div>
+
+            {/* MPC Controls */}
+            <div className="border-t border-dark-border pt-3 mt-3">
+              <div className="text-[10px] font-mono text-text-muted mb-2 uppercase">MPC</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Mute Group</label>
+                  <select
+                    value={pad.muteGroup}
+                    onChange={(e) => handleUpdate({ muteGroup: parseInt(e.target.value) })}
+                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                  >
+                    <option value={0}>Off</option>
+                    {[1,2,3,4,5,6,7,8].map(g => (
+                      <option key={g} value={g}>Group {g}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Play Mode</label>
+                  <select
+                    value={pad.playMode}
+                    onChange={(e) => handleUpdate({ playMode: e.target.value as PlayMode })}
+                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                  >
+                    <option value="oneshot">One-Shot</option>
+                    <option value="sustain">Sustain</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <label className="flex items-center gap-2 text-xs text-text-muted cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={pad.reverse}
+                    onChange={(e) => handleUpdate({ reverse: e.target.checked })}
+                    className="rounded border-dark-border bg-dark-surface text-accent-primary focus:ring-accent-primary"
+                  />
+                  Reverse
+                </label>
+              </div>
+
+              <div className="mt-3">
+                <label className="block text-xs text-text-muted mb-1">
+                  Sample Start: {Math.round(pad.sampleStart * 100)}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(pad.sampleStart * 100)}
+                  onChange={(e) => handleUpdate({ sampleStart: parseInt(e.target.value) / 100 })}
+                  className="w-full"
+                />
+              </div>
+              <div className="mt-2">
+                <label className="block text-xs text-text-muted mb-1">
+                  Sample End: {Math.round(pad.sampleEnd * 100)}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(pad.sampleEnd * 100)}
+                  onChange={(e) => handleUpdate({ sampleEnd: parseInt(e.target.value) / 100 })}
+                  className="w-full"
+                />
+              </div>
             </div>
 
             {/* MIDI Trigger */}

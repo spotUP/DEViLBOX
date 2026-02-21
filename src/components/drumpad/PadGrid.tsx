@@ -6,9 +6,13 @@ import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react'
 import { PadButton } from './PadButton';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
+import { NoteRepeatEngine } from '../../engine/drumpad/NoteRepeatEngine';
+import type { NoteRepeatRate } from '../../engine/drumpad/NoteRepeatEngine';
 import { getAudioContext, resumeAudioContext } from '../../audio/AudioContextSingleton';
+import { useTransportStore } from '../../stores/useTransportStore';
 import { useOrientation } from '@hooks/useOrientation';
-import type { ScratchActionId } from '../../types/drumpad';
+import type { ScratchActionId, PadBank } from '../../types/drumpad';
+import { getBankPads } from '../../types/drumpad';
 import {
   djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
   djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
@@ -61,8 +65,17 @@ export const PadGrid: React.FC<PadGridProps> = ({
   // Track velocity for each pad (for visual feedback)
   const [padVelocities, setPadVelocities] = useState<Record<number, number>>({});
 
-  // Track focused pad for keyboard navigation
+  // Track focused pad for keyboard navigation (uses bank-relative IDs)
   const [focusedPadId, setFocusedPadId] = useState<number>(1);
+
+  // Ref for noteRepeatEnabled to avoid stale closure in callbacks
+  const noteRepeatEnabledRef = useRef(false);
+
+  // Track held pads for sustain mode
+  const heldPadsRef = useRef<Set<number>>(new Set());
+
+  // Current bank
+  const { currentBank, setBank } = useDrumPadStore();
 
   const { isPortrait } = useOrientation();
   const gridCols = isPortrait ? 2 : 4; // 2x8 grid on portrait, 4x4 on landscape
@@ -72,6 +85,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
   // Audio engine instance
   const engineRef = useRef<DrumPadEngine | null>(null);
+  const noteRepeatRef = useRef<NoteRepeatEngine | null>(null);
 
   // Grid container ref for keyboard focus
   const gridRef = useRef<HTMLDivElement>(null);
@@ -80,11 +94,13 @@ export const PadGrid: React.FC<PadGridProps> = ({
   useEffect(() => {
     const audioContext = getAudioContext();
     engineRef.current = new DrumPadEngine(audioContext);
+    noteRepeatRef.current = new NoteRepeatEngine(engineRef.current);
 
     // Load persisted audio samples from IndexedDB
     useDrumPadStore.getState().loadFromIndexedDB(audioContext);
 
     return () => {
+      noteRepeatRef.current?.dispose();
       engineRef.current?.dispose();
     };
   }, []);
@@ -95,6 +111,37 @@ export const PadGrid: React.FC<PadGridProps> = ({
       engineRef.current.setMasterLevel(currentProgram.masterLevel);
     }
   }, [currentProgram?.masterLevel]);
+
+  // Sync mute groups to engine when program changes
+  useEffect(() => {
+    if (engineRef.current && currentProgram) {
+      engineRef.current.setMuteGroups(currentProgram.pads);
+    }
+  }, [currentProgram]);
+
+  // Sync note repeat state
+  const noteRepeatEnabled = useDrumPadStore(s => s.noteRepeatEnabled);
+  const noteRepeatRate = useDrumPadStore(s => s.noteRepeatRate);
+  const bpm = useTransportStore(s => s.bpm);
+
+  // Reset focused pad when bank changes
+  useEffect(() => {
+    const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
+    setFocusedPadId(bankOffset + 1);
+  }, [currentBank]);
+
+  useEffect(() => {
+    noteRepeatEnabledRef.current = noteRepeatEnabled;
+    noteRepeatRef.current?.setEnabled(noteRepeatEnabled);
+  }, [noteRepeatEnabled]);
+
+  useEffect(() => {
+    noteRepeatRef.current?.setRate(noteRepeatRate as NoteRepeatRate);
+  }, [noteRepeatRate]);
+
+  useEffect(() => {
+    noteRepeatRef.current?.setBpm(bpm);
+  }, [bpm]);
 
   // Sync bus levels from store to engine
   const busLevels = useDrumPadStore(s => s.busLevels);
@@ -123,6 +170,16 @@ export const PadGrid: React.FC<PadGridProps> = ({
         if (pad.sample) {
           engineRef.current.triggerPad(pad, velocity);
         }
+        // Track held pads for sustain mode
+        if (pad.playMode === 'sustain') {
+          heldPadsRef.current.add(padId);
+        }
+
+        // Start note repeat if enabled (use ref to avoid stale closure)
+        if (noteRepeatEnabledRef.current && noteRepeatRef.current) {
+          noteRepeatRef.current.startRepeat(pad, velocity);
+          heldPadsRef.current.add(padId); // Track for release
+        }
       }
     }
 
@@ -132,18 +189,39 @@ export const PadGrid: React.FC<PadGridProps> = ({
     }, 200);
   }, [currentProgram]);
 
-  // Arrange pads in 4x4 grid (memoized for performance)
-  const rows = useMemo(() => {
-    if (!currentProgram) return [];
-    return [
-      currentProgram.pads.slice(0, 4),
-      currentProgram.pads.slice(4, 8),
-      currentProgram.pads.slice(8, 12),
-      currentProgram.pads.slice(12, 16),
-    ];
+  const handlePadRelease = useCallback((padId: number) => {
+    if (!heldPadsRef.current.has(padId)) return;
+    heldPadsRef.current.delete(padId);
+
+    // Stop note repeat
+    noteRepeatRef.current?.stopRepeat(padId);
+
+    if (currentProgram && engineRef.current) {
+      const pad = currentProgram.pads.find(p => p.id === padId);
+      if (pad && pad.playMode === 'sustain') {
+        engineRef.current.stopPad(padId, pad.release / 1000);
+      }
+    }
   }, [currentProgram]);
 
-  // Keyboard navigation (arrow keys)
+  // Get pads for current bank (memoized for performance)
+  const bankPads = useMemo(() => {
+    if (!currentProgram) return [];
+    return getBankPads(currentProgram.pads, currentBank);
+  }, [currentProgram, currentBank]);
+
+  // Arrange pads in 4x4 grid (memoized for performance)
+  const rows = useMemo(() => {
+    if (bankPads.length === 0) return [];
+    return [
+      bankPads.slice(0, 4),
+      bankPads.slice(4, 8),
+      bankPads.slice(8, 12),
+      bankPads.slice(12, 16),
+    ];
+  }, [bankPads]);
+
+  // Keyboard navigation (arrow keys) - bank-aware
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Don't handle if focus is on input element
@@ -156,24 +234,29 @@ export const PadGrid: React.FC<PadGridProps> = ({
         return;
       }
 
+      // Calculate bank-aware bounds
+      const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
+      const bankStart = bankOffset + 1;
+      const bankEnd = bankOffset + 16;
+
       let newFocusedId = focusedPadId;
 
       switch (event.key) {
         case 'ArrowLeft':
           event.preventDefault();
-          newFocusedId = focusedPadId > 1 ? focusedPadId - 1 : 16;
+          newFocusedId = focusedPadId > bankStart ? focusedPadId - 1 : bankEnd;
           break;
         case 'ArrowRight':
           event.preventDefault();
-          newFocusedId = focusedPadId < 16 ? focusedPadId + 1 : 1;
+          newFocusedId = focusedPadId < bankEnd ? focusedPadId + 1 : bankStart;
           break;
         case 'ArrowUp':
           event.preventDefault();
-          newFocusedId = focusedPadId > 4 ? focusedPadId - 4 : focusedPadId + 12;
+          newFocusedId = focusedPadId > bankStart + 3 ? focusedPadId - 4 : focusedPadId + 12;
           break;
         case 'ArrowDown':
           event.preventDefault();
-          newFocusedId = focusedPadId <= 12 ? focusedPadId + 4 : focusedPadId - 12;
+          newFocusedId = focusedPadId <= bankEnd - 4 ? focusedPadId + 4 : focusedPadId - 12;
           break;
         case 'Enter':
         case ' ':
@@ -183,11 +266,10 @@ export const PadGrid: React.FC<PadGridProps> = ({
           break;
         case 'Tab':
           // Don't prevent default for Tab - let it navigate normally
-          // Just update our focus state to match
           if (event.shiftKey) {
-            newFocusedId = focusedPadId > 1 ? focusedPadId - 1 : 16;
+            newFocusedId = focusedPadId > bankStart ? focusedPadId - 1 : bankEnd;
           } else {
-            newFocusedId = focusedPadId < 16 ? focusedPadId + 1 : 1;
+            newFocusedId = focusedPadId < bankEnd ? focusedPadId + 1 : bankStart;
           }
           break;
         default:
@@ -199,7 +281,6 @@ export const PadGrid: React.FC<PadGridProps> = ({
         // Announce to screen readers
         const pad = currentProgram?.pads.find(p => p.id === newFocusedId);
         if (pad) {
-          // Create hidden live region for announcements if it doesn't exist
           let liveRegion = document.getElementById('pad-navigation-announcer');
           if (!liveRegion) {
             liveRegion = document.createElement('div');
@@ -217,7 +298,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusedPadId, currentProgram, handlePadTrigger]);
+  }, [focusedPadId, currentProgram, currentBank, handlePadTrigger]);
 
   if (!currentProgram) {
     return (
@@ -226,6 +307,10 @@ export const PadGrid: React.FC<PadGridProps> = ({
       </div>
     );
   }
+
+  const bankButtons: PadBank[] = ['A', 'B', 'C', 'D'];
+  const bankLoadedCount = bankPads.filter(p => p.sample !== null).length;
+  const totalLoadedCount = currentProgram.pads.filter(p => p.sample !== null).length;
 
   return (
     <div className="flex flex-col gap-2 p-4">
@@ -280,10 +365,28 @@ export const PadGrid: React.FC<PadGridProps> = ({
           >
             Import
           </button>
-          <div className="text-xs text-text-muted">
-            {currentProgram.pads.filter(p => p.sample !== null).length} / 16
+          <div className="text-xs text-text-muted" title={`${totalLoadedCount} samples across all banks`}>
+            {bankLoadedCount}/16 ({totalLoadedCount}/64)
           </div>
         </div>
+      </div>
+
+      {/* Bank selector */}
+      <div className="flex items-center gap-1 mb-1">
+        <span className="text-[10px] font-mono text-text-muted mr-1">BANK</span>
+        {bankButtons.map(bank => (
+          <button
+            key={bank}
+            onClick={() => setBank(bank)}
+            className={`px-3 py-1 text-xs font-bold font-mono rounded transition-colors ${
+              currentBank === bank
+                ? 'bg-accent-primary text-white'
+                : 'bg-dark-surface border border-dark-border text-text-muted hover:text-white'
+            }`}
+          >
+            {bank}
+          </button>
+        ))}
       </div>
 
       {/* Responsive Pad Grid (4x4 landscape, 2x8 portrait) */}
@@ -301,6 +404,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
             isFocused={focusedPadId === pad.id}
             velocity={padVelocities[pad.id] || 0}
             onTrigger={handlePadTrigger}
+            onRelease={handlePadRelease}
             onSelect={onPadSelect}
             onFocus={() => setFocusedPadId(pad.id)}
           />

@@ -16,6 +16,7 @@ import { PixiStatusBar } from './shell/PixiStatusBar';
 import { PixiTrackerView } from './views/PixiTrackerView';
 import { PixiDJView } from './views/PixiDJView';
 import { PixiArrangementView } from './views/PixiArrangementView';
+import { PixiPianoRollView } from './views/PixiPianoRollView';
 
 
 export const PixiRoot: React.FC = () => {
@@ -51,6 +52,7 @@ export const PixiRoot: React.FC = () => {
         {(activeView === 'tracker' || activeView === 'drumpad') && <PixiTrackerView />}
         {activeView === 'arrangement' && <PixiArrangementView />}
         {activeView === 'dj' && <PixiDJView />}
+        {activeView === 'pianoroll' && <PixiPianoRollView />}
       </pixiContainer>
 
       {/* Status bar */}

@@ -23,6 +23,8 @@ export class DrumPadEngine {
   private masterGain: GainNode;
   private voices: Map<number, VoiceState> = new Map();
   private outputs: Map<string, GainNode> = new Map();
+  private muteGroups: Map<number, number> = new Map(); // padId -> muteGroup
+  private reversedBufferCache: WeakMap<AudioBuffer, AudioBuffer> = new WeakMap();
 
   constructor(context: AudioContext) {
     this.context = context;
@@ -38,6 +40,41 @@ export class DrumPadEngine {
       gain.connect(this.masterGain);
       this.outputs.set(bus, gain);
     });
+  }
+
+  /**
+   * Set mute group assignments for all pads
+   */
+  setMuteGroups(pads: DrumPad[]): void {
+    this.muteGroups.clear();
+    for (const pad of pads) {
+      if (pad.muteGroup > 0) {
+        this.muteGroups.set(pad.id, pad.muteGroup);
+      }
+    }
+  }
+
+  /**
+   * Get or lazily create a reversed copy of an AudioBuffer
+   */
+  private getReversedBuffer(buffer: AudioBuffer): AudioBuffer {
+    const cached = this.reversedBufferCache.get(buffer);
+    if (cached) return cached;
+
+    const reversed = this.context.createBuffer(
+      buffer.numberOfChannels,
+      buffer.length,
+      buffer.sampleRate
+    );
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const src = buffer.getChannelData(ch);
+      const dst = reversed.getChannelData(ch);
+      for (let i = 0; i < src.length; i++) {
+        dst[i] = src[src.length - 1 - i];
+      }
+    }
+    this.reversedBufferCache.set(buffer, reversed);
+    return reversed;
   }
 
   /**
@@ -61,6 +98,20 @@ export class DrumPadEngine {
     if (!sampleBuffer) {
       console.warn(`[DrumPadEngine] Pad ${pad.id} has no sample`);
       return;
+    }
+
+    // Handle reverse: use reversed buffer
+    if (pad.reverse) {
+      sampleBuffer = this.getReversedBuffer(sampleBuffer);
+    }
+
+    // Mute group choking: stop all voices in the same non-zero mute group
+    if (pad.muteGroup > 0) {
+      for (const [otherPadId, otherGroup] of this.muteGroups.entries()) {
+        if (otherGroup === pad.muteGroup && otherPadId !== pad.id) {
+          this.stopPad(otherPadId);
+        }
+      }
     }
 
     // Stop any existing voice for this pad
@@ -134,11 +185,23 @@ export class DrumPadEngine {
     const outputBus = this.outputs.get(pad.output) || this.masterGain;
     gainNode.connect(outputBus);
 
-    // Start playback
-    source.start(now);
+    // Calculate sample start/end offsets
+    // When reversed, flip the start/end so sampleStart=0 still plays from the "beginning" of the reversed buffer
+    let startOffset: number;
+    let playDuration: number;
+    if (pad.reverse) {
+      startOffset = (1 - pad.sampleEnd) * sampleBuffer.duration;
+      playDuration = (pad.sampleEnd - pad.sampleStart) * sampleBuffer.duration;
+    } else {
+      startOffset = pad.sampleStart * sampleBuffer.duration;
+      playDuration = (pad.sampleEnd - pad.sampleStart) * sampleBuffer.duration;
+    }
+
+    // Start playback with sample start/end
+    source.start(now, startOffset, playDuration);
 
     // Schedule cleanup using Web Audio (sample-accurate)
-    const duration = sampleBuffer.duration / source.playbackRate.value;
+    const duration = playDuration / source.playbackRate.value;
     const cleanupTime = now + duration + releaseTime + 0.1; // Extra 100ms buffer
 
     // Create silent buffer to trigger cleanup at exact time
@@ -170,9 +233,9 @@ export class DrumPadEngine {
   }
 
   /**
-   * Stop a pad immediately (note off)
+   * Stop a pad (note off). Optional releaseTime in seconds for sustain mode pads.
    */
-  stopPad(padId: number): void {
+  stopPad(padId: number, releaseTime?: number): void {
     const voice = this.voices.get(padId);
     if (!voice || voice.noteOffTime !== null) {
       return;
@@ -182,13 +245,15 @@ export class DrumPadEngine {
     const now = this.context.currentTime;
     voice.noteOffTime = now;
 
+    const fadeTime = releaseTime ?? 0.1; // Default 100ms release
+
     // Release envelope (linear ramp to 0)
     voice.gainNode.gain.cancelScheduledValues(now);
     voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, now);
-    voice.gainNode.gain.linearRampToValueAtTime(0, now + 0.1); // 100ms release
+    voice.gainNode.gain.linearRampToValueAtTime(0, now + fadeTime);
 
     // Schedule cleanup using Web Audio (sample-accurate)
-    const cleanupTime = now + 0.15; // 150ms total
+    const cleanupTime = now + fadeTime + 0.05; // Extra 50ms buffer
     const silentBuffer = this.context.createBuffer(1, 1, this.context.sampleRate);
     const cleanupSource = this.context.createBufferSource();
     cleanupSource.buffer = silentBuffer;

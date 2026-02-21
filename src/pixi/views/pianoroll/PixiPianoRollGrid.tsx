@@ -1,10 +1,14 @@
 /**
- * PixiPianoRollGrid — Note grid with scale highlighting and note rectangles.
+ * PixiPianoRollGrid — Interactive note grid with scale highlighting and note rectangles.
+ * Supports draw, erase, and select tool modes.
  */
 
 import { useCallback } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
+import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
+import { usePianoRollStore } from '@stores';
+import { useTrackerStore } from '@stores';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 
 interface Note {
   note: number;      // MIDI note 0-127
@@ -24,6 +28,7 @@ interface PixiPianoRollGridProps {
   totalBeats?: number;
   gridDivision?: number;
   selectedNotes?: Set<number>;
+  onNotesChanged?: () => void;
 }
 
 const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
@@ -39,8 +44,51 @@ export const PixiPianoRollGrid: React.FC<PixiPianoRollGridProps> = ({
   totalBeats = 64,
   gridDivision = 4,
   selectedNotes,
+  onNotesChanged,
 }) => {
   const theme = usePixiTheme();
+
+  // Convert screen position to grid coordinates
+  const screenToGrid = useCallback((localX: number, localY: number) => {
+    const beat = Math.floor(localX / pixelsPerBeat + scrollBeat);
+    const midiNote = Math.floor((height - localY) / noteHeight + scrollNote);
+    return { beat: Math.max(0, beat), midiNote: Math.max(0, Math.min(127, midiNote)) };
+  }, [pixelsPerBeat, scrollBeat, noteHeight, scrollNote, height]);
+
+  // Handle pointer interaction based on active tool
+  const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
+    const tool = usePianoRollStore.getState().tool;
+    const local = e.getLocalPosition(e.currentTarget);
+    const { beat, midiNote } = screenToGrid(local.x, local.y);
+
+    const ts = useTrackerStore.getState();
+    const view = usePianoRollStore.getState().view;
+    const pat = ts.patterns[ts.currentPatternIndex];
+    if (!pat || beat >= pat.length) return;
+
+    const channelIndex = view.channelIndex;
+    // Convert MIDI note back to tracker note (subtract 11 as PixiPianoRollView adds 11)
+    const trackerNote = midiNote - 11;
+    if (trackerNote < 1 || trackerNote > 96) return;
+
+    if (tool === 'draw') {
+      // Place a note at the clicked position
+      const instrumentId = useInstrumentStore.getState().currentInstrumentId ?? 1;
+      ts.setCell(channelIndex, beat, {
+        note: trackerNote,
+        instrument: instrumentId,
+        volume: 64,
+      });
+      onNotesChanged?.();
+    } else if (tool === 'erase') {
+      // Find if there's a note at this position and clear it
+      const ch = pat.channels[channelIndex];
+      if (ch && ch.rows[beat] && ch.rows[beat].note > 0) {
+        ts.clearCell(channelIndex, beat);
+        onNotesChanged?.();
+      }
+    }
+  }, [screenToGrid, onNotesChanged]);
 
   const drawGrid = useCallback((g: GraphicsType) => {
     g.clear();
@@ -107,7 +155,12 @@ export const PixiPianoRollGrid: React.FC<PixiPianoRollGridProps> = ({
   }, [width, height, notes, noteHeight, pixelsPerBeat, scrollNote, scrollBeat, totalBeats, gridDivision, selectedNotes, theme]);
 
   return (
-    <pixiContainer layout={{ width, height }}>
+    <pixiContainer
+      layout={{ width, height }}
+      eventMode="static"
+      cursor="crosshair"
+      onPointerDown={handlePointerDown}
+    >
       <pixiGraphics draw={drawGrid} layout={{ position: 'absolute', width, height }} />
     </pixiContainer>
   );

@@ -4,7 +4,7 @@
  * Row 2: Menu bar buttons (Load, Save, Export, etc.)
  */
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
@@ -105,6 +105,30 @@ const PixiFT2MainRow: React.FC = () => {
     g.rect(0, TOOLBAR_HEIGHT - 1, 4000, 1);
     g.fill({ color: theme.border.color, alpha: theme.border.alpha });
   }, [theme]);
+
+  // Tap tempo
+  const tapTimesRef = useRef<number[]>([]);
+  const handleTapTempo = useCallback(() => {
+    const now = performance.now();
+    const taps = tapTimesRef.current;
+    // Reset if last tap was more than 2 seconds ago
+    if (taps.length > 0 && now - taps[taps.length - 1] > 2000) {
+      tapTimesRef.current = [];
+    }
+    taps.push(now);
+    if (taps.length > 8) taps.shift(); // Keep last 8 taps
+    if (taps.length >= 2) {
+      const intervals = [];
+      for (let i = 1; i < taps.length; i++) {
+        intervals.push(taps[i] - taps[i - 1]);
+      }
+      const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      const bpm = Math.round(60000 / avg);
+      if (bpm >= 32 && bpm <= 255) {
+        useTransportStore.getState().setBPM(bpm);
+      }
+    }
+  }, []);
 
   const isPlayingSong = isPlaying && !isLooping;
   const isPlayingPattern = isPlaying && isLooping;
@@ -220,37 +244,19 @@ const PixiFT2MainRow: React.FC = () => {
           active={isPlayingPattern}
           onClick={handlePlayPattern}
         />
+        <PixiButton
+          label="TAP"
+          variant="ghost"
+          size="sm"
+          onClick={handleTapTempo}
+        />
       </pixiContainer>
 
       {/* Spacer */}
       <pixiContainer layout={{ flex: 1 }} />
 
-      {/* Visualizer region placeholder */}
-      <pixiContainer
-        layout={{
-          width: 120,
-          height: 64,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <pixiGraphics
-          draw={(g: GraphicsType) => {
-            g.clear();
-            g.roundRect(0, 0, 120, 64, 4);
-            g.fill({ color: theme.bg.color });
-            g.roundRect(0, 0, 120, 64, 4);
-            g.stroke({ color: theme.border.color, alpha: 0.3, width: 1 });
-          }}
-          layout={{ position: 'absolute', width: 120, height: 64 }}
-        />
-        <pixiBitmapText
-          text="VIZ"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-          tint={theme.textMuted.color}
-          layout={{}}
-        />
-      </pixiContainer>
+      {/* Spectrum visualizer */}
+      <PixiSpectrumVisualizer />
     </pixiContainer>
   );
 };
@@ -305,6 +311,19 @@ const PixiFT2MenuBar: React.FC = () => {
     s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx');
   }, []);
 
+  const handleInstrFX = useCallback(() => {
+    const s = useUIStore.getState();
+    s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx');
+  }, []);
+
+  const handleAdvancedEdit = useCallback(() => {
+    useUIStore.getState().openModal('advancedEdit');
+  }, []);
+
+  const handleAutomation = useCallback(() => {
+    useUIStore.getState().openModal('automation');
+  }, []);
+
   const handleReference = useCallback(() => {
     useUIStore.getState().openModal('help', { initialTab: 'chip-effects' });
   }, []);
@@ -354,6 +373,9 @@ const PixiFT2MenuBar: React.FC = () => {
     { label: 'Instr', onClick: handleInstruments },
     { label: 'Pads', onClick: handlePads },
     { label: 'Master FX', onClick: handleMasterFX, active: modalOpen === 'masterFx' },
+    { label: 'Instr FX', onClick: handleInstrFX, active: modalOpen === 'instrumentFx' },
+    { label: 'Edit', onClick: handleAdvancedEdit, active: modalOpen === 'advancedEdit' },
+    { label: 'Auto', onClick: handleAutomation, active: modalOpen === 'automation' },
     { label: 'Reference', onClick: handleReference },
     { label: 'Help', onClick: handleHelp },
     { label: 'Settings', onClick: handleSettings },
@@ -417,5 +439,104 @@ const PixiToolbarSep: React.FC = () => {
       }}
       layout={{ width: 1, height: TOOLBAR_HEIGHT }}
     />
+  );
+};
+
+// ─── Spectrum Visualizer ─────────────────────────────────────────────────────
+
+const VIZ_WIDTH = 120;
+const VIZ_HEIGHT = 64;
+const VIZ_BARS = 32;
+
+const PixiSpectrumVisualizer: React.FC = () => {
+  const theme = usePixiTheme();
+  const graphicsRef = useRef<GraphicsType | null>(null);
+  const isPlaying = useTransportStore(s => s.isPlaying);
+
+  useEffect(() => {
+    if (!isPlaying || !graphicsRef.current) return;
+
+    let rafId: number;
+    const draw = () => {
+      const g = graphicsRef.current;
+      if (!g) return;
+
+      g.clear();
+
+      // Background
+      g.roundRect(0, 0, VIZ_WIDTH, VIZ_HEIGHT, 4);
+      g.fill({ color: theme.bg.color });
+      g.roundRect(0, 0, VIZ_WIDTH, VIZ_HEIGHT, 4);
+      g.stroke({ color: theme.border.color, alpha: 0.3, width: 1 });
+
+      try {
+        const engine = getToneEngine();
+        const fftData = engine.getFFT();
+        const barWidth = (VIZ_WIDTH - 8) / VIZ_BARS;
+        const step = Math.floor(fftData.length / VIZ_BARS);
+
+        for (let i = 0; i < VIZ_BARS; i++) {
+          // Average a range of FFT bins for each bar
+          let sum = 0;
+          for (let j = 0; j < step; j++) {
+            sum += fftData[i * step + j] ?? -100;
+          }
+          const db = sum / step;
+          // Normalize: -100dB = 0, 0dB = 1
+          const normalized = Math.max(0, Math.min(1, (db + 100) / 100));
+          const barH = normalized * (VIZ_HEIGHT - 8);
+
+          if (barH > 0.5) {
+            const x = 4 + i * barWidth;
+            const y = VIZ_HEIGHT - 4 - barH;
+            g.rect(x, y, barWidth - 1, barH);
+            g.fill({ color: theme.accent.color, alpha: 0.4 + normalized * 0.6 });
+          }
+        }
+      } catch {
+        // Engine not ready — draw empty
+      }
+
+      rafId = requestAnimationFrame(draw);
+    };
+
+    rafId = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(rafId);
+  }, [isPlaying, theme]);
+
+  // Static background when not playing
+  const drawStatic = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.roundRect(0, 0, VIZ_WIDTH, VIZ_HEIGHT, 4);
+    g.fill({ color: theme.bg.color });
+    g.roundRect(0, 0, VIZ_WIDTH, VIZ_HEIGHT, 4);
+    g.stroke({ color: theme.border.color, alpha: 0.3, width: 1 });
+  }, [theme]);
+
+  return (
+    <pixiContainer
+      layout={{ width: VIZ_WIDTH, height: VIZ_HEIGHT, justifyContent: 'center', alignItems: 'center' }}
+    >
+      {isPlaying ? (
+        <pixiGraphics
+          ref={graphicsRef}
+          draw={() => {}} // Initial draw — rAF loop takes over
+          layout={{ position: 'absolute', width: VIZ_WIDTH, height: VIZ_HEIGHT }}
+        />
+      ) : (
+        <>
+          <pixiGraphics
+            draw={drawStatic}
+            layout={{ position: 'absolute', width: VIZ_WIDTH, height: VIZ_HEIGHT }}
+          />
+          <pixiBitmapText
+            text="SPECTRUM"
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+            layout={{}}
+          />
+        </>
+      )}
+    </pixiContainer>
   );
 };
