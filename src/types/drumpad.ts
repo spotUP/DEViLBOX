@@ -4,6 +4,13 @@
 
 export type OutputBus = 'stereo' | 'out1' | 'out2' | 'out3' | 'out4';
 export type FilterType = 'lpf' | 'hpf' | 'bpf' | 'off';
+export type PlayMode = 'oneshot' | 'sustain';
+export type PadBank = 'A' | 'B' | 'C' | 'D';
+
+export interface MpcResampleConfig {
+  enabled: boolean;
+  model: 'MPC60' | 'MPC3000' | 'SP1200' | 'MPC2000XL';
+}
 
 export interface SampleData {
   id: string;
@@ -11,6 +18,8 @@ export interface SampleData {
   audioBuffer: AudioBuffer;
   duration: number;
   sampleRate: number;
+  reversedBuffer?: AudioBuffer;
+  originalAudioBuffer?: AudioBuffer;
 }
 
 export interface SampleLayer {
@@ -30,7 +39,7 @@ export type ScratchActionId =
   | 'lfo_off' | 'lfo_14' | 'lfo_18' | 'lfo_116' | 'lfo_132';
 
 export interface DrumPad {
-  id: number;              // 1-16
+  id: number;              // 1-64
   sample: SampleData | null;
   name: string;
 
@@ -51,6 +60,13 @@ export interface DrumPad {
   cutoff: number;          // 20-20000 Hz
   resonance: number;       // 0-100%
 
+  // MPC features
+  muteGroup: number;       // 0 = none, 1-8 = mute group
+  playMode: PlayMode;      // 'oneshot' or 'sustain'
+  sampleStart: number;     // 0-1 normalized (default 0)
+  sampleEnd: number;       // 0-1 normalized (default 1)
+  reverse: boolean;        // default false
+
   // Layers (velocity switching)
   layers: SampleLayer[];
 
@@ -61,9 +77,10 @@ export interface DrumPad {
 export interface DrumProgram {
   id: string;              // 'A-01' to 'Z-99'
   name: string;
-  pads: DrumPad[];         // 16 pads
+  pads: DrumPad[];         // 64 pads (4 banks of 16)
   masterLevel: number;     // 0-127
   masterTune: number;      // -12 to +12 semitones
+  mpcResample?: MpcResampleConfig;
 }
 
 export interface MIDIMapping {
@@ -102,6 +119,11 @@ export function createEmptyPad(id: number): DrumPad {
     filterType: 'off',
     cutoff: 20000,
     resonance: 0,
+    muteGroup: 0,
+    playMode: 'oneshot',
+    sampleStart: 0,
+    sampleEnd: 1,
+    reverse: false,
     layers: [],
   };
 }
@@ -113,10 +135,24 @@ export function createEmptyProgram(id: string, name: string): DrumProgram {
   return {
     id,
     name,
-    pads: Array.from({ length: 16 }, (_, i) => createEmptyPad(i + 1)),
+    pads: Array.from({ length: 64 }, (_, i) => createEmptyPad(i + 1)),
     masterLevel: 100,
     masterTune: 0,
   };
+}
+
+/** Get the bank letter for a pad ID (1-64) */
+export function getPadBank(padId: number): PadBank {
+  if (padId <= 16) return 'A';
+  if (padId <= 32) return 'B';
+  if (padId <= 48) return 'C';
+  return 'D';
+}
+
+/** Get the 16 pads for a given bank */
+export function getBankPads(pads: DrumPad[], bank: PadBank): DrumPad[] {
+  const bankIndex = { A: 0, B: 1, C: 2, D: 3 }[bank];
+  return pads.slice(bankIndex * 16, (bankIndex + 1) * 16);
 }
 
 /**

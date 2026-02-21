@@ -3,7 +3,7 @@
  * Layout: Toolbar (top) | [Piano keyboard | Note grid] (flex row) | Velocity lane
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PixiButton, PixiLabel } from '../components';
@@ -24,6 +24,9 @@ export const PixiPianoRollView: React.FC = () => {
   const tool = usePianoRollStore(s => s.tool);
   const setTool = usePianoRollStore(s => s.setTool);
   const view = usePianoRollStore(s => s.view);
+  // Version counter to force note recalculation after edits
+  const [noteVersion, setNoteVersion] = useState(0);
+  const handleNotesChanged = useCallback(() => setNoteVersion(v => v + 1), []);
 
   // Get notes from the current pattern/channel
   const notes = useMemo(() => {
@@ -53,7 +56,8 @@ export const PixiPianoRollView: React.FC = () => {
       }
     }
     return result;
-  }, [view.channelIndex]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.channelIndex, noteVersion]);
 
   const handleCycleGrid = useCallback(() => {
     const s = usePianoRollStore.getState();
@@ -162,6 +166,7 @@ export const PixiPianoRollView: React.FC = () => {
           width={4000}
           height={4000}
           notes={notes}
+          onNotesChanged={handleNotesChanged}
         />
       </pixiContainer>
 

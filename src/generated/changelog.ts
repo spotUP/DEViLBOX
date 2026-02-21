@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-21T01:32:34.462Z
+ * Generated: 2026-02-21T09:22:32.614Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1052';
-export const BUILD_NUMBER = '1052';
-export const BUILD_HASH = '1b7f9fae';
+export const BUILD_VERSION = '1.0.1066';
+export const BUILD_NUMBER = '1066';
+export const BUILD_HASH = '38617095';
 export const BUILD_DATE = '2026-02-21';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,65 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1052',
+    version: '1.0.1066',
     date: '2026-02-21',
     changes: [
+      {
+        type: 'fix',
+        "description": "Camera (mugshot) starts muted by default"
+      },
+      {
+        type: 'fix',
+        "description": "Use original slot ID for MOD instruments with empty slots"
+      },
+      {
+        type: 'feature',
+        "description": "Improve piano roll view and keyboard layout commands"
+      },
+      {
+        type: 'fix',
+        "description": "Convert drum pad view from modal to inline view"
+      },
+      {
+        type: 'feature',
+        "description": "Add drum pads to editor view tabs"
+      },
+      {
+        type: 'improvement',
+        "description": "Merge drumpad and instrument sample browsers"
+      },
+      {
+        type: 'feature',
+        "description": "Enhance engine, store, pad grid, and add persistence"
+      },
+      {
+        type: 'feature',
+        "description": "Improve WebGL views, status bar, and DJ deck rendering"
+      },
+      {
+        type: 'feature',
+        "description": "Enhance scratch engine with new patterns and fader LFO"
+      },
+      {
+        type: 'feature',
+        "description": "Add Scratch Originals sample pack"
+      },
+      {
+        type: 'feature',
+        "description": "Global SVG arrow cursor for peer mouse + fix caret offset"
+      },
+      {
+        type: 'fix',
+        "description": "Peer cursor now renders as a cell block matching local cursor shape"
+      },
+      {
+        type: 'fix',
+        "description": "Replace peer cursor full-row highlight with thin channel caret"
+      },
+      {
+        type: 'fix',
+        "description": "Achieve 100% FT2 effect command coverage"
+      },
       {
         type: 'fix',
         "description": "Remove unused posJumpPos field in TrackerReplayer"
@@ -182,62 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Expand DJ controls, button mapping, controller profiles, and master FX routing"
-      },
-      {
-        type: 'feature',
-        "description": "Upgrade scratch engine with 10 patterns and indefinite fader scheduling"
-      },
-      {
-        type: 'feature',
-        "description": "Add general-purpose Randomize dialog for pattern editor"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve erasableSyntaxOnly and unused import errors"
-      },
-      {
-        type: 'feature',
-        "description": "Context-aware DJ routing for knobs, pitch bend, and mod wheel"
-      },
-      {
-        type: 'feature',
-        "description": "Add per-pad DJ scratch action with editor UI"
-      },
-      {
-        type: 'feature',
-        "description": "Add scratch preset UI, fader LFO, and keyboard commands"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(keyboard-schemes): strip trailing blank lines from JSON scheme files"
-      },
-      {
-        type: 'feature',
-        "description": "Add true reverse scratch with ring-buffer AudioWorklet"
-      },
-      {
-        type: 'fix',
-        "description": "Fix instrument ID mismatch for empty module slots in DJ mode"
-      },
-      {
-        type: 'feature',
-        "description": "Add quick-nav keyboard shortcut (0-9, a-z) to file browser"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate modland.com browser into main file browser"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract module parser from App.tsx, improve status bar and layout"
-      },
-      {
-        type: 'feature',
-        "description": "Major DJ mode overhaul with per-deck routing, visualizers, and playlists"
-      },
-      {
-        type: 'fix',
-        "description": "Guard DB303 against redundant DSP-reinitializing param sends"
       }
     ]
   }

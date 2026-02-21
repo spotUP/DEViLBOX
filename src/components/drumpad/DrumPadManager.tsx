@@ -9,7 +9,7 @@ import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
-import type { SampleData } from '../../types/drumpad';
+import type { SampleData, MpcResampleConfig } from '../../types/drumpad';
 import {
   getAllKitSources,
   loadKitSource,
@@ -59,6 +59,10 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     setPreference,
     busLevels,
     setBusLevel,
+    noteRepeatEnabled,
+    noteRepeatRate,
+    setNoteRepeatEnabled,
+    setNoteRepeatRate,
   } = useDrumPadStore();
 
   // Get all available kit sources (presets + sample packs)
@@ -231,18 +235,20 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
     };
   }, []);
 
-  // Keyboard shortcuts for triggering pads
+  // Keyboard shortcuts for triggering pads (bank-aware)
+  // Uses mousedown simulation on pad buttons instead of broken click approach
+  const currentBank = useDrumPadStore(s => s.currentBank);
   useEffect(() => {
-    // Map keys to pad IDs (QWERTY keyboard layout)
-    const keyMap: Record<string, number> = {
-      // Top row: Q W E R (pads 1-4)
-      'q': 1, 'w': 2, 'e': 3, 'r': 4,
-      // Second row: A S D F (pads 5-8)
-      'a': 5, 's': 6, 'd': 7, 'f': 8,
-      // Third row: Z X C V (pads 9-12)
-      'z': 9, 'x': 10, 'c': 11, 'v': 12,
-      // Fourth row: T G B (pads 13-16)
-      't': 13, 'g': 14, 'b': 15, 'n': 16,
+    // Map keys to pad index within bank (0-15)
+    const keyToPadIndex: Record<string, number> = {
+      // Top row: Q W E R (pads 0-3)
+      'q': 0, 'w': 1, 'e': 2, 'r': 3,
+      // Second row: A S D F (pads 4-7)
+      'a': 4, 's': 5, 'd': 6, 'f': 7,
+      // Third row: Z X C V (pads 8-11)
+      'z': 8, 'x': 9, 'c': 10, 'v': 11,
+      // Fourth row: T G B N (pads 12-15)
+      't': 12, 'g': 13, 'b': 14, 'n': 15,
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -255,20 +261,29 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
         target.isContentEditable;
 
       const key = event.key.toLowerCase();
-      const padId = keyMap[key];
+      const padIndex = keyToPadIndex[key];
 
-      if (padId) {
-        // Only trigger pads if not typing in an input
+      if (padIndex !== undefined) {
         if (!isInputFocused) {
+          // Calculate bank-aware pad ID
+          const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
+          const padId = bankOffset + padIndex + 1;
           const program = programs.get(currentProgramId);
           if (program) {
             event.preventDefault();
             const pad = program.pads.find((p) => p.id === padId);
             if (pad?.sample) {
-              // Trigger via the PadGrid's audio engine
-              // We'll simulate a click with medium velocity
+              // Trigger via mousedown event on the pad button for proper audio triggering
               const padButton = document.querySelector(`[data-pad-id="${padId}"]`) as HTMLElement;
-              padButton?.click();
+              if (padButton) {
+                const rect = padButton.getBoundingClientRect();
+                const mouseEvent = new MouseEvent('mousedown', {
+                  bubbles: true,
+                  clientX: rect.left + rect.width / 2,
+                  clientY: rect.top + rect.height * 0.3, // Upper area = medium velocity
+                });
+                padButton.dispatchEvent(mouseEvent);
+              }
             }
           }
         }
@@ -282,7 +297,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [programs, currentProgramId, onClose]);
+  }, [programs, currentProgramId, currentBank, onClose]);
 
   // Determine if we're rendered as a full view (no onClose) or as a modal
   const isViewMode = !onClose;
@@ -333,7 +348,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
               DRUM PADS
             </span>
             <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider">
-              MPC-inspired 16-pad drum machine
+              MPC-style 64-pad drum machine
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -520,6 +535,89 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                     className="w-full"
                   />
                 </div>
+              </div>
+
+              {/* Note Repeat */}
+              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
+                <div className="text-xs font-mono text-text-muted mb-3">NOTE REPEAT</div>
+                <label className="flex items-center gap-2 text-xs text-text-muted cursor-pointer mb-3">
+                  <input
+                    type="checkbox"
+                    checked={noteRepeatEnabled}
+                    onChange={(e) => setNoteRepeatEnabled(e.target.checked)}
+                    className="rounded border-dark-border bg-dark-surface text-accent-primary focus:ring-accent-primary"
+                  />
+                  Enable
+                </label>
+                <div className="flex flex-wrap gap-1">
+                  {(['1/4', '1/8', '1/16', '1/32', '1/8T', '1/16T'] as const).map(rate => (
+                    <button
+                      key={rate}
+                      onClick={() => setNoteRepeatRate(rate)}
+                      className={`px-2 py-1 text-[10px] font-mono rounded transition-colors ${
+                        noteRepeatRate === rate
+                          ? 'bg-accent-primary text-white'
+                          : 'bg-dark-surface border border-dark-border text-text-muted hover:text-white'
+                      }`}
+                    >
+                      {rate}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* MPC Resampling */}
+              <div className="bg-dark-bg border border-dark-border rounded-lg p-4">
+                <div className="text-xs font-mono text-text-muted mb-3">MPC RESAMPLING</div>
+                <label className="flex items-center gap-2 text-xs text-text-muted cursor-pointer mb-3">
+                  <input
+                    type="checkbox"
+                    checked={programs.get(currentProgramId)?.mpcResample?.enabled ?? false}
+                    onChange={(e) => {
+                      const currentProg = programs.get(currentProgramId);
+                      if (currentProg) {
+                        saveProgram({
+                          ...currentProg,
+                          mpcResample: {
+                            enabled: e.target.checked,
+                            model: currentProg.mpcResample?.model ?? 'MPC60',
+                          },
+                        });
+                      }
+                    }}
+                    className="rounded border-dark-border bg-dark-surface text-accent-primary focus:ring-accent-primary"
+                  />
+                  Enable on sample load
+                </label>
+                {programs.get(currentProgramId)?.mpcResample?.enabled && (
+                  <div>
+                    <label className="block text-xs text-text-muted mb-1">Model</label>
+                    <select
+                      value={programs.get(currentProgramId)?.mpcResample?.model ?? 'MPC60'}
+                      onChange={(e) => {
+                        const currentProg = programs.get(currentProgramId);
+                        if (currentProg) {
+                          saveProgram({
+                            ...currentProg,
+                            mpcResample: {
+                              enabled: true,
+                              model: e.target.value as MpcResampleConfig['model'],
+                            },
+                          });
+                        }
+                      }}
+                      className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
+                    >
+                      <option value="MPC60">MPC 60 (12-bit, 40kHz)</option>
+                      <option value="MPC3000">MPC 3000 (16-bit, 44.1kHz)</option>
+                      <option value="SP1200">SP-1200 (12-bit, 26kHz)</option>
+                      <option value="MPC2000XL">MPC 2000XL (16-bit, 44.1kHz)</option>
+                    </select>
+                    <p className="text-[10px] text-text-muted mt-1">
+                      Samples loaded to pads will be processed through the selected MPC emulation.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Selected Pad Info */}

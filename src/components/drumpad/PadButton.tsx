@@ -11,6 +11,7 @@ interface PadButtonProps {
   isFocused?: boolean;  // Keyboard focus state
   velocity: number;  // Last triggered velocity (0-127)
   onTrigger: (padId: number, velocity: number) => void;
+  onRelease?: (padId: number) => void;  // For sustain mode
   onSelect: (padId: number) => void;
   onFocus?: () => void;  // Focus callback
   className?: string;
@@ -22,6 +23,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
   isFocused = false,
   velocity,
   onTrigger,
+  onRelease,
   onSelect,
   onFocus,
   className = '',
@@ -51,7 +53,8 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
   const handleMouseUp = useCallback(() => {
     setIsPressed(false);
-  }, []);
+    onRelease?.(pad.id);
+  }, [pad.id, onRelease]);
 
   const handleClick = useCallback((event: React.MouseEvent) => {
     if (event.shiftKey || event.metaKey || event.ctrlKey) {
@@ -73,13 +76,14 @@ export const PadButton: React.FC<PadButtonProps> = ({
   const handleTouchEnd = useCallback((event: React.TouchEvent) => {
     event.preventDefault();
     setIsPressed(false);
+    onRelease?.(pad.id);
 
     // Check for selection gesture (long press could be added later)
     if (event.changedTouches.length > 1) {
       // Multi-touch = select
       onSelect(pad.id);
     }
-  }, [pad.id, onSelect]);
+  }, [pad.id, onSelect, onRelease]);
 
   // Determine pad color based on state (memoized for performance)
   const padColor = useMemo(() => {
@@ -148,17 +152,24 @@ export const PadButton: React.FC<PadButtonProps> = ({
         </span>
       </div>
 
-      {/* Velocity indicator */}
-      {velocity > 0 && pad.sample && (
-        <div className="absolute bottom-1 right-1">
+      {/* Velocity indicator + pad badges */}
+      <div className="absolute bottom-1 right-1 flex items-center gap-0.5">
+        {pad.muteGroup > 0 && (
+          <span className="text-[8px] font-mono text-amber-400/70">M{pad.muteGroup}</span>
+        )}
+        {pad.playMode === 'sustain' && (
+          <span className="text-[8px] font-mono text-blue-400/70">S</span>
+        )}
+        {pad.reverse && (
+          <span className="text-[8px] font-mono text-purple-400/70">R</span>
+        )}
+        {velocity > 0 && pad.sample && (
           <div
             className="w-1.5 h-1.5 rounded-full bg-white"
-            style={{
-              opacity: velocity / 127,
-            }}
+            style={{ opacity: velocity / 127 }}
           />
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Empty state icon */}
       {!pad.sample && (

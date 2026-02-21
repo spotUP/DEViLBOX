@@ -83,6 +83,36 @@ const LazyKeyboardShortcutSheet = lazy(() =>
 const LazyDrumPadManager = lazy(() =>
   import('@/components/drumpad/DrumPadManager').then(m => ({ default: m.DrumPadManager }))
 );
+const LazyAdvancedEditModal = lazy(() =>
+  import('@/components/dialogs/AdvancedEditModal').then(m => ({ default: m.AdvancedEditModal }))
+);
+const LazyFadeVolumeDialog = lazy(() =>
+  import('@/components/tracker/FadeVolumeDialog').then(m => ({ default: m.FadeVolumeDialog }))
+);
+const LazyStrumDialog = lazy(() =>
+  import('@/components/dialogs/StrumDialog').then(m => ({ default: m.StrumDialog }))
+);
+const LazyEffectPicker = lazy(() =>
+  import('@/components/tracker/EffectPicker').then(m => ({ default: m.EffectPicker }))
+);
+const LazyUndoHistoryPanel = lazy(() =>
+  import('@/components/tracker/UndoHistoryPanel').then(m => ({ default: m.UndoHistoryPanel }))
+);
+const LazyPatternMatrix = lazy(() =>
+  import('@/components/tracker/PatternMatrix').then(m => ({ default: m.PatternMatrix }))
+);
+const LazyAutomationPanel = lazy(() =>
+  import('@/components/automation/AutomationPanel').then(m => ({ default: m.AutomationPanel }))
+);
+const LazySynthErrorDialog = lazy(() =>
+  import('@/components/ui/SynthErrorDialog').then(m => ({ default: m.SynthErrorDialog }))
+);
+const LazyRomUploadDialog = lazy(() =>
+  import('@/components/ui/RomUploadDialog').then(m => ({ default: m.RomUploadDialog }))
+);
+const LazyCollaborationModal = lazy(() =>
+  import('@/components/collaboration/CollaborationModal').then(m => ({ default: m.CollaborationModal }))
+);
 
 export const WebGLModalBridge: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -128,6 +158,30 @@ export const WebGLModalBridge: React.FC = () => {
         break;
       case 'keyboard-help':
         openModal('shortcutSheet');
+        break;
+      case 'advanced-edit':
+        openModal('advancedEdit');
+        break;
+      case 'fade-volume':
+        openModal('fadeVolume');
+        break;
+      case 'strum':
+        openModal('strum');
+        break;
+      case 'effect-picker':
+        openModal('effectPicker');
+        break;
+      case 'undo-history':
+        openModal('undoHistory');
+        break;
+      case 'pattern-matrix':
+        openModal('patternMatrix');
+        break;
+      case 'automation':
+        openModal('automation');
+        break;
+      case 'collaboration':
+        openModal('collaboration');
         break;
       case 'tempo-tap':
         // Tap tempo is handled inline, no modal needed
@@ -337,6 +391,74 @@ export const WebGLModalBridge: React.FC = () => {
       {showSamplePackModal && (
         <LazySamplePackBrowser onClose={() => setShowSamplePackModal(false)} />
       )}
+      {modalOpen === 'advancedEdit' && (
+        <LazyAdvancedEditModal
+          onClose={closeModal}
+          onShowScaleVolume={(scope) => openModal('scaleVolume', { scope })}
+          onShowFadeVolume={(scope) => openModal('fadeVolume', { scope })}
+        />
+      )}
+      {modalOpen === 'fadeVolume' && (
+        <LazyFadeVolumeDialog
+          scope={(modalData?.scope as 'block' | 'track' | 'pattern') || 'block'}
+          onConfirm={(startVol, endVol) => {
+            useTrackerStore.getState().fadeVolume(
+              (useUIStore.getState().modalData?.scope as 'block' | 'track' | 'pattern') || 'block',
+              startVol,
+              endVol,
+            );
+            closeModal();
+          }}
+          onCancel={closeModal}
+        />
+      )}
+      {modalOpen === 'strum' && (
+        <LazyStrumDialog isOpen={true} onClose={closeModal} />
+      )}
+      {modalOpen === 'effectPicker' && (
+        <LazyEffectPicker
+          isOpen={true}
+          onSelect={() => closeModal()}
+          onClose={closeModal}
+        />
+      )}
+      {modalOpen === 'undoHistory' && (
+        <LazyUndoHistoryPanel isOpen={true} onClose={closeModal} />
+      )}
+      {modalOpen === 'patternMatrix' && (
+        <LazyPatternMatrix isOpen={true} onClose={closeModal} />
+      )}
+      {modalOpen === 'automation' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{
+            display: 'flex', justifyContent: 'flex-end', padding: '8px 12px',
+            background: '#1e1e2e', borderBottom: '1px solid #333',
+          }}>
+            <button
+              onClick={closeModal}
+              style={{
+                background: 'transparent', border: '1px solid #555', borderRadius: 4,
+                color: '#aaa', padding: '4px 12px', cursor: 'pointer', fontSize: 11,
+                fontFamily: 'JetBrains Mono, monospace',
+              }}
+            >
+              Close Automation
+            </button>
+          </div>
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <LazyAutomationPanel />
+          </div>
+        </div>
+      )}
+      {modalOpen === 'collaboration' && (
+        <LazyCollaborationModal isOpen={true} onClose={closeModal} />
+      )}
+      {/* Always-mounted dialogs */}
+      <LazySynthErrorDialog />
+      <LazyRomUploadDialog />
       {activeView === 'drumpad' && (
         <LazyDrumPadManager />
       )}

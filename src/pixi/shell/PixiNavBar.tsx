@@ -14,14 +14,16 @@ import { useAudioStore } from '@stores/useAudioStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useProjectStore } from '@stores/useProjectStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { APP_VERSION } from '@/constants/version';
 
 const NAV_HEIGHT = 36;
 
-type ViewTab = 'tracker' | 'arrangement' | 'dj' | 'drumpad';
+type ViewTab = 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll';
 const VIEW_TABS: { id: ViewTab; label: string }[] = [
   { id: 'tracker', label: 'TRACKER' },
   { id: 'arrangement', label: 'ARRANGE' },
+  { id: 'pianoroll', label: 'PIANO' },
   { id: 'dj', label: 'DJ' },
   { id: 'drumpad', label: 'PADS' },
 ];
@@ -37,6 +39,8 @@ export const PixiNavBar: React.FC = () => {
   const setTheme = useThemeStore(s => s.setTheme);
   const masterVolume = useAudioStore(s => s.masterVolume);
   const masterMuted = useAudioStore(s => s.masterMuted);
+  const collabStatus = useCollaborationStore(s => s.status);
+  const openModal = useUIStore(s => s.openModal);
 
   // Cycle through themes
   const handleThemeToggle = useCallback(() => {
@@ -59,6 +63,16 @@ export const PixiNavBar: React.FC = () => {
   const handleMuteToggle = useCallback(() => {
     useAudioStore.getState().toggleMasterMute();
   }, []);
+
+  // Collaboration
+  const handleCollab = useCallback(() => {
+    const cs = useCollaborationStore.getState();
+    if (cs.status === 'connected') {
+      cs.setViewMode('split');
+    } else {
+      openModal('collaboration');
+    }
+  }, [openModal]);
 
   // Switch back to DOM mode
   const handleSwitchToDom = useCallback(() => {
@@ -172,6 +186,26 @@ export const PixiNavBar: React.FC = () => {
         style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
         tint={theme.textSecondary.color}
         layout={{ marginRight: 12 }}
+      />
+
+      {/* Collab button */}
+      <PixiButton
+        label={collabStatus === 'connected' ? 'COLLAB' : 'Collab'}
+        variant={collabStatus === 'connected' ? 'ft2' : 'ghost'}
+        color={collabStatus === 'connected' ? 'green' : undefined}
+        size="sm"
+        active={collabStatus === 'connected'}
+        onClick={handleCollab}
+      />
+
+      {/* Separator */}
+      <pixiGraphics
+        draw={(g) => {
+          g.clear();
+          g.rect(0, 6, 1, NAV_HEIGHT - 12);
+          g.fill({ color: theme.border.color, alpha: 0.4 });
+        }}
+        layout={{ width: 1, height: NAV_HEIGHT }}
       />
 
       {/* Master volume */}

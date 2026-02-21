@@ -19,7 +19,15 @@ export type DialogCommand =
   | 'scale-volume-track'
   | 'scale-volume-pattern'
   | 'keyboard-help'
-  | 'tempo-tap';
+  | 'tempo-tap'
+  | 'advanced-edit'
+  | 'fade-volume'
+  | 'strum'
+  | 'effect-picker'
+  | 'undo-history'
+  | 'pattern-matrix'
+  | 'automation'
+  | 'collaboration';
 
 interface UIStore {
   // State
@@ -47,8 +55,8 @@ interface UIStore {
   // Performance settings
   performanceQuality: PerformanceQuality; // Auto-adjusted based on FPS
 
-  // View switching (tracker vs arrangement vs DJ vs drum pads)
-  activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad';
+  // View switching (tracker vs arrangement vs DJ vs drum pads vs piano roll)
+  activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll';
 
   // Pop-out window state
   tb303PoppedOut: boolean;
@@ -94,7 +102,7 @@ interface UIStore {
   setPerformanceQuality: (quality: PerformanceQuality) => void;
 
   // View switching actions
-  setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad') => void;
+  setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll') => void;
   toggleActiveView: () => void;
 
   // Pop-out window actions

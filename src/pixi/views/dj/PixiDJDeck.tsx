@@ -11,6 +11,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { PixiDeckTransport } from './PixiDeckTransport';
 import { PixiDeckTurntable } from './PixiDeckTurntable';
 import { PixiDeckWaveform } from './PixiDeckWaveform';
+import { getDJEngine } from '@engine/dj/DJEngine';
 
 /** Format milliseconds as M:SS */
 function formatTime(ms: number): string {
@@ -35,6 +36,32 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
   const loopMode = useDJStore(s => s.decks[deckId].loopMode);
   const audioPosition = useDJStore(s => s.decks[deckId].audioPosition);
   const durationMs = useDJStore(s => s.decks[deckId].durationMs);
+
+  const cuePoint = useDJStore(s => s.decks[deckId].cuePoint);
+
+  // Set cue point at current position
+  const handleSetCue = useCallback(() => {
+    const pos = useDJStore.getState().decks[deckId].audioPosition;
+    useDJStore.getState().setDeckCuePoint(deckId, pos);
+  }, [deckId]);
+
+  // Jump to cue point
+  const handleGoToCue = useCallback(() => {
+    try {
+      const engine = getDJEngine();
+      const deck = engine.getDeck(deckId);
+      const cp = useDJStore.getState().decks[deckId].cuePoint;
+      deck.cue(cp / 1000);
+    } catch { /* engine not ready */ }
+  }, [deckId]);
+
+  // Nudge BPM
+  const handleNudge = useCallback((direction: 1 | -1) => {
+    try {
+      const engine = getDJEngine();
+      engine.getDeck(deckId).nudge(direction * 2, 8);
+    } catch { /* engine not ready */ }
+  }, [deckId]);
 
   const handleLoopLine = useCallback(() => {
     const s = useDJStore.getState();
@@ -188,6 +215,34 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         {loopActive && (
           <PixiButton label="Off" variant="ghost" size="sm" onClick={handleLoopOff} />
         )}
+      </pixiContainer>
+
+      {/* Cue point */}
+      <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+        <PixiLabel text="CUE" size="xs" color="textMuted" />
+        <PixiButton label="SET" variant="ghost" size="sm" onClick={handleSetCue} />
+        <PixiButton
+          label="GO"
+          variant={cuePoint > 0 ? 'ft2' : 'ghost'}
+          color={cuePoint > 0 ? 'yellow' : undefined}
+          size="sm"
+          onClick={handleGoToCue}
+        />
+        {cuePoint > 0 && (
+          <pixiBitmapText
+            text={formatTime(cuePoint)}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+            layout={{}}
+          />
+        )}
+      </pixiContainer>
+
+      {/* Nudge controls */}
+      <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+        <PixiLabel text="NUDGE" size="xs" color="textMuted" />
+        <PixiButton label="<< -" variant="ghost" size="sm" onClick={() => handleNudge(-1)} />
+        <PixiButton label="+ >>" variant="ghost" size="sm" onClick={() => handleNudge(1)} />
       </pixiContainer>
 
       {/* Spacer */}

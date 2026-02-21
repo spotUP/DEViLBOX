@@ -9,7 +9,8 @@
  *   - "samples":  Raw PCM channel data keyed by sampleId
  */
 
-import type { DrumProgram, DrumPad, SampleData } from '../../types/drumpad';
+import type { DrumProgram, DrumPad, SampleData, MpcResampleConfig } from '../../types/drumpad';
+import { createEmptyPad } from '../../types/drumpad';
 
 const DB_NAME = 'devilbox-drumpad';
 const DB_VERSION = 1;
@@ -174,6 +175,7 @@ interface StoredProgram {
   pads: StoredPad[];
   masterLevel: number;
   masterTune: number;
+  mpcResample?: MpcResampleConfig;
 }
 
 interface StoredPad {
@@ -192,6 +194,12 @@ interface StoredPad {
   cutoff: number;
   resonance: number;
   scratchAction?: string;
+  // MPC features
+  muteGroup?: number;
+  playMode?: string;
+  sampleStart?: number;
+  sampleEnd?: number;
+  reverse?: boolean;
   // layers omitted for now (future: array of sampleId + velocityRange)
 }
 
@@ -201,6 +209,7 @@ function programToStored(program: DrumProgram): StoredProgram {
     name: program.name,
     masterLevel: program.masterLevel,
     masterTune: program.masterTune,
+    mpcResample: program.mpcResample,
     pads: program.pads.map(pad => ({
       id: pad.id,
       name: pad.name,
@@ -217,6 +226,11 @@ function programToStored(program: DrumProgram): StoredProgram {
       cutoff: pad.cutoff,
       resonance: pad.resonance,
       scratchAction: pad.scratchAction,
+      muteGroup: pad.muteGroup,
+      playMode: pad.playMode,
+      sampleStart: pad.sampleStart,
+      sampleEnd: pad.sampleEnd,
+      reverse: pad.reverse,
     })),
   };
 }
@@ -225,29 +239,43 @@ function storedToProgram(
   stored: StoredProgram,
   sampleMap: Map<string, SampleData>,
 ): DrumProgram {
+  const pads: DrumPad[] = stored.pads.map(sp => ({
+    id: sp.id,
+    name: sp.name,
+    sample: sp.sampleId ? (sampleMap.get(sp.sampleId) ?? null) : null,
+    level: sp.level,
+    tune: sp.tune,
+    pan: sp.pan,
+    output: sp.output as DrumPad['output'],
+    attack: sp.attack,
+    decay: sp.decay,
+    sustain: sp.sustain,
+    release: sp.release,
+    filterType: sp.filterType as DrumPad['filterType'],
+    cutoff: sp.cutoff,
+    resonance: sp.resonance,
+    layers: [],
+    scratchAction: sp.scratchAction as DrumPad['scratchAction'],
+    // MPC fields with backward-compatible defaults
+    muteGroup: sp.muteGroup ?? 0,
+    playMode: (sp.playMode as DrumPad['playMode']) ?? 'oneshot',
+    sampleStart: sp.sampleStart ?? 0,
+    sampleEnd: sp.sampleEnd ?? 1,
+    reverse: sp.reverse ?? false,
+  }));
+
+  // Migration: expand 16-pad programs to 64 pads
+  while (pads.length < 64) {
+    pads.push(createEmptyPad(pads.length + 1));
+  }
+
   return {
     id: stored.id,
     name: stored.name,
     masterLevel: stored.masterLevel,
     masterTune: stored.masterTune,
-    pads: stored.pads.map(sp => ({
-      id: sp.id,
-      name: sp.name,
-      sample: sp.sampleId ? (sampleMap.get(sp.sampleId) ?? null) : null,
-      level: sp.level,
-      tune: sp.tune,
-      pan: sp.pan,
-      output: sp.output as DrumPad['output'],
-      attack: sp.attack,
-      decay: sp.decay,
-      sustain: sp.sustain,
-      release: sp.release,
-      filterType: sp.filterType as DrumPad['filterType'],
-      cutoff: sp.cutoff,
-      resonance: sp.resonance,
-      layers: [],
-      scratchAction: sp.scratchAction as DrumPad['scratchAction'],
-    })),
+    mpcResample: stored.mpcResample,
+    pads,
   };
 }
 

@@ -3,7 +3,7 @@
  * Layout: Toolbar (top) | [Track headers | Arrangement canvas] (flex row)
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PixiButton, PixiLabel } from '../components';
@@ -26,9 +26,12 @@ function cssColorToPixi(color: string | null, fallback: number): number {
 export const PixiArrangementView: React.FC = () => {
   const theme = usePixiTheme();
   const isPlaying = useTransportStore(s => s.isPlaying);
+  const playbackRowRef = useRef(0);
 
   // Arrangement store
   const arrangementTracks = useArrangementStore(s => s.tracks);
+  const isArrangementMode = useArrangementStore(s => s.isArrangementMode);
+  const playbackRow = useArrangementStore(s => s.playbackRow);
   const tool = useArrangementStore(s => s.tool);
   const setTool = useArrangementStore(s => s.setTool);
   const view = useArrangementStore(s => s.view);
@@ -61,6 +64,79 @@ export const PixiArrangementView: React.FC = () => {
 
   // Track interaction: mute/solo
   const useArrangementData = arrangementTracks.length > 0;
+
+  // Activate arrangement mode on mount, deactivate on unmount
+  useEffect(() => {
+    useArrangementStore.getState().setIsArrangementMode(true);
+
+    // Auto-import from pattern order if no arrangement tracks exist
+    const arr = useArrangementStore.getState();
+    if (arr.tracks.length === 0) {
+      const ts = useTrackerStore.getState();
+      if (ts.patternOrder.length > 0) {
+        arr.importFromPatternOrder(ts.patternOrder, ts.patterns);
+        arr.zoomToFit();
+      }
+    }
+
+    return () => {
+      useArrangementStore.getState().setIsArrangementMode(false);
+    };
+  }, []);
+
+  // Playback row sync via rAF loop
+  useEffect(() => {
+    if (!isPlaying || !isArrangementMode) return;
+
+    let rafId: number;
+    const update = () => {
+      const globalRow = useTransportStore.getState().currentGlobalRow;
+      if (globalRow !== playbackRowRef.current) {
+        playbackRowRef.current = globalRow;
+        useArrangementStore.getState().setPlaybackRow(globalRow);
+      }
+      rafId = requestAnimationFrame(update);
+    };
+    rafId = requestAnimationFrame(update);
+
+    return () => cancelAnimationFrame(rafId);
+  }, [isPlaying, isArrangementMode]);
+
+  // Keyboard shortcuts for arrangement
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't capture when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      switch (e.key.toLowerCase()) {
+        case 'v': handleSetTool('select'); break;
+        case 'd': handleSetTool('draw'); break;
+        case 'e': handleSetTool('erase'); break;
+        case 's':
+          if (!e.ctrlKey && !e.metaKey) handleSetTool('split');
+          break;
+        case 'delete':
+        case 'backspace': {
+          const arr = useArrangementStore.getState();
+          const selected = Array.from(arr.selectedClipIds);
+          if (selected.length > 0) arr.removeClips(selected);
+          break;
+        }
+        case 'z':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            if (e.shiftKey) {
+              useArrangementStore.getState().redo();
+            } else {
+              useArrangementStore.getState().undo();
+            }
+          }
+          break;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const handleToggleMute = useCallback((trackId: string) => {
     if (useArrangementData) {
@@ -174,6 +250,14 @@ export const PixiArrangementView: React.FC = () => {
           active={tool === 'erase'}
           onClick={() => handleSetTool('erase')}
         />
+        <PixiButton
+          label="Split"
+          variant={tool === 'split' ? 'ft2' : 'ghost'}
+          color={tool === 'split' ? 'yellow' : undefined}
+          size="sm"
+          active={tool === 'split'}
+          onClick={() => handleSetTool('split')}
+        />
 
         {/* Zoom */}
         <PixiButton label="-" variant="ghost" size="sm" onClick={handleZoomOut} />
@@ -225,7 +309,7 @@ export const PixiArrangementView: React.FC = () => {
           width={4000}
           height={4000}
           scrollBeat={view.scrollRow}
-          playbackBeat={isPlaying ? 0 : undefined}
+          playbackBeat={isPlaying ? playbackRow : undefined}
         />
       </pixiContainer>
     </pixiContainer>

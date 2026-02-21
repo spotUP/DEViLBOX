@@ -10,16 +10,35 @@ import type {
   SampleLayer,
   MIDIMapping,
   SampleData,
+  PadBank,
 } from '../types/drumpad';
-import { createEmptyProgram, create808Program, create909Program } from '../types/drumpad';
+import { createEmptyProgram, create808Program, create909Program, getBankPads } from '../types/drumpad';
 import {
   saveAllPrograms,
   loadAllPrograms,
   exportConfig,
   importConfig,
 } from '../lib/drumpad/drumpadDB';
+import { mpcResample, MODEL_CONFIGS } from '../engine/mpc-resampler/MpcResamplerDSP';
+import type { MpcResampleOptions } from '../engine/mpc-resampler/MpcResamplerDSP';
 
 interface DrumPadStore extends DrumPadState {
+  // Bank management
+  currentBank: PadBank;
+  setBank: (bank: PadBank) => void;
+  getCurrentBankPads: () => DrumPad[];
+
+  // Clipboard
+  clipboardPad: DrumPad | null;
+  copyPad: (padId: number) => void;
+  pastePad: (targetPadId: number) => void;
+
+  // Note repeat
+  noteRepeatEnabled: boolean;
+  noteRepeatRate: string;
+  setNoteRepeatEnabled: (enabled: boolean) => void;
+  setNoteRepeatRate: (rate: string) => void;
+
   // Program management
   loadProgram: (id: string) => void;
   saveProgram: (program: DrumProgram) => void;
@@ -29,7 +48,7 @@ interface DrumPadStore extends DrumPadState {
 
   // Pad editing
   updatePad: (padId: number, updates: Partial<DrumPad>) => void;
-  loadSampleToPad: (padId: number, sample: SampleData) => void;
+  loadSampleToPad: (padId: number, sample: SampleData) => Promise<void>;
   clearPad: (padId: number) => void;
 
   // Layer management
@@ -80,6 +99,60 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
   midiMappings: {},
   preferences: DEFAULT_PREFERENCES,
   busLevels: {} as Record<string, number>,
+
+  // Bank state
+  currentBank: 'A' as PadBank,
+  setBank: (bank: PadBank) => set({ currentBank: bank }),
+  getCurrentBankPads: () => {
+    const { programs, currentProgramId, currentBank } = get();
+    const program = programs.get(currentProgramId);
+    if (!program) return [];
+    return getBankPads(program.pads, currentBank);
+  },
+
+  // Clipboard
+  clipboardPad: null,
+  copyPad: (padId: number) => {
+    const { programs, currentProgramId } = get();
+    const program = programs.get(currentProgramId);
+    const pad = program?.pads.find(p => p.id === padId);
+    if (pad) {
+      set({ clipboardPad: { ...pad, layers: pad.layers.map(l => ({ ...l, sample: { ...l.sample } })) } });
+    }
+  },
+  pastePad: (targetPadId: number) => {
+    const { clipboardPad } = get();
+    if (!clipboardPad) return;
+    get().updatePad(targetPadId, {
+      sample: clipboardPad.sample ? { ...clipboardPad.sample } : null,
+      name: clipboardPad.name,
+      level: clipboardPad.level,
+      tune: clipboardPad.tune,
+      pan: clipboardPad.pan,
+      output: clipboardPad.output,
+      attack: clipboardPad.attack,
+      decay: clipboardPad.decay,
+      sustain: clipboardPad.sustain,
+      release: clipboardPad.release,
+      filterType: clipboardPad.filterType,
+      cutoff: clipboardPad.cutoff,
+      resonance: clipboardPad.resonance,
+      muteGroup: clipboardPad.muteGroup,
+      playMode: clipboardPad.playMode,
+      sampleStart: clipboardPad.sampleStart,
+      sampleEnd: clipboardPad.sampleEnd,
+      reverse: clipboardPad.reverse,
+      layers: clipboardPad.layers.map(l => ({ ...l, sample: { ...l.sample } })),
+      scratchAction: clipboardPad.scratchAction,
+    });
+    get().saveToIndexedDB();
+  },
+
+  // Note repeat
+  noteRepeatEnabled: false,
+  noteRepeatRate: '1/16',
+  setNoteRepeatEnabled: (enabled: boolean) => set({ noteRepeatEnabled: enabled }),
+  setNoteRepeatRate: (rate: string) => set({ noteRepeatRate: rate }),
 
   // Program management
   loadProgram: (id: string) => {
@@ -182,9 +255,34 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
     get().saveToStorage();
   },
 
-  loadSampleToPad: (padId: number, sample: SampleData) => {
+  loadSampleToPad: async (padId: number, sample: SampleData) => {
+    const { programs, currentProgramId } = get();
+    const program = programs.get(currentProgramId);
+
+    // Apply MPC resampling if enabled on this program
+    let processedSample = sample;
+    if (program?.mpcResample?.enabled) {
+      try {
+        const modelConfig = MODEL_CONFIGS[program.mpcResample.model];
+        const options: MpcResampleOptions = {
+          ...modelConfig,
+          model: program.mpcResample.model,
+        } as MpcResampleOptions;
+        const result = await mpcResample(sample.audioBuffer, options);
+        processedSample = {
+          ...sample,
+          audioBuffer: result.buffer,
+          originalAudioBuffer: sample.audioBuffer,
+          duration: result.buffer.duration,
+          sampleRate: result.buffer.sampleRate,
+        };
+      } catch (err) {
+        console.error('[DrumPadStore] MPC resample failed, using original:', err);
+      }
+    }
+
     get().updatePad(padId, {
-      sample,
+      sample: processedSample,
       name: sample.name,
     });
     // Audio data changed — persist to IndexedDB (async, fire-and-forget)
@@ -312,10 +410,45 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
       if (stored) {
         const state = JSON.parse(stored);
 
-        // Convert Object back to Map
+        // Convert Object back to Map with backward-compatible defaults
         const programs = new Map<string, DrumProgram>();
         Object.entries(state.programs || {}).forEach(([id, program]) => {
-          programs.set(id, program as DrumProgram);
+          const prog = program as DrumProgram;
+          // Apply MPC field defaults for pads loaded from older versions
+          const migratedPads = (prog.pads || []).map((p: DrumPad) => ({
+            ...p,
+            muteGroup: p.muteGroup ?? 0,
+            playMode: p.playMode ?? 'oneshot',
+            sampleStart: p.sampleStart ?? 0,
+            sampleEnd: p.sampleEnd ?? 1,
+            reverse: p.reverse ?? false,
+          }));
+          // Expand 16-pad programs to 64
+          while (migratedPads.length < 64) {
+            migratedPads.push({
+              id: migratedPads.length + 1,
+              sample: null,
+              name: `Pad ${migratedPads.length + 1}`,
+              level: 100,
+              tune: 0,
+              pan: 0,
+              output: 'stereo',
+              attack: 0,
+              decay: 200,
+              sustain: 80,
+              release: 100,
+              filterType: 'off',
+              cutoff: 20000,
+              resonance: 0,
+              muteGroup: 0,
+              playMode: 'oneshot',
+              sampleStart: 0,
+              sampleEnd: 1,
+              reverse: false,
+              layers: [],
+            });
+          }
+          programs.set(id, { ...prog, pads: migratedPads });
         });
 
         set({
