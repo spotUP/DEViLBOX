@@ -3,29 +3,70 @@
  * Layout: Toolbar (top) | [Piano keyboard | Note grid] (flex row) | Velocity lane
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PixiButton, PixiLabel } from '../components';
 import { PixiPianoKeyboard } from './pianoroll/PixiPianoKeyboard';
 import { PixiPianoRollGrid } from './pianoroll/PixiPianoRollGrid';
 import { PixiVelocityLane } from './pianoroll/PixiVelocityLane';
-
-// Placeholder notes for demo
-const PLACEHOLDER_NOTES = [
-  { note: 60, start: 0, duration: 1, velocity: 100 },
-  { note: 64, start: 1, duration: 0.5, velocity: 80 },
-  { note: 67, start: 1.5, duration: 0.5, velocity: 90 },
-  { note: 72, start: 2, duration: 2, velocity: 110 },
-  { note: 60, start: 4, duration: 1, velocity: 70 },
-];
+import { usePianoRollStore } from '@stores';
+import { useTrackerStore } from '@stores';
 
 const VELOCITY_HEIGHT = 80;
 const TOOLBAR_HEIGHT = 36;
 const KEYBOARD_WIDTH = 60;
 
+const GRID_DIVISIONS = [1, 2, 4, 8, 16];
+
 export const PixiPianoRollView: React.FC = () => {
   const theme = usePixiTheme();
+  const tool = usePianoRollStore(s => s.tool);
+  const setTool = usePianoRollStore(s => s.setTool);
+  const view = usePianoRollStore(s => s.view);
+
+  // Get notes from the current pattern/channel
+  const notes = useMemo(() => {
+    const ts = useTrackerStore.getState();
+    const pat = ts.patterns[ts.currentPatternIndex];
+    if (!pat) return [];
+    const ch = pat.channels[view.channelIndex];
+    if (!ch) return [];
+    // Convert tracker rows to piano roll note format
+    const result: { note: number; start: number; duration: number; velocity: number }[] = [];
+    for (let row = 0; row < pat.length; row++) {
+      const cell = ch.rows[row];
+      if (cell && cell.note > 0 && cell.note < 97) {
+        // Find note-off or next note to determine duration
+        let dur = 1;
+        for (let r = row + 1; r < pat.length; r++) {
+          const next = ch.rows[r];
+          if (next && (next.note > 0 || next.note === 97)) break;
+          dur++;
+        }
+        result.push({
+          note: cell.note + 11, // Convert tracker note to MIDI
+          start: row,
+          duration: dur,
+          velocity: cell.volume !== null ? cell.volume : 64,
+        });
+      }
+    }
+    return result;
+  }, [view.channelIndex]);
+
+  const handleCycleGrid = useCallback(() => {
+    const s = usePianoRollStore.getState();
+    const idx = GRID_DIVISIONS.indexOf(s.view.gridDivision);
+    const next = GRID_DIVISIONS[(idx + 1) % GRID_DIVISIONS.length];
+    s.setGridDivision(next);
+  }, []);
+
+  const handleToggleSnap = useCallback(() => {
+    usePianoRollStore.setState(state => {
+      state.view.snapToGrid = !state.view.snapToGrid;
+    });
+  }, []);
 
   const drawToolbarBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -58,13 +99,54 @@ export const PixiPianoRollView: React.FC = () => {
 
         <PixiLabel text="PIANO ROLL" size="sm" weight="bold" color="accent" />
 
-        <PixiButton label="Select" variant="ghost" size="sm" onClick={() => {}} />
-        <PixiButton label="Draw" variant="ghost" size="sm" onClick={() => {}} />
-        <PixiButton label="Erase" variant="ghost" size="sm" onClick={() => {}} />
+        <PixiButton
+          label="Select"
+          variant={tool === 'select' ? 'ft2' : 'ghost'}
+          color={tool === 'select' ? 'blue' : undefined}
+          size="sm"
+          active={tool === 'select'}
+          onClick={() => setTool('select')}
+        />
+        <PixiButton
+          label="Draw"
+          variant={tool === 'draw' ? 'ft2' : 'ghost'}
+          color={tool === 'draw' ? 'green' : undefined}
+          size="sm"
+          active={tool === 'draw'}
+          onClick={() => setTool('draw')}
+        />
+        <PixiButton
+          label="Erase"
+          variant={tool === 'erase' ? 'ft2' : 'ghost'}
+          color={tool === 'erase' ? 'red' : undefined}
+          size="sm"
+          active={tool === 'erase'}
+          onClick={() => setTool('erase')}
+        />
+
+        <PixiButton
+          label={`Grid:1/${view.gridDivision}`}
+          variant="ghost"
+          size="sm"
+          onClick={handleCycleGrid}
+        />
+        <PixiButton
+          label={view.snapToGrid ? 'Snap:ON' : 'Snap:OFF'}
+          variant={view.snapToGrid ? 'ft2' : 'ghost'}
+          color={view.snapToGrid ? 'blue' : undefined}
+          size="sm"
+          active={view.snapToGrid}
+          onClick={handleToggleSnap}
+        />
 
         <pixiContainer layout={{ flex: 1 }} />
 
-        <PixiLabel text="Grid: 1/16 | Snap: On" size="xs" color="textMuted" layout={{ marginRight: 8 }} />
+        <PixiLabel
+          text={`Ch ${view.channelIndex + 1}`}
+          size="xs"
+          color="textMuted"
+          layout={{ marginRight: 8 }}
+        />
       </pixiContainer>
 
       {/* Main area: Keyboard | Grid */}
@@ -79,7 +161,7 @@ export const PixiPianoRollView: React.FC = () => {
         <PixiPianoRollGrid
           width={4000}
           height={4000}
-          notes={PLACEHOLDER_NOTES}
+          notes={notes}
         />
       </pixiContainer>
 
@@ -87,7 +169,7 @@ export const PixiPianoRollView: React.FC = () => {
       <PixiVelocityLane
         width={4000}
         height={VELOCITY_HEIGHT}
-        notes={PLACEHOLDER_NOTES.map(n => ({ start: n.start, velocity: n.velocity }))}
+        notes={notes.map(n => ({ start: n.start, velocity: n.velocity }))}
       />
     </pixiContainer>
   );
