@@ -29,10 +29,16 @@ describe('computeStereoGains', () => {
   it('clamps values below 0 to 0%', () => {
     const g = computeStereoGains(-50);
     expect(g.gainLL).toBeCloseTo(0.5);
+    expect(g.gainRR).toBeCloseTo(0.5);
+    expect(g.gainLR).toBeCloseTo(0.5);
+    expect(g.gainRL).toBeCloseTo(0.5);
   });
 
   it('clamps values above 200 to 200%', () => {
     const g = computeStereoGains(300);
     expect(g.gainLL).toBeCloseTo(1.5);
+    expect(g.gainRR).toBeCloseTo(1.5);
+    expect(g.gainLR).toBeCloseTo(-0.5);
+    expect(g.gainRL).toBeCloseTo(-0.5);
   });
 });

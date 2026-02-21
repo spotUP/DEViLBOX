@@ -61,7 +61,7 @@ export class StereoSeparationNode {
 
     // Wire the graph:
     // inputTone → splitter → [gain matrix] → merger → outputTone
-    this.inputTone.connect(this.splitter as unknown as Tone.ToneAudioNode);
+    this.inputTone.connect(this.splitter);
 
     // L channel (splitter output 0) → LL and LR gains
     this.splitter.connect(this.gainLL, 0);
@@ -78,7 +78,7 @@ export class StereoSeparationNode {
     this.gainRR.connect(this.merger, 0, 1);
 
     // merger → outputTone's underlying AudioNode
-    this.merger.connect(this.outputTone.input as AudioNode);
+    this.merger.connect(this.outputTone.input);
 
     // Default: identity (100% = normal stereo)
     this.setSeparation(100);
@@ -87,6 +87,10 @@ export class StereoSeparationNode {
   /**
    * Set stereo separation. percent: 0–200 (OpenMPT libopenmpt scale).
    * 0 = mono, 100 = identity, 200 = enhanced width.
+   *
+   * NOTE: Values above 100% increase gain coefficients above 1.0.
+   * With hard-panned content, 200% can push instantaneous gain to 2x.
+   * Ensure a downstream limiter or low master gain is in place.
    */
   setSeparation(percent: number): void {
     const g = computeStereoGains(percent);
