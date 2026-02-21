@@ -1791,19 +1791,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           </>
         )}
 
-        {/* Peer cursor overlay — shown in 'shared' collab mode, thin caret at peer's channel */}
+        {/* Peer cursor overlay — shown in 'shared' collab mode, cell block at peer's channel */}
         <div
           ref={peerCursorDivRef}
           style={{
             position: 'absolute',
             top: 0,
             left: 0,
-            width: 2,
+            width: CHAR_WIDTH * 3 + 4,
             height: ROW_HEIGHT,
             display: 'none',
             pointerEvents: 'none',
-            backgroundColor: '#a855f7',
-            boxShadow: '0 0 4px #a855f7',
+            backgroundColor: 'rgba(168, 85, 247, 0.55)',
             zIndex: 25,
           }}
         />
