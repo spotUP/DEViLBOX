@@ -198,6 +198,13 @@ export class DeckEngine {
     // Apply the user's stereo separation setting (loadSong sets format default;
     // this overrides it with the user's preference, matching tracker view behavior)
     this.replayer.setStereoSeparation(useSettingsStore.getState().stereoSeparation);
+
+    // Apply Furnace compat flags to the dispatch engine (if this is a .fur song)
+    if (song.compatFlags && Object.keys(song.compatFlags).length > 0) {
+      const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
+      FurnaceDispatchEngine.getInstance().setCompatFlags(song.compatFlags as any);
+    }
+
     this.songTimeIndex = this._buildTimeIndex(song);
     await engine.preloadInstruments(song.instruments);
     await engine.ensureWASMSynthsReady(song.instruments);

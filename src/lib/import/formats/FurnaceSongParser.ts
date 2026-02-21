@@ -539,6 +539,9 @@ export interface FurnaceModule {
 
   // Song comment
   comment: string;
+
+  // Compatibility flags (parsed from inline bytes)
+  compatFlags: Record<string, unknown>;
 }
 
 /**
@@ -621,6 +624,7 @@ export async function parseFurnaceSong(buffer: ArrayBuffer): Promise<FurnaceModu
     samples: [],
     patterns: new Map(),
     comment: '',
+    compatFlags: {},
   };
 
   if (version >= 240) {
@@ -1021,12 +1025,34 @@ async function parseOldFormat(
   // A-4 tuning
   module.tuning = reader.readFloat32();
 
-  // Compatibility flags
+  // Compatibility flags block 0 (20 bytes)
   // Reference: fur.cpp:1258-1348
-  // This block always reads exactly 20 bytes for any version (v37+ reads
-  // flags with else clauses that skip; v<37 reads 20 padding bytes).
-  // Our parser doesn't use these flags, so just consume the fixed 20 bytes.
-  reader.skip(20);
+  // Always reads exactly 20 bytes for any version.
+  const compatFlags: Record<string, unknown> = {};
+  if (version >= 37) {
+    compatFlags.limitSlides = !!reader.readUint8();           // 0
+    compatFlags.linearPitch = reader.readUint8();              // 1
+    compatFlags.loopModality = reader.readUint8();             // 2
+    compatFlags.properNoiseLayout = version >= 43 ? !!reader.readUint8() : (reader.readUint8(), false);  // 3
+    compatFlags.waveDutyIsVol = version >= 43 ? !!reader.readUint8() : (reader.readUint8(), false);      // 4
+    compatFlags.resetMacroOnPorta = version >= 45 ? !!reader.readUint8() : (reader.readUint8(), false);  // 5
+    compatFlags.legacyVolumeSlides = version >= 45 ? !!reader.readUint8() : (reader.readUint8(), false); // 6
+    compatFlags.compatibleArpeggio = version >= 45 ? !!reader.readUint8() : (reader.readUint8(), false); // 7
+    compatFlags.noteOffResetsSlides = version >= 45 ? !!reader.readUint8() : (reader.readUint8(), false);// 8
+    compatFlags.targetResetsSlides = version >= 45 ? !!reader.readUint8() : (reader.readUint8(), false); // 9
+    compatFlags.arpNonPorta = version >= 47 ? !!reader.readUint8() : (reader.readUint8(), false);       // 10
+    compatFlags.algMacroBehavior = version >= 47 ? !!reader.readUint8() : (reader.readUint8(), false);  // 11
+    compatFlags.brokenShortcutSlides = version >= 49 ? !!reader.readUint8() : (reader.readUint8(), false);// 12
+    compatFlags.ignoreDuplicateSlides = version >= 50 ? !!reader.readUint8() : (reader.readUint8(), false);// 13
+    compatFlags.stopPortaOnNoteOff = version >= 62 ? !!reader.readUint8() : (reader.readUint8(), false); // 14
+    compatFlags.continuousVibrato = version >= 62 ? !!reader.readUint8() : (reader.readUint8(), false);  // 15
+    compatFlags.brokenDACMode = version >= 64 ? !!reader.readUint8() : (reader.readUint8(), false);     // 16
+    compatFlags.oneTickCut = version >= 65 ? !!reader.readUint8() : (reader.readUint8(), false);         // 17
+    compatFlags.newInsTriggersInPorta = version >= 66 ? !!reader.readUint8() : (reader.readUint8(), false);// 18
+    compatFlags.arp0Reset = version >= 69 ? !!reader.readUint8() : (reader.readUint8(), false);          // 19
+  } else {
+    reader.skip(20);
+  }
 
   // Pointers
   const insPtr: number[] = [];
@@ -1102,12 +1128,37 @@ async function parseOldFormat(
     module.masterVol = 2.0;
   }
 
-  // Extended compat flags block 1
+  // Extended compat flags block 1 (28 bytes)
   // Reference: fur.cpp:1422-1542
-  // Every version gate reads the same byte count via else clauses,
-  // totaling 28 bytes for any version >= 70.
   if (version >= 70) {
-    reader.skip(28); // 28 bytes of compat flags (all with else skip clauses)
+    compatFlags.brokenSpeedSel = !!reader.readUint8();                                                  // 0
+    compatFlags.noSlidesOnFirstTick = version >= 71 ? !!reader.readUint8() : (reader.readUint8(), false);// 1
+    compatFlags.rowResetsArpPos = version >= 71 ? !!reader.readUint8() : (reader.readUint8(), false);   // 2
+    compatFlags.ignoreJumpAtEnd = version >= 71 ? !!reader.readUint8() : (reader.readUint8(), false);   // 3
+    compatFlags.buggyPortaAfterSlide = version >= 72 ? !!reader.readUint8() : (reader.readUint8(), false);// 4
+    compatFlags.gbInsAffectsEnvelope = version >= 72 ? !!reader.readUint8() : (reader.readUint8(), false);// 5
+    compatFlags.sharedExtStat = version >= 78 ? !!reader.readUint8() : (reader.readUint8(), false);     // 6
+    compatFlags.ignoreDACModeOutsideChannel = version >= 83 ? !!reader.readUint8() : (reader.readUint8(), false);// 7
+    compatFlags.e1e2AlsoTakePriority = version >= 83 ? !!reader.readUint8() : (reader.readUint8(), false);// 8
+    compatFlags.newSegaPCM = version >= 84 ? !!reader.readUint8() : (reader.readUint8(), false);        // 9
+    compatFlags.fbPortaPause = version >= 85 ? !!reader.readUint8() : (reader.readUint8(), false);      // 10
+    compatFlags.snDutyReset = version >= 86 ? !!reader.readUint8() : (reader.readUint8(), false);       // 11
+    compatFlags.pitchMacroIsLinear = version >= 90 ? !!reader.readUint8() : (reader.readUint8(), false);// 12
+    compatFlags.pitchSlideSpeed = version >= 94 ? reader.readUint8() : (reader.readUint8(), 0);         // 13
+    compatFlags.oldOctaveBoundary = version >= 97 ? !!reader.readUint8() : (reader.readUint8(), false); // 14
+    compatFlags.noOPN2Vol = version >= 98 ? !!reader.readUint8() : (reader.readUint8(), false);         // 15
+    compatFlags.newVolumeScaling = version >= 99 ? !!reader.readUint8() : (reader.readUint8(), false);  // 16
+    compatFlags.volMacroLinger = version >= 99 ? !!reader.readUint8() : (reader.readUint8(), false);    // 17
+    compatFlags.brokenOutVol = version >= 99 ? !!reader.readUint8() : (reader.readUint8(), false);      // 18
+    compatFlags.e1e2StopOnSameNote = version >= 100 ? !!reader.readUint8() : (reader.readUint8(), false);// 19
+    compatFlags.brokenPortaArp = version >= 101 ? !!reader.readUint8() : (reader.readUint8(), false);   // 20
+    compatFlags.snNoLowPeriods = version >= 108 ? !!reader.readUint8() : (reader.readUint8(), false);   // 21
+    compatFlags.delayBehavior = version >= 110 ? reader.readUint8() : (reader.readUint8(), 0);          // 22
+    compatFlags.jumpTreatment = version >= 113 ? reader.readUint8() : (reader.readUint8(), 0);          // 23
+    reader.readUint8(); // 24: autoSystem (NOT a compat flag, song-level field)
+    compatFlags.disableSampleMacro = version >= 117 ? !!reader.readUint8() : (reader.readUint8(), false);// 25
+    compatFlags.brokenOutVol2 = version >= 121 ? !!reader.readUint8() : (reader.readUint8(), false);    // 26
+    compatFlags.oldArpStrategy = version >= 130 ? !!reader.readUint8() : (reader.readUint8(), false);   // 27
   }
 
   // Virtual tempo
@@ -1159,12 +1210,21 @@ async function parseOldFormat(
     reader.readUint8(); // patchbayAuto
   }
 
-  // Extended compat flags block 2
+  // Extended compat flags block 2 (8 bytes)
   // Reference: fur.cpp:1600-1637
-  // 8 bytes total (all with else skip clauses)
   if (version >= 138) {
-    reader.skip(8); // brokenPortaLegato + 7 more compat flags
+    compatFlags.brokenPortaLegato = !!reader.readUint8();                                                // 0
+    compatFlags.brokenFMOff = version >= 155 ? !!reader.readUint8() : (reader.readUint8(), false);       // 1
+    compatFlags.preNoteNoEffect = version >= 168 ? !!reader.readUint8() : (reader.readUint8(), false);   // 2
+    compatFlags.oldDPCM = version >= 183 ? !!reader.readUint8() : (reader.readUint8(), false);           // 3
+    compatFlags.resetArpPhaseOnNewNote = version >= 184 ? !!reader.readUint8() : (reader.readUint8(), false);// 4
+    compatFlags.ceilVolumeScaling = version >= 188 ? !!reader.readUint8() : (reader.readUint8(), false); // 5
+    compatFlags.oldAlwaysSetVolume = version >= 191 ? !!reader.readUint8() : (reader.readUint8(), false);// 6
+    compatFlags.oldSampleOffset = version >= 200 ? !!reader.readUint8() : (reader.readUint8(), false);  // 7
   }
+
+  // Store parsed compat flags on module
+  module.compatFlags = compatFlags;
 
   // Speeds and grooves
   // Reference: fur.cpp:1639-1659
@@ -2826,6 +2886,15 @@ function createMetadata(module: FurnaceModule): ImportMetadata {
       // (each combined pattern contains each channel's correct pattern data for that position)
       patternOrderTable: Array.from({ length: subsong?.ordersLen || 1 }, (_, i) => i),
       songMessage: module.comment,
+    },
+    furnaceData: {
+      speed2: subsong?.speed2,
+      hz: subsong?.hz,
+      virtualTempoN: subsong?.virtualTempo,
+      virtualTempoD: subsong?.virtualTempoD,
+      compatFlags: module.compatFlags,
+      systems: module.systems,
+      systemChans: module.systemChans,
     },
   };
 }

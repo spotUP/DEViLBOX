@@ -152,6 +152,14 @@ for (let i = 1; i <= 96; i++) {
   XM_NOTE_NAMES[i] = `${NOTE_NAMES_CLEAN[semitone]}${octave}`;
 }
 
+// FurnaceChipEngine synthTypes — these use the register-write path and need TS-side macros.
+// All other Furnace* synthTypes use FurnaceDispatchEngine (WASM processes macros internally).
+const FURNACE_CHIP_ENGINE_TYPES = new Set([
+  'Furnace', 'FurnaceOPN', 'FurnaceOPM', 'FurnaceOPL', 'FurnaceOPLL', 'FurnaceOPZ',
+  'FurnaceOPNA', 'FurnaceOPNB', 'FurnaceOPL4', 'FurnaceY8950', 'FurnaceESFM',
+  'FurnaceVRC7', 'FurnaceOPN2203', 'FurnaceOPNBB',
+]);
+
 // Pre-computed Amiga period → note name lookup (avoids iteration + string alloc per call)
 const PERIOD_NOTE_MAP = new Map<number, string>();
 for (let oct = 0; oct < 3; oct++) {
@@ -3183,6 +3191,12 @@ export class TrackerReplayer {
    */
   private processMacros(ch: ChannelState, time: number): void {
     if (!ch.instrument?.furnace?.macros) return;
+
+    // Skip TS-side macros for FurnaceDispatch instruments — the WASM worklet runs
+    // furnace_dispatch_tick() at 60Hz which processes macros natively in C++.
+    // Only FurnaceChipEngine (FM) instruments need TS-side macro processing.
+    const st = ch.instrument.synthType;
+    if (st && st.startsWith('Furnace') && !FURNACE_CHIP_ENGINE_TYPES.has(st)) return;
 
     const macros = ch.instrument.furnace.macros as FurnaceMacro[];
     if (macros.length === 0) return;
