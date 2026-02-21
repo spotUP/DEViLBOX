@@ -11,6 +11,9 @@ import type {
   BlockSelection,
   ClipboardData,
   ColumnVisibility,
+  EditorMode,
+  FurnaceNativeData,
+  HivelyNativeData,
 } from '@typedefs';
 import { DEFAULT_COLUMN_VISIBILITY, EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
 import { xmNoteToMidi, midiToXMNote } from '@/lib/xmConversions';
@@ -112,6 +115,11 @@ interface TrackerStore {
     format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN';
     sourceFile?: string;
   } | null;
+
+  // Multi-format editor support
+  editorMode: EditorMode;
+  furnaceNative: FurnaceNativeData | null;
+  hivelyNative: HivelyNativeData | null;
 
   // Actions
   setCurrentPattern: (index: number, fromReplayer?: boolean) => void;
@@ -258,6 +266,11 @@ interface TrackerStore {
   setPatternOrder: (order: number[]) => void;
   setOriginalModuleData: (data: TrackerStore['originalModuleData']) => void;
 
+  // Multi-format editor support
+  setEditorMode: (mode: EditorMode) => void;
+  setFurnaceNative: (data: FurnaceNativeData | null) => void;
+  setHivelyNative: (data: HivelyNativeData | null) => void;
+
   // Undo/Redo support
   replacePattern: (index: number, pattern: Pattern) => void;
 
@@ -332,6 +345,11 @@ export const useTrackerStore = create<TrackerStore>()(
 
     // Original module data for libopenmpt playback
     originalModuleData: null,
+
+    // Multi-format editor support
+    editorMode: 'classic' as EditorMode,
+    furnaceNative: null,
+    hivelyNative: null,
 
     // Actions
     setCurrentPattern: (index, fromReplayer) =>
@@ -2602,6 +2620,22 @@ export const useTrackerStore = create<TrackerStore>()(
         state.originalModuleData = data;
       }),
 
+    // Multi-format editor support
+    setEditorMode: (mode) =>
+      set((state) => {
+        state.editorMode = mode;
+      }),
+
+    setFurnaceNative: (data) =>
+      set((state) => {
+        state.furnaceNative = data;
+      }),
+
+    setHivelyNative: (data) =>
+      set((state) => {
+        state.hivelyNative = data;
+      }),
+
     importPattern: (pattern) => {
       const newIndex = get().patterns.length;
       set((state) => {
@@ -2754,6 +2788,9 @@ export const useTrackerStore = create<TrackerStore>()(
         state.macroSlots = Array.from({ length: 8 }, () => createEmptyMacroSlot());
         state.patternOrder = [0];
         state.currentPositionIndex = 0;
+        state.editorMode = 'classic';
+        state.furnaceNative = null;
+        state.hivelyNative = null;
       }),
   }))
 );

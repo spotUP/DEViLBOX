@@ -457,3 +457,71 @@ export const NOTE_OFF: TrackerCell = {
   effTyp2: 0,     // 0 = no second effect
   eff2: 0,        // 0x00 = no second parameter
 };
+
+// ── Editor Mode ─────────────────────────────────
+export type EditorMode = 'classic' | 'furnace' | 'hively';
+
+// ── Furnace Native Data ─────────────────────────
+export interface FurnaceNativeData {
+  subsongs: FurnaceSubsong[];
+  activeSubsong: number;
+}
+
+export interface FurnaceSubsong {
+  name: string;
+  patLen: number;                    // Rows per pattern (default 64)
+  ordersLen: number;                 // Number of positions
+  orders: number[][];                // orders[channel][position] = pattern_index
+  channels: FurnaceChannelData[];    // Per-channel pattern pools
+  speed1: number;
+  speed2: number;
+  hz: number;
+  virtualTempoN: number;
+  virtualTempoD: number;
+}
+
+export interface FurnaceChannelData {
+  name: string;
+  effectCols: number;                // 1-8 effect columns
+  patterns: Map<number, FurnacePatternData>;  // pattern_index → data
+}
+
+export interface FurnacePatternData {
+  rows: FurnaceRow[];
+}
+
+export interface FurnaceRow {
+  note: number;        // -1=empty, 0-179=notes, 252=null, 253=off, 254=release, 255=macro-rel
+  ins: number;         // -1=empty, 0-based
+  vol: number;         // -1=empty, 0-127
+  effects: Array<{ cmd: number; val: number }>;  // Up to 8 effect pairs
+}
+
+// ── HivelyTracker Native Data ───────────────────
+export interface HivelyNativeData {
+  channels: number;              // 4 (AHX) or 4-16 (HVL)
+  trackLength: number;           // Rows per track (typically 64)
+  tracks: HivelyNativeTrack[];   // Pool of reusable tracks (up to 256)
+  positions: HivelyNativePosition[];  // Song arrangement (up to 1000)
+  tempo: number;
+  speedMultiplier: number;
+}
+
+export interface HivelyNativeTrack {
+  id: number;
+  steps: HivelyNativeStep[];  // trackLength entries
+}
+
+export interface HivelyNativeStep {
+  note: number;       // 0=empty, 1-60 (C-0 to B-4)
+  instrument: number; // 0=empty, 1-63
+  fx: number;         // Primary effect 0-15
+  fxParam: number;    // Primary effect param 0-255
+  fxb: number;        // Secondary effect 0-15
+  fxbParam: number;   // Secondary effect param 0-255
+}
+
+export interface HivelyNativePosition {
+  track: number[];      // track index per channel
+  transpose: number[];  // signed transpose per channel (-128 to +127)
+}
