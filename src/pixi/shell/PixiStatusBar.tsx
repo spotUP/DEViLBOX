@@ -8,13 +8,18 @@ import { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme, usePixiThemeId, getDeckColors } from '../theme';
+import { PixiButton } from '../components';
 import { useUIStore, useTransportStore, useAudioStore } from '@stores';
 import { useTrackerStore } from '@stores';
 import { useDJStore } from '@/stores/useDJStore';
 import { useMIDIStore } from '@/stores/useMIDIStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
+import type { KnobAssignment } from '@/midi/knobBanks';
+import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
+import { Oscilloscope } from '@/components/visualization/Oscilloscope';
 
 const STATUS_HEIGHT = 24;
+const KNOB_BAR_HEIGHT = 28;
 
 // ─── Tracker status content ─────────────────────────────────────────────────
 
@@ -215,6 +220,93 @@ const DJStatus: React.FC = () => {
   );
 };
 
+// ─── MIDI Knob Bank Panel ────────────────────────────────────────────────────
+
+const PixiMIDIKnobPanel: React.FC = () => {
+  const theme = usePixiTheme();
+  const knobBank = useMIDIStore(s => s.knobBank);
+  const nksKnobAssignments = useMIDIStore(s => s.nksKnobAssignments);
+  const nksKnobPage = useMIDIStore(s => s.nksKnobPage);
+  const nksKnobTotalPages = useMIDIStore(s => s.nksKnobTotalPages);
+
+  const handlePrevPage = useCallback(() => {
+    useMIDIStore.getState().prevKnobPage();
+  }, []);
+
+  const handleNextPage = useCallback(() => {
+    useMIDIStore.getState().nextKnobPage();
+  }, []);
+
+  const drawBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, 4000, KNOB_BAR_HEIGHT);
+    g.fill({ color: theme.bgTertiary.color });
+    g.rect(0, 0, 4000, 1);
+    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
+  }, [theme]);
+
+  const assignments: KnobAssignment[] = nksKnobAssignments;
+
+  return (
+    <pixiContainer
+      layout={{
+        width: '100%',
+        height: KNOB_BAR_HEIGHT,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: 8,
+        paddingRight: 8,
+        gap: 4,
+      }}
+    >
+      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: '100%', height: KNOB_BAR_HEIGHT }} />
+
+      {/* Bank label */}
+      <pixiBitmapText
+        text={`MIDI:${knobBank.toUpperCase()}`}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+        tint={theme.accent.color}
+        layout={{}}
+      />
+
+      {/* Page navigation */}
+      {nksKnobTotalPages > 1 && (
+        <>
+          <PixiButton label="<" variant="ghost" size="sm" onClick={handlePrevPage} />
+          <pixiBitmapText
+            text={`${nksKnobPage + 1}/${nksKnobTotalPages}`}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+            layout={{}}
+          />
+          <PixiButton label=">" variant="ghost" size="sm" onClick={handleNextPage} />
+        </>
+      )}
+
+      {/* 8 knob assignments */}
+      {Array.from({ length: 8 }, (_, i) => {
+        const a = assignments[i];
+        return (
+          <pixiContainer key={i} layout={{ flexDirection: 'column', alignItems: 'center', width: 60, gap: 1 }}>
+            <pixiBitmapText
+              text={`CC${a?.cc ?? (70 + i)}`}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{}}
+            />
+            <pixiBitmapText
+              text={a?.label ?? `K${i + 1}`}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
+              tint={a ? theme.accent.color : theme.textMuted.color}
+              layout={{}}
+            />
+          </pixiContainer>
+        );
+      })}
+    </pixiContainer>
+  );
+};
+
 // ─── Main StatusBar ─────────────────────────────────────────────────────────
 
 export const PixiStatusBar: React.FC = () => {
@@ -224,6 +316,7 @@ export const PixiStatusBar: React.FC = () => {
   const midiInitialized = useMIDIStore(s => s.isInitialized);
   const midiInputDevices = useMIDIStore(s => s.inputDevices);
   const midiSelectedInput = useMIDIStore(s => s.selectedInputId);
+  const showKnobBar = useMIDIStore(s => s.showKnobBar);
   const collabStatus = useCollaborationStore(s => s.status);
   const collabRoomCode = useCollaborationStore(s => s.roomCode);
 
@@ -247,6 +340,7 @@ export const PixiStatusBar: React.FC = () => {
     ? midiInputDevices.find(d => d.id === midiSelectedInput)?.name || midiInputDevices[0].name
     : null;
   const isCollabConnected = collabStatus === 'connected' && collabRoomCode;
+  const showMIDIKnobPanel = hasMIDIDevice && showKnobBar;
 
   const sep = useCallback((g: GraphicsType) => {
     g.clear();
@@ -255,6 +349,16 @@ export const PixiStatusBar: React.FC = () => {
   }, [theme]);
 
   return (
+    <pixiContainer
+      layout={{
+        width: '100%',
+        height: showMIDIKnobPanel ? STATUS_HEIGHT + KNOB_BAR_HEIGHT : STATUS_HEIGHT,
+        flexDirection: 'column',
+      }}
+    >
+    {/* MIDI knob bank panel (conditionally shown above status bar) */}
+    {showMIDIKnobPanel && <PixiMIDIKnobPanel />}
+
     <pixiContainer
       layout={{
         width: '100%',
@@ -344,6 +448,19 @@ export const PixiStatusBar: React.FC = () => {
           </>
         )}
 
+        {/* Compact oscilloscope */}
+        {isAudioActive && (
+          <>
+            <PixiDOMOverlay
+              layout={{ width: 100, height: 20 }}
+              style={{ overflow: 'hidden', opacity: 0.8 }}
+            >
+              <Oscilloscope width={100} height={20} mode="waveform" />
+            </PixiDOMOverlay>
+            <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 4, marginRight: 4 }} />
+          </>
+        )}
+
         {/* Audio state indicator */}
         <pixiGraphics
           draw={(g: GraphicsType) => {
@@ -360,6 +477,7 @@ export const PixiStatusBar: React.FC = () => {
           layout={{}}
         />
       </pixiContainer>
+    </pixiContainer>
     </pixiContainer>
   );
 };

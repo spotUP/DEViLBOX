@@ -3,7 +3,7 @@
  * Layout: Toolbar (top) | [Piano keyboard | Note grid] (flex row) | Velocity lane
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PixiButton, PixiLabel } from '../components';
@@ -12,12 +12,21 @@ import { PixiPianoRollGrid } from './pianoroll/PixiPianoRollGrid';
 import { PixiVelocityLane } from './pianoroll/PixiVelocityLane';
 import { usePianoRollStore } from '@stores';
 import { useTrackerStore } from '@stores';
+import { usePianoRollData } from '@/hooks/pianoroll/usePianoRollData';
+import { useHistoryStore } from '@/stores/useHistoryStore';
 
 const VELOCITY_HEIGHT = 80;
 const TOOLBAR_HEIGHT = 36;
 const KEYBOARD_WIDTH = 60;
 
 const GRID_DIVISIONS = [1, 2, 4, 8, 16];
+
+/** QWERTY keyboard → semitone offset from base octave */
+const QWERTY_NOTE_MAP: Record<string, number> = {
+  z: 0, s: 1, x: 2, d: 3, c: 4, v: 5, g: 6, b: 7, h: 8, n: 9, j: 10, m: 11,
+  q: 12, '2': 13, w: 14, '3': 15, e: 16, r: 17, '5': 18, t: 19, '6': 20, y: 21, '7': 22, u: 23,
+  i: 24, '9': 25, o: 26, '0': 27, p: 28,
+};
 
 export const PixiPianoRollView: React.FC = () => {
   const theme = usePixiTheme();
@@ -27,6 +36,163 @@ export const PixiPianoRollView: React.FC = () => {
   // Version counter to force note recalculation after edits
   const [noteVersion, setNoteVersion] = useState(0);
   const handleNotesChanged = useCallback(() => setNoteVersion(v => v + 1), []);
+
+  // Note manipulation API from usePianoRollData
+  const pianoData = usePianoRollData(view.channelIndex);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      const key = e.key.toLowerCase();
+      const isMod = e.ctrlKey || e.metaKey;
+      const store = usePianoRollStore.getState();
+      const selectedIds = Array.from(store.selection.notes);
+
+      // Copy/Cut/Paste/Undo/Redo
+      if (isMod) {
+        if (key === 'c') {
+          const selectedNotes = pianoData.notes.filter(n => store.selection.notes.has(n.id));
+          if (selectedNotes.length > 0) store.copyNotes(selectedNotes);
+          e.preventDefault(); return;
+        }
+        if (key === 'x') {
+          const selectedNotes = pianoData.notes.filter(n => store.selection.notes.has(n.id));
+          if (selectedNotes.length > 0) {
+            store.copyNotes(selectedNotes);
+            pianoData.deleteNotes(selectedIds);
+            store.clearSelection();
+            handleNotesChanged();
+          }
+          e.preventDefault(); return;
+        }
+        if (key === 'v') {
+          const clip = store.clipboard;
+          if (clip) {
+            pianoData.pasteNotes(clip, Math.floor(store.view.scrollX), Math.round(store.view.scrollY + 60), view.channelIndex);
+            handleNotesChanged();
+          }
+          e.preventDefault(); return;
+        }
+        if (key === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) useHistoryStore.getState().redo();
+          else useHistoryStore.getState().undo();
+          handleNotesChanged();
+          return;
+        }
+        if (key === 'y') {
+          e.preventDefault();
+          useHistoryStore.getState().redo();
+          handleNotesChanged();
+          return;
+        }
+        if (key === 'a') {
+          e.preventDefault();
+          store.selectAll(pianoData.notes.map(n => n.id));
+          return;
+        }
+        if (key === 'd') {
+          e.preventDefault();
+          if (selectedIds.length > 0) {
+            pianoData.duplicateNotes(selectedIds);
+            handleNotesChanged();
+          }
+          return;
+        }
+        return;
+      }
+
+      // Delete/Backspace
+      if (key === 'delete' || key === 'backspace') {
+        if (selectedIds.length > 0) {
+          pianoData.deleteNotes(selectedIds);
+          store.clearSelection();
+          handleNotesChanged();
+        }
+        e.preventDefault(); return;
+      }
+
+      // Escape — clear selection
+      if (key === 'escape') {
+        store.clearSelection();
+        return;
+      }
+
+      // Arrow keys — transpose / adjust length
+      if (selectedIds.length > 0) {
+        if (key === 'arrowup') {
+          pianoData.transposeNotes(selectedIds, e.shiftKey ? 12 : 1);
+          handleNotesChanged();
+          e.preventDefault(); return;
+        }
+        if (key === 'arrowdown') {
+          pianoData.transposeNotes(selectedIds, e.shiftKey ? -12 : -1);
+          handleNotesChanged();
+          e.preventDefault(); return;
+        }
+        if (key === 'arrowleft' && e.shiftKey) {
+          const gridStep = Math.max(1, Math.floor(4 / store.view.gridDivision));
+          pianoData.adjustNoteLengths(selectedIds, -gridStep);
+          handleNotesChanged();
+          e.preventDefault(); return;
+        }
+        if (key === 'arrowright' && e.shiftKey) {
+          const gridStep = Math.max(1, Math.floor(4 / store.view.gridDivision));
+          pianoData.adjustNoteLengths(selectedIds, gridStep);
+          handleNotesChanged();
+          e.preventDefault(); return;
+        }
+      }
+
+      // Tool selection (only when NOT in draw mode where keys are note input)
+      if (tool !== 'draw') {
+        if (key === '1') { setTool('select'); e.preventDefault(); return; }
+        if (key === '2') { setTool('draw'); e.preventDefault(); return; }
+        if (key === '3') { setTool('erase'); e.preventDefault(); return; }
+      }
+
+      // Select-mode shortcuts
+      if (tool === 'select' && selectedIds.length > 0) {
+        if (key === 'q') { pianoData.quantizeNotes(selectedIds, store.view.gridDivision); handleNotesChanged(); return; }
+        if (key === 's') { pianoData.toggleSlide(selectedIds, true); handleNotesChanged(); return; }
+        if (key === 'a') { pianoData.toggleAccent(selectedIds, true); handleNotesChanged(); return; }
+      }
+
+      // Velocity adjust (+/-)
+      if (key === '+' || key === '=') {
+        if (selectedIds.length > 0) {
+          pianoData.adjustVelocities(selectedIds, 10);
+          handleNotesChanged();
+        }
+        return;
+      }
+      if (key === '-' || key === '_') {
+        if (selectedIds.length > 0) {
+          pianoData.adjustVelocities(selectedIds, -10);
+          handleNotesChanged();
+        }
+        return;
+      }
+
+      // QWERTY note input (draw mode)
+      if (tool === 'draw') {
+        const semitone = QWERTY_NOTE_MAP[key];
+        if (semitone != null) {
+          const baseOctave = 4; // C4 = MIDI 60
+          const midiNote = baseOctave * 12 + semitone;
+          const gridStep = Math.max(1, Math.floor(4 / store.view.gridDivision));
+          pianoData.addNote(midiNote, Math.floor(store.view.scrollX), gridStep, 100);
+          handleNotesChanged();
+          e.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tool, setTool, view.channelIndex, pianoData, handleNotesChanged]);
 
   // Get notes from the current pattern/channel
   const notes = useMemo(() => {

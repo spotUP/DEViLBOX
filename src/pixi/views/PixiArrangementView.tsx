@@ -8,10 +8,12 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PixiButton, PixiLabel } from '../components';
 import { PixiArrangementCanvas } from './arrangement/PixiArrangementCanvas';
+import type { ClipRenderData } from './arrangement/PixiArrangementCanvas';
 import { PixiTrackHeaders } from './arrangement/PixiTrackHeaders';
 import { useTransportStore, useTrackerStore } from '@stores';
 import { useArrangementStore } from '@/stores/useArrangementStore';
 import type { ArrangementToolMode } from '@/types/arrangement';
+import { useArrangementKeyboardShortcuts } from '@/components/arrangement/ArrangementKeyboardShortcuts';
 
 // Default channel colors when falling back to tracker channels
 const CHANNEL_COLORS = [0x60a5fa, 0xf87171, 0x4ade80, 0xfbbf24, 0xa78bfa, 0xfb923c, 0x38bdf8, 0xe879f9];
@@ -62,6 +64,52 @@ export const PixiArrangementView: React.FC = () => {
     }));
   }, [arrangementTracks, trackerChannels]);
 
+  // Clips and selection
+  const clips = useArrangementStore(s => s.clips);
+  const selectedClipIds = useArrangementStore(s => s.selectedClipIds);
+  const patterns = useTrackerStore(s => s.patterns);
+
+  // Pre-compute clip render data for the canvas
+  const clipRenderData = useMemo((): ClipRenderData[] => {
+    const trackIdToIndex = new Map<string, number>();
+    tracks.forEach((t, i) => trackIdToIndex.set(t.id, i));
+
+    return clips.map(clip => {
+      // Effective length: clipLengthRows or pattern length minus offset
+      let lengthRows = clip.clipLengthRows ?? 64;
+      if (clip.clipLengthRows == null) {
+        const pat = patterns.find(p => p.id === clip.patternId);
+        if (pat) {
+          const patLen = pat.channels[0]?.rows?.length ?? 64;
+          lengthRows = Math.max(1, patLen - (clip.offsetRows || 0));
+        }
+      }
+
+      // Color: clip color → track color → default
+      const trackIdx = trackIdToIndex.get(clip.trackId) ?? 0;
+      const trackColor = tracks[trackIdx]?.color ?? 0x3b82f6;
+      const color = clip.color ? cssColorToPixi(clip.color, trackColor) : trackColor;
+
+      // Name: custom name → pattern name → generic
+      let name = clip.name || '';
+      if (!name) {
+        const pat = patterns.find(p => p.id === clip.patternId);
+        name = pat?.name || `Pattern ${clip.sourceChannelIndex}`;
+      }
+
+      return {
+        id: clip.id,
+        startRow: clip.startRow,
+        lengthRows,
+        trackIndex: trackIdx,
+        color,
+        name,
+        muted: clip.muted,
+        selected: selectedClipIds.has(clip.id),
+      };
+    });
+  }, [clips, tracks, selectedClipIds, patterns]);
+
   // Track interaction: mute/solo
   const useArrangementData = arrangementTracks.length > 0;
 
@@ -102,41 +150,8 @@ export const PixiArrangementView: React.FC = () => {
     return () => cancelAnimationFrame(rafId);
   }, [isPlaying, isArrangementMode]);
 
-  // Keyboard shortcuts for arrangement
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      // Don't capture when typing in inputs
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      switch (e.key.toLowerCase()) {
-        case 'v': handleSetTool('select'); break;
-        case 'd': handleSetTool('draw'); break;
-        case 'e': handleSetTool('erase'); break;
-        case 's':
-          if (!e.ctrlKey && !e.metaKey) handleSetTool('split');
-          break;
-        case 'delete':
-        case 'backspace': {
-          const arr = useArrangementStore.getState();
-          const selected = Array.from(arr.selectedClipIds);
-          if (selected.length > 0) arr.removeClips(selected);
-          break;
-        }
-        case 'z':
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            if (e.shiftKey) {
-              useArrangementStore.getState().redo();
-            } else {
-              useArrangementStore.getState().undo();
-            }
-          }
-          break;
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
+  // Full arrangement keyboard shortcuts (Cmd+D duplicate, Cmd+E split, zoom presets, etc.)
+  useArrangementKeyboardShortcuts();
 
   const handleToggleMute = useCallback((trackId: string) => {
     if (useArrangementData) {
@@ -164,6 +179,22 @@ export const PixiArrangementView: React.FC = () => {
   const handleSetTool = useCallback((t: ArrangementToolMode) => {
     setTool(t);
   }, [setTool]);
+
+  // Tool selection shortcuts (V/D/E/S)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.ctrlKey || e.metaKey) return;
+      switch (e.key.toLowerCase()) {
+        case 'v': handleSetTool('select'); break;
+        case 'd': handleSetTool('draw'); break;
+        case 'e': handleSetTool('erase'); break;
+        case 's': handleSetTool('split'); break;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleSetTool]);
 
   // Zoom
   const handleZoomIn = useCallback(() => {
@@ -309,7 +340,10 @@ export const PixiArrangementView: React.FC = () => {
           width={4000}
           height={4000}
           scrollBeat={view.scrollRow}
+          pixelsPerBeat={view.pixelsPerRow}
           playbackBeat={isPlaying ? playbackRow : undefined}
+          clips={clipRenderData}
+          trackHeight={40}
         />
       </pixiContainer>
     </pixiContainer>
