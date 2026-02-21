@@ -485,6 +485,50 @@ export const ST02_PACK: SamplePack = {
 };
 
 // ============================================================================
+// SCRATCH ORIGINALS SAMPLE PACK
+// Chopped from ScratchOriginals_Phase.wav — 52 DJ scratch sounds
+// ============================================================================
+
+const SCRATCH_BASE_PATH = 'data/samples/packs/scratch-originals';
+
+// Build flat sample list (files live in root of pack dir, not in category subdirs)
+const SCRATCH_FX: SampleInfo[] = Array.from({ length: 53 }, (_, i) => {
+  const num = i + 1;
+  if (num === 52) return null; // Removed click artifact
+  const padded = String(num).padStart(3, '0');
+  return {
+    filename: `scratch_${padded}.wav`,
+    name: `Scratch ${padded}`,
+    category: 'fx' as SampleCategory,
+    url: normalizeUrl(`${SCRATCH_BASE_PATH}/scratch_${padded}.wav`),
+  };
+}).filter((x): x is SampleInfo => x !== null);
+
+export const SCRATCH_ORIGINALS_PACK: SamplePack = {
+  id: 'scratch-originals',
+  name: 'Scratch Originals',
+  author: 'Phase',
+  description: '52 DJ scratch sounds chopped from a continuous scratch performance. Turntablist moves including babies, transforms, flares, crabs and more.',
+  basePath: SCRATCH_BASE_PATH,
+  categories: ['fx'],
+  samples: {
+    kicks: [],
+    snares: [],
+    hihats: [],
+    claps: [],
+    percussion: [],
+    fx: SCRATCH_FX,
+    bass: [],
+    leads: [],
+    pads: [],
+    loops: [],
+    vocals: [],
+    other: [],
+  },
+  sampleCount: SCRATCH_FX.length,
+};
+
+// ============================================================================
 // SAMPLE PACK REGISTRY
 // ============================================================================
 
@@ -493,6 +537,7 @@ export const SAMPLE_PACKS: SamplePack[] = [
   CASIO_MT40_PACK,
   ST01_PACK,
   ST02_PACK,
+  SCRATCH_ORIGINALS_PACK,
 ];
 
 export const getSamplePackById = (id: string): SamplePack | undefined => {
