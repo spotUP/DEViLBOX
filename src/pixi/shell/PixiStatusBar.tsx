@@ -11,6 +11,8 @@ import { usePixiTheme, usePixiThemeId, getDeckColors } from '../theme';
 import { useUIStore, useTransportStore, useAudioStore } from '@stores';
 import { useTrackerStore } from '@stores';
 import { useDJStore } from '@/stores/useDJStore';
+import { useMIDIStore } from '@/stores/useMIDIStore';
+import { useCollaborationStore } from '@/stores/useCollaborationStore';
 
 const STATUS_HEIGHT = 24;
 
@@ -219,6 +221,15 @@ export const PixiStatusBar: React.FC = () => {
   const theme = usePixiTheme();
   const activeView = useUIStore(s => s.activeView);
   const contextState = useAudioStore(s => s.contextState);
+  const midiInitialized = useMIDIStore(s => s.isInitialized);
+  const midiInputDevices = useMIDIStore(s => s.inputDevices);
+  const midiSelectedInput = useMIDIStore(s => s.selectedInputId);
+  const collabStatus = useCollaborationStore(s => s.status);
+  const collabRoomCode = useCollaborationStore(s => s.roomCode);
+
+  const handleTips = useCallback(() => {
+    useUIStore.getState().openModal('tips');
+  }, []);
 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -231,6 +242,17 @@ export const PixiStatusBar: React.FC = () => {
   }, [theme]);
 
   const isAudioActive = contextState === 'running';
+  const hasMIDIDevice = midiInitialized && midiInputDevices.length > 0;
+  const midiDeviceName = hasMIDIDevice
+    ? midiInputDevices.find(d => d.id === midiSelectedInput)?.name || midiInputDevices[0].name
+    : null;
+  const isCollabConnected = collabStatus === 'connected' && collabRoomCode;
+
+  const sep = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 4, 1, STATUS_HEIGHT - 8);
+    g.fill({ color: theme.border.color, alpha: 0.4 });
+  }, [theme]);
 
   return (
     <pixiContainer
@@ -254,9 +276,75 @@ export const PixiStatusBar: React.FC = () => {
         {activeView === 'dj' ? <DJStatus /> : <TrackerStatus />}
       </pixiContainer>
 
-      {/* Right: Audio state */}
+      {/* Right side indicators */}
       <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        {/* Status dot */}
+
+        {/* MIDI device indicator */}
+        {hasMIDIDevice && (
+          <>
+            <pixiGraphics
+              draw={(g: GraphicsType) => {
+                g.clear();
+                g.circle(3, 3, 2.5);
+                g.fill({ color: theme.success.color });
+              }}
+              layout={{ width: 6, height: 6 }}
+            />
+            <pixiBitmapText
+              text={midiDeviceName ? (midiDeviceName.length > 12 ? midiDeviceName.substring(0, 12) + '..' : midiDeviceName) : 'MIDI'}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+              tint={theme.success.color}
+              layout={{}}
+            />
+            <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 4, marginRight: 4 }} />
+          </>
+        )}
+
+        {/* Tips button */}
+        <pixiContainer
+          eventMode="static"
+          cursor="pointer"
+          onPointerUp={handleTips}
+          layout={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+        >
+          <pixiBitmapText
+            text="TIPS"
+            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+            tint={theme.warning.color}
+            layout={{}}
+          />
+        </pixiContainer>
+
+        <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 4, marginRight: 4 }} />
+
+        {/* Collab status */}
+        {isCollabConnected && (
+          <>
+            <pixiGraphics
+              draw={(g: GraphicsType) => {
+                g.clear();
+                g.circle(3, 3, 2.5);
+                g.fill({ color: theme.success.color });
+              }}
+              layout={{ width: 6, height: 6 }}
+            />
+            <pixiBitmapText
+              text="Collab"
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+              tint={theme.success.color}
+              layout={{}}
+            />
+            <pixiBitmapText
+              text={collabRoomCode}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{ marginLeft: 3 }}
+            />
+            <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 4, marginRight: 4 }} />
+          </>
+        )}
+
+        {/* Audio state indicator */}
         <pixiGraphics
           draw={(g: GraphicsType) => {
             g.clear();

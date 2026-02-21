@@ -7,6 +7,7 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PixiKnob, PixiSlider, PixiLabel } from '../../components';
 import { useDJStore } from '@/stores/useDJStore';
+import { getDJEngine } from '@/engine/dj/DJEngine';
 
 const MIXER_WIDTH = 220;
 
@@ -41,6 +42,9 @@ export const PixiDJMixer: React.FC = () => {
 
       <PixiLabel text="MIXER" size="md" weight="bold" color="accent" />
 
+      {/* Filter Section */}
+      <MixerFilterSection />
+
       {/* EQ Section */}
       <MixerEQSection />
 
@@ -55,6 +59,43 @@ export const PixiDJMixer: React.FC = () => {
 
       {/* Master volume */}
       <MixerMaster />
+    </pixiContainer>
+  );
+};
+
+// ─── Filter Section ─────────────────────────────────────────────────────────
+
+const MixerFilterSection: React.FC = () => {
+  const theme = usePixiTheme();
+  const filterA = useDJStore(s => s.decks.A.filterPosition);
+  const filterB = useDJStore(s => s.decks.B.filterPosition);
+  const setDeckFilter = useDJStore(s => s.setDeckFilter);
+
+  const drawBorder = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, MIXER_WIDTH - 16, 1);
+    g.fill({ color: theme.border.color, alpha: 0.2 });
+  }, [theme]);
+
+  return (
+    <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+      <PixiLabel text="FILTER" size="xs" color="textMuted" />
+
+      <pixiContainer layout={{ flexDirection: 'row', gap: 16 }}>
+        {/* Deck A Filter: -1 (HPF) to 0 (off) to +1 (LPF) */}
+        <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+          <PixiLabel text="A" size="xs" color="textMuted" />
+          <PixiKnob value={filterA} min={-1} max={1} defaultValue={0} size="sm" label="FLT" bipolar onChange={(v) => setDeckFilter('A', v)} />
+        </pixiContainer>
+
+        {/* Deck B Filter */}
+        <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+          <PixiLabel text="B" size="xs" color="textMuted" />
+          <PixiKnob value={filterB} min={-1} max={1} defaultValue={0} size="sm" label="FLT" bipolar onChange={(v) => setDeckFilter('B', v)} />
+        </pixiContainer>
+      </pixiContainer>
+
+      <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 16, height: 1 }} />
     </pixiContainer>
   );
 };
@@ -180,6 +221,12 @@ const MixerCrossfader: React.FC = () => {
 
 const MixerMaster: React.FC = () => {
   const theme = usePixiTheme();
+  const masterVolume = useDJStore(s => s.masterVolume);
+
+  const handleVolumeChange = useCallback((value: number) => {
+    useDJStore.getState().setMasterVolume(value);
+    getDJEngine().mixer.setMasterVolume(value);
+  }, []);
 
   const drawBorder = useCallback((g: GraphicsType) => {
     g.clear();
@@ -191,12 +238,12 @@ const MixerMaster: React.FC = () => {
     <pixiContainer layout={{ flexDirection: 'column', gap: 4, alignItems: 'center', marginBottom: 4 }}>
       <pixiGraphics draw={drawBorder} layout={{ width: MIXER_WIDTH - 16, height: 1 }} />
       <PixiKnob
-        value={0.8}
+        value={masterVolume}
         min={0}
-        max={1}
+        max={1.5}
         size="sm"
         label="MASTER"
-        onChange={() => {}} // Placeholder — wire to master volume
+        onChange={handleVolumeChange}
       />
     </pixiContainer>
   );

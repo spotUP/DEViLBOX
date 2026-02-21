@@ -260,6 +260,7 @@ const PixiFT2MainRow: React.FC = () => {
 const PixiFT2MenuBar: React.FC = () => {
   const theme = usePixiTheme();
   const isDirty = useProjectStore(s => s.isDirty);
+  const modalOpen = useUIStore(s => s.modalOpen);
 
   const handleSave = useCallback(() => {
     // Trigger save via keyboard command (Ctrl+S handler in useGlobalKeyboardHandler)
@@ -268,16 +269,14 @@ const PixiFT2MenuBar: React.FC = () => {
 
   const handleNew = useCallback(() => {
     if (confirm('Create new project? Unsaved changes will be lost.')) {
-      const { resetPatterns } = useTrackerStore.getState();
-      resetPatterns();
+      useTrackerStore.getState().reset();
       useProjectStore.getState().setMetadata({ name: 'Untitled', author: '', description: '' });
     }
   }, []);
 
   const handleClear = useCallback(() => {
     if (confirm('Clear current pattern?')) {
-      const { currentPatternIndex, clearPattern } = useTrackerStore.getState();
-      clearPattern(currentPatternIndex);
+      useTrackerStore.getState().clearPattern();
     }
   }, []);
 
@@ -297,8 +296,29 @@ const PixiFT2MenuBar: React.FC = () => {
     useUIStore.getState().openModal('instruments');
   }, []);
 
+  const handlePads = useCallback(() => {
+    useUIStore.getState().openModal('drumpads');
+  }, []);
+
+  const handleMasterFX = useCallback(() => {
+    const s = useUIStore.getState();
+    s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx');
+  }, []);
+
+  const handleReference = useCallback(() => {
+    useUIStore.getState().openModal('help', { initialTab: 'chip-effects' });
+  }, []);
+
   const handleHelp = useCallback(() => {
-    useUIStore.getState().openModal('help');
+    useUIStore.getState().openModal('help', { initialTab: 'shortcuts' });
+  }, []);
+
+  const handleOrder = useCallback(() => {
+    useUIStore.getState().openModal('patternOrder');
+  }, []);
+
+  const handleRevisions = useCallback(() => {
+    useUIStore.getState().openModal('revisions');
   }, []);
 
   const handleFullscreen = useCallback(() => {
@@ -321,16 +341,22 @@ const PixiFT2MenuBar: React.FC = () => {
     g.fill({ color: theme.border.color, alpha: theme.border.alpha });
   }, [theme]);
 
-  // Menu items with their handlers
-  const menuItems: { label: string; onClick: () => void }[] = [
+  // Menu items with their handlers — matches DOM FT2Toolbar menu bar order
+  const menuItems: { label: string; onClick: () => void; active?: boolean }[] = [
     { label: 'Load', onClick: handleLoad },
     { label: isDirty ? 'Save*' : 'Save', onClick: handleSave },
+    { label: 'Revisions', onClick: handleRevisions },
+    { label: 'Download', onClick: handleSave },
+    { label: 'Export', onClick: handleExport },
     { label: 'New', onClick: handleNew },
     { label: 'Clear', onClick: handleClear },
-    { label: 'Export', onClick: handleExport },
+    { label: 'Order', onClick: handleOrder },
     { label: 'Instr', onClick: handleInstruments },
-    { label: 'Settings', onClick: handleSettings },
+    { label: 'Pads', onClick: handlePads },
+    { label: 'Master FX', onClick: handleMasterFX, active: modalOpen === 'masterFx' },
+    { label: 'Reference', onClick: handleReference },
     { label: 'Help', onClick: handleHelp },
+    { label: 'Settings', onClick: handleSettings },
     { label: 'Fullscr', onClick: handleFullscreen },
     { label: 'DOM Mode', onClick: handleSwitchToDOM },
   ];
@@ -352,8 +378,10 @@ const PixiFT2MenuBar: React.FC = () => {
         <PixiButton
           key={item.label}
           label={item.label}
-          variant="ghost"
+          variant={item.active ? 'ft2' : 'ghost'}
+          color={item.active ? 'blue' : undefined}
           size="sm"
+          active={item.active}
           onClick={item.onClick}
         />
       ))}
