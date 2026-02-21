@@ -33,6 +33,8 @@ juce-wasm/*/build/
 juce-wasm/**/build/
 mame-wasm/build/
 furnace-wasm/build/
+hively-wasm/build/
+hively-insed-wasm/build/
 spacey-delayer-wasm/build/
 re-tape-echo-wasm/build/
 ami-sampler-wasm/build/
