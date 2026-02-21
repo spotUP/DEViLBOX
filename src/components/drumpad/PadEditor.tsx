@@ -2,9 +2,12 @@
  * PadEditor - Detailed pad parameter editor with tabs
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import type { DrumPad, FilterType, OutputBus, ScratchActionId } from '../../types/drumpad';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
+import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
+import { getMIDIManager } from '../../midi/MIDIManager';
+import type { MIDIMessage } from '../../midi/types';
 
 interface PadEditorProps {
   padId: number;
@@ -14,31 +17,95 @@ interface PadEditorProps {
 type TabName = 'main' | 'adsr' | 'filter' | 'layers' | 'dj';
 
 const SCRATCH_ACTION_OPTIONS: { value: ScratchActionId | ''; label: string }[] = [
-  { value: '',             label: 'None' },
-  { value: 'scratch_baby', label: 'Baby Scratch' },
-  { value: 'scratch_trans',label: 'Transformer' },
-  { value: 'scratch_flare',label: 'Flare' },
-  { value: 'scratch_hydro',label: 'Hydroplane' },
-  { value: 'scratch_crab', label: 'Crab' },
-  { value: 'scratch_orbit',label: 'Orbit' },
-  { value: 'scratch_stop', label: 'Stop Scratch' },
-  { value: 'lfo_off',      label: 'Fader LFO: Off' },
-  { value: 'lfo_14',       label: 'Fader LFO: ¼' },
-  { value: 'lfo_18',       label: 'Fader LFO: ⅛' },
-  { value: 'lfo_116',      label: 'Fader LFO: ⅟₁₆' },
-  { value: 'lfo_132',      label: 'Fader LFO: ⅟₃₂' },
+  { value: '',                label: 'None' },
+  // Basic patterns
+  { value: 'scratch_baby',   label: 'Baby Scratch' },
+  { value: 'scratch_trans',  label: 'Transformer' },
+  { value: 'scratch_flare',  label: 'Flare' },
+  { value: 'scratch_hydro',  label: 'Hydroplane' },
+  { value: 'scratch_crab',   label: 'Crab' },
+  { value: 'scratch_orbit',  label: 'Orbit' },
+  // Extended patterns
+  { value: 'scratch_chirp',  label: 'Chirp' },
+  { value: 'scratch_stab',   label: 'Stab' },
+  { value: 'scratch_scribble', label: 'Scribble' },
+  { value: 'scratch_tear',   label: 'Tear' },
+  // Advanced patterns
+  { value: 'scratch_uzi',    label: 'Uzi' },
+  { value: 'scratch_twiddle', label: 'Twiddle' },
+  { value: 'scratch_8crab',  label: '8-Finger Crab' },
+  { value: 'scratch_3flare', label: '3-Click Flare' },
+  { value: 'scratch_laser',  label: 'Laser' },
+  { value: 'scratch_phaser', label: 'Phaser' },
+  { value: 'scratch_tweak',  label: 'Tweak' },
+  { value: 'scratch_drag',   label: 'Drag' },
+  { value: 'scratch_vibrato', label: 'Vibrato' },
+  // Control
+  { value: 'scratch_stop',   label: 'Stop Scratch' },
+  { value: 'lfo_off',        label: 'Fader LFO: Off' },
+  { value: 'lfo_14',         label: 'Fader LFO: ¼' },
+  { value: 'lfo_18',         label: 'Fader LFO: ⅛' },
+  { value: 'lfo_116',        label: 'Fader LFO: ⅟₁₆' },
+  { value: 'lfo_132',        label: 'Fader LFO: ⅟₃₂' },
 ];
 
 export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
   const [activeTab, setActiveTab] = useState<TabName>('main');
+  const [isLearning, setIsLearning] = useState(false);
+  const [showLayerBrowser, setShowLayerBrowser] = useState(false);
+  const learningRef = useRef(false);
 
-  const { programs, currentProgramId, updatePad, clearPad } = useDrumPadStore();
+  const {
+    programs, currentProgramId, updatePad, clearPad,
+    midiMappings, setMIDIMapping, clearMIDIMapping,
+    addLayerToPad, removeLayerFromPad, updateLayerOnPad,
+  } = useDrumPadStore();
   const currentProgram = programs.get(currentProgramId);
   const pad = currentProgram?.pads.find(p => p.id === padId);
+
+  // MIDI mapping for this pad
+  const midiMapping = midiMappings[String(padId)];
 
   const handleUpdate = useCallback((updates: Partial<DrumPad>) => {
     updatePad(padId, updates);
   }, [padId, updatePad]);
+
+  // MIDI Learn handler
+  const handleMIDILearn = useCallback(() => {
+    if (isLearning) {
+      setIsLearning(false);
+      learningRef.current = false;
+      return;
+    }
+    setIsLearning(true);
+    learningRef.current = true;
+
+    const manager = getMIDIManager();
+    const handler = (message: MIDIMessage) => {
+      if (!learningRef.current) return;
+      if (message.type === 'noteOn' && message.note !== undefined) {
+        setMIDIMapping(String(padId), { type: 'note', note: message.note });
+        setIsLearning(false);
+        learningRef.current = false;
+        manager.removeMessageHandler(handler);
+      }
+    };
+    manager.addMessageHandler(handler);
+
+    // Auto-cancel after 10 seconds
+    setTimeout(() => {
+      if (learningRef.current) {
+        setIsLearning(false);
+        learningRef.current = false;
+        manager.removeMessageHandler(handler);
+      }
+    }, 10000);
+  }, [isLearning, padId, setMIDIMapping]);
+
+  // Cleanup MIDI handler on unmount
+  useEffect(() => {
+    return () => { learningRef.current = false; };
+  }, []);
 
   // Memoize ADSR visualization calculations for performance
   const adsrVisualization = useMemo(() => {
@@ -202,6 +269,36 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
               </select>
             </div>
 
+            {/* MIDI Trigger */}
+            <div className="border-t border-dark-border pt-3 mt-3">
+              <label className="block text-xs text-text-muted mb-1">MIDI Trigger</label>
+              {midiMapping ? (
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm text-white font-mono">
+                    Note {midiMapping.note}
+                  </span>
+                  <button
+                    onClick={() => clearMIDIMapping(String(padId))}
+                    className="text-xs text-red-400 hover:text-red-300"
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : (
+                <div className="text-xs text-text-muted mb-2">No MIDI note assigned</div>
+              )}
+              <button
+                onClick={handleMIDILearn}
+                className={`w-full px-3 py-2 text-xs font-bold rounded transition-colors ${
+                  isLearning
+                    ? 'animate-pulse bg-amber-600 text-white'
+                    : 'bg-dark-surface border border-dark-border text-text-muted hover:text-white'
+                }`}
+              >
+                {isLearning ? 'Hit a MIDI pad...' : 'MIDI Learn'}
+              </button>
+            </div>
+
             <button
               onClick={() => clearPad(padId)}
               className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded transition-colors"
@@ -340,17 +437,82 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                     key={idx}
                     className="p-3 bg-dark-surface border border-dark-border rounded"
                   >
-                    <div className="text-sm text-white">{layer.sample.name}</div>
-                    <div className="text-xs text-text-muted">
-                      Velocity: {layer.velocityRange[0]}-{layer.velocityRange[1]}
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-white">{layer.sample.name}</div>
+                      <button
+                        onClick={() => removeLayerFromPad(padId, idx)}
+                        className="text-xs text-red-400 hover:text-red-300"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mt-2">
+                      <div>
+                        <label className="text-[10px] text-text-muted">Vel Min</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="127"
+                          value={layer.velocityRange[0]}
+                          onChange={(e) => updateLayerOnPad(padId, idx, {
+                            velocityRange: [parseInt(e.target.value) || 0, layer.velocityRange[1]],
+                          })}
+                          className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-text-muted">Vel Max</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="127"
+                          value={layer.velocityRange[1]}
+                          onChange={(e) => updateLayerOnPad(padId, idx, {
+                            velocityRange: [layer.velocityRange[0], parseInt(e.target.value) || 127],
+                          })}
+                          className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-text-muted">Level {layer.levelOffset}dB</label>
+                        <input
+                          type="range"
+                          min="-24"
+                          max="24"
+                          value={layer.levelOffset}
+                          onChange={(e) => updateLayerOnPad(padId, idx, {
+                            levelOffset: parseInt(e.target.value),
+                          })}
+                          className="w-full"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-            <button className="w-full px-4 py-2 bg-accent-primary hover:bg-accent-primary/80 text-white text-xs font-bold rounded transition-colors">
+            <button
+              onClick={() => setShowLayerBrowser(true)}
+              className="w-full px-4 py-2 bg-accent-primary hover:bg-accent-primary/80 text-white text-xs font-bold rounded transition-colors"
+            >
               + Add Layer
             </button>
+
+            {showLayerBrowser && (
+              <SamplePackBrowser
+                mode="drumpad"
+                onSelectSample={(sample) => {
+                  // Auto-calculate velocity range based on existing layers
+                  const existingCount = pad.layers.length;
+                  const rangeSize = Math.floor(128 / (existingCount + 1));
+                  const min = existingCount * rangeSize;
+                  const max = existingCount === 0 ? 127 : Math.min(min + rangeSize - 1, 127);
+                  addLayerToPad(padId, sample, [min, max]);
+                  setShowLayerBrowser(false);
+                }}
+                onClose={() => setShowLayerBrowser(false)}
+              />
+            )}
           </div>
         )}
 

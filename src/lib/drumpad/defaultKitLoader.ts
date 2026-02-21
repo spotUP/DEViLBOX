@@ -85,11 +85,40 @@ const DRUMNIBUS_808_KIT: KitPreset = {
 };
 
 /**
+ * Scratch Originals - Phase scratch sample pack (chopped from ScratchOriginals_Phase.wav)
+ * 53 individual scratch sounds — first 16 mapped to pads, all available in SampleBrowser
+ */
+const SCRATCH_ORIGINALS_KIT: KitPreset = {
+  id: 'scratch-originals',
+  name: 'Scratch Originals',
+  description: 'Phase scratch sounds — DJ scratch sample pack',
+  mappings: [
+    { name: 'Scratch 01', path: '/data/samples/packs/scratch-originals/scratch_001.wav' },
+    { name: 'Scratch 02', path: '/data/samples/packs/scratch-originals/scratch_002.wav' },
+    { name: 'Scratch 03', path: '/data/samples/packs/scratch-originals/scratch_003.wav' },
+    { name: 'Scratch 04', path: '/data/samples/packs/scratch-originals/scratch_004.wav' },
+    { name: 'Scratch 05', path: '/data/samples/packs/scratch-originals/scratch_005.wav' },
+    { name: 'Scratch 06', path: '/data/samples/packs/scratch-originals/scratch_006.wav' },
+    { name: 'Scratch 07', path: '/data/samples/packs/scratch-originals/scratch_007.wav' },
+    { name: 'Scratch 08', path: '/data/samples/packs/scratch-originals/scratch_008.wav' },
+    { name: 'Scratch 09', path: '/data/samples/packs/scratch-originals/scratch_009.wav' },
+    { name: 'Scratch 10', path: '/data/samples/packs/scratch-originals/scratch_010.wav' },
+    { name: 'Scratch 11', path: '/data/samples/packs/scratch-originals/scratch_011.wav' },
+    { name: 'Scratch 12', path: '/data/samples/packs/scratch-originals/scratch_012.wav' },
+    { name: 'Scratch 13', path: '/data/samples/packs/scratch-originals/scratch_013.wav' },
+    { name: 'Scratch 14', path: '/data/samples/packs/scratch-originals/scratch_014.wav' },
+    { name: 'Scratch 15', path: '/data/samples/packs/scratch-originals/scratch_015.wav' },
+    { name: 'Scratch 16', path: '/data/samples/packs/scratch-originals/scratch_016.wav' },
+  ],
+};
+
+/**
  * Available kit presets
  */
-export const AVAILABLE_KIT_PRESETS: KitPreset[] = [
+const AVAILABLE_KIT_PRESETS: KitPreset[] = [
   DRUMNIBUS_ELECTRO_KIT,
   DRUMNIBUS_808_KIT,
+  SCRATCH_ORIGINALS_KIT,
 ];
 
 /**
