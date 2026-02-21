@@ -231,6 +231,13 @@ export const usePatternPlayback = () => {
           grooves: furnaceData?.grooves,
         });
 
+        // Apply Furnace compat flags to the dispatch engine (if this is a .fur song)
+        if (furnaceData?.compatFlags && Object.keys(furnaceData.compatFlags).length > 0) {
+          import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
+            FurnaceDispatchEngine.getInstance().setCompatFlags(furnaceData.compatFlags as any);
+          });
+        }
+
         // Apply stored stereo separation (overrides format default from loadSong)
         replayer.setStereoSeparation(useSettingsStore.getState().stereoSeparation);
 
