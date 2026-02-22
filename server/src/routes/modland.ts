@@ -11,6 +11,7 @@ import {
   getFormats,
   getCachedFile,
   cacheFile,
+  forceReindex,
 } from '../services/modlandIndexer';
 
 const router = Router();
@@ -45,6 +46,22 @@ router.get('/status', (_req: Request, res: Response) => {
   } catch (err) {
     console.error('[Modland] Status error:', err);
     res.status(500).json({ error: 'Failed to get status' });
+  }
+});
+
+// ── POST /api/modland/reindex ────────────────────────────────────────────────
+
+router.post('/reindex', async (_req: Request, res: Response) => {
+  try {
+    const status = getIndexStatus();
+    if (status.status === 'indexing') {
+      return res.status(409).json({ error: 'Already indexing' });
+    }
+    const count = await forceReindex();
+    res.json({ success: true, totalFiles: count });
+  } catch (err) {
+    console.error('[Modland] Reindex error:', err);
+    res.status(500).json({ error: 'Reindex failed' });
   }
 });
 
