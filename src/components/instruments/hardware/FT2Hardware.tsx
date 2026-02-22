@@ -1,10 +1,13 @@
 /**
  * FT2Hardware — FastTracker 2 Instrument/Sample Editor Hardware UI
  *
- * Wraps the ft2_sampled WASM/SDL2 module in a React component.
+ * Wraps the ft2_sampled WASM module in a React component.
  * Renders the classic FT2 instrument editor with volume/panning envelope
  * editors, auto-vibrato controls, and sample waveform display.
  * Bidirectional sync with InstrumentConfig.
+ *
+ * Canvas is rendered declaratively in JSX (imperative createElement doesn't
+ * survive React Strict Mode remounts).
  */
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -35,6 +38,9 @@ const FT2 = {
   PAN_ENV_NUM_POINTS: 19,
 } as const;
 
+const FT2_SCREEN_W = 632;
+const FT2_SCREEN_H = 400;
+
 interface FT2HardwareProps {
   instrument: InstrumentConfig;
   onChange: (updates: Partial<InstrumentConfig>) => void;
@@ -42,7 +48,6 @@ interface FT2HardwareProps {
 
 /* Emscripten module interface */
 interface FT2Module {
-  canvas: HTMLCanvasElement;
   onParamChange?: (paramId: number, value: number) => void;
   onLoopChange?: (loopStart: number, loopLength: number, loopType: number) => void;
   onVolEnvChange?: (index: number, tick: number, value: number) => void;
@@ -60,6 +65,7 @@ interface FT2Module {
   _ft2_sampled_set_pan_env_point: (index: number, tick: number, value: number) => void;
   _ft2_sampled_load_config: (ptr: number, len: number) => void;
   _ft2_sampled_dump_config: (ptr: number, maxLen: number) => number;
+  _ft2_sampled_get_fb: () => number;
   _ft2_sampled_on_mouse_down: (x: number, y: number) => void;
   _ft2_sampled_on_mouse_up: (x: number, y: number) => void;
   _ft2_sampled_on_mouse_move: (x: number, y: number) => void;
@@ -73,6 +79,21 @@ interface FT2Module {
 
 /* Vibrato type string ↔ number */
 const VIB_TYPES: AutoVibrato['type'][] = ['sine', 'square', 'rampDown', 'rampUp'];
+
+/* Blit ARGB framebuffer from WASM to canvas 2D context */
+function blitFramebuffer(mod: FT2Module, ctx: CanvasRenderingContext2D, imgData: ImageData) {
+  const fbPtr = mod._ft2_sampled_get_fb();
+  const src = mod.HEAPU8.subarray(fbPtr, fbPtr + FT2_SCREEN_W * FT2_SCREEN_H * 4);
+  const dst = imgData.data;
+  for (let i = 0; i < FT2_SCREEN_W * FT2_SCREEN_H; i++) {
+    const off = i * 4;
+    dst[off]     = src[off + 2]; // R
+    dst[off + 1] = src[off + 1]; // G
+    dst[off + 2] = src[off];     // B
+    dst[off + 3] = 255;          // A
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
 
 /* ── Config → buffer packing (126 bytes) ───────────────────────── */
 
@@ -126,7 +147,7 @@ function configToBuffer(inst: InstrumentConfig): Uint8Array {
   // Volume envelope
   const volPts = volEnv?.points ?? [{ tick: 0, value: 64 }, { tick: 325, value: 0 }];
   buf[20] = (volEnv?.enabled ? 1 : 0);
-  buf[21] = volEnv?.sustainPoint != null ? volEnv.sustainPoint : 0xFF; // -1 → 0xFF
+  buf[21] = volEnv?.sustainPoint != null ? volEnv.sustainPoint : 0xFF;
   buf[22] = volEnv?.loopStartPoint != null ? volEnv.loopStartPoint : 0xFF;
   buf[23] = volEnv?.loopEndPoint != null ? volEnv.loopEndPoint : 0xFF;
 
@@ -248,7 +269,6 @@ function updateEnvFlags(
   const env = inst.metadata?.[envKey];
   const points = [...(env?.points ?? [])];
 
-  // Truncate or extend points array
   while (points.length > numPoints) points.pop();
   while (points.length < numPoints) {
     const lastTick = points.length > 0 ? points[points.length - 1].tick + 10 : 0;
@@ -275,8 +295,7 @@ function updateEnvFlags(
 export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }) => {
   const configRef = useRef(instrument);
   const moduleRef = useRef<FT2Module | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const onChangeRef = useRef(onChange);
@@ -311,31 +330,20 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
 
   /* Mount: load WASM and start render loop */
   useEffect(() => {
+    if (!canvasRef.current) return;
+    const canvas = canvasRef.current as HTMLCanvasElement;
+
     let cancelled = false;
     let mod: FT2Module | null = null;
     const eventCleanups: (() => void)[] = [];
 
     async function init() {
       try {
-        /* Create canvas — no SDL, so no id requirement */
-        const canvas = document.createElement('canvas');
-        canvas.width = 632;
-        canvas.height = 400;
-        canvas.style.width = '100%';
-        canvas.style.height = 'auto';
-        canvas.style.imageRendering = 'pixelated';
-        canvas.tabIndex = 0;
-
-        if (containerRef.current && !cancelled) {
-          containerRef.current.appendChild(canvas);
-          canvasRef.current = canvas;
-        }
-
         /* Load Emscripten module via script injection */
-        const factory = await new Promise<(opts: { canvas: HTMLCanvasElement }) => Promise<FT2Module>>((resolve, reject) => {
+        const factory = await new Promise<(opts: Record<string, unknown>) => Promise<FT2Module>>((resolve, reject) => {
           const existing = (window as unknown as Record<string, unknown>).createFT2SampEd;
           if (typeof existing === 'function') {
-            resolve(existing as (opts: { canvas: HTMLCanvasElement }) => Promise<FT2Module>);
+            resolve(existing as (opts: Record<string, unknown>) => Promise<FT2Module>);
             return;
           }
 
@@ -344,7 +352,7 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
           script.onload = () => {
             const fn = (window as unknown as Record<string, unknown>).createFT2SampEd;
             if (typeof fn === 'function') {
-              resolve(fn as (opts: { canvas: HTMLCanvasElement }) => Promise<FT2Module>);
+              resolve(fn as (opts: Record<string, unknown>) => Promise<FT2Module>);
             } else {
               reject(new Error('createFT2SampEd not found after script load'));
             }
@@ -355,7 +363,8 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
 
         if (cancelled) return;
 
-        mod = await factory({ canvas }) as FT2Module;
+        /* Don't pass canvas to Emscripten — we do our own 2D rendering */
+        mod = await factory({}) as FT2Module;
         moduleRef.current = mod;
 
         /* ── C→JS callbacks ──────────────────────────────────── */
@@ -475,8 +484,9 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
           onChangeRef.current(updates);
         };
 
-        /* Init (no SDL) */
-        mod._ft2_sampled_init(632, 400);
+        /* Init */
+        mod._ft2_sampled_init(FT2_SCREEN_W, FT2_SCREEN_H);
+        mod._ft2_sampled_start();
 
         /* Wire up canvas events → C input handlers */
         const m = mod;
@@ -528,8 +538,23 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
           mod._free(ptr);
         }
 
-        /* Start main loop */
-        mod._ft2_sampled_start();
+        /* Get 2D context and create reusable ImageData */
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) {
+          setError('Canvas 2D context unavailable');
+          return;
+        }
+        const imgData = ctx.createImageData(FT2_SCREEN_W, FT2_SCREEN_H);
+
+        /* Start React-driven rAF render loop */
+        let rafId = 0;
+        const renderLoop = () => {
+          if (cancelled) return;
+          blitFramebuffer(m, ctx, imgData);
+          rafId = requestAnimationFrame(renderLoop);
+        };
+        rafId = requestAnimationFrame(renderLoop);
+        eventCleanups.push(() => cancelAnimationFrame(rafId));
 
         if (!cancelled) setLoaded(true);
 
@@ -556,28 +581,27 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
       if (mod) {
         try { mod._ft2_sampled_shutdown(); } catch { /* ignore */ }
       }
-      if (canvasRef.current && containerRef.current) {
-        try { containerRef.current.removeChild(canvasRef.current); } catch { /* ignore */ }
-        canvasRef.current = null;
-      }
       moduleRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="ft2-hardware-container flex flex-col items-center">
-      <div
-        ref={containerRef}
-        className="relative bg-black overflow-hidden"
+      <canvas
+        ref={canvasRef}
+        width={FT2_SCREEN_W}
+        height={FT2_SCREEN_H}
+        tabIndex={0}
         style={{
-          maxWidth: 632,
           width: '100%',
-          aspectRatio: '632 / 400',
+          maxWidth: 632,
+          height: 'auto',
+          imageRendering: 'pixelated',
+          display: 'block',
         }}
-        onClick={() => canvasRef.current?.focus()}
       />
       {!loaded && !error && (
-        <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+        <div className="text-gray-400 text-sm mt-2">
           Loading FT2 instrument editor...
         </div>
       )}
