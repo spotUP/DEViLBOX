@@ -165,6 +165,7 @@ export const useTrackerInput = () => {
   const getPtnJumpPos = useTrackerStore((state) => state.getPtnJumpPos);
   const interpolateSelection = useTrackerStore((state) => state.interpolateSelection);
   const replacePattern = useTrackerStore((state) => state.replacePattern);
+  const setColumnVisibility = useTrackerStore((state) => state.setColumnVisibility);
 
   const {
     isPlaying,
@@ -338,6 +339,17 @@ export const useTrackerInput = () => {
         instrument: currentInstrumentId !== null ? currentInstrumentId : undefined,
       });
 
+      // Auto-enable 303 flag columns when entering notes with a TB-303/Buzz3o3 instrument
+      if (currentInstrumentId !== null) {
+        const inst = instruments.find((i) => i.id === currentInstrumentId);
+        if (inst && (inst.synthType === 'TB303' || inst.synthType === 'Buzz3o3')) {
+          const vis = useTrackerStore.getState().columnVisibility;
+          if (!vis.flag1 || !vis.flag2) {
+            setColumnVisibility({ flag1: true, flag2: true });
+          }
+        }
+      }
+
       // Chord entry mode: advance to next channel instead of next row
       const chordEntry = useUIStore.getState().chordEntryMode;
       if (chordEntry && !isPlaying && targetChannelOverride === undefined) {
@@ -357,7 +369,7 @@ export const useTrackerInput = () => {
         moveCursorToRow((cursor.rowIndex + editStep) % pattern.length);
       }
     },
-    [cursor, setCell, recordMode, editStep, pattern, moveCursorToRow, moveCursorToChannel, isPlaying, playbackRow, insertMode, insertRow, getTargetChannel, currentInstrumentId]
+    [cursor, setCell, recordMode, editStep, pattern, moveCursorToRow, moveCursorToChannel, isPlaying, playbackRow, insertMode, insertRow, getTargetChannel, currentInstrumentId, instruments, setColumnVisibility]
   );
 
   // FT2: Insert empty row at cursor, shift rows down (local wrapper)
@@ -893,9 +905,10 @@ export const useTrackerInput = () => {
       }
 
       // I key (no modifiers): Interpolate values in selection
-      if (keyLower === 'i' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      // Only consume the key if we're on the volume column (otherwise let it fall through to note entry)
+      if (keyLower === 'i' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && cursor.columnType === 'volume') {
         e.preventDefault();
-        if (selection && cursor.columnType === 'volume') {
+        if (selection) {
           // Get start and end values from selection
           const startRow = Math.min(selection.startRow, selection.endRow);
           const endRow = Math.max(selection.startRow, selection.endRow);
@@ -908,10 +921,8 @@ export const useTrackerInput = () => {
 
           interpolateSelection('volume', startValue, endValue, 'linear');
           useUIStore.getState().setStatusMessage(`INTERPOLATE: ${startValue} → ${endValue}`);
-        } else if (cursor.columnType === 'volume') {
-          useUIStore.getState().setStatusMessage('SELECT VOLUME RANGE FIRST');
         } else {
-          useUIStore.getState().setStatusMessage('INTERPOLATE: VOLUME COLUMN ONLY');
+          useUIStore.getState().setStatusMessage('SELECT VOLUME RANGE FIRST');
         }
         return;
       }
