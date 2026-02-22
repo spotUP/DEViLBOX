@@ -79,7 +79,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleViewModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value as ViewMode;
-    if (val === 'arrangement' || val === 'dj' || val === 'drumpad') {
+    if (val === 'arrangement' || val === 'dj' || val === 'drumpad' || val === 'pianoroll') {
       setActiveView(val);
     } else {
       onViewModeChange(val);

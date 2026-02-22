@@ -6,6 +6,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { GridSequencer } from '@components/grid/GridSequencer';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAudioStore, useUIStore } from '@stores';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { useShallow } from 'zustand/react/shallow';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
@@ -331,7 +332,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     scaleVolume,
     fadeVolume,
     remapInstrument,
-    applySystemPreset
+    applySystemPreset,
+    editorMode
   } = useTrackerStore(useShallow((state) => ({
     patterns: state.patterns,
     currentPatternIndex: state.currentPatternIndex,
@@ -343,7 +345,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     scaleVolume: state.scaleVolume,
     fadeVolume: state.fadeVolume,
     remapInstrument: state.remapInstrument,
-    applySystemPreset: state.applySystemPreset
+    applySystemPreset: state.applySystemPreset,
+    editorMode: state.editorMode
   })));
   // Fine-grained selector for cursor.channelIndex only — avoids re-rendering
   // the entire TrackerView on every cursor row/column move
@@ -1246,12 +1249,40 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         {/* Pattern Editor / Grid Sequencer / Piano Roll / TB-303 Editor - Flex item 1 */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
           {viewMode === 'tracker' ? (
-            <PatternEditorCanvas
-              onAcidGenerator={handleAcidGenerator}
-              onRandomize={handleRandomize}
-              onSwipeLeft={handleSwipeLeft}
-              onSwipeRight={handleSwipeRight}
-            />
+            (editorMode === 'hively' || editorMode === 'furnace') ? (
+              <div className="flex-1 flex flex-col items-center justify-center bg-dark-bgPrimary p-8 text-center">
+                <div className="max-w-md space-y-4">
+                  <div className="text-4xl mb-4">
+                    {editorMode === 'hively' ? '🎵' : '🎹'}
+                  </div>
+                  <h2 className="text-xl font-bold text-text-primary mb-2">
+                    {editorMode === 'hively' ? 'HivelyTracker/AHX' : 'Furnace'} Editor Mode
+                  </h2>
+                  <p className="text-text-secondary mb-4">
+                    This file uses a specialized {editorMode === 'hively' ? 'track-based' : 'multi-chip'} pattern editor that's only available in WebGL mode.
+                  </p>
+                  <button
+                    onClick={() => {
+                      useSettingsStore.getState().setRenderMode('webgl');
+                      notify.success('Switched to WebGL mode');
+                    }}
+                    className="px-6 py-3 bg-accent-primary hover:bg-accent-primary/80 text-white font-semibold rounded-lg transition-colors"
+                  >
+                    Switch to WebGL Mode
+                  </button>
+                  <p className="text-xs text-text-muted mt-4">
+                    You can change this anytime in Settings → Display → Render Mode
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <PatternEditorCanvas
+                onAcidGenerator={handleAcidGenerator}
+                onRandomize={handleRandomize}
+                onSwipeLeft={handleSwipeLeft}
+                onSwipeRight={handleSwipeRight}
+              />
+            )
           ) : viewMode === 'grid' ? (
             <GridSequencer channelIndex={gridChannelIndex} />
           ) : viewMode === 'pianoroll' ? (

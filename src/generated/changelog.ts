@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-22T14:59:20.222Z
+ * Generated: 2026-02-22T17:59:59.801Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1092';
-export const BUILD_NUMBER = '1092';
-export const BUILD_HASH = '42f79b7c';
+export const BUILD_VERSION = '1.0.1104';
+export const BUILD_NUMBER = '1104';
+export const BUILD_HASH = 'daa5a3a5';
 export const BUILD_DATE = '2026-02-22';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,57 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1092',
+    version: '1.0.1104',
     date: '2026-02-22',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix speed/BPM detection and all-zero PCM for VBlank formats"
+      },
+      {
+        type: 'fix',
+        "description": "Remove placeholder instruments for unextracted sample pointers"
+      },
+      {
+        type: 'fix',
+        "description": "Correct sample rate formula for PCM extraction"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve 9 TypeScript errors in UADE parsers and format types"
+      },
+      {
+        type: 'improvement',
+        "description": "Build(uade): rebuild WASM with extended channel, CIA timer, and memory read exports"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'feature',
+        "description": "Complete DOM/GL pixel-perfect parity + real FPS monitor"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve canvas null narrowing in FT2/PT2 hardware UIs"
+      },
+      {
+        type: 'feature',
+        "description": "Enhance editor controls, dialogs, and settings"
+      },
+      {
+        type: 'feature',
+        "description": "Add modland API integration"
+      },
+      {
+        type: 'feature',
+        "description": "Update UADE engine, worklet, and Amiga format parsers"
+      },
+      {
+        type: 'feature',
+        "description": "Update PT2/FT2 WASM sample editors"
+      },
       {
         type: 'improvement',
         "description": "Add WebGL UI enhancement progress tracking document"
@@ -186,60 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Peer cursor now renders as a cell block matching local cursor shape"
-      },
-      {
-        type: 'fix',
-        "description": "Replace peer cursor full-row highlight with thin channel caret"
-      },
-      {
-        type: 'fix',
-        "description": "Achieve 100% FT2 effect command coverage"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused posJumpPos field in TrackerReplayer"
-      },
-      {
-        type: 'fix',
-        "description": "Move channelOffsetsRef sync after useMemo declaration"
-      },
-      {
-        type: 'improvement',
-        "description": "Wip: save all local changes"
-      },
-      {
-        type: 'feature',
-        "description": "Add peer mouse cursor and selection overlay"
-      }
-    ]
-  },
-  {
-    version: '2026-02-20',
-    date: '2026-02-20',
-    changes: [
-      {
-        type: 'improvement',
-        "description": "Remove hot-path allocations, debug logs, and redundant worker messages"
-      },
-      {
-        type: 'improvement',
-        "description": "Convert VU meters to canvas, preload fonts, group preset dropdown"
-      },
-      {
-        type: 'fix',
-        "description": "Improve signaling server error handling"
-      },
-      {
-        type: 'improvement',
-        "description": "Add fullscreen canvas CSS class"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent font loading race in React Strict Mode"
-      },
-      {
-        type: 'feature',
-        "description": "Add multi-user live collaboration via WebRTC"
       }
     ]
   }

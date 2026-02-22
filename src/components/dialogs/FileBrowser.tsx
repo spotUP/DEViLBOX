@@ -54,6 +54,15 @@ import {
   type ModlandFormat,
   type ModlandStatus,
 } from '@/lib/modlandApi';
+import { getSupportedExtensions } from '@/lib/import/ModuleLoader';
+import { getSupportedMIDIExtensions } from '@/lib/import/MIDIImporter';
+
+// Build comprehensive accept string for file inputs (400+ supported formats)
+const ACCEPTED_FILE_FORMATS = [
+  '.json', '.dbx', '.dbox', '.xml',
+  ...getSupportedExtensions(),
+  ...getSupportedMIDIExtensions()
+].join(',');
 
 interface FileBrowserProps {
   isOpen: boolean;
@@ -489,7 +498,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         // Fallback to input element for browsers without File System Access API
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.dbx,.dbox,.mod,.xm,.it,.s3m,.fur,.mptm,.dmf,.ftm,.sqs,.seq,.mid,.midi,.xml';
+        input.accept = ACCEPTED_FILE_FORMATS;
         input.onchange = async (e) => {
           const file = (e.target as HTMLInputElement).files?.[0];
           if (file) {
