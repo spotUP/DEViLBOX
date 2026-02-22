@@ -19,17 +19,6 @@ import { createSamplerInstrument } from './AmigaUtils';
 // ── Fred Editor period table (from FEPlayer.js) ─────────────────────────────
 // 6 octaves of 12 semitones = 72 entries. Used with relative tuning per sample.
 
-const FE_PERIODS = [
-  8192, 7728, 7296, 6888, 6504, 6136, 5792, 5464, 5160,
-  4872, 4600, 4336, 4096, 3864, 3648, 3444, 3252, 3068,
-  2896, 2732, 2580, 2436, 2300, 2168, 2048, 1932, 1824,
-  1722, 1626, 1534, 1448, 1366, 1290, 1218, 1150, 1084,
-  1024,  966,  912,  861,  813,  767,  724,  683,  645,
-   609,  575,  542,  512,  483,  456,  430,  406,  383,
-   362,  341,  322,  304,  287,  271,  256,  241,  228,
-   215,  203,  191,  181,  170,  161,  152,  143,  135,
-];
-
 // ── Utility: read big-endian values from a DataView ─────────────────────────
 
 function readUint32(view: DataView, off: number): number {
@@ -119,24 +108,6 @@ interface FESong {
 function feNoteToXM(feNote: number): number {
   if (feNote < 0 || feNote > 71) return 0;
   return feNote + 1; // 1-based: FE note 0 = XM note 1 (C-0)
-}
-
-// ── Approximate period to XM note (for portamento targets) ──────────────────
-
-function fePeriodToNote(period: number, relative: number): number {
-  if (period <= 0 || relative <= 0) return 0;
-  // Find closest note: period = (FE_PERIODS[note] * relative) >> 10
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < FE_PERIODS.length; i++) {
-    const p = (FE_PERIODS[i] * relative) >> 10;
-    const d = Math.abs(p - period);
-    if (d < bestDist) {
-      bestDist = d;
-      bestIdx = i;
-    }
-  }
-  return bestIdx + 1;
 }
 
 // ── Format detection ────────────────────────────────────────────────────────

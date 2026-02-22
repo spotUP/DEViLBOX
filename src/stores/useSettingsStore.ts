@@ -65,7 +65,7 @@ interface SettingsStore {
   setAmigaLimits: (enabled: boolean) => void;
   setLinearInterpolation: (enabled: boolean) => void;
   setMasterTuning: (hz: number) => void;
-  setFormatEngine: (format: keyof FormatEnginePreferences, engine: FormatEngineChoice) => void;
+  setFormatEngine: (format: keyof FormatEnginePreferences, engine: FormatEngineChoice | UADEImportMode) => void;
   setPerformanceQuality: (quality: 'high' | 'medium' | 'low') => void;
   setUseBLEP: (enabled: boolean) => void;
   setStereoSeparation: (percent: number) => void;
@@ -126,7 +126,7 @@ export const useSettingsStore = create<SettingsStore>()(
 
     setFormatEngine: (format, engine) =>
       set((state) => {
-        state.formatEngine[format] = engine;
+        (state.formatEngine as Record<string, string>)[format] = engine;
       }),
 
     setPerformanceQuality: (performanceQuality) =>
