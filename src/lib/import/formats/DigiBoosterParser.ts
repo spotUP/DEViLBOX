@@ -131,7 +131,7 @@ export function parseDigiBoosterFile(buffer: ArrayBuffer, filename: string): Tra
         // Each: name[44], length(2), positions[128×2]
         let soff = dataStart;
         for (let s = 0; s < numSongs && soff + 46 <= dataStart + chunkSize; s++) {
-          const songName = readStr(buf, soff, 44);
+          // songName at soff, 44 bytes (skipped)
           const len = u16(buf, soff + 44);
           if (s === 0) {
             songLength = len;
@@ -277,7 +277,7 @@ export function parseDigiBoosterFile(buffer: ArrayBuffer, filename: string): Tra
         const xmNote  = rawNote > 0 ? rawNote + 12 : 0;
 
         const { effTyp, effParam } = mapDBMEffect(eff, param);
-        rows.push({ note: xmNote, instrument: inst, volume: 0, effTyp, eff: effParam });
+        rows.push({ note: xmNote, instrument: inst, volume: 0, effTyp, eff: effParam, effTyp2: 0, eff2: 0 });
       }
 
       return {
@@ -300,7 +300,7 @@ export function parseDigiBoosterFile(buffer: ArrayBuffer, filename: string): Tra
       length: pat.rows,
       channels,
       importMetadata: {
-        sourceFormat: 'DIGI' as TrackerFormat,
+        sourceFormat: 'DIGI',
         sourceFile: filename,
         importedAt: new Date().toISOString(),
         originalChannelCount: pat.channels,
