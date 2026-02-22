@@ -62,6 +62,8 @@ const ArrangementView = lazy(() => import('./components/arrangement').then(m => 
 const DJView = lazy(() => import('./components/dj/DJView').then(m => ({ default: m.DJView })));
 const FileBrowser = lazy(() => import('@components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser })));
 const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => ({ default: m.AuthModal })));
+const SettingsModal = lazy(() => import('@components/dialogs/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const RevisionBrowserDialog = lazy(() => import('@components/dialogs/RevisionBrowserDialog').then(m => ({ default: m.RevisionBrowserDialog })));
 const PixiApp = lazy(() => import('./pixi/PixiApp').then(m => ({ default: m.PixiApp })));
 const WebGLModalBridge = lazy(() => import('./pixi/WebGLModalBridge').then(m => ({ default: m.WebGLModalBridge })));
 const CollaborationSplitView = lazy(() => import('@components/collaboration/CollaborationSplitView').then(m => ({ default: m.CollaborationSplitView })));
@@ -1094,6 +1096,12 @@ function App() {
                 <DrumPadManager />
               </Suspense>
             )}
+
+            {activeView === 'pianoroll' && (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading piano roll...</div>}>
+                <PianoRoll />
+              </Suspense>
+            )}
           </div>
 
         </div>
@@ -1104,6 +1112,7 @@ function App() {
 
       {/* Modals */}
       <Suspense fallback={null}>
+        {modalOpen === 'settings' && <SettingsModal onClose={closeModal} />}
         {modalOpen === 'help' && <HelpModal isOpen={true} onClose={closeModal} initialTab={(modalData?.initialTab as any) || 'shortcuts'} />}
         {modalOpen === 'export' && <ExportDialog isOpen={true} onClose={closeModal} />}
         {modalOpen === 'instruments' && <EditInstrumentModal isOpen={true} onClose={closeModal} />}
@@ -1112,6 +1121,7 @@ function App() {
         {showTD3Pattern && <TD3PatternDialog isOpen={showTD3Pattern} onClose={closePatternDialog} />}
         {modalOpen === 'drumpads' && <DrumPadManager onClose={closeModal} />}
         {modalOpen === 'midi-pads' && <DrumpadEditorModal isOpen={true} onClose={closeModal} />}
+        {modalOpen === 'revisions' && <RevisionBrowserDialog isOpen={true} onClose={closeModal} />}
         {showFileBrowser && (
           <FileBrowser
             isOpen={showFileBrowser}

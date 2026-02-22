@@ -9,7 +9,7 @@
  * - Audio samples (.wav, .mp3, .ogg, .flac)
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Upload } from 'lucide-react';
 import { getSupportedExtensions } from '@lib/import/ModuleLoader';
 
@@ -46,82 +46,70 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
   children,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [, setDragCount] = useState(0);
+  // Keep a ref to onFileLoaded so the window event handler always calls the latest version
+  // without needing to re-register listeners on every render.
+  const onFileLoadedRef = useRef(onFileLoaded);
+  useEffect(() => { onFileLoadedRef.current = onFileLoaded; }, [onFileLoaded]);
 
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    setDragCount(prev => prev + 1);
-    
-    // Check if dragged items contain files
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-      const hasFiles = Array.from(e.dataTransfer.items).some(
-        item => item.kind === 'file'
-      );
-      if (hasFiles) {
-        setIsDragging(true);
+  useEffect(() => {
+    const handleDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      if (!e.dataTransfer || e.dataTransfer.items.length === 0) return;
+      const hasFiles = Array.from(e.dataTransfer.items).some(item => item.kind === 'file');
+      if (hasFiles) setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: DragEvent) => {
+      // relatedTarget is null only when the drag leaves the browser window entirely.
+      // Moving between elements on the page keeps relatedTarget non-null, so we
+      // ignore those transitions and avoid flickering the overlay off.
+      if (e.relatedTarget === null) setIsDragging(false);
+    };
+
+    const handleDragOver = (e: DragEvent) => { e.preventDefault(); };
+
+    const handleDrop = async (e: DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+
+      // If a child component (e.g. SampleEditor, DJ deck) has its own drop handler and
+      // already processed this file, skip the app-level handler to avoid double-handling.
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-sample-drop-zone]') || target.closest('[data-dj-deck-drop]')) return;
+
+      const files = e.dataTransfer ? Array.from(e.dataTransfer.files) : [];
+      if (files.length === 0) return;
+
+      const file = files.find(f => isSupportedFile(f.name));
+      if (!file) {
+        console.warn('[DragDrop] No supported files found');
+        return;
       }
-    }
-  }, []);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    setDragCount(prev => {
-      const newCount = prev - 1;
-      if (newCount === 0) {
-        setIsDragging(false);
+      try {
+        await onFileLoadedRef.current(file);
+      } catch (error) {
+        console.error('[DragDrop] Failed to load file:', error);
       }
-      return newCount;
-    });
-  }, []);
+    };
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
+    // Use window-level listeners so drops work everywhere — including on PixiDOMOverlay
+    // divs that are appended to document.body outside the React tree of this component.
+    window.addEventListener('dragenter', handleDragEnter);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('drop', handleDrop);
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    setIsDragging(false);
-    setDragCount(0);
-
-    // If a child component (e.g. SampleEditor, DJ deck) has its own drop handler and
-    // already processed this file, skip the app-level handler to avoid double-handling.
-    const target = e.target as HTMLElement;
-    if (target.closest('[data-sample-drop-zone]') || target.closest('[data-dj-deck-drop]')) return;
-
-    const files = Array.from(e.dataTransfer.files);
-
-    if (files.length === 0) return;
-
-    // Get first supported file
-    const file = files.find(f => isSupportedFile(f.name));
-
-    if (!file) {
-      console.warn('[DragDrop] No supported files found');
-      return;
-    }
-
-    try {
-      await onFileLoaded(file);
-    } catch (error) {
-      console.error('[DragDrop] Failed to load file:', error);
-    }
-  }, [onFileLoaded]);
+    return () => {
+      window.removeEventListener('dragenter', handleDragEnter);
+      window.removeEventListener('dragleave', handleDragLeave);
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, []); // Empty — event handlers use refs, no deps needed
 
   return (
-    <div
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      className="relative w-full h-full"
-    >
+    <div className="relative w-full h-full">
       {children}
       
       {/* Drag overlay */}
