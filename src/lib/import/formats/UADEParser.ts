@@ -412,27 +412,6 @@ function buildEnhancedSong(
     ));
   }
 
-  // Also map any sample pointers that appear in scan rows but weren't extracted
-  // (e.g., if read_memory failed for that address)
-  for (const row of scanRows) {
-    for (const ch of row) {
-      if (ch.samplePtr > 0 && !sampleMap.has(ch.samplePtr)) {
-        // Create a placeholder Sampler instrument
-        const instrId = nextInstrId++;
-        sampleMap.set(ch.samplePtr, instrId);
-        instruments.push({
-          id: instrId,
-          name: `Sample ${String(instrId).padStart(2, '0')}`,
-          type: 'synth' as const,
-          synthType: 'Sampler' as const,
-          effects: [],
-          volume: 0,
-          pan: 0,
-        });
-      }
-    }
-  }
-
   // Add a muted UADE reference instrument for comparison playback
   const uadeRefId = nextInstrId++;
   const uadeConfig: UADEConfig = {
