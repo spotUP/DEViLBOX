@@ -394,3 +394,55 @@ envelopes, and the accumulation behavior has no equivalent in standard ADSR modu
 | `src/hooks/useProjectPersistence.ts` | Schema versioning — bump when changing defaults. |
 
 ---
+
+## Hardware UI WASM Modules — Extraction Pattern
+
+Hardware UIs (PT2, FT2) compile real reference source code to WASM via Emscripten, then blit the framebuffer to a React canvas each rAF frame.
+
+### Architecture
+
+```
+Reference C source → WASM bridge (pt2_sampled.c / ft2_sampled.c) → Emscripten MODULARIZE
+→ factory `createXXX({})` injected via script tag → React rAF loop calls `_tick()` then blits fb
+```
+
+### Build Commands
+
+```bash
+cd <module>/build && emcmake cmake .. && emmake make
+# PT2: cd pt2-sampled-wasm/build && emcmake cmake .. && emmake make
+# FT2: cd ft2-sampled-wasm/build && emcmake cmake .. && emmake make
+```
+
+### Critical Rules
+
+- **NEVER let an agent generate binary data arrays** (font bitmaps, sprite data). Always `cp` from reference:
+  - `cp "Reference Code/pt2-clone-master/src/gfx/pt2_gfx_font.c" pt2-sampled-wasm/src/`
+  - Agent-generated binary data renders silently garbled (e.g., "FWk RACHT" instead of "ALL RIGHT")
+- `EM_JS` and `EMSCRIPTEN_KEEPALIVE` macros produce false IDE errors — they are NOT real build errors
+- Mouse `mouseup`/`mousemove` events go on `document`, not canvas, to handle drag-outside-canvas
+- Call `_tick()` before blit each rAF frame so C-side update flags are processed before rendering
+- Add null guard `if (m._module_tick)` to handle browser cache serving old WASM without the export
+
+### Framebuffer Blit (BGRA→RGBA byte swap)
+
+```typescript
+/* WASM little-endian ARGB 0xAARRGGBB stored as [BB,GG,RR,AA] */
+/* Canvas ImageData wants [RR,GG,BB,AA] */
+dst[off] = src[off+2]; dst[off+1] = src[off+1]; dst[off+2] = src[off]; dst[off+3] = 255;
+```
+
+### PT2 Module
+
+- Framebuffer: 320×255. Sampler occupies rows 121–254 (SAMPLER_Y=121, SAMPLER_H=134)
+- Output: `public/pt2/PT2SampEd.js` + `.wasm`
+- Config buffer: 11 bytes `[volume, finetune, loopStart(4 LE), loopLength(4 LE), loopType]`
+- Source: `pt2-sampled-wasm/src/` — extracted from `Reference Code/pt2-clone-master/`
+
+### FT2 Module
+
+- Framebuffer: 632×400. Sample editor occupies most of the screen.
+- Output: `public/ft2/FT2SampEd.js` + `.wasm`
+- Source: `ft2-sampled-wasm/src/` — extracted from `Reference Code/fast tracker 2/`
+
+---
