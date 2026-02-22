@@ -19,13 +19,39 @@ export interface UADEScanRow {
   samplePtr: number;
 }
 
+/** Enhanced scan row — includes detected effects and sample metadata */
+export interface UADEEnhancedScanRow extends UADEScanRow {
+  sampleStart: number;  // Current playback pointer
+  sampleLen: number;    // Sample length in words
+  effTyp: number;       // Detected effect type (XM format: 0=arpeggio, 1=portaUp, etc.)
+  eff: number;          // Detected effect parameter
+}
+
+/** Extracted PCM sample from Amiga chip RAM */
+export interface UADEExtractedSample {
+  pcm: Uint8Array;      // 8-bit signed Amiga PCM
+  length: number;       // Bytes
+  loopStart: number;    // Bytes (0 = no loop)
+  loopLength: number;   // Bytes
+  typicalPeriod: number; // Most common playback period (for sample rate calculation)
+}
+
+/** Enhanced scan data from the worklet */
+export interface UADEEnhancedScanData {
+  samples: Record<number, UADEExtractedSample>; // samplePtr → extracted sample
+  tempoChanges: Array<{ row: number; bpm: number; speed: number }>;
+  bpm: number;          // Detected BPM
+  speed: number;        // Detected speed
+}
+
 export interface UADEMetadata {
   player: string;       // Detected eagleplayer name (e.g. "JochenHippel")
   formatName: string;   // Human-readable format (e.g. "Jochen Hippel")
   minSubsong: number;
   maxSubsong: number;
   subsongCount: number;
-  scanData?: UADEScanRow[][];  // Pre-scanned pattern data: rows of 4 channels
+  scanData?: UADEScanRow[][];            // Pre-scanned pattern data: rows of 4 channels
+  enhancedScan?: UADEEnhancedScanData;   // Enhanced scan data with samples + effects
 }
 
 export interface UADEPositionUpdate {
@@ -167,14 +193,19 @@ export class UADEEngine {
 
         case 'loaded':
           if (this._resolveLoad) {
-            this._resolveLoad({
+            const meta: UADEMetadata = {
               player: data.player ?? 'Unknown',
               formatName: data.formatName ?? 'Unknown',
               minSubsong: data.minSubsong ?? 1,
               maxSubsong: data.maxSubsong ?? 1,
               subsongCount: data.subsongCount ?? 1,
               scanData: data.scanData,
-            });
+            };
+            // Include enhanced scan data if available
+            if (data.enhancedScan) {
+              meta.enhancedScan = data.enhancedScan;
+            }
+            this._resolveLoad(meta);
             this._resolveLoad = null;
             this._rejectLoad = null;
           }

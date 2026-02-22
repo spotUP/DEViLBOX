@@ -10,23 +10,42 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig } from '@/types';
+import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
+
+/** Get current format engine preferences (non-reactive, snapshot read) */
+function getFormatEngine(): FormatEnginePreferences {
+  return useSettingsStore.getState().formatEngine;
+}
+
+/** Check if a filename matches Future Composer extensions */
+function isFCFormat(filename: string): boolean {
+  return /\.(fc|fc2|fc3|fc4|fc13|fc14|sfc|smod|bfc|bsi)$/.test(filename);
+}
 
 /**
  * Parse a tracker module file and return a TrackerSong.
  * Handles .fur, .dmf, .mod, .xm, .it, .s3m, .mid, .hvl, .ahx, .okt, .med,
  * .digi, .fc/.fc14 and many more exotic Amiga formats via UADE.
+ *
+ * Format engine preferences (Settings → Format Engine) control which parser
+ * is used for formats supported by multiple engines (MOD, HVL, MED, FC, etc.).
  */
 export async function parseModuleToSong(file: File): Promise<TrackerSong> {
   const filename = file.name.toLowerCase();
   const buffer = await file.arrayBuffer();
+  const prefs = getFormatEngine();
 
   // ── MIDI ──────────────────────────────────────────────────────────────────
   if (filename.endsWith('.mid') || filename.endsWith('.midi')) {
     return parseMIDIFile(file);
   }
 
-  // ── HivelyTracker / AHX — MUST be before UADE catch-all ─────────────────
+  // ── HivelyTracker / AHX ─────────────────────────────────────────────────
   if (filename.endsWith('.hvl') || filename.endsWith('.ahx')) {
+    if (prefs.hvl === 'uade') {
+      const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+      return parseUADEFile(buffer, file.name);
+    }
     const { parseHivelyFile } = await import('@lib/import/formats/HivelyParser');
     return parseHivelyFile(buffer, file.name);
   }
@@ -38,6 +57,10 @@ export async function parseModuleToSong(file: File): Promise<TrackerSong> {
 
   // ── Oktalyzer ────────────────────────────────────────────────────────────
   if (filename.endsWith('.okt')) {
+    if (prefs.okt === 'uade') {
+      const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+      return parseUADEFile(buffer, file.name);
+    }
     const { parseOktalyzerFile } = await import('@lib/import/formats/OktalyzerParser');
     return parseOktalyzerFile(buffer, file.name);
   }
@@ -45,31 +68,107 @@ export async function parseModuleToSong(file: File): Promise<TrackerSong> {
   // ── OctaMED / MED ────────────────────────────────────────────────────────
   if (filename.endsWith('.med') || filename.endsWith('.mmd0') || filename.endsWith('.mmd1')
     || filename.endsWith('.mmd2') || filename.endsWith('.mmd3')) {
+    if (prefs.med === 'uade') {
+      const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+      return parseUADEFile(buffer, file.name);
+    }
     const { parseMEDFile } = await import('@lib/import/formats/MEDParser');
     return parseMEDFile(buffer, file.name);
   }
 
   // ── DigiBooster ──────────────────────────────────────────────────────────
   if (filename.endsWith('.digi')) {
+    if (prefs.digi === 'uade') {
+      const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+      return parseUADEFile(buffer, file.name);
+    }
     const { parseDigiBoosterFile } = await import('@lib/import/formats/DigiBoosterParser');
     return parseDigiBoosterFile(buffer, file.name);
   }
 
-  // ── Future Composer — route to UADE for authentic playback ───────────────
+  // ── Future Composer ──────────────────────────────────────────────────────
   // UADE has real FutureComposer1.3/1.4 eagleplayers that handle FC timing
   // and Paula output correctly. The JS FCParser is a partial reimplementation
-  // with timing issues — only use as fallback if UADE is unavailable.
-  // (FC extensions: .fc, .fc2, .fc3, .fc4, .fc13, .fc14, .sfc, .smod, .bfc, .bsi)
+  // with timing issues. Engine preference controls which path is used.
+  if (isFCFormat(filename)) {
+    if (prefs.fc === 'native') {
+      const { parseFCFile } = await import('@lib/import/formats/FCParser');
+      return parseFCFile(buffer, file.name);
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name);
+  }
+
+  // ── SoundMon (Brian Postma) ─────────────────────────────────────────────
+  if (/\.(bp|bp3|sndmon)$/.test(filename)) {
+    if (prefs.soundmon === 'native') {
+      const { parseSoundMonFile } = await import('@lib/import/formats/SoundMonParser');
+      return parseSoundMonFile(buffer, file.name);
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const uadeMode = prefs.uade ?? 'enhanced';
+    return parseUADEFile(buffer, file.name, uadeMode);
+  }
+
+  // ── SidMon II ─────────────────────────────────────────────────────────────
+  if (/\.(sid2|smn)$/.test(filename)) {
+    if (prefs.sidmon2 === 'native') {
+      const { parseSidMon2File } = await import('@lib/import/formats/SidMon2Parser');
+      return parseSidMon2File(buffer, file.name);
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const uadeMode = prefs.uade ?? 'enhanced';
+    return parseUADEFile(buffer, file.name, uadeMode);
+  }
+
+  // ── Fred Editor ───────────────────────────────────────────────────────────
+  if (/\.fred$/.test(filename)) {
+    if (prefs.fred === 'native') {
+      const { parseFredEditorFile } = await import('@lib/import/formats/FredEditorParser');
+      return parseFredEditorFile(buffer, file.name);
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const uadeMode = prefs.uade ?? 'enhanced';
+    return parseUADEFile(buffer, file.name, uadeMode);
+  }
+
+  // ── Sound-FX ──────────────────────────────────────────────────────────────
+  if (/\.(sfx|sfx13)$/.test(filename)) {
+    if (prefs.soundfx === 'native') {
+      const { parseSoundFXFile } = await import('@lib/import/formats/SoundFXParser');
+      return parseSoundFXFile(buffer, file.name);
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const uadeMode = prefs.uade ?? 'enhanced';
+    return parseUADEFile(buffer, file.name, uadeMode);
+  }
+
+  // ── Digital Mugician ──────────────────────────────────────────────────────
+  if (/\.(dmu|dmu2|mug|mug2)$/.test(filename)) {
+    if (prefs.mugician === 'native') {
+      const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
+      return parseDigitalMugicianFile(buffer, file.name);
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const uadeMode = prefs.uade ?? 'enhanced';
+    return parseUADEFile(buffer, file.name, uadeMode);
+  }
 
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
   const { isUADEFormat, parseUADEFile } = await import('@lib/import/formats/UADEParser');
   if (isUADEFormat(filename)) {
-    return await parseUADEFile(buffer, file.name);
+    const uadeMode = prefs.uade ?? 'enhanced';
+    return await parseUADEFile(buffer, file.name, uadeMode);
   }
 
   // ── MOD, XM, IT, S3M, and other tracker formats ────────────────────────
+  // MOD files can be routed to UADE for authentic Amiga playback
+  if (filename.endsWith('.mod') && prefs.mod === 'uade') {
+    return await parseUADEFile(buffer, file.name);
+  }
+
   try {
     return await parseTrackerModule(buffer, file.name);
   } catch {

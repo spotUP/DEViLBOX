@@ -4,16 +4,18 @@
  * Handles 130+ formats that cannot be natively parsed in TypeScript:
  * JochenHippel, TFMX, FredEditor, SidMon, Hippel-7V, and many more.
  *
- * Returns a playback-only TrackerSong with a single UADEConfig instrument.
- * The UADE WASM module (emulating Amiga 68000 + Paula) handles all audio output.
+ * Enhanced mode (with rebuilt WASM): Extracts real PCM samples from Amiga chip RAM,
+ * detects effects from per-tick analysis, and creates fully editable TrackerSong
+ * with real Sampler instruments.
  *
- * Pattern editing is not supported for these opaque formats — they use
- * tightly-coupled Amiga machine code that cannot be decomposed into cells.
+ * Classic mode (fallback): Returns a playback-only TrackerSong with UADESynth instrument.
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, UADEConfig } from '@/types/instrument';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
+import type { UADEEnhancedScanRow, UADEMetadata } from '@/engine/uade/UADEEngine';
+import { createSamplerInstrument } from './AmigaUtils';
 
 /**
  * Complete UADE eagleplayer extension set, derived from eagleplayer.conf prefixes.
@@ -314,12 +316,21 @@ export function isUADEFormat(filename: string): boolean {
 }
 
 /**
- * Parse an exotic Amiga music file by running a fast UADE scan.
- * Loads the file into the UADE WASM engine, renders the entire song silently,
- * captures Paula channel state at row intervals, and builds full pattern data
- * with detected instruments.
+ * Parse an exotic Amiga music file via UADE scan.
+ *
+ * If the WASM has enhanced exports (read_memory, get_channel_extended, get_cia_state),
+ * produces a fully editable TrackerSong with real Sampler instruments containing
+ * extracted PCM audio, detected effects, and accurate tempo.
+ *
+ * Otherwise falls back to classic mode: display-only patterns with UADESynth playback.
+ *
+ * @param mode - 'enhanced' (default) for editable output, 'classic' for UADESynth playback-only
  */
-export async function parseUADEFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
+export async function parseUADEFile(
+  buffer: ArrayBuffer,
+  filename: string,
+  mode: 'enhanced' | 'classic' = 'enhanced',
+): Promise<TrackerSong> {
   const { UADEEngine } = await import('@engine/uade/UADEEngine');
   const { periodToNoteIndex } = await import('@engine/effects/PeriodTables');
 
@@ -332,8 +343,243 @@ export async function parseUADEFile(buffer: ArrayBuffer, filename: string): Prom
   const metadata = await engine.load(buffer, filename);
   const scanRows = metadata.scanData ?? [];
 
+  // If enhanced scan data is available AND mode is 'enhanced', build editable song
+  if (mode === 'enhanced' && metadata.enhancedScan) {
+    return buildEnhancedSong(
+      name, ext, filename, buffer, metadata, scanRows, periodToNoteIndex,
+    );
+  }
+
+  // Classic mode: UADESynth playback with display-only patterns
+  return buildClassicSong(
+    name, ext, filename, buffer, metadata, scanRows, periodToNoteIndex,
+  );
+}
+
+/**
+ * Build fully editable TrackerSong from enhanced scan data.
+ * Creates real Sampler instruments with extracted PCM audio.
+ */
+function buildEnhancedSong(
+  name: string,
+  ext: string,
+  filename: string,
+  buffer: ArrayBuffer,
+  metadata: UADEMetadata,
+  scanRows: Array<Array<{ period: number; volume: number; samplePtr: number; effTyp?: number; eff?: number }>>,
+  periodToNoteIndex: (period: number, finetune?: number) => number,
+): TrackerSong {
+  const enhanced = metadata.enhancedScan!;
+
+  // Build instrument map: samplePtr → instrumentId, and create real Sampler instruments
+  const sampleMap = new Map<number, number>();
+  const instruments: InstrumentConfig[] = [];
+  let nextInstrId = 1;
+
+  // Create real Sampler instruments from extracted PCM data
+  for (const ptrStr of Object.keys(enhanced.samples)) {
+    const ptr = Number(ptrStr);
+    const sample = enhanced.samples[ptr];
+    if (!sample || !sample.pcm || sample.length <= 4) continue;
+
+    const instrId = nextInstrId++;
+    sampleMap.set(ptr, instrId);
+
+    // Calculate sample rate from typical playback period
+    // Amiga PAL: sampleRate = 3546895 / (period * 2)
+    const sampleRate = sample.typicalPeriod > 0
+      ? Math.round(3546895 / (sample.typicalPeriod * 2))
+      : 8287; // Default C-3 rate
+
+    // Reconstruct Uint8Array from transferred data
+    const pcm = sample.pcm instanceof Uint8Array
+      ? sample.pcm
+      : new Uint8Array(sample.pcm);
+
+    const loopEnd = sample.loopLength > 0 ? sample.loopStart + sample.loopLength : 0;
+
+    instruments.push(createSamplerInstrument(
+      instrId,
+      `Sample ${String(instrId).padStart(2, '0')}`,
+      pcm,
+      64, // Full volume
+      sampleRate,
+      sample.loopStart,
+      loopEnd,
+    ));
+  }
+
+  // Also map any sample pointers that appear in scan rows but weren't extracted
+  // (e.g., if read_memory failed for that address)
+  for (const row of scanRows) {
+    for (const ch of row) {
+      if (ch.samplePtr > 0 && !sampleMap.has(ch.samplePtr)) {
+        // Create a placeholder Sampler instrument
+        const instrId = nextInstrId++;
+        sampleMap.set(ch.samplePtr, instrId);
+        instruments.push({
+          id: instrId,
+          name: `Sample ${String(instrId).padStart(2, '0')}`,
+          type: 'synth' as const,
+          synthType: 'Sampler' as const,
+          effects: [],
+          volume: 0,
+          pan: 0,
+        });
+      }
+    }
+  }
+
+  // Add a muted UADE reference instrument for comparison playback
+  const uadeRefId = nextInstrId++;
+  const uadeConfig: UADEConfig = {
+    type: 'uade',
+    filename,
+    fileData: buffer,
+    subsongCount: metadata.subsongCount,
+    currentSubsong: 0,
+    metadata: {
+      player: metadata.player,
+      formatName: metadata.formatName || guessFormatName(ext),
+      minSubsong: metadata.minSubsong,
+      maxSubsong: metadata.maxSubsong,
+    },
+  };
+  instruments.push({
+    id: uadeRefId,
+    name: 'UADE Reference',
+    type: 'synth' as const,
+    synthType: 'UADESynth' as const,
+    effects: [],
+    volume: -60, // Muted by default
+    pan: 0,
+    uade: uadeConfig,
+  });
+
+  // Build patterns from enhanced scan rows (64 rows per pattern)
+  const ROWS_PER_PATTERN = 64;
+  const PAULA_CHANNEL_NAMES = ['Paula 1', 'Paula 2', 'Paula 3', 'Paula 4'];
+  const totalRows = scanRows.length;
+  const numPatterns = Math.max(1, Math.ceil(totalRows / ROWS_PER_PATTERN));
+
+  const patterns: Pattern[] = [];
+  const songPositions: number[] = [];
+
+  for (let pat = 0; pat < numPatterns; pat++) {
+    const rowStart = pat * ROWS_PER_PATTERN;
+    const rowEnd = Math.min(rowStart + ROWS_PER_PATTERN, totalRows);
+
+    const channels: ChannelData[] = PAULA_CHANNEL_NAMES.map((chName, chIdx) => ({
+      id: `channel-${chIdx}`,
+      name: chName,
+      muted: false,
+      solo: false,
+      collapsed: false,
+      volume: 100,
+      pan: 0,
+      instrumentId: null,
+      color: null,
+      rows: Array.from({ length: ROWS_PER_PATTERN }, (_, rowIdx) => {
+        const scanIdx = rowStart + rowIdx;
+        if (scanIdx >= rowEnd || scanIdx >= scanRows.length) {
+          return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+        }
+
+        const ch = scanRows[scanIdx][chIdx];
+        if (!ch || ch.period <= 0) {
+          // No note, but check for volume-only or effect-only data
+          const effTyp = (ch as UADEEnhancedScanRow)?.effTyp ?? 0;
+          const eff = (ch as UADEEnhancedScanRow)?.eff ?? 0;
+          if (effTyp > 0 || eff > 0) {
+            return { note: 0, instrument: 0, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
+          }
+          return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+        }
+
+        // Convert Amiga period to XM note (1-96)
+        const noteIdx = periodToNoteIndex(ch.period);
+        const note = noteIdx >= 0 ? Math.min(96, Math.max(1, noteIdx + 1)) : 0;
+        const instrId = ch.samplePtr > 0 ? (sampleMap.get(ch.samplePtr) ?? 0) : 0;
+        const volume = Math.min(0x50, 0x10 + ch.volume);
+
+        // Use detected effects from enhanced scan
+        const effTyp = (ch as UADEEnhancedScanRow)?.effTyp ?? 0;
+        const eff = (ch as UADEEnhancedScanRow)?.eff ?? 0;
+
+        return {
+          note,
+          instrument: instrId,
+          volume,
+          effTyp,
+          eff,
+          effTyp2: 0,
+          eff2: 0,
+        } as TrackerCell;
+      }),
+    }));
+
+    // Insert tempo change effects at pattern start if needed
+    const tempoChanges = enhanced.tempoChanges || [];
+    for (const tc of tempoChanges) {
+      if (tc.row >= rowStart && tc.row < rowEnd) {
+        const localRow = tc.row - rowStart;
+        // Put tempo effect (Fxx) on channel 0 if no effect already present
+        const cell = channels[0].rows[localRow];
+        if (cell.effTyp === 0 && cell.eff === 0) {
+          if (tc.bpm !== enhanced.bpm) {
+            cell.effTyp = 0x0F; // Fxx — Set speed/BPM
+            cell.eff = tc.bpm >= 32 ? tc.bpm : tc.speed;
+          }
+        }
+      }
+    }
+
+    patterns.push({
+      id: `pattern-${pat}`,
+      name: pat === 0 ? 'Song' : `Pattern ${pat}`,
+      length: ROWS_PER_PATTERN,
+      channels,
+      importMetadata: {
+        sourceFormat: 'MOD',
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: 4,
+        originalPatternCount: numPatterns,
+        originalInstrumentCount: instruments.length,
+      },
+    });
+
+    songPositions.push(pat);
+  }
+
+  return {
+    name,
+    format: 'MOD' as TrackerFormat, // Editable! TrackerReplayer handles playback
+    patterns,
+    instruments,
+    songPositions,
+    songLength: numPatterns,
+    restartPosition: 0,
+    numChannels: 4,
+    initialSpeed: enhanced.speed || 6,
+    initialBPM: enhanced.bpm || 125,
+  };
+}
+
+/**
+ * Build classic UADESynth-based TrackerSong (display-only patterns).
+ */
+function buildClassicSong(
+  name: string,
+  ext: string,
+  filename: string,
+  buffer: ArrayBuffer,
+  metadata: UADEMetadata,
+  scanRows: Array<Array<{ period: number; volume: number; samplePtr: number }>>,
+  periodToNoteIndex: (period: number, finetune?: number) => number,
+): TrackerSong {
   // Build instrument map from unique sample pointers
-  const sampleMap = new Map<number, number>(); // samplePtr → instrumentId
+  const sampleMap = new Map<number, number>();
   let nextInstrId = 2; // 1 = UADESynth playback engine
 
   for (const row of scanRows) {
@@ -344,7 +590,7 @@ export async function parseUADEFile(buffer: ArrayBuffer, filename: string): Prom
     }
   }
 
-  // Create UADESynth instrument (holds file data for playback)
+  // Create UADESynth instrument
   const uadeConfig: UADEConfig = {
     type: 'uade',
     filename,
@@ -419,7 +665,6 @@ export async function parseUADEFile(buffer: ArrayBuffer, filename: string): Prom
           return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
         }
 
-        // Convert Amiga period to XM note (1-96)
         const noteIdx = periodToNoteIndex(ch.period);
         const note = noteIdx >= 0 ? Math.min(96, Math.max(1, noteIdx + 1)) : 0;
         const instrId = ch.samplePtr > 0 ? (sampleMap.get(ch.samplePtr) ?? 0) : 0;

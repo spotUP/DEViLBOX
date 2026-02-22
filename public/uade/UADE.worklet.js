@@ -303,9 +303,14 @@ class UADEProcessor extends AudioWorkletProcessor {
       // Fast-scan the entire song to extract pattern data before playback
       console.log('[UADE.worklet] Starting song scan...');
       const scanStart = performance.now();
-      const scanData = this._scanSong();
-      console.log('[UADE.worklet] Scan complete: ' + scanData.length + ' rows in ' +
-        Math.round(performance.now() - scanStart) + 'ms');
+      const scanResult = this._scanSong();
+      const isEnhanced = scanResult && scanResult.isEnhanced;
+      const scanData = isEnhanced ? scanResult.rows : scanResult;
+      const scanDuration = Math.round(performance.now() - scanStart);
+      console.log('[UADE.worklet] Scan complete: ' + (isEnhanced ? 'enhanced' : 'basic') +
+        ', ' + (Array.isArray(scanData) ? scanData.length : 0) + ' rows, ' +
+        (isEnhanced ? Object.keys(scanResult.samples || {}).length + ' samples, ' : '') +
+        scanDuration + 'ms');
 
       // Reload the song for playback (scan consumed the song state)
       this._wasm._uade_wasm_stop();
@@ -316,7 +321,8 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       this._playing = false;
 
-      this.port.postMessage({
+      // Build message payload
+      const msg = {
         type: 'loaded',
         player: player || 'Unknown',
         formatName: formatName || 'Unknown',
@@ -324,7 +330,19 @@ class UADEProcessor extends AudioWorkletProcessor {
         maxSubsong,
         subsongCount,
         scanData,
-      });
+      };
+
+      // Include enhanced scan extras if available
+      if (isEnhanced) {
+        msg.enhancedScan = {
+          samples: scanResult.samples,
+          tempoChanges: scanResult.tempoChanges,
+          bpm: scanResult.bpm,
+          speed: scanResult.speed,
+        };
+      }
+
+      this.port.postMessage(msg);
     } catch (err) {
       let errMsg;
       if (err instanceof Error) {
@@ -347,6 +365,17 @@ class UADEProcessor extends AudioWorkletProcessor {
    * Returns array of rows, each containing 4 channels of {period, volume, samplePtr}.
    */
   _scanSong() {
+    // Try enhanced scan first; fall back to basic scan if new WASM exports aren't available
+    if (typeof this._wasm._uade_wasm_get_channel_extended === 'function') {
+      return this._scanSongEnhanced();
+    }
+    return this._scanSongBasic();
+  }
+
+  /**
+   * Basic scan — original row-based scan for older WASM builds without extended exports.
+   */
+  _scanSongBasic() {
     const CHUNK = 256;
     const FRAMES_PER_ROW = Math.round((sampleRate || 44100) * 2.5 * 6 / 125); // ~5292
     const MAX_ROWS = 64 * 256; // 256 patterns max
@@ -364,21 +393,18 @@ class UADEProcessor extends AudioWorkletProcessor {
 
     const rows = [];
     const prevPeriods = [0, 0, 0, 0];
-    // Accumulate best trigger per channel within each row window
     const rowAccum = [null, null, null, null];
     let frameSinceRow = 0;
     let totalFrames = 0;
 
-    // Start playback for scan
-    this._wasm._uade_wasm_set_looping(0); // Disable looping so song ends
+    this._wasm._uade_wasm_set_looping(0);
 
     while (rows.length < MAX_ROWS && totalFrames < maxFrames) {
       const ret = this._wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
-      if (ret <= 0) break; // Song ended or error
+      if (ret <= 0) break;
       totalFrames += ret;
       frameSinceRow += ret;
 
-      // Read channel state at each chunk for fine-grained trigger detection
       this._wasm._uade_wasm_get_channel_snapshot(this._channelBuf);
       const snap = new Uint32Array(this._wasm.HEAPU8.buffer, this._channelBuf, 16);
 
@@ -391,25 +417,19 @@ class UADEProcessor extends AudioWorkletProcessor {
         const triggered = per !== prevPeriods[i] && per > 0 && dma;
 
         if (triggered) {
-          // New note trigger — record it for this row window
           rowAccum[i] = { period: per, volume: vol, samplePtr: lc };
         } else if (!rowAccum[i] && dma && per > 0) {
-          // No trigger yet in this window, but channel is active — record volume
           rowAccum[i] = { period: 0, volume: vol, samplePtr: 0 };
         }
         prevPeriods[i] = per;
       }
 
-      // Emit a row at each row boundary
       if (frameSinceRow >= FRAMES_PER_ROW) {
         frameSinceRow -= FRAMES_PER_ROW;
-
         rows.push(rowAccum.map(acc => acc
           ? { period: acc.period, volume: acc.volume, samplePtr: acc.samplePtr }
           : { period: 0, volume: 0, samplePtr: 0 }
         ));
-
-        // Reset accumulators for next row
         for (let i = 0; i < 4; i++) rowAccum[i] = null;
       }
     }
@@ -418,6 +438,420 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._wasm._free(tmpR);
 
     return rows;
+  }
+
+  /**
+   * Enhanced scan — uses extended channel state + CIA timers + memory reads.
+   *
+   * Captures per-tick snapshots at high resolution, extracts sample PCM data
+   * directly from Amiga chip RAM, detects tempo from CIA timers, and post-processes
+   * to detect effects (vibrato, portamento, arpeggio, volume slides).
+   *
+   * Returns: { rows, samples, tempoChanges, isEnhanced }
+   *   rows[]: per-row data with 4 channels of { period, volume, samplePtr, sampleStart, sampleLen, effTyp, eff }
+   *   samples: { [samplePtr]: { pcm: Uint8Array, length, loopStart, loopLength, typicalPeriod } }
+   *   tempoChanges: [{ row, bpm, speed }]
+   */
+  _scanSongEnhanced() {
+    const CHUNK = 128;  // Smaller chunks = higher tick resolution
+    const MAX_SECONDS = 600;
+    const sr = sampleRate || 44100;
+    const maxFrames = sr * MAX_SECONDS;
+    const MAX_ROWS = 64 * 256;
+
+    // Allocate WASM buffers
+    const extBufSize = 128; // 4 channels * 8 uint32 = 128 bytes
+    const ciaBufSize = 20;  // 5 uint32 = 20 bytes
+    const extBuf = this._wasm._malloc(extBufSize);
+    const ciaBuf = this._wasm._malloc(ciaBufSize);
+    const tmpL = this._wasm._malloc(CHUNK * 4);
+    const tmpR = this._wasm._malloc(CHUNK * 4);
+
+    // For memory reads (sample extraction)
+    const MEM_READ_BUF_SIZE = 131072; // 128KB max sample read
+    const memBuf = this._wasm._malloc(MEM_READ_BUF_SIZE);
+
+    // Tick snapshot accumulator
+    const tickSnapshots = [];
+    const sampleCache = new Map(); // samplePtr → { pcm, length, loopStart, loopLength, typicalPeriod }
+
+    // Track previous state for change detection
+    const prevPeriods = [0, 0, 0, 0];
+    const prevVolumes = [0, 0, 0, 0];
+    const prevSamplePtrs = [0, 0, 0, 0];
+    let prevCiaBTA = 0;
+
+    let totalFrames = 0;
+
+    this._wasm._uade_wasm_set_looping(0);
+
+    // Phase 1: Capture per-tick snapshots at high resolution
+    while (tickSnapshots.length < MAX_ROWS * 20 && totalFrames < maxFrames) {
+      const ret = this._wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
+      if (ret <= 0) break;
+      totalFrames += CHUNK;
+
+      // Read extended channel state
+      this._wasm._uade_wasm_get_channel_extended(extBuf);
+      const ext = new Uint32Array(this._wasm.HEAPU8.buffer, extBuf, 32);
+
+      // Read CIA state for tempo
+      this._wasm._uade_wasm_get_cia_state(ciaBuf);
+      const cia = new Uint32Array(this._wasm.HEAPU8.buffer, ciaBuf, 5);
+
+      const tickChannels = [];
+      for (let ch = 0; ch < 4; ch++) {
+        const base = ch * 8;
+        const per = ext[base + 0];
+        const vol = ext[base + 1];
+        const dma = ext[base + 2];
+        const lc = ext[base + 3];    // sample start address (lc register)
+        const pt = ext[base + 4];    // current playback pointer
+        const len = ext[base + 5];   // sample length in words
+        const wper = ext[base + 6];  // pending period
+        const wlen = ext[base + 7];  // pending length
+
+        // Detect new sample pointer — extract PCM from Amiga memory
+        if (lc > 0 && len > 0 && dma && !sampleCache.has(lc)) {
+          const byteLen = Math.min(len * 2, MEM_READ_BUF_SIZE);
+          if (byteLen > 4) { // Skip tiny samples (likely loop stubs)
+            this._wasm._uade_wasm_read_memory(lc, memBuf, byteLen);
+            const pcm = new Uint8Array(byteLen);
+            pcm.set(new Uint8Array(this._wasm.HEAPU8.buffer, memBuf, byteLen));
+
+            // Detect loop: if wlen > 1 and sample re-triggers with same lc
+            // Most Amiga formats: loop start is at (lc), loop length is (wlen) words
+            // We'll store wlen for now and refine during post-processing
+            sampleCache.set(lc, {
+              pcm,
+              length: byteLen,
+              loopStart: 0,  // Refined later
+              loopLength: wlen > 1 ? wlen * 2 : 0,
+              typicalPeriod: per > 0 ? per : 428, // Default to C-2 if unknown
+            });
+          }
+        }
+
+        // Update typical period for known samples
+        if (lc > 0 && per > 0 && sampleCache.has(lc)) {
+          const cached = sampleCache.get(lc);
+          if (cached.typicalPeriod === 428 && per !== 428) {
+            cached.typicalPeriod = per;
+          }
+        }
+
+        const triggered = per !== prevPeriods[ch] && per > 0 && dma;
+        const sampleChanged = lc !== prevSamplePtrs[ch] && lc > 0;
+
+        tickChannels.push({
+          period: per,
+          volume: vol,
+          dma,
+          samplePtr: lc,
+          sampleStart: pt,
+          sampleLen: len,
+          triggered,
+          sampleChanged,
+        });
+
+        prevPeriods[ch] = per;
+        prevVolumes[ch] = vol;
+        prevSamplePtrs[ch] = lc;
+      }
+
+      // CIA-B Timer A drives BPM in most Amiga formats
+      const ciaBTA = cia[2];
+      const vblankHz = cia[4] || 50;
+      const ciaChanged = ciaBTA !== prevCiaBTA && ciaBTA > 0;
+      prevCiaBTA = ciaBTA;
+
+      tickSnapshots.push({
+        channels: tickChannels,
+        ciaBTA,
+        vblankHz,
+        ciaChanged,
+        frame: totalFrames,
+      });
+    }
+
+    // Free WASM buffers
+    this._wasm._free(extBuf);
+    this._wasm._free(ciaBuf);
+    this._wasm._free(tmpL);
+    this._wasm._free(tmpR);
+    this._wasm._free(memBuf);
+
+    // Phase 2: Determine row boundaries and BPM from CIA timers
+    // BPM = (vblankHz * 2.5 * PAL_CLOCK_CONSTANT) / ciaBTA  or heuristic
+    // For CIA timer: BPM ≈ 1773447 / (ciaBTA + 1)  [PAL systems]
+    // For VBlank-based: fixed 125 BPM at speed 6
+
+    // Detect BPM from most common CIA-B Timer A value
+    let detectedBPM = 125;
+    let detectedSpeed = 6;
+    const ciaCounts = new Map();
+    for (const tick of tickSnapshots) {
+      if (tick.ciaBTA > 0) {
+        ciaCounts.set(tick.ciaBTA, (ciaCounts.get(tick.ciaBTA) || 0) + 1);
+      }
+    }
+    if (ciaCounts.size > 0) {
+      // Find most common CIA timer value
+      let maxCount = 0;
+      let dominantCIA = 0;
+      for (const [val, count] of ciaCounts) {
+        if (count > maxCount) { maxCount = count; dominantCIA = val; }
+      }
+      if (dominantCIA > 0) {
+        detectedBPM = Math.round(1773447 / (dominantCIA + 1));
+        // Sanity clamp
+        if (detectedBPM < 32) detectedBPM = 32;
+        if (detectedBPM > 999) detectedBPM = 125; // Likely not a CIA-based timer
+      }
+    }
+
+    // Detect row timing: find the most common interval between note triggers
+    const triggerFrames = [];
+    let lastTriggerFrame = 0;
+    for (let i = 0; i < tickSnapshots.length; i++) {
+      const tick = tickSnapshots[i];
+      const anyTrigger = tick.channels.some(ch => ch.triggered);
+      if (anyTrigger) {
+        if (lastTriggerFrame > 0) {
+          triggerFrames.push(tick.frame - lastTriggerFrame);
+        }
+        lastTriggerFrame = tick.frame;
+      }
+    }
+
+    // Use BPM and speed to calculate frames per row
+    const framesPerRow = Math.round(sr * 2.5 * detectedSpeed / detectedBPM);
+
+    // If we have enough trigger intervals, refine speed estimate
+    if (triggerFrames.length > 10) {
+      // Find median trigger interval
+      triggerFrames.sort((a, b) => a - b);
+      const medianInterval = triggerFrames[Math.floor(triggerFrames.length / 2)];
+      // speed = interval * BPM / (sr * 2.5)
+      const estimatedSpeed = Math.round(medianInterval * detectedBPM / (sr * 2.5));
+      if (estimatedSpeed >= 1 && estimatedSpeed <= 31) {
+        detectedSpeed = estimatedSpeed;
+      }
+    }
+
+    const actualFPR = Math.round(sr * 2.5 * detectedSpeed / detectedBPM);
+
+    // Phase 3: Group tick snapshots into rows and detect effects
+    const rows = [];
+    const tempoChanges = [];
+    let frameSinceRow = 0;
+    let currentRowTicks = []; // Ticks within current row
+    let currentBPM = detectedBPM;
+
+    for (let i = 0; i < tickSnapshots.length && rows.length < MAX_ROWS; i++) {
+      const tick = tickSnapshots[i];
+      currentRowTicks.push(tick);
+      frameSinceRow += CHUNK;
+
+      // Detect tempo changes
+      if (tick.ciaChanged && tick.ciaBTA > 0) {
+        const newBPM = Math.round(1773447 / (tick.ciaBTA + 1));
+        if (newBPM >= 32 && newBPM <= 999 && newBPM !== currentBPM) {
+          currentBPM = newBPM;
+          tempoChanges.push({ row: rows.length, bpm: newBPM, speed: detectedSpeed });
+        }
+      }
+
+      if (frameSinceRow >= actualFPR) {
+        frameSinceRow -= actualFPR;
+        rows.push(this._processRowTicks(currentRowTicks));
+        currentRowTicks = [];
+      }
+    }
+
+    // Emit final partial row if significant
+    if (currentRowTicks.length > 2) {
+      rows.push(this._processRowTicks(currentRowTicks));
+    }
+
+    // Convert sample cache to transferable format
+    const samples = {};
+    for (const [ptr, data] of sampleCache) {
+      samples[ptr] = {
+        pcm: data.pcm, // Uint8Array (transferable)
+        length: data.length,
+        loopStart: data.loopStart,
+        loopLength: data.loopLength,
+        typicalPeriod: data.typicalPeriod,
+      };
+    }
+
+    return {
+      rows, // Enhanced rows compatible with basic scan format
+      samples,
+      tempoChanges,
+      bpm: detectedBPM,
+      speed: detectedSpeed,
+      isEnhanced: true,
+    };
+  }
+
+  /**
+   * Process accumulated tick snapshots within a single row to detect effects.
+   * Returns array of 4 channel entries with note, volume, sample, and detected effects.
+   */
+  _processRowTicks(ticks) {
+    if (!ticks.length) {
+      return [
+        { period: 0, volume: 0, samplePtr: 0, sampleStart: 0, sampleLen: 0, effTyp: 0, eff: 0 },
+        { period: 0, volume: 0, samplePtr: 0, sampleStart: 0, sampleLen: 0, effTyp: 0, eff: 0 },
+        { period: 0, volume: 0, samplePtr: 0, sampleStart: 0, sampleLen: 0, effTyp: 0, eff: 0 },
+        { period: 0, volume: 0, samplePtr: 0, sampleStart: 0, sampleLen: 0, effTyp: 0, eff: 0 },
+      ];
+    }
+
+    const result = [];
+
+    for (let ch = 0; ch < 4; ch++) {
+      // Collect per-tick data for this channel
+      const periods = [];
+      const volumes = [];
+      let bestPeriod = 0;
+      let bestVolume = 0;
+      let bestSamplePtr = 0;
+      let bestSampleStart = 0;
+      let bestSampleLen = 0;
+      let triggered = false;
+
+      for (const tick of ticks) {
+        const c = tick.channels[ch];
+        if (c.period > 0) periods.push(c.period);
+        volumes.push(c.volume);
+
+        if (c.triggered || c.sampleChanged) {
+          triggered = true;
+          bestPeriod = c.period;
+          bestVolume = c.volume;
+          bestSamplePtr = c.samplePtr;
+          bestSampleStart = c.sampleStart;
+          bestSampleLen = c.sampleLen;
+        }
+      }
+
+      // If no trigger, use most recent non-zero values
+      if (!triggered) {
+        bestPeriod = 0; // No note
+        bestVolume = volumes.length > 0 ? volumes[0] : 0;
+        if (ticks[0].channels[ch].dma && ticks[0].channels[ch].period > 0) {
+          bestSamplePtr = ticks[0].channels[ch].samplePtr;
+        }
+      }
+
+      // Detect effects from tick-by-tick period/volume changes
+      let effTyp = 0;
+      let eff = 0;
+
+      if (periods.length >= 3) {
+        // Check for arpeggio: 3-step period cycling
+        const uniquePeriods = [...new Set(periods)];
+        if (uniquePeriods.length === 3 || uniquePeriods.length === 2) {
+          // Check if periods cycle (arpeggio pattern)
+          const sorted = [...uniquePeriods].sort((a, b) => a - b);
+          const base = sorted[0];
+          // Convert period differences to semitones
+          // period_ratio = 2^(semitones/12)
+          if (sorted.length >= 2) {
+            const semi1 = Math.round(12 * Math.log2(base / sorted[Math.min(1, sorted.length - 1)]));
+            const semi2 = sorted.length >= 3 ? Math.round(12 * Math.log2(base / sorted[2])) : 0;
+            if (Math.abs(semi1) > 0 && Math.abs(semi1) <= 15 &&
+                Math.abs(semi2) >= 0 && Math.abs(semi2) <= 15) {
+              // Check if periods actually cycle (not just varying)
+              let cycling = false;
+              if (periods.length >= 4) {
+                // At least 2 full cycles
+                cycling = periods[0] === periods[3] || (periods.length >= 6 && periods[0] === periods[3]);
+              }
+              if (cycling) {
+                effTyp = 0; // Arpeggio (effect 0)
+                eff = (Math.abs(semi1) << 4) | Math.abs(semi2);
+              }
+            }
+          }
+        }
+
+        // Check for portamento: linear period change
+        if (effTyp === 0 && uniquePeriods.length >= 2) {
+          const first = periods[0];
+          const last = periods[periods.length - 1];
+          const diff = last - first;
+
+          // Check if consistently moving in one direction
+          let monotonic = true;
+          for (let t = 1; t < periods.length; t++) {
+            if (diff > 0 && periods[t] < periods[t - 1] - 2) { monotonic = false; break; }
+            if (diff < 0 && periods[t] > periods[t - 1] + 2) { monotonic = false; break; }
+          }
+
+          if (monotonic && Math.abs(diff) > 2) {
+            const rate = Math.min(255, Math.abs(Math.round(diff / periods.length)));
+            if (diff < 0) {
+              // Period decreasing = pitch going up = Portamento Up (1xx)
+              effTyp = 1;
+              eff = rate;
+            } else {
+              // Period increasing = pitch going down = Portamento Down (2xx)
+              effTyp = 2;
+              eff = rate;
+            }
+          }
+        }
+
+        // Check for vibrato: period oscillating around center
+        if (effTyp === 0 && periods.length >= 4) {
+          const avg = periods.reduce((a, b) => a + b, 0) / periods.length;
+          let crossings = 0;
+          for (let t = 1; t < periods.length; t++) {
+            if ((periods[t - 1] - avg) * (periods[t] - avg) < 0) crossings++;
+          }
+          if (crossings >= 2) {
+            // Oscillating — likely vibrato
+            const maxDev = Math.max(...periods.map(p => Math.abs(p - avg)));
+            const depth = Math.min(15, Math.round(maxDev / 4));
+            const speed = Math.min(15, Math.round(crossings * 2));
+            if (depth > 0) {
+              effTyp = 4; // Vibrato
+              eff = (speed << 4) | depth;
+            }
+          }
+        }
+      }
+
+      // Check for volume slide
+      if (effTyp === 0 && volumes.length >= 3) {
+        const first = volumes[0];
+        const last = volumes[volumes.length - 1];
+        const vdiff = last - first;
+        if (Math.abs(vdiff) > 2) {
+          const rate = Math.min(15, Math.abs(Math.round(vdiff / volumes.length)));
+          if (rate > 0) {
+            effTyp = 0x0A; // Volume slide
+            eff = vdiff > 0 ? (rate << 4) : rate; // Up: x0, Down: 0x
+          }
+        }
+      }
+
+      result.push({
+        period: bestPeriod,
+        volume: bestVolume,
+        samplePtr: bestSamplePtr,
+        sampleStart: bestSampleStart,
+        sampleLen: bestSampleLen,
+        effTyp,
+        eff,
+      });
+    }
+
+    return result;
   }
 
   process(_inputs, outputs) {
