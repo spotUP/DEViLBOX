@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-21T11:19:46.999Z
+ * Generated: 2026-02-22T12:31:07.791Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1077';
-export const BUILD_NUMBER = '1077';
-export const BUILD_HASH = 'c541dfcb';
-export const BUILD_DATE = '2026-02-21';
+export const BUILD_VERSION = '1.0.1086';
+export const BUILD_NUMBER = '1086';
+export const BUILD_HASH = '0152e32f';
+export const BUILD_DATE = '2026-02-22';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,45 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1077',
+    version: '1.0.1086',
     date: '2026-02-21',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add UADE playback layer and Amiga format parsers/exporters"
+      },
+      {
+        type: 'feature',
+        "description": "Add Furnace order matrix Pixi view component"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'fix',
+        "description": "FT2 toolbar visibility and modal z-index layering"
+      },
+      {
+        type: 'feature',
+        "description": "Expand Pixi views with full DOM overlay implementations"
+      },
+      {
+        type: 'feature',
+        "description": "Add PatternAccessor, Furnace subsong support, and replayer improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Enhance pad editor with note repeat and improved pad controls"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate HivelyTracker into instrument factory and import pipeline"
+      },
+      {
+        type: 'feature',
+        "description": "Add HivelyTracker WASM engine, synth, and hardware controls"
+      },
       {
         type: 'fix',
         "description": "Resolve all pre-existing TypeScript errors and code quality issues"
@@ -198,42 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add MIDI DJ controller presets and auto-mapping"
-      },
-      {
-        type: 'feature',
-        "description": "Improve scratch engine for tracker and audio modes"
-      },
-      {
-        type: 'feature',
-        "description": "Add Serato metadata display — cue points, beatgrid, waveform"
-      },
-      {
-        type: 'feature',
-        "description": "Add audio file playback engine with dual tracker/audio mode"
-      },
-      {
-        type: 'feature',
-        "description": "Add stereo separation control"
-      },
-      {
-        type: 'fix',
-        "description": "Improve ToneEngine cleanup, BlepManager routing, and TrackerReplayer timing"
-      },
-      {
-        type: 'improvement',
-        "description": "Rewrite visualization store with individual selectors"
-      },
-      {
-        type: 'improvement',
-        "description": "Optimize Zustand selectors to prevent unnecessary re-renders"
-      },
-      {
-        type: 'feature',
-        "description": "Add local IndexedDB song revision history"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove 30fps cap from visualization components"
       }
     ]
   }

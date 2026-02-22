@@ -11,7 +11,8 @@ export type ModuleFormat =
   | 'OKT' | '669' | 'FAR' | 'ULT'
   | 'STM' | 'STX' | 'PT36' | 'SFX'
   | 'FUR' | 'NATIVE'
-  | 'HVL' | 'AHX';
+  | 'HVL' | 'AHX'
+  | 'FC' | 'UADE';
 
 // Format-specific configuration
 export interface FormatConfig {

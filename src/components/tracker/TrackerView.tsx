@@ -56,6 +56,7 @@ import type { Pattern } from '@typedefs';
 import { downloadPattern } from '@lib/export/PatternExport';
 import { downloadTrack } from '@lib/export/TrackExport';
 import { DJPitchSlider } from '@components/transport/DJPitchSlider';
+import { PatternMinimap } from './PatternMinimap';
 
 // Create instruments for imported module, using samples if available
 function createInstrumentsForModule(
@@ -282,6 +283,27 @@ interface TrackerViewProps {
   showImportModule?: boolean;
   showPatterns?: boolean;
 }
+
+/** Wrapper that measures its own height and passes it to PatternMinimap */
+const MinimapWrapper: React.FC = () => {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [h, setH] = React.useState(400);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new ResizeObserver((entries) => {
+      for (const entry of entries) setH(entry.contentRect.height);
+    });
+    obs.observe(el);
+    setH(el.clientHeight);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="flex-shrink-0 self-stretch border-l border-ft2-border">
+      <PatternMinimap height={h} />
+    </div>
+  );
+};
 
 export const TrackerView: React.FC<TrackerViewProps> = ({
   onShowExport,
@@ -1241,7 +1263,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           )}
         </div>
 
-        {/* DJ Pitch Slider - Flex item 2 */}
+        {/* Pattern Minimap - Flex item 2 */}
+        {viewMode === 'tracker' && (
+          <MinimapWrapper />
+        )}
+
+        {/* DJ Pitch Slider - Flex item 3 */}
         <div className="flex-shrink-0 self-stretch border-l border-ft2-border bg-ft2-header">
           <DJPitchSlider className="h-full" />
         </div>

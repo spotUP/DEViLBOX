@@ -404,6 +404,12 @@ function App() {
     };
   }, [contextState, setContextState]);
 
+  // Check if a filename is a supported tracker/module format (lazy-loaded)
+  const isModuleFormat = async (filename: string): Promise<boolean> => {
+    const { isSupportedModule } = await import('@lib/import/ModuleLoader');
+    return isSupportedModule(filename);
+  };
+
   // Load song file after confirmation
   const loadSongFile = useCallback(async (file: File) => {
     const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
@@ -459,8 +465,8 @@ function App() {
         setBPM(midiResult.bpm);
         notify.success(`Loaded MIDI: ${midiResult.metadata.name}`);
         
-      } else if (filename.endsWith('.fur') || filename.endsWith('.dmf') || filename.match(/\.(mod|xm|it|s3m|mptm|669|amf|ams|dbm|dsm|far|ftm|gdm|imf|mdl|med|mt2|mtm|okt|psm|ptm|sfx|stm|ult|umx)$/)) {
-        // Furnace/DefleMask/MOD/XM/IT/S3M and other tracker formats — shared parser
+      } else if (await isModuleFormat(filename)) {
+        // All tracker/module formats: MOD, XM, IT, S3M, Furnace, HVL/AHX, UADE exotic, etc.
         const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
         const song = await parseModuleToSong(file);
 
@@ -475,6 +481,9 @@ function App() {
           author: '',
           description: `Imported from ${file.name}`,
         });
+
+        // Set editor mode based on native data availability
+        useTrackerStore.getState().applyEditorMode(song);
 
         notify.success(`Imported ${file.name}: ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
 
@@ -527,7 +536,8 @@ function App() {
       const filename = file.name.toLowerCase();
 
       // Check if it's a song format that will replace current project
-      const isSongFormat = filename.match(/\.(dbx|mid|midi|mod|xm|it|s3m|fur|mptm|669|amf|ams|dbm|dmf|dsm|far|ftm|gdm|imf|mdl|med|mt2|mtm|okt|psm|ptm|sfx|stm|ult|umx)$/);
+      const { isSupportedModule } = await import('@lib/import/ModuleLoader');
+      const isSongFormat = filename.endsWith('.dbx') || filename.endsWith('.mid') || filename.endsWith('.midi') || isSupportedModule(filename);
 
       if (isSongFormat) {
         // Show confirmation dialog for song formats
@@ -1219,13 +1229,16 @@ function App() {
                   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
                   const song = await parseModuleToSong(new File([buffer], filename));
 
-                  const { loadPatterns, setCurrentPattern, setPatternOrder } = useTrackerStore.getState();
+                  const { loadPatterns, setCurrentPattern, setPatternOrder, applyEditorMode } = useTrackerStore.getState();
                   const { addInstrument } = useInstrumentStore.getState();
 
                   song.instruments.forEach((inst: InstrumentConfig) => addInstrument(inst));
                   loadPatterns(song.patterns);
                   setCurrentPattern(0);
                   if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
+
+                  // Set editor mode based on native data availability
+                  applyEditorMode(song);
 
                   notify.success(`Imported ${filename}: ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
                 }

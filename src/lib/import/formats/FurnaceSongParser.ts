@@ -2871,7 +2871,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
   const patterns: ConvertedPatternCell[][][] = [];
   const subsong = module.subsongs[0];
   if (!subsong) {
-    return { instruments, patterns: [], metadata: createMetadata(module), wavetables: [], samples: [] };
+    return { instruments, patterns: [], metadata: createMetadata(module), wavetables: [], samples: [], furnaceNative: { subsongs: [], activeSubsong: 0 } };
   }
 
   // Debug: Log pattern map keys
@@ -3072,8 +3072,10 @@ function convertFurnaceNoteValue(cell: FurnacePatternCell): number {
   if (cell.note === 182 || cell.note === 102) return 255; // Macro release
   // Normal note: octave * 12 + (note - 1) for old format, or direct for new format
   if (cell.note >= 1 && cell.note <= 12) {
-    // Old format: note 1-12 = C#..C, octave is separate
-    return cell.octave * 12 + (cell.note - 1);
+    // Old format: note 1-12 = C#..C, octave is separate (signed byte: 255=-1, 254=-2)
+    const octave = cell.octave > 127 ? cell.octave - 256 : cell.octave;
+    const val = octave * 12 + (cell.note - 1);
+    return Math.max(0, Math.min(179, val));
   }
   // New format note values (0-179)
   if (cell.note >= 0 && cell.note < 180) {

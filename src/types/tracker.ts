@@ -299,7 +299,7 @@ export interface ParsedInstrument {
  * Preserves original module data for editing and re-export
  */
 export interface ImportMetadata {
-  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'HVL' | 'AHX';
+  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'HVL' | 'AHX' | 'OKT' | 'MED' | 'DIGI' | 'FC' | 'UADE';
   sourceFile: string;
   importedAt: string;
   originalChannelCount: number;

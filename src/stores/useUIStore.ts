@@ -27,7 +27,9 @@ export type DialogCommand =
   | 'undo-history'
   | 'pattern-matrix'
   | 'automation'
-  | 'collaboration';
+  | 'collaboration'
+  | 'randomize'
+  | 'acid-pattern';
 
 interface UIStore {
   // State
@@ -37,6 +39,9 @@ interface UIStore {
   modalOpen: string | null;
   modalData: Record<string, unknown> | null;
   showPatterns: boolean;
+  showAutomationLanes: boolean;
+  showMacroLanes: boolean;
+  showMacroSlots: boolean;
   sidebarCollapsed: boolean;
   useHexNumbers: boolean; // Display numbers in hex (true) or decimal (false)
   rowHighlightInterval: number; // Every N rows gets highlight (default 4, FT2 style)
@@ -79,6 +84,9 @@ interface UIStore {
   openModal: (modalId: string, data?: Record<string, unknown>) => void;
   closeModal: () => void;
   togglePatterns: () => void;
+  toggleAutomationLanes: () => void;
+  toggleMacroLanes: () => void;
+  toggleMacroSlots: () => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setUseHexNumbers: (useHex: boolean) => void;
@@ -139,6 +147,9 @@ export const useUIStore = create<UIStore>()(
       modalOpen: null,
       modalData: null,
       showPatterns: false,
+      showAutomationLanes: false,
+      showMacroLanes: false,
+      showMacroSlots: false,
       sidebarCollapsed: false,
       useHexNumbers: true, // Default to hex numbers (FT2 style)
       rowHighlightInterval: 4, // Highlight every 4th row (FT2 default)
@@ -219,6 +230,21 @@ export const useUIStore = create<UIStore>()(
       togglePatterns: () =>
         set((state) => {
           state.showPatterns = !state.showPatterns;
+        }),
+
+      toggleAutomationLanes: () =>
+        set((state) => {
+          state.showAutomationLanes = !state.showAutomationLanes;
+        }),
+
+      toggleMacroLanes: () =>
+        set((state) => {
+          state.showMacroLanes = !state.showMacroLanes;
+        }),
+
+      toggleMacroSlots: () =>
+        set((state) => {
+          state.showMacroSlots = !state.showMacroSlots;
         }),
 
       toggleSidebar: () =>
@@ -417,6 +443,9 @@ export const useUIStore = create<UIStore>()(
       partialize: (state) => ({
         // Only persist layout preferences, not transient UI state
         showPatterns: state.showPatterns,
+        showAutomationLanes: state.showAutomationLanes,
+        showMacroLanes: state.showMacroLanes,
+        showMacroSlots: state.showMacroSlots,
         tb303Collapsed: state.tb303Collapsed,
         oscilloscopeVisible: state.oscilloscopeVisible,
         compactToolbar: state.compactToolbar,

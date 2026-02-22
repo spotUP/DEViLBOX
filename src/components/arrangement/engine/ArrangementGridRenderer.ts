@@ -27,12 +27,12 @@ export const DEFAULT_ARRANGEMENT_GRID_COLORS: ArrangementGridColors = {
   background: '#0c0c0e',
   trackEven: 'rgba(255,255,255,0.02)',
   trackOdd: 'rgba(255,255,255,0.05)',
-  trackSeparator: 'rgba(255,255,255,0.12)',
-  gridLine: 'rgba(255,255,255,0.04)',
-  beatLine: 'rgba(255,255,255,0.15)',
-  barLine: 'rgba(255,255,255,0.30)',
-  fourBarLine: 'rgba(255,255,255,0.42)',
-  beyondEnd: 'rgba(100,100,100,0.08)',
+  trackSeparator: 'rgba(255,255,255,0.08)',
+  gridLine: 'rgba(255,255,255,0.02)',
+  beatLine: 'rgba(255,255,255,0.05)',
+  barLine: 'rgba(255,255,255,0.10)',
+  fourBarLine: 'rgba(255,255,255,0.16)',
+  beyondEnd: 'rgba(100,100,100,0.06)',
 };
 
 export class ArrangementGridRenderer {
