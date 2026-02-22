@@ -26,12 +26,12 @@ import { PixiMacroSlotsPanel } from './tracker/PixiMacroSlotsPanel';
 import { PixiMIDIKnobBar } from './tracker/PixiMIDIKnobBar';
 import { PixiRandomizeDialog } from '../dialogs/PixiRandomizeDialog';
 import { PixiAcidPatternDialog } from '../dialogs/PixiAcidPatternDialog';
-import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
-import { GridSequencer } from '@/components/grid/GridSequencer';
-import { TB303View } from '@/components/demo/TB303View';
-import { PianoRoll } from '@/components/pianoroll';
 import { PixiFurnaceView } from './furnace/PixiFurnaceView';
 import { PixiHivelyView } from './hively/PixiHivelyView';
+import { PixiPatternEditor } from './tracker/PixiPatternEditor';
+import { PixiGridSequencer } from './tracker/PixiGridSequencer';
+import { PixiTB303View } from './tracker/PixiTB303View';
+import { PixiPianoRollView } from './PixiPianoRollView';
 import { useTrackerInput } from '@/hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
@@ -177,31 +177,73 @@ export const PixiTrackerView: React.FC = () => {
       >
         {/* Editor area with overlays */}
         <pixiContainer layout={{ flex: 1, height: '100%' }}>
-          {/* Editor — single stable PixiDOMOverlay with conditional DOM children.
-              Using ONE overlay avoids swapping <pixiContainer> Yoga nodes in
-              @pixi/layout, which causes BindingError in insertChild. The overlay's
-              createRoot().render() handles DOM child swaps independently of Pixi. */}
+          {/* Editor — native Pixi components for each view mode.
+              All editors are ALWAYS mounted to avoid @pixi/layout BindingError
+              when swapping Yoga child nodes. Visibility controlled via visible +
+              zero layout dimensions. */}
+
+          {/* Classic tracker pattern editor — native Pixi */}
+          <pixiContainer
+            visible={viewMode === 'tracker' && editorMode === 'classic'}
+            layout={{
+              flex: viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0,
+              height: viewMode === 'tracker' && editorMode === 'classic' ? '100%' : 0,
+              width: viewMode === 'tracker' && editorMode === 'classic' ? '100%' : 0,
+            }}
+          >
+            <PixiPatternEditor width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+          </pixiContainer>
+
+          {/* Grid sequencer — native Pixi */}
+          <pixiContainer
+            visible={viewMode === 'grid'}
+            layout={{
+              flex: viewMode === 'grid' ? 1 : 0,
+              height: viewMode === 'grid' ? '100%' : 0,
+              width: viewMode === 'grid' ? '100%' : 0,
+            }}
+          >
+            <PixiGridSequencer channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+          </pixiContainer>
+
+          {/* Piano Roll — native Pixi (existing PixiPianoRollView) */}
+          <pixiContainer
+            visible={viewMode === 'pianoroll'}
+            layout={{
+              flex: viewMode === 'pianoroll' ? 1 : 0,
+              height: viewMode === 'pianoroll' ? '100%' : 0,
+              width: viewMode === 'pianoroll' ? '100%' : 0,
+            }}
+          >
+            <PixiPianoRollView />
+          </pixiContainer>
+
+          {/* TB-303 view — native Pixi */}
+          <pixiContainer
+            visible={viewMode === 'tb303'}
+            layout={{
+              flex: viewMode === 'tb303' ? 1 : 0,
+              height: viewMode === 'tb303' ? '100%' : 0,
+              width: viewMode === 'tb303' ? '100%' : 0,
+            }}
+          >
+            <PixiTB303View channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+          </pixiContainer>
+
+          {/* Furnace / Hively — still DOM-based, via PixiDOMOverlay */}
           <PixiDOMOverlay
-            layout={{ flex: 1, height: '100%' }}
+            layout={{
+              flex: viewMode === 'tracker' && (editorMode === 'furnace' || editorMode === 'hively') ? 1 : 0,
+              height: viewMode === 'tracker' && (editorMode === 'furnace' || editorMode === 'hively') ? '100%' : 0,
+              width: viewMode === 'tracker' && (editorMode === 'furnace' || editorMode === 'hively') ? '100%' : 0,
+            }}
             style={{ overflow: 'hidden' }}
           >
-            {viewMode === 'tracker' ? (
-              editorMode === 'furnace' ? (
-                <AutoSizeFurnaceView />
-              ) : editorMode === 'hively' ? (
-                <AutoSizeHivelyView />
-              ) : (
-                <PatternEditorCanvas />
-              )
-            ) : viewMode === 'grid' ? (
-              <GridSequencer channelIndex={gridChannelIndex} />
-            ) : viewMode === 'pianoroll' ? (
-              <PianoRoll channelIndex={gridChannelIndex} />
-            ) : (
-              <div style={{ height: '100%', overflowY: 'auto' }}>
-                <TB303View channelIndex={gridChannelIndex} />
-              </div>
-            )}
+            {viewMode === 'tracker' && editorMode === 'furnace' ? (
+              <AutoSizeFurnaceView />
+            ) : viewMode === 'tracker' && editorMode === 'hively' ? (
+              <AutoSizeHivelyView />
+            ) : null}
           </PixiDOMOverlay>
 
           {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga insertChild crash.
