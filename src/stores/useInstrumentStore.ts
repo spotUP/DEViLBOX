@@ -333,12 +333,22 @@ export const useInstrumentStore = create<InstrumentStore>()(
     presets: [],
 
     // Actions
-    setCurrentInstrument: (id) =>
+    setCurrentInstrument: (id) => {
+      const inst = get().instruments.find((i) => i.id === id);
+      if (!inst) return;
       set((state) => {
-        if (state.instruments.find((inst) => inst.id === id)) {
-          state.currentInstrumentId = id;
-        }
-      }),
+        state.currentInstrumentId = id;
+      });
+      // Auto-enable 303 flag columns when selecting a TB-303/Buzz3o3 instrument
+      if (inst.synthType === 'TB303' || inst.synthType === 'Buzz3o3') {
+        import('./useTrackerStore').then(({ useTrackerStore }) => {
+          const vis = useTrackerStore.getState().columnVisibility;
+          if (!vis.flag1 || !vis.flag2) {
+            useTrackerStore.getState().setColumnVisibility({ flag1: true, flag2: true });
+          }
+        }).catch(() => { /* ignore if store not ready */ });
+      }
+    },
 
     setPreviewInstrument: (instrument) =>
       set((state) => {

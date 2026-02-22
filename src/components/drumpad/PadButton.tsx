@@ -78,12 +78,18 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
+    
+    // Empty pads can be clicked for selection but don't trigger sound
+    if (!pad.sample) {
+      onSelect(pad.id);
+      return;
+    }
+    
     setIsPressed(true);
-
     const vel = calculateVelocity(event.clientY, event.currentTarget);
     flashTrigger(vel);
     onTrigger(pad.id, vel);
-  }, [pad.id, onTrigger, calculateVelocity, flashTrigger]);
+  }, [pad.id, pad.sample, onTrigger, onSelect, calculateVelocity, flashTrigger]);
 
   const handleMouseUp = useCallback(() => {
     setIsPressed(false);
@@ -100,13 +106,19 @@ export const PadButton: React.FC<PadButtonProps> = ({
   // Touch support for mobile devices
   const handleTouchStart = useCallback((event: React.TouchEvent) => {
     event.preventDefault();
+    
+    // Empty pads can be tapped for selection but don't trigger sound
+    if (!pad.sample) {
+      onSelect(pad.id);
+      return;
+    }
+    
     setIsPressed(true);
-
     const touch = event.touches[0];
     const vel = calculateVelocity(touch.clientY, event.currentTarget);
     flashTrigger(vel);
     onTrigger(pad.id, vel);
-  }, [pad.id, onTrigger, calculateVelocity, flashTrigger]);
+  }, [pad.id, pad.sample, onTrigger, onSelect, calculateVelocity, flashTrigger]);
 
   const handleTouchEnd = useCallback((event: React.TouchEvent) => {
     event.preventDefault();
@@ -140,10 +152,10 @@ export const PadButton: React.FC<PadButtonProps> = ({
     <button
       data-pad-id={pad.id}
       className={`
-        relative rounded-lg select-none overflow-hidden
+        relative rounded-lg select-none overflow-hidden cursor-pointer
         ${padStyle.className}
-        ${!pad.sample ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
-        ${isPressed ? 'scale-95' : 'scale-100'}
+        ${!pad.sample ? 'opacity-40' : ''}
+        ${isPressed && pad.sample ? 'scale-95' : 'scale-100'}
         ${isSelected ? 'ring-2 ring-accent-primary ring-offset-2 ring-offset-dark-bg' : ''}
         ${isFocused && !isSelected ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-dark-bg' : ''}
         transform-gpu will-change-transform
@@ -161,9 +173,8 @@ export const PadButton: React.FC<PadButtonProps> = ({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
-      disabled={!pad.sample}
       tabIndex={0}
-      aria-label={`Drum pad ${pad.id}: ${pad.name}${pad.sample ? '' : ' (empty)'}`}
+      aria-label={`Drum pad ${pad.id}: ${pad.name}${pad.sample ? '' : ' (empty - click to assign)'}`}
       aria-pressed={isPressed}
       role="gridcell"
     >

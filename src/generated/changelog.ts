@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-22T17:59:59.801Z
+ * Generated: 2026-02-22T19:06:06.801Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1104';
-export const BUILD_NUMBER = '1104';
-export const BUILD_HASH = 'daa5a3a5';
+export const BUILD_VERSION = '1.0.1109';
+export const BUILD_NUMBER = '1109';
+export const BUILD_HASH = '79638865';
 export const BUILD_DATE = '2026-02-22';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,29 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1104',
+    version: '1.0.1109',
     date: '2026-02-22',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: update gitignore for WASM build dirs, update CLAUDE.md"
+      },
+      {
+        type: 'fix',
+        "description": "Tracker view routing, editor controls, and drag-drop updates"
+      },
+      {
+        type: 'feature',
+        "description": "Add FT2 sample editor WASM module source"
+      },
+      {
+        type: 'fix',
+        "description": "Update PT2 sample editor WASM source and binary"
+      },
+      {
+        type: 'feature',
+        "description": "Add native Pixi pattern editors with full DOM parity"
+      },
       {
         type: 'fix',
         "description": "Fix speed/BPM detection and all-zero PCM for VBlank formats"
@@ -214,26 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Enhance engine, store, pad grid, and add persistence"
-      },
-      {
-        type: 'feature',
-        "description": "Improve WebGL views, status bar, and DJ deck rendering"
-      },
-      {
-        type: 'feature',
-        "description": "Enhance scratch engine with new patterns and fader LFO"
-      },
-      {
-        type: 'feature',
-        "description": "Add Scratch Originals sample pack"
-      },
-      {
-        type: 'feature',
-        "description": "Global SVG arrow cursor for peer mouse + fix caret offset"
-      },
-      {
-        type: 'fix',
-        "description": "Peer cursor now renders as a cell block matching local cursor shape"
       }
     ]
   }

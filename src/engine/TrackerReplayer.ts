@@ -330,9 +330,13 @@ interface ChannelState {
   activePlayerIdx: number;           // Current active player index in pool
   gainNode: Tone.Gain;
   panNode: Tone.Panner;
+  muteGain: Tone.Gain;              // Dedicated mute/solo gain (always 0 or 1)
 
   // Instrument reference
   instrument: InstrumentConfig | null;
+
+  // Mute/solo tracking for gain sync
+  _muteState: boolean;
 }
 
 /**
@@ -822,6 +826,7 @@ export class TrackerReplayer {
       }
       try { ch.gainNode.dispose(); } catch { /* ignored */ }
       try { ch.panNode.dispose(); } catch { /* ignored */ }
+      try { ch.muteGain.dispose(); } catch { /* ignored */ }
     }
 
     // Initialize channels
@@ -917,8 +922,10 @@ export class TrackerReplayer {
 
     const panNode = new Tone.Panner(panValue);
     const gainNode = new Tone.Gain(1);
+    const muteGain = new Tone.Gain(1); // Dedicated mute/solo gain
     gainNode.connect(panNode);
-    panNode.connect(this.masterGain);
+    panNode.connect(muteGain);
+    muteGain.connect(this.masterGain);
 
     // Pre-allocate player pool and connect to gain node
     const playerPool: Tone.Player[] = [];
@@ -1009,7 +1016,9 @@ export class TrackerReplayer {
       activePlayerIdx: 0,
       gainNode,
       panNode,
+      muteGain,
       instrument: null,
+      _muteState: false,
     };
   }
 
@@ -1272,6 +1281,20 @@ export class TrackerReplayer {
     // Process all channels (skipped during scratch note suppression —
     // sequencer still advances for visual tracking but no audio events fire)
     if (!this._suppressNotes) {
+      // Sync mute/solo state: use dedicated muteGain node so effect processing
+      // (Cxx, volume slides, etc.) on gainNode is not overridden.
+      // DJ decks use their own bitmask, tracker view uses ToneEngine's state.
+      if (!this.isDJDeck) {
+        const muteEngine = getToneEngine();
+        for (let m = 0; m < this.channels.length; m++) {
+          const muted = muteEngine.isChannelMuted(m);
+          if (this.channels[m]._muteState !== muted) {
+            this.channels[m]._muteState = muted;
+            this.channels[m].muteGain.gain.setValueAtTime(muted ? 0 : 1, safeTime);
+          }
+        }
+      }
+
       for (let ch = 0; ch < this.channels.length; ch++) {
         const channel = this.channels[ch];
         const row = useNativeAccessor
@@ -4189,6 +4212,7 @@ export class TrackerReplayer {
       }
       ch.gainNode.dispose();
       ch.panNode.dispose();
+      ch.muteGain.dispose();
     }
     // Clear buffer cache
     this.bufferCache.clear();
