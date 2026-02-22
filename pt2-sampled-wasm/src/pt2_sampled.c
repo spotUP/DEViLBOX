@@ -1,777 +1,668 @@
 /*
- * pt2_sampled.c — ProTracker 2 Sample Editor (WASM Canvas 2D)
- *
- * Standalone C module that renders the classic PT2 sampler screen.
- * Waveform display with min/max peak detection, loop markers,
- * volume/finetune editing, and zoom/scroll navigation.
- *
- * No SDL dependency — renders to a uint32_t framebuffer and pushes
- * to canvas via EM_JS putImageData. Events forwarded from React.
- *
- * Bitmap font derived from pt2-clone (8bitbubsy).
- * Palette: classic Amiga Workbench blue/gray/black.
- */
+** pt2_sampled.c - PT2 Clone Sample Editor WASM bridge
+**
+** Based on 8bitbubsy's pt2-clone (https://github.com/8bitbubsy/pt2-clone)
+**
+** This file provides:
+** - All global variable definitions (declared extern in pt2_wasm.h)
+** - Period table for note resampling (37 notes x 16 finetunes)
+** - Default Amiga palette initialization
+** - Stub functions for unused subsystems
+** - EM_JS callbacks for notifying JavaScript of parameter changes
+** - EMSCRIPTEN_KEEPALIVE exported WASM bridge API
+*/
 
 #include <emscripten.h>
-#include <emscripten/html5.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <math.h>
+#include "pt2_wasm.h"
 
-#include "pt2_sampled.h"
-#include "hwui_common.h"
+/* ---- Global variable definitions ---- */
 
-/* ── JS callbacks ──────────────────────────────────────────────── */
+video_t video;
+editor_t editor;
+sampler_t sampler;
+mouse_t mouse;
+keyb_t keyb;
+ui_t ui;
+cursor_t cursor;
+config_t config;
 
-EM_JS(void, js_on_param_change, (int param_id, int value), {
-    if (Module.onParamChange) Module.onParamChange(param_id, value);
-});
+static module_t songData;
+module_t *song = &songData;
+static int8_t sampleDataPool[MAX_SAMPLE_LENGTH + 4]; /* +4 safety */
 
-EM_JS(void, js_on_loop_change, (int loop_start_hi, int loop_start_lo,
-                                 int loop_length_hi, int loop_length_lo,
-                                 int loop_type), {
-    if (Module.onLoopChange) Module.onLoopChange(
-        (loop_start_hi << 16) | (loop_start_lo & 0xFFFF),
-        (loop_length_hi << 16) | (loop_length_lo & 0xFFFF),
-        loop_type);
-});
+/* ---- Period table (37 notes x 16 finetunes = 592 entries) ---- */
 
-/* ── Direct canvas rendering (bypasses SDL renderer) ──────────── */
-
-/* No EM_JS rendering — React side handles canvas blitting */
-
-/* ── Colours (classic PT2/Amiga Workbench style) ───────────────── */
-
-#define COL_BG          0xFF000000  /* Black background */
-#define COL_PANEL       0xFFBBBBBB  /* Light gray panels */
-#define COL_PANEL_DK    0xFF888888  /* Darker panel shade */
-#define COL_TEXT         0xFF000000  /* Black text on gray */
-#define COL_TEXT_BRIGHT 0xFFFFFFFF  /* White text on dark */
-#define COL_CURSOR      0xFF4444FF  /* Blue cursor/selection */
-#define COL_WAVEFORM    0xFF44BB44  /* Green waveform */
-#define COL_LOOP_MARK   0xFFFF4444  /* Red loop markers */
-#define COL_CENTER_LINE 0xFF333333  /* Waveform center line */
-#define COL_WAVE_BG     0xFF111111  /* Waveform area background */
-#define COL_BTN_FACE    0xFFAAAAAA  /* Button face */
-#define COL_BTN_HI      0xFFDDDDDD  /* Button highlight */
-#define COL_BTN_SH      0xFF666666  /* Button shadow */
-#define COL_SELECTION   0x6644AAFF  /* Selection overlay (alpha) */
-
-/* ── Layout constants ──────────────────────────────────────────── */
-
-#define SCREEN_W  320
-#define SCREEN_H  255
-
-/* Waveform display area */
-#define WAVE_X      3
-#define WAVE_Y      100
-#define WAVE_W      314
-#define WAVE_H      128
-#define WAVE_CY     (WAVE_Y + WAVE_H / 2)  /* center Y */
-
-/* Parameter display area */
-#define PARAM_Y     26
-#define PARAM_X     8
-
-/* Button area */
-#define BTN_ROW1_Y  58
-#define BTN_ROW2_Y  72
-#define BTN_ROW3_Y  86
-#define BTN_H       12
-#define BTN_PAD     2
-
-/* Scrollbar */
-#define SCROLL_Y    232
-#define SCROLL_H    10
-#define SCROLL_X    WAVE_X
-#define SCROLL_W    WAVE_W
-
-/* ── State ─────────────────────────────────────────────────────── */
-
-static uint32_t      g_fb[SCREEN_W * SCREEN_H];  /* framebuffer */
-
-/* PCM sample data (signed 8-bit) */
-static int8_t  *g_pcm  = NULL;
-static int      g_pcm_len = 0;
-
-/* Parameters */
-static int g_volume    = 64;
-static int g_finetune  = 0;   /* 0-15, displayed as -8..+7 */
-static int g_loop_start  = 0; /* sample frames */
-static int g_loop_length = 0;
-static int g_loop_type   = 0; /* 0=off, 1=forward */
-
-/* View state */
-static int g_view_start = 0;   /* first visible sample frame */
-static int g_view_size  = 0;   /* how many samples visible in waveform area */
-static int g_zoom_level = 0;   /* 0 = show all */
-
-/* Mouse interaction */
-static int g_mouse_x = 0, g_mouse_y = 0;
-static int g_mouse_down = 0;
-static int g_dragging_loop_start = 0;
-static int g_dragging_loop_end   = 0;
-static int g_dragging_scroll     = 0;
-static int g_scroll_drag_offset  = 0;
-
-/* Selection range */
-static int g_sel_start = -1, g_sel_end = -1;
-
-/* Dirty flag for rendering */
-static int g_dirty = 1;
-
-/* ── Helpers — thin macros bridging to hwui_common ─────────────── */
-
-#define fb_pixel(x, y, col)                     hwui_pixel(g_fb, SCREEN_W, (x), (y), (col))
-#define fb_rect(x, y, w, h, col)                hwui_rect(g_fb, SCREEN_W, (x), (y), (w), (h), (col))
-#define fb_hline(x, y, w, col)                  hwui_hline(g_fb, SCREEN_W, (x), (y), (w), (col))
-#define fb_vline(x, y, h, col)                  hwui_vline(g_fb, SCREEN_W, (x), (y), (h), (col))
-#define fb_char(px, py, ch, col)                hwui_char(g_fb, SCREEN_W, (px), (py), (ch), (col))
-#define fb_text(x, y, s, col)                   hwui_text(g_fb, SCREEN_W, (x), (y), (s), (col))
-#define fb_text_centered(rx, ry, rw, rh, s, col) hwui_text_centered(g_fb, SCREEN_W, (rx), (ry), (rw), (rh), (s), (col))
-
-/* Format a number as 4-digit hex */
-static void hex4(char *buf, int val) {
-    const char *hex = "0123456789ABCDEF";
-    buf[0] = hex[(val >> 12) & 0xF];
-    buf[1] = hex[(val >>  8) & 0xF];
-    buf[2] = hex[(val >>  4) & 0xF];
-    buf[3] = hex[val & 0xF];
-    buf[4] = 0;
-}
-
-/* Format a number as 2-digit hex */
-static void hex2(char *buf, int val) {
-    const char *hex = "0123456789ABCDEF";
-    buf[0] = hex[(val >> 4) & 0xF];
-    buf[1] = hex[val & 0xF];
-    buf[2] = 0;
-}
-
-/* Draw a 3D button */
-static void fb_button(int x, int y, int w, int h, const char *label, int pressed) {
-    uint32_t face = pressed ? COL_BTN_SH : COL_BTN_FACE;
-    uint32_t hi   = pressed ? COL_BTN_SH : COL_BTN_HI;
-    uint32_t sh   = pressed ? COL_BTN_HI : COL_BTN_SH;
-
-    fb_rect(x, y, w, h, face);
-    fb_hline(x, y, w, hi);          /* top highlight */
-    fb_vline(x, y, h, hi);          /* left highlight */
-    fb_hline(x, y + h - 1, w, sh);  /* bottom shadow */
-    fb_vline(x + w - 1, y, h, sh);  /* right shadow */
-
-    fb_text_centered(x, y, w, h, label, COL_TEXT);
-}
-
-/* ── Button definitions ────────────────────────────────────────── */
-
-typedef struct {
-    int x, y, w, h;
-    const char *label;
-    void (*action)(void);
-} Button;
-
-static void btn_show_all(void);
-static void btn_zoom_in(void);
-static void btn_zoom_out(void);
-static void btn_vol_up(void);
-static void btn_vol_down(void);
-static void btn_fine_up(void);
-static void btn_fine_down(void);
-
-static Button g_buttons[] = {
-    {   8, BTN_ROW1_Y, 64, BTN_H, "SHOW ALL",  btn_show_all },
-    {  76, BTN_ROW1_Y, 52, BTN_H, "ZOOM IN",   btn_zoom_in  },
-    { 132, BTN_ROW1_Y, 56, BTN_H, "ZOOM OUT",  btn_zoom_out },
-    /* Volume +/- */
-    { 200, BTN_ROW1_Y, 24, BTN_H, "V+", btn_vol_up   },
-    { 228, BTN_ROW1_Y, 24, BTN_H, "V-", btn_vol_down },
-    /* Finetune +/- */
-    { 260, BTN_ROW1_Y, 24, BTN_H, "F+", btn_fine_up   },
-    { 288, BTN_ROW1_Y, 24, BTN_H, "F-", btn_fine_down },
+const int16_t periodTable[37 * 16] = {
+	/* finetune 0 */
+	856,808,762,720,678,640,604,570,538,508,480,453,
+	428,404,381,360,339,320,302,285,269,254,240,226,
+	214,202,190,180,170,160,151,143,135,127,120,113,0,
+	/* finetune 1 */
+	850,802,757,715,674,637,601,567,535,505,477,450,
+	425,401,379,357,337,318,300,284,268,253,239,225,
+	213,201,189,179,169,159,150,142,134,126,119,113,0,
+	/* finetune 2 */
+	844,796,752,709,670,632,597,563,532,502,474,447,
+	422,398,376,355,335,316,298,282,266,251,237,224,
+	211,199,188,177,167,158,149,141,133,125,118,112,0,
+	/* finetune 3 */
+	838,791,746,704,665,628,592,559,528,498,470,444,
+	419,395,373,352,332,314,296,280,264,249,235,222,
+	209,198,187,176,166,157,148,140,132,125,118,111,0,
+	/* finetune 4 */
+	832,785,741,699,660,623,588,555,524,495,467,441,
+	416,392,370,350,330,312,294,278,262,247,233,220,
+	208,196,185,175,165,156,147,139,131,124,117,110,0,
+	/* finetune 5 */
+	826,779,736,694,655,619,584,551,520,491,463,437,
+	413,390,368,347,328,309,292,276,260,245,232,219,
+	206,195,184,174,164,155,146,138,130,123,116,109,0,
+	/* finetune 6 */
+	820,774,730,689,651,614,580,547,516,487,460,434,
+	410,387,365,345,325,307,290,274,258,244,230,217,
+	205,193,183,172,163,154,145,137,129,122,115,109,0,
+	/* finetune 7 */
+	814,768,725,684,646,610,575,543,513,484,457,431,
+	407,384,363,342,323,305,288,272,256,242,228,216,
+	204,192,181,171,161,152,144,136,128,121,114,108,0,
+	/* finetune -8 */
+	907,856,808,762,720,678,640,604,570,538,508,480,
+	453,428,404,381,360,339,320,302,285,269,254,240,
+	226,214,202,190,180,170,160,151,143,135,127,120,0,
+	/* finetune -7 */
+	900,850,802,757,715,675,636,601,567,535,505,477,
+	450,425,401,379,357,337,318,300,284,268,253,238,
+	225,212,200,189,179,169,159,150,142,134,126,119,0,
+	/* finetune -6 */
+	894,844,796,752,709,670,632,597,563,532,502,474,
+	447,422,398,376,355,335,316,298,282,266,251,237,
+	223,211,199,188,177,167,158,149,141,133,125,118,0,
+	/* finetune -5 */
+	887,838,791,746,704,665,628,592,559,528,498,470,
+	444,419,395,373,352,332,314,296,280,264,249,235,
+	222,209,198,187,176,166,157,148,140,132,125,118,0,
+	/* finetune -4 */
+	881,832,785,741,699,660,623,588,555,524,494,467,
+	441,416,392,370,350,330,312,294,278,262,247,233,
+	220,208,196,185,175,165,156,147,139,131,123,117,0,
+	/* finetune -3 */
+	875,826,779,736,694,655,619,584,551,520,491,463,
+	437,413,390,368,347,328,309,292,276,260,245,232,
+	219,206,195,184,174,164,155,146,138,130,123,116,0,
+	/* finetune -2 */
+	868,820,774,730,689,651,614,580,547,516,487,460,
+	434,410,387,365,345,325,307,290,274,258,244,230,
+	217,205,193,183,172,163,154,145,137,129,122,115,0,
+	/* finetune -1 */
+	862,814,768,725,684,646,610,575,543,513,484,457,
+	431,407,384,363,342,323,305,288,272,256,242,228,
+	216,204,192,181,171,161,152,144,136,128,121,114,0
 };
-#define NUM_BUTTONS (sizeof(g_buttons) / sizeof(g_buttons[0]))
 
-/* ── Button actions ────────────────────────────────────────────── */
+/* ---- Default Amiga palette ---- */
 
-static void btn_show_all(void) {
-    g_view_start = 0;
-    g_view_size = g_pcm_len > 0 ? g_pcm_len : 1;
-    g_zoom_level = 0;
-    g_dirty = 1;
+static void initDefaultPalette(void)
+{
+	video.palette[PAL_BACKGRD]   = 0x000000;
+	video.palette[PAL_BORDER]    = 0xBBBBBB;
+	video.palette[PAL_GENBKG]    = 0x888888;
+	video.palette[PAL_GENBKG2]   = 0x555555;
+	video.palette[PAL_QADSCP]    = 0x7DB8B8;
+	video.palette[PAL_PATCURSOR] = 0xAAAAAA;
+	video.palette[PAL_GENTXT]    = 0x000000;
+	video.palette[PAL_PATTXT]    = 0x3344FF;
+	video.palette[PAL_SAMPLLINE] = 0x7DB8B8;
+	video.palette[PAL_LOOPPIN]   = 0xFF2200;
+	video.palette[PAL_TEXTMARK]  = 0x4477FF;
+	video.palette[PAL_MOUSE_1]   = 0x444444;
+	video.palette[PAL_MOUSE_2]   = 0x777777;
+	video.palette[PAL_MOUSE_3]   = 0xAAAAAA;
+	video.palette[PAL_COLORKEY]  = 0x0000FF;
 }
 
-static void btn_zoom_in(void) {
-    if (g_pcm_len <= 0) return;
-    int new_size = g_view_size / 2;
-    if (new_size < WAVE_W) new_size = WAVE_W;
-    int center = g_view_start + g_view_size / 2;
-    g_view_start = center - new_size / 2;
-    if (g_view_start < 0) g_view_start = 0;
-    g_view_size = new_size;
-    if (g_view_start + g_view_size > g_pcm_len)
-        g_view_start = g_pcm_len - g_view_size;
-    if (g_view_start < 0) g_view_start = 0;
-    g_zoom_level++;
-    g_dirty = 1;
+/* ---- Stub functions ---- */
+
+void turnOffVoices(void) { }
+void lockAudio(void) { }
+void unlockAudio(void) { }
+
+static void notifyParamChanges(void); /* forward declaration */
+
+void updateCurrSample(void)
+{
+	notifyParamChanges();
+	redrawSample();
 }
 
-static void btn_zoom_out(void) {
-    if (g_pcm_len <= 0) return;
-    int new_size = g_view_size * 2;
-    if (new_size > g_pcm_len) new_size = g_pcm_len;
-    int center = g_view_start + g_view_size / 2;
-    g_view_start = center - new_size / 2;
-    if (g_view_start < 0) g_view_start = 0;
-    g_view_size = new_size;
-    if (g_view_start + g_view_size > g_pcm_len)
-        g_view_start = g_pcm_len - g_view_size;
-    if (g_view_start < 0) g_view_start = 0;
-    if (g_zoom_level > 0) g_zoom_level--;
-    g_dirty = 1;
+void updateWindowTitle(int modified) { (void)modified; }
+void statusNotSampleZero(void) { displayErrorMsg("NOT SAMPLE 0 !"); }
+void statusSampleIsEmpty(void) { displayErrorMsg("SAMPLE IS EMPTY"); }
+void statusOutOfMemory(void)  { displayErrorMsg("OUT OF MEMORY !"); }
+
+double getDoublePeak(const double *buf, int32_t len)
+{
+	double peak = 0.0;
+	for (int32_t i = 0; i < len; i++)
+	{
+		double abs_val = fabs(buf[i]);
+		if (abs_val > peak) peak = abs_val;
+	}
+	return peak;
 }
 
-static void btn_vol_up(void) {
-    if (g_volume < 64) {
-        g_volume++;
-        js_on_param_change(PT2_VOLUME, g_volume);
-        g_dirty = 1;
-    }
+void setErrPointer(void) { }
+
+/* Vol/filter box stubs (not rendered in our extraction) */
+void renderSamplerVolBox(void) { }
+void renderSamplerFiltersBox(void) { }
+void showVolFromSlider(void) { }
+void showVolToSlider(void) { }
+
+/* Chord/replayer stubs */
+void recalcChordLength(void) { }
+void updatePaulaLoops(void) { }
+
+/* Play stubs (no audio in WASM extraction) */
+static void samplerPlayWaveform(void) { displayMsg("PLAY WAVEFORM"); }
+static void samplerPlayDisplay(void) { displayMsg("PLAY DISPLAY"); }
+static void samplerPlayRange(void) { displayMsg("PLAY RANGE"); }
+static void toggleTuningTone(void) { displayMsg("TUNING TONE"); }
+static void samplerResample(void) { displayMsg("RESAMPLE N/A"); }
+static void exitFromSam(void) { /* no-op: sampler is always shown */ }
+
+/* ---- EM_JS callback functions ---- */
+
+EM_JS(void, js_onParamChange, (int paramId, int value), {
+	if (Module.onParamChange) Module.onParamChange(paramId, value);
+});
+
+EM_JS(void, js_onLoopChange, (int loopStart, int loopLength, int loopType), {
+	if (Module.onLoopChange) Module.onLoopChange(loopStart, loopLength, loopType);
+});
+
+/* ---- notifyParamChanges helper ---- */
+
+static void notifyParamChanges(void)
+{
+	moduleSample_t *s = &song->samples[editor.currSample];
+	js_onParamChange(PT2_VOLUME, s->volume);
+	js_onParamChange(PT2_FINETUNE, s->fineTune);
+
+	int loopType = (s->loopStart + s->loopLength > 2) ? 1 : 0;
+	js_onLoopChange(s->loopStart, s->loopLength, loopType);
 }
 
-static void btn_vol_down(void) {
-    if (g_volume > 0) {
-        g_volume--;
-        js_on_param_change(PT2_VOLUME, g_volume);
-        g_dirty = 1;
-    }
+/* ---- WASM bridge API (all EMSCRIPTEN_KEEPALIVE) ---- */
+
+EMSCRIPTEN_KEEPALIVE
+void pt2_sampled_init(int w, int h)
+{
+	(void)w; (void)h;
+
+	memset(&video, 0, sizeof(video));
+	memset(&editor, 0, sizeof(editor));
+	memset(&sampler, 0, sizeof(sampler));
+	memset(&mouse, 0, sizeof(mouse));
+	memset(&keyb, 0, sizeof(keyb));
+	memset(&ui, 0, sizeof(ui));
+	memset(&cursor, 0, sizeof(cursor));
+	memset(&config, 0, sizeof(config));
+	memset(&songData, 0, sizeof(songData));
+	memset(sampleDataPool, 0, sizeof(sampleDataPool));
+
+	/* allocate framebuffer */
+	video.frameBuffer = (uint32_t *)calloc(SCREEN_W * SCREEN_H, sizeof(uint32_t));
+
+	/* setup config */
+	config.maxSampleLength = MAX_SAMPLE_LENGTH;
+	config.waveformCenterLine = true;
+
+	/* setup palette */
+	initDefaultPalette();
+
+	/* setup song data */
+	songData.sampleData = sampleDataPool;
+	for (int i = 0; i < MOD_SAMPLES; i++)
+	{
+		songData.samples[i].offset = 0; /* all samples share the pool (we only use sample 0) */
+		songData.samples[i].loopLength = 2;
+	}
+
+	/* setup editor */
+	editor.currSample = 0;
+	editor.markStartOfs = -1;
+
+	/* allocate sampler variables */
+	allocSamplerVars();
+
+	/* unpack sampler screen BMP */
+	samplerScreenBMP = unpackBMP(samplerScreenPackedBMP, sizeof(samplerScreenPackedBMP));
+
+	/* create the mark/invert table */
+	createSampleMarkTable();
 }
 
-static void btn_fine_up(void) {
-    if (g_finetune < 15) {
-        g_finetune++;
-        js_on_param_change(PT2_FINETUNE, g_finetune);
-        g_dirty = 1;
-    }
+EMSCRIPTEN_KEEPALIVE
+void pt2_sampled_start(void)
+{
+	ui.samplerScreenShown = true;
+
+	/* draw the sampler screen background */
+	if (samplerScreenBMP != NULL)
+		memcpy(&video.frameBuffer[121 * SCREEN_W], samplerScreenBMP, 320 * 134 * sizeof(uint32_t));
+
+	/* set initial status */
+	strcpy(ui.statusMessage, "ALL RIGHT");
+	ui.updateStatusText = true;
+
+	redrawSample();
 }
 
-static void btn_fine_down(void) {
-    if (g_finetune > 0) {
-        g_finetune--;
-        js_on_param_change(PT2_FINETUNE, g_finetune);
-        g_dirty = 1;
-    }
+EMSCRIPTEN_KEEPALIVE
+void pt2_sampled_shutdown(void)
+{
+	deAllocSamplerVars();
+	if (samplerScreenBMP != NULL) { free(samplerScreenBMP); samplerScreenBMP = NULL; }
+	if (video.frameBuffer != NULL) { free(video.frameBuffer); video.frameBuffer = NULL; }
 }
 
-/* ── Sample-to-screen coordinate mapping ───────────────────────── */
+EMSCRIPTEN_KEEPALIVE
+void pt2_sampled_load_pcm(const int8_t *data, int length)
+{
+	if (length > MAX_SAMPLE_LENGTH) length = MAX_SAMPLE_LENGTH;
+	if (length < 0) length = 0;
 
-static int sample_to_screen_x(int sample_pos) {
-    if (g_view_size <= 0) return WAVE_X;
-    return WAVE_X + (int)(((double)(sample_pos - g_view_start) / g_view_size) * WAVE_W);
+	turnOffVoices();
+
+	moduleSample_t *s = &song->samples[editor.currSample];
+
+	memcpy(&song->sampleData[s->offset], data, length);
+	if (length < (int)config.maxSampleLength)
+		memset(&song->sampleData[s->offset + length], 0, config.maxSampleLength - length);
+
+	s->length = length & ~1; /* even length */
+
+	/* reset loop if it extends beyond new length */
+	if (s->loopStart + s->loopLength > s->length)
+	{
+		s->loopStart = 0;
+		s->loopLength = 2;
+	}
+
+	editor.samplePos = 0;
+	editor.markStartOfs = -1;
+
+	/* fill redo buffer */
+	fillSampleRedoBuffer(editor.currSample);
+
+	if (ui.samplerScreenShown)
+		redrawSample();
+
+	notifyParamChanges();
 }
 
-static int screen_x_to_sample(int sx) {
-    if (g_view_size <= 0) return 0;
-    double frac = (double)(sx - WAVE_X) / WAVE_W;
-    int sample = g_view_start + (int)(frac * g_view_size);
-    if (sample < 0) sample = 0;
-    if (sample >= g_pcm_len) sample = g_pcm_len - 1;
-    return sample;
+EMSCRIPTEN_KEEPALIVE
+void pt2_sampled_set_param(int param_id, int value)
+{
+	moduleSample_t *s = &song->samples[editor.currSample];
+	switch (param_id)
+	{
+		case PT2_VOLUME:
+			s->volume = CLAMP(value, 0, 64);
+			break;
+		case PT2_FINETUNE:
+			s->fineTune = value & 0x0F;
+			break;
+		case PT2_LOOP_START_HI:
+			sampler.tmpLoopStart = (sampler.tmpLoopStart & 0xFFFF) | ((value & 0xFFFF) << 16);
+			break;
+		case PT2_LOOP_START_LO:
+			sampler.tmpLoopStart = (sampler.tmpLoopStart & 0xFFFF0000) | (value & 0xFFFF);
+			s->loopStart = sampler.tmpLoopStart & ~1;
+			if (s->loopStart + s->loopLength > s->length)
+			{
+				s->loopStart = 0;
+				s->loopLength = 2;
+			}
+			if (ui.samplerScreenShown) displaySample();
+			break;
+		case PT2_LOOP_LENGTH_HI:
+			sampler.tmpLoopLength = (sampler.tmpLoopLength & 0xFFFF) | ((value & 0xFFFF) << 16);
+			break;
+		case PT2_LOOP_LENGTH_LO:
+			sampler.tmpLoopLength = (sampler.tmpLoopLength & 0xFFFF0000) | (value & 0xFFFF);
+			s->loopLength = sampler.tmpLoopLength;
+			if (s->loopLength < 2) s->loopLength = 2;
+			if (s->loopStart + s->loopLength > s->length)
+			{
+				s->loopLength = s->length - s->loopStart;
+				if (s->loopLength < 2)
+				{
+					s->loopStart = 0;
+					s->loopLength = 2;
+				}
+			}
+			if (ui.samplerScreenShown) displaySample();
+			break;
+		case PT2_LOOP_TYPE:
+		{
+			int loopEnabled = (value != 0);
+			if (loopEnabled && s->loopStart + s->loopLength <= 2)
+			{
+				/* enable loop over entire sample */
+				s->loopStart = 0;
+				s->loopLength = s->length;
+			}
+			else if (!loopEnabled)
+			{
+				s->loopStart = 0;
+				s->loopLength = 2;
+			}
+			if (ui.samplerScreenShown) displaySample();
+			break;
+		}
+	}
 }
 
-/* ── Waveform rendering (min/max peak detection) ───────────────── */
-
-static void render_waveform(void) {
-    /* Clear waveform area */
-    fb_rect(WAVE_X, WAVE_Y, WAVE_W, WAVE_H, COL_WAVE_BG);
-
-    /* Center line */
-    fb_hline(WAVE_X, WAVE_CY, WAVE_W, COL_CENTER_LINE);
-
-    if (!g_pcm || g_pcm_len <= 0) return;
-
-    /* Per-column min/max peak detection */
-    for (int col = 0; col < WAVE_W; col++) {
-        int s0 = g_view_start + (int)((double)col / WAVE_W * g_view_size);
-        int s1 = g_view_start + (int)((double)(col + 1) / WAVE_W * g_view_size);
-        if (s0 < 0) s0 = 0;
-        if (s1 < 0) s1 = 0;
-        if (s0 >= g_pcm_len) s0 = g_pcm_len - 1;
-        if (s1 >= g_pcm_len) s1 = g_pcm_len - 1;
-        if (s1 <= s0) s1 = s0 + 1;
-
-        int vmin = 127, vmax = -128;
-        for (int i = s0; i < s1 && i < g_pcm_len; i++) {
-            int v = g_pcm[i];
-            if (v < vmin) vmin = v;
-            if (v > vmax) vmax = v;
-        }
-
-        /* Map -128..127 to waveform area */
-        int y_max = WAVE_CY - (int)((double)vmax / 128.0 * (WAVE_H / 2));
-        int y_min = WAVE_CY - (int)((double)vmin / 128.0 * (WAVE_H / 2));
-
-        /* Clamp */
-        if (y_max < WAVE_Y) y_max = WAVE_Y;
-        if (y_min >= WAVE_Y + WAVE_H) y_min = WAVE_Y + WAVE_H - 1;
-        if (y_max > y_min) { int t = y_max; y_max = y_min; y_min = t; }
-
-        /* Draw vertical line for this column */
-        for (int y = y_max; y <= y_min; y++)
-            fb_pixel(WAVE_X + col, y, COL_WAVEFORM);
-    }
-
-    /* Loop markers */
-    if (g_loop_type > 0 && g_loop_length > 0) {
-        int lx_start = sample_to_screen_x(g_loop_start);
-        int lx_end   = sample_to_screen_x(g_loop_start + g_loop_length);
-
-        if (lx_start >= WAVE_X && lx_start < WAVE_X + WAVE_W)
-            fb_vline(lx_start, WAVE_Y, WAVE_H, COL_LOOP_MARK);
-        if (lx_end >= WAVE_X && lx_end < WAVE_X + WAVE_W)
-            fb_vline(lx_end, WAVE_Y, WAVE_H, COL_LOOP_MARK);
-
-        /* Shade loop region slightly */
-        int x0 = lx_start < WAVE_X ? WAVE_X : lx_start;
-        int x1 = lx_end >= WAVE_X + WAVE_W ? WAVE_X + WAVE_W - 1 : lx_end;
-        for (int x = x0; x <= x1; x++) {
-            /* Just brighten the top and bottom rows as markers */
-            fb_pixel(x, WAVE_Y, COL_LOOP_MARK);
-            fb_pixel(x, WAVE_Y + WAVE_H - 1, COL_LOOP_MARK);
-        }
-    }
-
-    /* Selection overlay */
-    if (g_sel_start >= 0 && g_sel_end >= 0 && g_sel_start != g_sel_end) {
-        int sx0 = sample_to_screen_x(g_sel_start < g_sel_end ? g_sel_start : g_sel_end);
-        int sx1 = sample_to_screen_x(g_sel_start < g_sel_end ? g_sel_end : g_sel_start);
-        if (sx0 < WAVE_X) sx0 = WAVE_X;
-        if (sx1 >= WAVE_X + WAVE_W) sx1 = WAVE_X + WAVE_W - 1;
-        for (int x = sx0; x <= sx1; x++)
-            for (int y = WAVE_Y; y < WAVE_Y + WAVE_H; y++) {
-                /* Simple invert-ish highlight */
-                uint32_t c = g_fb[y * SCREEN_W + x];
-                g_fb[y * SCREEN_W + x] = c ^ 0x00444444;
-            }
-    }
+EMSCRIPTEN_KEEPALIVE
+int pt2_sampled_get_param(int param_id)
+{
+	moduleSample_t *s = &song->samples[editor.currSample];
+	switch (param_id)
+	{
+		case PT2_VOLUME:         return s->volume;
+		case PT2_FINETUNE:       return s->fineTune;
+		case PT2_LOOP_START_HI:  return (s->loopStart >> 16) & 0xFFFF;
+		case PT2_LOOP_START_LO:  return s->loopStart & 0xFFFF;
+		case PT2_LOOP_LENGTH_HI: return (s->loopLength >> 16) & 0xFFFF;
+		case PT2_LOOP_LENGTH_LO: return s->loopLength & 0xFFFF;
+		case PT2_LOOP_TYPE:      return (s->loopStart + s->loopLength > 2) ? 1 : 0;
+		default:                 return 0;
+	}
 }
 
-/* ── Scrollbar rendering & interaction ─────────────────────────── */
+EMSCRIPTEN_KEEPALIVE
+void pt2_sampled_load_config(const uint8_t *buf, int len)
+{
+	if (len < 11) return;
 
-static void render_scrollbar(void) {
-    /* Track */
-    fb_rect(SCROLL_X, SCROLL_Y, SCROLL_W, SCROLL_H, COL_PANEL_DK);
+	moduleSample_t *s = &song->samples[editor.currSample];
+	s->volume = buf[0];
+	s->fineTune = buf[1] & 0x0F;
+	s->loopStart = buf[2] | (buf[3] << 8) | (buf[4] << 16) | (buf[5] << 24);
+	s->loopLength = buf[6] | (buf[7] << 8) | (buf[8] << 16) | (buf[9] << 24);
+	if (s->loopLength < 2) s->loopLength = 2;
+	int loopType = buf[10];
+	if (!loopType) { s->loopStart = 0; s->loopLength = 2; }
 
-    if (g_pcm_len <= 0) return;
-
-    /* Thumb */
-    double frac_start = (double)g_view_start / g_pcm_len;
-    double frac_size  = (double)g_view_size / g_pcm_len;
-    int thumb_x = SCROLL_X + (int)(frac_start * SCROLL_W);
-    int thumb_w = (int)(frac_size * SCROLL_W);
-    if (thumb_w < 8) thumb_w = 8;
-    if (thumb_x + thumb_w > SCROLL_X + SCROLL_W)
-        thumb_x = SCROLL_X + SCROLL_W - thumb_w;
-
-    fb_rect(thumb_x, SCROLL_Y, thumb_w, SCROLL_H, COL_PANEL);
-    fb_hline(thumb_x, SCROLL_Y, thumb_w, COL_BTN_HI);
-    fb_hline(thumb_x, SCROLL_Y + SCROLL_H - 1, thumb_w, COL_BTN_SH);
+	if (ui.samplerScreenShown) displaySample();
 }
 
-/* ── Main render ───────────────────────────────────────────────── */
+EMSCRIPTEN_KEEPALIVE
+int pt2_sampled_dump_config(uint8_t *buf, int max_len)
+{
+	if (max_len < 11) return 0;
 
-static void pt2_render(void) {
-    /* Clear */
-    for (int i = 0; i < SCREEN_W * SCREEN_H; i++)
-        g_fb[i] = COL_BG;
+	moduleSample_t *s = &song->samples[editor.currSample];
+	buf[0] = (uint8_t)s->volume;
+	buf[1] = s->fineTune;
+	buf[2] = s->loopStart & 0xFF;
+	buf[3] = (s->loopStart >> 8) & 0xFF;
+	buf[4] = (s->loopStart >> 16) & 0xFF;
+	buf[5] = (s->loopStart >> 24) & 0xFF;
+	buf[6] = s->loopLength & 0xFF;
+	buf[7] = (s->loopLength >> 8) & 0xFF;
+	buf[8] = (s->loopLength >> 16) & 0xFF;
+	buf[9] = (s->loopLength >> 24) & 0xFF;
+	buf[10] = (s->loopStart + s->loopLength > 2) ? 1 : 0;
 
-    /* Title bar */
-    fb_rect(0, 0, SCREEN_W, 14, COL_PANEL);
-    fb_text_centered(0, 0, SCREEN_W, 14, "SAMPLE EDITOR", COL_TEXT);
-
-    /* Separator */
-    fb_hline(0, 14, SCREEN_W, COL_PANEL_DK);
-    fb_hline(0, 15, SCREEN_W, COL_BTN_HI);
-
-    /* Parameter panel background */
-    fb_rect(0, 16, SCREEN_W, 40, COL_PANEL);
-
-    /* Volume display */
-    {
-        char buf[32];
-        fb_text(PARAM_X, PARAM_Y, "VOL:", COL_TEXT);
-        hex2(buf, g_volume);
-        fb_text(PARAM_X + 25, PARAM_Y, buf, COL_TEXT);
-    }
-
-    /* Finetune display (show as signed: -8..+7) */
-    {
-        char buf[8];
-        int signed_ft = (g_finetune > 7) ? g_finetune - 16 : g_finetune;
-        if (signed_ft >= 0) {
-            buf[0] = '+';
-            buf[1] = '0' + signed_ft;
-        } else {
-            buf[0] = '-';
-            buf[1] = '0' + (-signed_ft);
-        }
-        buf[2] = 0;
-        fb_text(PARAM_X + 60, PARAM_Y, "FINE:", COL_TEXT);
-        fb_text(PARAM_X + 90, PARAM_Y, buf, COL_TEXT);
-    }
-
-    /* Length display */
-    {
-        char buf[8];
-        fb_text(PARAM_X + 120, PARAM_Y, "LEN:", COL_TEXT);
-        hex4(buf, g_pcm_len > 0xFFFF ? 0xFFFF : g_pcm_len);
-        fb_text(PARAM_X + 148, PARAM_Y, buf, COL_TEXT);
-    }
-
-    /* Loop start / loop length */
-    {
-        char buf[8];
-        fb_text(PARAM_X, PARAM_Y + 12, "RPT:", COL_TEXT);
-        hex4(buf, g_loop_start > 0xFFFF ? 0xFFFF : g_loop_start);
-        fb_text(PARAM_X + 25, PARAM_Y + 12, buf, COL_TEXT);
-
-        fb_text(PARAM_X + 60, PARAM_Y + 12, "REPLEN:", COL_TEXT);
-        hex4(buf, g_loop_length > 0xFFFF ? 0xFFFF : g_loop_length);
-        fb_text(PARAM_X + 102, PARAM_Y + 12, buf, COL_TEXT);
-
-        /* Loop type indicator */
-        fb_text(PARAM_X + 140, PARAM_Y + 12,
-                g_loop_type == 0 ? "LOOP:OFF" : "LOOP:FWD", COL_TEXT);
-    }
-
-    /* Separator */
-    fb_hline(0, 55, SCREEN_W, COL_PANEL_DK);
-
-    /* Buttons */
-    for (int i = 0; i < (int)NUM_BUTTONS; i++) {
-        Button *b = &g_buttons[i];
-        fb_button(b->x, b->y, b->w, b->h, b->label, 0);
-    }
-
-    /* Waveform separator */
-    fb_hline(0, WAVE_Y - 2, SCREEN_W, COL_PANEL_DK);
-    fb_hline(0, WAVE_Y - 1, SCREEN_W, COL_BTN_HI);
-
-    /* Waveform */
-    render_waveform();
-
-    /* Scrollbar */
-    render_scrollbar();
-
-    /* Bottom info line */
-    fb_rect(0, SCROLL_Y + SCROLL_H + 2, SCREEN_W, 12, COL_PANEL);
-    {
-        char info[64];
-        snprintf(info, sizeof(info), "VIEW: %d - %d  ZOOM: %d",
-                 g_view_start, g_view_start + g_view_size, g_zoom_level);
-        fb_text(PARAM_X, SCROLL_Y + SCROLL_H + 5, info, COL_TEXT);
-    }
-
-    /* Framebuffer is ready — React will blit it via pt2_sampled_get_fb */
+	return 11;
 }
 
-/* ── Loop marker dragging ──────────────────────────────────────── */
-
-static void fire_loop_change(void) {
-    js_on_loop_change(
-        (g_loop_start >> 16) & 0xFFFF,
-        g_loop_start & 0xFFFF,
-        (g_loop_length >> 16) & 0xFFFF,
-        g_loop_length & 0xFFFF,
-        g_loop_type
-    );
+EMSCRIPTEN_KEEPALIVE
+uint32_t *pt2_sampled_get_fb(void)
+{
+	return video.frameBuffer;
 }
 
-static void handle_loop_marker_drag(int mx) {
-    int sample_pos = screen_x_to_sample(mx);
+EMSCRIPTEN_KEEPALIVE
+void pt2_sampled_on_mouse_down(int x, int y)
+{
+	mouse.x = x;
+	mouse.y = y;
+	mouse.leftButtonPressed = true;
+	mouse.buttonState = 1;
 
-    if (g_dragging_loop_start) {
-        int end = g_loop_start + g_loop_length;
-        g_loop_start = sample_pos;
-        if (g_loop_start < 0) g_loop_start = 0;
-        if (g_loop_start >= end) g_loop_start = end - 1;
-        g_loop_length = end - g_loop_start;
-        g_dirty = 1;
-    } else if (g_dragging_loop_end) {
-        int new_end = sample_pos;
-        if (new_end <= g_loop_start) new_end = g_loop_start + 1;
-        if (new_end > g_pcm_len) new_end = g_pcm_len;
-        g_loop_length = new_end - g_loop_start;
-        g_dirty = 1;
-    }
+	if (!ui.samplerScreenShown) return;
+
+	/* ---- Sample waveform area (y 138-201) ---- */
+	if (y >= 138 && y <= 201)
+	{
+		if (ui.forceSampleEdit)
+			samplerEditSample(true);
+		else
+			samplerSamplePressed(false);
+		return;
+	}
+
+	/* ---- Zoom/drag bar area (y 205-210) ---- */
+	if (y >= 205 && y <= 210)
+	{
+		samplerBarPressed(false);
+		return;
+	}
+
+	/* ---- EXIT button (y 124-134) ---- */
+	if (y >= 124 && y <= 134 && x >= 6 && x <= 25)
+	{
+		exitFromSam();
+		return;
+	}
+
+	/* ---- Row: PLAY WAV / SHOW RANGE / ZOOM OUT (y 211-221) ---- */
+	if (y >= 211 && y <= 221)
+	{
+		if (x >= 32 && x <= 95) samplerPlayWaveform();
+		else if (x >= 96 && x <= 175) samplerShowRange();
+		else if (x >= 176 && x <= 245) samplerZoomOut2x();
+		return;
+	}
+
+	/* ---- STOP button spans rows 222-243 (x 0-30) ---- */
+	if (y >= 222 && y <= 243 && x >= 0 && x <= 30)
+	{
+		turnOffVoices();
+		displayMsg("ALL RIGHT");
+		return;
+	}
+
+	/* ---- Row: PLAY DISP / SHOW ALL / RANGE ALL / LOOP (y 222-232) ---- */
+	if (y >= 222 && y <= 232)
+	{
+		if (x >= 32 && x <= 95) samplerPlayDisplay();
+		else if (x >= 96 && x <= 175) samplerShowAll();
+		else if (x >= 176 && x <= 245) samplerRangeAll();
+		else if (x >= 246 && x <= 319) samplerLoopToggle();
+		return;
+	}
+
+	/* ---- Row: PLAY RNG / BEG / END / CENTER / SAMPLE / RESAMPLE / NOTE (y 233-243) ---- */
+	if (y >= 233 && y <= 243)
+	{
+		if (x >= 32 && x <= 94) samplerPlayRange();
+		else if (x >= 96 && x <= 115) sampleMarkerToBeg();
+		else if (x >= 116 && x <= 135) sampleMarkerToEnd();
+		else if (x >= 136 && x <= 174) sampleMarkerToCenter();
+		else if (x >= 176 && x <= 210) displayMsg("SAMPLING N/A");
+		else if (x >= 211 && x <= 245) samplerResample();
+		else if (x >= 246 && x <= 319) samplerResample();
+		return;
+	}
+
+	/* ---- Row: CUT / COPY / PASTE / VOLUME / TUNE / DC / FILTERS (y 244-254) ---- */
+	if (y >= 244 && y <= 254)
+	{
+		if (x >= 0 && x <= 31) samplerSamDelete(SAMPLE_CUT);
+		else if (x >= 32 && x <= 63) samplerSamCopy();
+		else if (x >= 64 && x <= 95) samplerSamPaste();
+		else if (x >= 96 && x <= 135) renderSamplerVolBox();
+		else if (x >= 136 && x <= 175) toggleTuningTone();
+		else if (x >= 176 && x <= 210) samplerRemoveDcOffset();
+		else if (x >= 211 && x <= 245) renderSamplerFiltersBox();
+		return;
+	}
 }
 
-/* ── Scrollbar dragging ────────────────────────────────────────── */
-
-static void handle_scroll_drag(int mx) {
-    if (g_pcm_len <= 0) return;
-    double frac = (double)(mx - SCROLL_X - g_scroll_drag_offset) / SCROLL_W;
-    g_view_start = (int)(frac * g_pcm_len);
-    if (g_view_start < 0) g_view_start = 0;
-    if (g_view_start + g_view_size > g_pcm_len)
-        g_view_start = g_pcm_len - g_view_size;
-    if (g_view_start < 0) g_view_start = 0;
-    g_dirty = 1;
+EMSCRIPTEN_KEEPALIVE
+void pt2_sampled_on_mouse_up(int x, int y)
+{
+	(void)x; (void)y;
+	mouse.leftButtonPressed = false;
+	mouse.rightButtonPressed = false;
+	mouse.buttonState = 0;
+	ui.forceSampleDrag = false;
+	ui.forceSampleEdit = false;
+	ui.leftLoopPinMoving = false;
+	ui.rightLoopPinMoving = false;
+	ui.forceVolDrag = 0;
 }
 
-/* ── Input handling (exported, called from React) ─────────────── */
+EMSCRIPTEN_KEEPALIVE
+void pt2_sampled_on_mouse_move(int x, int y)
+{
+	mouse.x = x;
+	mouse.y = y;
 
-void pt2_sampled_on_mouse_down(int mx, int my) {
-    g_mouse_x = mx;
-    g_mouse_y = my;
-    g_mouse_down = 1;
+	if (!mouse.leftButtonPressed) return;
+	if (!ui.samplerScreenShown) return;
 
-    /* Check buttons */
-    for (int i = 0; i < (int)NUM_BUTTONS; i++) {
-        Button *b = &g_buttons[i];
-        if (mx >= b->x && mx < b->x + b->w &&
-            my >= b->y && my < b->y + b->h) {
-            if (b->action) b->action();
-            return;
-        }
-    }
-
-    /* Scrollbar */
-    if (my >= SCROLL_Y && my < SCROLL_Y + SCROLL_H &&
-        mx >= SCROLL_X && mx < SCROLL_X + SCROLL_W) {
-        if (g_pcm_len > 0) {
-            double frac_start = (double)g_view_start / g_pcm_len;
-            int thumb_x = SCROLL_X + (int)(frac_start * SCROLL_W);
-            g_scroll_drag_offset = mx - thumb_x;
-            g_dragging_scroll = 1;
-        }
-        return;
-    }
-
-    /* Waveform area — check loop markers first */
-    if (my >= WAVE_Y && my < WAVE_Y + WAVE_H &&
-        mx >= WAVE_X && mx < WAVE_X + WAVE_W) {
-
-        if (g_loop_type > 0 && g_loop_length > 0) {
-            int lx_start = sample_to_screen_x(g_loop_start);
-            int lx_end   = sample_to_screen_x(g_loop_start + g_loop_length);
-
-            if (abs(mx - lx_start) <= 3) {
-                g_dragging_loop_start = 1;
-                return;
-            }
-            if (abs(mx - lx_end) <= 3) {
-                g_dragging_loop_end = 1;
-                return;
-            }
-        }
-
-        /* Start selection */
-        g_sel_start = screen_x_to_sample(mx);
-        g_sel_end = g_sel_start;
-        g_dirty = 1;
-    }
+	if (ui.forceSampleDrag)
+	{
+		samplerBarPressed(true);
+	}
+	else if (ui.forceSampleEdit)
+	{
+		samplerEditSample(true);
+	}
+	else if (ui.leftLoopPinMoving || ui.rightLoopPinMoving)
+	{
+		samplerSamplePressed(true);
+	}
+	else if (y >= 138 && y <= 201)
+	{
+		samplerSamplePressed(true);
+	}
 }
 
-void pt2_sampled_on_mouse_up(int mx, int my) {
-    (void)mx; (void)my;
-    if (g_dragging_loop_start || g_dragging_loop_end) {
-        fire_loop_change();
-    }
-    g_mouse_down = 0;
-    g_dragging_loop_start = 0;
-    g_dragging_loop_end = 0;
-    g_dragging_scroll = 0;
+EMSCRIPTEN_KEEPALIVE
+void pt2_sampled_on_wheel(int deltaY, int x, int y)
+{
+	(void)y;
+	mouse.x = x;
+
+	if (!ui.samplerScreenShown) return;
+
+	if (deltaY < 0)
+		samplerZoomInMouseWheel();
+	else if (deltaY > 0)
+		samplerZoomOutMouseWheel();
 }
 
-void pt2_sampled_on_mouse_move(int mx, int my) {
-    g_mouse_x = mx;
-    g_mouse_y = my;
+EMSCRIPTEN_KEEPALIVE
+void pt2_sampled_on_key_down(int keyCode)
+{
+	if (!ui.samplerScreenShown) return;
 
-    if (g_dragging_loop_start || g_dragging_loop_end) {
-        handle_loop_marker_drag(mx);
-    } else if (g_dragging_scroll) {
-        handle_scroll_drag(mx);
-    } else if (g_mouse_down &&
-               g_mouse_y >= WAVE_Y && g_mouse_y < WAVE_Y + WAVE_H) {
-        /* Extend selection */
-        g_sel_end = screen_x_to_sample(mx);
-        g_dirty = 1;
-    }
+	/* Negative keyCode = key up (for modifier release) */
+	if (keyCode < 0)
+	{
+		switch (-keyCode)
+		{
+			case 16: keyb.shiftPressed = false; break;
+			case 17: keyb.leftCtrlPressed = false; break;
+			case 18: keyb.leftAltPressed = false; break;
+		}
+		return;
+	}
+
+	switch (keyCode)
+	{
+		case 16: keyb.shiftPressed = true; break;    /* Shift */
+		case 17: keyb.leftCtrlPressed = true; break;  /* Ctrl */
+		case 18: keyb.leftAltPressed = true; break;   /* Alt */
+
+		/* Sampler keyboard shortcuts */
+		case 65: samplerRangeAll(); break;             /* A = select all */
+		case 67: samplerSamCopy(); break;              /* C = copy */
+		case 86: samplerSamPaste(); break;             /* V = paste */
+		case 88: samplerSamDelete(SAMPLE_CUT); break;  /* X = cut */
+		case 46: samplerSamDelete(NO_SAMPLE_CUT); break; /* Delete */
+		case 90: samplerShowAll(); break;              /* Z = show all */
+		case 82: samplerShowRange(); break;            /* R = show range */
+
+		/* Zoom */
+		case 187: samplerZoomInMouseWheel(); break;    /* + zoom in */
+		case 189: samplerZoomOutMouseWheel(); break;   /* - zoom out */
+
+		/* Mark positions */
+		case 49: sampleMarkerToBeg(); break;           /* 1 = beginning */
+		case 50: sampleMarkerToCenter(); break;        /* 2 = center */
+		case 51: sampleMarkerToEnd(); break;           /* 3 = end */
+
+		/* Loop toggle */
+		case 76: samplerLoopToggle(); break;           /* L = loop toggle */
+
+		/* DC offset removal */
+		case 68:
+			if (keyb.leftCtrlPressed)
+				samplerRemoveDcOffset();
+			break;
+
+		/* Boost / Filter */
+		case 66:
+			boostSample(editor.currSample, false);
+			displaySample();
+			break;
+		case 70:
+			filterSample(editor.currSample, false);
+			displaySample();
+			break;
+
+		/* Undo */
+		case 85:
+			redoSampleData(editor.currSample);
+			break;
+	}
 }
 
-void pt2_sampled_on_wheel(int delta_y, int mx, int my) {
-    g_mouse_x = mx;
-    g_mouse_y = my;
+EMSCRIPTEN_KEEPALIVE
+void pt2_sampled_tick(void)
+{
+	if (!ui.samplerScreenShown) return;
 
-    /* Zoom with mouse wheel over waveform */
-    if (my >= WAVE_Y && my < WAVE_Y + WAVE_H) {
-        if (delta_y < 0) btn_zoom_in();
-        else if (delta_y > 0) btn_zoom_out();
-    }
-    /* Volume with wheel on param area */
-    if (my >= PARAM_Y && my < PARAM_Y + 10 &&
-        mx >= PARAM_X && mx < PARAM_X + 50) {
-        if (delta_y < 0) btn_vol_up();
-        else if (delta_y > 0) btn_vol_down();
-    }
-}
+	/* Handle error message timeout (~2 seconds at 60fps) */
+	if (editor.errorMsgActive)
+	{
+		if (++editor.errorMsgCounter >= 120)
+		{
+			editor.errorMsgActive = false;
+			editor.errorMsgBlock = false;
+			editor.errorMsgCounter = 0;
 
-/* key_code uses DOM KeyboardEvent.keyCode values */
-#define KEY_HOME  36
-#define KEY_END   35
-#define KEY_LEFT  37
-#define KEY_RIGHT 39
+			strcpy(ui.statusMessage, "ALL RIGHT");
+			ui.updateStatusText = true;
+		}
+	}
 
-void pt2_sampled_on_key_down(int key_code) {
-    switch (key_code) {
-    case KEY_HOME:
-        g_view_start = 0;
-        g_dirty = 1;
-        break;
-    case KEY_END:
-        g_view_start = g_pcm_len - g_view_size;
-        if (g_view_start < 0) g_view_start = 0;
-        g_dirty = 1;
-        break;
-    case KEY_LEFT:
-        g_view_start -= g_view_size / 8;
-        if (g_view_start < 0) g_view_start = 0;
-        g_dirty = 1;
-        break;
-    case KEY_RIGHT:
-        g_view_start += g_view_size / 8;
-        if (g_view_start + g_view_size > g_pcm_len)
-            g_view_start = g_pcm_len - g_view_size;
-        if (g_view_start < 0) g_view_start = 0;
-        g_dirty = 1;
-        break;
-    default:
-        break;
-    }
-}
+	/* Render status text to framebuffer */
+	if (ui.updateStatusText)
+	{
+		ui.updateStatusText = false;
 
-/* ── Render-on-demand (called from React rAF loop) ─────────────── */
-
-uint32_t *pt2_sampled_get_fb(void) {
-    if (g_dirty) {
-        pt2_render();
-        g_dirty = 0;
-    }
-    return g_fb;
-}
-
-/* ── Public API ────────────────────────────────────────────────── */
-
-void pt2_sampled_init(int w, int h) {
-    (void)w; (void)h;
-
-    memset(g_fb, 0, sizeof(g_fb));
-    hwui_set_fb_size(SCREEN_W, SCREEN_H);
-
-    g_view_start = 0;
-    g_view_size = 1;
-    g_dirty = 1;
-}
-
-void pt2_sampled_start(void) {
-    /* No-op — rendering is driven by React's rAF loop calling pt2_sampled_get_fb */
-}
-
-void pt2_sampled_shutdown(void) {
-    if (g_pcm) { free(g_pcm); g_pcm = NULL; }
-    g_pcm_len = 0;
-}
-
-void pt2_sampled_load_pcm(const int8_t *data, int length) {
-    if (g_pcm) free(g_pcm);
-    g_pcm = (int8_t *)malloc(length);
-    if (!g_pcm) { g_pcm_len = 0; return; }
-    memcpy(g_pcm, data, length);
-    g_pcm_len = length;
-
-    /* Reset view to show all */
-    g_view_start = 0;
-    g_view_size = length > 0 ? length : 1;
-    g_zoom_level = 0;
-    g_sel_start = -1;
-    g_sel_end = -1;
-    g_dirty = 1;
-}
-
-void pt2_sampled_set_param(int param_id, int value) {
-    switch (param_id) {
-    case PT2_VOLUME:
-        g_volume = value;
-        if (g_volume < 0) g_volume = 0;
-        if (g_volume > 64) g_volume = 64;
-        break;
-    case PT2_FINETUNE:
-        g_finetune = value & 0xF;
-        break;
-    case PT2_LOOP_START_HI:
-        g_loop_start = (g_loop_start & 0xFFFF) | ((value & 0xFFFF) << 16);
-        break;
-    case PT2_LOOP_START_LO:
-        g_loop_start = (g_loop_start & 0xFFFF0000) | (value & 0xFFFF);
-        break;
-    case PT2_LOOP_LENGTH_HI:
-        g_loop_length = (g_loop_length & 0xFFFF) | ((value & 0xFFFF) << 16);
-        break;
-    case PT2_LOOP_LENGTH_LO:
-        g_loop_length = (g_loop_length & 0xFFFF0000) | (value & 0xFFFF);
-        break;
-    case PT2_LOOP_TYPE:
-        g_loop_type = value;
-        break;
-    default:
-        break;
-    }
-    g_dirty = 1;
-}
-
-int pt2_sampled_get_param(int param_id) {
-    switch (param_id) {
-    case PT2_VOLUME:        return g_volume;
-    case PT2_FINETUNE:      return g_finetune;
-    case PT2_LOOP_START_HI: return (g_loop_start >> 16) & 0xFFFF;
-    case PT2_LOOP_START_LO: return g_loop_start & 0xFFFF;
-    case PT2_LOOP_LENGTH_HI: return (g_loop_length >> 16) & 0xFFFF;
-    case PT2_LOOP_LENGTH_LO: return g_loop_length & 0xFFFF;
-    case PT2_LOOP_TYPE:     return g_loop_type;
-    default:                return 0;
-    }
-}
-
-void pt2_sampled_load_config(const uint8_t *buf, int len) {
-    if (len < 11) return;
-
-    g_volume     = buf[0];
-    g_finetune   = buf[1] & 0xF;
-    g_loop_start = (uint32_t)buf[2] | ((uint32_t)buf[3] << 8) |
-                   ((uint32_t)buf[4] << 16) | ((uint32_t)buf[5] << 24);
-    g_loop_length = (uint32_t)buf[6] | ((uint32_t)buf[7] << 8) |
-                    ((uint32_t)buf[8] << 16) | ((uint32_t)buf[9] << 24);
-    g_loop_type  = buf[10];
-
-    g_dirty = 1;
-}
-
-int pt2_sampled_dump_config(uint8_t *buf, int max_len) {
-    if (max_len < 11) return 0;
-
-    buf[0] = (uint8_t)g_volume;
-    buf[1] = (uint8_t)(g_finetune & 0xF);
-    buf[2] = (uint8_t)(g_loop_start & 0xFF);
-    buf[3] = (uint8_t)((g_loop_start >> 8) & 0xFF);
-    buf[4] = (uint8_t)((g_loop_start >> 16) & 0xFF);
-    buf[5] = (uint8_t)((g_loop_start >> 24) & 0xFF);
-    buf[6] = (uint8_t)(g_loop_length & 0xFF);
-    buf[7] = (uint8_t)((g_loop_length >> 8) & 0xFF);
-    buf[8] = (uint8_t)((g_loop_length >> 16) & 0xFF);
-    buf[9] = (uint8_t)((g_loop_length >> 24) & 0xFF);
-    buf[10] = (uint8_t)g_loop_type;
-
-    return 11;
+		/* Clear status text area and draw message */
+		fillRect(88, 127, 17 * FONT_CHAR_W, FONT_CHAR_H,
+			video.palette[PAL_GENBKG]);
+		textOut(88, 127, ui.statusMessage,
+			video.palette[PAL_GENTXT]);
+	}
 }

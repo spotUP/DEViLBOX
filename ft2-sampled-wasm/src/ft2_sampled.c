@@ -958,11 +958,13 @@ void ft2_sampled_on_key_down(int key_code) {
 
 /* ── Main loop tick ────────────────────────────────────────────── */
 
-static void ft2_sampled_tick(void) {
+/* Returns pointer to framebuffer for React-side blitting */
+uint32_t *ft2_sampled_get_fb(void) {
     if (g_dirty) {
         ft2_render();
         g_dirty = 0;
     }
+    return g_fb;
 }
 
 /* ── Public API ────────────────────────────────────────────────── */
@@ -979,11 +981,10 @@ void ft2_sampled_init(int w, int h) {
 }
 
 void ft2_sampled_start(void) {
-    emscripten_set_main_loop(ft2_sampled_tick, 60, 0);
+    /* No-op — rendering is driven by React's rAF loop calling ft2_sampled_get_fb */
 }
 
 void ft2_sampled_shutdown(void) {
-    emscripten_cancel_main_loop();
     if (g_pcm) { free(g_pcm); g_pcm = NULL; }
     g_pcm_len = 0;
 }
