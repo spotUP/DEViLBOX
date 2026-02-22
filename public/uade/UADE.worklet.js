@@ -511,7 +511,12 @@ class UADEProcessor extends AudioWorkletProcessor {
         const wper = ext[base + 6];  // pending period
         const wlen = ext[base + 7];  // pending length
 
-        // Detect new sample pointer — extract PCM from Amiga memory
+        // Detect new sample pointer — extract PCM from Amiga memory.
+        // Don't cache yet if PCM is all-zero (chip RAM not yet initialized by
+        // the player — common in macro-based formats like FC2 where waveform
+        // data is written a few ticks after the DMA address is first set).
+        // By leaving it uncached, we re-try on the next encounter when the
+        // data should be populated.
         if (lc > 0 && len > 0 && dma && !sampleCache.has(lc)) {
           const byteLen = Math.min(len * 2, MEM_READ_BUF_SIZE);
           if (byteLen > 4) { // Skip tiny samples (likely loop stubs)
@@ -519,16 +524,20 @@ class UADEProcessor extends AudioWorkletProcessor {
             const pcm = new Uint8Array(byteLen);
             pcm.set(new Uint8Array(this._wasm.HEAPU8.buffer, memBuf, byteLen));
 
-            // Detect loop: if wlen > 1 and sample re-triggers with same lc
-            // Most Amiga formats: loop start is at (lc), loop length is (wlen) words
-            // We'll store wlen for now and refine during post-processing
-            sampleCache.set(lc, {
-              pcm,
-              length: byteLen,
-              loopStart: 0,  // Refined later
-              loopLength: wlen > 1 ? wlen * 2 : 0,
-              typicalPeriod: per > 0 ? per : 428, // Default to C-2 if unknown
-            });
+            // Skip all-zero PCM — memory not yet written by the player
+            const hasNonZero = pcm.some(b => b !== 0);
+            if (hasNonZero) {
+              // Detect loop: if wlen > 1 and sample re-triggers with same lc
+              // Most Amiga formats: loop start is at (lc), loop length is (wlen) words
+              // We'll store wlen for now and refine during post-processing
+              sampleCache.set(lc, {
+                pcm,
+                length: byteLen,
+                loopStart: 0,  // Refined later
+                loopLength: wlen > 1 ? wlen * 2 : 0,
+                typicalPeriod: per > 0 ? per : 428, // Default to C-2 if unknown
+              });
+            }
           }
         }
 
@@ -586,9 +595,14 @@ class UADEProcessor extends AudioWorkletProcessor {
     // For CIA timer: BPM ≈ 1773447 / (ciaBTA + 1)  [PAL systems]
     // For VBlank-based: fixed 125 BPM at speed 6
 
-    // Detect BPM from most common CIA-B Timer A value
+    // Detect BPM from most common CIA-B Timer A value.
+    // ciaReliable=true when CIA-B is actually driving BPM (most MOD/XM/S3M formats).
+    // ciaReliable=false when the format uses VBlank/CIA-A timing (FC2, etc.) — in
+    // that case CIA-B holds an OS or unrelated value, and trigger-based speed
+    // estimation is also unreliable (FC2 macros cycle sample pointers every VBlank).
     let detectedBPM = 125;
     let detectedSpeed = 6;
+    let ciaReliable = false;
     const ciaCounts = new Map();
     for (const tick of tickSnapshots) {
       if (tick.ciaBTA > 0) {
@@ -603,39 +617,39 @@ class UADEProcessor extends AudioWorkletProcessor {
         if (count > maxCount) { maxCount = count; dominantCIA = val; }
       }
       if (dominantCIA > 0) {
-        detectedBPM = Math.round(1773447 / (dominantCIA + 1));
-        // Sanity clamp
-        if (detectedBPM < 32) detectedBPM = 32;
-        if (detectedBPM > 999) detectedBPM = 125; // Likely not a CIA-based timer
-      }
-    }
-
-    // Detect row timing: find the most common interval between note triggers
-    const triggerFrames = [];
-    let lastTriggerFrame = 0;
-    for (let i = 0; i < tickSnapshots.length; i++) {
-      const tick = tickSnapshots[i];
-      const anyTrigger = tick.channels.some(ch => ch.triggered);
-      if (anyTrigger) {
-        if (lastTriggerFrame > 0) {
-          triggerFrames.push(tick.frame - lastTriggerFrame);
+        const rawBPM = Math.round(1773447 / (dominantCIA + 1));
+        if (rawBPM >= 32 && rawBPM <= 999) {
+          detectedBPM = rawBPM;
+          ciaReliable = true;
         }
-        lastTriggerFrame = tick.frame;
+        // else: CIA-B timer not used for music timing; keep defaults BPM=125, speed=6
       }
     }
 
-    // Use BPM and speed to calculate frames per row
-    const framesPerRow = Math.round(sr * 2.5 * detectedSpeed / detectedBPM);
-
-    // If we have enough trigger intervals, refine speed estimate
-    if (triggerFrames.length > 10) {
-      // Find median trigger interval
-      triggerFrames.sort((a, b) => a - b);
-      const medianInterval = triggerFrames[Math.floor(triggerFrames.length / 2)];
-      // speed = interval * BPM / (sr * 2.5)
-      const estimatedSpeed = Math.round(medianInterval * detectedBPM / (sr * 2.5));
-      if (estimatedSpeed >= 1 && estimatedSpeed <= 31) {
-        detectedSpeed = estimatedSpeed;
+    // Only estimate speed from period-change triggers when CIA-B was reliable.
+    // For VBlank-based formats (FC2 etc.), macro systems cause period/sample
+    // pointer changes at VBlank rate, producing completely wrong speed estimates.
+    if (ciaReliable) {
+      const triggerFrames = [];
+      let lastTriggerFrame = 0;
+      for (let i = 0; i < tickSnapshots.length; i++) {
+        const tick = tickSnapshots[i];
+        const anyTrigger = tick.channels.some(ch => ch.triggered);
+        if (anyTrigger) {
+          if (lastTriggerFrame > 0) {
+            triggerFrames.push(tick.frame - lastTriggerFrame);
+          }
+          lastTriggerFrame = tick.frame;
+        }
+      }
+      if (triggerFrames.length > 10) {
+        triggerFrames.sort((a, b) => a - b);
+        const medianInterval = triggerFrames[Math.floor(triggerFrames.length / 2)];
+        // speed = interval * BPM / (sr * 2.5)
+        const estimatedSpeed = Math.round(medianInterval * detectedBPM / (sr * 2.5));
+        if (estimatedSpeed >= 1 && estimatedSpeed <= 31) {
+          detectedSpeed = estimatedSpeed;
+        }
       }
     }
 
