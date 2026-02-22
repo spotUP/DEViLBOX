@@ -640,7 +640,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   return (
     <div className="ft2-toolbar">
-      <div className="flex flex-1 min-w-0 overflow-hidden min-h-[120px] justify-between">
+      <div className="flex flex-1 min-w-0 overflow-hidden justify-between">
         <div className="flex-shrink min-w-0">
           <div className="ft2-toolbar-row">
             <div className="ft2-section ft2-col-1">

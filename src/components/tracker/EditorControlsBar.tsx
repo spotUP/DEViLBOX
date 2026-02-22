@@ -132,10 +132,10 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
       <div className="flex items-center gap-2">
         {/* View Mode Dropdown */}
         <div className="flex items-center gap-1">
-          {viewMode === 'tracker' && <List size={14} className="text-text-secondary" />}
-          {viewMode === 'grid' && <Grid3x3 size={14} className="text-text-secondary" />}
-          {viewMode === 'pianoroll' && <Piano size={14} className="text-text-secondary" />}
-          {viewMode === 'tb303' && <Radio size={14} className="text-text-secondary" />}
+          {viewMode === 'tracker' && <List size={14} className="shrink-0 text-text-secondary" />}
+          {viewMode === 'grid' && <Grid3x3 size={14} className="shrink-0 text-text-secondary" />}
+          {viewMode === 'pianoroll' && <Piano size={14} className="shrink-0 text-text-secondary" />}
+          {viewMode === 'tb303' && <Radio size={14} className="shrink-0 text-text-secondary" />}
           <select
             value={viewMode}
             onChange={handleViewModeChange}
@@ -154,7 +154,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
         {/* Hardware System Preset Selector */}
         <div className="flex items-center gap-1.5 ml-1 pl-2 border-l border-dark-border">
-          <Cpu size={14} className="text-text-secondary" />
+          <Cpu size={14} className="shrink-0 text-text-secondary" />
           <select
             className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer outline-none"
             onChange={handleHardwarePresetChange}

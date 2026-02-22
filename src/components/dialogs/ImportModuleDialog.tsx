@@ -3,7 +3,7 @@
  * Uses chiptune3/libopenmpt for parsing and playback preview
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { X, Upload, Play, Square, Music, FileAudio, AlertCircle, Info } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import {
@@ -14,6 +14,8 @@ import {
   isSupportedModule,
   type ModuleInfo,
 } from '@lib/import/ModuleLoader';
+import { isUADEFormat } from '@lib/import/formats/UADEParser';
+import { useSettingsStore, type UADEImportMode } from '@/stores/useSettingsStore';
 
 export interface ImportOptions {
   useLibopenmpt: boolean;  // Use libopenmpt for sample-accurate playback
@@ -38,6 +40,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [useLibopenmpt, setUseLibopenmpt] = useState(true); // Default to libopenmpt for accuracy
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uadeMode = useSettingsStore((s) => s.formatEngine.uade) ?? 'enhanced';
+  const setFormatEngine = useSettingsStore((s) => s.setFormatEngine);
 
   const handleFileSelect = useCallback(async (file: File) => {
     if (!isSupportedModule(file.name)) {
@@ -245,8 +249,45 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
             </div>
           )}
 
-          {/* Playback options */}
-          {moduleInfo && (
+          {/* UADE Engine Selector — shown for exotic Amiga formats */}
+          {moduleInfo && isUADEFormat(moduleInfo.metadata.title || initialFile?.name || '') && (
+            <div className="bg-dark-bg rounded-lg p-3 space-y-2">
+              <p className="text-xs font-medium text-text-primary mb-2">Import Engine</p>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="uadeMode"
+                  checked={uadeMode === 'enhanced'}
+                  onChange={() => setFormatEngine('uade', 'enhanced' as UADEImportMode)}
+                  className="mt-0.5 accent-accent-primary"
+                />
+                <div>
+                  <span className="text-sm text-text-primary">Enhanced (Editable)</span>
+                  <p className="text-xs text-text-muted">
+                    Extracts real samples, detects effects. Fully editable patterns.
+                  </p>
+                </div>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="uadeMode"
+                  checked={uadeMode === 'classic'}
+                  onChange={() => setFormatEngine('uade', 'classic' as UADEImportMode)}
+                  className="mt-0.5 accent-accent-primary"
+                />
+                <div>
+                  <span className="text-sm text-text-primary">Classic (UADE Playback)</span>
+                  <p className="text-xs text-text-muted">
+                    Authentic emulation, display-only patterns.
+                  </p>
+                </div>
+              </label>
+            </div>
+          )}
+
+          {/* Playback options — shown for non-UADE formats */}
+          {moduleInfo && !isUADEFormat(moduleInfo.metadata.title || initialFile?.name || '') && (
             <div className="bg-dark-bg rounded-lg p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <input
@@ -271,7 +312,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
           )}
 
           {/* Import note */}
-          {moduleInfo && !useLibopenmpt && (
+          {moduleInfo && !useLibopenmpt && !isUADEFormat(moduleInfo.metadata.title || initialFile?.name || '') && (
             <p className="text-xs text-text-muted">
               Note: Importing will create patterns and sampler instruments from this module.
               Complex effects may not translate perfectly.
