@@ -82,6 +82,7 @@ export const PixiFT2Toolbar: React.FC = () => {
     <PixiDOMOverlay
       layout={{ width: '100%', height: FT2_TOOLBAR_DOM_HEIGHT }}
       style={{ overflow: 'visible', zIndex: 35 }}
+      autoHeight
     >
       <FT2ToolbarOverlay />
     </PixiDOMOverlay>

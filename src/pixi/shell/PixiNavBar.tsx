@@ -9,7 +9,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
 import { useSettingsStore } from '@stores/useSettingsStore';
-import { useTabsStore } from '@stores/useTabsStore';
 import { useThemeStore } from '@stores/useThemeStore';
 
 /**
@@ -33,13 +32,14 @@ const NavBarOverlay: React.FC = () => {
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Comp />
-      {/* GL-specific: Switch to DOM rendering mode */}
+      {/* GL-specific: Switch to DOM rendering mode — positioned in tab bar row,
+          left of the "+" new-tab button to avoid overlapping navbar controls */}
       <button
         onClick={handleSwitchToDom}
         style={{
           position: 'absolute',
-          top: '8px',
-          right: '8px',
+          bottom: '5px',
+          right: '44px',
           padding: '2px 8px',
           fontSize: '11px',
           fontFamily: 'monospace',
@@ -60,10 +60,8 @@ const NavBarOverlay: React.FC = () => {
 };
 
 export const PixiNavBar: React.FC = () => {
-  const tabCount = useTabsStore(s => s.tabs.length);
-  const showTabBar = tabCount > 1;
-  // DOM NavBar: top nav (~44px) + optional tab bar (~32px)
-  const totalHeight = showTabBar ? 76 : 44;
+  // DOM NavBar: top nav (~44px) + tab bar (~32px) — always shown
+  const totalHeight = 76;
 
   return (
     <PixiDOMOverlay
