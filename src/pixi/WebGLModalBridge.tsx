@@ -114,6 +114,9 @@ const LazyRomUploadDialog = lazy(() =>
 const LazyCollaborationModal = lazy(() =>
   import('@/components/collaboration/CollaborationModal').then(m => ({ default: m.CollaborationModal }))
 );
+const LazyDownloadModal = lazy(() =>
+  import('@/components/dialogs/DownloadModal').then(m => ({ default: m.DownloadModal }))
+);
 
 export const WebGLModalBridge: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -203,6 +206,12 @@ export const WebGLModalBridge: React.FC = () => {
         break;
       case 'collaboration':
         openModal('collaboration');
+        break;
+      case 'randomize':
+        openModal('randomize');
+        break;
+      case 'acid-pattern':
+        openModal('acidPattern');
         break;
       case 'tempo-tap':
         // Tap tempo is handled inline, no modal needed
@@ -476,6 +485,9 @@ export const WebGLModalBridge: React.FC = () => {
       )}
       {modalOpen === 'collaboration' && (
         <LazyCollaborationModal isOpen={true} onClose={closeModal} />
+      )}
+      {modalOpen === 'download' && (
+        <LazyDownloadModal isOpen={true} onClose={closeModal} />
       )}
       {/* Always-mounted dialogs */}
       <LazySynthErrorDialog />

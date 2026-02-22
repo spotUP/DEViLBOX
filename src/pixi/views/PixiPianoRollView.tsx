@@ -7,11 +7,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PixiButton, PixiLabel } from '../components';
+import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
 import { PixiPianoKeyboard } from './pianoroll/PixiPianoKeyboard';
 import { PixiPianoRollGrid } from './pianoroll/PixiPianoRollGrid';
 import { PixiVelocityLane } from './pianoroll/PixiVelocityLane';
-import { usePianoRollStore } from '@stores';
+import { usePianoRollStore, useUIStore } from '@stores';
 import { useTrackerStore } from '@stores';
+import { useThemeStore } from '@stores/useThemeStore';
 import { usePianoRollData } from '@/hooks/pianoroll/usePianoRollData';
 import { useHistoryStore } from '@/stores/useHistoryStore';
 
@@ -30,6 +32,7 @@ const QWERTY_NOTE_MAP: Record<string, number> = {
 
 export const PixiPianoRollView: React.FC = () => {
   const theme = usePixiTheme();
+  const themeColors = useThemeStore(s => s.getCurrentTheme().colors);
   const tool = usePianoRollStore(s => s.tool);
   const setTool = usePianoRollStore(s => s.setTool);
   const view = usePianoRollStore(s => s.view);
@@ -266,6 +269,39 @@ export const PixiPianoRollView: React.FC = () => {
         }}
       >
         <pixiGraphics draw={drawToolbarBg} layout={{ position: 'absolute', width: '100%', height: TOOLBAR_HEIGHT }} />
+
+        {/* View mode selector */}
+        <PixiDOMOverlay
+          layout={{ height: 24, width: 100 }}
+          style={{ overflow: 'visible' }}
+        >
+          <select
+            value="pianoroll"
+            onChange={(e) => {
+              const v = e.target.value;
+              setTimeout(() => useUIStore.getState().setActiveView(v as any), 0);
+            }}
+            style={{
+              width: '100%',
+              height: '100%',
+              padding: '0 4px',
+              fontSize: '11px',
+              fontFamily: 'monospace',
+              background: themeColors.bg,
+              color: themeColors.text,
+              border: `1px solid ${themeColors.border}`,
+              borderRadius: '3px',
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            <option value="tracker">Tracker</option>
+            <option value="arrangement">Arrangement</option>
+            <option value="pianoroll">Piano Roll</option>
+            <option value="dj">DJ Mixer</option>
+            <option value="drumpad">Drum Pads</option>
+          </select>
+        </PixiDOMOverlay>
 
         <PixiLabel text="PIANO ROLL" size="sm" weight="bold" color="accent" />
 

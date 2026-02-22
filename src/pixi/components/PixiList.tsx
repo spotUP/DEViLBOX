@@ -5,7 +5,7 @@
  */
 
 import { useRef, useCallback, useState, useMemo } from 'react';
-import type { Graphics as GraphicsType, FederatedWheelEvent } from 'pixi.js';
+import type { Graphics as GraphicsType, FederatedWheelEvent, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 
@@ -70,36 +70,68 @@ export const PixiList: React.FC<PixiListProps> = ({
     }
   }, [onSelect, onDoubleClick]);
 
-  // Draw scrollbar
-  const drawScrollbar = useCallback((g: GraphicsType) => {
+  // Scrollbar geometry
+  const trackHeight = height - 4;
+  const thumbHeight = maxScroll > 0 ? Math.max(20, (height / totalHeight) * trackHeight) : 0;
+  const thumbY = maxScroll > 0 ? 2 + (scrollY / maxScroll) * (trackHeight - thumbHeight) : 2;
+
+  // Scrollbar drag state
+  const isDraggingRef = useRef(false);
+  const dragOffsetRef = useRef(0);
+
+  // Global pointer move/up for scrollbar drag (attached to the list container)
+  const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
+    if (!isDraggingRef.current || maxScroll <= 0) return;
+    const newThumbY = e.globalY - dragOffsetRef.current;
+    const ratio = Math.max(0, Math.min(1, (newThumbY - 2) / (trackHeight - thumbHeight)));
+    setScrollY(ratio * maxScroll);
+  }, [maxScroll, trackHeight, thumbHeight]);
+
+  const handlePointerUp = useCallback(() => {
+    isDraggingRef.current = false;
+  }, []);
+
+  const handleScrollbarDown = useCallback((e: FederatedPointerEvent) => {
+    if (maxScroll <= 0) return;
+    e.stopPropagation();
+    isDraggingRef.current = true;
+    // Offset from top of thumb to pointer
+    dragOffsetRef.current = e.globalY - thumbY;
+  }, [maxScroll, thumbY]);
+
+  // Draw scrollbar track
+  const drawScrollbarTrack = useCallback((g: GraphicsType) => {
     g.clear();
     if (maxScroll <= 0) return;
-
-    const trackHeight = height - 4;
-    const thumbHeight = Math.max(20, (height / totalHeight) * trackHeight);
-    const thumbY = 2 + (scrollY / maxScroll) * (trackHeight - thumbHeight);
-
-    g.roundRect(width - 8, 2, 6, trackHeight, 3);
+    g.roundRect(0, 2, 6, trackHeight, 3);
     g.fill({ color: theme.bgActive.color, alpha: 0.3 });
+  }, [trackHeight, maxScroll, theme]);
 
-    g.roundRect(width - 8, thumbY, 6, thumbHeight, 3);
-    g.fill({ color: theme.textMuted.color, alpha: 0.4 });
-  }, [width, height, totalHeight, scrollY, maxScroll, theme]);
+  // Draw scrollbar thumb
+  const drawScrollbarThumb = useCallback((g: GraphicsType) => {
+    g.clear();
+    if (maxScroll <= 0) return;
+    g.roundRect(0, 0, 6, thumbHeight, 3);
+    g.fill({ color: isDraggingRef.current ? theme.accent.color : theme.textMuted.color, alpha: isDraggingRef.current ? 0.6 : 0.4 });
+  }, [thumbHeight, maxScroll, theme]);
 
-  // Draw clipping mask
-  const drawMask = useCallback((g: GraphicsType) => {
+  // Draw list background (uses theme color, not white)
+  const drawListBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, height);
-    g.fill(0xffffff);
-  }, [width, height]);
+    g.fill({ color: theme.bg.color });
+  }, [width, height, theme]);
 
   return (
     <pixiContainer
       eventMode="static"
       onWheel={handleWheel}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerUpOutside={handlePointerUp}
       layout={{ width, height, overflow: 'hidden', ...layoutProp }}
     >
-      <pixiGraphics draw={drawMask} layout={{ position: 'absolute' }} />
+      <pixiGraphics draw={drawListBg} layout={{ position: 'absolute', width, height }} />
 
       {/* Virtual items */}
       {visibleItems.map((item, i) => {
@@ -133,7 +165,7 @@ export const PixiList: React.FC<PixiListProps> = ({
                 if (isSelected) {
                   g.fill({ color: theme.accent.color, alpha: 0.15 });
                 } else {
-                  g.fill({ color: isEven ? theme.bg.color : theme.bgSecondary.color, alpha: 0.5 });
+                  g.fill({ color: isEven ? theme.bg.color : theme.bgSecondary.color });
                 }
               }}
               layout={{ position: 'absolute', width: width - 10, height: itemHeight }}
@@ -166,8 +198,19 @@ export const PixiList: React.FC<PixiListProps> = ({
         );
       })}
 
-      {/* Scrollbar */}
-      <pixiGraphics draw={drawScrollbar} layout={{ position: 'absolute', width, height }} />
+      {/* Scrollbar track + draggable thumb */}
+      {maxScroll > 0 && (
+        <pixiContainer layout={{ position: 'absolute', left: width - 8, top: 0, width: 6, height }}>
+          <pixiGraphics draw={drawScrollbarTrack} layout={{ position: 'absolute', width: 6, height }} />
+          <pixiGraphics
+            draw={drawScrollbarThumb}
+            eventMode="static"
+            cursor="pointer"
+            onPointerDown={handleScrollbarDown}
+            layout={{ position: 'absolute', top: thumbY, width: 6, height: thumbHeight }}
+          />
+        </pixiContainer>
+      )}
     </pixiContainer>
   );
 };

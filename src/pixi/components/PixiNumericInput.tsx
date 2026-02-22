@@ -28,6 +28,8 @@ interface PixiNumericInputProps {
 
 const ARROW_BTN_SIZE = 18;
 const INPUT_HEIGHT = 24;
+const HOLD_DELAY = 300;
+const HOLD_INTERVAL = 80;
 
 export const PixiNumericInput: React.FC<PixiNumericInputProps> = ({
   value,
@@ -46,17 +48,41 @@ export const PixiNumericInput: React.FC<PixiNumericInputProps> = ({
   const onChangeRef = useRef(onChange);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
+  // Refs for hold-to-repeat (current value tracked via ref to avoid stale closures)
+  const valueRef = useRef(value);
+  useEffect(() => { valueRef.current = value; }, [value]);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearHoldTimers = useCallback(() => {
+    if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+    if (holdIntervalRef.current) { clearInterval(holdIntervalRef.current); holdIntervalRef.current = null; }
+  }, []);
+
+  // Clean up on unmount
+  useEffect(() => clearHoldTimers, [clearHoldTimers]);
+
   const increment = useCallback(() => {
     if (disabled) return;
-    const newVal = Math.min(max, value + step);
+    const newVal = Math.min(max, valueRef.current + step);
+    valueRef.current = newVal;
     onChangeRef.current(newVal);
-  }, [value, max, step, disabled]);
+  }, [max, step, disabled]);
 
   const decrement = useCallback(() => {
     if (disabled) return;
-    const newVal = Math.max(min, value - step);
+    const newVal = Math.max(min, valueRef.current - step);
+    valueRef.current = newVal;
     onChangeRef.current(newVal);
-  }, [value, min, step, disabled]);
+  }, [min, step, disabled]);
+
+  const startHoldRepeat = useCallback((action: () => void) => {
+    clearHoldTimers();
+    action(); // fire once immediately
+    holdTimerRef.current = setTimeout(() => {
+      holdIntervalRef.current = setInterval(action, HOLD_INTERVAL);
+    }, HOLD_DELAY);
+  }, [clearHoldTimers]);
 
   const displayText = formatValue ? formatValue(value) : String(value);
 
@@ -130,20 +156,24 @@ export const PixiNumericInput: React.FC<PixiNumericInputProps> = ({
       {/* Arrow buttons */}
       {showButtons && (
         <pixiContainer layout={{ width: ARROW_BTN_SIZE, height: INPUT_HEIGHT, flexDirection: 'column', gap: 1 }}>
-          {/* Up arrow */}
+          {/* Up arrow — hold-to-repeat */}
           <pixiGraphics
             draw={(g) => drawArrow(g, true, false)}
             eventMode={disabled ? 'none' : 'static'}
             cursor="pointer"
-            onPointerUp={increment}
+            onPointerDown={() => startHoldRepeat(increment)}
+            onPointerUp={clearHoldTimers}
+            onPointerUpOutside={clearHoldTimers}
             layout={{ width: ARROW_BTN_SIZE, height: ARROW_BTN_SIZE / 2 }}
           />
-          {/* Down arrow */}
+          {/* Down arrow — hold-to-repeat */}
           <pixiGraphics
             draw={(g) => drawArrow(g, false, false)}
             eventMode={disabled ? 'none' : 'static'}
             cursor="pointer"
-            onPointerUp={decrement}
+            onPointerDown={() => startHoldRepeat(decrement)}
+            onPointerUp={clearHoldTimers}
+            onPointerUpOutside={clearHoldTimers}
             layout={{ width: ARROW_BTN_SIZE, height: ARROW_BTN_SIZE / 2 }}
           />
         </pixiContainer>

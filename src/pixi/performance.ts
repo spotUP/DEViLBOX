@@ -37,6 +37,9 @@ export function attachFPSLimiter(app: Application): () => void {
     if (!isIdle && performance.now() - lastActivityMs > IDLE_TIMEOUT_MS) {
       isIdle = true;
       app.ticker.maxFPS = IDLE_FPS;
+      // Force one final render so the last active frame persists on-screen
+      // (prevents black screen when FPS drops to idle with preserveDrawingBuffer)
+      app.renderer.render(app.stage);
     }
   };
 
