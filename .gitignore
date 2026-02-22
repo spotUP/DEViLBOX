@@ -56,3 +56,19 @@ scripts/db303-knob-diag.js
 .playwright-mcp/
 /.env
 /server/.env
+
+# WASM module build directories
+ft2-sampled-wasm/build/
+furnace-fm-wasm/build/
+furnace-macro-wasm/build/
+furnace-pcm-wasm/build/
+furnace-psg-wasm/build/
+furnace-wave-wasm/build/
+mame-generic-wasm/build/
+pt2-sampled-wasm/build/
+vstbridge-generic-wasm/build/
+uade-wasm/build/
+
+# Stray audio files
+*.wav
+uade-wasm/generated/
