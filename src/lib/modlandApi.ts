@@ -89,3 +89,12 @@ export async function getModlandStatus(): Promise<ModlandStatus> {
   }
   return response.json();
 }
+
+export async function reindexModland(): Promise<{ success: boolean; totalFiles: number }> {
+  const response = await fetch(`${API_URL}/modland/reindex`, { method: 'POST' });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Reindex failed' }));
+    throw new Error(err.error || 'Reindex failed');
+  }
+  return response.json();
+}
