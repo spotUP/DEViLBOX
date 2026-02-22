@@ -37,6 +37,6 @@ target_link_options(HivelyInsEd PRIVATE
     "SHELL:-s USE_SDL_IMAGE=2"
     "SHELL:-s SDL2_IMAGE_FORMATS='[\"png\"]'"
     "SHELL:-s EXPORTED_FUNCTIONS=['_insed_init','_insed_start','_insed_shutdown','_insed_set_param','_insed_get_param','_insed_set_plist_entry','_insed_get_plist_entry','_insed_load_from_buffer','_insed_dump_to_buffer','_malloc','_free']"
-    "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','setValue','getValue']"
+    "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','setValue','getValue','HEAPU8','HEAP8']"
     "SHELL:--embed-file ${CMAKE_SOURCE_DIR}/assets@/assets"
 )
