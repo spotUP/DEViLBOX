@@ -518,6 +518,64 @@ void uade_wasm_get_channel_snapshot(uint32_t *out) {
     }
 }
 
+/* ── Extended channel state for enhanced scanning ──────────────────────── */
+
+/*
+ * Write extended 4-channel snapshot into caller-provided buffer.
+ * Layout per channel (8 uint32s = 32 bytes): period, volume, dmaen,
+ * lc (sample start), pt (current pointer), len (words), wper, wlen
+ * Total: 4 channels * 8 * 4 = 128 bytes
+ */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_get_channel_extended(uint32_t *out) {
+    for (int i = 0; i < 4; i++) {
+        int base = i * 8;
+        out[base + 0] = (uint32_t)audio_channel[i].per;     /* AUDxPER (Amiga period) */
+        out[base + 1] = (uint32_t)audio_channel[i].vol;     /* AUDxVOL (0-64) */
+        out[base + 2] = dmaen(1 << i) ? 1 : 0;              /* DMA enabled */
+        out[base + 3] = (uint32_t)audio_channel[i].lc;      /* Sample start address */
+        out[base + 4] = (uint32_t)audio_channel[i].pt;      /* Current sample pointer */
+        out[base + 5] = (uint32_t)audio_channel[i].len;     /* Sample length (words) */
+        out[base + 6] = (uint32_t)audio_channel[i].wper;    /* Write period (pending) */
+        out[base + 7] = (uint32_t)audio_channel[i].wlen;    /* Write length (pending) */
+    }
+}
+
+/* ── CIA timer state for BPM/tempo detection ───────────────────────────── */
+
+#include "cia.h"
+
+/*
+ * Write CIA timer state into caller-provided buffer.
+ * Layout: ciaata, ciaatb, ciabta, ciabtb, vblank_hz
+ * Total: 5 * 4 = 20 bytes
+ */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_get_cia_state(uint32_t *out) {
+    out[0] = (uint32_t)ciaata;       /* CIA-A Timer A */
+    out[1] = (uint32_t)ciaatb;       /* CIA-A Timer B */
+    out[2] = (uint32_t)ciabta;       /* CIA-B Timer A (BPM timer) */
+    out[3] = (uint32_t)ciabtb;       /* CIA-B Timer B */
+    out[4] = (uint32_t)vblank_hz;    /* 50 (PAL) or 60 (NTSC) */
+}
+
+/* ── Read Amiga memory for sample extraction ───────────────────────────── */
+
+#include "memory.h"
+
+/*
+ * Read `len` bytes from Amiga address space into caller-provided buffer.
+ * Uses byteget() which goes through UAE memory banking (chip RAM, etc.).
+ * Returns 0 on success.
+ */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_read_memory(uint32_t addr, uint8_t *out, uint32_t len) {
+    for (uint32_t i = 0; i < len; i++) {
+        out[i] = (uint8_t)byteget(addr + i);
+    }
+    return 0;
+}
+
 EMSCRIPTEN_KEEPALIVE
 int uade_wasm_get_total_frames(void) {
     return s_total_frames;
