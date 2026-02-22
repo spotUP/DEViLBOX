@@ -421,6 +421,18 @@ export const WebGLModalBridge: React.FC = () => {
       {showSamplePackModal && (
         <LazySamplePackBrowser onClose={() => setShowSamplePackModal(false)} />
       )}
+      {modalOpen === 'fileBrowser' && (
+        <LazyFileBrowser
+          isOpen={true}
+          onClose={closeModal}
+          mode="load"
+          onLoad={handleFileBrowserLoad}
+          onLoadTrackerModule={handleLoadTrackerModule}
+        />
+      )}
+      {modalOpen === 'midi-pads' && (
+        <LazyDrumpadEditorModal isOpen={true} onClose={closeModal} />
+      )}
       {modalOpen === 'advancedEdit' && (
         <LazyAdvancedEditModal
           onClose={closeModal}

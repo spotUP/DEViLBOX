@@ -20,6 +20,11 @@ interface PixiDOMOverlayProps {
   zIndex?: number;                     // Default 10
   className?: string;                  // Optional class on wrapper div
   style?: React.CSSProperties;        // Additional styles on wrapper div
+  /** When true, measure DOM content height and update Pixi layout to match.
+   *  Eliminates gaps caused by hardcoded height constants not matching actual
+   *  rendered DOM content height. The initial `layout.height` serves as a
+   *  fallback until the first measurement arrives. */
+  autoHeight?: boolean;
 }
 
 export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
@@ -28,10 +33,13 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
   zIndex = 10,
   className,
   style,
+  autoHeight = false,
 }) => {
   const containerRef = useRef<ContainerType>(null);
   const portalRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<Root | null>(null);
+  const autoHeightRef = useRef(autoHeight);
+  autoHeightRef.current = autoHeight;
 
   // Create imperitive DOM container + React root on mount
   useEffect(() => {
@@ -61,6 +69,28 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
   useEffect(() => {
     rootRef.current?.render(children);
   }, [children]);
+
+  // Auto-height: measure DOM content and update Pixi layout to match
+  useEffect(() => {
+    if (!autoHeight) return;
+    const div = portalRef.current;
+    const el = containerRef.current;
+    if (!div || !el) return;
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const h = Math.ceil(entry.contentRect.height);
+        if (h > 0) {
+          const elLayout = (el as any).layout;
+          if (elLayout?.style) {
+            elLayout.style.height = h;
+          }
+        }
+      }
+    });
+    ro.observe(div);
+    return () => ro.disconnect();
+  }, [autoHeight]);
 
   // RAF loop — reads layout-computed bounds and repositions the portal div
   useEffect(() => {
@@ -92,7 +122,12 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
               div.style.left = `${x}px`;
               div.style.top = `${y}px`;
               div.style.width = `${w}px`;
-              div.style.height = `${h}px`;
+              // When autoHeight is enabled, don't constrain the div height —
+              // let the div size to its DOM content naturally. The ResizeObserver
+              // feeds the measured content height back to the Pixi layout.
+              if (!autoHeightRef.current) {
+                div.style.height = `${h}px`;
+              }
               div.style.display = '';
             }
           }

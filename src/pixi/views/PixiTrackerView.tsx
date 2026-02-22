@@ -52,6 +52,16 @@ const PitchSliderOverlay: React.FC = () => {
   return Comp ? <Comp className="h-full" /> : null;
 };
 
+/** Deferred TB303KnobPanel — dynamic import avoids circular deps */
+const TB303KnobPanelOverlay: React.FC<{ visible: boolean }> = ({ visible }) => {
+  const [Comp, setComp] = useState<React.ComponentType | null>(null);
+  useEffect(() => {
+    import('@components/tracker/TB303KnobPanel').then(m => setComp(() => m.TB303KnobPanel));
+  }, []);
+  if (!visible || !Comp) return null;
+  return <Comp />;
+};
+
 /** Generate theme-aware inline styles for DOM <select> overlays */
 const useSelectStyle = (variant: 'default' | 'accent' = 'default'): React.CSSProperties => {
   const themeColors = useThemeStore(s => s.getCurrentTheme().colors);
@@ -89,6 +99,12 @@ export const PixiTrackerView: React.FC = () => {
   const editorMode = useTrackerStore(s => s.editorMode);
   const { width: windowWidth, height: windowHeight } = usePixiResponsive();
   const showMacroSlots = useUIStore(s => s.showMacroSlots);
+  const [showInstrumentPanel, setShowInstrumentPanel] = useState(true);
+
+  // Hide instrument panel on narrow windows (matches DOM TrackerView)
+  const canShowInstrumentPanel = windowWidth >= 900;
+  const instrumentPanelVisible = viewMode !== 'tb303' && canShowInstrumentPanel && showInstrumentPanel;
+  const INSTRUMENT_PANEL_W = 200;
 
   // Pattern data for automation/macro lanes overlay
   const patterns = useTrackerStore(s => s.patterns);
@@ -111,13 +127,13 @@ export const PixiTrackerView: React.FC = () => {
   const nextPatternId = nextPositionIdx >= 0 ? patterns[patternOrder[nextPositionIdx]]?.id : undefined;
   const nextPatternLength = nextPositionIdx >= 0 ? patterns[patternOrder[nextPositionIdx]]?.length : undefined;
 
-  // Compute instrument panel height: window minus navbar(36) + toolbar(108) + controls(32) + statusbar(24) + optional pattern panel
-  const NAVBAR_H = 36;
-  const STATUSBAR_H = 24;
+  // Compute instrument panel height: window minus navbar(76) + toolbar(160) + controls(32) + statusbar(32) + optional pattern panel
+  const NAVBAR_H = 76; // NavBar(44px) + TabBar(32px) — must match PixiNavBar totalHeight
+  const STATUSBAR_H = 32; // must match PixiStatusBar STATUS_BAR_HEIGHT
   const CONTROLS_BAR_H = 32;
   const MACRO_SLOTS_H = showMacroSlots ? 32 : 0;
   const instrumentPanelHeight = windowHeight - NAVBAR_H - FT2_TOOLBAR_HEIGHT - CONTROLS_BAR_H - STATUSBAR_H - MACRO_SLOTS_H - (showPatterns ? PATTERN_PANEL_HEIGHT : 0);
-  const editorWidth = windowWidth - 200 - 16; // minus instrument panel and minimap
+  const editorWidth = windowWidth - (instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0) - 16; // minus instrument panel and minimap
 
   return (
     <pixiContainer
@@ -129,6 +145,15 @@ export const PixiTrackerView: React.FC = () => {
     >
       {/* FT2 Toolbar + Menu bar — native Pixi rendering */}
       <PixiFT2Toolbar />
+
+      {/* TB-303 Knob Panel — shown when not in TB-303 view (matches DOM TrackerView) */}
+      <PixiDOMOverlay
+        layout={{ width: '100%', height: 0 }}
+        style={{ overflow: 'visible', zIndex: 34 }}
+        autoHeight
+      >
+        <TB303KnobPanelOverlay visible={viewMode !== 'tb303'} />
+      </PixiDOMOverlay>
 
       {/* Editor controls bar — DOM overlay for 1:1 parity */}
       <PixiEditorControlsBarOverlay viewMode={viewMode} onViewModeChange={setViewMode} gridChannelIndex={gridChannelIndex} onGridChannelChange={setGridChannelIndex} />
@@ -223,9 +248,37 @@ export const PixiTrackerView: React.FC = () => {
           <PitchSliderOverlay />
         </PixiDOMOverlay>
 
+        {/* Instrument panel toggle button — always mounted, zero-width when hidden */}
+        <PixiDOMOverlay
+          layout={{ width: canShowInstrumentPanel && viewMode !== 'tb303' ? 24 : 0, height: '100%' }}
+          style={{ borderLeft: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          {canShowInstrumentPanel && viewMode !== 'tb303' && (
+            <button
+              onClick={() => setShowInstrumentPanel(p => !p)}
+              style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'var(--color-bg-secondary)',
+                border: 'none',
+                cursor: 'pointer',
+                color: instrumentPanelVisible ? 'var(--color-accent)' : 'var(--color-text-dim)',
+                fontSize: '14px',
+                padding: 0,
+              }}
+              title={instrumentPanelVisible ? 'Hide Instruments' : 'Show Instruments'}
+            >
+              {instrumentPanelVisible ? '\u25B6' : '\u25C0'}
+            </button>
+          )}
+        </PixiDOMOverlay>
+
         {/* Instrument list — always mounted, zero-width when hidden */}
-        <pixiContainer visible={viewMode !== 'tb303'} layout={{ width: viewMode !== 'tb303' ? 200 : 0, height: '100%' }}>
-          <PixiInstrumentPanel width={200} height={Math.max(100, instrumentPanelHeight)} />
+        <pixiContainer visible={instrumentPanelVisible} layout={{ width: instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0, height: '100%' }}>
+          <PixiInstrumentPanel width={INSTRUMENT_PANEL_W} height={Math.max(100, instrumentPanelHeight)} />
         </pixiContainer>
       </pixiContainer>
 
@@ -337,6 +390,7 @@ const PixiEditorControlsBarOverlay: React.FC<EditorControlsBarOverlayProps> = (p
     <PixiDOMOverlay
       layout={{ width: '100%', height: 32 }}
       style={{ overflow: 'visible', zIndex: 33 }}
+      autoHeight
     >
       <EditorControlsBarInner {...props} />
     </PixiDOMOverlay>

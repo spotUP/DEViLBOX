@@ -99,15 +99,19 @@ export const PixiMIDIKnobBar: React.FC<PixiMIDIKnobBarProps> = ({ width }) => {
   );
 };
 
-/** Individual knob cell with hover highlight */
+/** Individual knob cell with hover highlight + top accent bar (matches DOM) */
 const KnobCell: React.FC<{ assignment: KnobAssignment; index: number }> = ({ assignment, index }) => {
   const theme = usePixiTheme();
   const [hovered, setHovered] = useState(false);
 
   const drawCellBg = useCallback((g: GraphicsType) => {
     g.clear();
+    // Top accent bar (matches DOM's h-[2px] bg-accent-primary)
+    g.rect(0, 0, 80, 2);
+    g.fill({ color: theme.accent.color, alpha: hovered ? 0.5 : 0.2 });
+    // Cell background on hover
     if (hovered) {
-      g.roundRect(0, 0, 80, 32, 3);
+      g.roundRect(0, 2, 80, 30, 3);
       g.fill({ color: theme.accent.color, alpha: 0.1 });
     }
   }, [hovered, theme]);
@@ -121,7 +125,7 @@ const KnobCell: React.FC<{ assignment: KnobAssignment; index: number }> = ({ ass
     >
       <pixiGraphics draw={drawCellBg} layout={{ position: 'absolute', width: 80, height: 32 }} />
       <pixiBitmapText
-        text={`K${index + 1} CC${String(assignment.cc).padStart(3, '0')}`}
+        text={`K${index + 1} (CC ${assignment.cc})`}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
         tint={hovered ? theme.textSecondary.color : theme.textMuted.color}
         layout={{}}
