@@ -386,10 +386,13 @@ function buildEnhancedSong(
     sampleMap.set(ptr, instrId);
 
     // Calculate sample rate from typical playback period
-    // Amiga PAL: sampleRate = 3546895 / (period * 2)
-    const sampleRate = sample.typicalPeriod > 0
-      ? Math.round(3546895 / (sample.typicalPeriod * 2))
-      : 8287; // Default C-3 rate
+    // Amiga PAL: sampleRate = 3546895 / period  (NOT /2 — that's a common off-by-one)
+    // Period 428 → 8287 Hz (C-3), period 214 → 16574 Hz (C-4)
+    const rawRate = sample.typicalPeriod > 0
+      ? Math.round(3546895 / sample.typicalPeriod)
+      : 8287;
+    // Clamp to valid Web Audio API range (8000–96000 Hz)
+    const sampleRate = Math.max(8000, Math.min(96000, rawRate));
 
     // Reconstruct Uint8Array from transferred data
     const pcm = sample.pcm instanceof Uint8Array
