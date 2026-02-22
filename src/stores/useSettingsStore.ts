@@ -6,11 +6,43 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
 
+/**
+ * Format engine preference: which engine to use for formats supported by multiple paths.
+ * 'native' = dedicated TypeScript parser (libopenmpt, HivelyParser, MEDParser, etc.)
+ * 'uade'   = UADE 68k emulation (authentic Amiga hardware playback via Paula chip)
+ */
+export type FormatEngineChoice = 'native' | 'uade';
+
+/**
+ * UADE import mode: how to handle UADE-only formats (130+ exotic Amiga formats).
+ * 'enhanced' = Extract real PCM samples + detect effects → fully editable song
+ * 'classic'  = UADE playback engine with display-only patterns
+ */
+export type UADEImportMode = 'enhanced' | 'classic';
+
+export interface FormatEnginePreferences {
+  mod: FormatEngineChoice;     // .mod → libopenmpt/MODParser vs UADE
+  hvl: FormatEngineChoice;     // .hvl/.ahx → HivelyParser vs UADE
+  med: FormatEngineChoice;     // .med/.mmd0-3 → MEDParser vs UADE
+  fc: FormatEngineChoice;      // .fc/.fc13/.fc14/.sfc → FCParser vs UADE
+  okt: FormatEngineChoice;     // .okt → OktalyzerParser vs UADE
+  digi: FormatEngineChoice;    // .digi → DigiBoosterParser vs UADE
+  soundmon: FormatEngineChoice; // .bp/.bp3/.sndmon → SoundMonParser vs UADE
+  sidmon2: FormatEngineChoice;  // .sid2/.smn → SidMon2Parser vs UADE
+  fred: FormatEngineChoice;     // .fred → FredEditorParser vs UADE
+  soundfx: FormatEngineChoice;  // .sfx/.sfx13 → SoundFXParser vs UADE
+  mugician: FormatEngineChoice;  // .dmu/.mug → DigitalMugicianParser vs UADE
+  uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
+}
+
 interface SettingsStore {
   // Engine Settings
   amigaLimits: boolean;      // Clamp periods to 113-856 (MOD/S3M/IT)
   linearInterpolation: boolean; // Enable linear interpolation for sample playback
   masterTuning: number;      // Master tuning in Hz (default 440)
+
+  // Format Engine Preferences
+  formatEngine: FormatEnginePreferences;
 
   // Audio Settings
   performanceQuality: 'high' | 'medium' | 'low';
@@ -33,6 +65,7 @@ interface SettingsStore {
   setAmigaLimits: (enabled: boolean) => void;
   setLinearInterpolation: (enabled: boolean) => void;
   setMasterTuning: (hz: number) => void;
+  setFormatEngine: (format: keyof FormatEnginePreferences, engine: FormatEngineChoice) => void;
   setPerformanceQuality: (quality: 'high' | 'medium' | 'low') => void;
   setUseBLEP: (enabled: boolean) => void;
   setStereoSeparation: (percent: number) => void;
@@ -51,6 +84,20 @@ export const useSettingsStore = create<SettingsStore>()(
       amigaLimits: false,
       linearInterpolation: true,
       masterTuning: 440,
+      formatEngine: {
+        mod: 'native',      // libopenmpt — full sample extraction + effects
+        hvl: 'native',      // HivelyParser — WebAudio synthesis
+        med: 'native',      // MEDParser — dedicated OctaMED support
+        fc: 'native',       // FCParser — full sample extraction + effects
+        okt: 'native',      // OktalyzerParser — dedicated Oktalyzer support
+        digi: 'native',     // DigiBoosterParser — dedicated DigiBooster support
+        soundmon: 'native', // SoundMonParser — dedicated SoundMon support
+        sidmon2: 'native',  // SidMon2Parser — dedicated SidMon II support
+        fred: 'native',     // FredEditorParser — dedicated Fred Editor support
+        soundfx: 'native',  // SoundFXParser — dedicated Sound-FX support
+        mugician: 'native', // DigitalMugicianParser — dedicated Digital Mugician support
+        uade: 'enhanced',   // UADE formats — enhanced (editable) by default
+      },
       performanceQuality: 'high',
       useBLEP: false,  // Default: BLEP disabled (enable in Settings for band-limited synthesis)
       stereoSeparation: 20,  // Default: 20% (classic Amiga-style narrow separation)
@@ -75,6 +122,11 @@ export const useSettingsStore = create<SettingsStore>()(
     setMasterTuning: (masterTuning) =>
       set((state) => {
         state.masterTuning = masterTuning;
+      }),
+
+    setFormatEngine: (format, engine) =>
+      set((state) => {
+        state.formatEngine[format] = engine;
       }),
 
     setPerformanceQuality: (performanceQuality) =>
@@ -128,6 +180,7 @@ export const useSettingsStore = create<SettingsStore>()(
         amigaLimits: state.amigaLimits,
         linearInterpolation: state.linearInterpolation,
         masterTuning: state.masterTuning,
+        formatEngine: state.formatEngine,
         performanceQuality: state.performanceQuality,
         useBLEP: state.useBLEP,
         stereoSeparation: state.stereoSeparation,

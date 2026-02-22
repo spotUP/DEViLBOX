@@ -342,7 +342,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 </span>
 
                 {/* Icon */}
-                <IconComponent size={12} className={isSelected ? 'text-ft2-bg' : (synthInfo?.color || 'text-ft2-highlight')} />
+                <IconComponent size={12} className={`shrink-0 ${isSelected ? 'text-ft2-bg' : (synthInfo?.color || 'text-ft2-highlight')}`} />
 
                 {/* Name (double-click to edit) */}
                 {editingId === instrument.id ? (
@@ -433,7 +433,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 {/* Synth type icon */}
                 <IconComponent
                   size={compact ? 12 : 14}
-                  className={synthInfo?.color || 'text-accent-primary'}
+                  className={`shrink-0 ${synthInfo?.color || 'text-accent-primary'}`}
                 />
 
                 {/* Instrument name (double-click to edit) */}
@@ -477,12 +477,12 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   >
                     {instrument.sample.loopType === 'pingpong' ? (
                       <>
-                        <Repeat size={12} className="text-blue-400" />
+                        <Repeat size={12} className="shrink-0 text-blue-400" />
                         <span className="text-[9px] text-blue-400 font-bold leading-none">↔</span>
                       </>
                     ) : (
                       <>
-                        <Repeat1 size={12} className="text-green-400" />
+                        <Repeat1 size={12} className="shrink-0 text-green-400" />
                         <span className="text-[9px] text-green-400 font-bold leading-none">→</span>
                       </>
                     )}

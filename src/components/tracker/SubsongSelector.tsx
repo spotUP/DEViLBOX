@@ -135,7 +135,7 @@ export const SubsongSelector: React.FC = React.memo(() => {
 
   return (
     <div className="flex items-center gap-1.5 ml-1 pl-2 border-l border-dark-border">
-      <Music2 size={14} className="text-accent-primary" />
+      <Music2 size={14} className="shrink-0 text-accent-primary" />
       <span className="text-[10px] text-text-secondary font-medium">SUBSONG:</span>
       <select
         value={currentSubsong}
