@@ -152,11 +152,179 @@ double getDoublePeak(const double *buf, int32_t len)
 
 void setErrPointer(void) { }
 
-/* Vol/filter box stubs (not rendered in our extraction) */
-void renderSamplerVolBox(void) { }
-void renderSamplerFiltersBox(void) { }
-void showVolFromSlider(void) { }
-void showVolToSlider(void) { }
+/* ---- Volume box (simplified — no BMP, drawn with primitives) ---- */
+
+void showVolFromSlider(void)
+{
+	/* Slider track at (105, 158), 65px wide, 3px tall */
+	fillRect(105, 158, 65, 3, video.palette[PAL_BACKGRD]);
+	uint32_t pos = ((editor.vol1 * 3) + 5) / 10;
+	if (pos > 62) pos = 62;
+	fillRect(105 + pos, 158, 3, 3, video.palette[PAL_QADSCP]);
+}
+
+void showVolToSlider(void)
+{
+	/* Slider track at (105, 169), 65px wide, 3px tall */
+	fillRect(105, 169, 65, 3, video.palette[PAL_BACKGRD]);
+	uint32_t pos = ((editor.vol2 * 3) + 5) / 10;
+	if (pos > 62) pos = 62;
+	fillRect(105 + pos, 169, 3, 3, video.palette[PAL_QADSCP]);
+}
+
+void renderSamplerVolBox(void)
+{
+	if (ui.samplerVolBoxShown)
+	{
+		/* Toggle off */
+		ui.samplerVolBoxShown = false;
+		redrawSample();
+		return;
+	}
+
+	ui.samplerVolBoxShown = true;
+
+	/* Draw volume box overlay at (72, 154), 136x33 */
+	fillRect(72, 154, 136, 33, video.palette[PAL_GENBKG]);
+	hLine(72, 154, 136, video.palette[PAL_BORDER]);
+	hLine(72, 186, 136, video.palette[PAL_BORDER]);
+	vLine(72, 154, 33, video.palette[PAL_BORDER]);
+	vLine(207, 154, 33, video.palette[PAL_BORDER]);
+
+	/* Labels */
+	textOut(76, 159, "FROM", video.palette[PAL_GENTXT]);
+	textOut(76, 170, "TO", video.palette[PAL_GENTXT]);
+
+	/* Slider tracks */
+	fillRect(105, 158, 65, 3, video.palette[PAL_BACKGRD]);
+	fillRect(105, 169, 65, 3, video.palette[PAL_BACKGRD]);
+
+	/* Numeric displays */
+	printTwoDecimals(176, 159, editor.vol1 > 99 ? 99 : editor.vol1, video.palette[PAL_GENTXT]);
+	printTwoDecimals(176, 170, editor.vol2 > 99 ? 99 : editor.vol2, video.palette[PAL_GENTXT]);
+
+	/* Button labels */
+	textOut(76, 178, "RAMP", video.palette[PAL_GENTXT]);
+	textOut(108, 178, "NORM", video.palette[PAL_GENTXT]);
+	textOut(148, 178, "100%", video.palette[PAL_GENTXT]);
+	textOut(180, 178, "DONE", video.palette[PAL_GENTXT]);
+
+	showVolFromSlider();
+	showVolToSlider();
+}
+
+static void applyVolumeRamp(void)
+{
+	moduleSample_t *s = &song->samples[editor.currSample];
+	if (s->length == 0) return;
+
+	int32_t markStart = editor.markStartOfs;
+	int32_t markEnd = editor.markEndOfs;
+
+	if (markStart < 0 || markStart >= markEnd)
+	{
+		markStart = 0;
+		markEnd = s->length;
+	}
+
+	int32_t rangeLen = markEnd - markStart;
+	if (rangeLen <= 0) return;
+
+	fillSampleFilterUndoBuffer();
+
+	int8_t *ptr = &song->sampleData[s->offset + markStart];
+	double dFromVol = editor.vol1 / 100.0;
+	double dToVol = editor.vol2 / 100.0;
+	double dDelta = (dToVol - dFromVol) / rangeLen;
+	double dVol = dFromVol;
+
+	for (int32_t i = 0; i < rangeLen; i++)
+	{
+		int32_t smp = (int32_t)(ptr[i] * dVol);
+		CLAMP8(smp);
+		ptr[i] = (int8_t)smp;
+		dVol += dDelta;
+	}
+
+	fixSampleBeep(s);
+	displaySample();
+	displayMsg("VOLUME APPLIED");
+}
+
+static void normalizeVolume(void)
+{
+	moduleSample_t *s = &song->samples[editor.currSample];
+	if (s->length == 0) return;
+
+	int32_t markStart = editor.markStartOfs;
+	int32_t markEnd = editor.markEndOfs;
+
+	if (markStart < 0 || markStart >= markEnd)
+	{
+		markStart = 0;
+		markEnd = s->length;
+	}
+
+	int8_t *ptr = &song->sampleData[s->offset + markStart];
+	int32_t rangeLen = markEnd - markStart;
+	int32_t peak = 0;
+
+	for (int32_t i = 0; i < rangeLen; i++)
+	{
+		int32_t abs_val = ABS(ptr[i]);
+		if (abs_val > peak) peak = abs_val;
+	}
+
+	if (peak <= 0 || peak >= 127)
+	{
+		editor.vol1 = 100;
+		editor.vol2 = 100;
+	}
+	else
+	{
+		int16_t vol = (int16_t)((100 * 127) / peak);
+		if (vol > 200) vol = 200;
+		editor.vol1 = vol;
+		editor.vol2 = vol;
+	}
+
+	showVolFromSlider();
+	showVolToSlider();
+	displayMsg("NORMALIZE SET");
+}
+
+static void volBoxBarPressed(bool mouseButtonHeld)
+{
+	if (!mouseButtonHeld)
+	{
+		if (mouse.x >= 105 && mouse.x <= 170)
+		{
+			if (mouse.y >= 155 && mouse.y <= 164) ui.forceVolDrag = 1;
+			if (mouse.y >= 165 && mouse.y <= 175) ui.forceVolDrag = 2;
+		}
+	}
+	else
+	{
+		if (sampler.lastMouseX != mouse.x)
+		{
+			sampler.lastMouseX = mouse.x;
+			int32_t mouseX = CLAMP(sampler.lastMouseX - 107, 0, 60);
+
+			if (ui.forceVolDrag == 1)
+			{
+				editor.vol1 = (int16_t)(((mouseX * 200) + 30) / 60);
+				showVolFromSlider();
+			}
+			else if (ui.forceVolDrag == 2)
+			{
+				editor.vol2 = (int16_t)(((mouseX * 200) + 30) / 60);
+				showVolToSlider();
+			}
+		}
+	}
+}
+
+void renderSamplerFiltersBox(void) { displayMsg("FILTERS N/A"); }
 
 /* Chord/replayer stubs */
 void recalcChordLength(void) { }
@@ -435,6 +603,41 @@ void pt2_sampled_on_mouse_down(int x, int y)
 
 	if (!ui.samplerScreenShown) return;
 
+	/* ---- Volume box overlay (intercepts clicks when shown) ---- */
+	if (ui.samplerVolBoxShown)
+	{
+		/* Slider drag area */
+		if (x >= 105 && x <= 170 && y >= 155 && y <= 175)
+		{
+			volBoxBarPressed(false);
+			return;
+		}
+		/* Button row (y 176-186) */
+		if (y >= 176 && y <= 186)
+		{
+			if (x >= 76 && x <= 103) { applyVolumeRamp(); ui.samplerVolBoxShown = false; redrawSample(); }
+			else if (x >= 104 && x <= 143) normalizeVolume();
+			else if (x >= 144 && x <= 173) { editor.vol1 = 100; editor.vol2 = 100; showVolFromSlider(); showVolToSlider(); }
+			else if (x >= 174 && x <= 207) { ui.samplerVolBoxShown = false; redrawSample(); displayMsg("ALL RIGHT"); }
+			return;
+		}
+		/* VOLUME button toggles off */
+		if (y >= 244 && y <= 254 && x >= 96 && x <= 135)
+		{
+			ui.samplerVolBoxShown = false;
+			redrawSample();
+			return;
+		}
+		/* Click outside box — close it */
+		if (x < 72 || x > 207 || y < 154 || y > 186)
+		{
+			ui.samplerVolBoxShown = false;
+			redrawSample();
+			return;
+		}
+		return;
+	}
+
 	/* ---- Sample waveform area (y 138-201) ---- */
 	if (y >= 138 && y <= 201)
 	{
@@ -535,6 +738,12 @@ void pt2_sampled_on_mouse_move(int x, int y)
 
 	if (!mouse.leftButtonPressed) return;
 	if (!ui.samplerScreenShown) return;
+
+	if (ui.forceVolDrag)
+	{
+		volBoxBarPressed(true);
+		return;
+	}
 
 	if (ui.forceSampleDrag)
 	{
