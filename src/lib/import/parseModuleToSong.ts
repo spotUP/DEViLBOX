@@ -55,22 +55,27 @@ export async function parseModuleToSong(file: File): Promise<TrackerSong> {
     return parseDigiBoosterFile(buffer, file.name);
   }
 
-  // ── Future Composer 1.3 / 1.4 ────────────────────────────────────────────
-  if (filename.endsWith('.fc') || filename.endsWith('.fc13') || filename.endsWith('.fc14')
-    || filename.endsWith('.sfc')) {
-    const { parseFCFile } = await import('@lib/import/formats/FCParser');
-    return parseFCFile(buffer, file.name);
-  }
+  // ── Future Composer — route to UADE for authentic playback ───────────────
+  // UADE has real FutureComposer1.3/1.4 eagleplayers that handle FC timing
+  // and Paula output correctly. The JS FCParser is a partial reimplementation
+  // with timing issues — only use as fallback if UADE is unavailable.
+  // (FC extensions: .fc, .fc2, .fc3, .fc4, .fc13, .fc14, .sfc, .smod, .bfc, .bsi)
 
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
-  // Check extension list (non-exhaustive, UADE also auto-detects by magic bytes)
+  // Check extension list first, then fall back to UADE for unknown formats
+  // (UADE also detects many formats by magic bytes, not just extension)
   const { isUADEFormat, parseUADEFile } = await import('@lib/import/formats/UADEParser');
   if (isUADEFormat(filename)) {
-    return parseUADEFile(buffer, file.name);
+    return await parseUADEFile(buffer, file.name);
   }
 
   // ── MOD, XM, IT, S3M, and other tracker formats ────────────────────────
-  return parseTrackerModule(buffer, file.name);
+  try {
+    return await parseTrackerModule(buffer, file.name);
+  } catch {
+    // If libopenmpt fails, try UADE as last resort (magic byte detection)
+    return await parseUADEFile(buffer, file.name);
+  }
 }
 
 // ─── MIDI ────────────────────────────────────────────────────────────────────

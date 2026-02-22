@@ -101,7 +101,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
   const volMacroPtr  = u32BE(buf, off);  off += 4;
   const volMacroLen  = u32BE(buf, off);  off += 4;
   const samplePtr    = u32BE(buf, off);  off += 4;
-  const wavePtr      = isFC14 ? u32BE(buf, off) : 0;
+  // wavePtr (FC14 only, not used yet)
   off += 4;
 
   // ── 10 sample definitions (6 bytes each: len, loopStart, loopLen — u16 BE) ──
@@ -307,7 +307,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
           eff    = seq.speed;
         }
 
-        rows.push({ note: xmNote, instrument, volume: 0, effTyp, eff });
+        rows.push({ note: xmNote, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 });
       }
 
       return {
@@ -330,7 +330,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
       length: 32,
       channels,
       importMetadata: {
-        sourceFormat: 'FC' as TrackerFormat,
+        sourceFormat: 'FC',
         sourceFile: filename,
         importedAt: new Date().toISOString(),
         originalChannelCount: 4,
@@ -356,10 +356,10 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
         pan: ch % 2 === 0 ? -25 : 25,
         instrumentId: null,
         color: null,
-        rows: Array.from({ length: 32 }, () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 })),
+        rows: Array.from({ length: 32 }, () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 })),
       })),
       importMetadata: {
-        sourceFormat: 'FC' as TrackerFormat,
+        sourceFormat: 'FC',
         sourceFile: filename,
         importedAt: new Date().toISOString(),
         originalChannelCount: 4,

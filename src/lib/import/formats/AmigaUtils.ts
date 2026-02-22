@@ -132,7 +132,7 @@ export function createSamplerInstrument(
     type: 'sample' as const,
     synthType: 'Sampler' as const,
     effects: [],
-    volume: -6,
+    volume: volume > 0 ? 20 * Math.log10(volume / 64) : -60,
     pan: 0,
     sample: {
       audioBuffer: wavBuf,

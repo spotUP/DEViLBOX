@@ -13,12 +13,19 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 
+export interface UADEScanRow {
+  period: number;
+  volume: number;
+  samplePtr: number;
+}
+
 export interface UADEMetadata {
   player: string;       // Detected eagleplayer name (e.g. "JochenHippel")
   formatName: string;   // Human-readable format (e.g. "Jochen Hippel")
   minSubsong: number;
   maxSubsong: number;
   subsongCount: number;
+  scanData?: UADEScanRow[][];  // Pre-scanned pattern data: rows of 4 channels
 }
 
 export interface UADEPositionUpdate {
@@ -26,11 +33,21 @@ export interface UADEPositionUpdate {
   position: number;
 }
 
+export interface UADEChannelData {
+  period: number;
+  volume: number;
+  dma: boolean;
+  triggered: boolean;  // New note detected (period changed)
+  samplePtr: number;   // Paula lc register — identifies which sample/instrument
+}
+
 type PositionCallback = (update: UADEPositionUpdate) => void;
+type ChannelCallback = (channels: UADEChannelData[], totalFrames: number) => void;
 
 export class UADEEngine {
   private static instance: UADEEngine | null = null;
   private static wasmBinary: ArrayBuffer | null = null;
+  private static jsCode: string | null = null;
   private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
   private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
 
@@ -40,10 +57,12 @@ export class UADEEngine {
 
   private _initPromise: Promise<void>;
   private _resolveInit: (() => void) | null = null;
+  private _rejectInit: ((err: Error) => void) | null = null;
   private _loadPromise: Promise<UADEMetadata> | null = null;
   private _resolveLoad: ((meta: UADEMetadata) => void) | null = null;
   private _rejectLoad: ((err: Error) => void) | null = null;
   private _positionCallbacks: Set<PositionCallback> = new Set();
+  private _channelCallbacks: Set<ChannelCallback> = new Set();
   private _songEndCallbacks: Set<() => void> = new Set();
   private _disposed = false;
 
@@ -51,8 +70,9 @@ export class UADEEngine {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
 
-    this._initPromise = new Promise<void>((resolve) => {
+    this._initPromise = new Promise<void>((resolve, reject) => {
       this._resolveInit = resolve;
+      this._rejectInit = reject;
     });
 
     this.initialize();
@@ -89,13 +109,32 @@ export class UADEEngine {
         // Module might already be registered
       }
 
-      // Fetch WASM binary (shared across contexts, lazy-loaded)
-      if (!this.wasmBinary) {
-        const wasmResponse = await fetch(`${baseUrl}uade/UADE.wasm`);
+      // Fetch WASM binary and JS glue code (shared across contexts, lazy-loaded)
+      if (!this.wasmBinary || !this.jsCode) {
+        const [wasmResponse, jsResponse] = await Promise.all([
+          fetch(`${baseUrl}uade/UADE.wasm`),
+          fetch(`${baseUrl}uade/UADE.js`),
+        ]);
+
         if (wasmResponse.ok) {
           this.wasmBinary = await wasmResponse.arrayBuffer();
         } else {
           throw new Error('[UADEEngine] Failed to fetch UADE.wasm');
+        }
+
+        if (jsResponse.ok) {
+          let code = await jsResponse.text();
+          // Transform Emscripten output for worklet Function() execution:
+          // - Replace import.meta.url (not available in worklet scope)
+          // - Remove ESM export statements
+          // - Ensure wasmBinary is read from Module config
+          code = code
+            .replace(/import\.meta\.url/g, "'.'")
+            .replace(/export\s+default\s+\w+;?/g, '')
+            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];');
+          this.jsCode = code;
+        } else {
+          throw new Error('[UADEEngine] Failed to fetch UADE.js');
         }
       }
 
@@ -122,6 +161,7 @@ export class UADEEngine {
           if (this._resolveInit) {
             this._resolveInit();
             this._resolveInit = null;
+            this._rejectInit = null;
           }
           break;
 
@@ -133,6 +173,7 @@ export class UADEEngine {
               minSubsong: data.minSubsong ?? 1,
               maxSubsong: data.maxSubsong ?? 1,
               subsongCount: data.subsongCount ?? 1,
+              scanData: data.scanData,
             });
             this._resolveLoad = null;
             this._rejectLoad = null;
@@ -141,6 +182,12 @@ export class UADEEngine {
 
         case 'error':
           console.error('[UADEEngine]', data.message);
+          // Reject init promise if still pending (WASM init failed)
+          if (this._rejectInit) {
+            this._rejectInit(new Error(data.message));
+            this._resolveInit = null;
+            this._rejectInit = null;
+          }
           if (this._rejectLoad) {
             this._rejectLoad(new Error(data.message));
             this._resolveLoad = null;
@@ -154,6 +201,12 @@ export class UADEEngine {
           }
           break;
 
+        case 'channels':
+          for (const cb of this._channelCallbacks) {
+            cb(data.channels, data.totalFrames);
+          }
+          break;
+
         case 'songEnd':
           for (const cb of this._songEndCallbacks) {
             cb();
@@ -163,7 +216,7 @@ export class UADEEngine {
     };
 
     this.workletNode.port.postMessage(
-      { type: 'init', sampleRate: ctx.sampleRate, wasmBinary: UADEEngine.wasmBinary },
+      { type: 'init', sampleRate: ctx.sampleRate, wasmBinary: UADEEngine.wasmBinary, jsCode: UADEEngine.jsCode },
       UADEEngine.wasmBinary ? [UADEEngine.wasmBinary] : []
     );
     // Note: transferring the buffer clears the static cache; re-fetch on next load if needed
@@ -227,6 +280,12 @@ export class UADEEngine {
     return () => this._positionCallbacks.delete(cb);
   }
 
+  /** Subscribe to live Paula channel data (~20Hz). Returns unsubscribe function. */
+  onChannelData(cb: ChannelCallback): () => void {
+    this._channelCallbacks.add(cb);
+    return () => this._channelCallbacks.delete(cb);
+  }
+
   /** Subscribe to song end events. Returns unsubscribe function. */
   onSongEnd(cb: () => void): () => void {
     this._songEndCallbacks.add(cb);
@@ -239,6 +298,7 @@ export class UADEEngine {
     this.workletNode?.disconnect();
     this.workletNode = null;
     this._positionCallbacks.clear();
+    this._channelCallbacks.clear();
     this._songEndCallbacks.clear();
     if (UADEEngine.instance === this) {
       UADEEngine.instance = null;

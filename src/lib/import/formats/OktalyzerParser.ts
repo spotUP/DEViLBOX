@@ -201,6 +201,8 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
           volume: 0,
           effTyp,
           eff,
+          effTyp2: 0,
+          eff2: 0,
         };
       });
 
@@ -224,7 +226,7 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
       length: pat.rows,
       channels,
       importMetadata: {
-        sourceFormat: 'OKT' as TrackerFormat,
+        sourceFormat: 'OKT',
         sourceFile: filename,
         importedAt: new Date().toISOString(),
         originalChannelCount: pat.channels,

@@ -91,7 +91,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
 
   const songOffset   = u32(buf, 0x08);  // → MMD0Song
   const blockOffset  = u32(buf, 0x10);  // → pointer array of MMD0Block*
-  const sampleOffset = u32(buf, 0x14);  // → sample data area (expansion section)
+  // sampleOffset at 0x14 (reserved for future sample parsing)
   const expOffset    = u32(buf, 0x18);  // → MMD0Exp (extension)
 
   // ── Parse MMD0Song ───────────────────────────────────────────────────────
@@ -178,7 +178,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
       for (let row = 0; row <= nLines; row++) {
         const offset = dataStart + (row * nTracks + ch) * bytesPerCell;
         if (offset + bytesPerCell > buf.length) {
-          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
+          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
           continue;
         }
 
@@ -210,7 +210,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           eff = ev;
         }
 
-        rows.push({ note, instrument: inst, volume: 0, effTyp, eff });
+        rows.push({ note, instrument: inst, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 });
       }
 
       return {
@@ -233,7 +233,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
       length: nLines + 1,
       channels,
       importMetadata: {
-        sourceFormat: magic as TrackerFormat,
+        sourceFormat: 'MED',
         sourceFile: filename,
         importedAt: new Date().toISOString(),
         originalChannelCount: nTracks,
@@ -252,9 +252,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   let instrNames: string[] = [];
   if (expOffset > 0 && expOffset < buf.length) {
     // MMD0Exp.nextmod, hdrlen, instrext_offset, instrext_entries, ...
-    const instrExtOff = u32(buf, expOffset + 8);
-    const instrExtSize = u16(buf, expOffset + 12);
-    const instrExtEntries = u16(buf, expOffset + 14);
+    // instrExt fields at expOffset+8..+14 (reserved for future instrument extension parsing)
     const instrInfoOff = u32(buf, expOffset + 16);
     const instrInfoEntries = u16(buf, expOffset + 20);
     const instrInfoSize = u16(buf, expOffset + 22);
