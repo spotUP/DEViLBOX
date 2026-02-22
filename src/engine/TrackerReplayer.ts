@@ -224,6 +224,12 @@ export type TrackerFormat =
   | 'MED'   // OctaMED / MED
   | 'DIGI'  // DigiBooster
   | 'FC'    // Future Composer 1.3/1.4
+  // FlodJS-enhanced native parsers
+  | 'SFX'   // Sound-FX
+  | 'SMON'  // SoundMon (Brian Postma)
+  | 'SIDMON2' // SidMon II
+  | 'FRED'  // Fred Editor
+  | 'DMUG'  // Digital Mugician
   // UADE catch-all (playback-only, 130+ formats)
   | 'UADE';
 

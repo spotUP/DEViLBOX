@@ -12,7 +12,8 @@ export type ModuleFormat =
   | 'STM' | 'STX' | 'PT36' | 'SFX'
   | 'FUR' | 'NATIVE'
   | 'HVL' | 'AHX'
-  | 'FC' | 'UADE';
+  | 'FC' | 'SMON' | 'SIDMON2' | 'FRED' | 'DMUG'
+  | 'UADE';
 
 // Format-specific configuration
 export interface FormatConfig {

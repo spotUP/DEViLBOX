@@ -264,7 +264,6 @@ export async function parseDigitalMugicianFile(
   // -- Detect version from magic string -------------------------------------
   const id = readString(buf, 0, 24);
   // V2 has 7-channel mixing mode; both V1 and V2 share the same pattern/sample format
-  const _isV2 = id === MAGIC_V2;
   if (id !== MAGIC_V1 && id !== MAGIC_V2) {
     throw new Error(`Not a Digital Mugician file: magic="${id}"`);
   }
@@ -456,10 +455,7 @@ export async function parseDigitalMugicianFile(
   // -- Arpeggio data (optional, appended at end if flag == 1) ---------------
   const arpeggios = new Uint8Array(256);
   if (arpeggioFlag === 1) {
-    const arpeggioPos = patternDataStart + totalPatternRows * 4 +
-      (instrHeaderCount > 0 ? u32BE(buf, 72) : 0);
-
-    // Actually, from FlodJS: arpeggio data is at position after pattern data + instrument PCM
+    // From FlodJS: arpeggio data is at position after pattern data + instrument PCM
     // Let's try to read from the position after patterns + PCM data
     // The FlodJS code reads arpeggios after all other data:
     //   stream.position = position (after patterns + PCM instrument data)

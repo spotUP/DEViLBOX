@@ -3,7 +3,7 @@
  * Uses chiptune3/libopenmpt for parsing and playback preview
  */
 
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { X, Upload, Play, Square, Music, FileAudio, AlertCircle, Info } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import {
@@ -15,7 +15,7 @@ import {
   type ModuleInfo,
 } from '@lib/import/ModuleLoader';
 import { isUADEFormat } from '@lib/import/formats/UADEParser';
-import { useSettingsStore, type UADEImportMode } from '@/stores/useSettingsStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 export interface ImportOptions {
   useLibopenmpt: boolean;  // Use libopenmpt for sample-accurate playback
@@ -258,7 +258,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                   type="radio"
                   name="uadeMode"
                   checked={uadeMode === 'enhanced'}
-                  onChange={() => setFormatEngine('uade', 'enhanced' as UADEImportMode)}
+                  onChange={() => setFormatEngine('uade', 'enhanced')}
                   className="mt-0.5 accent-accent-primary"
                 />
                 <div>
@@ -273,7 +273,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                   type="radio"
                   name="uadeMode"
                   checked={uadeMode === 'classic'}
-                  onChange={() => setFormatEngine('uade', 'classic' as UADEImportMode)}
+                  onChange={() => setFormatEngine('uade', 'classic')}
                   className="mt-0.5 accent-accent-primary"
                 />
                 <div>
