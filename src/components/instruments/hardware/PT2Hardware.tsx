@@ -1,9 +1,12 @@
 /**
  * PT2Hardware — ProTracker 2 Sample Editor Hardware UI
  *
- * Wraps the pt2_sampled WASM/SDL2 module in a React component.
+ * Wraps the pt2_sampled WASM module in a React component.
  * Renders the classic Amiga ProTracker sampler screen with waveform display,
  * loop markers, and parameter editing. Bidirectional sync with InstrumentConfig.
+ *
+ * Canvas is rendered declaratively in JSX (imperative createElement doesn't
+ * survive React Strict Mode remounts).
  */
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -27,10 +30,11 @@ interface PT2HardwareProps {
 
 const SCREEN_W = 320;
 const SCREEN_H = 255;
+const SAMPLER_Y = 121;       // Sampler screen starts at row 121
+const SAMPLER_H = SCREEN_H - SAMPLER_Y; // 134 rows visible
 
 /* Emscripten module interface */
 interface PT2Module {
-  canvas: HTMLCanvasElement;
   onParamChange?: (paramId: number, value: number) => void;
   onLoopChange?: (loopStart: number, loopLength: number, loopType: number) => void;
   _pt2_sampled_init: (w: number, h: number) => void;
@@ -47,20 +51,22 @@ interface PT2Module {
   _pt2_sampled_on_mouse_move: (x: number, y: number) => void;
   _pt2_sampled_on_wheel: (deltaY: number, x: number, y: number) => void;
   _pt2_sampled_on_key_down: (keyCode: number) => void;
+  _pt2_sampled_tick: () => void;
   _malloc: (size: number) => number;
   _free: (ptr: number) => void;
   HEAPU8: Uint8Array;
   HEAP8: Int8Array;
 }
 
-/* Blit ARGB framebuffer from WASM to canvas 2D context */
+/* Blit ARGB framebuffer from WASM to canvas 2D context (sampler portion only) */
 function blitFramebuffer(mod: PT2Module, ctx: CanvasRenderingContext2D, imgData: ImageData) {
   const fbPtr = mod._pt2_sampled_get_fb();
-  const src = mod.HEAPU8.subarray(fbPtr, fbPtr + SCREEN_W * SCREEN_H * 4);
+  const srcOffset = fbPtr + SAMPLER_Y * SCREEN_W * 4; // skip top 121 rows
+  const src = mod.HEAPU8.subarray(srcOffset, srcOffset + SCREEN_W * SAMPLER_H * 4);
   const dst = imgData.data;
   /* WASM little-endian: ARGB 0xAARRGGBB stored as [BB,GG,RR,AA] */
   /* Canvas ImageData wants [RR,GG,BB,AA] */
-  for (let i = 0; i < SCREEN_W * SCREEN_H; i++) {
+  for (let i = 0; i < SCREEN_W * SAMPLER_H; i++) {
     const off = i * 4;
     dst[off]     = src[off + 2]; // R
     dst[off + 1] = src[off + 1]; // G
@@ -147,8 +153,7 @@ async function decodePCM(instrument: InstrumentConfig): Promise<Int8Array | null
 export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }) => {
   const configRef = useRef(instrument);
   const moduleRef = useRef<PT2Module | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const onChangeRef = useRef(onChange);
@@ -171,44 +176,33 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
     mod._free(ptr);
   }, [instrument, loaded]);
 
-  /* Convert CSS mouse coordinates to canvas pixel coordinates */
+  /* Convert CSS mouse coordinates to WASM framebuffer coordinates */
   const canvasCoords = (canvas: HTMLCanvasElement, e: MouseEvent): [number, number] => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     return [
       Math.floor((e.clientX - rect.left) * scaleX),
-      Math.floor((e.clientY - rect.top) * scaleY),
+      Math.floor((e.clientY - rect.top) * scaleY) + SAMPLER_Y, // offset to absolute FB coords
     ];
   };
 
   /* Mount: load WASM and start render loop */
   useEffect(() => {
+    if (!canvasRef.current) return;
+    const canvas = canvasRef.current as HTMLCanvasElement;
+
     let cancelled = false;
     let mod: PT2Module | null = null;
     const eventCleanups: (() => void)[] = [];
 
     async function init() {
       try {
-        /* Create canvas — no SDL, so no id requirement */
-        const canvas = document.createElement('canvas');
-        canvas.width = 320;
-        canvas.height = 255;
-        canvas.style.width = '100%';
-        canvas.style.height = 'auto';
-        canvas.style.imageRendering = 'pixelated';
-        canvas.tabIndex = 0;
-
-        if (containerRef.current && !cancelled) {
-          containerRef.current.appendChild(canvas);
-          canvasRef.current = canvas;
-        }
-
         /* Load Emscripten module via script injection */
-        const factory = await new Promise<(opts: { canvas: HTMLCanvasElement }) => Promise<PT2Module>>((resolve, reject) => {
+        const factory = await new Promise<(opts: Record<string, unknown>) => Promise<PT2Module>>((resolve, reject) => {
           const existing = (window as unknown as Record<string, unknown>).createPT2SampEd;
           if (typeof existing === 'function') {
-            resolve(existing as (opts: { canvas: HTMLCanvasElement }) => Promise<PT2Module>);
+            resolve(existing as (opts: Record<string, unknown>) => Promise<PT2Module>);
             return;
           }
 
@@ -217,7 +211,7 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
           script.onload = () => {
             const fn = (window as unknown as Record<string, unknown>).createPT2SampEd;
             if (typeof fn === 'function') {
-              resolve(fn as (opts: { canvas: HTMLCanvasElement }) => Promise<PT2Module>);
+              resolve(fn as (opts: Record<string, unknown>) => Promise<PT2Module>);
             } else {
               reject(new Error('createPT2SampEd not found after script load'));
             }
@@ -228,7 +222,8 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
 
         if (cancelled) return;
 
-        mod = await factory({ canvas }) as PT2Module;
+        /* Don't pass canvas to Emscripten — we do our own 2D rendering */
+        mod = await factory({}) as PT2Module;
         moduleRef.current = mod;
 
         /* C→JS callbacks */
@@ -290,11 +285,13 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
 
         /* Init */
         mod._pt2_sampled_init(SCREEN_W, SCREEN_H);
-        mod._pt2_sampled_start(); // no-op, kept for API compat
+        mod._pt2_sampled_start();
 
         /* Wire up canvas events → C input handlers */
-        const m = mod; // capture for closures
+        const m = mod;
         const onMouseDown = (e: MouseEvent) => {
+          e.preventDefault();
+          canvas.focus(); // grab focus for keyboard
           const [cx, cy] = canvasCoords(canvas, e);
           m._pt2_sampled_on_mouse_down(cx, cy);
         };
@@ -312,25 +309,31 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
           m._pt2_sampled_on_wheel(Math.sign(e.deltaY), cx, cy);
         };
         const onKeyDown = (e: KeyboardEvent) => {
-          const navKeys = [36, 35, 37, 39]; // Home, End, Left, Right
-          if (navKeys.includes(e.keyCode)) {
-            e.preventDefault();
-            m._pt2_sampled_on_key_down(e.keyCode);
+          e.preventDefault();
+          m._pt2_sampled_on_key_down(e.keyCode);
+        };
+        const onKeyUp = (e: KeyboardEvent) => {
+          // Clear modifier keys in WASM
+          if (e.keyCode === 16 || e.keyCode === 17 || e.keyCode === 18) {
+            // Send a synthetic key-up by clearing modifiers via a no-op key
+            m._pt2_sampled_on_key_down(-e.keyCode); // negative = key up
           }
         };
 
         canvas.addEventListener('mousedown', onMouseDown);
-        canvas.addEventListener('mouseup', onMouseUp);
-        canvas.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        document.addEventListener('mousemove', onMouseMove);
         canvas.addEventListener('wheel', onWheel, { passive: false });
         canvas.addEventListener('keydown', onKeyDown);
+        canvas.addEventListener('keyup', onKeyUp);
 
         eventCleanups.push(
           () => canvas.removeEventListener('mousedown', onMouseDown),
-          () => canvas.removeEventListener('mouseup', onMouseUp),
-          () => canvas.removeEventListener('mousemove', onMouseMove),
+          () => document.removeEventListener('mouseup', onMouseUp),
+          () => document.removeEventListener('mousemove', onMouseMove),
           () => canvas.removeEventListener('wheel', onWheel),
           () => canvas.removeEventListener('keydown', onKeyDown),
+          () => canvas.removeEventListener('keyup', onKeyUp),
         );
 
         /* Push initial config */
@@ -343,13 +346,18 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
         }
 
         /* Get 2D context and create reusable ImageData */
-        const ctx = canvas.getContext('2d')!;
-        const imgData = ctx.createImageData(SCREEN_W, SCREEN_H);
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) {
+          setError('Canvas 2D context unavailable');
+          return;
+        }
+        const imgData = ctx.createImageData(SCREEN_W, SAMPLER_H);
 
         /* Start React-driven rAF render loop */
         let rafId = 0;
         const renderLoop = () => {
           if (cancelled) return;
+          if (m._pt2_sampled_tick) m._pt2_sampled_tick();
           blitFramebuffer(m, ctx, imgData);
           rafId = requestAnimationFrame(renderLoop);
         };
@@ -382,10 +390,6 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
       if (mod) {
         try { mod._pt2_sampled_shutdown(); } catch { /* ignore */ }
       }
-      if (canvasRef.current && containerRef.current) {
-        try { containerRef.current.removeChild(canvasRef.current); } catch { /* ignore */ }
-        canvasRef.current = null;
-      }
       moduleRef.current = null;
       pcmLoadedRef.current = false;
     };
@@ -393,18 +397,21 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
 
   return (
     <div className="pt2-hardware-container flex flex-col items-center">
-      <div
-        ref={containerRef}
-        className="relative bg-black overflow-hidden"
+      <canvas
+        ref={canvasRef}
+        width={SCREEN_W}
+        height={SAMPLER_H}
+        tabIndex={0}
         style={{
-          maxWidth: 640,
           width: '100%',
-          aspectRatio: '320 / 255',
+          maxWidth: 640,
+          height: 'auto',
+          imageRendering: 'pixelated',
+          display: 'block',
         }}
-        onClick={() => canvasRef.current?.focus()}
       />
       {!loaded && !error && (
-        <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+        <div className="text-gray-400 text-sm mt-2">
           Loading PT2 sample editor...
         </div>
       )}
