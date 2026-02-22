@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-22T12:31:07.791Z
+ * Generated: 2026-02-22T14:59:20.222Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1086';
-export const BUILD_NUMBER = '1086';
-export const BUILD_HASH = '0152e32f';
+export const BUILD_VERSION = '1.0.1092';
+export const BUILD_NUMBER = '1092';
+export const BUILD_HASH = '42f79b7c';
 export const BUILD_DATE = '2026-02-22';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,7 +30,37 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1086',
+    version: '1.0.1092',
+    date: '2026-02-22',
+    changes: [
+      {
+        type: 'improvement',
+        "description": "Add WebGL UI enhancement progress tracking document"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update stores, engine, and supporting files"
+      },
+      {
+        type: 'feature',
+        "description": "Convert GL shell components to DOM overlays for 1:1 parity"
+      },
+      {
+        type: 'feature',
+        "description": "Add Pixi views for Furnace, Hively, tracker overlays, and visualizations"
+      },
+      {
+        type: 'feature',
+        "description": "Add WASM hardware UI modules and instrument components"
+      },
+      {
+        type: 'feature',
+        "description": "Expand UADE WASM engine and Amiga format parsers"
+      }
+    ]
+  },
+  {
+    version: '2026-02-21',
     date: '2026-02-21',
     changes: [
       {
@@ -210,30 +240,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add multi-user live collaboration via WebRTC"
-      },
-      {
-        type: 'feature',
-        "description": "Complete WebGL offscreen canvas UI scaffolding"
-      },
-      {
-        type: 'feature',
-        "description": "Add UI component scaffolding"
-      },
-      {
-        type: 'feature',
-        "description": "Add audioMotion visualizer presets across DJ, tracker, and FT2 views"
-      },
-      {
-        type: 'feature',
-        "description": "Add note suppression to TrackerReplayer for scratch mode"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update changelog and improve PatternEditorCanvas rendering"
-      },
-      {
-        type: 'feature',
-        "description": "Add MIDI DJ controller presets and auto-mapping"
       }
     ]
   }
