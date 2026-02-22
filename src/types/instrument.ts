@@ -192,7 +192,8 @@ export type SynthType =
   // UADE - Universal Amiga Dead-player (130+ exotic Amiga formats)
   | 'UADESynth'       // UADE catch-all (playback-only via 68k emulation)
   // Modular Synthesis
-  | 'ModularSynth';   // Modular synthesizer with patch editor
+  | 'ModularSynth'    // Modular synthesizer with patch editor
+  | 'UADESynth';      // UADE playback-only (exotic Amiga formats)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 

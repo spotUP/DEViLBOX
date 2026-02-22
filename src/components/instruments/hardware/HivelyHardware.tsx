@@ -6,8 +6,8 @@
  * blue/white Amiga-style editor while React maintains the source of truth.
  */
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
-import type { HivelyConfig, HivelyPerfEntryConfig } from '@typedefs/instrument';
+import React, { useRef, useEffect, useState } from 'react';
+import type { HivelyConfig } from '@typedefs/instrument';
 
 /* Parameter IDs must match the InsedParam enum in hvl_insed.h */
 const INSED = {
@@ -210,8 +210,9 @@ export const HivelyHardware: React.FC<HivelyHardwareProps> = ({ config, onChange
 
     async function init() {
       try {
-        /* Create canvas for SDL */
+        /* Create canvas for SDL — must have id="canvas" for Emscripten event registration */
         const canvas = document.createElement('canvas');
+        canvas.id = 'canvas';
         canvas.width = 800;
         canvas.height = 480;
         canvas.style.width = '100%';

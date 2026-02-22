@@ -1523,6 +1523,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Cable',
     color: 'text-indigo-500',
   },
+  UADESynth: {
+    type: 'UADESynth',
+    name: 'UADE',
+    shortName: 'UADE',
+    description: 'Playback-only engine for 130+ exotic Amiga tracker formats via UADE',
+    bestFor: ['Amiga modules', 'Exotic formats', 'Playback'],
+    icon: 'Disc',
+    color: 'text-gray-500',
+  },
 };
 
 // Organized categories

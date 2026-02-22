@@ -50,6 +50,13 @@ import { Odin2Controls } from '../controls/Odin2Controls';
 import { SurgeControls } from '../controls/SurgeControls';
 import { HivelyControls } from '../controls/HivelyControls';
 import { HivelyHardware } from '../hardware/HivelyHardware';
+import { PT2Hardware } from '../hardware/PT2Hardware';
+import { FT2Hardware } from '../hardware/FT2Hardware';
+import { FurnaceFMHardware, isFurnaceFMType } from '../hardware/FurnaceFMHardware';
+import { FurnacePSGHardware, isFurnacePSGType } from '../hardware/FurnacePSGHardware';
+import { FurnaceWaveHardware, isFurnaceWaveType } from '../hardware/FurnaceWaveHardware';
+import { FurnacePCMHardware, isFurnacePCMType } from '../hardware/FurnacePCMHardware';
+import { FurnaceMacroHardware } from '../hardware/FurnaceMacroHardware';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
 import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
 import { MAMEOscilloscope } from '../../visualization/MAMEOscilloscope';
@@ -547,13 +554,18 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     });
   }, [instrument.synare, handleChange]);
 
-  // Handle Furnace config updates
+  // Handle Furnace config updates (partial — for FurnaceControls)
   const handleFurnaceChange = useCallback((updates: Partial<typeof instrument.furnace>) => {
     const currentFurnace = instrument.furnace || DEFAULT_FURNACE;
     handleChange({
       furnace: { ...currentFurnace, ...updates },
     });
   }, [instrument.furnace, handleChange]);
+
+  // Handle Furnace hardware config updates (full config — for Furnace*Hardware)
+  const handleFurnaceHardwareChange = useCallback((fullConfig: typeof DEFAULT_FURNACE) => {
+    handleChange({ furnace: fullConfig });
+  }, [handleChange]);
 
   // Handle MAME config updates
   const handleMAMEChange = useCallback((updates: Partial<typeof instrument.mame>) => {
@@ -728,6 +740,29 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       FurnaceAY: ['A', 'B', 'C'],
     };
 
+    // Determine if this Furnace chip has a hardware UI
+    const hasFurnaceHardware = isFurnaceFMType(instrument.synthType) ||
+      isFurnacePSGType(instrument.synthType) ||
+      isFurnaceWaveType(instrument.synthType) ||
+      isFurnacePCMType(instrument.synthType);
+
+    // Render the correct Furnace hardware UI based on chip category
+    const renderFurnaceHardware = () => {
+      if (isFurnaceFMType(instrument.synthType)) {
+        return <FurnaceFMHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} />;
+      }
+      if (isFurnacePSGType(instrument.synthType)) {
+        return <FurnacePSGHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} />;
+      }
+      if (isFurnaceWaveType(instrument.synthType)) {
+        return <FurnaceWaveHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} synthType={instrument.synthType} />;
+      }
+      if (isFurnacePCMType(instrument.synthType)) {
+        return <FurnacePCMHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} />;
+      }
+      return null;
+    };
+
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         {/* Use common header with visualization */}
@@ -737,6 +772,24 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           showHelpButton={false}
+          customHeaderControls={
+            hasFurnaceHardware ? (
+              <button
+                onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
+                  uiMode === 'hardware'
+                    ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/50'
+                    : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                }`}
+                title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+              >
+                {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+                <span className="text-[10px] font-bold uppercase">
+                  {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+                </span>
+              </button>
+            ) : undefined
+          }
         />
 
         {/* Channel Oscilloscope for native dispatch synths */}
@@ -751,13 +804,26 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           </div>
         )}
 
-        {/* Furnace Controls */}
+        {/* Furnace Controls — hardware or simple */}
         <div className="synth-editor-content overflow-y-auto p-4">
-          <FurnaceControls
-            config={furnaceConfig}
-            instrumentId={instrument.id}
-            onChange={handleFurnaceChange}
-          />
+          {uiMode === 'hardware' && hasFurnaceHardware ? (
+            <div className="space-y-4">
+              {renderFurnaceHardware()}
+              {/* Macro editor below the main hardware UI */}
+              {furnaceConfig.macros && furnaceConfig.macros.length > 0 && (
+                <FurnaceMacroHardware
+                  config={furnaceConfig}
+                  onChange={handleFurnaceHardwareChange}
+                />
+              )}
+            </div>
+          ) : (
+            <FurnaceControls
+              config={furnaceConfig}
+              instrumentId={instrument.id}
+              onChange={handleFurnaceChange}
+            />
+          )}
         </div>
       </div>
     );
@@ -818,7 +884,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       );
     }
 
-    // Regular sample editor for other sample-based instruments
+    // Regular sample editor for other sample-based instruments — with hardware UI toggle
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         {/* Use common header but hide viz (sample editor has waveform) */}
@@ -829,14 +895,42 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           onVizModeChange={setVizMode}
           hideVisualization={true}
           showHelpButton={false}
+          customHeaderControls={
+            <button
+              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                uiMode === 'hardware'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+              onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
+              title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
+            >
+              {uiMode === 'hardware' ? <Cpu size={14} /> : <Monitor size={14} />}
+              <span className="hidden sm:inline">
+                {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
+              </span>
+            </button>
+          }
         />
 
-        {/* Sample Controls */}
+        {/* Sample Controls — hardware or simple */}
         <div className="synth-editor-content overflow-y-auto p-4">
-          <SampleControls
-            instrument={instrument}
-            onChange={handleChange}
-          />
+          {uiMode === 'hardware' ? (
+            /* Detect bit depth: use PT2 for 8-bit, FT2 for 16-bit/default */
+            (instrument.metadata?.modPlayback?.usePeriodPlayback &&
+             !instrument.metadata?.originalEnvelope &&
+             !instrument.metadata?.panningEnvelope &&
+             !instrument.metadata?.autoVibrato) ? (
+              <PT2Hardware instrument={instrument} onChange={handleChange} />
+            ) : (
+              <FT2Hardware instrument={instrument} onChange={handleChange} />
+            )
+          ) : (
+            <SampleControls
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          )}
         </div>
       </div>
     );

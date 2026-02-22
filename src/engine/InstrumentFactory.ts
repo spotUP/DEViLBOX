@@ -839,9 +839,17 @@ export class InstrumentFactory {
         instrument = new HivelySynth();
         break;
 
-      case 'UADESynth':
-        instrument = new UADESynth();
+      case 'UADESynth': {
+        const uadeSynth = new UADESynth();
+        if (config.uade) {
+          // Fire-and-forget: load the file data into the UADE engine
+          uadeSynth.setInstrument(config.uade).catch(err =>
+            console.error('[InstrumentFactory] UADE load failed:', err)
+          );
+        }
+        instrument = uadeSynth;
         break;
+      }
 
       default: {
         // Check VSTBridge registry for dynamically registered synths
