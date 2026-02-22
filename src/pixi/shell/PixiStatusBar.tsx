@@ -1,483 +1,87 @@
 /**
- * PixiStatusBar — Bottom status bar (24px).
- * Shows tracker info in tracker/arrangement views, DJ info in DJ view.
- * Right side: audio state indicator.
+ * PixiStatusBar — Bottom status bar for WebGL mode.
+ * Renders the actual DOM StatusBar component via PixiDOMOverlay
+ * for pixel-perfect parity with the DOM tracker view.
+ *
+ * Adds a GL-specific compact oscilloscope when audio is active.
  */
 
-import { useCallback } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
-import { PIXI_FONTS } from '../fonts';
-import { usePixiTheme, usePixiThemeId, getDeckColors } from '../theme';
-import { PixiButton } from '../components';
-import { useUIStore, useTransportStore, useAudioStore } from '@stores';
-import { useTrackerStore } from '@stores';
-import { useDJStore } from '@/stores/useDJStore';
-import { useMIDIStore } from '@/stores/useMIDIStore';
-import { useCollaborationStore } from '@/stores/useCollaborationStore';
-import type { KnobAssignment } from '@/midi/knobBanks';
+import { useCallback, useEffect, useState } from 'react';
 import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
-import { Oscilloscope } from '@/components/visualization/Oscilloscope';
+import { useUIStore, useAudioStore } from '@stores';
+import { useMIDIStore } from '@/stores/useMIDIStore';
 
-const STATUS_HEIGHT = 24;
-const KNOB_BAR_HEIGHT = 28;
+/** Main status bar height (matches DOM py-1.5 + text) */
+const STATUS_BAR_HEIGHT = 32;
+/** MIDI knob panel height when expanded (matches DOM grid + tabs) */
+const KNOB_PANEL_HEIGHT = 80;
 
-// ─── Tracker status content ─────────────────────────────────────────────────
+/**
+ * Lazy-loaded wrapper for the DOM StatusBar + optional oscilloscope.
+ * Uses dynamic import() to avoid circular dependency issues.
+ */
+const StatusBarOverlay: React.FC = () => {
+  const [Comp, setComp] = useState<React.ComponentType<any> | null>(null);
+  const [OscComp, setOscComp] = useState<React.ComponentType<any> | null>(null);
+  const isAudioActive = useAudioStore(s => s.contextState === 'running');
 
-const TrackerStatus: React.FC = () => {
-  const theme = usePixiTheme();
-  const cursor = useTrackerStore(s => s.cursor);
-  const currentOctave = useTrackerStore(s => s.currentOctave);
-  const insertMode = useTrackerStore(s => s.insertMode);
-  const recordMode = useTrackerStore(s => s.recordMode);
-  const patternLength = useTrackerStore(s => {
-    const pat = s.patterns[s.currentPatternIndex];
-    return pat?.length || 64;
-  });
-  const isPlaying = useTransportStore(s => s.isPlaying);
-  const currentRow = useTransportStore(s => s.currentRow);
-
-  const displayRow = isPlaying ? currentRow : cursor.rowIndex;
-  const rowStr = `${String(displayRow).padStart(2, '0')}/${String(patternLength - 1).padStart(2, '0')}`;
-
-  const sep = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 4, 1, STATUS_HEIGHT - 8);
-    g.fill({ color: theme.border.color, alpha: 0.4 });
-  }, [theme]);
-
-  return (
-    <>
-      {/* Row */}
-      <pixiBitmapText
-        text="Row"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-        tint={theme.text.color}
-        layout={{}}
-      />
-      <pixiBitmapText
-        text={rowStr}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-        tint={theme.accent.color}
-        layout={{ marginLeft: 4 }}
-      />
-
-      <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 8, marginRight: 8 }} />
-
-      {/* Channel */}
-      <pixiBitmapText
-        text={`Ch ${cursor.channelIndex + 1}`}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-        tint={theme.text.color}
-        layout={{}}
-      />
-
-      <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 8, marginRight: 8 }} />
-
-      {/* Column type */}
-      <pixiBitmapText
-        text={cursor.columnType}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-        tint={theme.text.color}
-        layout={{}}
-      />
-
-      <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 8, marginRight: 8 }} />
-
-      {/* Octave */}
-      <pixiBitmapText
-        text="Oct"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-        tint={theme.text.color}
-        layout={{}}
-      />
-      <pixiBitmapText
-        text={String(currentOctave)}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-        tint={theme.accent.color}
-        layout={{ marginLeft: 4 }}
-      />
-
-      <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 8, marginRight: 8 }} />
-
-      {/* Insert/Overwrite mode */}
-      <pixiBitmapText
-        text={insertMode ? 'INS' : 'OVR'}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-        tint={insertMode ? theme.warning.color : theme.accent.color}
-        layout={{}}
-      />
-
-      <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 8, marginRight: 8 }} />
-
-      {/* Record/Edit mode */}
-      <pixiBitmapText
-        text={recordMode ? 'REC' : 'EDIT'}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-        tint={recordMode ? theme.error.color : theme.text.color}
-        layout={{}}
-      />
-    </>
-  );
-};
-
-// ─── DJ status content ──────────────────────────────────────────────────────
-
-const DJStatus: React.FC = () => {
-  const theme = usePixiTheme();
-  const deck1Playing = useDJStore(s => s.decks.A.isPlaying);
-  const deck2Playing = useDJStore(s => s.decks.B.isPlaying);
-  const deck1BPM = useDJStore(s => s.decks.A.effectiveBPM);
-  const deck2BPM = useDJStore(s => s.decks.B.effectiveBPM);
-  const deck1Name = useDJStore(s => s.decks.A.trackName);
-  const deck2Name = useDJStore(s => s.decks.B.trackName);
-  const crossfader = useDJStore(s => s.crossfaderPosition);
-
-  const themeId = usePixiThemeId();
-  const { deckA, deckB } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
-
-  const sep = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 4, 1, STATUS_HEIGHT - 8);
-    g.fill({ color: theme.border.color, alpha: 0.4 });
-  }, [theme]);
-
-  return (
-    <>
-      {/* Deck 1 */}
-      <pixiBitmapText
-        text="D1"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-        tint={deckA}
-        layout={{}}
-      />
-      <pixiBitmapText
-        text={deck1Playing ? 'PLAY' : 'STOP'}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-        tint={deck1Playing ? theme.success.color : theme.textMuted.color}
-        layout={{ marginLeft: 4 }}
-      />
-      {deck1Name ? (
-        <pixiBitmapText
-          text={deck1Name.length > 15 ? deck1Name.substring(0, 15) + '..' : deck1Name}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-          tint={theme.textMuted.color}
-          layout={{ marginLeft: 6 }}
-        />
-      ) : null}
-      <pixiBitmapText
-        text={`${deck1BPM.toFixed(1)} BPM`}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-        tint={deckA}
-        layout={{ marginLeft: 6 }}
-      />
-
-      <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 8, marginRight: 8 }} />
-
-      {/* Crossfader */}
-      <pixiBitmapText
-        text="X-Fade"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-        tint={theme.text.color}
-        layout={{}}
-      />
-      <pixiBitmapText
-        text={`${(crossfader * 100).toFixed(0)}%`}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-        tint={theme.accent.color}
-        layout={{ marginLeft: 4 }}
-      />
-
-      <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 8, marginRight: 8 }} />
-
-      {/* Deck 2 */}
-      <pixiBitmapText
-        text="D2"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-        tint={deckB}
-        layout={{}}
-      />
-      <pixiBitmapText
-        text={deck2Playing ? 'PLAY' : 'STOP'}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-        tint={deck2Playing ? theme.success.color : theme.textMuted.color}
-        layout={{ marginLeft: 4 }}
-      />
-      {deck2Name ? (
-        <pixiBitmapText
-          text={deck2Name.length > 15 ? deck2Name.substring(0, 15) + '..' : deck2Name}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-          tint={theme.textMuted.color}
-          layout={{ marginLeft: 6 }}
-        />
-      ) : null}
-      <pixiBitmapText
-        text={`${deck2BPM.toFixed(1)} BPM`}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-        tint={deckB}
-        layout={{ marginLeft: 6 }}
-      />
-    </>
-  );
-};
-
-// ─── MIDI Knob Bank Panel ────────────────────────────────────────────────────
-
-const PixiMIDIKnobPanel: React.FC = () => {
-  const theme = usePixiTheme();
-  const knobBank = useMIDIStore(s => s.knobBank);
-  const nksKnobAssignments = useMIDIStore(s => s.nksKnobAssignments);
-  const nksKnobPage = useMIDIStore(s => s.nksKnobPage);
-  const nksKnobTotalPages = useMIDIStore(s => s.nksKnobTotalPages);
-
-  const handlePrevPage = useCallback(() => {
-    useMIDIStore.getState().prevKnobPage();
+  useEffect(() => {
+    import('@components/layout/StatusBar').then(m => setComp(() => m.StatusBar));
   }, []);
 
-  const handleNextPage = useCallback(() => {
-    useMIDIStore.getState().nextKnobPage();
+  useEffect(() => {
+    if (isAudioActive) {
+      import('@/components/visualization/Oscilloscope').then(m => setOscComp(() => m.Oscilloscope));
+    }
+  }, [isAudioActive]);
+
+  const handleShowTips = useCallback(() => {
+    useUIStore.getState().openModal('tips', { initialTab: 'tips' });
   }, []);
 
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 4000, KNOB_BAR_HEIGHT);
-    g.fill({ color: theme.bgTertiary.color });
-    g.rect(0, 0, 4000, 1);
-    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [theme]);
-
-  const assignments: KnobAssignment[] = nksKnobAssignments;
+  if (!Comp) return null;
 
   return (
-    <pixiContainer
-      layout={{
-        width: '100%',
-        height: KNOB_BAR_HEIGHT,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingLeft: 8,
-        paddingRight: 8,
-        gap: 4,
-      }}
-    >
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: '100%', height: KNOB_BAR_HEIGHT }} />
-
-      {/* Bank label */}
-      <pixiBitmapText
-        text={`MIDI:${knobBank.toUpperCase()}`}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
-        tint={theme.accent.color}
-        layout={{}}
-      />
-
-      {/* Page navigation */}
-      {nksKnobTotalPages > 1 && (
-        <>
-          <PixiButton label="<" variant="ghost" size="sm" onClick={handlePrevPage} />
-          <pixiBitmapText
-            text={`${nksKnobPage + 1}/${nksKnobTotalPages}`}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-            tint={theme.textMuted.color}
-            layout={{}}
-          />
-          <PixiButton label=">" variant="ghost" size="sm" onClick={handleNextPage} />
-        </>
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <Comp onShowTips={handleShowTips} />
+      {/* GL enhancement: compact oscilloscope in the status bar */}
+      {isAudioActive && OscComp && (
+        <div
+          style={{
+            position: 'absolute',
+            right: '140px',
+            bottom: '6px',
+            width: '100px',
+            height: '20px',
+            overflow: 'hidden',
+            opacity: 0.8,
+            pointerEvents: 'none',
+          }}
+        >
+          <OscComp width={100} height={20} mode="waveform" />
+        </div>
       )}
-
-      {/* 8 knob assignments */}
-      {Array.from({ length: 8 }, (_, i) => {
-        const a = assignments[i];
-        return (
-          <pixiContainer key={i} layout={{ flexDirection: 'column', alignItems: 'center', width: 60, gap: 1 }}>
-            <pixiBitmapText
-              text={`CC${a?.cc ?? (70 + i)}`}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
-              tint={theme.textMuted.color}
-              layout={{}}
-            />
-            <pixiBitmapText
-              text={a?.label ?? `K${i + 1}`}
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
-              tint={a ? theme.accent.color : theme.textMuted.color}
-              layout={{}}
-            />
-          </pixiContainer>
-        );
-      })}
-    </pixiContainer>
+    </div>
   );
 };
-
-// ─── Main StatusBar ─────────────────────────────────────────────────────────
 
 export const PixiStatusBar: React.FC = () => {
-  const theme = usePixiTheme();
-  const activeView = useUIStore(s => s.activeView);
-  const contextState = useAudioStore(s => s.contextState);
-  const midiInitialized = useMIDIStore(s => s.isInitialized);
-  const midiInputDevices = useMIDIStore(s => s.inputDevices);
-  const midiSelectedInput = useMIDIStore(s => s.selectedInputId);
+  const hasMIDIDevice = useMIDIStore(s => s.isInitialized && s.inputDevices.length > 0);
   const showKnobBar = useMIDIStore(s => s.showKnobBar);
-  const collabStatus = useCollaborationStore(s => s.status);
-  const collabRoomCode = useCollaborationStore(s => s.roomCode);
+  const activeView = useUIStore(s => s.activeView);
 
-  const handleTips = useCallback(() => {
-    useUIStore.getState().openModal('tips');
-  }, []);
-
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    // Top border
-    g.rect(0, 0, 4000, 1);
-    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-    // Background
-    g.rect(0, 1, 4000, STATUS_HEIGHT - 1);
-    g.fill({ color: theme.bgSecondary.color });
-  }, [theme]);
-
-  const isAudioActive = contextState === 'running';
-  const hasMIDIDevice = midiInitialized && midiInputDevices.length > 0;
-  const midiDeviceName = hasMIDIDevice
-    ? midiInputDevices.find(d => d.id === midiSelectedInput)?.name || midiInputDevices[0].name
-    : null;
-  const isCollabConnected = collabStatus === 'connected' && collabRoomCode;
-  const showMIDIKnobPanel = hasMIDIDevice && showKnobBar;
-
-  const sep = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 4, 1, STATUS_HEIGHT - 8);
-    g.fill({ color: theme.border.color, alpha: 0.4 });
-  }, [theme]);
+  // MIDI knob panel shows in tracker/arrangement views when a MIDI device is connected
+  const showMIDIPanel = activeView !== 'dj' && hasMIDIDevice && showKnobBar;
+  const totalHeight = showMIDIPanel
+    ? STATUS_BAR_HEIGHT + KNOB_PANEL_HEIGHT
+    : STATUS_BAR_HEIGHT;
 
   return (
-    <pixiContainer
-      layout={{
-        width: '100%',
-        height: showMIDIKnobPanel ? STATUS_HEIGHT + KNOB_BAR_HEIGHT : STATUS_HEIGHT,
-        flexDirection: 'column',
-      }}
+    <PixiDOMOverlay
+      layout={{ width: '100%', height: totalHeight }}
+      style={{ overflow: 'visible', zIndex: 30 }}
     >
-    {/* MIDI knob bank panel (conditionally shown above status bar) */}
-    {showMIDIKnobPanel && <PixiMIDIKnobPanel />}
-
-    <pixiContainer
-      layout={{
-        width: '100%',
-        height: STATUS_HEIGHT,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingLeft: 12,
-        paddingRight: 12,
-      }}
-    >
-      {/* Background */}
-      <pixiGraphics
-        draw={drawBg}
-        layout={{ position: 'absolute', width: '100%', height: STATUS_HEIGHT }}
-      />
-
-      {/* Left: View-specific content */}
-      <pixiContainer layout={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-        {activeView === 'dj' ? <DJStatus /> : <TrackerStatus />}
-      </pixiContainer>
-
-      {/* Right side indicators */}
-      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-
-        {/* MIDI device indicator */}
-        {hasMIDIDevice && (
-          <>
-            <pixiGraphics
-              draw={(g: GraphicsType) => {
-                g.clear();
-                g.circle(3, 3, 2.5);
-                g.fill({ color: theme.success.color });
-              }}
-              layout={{ width: 6, height: 6 }}
-            />
-            <pixiBitmapText
-              text={midiDeviceName ? (midiDeviceName.length > 12 ? midiDeviceName.substring(0, 12) + '..' : midiDeviceName) : 'MIDI'}
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
-              tint={theme.success.color}
-              layout={{}}
-            />
-            <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 4, marginRight: 4 }} />
-          </>
-        )}
-
-        {/* Tips button */}
-        <pixiContainer
-          eventMode="static"
-          cursor="pointer"
-          onPointerUp={handleTips}
-          layout={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
-        >
-          <pixiBitmapText
-            text="TIPS"
-            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
-            tint={theme.warning.color}
-            layout={{}}
-          />
-        </pixiContainer>
-
-        <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 4, marginRight: 4 }} />
-
-        {/* Collab status */}
-        {isCollabConnected && (
-          <>
-            <pixiGraphics
-              draw={(g: GraphicsType) => {
-                g.clear();
-                g.circle(3, 3, 2.5);
-                g.fill({ color: theme.success.color });
-              }}
-              layout={{ width: 6, height: 6 }}
-            />
-            <pixiBitmapText
-              text="Collab"
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
-              tint={theme.success.color}
-              layout={{}}
-            />
-            <pixiBitmapText
-              text={collabRoomCode}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
-              tint={theme.textMuted.color}
-              layout={{ marginLeft: 3 }}
-            />
-            <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 4, marginRight: 4 }} />
-          </>
-        )}
-
-        {/* Compact oscilloscope */}
-        {isAudioActive && (
-          <>
-            <PixiDOMOverlay
-              layout={{ width: 100, height: 20 }}
-              style={{ overflow: 'hidden', opacity: 0.8 }}
-            >
-              <Oscilloscope width={100} height={20} mode="waveform" />
-            </PixiDOMOverlay>
-            <pixiGraphics draw={sep} layout={{ width: 1, height: STATUS_HEIGHT, marginLeft: 4, marginRight: 4 }} />
-          </>
-        )}
-
-        {/* Audio state indicator */}
-        <pixiGraphics
-          draw={(g: GraphicsType) => {
-            g.clear();
-            g.circle(4, 4, 3);
-            g.fill({ color: isAudioActive ? theme.success.color : theme.textMuted.color });
-          }}
-          layout={{ width: 8, height: 8 }}
-        />
-        <pixiBitmapText
-          text={isAudioActive ? 'Audio Active' : 'Audio Off'}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-          tint={isAudioActive ? theme.success.color : theme.textMuted.color}
-          layout={{}}
-        />
-      </pixiContainer>
-    </pixiContainer>
-    </pixiContainer>
+      <StatusBarOverlay />
+    </PixiDOMOverlay>
   );
 };

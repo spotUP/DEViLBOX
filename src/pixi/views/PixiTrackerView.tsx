@@ -10,33 +10,71 @@
  * are hooked here — they only attach window event listeners, no DOM rendering.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { PixiButton, PixiNumericInput } from '../components';
 import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
-import { FT2Toolbar } from '@/components/tracker/FT2Toolbar';
+import { PixiFT2Toolbar } from './tracker/PixiFT2Toolbar';
+import { PixiInstrumentPanel } from './tracker/PixiInstrumentPanel';
+import { PixiChannelVUMeters } from './tracker/PixiChannelVUMeters';
+import { PixiPatternMinimap } from './tracker/PixiPatternMinimap';
+import { PixiAutomationLanes } from './tracker/PixiAutomationLanes';
+import { PixiMacroLanes } from './tracker/PixiMacroLanes';
+import { PixiMacroSlotsPanel } from './tracker/PixiMacroSlotsPanel';
+import { PixiMIDIKnobBar } from './tracker/PixiMIDIKnobBar';
+import { PixiRandomizeDialog } from '../dialogs/PixiRandomizeDialog';
+import { PixiAcidPatternDialog } from '../dialogs/PixiAcidPatternDialog';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
-import { InstrumentList } from '@/components/instruments/InstrumentList';
 import { GridSequencer } from '@/components/grid/GridSequencer';
 import { TB303View } from '@/components/demo/TB303View';
 import { PianoRoll } from '@/components/pianoroll';
+import { PixiFurnaceView } from './furnace/PixiFurnaceView';
+import { PixiHivelyView } from './hively/PixiHivelyView';
 import { useTrackerInput } from '@/hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
+import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useTrackerStore, useTransportStore, useUIStore } from '@stores';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useFPSMonitor } from '@/hooks/useFPSMonitor';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
 import { notify } from '@stores/useNotificationStore';
+import { useThemeStore } from '@stores/useThemeStore';
 import { PatternManagement } from '@/components/pattern/PatternManagement';
+/** Deferred pitch slider — avoids circular import from @engine/PatternScheduler */
+const PitchSliderOverlay: React.FC = () => {
+  const [Comp, setComp] = useState<React.ComponentType<{ className?: string }> | null>(null);
+  useEffect(() => {
+    import('@/components/transport/DJPitchSlider').then(m => setComp(() => m.DJPitchSlider));
+  }, []);
+  return Comp ? <Comp className="h-full" /> : null;
+};
 
-type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303';
+/** Generate theme-aware inline styles for DOM <select> overlays */
+const useSelectStyle = (variant: 'default' | 'accent' = 'default'): React.CSSProperties => {
+  const themeColors = useThemeStore(s => s.getCurrentTheme().colors);
+  return {
+    width: '100%',
+    height: '100%',
+    padding: '0 4px',
+    fontSize: '11px',
+    fontFamily: 'monospace',
+    background: themeColors.bg,
+    color: variant === 'accent' ? themeColors.accent : themeColors.text,
+    border: `1px solid ${themeColors.border}`,
+    borderRadius: '3px',
+    cursor: 'pointer',
+    outline: 'none',
+  };
+};
+
+type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'arrangement' | 'dj' | 'drumpad';
 
 const PATTERN_PANEL_HEIGHT = 180;
 
-const FT2_TOOLBAR_HEIGHT = 140;
+const FT2_TOOLBAR_HEIGHT = 160; // DOM FT2Toolbar via PixiDOMOverlay: ~120px content + ~28px menu + padding
 
 export const PixiTrackerView: React.FC = () => {
   // Enable FT2-style keyboard input (window event listeners — no DOM needed)
@@ -47,20 +85,39 @@ export const PixiTrackerView: React.FC = () => {
   const [gridChannelIndex, setGridChannelIndex] = useState(0);
   const showPatterns = useUIStore(s => s.showPatterns);
   const modalOpen = useUIStore(s => s.modalOpen);
+  const closeModal = useUIStore(s => s.closeModal);
+  const editorMode = useTrackerStore(s => s.editorMode);
+  const { width: windowWidth, height: windowHeight } = usePixiResponsive();
+  const showMacroSlots = useUIStore(s => s.showMacroSlots);
 
-  const handleShowExport = useCallback(() => useUIStore.getState().openModal('export'), []);
-  const handleShowHelp = useCallback((tab?: string) => useUIStore.getState().openModal('help', { initialTab: tab || 'shortcuts' }), []);
-  const handleShowMasterFX = useCallback(() => {
-    const s = useUIStore.getState();
-    s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx');
-  }, []);
-  const handleShowInstrumentFX = useCallback(() => {
-    const s = useUIStore.getState();
-    s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx');
-  }, []);
-  const handleShowInstruments = useCallback(() => useUIStore.getState().openModal('instruments'), []);
-  const handleShowPatternOrder = useCallback(() => useUIStore.getState().openModal('patternOrder'), []);
-  const handleShowDrumpads = useCallback(() => useUIStore.getState().openModal('drumpads'), []);
+  // Pattern data for automation/macro lanes overlay
+  const patterns = useTrackerStore(s => s.patterns);
+  const currentPatternIndex = useTrackerStore(s => s.currentPatternIndex);
+  const patternOrder = useTrackerStore(s => s.patternOrder);
+  const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
+  const showAutomation = useUIStore(s => s.showAutomationLanes);
+  const showMacroLanes = useUIStore(s => s.showMacroLanes);
+  const currentPattern = patterns[currentPatternIndex];
+  const patternId = currentPattern?.id || '';
+  const patternLength = currentPattern?.length || 64;
+  const channelCount = currentPattern?.channels?.length || 4;
+  const ROW_HEIGHT = 18; // matches PatternEditorCanvas default row height
+
+  // Adjacent pattern IDs for ghost automation curves
+  const prevPositionIdx = currentPositionIndex > 0 ? currentPositionIndex - 1 : -1;
+  const nextPositionIdx = currentPositionIndex < patternOrder.length - 1 ? currentPositionIndex + 1 : -1;
+  const prevPatternId = prevPositionIdx >= 0 ? patterns[patternOrder[prevPositionIdx]]?.id : undefined;
+  const prevPatternLength = prevPositionIdx >= 0 ? patterns[patternOrder[prevPositionIdx]]?.length : undefined;
+  const nextPatternId = nextPositionIdx >= 0 ? patterns[patternOrder[nextPositionIdx]]?.id : undefined;
+  const nextPatternLength = nextPositionIdx >= 0 ? patterns[patternOrder[nextPositionIdx]]?.length : undefined;
+
+  // Compute instrument panel height: window minus navbar(36) + toolbar(108) + controls(32) + statusbar(24) + optional pattern panel
+  const NAVBAR_H = 36;
+  const STATUSBAR_H = 24;
+  const CONTROLS_BAR_H = 32;
+  const MACRO_SLOTS_H = showMacroSlots ? 32 : 0;
+  const instrumentPanelHeight = windowHeight - NAVBAR_H - FT2_TOOLBAR_HEIGHT - CONTROLS_BAR_H - STATUSBAR_H - MACRO_SLOTS_H - (showPatterns ? PATTERN_PANEL_HEIGHT : 0);
+  const editorWidth = windowWidth - 200 - 16; // minus instrument panel and minimap
 
   return (
     <pixiContainer
@@ -70,36 +127,20 @@ export const PixiTrackerView: React.FC = () => {
         flexDirection: 'column',
       }}
     >
-      {/* FT2 Toolbar + Menu bar — DOM overlay so it's visible through modal backdrops */}
+      {/* FT2 Toolbar + Menu bar — native Pixi rendering */}
+      <PixiFT2Toolbar />
+
+      {/* Editor controls bar — DOM overlay for 1:1 parity */}
+      <PixiEditorControlsBarOverlay viewMode={viewMode} onViewModeChange={setViewMode} gridChannelIndex={gridChannelIndex} onGridChannelChange={setGridChannelIndex} />
+
+      {/* Pattern management panel (collapsible) — always mounted, height:0 when hidden
+          to avoid Yoga node swap errors in @pixi/layout */}
       <PixiDOMOverlay
-        layout={{ width: '100%', height: FT2_TOOLBAR_HEIGHT }}
-        style={{ overflow: 'visible', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+        layout={{ width: '100%', height: showPatterns ? PATTERN_PANEL_HEIGHT : 0 }}
+        style={{ overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
       >
-        <FT2Toolbar
-          onShowExport={handleShowExport}
-          onShowHelp={handleShowHelp}
-          onShowMasterFX={handleShowMasterFX}
-          onShowInstrumentFX={handleShowInstrumentFX}
-          onShowInstruments={handleShowInstruments}
-          onShowPatternOrder={handleShowPatternOrder}
-          onShowDrumpads={handleShowDrumpads}
-          showMasterFX={modalOpen === 'masterFx'}
-          showInstrumentFX={modalOpen === 'instrumentFx'}
-        />
+        {showPatterns && <PatternManagement />}
       </PixiDOMOverlay>
-
-      {/* Editor controls bar */}
-      <PixiEditorControlsBar viewMode={viewMode} onViewModeChange={setViewMode} gridChannelIndex={gridChannelIndex} onGridChannelChange={setGridChannelIndex} />
-
-      {/* Pattern management panel (collapsible) */}
-      {showPatterns && (
-        <PixiDOMOverlay
-          layout={{ width: '100%', height: PATTERN_PANEL_HEIGHT }}
-          style={{ overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
-        >
-          <PatternManagement />
-        </PixiDOMOverlay>
-      )}
 
       {/* Main content: editor + instrument panel */}
       <pixiContainer
@@ -109,72 +150,213 @@ export const PixiTrackerView: React.FC = () => {
           flexDirection: 'row',
         }}
       >
-        {/* Editor area — switches based on viewMode */}
-        {viewMode === 'tracker' ? (
+        {/* Editor area with overlays */}
+        <pixiContainer layout={{ flex: 1, height: '100%' }}>
+          {/* Editor — single stable PixiDOMOverlay with conditional DOM children.
+              Using ONE overlay avoids swapping <pixiContainer> Yoga nodes in
+              @pixi/layout, which causes BindingError in insertChild. The overlay's
+              createRoot().render() handles DOM child swaps independently of Pixi. */}
           <PixiDOMOverlay
             layout={{ flex: 1, height: '100%' }}
             style={{ overflow: 'hidden' }}
           >
-            <PatternEditorCanvas />
+            {viewMode === 'tracker' ? (
+              editorMode === 'furnace' ? (
+                <AutoSizeFurnaceView />
+              ) : editorMode === 'hively' ? (
+                <AutoSizeHivelyView />
+              ) : (
+                <PatternEditorCanvas />
+              )
+            ) : viewMode === 'grid' ? (
+              <GridSequencer channelIndex={gridChannelIndex} />
+            ) : viewMode === 'pianoroll' ? (
+              <PianoRoll channelIndex={gridChannelIndex} />
+            ) : (
+              <div style={{ height: '100%', overflowY: 'auto' }}>
+                <TB303View channelIndex={gridChannelIndex} />
+              </div>
+            )}
           </PixiDOMOverlay>
-        ) : viewMode === 'grid' ? (
-          <PixiDOMOverlay
-            layout={{ flex: 1, height: '100%' }}
-            style={{ overflow: 'hidden' }}
-          >
-            <GridSequencer channelIndex={gridChannelIndex} />
-          </PixiDOMOverlay>
-        ) : viewMode === 'pianoroll' ? (
-          <PixiDOMOverlay
-            layout={{ flex: 1, height: '100%' }}
-            style={{ overflow: 'hidden' }}
-          >
-            <PianoRoll channelIndex={gridChannelIndex} />
-          </PixiDOMOverlay>
-        ) : (
-          <PixiDOMOverlay
-            layout={{ flex: 1, height: '100%' }}
-            style={{ overflow: 'hidden', overflowY: 'auto' }}
-          >
-            <TB303View channelIndex={gridChannelIndex} />
-          </PixiDOMOverlay>
-        )}
 
-        {/* Instrument list — DOM overlay for the side panel */}
-        {viewMode !== 'tb303' && (
-          <PixiDOMOverlay
-            layout={{ width: 200, height: '100%' }}
-            style={{ overflow: 'hidden', borderLeft: '1px solid rgba(255,255,255,0.1)' }}
-          >
-            <InstrumentList
-              variant="ft2"
-              showPreviewOnClick={true}
-              showPresetButton={true}
-              showSamplePackButton={true}
-              showEditButton={true}
+          {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga insertChild crash.
+              Conditional mount/unmount of Pixi children triggers BindingError in
+              Emscripten's Yoga WASM binding. Use visible + layout sizing instead. */}
+          <pixiContainer visible={viewMode === 'tracker' && editorMode === 'classic'} layout={{ position: 'absolute' }}>
+            <PixiChannelVUMeters width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+          </pixiContainer>
+          <pixiContainer visible={viewMode === 'tracker' && showAutomation && !!patternId} layout={{ position: 'absolute' }}>
+            <PixiAutomationLanes
+              width={Math.max(100, editorWidth)}
+              height={Math.max(100, instrumentPanelHeight)}
+              patternId={patternId || ''}
+              patternLength={patternLength}
+              rowHeight={ROW_HEIGHT}
+              channelCount={channelCount}
+              prevPatternId={prevPatternId}
+              prevPatternLength={prevPatternLength}
+              nextPatternId={nextPatternId}
+              nextPatternLength={nextPatternLength}
             />
-          </PixiDOMOverlay>
-        )}
+          </pixiContainer>
+          <pixiContainer visible={viewMode === 'tracker' && showMacroLanes} layout={{ position: 'absolute' }}>
+            <PixiMacroLanes
+              width={Math.max(100, editorWidth)}
+              height={Math.max(100, instrumentPanelHeight)}
+              patternLength={patternLength}
+              rowHeight={ROW_HEIGHT}
+              channelCount={channelCount}
+            />
+          </pixiContainer>
+        </pixiContainer>
+
+        {/* Pattern minimap — always mounted, zero-width when hidden */}
+        <pixiContainer visible={viewMode === 'tracker'} layout={{ width: viewMode === 'tracker' ? 16 : 0 }}>
+          <PixiPatternMinimap height={Math.max(100, instrumentPanelHeight)} />
+        </pixiContainer>
+
+        {/* Pitch slider — DOM overlay, matches DOM TrackerView layout */}
+        <PixiDOMOverlay
+          layout={{ width: 32, height: Math.max(100, instrumentPanelHeight) }}
+          style={{ borderLeft: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          <PitchSliderOverlay />
+        </PixiDOMOverlay>
+
+        {/* Instrument list — always mounted, zero-width when hidden */}
+        <pixiContainer visible={viewMode !== 'tb303'} layout={{ width: viewMode !== 'tb303' ? 200 : 0, height: '100%' }}>
+          <PixiInstrumentPanel width={200} height={Math.max(100, instrumentPanelHeight)} />
+        </pixiContainer>
       </pixiContainer>
+
+      {/* Macro Slots Panel — always mounted, zero-height when hidden */}
+      <pixiContainer visible={showMacroSlots && viewMode === 'tracker'} layout={{ width: '100%', height: showMacroSlots && viewMode === 'tracker' ? 32 : 0 }}>
+        <PixiMacroSlotsPanel width={windowWidth} />
+      </pixiContainer>
+
+      {/* MIDI Knob Bar */}
+      <PixiMIDIKnobBar width={windowWidth} />
+
+      {/* Pixi-native dialogs (rendered in Pixi canvas, triggered via modalOpen state) */}
+      <PixiRandomizeDialog
+        isOpen={modalOpen === 'randomize'}
+        onClose={closeModal}
+        channelIndex={gridChannelIndex}
+      />
+      <PixiAcidPatternDialog
+        isOpen={modalOpen === 'acidPattern'}
+        onClose={closeModal}
+        channelIndex={gridChannelIndex}
+      />
     </pixiContainer>
   );
 };
 
-// ─── Editor Controls Bar ────────────────────────────────────────────────────
+// ─── Auto-sizing wrappers for format-specific editors ───────────────────────
 
-interface EditorControlsBarProps {
+const AutoSizeFurnaceView: React.FC = () => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 800, height: 600 });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+      }
+    });
+    obs.observe(el);
+    // Set initial size
+    setSize({ width: el.clientWidth, height: el.clientHeight });
+    return () => obs.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} style={{ width: '100%', height: '100%' }}>
+      <PixiFurnaceView width={size.width} height={size.height} />
+    </div>
+  );
+};
+
+const AutoSizeHivelyView: React.FC = () => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 800, height: 600 });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+      }
+    });
+    obs.observe(el);
+    setSize({ width: el.clientWidth, height: el.clientHeight });
+    return () => obs.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} style={{ width: '100%', height: '100%' }}>
+      <PixiHivelyView width={size.width} height={size.height} />
+    </div>
+  );
+};
+
+// ─── Editor Controls Bar (DOM Overlay) ──────────────────────────────────────
+
+interface EditorControlsBarOverlayProps {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   gridChannelIndex: number;
   onGridChannelChange: (index: number) => void;
 }
 
-const PixiEditorControlsBar: React.FC<EditorControlsBarProps> = ({ viewMode, onViewModeChange, gridChannelIndex, onGridChannelChange }) => {
+/**
+ * Lazy-loaded DOM EditorControlsBar rendered via PixiDOMOverlay
+ * for pixel-perfect parity with the DOM tracker view.
+ */
+const EditorControlsBarInner: React.FC<EditorControlsBarOverlayProps> = ({ viewMode, onViewModeChange, gridChannelIndex, onGridChannelChange }) => {
+  const [Comp, setComp] = useState<React.ComponentType<any> | null>(null);
+  useEffect(() => {
+    import('@components/tracker/EditorControlsBar').then(m => setComp(() => m.EditorControlsBar));
+  }, []);
+  if (!Comp) return null;
+  return (
+    <Comp
+      viewMode={viewMode}
+      onViewModeChange={onViewModeChange}
+      gridChannelIndex={gridChannelIndex}
+      onGridChannelChange={onGridChannelChange}
+    />
+  );
+};
+
+const PixiEditorControlsBarOverlay: React.FC<EditorControlsBarOverlayProps> = (props) => {
+  return (
+    <PixiDOMOverlay
+      layout={{ width: '100%', height: 32 }}
+      style={{ overflow: 'visible', zIndex: 33 }}
+    >
+      <EditorControlsBarInner {...props} />
+    </PixiDOMOverlay>
+  );
+};
+
+/* Legacy Pixi editor controls bar — replaced by DOM EditorControlsBar via PixiDOMOverlay above */
+// @ts-expect-error Legacy code kept for reference, not actively used
+const _LegacyPixiEditorControlsBar: React.FC<EditorControlsBarOverlayProps> = ({ viewMode, onViewModeChange, gridChannelIndex, onGridChannelChange }) => {
   const theme = usePixiTheme();
   const fps = useFPSMonitor();
+  const selectStyle = useSelectStyle('default');
+  const selectStyleAccent = useSelectStyle('accent');
 
   // Store subscriptions
   const songLength = useTrackerStore(s => s.patternOrder.length);
+  const channelCount = useTrackerStore(s => {
+    const pat = s.patterns[s.currentPatternIndex];
+    return pat?.channels?.length || 4;
+  });
   const patternLength = useTrackerStore(s => {
     const pat = s.patterns[s.currentPatternIndex];
     return pat?.length || 64;
@@ -249,6 +431,21 @@ const PixiEditorControlsBar: React.FC<EditorControlsBarProps> = ({ viewMode, onV
     useUIStore.getState().openModal('grooveSettings');
   }, []);
 
+  // Overlay toggles
+  const showAutoLanes = useUIStore(s => s.showAutomationLanes);
+  const showMacLanes = useUIStore(s => s.showMacroLanes);
+  const showMacSlots = useUIStore(s => s.showMacroSlots);
+
+  const handleToggleAutoLanes = useCallback(() => {
+    useUIStore.getState().toggleAutomationLanes();
+  }, []);
+  const handleToggleMacroLanes = useCallback(() => {
+    useUIStore.getState().toggleMacroLanes();
+  }, []);
+  const handleToggleMacroSlots = useCallback(() => {
+    useUIStore.getState().toggleMacroSlots();
+  }, []);
+
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, 4000, 32);
@@ -277,57 +474,51 @@ const PixiEditorControlsBar: React.FC<EditorControlsBarProps> = ({ viewMode, onV
       >
         <select
           value={viewMode}
-          onChange={(e) => onViewModeChange(e.target.value as ViewMode)}
-          style={{
-            width: '100%',
-            height: '100%',
-            padding: '0 4px',
-            fontSize: '11px',
-            fontFamily: 'monospace',
-            background: '#1e1e2e',
-            color: '#cdd6f4',
-            border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: '3px',
-            cursor: 'pointer',
-            outline: 'none',
+          onChange={(e) => {
+            const v = e.target.value as ViewMode;
+            // Defer to break cross-reconciler sync: this DOM event handler calls
+            // a Pixi reconciler state setter, which can corrupt @pixi/layout's
+            // Yoga tree if the commit runs during react-dom's event dispatch.
+            if (v === 'arrangement' || v === 'dj' || v === 'drumpad') {
+              // These are global views — switch via useUIStore
+              setTimeout(() => useUIStore.getState().setActiveView(v), 0);
+            } else {
+              setTimeout(() => onViewModeChange(v), 0);
+            }
           }}
+          style={selectStyle}
         >
           <option value="tracker">Tracker</option>
           <option value="grid">Grid</option>
           <option value="pianoroll">Piano Roll</option>
           <option value="tb303">TB-303</option>
+          <option value="arrangement">Arrangement</option>
+          <option value="dj">DJ Mixer</option>
+          <option value="drumpad">Drum Pads</option>
         </select>
       </PixiDOMOverlay>
 
-      {/* Channel selector (for grid/pianoroll/tb303 modes) */}
-      {viewMode !== 'tracker' && (
-        <PixiDOMOverlay
-          layout={{ height: 24, width: 56 }}
-          style={{ overflow: 'visible' }}
-        >
+      {/* Channel selector (for grid/pianoroll/tb303 modes).
+          Always rendered to avoid Yoga node swap errors — hidden via width:0 in tracker mode. */}
+      <PixiDOMOverlay
+        layout={{ height: 24, width: viewMode !== 'tracker' ? 56 : 0 }}
+        style={{ overflow: 'visible' }}
+      >
+        {viewMode !== 'tracker' && (
           <select
             value={gridChannelIndex}
-            onChange={(e) => onGridChannelChange(Number(e.target.value))}
-            style={{
-              width: '100%',
-              height: '100%',
-              padding: '0 4px',
-              fontSize: '11px',
-              fontFamily: 'monospace',
-              background: '#1e1e2e',
-              color: '#a6e3a1',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '3px',
-              cursor: 'pointer',
-              outline: 'none',
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setTimeout(() => onGridChannelChange(v), 0);
             }}
+            style={selectStyleAccent}
           >
-            {Array.from({ length: 16 }, (_, i) => (
+            {Array.from({ length: channelCount }, (_, i) => (
               <option key={i} value={i}>Ch {i + 1}</option>
             ))}
           </select>
-        </PixiDOMOverlay>
-      )}
+        )}
+      </PixiDOMOverlay>
 
       <PixiControlsSep />
 
@@ -398,7 +589,7 @@ const PixiEditorControlsBar: React.FC<EditorControlsBarProps> = ({ viewMode, onV
         onClick={handleToggleGhosts}
       />
 
-      {/* REC button */}
+      {/* REC button + settings */}
       <PixiButton
         label="REC"
         variant={recordMode ? 'ft2' : 'ghost'}
@@ -406,6 +597,12 @@ const PixiEditorControlsBar: React.FC<EditorControlsBarProps> = ({ viewMode, onV
         size="sm"
         active={recordMode}
         onClick={handleToggleRecord}
+      />
+      <PixiButton
+        label="..."
+        variant="ghost"
+        size="sm"
+        onClick={() => useUIStore.getState().openModal('settings')}
       />
 
       {/* Master Mute */}
@@ -426,6 +623,34 @@ const PixiEditorControlsBar: React.FC<EditorControlsBarProps> = ({ viewMode, onV
         size="sm"
         active={smoothScrolling}
         onClick={handleToggleSmooth}
+      />
+
+      <PixiControlsSep />
+
+      {/* Overlay toggles */}
+      <PixiButton
+        label="Auto"
+        variant={showAutoLanes ? 'ft2' : 'ghost'}
+        color={showAutoLanes ? 'blue' : undefined}
+        size="sm"
+        active={showAutoLanes}
+        onClick={handleToggleAutoLanes}
+      />
+      <PixiButton
+        label="Macro"
+        variant={showMacLanes ? 'ft2' : 'ghost'}
+        color={showMacLanes ? 'blue' : undefined}
+        size="sm"
+        active={showMacLanes}
+        onClick={handleToggleMacroLanes}
+      />
+      <PixiButton
+        label="Slots"
+        variant={showMacSlots ? 'ft2' : 'ghost'}
+        color={showMacSlots ? 'blue' : undefined}
+        size="sm"
+        active={showMacSlots}
+        onClick={handleToggleMacroSlots}
       />
 
       <PixiControlsSep />
@@ -464,6 +689,7 @@ const PixiEditorControlsBar: React.FC<EditorControlsBarProps> = ({ viewMode, onV
 
 const PixiHardwarePresetSelector: React.FC = () => {
   const applySystemPreset = useTrackerStore(s => s.applySystemPreset);
+  const selectStyle = useSelectStyle('default');
 
   const groupedPresets = useMemo(() => getGroupedPresets(), []);
 
@@ -484,19 +710,7 @@ const PixiHardwarePresetSelector: React.FC = () => {
         onChange={handleChange}
         defaultValue="none"
         title="Select Hardware System Preset (NES, SMS, Genesis, etc.)"
-        style={{
-          width: '100%',
-          height: '100%',
-          padding: '0 4px',
-          fontSize: '11px',
-          fontFamily: 'monospace',
-          background: '#1e1e2e',
-          color: '#cdd6f4',
-          border: '1px solid rgba(255,255,255,0.15)',
-          borderRadius: '3px',
-          cursor: 'pointer',
-          outline: 'none',
-        }}
+        style={selectStyle}
       >
         <option value="none" disabled>HW SYSTEM...</option>
         {groupedPresets.map(group => (
@@ -514,6 +728,7 @@ const PixiHardwarePresetSelector: React.FC = () => {
 // ─── Subsong Selector ───────────────────────────────────────────────────────
 
 const PixiSubsongSelector: React.FC = () => {
+  const selectStyle = useSelectStyle('accent');
   const currentPatternIndex = useTrackerStore(s => s.currentPatternIndex);
   const patterns = useTrackerStore(s => s.patterns);
   const loadPatterns = useTrackerStore(s => s.loadPatterns);
@@ -605,19 +820,7 @@ const PixiSubsongSelector: React.FC = () => {
           value={currentSubsong}
           onChange={handleSubsongChange}
           title="Select subsong (Furnace multi-song module)"
-          style={{
-            width: '100%',
-            height: '100%',
-            padding: '0 4px',
-            fontSize: '11px',
-            fontFamily: 'monospace',
-            background: '#1e1e2e',
-            color: '#a6e3a1',
-            border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: '3px',
-            cursor: 'pointer',
-            outline: 'none',
-          }}
+          style={selectStyle}
         >
           {subsongNames.map((name: string, idx: number) => (
             <option key={idx} value={idx}>
