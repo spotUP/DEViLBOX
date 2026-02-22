@@ -711,6 +711,86 @@ async function createWasm() {
       }
     };
 
+  var UTF8Decoder = globalThis.TextDecoder && new TextDecoder();
+  
+  var findStringEnd = (heapOrArray, idx, maxBytesToRead, ignoreNul) => {
+      var maxIdx = idx + maxBytesToRead;
+      if (ignoreNul) return maxIdx;
+      // TextDecoder needs to know the byte length in advance, it doesn't stop on
+      // null terminator by itself.
+      // As a tiny code save trick, compare idx against maxIdx using a negation,
+      // so that maxBytesToRead=undefined/NaN means Infinity.
+      while (heapOrArray[idx] && !(idx >= maxIdx)) ++idx;
+      return idx;
+    };
+  
+  
+    /**
+     * Given a pointer 'idx' to a null-terminated UTF8-encoded string in the given
+     * array that contains uint8 values, returns a copy of that string as a
+     * Javascript String object.
+     * heapOrArray is either a regular array, or a JavaScript typed array view.
+     * @param {number=} idx
+     * @param {number=} maxBytesToRead
+     * @param {boolean=} ignoreNul - If true, the function will not stop on a NUL character.
+     * @return {string}
+     */
+  var UTF8ArrayToString = (heapOrArray, idx = 0, maxBytesToRead, ignoreNul) => {
+  
+      var endPtr = findStringEnd(heapOrArray, idx, maxBytesToRead, ignoreNul);
+  
+      // When using conditional TextDecoder, skip it for short strings as the overhead of the native call is not worth it.
+      if (endPtr - idx > 16 && heapOrArray.buffer && UTF8Decoder) {
+        return UTF8Decoder.decode(heapOrArray.subarray(idx, endPtr));
+      }
+      var str = '';
+      while (idx < endPtr) {
+        // For UTF8 byte structure, see:
+        // http://en.wikipedia.org/wiki/UTF-8#Description
+        // https://www.ietf.org/rfc/rfc2279.txt
+        // https://tools.ietf.org/html/rfc3629
+        var u0 = heapOrArray[idx++];
+        if (!(u0 & 0x80)) { str += String.fromCharCode(u0); continue; }
+        var u1 = heapOrArray[idx++] & 63;
+        if ((u0 & 0xE0) == 0xC0) { str += String.fromCharCode(((u0 & 31) << 6) | u1); continue; }
+        var u2 = heapOrArray[idx++] & 63;
+        if ((u0 & 0xF0) == 0xE0) {
+          u0 = ((u0 & 15) << 12) | (u1 << 6) | u2;
+        } else {
+          if ((u0 & 0xF8) != 0xF0) warnOnce('Invalid UTF-8 leading byte ' + ptrToString(u0) + ' encountered when deserializing a UTF-8 string in wasm memory to a JS string!');
+          u0 = ((u0 & 7) << 18) | (u1 << 12) | (u2 << 6) | (heapOrArray[idx++] & 63);
+        }
+  
+        if (u0 < 0x10000) {
+          str += String.fromCharCode(u0);
+        } else {
+          var ch = u0 - 0x10000;
+          str += String.fromCharCode(0xD800 | (ch >> 10), 0xDC00 | (ch & 0x3FF));
+        }
+      }
+      return str;
+    };
+  
+    /**
+     * Given a pointer 'ptr' to a null-terminated UTF8-encoded string in the
+     * emscripten HEAP, returns a copy of that string as a Javascript String object.
+     *
+     * @param {number} ptr
+     * @param {number=} maxBytesToRead - An optional length that specifies the
+     *   maximum number of bytes to read. You can omit this parameter to scan the
+     *   string until the first 0 byte. If maxBytesToRead is passed, and the string
+     *   at [ptr, ptr+maxBytesToReadr[ contains a null byte in the middle, then the
+     *   string will cut short at that byte index.
+     * @param {boolean=} ignoreNul - If true, the function will not stop on a NUL character.
+     * @return {string}
+     */
+  var UTF8ToString = (ptr, maxBytesToRead, ignoreNul) => {
+      assert(typeof ptr == 'number', `UTF8ToString expects a number (got ${typeof ptr})`);
+      return ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead, ignoreNul) : '';
+    };
+  var ___assert_fail = (condition, filename, line, func) =>
+      abort(`Assertion failed: ${UTF8ToString(condition)}, at: ` + [filename ? UTF8ToString(filename) : 'unknown filename', line, func ? UTF8ToString(func) : 'unknown function']);
+
   var __abort_js = () =>
       abort('native code called abort()');
 
@@ -793,83 +873,6 @@ async function createWasm() {
       return false;
     };
 
-  var UTF8Decoder = globalThis.TextDecoder && new TextDecoder();
-  
-  var findStringEnd = (heapOrArray, idx, maxBytesToRead, ignoreNul) => {
-      var maxIdx = idx + maxBytesToRead;
-      if (ignoreNul) return maxIdx;
-      // TextDecoder needs to know the byte length in advance, it doesn't stop on
-      // null terminator by itself.
-      // As a tiny code save trick, compare idx against maxIdx using a negation,
-      // so that maxBytesToRead=undefined/NaN means Infinity.
-      while (heapOrArray[idx] && !(idx >= maxIdx)) ++idx;
-      return idx;
-    };
-  
-  
-    /**
-     * Given a pointer 'idx' to a null-terminated UTF8-encoded string in the given
-     * array that contains uint8 values, returns a copy of that string as a
-     * Javascript String object.
-     * heapOrArray is either a regular array, or a JavaScript typed array view.
-     * @param {number=} idx
-     * @param {number=} maxBytesToRead
-     * @param {boolean=} ignoreNul - If true, the function will not stop on a NUL character.
-     * @return {string}
-     */
-  var UTF8ArrayToString = (heapOrArray, idx = 0, maxBytesToRead, ignoreNul) => {
-  
-      var endPtr = findStringEnd(heapOrArray, idx, maxBytesToRead, ignoreNul);
-  
-      // When using conditional TextDecoder, skip it for short strings as the overhead of the native call is not worth it.
-      if (endPtr - idx > 16 && heapOrArray.buffer && UTF8Decoder) {
-        return UTF8Decoder.decode(heapOrArray.subarray(idx, endPtr));
-      }
-      var str = '';
-      while (idx < endPtr) {
-        // For UTF8 byte structure, see:
-        // http://en.wikipedia.org/wiki/UTF-8#Description
-        // https://www.ietf.org/rfc/rfc2279.txt
-        // https://tools.ietf.org/html/rfc3629
-        var u0 = heapOrArray[idx++];
-        if (!(u0 & 0x80)) { str += String.fromCharCode(u0); continue; }
-        var u1 = heapOrArray[idx++] & 63;
-        if ((u0 & 0xE0) == 0xC0) { str += String.fromCharCode(((u0 & 31) << 6) | u1); continue; }
-        var u2 = heapOrArray[idx++] & 63;
-        if ((u0 & 0xF0) == 0xE0) {
-          u0 = ((u0 & 15) << 12) | (u1 << 6) | u2;
-        } else {
-          if ((u0 & 0xF8) != 0xF0) warnOnce('Invalid UTF-8 leading byte ' + ptrToString(u0) + ' encountered when deserializing a UTF-8 string in wasm memory to a JS string!');
-          u0 = ((u0 & 7) << 18) | (u1 << 12) | (u2 << 6) | (heapOrArray[idx++] & 63);
-        }
-  
-        if (u0 < 0x10000) {
-          str += String.fromCharCode(u0);
-        } else {
-          var ch = u0 - 0x10000;
-          str += String.fromCharCode(0xD800 | (ch >> 10), 0xDC00 | (ch & 0x3FF));
-        }
-      }
-      return str;
-    };
-  
-    /**
-     * Given a pointer 'ptr' to a null-terminated UTF8-encoded string in the
-     * emscripten HEAP, returns a copy of that string as a Javascript String object.
-     *
-     * @param {number} ptr
-     * @param {number=} maxBytesToRead - An optional length that specifies the
-     *   maximum number of bytes to read. You can omit this parameter to scan the
-     *   string until the first 0 byte. If maxBytesToRead is passed, and the string
-     *   at [ptr, ptr+maxBytesToReadr[ contains a null byte in the middle, then the
-     *   string will cut short at that byte index.
-     * @param {boolean=} ignoreNul - If true, the function will not stop on a NUL character.
-     * @return {string}
-     */
-  var UTF8ToString = (ptr, maxBytesToRead, ignoreNul) => {
-      assert(typeof ptr == 'number', `UTF8ToString expects a number (got ${typeof ptr})`);
-      return ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead, ignoreNul) : '';
-    };
   var SYSCALLS = {
   varargs:undefined,
   getStr(ptr) {
@@ -1549,26 +1552,27 @@ unexportedSymbols.forEach(unexportedRuntimeSymbol);
 function checkIncomingModuleAPI() {
   ignoredModuleProp('fetchSettings');
 }
-function js_on_param_change(param_id,value) { if (Module.onParamChange) Module.onParamChange(param_id, value); }
-function js_on_loop_change(loop_start_hi,loop_start_lo,loop_length_hi,loop_length_lo,loop_type) { if (Module.onLoopChange) Module.onLoopChange( (loop_start_hi << 16) | (loop_start_lo & 0xFFFF), (loop_length_hi << 16) | (loop_length_lo & 0xFFFF), loop_type); }
+function js_onParamChange(paramId,value) { if (Module.onParamChange) Module.onParamChange(paramId, value); }
+function js_onLoopChange(loopStart,loopLength,loopType) { if (Module.onLoopChange) Module.onLoopChange(loopStart, loopLength, loopType); }
 
 // Imports from the Wasm binary.
-var _pt2_sampled_on_mouse_down = Module['_pt2_sampled_on_mouse_down'] = makeInvalidEarlyAccess('_pt2_sampled_on_mouse_down');
-var _pt2_sampled_on_mouse_up = Module['_pt2_sampled_on_mouse_up'] = makeInvalidEarlyAccess('_pt2_sampled_on_mouse_up');
-var _pt2_sampled_on_mouse_move = Module['_pt2_sampled_on_mouse_move'] = makeInvalidEarlyAccess('_pt2_sampled_on_mouse_move');
-var _pt2_sampled_on_wheel = Module['_pt2_sampled_on_wheel'] = makeInvalidEarlyAccess('_pt2_sampled_on_wheel');
-var _pt2_sampled_on_key_down = Module['_pt2_sampled_on_key_down'] = makeInvalidEarlyAccess('_pt2_sampled_on_key_down');
-var _pt2_sampled_get_fb = Module['_pt2_sampled_get_fb'] = makeInvalidEarlyAccess('_pt2_sampled_get_fb');
 var _pt2_sampled_init = Module['_pt2_sampled_init'] = makeInvalidEarlyAccess('_pt2_sampled_init');
 var _pt2_sampled_start = Module['_pt2_sampled_start'] = makeInvalidEarlyAccess('_pt2_sampled_start');
 var _pt2_sampled_shutdown = Module['_pt2_sampled_shutdown'] = makeInvalidEarlyAccess('_pt2_sampled_shutdown');
 var _free = Module['_free'] = makeInvalidEarlyAccess('_free');
 var _pt2_sampled_load_pcm = Module['_pt2_sampled_load_pcm'] = makeInvalidEarlyAccess('_pt2_sampled_load_pcm');
-var _malloc = Module['_malloc'] = makeInvalidEarlyAccess('_malloc');
 var _pt2_sampled_set_param = Module['_pt2_sampled_set_param'] = makeInvalidEarlyAccess('_pt2_sampled_set_param');
 var _pt2_sampled_get_param = Module['_pt2_sampled_get_param'] = makeInvalidEarlyAccess('_pt2_sampled_get_param');
 var _pt2_sampled_load_config = Module['_pt2_sampled_load_config'] = makeInvalidEarlyAccess('_pt2_sampled_load_config');
 var _pt2_sampled_dump_config = Module['_pt2_sampled_dump_config'] = makeInvalidEarlyAccess('_pt2_sampled_dump_config');
+var _pt2_sampled_get_fb = Module['_pt2_sampled_get_fb'] = makeInvalidEarlyAccess('_pt2_sampled_get_fb');
+var _pt2_sampled_on_mouse_down = Module['_pt2_sampled_on_mouse_down'] = makeInvalidEarlyAccess('_pt2_sampled_on_mouse_down');
+var _pt2_sampled_on_mouse_up = Module['_pt2_sampled_on_mouse_up'] = makeInvalidEarlyAccess('_pt2_sampled_on_mouse_up');
+var _pt2_sampled_on_mouse_move = Module['_pt2_sampled_on_mouse_move'] = makeInvalidEarlyAccess('_pt2_sampled_on_mouse_move');
+var _pt2_sampled_on_wheel = Module['_pt2_sampled_on_wheel'] = makeInvalidEarlyAccess('_pt2_sampled_on_wheel');
+var _pt2_sampled_on_key_down = Module['_pt2_sampled_on_key_down'] = makeInvalidEarlyAccess('_pt2_sampled_on_key_down');
+var _pt2_sampled_tick = Module['_pt2_sampled_tick'] = makeInvalidEarlyAccess('_pt2_sampled_tick');
+var _malloc = Module['_malloc'] = makeInvalidEarlyAccess('_malloc');
 var _fflush = makeInvalidEarlyAccess('_fflush');
 var _strerror = makeInvalidEarlyAccess('_strerror');
 var _emscripten_stack_get_end = makeInvalidEarlyAccess('_emscripten_stack_get_end');
@@ -1582,22 +1586,23 @@ var wasmMemory = makeInvalidEarlyAccess('wasmMemory');
 var wasmTable = makeInvalidEarlyAccess('wasmTable');
 
 function assignWasmExports(wasmExports) {
-  _pt2_sampled_on_mouse_down = Module['_pt2_sampled_on_mouse_down'] = createExportWrapper('pt2_sampled_on_mouse_down', 2);
-  _pt2_sampled_on_mouse_up = Module['_pt2_sampled_on_mouse_up'] = createExportWrapper('pt2_sampled_on_mouse_up', 2);
-  _pt2_sampled_on_mouse_move = Module['_pt2_sampled_on_mouse_move'] = createExportWrapper('pt2_sampled_on_mouse_move', 2);
-  _pt2_sampled_on_wheel = Module['_pt2_sampled_on_wheel'] = createExportWrapper('pt2_sampled_on_wheel', 3);
-  _pt2_sampled_on_key_down = Module['_pt2_sampled_on_key_down'] = createExportWrapper('pt2_sampled_on_key_down', 1);
-  _pt2_sampled_get_fb = Module['_pt2_sampled_get_fb'] = createExportWrapper('pt2_sampled_get_fb', 0);
   _pt2_sampled_init = Module['_pt2_sampled_init'] = createExportWrapper('pt2_sampled_init', 2);
   _pt2_sampled_start = Module['_pt2_sampled_start'] = createExportWrapper('pt2_sampled_start', 0);
   _pt2_sampled_shutdown = Module['_pt2_sampled_shutdown'] = createExportWrapper('pt2_sampled_shutdown', 0);
   _free = Module['_free'] = createExportWrapper('free', 1);
   _pt2_sampled_load_pcm = Module['_pt2_sampled_load_pcm'] = createExportWrapper('pt2_sampled_load_pcm', 2);
-  _malloc = Module['_malloc'] = createExportWrapper('malloc', 1);
   _pt2_sampled_set_param = Module['_pt2_sampled_set_param'] = createExportWrapper('pt2_sampled_set_param', 2);
   _pt2_sampled_get_param = Module['_pt2_sampled_get_param'] = createExportWrapper('pt2_sampled_get_param', 1);
   _pt2_sampled_load_config = Module['_pt2_sampled_load_config'] = createExportWrapper('pt2_sampled_load_config', 2);
   _pt2_sampled_dump_config = Module['_pt2_sampled_dump_config'] = createExportWrapper('pt2_sampled_dump_config', 2);
+  _pt2_sampled_get_fb = Module['_pt2_sampled_get_fb'] = createExportWrapper('pt2_sampled_get_fb', 0);
+  _pt2_sampled_on_mouse_down = Module['_pt2_sampled_on_mouse_down'] = createExportWrapper('pt2_sampled_on_mouse_down', 2);
+  _pt2_sampled_on_mouse_up = Module['_pt2_sampled_on_mouse_up'] = createExportWrapper('pt2_sampled_on_mouse_up', 2);
+  _pt2_sampled_on_mouse_move = Module['_pt2_sampled_on_mouse_move'] = createExportWrapper('pt2_sampled_on_mouse_move', 2);
+  _pt2_sampled_on_wheel = Module['_pt2_sampled_on_wheel'] = createExportWrapper('pt2_sampled_on_wheel', 3);
+  _pt2_sampled_on_key_down = Module['_pt2_sampled_on_key_down'] = createExportWrapper('pt2_sampled_on_key_down', 1);
+  _pt2_sampled_tick = Module['_pt2_sampled_tick'] = createExportWrapper('pt2_sampled_tick', 0);
+  _malloc = Module['_malloc'] = createExportWrapper('malloc', 1);
   _fflush = createExportWrapper('fflush', 1);
   _strerror = createExportWrapper('strerror', 1);
   _emscripten_stack_get_end = wasmExports['emscripten_stack_get_end'];
@@ -1613,6 +1618,8 @@ function assignWasmExports(wasmExports) {
 
 var wasmImports = {
   /** @export */
+  __assert_fail: ___assert_fail,
+  /** @export */
   _abort_js: __abort_js,
   /** @export */
   emscripten_resize_heap: _emscripten_resize_heap,
@@ -1623,9 +1630,9 @@ var wasmImports = {
   /** @export */
   fd_write: _fd_write,
   /** @export */
-  js_on_loop_change,
+  js_onLoopChange,
   /** @export */
-  js_on_param_change
+  js_onParamChange
 };
 
 
