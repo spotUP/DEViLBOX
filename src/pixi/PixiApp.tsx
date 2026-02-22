@@ -72,6 +72,7 @@ export const PixiApp: React.FC = () => {
         resolution={window.devicePixelRatio || 1}
         resizeTo={window}
         roundPixels
+        preserveDrawingBuffer
         className="pixi-canvas"
       >
         <PixiAppContent />

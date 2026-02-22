@@ -14,10 +14,8 @@
  * └─────┴────────┴────────┴────────┴────────┘
  */
 
-import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { usePixiTheme } from '@/pixi/theme';
-import { PIXI_FONTS } from '@/pixi/fonts';
-import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import type { FurnaceNativeData } from '@/types';
 
@@ -26,7 +24,6 @@ const ROW_HEIGHT = 20;
 const POS_COL_WIDTH = 36;
 const CHAN_COL_WIDTH = 48;
 const HEADER_HEIGHT = 22;
-const SCROLLBAR_WIDTH = 12;
 
 interface OrderMatrixProps {
   width: number;
@@ -96,13 +93,19 @@ export const PixiFurnaceOrderMatrix: React.FC<OrderMatrixProps> = ({
     switch (e.key) {
       case 'ArrowUp':
         e.preventDefault();
-        setCursorPos(p => Math.max(0, p - 1));
-        onPositionChange?.(Math.max(0, cursorPos - 1));
+        setCursorPos(p => {
+          const next = Math.max(0, p - 1);
+          onPositionChange?.(next);
+          return next;
+        });
         break;
       case 'ArrowDown':
         e.preventDefault();
-        setCursorPos(p => Math.min(ordersLen - 1, p + 1));
-        onPositionChange?.(Math.min(ordersLen - 1, cursorPos + 1));
+        setCursorPos(p => {
+          const next = Math.min(ordersLen - 1, p + 1);
+          onPositionChange?.(next);
+          return next;
+        });
         break;
       case 'ArrowLeft':
         e.preventDefault();
@@ -111,6 +114,11 @@ export const PixiFurnaceOrderMatrix: React.FC<OrderMatrixProps> = ({
       case 'ArrowRight':
         e.preventDefault();
         setCursorChan(c => Math.min(numChannels - 1, c + 1));
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setEditingDigit(-1);
+        setEditBuffer('');
         break;
       default:
         // Hex digit input
@@ -130,7 +138,7 @@ export const PixiFurnaceOrderMatrix: React.FC<OrderMatrixProps> = ({
         }
         break;
     }
-  }, [sub, ordersLen, numChannels, cursorPos, editingDigit, editBuffer, onPositionChange, onOrderChange, cursorChan]);
+  }, [sub, ordersLen, numChannels, editingDigit, editBuffer, onPositionChange, onOrderChange, cursorChan]);
 
   // Compute visible range
   const startRow = Math.floor(scrollRef.current / ROW_HEIGHT);
