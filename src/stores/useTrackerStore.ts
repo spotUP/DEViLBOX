@@ -270,9 +270,13 @@ interface TrackerStore {
   setEditorMode: (mode: EditorMode) => void;
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
   setHivelyNative: (data: HivelyNativeData | null) => void;
+  applyEditorMode: (song: { furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData }) => void;
 
   // Undo/Redo support
   replacePattern: (index: number, pattern: Pattern) => void;
+
+  // UADE live pattern display — updates cells in-place without undo history
+  setLiveChannelData: (row: number, channelData: Array<{ note: number; instrument: number; volume: number }>) => void;
 
   // Reset to initial state
   reset: () => void;
@@ -2636,6 +2640,23 @@ export const useTrackerStore = create<TrackerStore>()(
         state.hivelyNative = data;
       }),
 
+    applyEditorMode: (song) =>
+      set((state) => {
+        if (song.furnaceNative) {
+          state.editorMode = 'furnace';
+          state.furnaceNative = song.furnaceNative;
+          state.hivelyNative = null;
+        } else if (song.hivelyNative) {
+          state.editorMode = 'hively';
+          state.hivelyNative = song.hivelyNative;
+          state.furnaceNative = null;
+        } else {
+          state.editorMode = 'classic';
+          state.furnaceNative = null;
+          state.hivelyNative = null;
+        }
+      }),
+
     importPattern: (pattern) => {
       const newIndex = get().patterns.length;
       set((state) => {
@@ -2759,6 +2780,25 @@ export const useTrackerStore = create<TrackerStore>()(
               const currentRow = useTransportStore.getState().currentRow;
               replayer.seekTo(positionIndex, currentRow);
             }
+          }
+        }
+      }),
+
+    // UADE live pattern display — uses immer draft for safe mutation, no undo
+    setLiveChannelData: (row, channelData) =>
+      set((state) => {
+        const patIdx = state.patternOrder[state.currentPositionIndex] ?? state.currentPatternIndex;
+        const pattern = state.patterns[patIdx];
+        if (!pattern) return;
+
+        for (let ch = 0; ch < Math.min(channelData.length, pattern.channels.length); ch++) {
+          const cell = pattern.channels[ch]?.rows[row];
+          if (!cell) continue;
+          const d = channelData[ch];
+          if (d.note > 0) {
+            cell.note = d.note;
+            cell.instrument = d.instrument;
+            cell.volume = d.volume;
           }
         }
       }),

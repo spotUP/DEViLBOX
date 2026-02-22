@@ -14,6 +14,7 @@ import { useArrangementStore } from '@stores/useArrangementStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer';
 import { resolveArrangement } from '@lib/arrangement/resolveArrangement';
+import type { UADEEngine } from '@engine/uade/UADEEngine';
 
 export const usePatternPlayback = () => {
   const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition } = useTrackerStore(useShallow((s) => ({
@@ -86,6 +87,10 @@ export const usePatternPlayback = () => {
 
   // Track if we've started playback
   const hasStartedRef = useRef(false);
+  // UADE live channel data subscription cleanup
+  const uadeChannelUnsubRef = useRef<(() => void) | null>(null);
+  // UADE live row counter (increments on note triggers during playback)
+  const uadeLiveRowRef = useRef(0);
 
   // Flag to distinguish replayer-driven position changes from user-driven ones.
   // Without this, the replayer's 100ms lookahead scheduling means its getCurrentPosition()
@@ -166,6 +171,64 @@ export const usePatternPlayback = () => {
 
       const needsReload = hasStartedRef.current && !isNaturalAdvancement;
       const format = (pattern.importMetadata?.sourceFormat as TrackerFormat) || 'XM';
+
+      // ── UADE: opaque song player — bypass TrackerReplayer entirely ──────
+      if (format === 'UADE') {
+        if (!hasStartedRef.current) {
+          hasStartedRef.current = true;
+          uadeLiveRowRef.current = 0;
+          console.log('[Playback] Starting UADE playback (opaque song player)');
+          // Find the UADESynth instrument instance and trigger playback directly.
+          // Must await engine readiness — setInstrument() is fire-and-forget during preload.
+          const engine = getToneEngine();
+          const uadeInst = instrumentsRef.current.find(i => i.synthType === 'UADESynth');
+          if (uadeInst) {
+            const key = engine.getInstrumentKey(uadeInst.id, -1);
+            let synth = engine.instruments.get(key);
+            // If the synth isn't in the map yet (preload race), create it now
+            if (!synth) {
+              console.log('[Playback] UADESynth not cached, creating via getInstrument');
+              synth = engine.getInstrument(uadeInst.id, uadeInst) ?? undefined;
+            }
+            if (synth && 'getEngine' in synth) {
+              const uadeEngine = (synth as { getEngine: () => UADEEngine }).getEngine();
+              uadeEngine.ready().then(() => {
+                console.log('[Playback] UADE engine ready, starting playback');
+                uadeEngine.play();
+
+                // Subscribe to channel data for playback position tracking.
+                // Pattern data is pre-populated at import time via scan — we just
+                // need to advance the row/pattern cursor as the song plays.
+                // Use totalFrames to compute position matching the scan's fixed row rate.
+                uadeChannelUnsubRef.current?.();
+                const framesPerRow = Math.round(44100 * 2.5 * 6 / 125); // ~5292 at standard Amiga rate
+                uadeChannelUnsubRef.current = uadeEngine.onChannelData((_channels, totalFrames) => {
+                  const globalRow = Math.floor(totalFrames / framesPerRow);
+                  const store = useTrackerStore.getState();
+                  const pLen = store.patterns[0]?.length ?? 64;
+                  const patternIdx = Math.floor(globalRow / pLen);
+                  const rowInPattern = globalRow % pLen;
+
+                  // Update pattern position if needed
+                  if (patternIdx !== store.currentPositionIndex && patternIdx < store.patternOrder.length) {
+                    setCurrentPosition(patternIdx, true);
+                    setCurrentPattern(store.patternOrder[patternIdx] ?? patternIdx, true);
+                  }
+
+                  setCurrentRowThrottled(rowInPattern, pLen);
+                });
+              }).catch(err => {
+                console.error('[Playback] UADE engine ready failed:', err);
+              });
+            } else {
+              console.warn('[Playback] UADESynth not found or missing getEngine (key=' + key + ', synth=' + synth + ')');
+            }
+          } else {
+            console.warn('[Playback] No UADESynth instrument config found in store');
+          }
+        }
+        return;
+      }
 
       if (!hasStartedRef.current || needsReload) {
         hasStartedRef.current = true;
@@ -307,6 +370,20 @@ export const usePatternPlayback = () => {
       // Stop playback — keep current position (don't reset row/position)
       console.log('[Playback] Stopping playback');
       hasStartedRef.current = false;
+
+      // UADE: stop the song player and clean up channel subscription
+      uadeChannelUnsubRef.current?.();
+      uadeChannelUnsubRef.current = null;
+      const uadeInst = instrumentsRef.current.find(i => i.synthType === 'UADESynth');
+      if (uadeInst) {
+        const engine = getToneEngine();
+        const key = engine.getInstrumentKey(uadeInst.id, -1);
+        const synth = engine.instruments.get(key);
+        if (synth && 'triggerRelease' in synth) {
+          (synth as { triggerRelease: () => void }).triggerRelease();
+        }
+      }
+
       replayer.stop();
       replayer.onRowChange = null;
       replayer.onSongEnd = null;

@@ -1191,6 +1191,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             const progress = Math.min(Math.max((audioTime - audioState.time) / effectiveDuration, 0), 1);
             smoothOffset = progress * ROW_HEIGHT;
           }
+        } else {
+          // UADE / opaque playback: replayer has no state, use transport store row
+          currentRow = transportState.currentRow;
         }
       }
 

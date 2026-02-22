@@ -11,14 +11,15 @@
 
 import React, { useState, useCallback } from 'react';
 import { Upload } from 'lucide-react';
+import { getSupportedExtensions } from '@lib/import/ModuleLoader';
 
 interface GlobalDragDropHandlerProps {
   onFileLoaded: (file: File) => Promise<void>;
   children: React.ReactNode;
 }
 
-// All supported file extensions
-const SUPPORTED_EXTENSIONS = [
+// All supported file extensions — module formats from ModuleLoader + app-specific
+const SUPPORTED_EXTENSIONS = new Set([
   // DEViLBOX projects
   '.dbx',
   // DEViLBOX instruments
@@ -27,19 +28,17 @@ const SUPPORTED_EXTENSIONS = [
   '.xml',
   // Behringer TD-3 patterns
   '.sqs', '.seq',
-  // Tracker modules
-  '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.669', '.amf', '.ams', 
-  '.dbm', '.dmf', '.dsm', '.far', '.ftm', '.gdm', '.imf', '.mdl', '.med', 
-  '.mt2', '.mtm', '.okt', '.psm', '.ptm', '.sfx', '.stm', '.ult', '.umx',
   // MIDI
   '.mid', '.midi',
   // Audio samples
   '.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif',
-];
+  // All tracker/module formats (MOD, XM, IT, S3M, Furnace, HVL, UADE exotic, etc.)
+  ...getSupportedExtensions(),
+]);
 
 function isSupportedFile(filename: string): boolean {
   const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
-  return SUPPORTED_EXTENSIONS.includes(ext);
+  return SUPPORTED_EXTENSIONS.has(ext);
 }
 
 export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({

@@ -393,6 +393,11 @@ export class ToneEngine {
       const dispatchEngine = FurnaceDispatchEngine.getInstance();
       if (!dispatchEngine.isInitialized) return;
       engineGain = dispatchEngine.getOrCreateSharedGain();
+    } else if ('output' in instrument && (instrument as any).output instanceof GainNode) {
+      // Generic native GainNode output (UADESynth, HivelySynth, etc.)
+      const synthName = (instrument as any).name || 'NativeWASM';
+      engineKey = synthName;
+      engineGain = (instrument as any).output;
     } else {
       return;
     }
@@ -1782,7 +1787,10 @@ export class ToneEngine {
       case 'Sam':
       case 'Synare':
       case 'WAM':
-      case 'Buzzmachine': {
+      case 'Buzzmachine':
+      // WASM song players (full-module playback via AudioWorklet)
+      case 'HivelySynth':
+      case 'UADESynth': {
         instrument = InstrumentFactory.createInstrument(config);
         break;
       }
