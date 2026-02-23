@@ -101,7 +101,7 @@ let uadeInstance: any = null;
 async function initUADE(): Promise<void> {
   if (uadeReady) return;
 
-  const baseUrl = self.location.origin + (self.location.pathname.replace(/\/[^/]*$/, '') || '');
+  const baseUrl = self.location.origin;
   const [wasmResponse, jsResponse] = await Promise.all([
     fetch(`${baseUrl}/uade/UADE.wasm`),
     fetch(`${baseUrl}/uade/UADE.js`),
@@ -236,7 +236,7 @@ let openmptReady = false;
 async function initLibopenmpt(): Promise<void> {
   if (openmptReady) return;
 
-  const baseUrl = self.location.origin + (self.location.pathname.replace(/\/[^/]*$/, '') || '');
+  const baseUrl = self.location.origin;
 
   // Fetch the libopenmpt emscripten glue (which embeds the WASM as data URL)
   const jsResponse = await fetch(`${baseUrl}/chiptune3/libopenmpt.worklet.js`);

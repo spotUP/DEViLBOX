@@ -55,7 +55,7 @@ let essentiaReady = false;
 async function initEssentia(): Promise<void> {
   if (essentiaReady) return;
 
-  const baseUrl = self.location.origin + (self.location.pathname.replace(/\/[^/]*$/, '') || '');
+  const baseUrl = self.location.origin;
 
   // Fetch and execute WASM glue
   const wasmGlueUrl = `${baseUrl}/essentia/essentia-wasm.web.js`;

@@ -67,6 +67,11 @@ export class HivelyEngine {
     return HivelyEngine.instance;
   }
 
+  /** Check if a live singleton instance exists (without creating one). */
+  static hasInstance(): boolean {
+    return !!HivelyEngine.instance && !HivelyEngine.instance._disposed;
+  }
+
   private async initialize(): Promise<void> {
     try {
       await HivelyEngine.ensureInitialized(this.audioContext);

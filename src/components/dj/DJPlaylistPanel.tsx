@@ -25,6 +25,7 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { getCachedSong, cacheSong } from '@/engine/dj/DJSongCache';
+import { getDJPipeline } from '@/engine/dj/DJPipeline';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -117,10 +118,17 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   // ── Load track to deck (uses song cache, falls back to file picker) ─────
 
   const loadSongToDeck = useCallback(
-    async (song: import('@/engine/TrackerReplayer').TrackerSong, fileName: string, deckId: 'A' | 'B' | 'C') => {
+    async (song: import('@/engine/TrackerReplayer').TrackerSong, fileName: string, deckId: 'A' | 'B' | 'C', rawBuffer?: ArrayBuffer) => {
       const engine = getDJEngine();
       await engine.loadToDeck(deckId, song);
       const bpmResult = detectBPM(song);
+
+      // Fire background pipeline for render + analysis if we have the raw buffer
+      if (rawBuffer) {
+        void getDJPipeline().loadOrEnqueue(rawBuffer, fileName, deckId, 'high').catch((err) => {
+          console.warn(`[DJPlaylistPanel] Pipeline for ${fileName}:`, err);
+        });
+      }
 
       useDJStore.getState().setDeckState(deckId, {
         fileName,
@@ -160,7 +168,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
           const blob = new File([buffer], filename, { type: 'application/octet-stream' });
           const song = await parseModuleToSong(blob);
           cacheSong(track.fileName, song);
-          await loadSongToDeck(song, track.fileName, deckId);
+          await loadSongToDeck(song, track.fileName, deckId, buffer);
           return;
         } catch (err) {
           console.error(`[DJPlaylistPanel] Modland re-download failed:`, err);
@@ -175,9 +183,10 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
         const file = input.files?.[0];
         if (!file) return;
         try {
+          const rawBuffer = await file.arrayBuffer();
           const song = await parseModuleToSong(file);
           cacheSong(file.name, song);
-          await loadSongToDeck(song, file.name, deckId);
+          await loadSongToDeck(song, file.name, deckId, rawBuffer);
         } catch (err) {
           console.error(`[DJPlaylistPanel] Failed to load track:`, err);
         }

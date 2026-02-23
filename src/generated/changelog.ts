@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-23T19:23:01.526Z
+ * Generated: 2026-02-23T19:48:59.435Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1120';
-export const BUILD_NUMBER = '1120';
-export const BUILD_HASH = 'd9c7d817';
+export const BUILD_VERSION = '1.0.1130';
+export const BUILD_NUMBER = '1130';
+export const BUILD_HASH = '7ee47686';
 export const BUILD_DATE = '2026-02-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,49 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1120',
+    version: '1.0.1130',
     date: '2026-02-23',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: Update dependencies for DJ system"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate DJ audio routing with tracker and export"
+      },
+      {
+        type: 'feature',
+        "description": "Add comprehensive keyboard shortcuts and inline sampler"
+      },
+      {
+        type: 'feature',
+        "description": "Add mixer controls with EQ, filter, VU meters, and transitions"
+      },
+      {
+        type: 'feature',
+        "description": "Add frequency-colored waveforms and 3D vinyl visualization"
+      },
+      {
+        type: 'feature',
+        "description": "Add deck controls with hot cues, loops, and FX pads"
+      },
+      {
+        type: 'feature',
+        "description": "Update core DJ view layout and file browser"
+      },
+      {
+        type: 'feature',
+        "description": "Add beat sync, quantized FX, and beat jump utilities"
+      },
+      {
+        type: 'feature',
+        "description": "Enhance DJ store and audio engine with advanced features"
+      },
+      {
+        type: 'feature',
+        "description": "Add DJ pipeline orchestrator with render and analysis workers"
+      },
       {
         type: 'improvement',
         "description": "Chore: gitignore turntable source models and backup files"
@@ -204,46 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add PatternAccessor, Furnace subsong support, and replayer improvements"
-      },
-      {
-        type: 'feature',
-        "description": "Enhance pad editor with note repeat and improved pad controls"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate HivelyTracker into instrument factory and import pipeline"
-      },
-      {
-        type: 'feature',
-        "description": "Add HivelyTracker WASM engine, synth, and hardware controls"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve all pre-existing TypeScript errors and code quality issues"
-      },
-      {
-        type: 'fix',
-        "description": "Complete instrument support — operator macros, wavetable/sample upload, old format parsing"
-      },
-      {
-        type: 'feature',
-        "description": "Add ModPlug stereo separation mode toggle and slider to Settings"
-      },
-      {
-        type: 'feature',
-        "description": "Insert StereoSeparationNode into audio chain; add ModPlug mode"
-      },
-      {
-        type: 'feature',
-        "description": "Add stereoSeparationMode and modplugSeparation fields"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unnecessary casts, expand clamp tests, add gain-boost warning"
-      },
-      {
-        type: 'feature',
-        "description": "Add StereoSeparationNode (OpenMPT M-S algorithm)"
       }
     ]
   }

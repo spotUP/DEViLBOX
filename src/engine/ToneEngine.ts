@@ -853,13 +853,25 @@ export class ToneEngine {
    */
   public async ensureWASMSynthsReady(configs: InstrumentConfig[]): Promise<void> {
     const wasmConfigs = configs.filter((c) => 
-      ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace'].includes(c.synthType || '') ||
+      ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth'].includes(c.synthType || '') ||
       c.synthType?.startsWith('Furnace')
     );
     if (wasmConfigs.length === 0) return;
 
+    // For native whole-song players (HivelySynth, UADESynth) only create ONE
+    // instance regardless of how many instrument configs use them — the engine
+    // is a singleton that handles all channels internally.
+    const seenNativePlayers = new Set<string>();
+    const deduped = wasmConfigs.filter(c => {
+      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth') {
+        if (seenNativePlayers.has(c.synthType!)) return false;
+        seenNativePlayers.add(c.synthType!);
+      }
+      return true;
+    });
+
     const promises: Promise<void>[] = [];
-    for (const config of wasmConfigs) {
+    for (const config of deduped) {
       // Create the instrument if it doesn't exist yet
       const instrument = this.getInstrument(config.id, config);
       if ((instrument as any)?.ensureInitialized) {
@@ -2500,6 +2512,7 @@ export class ToneEngine {
         config.synthType === 'DuoSynth' ||
         config.synthType === 'MetalSynth' ||
         config.synthType === 'MembraneSynth' ||
+        config.synthType === 'DrumMachine' ||
         config.synthType === 'TB303' ||
         config.synthType === 'DubSiren' ||
         config.synthType === 'Synare' ||

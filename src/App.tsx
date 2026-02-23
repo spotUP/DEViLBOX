@@ -441,31 +441,30 @@ function App() {
       const filename = file.name.toLowerCase();
       
       if (filename.endsWith('.mid') || filename.endsWith('.midi')) {
-        // MIDI file
+        // MIDI file — use same pipeline as FileBrowser load
         const midiResult = await importMIDIFile(file, {
           quantize: 1, 
-          mergeChannels: false, 
+          mergeChannels: true, 
           velocityToVolume: true, 
           defaultPatternLength: 64,
         });
+        if (midiResult.patterns.length === 0) {
+          notify.error('No patterns found in MIDI file');
+          return;
+        }
         loadPatterns(midiResult.patterns);
-        const instruments = midiResult.patterns.map((_, i) => ({
-          id: i + 1,
-          name: `Track ${i + 1}`,
-          type: 'synth' as const,
-          synthType: 'Synth' as const,
-          effects: [] as EffectConfig[],
-          volume: -6,
-          pan: 0,
-        })) as InstrumentConfig[];
-        loadInstruments(instruments);
+        if (midiResult.instruments.length > 0) {
+          loadInstruments(midiResult.instruments);
+        }
+        setPatternOrder(midiResult.patterns.map((_: unknown, i: number) => i));
+        setCurrentPattern(0);
         setMetadata({
           name: midiResult.metadata.name,
           author: '',
           description: `Imported from ${file.name} (${midiResult.metadata.tracks} tracks)`,
         });
         setBPM(midiResult.bpm);
-        notify.success(`Loaded MIDI: ${midiResult.metadata.name}`);
+        notify.success(`Imported: ${midiResult.metadata.name} — ${midiResult.instruments.length} instrument(s), BPM: ${midiResult.bpm}`);
         
       } else if (await isModuleFormat(filename)) {
         // All tracker/module formats: MOD, XM, IT, S3M, Furnace, HVL/AHX, UADE exotic, etc.

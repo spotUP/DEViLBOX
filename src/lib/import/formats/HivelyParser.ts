@@ -722,5 +722,8 @@ function buildHivelyNativeData(mod: HivelyModule): HivelyNativeData {
  */
 export function parseHivelyFile(buffer: ArrayBuffer, fileName: string): TrackerSong {
   const mod = parseHivelyBinary(buffer);
-  return convertHivelyToTrackerSong(mod, fileName);
+  const song = convertHivelyToTrackerSong(mod, fileName);
+  // Preserve raw binary so HivelyEngine WASM can load the full tune for playback
+  song.hivelyFileData = buffer.slice(0);
+  return song;
 }
