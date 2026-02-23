@@ -24,7 +24,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
-import { getCachedSong, cacheSong } from '@/engine/dj/DJSongCache';
+import { cacheSong } from '@/engine/dj/DJSongCache';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -122,8 +122,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
       const engine = getDJEngine();
       const bpmResult = detectBPM(song);
 
-      // If we have the raw buffer, render FIRST then load audio directly
-      // This eliminates tracker playback bugs
+      // We MUST have the raw buffer to render
       if (rawBuffer) {
         useDJStore.getState().setDeckState(deckId, {
           fileName,
@@ -138,44 +137,19 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
           const result = await getDJPipeline().loadOrEnqueue(rawBuffer, fileName, deckId, 'high');
           await engine.loadAudioToDeck(deckId, result.wavData, fileName, song.name || fileName, result.analysis?.bpm || bpmResult.bpm);
           console.log(`[DJPlaylistPanel] Loaded ${fileName} in audio mode (skipped tracker bugs)`);
-          return;
         } catch (err) {
-          console.warn(`[DJPlaylistPanel] Pipeline failed for ${fileName}, falling back to tracker:`, err);
-          // Fall through to tracker mode as fallback
+          console.error(`[DJPlaylistPanel] Pipeline failed for ${fileName}:`, err);
         }
+      } else {
+        console.warn(`[DJPlaylistPanel] Cannot load ${fileName}: missing raw buffer for rendering`);
       }
-
-      // Fallback: load in tracker mode (no raw buffer available)
-      await engine.loadToDeck(deckId, song, fileName, bpmResult.bpm);
-      useDJStore.getState().setDeckState(deckId, {
-        fileName,
-        trackName: song.name || fileName,
-        detectedBPM: bpmResult.bpm,
-        effectiveBPM: bpmResult.bpm,
-        totalPositions: song.songLength,
-        songPos: 0,
-        pattPos: 0,
-        elapsedMs: 0,
-        isPlaying: false,
-      });
     },
     [],
   );
 
   const loadTrackToDeck = useCallback(
     async (track: PlaylistTrack, deckId: 'A' | 'B' | 'C') => {
-      // Try cache first (song was loaded via file browser this session)
-      const cached = getCachedSong(track.fileName);
-      if (cached) {
-        try {
-          await loadSongToDeck(cached, track.fileName, deckId);
-          return;
-        } catch (err) {
-          console.error(`[DJPlaylistPanel] Cache load failed:`, err);
-        }
-      }
-
-      // Modland tracks: auto re-download from server
+      // Modland tracks: auto re-download from server to get the raw buffer
       if (track.fileName.startsWith('modland:')) {
         const modlandPath = track.fileName.slice('modland:'.length);
         try {
@@ -192,7 +166,10 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
         }
       }
 
-      // Not cached — prompt user to select the file
+      // If we have the song but no raw buffer, we still need the buffer to render
+      // (songs are too large to store in DJSongCache, and rendering requires the raw file)
+      
+      // Prompt user to select the file to get the raw buffer
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '*/*';

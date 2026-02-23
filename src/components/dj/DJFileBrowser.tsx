@@ -94,36 +94,33 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
     const engine = getDJEngine();
 
     try {
-      if (file.isUADE && file.rawBuffer) {
-        // UADE path — loadUADEToDeck handles cache + pipeline + store updates
-        const result = await loadUADEToDeck(
-          engine, deckId, file.rawBuffer, file.name, true, file.bpm, file.song.name
-        );
-        setFiles(prev => prev.map(f =>
-          f.name === file.name ? { ...f, isCached: result.cached } : f
-        ));
-      } else if (file.rawBuffer) {
-        // Non-UADE tracker (XM/IT/S3M/etc.) — render FIRST, then load audio directly
-        useDJStore.getState().setDeckState(deckId, {
-          fileName: file.name,
-          trackName: file.song.name || file.name,
-          detectedBPM: file.bpm,
-          effectiveBPM: file.bpm,
-          analysisState: 'rendering',
-          isPlaying: false,
-        });
+      if (file.rawBuffer) {
+        if (file.isUADE) {
+          // UADE path — loadUADEToDeck now handles the full render + wait cycle
+          const result = await loadUADEToDeck(
+            engine, deckId, file.rawBuffer, file.name, true, file.bpm, file.song.name
+          );
+          setFiles(prev => prev.map(f =>
+            f.name === file.name ? { ...f, isCached: result.cached } : f
+          ));
+        } else {
+          // Non-UADE tracker (XM/IT/S3M/etc.) — also render FIRST, then load audio directly
+          useDJStore.getState().setDeckState(deckId, {
+            fileName: file.name,
+            trackName: file.song.name || file.name,
+            detectedBPM: file.bpm,
+            effectiveBPM: file.bpm,
+            analysisState: 'rendering',
+            isPlaying: false,
+          });
 
-        try {
           const result = await getDJPipeline().loadOrEnqueue(file.rawBuffer, file.name, deckId, 'high');
           await engine.loadAudioToDeck(deckId, result.wavData, file.name, file.song.name || file.name, result.analysis?.bpm || file.bpm);
           console.log(`[DJFileBrowser] Loaded ${file.name} in audio mode (skipped tracker bugs)`);
-        } catch (err) {
-          console.warn(`[DJFileBrowser] Pipeline failed for ${file.name}, falling back to tracker:`, err);
-          await engine.loadToDeck(deckId, file.song, file.name, file.bpm);
         }
       } else {
-        // Fallback: standard tracker loading (no pipeline)
-        await engine.loadToDeck(deckId, file.song, file.name, file.bpm);
+        // This should not happen if rawBuffer is captured during selection
+        console.warn(`[DJFileBrowser] No raw buffer for ${file.name}, cannot render for DJ mode`);
       }
     } catch (err) {
       console.error(`[DJFileBrowser] Failed to load ${file.name} to deck ${deckId}:`, err);
