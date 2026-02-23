@@ -1015,7 +1015,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       <input
         ref={fileInputRef}
         type="file"
-        accept="audio/*,.wav,.mp3,.ogg,.flac,.webm"
+        accept="audio/*,.wav,.mp3,.ogg,.flac,.webm,.opus,.aac,.m4a,.aiff,.aif"
         onChange={handleFileInputChange}
         className="hidden"
       />

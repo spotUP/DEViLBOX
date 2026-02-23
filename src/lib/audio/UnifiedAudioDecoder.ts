@@ -5,7 +5,8 @@
  * formats not supported by the browser (e.g., OGG/OPUS on Safari).
  */
 
-import { detectFormat, requiresWasmDecoder, canDecodeNatively, AudioFormat } from './codecDetection';
+import { detectFormat, requiresWasmDecoder, canDecodeNatively } from './codecDetection';
+import type { AudioFormat } from './codecDetection';
 
 // Lazy-loaded WASM decoders
 let FlacDecoder: typeof import('@wasm-audio-decoders/flac').FLACDecoder | null = null;
@@ -33,7 +34,7 @@ interface WasmDecoderInstance {
  */
 async function loadWasmDecoder(format: AudioFormat): Promise<WasmDecoderInstance | null> {
   switch (format) {
-    case 'flac':
+    case 'flac': {
       if (!FlacDecoder) {
         const mod = await import('@wasm-audio-decoders/flac');
         FlacDecoder = mod.FLACDecoder;
@@ -41,8 +42,9 @@ async function loadWasmDecoder(format: AudioFormat): Promise<WasmDecoderInstance
       const flacInstance = new FlacDecoder();
       await flacInstance.ready;
       return flacInstance as unknown as WasmDecoderInstance;
+    }
 
-    case 'ogg':
+    case 'ogg': {
       if (!OggVorbisDecoder) {
         const mod = await import('@wasm-audio-decoders/ogg-vorbis');
         OggVorbisDecoder = mod.OggVorbisDecoder;
@@ -50,8 +52,9 @@ async function loadWasmDecoder(format: AudioFormat): Promise<WasmDecoderInstance
       const oggInstance = new OggVorbisDecoder();
       await oggInstance.ready;
       return oggInstance as unknown as WasmDecoderInstance;
+    }
 
-    case 'opus':
+    case 'opus': {
       if (!OpusDecoder) {
         const mod = await import('@wasm-audio-decoders/opus-ml');
         OpusDecoder = mod.OpusDecoder;
@@ -59,8 +62,9 @@ async function loadWasmDecoder(format: AudioFormat): Promise<WasmDecoderInstance
       const opusInstance = new OpusDecoder();
       await opusInstance.ready;
       return opusInstance as unknown as WasmDecoderInstance;
+    }
 
-    case 'mp3':
+    case 'mp3': {
       if (!MPEGDecoder) {
         const mod = await import('mpg123-decoder');
         MPEGDecoder = mod.MPEGDecoder;
@@ -68,6 +72,7 @@ async function loadWasmDecoder(format: AudioFormat): Promise<WasmDecoderInstance
       const mpegInstance = new MPEGDecoder();
       await mpegInstance.ready;
       return mpegInstance as unknown as WasmDecoderInstance;
+    }
 
     default:
       return null;
@@ -92,7 +97,7 @@ function channelsToAudioBuffer(
   const audioBuffer = audioContext.createBuffer(numberOfChannels, length, sampleRate);
 
   for (let i = 0; i < numberOfChannels; i++) {
-    audioBuffer.copyToChannel(channelData[i], i);
+    audioBuffer.copyToChannel(new Float32Array(channelData[i]), i);
   }
 
   return audioBuffer;
@@ -168,7 +173,7 @@ export async function decodeAudio(
   const { forceWasm = false, filename } = options;
 
   // Detect format
-  const format = detectFormat(data, filename);
+  const format = detectFormat(data, filename ?? '');
   if (!format) {
     throw new Error('Unable to detect audio format');
   }
@@ -263,6 +268,7 @@ export function getFormatDisplayName(format: AudioFormat): string {
     aac: 'AAC',
     m4a: 'M4A/AAC',
     aiff: 'AIFF',
+    alac: 'Apple Lossless',
     webm: 'WebM',
     wma: 'WMA',
     unknown: 'Unknown',
