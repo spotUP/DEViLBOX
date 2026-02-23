@@ -154,7 +154,7 @@ export async function scanDirectoryForSamples(
   items: FileSystemEntry[]
 ): Promise<File[]> {
   const audioFiles: File[] = [];
-  const validExtensions = ['.wav', '.aif', '.aiff', '.mp3', '.ogg', '.flac'];
+  const validExtensions = ['.wav', '.aif', '.aiff', '.mp3', '.ogg', '.flac', '.opus', '.aac', '.m4a', '.webm'];
 
   async function traverseEntry(entry: FileSystemEntry): Promise<void> {
     if (entry.isFile) {

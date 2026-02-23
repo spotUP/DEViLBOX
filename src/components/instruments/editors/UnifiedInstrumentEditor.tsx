@@ -1353,7 +1353,8 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
                     hasNoise: chipCaps.hasNoise,
                     hasPanning: chipCaps.hasPanning,
                   }}
-              />
+                />
+              </Suspense>
 
               {/* Wavetable Editor (for chips that support it) */}
               {chipCaps.hasWavetable && (

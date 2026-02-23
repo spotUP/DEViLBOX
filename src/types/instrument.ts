@@ -181,15 +181,20 @@ export type SynthType =
   | 'Vital'            // Vital Spectral Warping Wavetable Synthesizer
   | 'Odin2'            // Odin2 Semi-Modular Hybrid Synthesizer
   | 'Surge'            // Surge XT Hybrid Synthesizer
+  | 'Helm'             // Helm Polyphonic Synthesizer by Matt Tytel
+  | 'Sorcer'           // Sorcer FAUST-based Wavetable Synthesizer
+  | 'Amsynth'          // amsynth Classic Analog Modeling Synthesizer
+  | 'OBXf'             // OB-Xf Oberheim OB-X/OB-Xa Modeling
+  | 'Open303'          // Open303 Roland TB-303 Bass Synthesizer
   | 'TonewheelOrgan'   // Hammond-style Tonewheel Organ (VSTBridge)
   | 'Melodica'         // Melodica Reed Instrument (VSTBridge)
-  | 'Monique'         // Monique Morphing Monosynth (VSTBridge)
+  | 'Monique'          // Monique Morphing Monosynth (VSTBridge)
   // Virtual instruments (aliased MAME)
   | 'VFX'             // Ensoniq VFX (alias for MAMEVFX)
   | 'D50'            // Roland D-50 (virtual analog)
   // HivelyTracker / AHX synthesis
   | 'HivelySynth'     // HivelyTracker 16-channel chip synth (WASM)
-  // UADE - Universal Amiga Dead-player (130+ exotic Amiga formats)
+  // UADE - Universal Amiga Demod-player (130+ exotic Amiga formats)
   | 'UADESynth'       // UADE catch-all (playback-only via 68k emulation)
   // Modular Synthesis
   | 'ModularSynth'    // Modular synthesizer with patch editor
