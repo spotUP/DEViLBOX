@@ -5,12 +5,13 @@
  * Inspired by Pioneer DJM-900 hardware mixer aesthetic.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine, disposeDJEngine } from '@/engine/dj/DJEngine';
 import { clearSongCache } from '@/engine/dj/DJSongCache';
 import type { DJEngine } from '@/engine/dj/DJEngine';
 import { useTransportStore, useUIStore } from '@/stores';
+import { useAudioStore } from '@/stores/useAudioStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { DJDeck } from './DJDeck';
 import { DJMixer } from './DJMixer';
@@ -18,6 +19,7 @@ import { DJFileBrowser } from './DJFileBrowser';
 import { DJPlaylistPanel } from './DJPlaylistPanel';
 import { DJModlandBrowser } from './DJModlandBrowser';
 import { DJSeratoBrowser } from './DJSeratoBrowser';
+import { DJCachePanel } from './DJCachePanel';
 import { MasterEffectsModal } from '@/components/effects';
 import { DJFxQuickPresets } from './DJFxQuickPresets';
 import { DJControllerSelector } from './DJControllerSelector';
@@ -35,6 +37,10 @@ interface DJViewProps {
 export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
   const engineRef = useRef<DJEngine | null>(null);
   const setDJModeActive = useDJStore((s) => s.setDJModeActive);
+  const deckViewMode = useDJStore((s) => s.deckViewMode);
+  const cycleDeckViewMode = useDJStore((s) => s.cycleDeckViewMode);
+  const thirdDeckActive = useDJStore((s) => s.thirdDeckActive);
+  const setThirdDeckActive = useDJStore((s) => s.setThirdDeckActive);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [showPlaylists, setShowPlaylists] = useState(false);
   const [showModland, setShowModland] = useState(false);
@@ -73,9 +79,24 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
   // DJ keyboard shortcuts
   useDJKeyboardHandler(true);
 
+  // ── Sync master FX presets to DJ mixer ──────────────────────────────────
+  // When user selects an FX preset via DJFxQuickPresets or MasterEffectsModal,
+  // useAudioStore.masterEffects updates. We watch that and rebuild the DJ mixer's
+  // FX chain (inserted between masterGain and limiter).
+  const masterEffects = useAudioStore((s) => s.masterEffects);
+  const masterEffectsKey = useMemo(
+    () => masterEffects.map(e => `${e.id}:${e.enabled}:${e.type}`).join('|'),
+    [masterEffects]
+  );
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.mixer.rebuildMasterEffects(masterEffects);
+  }, [masterEffectsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Handle loading a Serato track to a deck
   // Detects audio files vs tracker modules, and parses Serato metadata (cue points, beatgrid)
-  const handleSeratoTrackLoad = useCallback(async (track: SeratoTrack, deckId: 'A' | 'B') => {
+  const handleSeratoTrackLoad = useCallback(async (track: SeratoTrack, deckId: 'A' | 'B' | 'C') => {
     const fs = window.electron?.fs;
     if (!fs) {
       console.warn('[DJView] Electron fs not available for Serato track loading');
@@ -201,6 +222,30 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
           <DJControllerSelector />
           <DJFxQuickPresets />
           <button
+            onClick={cycleDeckViewMode}
+            className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
+              ${deckViewMode === 'vinyl'
+                ? 'border-amber-500 bg-amber-900/20 text-amber-400'
+                : deckViewMode === '3d'
+                  ? 'border-purple-500 bg-purple-900/20 text-purple-400'
+                  : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+              }`}
+            title="Cycle deck view: Visualizer → Vinyl → 3D"
+          >
+            {deckViewMode === '3d' ? '3D' : deckViewMode === 'vinyl' ? 'Vinyl' : 'Deck'}
+          </button>
+          <button
+            onClick={() => setThirdDeckActive(!thirdDeckActive)}
+            className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
+              ${thirdDeckActive
+                ? 'border-emerald-500 bg-emerald-900/20 text-emerald-400'
+                : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+              }`}
+            title="Toggle 3rd deck (Deck C)"
+          >
+            Deck C
+          </button>
+          <button
             onClick={() => setShowMasterFX(!showMasterFX)}
             className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
               ${showMasterFX
@@ -275,31 +320,41 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
               ? 'grid grid-cols-2 gap-2'
               : '';
         return (
-          <div className={`shrink-0 px-2 pt-2 ${gridClass}`}>
-            {showFileBrowser && (
-              <DJFileBrowser onClose={() => setShowFileBrowser(false)} />
-            )}
-            {showPlaylists && (
-              <DJPlaylistPanel onClose={() => setShowPlaylists(false)} />
-            )}
-            {showModland && (
-              <DJModlandBrowser onClose={() => setShowModland(false)} />
-            )}
-            {showSerato && (
-              <DJSeratoBrowser
-                onClose={() => setShowSerato(false)}
-                onLoadTrackToDevice={handleSeratoTrackLoad}
-              />
-            )}
+          <div className="flex flex-col gap-2 shrink-0 px-2 pt-2">
+            {/* Cache status panel */}
+            <DJCachePanel />
+            
+            {/* Browser panels */}
+            <div className={gridClass}>
+              {showFileBrowser && (
+                <DJFileBrowser onClose={() => setShowFileBrowser(false)} />
+              )}
+              {showPlaylists && (
+                <DJPlaylistPanel onClose={() => setShowPlaylists(false)} />
+              )}
+              {showModland && (
+                <DJModlandBrowser onClose={() => setShowModland(false)} />
+              )}
+              {showSerato && (
+                <DJSeratoBrowser
+                  onClose={() => setShowSerato(false)}
+                  onLoadTrackToDevice={handleSeratoTrackLoad}
+                />
+              )}
+            </div>
           </div>
         );
       })()}
 
       {/* ================================================================== */}
-      {/* MAIN 3-COLUMN LAYOUT: Deck 1 | Mixer | Deck 2                     */}
+      {/* MAIN LAYOUT: Deck A | Mixer | Deck B [| Deck C]                   */}
       {/* ================================================================== */}
-      <div className="flex-1 grid grid-cols-[1fr_280px_1fr] gap-2 p-2 overflow-hidden min-h-0">
-        {/* ---- Deck 1 (left) ---- */}
+      <div className={`flex-1 grid gap-2 p-2 overflow-hidden min-h-0 ${
+        thirdDeckActive
+          ? 'grid-cols-[1fr_280px_1fr_1fr]'
+          : 'grid-cols-[1fr_280px_1fr]'
+      }`}>
+        {/* ---- Deck A (left) ---- */}
         <div className="min-h-0 min-w-0 overflow-hidden">
           <DJDeck deckId="A" />
         </div>
@@ -309,10 +364,17 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
           <DJMixer />
         </div>
 
-        {/* ---- Deck 2 (right) ---- */}
+        {/* ---- Deck B (right) ---- */}
         <div className="min-h-0 min-w-0 overflow-hidden">
           <DJDeck deckId="B" />
         </div>
+
+        {/* ---- Deck C (far right, conditional) ---- */}
+        {thirdDeckActive && (
+          <div className="min-h-0 min-w-0 overflow-hidden">
+            <DJDeck deckId="C" />
+          </div>
+        )}
       </div>
 
       {/* Master Effects Modal */}
