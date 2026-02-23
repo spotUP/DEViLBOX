@@ -1,18 +1,26 @@
 /**
- * DJMixerEngine - Crossfader, master gain, and limiter
+ * DJMixerEngine - Crossfader, master gain, master FX chain, and limiter
  *
  * Audio graph:
- *   Deck A channelGain ──> crossfaderA ──┐
- *                                         ├──> masterGain ──> limiter ──> mainOut
- *   Deck B channelGain ──> crossfaderB ──┘
+ *   Deck A channelGain ──> inputA (crossfader) ──┐
+ *                                                  ├──> masterGain ──> [master FX] ──> limiter ──> mainOut
+ *   Deck B channelGain ──> inputB (crossfader) ──┘
+ *   Deck C channelGain ──> inputC (thru, no xfader) ──┘
+ *
+ * Master FX preset effects (reverb, delay, chorus, etc.) are inserted between
+ * masterGain and limiter via rebuildMasterEffects().
  *
  * Crossfader curves:
  *   - linear: gainA = 1-pos, gainB = pos
  *   - cut: hard cut at ~5% from each end (DJ battle style)
  *   - smooth: constant-power (cos/sin)
+ *
+ * Deck C bypasses the crossfader entirely — always audible at channel volume.
  */
 
 import * as Tone from 'tone';
+import { InstrumentFactory } from '@/engine/InstrumentFactory';
+import type { EffectConfig } from '@typedefs/instrument';
 
 export type CrossfaderCurve = 'linear' | 'cut' | 'smooth';
 
@@ -20,11 +28,17 @@ export class DJMixerEngine {
   // Crossfader inputs — Deck engines connect to these
   readonly inputA: Tone.Gain;
   readonly inputB: Tone.Gain;
+  // Deck C thru input — bypasses crossfader, always at unity
+  readonly inputC: Tone.Gain;
 
   // Master chain
   private masterGain: Tone.Gain;
   private limiter: Tone.Compressor;
   readonly masterMeter: Tone.Meter;
+
+  // Master FX chain (inserted between masterGain and limiter)
+  private masterEffectsNodes: Tone.ToneAudioNode[] = [];
+  private masterEffectsRebuildVersion = 0;
 
   // State
   private position = 0.5;
@@ -33,6 +47,7 @@ export class DJMixerEngine {
   constructor() {
     this.inputA = new Tone.Gain(1);
     this.inputB = new Tone.Gain(1);
+    this.inputC = new Tone.Gain(1);
 
     this.masterGain = new Tone.Gain(1);
 
@@ -49,6 +64,7 @@ export class DJMixerEngine {
     // Wire: inputs → masterGain → limiter → destination + meter
     this.inputA.connect(this.masterGain);
     this.inputB.connect(this.masterGain);
+    this.inputC.connect(this.masterGain);  // thru — no crossfader
     this.masterGain.connect(this.limiter);
     this.limiter.toDestination();
     this.limiter.connect(this.masterMeter);
@@ -132,12 +148,93 @@ export class DJMixerEngine {
   }
 
   // ==========================================================================
+  // MASTER FX CHAIN
+  // ==========================================================================
+
+  /**
+   * Rebuild the master effects chain from a list of EffectConfig.
+   * Inserts effects between masterGain and limiter.
+   * Called when the user selects/changes FX presets in the DJ view.
+   */
+  async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
+    const myVersion = ++this.masterEffectsRebuildVersion;
+
+    // Disconnect masterGain's output (preserves upstream from deck inputs)
+    this.masterGain.disconnect();
+
+    // Dispose old effect nodes
+    for (const node of this.masterEffectsNodes) {
+      try { node.disconnect(); node.dispose(); } catch { /* already disposed */ }
+    }
+    this.masterEffectsNodes = [];
+
+    // Filter to enabled effects only
+    const enabled = effects.filter((fx) => fx.enabled);
+
+    if (enabled.length === 0) {
+      // No effects — direct path
+      this.masterGain.connect(this.limiter);
+      return;
+    }
+
+    // Ensure AudioContext is running
+    if (Tone.getContext().state === 'suspended') {
+      try { await Tone.start(); } catch { /* user gesture required */ }
+    }
+
+    // Create effect nodes
+    const nodes: Tone.ToneAudioNode[] = [];
+    for (const config of enabled) {
+      if (myVersion !== this.masterEffectsRebuildVersion) {
+        // Superseded by newer rebuild — abort
+        nodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
+        return;
+      }
+      try {
+        const node = await InstrumentFactory.createEffect(config) as Tone.ToneAudioNode;
+        nodes.push(node);
+      } catch (err) {
+        console.warn(`[DJMixer] Failed to create effect ${config.type}:`, err);
+      }
+    }
+
+    // Final version check
+    if (myVersion !== this.masterEffectsRebuildVersion) {
+      nodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
+      return;
+    }
+
+    if (nodes.length === 0) {
+      this.masterGain.connect(this.limiter);
+      return;
+    }
+
+    this.masterEffectsNodes = nodes;
+
+    // Chain: masterGain → fx[0] → fx[1] → ... → limiter
+    this.masterGain.connect(nodes[0]);
+    for (let i = 0; i < nodes.length - 1; i++) {
+      nodes[i].connect(nodes[i + 1]);
+    }
+    nodes[nodes.length - 1].connect(this.limiter);
+
+    console.log(`[DJMixer] Master FX chain: ${enabled.map(e => e.type).join(' → ')}`);
+  }
+
+  // ==========================================================================
   // CLEANUP
   // ==========================================================================
 
   dispose(): void {
+    // Dispose FX nodes
+    for (const node of this.masterEffectsNodes) {
+      try { node.disconnect(); node.dispose(); } catch { /* */ }
+    }
+    this.masterEffectsNodes = [];
+
     this.inputA.dispose();
     this.inputB.dispose();
+    this.inputC.dispose();
     this.masterGain.dispose();
     this.limiter.dispose();
     this.masterMeter.dispose();
