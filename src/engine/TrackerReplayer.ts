@@ -1152,6 +1152,16 @@ export class TrackerReplayer {
       this.schedulerTimerId = null;
     }
 
+    // Stop routed native engines (UADE/Hively)
+    if (this.routedNativeEngines.size > 0) {
+      const engine = getToneEngine();
+      for (const st of this.routedNativeEngines) {
+        try {
+          engine.stopNativeEngine(st);
+        } catch { /* ignored */ }
+      }
+    }
+
     // Stop HivelyEngine if this is an HVL/AHX song
     if (this.song?.hivelyFileData && (this.song.format === 'HVL' || this.song.format === 'AHX')) {
       try {
@@ -1204,6 +1214,16 @@ export class TrackerReplayer {
       this.schedulerTimerId = null;
     }
     this.playing = false;
+
+    // Stop routed native engines (UADE/Hively) on pause
+    if (this.routedNativeEngines.size > 0) {
+      const engine = getToneEngine();
+      for (const st of this.routedNativeEngines) {
+        try {
+          engine.stopNativeEngine(st);
+        } catch { /* ignored */ }
+      }
+    }
   }
 
   resume(): void {

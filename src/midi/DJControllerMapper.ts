@@ -628,7 +628,7 @@ class DJControllerMapper {
    * Trigger quantized FX (echo, reverb, delay, flanger).
    * FX are beat-synced to the current BPM.
    */
-  private triggerQuantizedFX(deckId: 'A' | 'B' | 'C', fxType: string): void {
+  private async triggerQuantizedFX(deckId: 'A' | 'B' | 'C', fxType: string): Promise<void> {
     try {
       switch (fxType) {
         case 'echo': {

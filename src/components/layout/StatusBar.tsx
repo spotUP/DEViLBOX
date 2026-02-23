@@ -29,8 +29,8 @@ const DJStatusContent: React.FC = () => {
   } = useDJStore(useShallow((s) => ({
     deck1Playing: s.decks.A.isPlaying,
     deck2Playing: s.decks.B.isPlaying,
-    deck1BPM: s.decks.A.effectiveBPM,
-    deck2BPM: s.decks.B.effectiveBPM,
+    deck1BPM: s.decks.A.effectiveBPM || 0,
+    deck2BPM: s.decks.B.effectiveBPM || 0,
     deck1Name: s.decks.A.trackName,
     deck2Name: s.decks.B.trackName,
     deck1Pos: s.decks.A.songPos,

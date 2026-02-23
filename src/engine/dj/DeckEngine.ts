@@ -11,6 +11,7 @@ import { TrackerReplayer, type TrackerSong } from '@/engine/TrackerReplayer';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { getNativeAudioNode } from '@/utils/audio-context';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useDJStore } from '@/stores/useDJStore';
 import { ScratchPlayback, getPatternByName } from './DJScratchEngine';
 import { DeckScratchBuffer } from './DeckScratchBuffer';
 import { DeckAudioPlayer, type AudioFileInfo } from './DeckAudioPlayer';
@@ -167,6 +168,46 @@ export class DeckEngine {
 
     // Kick off async worklet init (non-blocking)
     void this._initScratchBuffer();
+  }
+
+  /**
+   * Seamlessly transition from live tracker playback to a pre-rendered audio stream.
+   * Maintains playback state, position, and pitch.
+   */
+  async hotSwapToAudio(wavData: ArrayBuffer, filename: string): Promise<void> {
+    const wasPlaying = this.isPlaying();
+    const positionSec = this.replayer.getElapsedMs() / 1000;
+    const pitch = this.currentPitchSemitones;
+
+    console.log(`[DeckEngine] Hot-swapping ${filename} from tracker to audio stream at ${positionSec.toFixed(2)}s`);
+
+    // Load audio buffer (switches mode to 'audio' internally)
+    const info = await this.loadAudioFile(wavData, filename);
+
+    // Sync state
+    this.setPitch(pitch);
+    this.audioPlayer.seek(positionSec);
+
+    // Update store state to reflect the new playback mode and data
+    useDJStore.getState().setDeckState(this.id, {
+      playbackMode: 'audio',
+      durationMs: info.duration * 1000,
+      waveformPeaks: info.waveformPeaks,
+      audioPosition: positionSec,
+      elapsedMs: positionSec * 1000,
+    });
+
+    if (wasPlaying) {
+      // CRITICAL: Stop tracker BEFORE starting audio to prevent double audio / echo
+      this.replayer.stop();
+      this.audioPlayer.play();
+    } else {
+      this.replayer.stop();
+    }
+
+    // Clean up tracker-specific native routing
+    this.restoreNativeRouting();
+    this.unregisterOutputOverrides();
   }
 
   // ==========================================================================
@@ -329,11 +370,17 @@ export class DeckEngine {
 
     if (this._playbackMode === 'audio') {
       this.audioPlayer.setPlaybackRate(multiplier);
+      // Ensure tracker is reset to normal speed if it's still somehow running
+      this.replayer.setTempoMultiplier(1.0);
+      this.replayer.setPitchMultiplier(1.0);
+      this.replayer.setDetuneCents(0);
     } else {
       // Per-deck isolation: only touches this replayer's state, not ToneEngine globals
       this.replayer.setTempoMultiplier(multiplier);   // Changes scheduler speed
       this.replayer.setPitchMultiplier(multiplier);    // Changes sample playback rates
       this.replayer.setDetuneCents(semitones * 100);   // Changes synth pitch
+      // Ensure audio player is reset
+      this.audioPlayer.setPlaybackRate(1.0);
     }
 
     // Key lock: compensate pitch shift to maintain original key

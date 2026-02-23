@@ -185,7 +185,6 @@ export type SynthType =
   | 'Sorcer'           // Sorcer FAUST-based Wavetable Synthesizer
   | 'Amsynth'          // amsynth Classic Analog Modeling Synthesizer
   | 'OBXf'             // OB-Xf Oberheim OB-X/OB-Xa Modeling
-  | 'Open303'          // Open303 Roland TB-303 Bass Synthesizer
   | 'TonewheelOrgan'   // Hammond-style Tonewheel Organ (VSTBridge)
   | 'Melodica'         // Melodica Reed Instrument (VSTBridge)
   | 'Monique'          // Monique Morphing Monosynth (VSTBridge)

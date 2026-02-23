@@ -17,6 +17,7 @@ import { useMIDIActions } from './hooks/useMIDIActions';
 import { usePadTriggers } from './hooks/usePadTriggers';
 import { useProjectPersistence } from './hooks/useProjectPersistence';
 import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
+import { initKeyboardRouter, destroyKeyboardRouter } from './engine/keyboard/KeyboardRouter';
 import { useCloudSync } from './hooks/useCloudSync';
 import { setupCloudSyncSubscribers } from './lib/cloudSyncSubscribers';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -153,6 +154,14 @@ function App() {
   }, [applyAutoCompact]);
 
   const { save: saveProject } = useProjectPersistence();
+
+  // Initialize KeyboardRouter once at app startup
+  useEffect(() => {
+    initKeyboardRouter();
+    return () => {
+      destroyKeyboardRouter();
+    };
+  }, []);
 
   useEffect(() => {
     // Initialize audio engine

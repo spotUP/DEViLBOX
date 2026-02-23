@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { DJ_SCENARIO_PRESETS, getScenarioById, getScenariosByCategory } from '@/midi/djScenarioPresets';
+import { getScenarioById, getScenariosByCategory } from '@/midi/djScenarioPresets';
 import { getDJControllerMapper } from '@/midi/DJControllerMapper';
 import { useDJStore } from '@/stores/useDJStore';
 

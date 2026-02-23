@@ -25,6 +25,8 @@ import type { TaskPriority } from './DJPipeline';
  * @param fileBuffer - Module file data
  * @param filename - Original filename
  * @param renderIfMissing - Whether to pipeline render + analyze if not cached (default: false)
+ * @param bpm - Optional BPM hint
+ * @param trackName - Optional track name hint
  * @returns Promise resolving to { cached: boolean, duration: number }
  */
 export async function loadUADEToDeck(
@@ -33,6 +35,8 @@ export async function loadUADEToDeck(
   fileBuffer: ArrayBuffer,
   filename: string,
   renderIfMissing = false,
+  bpm?: number,
+  trackName?: string,
 ): Promise<{ cached: boolean; duration: number }> {
   // Check cache first
   const cached = await getCachedAudio(fileBuffer);
@@ -40,7 +44,7 @@ export async function loadUADEToDeck(
   if (cached) {
     // Load from cache (audio file mode)
     console.log(`[DJPrerender] Loading cached audio for ${filename}`);
-    const info = await engine.loadAudioToDeck(deckId, cached.audioData, filename);
+    const info = await engine.loadAudioToDeck(deckId, cached.audioData, filename, trackName || cached.filename, bpm || cached.bpm);
 
     // If cached but not yet analyzed, trigger analysis in background
     if (!cached.beatGrid) {
@@ -58,7 +62,7 @@ export async function loadUADEToDeck(
   const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
   const file = new File([fileBuffer], filename);
   const song = await parseModuleToSong(file);
-  await engine.loadToDeck(deckId, song);
+  await engine.loadToDeck(deckId, song, filename, bpm || 125);
 
   // Render + analyze in background via pipeline
   if (renderIfMissing) {
