@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-22T19:06:06.801Z
+ * Generated: 2026-02-23T13:19:39.506Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1109';
-export const BUILD_NUMBER = '1109';
-export const BUILD_HASH = '79638865';
-export const BUILD_DATE = '2026-02-22';
+export const BUILD_VERSION = '1.0.1110';
+export const BUILD_NUMBER = '1110';
+export const BUILD_HASH = 'c63a1c03';
+export const BUILD_DATE = '2026-02-23';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1109',
+    version: '1.0.1110',
     date: '2026-02-22',
     changes: [
+      {
+        type: 'fix',
+        "description": "Resolve 5 bugs from Swedish beta testing"
+      },
       {
         type: 'improvement',
         "description": "Chore: update gitignore for WASM build dirs, update CLAUDE.md"
@@ -230,10 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Merge drumpad and instrument sample browsers"
-      },
-      {
-        type: 'feature',
-        "description": "Enhance engine, store, pad grid, and add persistence"
       }
     ]
   }

@@ -60,6 +60,11 @@ interface UIStore {
   // Performance settings
   performanceQuality: PerformanceQuality; // Auto-adjusted based on FPS
 
+  // Scratch settings
+  scratchEnabled: boolean; // Manual scratch toggle (true = always enabled, false = only during playback)
+  scratchAcceleration: boolean; // Scroll acceleration for scratch (true = smoothed, false = raw 1:1)
+  platterMass: number; // Turntable platter mass 0-1 (0=CDJ light, 0.5=Technics 1200, 1=heavy)
+
   // View switching (tracker vs arrangement vs DJ vs drum pads vs piano roll)
   activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll';
 
@@ -108,6 +113,11 @@ interface UIStore {
 
   // Performance actions
   setPerformanceQuality: (quality: PerformanceQuality) => void;
+
+  // Scratch actions
+  setScratchEnabled: (enabled: boolean) => void;
+  setScratchAcceleration: (enabled: boolean) => void;
+  setPlatterMass: (mass: number) => void;
 
   // View switching actions
   setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll') => void;
@@ -167,6 +177,11 @@ export const useUIStore = create<UIStore>()(
 
       // Performance settings (default to high quality)
       performanceQuality: 'high',
+
+      // Scratch settings
+      scratchEnabled: false, // Manual toggle off by default (scratch only during playback)
+      scratchAcceleration: true, // Acceleration on by default
+      platterMass: 0.5, // Technics 1200 default
 
       // View switching
       activeView: 'tracker' as const,
@@ -372,6 +387,22 @@ export const useUIStore = create<UIStore>()(
           state.performanceQuality = quality;
         }),
 
+      // Scratch actions
+      setScratchEnabled: (enabled) =>
+        set((state) => {
+          state.scratchEnabled = enabled;
+        }),
+
+      setScratchAcceleration: (enabled) =>
+        set((state) => {
+          state.scratchAcceleration = enabled;
+        }),
+
+      setPlatterMass: (mass) =>
+        set((state) => {
+          state.platterMass = Math.max(0, Math.min(1, mass));
+        }),
+
       // View switching actions
       setActiveView: (view) =>
         set((state) => {
@@ -457,6 +488,9 @@ export const useUIStore = create<UIStore>()(
         chordEntryMode: state.chordEntryMode,
         blankEmptyCells: state.blankEmptyCells,
         performanceQuality: state.performanceQuality,
+        scratchEnabled: state.scratchEnabled,
+        scratchAcceleration: state.scratchAcceleration,
+        platterMass: state.platterMass,
         activeView: state.activeView,
         uiVersion: state.uiVersion,
       }),

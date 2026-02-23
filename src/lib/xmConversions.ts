@@ -27,8 +27,8 @@ export function stringNoteToXM(note: string | null): number {
     return 97; // Note off
   }
 
-  // Parse note string like "C-4" or "C#5"
-  const match = note.match(/^([A-G])([#-])(\d)$/);
+  // Parse note string like "C-4", "C#5", or "C#-4"
+  const match = note.match(/^([A-G])([#-])[-]?(\d)$/);
   if (!match) {
     console.warn(`Invalid note format: ${note}`);
     return 0;

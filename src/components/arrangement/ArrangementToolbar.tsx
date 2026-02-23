@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useArrangementStore } from '@stores/useArrangementStore';
 import { useUIStore, useTransportStore } from '@stores';
+import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { ArrangementToolMode } from '@/types/arrangement';
 
 const SNAP_OPTIONS = [
@@ -105,8 +106,11 @@ export const ArrangementToolbar: React.FC = () => {
         </button>
         <button
           className="p-1.5 rounded bg-dark-bgTertiary text-text-secondary hover:bg-dark-border hover:text-text-primary"
-          onClick={stop}
-          title="Stop (Space when playing)"
+          onClick={(e) => { if (isPlaying && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); } else { stop(); } }}
+          onContextMenu={(e) => {
+            if (isPlaying) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+          }}
+          title={isPlaying ? 'Click: Stop · Shift+click/Right-click: Power off' : 'Stop'}
         >
           <Square size={14} />
         </button>

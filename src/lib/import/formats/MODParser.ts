@@ -110,6 +110,7 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
     // Convert loop points from words to sample units (1 word = 2 bytes for 8-bit samples)
     const loopStartSamples = sampleHeader.loopStart * 2;
     const loopLengthSamples = sampleHeader.loopLength * 2;
+    console.log(`[MODParser] Sample ${i+1} "${sampleHeader.name}": loopStart=${loopStartSamples} loopLength=${loopLengthSamples} length=${sampleHeader.length * 2}`);
 
     // MOD instruments are 1-indexed (1-31) in pattern data
     const instrumentId = i + 1;
