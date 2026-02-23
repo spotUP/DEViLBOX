@@ -3,12 +3,14 @@
  *
  * Center = off, left = HPF, right = LPF.
  * Bipolar control: -1 (full HPF) to +1 (full LPF), 0 = bypass.
+ * Shows a quantize indicator dot when quantize mode is active.
  */
 
 import React, { useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import { setTrackedFilterPosition } from '@/engine/dj/DJQuantizedFX';
 
 interface MixerFilterProps {
   deckId: 'A' | 'B' | 'C';
@@ -20,10 +22,12 @@ export const MixerFilter: React.FC<MixerFilterProps> = ({ deckId }) => {
   const handleChange = useCallback((value: number) => {
     useDJStore.getState().setDeckFilter(deckId, value);
     getDJEngine().getDeck(deckId).setFilterPosition(value);
+    // Keep the tracked position in sync for filter sweep starting point
+    setTrackedFilterPosition(deckId, value);
   }, [deckId]);
 
   const formatFilter = useCallback((val: number) => {
-    if (Math.abs(val) < 0.05) return 'OFF';
+    if (Math.abs(val) < 0.01) return 'OFF';
     if (val < 0) return 'HPF';
     return 'LPF';
   }, []);
