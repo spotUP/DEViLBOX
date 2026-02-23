@@ -367,6 +367,16 @@ export class VFXSynth implements DevilboxSynth {
   }
 
   /**
+   * Release all active voices (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    if (!this.isInitialized) return;
+    for (const voice of this.voices.filter(v => v.active)) {
+      this.triggerRelease(voice.note);
+    }
+  }
+
+  /**
    * Set filter parameters
    */
   setFilter(voice: number, cutoff: number, resonance: number): void {

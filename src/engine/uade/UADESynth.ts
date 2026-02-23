@@ -56,6 +56,13 @@ export class UADESynth implements DevilboxSynth {
     this.engine.stop();
   }
 
+  /**
+   * Release all / stop playback (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    this.triggerRelease();
+  }
+
   set(param: string, value: number): void {
     switch (param) {
       case 'volume':

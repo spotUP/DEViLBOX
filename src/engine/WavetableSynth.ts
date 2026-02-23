@@ -155,6 +155,20 @@ export class WavetableSynth implements DevilboxSynth {
   }
 
   /**
+   * Release all active voices
+   */
+  releaseAll(): void {
+    const now = audioNow();
+    for (const [midiNote, voice] of this.voices.entries()) {
+      voice.triggerRelease(now);
+      setTimeout(() => {
+        this.voicePool.push(voice);
+      }, (this.config.envelope.release + 100));
+      this.voices.delete(midiNote);
+    }
+  }
+
+  /**
    * Trigger attack and release
    */
   triggerAttackRelease(

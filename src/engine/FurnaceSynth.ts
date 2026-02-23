@@ -2210,6 +2210,13 @@ export class FurnaceSynth implements DevilboxSynth {
   }
 
   /**
+   * Release all voices (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    this.triggerRelease();
+  }
+
+  /**
    * Write chip-specific key-off command
    */
   private writeKeyOff(): void {

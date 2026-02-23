@@ -175,6 +175,13 @@ export class DubSirenSynth implements DevilboxSynth {
     this.gate.gain.setValueAtTime(0, t);
   }
 
+  /**
+   * Release all voices (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    this.triggerRelease();
+  }
+
   // Parameter Setters
   setOscType(type: 'sine' | 'square' | 'sawtooth' | 'triangle') {
     this.osc.type = type;
@@ -217,6 +224,9 @@ export class DubSirenSynth implements DevilboxSynth {
   }
 
   dispose(): void {
+    // Stop running audio sources before disposing
+    try { this.osc.stop(); } catch { /* ignore */ }
+    try { this.lfo.stop(); } catch { /* ignore */ }
     this.osc.dispose();
     this.gate.dispose();
     this.filter.dispose();

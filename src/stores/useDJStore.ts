@@ -206,6 +206,7 @@ interface DJState {
   crossfaderPosition: number;
   crossfaderCurve: CrossfaderCurve;
   masterVolume: number;
+  jogWheelSensitivity: number; // 0.5-2.0x multiplier (1.0 = default)
 
   // Per-deck
   decks: { A: DeckState; B: DeckState; C: DeckState };
@@ -229,6 +230,7 @@ interface DJActions {
   setCrossfader: (position: number) => void;
   setCrossfaderCurve: (curve: CrossfaderCurve) => void;
   setMasterVolume: (volume: number) => void;
+  setJogWheelSensitivity: (multiplier: number) => void;
 
   // Per-deck
   setDeckState: (deck: DeckId, partial: Partial<DeckState>) => void;
@@ -243,8 +245,11 @@ interface DJActions {
   setDeckAutoGain: (deck: DeckId, enabled: boolean) => void;
   setDeckCuePoint: (deck: DeckId, songPos: number) => void;
   setDeckPFL: (deck: DeckId, enabled: boolean) => void;
+  togglePFL: (deck: DeckId) => void;
   setDeckLoop: (deck: DeckId, mode: 'line' | 'pattern' | 'off', active: boolean) => void;
   setDeckLoopSize: (deck: DeckId, size: 1 | 2 | 4 | 8 | 16 | 32) => void;
+  setLineLoopSize: (deck: DeckId, size: 1 | 2 | 4 | 8 | 16 | 32) => void;
+  toggleLoop: (deck: DeckId) => void;
 
   // Hot cues
   setHotCue: (deck: DeckId, index: number, cue: HotCue | null) => void;
@@ -284,6 +289,7 @@ export const useDJStore = create<DJStore>()(
     crossfaderPosition: 0.5,
     crossfaderCurve: 'smooth' as CrossfaderCurve,
     masterVolume: 1,
+    jogWheelSensitivity: 1.0, // default 1.0x
 
     decks: {
       A: { ...defaultDeckState },
@@ -334,6 +340,11 @@ export const useDJStore = create<DJStore>()(
     setMasterVolume: (volume) =>
       set((state) => {
         state.masterVolume = Math.max(0, Math.min(1.5, volume));
+      }),
+
+    setJogWheelSensitivity: (multiplier) =>
+      set((state) => {
+        state.jogWheelSensitivity = Math.max(0.5, Math.min(2.0, multiplier));
       }),
 
     setDeckState: (deck, partial) =>
@@ -402,6 +413,11 @@ export const useDJStore = create<DJStore>()(
         state.decks[deck].pflEnabled = enabled;
       }),
 
+    togglePFL: (deck) =>
+      set((state) => {
+        state.decks[deck].pflEnabled = !state.decks[deck].pflEnabled;
+      }),
+
     setDeckLoop: (deck, mode, active) =>
       set((state) => {
         state.decks[deck].loopMode = mode;
@@ -411,6 +427,16 @@ export const useDJStore = create<DJStore>()(
     setDeckLoopSize: (deck, size) =>
       set((state) => {
         state.decks[deck].lineLoopSize = size;
+      }),
+
+    setLineLoopSize: (deck, size) =>
+      set((state) => {
+        state.decks[deck].lineLoopSize = size;
+      }),
+
+    toggleLoop: (deck) =>
+      set((state) => {
+        state.decks[deck].loopActive = !state.decks[deck].loopActive;
       }),
 
     setHotCue: (deck, index, cue) =>

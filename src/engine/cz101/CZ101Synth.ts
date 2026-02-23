@@ -397,6 +397,15 @@ export class CZ101Synth implements DevilboxSynth {
   }
 
   /**
+   * Release all active voices (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    for (const voice of this.voices.filter(v => v.active)) {
+      this.triggerRelease(voice.note);
+    }
+  }
+
+  /**
    * Set a parameter value
    */
   setParameter(param: string, value: number): void {
