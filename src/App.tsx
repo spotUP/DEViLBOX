@@ -1239,12 +1239,20 @@ function App() {
                   const song = await parseModuleToSong(new File([buffer], filename));
 
                   const { loadPatterns, setCurrentPattern, setPatternOrder, applyEditorMode } = useTrackerStore.getState();
-                  const { addInstrument } = useInstrumentStore.getState();
+                  const { reset: resetInstruments, loadInstruments: loadInst } = useInstrumentStore.getState();
+                  const { setBPM: setB, setSpeed, reset: resetTransport } = useTransportStore.getState();
 
-                  song.instruments.forEach((inst: InstrumentConfig) => addInstrument(inst));
+                  // Reset state to match drag-drop and other import paths
+                  resetTransport();
+                  resetInstruments();
+                  getToneEngine().disposeAllInstruments();
+
+                  loadInst(song.instruments);
                   loadPatterns(song.patterns);
                   setCurrentPattern(0);
                   if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
+                  setB(song.initialBPM);
+                  if (song.initialSpeed !== 6) setSpeed(song.initialSpeed);
 
                   // Set editor mode based on native data availability
                   applyEditorMode(song);
