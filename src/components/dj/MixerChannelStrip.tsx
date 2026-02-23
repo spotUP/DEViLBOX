@@ -9,7 +9,7 @@
  * - Fader closed (gain=0): track groove lights up with deck color + "CUT" label
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 
@@ -32,11 +32,21 @@ function volumeToDb(volume: number): string {
 
 export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId }) => {
   const volume = useDJStore((s) => s.decks[deckId].volume);
+  const trimGain = useDJStore((s) => s.decks[deckId].trimGain);
   const scratchFaderGain = useDJStore((s) => s.decks[deckId].scratchFaderGain);
   const activePatternName = useDJStore((s) => s.decks[deckId].activePatternName);
   const faderLFOActive = useDJStore((s) => s.decks[deckId].faderLFOActive);
   const [dragging, setDragging] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
+
+  // Sync trim gain to engine whenever it changes (auto-gain or manual trim)
+  useEffect(() => {
+    try {
+      getDJEngine().getDeck(deckId).setTrimGain(trimGain);
+    } catch {
+      // Engine not ready
+    }
+  }, [deckId, trimGain]);
 
   const setVolume = useCallback((value: number) => {
     const clamped = Math.max(0, Math.min(1, value));
@@ -174,6 +184,13 @@ export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId }) 
       <div className="text-text-muted text-[9px] font-mono">
         {volumeToDb(volume)}
       </div>
+
+      {/* Trim/auto-gain indicator */}
+      {trimGain !== 0 && (
+        <div className="text-[8px] font-mono text-accent-info opacity-70" title={`Auto-gain trim: ${trimGain > 0 ? '+' : ''}${trimGain.toFixed(1)}dB`}>
+          AG {trimGain > 0 ? '+' : ''}{trimGain.toFixed(0)}
+        </div>
+      )}
     </div>
   );
 };
