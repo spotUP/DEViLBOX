@@ -35,8 +35,6 @@ interface InitRequest {
 type WorkerMessage = RenderRequest | InitRequest;
 
 // ── UADE extensions for format routing ───────────────────────────────────────
-// This is a subset of the UADE_EXTENSIONS set from UADEParser.ts.
-// MOD is added explicitly since it's an Amiga format.
 const AMIGA_EXTENSIONS = new Set([
   // ProTracker MOD
   'mod',
@@ -164,8 +162,26 @@ async function renderWithUADE(
   const fnamePtr = wasm._malloc(fnameLen);
   wasm.stringToUTF8(filename, fnamePtr, fnameLen);
 
-  // Load the module
-  const loadResult = wasm._uade_wasm_load(filePtr, fileSize, fnamePtr);
+  // Stop any previous playback/loading state to clear IPC buffers
+  if (wasm._uade_wasm_stop) wasm._uade_wasm_stop();
+
+  // Load the module with retry logic for IPC sync issues
+  let loadResult = wasm._uade_wasm_load(filePtr, fileSize, fnamePtr);
+  
+  if (loadResult !== 0) {
+    console.warn(`[DJRenderWorker/UADE] First load failed (${loadResult}), attempting IPC buffer clear...`);
+    // If it failed with IPC issues (likely 'cmd buffer full'), try to pump the 
+    // render loop a few times to clear the command queue, then retry.
+    const dummyL = wasm._malloc(1024 * 4);
+    const dummyR = wasm._malloc(1024 * 4);
+    for (let i = 0; i < 5; i++) wasm._uade_wasm_render(dummyL, dummyR, 1024);
+    wasm._free(dummyL);
+    wasm._free(dummyR);
+    
+    if (wasm._uade_wasm_stop) wasm._uade_wasm_stop();
+    loadResult = wasm._uade_wasm_load(filePtr, fileSize, fnamePtr);
+  }
+
   wasm._free(filePtr);
   wasm._free(fnamePtr);
 
