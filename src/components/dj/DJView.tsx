@@ -80,6 +80,49 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
     };
   }, [setDJModeActive]);
 
+  // Subscribe to PFL changes and route to engine
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    const unsubscribePFLA = useDJStore.subscribe(
+      (s) => s.decks.A.pflEnabled,
+      (enabled) => engine.mixer.setPFL('A', enabled)
+    );
+
+    const unsubscribePFLB = useDJStore.subscribe(
+      (s) => s.decks.B.pflEnabled,
+      (enabled) => engine.mixer.setPFL('B', enabled)
+    );
+
+    const unsubscribePFLC = useDJStore.subscribe(
+      (s) => s.decks.C.pflEnabled,
+      (enabled) => engine.mixer.setPFL('C', enabled)
+    );
+
+    const unsubscribeCueVolume = useDJStore.subscribe(
+      (s) => s.cueVolume,
+      (volume) => engine.cueEngine.setCueVolume(volume)
+    );
+
+    const unsubscribeCueDevice = useDJStore.subscribe(
+      (s) => s.cueDeviceId,
+      (deviceId) => {
+        if (deviceId) {
+          void engine.cueEngine.setCueDevice(deviceId);
+        }
+      }
+    );
+
+    return () => {
+      unsubscribePFLA();
+      unsubscribePFLB();
+      unsubscribePFLC();
+      unsubscribeCueVolume();
+      unsubscribeCueDevice();
+    };
+  }, []);
+
   // DJ keyboard shortcuts
   useDJKeyboardHandler(true);
 
