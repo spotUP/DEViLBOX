@@ -365,7 +365,7 @@ async function loadDB303Pattern(xmlDoc: Document, filename: string): Promise<Fil
   const { parseDb303Pattern } = await import('@/lib/import/Db303PatternConverter');
   const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
 
-  const result = parseDb303Pattern(xmlDoc.documentElement.outerHTML, filename, 'temp-id');
+  const result = parseDb303Pattern(xmlDoc.documentElement.outerHTML, filename, 1);
   const pattern = result.pattern;
   const tempo = result.tempo;
 
