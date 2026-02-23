@@ -17,16 +17,16 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import type { Graphics as GraphicsType, FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
+import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
-import { useTrackerStore, useTransportStore, useUIStore, useInstrumentStore } from '@stores';
-import { useThemeStore } from '@/stores/useThemeStore';
+import { useTrackerStore, useTransportStore, useUIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useCollaborationStore, getCollabClient } from '@stores/useCollaborationStore';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { ChannelContextMenu } from '@/components/tracker/ChannelContextMenu';
@@ -112,7 +112,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     setChannelColor,
     updateChannelName,
     setCell,
-    moveCursorToChannelAndColumn,
     copyTrack,
     cutTrack,
     pasteTrack,
@@ -381,10 +380,16 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   }, [allChannelsFit, scrollLeft]);
 
   // ── RAF loop for playback tracking ─────────────────────────────────────────
+  // Track previous values to skip redundant state updates (avoids costly
+  // React re-renders + @pixi/react reconciliation of hundreds of BitmapText nodes)
+  const prevPlaybackRef = useRef({ row: -1, smoothOffset: 0, patternIndex: -1 });
+
   useEffect(() => {
     let rafId: number;
     const tick = () => {
       if (!isPlaying) {
+        // Reset prev so we re-render on first play frame
+        prevPlaybackRef.current = { row: -1, smoothOffset: 0, patternIndex: -1 };
         rafId = requestAnimationFrame(tick);
         return;
       }
@@ -393,8 +398,14 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       const audioState = replayer.getStateAtTime(audioTime);
       const ts = useTrackerStore.getState();
 
+      let newRow: number;
+      let newOffset: number;
+      let newPattern: number;
+
       if (audioState) {
-        let offset = 0;
+        newRow = audioState.row;
+        newPattern = audioState.pattern;
+        newOffset = 0;
         if (smoothScrolling) {
           const bpm = useTransportStore.getState().bpm;
           const speed = useTransportStore.getState().speed;
@@ -403,12 +414,25 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
             ? nextState.time - audioState.time
             : (2.5 / bpm) * speed;
           const progress = Math.min(Math.max((audioTime - audioState.time) / dur, 0), 1);
-          offset = progress * ROW_HEIGHT;
+          newOffset = progress * ROW_HEIGHT;
         }
-        setPlaybackState({ row: audioState.row, smoothOffset: offset, patternIndex: audioState.pattern });
       } else {
-        setPlaybackState({ row: useTransportStore.getState().currentRow, smoothOffset: 0, patternIndex: ts.currentPatternIndex });
+        newRow = useTransportStore.getState().currentRow;
+        newOffset = 0;
+        newPattern = ts.currentPatternIndex;
       }
+
+      // Only update state when values actually change — avoids creating a new
+      // object reference every frame which would trigger a full React re-render
+      const prev = prevPlaybackRef.current;
+      if (newRow !== prev.row ||
+          newPattern !== prev.patternIndex ||
+          Math.abs(newOffset - prev.smoothOffset) > 0.5) {
+        const state = { row: newRow, smoothOffset: newOffset, patternIndex: newPattern };
+        prevPlaybackRef.current = state;
+        setPlaybackState(state);
+      }
+
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
@@ -419,6 +443,16 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const currentRow = isPlaying ? playbackState.row : cursor.rowIndex;
   const smoothOffset = isPlaying ? playbackState.smoothOffset : 0;
 
+  // During playback, use the replayer's pattern index for rendering rather than
+  // the store's currentPatternIndex. The RAF loop reads the replayer directly,
+  // but the store only updates after queueMicrotask → setCurrentPattern → React
+  // re-render. This 1-3 frame timing gap caused visible jumps at pattern transitions
+  // because currentRow would be from the new pattern while pattern data was still old.
+  const displayPattern = isPlaying
+    ? (patterns[playbackState.patternIndex] ?? pattern)
+    : pattern;
+  const displayPatternIndex = isPlaying ? playbackState.patternIndex : currentPatternIndex;
+
   // ── Visible range ─────────────────────────────────────────────────────────
   const scrollbarHeight = allChannelsFit ? 0 : SCROLLBAR_HEIGHT;
   const gridHeight = height - HEADER_HEIGHT - scrollbarHeight;
@@ -427,7 +461,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const centerLineTop = Math.floor(gridHeight / 2) - ROW_HEIGHT / 2;
   const baseY = centerLineTop - topLines * ROW_HEIGHT - smoothOffset;
   const vStart = currentRow - topLines;
-  const patternLength = pattern?.length ?? 64;
+  const patternLength = displayPattern?.length ?? 64;
 
   // ── Click → cell mapping ──────────────────────────────────────────────────
   const getCellFromLocal = useCallback((localX: number, localY: number): { rowIndex: number; channelIndex: number; columnType: CursorPosition['columnType'] } | null => {
@@ -525,6 +559,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   // ── Mouse handlers ────────────────────────────────────────────────────────
   const isDraggingRef = useRef(false);
 
+  /** Whether the current pointer drag is a scratch-grab (playing + left-click) */
+  const isScratchDragRef = useRef(false);
+
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
     const local = e.getLocalPosition(e.currentTarget);
     const cell = getCellFromLocal(local.x, local.y);
@@ -543,6 +580,15 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       return;
     }
 
+    // During playback — left-click drag becomes scratch grab (hand on record)
+    if (wheelStateRef.current.isPlaying && nativeEvent.button === 0 && !nativeEvent.shiftKey && !nativeEvent.metaKey && !nativeEvent.ctrlKey) {
+      isScratchDragRef.current = true;
+      isDraggingRef.current = false;
+      const scratch = getTrackerScratchController();
+      scratch.onGrabStart(nativeEvent.clientY, performance.now());
+      return;
+    }
+
     if (nativeEvent.shiftKey) {
       store.updateSelection(cell.channelIndex, cell.rowIndex);
     } else {
@@ -554,6 +600,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   }, [getCellFromLocal, cellContextMenu]);
 
   const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
+    // Scratch drag — route to scratch controller
+    if (isScratchDragRef.current) {
+      const nativeEvent = e.nativeEvent as PointerEvent;
+      getTrackerScratchController().onGrabMove(nativeEvent.clientY, performance.now());
+      return;
+    }
+
     if (!isDraggingRef.current) return;
     const local = e.getLocalPosition(e.currentTarget);
     const cell = getCellFromLocal(local.x, local.y);
@@ -563,50 +616,182 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   }, [getCellFromLocal]);
 
   const handlePointerUp = useCallback(() => {
+    // End scratch drag
+    if (isScratchDragRef.current) {
+      isScratchDragRef.current = false;
+      getTrackerScratchController().onGrabEnd(performance.now());
+      return;
+    }
     isDraggingRef.current = false;
   }, []);
 
-  // ── Wheel scroll — stepped horizontal, smooth vertical ───────────────────
-  const handleWheel = useCallback((e: FederatedWheelEvent) => {
-    if (isPlaying) return;
-    const nativeEvent = e.nativeEvent as WheelEvent;
-    nativeEvent.preventDefault?.();
+  // ── Wheel scroll — native non-passive listener on canvas ─────────────────
+  // PixiJS registers wheel events as passive, so preventDefault() fails via
+  // the federated event system. Attach directly on the canvas with { passive: false }.
+  const wheelStateRef = useRef({ isPlaying, allChannelsFit, channelOffsets, totalChannelsWidth, width });
+  wheelStateRef.current = { isPlaying, allChannelsFit, channelOffsets, totalChannelsWidth, width };
 
-    if (Math.abs(nativeEvent.deltaY) > Math.abs(nativeEvent.deltaX)) {
-      // Vertical scroll — move cursor
-      const delta = Math.sign(nativeEvent.deltaY) * 2;
-      const store = useTrackerStore.getState();
-      const pat = store.patterns[store.currentPatternIndex];
-      if (!pat) return;
-      const newRow = Math.max(0, Math.min(pat.length + 32, store.cursor.rowIndex + delta));
-      store.moveCursorToRow(newRow);
-    } else if (!allChannelsFit) {
-      // Horizontal scroll — stepped with accumulator (matches DOM behavior)
-      scrollAccumulatorRef.current += nativeEvent.deltaX;
-      if (Math.abs(scrollAccumulatorRef.current) > SCROLL_THRESHOLD) {
-        const direction = Math.sign(scrollAccumulatorRef.current);
-        scrollAccumulatorRef.current = 0;
+  useEffect(() => {
+    // Find the Pixi canvas — it's the <canvas> element inside the app's root
+    const canvas = document.querySelector('canvas[data-pixijs]') as HTMLCanvasElement | null
+      ?? document.querySelector('#pixi-app canvas') as HTMLCanvasElement | null
+      ?? document.querySelector('canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
 
-        // Find current leftmost visible channel
-        let currentCh = 0;
-        for (let i = 0; i < channelOffsets.length; i++) {
-          const targetScroll = channelOffsets[i] - LINE_NUMBER_WIDTH;
-          if (targetScroll <= scrollLeftRef.current + 5) {
-            currentCh = i;
-          } else {
-            break;
+    const onWheel = (e: WheelEvent) => {
+      const { isPlaying: playing, allChannelsFit: allFit, channelOffsets: offsets, totalChannelsWidth: totalW, width: w } = wheelStateRef.current;
+      e.preventDefault();
+
+      // During playback — route vertical scroll to scratch controller (nudge mode)
+      if (playing && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        const scratch = getTrackerScratchController();
+        scratch.onScrollDelta(e.deltaY, performance.now(), e.deltaMode);
+        return;
+      }
+
+      // Not playing — normal scroll behavior
+      if (playing) return; // Horizontal scroll disabled during playback
+
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        // Vertical scroll — move cursor
+        const delta = Math.sign(e.deltaY) * 2;
+        const store = useTrackerStore.getState();
+        const pat = store.patterns[store.currentPatternIndex];
+        if (!pat) return;
+        const newRow = Math.max(0, Math.min(pat.length + 32, store.cursor.rowIndex + delta));
+        store.moveCursorToRow(newRow);
+      } else if (!allFit) {
+        // Horizontal scroll — stepped with accumulator (matches DOM behavior)
+        scrollAccumulatorRef.current += e.deltaX;
+        if (Math.abs(scrollAccumulatorRef.current) > SCROLL_THRESHOLD) {
+          const direction = Math.sign(scrollAccumulatorRef.current);
+          scrollAccumulatorRef.current = 0;
+
+          // Find current leftmost visible channel
+          let currentCh = 0;
+          for (let i = 0; i < offsets.length; i++) {
+            const targetScroll = offsets[i] - LINE_NUMBER_WIDTH;
+            if (targetScroll <= scrollLeftRef.current + 5) {
+              currentCh = i;
+            } else {
+              break;
+            }
+          }
+
+          const nextCh = Math.max(0, Math.min(offsets.length - 1, currentCh + direction));
+          const maxScroll = Math.max(0, LINE_NUMBER_WIDTH + totalW - w);
+          const newScrollLeft = Math.max(0, Math.min(maxScroll, offsets[nextCh] - LINE_NUMBER_WIDTH));
+
+          scrollLeftRef.current = newScrollLeft;
+          setScrollLeft(newScrollLeft);
+        }
+      }
+    };
+
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // ── Touch scratch — native touch listener for touchscreen scratch during playback ──
+  // 2-finger touch = nudge (flick edge of platter), 3+ fingers = grab (hand on record)
+  // Note: Mac trackpad doesn't fire touch events — it fires wheel events (handled above).
+  // These handlers are for actual touchscreens (iPad, touch monitors, phones).
+  const touchLastYRef = useRef<number | null>(null);
+  const touchModeRef = useRef<'none' | 'nudge' | 'grab'>('none');
+
+  useEffect(() => {
+    const canvas = document.querySelector('canvas[data-pixijs]') as HTMLCanvasElement | null
+      ?? document.querySelector('canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+
+    /** Average Y position of all touch points */
+    const avgTouchY = (touches: TouchList): number => {
+      let sum = 0;
+      for (let i = 0; i < touches.length; i++) sum += touches[i].clientY;
+      return sum / touches.length;
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (!wheelStateRef.current.isPlaying) return;
+      const scratch = getTrackerScratchController();
+      const count = e.touches.length;
+
+      if (scratch.isGrabTouch(count)) {
+        // 3+ fingers → grab mode (hand on record)
+        e.preventDefault();
+        touchModeRef.current = 'grab';
+        const y = avgTouchY(e.touches);
+        scratch.onGrabStart(y, performance.now());
+      } else if (count === 2) {
+        // 2 fingers → nudge mode (edge-of-platter flick)
+        touchModeRef.current = 'nudge';
+        touchLastYRef.current = avgTouchY(e.touches);
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!wheelStateRef.current.isPlaying) return;
+      const scratch = getTrackerScratchController();
+      const count = e.touches.length;
+
+      // Upgrade from nudge to grab if finger count increases
+      if (touchModeRef.current === 'nudge' && scratch.isGrabTouch(count)) {
+        touchModeRef.current = 'grab';
+        const y = avgTouchY(e.touches);
+        scratch.onGrabStart(y, performance.now());
+        e.preventDefault();
+        return;
+      }
+
+      if (touchModeRef.current === 'grab') {
+        // Grab: direct velocity from touch movement
+        e.preventDefault();
+        const y = avgTouchY(e.touches);
+        scratch.onGrabMove(y, performance.now());
+      } else if (touchModeRef.current === 'nudge' && touchLastYRef.current !== null) {
+        // Nudge: convert delta to scroll impulse
+        const y = avgTouchY(e.touches);
+        const deltaY = touchLastYRef.current - y; // drag up = scroll down
+        touchLastYRef.current = y;
+        if (Math.abs(deltaY) > 1) {
+          e.preventDefault();
+          scratch.onScrollDelta(deltaY, performance.now());
+        }
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      const scratch = getTrackerScratchController();
+
+      if (touchModeRef.current === 'grab') {
+        // If all fingers lifted or dropped below grab threshold
+        if (e.touches.length < GRAB_TOUCH_COUNT) {
+          scratch.onGrabEnd(performance.now());
+          touchModeRef.current = e.touches.length >= 2 ? 'nudge' : 'none';
+          if (touchModeRef.current === 'nudge') {
+            touchLastYRef.current = avgTouchY(e.touches);
           }
         }
-
-        const nextCh = Math.max(0, Math.min(channelOffsets.length - 1, currentCh + direction));
-        const maxScroll = Math.max(0, LINE_NUMBER_WIDTH + totalChannelsWidth - width);
-        const newScrollLeft = Math.max(0, Math.min(maxScroll, channelOffsets[nextCh] - LINE_NUMBER_WIDTH));
-
-        scrollLeftRef.current = newScrollLeft;
-        setScrollLeft(newScrollLeft);
+      } else if (e.touches.length < 2) {
+        touchModeRef.current = 'none';
+        touchLastYRef.current = null;
       }
-    }
-  }, [isPlaying, totalChannelsWidth, width, allChannelsFit, channelOffsets]);
+    };
+
+    // Grab touch count constant (imported from controller)
+    const GRAB_TOUCH_COUNT = 3;
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: true });
+    canvas.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    return () => {
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, []);
 
   // ── Draw grid backgrounds ─────────────────────────────────────────────────
   const drawGrid = useCallback((g: GraphicsType) => {
@@ -658,7 +843,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       }
 
       // Channel color stripe
-      const channelColor = pattern?.channels[ch]?.color;
+      const channelColor = displayPattern?.channels[ch]?.color;
       if (channelColor) {
         g.rect(colX, 0, 2, gridHeight);
         g.fill({ color: parseInt(channelColor.replace('#', ''), 16), alpha: 0.4 });
@@ -670,7 +855,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     }
 
     // Selection overlay
-    if (selection && pattern) {
+    if (selection && displayPattern) {
       const startCh = Math.min(selection.startChannel, selection.endChannel);
       const endCh = Math.max(selection.startChannel, selection.endChannel);
       const startRow = Math.min(selection.startRow, selection.endRow);
@@ -743,12 +928,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     g.fill({ color: theme.bg.color, alpha: 0.85 });
   }, [width, gridHeight, theme, visibleLines, vStart, baseY, patternLength, currentRow,
       showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
-      cursor, selection, pattern, isPlaying, recordMode, scrollLeft, currentPatternIndex]);
+      cursor, selection, displayPattern, isPlaying, recordMode, scrollLeft, displayPatternIndex]);
 
   // ── Generate text labels for visible rows ─────────────────────────────────
   const cellLabels = useMemo(() => {
-    if (!pattern) return [];
-    const labels: { x: number; y: number; text: string; color: number; bold?: boolean }[] = [];
+    if (!displayPattern) return [];
+    const labels: { x: number; y: number; text: string; color: number; bold?: boolean; alpha?: number }[] = [];
 
     for (let i = 0; i < visibleLines; i++) {
       const rowNum = vStart + i;
@@ -757,7 +942,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
       // Determine if this row is from the current pattern or a ghost
       let actualRow = rowNum;
-      let actualPattern = pattern;
+      let actualPattern = displayPattern;
       let isGhost = false;
 
       if (rowNum < 0 || rowNum >= patternLength) {
@@ -765,13 +950,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         isGhost = true;
         // Wrap into adjacent patterns
         if (rowNum < 0) {
-          const prevPatIdx = currentPatternIndex > 0 ? currentPatternIndex - 1 : patterns.length - 1;
+          const prevPatIdx = displayPatternIndex > 0 ? displayPatternIndex - 1 : patterns.length - 1;
           actualPattern = patterns[prevPatIdx];
           if (!actualPattern) continue;
           actualRow = actualPattern.length + rowNum;
           if (actualRow < 0) continue;
         } else {
-          const nextPatIdx = currentPatternIndex < patterns.length - 1 ? currentPatternIndex + 1 : 0;
+          const nextPatIdx = displayPatternIndex < patterns.length - 1 ? displayPatternIndex + 1 : 0;
           actualPattern = patterns[nextPatIdx];
           if (!actualPattern) continue;
           actualRow = rowNum - patternLength;
@@ -790,6 +975,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         text: lineNumText,
         color: isHighlightRow ? theme.accentSecondary.color : theme.textMuted.color,
         bold: isHighlightRow,
+        alpha: isGhost ? 0.35 : undefined,
       });
 
       // Per-channel cells
@@ -805,7 +991,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         if (!cell) continue;
 
         const isCurrentRow = rowNum === currentRow;
-        const ghostAlpha = isGhost ? 0.35 : 1;
         const baseX = colX + 8;
 
         // Note column
@@ -816,7 +1001,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
             ? (isCurrentRow ? 0xffffff : theme.cellNote.color)
             : theme.cellEmpty.color;
         if (noteText !== '---' || !blankEmpty) {
-          labels.push({ x: baseX, y, text: noteText, color: noteColor });
+          labels.push({ x: baseX, y, text: noteText, color: noteColor, alpha: isGhost ? 0.35 : undefined });
         }
 
         if (isCollapsed) continue;
@@ -827,7 +1012,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         // Instrument
         const insText = cell.instrument > 0 ? hexByte(cell.instrument) : (blankEmpty ? '' : '..');
         if (insText) {
-          labels.push({ x: px, y, text: insText, color: cell.instrument > 0 ? theme.cellInstrument.color : theme.cellEmpty.color });
+          labels.push({ x: px, y, text: insText, color: cell.instrument > 0 ? theme.cellInstrument.color : theme.cellEmpty.color, alpha: isGhost ? 0.35 : undefined });
         }
         px += CHAR_WIDTH * 2 + 4;
 
@@ -835,7 +1020,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         const volValid = cell.volume >= 0x10 && cell.volume <= 0x50;
         const volText = volValid ? hexByte(cell.volume) : (blankEmpty ? '' : '..');
         if (volText) {
-          labels.push({ x: px, y, text: volText, color: volValid ? theme.cellVolume.color : theme.cellEmpty.color });
+          labels.push({ x: px, y, text: volText, color: volValid ? theme.cellVolume.color : theme.cellEmpty.color, alpha: isGhost ? 0.35 : undefined });
         }
         px += CHAR_WIDTH * 2 + 4;
 
@@ -846,7 +1031,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
           const val = e === 0 ? (cell.eff ?? 0) : (cell.eff2 ?? 0);
           const effText = formatEffect(typ, val, useHex);
           if (effText !== '...' || !blankEmpty) {
-            labels.push({ x: px, y, text: effText, color: (typ > 0 || val > 0) ? theme.cellEffect.color : theme.cellEmpty.color });
+            labels.push({ x: px, y, text: effText, color: (typ > 0 || val > 0) ? theme.cellEffect.color : theme.cellEmpty.color, alpha: isGhost ? 0.35 : undefined });
           }
           px += CHAR_WIDTH * 3 + 4;
         }
@@ -855,13 +1040,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         if (columnVisibility.flag1 && cell.flag1 !== undefined) {
           const flagChar = cell.flag1 === 1 ? 'A' : cell.flag1 === 2 ? 'S' : '.';
           const flagColor = cell.flag1 === 1 ? FLAG_COLORS.accent : cell.flag1 === 2 ? FLAG_COLORS.slide : theme.cellEmpty.color;
-          labels.push({ x: px, y, text: flagChar, color: flagColor });
+          labels.push({ x: px, y, text: flagChar, color: flagColor, alpha: isGhost ? 0.35 : undefined });
           px += CHAR_WIDTH + 4;
         }
         if (columnVisibility.flag2 && cell.flag2 !== undefined) {
           const flagChar = cell.flag2 === 1 ? 'M' : cell.flag2 === 2 ? 'H' : '.';
           const flagColor = cell.flag2 === 1 ? FLAG_COLORS.mute : cell.flag2 === 2 ? FLAG_COLORS.hammer : theme.cellEmpty.color;
-          labels.push({ x: px, y, text: flagChar, color: flagColor });
+          labels.push({ x: px, y, text: flagChar, color: flagColor, alpha: isGhost ? 0.35 : undefined });
           px += CHAR_WIDTH + 4;
         }
 
@@ -871,14 +1056,14 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
             ? (useHex ? hexByte(cell.probability) : cell.probability.toString().padStart(2, '0'))
             : (blankEmpty ? '' : '..');
           if (probText) {
-            labels.push({ x: px, y, text: probText, color: cell.probability > 0 ? probColor(cell.probability) : theme.cellEmpty.color });
+            labels.push({ x: px, y, text: probText, color: cell.probability > 0 ? probColor(cell.probability) : theme.cellEmpty.color, alpha: isGhost ? 0.35 : undefined });
           }
         }
       }
     }
 
     return labels;
-  }, [pattern, patterns, currentPatternIndex, visibleLines, vStart, baseY, gridHeight,
+  }, [displayPattern, patterns, displayPatternIndex, visibleLines, vStart, baseY, gridHeight,
       patternLength, showGhostPatterns, useHex, blankEmpty, numChannels,
       channelOffsets, channelWidths, width, currentRow, theme, columnVisibility, scrollLeft]);
 
@@ -918,7 +1103,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       >
         <ChannelHeaderDOM
           pattern={pattern}
-          numChannels={numChannels}
           channelWidths={channelWidths}
           totalChannelsWidth={totalChannelsWidth}
           scrollLeft={scrollLeft}
@@ -954,13 +1138,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
       {/* ─── Pattern Grid — native Pixi rendering ────────────────────── */}
       <pixiContainer
-        layout={{ width, flex: 1 }}
+        layout={{ width, height: gridHeight }}
         eventMode="static"
-        cursor="text"
+        cursor={isPlaying ? 'grab' : 'text'}
         onPointerDown={handlePointerDown}
-        onGlobalPointerMove={handlePointerMove}
-        onGlobalPointerUp={handlePointerUp}
-        onWheel={handleWheel}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerUpOutside={handlePointerUp}
       >
         {/* TrackerVisualBackground behind the grid */}
         {trackerVisualBg && (
@@ -980,6 +1164,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
             text={label.text}
             style={{ fontFamily: label.bold ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }}
             tint={label.color}
+            alpha={label.alpha ?? 1.0}
             layout={{ position: 'absolute', left: label.x, top: label.y }}
           />
         ))}
@@ -1048,7 +1233,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
 interface ChannelHeaderDOMProps {
   pattern: NonNullable<ReturnType<typeof useTrackerStore.getState>['patterns'][0]>;
-  numChannels: number;
   channelWidths: number[];
   totalChannelsWidth: number;
   scrollLeft: number;
@@ -1083,7 +1267,6 @@ interface ChannelHeaderDOMProps {
 
 const ChannelHeaderDOM: React.FC<ChannelHeaderDOMProps> = ({
   pattern,
-  numChannels,
   channelWidths,
   totalChannelsWidth,
   scrollLeft,

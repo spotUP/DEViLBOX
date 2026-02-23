@@ -9,7 +9,7 @@ import { usePixiTheme, usePixiThemeId, getDeckColors } from '../../theme';
 import { useDJStore } from '@/stores/useDJStore';
 
 interface PixiDeckTurntableProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
   size?: number;
 }
 
@@ -19,8 +19,8 @@ export const PixiDeckTurntable: React.FC<PixiDeckTurntableProps> = ({ deckId, si
   const position = useDJStore(s => s.decks[deckId].audioPosition);
 
   const themeId = usePixiThemeId();
-  const { deckA, deckB } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
-  const DECK_COLOR = deckId === 'A' ? deckA : deckB;
+  const { deckA, deckB, deckC } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
+  const DECK_COLOR = deckId === 'A' ? deckA : deckId === 'B' ? deckB : deckC;
   const cx = size / 2;
   const cy = size / 2;
   const outerR = size / 2 - 4;

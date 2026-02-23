@@ -11,7 +11,7 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { DJBeatSync } from '@/engine/dj/DJBeatSync';
 
 interface PixiDeckTransportProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 const BTN_SIZE = 36;

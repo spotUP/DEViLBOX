@@ -25,6 +25,8 @@ export const PixiChannelLevels: React.FC<PixiChannelLevelsProps> = ({ width, hei
   });
   const graphicsRef = useRef<GraphicsType | null>(null);
   const peaksRef = useRef(new Float32Array(32));
+  const lastGensRef = useRef<number[]>([]);
+  const decayLevelsRef = useRef(new Float32Array(32));
 
   useEffect(() => {
     if (!isPlaying || !graphicsRef.current) return;
@@ -41,14 +43,37 @@ export const PixiChannelLevels: React.FC<PixiChannelLevelsProps> = ({ width, hei
       g.rect(0, 0, width, height);
       g.fill({ color: theme.bg.color });
 
-      let levels: Float32Array | number[];
-      try { levels = getToneEngine().getChannelTriggerLevels(numChannels); } catch { rafId = requestAnimationFrame(draw); return; }
+      let levels: number[];
+      let gens: number[];
+      try {
+        const engine = getToneEngine();
+        levels = engine.getChannelTriggerLevels(numChannels);
+        gens = engine.getChannelTriggerGenerations(numChannels);
+      } catch { rafId = requestAnimationFrame(draw); return; }
+
+      // Grow lastGens if needed
+      if (lastGensRef.current.length < numChannels) {
+        lastGensRef.current = new Array(numChannels).fill(0);
+      }
+      if (decayLevelsRef.current.length < numChannels) {
+        decayLevelsRef.current = new Float32Array(numChannels);
+      }
 
       const barHeight = Math.max(4, (height - 8) / numChannels - 2);
       const barMaxWidth = width - 40;
 
       for (let ch = 0; ch < numChannels; ch++) {
-        const level = levels[ch] || 0;
+        const isNewTrigger = gens[ch] !== lastGensRef.current[ch];
+        let level: number;
+        if (isNewTrigger && levels[ch] > 0) {
+          level = levels[ch];
+          lastGensRef.current[ch] = gens[ch];
+          decayLevelsRef.current[ch] = level;
+        } else {
+          decayLevelsRef.current[ch] *= 0.92;
+          if (decayLevelsRef.current[ch] < 0.01) decayLevelsRef.current[ch] = 0;
+          level = decayLevelsRef.current[ch];
+        }
         const y = 4 + ch * (barHeight + 2);
         const barW = level * barMaxWidth;
 

@@ -10,7 +10,7 @@
  *   4. RAF-poll the container's @pixi/layout computed bounds to reposition the div
  */
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { Container as ContainerType } from 'pixi.js';
 
@@ -40,6 +40,9 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
   const rootRef = useRef<Root | null>(null);
   const autoHeightRef = useRef(autoHeight);
   autoHeightRef.current = autoHeight;
+  // Persist the last measured autoHeight value so parent re-renders
+  // don't overwrite it with the caller's static height prop.
+  const measuredHeightRef = useRef<number | null>(null);
 
   // Create imperitive DOM container + React root on mount
   useEffect(() => {
@@ -79,8 +82,9 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
 
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const h = Math.ceil(entry.contentRect.height);
-        if (h > 0) {
+        const h = Math.round(entry.contentRect.height);
+        if (h > 0 && h !== measuredHeightRef.current) {
+          measuredHeightRef.current = h;
           const elLayout = (el as any).layout;
           if (elLayout?.style) {
             elLayout.style.height = h;
@@ -140,6 +144,21 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
     return () => cancelAnimationFrame(rafId);
   }, []);
 
+  // When autoHeight is active, override the caller's static height with the
+  // last ResizeObserver measurement. This prevents parent re-renders from
+  // resetting the Pixi layout height back to the hardcoded prop value,
+  // which caused progressive layout drift (elements scrolling down & shrinking).
+  const effectiveLayout = useMemo(() => {
+    if (autoHeight && measuredHeightRef.current !== null) {
+      return { ...layout, height: measuredHeightRef.current };
+    }
+    return layout;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout, autoHeight]);
+  // Note: measuredHeightRef is a ref — we read it during render but don't
+  // depend on it. The ResizeObserver imperatively updates elLayout.style.height,
+  // and the effectiveLayout ensures the next React re-render won't overwrite it.
+
   // Only return the Pixi container — the DOM overlay is managed imperatively
-  return <pixiContainer ref={containerRef} layout={layout} />;
+  return <pixiContainer ref={containerRef} layout={effectiveLayout} />;
 };
