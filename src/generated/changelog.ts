@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-23T23:30:21.270Z
+ * Generated: 2026-02-23T23:38:31.706Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1143';
-export const BUILD_NUMBER = '1143';
-export const BUILD_HASH = 'ffab92c7';
+export const BUILD_VERSION = '1.0.1145';
+export const BUILD_NUMBER = '1145';
+export const BUILD_HASH = '58bb4e0a';
 export const BUILD_DATE = '2026-02-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1143',
+    version: '1.0.1145',
     date: '2026-02-24',
     changes: [
+      {
+        type: 'fix',
+        "description": "Resolve keyboard hook unused variables and incorrect argument count"
+      },
+      {
+        type: 'fix',
+        "description": "Implement stopNativeEngine and add UADE instance check"
+      },
       {
         type: 'fix',
         "description": "Eliminate tracker playback bugs by rendering MOD files first"
@@ -236,14 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Enhance editor controls, dialogs, and settings"
-      },
-      {
-        type: 'feature',
-        "description": "Add modland API integration"
-      },
-      {
-        type: 'feature',
-        "description": "Update UADE engine, worklet, and Amiga format parsers"
       }
     ]
   }
