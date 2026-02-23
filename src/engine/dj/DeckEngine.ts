@@ -31,7 +31,7 @@ if (_origOnSourceEnd && !(Tone.Player.prototype as any).__scratchPatched) {
 
 type FaderLFODivision = '1/4' | '1/8' | '1/16' | '1/32';
 
-export type DeckId = 'A' | 'B';
+export type DeckId = 'A' | 'B' | 'C';
 
 export interface DeckEngineOptions {
   id: DeckId;
@@ -62,8 +62,8 @@ export class DeckEngine {
   // Instrument IDs from the currently loaded song (for output override cleanup)
   private currentSongInstrumentIds: number[] = [];
 
-  // Track which Furnace engine keys this deck has rerouted (for cleanup)
-  private routedFurnaceEngines: Set<string> = new Set();
+  // Track which native engine keys this deck has rerouted (Furnace, UADE, Hively — for cleanup)
+  private routedNativeEngines: Set<string> = new Set();
 
   // Scratch
   private scratchPlayback: ScratchPlayback;
@@ -163,7 +163,7 @@ export class DeckEngine {
   private async _initScratchBuffer(): Promise<void> {
     try {
       const ctx = Tone.getContext().rawContext as AudioContext;
-      const bufferId: 0 | 1 = this.id === 'A' ? 0 : 1;
+      const bufferId = this.id === 'A' ? 0 : this.id === 'B' ? 1 : 2;
       this.scratchBuffer = new DeckScratchBuffer(ctx, bufferId);
       await this.scratchBuffer.init();
       this.scratchBuffer.wireIntoChain(this.filter, this.channelGain);
@@ -183,7 +183,7 @@ export class DeckEngine {
     this._playbackMode = 'tracker';
 
     this.unregisterOutputOverrides();
-    this.restoreFurnaceRouting();
+    this.restoreNativeRouting();
 
     const engine = getToneEngine();
 
@@ -212,18 +212,24 @@ export class DeckEngine {
     await engine.preloadInstruments(song.instruments);
     await engine.ensureWASMSynthsReady(song.instruments);
 
-    // Reroute Furnace singleton engine output to this deck's deckGain
-    // so Furnace audio goes through the deck's EQ, filter, and crossfader
+    // Reroute native singleton engine outputs into this deck's audio chain
+    // so they go through the deck's EQ, filter, and crossfader.
+    // Furnace → deckGain directly (no Amiga stereo separation needed).
+    // UADE/Hively → replayer's separation chain → deckGain (applies stereo separation).
     const nativeDeckGain = getNativeAudioNode(this.deckGain as any);
+    const nativeSeparationInput = getNativeAudioNode(this.replayer.getSeparationInput() as any);
     if (nativeDeckGain) {
       for (const inst of song.instruments) {
         const synthType = inst.synthType || '';
         if (synthType.startsWith('Furnace')) {
           engine.rerouteNativeEngine('FurnaceChipEngine', nativeDeckGain);
           engine.rerouteNativeEngine('FurnaceDispatchEngine', nativeDeckGain);
-          this.routedFurnaceEngines.add('FurnaceChipEngine');
-          this.routedFurnaceEngines.add('FurnaceDispatchEngine');
-          break; // Only need to detect once
+          this.routedNativeEngines.add('FurnaceChipEngine');
+          this.routedNativeEngines.add('FurnaceDispatchEngine');
+        } else if ((synthType === 'UADESynth' || synthType === 'HivelySynth') && nativeSeparationInput) {
+          // Route through separation chain so Amiga hard-pan stereo mix setting applies
+          engine.rerouteNativeEngine(synthType, nativeSeparationInput);
+          this.routedNativeEngines.add(synthType);
         }
       }
     }
@@ -837,19 +843,19 @@ export class DeckEngine {
     }
   }
 
-  private restoreFurnaceRouting(): void {
-    if (this.routedFurnaceEngines.size > 0) {
+  private restoreNativeRouting(): void {
+    if (this.routedNativeEngines.size > 0) {
       const engine = getToneEngine();
-      for (const key of this.routedFurnaceEngines) {
+      for (const key of this.routedNativeEngines) {
         engine.restoreNativeEngineRouting(key);
       }
-      this.routedFurnaceEngines.clear();
+      this.routedNativeEngines.clear();
     }
   }
 
   dispose(): void {
     this.unregisterOutputOverrides();
-    this.restoreFurnaceRouting();
+    this.restoreNativeRouting();
     this.scratchPlayback.dispose();
     this.scratchBuffer?.dispose();
     if (this.decayRafId !== null) {

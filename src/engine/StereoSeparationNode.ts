@@ -77,7 +77,7 @@ export class StereoSeparationNode {
     this.gainLR.connect(this.merger, 0, 1);
     this.gainRR.connect(this.merger, 0, 1);
 
-    // merger → outputTone's underlying AudioNode
+    //merger → outputTone's underlying AudioNode
     this.merger.connect(this.outputTone.input);
 
     // Default: identity (100% = normal stereo)
