@@ -120,16 +120,33 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   const loadSongToDeck = useCallback(
     async (song: import('@/engine/TrackerReplayer').TrackerSong, fileName: string, deckId: 'A' | 'B' | 'C', rawBuffer?: ArrayBuffer) => {
       const engine = getDJEngine();
-      await engine.loadToDeck(deckId, song);
       const bpmResult = detectBPM(song);
 
-      // Fire background pipeline for render + analysis if we have the raw buffer
+      // If we have the raw buffer, render FIRST then load audio directly
+      // This eliminates tracker playback bugs
       if (rawBuffer) {
-        void getDJPipeline().loadOrEnqueue(rawBuffer, fileName, deckId, 'high').catch((err) => {
-          console.warn(`[DJPlaylistPanel] Pipeline for ${fileName}:`, err);
+        useDJStore.getState().setDeckState(deckId, {
+          fileName,
+          trackName: song.name || fileName,
+          detectedBPM: bpmResult.bpm,
+          effectiveBPM: bpmResult.bpm,
+          analysisState: 'rendering',
+          isPlaying: false,
         });
+
+        try {
+          const result = await getDJPipeline().loadOrEnqueue(rawBuffer, fileName, deckId, 'high');
+          await engine.loadAudioToDeck(deckId, result.wavData, fileName, song.name || fileName, result.analysis?.bpm || bpmResult.bpm);
+          console.log(`[DJPlaylistPanel] Loaded ${fileName} in audio mode (skipped tracker bugs)`);
+          return;
+        } catch (err) {
+          console.warn(`[DJPlaylistPanel] Pipeline failed for ${fileName}, falling back to tracker:`, err);
+          // Fall through to tracker mode as fallback
+        }
       }
 
+      // Fallback: load in tracker mode (no raw buffer available)
+      await engine.loadToDeck(deckId, song, fileName, bpmResult.bpm);
       useDJStore.getState().setDeckState(deckId, {
         fileName,
         trackName: song.name || fileName,

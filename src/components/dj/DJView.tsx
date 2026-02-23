@@ -197,7 +197,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
         const bpmResult = detectBPM(song);
 
         cacheSong(cacheKey, song);
-        await engine.loadToDeck(deckId, song);
+        await engine.loadToDeck(deckId, song, filename, bpmResult.bpm);
 
         // Fire background pipeline for render + analysis
         void getDJPipeline().loadOrEnqueue(buffer.slice(0), filename, deckId, 'high').catch((err) => {
