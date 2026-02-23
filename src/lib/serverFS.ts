@@ -6,7 +6,7 @@
 
 import fileManifest from '@generated/file-manifest.json';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
 
 export interface ServerFileEntry {
   name: string;
@@ -25,7 +25,7 @@ export async function isServerFSAvailable(): Promise<boolean> {
     const timeoutId = setTimeout(() => controller.abort(), 1000); // 1 second timeout
 
     // Check the public demo endpoint instead of auth-required endpoint
-    const response = await fetch(`${API_BASE}/api/demo/songs/`, {
+    const response = await fetch(`${API_BASE}/demo/songs/`, {
       method: 'HEAD',
       signal: controller.signal
     });
@@ -124,7 +124,7 @@ export async function listServerDirectory(dirPath: string): Promise<ServerFileEn
     subpath = cleanPath;
   }
 
-  const response = await fetch(`${API_BASE}/api/demo/${type}/${subpath}`);
+  const response = await fetch(`${API_BASE}/demo/${type}/${subpath}`);
 
   if (!response.ok) {
     throw new Error(`Failed to list directory: ${response.statusText}`);
@@ -175,7 +175,7 @@ export async function readServerFile(filePath: string): Promise<ArrayBuffer> {
     subpath = cleanPath;
   }
 
-  const response = await fetch(`${API_BASE}/api/demo/${type}/${subpath}`);
+  const response = await fetch(`${API_BASE}/demo/${type}/${subpath}`);
 
   if (!response.ok) {
     throw new Error(`Failed to read file: ${response.statusText}`);
@@ -214,7 +214,7 @@ export async function writeServerFile(
   const bytes = content instanceof ArrayBuffer ? new Uint8Array(content) : content;
   const base64 = btoa(String.fromCharCode(...bytes));
   
-  const response = await fetch(`${API_BASE}/api/files/${cleanPath}`, {
+  const response = await fetch(`${API_BASE}/files/${cleanPath}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -232,7 +232,7 @@ export async function writeServerFile(
  */
 export async function deleteServerFile(filePath: string): Promise<void> {
   const cleanPath = filePath.replace(/^\/+/, '');
-  const response = await fetch(`${API_BASE}/api/files/${cleanPath}`, {
+  const response = await fetch(`${API_BASE}/files/${cleanPath}`, {
     method: 'DELETE',
   });
   

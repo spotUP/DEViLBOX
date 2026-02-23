@@ -175,7 +175,7 @@ export interface DeckColorsExt extends DeckColors {
 // ─── Turntable ───────────────────────────────────────────────────────────────
 
 export type TurntableMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; colors: DeckColorsExt; deckId: 'A' | 'B'; isPlaying: boolean; effectiveBPM: number }
+  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; colors: DeckColorsExt; deckId: 'A' | 'B' | 'C'; isPlaying: boolean; effectiveBPM: number }
   | { type: 'playback'; isPlaying: boolean; effectiveBPM: number }
   | { type: 'velocity'; v: number }
   | { type: 'scratchActive'; active: boolean }

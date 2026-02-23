@@ -9,7 +9,7 @@
  */
 
 import React, { useEffect, useRef, memo } from 'react';
-import { useTrackerStore, useUIStore } from '@stores';
+import { useTrackerStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -17,7 +17,8 @@ import { useTransportStore } from '@stores/useTransportStore';
 // VU meter timing constants - ProTracker style
 const DECAY_RATE = 0.92;
 const SWING_RANGE = 25;
-const SWING_SPEED = 0.8;
+const SWING_FREQ = 0.0025;     // radians per ms (~2.5s full cycle)
+const SWING_PHASE_STEP = 0.45; // radians between adjacent channels
 const NUM_SEGMENTS = 26;
 const SEGMENT_GAP = 4;
 const SEGMENT_HEIGHT = 4;
@@ -31,8 +32,6 @@ const COLOR_RED = '#ef4444';
 
 interface MeterState {
   level: number;
-  position: number;
-  direction: number;
 }
 
 interface ChannelVUMetersProps {
@@ -46,13 +45,13 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex
   })));
-  const performanceQuality = useUIStore((state) => state.performanceQuality);
   const pattern = patterns[currentPatternIndex];
   const numChannels = pattern?.channels.length || 4;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const meterStates = useRef<MeterState[]>([]);
   const animationRef = useRef<number | null>(null);
+  const lastGensRef = useRef<number[]>([]);
 
   // Refs for values needed inside the animation loop
   const numChannelsRef = useRef(numChannels);
@@ -66,10 +65,8 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
 
   // Initialize meter states
   useEffect(() => {
-    meterStates.current = Array.from({ length: numChannels }, (_, i) => ({
+    meterStates.current = Array.from({ length: numChannels }, () => ({
       level: 0,
-      position: (i % 2 === 0 ? -1 : 1) * SWING_RANGE * 0.5,
-      direction: i % 2 === 0 ? 1 : -1
     }));
   }, [numChannels]);
 
@@ -96,16 +93,9 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
     return () => observer.disconnect();
   }, []);
 
-  // Animation loop
+  // Animation loop — always runs (VU meters are lightweight canvas ops,
+  // no need to gate on performanceQuality which can oscillate and kill the loop)
   useEffect(() => {
-    if (performanceQuality === 'low') {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = null;
-      }
-      return;
-    }
-
     const tick = () => {
       const canvas = canvasRef.current;
       if (!canvas) {
@@ -129,9 +119,17 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
       const engine = getToneEngine();
       const nc = numChannelsRef.current;
       const triggerLevels = engine.getChannelTriggerLevels(nc);
+      const triggerGens = engine.getChannelTriggerGenerations(nc);
       const sl = scrollLeftRef.current;
       const offsets = channelOffsetsRef.current;
       const widths = channelWidthsRef.current;
+
+      // Grow lastGens if needed
+      if (lastGensRef.current.length < nc) {
+        const old = lastGensRef.current;
+        lastGensRef.current = new Array(nc).fill(0);
+        for (let j = 0; j < old.length; j++) lastGensRef.current[j] = old[j];
+      }
 
       for (let i = 0; i < nc; i++) {
         const meter = meterStates.current[i];
@@ -140,36 +138,28 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         // Skip collapsed channels
         if (widths[i] && widths[i] < 20) continue;
 
-        const trigger = triggerLevels[i] || 0;
+        // Detect NEW trigger by comparing generation counter
+        const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
         const staggerOffset = i * 0.012;
 
-        // Update level - instant jump on trigger, smooth decay
+        // Update level - instant jump on NEW trigger, smooth decay otherwise
         // When playback is stopped, kill meters instantly (no lingering bounce)
         if (!useTransportStore.getState().isPlaying) {
           meter.level = 0;
-        } else if (trigger > 0) {
-          meter.level = trigger;
+        } else if (isNewTrigger && triggerLevels[i] > 0) {
+          meter.level = triggerLevels[i];
+          lastGensRef.current[i] = triggerGens[i];
         } else {
           const decayRate = DECAY_RATE - staggerOffset;
           meter.level = meter.level * decayRate;
           if (meter.level < 0.01) meter.level = 0;
         }
 
-        // Update swing position
-        if (meter.level > 0.02) {
-          const distFromCenter = Math.abs(meter.position) / SWING_RANGE;
-          const easeZone = Math.max(0, (distFromCenter - 0.7) / 0.3);
-          const easedSpeed = SWING_SPEED * (1 - easeZone * 0.7);
-          meter.position += easedSpeed * meter.direction;
-
-          if (meter.position >= SWING_RANGE) {
-            meter.position = SWING_RANGE;
-            meter.direction = -1;
-          } else if (meter.position <= -SWING_RANGE) {
-            meter.position = -SWING_RANGE;
-            meter.direction = 1;
-          }
-        }
+        // Swing position — global time-based sine wave with per-channel phase offset.
+        // All channels share one clock so they move as a synced staggered wave.
+        const swingPos = meter.level > 0.02
+          ? Math.sin(performance.now() * SWING_FREQ + i * SWING_PHASE_STEP) * SWING_RANGE
+          : 0;
 
         // Calculate channel center X
         let centerX: number;
@@ -181,7 +171,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         }
 
         // Apply scroll and swing
-        const meterX = centerX - METER_WIDTH / 2 - sl + meter.position;
+        const meterX = centerX - METER_WIDTH / 2 - sl + swingPos;
 
         // Draw segments bottom-to-top
         const activeSegments = Math.round(meter.level * NUM_SEGMENTS);
@@ -200,30 +190,10 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
             color = COLOR_RED;
           }
 
-          // Draw segment with glow
-          ctx.shadowColor = color;
-          ctx.shadowBlur = 6;
+          // Draw segment - simplified for performance
           ctx.fillStyle = color;
-
-          // Rounded rect
-          const r = 1;
-          ctx.beginPath();
-          ctx.moveTo(meterX + r, segY);
-          ctx.lineTo(meterX + METER_WIDTH - r, segY);
-          ctx.quadraticCurveTo(meterX + METER_WIDTH, segY, meterX + METER_WIDTH, segY + r);
-          ctx.lineTo(meterX + METER_WIDTH, segY + SEGMENT_HEIGHT - r);
-          ctx.quadraticCurveTo(meterX + METER_WIDTH, segY + SEGMENT_HEIGHT, meterX + METER_WIDTH - r, segY + SEGMENT_HEIGHT);
-          ctx.lineTo(meterX + r, segY + SEGMENT_HEIGHT);
-          ctx.quadraticCurveTo(meterX, segY + SEGMENT_HEIGHT, meterX, segY + SEGMENT_HEIGHT - r);
-          ctx.lineTo(meterX, segY + r);
-          ctx.quadraticCurveTo(meterX, segY, meterX + r, segY);
-          ctx.closePath();
-          ctx.fill();
+          ctx.fillRect(Math.round(meterX), Math.round(segY), METER_WIDTH, SEGMENT_HEIGHT);
         }
-
-        // Reset shadow after each meter
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
       }
 
       animationRef.current = requestAnimationFrame(tick);
@@ -236,11 +206,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         animationRef.current = null;
       }
     };
-  }, [performanceQuality]);
-
-  if (performanceQuality === 'low') {
-    return null;
-  }
+  }, []);
 
   return (
     <canvas

@@ -556,12 +556,14 @@ function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuff
   const base64 = arrayBufferToBase64(wavArrayBuffer);
   const dataUrl = `data:audio/wav;base64,${base64}`;
 
+  const loopEnd = finalLoopStart + finalLoopLength;
+  console.log(`[InstrumentConverter] convertPCMToAudioBuffer: loopStart=${finalLoopStart} loopEnd=${loopEnd} length=${finalSamples.length}`);
   return {
     // Return WAV buffer (not raw PCM) so ToneEngine.decodeAudioData can decode it
     audioBuffer: wavArrayBuffer,
     blobUrl: dataUrl,
     loopStart: finalLoopStart,
-    loopEnd: finalLoopStart + finalLoopLength,
+    loopEnd: loopEnd,
   };
 }
 

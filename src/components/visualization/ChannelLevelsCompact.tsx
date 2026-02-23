@@ -26,6 +26,7 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
   const animationRef = useRef<number | null>(null);
   const levelStatesRef = useRef<number[]>([]);
   const peakHoldsRef = useRef<{ level: number; frames: number }[]>([]);
+  const lastGensRef = useRef<number[]>([]);
   // PERF: Cache gradient to avoid createLinearGradient every frame
   const gradientCacheRef = useRef<{ gradient: CanvasGradient; width: number; cyan: boolean } | null>(null);
 
@@ -133,10 +134,20 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
 
       const engine = getToneEngine();
       const triggerLevels = engine.getChannelTriggerLevels(nc);
+      const triggerGens = engine.getChannelTriggerGenerations(nc);
+
+      // Grow lastGens if needed
+      if (lastGensRef.current.length < nc) {
+        const old = lastGensRef.current;
+        lastGensRef.current = new Array(nc).fill(0);
+        for (let j = 0; j < old.length; j++) lastGensRef.current[j] = old[j];
+      }
 
       // Update levels with smoothing
       for (let i = 0; i < nc; i++) {
-        const trigger = triggerLevels[i] || 0;
+        const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
+        const trigger = isNewTrigger ? (triggerLevels[i] || 0) : 0;
+        if (isNewTrigger) lastGensRef.current[i] = triggerGens[i];
         const current = levelStatesRef.current[i] || 0;
 
         if (trigger > current) {

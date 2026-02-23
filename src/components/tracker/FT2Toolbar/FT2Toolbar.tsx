@@ -19,6 +19,7 @@ import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { FilePlus, Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
@@ -676,8 +677,20 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               <FT2NumericInput label="Edit Step" value={editStep} onChange={setEditStep} min={0} max={16} />
             </div>
             <div className="ft2-section ft2-section-playback">
-              <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm" onClick={handlePlaySong} className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
-              <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm" onClick={handlePlayPattern} className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
+              <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
+                onClick={(e) => { if (isPlayingSong && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); } else { handlePlaySong(); } }}
+                onContextMenu={(e) => {
+                  if (isPlayingSong) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+                }}
+                title={isPlayingSong ? 'Click: Stop · Shift+click/Right-click: Power off' : 'Play Song'}
+                className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
+              <Button variant={isPlayingPattern ? 'danger' : 'primary'} size="sm"
+                onClick={(e) => { if (isPlayingPattern && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); } else { handlePlayPattern(); } }}
+                onContextMenu={(e) => {
+                  if (isPlayingPattern) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
+                }}
+                title={isPlayingPattern ? 'Click: Stop · Shift+click/Right-click: Power off' : 'Play Pattern'}
+                className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
             </div>
           </div>
 

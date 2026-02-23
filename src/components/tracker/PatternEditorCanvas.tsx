@@ -23,6 +23,7 @@ import { useMobilePatternGestures } from '@/hooks/useMobilePatternGestures';
 import { useResponsiveSafe } from '@contexts/ResponsiveContext';
 import { haptics } from '@/utils/haptics';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import * as Tone from 'tone';
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -286,6 +287,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const handleScroll = useCallback((deltaY: number) => {
     if (!pattern || !isMobile) return;
 
+    // Check if scratch should be active (same logic as wheel handler)
+    const playing = useTransportStore.getState().isPlaying;
+    const uiState = useUIStore.getState();
+    const isDJView = uiState.activeView === 'dj';
+    const scratchToggleOn = uiState.scratchEnabled;
+    const shouldUseScratch = isDJView || scratchToggleOn || playing;
+
+    if (shouldUseScratch) {
+      const scratch = getTrackerScratchController();
+      // Touch deltaY is in pixels; scale similarly to wheel (deltaMode 0 = pixel)
+      scratch.onScrollDelta(deltaY, performance.now(), 0);
+      return;
+    }
+
     // Convert pixels to rows (ROW_HEIGHT = 24px)
     const rowDelta = Math.round(deltaY / ROW_HEIGHT);
 
@@ -443,6 +458,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     const cell = getCellFromCoords(e.clientX, e.clientY);
     if (!cell) return;
+
+    // Check if scratch should override block selection
+    const uiState = useUIStore.getState();
+    const isDJView = uiState.activeView === 'dj';
+    const scratchToggleOn = uiState.scratchEnabled;
+    const shouldBlockSelection = isDJView || scratchToggleOn;
+
+    // If scratch should be active, don't start block selection
+    if (shouldBlockSelection) {
+      return;
+    }
 
     const store = useTrackerStore.getState();
     
@@ -1338,7 +1364,25 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       const isPlaying = useTransportStore.getState().isPlaying;
-      if (isPlaying) return;
+      const uiState = useUIStore.getState();
+      const isDJView = uiState.activeView === 'dj';
+      const scratchToggleOn = uiState.scratchEnabled;
+
+      // Determine if scratch should be active:
+      // - Always in DJ view
+      // - Always if scratch toggle is ON
+      // - Only during playback if toggle is OFF
+      const shouldUseScratch = isDJView || scratchToggleOn || isPlaying;
+
+      // Route vertical scroll to scratch controller when appropriate
+      if (shouldUseScratch && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        const scratch = getTrackerScratchController();
+        scratch.onScrollDelta(e.deltaY, performance.now(), e.deltaMode);
+        return;
+      }
+
+      // Normal scroll behavior when scratch is not active
+      if (isPlaying) return; // Horizontal scroll disabled during playback
 
       // Vertical scroll - move cursor
       if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {

@@ -6267,14 +6267,23 @@ export class ToneEngine {
 
   // Channel trigger levels for VU meters (set when notes trigger)
   private channelTriggerLevels: Map<number, number> = new Map();
-  // PERF: Pre-allocated array for getChannelTriggerLevels — never reallocated
+  // PERF: Pre-allocated arrays for trigger levels — never reallocated
   private triggerLevelsCache: number[] = new Array(16).fill(0);
+  private triggerGensCache: number[] = new Array(16).fill(0);
+
+  // Per-channel generation counter — bumped each time a trigger fires.
+  // Consumers compare their "last seen" generation to detect new triggers
+  // without consume-on-read zeroing (which caused missed triggers due to
+  // RAF ordering between Tone.Draw and consumer animation loops).
+  private channelTriggerGens = new Map<number, number>();
+  private triggerGenCounter = 0;
 
   /**
    * Trigger a channel's VU meter (called when a note plays on that channel)
    */
   public triggerChannelMeter(channelIndex: number, velocity: number): void {
     this.channelTriggerLevels.set(channelIndex, Math.min(1, velocity * 1.2));
+    this.channelTriggerGens.set(channelIndex, ++this.triggerGenCounter);
   }
 
   /**
@@ -6282,11 +6291,15 @@ export class ToneEngine {
    */
   public clearChannelTriggerLevels(): void {
     this.channelTriggerLevels.clear();
+    this.channelTriggerGens.clear();
   }
 
   /**
-   * Get channel trigger levels for VU meters (real-time note triggers)
-   * PERF: Reuses internal array to avoid allocations every frame
+   * Get channel trigger levels for VU meters (real-time note triggers).
+   * Does NOT zero triggers on read — multiple consumers can read the same
+   * trigger. Consumers use getChannelTriggerGenerations() to detect NEW
+   * triggers vs. stale ones they've already processed.
+   * PERF: Reuses internal array to avoid allocations every frame.
    */
   public getChannelTriggerLevels(numChannels: number): number[] {
     // Grow cache if needed (never shrinks — avoids reallocation)
@@ -6297,16 +6310,25 @@ export class ToneEngine {
     }
 
     for (let i = 0; i < numChannels; i++) {
-      const current = this.channelTriggerLevels.get(i) || 0;
-      this.triggerLevelsCache[i] = current;
-
-      // Clear the trigger after reading - VU component handles decay visually
-      // This ensures triggers are consumed exactly once for tight sync
-      if (current > 0) {
-        this.channelTriggerLevels.set(i, 0);
-      }
+      this.triggerLevelsCache[i] = this.channelTriggerLevels.get(i) || 0;
     }
     return this.triggerLevelsCache;
+  }
+
+  /**
+   * Get per-channel trigger generation counters.
+   * Each call to triggerChannelMeter() bumps the generation for that channel.
+   * Consumers compare with their "last seen" generation to detect new triggers.
+   * PERF: Reuses internal array to avoid allocations every frame.
+   */
+  public getChannelTriggerGenerations(numChannels: number): number[] {
+    if (this.triggerGensCache.length < numChannels) {
+      this.triggerGensCache = new Array(Math.max(numChannels, 16)).fill(0);
+    }
+    for (let i = 0; i < numChannels; i++) {
+      this.triggerGensCache[i] = this.channelTriggerGens.get(i) || 0;
+    }
+    return this.triggerGensCache;
   }
 
   /**
