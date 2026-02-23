@@ -26,12 +26,12 @@ export class DrumPadEngine {
   private muteGroups: Map<number, number> = new Map(); // padId -> muteGroup
   private reversedBufferCache: WeakMap<AudioBuffer, AudioBuffer> = new WeakMap();
 
-  constructor(context: AudioContext) {
+  constructor(context: AudioContext, outputDestination?: AudioNode) {
     this.context = context;
 
-    // Create master output
+    // Create master output — route to custom destination or default to context.destination
     this.masterGain = this.context.createGain();
-    this.masterGain.connect(this.context.destination);
+    this.masterGain.connect(outputDestination ?? this.context.destination);
 
     // Create separate output buses
     this.outputs.set('stereo', this.masterGain);
@@ -40,6 +40,15 @@ export class DrumPadEngine {
       gain.connect(this.masterGain);
       this.outputs.set(bus, gain);
     });
+  }
+
+  /**
+   * Reconnect master output to a different destination node.
+   * Used when switching between standalone and DJ mixer routing.
+   */
+  rerouteOutput(destination: AudioNode): void {
+    this.masterGain.disconnect();
+    this.masterGain.connect(destination);
   }
 
   /**

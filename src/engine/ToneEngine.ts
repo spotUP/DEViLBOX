@@ -5112,10 +5112,12 @@ export class ToneEngine {
         : getNativeAudioNode(preSourceToneNode);
       if (preNative) {
         try { preNative.connect(pre); } catch (e) {
-          console.warn('[ToneEngine] Pre-analyser tap failed for effect', config.id, e);
+          // Non-fatal: analyser just won't show data for this effect
+          console.debug('[ToneEngine] Pre-analyser tap failed for effect', config.id, e);
         }
       } else {
-        console.warn('[ToneEngine] Pre-analyser: could not get native node for effect', config.id);
+        // Some effect types don't expose their internal AudioNode — analyser won't display
+        console.debug('[ToneEngine] Pre-analyser: could not get native node for effect', config.id);
       }
 
       // Post-tap: tap the output of effect[i]
@@ -5125,10 +5127,10 @@ export class ToneEngine {
         : getNativeAudioNode(successNodes[i]);
       if (postNative) {
         try { postNative.connect(post); } catch (e) {
-          console.warn('[ToneEngine] Post-analyser tap failed for effect', config.id, e);
+          console.debug('[ToneEngine] Post-analyser tap failed for effect', config.id, e);
         }
       } else {
-        console.warn('[ToneEngine] Post-analyser: could not get native node for effect', config.id);
+        console.debug('[ToneEngine] Post-analyser: could not get native node for effect', config.id);
       }
 
       this.masterEffectAnalysers.set(config.id, { pre, post });

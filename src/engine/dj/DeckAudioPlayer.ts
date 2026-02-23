@@ -23,6 +23,11 @@ export class DeckAudioPlayer {
   private _loaded = false;
   private _playbackRate = 1;
 
+  // Audio loop region (seconds)
+  private _loopIn: number | null = null;
+  private _loopOut: number | null = null;
+  private _loopCheckTimer: number | null = null;
+
   constructor(outputNode: Tone.ToneAudioNode) {
     this.player = new Tone.Player({
       loop: false,
@@ -192,7 +197,54 @@ export class DeckAudioPlayer {
     return peaks;
   }
 
+  // ==========================================================================
+  // AUDIO LOOP (time-based)
+  // ==========================================================================
+
+  /**
+   * Set loop in/out points (seconds). When both are set, playback loops.
+   * Pass null to clear a loop point.
+   */
+  setLoopRegion(loopIn: number | null, loopOut: number | null): void {
+    this._loopIn = loopIn;
+    this._loopOut = loopOut;
+
+    if (loopIn !== null && loopOut !== null && loopOut > loopIn) {
+      this.startLoopCheck();
+    } else {
+      this.stopLoopCheck();
+    }
+  }
+
+  getLoopIn(): number | null { return this._loopIn; }
+  getLoopOut(): number | null { return this._loopOut; }
+
+  /** Start polling to detect when playback crosses loopOut and seek back to loopIn */
+  private startLoopCheck(): void {
+    this.stopLoopCheck();
+    const check = () => {
+      if (this._loopIn === null || this._loopOut === null) {
+        this.stopLoopCheck();
+        return;
+      }
+      const pos = this.getPosition();
+      if (pos >= this._loopOut) {
+        this.seek(this._loopIn);
+      }
+      this._loopCheckTimer = requestAnimationFrame(check);
+    };
+    this._loopCheckTimer = requestAnimationFrame(check);
+  }
+
+  private stopLoopCheck(): void {
+    if (this._loopCheckTimer !== null) {
+      cancelAnimationFrame(this._loopCheckTimer);
+      this._loopCheckTimer = null;
+    }
+  }
+
   dispose(): void {
+    this.stopLoopCheck();
     try { this.player.stop(); } catch { /* ignore */ }
     this.player.disconnect();
     this.player.dispose();

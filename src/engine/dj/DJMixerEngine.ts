@@ -6,6 +6,7 @@
  *                                                  ├──> masterGain ──> [master FX] ──> limiter ──> mainOut
  *   Deck B channelGain ──> inputB (crossfader) ──┘
  *   Deck C channelGain ──> inputC (thru, no xfader) ──┘
+ *   Sampler (DrumPads) ──> samplerInput (thru) ──────┘
  *
  * Master FX preset effects (reverb, delay, chorus, etc.) are inserted between
  * masterGain and limiter via rebuildMasterEffects().
@@ -16,6 +17,7 @@
  *   - smooth: constant-power (cos/sin)
  *
  * Deck C bypasses the crossfader entirely — always audible at channel volume.
+ * Sampler input also bypasses the crossfader — always at unity gain.
  */
 
 import * as Tone from 'tone';
@@ -30,6 +32,8 @@ export class DJMixerEngine {
   readonly inputB: Tone.Gain;
   // Deck C thru input — bypasses crossfader, always at unity
   readonly inputC: Tone.Gain;
+  // Sampler thru input — bypasses crossfader, for DrumPadEngine in DJ mode
+  readonly samplerInput: GainNode;
 
   // Master chain
   private masterGain: Tone.Gain;
@@ -49,6 +53,11 @@ export class DJMixerEngine {
     this.inputB = new Tone.Gain(1);
     this.inputC = new Tone.Gain(1);
 
+    // Raw Web Audio GainNode for DrumPadEngine (which uses raw Web Audio, not Tone.js)
+    const ctx = Tone.getContext().rawContext;
+    this.samplerInput = (ctx as AudioContext).createGain();
+    this.samplerInput.gain.value = 1;
+
     this.masterGain = new Tone.Gain(1);
 
     // Limiter: fast attack, high ratio compressor acting as a brickwall
@@ -65,6 +74,11 @@ export class DJMixerEngine {
     this.inputA.connect(this.masterGain);
     this.inputB.connect(this.masterGain);
     this.inputC.connect(this.masterGain);  // thru — no crossfader
+
+    // Connect raw Web Audio sampler input to Tone.js master gain
+    const masterGainRaw = this.masterGain.input as AudioNode;
+    this.samplerInput.connect(masterGainRaw);
+
     this.masterGain.connect(this.limiter);
     this.limiter.toDestination();
     this.limiter.connect(this.masterMeter);
@@ -235,6 +249,7 @@ export class DJMixerEngine {
     this.inputA.dispose();
     this.inputB.dispose();
     this.inputC.dispose();
+    this.samplerInput.disconnect();
     this.masterGain.dispose();
     this.limiter.dispose();
     this.masterMeter.dispose();
