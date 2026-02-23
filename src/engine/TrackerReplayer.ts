@@ -1176,12 +1176,6 @@ export class TrackerReplayer {
       this.stopChannel(this.channels[i], i);
     }
 
-    // Safety net: release ALL active notes in the engine to prevent any hanging voices
-    try {
-      const engine = getToneEngine();
-      engine.releaseAll();
-    } catch { /* ignored */ }
-
     // Cancel any scheduled VU meter triggers (look-ahead scheduling enqueues callbacks
     // into Tone.Draw that would otherwise fire after stop, causing lingering VU bouncing)
     try {
