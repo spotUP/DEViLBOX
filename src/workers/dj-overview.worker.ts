@@ -32,6 +32,7 @@ let patternLoopStart = 0, patternLoopEnd = 0;
 let audioPosition   = 0;
 let durationMs      = 0;
 let waveformPeaks: number[] | null = null;
+let frequencyPeaks: number[][] | null = null;
 let pulsePhase      = 0;
 let dirty           = true;
 
@@ -81,6 +82,7 @@ function applyStateMsg(msg: OverviewState): void {
   audioPosition    = msg.audioPosition;
   durationMs       = msg.durationMs;
   waveformPeaks    = msg.waveformPeaks;
+  frequencyPeaks   = msg.frequencyPeaks;
 }
 
 // ─── RAF loop ─────────────────────────────────────────────────────────────────
@@ -110,11 +112,49 @@ function renderFrame(): void {
       const numBins = waveformPeaks.length;
       const binWidth = width / numBins;
       const midY = height / 2;
-      for (let i = 0; i < numBins; i++) {
-        const amp = waveformPeaks[i];
-        const barH = amp * midY * 0.9;
-        ctx.fillStyle = 'rgba(100, 160, 255, 0.5)';
-        ctx.fillRect(i * binWidth, midY - barH, Math.max(1, binWidth - 0.5), barH * 2);
+
+      // Use 3-band frequency-colored waveform if analysis data available
+      if (frequencyPeaks && frequencyPeaks.length === 3 && frequencyPeaks[0].length > 0) {
+        const low = frequencyPeaks[0];
+        const mid = frequencyPeaks[1];
+        const high = frequencyPeaks[2];
+        const freqBins = low.length;
+        const freqBinWidth = width / freqBins;
+        const freqMidY = midY;
+
+        for (let i = 0; i < freqBins; i++) {
+          const x = i * freqBinWidth;
+          const bw = Math.max(1, freqBinWidth - 0.5);
+
+          // Stack: low (bottom, blue) → mid (green) → high (top, orange)
+          const lowH  = low[i]  * freqMidY * 0.9;
+          const midH  = mid[i]  * freqMidY * 0.9;
+          const highH = high[i] * freqMidY * 0.9;
+
+          // Low band — blue
+          if (lowH > 0.5) {
+            ctx.fillStyle = 'rgba(60, 130, 246, 0.7)';
+            ctx.fillRect(x, freqMidY - lowH, bw, lowH * 2);
+          }
+          // Mid band — green
+          if (midH > 0.5) {
+            ctx.fillStyle = 'rgba(74, 222, 128, 0.55)';
+            ctx.fillRect(x, freqMidY - midH, bw, midH * 2);
+          }
+          // High band — orange/yellow
+          if (highH > 0.5) {
+            ctx.fillStyle = 'rgba(251, 191, 36, 0.5)';
+            ctx.fillRect(x, freqMidY - highH, bw, highH * 2);
+          }
+        }
+      } else {
+        // Fallback: single-color waveform
+        for (let i = 0; i < numBins; i++) {
+          const amp = waveformPeaks[i];
+          const barH = amp * midY * 0.9;
+          ctx.fillStyle = 'rgba(100, 160, 255, 0.5)';
+          ctx.fillRect(i * binWidth, midY - barH, Math.max(1, binWidth - 0.5), barH * 2);
+        }
       }
     } else {
       ctx.fillStyle = colors.bgSecondary;
@@ -149,6 +189,52 @@ function renderFrame(): void {
       if (i > 0) {
         ctx.fillStyle = colors.border;
         ctx.fillRect(x, 0, 1, height);
+      }
+    }
+
+    // Draw note density / frequency waveform over the pattern segments
+    if (waveformPeaks && waveformPeaks.length > 0) {
+      const numBins = waveformPeaks.length;
+      const binWidth = width / numBins;
+      const midY = height / 2;
+
+      // Use 3-band frequency-colored waveform if analysis data available
+      if (frequencyPeaks && frequencyPeaks.length === 3 && frequencyPeaks[0].length > 0) {
+        const low = frequencyPeaks[0];
+        const mid = frequencyPeaks[1];
+        const high = frequencyPeaks[2];
+        const freqBins = low.length;
+        const freqBinWidth = width / freqBins;
+
+        for (let i = 0; i < freqBins; i++) {
+          const x = i * freqBinWidth;
+          const bw = Math.max(1, freqBinWidth - 0.5);
+          const lowH  = low[i]  * midY * 0.85;
+          const midH  = mid[i]  * midY * 0.85;
+          const highH = high[i] * midY * 0.85;
+
+          if (lowH > 0.5) {
+            ctx.fillStyle = 'rgba(60, 130, 246, 0.55)';
+            ctx.fillRect(x, midY - lowH, bw, lowH * 2);
+          }
+          if (midH > 0.5) {
+            ctx.fillStyle = 'rgba(74, 222, 128, 0.4)';
+            ctx.fillRect(x, midY - midH, bw, midH * 2);
+          }
+          if (highH > 0.5) {
+            ctx.fillStyle = 'rgba(251, 191, 36, 0.35)';
+            ctx.fillRect(x, midY - highH, bw, highH * 2);
+          }
+        }
+      } else {
+        // Fallback: single-color note density
+        for (let i = 0; i < numBins; i++) {
+          const amp = waveformPeaks[i];
+          if (amp <= 0) continue;
+          const barH = amp * midY * 0.85;
+          ctx.fillStyle = 'rgba(140, 180, 255, 0.4)';
+          ctx.fillRect(i * binWidth, midY - barH, Math.max(1, binWidth - 0.5), barH * 2);
+        }
       }
     }
 

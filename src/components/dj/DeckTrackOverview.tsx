@@ -43,6 +43,9 @@ function snapshotDeck(d: ReturnType<typeof useDJStore.getState>['decks']['A']): 
     durationMs:       d.durationMs,
     // Convert Float32Array → plain number[] for structured clone
     waveformPeaks:    d.waveformPeaks ? Array.from(d.waveformPeaks) : null,
+    frequencyPeaks:   d.frequencyPeaks
+      ? d.frequencyPeaks.map(band => Array.from(band))
+      : null,
   };
 }
 
@@ -117,35 +120,83 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deckId]);
 
-  // ── Click to seek ──────────────────────────────────────────────────────────
+  // ── Click / drag to seek (scrub) ─────────────────────────────────────────
 
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    const container = containerRef.current;
-    if (!container) return;
-    const rect     = container.getBoundingClientRect();
-    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-
+  /** Perform an actual audio seek to a fraction of the song */
+  const seekToFraction = useCallback((fraction: number) => {
+    const f = Math.max(0, Math.min(1, fraction));
     try {
       const deck = getDJEngine().getDeck(deckId);
       if (deck.playbackMode === 'audio') {
-        const seekSec = fraction * (useDJStore.getState().decks[deckId].durationMs / 1000);
+        const seekSec = f * (useDJStore.getState().decks[deckId].durationMs / 1000);
         deck.audioPlayer.seek(seekSec);
         useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
       } else {
         const total = Math.max(useDJStore.getState().decks[deckId].totalPositions, 1);
-        const targetPos = Math.floor(fraction * total);
+        const targetPos = Math.min(Math.floor(f * total), total - 1);
         deck.cue(targetPos, 0);
         useDJStore.getState().setDeckPosition(deckId, targetPos, 0);
       }
     } catch { /* Engine not ready */ }
   }, [deckId]);
 
+  /** Update only the visual position marker (no audio seek — prevents noise during drag) */
+  const previewPosition = useCallback((fraction: number) => {
+    const f = Math.max(0, Math.min(1, fraction));
+    try {
+      const state = useDJStore.getState().decks[deckId];
+      if (state.playbackMode === 'audio') {
+        const seekSec = f * (state.durationMs / 1000);
+        useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
+      } else {
+        const total = Math.max(state.totalPositions, 1);
+        const targetPos = Math.min(Math.floor(f * total), total - 1);
+        useDJStore.getState().setDeckPosition(deckId, targetPos, 0);
+      }
+    } catch { /* Engine not ready */ }
+  }, [deckId]);
+
+  const isDraggingRef = useRef(false);
+  const lastFractionRef = useRef(0);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    lastFractionRef.current = fraction;
+    // Initial click: do the actual seek
+    seekToFraction(fraction);
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDraggingRef.current || !container) return;
+      const r = container.getBoundingClientRect();
+      const f = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+      lastFractionRef.current = f;
+      // During drag: only update visual position (no audio seek → no noise)
+      previewPosition(f);
+    };
+
+    const onMouseUp = () => {
+      isDraggingRef.current = false;
+      // Final position: do the actual seek
+      seekToFraction(lastFractionRef.current);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [seekToFraction, previewPosition]);
+
   return (
     <div
       ref={containerRef}
       className="w-full cursor-pointer"
       style={{ height: BAR_HEIGHT }}
-      onClick={handleClick}
+      onMouseDown={handleMouseDown}
     />
   );
 };
