@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-23T13:19:39.506Z
+ * Generated: 2026-02-23T19:23:01.526Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1110';
-export const BUILD_NUMBER = '1110';
-export const BUILD_HASH = 'c63a1c03';
+export const BUILD_VERSION = '1.0.1120';
+export const BUILD_NUMBER = '1120';
+export const BUILD_HASH = 'd9c7d817';
 export const BUILD_DATE = '2026-02-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,7 +30,53 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1110',
+    version: '1.0.1120',
+    date: '2026-02-23',
+    changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: gitignore turntable source models and backup files"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: tracker UI tweaks, import fixes, engine updates, and changelog"
+      },
+      {
+        type: 'improvement',
+        "description": "Update Pixi DJ/tracker views, navigation, theming, and performance"
+      },
+      {
+        type: 'feature',
+        "description": "DJ engine improvements, audio cache, UADE prerender, and UI component updates"
+      },
+      {
+        type: 'feature',
+        "description": "Always overlay pattern display on visualizers with nav buttons instead of click-to-cycle"
+      },
+      {
+        type: 'feature',
+        "description": "Add master FX chain support to DJMixerEngine with preset watcher in DJView"
+      },
+      {
+        type: 'fix',
+        "description": "Route UADE/Hively through stereo separation chain for proper master FX processing"
+      },
+      {
+        type: 'fix',
+        "description": "Gate DeckScopes animation on isPlaying to pause when stopped"
+      },
+      {
+        type: 'feature',
+        "description": "Add 2D/3D vinyl turntable views with Three.js GLB model and deck view mode switching"
+      },
+      {
+        type: 'feature',
+        "description": "Add turntable physics engine, scratch buffer worklet, and keyboard/MIDI controls"
+      }
+    ]
+  },
+  {
+    version: '2026-02-22',
     date: '2026-02-22',
     changes: [
       {
@@ -198,42 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add StereoSeparationNode (OpenMPT M-S algorithm)"
-      },
-      {
-        type: 'feature',
-        "description": "Close compatibility gaps — compat flags, macro gating, chip mode flags"
-      },
-      {
-        type: 'feature',
-        "description": "Extend drum pad engine with note repeat and pixi UI improvements"
-      },
-      {
-        type: 'feature',
-        "description": "Add self-view toggle to video chat window"
-      },
-      {
-        type: 'fix',
-        "description": "Camera (mugshot) starts muted by default"
-      },
-      {
-        type: 'fix',
-        "description": "Use original slot ID for MOD instruments with empty slots"
-      },
-      {
-        type: 'feature',
-        "description": "Improve piano roll view and keyboard layout commands"
-      },
-      {
-        type: 'fix',
-        "description": "Convert drum pad view from modal to inline view"
-      },
-      {
-        type: 'feature',
-        "description": "Add drum pads to editor view tabs"
-      },
-      {
-        type: 'improvement',
-        "description": "Merge drumpad and instrument sample browsers"
       }
     ]
   }
