@@ -34,6 +34,7 @@ import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { importMIDIFile } from '@lib/import/MIDIImporter';
 import { importInstrument } from '@lib/export/exporters';
 import { notify } from '@stores/useNotificationStore';
+import { loadFile } from '@lib/file/UnifiedFileLoader';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useProjectStore } from '@stores/useProjectStore';
@@ -407,305 +408,31 @@ function App() {
   }, [contextState, setContextState]);
 
   // Check if a filename is a supported tracker/module format (lazy-loaded)
-  const isModuleFormat = async (filename: string): Promise<boolean> => {
-    const { isSupportedModule } = await import('@lib/import/ModuleLoader');
-    return isSupportedModule(filename);
-  };
-
-  // Load song file after confirmation
+  // Load song file after confirmation (uses unified file loader)
   const loadSongFile = useCallback(async (file: File) => {
-    const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
-    const { loadInstruments } = useInstrumentStore.getState();
-    const { setBPM, setSpeed, setGrooveTemplate } = useTransportStore.getState();
-    const { setMetadata } = useProjectStore.getState();
-    
-    try {
-      // === CRITICAL: Full state reset before loading new song ===
-      // Following Furnace's pattern: stop → release → dispose → load
-      // Without this, dirty state from the old song can break playback.
-      const { isPlaying, stop: stopTransport, reset: resetTransport } = useTransportStore.getState();
-      const engine = getToneEngine();
-      
-      // 1. Stop playback and release all active notes
-      if (isPlaying) {
-        stopTransport();
-      }
-      engine.releaseAll();
-      
-      // 2. Dispose all cached instruments (prevents stale synth instances)
-      engine.disposeAllInstruments();
-      
-      // 3. Reset transport state (BPM, speed, row, groove — all to defaults)
-      resetTransport();
-      
-      const filename = file.name.toLowerCase();
-      
-      if (filename.endsWith('.mid') || filename.endsWith('.midi')) {
-        // MIDI file — use same pipeline as FileBrowser load
-        const midiResult = await importMIDIFile(file, {
-          quantize: 1, 
-          mergeChannels: true, 
-          velocityToVolume: true, 
-          defaultPatternLength: 64,
-        });
-        if (midiResult.patterns.length === 0) {
-          notify.error('No patterns found in MIDI file');
-          return;
-        }
-        loadPatterns(midiResult.patterns);
-        if (midiResult.instruments.length > 0) {
-          loadInstruments(midiResult.instruments);
-        }
-        setPatternOrder(midiResult.patterns.map((_: unknown, i: number) => i));
-        setCurrentPattern(0);
-        setMetadata({
-          name: midiResult.metadata.name,
-          author: '',
-          description: `Imported from ${file.name} (${midiResult.metadata.tracks} tracks)`,
-        });
-        setBPM(midiResult.bpm);
-        notify.success(`Imported: ${midiResult.metadata.name} — ${midiResult.instruments.length} instrument(s), BPM: ${midiResult.bpm}`);
-        
-      } else if (await isModuleFormat(filename)) {
-        // All tracker/module formats: MOD, XM, IT, S3M, Furnace, HVL/AHX, UADE exotic, etc.
-        const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-        const song = await parseModuleToSong(file);
-
-        loadInstruments(song.instruments);
-        loadPatterns(song.patterns);
-        setCurrentPattern(0);
-        if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-        setBPM(song.initialBPM);
-        if (song.initialSpeed !== 6) setSpeed(song.initialSpeed);
-        setMetadata({
-          name: song.name,
-          author: '',
-          description: `Imported from ${file.name}`,
-        });
-
-        // Set editor mode based on native data availability
-        useTrackerStore.getState().applyEditorMode(song);
-
-        notify.success(`Imported ${file.name}: ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
-
-      } else if (filename.endsWith('.dbx')) {
-        // DEViLBOX project file
-        const text = await file.text();
-        const songData = JSON.parse(text);
-        
-        const { needsMigration, migrateProject } = await import('@/lib/migration');
-        let patterns = songData.patterns;
-        let instruments = songData.instruments;
-        
-        if (needsMigration(patterns, instruments)) {
-          const migrated = migrateProject(patterns, instruments);
-          patterns = migrated.patterns;
-          instruments = migrated.instruments;
-        }
-        
-        loadPatterns(patterns);
-        
-        if (songData.sequence && Array.isArray(songData.sequence)) {
-          const patternIdToIndex = new Map(patterns.map((p: Pattern, i: number) => [p.id, i]));
-          const order = songData.sequence
-            .map((patternId: string) => patternIdToIndex.get(patternId))
-            .filter((index: number | undefined): index is number => index !== undefined);
-          if (order.length > 0) setPatternOrder(order);
-        }
-        
-        if (instruments) loadInstruments(instruments);
-        if (songData.masterEffects) useAudioStore.getState().setMasterEffects(songData.masterEffects);
-        setBPM(songData.bpm);
-        setMetadata(songData.metadata);
-        setGrooveTemplate(songData.grooveTemplateId || 'straight');
-        notify.success(`Loaded: ${songData.metadata?.name || file.name}`);
-      }
-    } catch (error) {
-      console.error('[FileDrop] Failed to load file:', error);
-      notify.error(`Failed to load ${file.name}`);
+    const result = await loadFile(file, { requireConfirmation: false });
+    if (result.success === true) {
+      notify.success(result.message);
+    } else if (result.success === false) {
+      notify.error(result.error);
     }
   }, []);
 
-  // Unified file loading handler for drag and drop
+  // Unified file loading handler for drag and drop (uses unified file loader)
   const handleFileDrop = useCallback(async (file: File) => {
     // In DJ mode, deck-level drop zones handle file loading — ignore here
     if (useUIStore.getState().activeView === 'dj') return;
 
-    const { addInstrument } = useInstrumentStore.getState();
-
-    try {
-      const filename = file.name.toLowerCase();
-
-      // Check if it's a song format that will replace current project
-      const { isSupportedModule } = await import('@lib/import/ModuleLoader');
-      const isSongFormat = filename.endsWith('.dbx') || filename.endsWith('.mid') || filename.endsWith('.midi') || isSupportedModule(filename);
-
-      if (isSongFormat) {
-        // Show confirmation dialog for song formats
-        setPendingSongFile(file);
-        setShowSongLoadConfirm(true);
-        return;
-      }
-      
-      // Handle non-song formats immediately
-      if (filename.endsWith('.dbi')) {
-        // DEViLBOX instrument file
-        const instrumentData = await importInstrument(file);
-        if (instrumentData?.instrument) {
-          addInstrument(instrumentData.instrument);
-          notify.success(`Loaded instrument: ${instrumentData.instrument.name || 'Untitled'}`);
-        } else {
-          notify.error(`Failed to load instrument: ${file.name}`);
-        }
-        
-      } else if (filename.endsWith('.xml')) {
-        // XML file - could be DB303 pattern or preset
-        const text = await file.text();
-        const isPreset = text.includes('<db303-preset');
-        const isPattern = text.includes('<db303-pattern');
-        
-        if (isPreset) {
-          // Import preset - find or create TB-303 instrument and apply
-          const { parseDb303Preset } = await import('@lib/import/Db303PresetConverter');
-          const { instruments, updateInstrument, addInstrument: addInst } = useInstrumentStore.getState();
-          const presetConfig = parseDb303Preset(text);
-          
-          let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
-          if (!tb303Instrument) {
-            // Auto-create TB-303 instrument
-            const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
-            const newInst = createDefaultTB303Instrument();
-            addInst(newInst);
-            tb303Instrument = newInst;
-          }
-
-          updateInstrument(tb303Instrument.id, {
-            tb303: { ...tb303Instrument.tb303, ...presetConfig }
-          });
-
-          notify.success(`Loaded DB303 preset: ${file.name}`);
-          
-        } else if (isPattern) {
-          // Import pattern - find or create TB-303 instrument
-          const { parseDb303Pattern } = await import('@lib/import/Db303PatternConverter');
-          const { patterns, loadPatterns, setCurrentPattern, setPatternOrder } = useTrackerStore.getState();
-          const { instruments, addInstrument: addInst } = useInstrumentStore.getState();
-          const { setBPM } = useTransportStore.getState();
-          
-          let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
-          if (!tb303Instrument) {
-            // Auto-create TB-303 instrument
-            const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
-            const newInst = createDefaultTB303Instrument();
-            addInst(newInst);
-            tb303Instrument = newInst;
-          }
-
-          const patternName = file.name.replace('.xml', '') || 'Imported Pattern';
-          const { pattern: importedPattern, tempo } = parseDb303Pattern(text, patternName, tb303Instrument.id);
-          
-          importedPattern.channels[0].instrumentId = tb303Instrument.id;
-          
-          const newPatterns = [...patterns, importedPattern];
-          loadPatterns(newPatterns);
-          setCurrentPattern(newPatterns.length - 1);
-          setPatternOrder([newPatterns.length - 1]);
-          
-          if (tempo !== undefined) setBPM(tempo);
-          // NOTE: We intentionally DO NOT apply swing from DB303 XML to avoid
-          // double-swing with tracker's global groove/swing system.
-          // Users can manually adjust swing via the tracker's transport settings.
-          // The swing parameter in DB303 XML affects slide timing in the original,
-          // but applying it here would conflict with tracker groove and cause
-          // incorrect slide behavior.
-          // Original code (now disabled):
-          // if (swing !== undefined) {
-          //   setSwing(100 + (swing * 100));
-          //   setGrooveSteps(2);
-          // }
-          
-          notify.success(`Loaded DB303 pattern: ${importedPattern.name}`);
-          
-        } else {
-          notify.error('Unknown XML format. Expected db303-pattern or db303-preset.');
-        }
-        
-      } else if (filename.endsWith('.sqs') || filename.endsWith('.seq')) {
-        // Behringer TD-3 / Synthtribe pattern file (.sqs = single, .seq = sequence/multiple patterns)
-        const { parseTD3File } = await import('@lib/import/TD3PatternLoader');
-        const { td3StepsToTrackerCells } = await import('@/midi/sysex/TD3PatternTranslator');
-        const { loadPatterns, setCurrentPattern, setPatternOrder } = useTrackerStore.getState();
-        const { reset: resetInstruments, addInstrument: addInst } = useInstrumentStore.getState();
-        const { reset: resetTransport } = useTransportStore.getState();
-        const engine = getToneEngine();
-
-        const buffer = await file.arrayBuffer();
-        const td3File = await parseTD3File(buffer);
-
-        if (td3File.patterns.length === 0) {
-          notify.error('No patterns found in SQS file');
-          return;
-        }
-
-        // Clear existing project state before loading
-        useAutomationStore.getState().reset();
-        resetTransport();
-        resetInstruments();
-        engine.disposeAllInstruments();
-
-        // Create a fresh TB-303 instrument
-        const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
-        const tb303Instrument = createDefaultTB303Instrument();
-        addInst(tb303Instrument);
-        const instrumentIndex = 1; // First (and only) instrument after reset
-
-        // Import all patterns from the file
-        const importedPatterns: Pattern[] = td3File.patterns.map((td3Pattern, idx) => {
-          const cells = td3StepsToTrackerCells(td3Pattern.steps, 2); // Base octave 2
-          const patternLength = td3Pattern.length || 16;
-          const patternId = `td3-${Date.now()}-${idx}`;
-          return {
-            id: patternId,
-            name: td3Pattern.name || `TD-3 Pattern ${idx + 1}`,
-            length: patternLength,
-            channels: [{
-              id: `ch-${tb303Instrument.id}-${idx}`,
-              name: 'TB-303',
-              muted: false,
-              solo: false,
-              collapsed: false,
-              volume: 100,
-              pan: 0,
-              instrumentId: tb303Instrument.id,
-              color: '#ec4899',
-              rows: cells.slice(0, patternLength).map(cell => ({
-                ...cell,
-                instrument: cell.note ? instrumentIndex : 0
-              }))
-            }]
-          };
-        });
-
-        loadPatterns(importedPatterns);
-        setCurrentPattern(0);
-        setPatternOrder(importedPatterns.map((_, i) => i));
-
-        notify.success(`Loaded ${importedPatterns.length} TD-3 pattern(s) from ${file.name}`);
-        
-      } else if (filename.match(/\.(wav|mp3|ogg|flac|aiff|aif)$/)) {
-        // Audio sample - create new instrument
-        notify.info(`Audio sample: ${file.name}. Opening instrument editor...`);
-        // TODO: Create new instrument with this sample
-        // For now just show the instrument modal
-        useUIStore.getState().openModal('instruments');
-        
-      } else {
-        notify.warning(`Unsupported file format: ${file.name}`);
-      }
-      
-    } catch (error) {
-      console.error('[FileDrop] Failed to handle file:', error);
-      notify.error(`Failed to handle ${file.name}`);
+    const result = await loadFile(file, { requireConfirmation: true });
+    
+    if (result.success === 'pending-confirmation') {
+      // Song format — show confirmation dialog
+      setPendingSongFile(result.file);
+      setShowSongLoadConfirm(true);
+    } else if (result.success === true) {
+      notify.success(result.message);
+    } else if (result.success === false) {
+      notify.error(result.error);
     }
   }, []);
 
@@ -1128,136 +855,30 @@ function App() {
             mode="load"
             onLoad={async (data: any, filename: string) => {
               setShowFileBrowser(false);
-              // Load the project data
-              const { loadPatterns, setCurrentPattern } = useTrackerStore.getState();
-              const { addInstrument } = useInstrumentStore.getState();
-
+              // .dbx project files (JSON format) - validate and load via unified loader
               try {
-                if (data.patterns) {
-                  loadPatterns(data.patterns);
-                  if (data.patterns.length > 0) {
-                    setCurrentPattern(0);
-                  }
+                const file = new File([JSON.stringify(data)], filename, { type: 'application/json' });
+                const result = await loadFile(file, { requireConfirmation: false });
+                if (result.success === true) {
+                  notify.success(result.message);
+                } else if (result.success === false) {
+                  notify.error(result.error);
                 }
-                if (data.instruments && Array.isArray(data.instruments)) {
-                  data.instruments.forEach((inst: InstrumentConfig) => addInstrument(inst));
-                }
-                notify.success(`Loaded: ${filename}`);
               } catch (error) {
                 console.error('Failed to load project:', error);
                 notify.error('Failed to load project');
               }
             }}
             onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
-              const { isPlaying, stop } = useTransportStore.getState();
-              const engine = getToneEngine();
-              if (isPlaying) { stop(); engine.releaseAll(); }
-
+              setShowFileBrowser(false);
               try {
-                const lower = filename.toLowerCase();
-                if (lower.endsWith('.sqs') || lower.endsWith('.seq')) {
-                  // Behringer TD-3 pattern file
-                  const { parseTD3File } = await import('@lib/import/TD3PatternLoader');
-                  const { td3StepsToTrackerCells } = await import('@/midi/sysex/TD3PatternTranslator');
-                  const { loadPatterns, setCurrentPattern, setPatternOrder } = useTrackerStore.getState();
-                  const { reset: resetInstruments, addInstrument: addInst } = useInstrumentStore.getState();
-                  const { reset: resetTransport } = useTransportStore.getState();
-
-                  const td3File = await parseTD3File(buffer);
-                  if (td3File.patterns.length === 0) {
-                    notify.error('No patterns found in file');
-                    return;
-                  }
-
-                  // Clear existing project state before loading
-                  useAutomationStore.getState().reset();
-                  resetTransport();
-                  resetInstruments();
-                  getToneEngine().disposeAllInstruments();
-
-                  // Create a fresh TB-303 instrument
-                  const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
-                  const tb303Instrument = createDefaultTB303Instrument();
-                  addInst(tb303Instrument);
-                  const instrumentIndex = 1; // First (and only) instrument after reset
-
-                  const importedPatterns = td3File.patterns.map((td3Pattern, idx) => {
-                    const cells = td3StepsToTrackerCells(td3Pattern.steps, 2);
-                    const patternLength = td3Pattern.length || 16;
-                    const patternId = `td3-${Date.now()}-${idx}`;
-                    return {
-                      id: patternId,
-                      name: td3Pattern.name || `TD-3 Pattern ${idx + 1}`,
-                      length: patternLength,
-                      channels: [{
-                        id: `ch-${tb303Instrument.id}-${idx}`,
-                        name: 'TB-303',
-                        muted: false,
-                        solo: false,
-                        collapsed: false,
-                        volume: 100,
-                        pan: 0,
-                        instrumentId: tb303Instrument.id,
-                        color: '#ec4899',
-                        rows: cells.slice(0, patternLength).map(cell => ({
-                          ...cell,
-                          instrument: cell.note ? instrumentIndex : 0
-                        }))
-                      }]
-                    };
-                  });
-
-                  loadPatterns(importedPatterns);
-                  setCurrentPattern(0);
-                  setPatternOrder(importedPatterns.map((_, i) => i));
-                  notify.success(`Imported ${importedPatterns.length} TD-3 pattern(s)`);
-                } else if (lower.endsWith('.mid') || lower.endsWith('.midi')) {
-                  // Standard MIDI file import
-                  const { importMIDIFile } = await import('@lib/import/MIDIImporter');
-                  const result = await importMIDIFile(new File([buffer], filename), { mergeChannels: true });
-                  if (result.patterns.length === 0) {
-                    notify.error('No patterns found in MIDI file');
-                    return;
-                  }
-                  const { loadPatterns: loadPats, setCurrentPattern: setCurPat, setPatternOrder: setPO } = useTrackerStore.getState();
-                  const { setBPM: setB, reset: resetTransport } = useTransportStore.getState();
-                  const { reset: resetInstruments, loadInstruments: loadInst } = useInstrumentStore.getState();
-                  resetTransport();
-                  resetInstruments();
-                  getToneEngine().disposeAllInstruments();
-                  if (result.instruments.length > 0) {
-                    loadInst(result.instruments);
-                  }
-                  loadPats(result.patterns);
-                  setPO(result.patterns.map((_: unknown, i: number) => i));
-                  setCurPat(0);
-                  setB(result.bpm);
-                  notify.success(`Imported: ${result.metadata.name} — ${result.instruments.length} instrument(s), BPM: ${result.bpm}`);
-                } else {
-                  // Load other tracker modules (.fur, .mod, .xm, etc.) — shared parser
-                  const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-                  const song = await parseModuleToSong(new File([buffer], filename));
-
-                  const { loadPatterns, setCurrentPattern, setPatternOrder, applyEditorMode } = useTrackerStore.getState();
-                  const { reset: resetInstruments, loadInstruments: loadInst } = useInstrumentStore.getState();
-                  const { setBPM: setB, setSpeed, reset: resetTransport } = useTransportStore.getState();
-
-                  // Reset state to match drag-drop and other import paths
-                  resetTransport();
-                  resetInstruments();
-                  getToneEngine().disposeAllInstruments();
-
-                  loadInst(song.instruments);
-                  loadPatterns(song.patterns);
-                  setCurrentPattern(0);
-                  if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-                  setB(song.initialBPM);
-                  if (song.initialSpeed !== 6) setSpeed(song.initialSpeed);
-
-                  // Set editor mode based on native data availability
-                  applyEditorMode(song);
-
-                  notify.success(`Imported ${filename}: ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
+                // All binary formats (.mid, .mod, .xm, .it, .fur, .hvl, .ahx, .sqs, .seq, etc.)
+                const file = new File([buffer], filename);
+                const result = await loadFile(file, { requireConfirmation: false });
+                if (result.success === true) {
+                  notify.success(result.message);
+                } else if (result.success === false) {
+                  notify.error(result.error);
                 }
               } catch (error) {
                 console.error('Failed to load tracker module:', error);
