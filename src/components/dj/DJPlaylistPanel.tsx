@@ -26,6 +26,7 @@ import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
+import { isAudioFile } from '@/lib/audioFileUtils';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -89,23 +90,38 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
 
       for (const file of Array.from(e.target.files)) {
         try {
-          const song = await parseModuleToSong(file);
-          cacheSong(file.name, song);
-          const bpmResult = detectBPM(song);
-          const duration = estimateSongDuration(song);
+          const isAudio = isAudioFile(file.name);
+          const fileExt = file.name.split('.').pop()?.toUpperCase() ?? 'MOD';
 
-          const track: PlaylistTrack = {
-            fileName: file.name,
-            trackName: song.name || file.name,
-            format: file.name.split('.').pop()?.toUpperCase() ?? 'MOD',
-            bpm: bpmResult.bpm,
-            duration,
-            addedAt: Date.now(),
-          };
+          if (isAudio) {
+            const track: PlaylistTrack = {
+              fileName: file.name,
+              trackName: file.name.replace(/\.[^.]+$/, ''),
+              format: fileExt,
+              bpm: 0,
+              duration: 0,
+              addedAt: Date.now(),
+            };
+            addTrack(activePlaylistId, track);
+          } else {
+            const song = await parseModuleToSong(file);
+            cacheSong(file.name, song);
+            const bpmResult = detectBPM(song);
+            const duration = estimateSongDuration(song);
 
-          addTrack(activePlaylistId, track);
+            const track: PlaylistTrack = {
+              fileName: file.name,
+              trackName: song.name || file.name,
+              format: fileExt,
+              bpm: bpmResult.bpm,
+              duration,
+              addedAt: Date.now(),
+            };
+
+            addTrack(activePlaylistId, track);
+          }
         } catch (err) {
-          console.error(`[DJPlaylistPanel] Failed to parse ${file.name}:`, err);
+          console.error(`[DJPlaylistPanel] Failed to process ${file.name}:`, err);
         }
       }
 
@@ -149,6 +165,8 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
 
   const loadTrackToDeck = useCallback(
     async (track: PlaylistTrack, deckId: 'A' | 'B' | 'C') => {
+      const engine = getDJEngine();
+
       // Modland tracks: auto re-download from server to get the raw buffer
       if (track.fileName.startsWith('modland:')) {
         const modlandPath = track.fileName.slice('modland:'.length);
@@ -156,19 +174,21 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
           const { downloadModlandFile } = await import('@/lib/modlandApi');
           const buffer = await downloadModlandFile(modlandPath);
           const filename = modlandPath.split('/').pop() || 'download.mod';
-          const blob = new File([buffer], filename, { type: 'application/octet-stream' });
-          const song = await parseModuleToSong(blob);
-          cacheSong(track.fileName, song);
-          await loadSongToDeck(song, track.fileName, deckId, buffer);
+          
+          if (isAudioFile(filename)) {
+            await engine.loadAudioToDeck(deckId, buffer, track.fileName);
+          } else {
+            const blob = new File([buffer], filename, { type: 'application/octet-stream' });
+            const song = await parseModuleToSong(blob);
+            cacheSong(track.fileName, song);
+            await loadSongToDeck(song, track.fileName, deckId, buffer);
+          }
           return;
         } catch (err) {
           console.error(`[DJPlaylistPanel] Modland re-download failed:`, err);
         }
       }
 
-      // If we have the song but no raw buffer, we still need the buffer to render
-      // (songs are too large to store in DJSongCache, and rendering requires the raw file)
-      
       // Prompt user to select the file to get the raw buffer
       const input = document.createElement('input');
       input.type = 'file';
@@ -178,9 +198,13 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
         if (!file) return;
         try {
           const rawBuffer = await file.arrayBuffer();
-          const song = await parseModuleToSong(file);
-          cacheSong(file.name, song);
-          await loadSongToDeck(song, file.name, deckId, rawBuffer);
+          if (isAudioFile(file.name)) {
+            await engine.loadAudioToDeck(deckId, rawBuffer, file.name);
+          } else {
+            const song = await parseModuleToSong(file);
+            cacheSong(file.name, song);
+            await loadSongToDeck(song, file.name, deckId, rawBuffer);
+          }
         } catch (err) {
           console.error(`[DJPlaylistPanel] Failed to load track:`, err);
         }
@@ -224,21 +248,35 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
       setIsLoadingFile(true);
       for (const file of droppedFiles) {
         try {
-          const song = await parseModuleToSong(file);
-          cacheSong(file.name, song);
-          const bpmResult = detectBPM(song);
-          const duration = estimateSongDuration(song);
+          const isAudio = isAudioFile(file.name);
+          const fileExt = file.name.split('.').pop()?.toUpperCase() ?? 'MOD';
 
-          addTrack(activePlaylistId, {
-            fileName: file.name,
-            trackName: song.name || file.name,
-            format: file.name.split('.').pop()?.toUpperCase() ?? 'MOD',
-            bpm: bpmResult.bpm,
-            duration,
-            addedAt: Date.now(),
-          });
+          if (isAudio) {
+            addTrack(activePlaylistId, {
+              fileName: file.name,
+              trackName: file.name.replace(/\.[^.]+$/, ''),
+              format: fileExt,
+              bpm: 0,
+              duration: 0,
+              addedAt: Date.now(),
+            });
+          } else {
+            const song = await parseModuleToSong(file);
+            cacheSong(file.name, song);
+            const bpmResult = detectBPM(song);
+            const duration = estimateSongDuration(song);
+
+            addTrack(activePlaylistId, {
+              fileName: file.name,
+              trackName: song.name || file.name,
+              format: fileExt,
+              bpm: bpmResult.bpm,
+              duration,
+              addedAt: Date.now(),
+            });
+          }
         } catch (err) {
-          console.error(`[DJPlaylistPanel] Drop parse error:`, err);
+          console.error(`[DJPlaylistPanel] Drop process error:`, err);
         }
       }
       setIsLoadingFile(false);
