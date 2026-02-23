@@ -1732,20 +1732,43 @@ export class InstrumentFactory {
     const pitchEnv = config.pitchEnvelope;
     const hasPitchEnv = pitchEnv?.enabled && pitchEnv.amount !== 0;
 
-    // If no pitch envelope, return synth directly
+    // If no pitch envelope, return wrapped synth with voice leak prevention
     if (!hasPitchEnv) {
-      return synth;
+      return {
+        triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+          // Release any existing voice for this note first to prevent voice leak
+          try { synth.triggerRelease(note, time); } catch { /* ignore */ }
+          synth.triggerAttackRelease(note, duration, time, velocity);
+        },
+        triggerAttack: (note: string, time?: number, velocity?: number) => {
+          // Release any existing voice for this note first to prevent voice leak
+          try { synth.triggerRelease(note, time); } catch { /* ignore */ }
+          synth.triggerAttack(note, time, velocity);
+        },
+        triggerRelease: (note: string, time?: number) => {
+          synth.triggerRelease(note, time);
+        },
+        releaseAll: () => synth.releaseAll(),
+        connect: (dest: Tone.InputNode) => synth.connect(dest),
+        disconnect: () => synth.disconnect(),
+        dispose: () => synth.dispose(),
+        volume: synth.volume,
+      } as unknown as Tone.ToneAudioNode;
     }
 
     // Wrap synth to add pitch envelope support
     return {
       triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
         const t = time ?? Tone.now();
+        // Release any existing voice for this note first to prevent voice leak
+        try { synth.triggerRelease(note, t); } catch { /* ignore */ }
         this.applyPitchEnvelope(synth, pitchEnv!, t, duration);
         synth.triggerAttackRelease(note, duration, t, velocity);
       },
       triggerAttack: (note: string, time?: number, velocity?: number) => {
         const t = time ?? Tone.now();
+        // Release any existing voice for this note first to prevent voice leak
+        try { synth.triggerRelease(note, t); } catch { /* ignore */ }
         this.triggerPitchEnvelopeAttack(synth, pitchEnv!, t);
         synth.triggerAttack(note, t, velocity);
       },
@@ -1808,9 +1831,9 @@ export class InstrumentFactory {
     return new Tone.MonoSynth(monoConfig as unknown as Tone.MonoSynthOptions);
   }
 
-  private static createDuoSynth(config: InstrumentConfig): Tone.DuoSynth {
+  private static createDuoSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     const oscType = (config.oscillator?.type || 'sawtooth') as Tone.ToneOscillatorType;
-    return new Tone.DuoSynth({
+    const synth = new Tone.DuoSynth({
       voice0: {
         oscillator: {
           type: oscType,
@@ -1837,10 +1860,28 @@ export class InstrumentFactory {
       vibratoRate: 5,
       volume: this.getNormalizedVolume('DuoSynth', config.volume),
     });
+    // DuoSynth is monophonic (2 oscillators per single voice) but can still get stuck
+    // if triggered rapidly before release completes. Wrap to force release before attack.
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(time); } catch { /* ignore */ }
+        synth.triggerAttackRelease(note, duration, time, velocity);
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(time); } catch { /* ignore */ }
+        synth.triggerAttack(note, time, velocity);
+      },
+      triggerRelease: (time?: number) => synth.triggerRelease(time),
+      releaseAll: () => { try { synth.triggerRelease(); } catch { /* ignore */ } },
+      connect: (dest: Tone.InputNode) => synth.connect(dest),
+      disconnect: () => synth.disconnect(),
+      dispose: () => synth.dispose(),
+      volume: synth.volume,
+    } as unknown as Tone.ToneAudioNode;
   }
 
-  private static createFMSynth(config: InstrumentConfig): Tone.PolySynth {
-    return new Tone.PolySynth(Tone.FMSynth, {
+  private static createFMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new Tone.PolySynth(Tone.FMSynth, {
       oscillator: {
         type: config.oscillator?.type || 'sine',
       } as Partial<Tone.OmniOscillatorOptions>,
@@ -1853,10 +1894,27 @@ export class InstrumentFactory {
       modulationIndex: 10,
       volume: this.getNormalizedVolume('FMSynth', config.volume),
     });
+    // Wrap to prevent voice leak on rapid retrigger
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
+        synth.triggerAttackRelease(note, duration, time, velocity);
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
+        synth.triggerAttack(note, time, velocity);
+      },
+      triggerRelease: (note: string, time?: number) => synth.triggerRelease(note, time),
+      releaseAll: () => synth.releaseAll(),
+      connect: (dest: Tone.InputNode) => synth.connect(dest),
+      disconnect: () => synth.disconnect(),
+      dispose: () => synth.dispose(),
+      volume: synth.volume,
+    } as unknown as Tone.ToneAudioNode;
   }
 
-  private static createAMSynth(config: InstrumentConfig): Tone.PolySynth {
-    return new Tone.PolySynth(Tone.AMSynth, {
+  private static createAMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
+    const synth = new Tone.PolySynth(Tone.AMSynth, {
       oscillator: {
         type: config.oscillator?.type || 'sine',
       } as Partial<Tone.OmniOscillatorOptions>,
@@ -1868,9 +1926,26 @@ export class InstrumentFactory {
       },
       volume: this.getNormalizedVolume('AMSynth', config.volume),
     });
+    // Wrap to prevent voice leak on rapid retrigger
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
+        synth.triggerAttackRelease(note, duration, time, velocity);
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
+        synth.triggerAttack(note, time, velocity);
+      },
+      triggerRelease: (note: string, time?: number) => synth.triggerRelease(note, time),
+      releaseAll: () => synth.releaseAll(),
+      connect: (dest: Tone.InputNode) => synth.connect(dest),
+      disconnect: () => synth.disconnect(),
+      dispose: () => synth.dispose(),
+      volume: synth.volume,
+    } as unknown as Tone.ToneAudioNode;
   }
 
-  private static createPluckSynth(config: InstrumentConfig): Tone.PolySynth {
+  private static createPluckSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     const synth = new Tone.PolySynth(Tone.PluckSynth as unknown as typeof Tone.Synth);
     synth.set({
       attackNoise: 1,
@@ -1878,7 +1953,23 @@ export class InstrumentFactory {
       resonance: 0.7,
     } as unknown as Partial<Tone.SynthOptions>);
     synth.volume.value = this.getNormalizedVolume('PluckSynth', config.volume);
-    return synth;
+    // Wrap to prevent voice leak on rapid retrigger
+    return {
+      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
+        synth.triggerAttackRelease(note, duration, time, velocity);
+      },
+      triggerAttack: (note: string, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
+        synth.triggerAttack(note, time, velocity);
+      },
+      triggerRelease: (note: string, time?: number) => synth.triggerRelease(note, time),
+      releaseAll: () => synth.releaseAll(),
+      connect: (dest: Tone.InputNode) => synth.connect(dest),
+      disconnect: () => synth.disconnect(),
+      dispose: () => synth.dispose(),
+      volume: synth.volume,
+    } as unknown as Tone.ToneAudioNode;
   }
 
   private static createMetalSynth(config: InstrumentConfig): Tone.MetalSynth {
@@ -2240,6 +2331,8 @@ export class InstrumentFactory {
     return {
       triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
         const t = time ?? Tone.now();
+        // Release any existing voice for this note first to prevent voice leak
+        try { synth.triggerRelease(note, t); } catch { /* ignore */ }
         if (hasPitchEnv) {
           this.applyPitchEnvelope(synth, pitchEnv!, t, duration);
         }
@@ -2247,6 +2340,8 @@ export class InstrumentFactory {
       },
       triggerAttack: (note: string, time?: number, velocity?: number) => {
         const t = time ?? Tone.now();
+        // Release any existing voice for this note first to prevent voice leak
+        try { synth.triggerRelease(note, t); } catch { /* ignore */ }
         if (hasPitchEnv) {
           this.triggerPitchEnvelopeAttack(synth, pitchEnv!, t);
         }
@@ -2324,20 +2419,37 @@ export class InstrumentFactory {
     const pitchEnv = config.pitchEnvelope;
     const hasPitchEnv = pitchEnv?.enabled && pitchEnv.amount !== 0;
 
-    // If no pitch envelope, return synth directly
+    // If no pitch envelope, return wrapped synth with voice leak prevention
     if (!hasPitchEnv) {
-      return synth;
+      return {
+        triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+          try { synth.triggerRelease(note, time); } catch { /* ignore */ }
+          synth.triggerAttackRelease(note, duration, time, velocity);
+        },
+        triggerAttack: (note: string, time?: number, velocity?: number) => {
+          try { synth.triggerRelease(note, time); } catch { /* ignore */ }
+          synth.triggerAttack(note, time, velocity);
+        },
+        triggerRelease: (note: string, time?: number) => synth.triggerRelease(note, time),
+        releaseAll: () => synth.releaseAll(),
+        connect: (dest: Tone.InputNode) => synth.connect(dest),
+        disconnect: () => synth.disconnect(),
+        dispose: () => synth.dispose(),
+        volume: synth.volume,
+      } as unknown as Tone.ToneAudioNode;
     }
 
     // Wrap synth to add pitch envelope support
     return {
       triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
         const t = time ?? Tone.now();
+        try { synth.triggerRelease(note, t); } catch { /* ignore */ }
         this.applyPitchEnvelope(synth, pitchEnv!, t, duration);
         synth.triggerAttackRelease(note, duration, t, velocity);
       },
       triggerAttack: (note: string, time?: number, velocity?: number) => {
         const t = time ?? Tone.now();
+        try { synth.triggerRelease(note, t); } catch { /* ignore */ }
         this.triggerPitchEnvelopeAttack(synth, pitchEnv!, t);
         synth.triggerAttack(note, t, velocity);
       },
@@ -2411,9 +2523,13 @@ export class InstrumentFactory {
 
     return {
       triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        // Release any existing voice for this note first to prevent voice leak
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
         synth.triggerAttackRelease(note, duration, time, velocity);
       },
       triggerAttack: (note: string, time?: number, velocity?: number) => {
+        // Release any existing voice for this note first to prevent voice leak
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
         synth.triggerAttack(note, time, velocity);
       },
       triggerRelease: (note: string, time?: number) => {
@@ -3716,6 +3832,8 @@ export class InstrumentFactory {
             }, stopTime);
           }
         } else {
+          // Release any existing voice for this note first to prevent voice leak
+          try { synth.triggerRelease(note, time); } catch { /* ignore */ }
           synth.triggerAttackRelease(note, duration, time, velocity);
         }
       },
@@ -3723,6 +3841,8 @@ export class InstrumentFactory {
         if (arpeggioEngine && arpeggioConfig?.enabled) {
           arpeggioEngine.start(note, velocity ?? 1);
         } else {
+          // Release any existing voice for this note first to prevent voice leak
+          try { synth.triggerRelease(note, time); } catch { /* ignore */ }
           synth.triggerAttack(note, time, velocity);
         }
       },
@@ -4044,9 +4164,11 @@ export class InstrumentFactory {
 
     return {
       triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
         synth.triggerAttackRelease(note, duration, time, velocity);
       },
       triggerAttack: (note: string, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
         synth.triggerAttack(note, time, velocity);
       },
       triggerRelease: (note: string, time?: number) => {
@@ -4130,9 +4252,11 @@ export class InstrumentFactory {
 
     return {
       triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
         synth.triggerAttackRelease(note, duration, time, velocity);
       },
       triggerAttack: (note: string, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
         synth.triggerAttack(note, time, velocity);
       },
       triggerRelease: (note: string, time?: number) => {
@@ -4216,9 +4340,11 @@ export class InstrumentFactory {
 
     return {
       triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
         synth.triggerAttackRelease(note, duration, time, velocity);
       },
       triggerAttack: (note: string, time?: number, velocity?: number) => {
+        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
         synth.triggerAttack(note, time, velocity);
       },
       triggerRelease: (note: string, time?: number) => {
@@ -4261,13 +4387,6 @@ export class InstrumentFactory {
    */
   private static createWobbleBass(config: InstrumentConfig): Tone.ToneAudioNode {
     const wbConfig = config.wobbleBass || DEFAULT_WOBBLE_BASS;
-    console.log('[WobbleBass] Creating with config:', {
-      hasWobbleBass: !!config.wobbleBass,
-      envelope: wbConfig.envelope,
-      osc1: wbConfig.osc1,
-      filter: wbConfig.filter,
-      configVolume: config.volume,
-    });
 
     // === OSCILLATOR SECTION ===
     // Create dual oscillators with unison
@@ -4572,6 +4691,13 @@ export class InstrumentFactory {
         const t = time ?? Tone.now();
         const v = velocity ?? 0.8;
 
+        // Release any existing voice for this note first to prevent voice leak
+        try { osc1.triggerRelease(note, t); } catch { /* ignore */ }
+        try { osc2.triggerRelease(note, t); } catch { /* ignore */ }
+        try { if (subOsc) subOsc.triggerRelease(note, t); } catch { /* ignore */ }
+        try { if (fmSynth) fmSynth.triggerRelease(note, t); } catch { /* ignore */ }
+        try { unisonVoices.forEach(voice => voice.triggerRelease(note, t)); } catch { /* ignore */ }
+
         // Reset LFO phase on retrigger
         if (wbConfig.wobbleLFO.retrigger && wobbleLFO) {
           wobbleLFO.phase = wbConfig.wobbleLFO.phase;
@@ -4592,7 +4718,12 @@ export class InstrumentFactory {
         const v = velocity ?? 0.8;
         activeNotes.add(note);
 
-        console.log(`[WobbleBass] triggerAttack note=${note} time=${t} velocity=${v} osc1Vol=${osc1.volume.value}dB outputGain=${output.gain.value}`);
+        // Release any existing voice for this note first to prevent voice leak
+        try { osc1.triggerRelease(note, t); } catch { /* ignore */ }
+        try { osc2.triggerRelease(note, t); } catch { /* ignore */ }
+        try { if (subOsc) subOsc.triggerRelease(note, t); } catch { /* ignore */ }
+        try { if (fmSynth) fmSynth.triggerRelease(note, t); } catch { /* ignore */ }
+        try { unisonVoices.forEach(voice => voice.triggerRelease(note, t)); } catch { /* ignore */ }
 
         // Reset LFO phase on retrigger
         if (wbConfig.wobbleLFO.retrigger && wobbleLFO) {
