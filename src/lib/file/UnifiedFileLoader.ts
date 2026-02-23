@@ -289,13 +289,14 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
  */
 async function loadInstrumentFile(file: File): Promise<FileLoadResult> {
   try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-
     // Import and add to project
     const { importInstrument } = await import('@/lib/export/exporters');
     const result = await importInstrument(file);
     const instrument = result?.instrument;
+
+    if (!instrument) {
+      return { success: false, error: 'Invalid instrument file' };
+    }
 
     useInstrumentStore.getState().addInstrument(instrument);
 
