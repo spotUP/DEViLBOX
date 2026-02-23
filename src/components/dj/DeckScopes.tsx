@@ -11,7 +11,7 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { useDJStore } from '@/stores/useDJStore';
 
 interface DeckScopesProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
   /** Size of each scope (matches turntable) */
   size?: number;
 }
@@ -19,7 +19,7 @@ interface DeckScopesProps {
 const NUM_CHANNELS = 4;
 
 interface ScopeCanvasProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
   /** Channel index 0-3, or -1 for ALL */
   channel: number;
   size: number;
@@ -74,12 +74,15 @@ const ScopeCanvas: React.FC<ScopeCanvasProps> = ({ deckId, channel, size, muted,
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // Waveform trace
+    // Waveform trace — only fetch live data when playing
+    const isPlaying = useDJStore.getState().decks[deckId]?.isPlaying ?? false;
     let waveform: Float32Array | null = null;
-    try {
-      waveform = getDJEngine().getDeck(deckId).getWaveform();
-    } catch {
-      // Engine not ready
+    if (isPlaying) {
+      try {
+        waveform = getDJEngine().getDeck(deckId).getWaveform();
+      } catch {
+        // Engine not ready
+      }
     }
 
     if (waveform && waveform.length >= 256) {
