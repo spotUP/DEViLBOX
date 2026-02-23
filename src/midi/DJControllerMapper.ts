@@ -31,6 +31,14 @@ class DJControllerMapper {
   private jogCCs = new Set<string>();       // "channel:cc" keys for jog wheel CCs
   private jogTouchNotes = new Map<string, 'A' | 'B' | 'C'>(); // "channel:note" → deck
 
+  // Active loop roll state for noteOff handling
+  private activeLoopRolls = new Map<string, {
+    deckId: 'A' | 'B' | 'C';
+    prevLooping: boolean;
+    prevSize: 1 | 2 | 4 | 8 | 16 | 32;
+    timeoutId?: NodeJS.Timeout;
+  }>();
+
   private constructor() {}
 
   static getInstance(): DJControllerMapper {
@@ -125,6 +133,13 @@ class DJControllerMapper {
       if (touchDeck) {
         this.handleJogTouch(touchDeck, false);
       }
+
+      // Loop roll release
+      const loopRollKey = `${msg.channel}:${msg.note}`;
+      const loopRollState = this.activeLoopRolls.get(loopRollKey);
+      if (loopRollState) {
+        this.releaseLoopRoll(loopRollKey, loopRollState);
+      }
     }
   }
 
@@ -163,13 +178,20 @@ class DJControllerMapper {
     const mapping = this.noteLookup.get(key);
     if (!mapping) return;
 
-    this.executeDJAction(mapping.action);
+    // Check if this is a loop roll action
+    if (mapping.action.startsWith('loop_roll_')) {
+      // Store the note key for noteOff handling
+      this.executeDJAction(mapping.action, key);
+    } else {
+      this.executeDJAction(mapping.action);
+    }
   }
 
   /**
    * Execute a named DJ action (play, cue, sync, hot cue, etc.)
+   * @param noteKey - Optional MIDI note key for tracking loop rolls
    */
-  private executeDJAction(action: string): void {
+  private executeDJAction(action: string, noteKey?: string): void {
     // Tracker scratch actions work without DJ engine
     if (action.startsWith('tracker_')) {
       this.executeTrackerScratchAction(action);
@@ -246,7 +268,7 @@ class DJControllerMapper {
         case 'loop_roll_16_a':
         case 'loop_roll_32_a': {
           const size = parseInt(action.match(/\d+/)?.[0] || '4') as 1 | 2 | 4 | 8 | 16 | 32;
-          this.activateLoopRoll('A', size);
+          this.activateLoopRoll('A', size, noteKey);
           break;
         }
         case 'loop_roll_4_b':
@@ -254,7 +276,7 @@ class DJControllerMapper {
         case 'loop_roll_16_b':
         case 'loop_roll_32_b': {
           const size = parseInt(action.match(/\d+/)?.[0] || '4') as 1 | 2 | 4 | 8 | 16 | 32;
-          this.activateLoopRoll('B', size);
+          this.activateLoopRoll('B', size, noteKey);
           break;
         }
 
@@ -407,6 +429,10 @@ class DJControllerMapper {
    *   64 = no movement (some controllers), value distance from 64 = speed
    */
   private handleJogSpin(deckId: 'A' | 'B' | 'C', value: number): void {
+    // Get jog wheel sensitivity multiplier from store (0.5-2.0x)
+    const store = useDJStore.getState();
+    const sensitivity = store.jogWheelSensitivity || 1.0;
+
     // Convert relative CC to velocity: 0-63 = forward, 65-127 = backward
     let velocity: number;
     if (value <= 63) {
@@ -414,7 +440,7 @@ class DJControllerMapper {
     } else {
       velocity = -(128 - value) / 63; // -1 to 0 (backward, fast to slow)
     }
-    velocity *= 2; // Scale up for more dramatic effect
+    velocity *= 2 * sensitivity; // Scale up for dramatic effect + apply sensitivity
 
     // Route to DJ engine if in DJ context, otherwise to tracker scratch
     if (isDJContext()) {
@@ -488,8 +514,13 @@ class DJControllerMapper {
    * Activate a momentary loop roll (auto-releases when pad is released).
    * Loop roll is a performance technique where a small loop plays momentarily
    * then resumes normal playback.
+   * @param noteKey - Optional MIDI note key for tracking state on noteOff
    */
-  private activateLoopRoll(deckId: 'A' | 'B' | 'C', beats: 1 | 2 | 4 | 8 | 16 | 32): void {
+  private activateLoopRoll(
+    deckId: 'A' | 'B' | 'C',
+    beats: 1 | 2 | 4 | 8 | 16 | 32,
+    noteKey?: string
+  ): void {
     const store = useDJStore.getState();
     // Store previous loop state
     const wasLooping = store.decks[deckId].loopActive;
@@ -501,14 +532,65 @@ class DJControllerMapper {
       store.toggleLoop(deckId);
     }
     
-    // Auto-release after 50ms (pad release would trigger earlier via noteOff)
-    // This is a fallback for CC-based triggers
-    setTimeout(() => {
-      if (!wasLooping) {
-        store.toggleLoop(deckId);
+    // If noteKey provided, track for immediate noteOff release
+    if (noteKey) {
+      // Clear any existing timeout for this note
+      const existing = this.activeLoopRolls.get(noteKey);
+      if (existing?.timeoutId) {
+        clearTimeout(existing.timeoutId);
       }
-      store.setLineLoopSize(deckId, prevSize);
-    }, 50);
+
+      // Set fallback timeout (50ms)
+      const timeoutId = setTimeout(() => {
+        const state = this.activeLoopRolls.get(noteKey);
+        if (state) {
+          this.releaseLoopRoll(noteKey, state);
+        }
+      }, 50);
+
+      this.activeLoopRolls.set(noteKey, {
+        deckId,
+        prevLooping: wasLooping,
+        prevSize,
+        timeoutId,
+      });
+    } else {
+      // No note tracking (CC-based trigger): use timeout only
+      setTimeout(() => {
+        if (!wasLooping) {
+          store.toggleLoop(deckId);
+        }
+        store.setLineLoopSize(deckId, prevSize);
+      }, 50);
+    }
+  }
+
+  /**
+   * Release a loop roll immediately (called on MIDI noteOff).
+   */
+  private releaseLoopRoll(
+    noteKey: string,
+    state: {
+      deckId: 'A' | 'B' | 'C';
+      prevLooping: boolean;
+      prevSize: 1 | 2 | 4 | 8 | 16 | 32;
+      timeoutId?: NodeJS.Timeout;
+    }
+  ): void {
+    // Clear fallback timeout
+    if (state.timeoutId) {
+      clearTimeout(state.timeoutId);
+    }
+
+    // Restore previous loop state
+    const store = useDJStore.getState();
+    if (!state.prevLooping) {
+      store.toggleLoop(state.deckId);
+    }
+    store.setLineLoopSize(state.deckId, state.prevSize);
+
+    // Remove from tracking
+    this.activeLoopRolls.delete(noteKey);
   }
 
   /**
@@ -547,13 +629,44 @@ class DJControllerMapper {
    * FX are beat-synced to the current BPM.
    */
   private triggerQuantizedFX(deckId: 'A' | 'B' | 'C', fxType: string): void {
-    // TODO: Wire to DJQuantizedFX engine once implemented
-    // For now, log the action
-    console.log(`Quantized FX triggered: ${fxType} on deck ${deckId}`);
-    
-    // Placeholder: Set a store flag that the DJ engine can react to
-    const store = useDJStore.getState();
-    // store.setDeckFX(deckId, fxType, true);  // Requires store method
+    try {
+      switch (fxType) {
+        case 'echo': {
+          // Echo out over 4 beats
+          const { echoOut } = await import('@/engine/dj/DJQuantizedFX');
+          echoOut(deckId, 4);
+          break;
+        }
+        case 'reverb': {
+          // Filter sweep up (simulate reverb tail)
+          const { filterSweep } = await import('@/engine/dj/DJQuantizedFX');
+          filterSweep(deckId, 0.8, 4); // LPF sweep up over 4 beats
+          break;
+        }
+        case 'delay': {
+          // Filter sweep down then up (delay-like effect)
+          const { filterSweep } = await import('@/engine/dj/DJQuantizedFX');
+          filterSweep(deckId, -0.6, 2, () => {
+            filterSweep(deckId, 0, 2); // HPF down, then reset
+          });
+          break;
+        }
+        case 'flanger': {
+          // Quick filter wobble
+          const { filterSweep } = await import('@/engine/dj/DJQuantizedFX');
+          filterSweep(deckId, 0.5, 1, () => {
+            filterSweep(deckId, -0.5, 1, () => {
+              filterSweep(deckId, 0, 1); // Up, down, reset
+            });
+          });
+          break;
+        }
+        default:
+          console.log(`Unknown FX type: ${fxType}`);
+      }
+    } catch (err) {
+      console.warn(`[DJControllerMapper] Failed to trigger quantized FX: ${fxType}`, err);
+    }
   }
 }
 

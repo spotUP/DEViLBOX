@@ -157,6 +157,13 @@ export class HivelySynth implements DevilboxSynth {
     }
   }
 
+  /**
+   * Release all voices / stop playback (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    this.triggerRelease();
+  }
+
   set(param: string, value: number): void {
     switch (param) {
       case 'volume':

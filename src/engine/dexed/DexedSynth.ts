@@ -582,6 +582,13 @@ export class DexedSynth implements DevilboxSynth {
   }
 
   /**
+   * Release all voices (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    this._worklet?.port.postMessage({ type: 'allNotesOff' });
+  }
+
+  /**
    * Send MIDI Control Change
    */
   controlChange(cc: number, value: number): void {

@@ -204,9 +204,19 @@ export class ModularSynth implements DevilboxSynth {
   }
 
   /**
+   * Release all active voices (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    for (const midiNote of this.activeVoices.keys()) {
+      this.triggerRelease(midiNote);
+    }
+  }
+
+  /**
    * Cleanup all resources
    */
   dispose(): void {
+    this.releaseAll();
     this.voices.forEach((voice) => voice.dispose());
     this.voices = [];
     this.activeVoices.clear();

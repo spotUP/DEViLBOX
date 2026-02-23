@@ -14,6 +14,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { DJ_SCENARIO_PRESETS, getScenarioById, getScenariosByCategory } from '@/midi/djScenarioPresets';
 import { getDJControllerMapper } from '@/midi/DJControllerMapper';
+import { useDJStore } from '@/stores/useDJStore';
 
 const STORAGE_KEY = 'devilbox-dj-scenario-preset';
 
@@ -35,8 +36,24 @@ export const DJScenarioSelector: React.FC = () => {
   const applyScenario = useCallback((scenario: ReturnType<typeof getScenarioById>) => {
     if (!scenario) return;
 
+    const store = useDJStore.getState();
     const mapper = getDJControllerMapper();
     const currentPreset = mapper.getPreset();
+
+    // Apply scenario behaviors to DJ store
+    if (scenario.jogWheelSensitivity !== undefined) {
+      store.setJogWheelSensitivity(scenario.jogWheelSensitivity);
+    }
+
+    if (scenario.crossfaderCurve) {
+      store.setCrossfaderCurve(scenario.crossfaderCurve);
+    }
+
+    if (scenario.keyLockDefault !== undefined) {
+      // Apply key lock to both decks
+      store.setDeckKeyLock('A', scenario.keyLockDefault);
+      store.setDeckKeyLock('B', scenario.keyLockDefault);
+    }
 
     // If using a generic controller, apply scenario knob/pad mappings
     if (currentPreset?.manufacturer === 'Generic' && scenario.knobMappings && scenario.padMappings) {
@@ -49,8 +66,6 @@ export const DJScenarioSelector: React.FC = () => {
       mapper.setPreset(hybridPreset);
     }
 
-    // Apply scenario behaviors (crossfader curve, jog sensitivity, etc.)
-    // These would be stored in useDJStore for the engine to use
     console.log(`Applied DJ scenario: ${scenario.name}`, {
       jogWheelSensitivity: scenario.jogWheelSensitivity,
       crossfaderCurve: scenario.crossfaderCurve,

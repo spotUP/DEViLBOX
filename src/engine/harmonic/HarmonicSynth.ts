@@ -221,6 +221,13 @@ export class HarmonicSynth implements DevilboxSynth {
     }
   }
 
+  /**
+   * Release all active voices (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    this.triggerRelease(); // triggerRelease without args releases all voices
+  }
+
   triggerAttackRelease(note: string | number, duration: number, time?: number, velocity?: number): void {
     const now = time ?? audioNow();
     this.triggerAttack(note, now, velocity);
