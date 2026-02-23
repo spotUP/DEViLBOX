@@ -14,13 +14,14 @@ import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { loadUADEToDeck, isUADECached } from '@/engine/dj/DJUADEPrerender';
+import { isAudioFile } from '@/lib/audioFileUtils';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 interface LoadedFile {
   name: string;
-  song: TrackerSong;
+  song?: TrackerSong;
   bpm: number;
   duration: number; // seconds
   format: string;
@@ -52,28 +53,42 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
     for (const file of Array.from(selectedFiles)) {
       try {
         const buffer = await file.arrayBuffer();
-        const isUADE = isUADEFormat(file.name);
+        const fileExt = file.name.split('.').pop()?.toLowerCase() ?? '';
+        const isAudio = isAudioFile(file.name);
+        
+        if (isAudio) {
+          // Regular audio file (MP3, WAV, etc.)
+          newFiles.push({
+            name: file.name,
+            bpm: 0, // Will be analyzed on load
+            duration: 0,
+            format: fileExt.toUpperCase(),
+            rawBuffer: buffer,
+          });
+        } else {
+          // Tracker module
+          const isUADE = isUADEFormat(file.name);
+          const song = await parseModuleToSong(file);
+          const bpmResult = detectBPM(song);
+          const duration = estimateSongDuration(song);
 
-        const song = await parseModuleToSong(file);
-        const bpmResult = detectBPM(song);
-        const duration = estimateSongDuration(song);
+          // Cache the parsed song for playlist deck-loading
+          cacheSong(file.name, song);
 
-        // Cache the parsed song for playlist deck-loading
-        cacheSong(file.name, song);
+          // Check if module is already pre-rendered in cache
+          const cached = await isUADECached(buffer);
 
-        // Check if module is already pre-rendered in cache
-        const cached = await isUADECached(buffer);
-
-        newFiles.push({
-          name: file.name,
-          song,
-          bpm: bpmResult.bpm,
-          duration,
-          format: file.name.split('.').pop()?.toUpperCase() ?? 'MOD',
-          rawBuffer: buffer, // Store buffer for all formats (pipeline rendering)
-          isUADE,
-          isCached: cached,
-        });
+          newFiles.push({
+            name: file.name,
+            song,
+            bpm: bpmResult.bpm,
+            duration,
+            format: fileExt.toUpperCase(),
+            rawBuffer: buffer,
+            isUADE,
+            isCached: cached,
+          });
+        }
       } catch (err) {
         console.error(`[DJFileBrowser] Failed to parse ${file.name}:`, err);
         setError(`Failed to load ${file.name}: ${err instanceof Error ? err.message : 'unknown error'}`);
@@ -89,12 +104,17 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
   }, []);
 
   const loadToDeck = useCallback(async (file: LoadedFile, deckId: 'A' | 'B' | 'C') => {
-    if (!file.song) return;
-
     const engine = getDJEngine();
 
     try {
       if (file.rawBuffer) {
+        if (!file.song) {
+          // Regular audio file path
+          await engine.loadAudioToDeck(deckId, file.rawBuffer, file.name);
+          console.log(`[DJFileBrowser] Loaded ${file.name} as audio file`);
+          return;
+        }
+
         if (file.isUADE) {
           // UADE path — loadUADEToDeck now handles the full render + wait cycle
           const result = await loadUADEToDeck(
@@ -243,7 +263,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
                     if (!playlistId) return;
                     useDJPlaylistStore.getState().addTrack(playlistId, {
                       fileName: file.name,
-                      trackName: file.song.name || file.name,
+                      trackName: file.song?.name || file.name,
                       format: file.format,
                       bpm: file.bpm,
                       duration: file.duration,
