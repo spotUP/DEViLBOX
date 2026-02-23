@@ -87,7 +87,7 @@ export interface DeckState {
   seratoKey: string | null;
 }
 
-type DeckId = 'A' | 'B';
+type DeckId = 'A' | 'B' | 'C';
 
 export type CueMode = 'multi-output' | 'split-stereo' | 'none';
 export type CrossfaderCurve = 'linear' | 'cut' | 'smooth';
@@ -154,15 +154,19 @@ const defaultDeckState: DeckState = {
 // STORE
 // ============================================================================
 
+export type DeckViewMode = 'visualizer' | 'vinyl' | '3d';
+
 interface DJState {
   // Global
   djModeActive: boolean;
+  deckViewMode: DeckViewMode;
+  thirdDeckActive: boolean;
   crossfaderPosition: number;
   crossfaderCurve: CrossfaderCurve;
   masterVolume: number;
 
   // Per-deck
-  decks: { A: DeckState; B: DeckState };
+  decks: { A: DeckState; B: DeckState; C: DeckState };
 
   // Headphone cueing
   cueMode: CueMode;
@@ -173,6 +177,8 @@ interface DJState {
 interface DJActions {
   // Global
   setDJModeActive: (active: boolean) => void;
+  cycleDeckViewMode: () => void;
+  setThirdDeckActive: (active: boolean) => void;
   setCrossfader: (position: number) => void;
   setCrossfaderCurve: (curve: CrossfaderCurve) => void;
   setMasterVolume: (volume: number) => void;
@@ -212,6 +218,8 @@ export const useDJStore = create<DJStore>()(
   subscribeWithSelector(immer((set) => ({
     // Initial state
     djModeActive: false,
+    deckViewMode: 'visualizer' as DeckViewMode,
+    thirdDeckActive: false,
     crossfaderPosition: 0.5,
     crossfaderCurve: 'smooth' as CrossfaderCurve,
     masterVolume: 1,
@@ -219,6 +227,7 @@ export const useDJStore = create<DJStore>()(
     decks: {
       A: { ...defaultDeckState },
       B: { ...defaultDeckState },
+      C: { ...defaultDeckState },
     },
 
     cueMode: 'none' as CueMode,
@@ -232,6 +241,18 @@ export const useDJStore = create<DJStore>()(
     setDJModeActive: (active) =>
       set((state) => {
         state.djModeActive = active;
+      }),
+
+    cycleDeckViewMode: () =>
+      set((state) => {
+        const order: DeckViewMode[] = ['visualizer', 'vinyl', '3d'];
+        const idx = order.indexOf(state.deckViewMode);
+        state.deckViewMode = order[(idx + 1) % order.length];
+      }),
+
+    setThirdDeckActive: (active) =>
+      set((state) => {
+        state.thirdDeckActive = active;
       }),
 
     setCrossfader: (position) =>
@@ -378,6 +399,10 @@ export const useDJStore = create<DJStore>()(
 // ============================================================================
 
 export const useDJModeActive = () => useDJStore((s) => s.djModeActive);
+export const useDeckViewMode = () => useDJStore((s) => s.deckViewMode);
+/** @deprecated Use useDeckViewMode instead */
+export const useVinylMode = () => useDJStore((s) => s.deckViewMode !== 'visualizer');
+export const useThirdDeckActive = () => useDJStore((s) => s.thirdDeckActive);
 export const useDeckState = (deck: DeckId) => useDJStore((s) => s.decks[deck]);
 export const useCrossfader = () => useDJStore((s) => s.crossfaderPosition);
 export const useCrossfaderCurve = () => useDJStore((s) => s.crossfaderCurve);

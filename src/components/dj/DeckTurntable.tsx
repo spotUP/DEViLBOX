@@ -14,7 +14,7 @@ import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import TurntableWorkerFactory from '@/workers/dj-turntable.worker.ts?worker';
 
 interface DeckTurntableProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 import type { TurntableMsg, DeckColorsExt } from '@engine/renderer/worker-types';
