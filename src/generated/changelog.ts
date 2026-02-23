@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-23T21:30:38.549Z
+ * Generated: 2026-02-23T22:20:46.583Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1137';
-export const BUILD_NUMBER = '1137';
-export const BUILD_HASH = '53378dfd';
+export const BUILD_VERSION = '1.0.1140';
+export const BUILD_NUMBER = '1140';
+export const BUILD_HASH = 'ad747392';
 export const BUILD_DATE = '2026-02-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,21 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1137',
+    version: '1.0.1140',
     date: '2026-02-23',
     changes: [
+      {
+        type: 'feature',
+        "description": "Implement headphone cueing (PFL) system"
+      },
+      {
+        type: 'feature',
+        "description": "Wire scenario behaviors and complete MIDI noteOff handling"
+      },
+      {
+        type: 'feature',
+        "description": "Implement DJ scenario presets and generic controller support"
+      },
       {
         type: 'fix',
         "description": "Actually fix TypeScript errors in loadInstrumentFile"
@@ -226,18 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore: update stores, engine, and supporting files"
-      },
-      {
-        type: 'feature',
-        "description": "Convert GL shell components to DOM overlays for 1:1 parity"
-      },
-      {
-        type: 'feature',
-        "description": "Add Pixi views for Furnace, Hively, tracker overlays, and visualizations"
-      },
-      {
-        type: 'feature',
-        "description": "Add WASM hardware UI modules and instrument components"
       }
     ]
   }

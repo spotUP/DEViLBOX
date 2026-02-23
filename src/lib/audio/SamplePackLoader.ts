@@ -51,8 +51,8 @@ const CATEGORY_MAPPINGS: Record<string, SampleCategory> = {
   ch: 'hihats',
 };
 
-// Audio file extensions
-const AUDIO_EXTENSIONS = ['.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif'];
+// Audio file extensions (includes formats with WASM fallback support)
+const AUDIO_EXTENSIONS = ['.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif', '.opus', '.aac', '.m4a', '.webm'];
 // Image file extensions
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
 
