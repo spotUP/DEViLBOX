@@ -72,3 +72,10 @@ uade-wasm/build/
 # Stray audio files
 *.wav
 uade-wasm/generated/
+
+# Turntable source models (GLB already in public/models/)
+Turntable/
+turntable.glb
+
+# Backup files
+*.bak
