@@ -78,22 +78,27 @@ export class DeckAudioPlayer {
   }
 
   play(): void {
-    if (!this._loaded) return;
+    if (!this._loaded || !this.player.buffer.loaded) return;
     if (this.player.state === 'started') {
       // Already playing
       return;
     }
+    
+    // Tiny fade-in (10ms) to prevent DC offset clicks/ticks
+    this.player.fadeIn = 0.01;
     this.player.start();
   }
 
   pause(): void {
     if (this.player.state === 'started') {
+      this.player.fadeOut = 0.01;
       this.player.stop();
     }
   }
 
   stop(): void {
     if (this.player.state === 'started') {
+      this.player.fadeOut = 0.01;
       this.player.stop();
     }
     this.player.seek(0);
