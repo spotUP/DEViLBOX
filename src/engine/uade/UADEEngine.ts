@@ -114,6 +114,11 @@ export class UADEEngine {
     return UADEEngine.instance;
   }
 
+  /** Check if a live singleton instance exists (without creating one). */
+  static hasInstance(): boolean {
+    return !!UADEEngine.instance && !UADEEngine.instance._disposed;
+  }
+
   private async initialize(): Promise<void> {
     try {
       await UADEEngine.ensureInitialized(this.audioContext);

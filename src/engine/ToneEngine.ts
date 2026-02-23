@@ -465,6 +465,23 @@ export class ToneEngine {
   }
 
   /**
+   * Stop a native engine (UADE/Hively) by type name.
+   */
+  public async stopNativeEngine(type: string): Promise<void> {
+    if (type === 'UADESynth') {
+      const { UADEEngine } = await import('./uade/UADEEngine');
+      if (UADEEngine.hasInstance()) {
+        UADEEngine.getInstance().stop();
+      }
+    } else if (type === 'HivelySynth') {
+      const { HivelyEngine } = await import('./hively/HivelyEngine');
+      if (HivelyEngine.hasInstance()) {
+        HivelyEngine.getInstance().stop();
+      }
+    }
+  }
+
+  /**
    * Helper to decode an ArrayBuffer to an AudioBuffer
    * Also handles AudioBuffer (returns as-is) and Uint8Array (converts to ArrayBuffer)
    */
