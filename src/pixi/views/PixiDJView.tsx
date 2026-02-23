@@ -34,7 +34,7 @@ export const PixiDJView: React.FC = () => {
   const thirdDeckActive = useDJStore(s => s.thirdDeckActive);
 
   // DJ keyboard shortcuts
-  useDJKeyboardHandler(true);
+  useDJKeyboardHandler();
 
   // Initialize DJ engine on mount, clean up on unmount
   useEffect(() => {
