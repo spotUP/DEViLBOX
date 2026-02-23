@@ -61,12 +61,14 @@ export async function loadUADEToDeck(
   if (renderIfMissing) {
     console.log(`[DJPrerender] ${filename} not cached, triggering background render + wait`);
     
-    // Set loading state in UI immediately
+    // Also load the tracker song into the replayer for visuals while rendering
+    const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+    const file = new File([fileBuffer], filename);
+    const song = await parseModuleToSong(file);
+    await engine.loadToDeck(deckId, song, filename, bpm || 125);
+
+    // Set loading state in UI (loadToDeck sets mode to audio and resets positions)
     useDJStore.getState().setDeckState(deckId, {
-      fileName: filename,
-      trackName: trackName || filename,
-      detectedBPM: bpm || 125,
-      effectiveBPM: bpm || 125,
       analysisState: 'rendering',
       isPlaying: false,
     });
