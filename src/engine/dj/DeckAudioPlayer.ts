@@ -80,7 +80,7 @@ export class DeckAudioPlayer {
     };
   }
 
-  play(): void {
+  async play(): Promise<void> {
     if (!this._loaded || !this.player.buffer.loaded) {
       console.warn('[DeckAudioPlayer] Cannot play: audio not loaded');
       return;
@@ -90,6 +90,12 @@ export class DeckAudioPlayer {
       return;
     }
     
+    // Ensure AudioContext is running (essential for audio output)
+    if (Tone.getContext().state !== 'running') {
+      console.log('[DeckAudioPlayer] Resuming AudioContext...');
+      await Tone.start();
+    }
+
     console.log('[DeckAudioPlayer] Starting playback');
     // Tiny fade-in (10ms) to prevent DC offset clicks/ticks
     this.player.fadeIn = 0.01;
