@@ -123,6 +123,15 @@ import {
   djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
   djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132
 } from '@engine/keyboard/commands/djScratch';
+import {
+  trackerFaderCutOn, trackerFaderCutOff,
+  trackerCrabOn, trackerCrabOff,
+  trackerTransformerOn, trackerTransformerOff,
+  trackerFlareOn, trackerFlareOff,
+  trackerScratchTransformer, trackerScratchCrab, trackerScratchFlare,
+  trackerScratchChirp, trackerScratchStab, trackerScratch8Crab, trackerScratchTwiddle,
+  trackerScratchStop, trackerSpinback, trackerPowerCut,
+} from '@engine/keyboard/commands/trackerScratch';
 
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useUIStore } from '@stores/useUIStore';
@@ -683,6 +692,24 @@ function initializeRegistry() {
     { name: 'dj_fader_lfo_18',   contexts: ['global'], handler: djFaderLFO18,   description: 'DJ Fader LFO: 1/8 note' },
     { name: 'dj_fader_lfo_116',  contexts: ['global'], handler: djFaderLFO116,  description: 'DJ Fader LFO: 1/16 note' },
     { name: 'dj_fader_lfo_132',  contexts: ['global'], handler: djFaderLFO132,  description: 'DJ Fader LFO: 1/32 note' },
+
+    // === TRACKER SCRATCH (works during tracker playback, no DJ mode needed) ===
+    // Held-key commands (keydown triggers handler, keyup triggers releaseHandler)
+    { name: 'tracker_fader_cut', contexts: ['global'], handler: trackerFaderCutOn, releaseHandler: trackerFaderCutOff, description: 'Tracker: Fader cut (hold to mute)' },
+    { name: 'tracker_crab',      contexts: ['global'], handler: trackerCrabOn,      releaseHandler: trackerCrabOff,      description: 'Tracker: Crab scratch (hold)' },
+    { name: 'tracker_transformer', contexts: ['global'], handler: trackerTransformerOn, releaseHandler: trackerTransformerOff, description: 'Tracker: Transformer (hold)' },
+    { name: 'tracker_flare',     contexts: ['global'], handler: trackerFlareOn,     releaseHandler: trackerFlareOff,     description: 'Tracker: Flare scratch (hold)' },
+    // Toggle commands (tap to start/stop)
+    { name: 'tracker_scratch_trans', contexts: ['global'], handler: trackerScratchTransformer, description: 'Tracker Scratch: Transformer' },
+    { name: 'tracker_scratch_crab',  contexts: ['global'], handler: trackerScratchCrab,        description: 'Tracker Scratch: Crab' },
+    { name: 'tracker_scratch_flare', contexts: ['global'], handler: trackerScratchFlare,       description: 'Tracker Scratch: Flare' },
+    { name: 'tracker_scratch_chirp', contexts: ['global'], handler: trackerScratchChirp,       description: 'Tracker Scratch: Chirp' },
+    { name: 'tracker_scratch_stab',  contexts: ['global'], handler: trackerScratchStab,        description: 'Tracker Scratch: Stab' },
+    { name: 'tracker_scratch_8crab', contexts: ['global'], handler: trackerScratch8Crab,       description: 'Tracker Scratch: 8-Finger Crab' },
+    { name: 'tracker_scratch_twdl',  contexts: ['global'], handler: trackerScratchTwiddle,     description: 'Tracker Scratch: Twiddle' },
+    { name: 'tracker_scratch_stop',  contexts: ['global'], handler: trackerScratchStop,        description: 'Tracker Scratch: Stop pattern' },
+    { name: 'tracker_spinback',       contexts: ['global'], handler: trackerSpinback,            description: 'Tracker: Spinback (platter brake + spinup)' },
+    { name: 'power_cut_stop',          contexts: ['pattern', 'global'], handler: trackerPowerCut,  description: 'Stop playback with turntable power-off spindown' },
   ];
 
   commands.forEach(cmd => globalRegistry.register(cmd));
@@ -725,6 +752,8 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
   const { activeScheme, platformOverride } = useKeyboardStore();
   const schemeLoaderRef = useRef<SchemeLoader>(new SchemeLoader());
   const schemeLoadedRef = useRef<string | null>(null);
+  /** Track held commands by combo → commandName for keyup release */
+  const heldCommandsRef = useRef<Map<string, string>>(new Map());
 
   // Initialize command registry
   useEffect(() => {
@@ -803,6 +832,10 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
       const handled = globalRegistry.execute(commandName, context);
 
       if (handled) {
+        // Track held commands that need keyup release
+        if (globalRegistry.hasReleaseHandler(commandName)) {
+          heldCommandsRef.current.set(combo, commandName);
+        }
         // Command was executed - prevent default browser behavior
         e.preventDefault();
         e.stopPropagation();
@@ -810,6 +843,40 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
     };
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
-    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+
+    // Handle keyup for hold-to-release commands (fader cut, crab, transformer, flare)
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement)?.isContentEditable
+      ) {
+        return;
+      }
+
+      const normalized = KeyboardNormalizer.normalize(e);
+      const platform = getPlatform();
+      const combo = KeyComboFormatter.format(normalized, platform === 'mac');
+
+      // Check if this combo has a held command
+      const commandName = heldCommandsRef.current.get(combo);
+      if (commandName) {
+        const context = getCurrentContext();
+        globalRegistry.release(commandName, context);
+        heldCommandsRef.current.delete(combo);
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('keyup', handleKeyUp, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+      window.removeEventListener('keyup', handleKeyUp, { capture: true });
+      // Release any held commands on cleanup
+      for (const [, cmdName] of heldCommandsRef.current) {
+        globalRegistry.release(cmdName, 'global');
+      }
+      heldCommandsRef.current.clear();
+    };
   }, [disabled, getPlatform]);
 }

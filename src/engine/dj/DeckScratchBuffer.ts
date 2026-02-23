@@ -1,42 +1,31 @@
 /**
- * DeckScratchBuffer - Ring-buffer capture + bidirectional playback for DJ scratch.
+ * DeckScratchBuffer — Unified ring-buffer capture + bidirectional playback.
  *
- * The ring buffer IS the vinyl record. Audio is continuously captured into it.
- * During scratch, the capture freezes and the playback processor scrubs through
- * the buffer at a signed rate: positive = forward, negative = backward.
+ * Architecture (terminatorX-inspired):
+ *   - CaptureNode continuously writes the tracker's audio into a ring buffer
+ *   - PlaybackNode reads the ring buffer at a signed rate with cubic Hermite
+ *     interpolation, per-sample rate smoothing, and zero-crossing fades
+ *   - During scratch, ALL audio comes from the ring buffer (live tracker muted)
+ *   - No forward/backward path switching — rate sign determines direction
  *
  * Loads scratch-buffer.worklet.js (two processors sharing module-level ring buffers).
  * One instance per deck. bufferId 0 = Deck A, bufferId 1 = Deck B.
  *
- * IMPROVEMENTS (inspired by DJ-Scratch-Sample reference implementation):
- *
- * 1. LINEAR INTERPOLATION: handled in the worklet process() loop — eliminates
- *    staircase artifacts from nearest-neighbor sampling.
- *    (reference: lerp between floor/ceil samples in SoundRenderer.cpp)
- *
- * 2. RATE SMOOTHING: 2ms exponential smoothing in the worklet prevents clicks
- *    at rate/direction transitions (e.g. forward→backward in Baby Scratch).
- *    (reference: smooth position accumulator handles rate changes naturally)
- *
- * Audio chain wiring (call wireIntoChain once after init):
- *   filter ──→ captureNode  (taps audio into ring buffer; output unconnected)
- *   playbackNode ──→ playbackGain ──→ channelGain  (injected into chain when active)
+ * Gain transitions use 3ms linearRamp for click-free on/off.
  */
 
 import * as Tone from 'tone';
 import { getNativeAudioNode } from '@/utils/audio-context';
 
-/** Seconds of buffer to start behind the write position for pattern scratch.
- *  Gives forward headroom while keeping audio contextually recent. */
-const PATTERN_START_OFFSET_SEC = 3;
+/** Gain ramp time for click-free transitions (seconds) */
+const GAIN_RAMP_SEC = 0.003;
 
 export class DeckScratchBuffer {
   private captureNode!: AudioWorkletNode;
   private playbackNode!: AudioWorkletNode;
-  /** GainNode (0 = silent, 1 = active). Wired to channelGain input. */
+  /** GainNode (0 = silent, 1 = active). Wired to master input. */
   playbackGain!: GainNode;
 
-  private currentWritePos = 0;
   private initialized = false;
 
   // Deduplicate addModule calls per AudioContext instance
@@ -44,9 +33,9 @@ export class DeckScratchBuffer {
   private static initPromises = new WeakMap<AudioContext, Promise<void>>();
 
   private readonly ctx: AudioContext;
-  private readonly bufferId: 0 | 1;
+  private readonly bufferId: number;
 
-  constructor(ctx: AudioContext, bufferId: 0 | 1) {
+  constructor(ctx: AudioContext, bufferId: number) {
     this.ctx = ctx;
     this.bufferId = bufferId;
   }
@@ -75,17 +64,6 @@ export class DeckScratchBuffer {
       numberOfOutputs: 1,
       outputChannelCount: [2],
     });
-    this.captureNode.port.onmessage = (e: MessageEvent) => {
-      if (e.data.type === 'writePos') {
-        this.currentWritePos = e.data.pos as number;
-      } else if (e.data.type === 'debug-freeze') {
-        const d = e.data;
-        console.log(
-          `[ScratchCapture ${this.bufferId}] FREEZE writePos=${d.writePos} ` +
-          `nonZero=${d.nonZeroInLast1s}/${d.checkedFrames} peak=${d.peakBeforeFreeze.toFixed(4)}`
-        );
-      }
-    };
 
     this.playbackNode = new AudioWorkletNode(this.ctx, 'scratch-reverse', {
       ...sharedOpts,
@@ -96,24 +74,11 @@ export class DeckScratchBuffer {
 
     this.playbackNode.port.onmessage = (e: MessageEvent) => {
       const d = e.data;
-      if (d.type === 'debug-start') {
-        console.log(
-          `[ScratchPlayback ${this.bufferId}] START pos=${d.startPos} rate=${d.rate} ` +
-          `nonZero=${d.nonZeroAroundStart}/${d.checkedFrames} peak=${d.peakAroundStart.toFixed(4)} ` +
-          `sampleAt0={L:${d.sampleAt0.L.toFixed(6)}, R:${d.sampleAt0.R.toFixed(6)}}`
-        );
-      } else if (d.type === 'debug-playback') {
+      if (d.type === 'debug-playback') {
         console.log(
           `[ScratchPlayback ${this.bufferId}] readPos=${Math.floor(d.readPos)} ` +
-          `rate=${d.smoothRate.toFixed(3)} target=${d.targetRate.toFixed(3)} ` +
-          `outPeak=${d.outPeak.toFixed(4)} samples=[${
-            d.samplesAroundPos.map(
-              (s: {L: number; R: number}) => `${s.L.toFixed(4)}`
-            ).join(',')
-          }]`
+          `rate=${d.smoothRate.toFixed(3)} target=${d.targetRate.toFixed(3)}`
         );
-      } else if (d.type === 'stopped') {
-        // Existing handler will catch this via addEventListener if needed
       }
     };
 
@@ -139,17 +104,15 @@ export class DeckScratchBuffer {
       return;
     }
 
-    // Tap: filter output → captureNode (capture output not connected to anything)
     nativeFilter.connect(this.captureNode);
-    // Inject: playbackNode → playbackGain → channelGain
     this.playbackGain.connect(nativeChannel);
   }
 
   // ==========================================================================
-  // CAPTURE FREEZE (turn the ring buffer into a fixed "record" during scratch)
+  // CAPTURE CONTROL
   // ==========================================================================
 
-  /** Freeze capture — stops writing to the buffer so it becomes a fixed record. */
+  /** Freeze capture — stops writing so the buffer becomes a fixed record. */
   freezeCapture(): void {
     if (!this.initialized) return;
     this.captureNode.port.postMessage({ type: 'freeze' });
@@ -162,107 +125,65 @@ export class DeckScratchBuffer {
   }
 
   // ==========================================================================
-  // PLAYBACK — bidirectional, signed rate
+  // UNIFIED SCRATCH API
+  //
+  // startScratch() → setScratchRate() → stopScratch()
+  //
+  // Rate is SIGNED: +1.0 = normal forward, -1.0 = backward, 0 = stopped.
+  // The worklet handles interpolation, smoothing, and zero-crossing fades.
   // ==========================================================================
 
   /**
-   * Start playback for pattern scratch. Freezes capture first.
-   * Starts reading from a position behind the write pos to give forward headroom.
-   * @param rate Signed rate: positive = forward, negative = backward
+   * Begin scratch playback. Freezes capture, starts reading from near the
+   * current write position with forward headroom.
+   *
+   * @param rate Initial signed rate (+1.0 = normal speed forward)
    */
-  startScratchPlayback(rate: number): void {
+  startScratch(rate: number): void {
     if (!this.initialized) return;
     this.freezeCapture();
 
-    // Start a few seconds behind the write position so forward pushes
-    // have headroom before wrapping into old audio.
-    const bufferFrames = Math.round(this.ctx.sampleRate * 45);
-    const offset = Math.round(this.ctx.sampleRate * PATTERN_START_OFFSET_SEC);
-    const startPos = (this.currentWritePos - offset + bufferFrames) % bufferFrames;
+    // Ramp gain up (click-free)
+    const now = this.ctx.currentTime;
+    this.playbackGain.gain.cancelScheduledValues(now);
+    this.playbackGain.gain.setValueAtTime(this.playbackGain.gain.value, now);
+    this.playbackGain.gain.linearRampToValueAtTime(1, now + GAIN_RAMP_SEC);
 
-    console.log(
-      `[ScratchBuffer ${this.bufferId}] startScratchPlayback rate=${rate} ` +
-      `writePos=${this.currentWritePos} startPos=${startPos} offset=${offset} ` +
-      `bufferFrames=${bufferFrames} sampleRate=${this.ctx.sampleRate}`
-    );
-
-    this.playbackGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.playbackGain.gain.setValueAtTime(1, this.ctx.currentTime);
-    // Start message includes rate — worklet snaps to this rate instantly (no ramp)
-    this.playbackNode.port.postMessage({ type: 'start', startPos, rate });
+    // Start from the current write position — worklet reads shared state directly
+    this.playbackNode.port.postMessage({ type: 'startFromWrite', rate });
   }
 
   /**
-   * Update playback rate (signed: positive = forward, negative = backward).
-   * The worklet applies 2ms exponential smoothing for click-free transitions.
+   * Update scratch rate (signed). The worklet applies per-sample smoothing
+   * with cubic Hermite interpolation for alias-free, click-free playback.
    */
   setScratchRate(rate: number): void {
     if (!this.initialized) return;
     this.playbackNode.port.postMessage({ type: 'setRate', rate });
   }
 
-  /** Stop scratch playback and unfreeze capture. Non-blocking. */
-  stopScratchPlayback(): void {
+  /**
+   * Snap rate immediately (no smoothing). Use for initial scratch engage
+   * when the first rate value should be applied instantly.
+   */
+  snapScratchRate(rate: number): void {
     if (!this.initialized) return;
-    this.playbackNode.port.postMessage({ type: 'setRate', rate: 0 });
-    this.playbackGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.playbackGain.gain.setValueAtTime(0, this.ctx.currentTime);
-    this.playbackNode.port.postMessage({ type: 'stop' });
-    this.unfreezeCapture();
-  }
-
-  // ==========================================================================
-  // LEGACY — jog wheel backward scratch (uses negative rate internally)
-  // ==========================================================================
-
-  /** Start backward-only playback from the current write position (jog wheel). */
-  startReverse(rate: number): void {
-    if (!this.initialized) return;
-    const negRate = -Math.abs(rate);
-    this.playbackGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.playbackGain.gain.setValueAtTime(1, this.ctx.currentTime);
-    this.playbackNode.port.postMessage({
-      type: 'start',
-      startPos: this.currentWritePos,
-      rate: negRate,
-    });
+    this.playbackNode.port.postMessage({ type: 'snapRate', rate });
   }
 
   /**
-   * Start backward playback from the worklet's EXACT current write position.
-   * Eliminates main-thread writePos staleness (up to 50ms) by reading the
-   * shared module-level writePoss[] directly in the audio thread.
+   * Stop scratch playback. Ramps gain down, stops worklet, unfreezes capture.
+   * Returns a promise that resolves with the number of frames the read position
+   * moved backward from the start position (for seek-back estimation).
    */
-  startReverseFromWritePos(rate: number): void {
-    if (!this.initialized) return;
-    const negRate = -Math.abs(rate);
-    this.playbackGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.playbackGain.gain.setValueAtTime(1, this.ctx.currentTime);
-    this.playbackNode.port.postMessage({ type: 'startFromWrite', rate: negRate });
-  }
-
-  /** Update rate for jog wheel backward scratch (always negative). */
-  setRate(rate: number): void {
-    if (!this.initialized) return;
-    this.playbackNode.port.postMessage({ type: 'setRate', rate: -Math.abs(rate) });
-  }
-
-  /** Immediately silence and stop. Non-blocking. */
-  silenceAndStop(): void {
-    if (!this.initialized) return;
-    this.playbackNode.port.postMessage({ type: 'setRate', rate: 0 });
-    this.playbackGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.playbackGain.gain.setValueAtTime(0, this.ctx.currentTime);
-    this.playbackNode.port.postMessage({ type: 'stop' });
-  }
-
-  /** Silences playbackGain and resolves with frames played backward (for seek estimation). */
-  stopReverse(): Promise<number> {
+  stopScratch(): Promise<number> {
     if (!this.initialized) return Promise.resolve(0);
 
-    this.playbackNode.port.postMessage({ type: 'setRate', rate: 0 });
-    this.playbackGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.playbackGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    // Ramp gain down (click-free)
+    const now = this.ctx.currentTime;
+    this.playbackGain.gain.cancelScheduledValues(now);
+    this.playbackGain.gain.setValueAtTime(this.playbackGain.gain.value, now);
+    this.playbackGain.gain.linearRampToValueAtTime(0, now + GAIN_RAMP_SEC);
 
     return new Promise<number>((resolve) => {
       const handler = (e: MessageEvent) => {
@@ -272,9 +193,39 @@ export class DeckScratchBuffer {
         }
       };
       this.playbackNode.port.addEventListener('message', handler);
-      this.playbackNode.port.postMessage({ type: 'stop' });
+
+      // Schedule stop after gain ramp completes
+      setTimeout(() => {
+        this.playbackNode.port.postMessage({ type: 'stop' });
+        this.unfreezeCapture();
+      }, GAIN_RAMP_SEC * 1000 + 1);
     });
   }
+
+  /**
+   * Force-silence and stop immediately (used when transport stops externally).
+   */
+  silenceAndStop(): void {
+    if (!this.initialized) return;
+    this.playbackNode.port.postMessage({ type: 'setRate', rate: 0 });
+    // Immediate silence (transport is stopping, no listener for ramp tail)
+    const now = this.ctx.currentTime;
+    this.playbackGain.gain.cancelScheduledValues(now);
+    this.playbackGain.gain.setValueAtTime(0, now);
+    this.playbackNode.port.postMessage({ type: 'stop' });
+    this.unfreezeCapture();
+  }
+
+  // ==========================================================================
+  // LEGACY COMPAT — these map to the unified API for any callers not yet updated
+  // ==========================================================================
+
+  startScratchPlayback(rate: number): void { this.startScratch(rate); }
+  stopScratchPlayback(): void { void this.stopScratch(); }
+  startReverseFromWritePos(rate: number): void { this.startScratch(-Math.abs(rate)); }
+  startReverse(rate: number): void { this.startScratch(-Math.abs(rate)); }
+  setRate(rate: number): void { this.setScratchRate(rate); }
+  stopReverse(): Promise<number> { return this.stopScratch(); }
 
   dispose(): void {
     try { this.captureNode?.disconnect(); } catch { /* ignore */ }

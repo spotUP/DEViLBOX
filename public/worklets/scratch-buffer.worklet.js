@@ -1,32 +1,42 @@
 /**
- * scratch-buffer.worklet.js
+ * scratch-buffer.worklet.js — Unified vinyl scratch engine
  *
- * Two AudioWorklet processors sharing module-level ring buffers (one per deck).
- * Deck A → bufferId 0, Deck B → bufferId 1.
+ * Architecture inspired by terminatorX (Alexander König):
+ *   - Single ring buffer continuously captures the master audio
+ *   - When scratch is active, a UNIFIED playback processor reads the
+ *     ring buffer at a signed rate (positive=forward, negative=backward)
+ *   - Fractional-position tracking with CUBIC HERMITE interpolation
+ *   - Per-sample rate smoothing with configurable inertia
+ *   - Zero-crossing fade (1ms) at direction changes to prevent clicks
+ *   - ALL scratch audio comes from the ring buffer (no live/buffer switching)
  *
- * ScratchCaptureProcessor: taps the audio chain and writes to the ring buffer.
- *   Supports freeze/unfreeze — when frozen, writing stops and the buffer becomes
- *   a fixed "record" that the playback processor can scrub through freely.
+ * Two processors share module-level ring buffers (one per deck):
+ *   ScratchCaptureProcessor: continuously writes audio into ring buffer
+ *   ScratchPlaybackProcessor: reads ring buffer at variable rate with interpolation
  *
- * ScratchPlaybackProcessor: reads the ring buffer at a signed rate with LINEAR
- *   INTERPOLATION (ported from SoundRenderer.cpp reference implementation).
- *   Positive rate = forward, negative rate = backward, 0 = stopped.
- *
- * RATE SMOOTHING: 2ms exponential smoothing on rate changes prevents clicks at
- *   direction/speed transitions while keeping scratch response tight.
- *
- * Ring buffer size: 45 s × sampleRate × 2 ch interleaved (L/R)
+ * Ring buffer: 45 s × sampleRate × 2 ch interleaved (L/R)
  */
 
 const BUFFER_SECONDS = 45;
 
-/** Rate smoothing time constant in seconds. 2ms is fast enough for scratch
- *  responsiveness while preventing audible clicks at rate transitions. */
-const RATE_SMOOTH_SEC = 0.002;
+/**
+ * Rate smoothing time constant in seconds.
+ * 5ms balances between responsive feel and click-free transitions.
+ * The worklet interpolates per-sample, so even with 60Hz rate updates
+ * from the main thread, the audio is smooth.
+ */
+const RATE_SMOOTH_SEC = 0.005;
+
+/**
+ * Zero-crossing fade duration in samples (~1ms at 48kHz).
+ * When rate crosses zero (direction change), we apply a short
+ * linear crossfade to prevent discontinuities.
+ */
+const ZERO_FADE_SAMPLES = 48;
 
 // Module-level shared state (one AudioWorkletGlobalScope per context)
-const rings     = [];      // Float32Array per bufferId, lazy-initialized
-const writePoss = [0, 0];  // Current write position per bufferId
+const rings     = [];            // Float32Array per bufferId, lazy-initialized
+const writePoss = [0, 0];        // Current write position per bufferId
 const frozen    = [false, false]; // Per-buffer freeze state
 
 function getOrCreateRing(bufferId, sr) {
@@ -35,6 +45,25 @@ function getOrCreateRing(bufferId, sr) {
     rings[bufferId] = new Float32Array(frames * 2); // interleaved L/R
   }
   return rings[bufferId];
+}
+
+/**
+ * Cubic Hermite interpolation (4-point, 3rd order).
+ * Gives smooth, alias-free interpolation for variable-rate playback.
+ *
+ * @param {number} y0 sample at pos-1
+ * @param {number} y1 sample at pos (floor)
+ * @param {number} y2 sample at pos+1
+ * @param {number} y3 sample at pos+2
+ * @param {number} t  fractional position [0..1)
+ * @returns {number} interpolated value
+ */
+function hermite(y0, y1, y2, y3, t) {
+  const c0 = y1;
+  const c1 = 0.5 * (y2 - y0);
+  const c2 = y0 - 2.5 * y1 + 2 * y2 - 0.5 * y3;
+  const c3 = 0.5 * (y3 - y0) + 1.5 * (y1 - y2);
+  return ((c3 * t + c2) * t + c1) * t + c0;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,31 +79,12 @@ class ScratchCaptureProcessor extends AudioWorkletProcessor {
     // Report write position to main thread every ~50ms
     this._reportEvery       = Math.round(sampleRate * 0.05);
     this._framesSinceReport = 0;
-
-    // Debug: track peak input level
     this._debugPeak = 0;
 
     this.port.onmessage = (e) => {
       const d = e.data;
       if (d.type === 'freeze') {
         frozen[this.bufferId] = true;
-        // Debug: report buffer state at freeze time
-        const wp = writePoss[this.bufferId];
-        let nonZero = 0;
-        const checkFrames = Math.min(this.bufferFrames, 48000); // check ~1s around write pos
-        for (let i = 0; i < checkFrames; i++) {
-          const idx = ((wp - checkFrames + i + this.bufferFrames) % this.bufferFrames) * 2;
-          if (this.ring[idx] !== 0 || this.ring[idx + 1] !== 0) nonZero++;
-        }
-        this.port.postMessage({
-          type: 'debug-freeze',
-          writePos: wp,
-          bufferFrames: this.bufferFrames,
-          nonZeroInLast1s: nonZero,
-          checkedFrames: checkFrames,
-          peakBeforeFreeze: this._debugPeak,
-        });
-        this._debugPeak = 0;
       } else if (d.type === 'unfreeze') {
         frozen[this.bufferId] = false;
       }
@@ -106,7 +116,7 @@ class ScratchCaptureProcessor extends AudioWorkletProcessor {
         wp = (wp + 1) % bf;
       }
 
-      // Pass through to output (output not connected, but harmless)
+      // Pass through to output (capture node output usually not connected)
       if (out[0]) out[0][i] = L;
       if (out[1]) out[1][i] = R;
     }
@@ -134,19 +144,19 @@ class ScratchCaptureProcessor extends AudioWorkletProcessor {
 }
 
 // ---------------------------------------------------------------------------
-// ScratchPlaybackProcessor — reads ring buffer at a signed rate
+// ScratchPlaybackProcessor — unified forward+backward scrub engine
 //
-// LINEAR INTERPOLATION ported from DJ-Scratch-Sample SoundRenderer.cpp:
-//   pos1 = floor(position), pos2 = pos1+1, frac = position - pos1
-//   output = sample[pos1] + (sample[pos2] - sample[pos1]) * frac
+// Inspired by terminatorX's render_scratch():
+//   - Fractional position (double) into the ring buffer
+//   - Per-sample: pos += smoothedRate
+//   - Cubic Hermite interpolation (4-point)
+//   - Zero-crossing fade at direction changes
+//   - Rate smoothing via 1-pole exponential filter
 //
-// RATE SMOOTHING: 1-pole exponential filter on rate prevents clicks at
-//   direction changes (e.g. +2.4 → -1.0 in Baby Scratch).
-//   Time constant: ~2ms (96 samples at 48kHz).
-//
-// Rate controlled via postMessage (setRate / start messages).
+// Rate is signed: +1.0 = normal forward, -1.0 = normal backward, 0 = stopped
+// Rate controlled via postMessage from main thread.
 // ---------------------------------------------------------------------------
-class ScratchReverseProcessor extends AudioWorkletProcessor {
+class ScratchPlaybackProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
     this.bufferId     = (options.processorOptions && options.processorOptions.bufferId) ?? 0;
@@ -154,59 +164,35 @@ class ScratchReverseProcessor extends AudioWorkletProcessor {
     this.ring         = getOrCreateRing(this.bufferId, sampleRate);
 
     this.active     = false;
-    this.readPosF   = 0;     // float — sub-frame precision for interpolation
-    this.targetRate = 0;     // target rate (set by messages, smoothed before use)
-    this.smoothRate = 0;     // current smoothed rate (used for position advancement)
-    this.startPos   = 0;     // position snapshot when playback started
+    this.readPosF   = 0;     // fractional read position (sub-sample precision)
+    this.targetRate = 0;     // target playback rate from main thread
+    this.smoothRate = 0;     // smoothed rate (used per-sample for position advance)
+    this.startPos   = 0;     // position at scratch start (for framesBack calc)
 
-    // Rate smoothing coefficient: alpha = 1 - exp(-1 / (T * sampleRate))
-    // For T = 2ms at 48kHz: alpha ≈ 0.0104
+    // Rate smoothing coefficient
     this.smoothAlpha = 1 - Math.exp(-1 / (RATE_SMOOTH_SEC * sampleRate));
 
-    // Debug: report every ~200ms
-    this._reportEvery       = Math.round(sampleRate * 0.2);
+    // Zero-crossing fade state
+    this.fadeCounter = 0;    // countdown for fade (0 = no fade active)
+    this.prevSign   = 0;     // sign of rate before zero crossing (-1, 0, +1)
+
+    // Debug reporting
+    this._reportEvery       = Math.round(sampleRate * 0.5); // every 500ms
     this._framesSinceReport = 0;
-    this._debugOutPeak      = 0;
 
     this.port.onmessage = (e) => {
       const d = e.data;
       switch (d.type) {
         case 'start':
-          // Re-grab the ring in case it was initialized after construction
           this.ring         = getOrCreateRing(this.bufferId, sampleRate);
           this.bufferFrames = Math.round(sampleRate * BUFFER_SECONDS);
           this.startPos     = d.startPos;
           this.readPosF     = d.startPos;
-          this.targetRate   = d.rate ?? this.targetRate;
-          this.smoothRate   = d.rate ?? this.targetRate;  // snap to rate on start (no ramp)
+          this.targetRate   = d.rate ?? 0;
+          this.smoothRate   = d.rate ?? 0; // snap on start
+          this.prevSign     = Math.sign(this.smoothRate);
+          this.fadeCounter  = 0;
           this.active       = true;
-
-          // Debug: check buffer content around start position
-          {
-            const bf = this.bufferFrames;
-            const ring = this.ring;
-            let nonZero = 0;
-            let peak = 0;
-            const checkRange = Math.min(48000, bf); // ~1s
-            for (let i = 0; i < checkRange; i++) {
-              const idx = ((d.startPos - checkRange / 2 + i + bf) % bf);
-              const L = Math.abs(ring[idx * 2]);
-              const R = Math.abs(ring[idx * 2 + 1]);
-              if (L > 0 || R > 0) nonZero++;
-              if (L > peak) peak = L;
-              if (R > peak) peak = R;
-            }
-            this.port.postMessage({
-              type: 'debug-start',
-              startPos: d.startPos,
-              rate: d.rate,
-              bufferFrames: bf,
-              nonZeroAroundStart: nonZero,
-              peakAroundStart: peak,
-              checkedFrames: checkRange,
-              sampleAt0: { L: ring[d.startPos * 2], R: ring[d.startPos * 2 + 1] },
-            });
-          }
           break;
 
         case 'setRate':
@@ -214,41 +200,16 @@ class ScratchReverseProcessor extends AudioWorkletProcessor {
           break;
 
         case 'startFromWrite':
-          // Start playback from the EXACT current write position (no main-thread staleness).
-          // Uses the shared module-level writePoss[] directly.
+          // Start from the EXACT write position (reads shared module state directly)
           this.ring         = getOrCreateRing(this.bufferId, sampleRate);
           this.bufferFrames = Math.round(sampleRate * BUFFER_SECONDS);
           this.startPos     = writePoss[this.bufferId];
           this.readPosF     = writePoss[this.bufferId];
-          this.targetRate   = d.rate ?? this.targetRate;
-          this.smoothRate   = d.rate ?? this.targetRate;
+          this.targetRate   = d.rate ?? 0;
+          this.smoothRate   = d.rate ?? 0;
+          this.prevSign     = Math.sign(this.smoothRate);
+          this.fadeCounter  = 0;
           this.active       = true;
-          {
-            const wp = writePoss[this.bufferId];
-            const bf = this.bufferFrames;
-            const ring = this.ring;
-            let nonZero = 0;
-            let peak = 0;
-            const checkRange = Math.min(48000, bf);
-            for (let i = 0; i < checkRange; i++) {
-              const idx = ((wp - i + bf) % bf);
-              const L = Math.abs(ring[idx * 2]);
-              const R = Math.abs(ring[idx * 2 + 1]);
-              if (L > 0 || R > 0) nonZero++;
-              if (L > peak) peak = L;
-              if (R > peak) peak = R;
-            }
-            this.port.postMessage({
-              type: 'debug-start',
-              startPos: wp,
-              rate: d.rate,
-              bufferFrames: bf,
-              nonZeroAroundStart: nonZero,
-              peakAroundStart: peak,
-              checkedFrames: checkRange,
-              sampleAt0: { L: ring[wp * 2], R: ring[wp * 2 + 1] },
-            });
-          }
           break;
 
         case 'stop': {
@@ -262,8 +223,29 @@ class ScratchReverseProcessor extends AudioWorkletProcessor {
           this.port.postMessage({ type: 'stopped', framesBack });
           break;
         }
+
+        case 'snapRate':
+          // Snap rate immediately (no smoothing) — used for initial engage
+          this.targetRate = d.rate;
+          this.smoothRate = d.rate;
+          this.prevSign   = Math.sign(d.rate);
+          break;
       }
     };
+  }
+
+  /**
+   * Read a sample from the ring buffer with wrapping.
+   * @param {number} idx Integer frame index (may be negative or >= bufferFrames)
+   * @param {number} ch  Channel offset (0=L, 1=R)
+   * @returns {number} sample value
+   */
+  getSample(idx, ch) {
+    const bf = this.bufferFrames;
+    // Modular wrap (handles negative indices)
+    let i = idx % bf;
+    if (i < 0) i += bf;
+    return this.ring[i * 2 + ch];
   }
 
   process(_inputs, outputs) {
@@ -276,74 +258,75 @@ class ScratchReverseProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    const ring   = this.ring;
-    const bf     = this.bufferFrames;
     const target = this.targetRate;
     const alpha  = this.smoothAlpha;
     let   rate   = this.smoothRate;
-    let   outPeak = 0;
+    let   fadeCounter = this.fadeCounter;
+    let   prevSign    = this.prevSign;
 
     for (let i = 0; i < frames; i++) {
-      // Smooth rate toward target (1-pole exponential filter)
+      // ── Per-sample rate smoothing ──
       rate += (target - rate) * alpha;
 
-      // Advance read position by smoothed rate
+      // ── Zero-crossing detection & fade ──
+      const curSign = rate > 0.001 ? 1 : (rate < -0.001 ? -1 : 0);
+      if (prevSign !== 0 && curSign !== 0 && curSign !== prevSign) {
+        // Direction just reversed — start a fade
+        fadeCounter = ZERO_FADE_SAMPLES;
+      }
+      if (curSign !== 0) prevSign = curSign;
+
+      // Compute fade gain (1.0 normally, ramps 0→1 during fade)
+      let fadeGain = 1.0;
+      if (fadeCounter > 0) {
+        fadeGain = 1.0 - (fadeCounter / ZERO_FADE_SAMPLES);
+        fadeCounter--;
+      }
+
+      // ── Advance fractional position ──
       this.readPosF += rate;
 
-      // Wrap around the circular buffer (while for safety with extreme rates)
-      while (this.readPosF < 0) this.readPosF += bf;
-      while (this.readPosF >= bf) this.readPosF -= bf;
+      // Wrap (ring buffer is circular)
+      const bf = this.bufferFrames;
+      if (this.readPosF >= bf) this.readPosF -= bf;
+      if (this.readPosF < 0)   this.readPosF += bf;
 
-      // ── LINEAR INTERPOLATION (from SoundRenderer.cpp DoRenderThread) ──
-      const pos1 = Math.floor(this.readPosF);
-      const pos2 = (pos1 + 1) % bf;  // wrap at buffer boundary
-      const frac = this.readPosF - pos1;
+      // ── Cubic Hermite interpolation (4-point) ──
+      const posI = Math.floor(this.readPosF);
+      const frac = this.readPosF - posI;
 
-      // Interpolate left channel
-      const L1 = ring[pos1 * 2];
-      const L2 = ring[pos2 * 2];
-      const outL = L1 + (L2 - L1) * frac;
+      // Get 4 surrounding samples for each channel
+      const L0 = this.getSample(posI - 1, 0);
+      const L1 = this.getSample(posI,     0);
+      const L2 = this.getSample(posI + 1, 0);
+      const L3 = this.getSample(posI + 2, 0);
 
-      // Interpolate right channel
-      const R1 = ring[pos1 * 2 + 1];
-      const R2 = ring[pos2 * 2 + 1];
-      const outR = R1 + (R2 - R1) * frac;
+      const R0 = this.getSample(posI - 1, 1);
+      const R1 = this.getSample(posI,     1);
+      const R2 = this.getSample(posI + 1, 1);
+      const R3 = this.getSample(posI + 2, 1);
+
+      let outL = hermite(L0, L1, L2, L3, frac) * fadeGain;
+      let outR = hermite(R0, R1, R2, R3, frac) * fadeGain;
 
       if (out[0]) out[0][i] = outL;
       if (out[1]) out[1][i] = outR;
-
-      const absL = Math.abs(outL);
-      const absR = Math.abs(outR);
-      if (absL > outPeak) outPeak = absL;
-      if (absR > outPeak) outPeak = absR;
     }
 
-    this.smoothRate = rate;
-    if (outPeak > this._debugOutPeak) this._debugOutPeak = outPeak;
+    this.smoothRate  = rate;
+    this.fadeCounter = fadeCounter;
+    this.prevSign    = prevSign;
 
     this._framesSinceReport += frames;
     if (this._framesSinceReport >= this._reportEvery) {
       this._framesSinceReport = 0;
-
-      // Sample a few values around the current read position for debug
-      const pos = Math.floor(this.readPosF);
-      const sampleValues = [];
-      for (let j = -2; j <= 2; j++) {
-        const idx = ((pos + j) + bf) % bf;
-        sampleValues.push({ L: ring[idx * 2], R: ring[idx * 2 + 1] });
-      }
-
       this.port.postMessage({
         type: 'debug-playback',
         readPos: this.readPosF,
-        startPos: this.startPos,
         targetRate: this.targetRate,
         smoothRate: this.smoothRate,
-        outPeak: this._debugOutPeak,
-        bufferFrames: bf,
-        samplesAroundPos: sampleValues,
+        bufferFrames: this.bufferFrames,
       });
-      this._debugOutPeak = 0;
     }
 
     return true;
@@ -351,4 +334,4 @@ class ScratchReverseProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('scratch-capture', ScratchCaptureProcessor);
-registerProcessor('scratch-reverse', ScratchReverseProcessor);
+registerProcessor('scratch-reverse', ScratchPlaybackProcessor);

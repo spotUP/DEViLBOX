@@ -11,6 +11,7 @@ import { useUIStore } from '@stores/useUIStore';
 import { useHistoryStore } from '@stores/useHistoryStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { stringNoteToXM } from '@/lib/xmConversions';
 
 // Track currently held notes to prevent retriggering and enable proper release
@@ -985,6 +986,8 @@ export const useTrackerInput = () => {
 
       // FT2: Right Shift = Record pattern (play with recording)
       if (e.key === 'Shift' && e.location === 2) { // location 2 = right side
+        // Skip if scratch mode is active (don't interrupt scratching)
+        if (getTrackerScratchController().isActive) return;
         e.preventDefault();
         if (!recordMode) {
           toggleRecordMode(); // Enable record mode
@@ -998,6 +1001,8 @@ export const useTrackerInput = () => {
 
       // FT2: Right Ctrl = Play song
       if (e.key === 'Control' && e.location === 2) {
+        // Skip if scratch mode is active (don't interrupt scratching)
+        if (getTrackerScratchController().isActive) return;
         e.preventDefault();
         // Always restart song playback from beginning
         if (isPlaying) stop();
@@ -1008,6 +1013,8 @@ export const useTrackerInput = () => {
 
       // FT2: Right Alt = Play pattern
       if (e.key === 'Alt' && e.location === 2) {
+        // Skip if scratch mode is active (don't interrupt scratching)
+        if (getTrackerScratchController().isActive) return;
         e.preventDefault();
         // Always restart pattern playback from beginning
         if (isPlaying) stop();

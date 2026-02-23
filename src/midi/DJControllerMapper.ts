@@ -16,6 +16,7 @@ import { routeDJParameter } from './performance/parameterRouter';
 import { getDJEngine } from '../engine/dj/DJEngine';
 import { useDJStore } from '../stores/useDJStore';
 import { DJBeatSync } from '../engine/dj/DJBeatSync';
+import { getTrackerScratchController } from '../engine/TrackerScratchController';
 import type { DJControllerPreset, DJControllerCCMapping, DJControllerNoteMapping } from './djControllerPresets';
 import type { MIDIMessage } from './types';
 class DJControllerMapper {
@@ -28,7 +29,7 @@ class DJControllerMapper {
   private ccLookup = new Map<string, DJControllerCCMapping>();
   private noteLookup = new Map<string, DJControllerNoteMapping>();
   private jogCCs = new Set<string>();       // "channel:cc" keys for jog wheel CCs
-  private jogTouchNotes = new Map<string, 'A' | 'B'>(); // "channel:note" → deck
+  private jogTouchNotes = new Map<string, 'A' | 'B' | 'C'>(); // "channel:note" → deck
 
   private constructor() {}
 
@@ -91,7 +92,9 @@ class DJControllerMapper {
 
     const manager = getMIDIManager();
     manager.addMessageHandler((msg) => {
-      if (!this.activePreset || !isDJContext()) return;
+      if (!this.activePreset) return;
+      // Allow MIDI through for tracker scratch even when not in DJ context
+      // Individual handlers check isDJContext() when needed
       this.handleMessage(msg);
     });
   }
@@ -167,6 +170,15 @@ class DJControllerMapper {
    * Execute a named DJ action (play, cue, sync, hot cue, etc.)
    */
   private executeDJAction(action: string): void {
+    // Tracker scratch actions work without DJ engine
+    if (action.startsWith('tracker_')) {
+      this.executeTrackerScratchAction(action);
+      return;
+    }
+
+    // DJ engine-dependent actions require DJ context
+    if (!isDJContext()) return;
+
     try {
       const engine = getDJEngine();
       const store = useDJStore.getState();
@@ -221,7 +233,7 @@ class DJControllerMapper {
           const hotcueMatch = action.match(/^hotcue(\d)_([ab])$/);
           if (hotcueMatch) {
             const cueIndex = parseInt(hotcueMatch[1]) - 1;
-            const deckId = hotcueMatch[2].toUpperCase() as 'A' | 'B';
+            const deckId = hotcueMatch[2].toUpperCase() as 'A' | 'B' | 'C';
             const cuePoints = store.decks[deckId].seratoCuePoints;
             const cue = cuePoints.find(c => c.index === cueIndex);
             if (cue) {
@@ -243,20 +255,71 @@ class DJControllerMapper {
   }
 
   /**
-   * Handle jog wheel touch on/off — starts/stops scratch mode.
+   * Execute tracker scratch actions (fader cut, pattern toggles).
+   * These work without DJ engine — they use TrackerScratchController directly.
    */
-  private handleJogTouch(deckId: 'A' | 'B', touching: boolean): void {
-    try {
-      const deck = getDJEngine().getDeck(deckId);
-      if (touching) {
-        deck.startScratch();
-        useDJStore.getState().setDeckScratchActive(deckId, true);
-      } else {
-        deck.stopScratch();
-        useDJStore.getState().setDeckScratchActive(deckId, false);
+  private executeTrackerScratchAction(action: string): void {
+    const ctrl = getTrackerScratchController();
+    switch (action) {
+      case 'tracker_fader_cut':
+        ctrl.setFaderCut(true);
+        // Auto-release after 50ms if no note-off (CC mode)
+        setTimeout(() => ctrl.setFaderCut(false), 50);
+        break;
+      case 'tracker_fader_cut_on':
+        ctrl.setFaderCut(true);
+        break;
+      case 'tracker_fader_cut_off':
+        ctrl.setFaderCut(false);
+        break;
+      case 'tracker_scratch_trans':
+        ctrl.toggleFaderPattern('Transformer');
+        break;
+      case 'tracker_scratch_crab':
+        ctrl.toggleFaderPattern('Crab');
+        break;
+      case 'tracker_scratch_flare':
+        ctrl.toggleFaderPattern('Flare');
+        break;
+      case 'tracker_scratch_chirp':
+        ctrl.toggleFaderPattern('Chirp');
+        break;
+      case 'tracker_scratch_stab':
+        ctrl.toggleFaderPattern('Stab');
+        break;
+      case 'tracker_scratch_8crab':
+        ctrl.toggleFaderPattern('8-Finger Crab');
+        break;
+      case 'tracker_scratch_twdl':
+        ctrl.toggleFaderPattern('Twiddle');
+        break;
+      case 'tracker_scratch_stop':
+        ctrl.stopFaderPattern();
+        break;
+    }
+  }
+
+  /**
+   * Handle jog wheel touch on/off — starts/stops scratch mode.
+   * Routes to DJ engine in DJ context, or tracker turntable physics otherwise.
+   */
+  private handleJogTouch(deckId: 'A' | 'B' | 'C', touching: boolean): void {
+    if (isDJContext()) {
+      try {
+        const deck = getDJEngine().getDeck(deckId);
+        if (touching) {
+          deck.startScratch();
+          useDJStore.getState().setDeckScratchActive(deckId, true);
+        } else {
+          deck.stopScratch();
+          useDJStore.getState().setDeckScratchActive(deckId, false);
+        }
+      } catch {
+        // Engine not ready
       }
-    } catch {
-      // Engine not ready
+    } else {
+      // Tracker context: jog touch = hand on record (grab mode)
+      getTrackerScratchController().onMidiJogTouch(touching);
     }
   }
 
@@ -267,24 +330,29 @@ class DJControllerMapper {
    *   0-63 = clockwise (forward), 65-127 = counter-clockwise (backward)
    *   64 = no movement (some controllers), value distance from 64 = speed
    */
-  private handleJogSpin(deckId: 'A' | 'B', value: number): void {
-    try {
-      const deck = getDJEngine().getDeck(deckId);
+  private handleJogSpin(deckId: 'A' | 'B' | 'C', value: number): void {
+    // Convert relative CC to velocity: 0-63 = forward, 65-127 = backward
+    let velocity: number;
+    if (value <= 63) {
+      velocity = value / 63;         // 0 to 1 (forward, slow to fast)
+    } else {
+      velocity = -(128 - value) / 63; // -1 to 0 (backward, fast to slow)
+    }
+    velocity *= 2; // Scale up for more dramatic effect
 
-      // Convert relative CC to velocity: 0-63 = forward, 65-127 = backward
-      let velocity: number;
-      if (value <= 63) {
-        velocity = value / 63;         // 0 to 1 (forward, slow to fast)
-      } else {
-        velocity = -(128 - value) / 63; // -1 to 0 (backward, fast to slow)
-      }
-
-      // Scale up for more dramatic effect
-      velocity *= 2;
-
-      deck.setScratchVelocity(velocity);
-    } catch {
-      // Engine not ready
+    // Route to DJ engine if in DJ context, otherwise to tracker scratch
+    if (isDJContext()) {
+      try {
+        const deck = getDJEngine().getDeck(deckId);
+        deck.setScratchVelocity(velocity);
+      } catch { /* Engine not ready */ }
+    } else {
+      // Route jog to tracker turntable physics.
+      // When jog touch is active, treat as direct velocity (grab);
+      // when not touching (outer ring spin), treat as nudge impulse.
+      const ctrl = getTrackerScratchController();
+      const isTouching = ctrl.turntable.touching;
+      ctrl.onMidiJogSpin(value, isTouching);
     }
   }
 
