@@ -30,7 +30,7 @@ const NavBarOverlay: React.FC = () => {
   if (!Comp) return null;
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div style={{ width: '100%', position: 'relative' }}>
       <Comp />
       {/* GL-specific: Switch to DOM rendering mode — positioned in tab bar row,
           left of the "+" new-tab button to avoid overlapping navbar controls */}
@@ -60,13 +60,14 @@ const NavBarOverlay: React.FC = () => {
 };
 
 export const PixiNavBar: React.FC = () => {
-  // DOM NavBar: top nav (~44px) + tab bar (~32px) — always shown
-  const totalHeight = 76;
-
+  // DOM NavBar actual measured height:
+  //   Top nav: py-2 (16px) + text-lg (28px) + border-b (1px) = 45px
+  //   Tab bar: py-1 (8px) + buttons py-1.5+text-sm (32px) + border-b (1px) = 41px
+  //   Outer border-b (1px) + padding/border accum ≈ 98px
   return (
     <PixiDOMOverlay
-      layout={{ width: '100%', height: totalHeight }}
-      style={{ overflow: 'visible', zIndex: 40 }}
+      layout={{ width: '100%', height: 98 }}
+      style={{ overflow: 'hidden', zIndex: 40 }}
     >
       <NavBarOverlay />
     </PixiDOMOverlay>

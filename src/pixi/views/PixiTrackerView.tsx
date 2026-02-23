@@ -128,7 +128,7 @@ export const PixiTrackerView: React.FC = () => {
   const nextPatternLength = nextPositionIdx >= 0 ? patterns[patternOrder[nextPositionIdx]]?.length : undefined;
 
   // Compute instrument panel height: window minus navbar(76) + toolbar(160) + controls(32) + statusbar(32) + optional pattern panel
-  const NAVBAR_H = 76; // NavBar(44px) + TabBar(32px) — must match PixiNavBar totalHeight
+  const NAVBAR_H = 98; // NavBar(45px) + TabBar(41px) + borders+padding — must match PixiNavBar height
   const STATUSBAR_H = 32; // must match PixiStatusBar STATUS_BAR_HEIGHT
   const CONTROLS_BAR_H = 32;
   const MACRO_SLOTS_H = showMacroSlots ? 32 : 0;
@@ -172,11 +172,12 @@ export const PixiTrackerView: React.FC = () => {
         layout={{
           flex: 1,
           width: '100%',
+          height: instrumentPanelHeight,
           flexDirection: 'row',
         }}
       >
         {/* Editor area with overlays */}
-        <pixiContainer layout={{ flex: 1, height: '100%' }}>
+        <pixiContainer layout={{ flex: 1, width: '100%', height: '100%' }}>
           {/* Editor — native Pixi components for each view mode.
               All editors are ALWAYS mounted to avoid @pixi/layout BindingError
               when swapping Yoga child nodes. Visibility controlled via visible +
@@ -249,9 +250,23 @@ export const PixiTrackerView: React.FC = () => {
           {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga insertChild crash.
               Conditional mount/unmount of Pixi children triggers BindingError in
               Emscripten's Yoga WASM binding. Use visible + layout sizing instead. */}
-          <pixiContainer visible={viewMode === 'tracker' && editorMode === 'classic'} layout={{ position: 'absolute' }}>
-            <PixiChannelVUMeters width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
-          </pixiContainer>
+          {/* VU meters overlay — covers top half of editor down to the edit bar.
+              VU segments draw upward from the bottom of this area, so they
+              appear to shoot out from the edit cursor row.
+              Height accounts for PixiPatternEditor internal layout:
+              scrollbar(12) + header(28) + grid, with cursor centered in grid. */}
+          {(() => {
+            const PE_SCROLLBAR = 12;  // PixiPatternEditor top scrollbar
+            const PE_HEADER = 28;     // PixiPatternEditor channel header
+            const PE_ROW = 24;        // PixiPatternEditor row height
+            const gridH = instrumentPanelHeight - PE_HEADER - PE_SCROLLBAR;
+            const vuHeight = Math.max(50, Math.floor(PE_SCROLLBAR + PE_HEADER + (gridH - PE_ROW) / 2));
+            return (
+              <pixiContainer visible={viewMode === 'tracker' && editorMode === 'classic'} layout={{ position: 'absolute', width: Math.max(100, editorWidth), height: vuHeight }}>
+                <PixiChannelVUMeters width={Math.max(100, editorWidth)} height={vuHeight} />
+              </pixiContainer>
+            );
+          })()}
           <pixiContainer visible={viewMode === 'tracker' && showAutomation && !!patternId} layout={{ position: 'absolute' }}>
             <PixiAutomationLanes
               width={Math.max(100, editorWidth)}

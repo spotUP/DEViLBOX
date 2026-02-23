@@ -12,16 +12,14 @@
  * Knobs: native PixiKnob components. Dropdowns: PixiDOMOverlay for <select>.
  */
 
-import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useRef, useEffect } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton, PixiKnob, PixiLabel } from '../../components';
-import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
 import { useTrackerStore, useInstrumentStore, useTransportStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { xmNoteToString, stringNoteToXM } from '@/lib/xmConversions';
-import { useThemeStore } from '@/stores/useThemeStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { DEFAULT_TB303 } from '@typedefs/instrument';
 import type { InstrumentConfig, DevilFishConfig } from '@typedefs/instrument';
@@ -84,13 +82,12 @@ interface PixiTB303ViewProps {
 
 export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, width, height }) => {
   const theme = usePixiTheme();
-  const themeColors = useThemeStore(s => s.getCurrentTheme().colors);
 
   const { patterns, currentPatternIndex, setCell } = useTrackerStore(
     useShallow((s) => ({ patterns: s.patterns, currentPatternIndex: s.currentPatternIndex, setCell: s.setCell }))
   );
-  const { instruments, updateInstrument, addInstrument } = useInstrumentStore(
-    useShallow((s) => ({ instruments: s.instruments, updateInstrument: s.updateInstrument, addInstrument: s.addInstrument }))
+  const { instruments, updateInstrument } = useInstrumentStore(
+    useShallow((s) => ({ instruments: s.instruments, updateInstrument: s.updateInstrument }))
   );
   const isPlaying = useTransportStore((s) => s.isPlaying);
   const currentRow = useTransportStore((s) => s.currentRow);
@@ -107,30 +104,17 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
     [instruments]
   );
 
+  // Auto-assign existing TB303 instrument to channel if only one exists
   useEffect(() => {
     if (!instrument || (instrument.synthType !== 'TB303' && instrument.synthType !== 'Buzz3o3')) {
-      if (tb303Instruments.length === 0) {
-        const existingIds = useInstrumentStore.getState().instruments.map(i => i.id);
-        let nextId = 1;
-        for (let id = 1; id <= 128; id++) { if (!existingIds.includes(id)) { nextId = id; break; } }
-        const newInst: InstrumentConfig = {
-          id: nextId, name: 'TB-303', type: 'synth', synthType: 'TB303',
-          volume: 0.7, pan: 0, monophonic: true, effects: [],
-          tb303: { ...DEFAULT_TB303 },
-        };
-        addInstrument(newInst);
-        useTrackerStore.setState((state) => {
-          const pat = state.patterns[state.currentPatternIndex];
-          if (pat?.channels[channelIndex]) pat.channels[channelIndex].instrumentId = newInst.id;
-        });
-      } else if (tb303Instruments.length === 1) {
+      if (tb303Instruments.length === 1) {
         useTrackerStore.setState((state) => {
           const pat = state.patterns[state.currentPatternIndex];
           if (pat?.channels[channelIndex]) pat.channels[channelIndex].instrumentId = tb303Instruments[0].id;
         });
       }
     }
-  }, [instrument, tb303Instruments, channelIndex, addInstrument]);
+  }, [instrument, tb303Instruments, channelIndex]);
 
   instrument = instruments.find((inst) => inst.id === (channel?.instrumentId ?? 0));
 

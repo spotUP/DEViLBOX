@@ -14,6 +14,15 @@ const ACTIVE_FPS = 60;
 const IDLE_FPS = 10;
 const IDLE_TIMEOUT_MS = 2000;
 
+/** Optional callback to check if audio is playing — set via setIsPlayingFn() */
+let _isPlayingFn: (() => boolean) | null = null;
+
+/** Register a callback that reports whether audio playback is active.
+ *  Called from PixiAppContent after stores are available. */
+export function setIsPlayingFn(fn: () => boolean): void {
+  _isPlayingFn = fn;
+}
+
 /**
  * Attach an FPS limiter to a PixiJS app.
  * Drops to IDLE_FPS after IDLE_TIMEOUT_MS of no user interaction.
@@ -34,6 +43,13 @@ export function attachFPSLimiter(app: Application): () => void {
   };
 
   const checkIdle = () => {
+    // Treat audio playback as activity — prevents Pixi ticker dropping to
+    // idle FPS while the pattern editor is scrolling and VU meters animate.
+    if (_isPlayingFn && _isPlayingFn()) {
+      markActive();
+      return;
+    }
+
     if (!isIdle && performance.now() - lastActivityMs > IDLE_TIMEOUT_MS) {
       isIdle = true;
       app.ticker.maxFPS = IDLE_FPS;

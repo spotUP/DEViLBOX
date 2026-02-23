@@ -11,7 +11,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 
 interface PixiDeckWaveformProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
   width: number;
   height: number;
 }
@@ -23,8 +23,8 @@ export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, widt
   const duration = useDJStore(s => s.decks[deckId].durationMs);
 
   const themeId = usePixiThemeId();
-  const { deckA, deckB } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
-  const DECK_COLOR = deckId === 'A' ? deckA : deckB;
+  const { deckA, deckB, deckC } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
+  const DECK_COLOR = deckId === 'A' ? deckA : deckId === 'B' ? deckB : deckC;
 
   const handleSeek = useCallback((e: FederatedPointerEvent) => {
     if (!peaks || peaks.length === 0 || duration <= 0) return;

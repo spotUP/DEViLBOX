@@ -31,6 +31,7 @@ type DJBrowserPanel = 'none' | 'playlists' | 'modland' | 'serato';
 export const PixiDJView: React.FC = () => {
   const engineRef = useRef<DJEngine | null>(null);
   const setDJModeActive = useDJStore(s => s.setDJModeActive);
+  const thirdDeckActive = useDJStore(s => s.thirdDeckActive);
 
   // DJ keyboard shortcuts
   useDJKeyboardHandler(true);
@@ -83,7 +84,7 @@ export const PixiDJView: React.FC = () => {
         </PixiDOMOverlay>
       )}
 
-      {/* Main deck area: Deck A | Mixer | Deck B */}
+      {/* Main deck area: Deck A | Mixer | Deck B [| Deck C] */}
       <pixiContainer
         layout={{
           flex: 1,
@@ -94,6 +95,7 @@ export const PixiDJView: React.FC = () => {
         <PixiDJDeck deckId="A" />
         <PixiDJMixer />
         <PixiDJDeck deckId="B" />
+        {thirdDeckActive && <PixiDJDeck deckId="C" />}
       </pixiContainer>
     </pixiContainer>
   );

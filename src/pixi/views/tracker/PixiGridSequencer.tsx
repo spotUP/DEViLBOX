@@ -19,7 +19,7 @@ import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton, PixiNumericInput, PixiLabel } from '../../components';
 import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
-import { useGridPattern, type GridStep } from '@/hooks/useGridPattern';
+import { useGridPattern } from '@/hooks/useGridPattern';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
@@ -77,7 +77,7 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
 
   // Scale mode state
   const [scaleKey, setScaleKey] = useState<string>('chromatic');
-  const [rootNote, setRootNote] = useState<number>(0);
+  const [rootNote] = useState<number>(0);
 
   // Focus state for keyboard navigation
   const [focusedCell, setFocusedCell] = useState<{ noteIndex: number; stepIndex: number } | null>({ noteIndex: 11, stepIndex: 0 });

@@ -13,37 +13,46 @@ import { loadYoga } from 'yoga-layout/load';
 import { loadPixiFonts } from './fonts';
 import { usePixiTheme } from './theme';
 import { PixiRoot } from './PixiRoot';
-import { attachFPSLimiter } from './performance';
-import { useProjectPersistence } from '@/hooks/useProjectPersistence';
-import { useGlobalKeyboardHandler } from '@/hooks/useGlobalKeyboardHandler';
+import { attachFPSLimiter, setIsPlayingFn } from './performance';
+import { useTransportStore } from '@stores';
 
 // Register PixiJS classes for use in @pixi/react JSX
 extend({ Container, Graphics, BitmapText, Sprite, Text });
+
+/**
+ * Shared promise for Yoga WASM + font initialization.
+ * Ensures React Strict Mode double-invocation waits for the same operation
+ * instead of loading Yoga twice (which would mix WASM Node instances and
+ * cause "Expected null or instance of Node" BindingErrors).
+ */
+let initPromise: Promise<void> | null = null;
+
+function initPixiLayout(): Promise<void> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      const yoga = await loadYoga();
+      setYoga(yoga);
+      setYogaConfig(yoga.Config.create());
+      await loadPixiFonts();
+    })();
+  }
+  return initPromise;
+}
 
 export const PixiApp: React.FC = () => {
   const [ready, setReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-save project to localStorage every 30s
-  useProjectPersistence();
-
-  // Global tracker keyboard shortcuts (cursor, transpose, octave, etc.)
-  useGlobalKeyboardHandler();
+  // NOTE: useProjectPersistence() and useGlobalKeyboardHandler() are called
+  // in the parent App.tsx. Do NOT duplicate them here — it causes double
+  // keyboard event handlers (every keypress fires twice) and double auto-saves.
 
   // Pre-initialize Yoga WASM and load fonts before rendering any layout nodes
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      // Initialize Yoga WASM — must complete before any @pixi/layout node is created
-      const yoga = await loadYoga();
-      setYoga(yoga);
-      setYogaConfig(yoga.Config.create());
-
-      // Load MSDF bitmap fonts
-      await loadPixiFonts();
-
+    initPixiLayout().then(() => {
       if (!cancelled) setReady(true);
-    })();
+    });
     return () => { cancelled = true; };
   }, []);
 
@@ -96,9 +105,10 @@ const PixiAppContent: React.FC = () => {
     }
   }, [app, theme.bg.color]);
 
-  // Attach FPS limiter — drops to 10fps when idle
+  // Attach FPS limiter — drops to 10fps when idle, stays at 60 during playback
   useEffect(() => {
     if (!app) return;
+    setIsPlayingFn(() => useTransportStore.getState().isPlaying);
     return attachFPSLimiter(app);
   }, [app]);
 

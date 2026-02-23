@@ -109,10 +109,10 @@ export function usePixiThemeId(): string {
 }
 
 /** Deck accent colors — cyan-lineart collapses both to cyan shades */
-export function getDeckColors(themeId: string, accent: PixiColor, accentSecondary: PixiColor): { deckA: number; deckB: number } {
+export function getDeckColors(themeId: string, accent: PixiColor, accentSecondary: PixiColor): { deckA: number; deckB: number; deckC: number } {
   if (themeId === 'cyan-lineart') {
-    return { deckA: accent.color, deckB: accentSecondary.color };
+    return { deckA: accent.color, deckB: accentSecondary.color, deckC: 0x34d399 };
   }
-  // Standard deck colors (blue/red) for all other themes
-  return { deckA: 0x60a5fa, deckB: 0xf87171 };
+  // Standard deck colors (blue/red/green) for all other themes
+  return { deckA: 0x60a5fa, deckB: 0xf87171, deckC: 0x34d399 };
 }

@@ -387,7 +387,7 @@ const MixerCueSection: React.FC = () => {
   const pflB = useDJStore(s => s.decks.B.pflEnabled);
   const cueVolume = useDJStore(s => s.cueVolume);
 
-  const handlePFLToggle = useCallback((deck: 'A' | 'B') => {
+  const handlePFLToggle = useCallback((deck: 'A' | 'B' | 'C') => {
     const current = deck === 'A'
       ? useDJStore.getState().decks.A.pflEnabled
       : useDJStore.getState().decks.B.pflEnabled;

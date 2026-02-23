@@ -27,7 +27,7 @@ function formatTime(ms: number): string {
 }
 
 interface PixiDJDeckProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
@@ -85,8 +85,8 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
   }, [deckId]);
 
   const themeId = usePixiThemeId();
-  const { deckA, deckB } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
-  const DECK_COLOR = deckId === 'A' ? deckA : deckB;
+  const { deckA, deckB, deckC } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
+  const DECK_COLOR = deckId === 'A' ? deckA : deckId === 'B' ? deckB : deckC;
 
   return (
     <pixiContainer
