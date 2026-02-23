@@ -23,6 +23,26 @@ export interface CachedAudio {
   numberOfChannels: number;
   timestamp: number;      // Cache insertion time (for LRU)
   sizeBytes: number;      // Audio data size
+
+  // ── Analysis results (populated asynchronously after render) ──
+  beatGrid?: BeatGridData;         // Computed beat positions + downbeats
+  bpm?: number;                    // Detected BPM
+  bpmConfidence?: number;          // 0-1 confidence score
+  musicalKey?: string;             // e.g. "C minor", "A major"
+  keyConfidence?: number;          // 0-1
+  onsets?: number[];               // Onset positions in seconds
+  frequencyPeaks?: number[][];     // [low[], mid[], high[]] frequency-band peaks
+  rmsDb?: number;                  // RMS loudness in dB (for auto-gain)
+  peakDb?: number;                 // Peak level in dB
+  analysisVersion?: number;        // Bump to re-analyze when algorithm improves
+}
+
+/** Beat grid data — compatible with Serato beat markers */
+export interface BeatGridData {
+  beats: number[];         // Beat positions in seconds
+  downbeats: number[];     // Downbeat positions (bar starts) in seconds
+  bpm: number;             // Detected tempo
+  timeSignature: number;   // Beats per bar (usually 4)
 }
 
 interface CacheMetadata {
@@ -58,7 +78,7 @@ async function initDB(): Promise<IDBDatabase> {
 }
 
 /** Compute SHA-256 hash of file content */
-async function hashFile(buffer: ArrayBuffer): Promise<string> {
+export async function hashFile(buffer: ArrayBuffer): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -288,6 +308,52 @@ export async function getCacheStats(): Promise<{ sizeMB: number; entryCount: num
     sizeMB: metadata.totalSizeBytes / (1024 * 1024),
     entryCount: metadata.entryCount,
   };
+}
+
+/**
+ * Update analysis data on an existing cache entry without rewriting audio.
+ * This enables async analysis to be stored after the initial render/cache.
+ */
+export async function updateCacheAnalysis(
+  fileBuffer: ArrayBuffer,
+  analysis: {
+    beatGrid?: BeatGridData;
+    bpm?: number;
+    bpmConfidence?: number;
+    musicalKey?: string;
+    keyConfidence?: number;
+    onsets?: number[];
+    frequencyPeaks?: number[][];
+    analysisVersion?: number;
+  },
+): Promise<void> {
+  try {
+    const database = await initDB();
+    const hash = await hashFile(fileBuffer);
+
+    return new Promise((resolve, reject) => {
+      const tx = database.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const getReq = store.get(hash);
+
+      getReq.onsuccess = () => {
+        const entry = getReq.result as CachedAudio | undefined;
+        if (!entry) {
+          resolve(); // Entry not cached yet — skip
+          return;
+        }
+        // Merge analysis fields
+        Object.assign(entry, analysis);
+        entry.timestamp = Date.now();
+        const putReq = store.put(entry);
+        putReq.onsuccess = () => resolve();
+        putReq.onerror = () => reject(putReq.error);
+      };
+      getReq.onerror = () => reject(getReq.error);
+    });
+  } catch (err) {
+    console.error('[DJAudioCache] Failed to update analysis:', err);
+  }
 }
 
 /** Remove a specific entry from cache */
