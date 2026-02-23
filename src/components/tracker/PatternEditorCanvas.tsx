@@ -405,6 +405,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, [pattern, dimensions.height, scrollLeft, cursor.rowIndex, channelOffsets, channelWidths, numChannels]);
 
   const [isDragging, setIsDragging] = useState(false);
+  const isScratchDragRef = useRef(false);
   const [, setDragOverCell] = useState<{ channelIndex: number; rowIndex: number } | null>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -459,14 +460,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const cell = getCellFromCoords(e.clientX, e.clientY);
     if (!cell) return;
 
-    // Check if scratch should override block selection
+    // During playback with scratch enabled, left-click drag = grab scratch (hand on record)
+    const isPlaying = useTransportStore.getState().isPlaying;
     const uiState = useUIStore.getState();
     const isDJView = uiState.activeView === 'dj';
     const scratchToggleOn = uiState.scratchEnabled;
-    const shouldBlockSelection = isDJView || scratchToggleOn;
+    const shouldScratch = (isDJView || scratchToggleOn) && isPlaying;
 
-    // If scratch should be active, don't start block selection
-    if (shouldBlockSelection) {
+    if (shouldScratch && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+      isScratchDragRef.current = true;
+      const scratch = getTrackerScratchController();
+      scratch.onGrabStart(e.clientY, performance.now());
+      return;
+    }
+
+    // Non-playing scratch mode: block selection but don't grab
+    if ((isDJView || scratchToggleOn) && !isPlaying) {
       return;
     }
 
@@ -488,6 +497,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, [isMobile, getCellFromCoords]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    // Scratch drag — route to scratch controller
+    if (isScratchDragRef.current) {
+      getTrackerScratchController().onGrabMove(e.clientY, performance.now());
+      return;
+    }
+
     if (!isDragging || isMobile) return;
 
     const cell = getCellFromCoords(e.clientX, e.clientY);
@@ -498,6 +513,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, [isDragging, isMobile, getCellFromCoords]);
 
   const handleMouseUp = useCallback(() => {
+    // End scratch drag
+    if (isScratchDragRef.current) {
+      isScratchDragRef.current = false;
+      getTrackerScratchController().onGrabEnd(performance.now());
+      return;
+    }
     if (isDragging) {
       setIsDragging(false);
     }

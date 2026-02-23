@@ -1,11 +1,13 @@
 /**
  * Audio Export - Render pattern/song to WAV file
- * Uses Tone.js Offline rendering for accurate timing
+ * Uses Tone.js Offline rendering for accurate timing.
+ * UADE-backed formats are rendered through the real UADE engine for accurate playback.
  */
 
 import * as Tone from 'tone';
 import type { Pattern } from '@typedefs';
 import type { InstrumentConfig } from '@typedefs/instrument';
+import { UADEEngine } from '@/engine/uade/UADEEngine';
 
 /** Synth node that can play notes */
 interface PlayableSynth extends Tone.ToneAudioNode {
@@ -308,6 +310,80 @@ function concatenateAudioBuffers(
   }
 
   return combinedBuffer;
+}
+
+// ==========================================================================
+// UADE RENDER PATH — accurate offline render for UADE-backed modules
+// ==========================================================================
+
+/**
+ * Check whether the loaded instruments indicate a UADE-backed module.
+ * Returns the UADE instrument config if found, null otherwise.
+ */
+export function getUADEInstrument(instruments: InstrumentConfig[]): InstrumentConfig | null {
+  return instruments.find(i => i.synthType === 'UADESynth' && i.uade?.fileData) ?? null;
+}
+
+/**
+ * Render a UADE module to a WAV Blob via the real UADE engine.
+ * This produces sample-accurate playback with all effects intact.
+ *
+ * @param fileData - Original module file bytes (from instrument.uade.fileData)
+ * @param filename - Original filename (needed for UADE format detection)
+ * @param subsong - Subsong index (default: 0)
+ * @param onProgress - Progress callback
+ * @returns WAV Blob ready for download
+ */
+export async function renderUADEToWav(
+  fileData: ArrayBuffer,
+  filename: string,
+  subsong = 0,
+  onProgress?: (progress: number) => void,
+): Promise<Blob> {
+  onProgress?.(5);
+
+  const engine = UADEEngine.getInstance();
+  await engine.ready();
+
+  onProgress?.(10);
+
+  // Load the module into UADE
+  await engine.load(fileData.slice(0), filename);
+
+  onProgress?.(20);
+
+  // Render the full song to WAV (ArrayBuffer containing complete WAV file)
+  const wavBuffer = await engine.renderFull(subsong);
+
+  onProgress?.(90);
+
+  const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+
+  onProgress?.(100);
+  return blob;
+}
+
+/**
+ * Export a UADE module as WAV file (download).
+ */
+export async function exportUADEAsWav(
+  fileData: ArrayBuffer,
+  filename: string,
+  outputFilename: string,
+  subsong = 0,
+  onProgress?: (progress: number) => void,
+): Promise<void> {
+  const wavBlob = await renderUADEToWav(fileData, filename, subsong, onProgress);
+
+  // Download the file
+  const url = URL.createObjectURL(wavBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = outputFilename.endsWith('.wav') ? outputFilename : `${outputFilename}.wav`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /**
