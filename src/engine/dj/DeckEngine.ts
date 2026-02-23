@@ -48,6 +48,7 @@ export class DeckEngine {
   private deckGain: Tone.Gain;
   private eq3: Tone.EQ3;
   private filter: Tone.Filter;
+  private pitchShift: Tone.PitchShift;  // For key lock (compensates pitch when tempo changes)
   readonly channelGain: Tone.Gain;
 
   // Meter for VU display
@@ -102,22 +103,34 @@ export class DeckEngine {
   private filterPosition = 0;  // -1 (HPF) to 0 (off) to +1 (LPF)
   private filterResonance = 1; // Q value
 
+  // Key lock state
+  private keyLockEnabled = false;
+  private currentPitchSemitones = 0;
+
+  // Slip mode for audio playback + scratch
+  private _slipEnabled = false;
+  private slipGhostPosition = 0;       // Where the track "would be" if not scratching/looping
+  private slipGhostStartTime = 0;      // performance.now() when ghost started
+  private slipGhostRate = 1;           // playback rate for ghost advancement
+
   constructor(options: DeckEngineOptions) {
     this.id = options.id;
 
-    // Create the audio chain nodes (order: replayer → deckGain → EQ3 → filter → channelGain → output)
+    // Create the audio chain nodes (order: replayer → deckGain → EQ3 → filter → pitchShift → channelGain → output)
     this.deckGain = new Tone.Gain(1);
     this.eq3 = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
     this.filter = new Tone.Filter({ type: 'lowpass', frequency: 20000, Q: 1 });
+    this.pitchShift = new Tone.PitchShift({ pitch: 0, windowSize: 0.1, delayTime: 0 });
     this.channelGain = new Tone.Gain(1);
     this.meter = new Tone.Meter({ smoothing: 0.8 });
     this.waveformAnalyser = new Tone.Analyser('waveform', 256);
     this.fftAnalyser = new Tone.FFT(1024);
 
-    // Wire: deckGain → EQ3 → filter → channelGain → [output + meter + analyser]
+    // Wire: deckGain → EQ3 → filter → pitchShift → channelGain → [output + meter + analyser]
     this.deckGain.connect(this.eq3);
     this.eq3.connect(this.filter);
-    this.filter.connect(this.channelGain);
+    this.filter.connect(this.pitchShift);
+    this.pitchShift.connect(this.channelGain);
     this.channelGain.connect(options.outputNode);
     this.channelGain.connect(this.meter);
     this.channelGain.connect(this.waveformAnalyser);
@@ -312,6 +325,7 @@ export class DeckEngine {
   setPitch(semitones: number): void {
     const multiplier = Math.pow(2, semitones / 12);
     this.restMultiplier = multiplier;                // Always track — scratch/pattern restore target
+    this.currentPitchSemitones = semitones;
 
     if (this._playbackMode === 'audio') {
       this.audioPlayer.setPlaybackRate(multiplier);
@@ -321,11 +335,34 @@ export class DeckEngine {
       this.replayer.setPitchMultiplier(multiplier);    // Changes sample playback rates
       this.replayer.setDetuneCents(semitones * 100);   // Changes synth pitch
     }
+
+    // Key lock: compensate pitch shift to maintain original key
+    if (this.keyLockEnabled && Math.abs(semitones) > 0.01) {
+      this.pitchShift.pitch = -semitones;
+    } else if (!this.keyLockEnabled) {
+      this.pitchShift.pitch = 0;
+    }
   }
 
   /** Temporary BPM bump for beat matching */
   nudge(offset: number, ticks: number = 8): void {
     this.replayer.setNudge(offset, ticks);
+  }
+
+  /** Enable/disable key lock (master tempo). When on, pitch changes only affect tempo. */
+  setKeyLock(enabled: boolean): void {
+    this.keyLockEnabled = enabled;
+    if (enabled && Math.abs(this.currentPitchSemitones) > 0.01) {
+      // Apply compensating pitch shift
+      this.pitchShift.pitch = -this.currentPitchSemitones;
+    } else {
+      // Disable pitch compensation
+      this.pitchShift.pitch = 0;
+    }
+  }
+
+  getKeyLock(): boolean {
+    return this.keyLockEnabled;
   }
 
   // ==========================================================================
@@ -366,6 +403,13 @@ export class DeckEngine {
     }
     this.scratchDirection = 1; // Reset for fresh scratch session
     // restMultiplier always tracks the pitch slider — no extra save needed
+
+    // Slip mode: save position for snap-back when scratch ends
+    if (this._slipEnabled && this._playbackMode === 'audio') {
+      this.slipGhostPosition = this.audioPlayer.getPosition();
+      this.slipGhostStartTime = performance.now();
+      this.slipGhostRate = this.audioPlayer.getPlaybackRate();
+    }
   }
 
   /**
@@ -452,10 +496,15 @@ export class DeckEngine {
 
   /**
    * Exit scratch mode — smoothly decays pitch/tempo back to the pitch-slider value over decayMs.
+   * If slip mode is active, snaps back to the ghost position.
    */
   stopScratch(decayMs = 200): void {
     if (!this.isScratchActive) return;
     this.isScratchActive = false;
+
+    // Slip mode: snap back to ghost position
+    this.slipSnapBack();
+
     if (this.scratchDirection === -1) {
       // End backward scratch, then decay to rest
       void this._switchToForward(1).then(() => this._decayToRest(decayMs));
@@ -741,22 +790,17 @@ export class DeckEngine {
   setFilterPosition(position: number): void {
     this.filterPosition = Math.max(-1, Math.min(1, position));
 
-    if (Math.abs(this.filterPosition) < 0.05) {
-      // Center dead zone — bypass filter
-      this.filter.frequency.rampTo(20000, 0.05);
+    if (this.filterPosition >= 0) {
+      // 0 → +1: LPF sweep from 20kHz (fully open / bypass) down to 100Hz
       this.filter.type = 'lowpass';
-      return;
-    }
-
-    if (this.filterPosition > 0) {
-      // Positive = LPF sweep (20kHz → 100Hz)
-      this.filter.type = 'lowpass';
+      // At 0: freq = 20000 (bypass). At 1: freq = 100.
       const freq = 20000 * Math.pow(100 / 20000, this.filterPosition);
       this.filter.frequency.rampTo(freq, 0.05);
     } else {
-      // Negative = HPF sweep (20Hz → 10kHz)
+      // -1 → 0: HPF sweep from 10kHz down to 20Hz (bypass)
       this.filter.type = 'highpass';
-      const amount = -this.filterPosition;
+      const amount = -this.filterPosition; // 0..1
+      // At 0 (amount=0): freq = 20 (bypass). At -1 (amount=1): freq = 10kHz.
       const freq = 20 * Math.pow(10000 / 20, amount);
       this.filter.frequency.rampTo(freq, 0.05);
     }
@@ -768,8 +812,14 @@ export class DeckEngine {
   }
 
   // ==========================================================================
-  // VOLUME (channel fader)
+  // VOLUME (channel fader) + TRIM (auto-gain)
   // ==========================================================================
+
+  /** Set the trim/auto-gain level in dB (applied to deckGain node) */
+  setTrimGain(dB: number): void {
+    const linear = Math.pow(10, dB / 20);
+    this.deckGain.gain.rampTo(Math.max(0, Math.min(4, linear)), 0.05);
+  }
 
   setVolume(value: number): void {
     this.channelGain.gain.rampTo(Math.max(0, Math.min(1.5, value)), 0.02);
@@ -815,8 +865,58 @@ export class DeckEngine {
     this.replayer.clearPatternLoop();
   }
 
+  // ==========================================================================
+  // AUDIO LOOP (time-based, for audio playback mode)
+  // ==========================================================================
+
+  /** Set the audio loop in/out region (seconds). Both must be set for loop to activate. */
+  setAudioLoop(loopIn: number | null, loopOut: number | null): void {
+    this.audioPlayer.setLoopRegion(loopIn, loopOut);
+  }
+
+  /** Clear the audio loop region */
+  clearAudioLoop(): void {
+    this.audioPlayer.setLoopRegion(null, null);
+  }
+
   setSlipEnabled(enabled: boolean): void {
-    this.replayer.setSlipEnabled(enabled);
+    this._slipEnabled = enabled;
+    if (this._playbackMode === 'audio') {
+      if (enabled) {
+        // Save current audio position as ghost start
+        this.slipGhostPosition = this.audioPlayer.getPosition();
+        this.slipGhostStartTime = performance.now();
+        this.slipGhostRate = this.audioPlayer.getPlaybackRate();
+      }
+    } else {
+      this.replayer.setSlipEnabled(enabled);
+    }
+  }
+
+  /** Get the ghost position for slip mode (where the track "would be") */
+  getSlipGhostPosition(): number {
+    if (!this._slipEnabled) return -1;
+    if (this._playbackMode === 'audio') {
+      const elapsed = (performance.now() - this.slipGhostStartTime) / 1000;
+      return this.slipGhostPosition + elapsed * this.slipGhostRate;
+    }
+    const slip = this.replayer.getSlipState();
+    return slip.enabled ? slip.songPos : -1;
+  }
+
+  /** Snap back to slip ghost position (called when scratch/loop ends) */
+  private slipSnapBack(): void {
+    if (!this._slipEnabled) return;
+    if (this._playbackMode === 'audio') {
+      const ghostPos = this.getSlipGhostPosition();
+      if (ghostPos >= 0) {
+        this.audioPlayer.seek(ghostPos);
+        // Reset ghost tracking
+        this.slipGhostPosition = ghostPos;
+        this.slipGhostStartTime = performance.now();
+      }
+    }
+    // Tracker mode slip snap-back is handled by TrackerReplayer internally
   }
 
   // ==========================================================================
@@ -873,6 +973,7 @@ export class DeckEngine {
     this.meter.dispose();
     this.channelGain.dispose();
     this.filter.dispose();
+    this.pitchShift.dispose();
     this.eq3.dispose();
     this.deckGain.dispose();
   }

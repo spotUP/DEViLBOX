@@ -9,6 +9,14 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { SeratoCuePoint, SeratoLoop, SeratoBeatMarker } from '@/lib/serato/seratoMetadata';
+import type { BeatGridData } from '@/engine/dj/DJAudioCache';
+
+// Native hot cue (compatible shape with Serato, but user-created)
+export interface HotCue {
+  position: number;    // ms from start
+  color: string;       // hex color
+  name: string;        // user label
+}
 
 // ============================================================================
 // TYPES
@@ -31,6 +39,7 @@ export interface DeckState {
   pitchOffset: number;         // -16 to +16 semitones
   effectiveBPM: number;
   repitchLock: boolean;
+  keyLockEnabled: boolean;    // Key lock (master tempo) — pitch slider changes tempo only
 
   // EQ
   eqLow: number;              // dB (-24 to +6)
@@ -46,10 +55,17 @@ export interface DeckState {
 
   // Volume
   volume: number;              // 0 to 1 (channel fader)
+  trimGain: number;            // Auto-gain trim in dB (-12 to +12)
+  autoGainEnabled: boolean;    // Whether auto-gain is active
+  rmsDb: number;               // Analyzed RMS loudness
+  peakDb: number;              // Analyzed peak level
 
   // Cue
   cuePoint: number;            // Song position for cue point
   pflEnabled: boolean;
+
+  // Hot cues (native — 8 slots, compatible with Serato format)
+  hotCues: (HotCue | null)[];
 
   // Loop
   loopActive: boolean;
@@ -57,6 +73,10 @@ export interface DeckState {
   patternLoopStart: number;
   patternLoopEnd: number;
   loopMode: 'line' | 'pattern' | 'off';
+
+  // Audio-mode loop (time-based, in seconds)
+  audioLoopIn: number | null;
+  audioLoopOut: number | null;
 
   // Slip
   slipEnabled: boolean;
@@ -85,6 +105,13 @@ export interface DeckState {
   seratoLoops: SeratoLoop[];
   seratoBeatGrid: SeratoBeatMarker[];
   seratoKey: string | null;
+
+  // Analysis state (populated by DJPipeline background analysis)
+  analysisState: 'none' | 'pending' | 'rendering' | 'analyzing' | 'ready';
+  beatGrid: BeatGridData | null;
+  musicalKey: string | null;
+  keyConfidence: number;
+  frequencyPeaks: Float32Array[] | null;  // [low, mid, high] band peaks
 }
 
 type DeckId = 'A' | 'B' | 'C';
@@ -108,6 +135,7 @@ const defaultDeckState: DeckState = {
   pitchOffset: 0,
   effectiveBPM: 125,
   repitchLock: false,
+  keyLockEnabled: false,
   eqLow: 0,
   eqMid: 0,
   eqHigh: 0,
@@ -117,13 +145,20 @@ const defaultDeckState: DeckState = {
   filterPosition: 0,
   filterResonance: 1,
   volume: 1,
+  trimGain: 0,
+  autoGainEnabled: true,
+  rmsDb: -100,
+  peakDb: -100,
   cuePoint: 0,
   pflEnabled: false,
+  hotCues: Array(8).fill(null) as (HotCue | null)[],
   loopActive: false,
   lineLoopSize: 4,
   patternLoopStart: 0,
   patternLoopEnd: 0,
   loopMode: 'off',
+  audioLoopIn: null,
+  audioLoopOut: null,
   slipEnabled: false,
   slipSongPos: 0,
   slipPattPos: 0,
@@ -148,6 +183,13 @@ const defaultDeckState: DeckState = {
   seratoLoops: [],
   seratoBeatGrid: [],
   seratoKey: null,
+
+  // Analysis
+  analysisState: 'none',
+  beatGrid: null,
+  musicalKey: null,
+  keyConfidence: 0,
+  frequencyPeaks: null,
 };
 
 // ============================================================================
@@ -172,6 +214,11 @@ interface DJState {
   cueMode: CueMode;
   cueDeviceId: string | null;
   cueVolume: number;
+
+  // Pipeline (background render + analysis)
+  pipelineActive: boolean;
+  pipelineQueue: number;           // Number of pending tasks
+  pipelineCurrentTask: string | null; // e.g. "Rendering mod.symphony..." or "Analyzing..."
 }
 
 interface DJActions {
@@ -192,11 +239,22 @@ interface DJActions {
   setDeckEQKill: (deck: DeckId, band: 'low' | 'mid' | 'high', kill: boolean) => void;
   setDeckFilter: (deck: DeckId, position: number) => void;
   setDeckVolume: (deck: DeckId, volume: number) => void;
+  setDeckTrimGain: (deck: DeckId, trimDb: number) => void;
+  setDeckAutoGain: (deck: DeckId, enabled: boolean) => void;
   setDeckCuePoint: (deck: DeckId, songPos: number) => void;
   setDeckPFL: (deck: DeckId, enabled: boolean) => void;
   setDeckLoop: (deck: DeckId, mode: 'line' | 'pattern' | 'off', active: boolean) => void;
   setDeckLoopSize: (deck: DeckId, size: 1 | 2 | 4 | 8 | 16 | 32) => void;
+
+  // Hot cues
+  setHotCue: (deck: DeckId, index: number, cue: HotCue | null) => void;
+  deleteHotCue: (deck: DeckId, index: number) => void;
+
+  // Audio loop
+  setAudioLoopIn: (deck: DeckId, timeSec: number | null) => void;
+  setAudioLoopOut: (deck: DeckId, timeSec: number | null) => void;
   setDeckSlip: (deck: DeckId, enabled: boolean) => void;
+  setDeckKeyLock: (deck: DeckId, enabled: boolean) => void;
   toggleDeckChannel: (deck: DeckId, channel: number) => void;
   setAllDeckChannels: (deck: DeckId, enabled: boolean) => void;
   resetDeck: (deck: DeckId) => void;
@@ -205,6 +263,9 @@ interface DJActions {
   setDeckScratchActive: (deck: DeckId, active: boolean) => void;
   setDeckFaderLFO: (deck: DeckId, active: boolean, division?: '1/4' | '1/8' | '1/16' | '1/32') => void;
   setDeckPattern: (deck: DeckId, name: string | null) => void;
+
+  // Pipeline
+  setPipelineState: (queue: number, currentTask: string | null) => void;
 
   // Headphone cueing
   setCueMode: (mode: CueMode) => void;
@@ -233,6 +294,11 @@ export const useDJStore = create<DJStore>()(
     cueMode: 'none' as CueMode,
     cueDeviceId: null,
     cueVolume: 1,
+
+    // Pipeline
+    pipelineActive: false,
+    pipelineQueue: 0,
+    pipelineCurrentTask: null as string | null,
 
     // ========================================================================
     // ACTIONS
@@ -316,6 +382,16 @@ export const useDJStore = create<DJStore>()(
         state.decks[deck].volume = Math.max(0, Math.min(1.5, volume));
       }),
 
+    setDeckTrimGain: (deck, trimDb) =>
+      set((state) => {
+        state.decks[deck].trimGain = Math.max(-12, Math.min(12, trimDb));
+      }),
+
+    setDeckAutoGain: (deck, enabled) =>
+      set((state) => {
+        state.decks[deck].autoGainEnabled = enabled;
+      }),
+
     setDeckCuePoint: (deck, songPos) =>
       set((state) => {
         state.decks[deck].cuePoint = songPos;
@@ -337,9 +413,38 @@ export const useDJStore = create<DJStore>()(
         state.decks[deck].lineLoopSize = size;
       }),
 
+    setHotCue: (deck, index, cue) =>
+      set((state) => {
+        if (index >= 0 && index < 8) {
+          state.decks[deck].hotCues[index] = cue;
+        }
+      }),
+
+    deleteHotCue: (deck, index) =>
+      set((state) => {
+        if (index >= 0 && index < 8) {
+          state.decks[deck].hotCues[index] = null;
+        }
+      }),
+
+    setAudioLoopIn: (deck, timeSec) =>
+      set((state) => {
+        state.decks[deck].audioLoopIn = timeSec;
+      }),
+
+    setAudioLoopOut: (deck, timeSec) =>
+      set((state) => {
+        state.decks[deck].audioLoopOut = timeSec;
+      }),
+
     setDeckSlip: (deck, enabled) =>
       set((state) => {
         state.decks[deck].slipEnabled = enabled;
+      }),
+
+    setDeckKeyLock: (deck, enabled) =>
+      set((state) => {
+        state.decks[deck].keyLockEnabled = enabled;
       }),
 
     toggleDeckChannel: (deck, channel) =>
@@ -390,6 +495,13 @@ export const useDJStore = create<DJStore>()(
     setCueVolume: (volume) =>
       set((state) => {
         state.cueVolume = Math.max(0, Math.min(1.5, volume));
+      }),
+
+    setPipelineState: (queue, currentTask) =>
+      set((state) => {
+        state.pipelineQueue = queue;
+        state.pipelineCurrentTask = currentTask;
+        state.pipelineActive = queue > 0 || currentTask !== null;
       }),
   })))
 );
