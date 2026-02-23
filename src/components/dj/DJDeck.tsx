@@ -12,6 +12,7 @@ import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { detectBPM } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { isAudioFile } from '@/lib/audioFileUtils';
+import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { DeckTransport } from './DeckTransport';
 import { DeckPitchSlider } from './DeckPitchSlider';
 import { DeckNudge } from './DeckNudge';
@@ -23,6 +24,7 @@ import { DeckVinylView } from './DeckVinylView';
 import { DeckLoopControls } from './DeckLoopControls';
 import { DeckScopes } from './DeckScopes';
 import { DeckScratch } from './DeckScratch';
+import { DeckFXPads } from './DeckFXPads';
 import { DeckCuePoints } from './DeckCuePoints';
 import { DeckBeatGrid } from './DeckBeatGrid';
 import { DeckAudioWaveform } from './DeckAudioWaveform';
@@ -273,6 +275,10 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
 
         await engine.loadToDeck(deckId, song);
 
+        // Compute note density peaks for overview waveform
+        const { computeTrackerPeaks } = await import('@/engine/dj/computeTrackerPeaks');
+        const trackerPeaks = computeTrackerPeaks(song, 800);
+
         useDJStore.getState().setDeckState(deckId, {
           fileName: file.name,
           trackName: song.name || file.name,
@@ -286,7 +292,13 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
           playbackMode: 'tracker',
           durationMs: 0,
           audioPosition: 0,
-          waveformPeaks: null,
+          waveformPeaks: trackerPeaks,
+        });
+
+        // Pipeline render + analysis in background (all tracker formats)
+        const buffer = await file.arrayBuffer();
+        void getDJPipeline().loadOrEnqueue(buffer, file.name, deckId, 'high').catch((err) => {
+          console.warn(`[DJDeck] Background pipeline for ${file.name}:`, err);
         });
       }
     } catch (err) {
@@ -384,6 +396,9 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         <DeckNudge deckId={deckId} />
         <DeckLoopControls deckId={deckId} />
       </div>
+
+      {/* Performance FX Pads */}
+      <DeckFXPads deckId={deckId} />
 
       {/* Scratch presets + Fader LFO */}
       <DeckScratch deckId={deckId} />

@@ -23,6 +23,7 @@ import { DJCachePanel } from './DJCachePanel';
 import { MasterEffectsModal } from '@/components/effects';
 import { DJFxQuickPresets } from './DJFxQuickPresets';
 import { DJControllerSelector } from './DJControllerSelector';
+import { DJSamplerPanel } from './DJSamplerPanel';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
 
@@ -46,6 +47,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
   const [showModland, setShowModland] = useState(false);
   const [showSerato, setShowSerato] = useState(false);
   const [showMasterFX, setShowMasterFX] = useState(false);
+  const [showSampler, setShowSampler] = useState(false);
 
   // Initialize DJEngine on mount, silence tracker + dispose on unmount
   useEffect(() => {
@@ -153,6 +155,10 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
         cacheSong(cacheKey, song);
         await engine.loadToDeck(deckId, song);
 
+        // Compute note density peaks for overview waveform
+        const { computeTrackerPeaks } = await import('@/engine/dj/computeTrackerPeaks');
+        const trackerPeaks = computeTrackerPeaks(song, 800);
+
         useDJStore.getState().setDeckState(deckId, {
           fileName: cacheKey,
           trackName: song.name || track.title || filename,
@@ -166,7 +172,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
           playbackMode: 'tracker',
           durationMs: 0,
           audioPosition: 0,
-          waveformPeaks: null,
+          waveformPeaks: trackerPeaks,
           seratoCuePoints: [],
           seratoLoops: [],
           seratoBeatGrid: [],
@@ -265,6 +271,17 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
             </button>
           )}
           <button
+            onClick={() => setShowSampler(!showSampler)}
+            className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
+              ${showSampler
+                ? 'border-amber-500 bg-amber-900/20 text-amber-400'
+                : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary'
+              }`}
+            title="Toggle inline sampler pads (routes through DJ mixer)"
+          >
+            Sampler
+          </button>
+          <button
             onClick={() => setShowFileBrowser(!showFileBrowser)}
             className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
               ${showFileBrowser
@@ -345,6 +362,15 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
           </div>
         );
       })()}
+
+      {/* ================================================================== */}
+      {/* INLINE SAMPLER (routes through DJ mixer)                          */}
+      {/* ================================================================== */}
+      {showSampler && (
+        <div className="shrink-0 px-2 pt-2">
+          <DJSamplerPanel onClose={() => setShowSampler(false)} />
+        </div>
+      )}
 
       {/* ================================================================== */}
       {/* MAIN LAYOUT: Deck A | Mixer | Deck B [| Deck C]                   */}

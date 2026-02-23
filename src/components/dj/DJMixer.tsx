@@ -15,6 +15,7 @@ import { MixerFilter } from '@/components/dj/MixerFilter';
 import { MixerVUMeter } from '@/components/dj/MixerVUMeter';
 import { MixerChannelStrip } from '@/components/dj/MixerChannelStrip';
 import { MixerCrossfader } from '@/components/dj/MixerCrossfader';
+import { MixerTransition } from '@/components/dj/MixerTransition';
 import { MixerMaster } from '@/components/dj/MixerMaster';
 import { MixerCueSection } from '@/components/dj/MixerCueSection';
 
@@ -66,6 +67,11 @@ export const DJMixer: React.FC = () => {
       {/* Row 3: Crossfader (A↔B only; Deck C is thru) */}
       <div className="w-full border-b border-dark-border pb-2">
         <MixerCrossfader />
+      </div>
+
+      {/* Row 3.5: Transition controls */}
+      <div className="w-full border-b border-dark-border pb-2">
+        <MixerTransition />
       </div>
 
       {/* Row 4: Master + Cue */}

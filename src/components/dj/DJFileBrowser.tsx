@@ -14,6 +14,7 @@ import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { loadUADEToDeck, isUADECached } from '@/engine/dj/DJUADEPrerender';
+import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
@@ -23,9 +24,9 @@ interface LoadedFile {
   bpm: number;
   duration: number; // seconds
   format: string;
-  rawBuffer?: ArrayBuffer; // For UADE modules (pre-render)
+  rawBuffer?: ArrayBuffer; // Raw file buffer for pipeline rendering
   isUADE?: boolean;
-  isCached?: boolean; // Whether UADE module is pre-rendered in cache
+  isCached?: boolean; // Whether module is pre-rendered in cache
 }
 
 interface DJFileBrowserProps {
@@ -60,8 +61,8 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
         // Cache the parsed song for playlist deck-loading
         cacheSong(file.name, song);
 
-        // Check if UADE module is already pre-rendered
-        const cached = isUADE ? await isUADECached(buffer) : false;
+        // Check if module is already pre-rendered in cache
+        const cached = await isUADECached(buffer);
 
         newFiles.push({
           name: file.name,
@@ -69,7 +70,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
           bpm: bpmResult.bpm,
           duration,
           format: file.name.split('.').pop()?.toUpperCase() ?? 'MOD',
-          rawBuffer: isUADE ? buffer : undefined,
+          rawBuffer: buffer, // Store buffer for all formats (pipeline rendering)
           isUADE,
           isCached: cached,
         });
@@ -94,14 +95,21 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
     const store = useDJStore.getState();
 
     try {
-      // Use pre-render system for UADE modules
       if (file.isUADE && file.rawBuffer) {
+        // UADE path — loadUADEToDeck handles cache + pipeline
         const result = await loadUADEToDeck(engine, deckId, file.rawBuffer, file.name, true);
         setFiles(prev => prev.map(f =>
           f.name === file.name ? { ...f, isCached: result.cached } : f
         ));
+      } else if (file.rawBuffer) {
+        // Non-UADE tracker (XM/IT/S3M/etc.) — load immediately as tracker,
+        // then pipeline render + analysis in background
+        await engine.loadToDeck(deckId, file.song);
+        void getDJPipeline().loadOrEnqueue(file.rawBuffer, file.name, deckId, 'high').catch((err) => {
+          console.warn(`[DJFileBrowser] Background pipeline for ${file.name}:`, err);
+        });
       } else {
-        // Standard tracker loading
+        // Fallback: standard tracker loading (no pipeline)
         await engine.loadToDeck(deckId, file.song);
       }
 
