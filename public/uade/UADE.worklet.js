@@ -85,6 +85,10 @@ class UADEProcessor extends AudioWorkletProcessor {
         this._ready = false;
         this._playing = false;
         break;
+
+      case 'renderFull':
+        this._renderFullSong(data.subsong);
+        break;
     }
   }
 
@@ -866,6 +870,134 @@ class UADEProcessor extends AudioWorkletProcessor {
     }
 
     return result;
+  }
+
+  /**
+   * Render the entire song to a WAV audio buffer.
+   * Used for pre-rendering UADE modules for DJ playback.
+   */
+  _renderFullSong(subsong) {
+    if (!this._wasm || !this._ready) {
+      this.port.postMessage({ type: 'renderError', message: 'WASM not ready' });
+      return;
+    }
+
+    try {
+      // Switch to specified subsong if provided
+      if (subsong !== undefined && subsong !== null) {
+        this._wasm._uade_wasm_set_subsong(subsong);
+      }
+
+      const sampleRate = this._wasm.HEAPU32[0] || 44100; // Read from WASM if available
+      const CHUNK = 4096;
+      const MAX_SECONDS = 600; // 10 minute safety limit
+      const maxFrames = sampleRate * MAX_SECONDS;
+
+      // Allocate temp render buffers
+      const tmpL = this._wasm._malloc(CHUNK * 4);
+      const tmpR = this._wasm._malloc(CHUNK * 4);
+
+      // Collect rendered audio
+      const audioChunks = [];
+      let totalFrames = 0;
+
+      // Disable looping for full render
+      this._wasm._uade_wasm_set_looping(0);
+
+      // Render loop
+      while (totalFrames < maxFrames) {
+        const ret = this._wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
+        if (ret <= 0) break; // Song ended
+
+        // Copy audio to JS arrays
+        const leftData = new Float32Array(ret);
+        const rightData = new Float32Array(ret);
+        const heapL = new Float32Array(this._wasm.HEAPF32.buffer, tmpL, ret);
+        const heapR = new Float32Array(this._wasm.HEAPF32.buffer, tmpR, ret);
+        leftData.set(heapL);
+        rightData.set(heapR);
+
+        audioChunks.push({ left: leftData, right: rightData });
+        totalFrames += ret;
+      }
+
+      this._wasm._free(tmpL);
+      this._wasm._free(tmpR);
+
+      if (totalFrames === 0) {
+        this.port.postMessage({ type: 'renderError', message: 'No audio rendered' });
+        return;
+      }
+
+      // Concatenate all chunks into single buffers
+      const leftChannel = new Float32Array(totalFrames);
+      const rightChannel = new Float32Array(totalFrames);
+      let offset = 0;
+      for (const chunk of audioChunks) {
+        leftChannel.set(chunk.left, offset);
+        rightChannel.set(chunk.right, offset);
+        offset += chunk.left.length;
+      }
+
+      // Encode to WAV
+      const wavBuffer = this._encodeWAV(leftChannel, rightChannel, sampleRate);
+
+      // Send back to main thread
+      this.port.postMessage(
+        { type: 'renderComplete', audioBuffer: wavBuffer },
+        [wavBuffer] // Transfer ownership
+      );
+
+    } catch (err) {
+      let errMsg = err instanceof Error ? err.message : String(err);
+      console.error('[UADE.worklet] Render error:', errMsg);
+      this.port.postMessage({ type: 'renderError', message: errMsg });
+    }
+  }
+
+  /**
+   * Encode stereo float32 PCM to WAV format (16-bit PCM).
+   */
+  _encodeWAV(leftChannel, rightChannel, sampleRate) {
+    const numChannels = 2;
+    const numFrames = leftChannel.length;
+    const bytesPerSample = 2; // 16-bit
+    const dataSize = numFrames * numChannels * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+
+    // WAV header
+    let offset = 0;
+
+    // "RIFF" chunk descriptor
+    view.setUint32(offset, 0x52494646, false); offset += 4; // "RIFF"
+    view.setUint32(offset, 36 + dataSize, true); offset += 4; // File size - 8
+    view.setUint32(offset, 0x57415645, false); offset += 4; // "WAVE"
+
+    // "fmt " sub-chunk
+    view.setUint32(offset, 0x666d7420, false); offset += 4; // "fmt "
+    view.setUint32(offset, 16, true); offset += 4; // Sub-chunk size (16 for PCM)
+    view.setUint16(offset, 1, true); offset += 2; // Audio format (1 = PCM)
+    view.setUint16(offset, numChannels, true); offset += 2; // Num channels
+    view.setUint32(offset, sampleRate, true); offset += 4; // Sample rate
+    view.setUint32(offset, sampleRate * numChannels * bytesPerSample, true); offset += 4; // Byte rate
+    view.setUint16(offset, numChannels * bytesPerSample, true); offset += 2; // Block align
+    view.setUint16(offset, bytesPerSample * 8, true); offset += 2; // Bits per sample
+
+    // "data" sub-chunk
+    view.setUint32(offset, 0x64617461, false); offset += 4; // "data"
+    view.setUint32(offset, dataSize, true); offset += 4; // Data size
+
+    // Audio data (interleaved 16-bit PCM)
+    for (let i = 0; i < numFrames; i++) {
+      // Clamp and convert to 16-bit signed integer
+      const left = Math.max(-1, Math.min(1, leftChannel[i]));
+      const right = Math.max(-1, Math.min(1, rightChannel[i]));
+      view.setInt16(offset, left * 0x7FFF, true); offset += 2;
+      view.setInt16(offset, right * 0x7FFF, true); offset += 2;
+    }
+
+    return buffer;
   }
 
   process(_inputs, outputs) {

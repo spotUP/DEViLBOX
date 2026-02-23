@@ -20,6 +20,7 @@ import { FurnaceMacroType } from '@/types/instrument';
 import { PatternAccessor } from './PatternAccessor';
 import { getToneEngine } from './ToneEngine';
 import { StereoSeparationNode } from './StereoSeparationNode';
+import { getNativeAudioNode } from '@utils/audio-context';
 import { getPatternScheduler } from './PatternScheduler';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/audio';
@@ -471,10 +472,6 @@ export class TrackerReplayer {
   // Instrument lookup map (keyed by instrument ID) — avoids linear scan per note
   private instrumentMap: Map<number, InstrumentConfig> = new Map();
 
-  // Per-channel meter staging + reusable callbacks (avoids closure allocation per note)
-  private meterStaging: Float64Array = new Float64Array(64);
-  private meterCallbacks: (() => void)[] | null = null;
-
   // Callbacks
   public onRowChange: ((row: number, pattern: number, position: number) => void) | null = null;
   public onSongEnd: (() => void) | null = null;
@@ -510,11 +507,18 @@ export class TrackerReplayer {
   // Kept separate from ToneEngine's global mute states so each deck is independent.
   private channelMuteMask = 0xFFFF;   // All 16 channels enabled by default
 
+  // Pre-allocated VU meter trigger callbacks (avoid closure allocation per note)
+  private meterCallbacks: (() => void)[] | null = null;
+  private meterStaging = new Float64Array(64);
+
   // Stereo separation (0-100): controls how wide the stereo image is.
   // 100 = full Amiga hard-pan (LRRL), 0 = mono, 20 = pt2-clone default for MOD.
   // Based on per-channel pan narrowing: actual_pan = basePan * (separation / 100)
   // Reference: pt2-clone (8bitbubsy), MilkyTracker, Schism Tracker
   private stereoSeparation = 100;
+
+  // Track native engines (UADE/Hively) rerouted to separation chain (for cleanup on song change)
+  private routedNativeEngines: Set<string> = new Set();
 
   /**
    * Optional callback set by DeckEngine to handle DJ scratch effect commands (Xnn).
@@ -546,6 +550,12 @@ export class TrackerReplayer {
   /** Get the master gain node for external routing (DJ mixer, etc.) */
   getMasterGain(): Tone.Gain {
     return this.masterGain;
+  }
+
+  /** Get the stereo separation node's input for routing external native audio sources.
+   *  UADE/Hively outputs connect here so stereo separation applies to their pre-mixed output. */
+  getSeparationInput(): Tone.Gain {
+    return this.separationNode.inputTone;
   }
 
   /** Get current song position */
@@ -803,6 +813,16 @@ export class TrackerReplayer {
 
   loadSong(song: TrackerSong): void {
     this.stop();
+
+    // Restore any native engines rerouted to separation chain (UADE/Hively)
+    if (this.routedNativeEngines.size > 0) {
+      const engine = getToneEngine();
+      for (const key of this.routedNativeEngines) {
+        engine.restoreNativeEngineRouting(key);
+      }
+      this.routedNativeEngines.clear();
+    }
+
     this.song = song;
 
     // Configure format-dispatching pattern accessor
@@ -1067,6 +1087,22 @@ export class TrackerReplayer {
     // Ensure WASM synths (Open303, etc.) are initialized before starting playback.
     const engine = getToneEngine();
     await engine.ensureWASMSynthsReady(this.song.instruments);
+
+    // Route UADE/Hively native engine output through the stereo separation chain
+    // so the Amiga stereo mix (hard-pan LRRL) gets narrowed by stereoSeparation.
+    // In DJ mode, DeckEngine.loadSong() handles this; only do it for tracker view.
+    if (!this.isDJDeck) {
+      for (const inst of this.song.instruments) {
+        const st = inst.synthType;
+        if ((st === 'UADESynth' || st === 'HivelySynth') && !this.routedNativeEngines.has(st)) {
+          const nativeInput = getNativeAudioNode(this.separationNode.inputTone as any);
+          if (nativeInput) {
+            engine.rerouteNativeEngine(st, nativeInput);
+            this.routedNativeEngines.add(st);
+          }
+        }
+      }
+    }
 
     this.playing = true;
     const transportState = useTransportStore.getState();
@@ -3512,10 +3548,13 @@ export class TrackerReplayer {
     }
 
     // Schedule VU meter trigger at exact audio playback time for tight sync.
-    // Uses pre-allocated per-channel callbacks to avoid closure allocation per note.
+    // Uses Tone.Draw.schedule to defer the visual trigger to the nearest
+    // animation frame matching the audio time. Pre-allocated per-channel
+    // callbacks avoid closure allocation per note.
     if (channelIndex !== undefined) {
       if (!this.meterCallbacks) {
         this.meterCallbacks = [];
+        this.meterStaging = new Float64Array(64);
         for (let i = 0; i < 64; i++) {
           const ch = i;
           this.meterCallbacks[i] = () => {
@@ -3659,14 +3698,19 @@ export class TrackerReplayer {
 
     // FT2/PT2 loop validation: if loop points exceed sample length, disable loop entirely
     // (reference implementations never clamp — they reset to no-loop)
+    //
+    // CRITICAL: Loop points are in ORIGINAL sample rate units, but decodedBuffer has been
+    // resampled to AudioContext rate (44100 Hz). We must convert back to get original length.
+    const originalSampleLength = Math.round(duration * originalSampleRate);
     const loopStartSmp = sample?.loopStart ?? 0;
     const loopEndSmp = sample?.loopEnd ?? 0;
-    const hasLoop = sample?.loop && loopEndSmp > loopStartSmp && loopEndSmp <= (decodedBuffer.length + 1);
+    const hasLoop = sample?.loop && loopEndSmp > loopStartSmp && loopEndSmp <= originalSampleLength;
     if (hasLoop) {
       const lsTime = loopStartSmp / originalSampleRate;
       const leTime = loopEndSmp / originalSampleRate;
       // Validate converted times against buffer duration
-      if (lsTime >= 0 && lsTime < duration && leTime > lsTime && leTime <= duration + 0.001) {
+      const timeValid = lsTime >= 0 && lsTime < duration && leTime > lsTime && leTime <= duration + 0.001;
+      if (timeValid) {
         player.loop = true;
         player.loopStart = Math.max(0, Math.min(lsTime, duration));
         player.loopEnd = Math.min(leTime, duration);
@@ -4205,6 +4249,16 @@ export class TrackerReplayer {
 
   dispose(): void {
     this.stop();
+
+    // Restore any native engines rerouted to separation chain
+    if (this.routedNativeEngines.size > 0) {
+      const engine = getToneEngine();
+      for (const key of this.routedNativeEngines) {
+        engine.restoreNativeEngineRouting(key);
+      }
+      this.routedNativeEngines.clear();
+    }
+
     for (const ch of this.channels) {
       // Dispose all pooled players
       for (const player of ch.playerPool) {

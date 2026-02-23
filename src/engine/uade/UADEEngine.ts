@@ -87,6 +87,9 @@ export class UADEEngine {
   private _loadPromise: Promise<UADEMetadata> | null = null;
   private _resolveLoad: ((meta: UADEMetadata) => void) | null = null;
   private _rejectLoad: ((err: Error) => void) | null = null;
+  private _renderPromise: Promise<ArrayBuffer> | null = null;
+  private _resolveRender: ((buffer: ArrayBuffer) => void) | null = null;
+  private _rejectRender: ((err: Error) => void) | null = null;
   private _positionCallbacks: Set<PositionCallback> = new Set();
   private _channelCallbacks: Set<ChannelCallback> = new Set();
   private _songEndCallbacks: Set<() => void> = new Set();
@@ -243,6 +246,22 @@ export class UADEEngine {
             cb();
           }
           break;
+
+        case 'renderComplete':
+          if (this._resolveRender) {
+            this._resolveRender(data.audioBuffer);
+            this._resolveRender = null;
+            this._rejectRender = null;
+          }
+          break;
+
+        case 'renderError':
+          if (this._rejectRender) {
+            this._rejectRender(new Error(data.message));
+            this._resolveRender = null;
+            this._rejectRender = null;
+          }
+          break;
       }
     };
 
@@ -321,6 +340,26 @@ export class UADEEngine {
   onSongEnd(cb: () => void): () => void {
     this._songEndCallbacks.add(cb);
     return () => this._songEndCallbacks.delete(cb);
+  }
+
+  /**
+   * Render the loaded song to a complete audio buffer (WAV format).
+   * Useful for pre-rendering UADE modules for DJ playback.
+   * @param subsong - Optional subsong index (default: current subsong)
+   * @returns ArrayBuffer containing encoded WAV audio
+   */
+  async renderFull(subsong?: number): Promise<ArrayBuffer> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('UADEEngine not initialized');
+
+    this._renderPromise = new Promise<ArrayBuffer>((resolve, reject) => {
+      this._resolveRender = resolve;
+      this._rejectRender = reject;
+    });
+
+    this.workletNode.port.postMessage({ type: 'renderFull', subsong });
+
+    return this._renderPromise;
   }
 
   dispose(): void {
