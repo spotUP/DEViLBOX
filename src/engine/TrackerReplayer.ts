@@ -524,6 +524,9 @@ export class TrackerReplayer {
   // Track native engines (UADE/Hively) rerouted to separation chain (for cleanup on song change)
   private routedNativeEngines: Set<string> = new Set();
 
+  // Whether the replayer is muted (DJ mode visuals-only)
+  private _muted = false;
+
   /**
    * Optional callback set by DeckEngine to handle DJ scratch effect commands (Xnn).
    * High nibble 0: scratch pattern (0=stop, 1=Baby, 2=Trans, 3=Flare, 4=Hydro, 5=Crab, 6=Orbit)
@@ -554,6 +557,12 @@ export class TrackerReplayer {
   /** Get the master gain node for external routing (DJ mixer, etc.) */
   getMasterGain(): Tone.Gain {
     return this.masterGain;
+  }
+
+  /** Mute/unmute all audio from this replayer (including native engines). */
+  setMuted(mute: boolean): void {
+    this._muted = mute;
+    this.masterGain.gain.value = mute ? 0 : 1;
   }
 
   /** Get the stereo separation node's input for routing external native audio sources.
@@ -1111,9 +1120,13 @@ export class TrackerReplayer {
           engine.getInstrument(firstHVL.id, firstHVL);
         }
 
-        // Start WASM playback immediately — don't wait for a note trigger
-        hivelyEngine.play();
-        console.log('[TrackerReplayer] HivelyEngine tune loaded & playing for', this.song.format);
+        // Start WASM playback immediately — skip if muted (DJ mode visuals)
+        if (!this._muted) {
+          hivelyEngine.play();
+          console.log('[TrackerReplayer] HivelyEngine tune loaded & playing for', this.song.format);
+        } else {
+          console.log('[TrackerReplayer] HivelyEngine tune loaded but skipping play (muted for DJ visuals)');
+        }
       } catch (err) {
         console.error('[TrackerReplayer] Failed to load HVL tune into WASM engine:', err);
       }
