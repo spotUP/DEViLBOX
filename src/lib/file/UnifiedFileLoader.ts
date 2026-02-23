@@ -7,7 +7,7 @@
  * Eliminates code duplication and ensures consistent behavior across load methods.
  */
 
-import type { InstrumentConfig, EffectConfig } from '@/types/instrument';
+import type { InstrumentConfig } from '@/types/instrument';
 import type { Pattern } from '@/types';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
@@ -16,7 +16,7 @@ import { useProjectStore } from '@/stores/useProjectStore';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useAudioStore } from '@/stores/useAudioStore';
 import { getToneEngine } from '@/engine/ToneEngine';
-import { notify } from '@/utils/notify';
+import { notify } from '@/stores/useNotificationStore';
 import { isSupportedModule } from '@/lib/import/ModuleLoader';
 
 export interface FileLoadOptions {
@@ -293,8 +293,9 @@ async function loadInstrumentFile(file: File): Promise<FileLoadResult> {
     const data = JSON.parse(text);
 
     // Import and add to project
-    const { importInstrument } = await import('@lib/import/instrumentImporter');
-    const instrument = importInstrument(data);
+    const { importInstrument } = await import('@/lib/export/exporters');
+    const result = await importInstrument(file);
+    const instrument = result?.instrument;
 
     useInstrumentStore.getState().addInstrument(instrument);
 
@@ -335,10 +336,10 @@ async function loadXMLFile(file: File): Promise<FileLoadResult> {
  * Load a DB303 preset from XML.
  */
 async function loadDB303Preset(xmlDoc: Document): Promise<FileLoadResult> {
-  const { parseDB303Preset } = await import('@/components/instruments/controls/db303/DB303PresetParser');
+  const { parseDb303Preset } = await import('@/lib/import/Db303PresetConverter');
   const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
 
-  const preset = parseDB303Preset(xmlDoc);
+  const preset = parseDb303Preset(xmlDoc.documentElement.outerHTML);
 
   // Find or create TB-303 instrument
   let tb303 = useInstrumentStore.getState().instruments.find(i => i.synthType === 'TB303');
@@ -348,7 +349,7 @@ async function loadDB303Preset(xmlDoc: Document): Promise<FileLoadResult> {
   }
 
   // Apply preset
-  const updatedConfig = { ...tb303, db303: { ...tb303.db303, ...preset } };
+  const updatedConfig = { ...tb303, tb303: { ...tb303.tb303, ...preset } };
   useInstrumentStore.getState().updateInstrument(tb303.id, updatedConfig);
 
   return {
@@ -361,10 +362,12 @@ async function loadDB303Preset(xmlDoc: Document): Promise<FileLoadResult> {
  * Load a DB303 pattern from XML.
  */
 async function loadDB303Pattern(xmlDoc: Document, filename: string): Promise<FileLoadResult> {
-  const { parseDB303Pattern } = await import('@/components/instruments/controls/db303/DB303PresetParser');
+  const { parseDb303Pattern } = await import('@/lib/import/Db303PatternConverter');
   const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
 
-  const patternData = parseDB303Pattern(xmlDoc);
+  const result = parseDb303Pattern(xmlDoc.documentElement.outerHTML, filename, 'temp-id');
+  const pattern = result.pattern;
+  const tempo = result.tempo;
 
   // Find or create TB-303 instrument
   let tb303 = useInstrumentStore.getState().instruments.find(i => i.synthType === 'TB303');
@@ -373,9 +376,8 @@ async function loadDB303Pattern(xmlDoc: Document, filename: string): Promise<Fil
     useInstrumentStore.getState().addInstrument(tb303);
   }
 
-  // Convert to tracker pattern
-  const { db303ToTrackerPattern } = await import('@/components/instruments/controls/db303/DB303PatternConverter');
-  const pattern = db303ToTrackerPattern(patternData, tb303, filename);
+  // Update pattern with correct instrument ID
+  pattern.channels[0].instrumentId = tb303.id;
 
   // Append pattern to project
   const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
@@ -387,8 +389,8 @@ async function loadDB303Pattern(xmlDoc: Document, filename: string): Promise<Fil
   setPatternOrder([existingPatterns.length]);
 
   // Apply tempo if present
-  if (patternData.bpm) {
-    useTransportStore.getState().setBPM(patternData.bpm);
+  if (tempo !== undefined) {
+    useTransportStore.getState().setBPM(tempo);
   }
 
   return {

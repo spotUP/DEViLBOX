@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-23T19:48:59.435Z
+ * Generated: 2026-02-23T20:44:10.058Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1130';
-export const BUILD_NUMBER = '1130';
-export const BUILD_HASH = '7ee47686';
+export const BUILD_VERSION = '1.0.1132';
+export const BUILD_NUMBER = '1132';
+export const BUILD_HASH = 'd557c5d7';
 export const BUILD_DATE = '2026-02-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1130',
+    version: '1.0.1132',
     date: '2026-02-23',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix tracker module file dialog path to match drag-drop"
+      },
+      {
+        type: 'fix',
+        "description": "Fix HVL silence, DrumMachine crash, MIDI drag-drop, song-ended spam, DJ pipeline"
+      },
       {
         type: 'improvement',
         "description": "Chore: Update dependencies for DJ system"
@@ -236,14 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "FT2 toolbar visibility and modal z-index layering"
-      },
-      {
-        type: 'feature',
-        "description": "Expand Pixi views with full DOM overlay implementations"
-      },
-      {
-        type: 'feature',
-        "description": "Add PatternAccessor, Furnace subsong support, and replayer improvements"
       }
     ]
   }
