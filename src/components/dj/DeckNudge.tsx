@@ -10,7 +10,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 
 interface DeckNudgeProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 const SOFT_OFFSET = 2;

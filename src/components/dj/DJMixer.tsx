@@ -9,6 +9,7 @@
  */
 
 import React from 'react';
+import { useDJStore } from '@/stores/useDJStore';
 import { MixerEQ } from '@/components/dj/MixerEQ';
 import { MixerFilter } from '@/components/dj/MixerFilter';
 import { MixerVUMeter } from '@/components/dj/MixerVUMeter';
@@ -18,6 +19,8 @@ import { MixerMaster } from '@/components/dj/MixerMaster';
 import { MixerCueSection } from '@/components/dj/MixerCueSection';
 
 export const DJMixer: React.FC = () => {
+  const thirdDeck = useDJStore((s) => s.thirdDeckActive);
+
   return (
     <div
       className="
@@ -29,6 +32,7 @@ export const DJMixer: React.FC = () => {
       <div className="flex items-center justify-center gap-4 w-full border-b border-dark-border pb-2">
         <MixerFilter deckId="A" />
         <MixerFilter deckId="B" />
+        {thirdDeck && <MixerFilter deckId="C" />}
       </div>
 
       {/* Row 2: EQ + VU meters */}
@@ -39,9 +43,11 @@ export const DJMixer: React.FC = () => {
         <div className="flex gap-1 items-end mx-0.5">
           <MixerVUMeter deckId="A" />
           <MixerVUMeter deckId="B" />
+          {thirdDeck && <MixerVUMeter deckId="C" />}
         </div>
 
         <MixerEQ deckId="B" />
+        {thirdDeck && <MixerEQ deckId="C" />}
       </div>
 
       {/* Row 2: Channel strips */}
@@ -49,9 +55,15 @@ export const DJMixer: React.FC = () => {
         <MixerChannelStrip deckId="A" />
         <div className="w-px bg-dark-borderLight self-stretch" />
         <MixerChannelStrip deckId="B" />
+        {thirdDeck && (
+          <>
+            <div className="w-px bg-dark-borderLight self-stretch" />
+            <MixerChannelStrip deckId="C" />
+          </>
+        )}
       </div>
 
-      {/* Row 3: Crossfader */}
+      {/* Row 3: Crossfader (A↔B only; Deck C is thru) */}
       <div className="w-full border-b border-dark-border pb-2">
         <MixerCrossfader />
       </div>

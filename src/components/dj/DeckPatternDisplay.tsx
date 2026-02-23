@@ -16,7 +16,7 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { ReadOnlyPatternCanvas } from '@/components/tracker/ReadOnlyPatternCanvas';
 
 interface DeckPatternDisplayProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }) => {

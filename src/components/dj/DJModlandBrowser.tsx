@@ -106,7 +106,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   // ── Download → Parse → Load to Deck ─────────────────────────────────────
 
   const loadToDeck = useCallback(
-    async (file: ModlandFile, deckId: 'A' | 'B') => {
+    async (file: ModlandFile, deckId: 'A' | 'B' | 'C') => {
       setDownloadingPaths((prev) => new Set(prev).add(file.full_path));
       setError(null);
 
@@ -314,6 +314,17 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
                     >
                       2
                     </button>
+                    {useDJStore.getState().thirdDeckActive && (
+                      <button
+                        onClick={() => loadToDeck(file, 'C')}
+                        className="px-2 py-1 text-[10px] font-mono font-bold rounded
+                                   bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
+                                   hover:bg-emerald-800/40 hover:text-emerald-300 transition-colors
+                                   opacity-0 group-hover:opacity-100"
+                      >
+                        3
+                      </button>
+                    )}
                   </>
                 )}
               </div>

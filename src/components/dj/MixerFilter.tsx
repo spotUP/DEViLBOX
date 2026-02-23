@@ -11,7 +11,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 
 interface MixerFilterProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 export const MixerFilter: React.FC<MixerFilterProps> = ({ deckId }) => {

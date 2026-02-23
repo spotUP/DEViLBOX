@@ -11,7 +11,9 @@ import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
+import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { cacheSong } from '@/engine/dj/DJSongCache';
+import { loadUADEToDeck, isUADECached } from '@/engine/dj/DJUADEPrerender';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
@@ -21,6 +23,9 @@ interface LoadedFile {
   bpm: number;
   duration: number; // seconds
   format: string;
+  rawBuffer?: ArrayBuffer; // For UADE modules (pre-render)
+  isUADE?: boolean;
+  isCached?: boolean; // Whether UADE module is pre-rendered in cache
 }
 
 interface DJFileBrowserProps {
@@ -45,6 +50,9 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
 
     for (const file of Array.from(selectedFiles)) {
       try {
+        const buffer = await file.arrayBuffer();
+        const isUADE = isUADEFormat(file.name);
+
         const song = await parseModuleToSong(file);
         const bpmResult = detectBPM(song);
         const duration = estimateSongDuration(song);
@@ -52,12 +60,18 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
         // Cache the parsed song for playlist deck-loading
         cacheSong(file.name, song);
 
+        // Check if UADE module is already pre-rendered
+        const cached = isUADE ? await isUADECached(buffer) : false;
+
         newFiles.push({
           name: file.name,
           song,
           bpm: bpmResult.bpm,
           duration,
           format: file.name.split('.').pop()?.toUpperCase() ?? 'MOD',
+          rawBuffer: isUADE ? buffer : undefined,
+          isUADE,
+          isCached: cached,
         });
       } catch (err) {
         console.error(`[DJFileBrowser] Failed to parse ${file.name}:`, err);
@@ -73,14 +87,23 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
     }
   }, []);
 
-  const loadToDeck = useCallback(async (file: LoadedFile, deckId: 'A' | 'B') => {
+  const loadToDeck = useCallback(async (file: LoadedFile, deckId: 'A' | 'B' | 'C') => {
     if (!file.song) return;
 
     const engine = getDJEngine();
     const store = useDJStore.getState();
 
     try {
-      await engine.loadToDeck(deckId, file.song);
+      // Use pre-render system for UADE modules
+      if (file.isUADE && file.rawBuffer) {
+        const result = await loadUADEToDeck(engine, deckId, file.rawBuffer, file.name, true);
+        setFiles(prev => prev.map(f =>
+          f.name === file.name ? { ...f, isCached: result.cached } : f
+        ));
+      } else {
+        // Standard tracker loading
+        await engine.loadToDeck(deckId, file.song);
+      }
 
       store.setDeckState(deckId, {
         fileName: file.name,
@@ -192,7 +215,14 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
               >
                 {/* File info */}
                 <div className="flex-1 min-w-0">
-                  <div className="text-text-primary text-xs font-mono truncate">{file.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="text-text-primary text-xs font-mono truncate">{file.name}</div>
+                    {file.isCached && (
+                      <span className="text-[8px] font-mono px-1 py-0.5 bg-green-900/30 text-green-400 rounded border border-green-700/30">
+                        CACHED
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-3 text-[10px] text-text-muted font-mono">
                     <span>{file.format}</span>
                     {file.bpm > 0 && <span>{file.bpm} BPM</span>}
@@ -240,6 +270,17 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
                 >
                   2
                 </button>
+                {useDJStore.getState().thirdDeckActive && (
+                  <button
+                    onClick={() => loadToDeck(file, 'C')}
+                    className="px-2 py-1 text-[10px] font-mono font-bold rounded
+                               bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
+                               hover:bg-emerald-800/40 hover:text-emerald-300 transition-colors
+                               opacity-0 group-hover:opacity-100"
+                  >
+                    3
+                  </button>
+                )}
                 <button
                   onClick={() => removeFile(i)}
                   className="p-0.5 text-text-muted hover:text-accent-error transition-colors

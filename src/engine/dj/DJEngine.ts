@@ -12,11 +12,12 @@ import type { AudioFileInfo } from './DeckAudioPlayer';
 
 // Instrument ID offsets to avoid collisions with the tracker view (IDs 1-999)
 // and between decks. Each deck gets a 10000-wide namespace.
-const DECK_ID_OFFSETS: Record<DeckId, number> = { A: 10000, B: 20000 };
+const DECK_ID_OFFSETS: Record<DeckId, number> = { A: 10000, B: 20000, C: 30000 };
 
 export class DJEngine {
   readonly deckA: DeckEngine;
   readonly deckB: DeckEngine;
+  readonly deckC: DeckEngine;
   readonly mixer: DJMixerEngine;
 
   private disposed = false;
@@ -28,6 +29,7 @@ export class DJEngine {
     // Create decks connected to mixer inputs
     this.deckA = new DeckEngine({ id: 'A', outputNode: this.mixer.inputA });
     this.deckB = new DeckEngine({ id: 'B', outputNode: this.mixer.inputB });
+    this.deckC = new DeckEngine({ id: 'C', outputNode: this.mixer.inputC });
   }
 
   // ==========================================================================
@@ -35,7 +37,11 @@ export class DJEngine {
   // ==========================================================================
 
   getDeck(id: DeckId): DeckEngine {
-    return id === 'A' ? this.deckA : this.deckB;
+    switch (id) {
+      case 'A': return this.deckA;
+      case 'B': return this.deckB;
+      case 'C': return this.deckC;
+    }
   }
 
   // ==========================================================================
@@ -107,6 +113,7 @@ export class DJEngine {
   killAll(): void {
     this.deckA.stop();
     this.deckB.stop();
+    this.deckC.stop();
     this.mixer.setCrossfader(0.5);
   }
 
@@ -120,6 +127,7 @@ export class DJEngine {
 
     this.deckA.dispose();
     this.deckB.dispose();
+    this.deckC.dispose();
     this.mixer.dispose();
   }
 }

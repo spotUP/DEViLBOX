@@ -11,7 +11,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 
 interface DeckLoopControlsProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 const LOOP_SIZES = [1, 2, 4, 8, 16, 32] as const;

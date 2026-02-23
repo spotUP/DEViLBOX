@@ -17,6 +17,7 @@ import {
   type SeratoLibrary,
   type SeratoTrack,
 } from '@/lib/serato';
+import { useDJStore } from '@/stores/useDJStore';
 
 // ============================================================================
 // TYPES
@@ -27,7 +28,7 @@ type SortDir = 'asc' | 'desc';
 
 interface DJSeratoBrowserProps {
   onClose?: () => void;
-  onLoadTrackToDevice?: (track: SeratoTrack, deckId: 'A' | 'B') => void;
+  onLoadTrackToDevice?: (track: SeratoTrack, deckId: 'A' | 'B' | 'C') => void;
 }
 
 // ============================================================================
@@ -374,6 +375,17 @@ export const DJSeratoBrowser: React.FC<DJSeratoBrowserProps> = ({ onClose, onLoa
                     >
                       2
                     </button>
+                    {useDJStore.getState().thirdDeckActive && (
+                      <button
+                        onClick={() => onLoadTrackToDevice(track, 'C')}
+                        className="px-2 py-1 text-[10px] font-mono font-bold rounded
+                                   bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
+                                   hover:bg-emerald-800/40 hover:text-emerald-300 transition-colors
+                                   opacity-0 group-hover:opacity-100"
+                      >
+                        3
+                      </button>
+                    )}
                   </>
                 ) : (
                   <div className="w-[60px] flex justify-end gap-1">

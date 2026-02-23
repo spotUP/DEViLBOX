@@ -13,7 +13,7 @@ import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import OverviewWorkerFactory from '@/workers/dj-overview.worker.ts?worker';
 
 interface DeckTrackOverviewProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 import type { OverviewMsg, OverviewState, DeckColors } from '@engine/renderer/worker-types';

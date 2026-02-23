@@ -117,7 +117,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   // ── Load track to deck (uses song cache, falls back to file picker) ─────
 
   const loadSongToDeck = useCallback(
-    async (song: import('@/engine/TrackerReplayer').TrackerSong, fileName: string, deckId: 'A' | 'B') => {
+    async (song: import('@/engine/TrackerReplayer').TrackerSong, fileName: string, deckId: 'A' | 'B' | 'C') => {
       const engine = getDJEngine();
       await engine.loadToDeck(deckId, song);
       const bpmResult = detectBPM(song);
@@ -138,7 +138,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
   );
 
   const loadTrackToDeck = useCallback(
-    async (track: PlaylistTrack, deckId: 'A' | 'B') => {
+    async (track: PlaylistTrack, deckId: 'A' | 'B' | 'C') => {
       // Try cache first (song was loaded via file browser this session)
       const cached = getCachedSong(track.fileName);
       if (cached) {
@@ -446,6 +446,18 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
                   >
                     2
                   </button>
+                  {useDJStore.getState().thirdDeckActive && (
+                    <button
+                      onClick={() => loadTrackToDeck(track, 'C')}
+                      className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded
+                                 bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
+                                 hover:bg-emerald-800/40 hover:text-emerald-300 transition-colors
+                                 opacity-0 group-hover:opacity-100"
+                      title="Load to Deck 3"
+                    >
+                      3
+                    </button>
+                  )}
                   <button
                     onClick={() => removeTrack(activePlaylist.id, i)}
                     className="p-0.5 text-text-muted hover:text-accent-error transition-colors
