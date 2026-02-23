@@ -139,6 +139,7 @@ export class DeckEngine {
 
     // Create TrackerReplayer connected to our deckGain input
     this.replayer = new TrackerReplayer(this.deckGain);
+    this.replayer.setMuted(true); // Silent by default in DJ mode
 
     // Create AudioPlayer for audio file playback (MP3/WAV/FLAC etc.)
     this.audioPlayer = new DeckAudioPlayer(this.deckGain);
