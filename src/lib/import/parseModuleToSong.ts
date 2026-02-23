@@ -11,6 +11,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig } from '@/types';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
+import { isAudioFile } from '@/lib/audioFileUtils';
 
 /** Get current format engine preferences (non-reactive, snapshot read) */
 function getFormatEngine(): FormatEnginePreferences {
@@ -34,6 +35,13 @@ export async function parseModuleToSong(file: File): Promise<TrackerSong> {
   const filename = file.name.toLowerCase();
   const buffer = await file.arrayBuffer();
   const prefs = getFormatEngine();
+
+  // ── Regular Audio ─────────────────────────────────────────────────────────
+  // If it's a regular audio file (MP3, WAV, etc.), it shouldn't be here.
+  // The DJ UI should handle it via DeckAudioPlayer directly.
+  if (isAudioFile(file.name)) {
+    throw new Error(`Cannot parse ${file.name} as a tracker module: it is a regular audio file.`);
+  }
 
   // ── MIDI ──────────────────────────────────────────────────────────────────
   if (filename.endsWith('.mid') || filename.endsWith('.midi')) {
