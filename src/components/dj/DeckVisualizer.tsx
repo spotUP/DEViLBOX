@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { DeckPatternDisplay } from './DeckPatternDisplay';
+import { getBeatPhaseInfo } from '@/engine/dj/DJAutoSync';
 import {
   VISUALIZER_MODES,
   MODE_LABELS,
@@ -61,6 +62,45 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
 
   const mode = VIZ_MODES[vizIndex % VIZ_MODES.length];
   const isAMMode = isAudioMotionMode(mode);
+
+  // Beat flash state — border glow on each beat
+  const [beatFlashOpacity, setBeatFlashOpacity] = useState(0);
+  const beatFlashRafRef = useRef<number>(0);
+  const prevBeatIdxRef = useRef(-1);
+
+  useEffect(() => {
+    let mounted = true;
+    let flashDecay = 0;
+
+    const tick = () => {
+      if (!mounted) return;
+      const phase = getBeatPhaseInfo(deckId);
+      if (phase) {
+        // Detect beat transition (nearest beat index changed)
+        if (phase.nearestBeatIdx !== prevBeatIdxRef.current && prevBeatIdxRef.current >= 0) {
+          flashDecay = 1.0; // trigger flash
+        }
+        prevBeatIdxRef.current = phase.nearestBeatIdx;
+      }
+      // Decay the flash
+      if (flashDecay > 0.01) {
+        flashDecay *= 0.88; // exponential decay (~200ms to invisible)
+        setBeatFlashOpacity(flashDecay);
+      } else if (flashDecay > 0) {
+        flashDecay = 0;
+        setBeatFlashOpacity(0);
+      }
+      beatFlashRafRef.current = requestAnimationFrame(tick);
+    };
+
+    beatFlashRafRef.current = requestAnimationFrame(tick);
+    return () => {
+      mounted = false;
+      cancelAnimationFrame(beatFlashRafRef.current);
+    };
+  }, [deckId]);
+
+  const beatFlashColor = deckId === 'A' ? '59,130,246' : '249,115,22'; // blue / orange
 
   // Reset to first viz mode when a new song is dropped
   const prevResetKeyRef = useRef(resetKey);
@@ -233,6 +273,17 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
       <div className="absolute inset-0" style={{ opacity: 0.55 }}>
         <DeckPatternDisplay deckId={deckId} />
       </div>
+
+      {/* Beat flash border glow */}
+      {beatFlashOpacity > 0.01 && (
+        <div
+          className="absolute inset-0 pointer-events-none rounded-sm"
+          style={{
+            boxShadow: `inset 0 0 12px 2px rgba(${beatFlashColor},${beatFlashOpacity * 0.6})`,
+            border: `1px solid rgba(${beatFlashColor},${beatFlashOpacity * 0.4})`,
+          }}
+        />
+      )}
 
       {/* Mode label — bottom-right */}
       <div
