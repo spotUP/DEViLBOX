@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-23T20:44:10.058Z
+ * Generated: 2026-02-23T20:47:11.269Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1132';
-export const BUILD_NUMBER = '1132';
-export const BUILD_HASH = 'd557c5d7';
+export const BUILD_VERSION = '1.0.1134';
+export const BUILD_NUMBER = '1134';
+export const BUILD_HASH = '7a1f52a6';
 export const BUILD_DATE = '2026-02-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1132',
+    version: '1.0.1134',
     date: '2026-02-23',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix TypeScript errors in unified file loader"
+      },
+      {
+        type: 'improvement',
+        "description": "Unify file loading: Single code path for all 137 formats"
+      },
       {
         type: 'fix',
         "description": "Fix tracker module file dialog path to match drag-drop"
@@ -236,14 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add Furnace order matrix Pixi view component"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
-      },
-      {
-        type: 'fix',
-        "description": "FT2 toolbar visibility and modal z-index layering"
       }
     ]
   }
