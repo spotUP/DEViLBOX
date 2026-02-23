@@ -23,6 +23,8 @@
 import * as Tone from 'tone';
 import { InstrumentFactory } from '@/engine/InstrumentFactory';
 import type { EffectConfig } from '@typedefs/instrument';
+import type { DJCueEngine } from './DJCueEngine';
+import type { DeckId } from './DeckEngine';
 
 export type CrossfaderCurve = 'linear' | 'cut' | 'smooth';
 
@@ -43,6 +45,12 @@ export class DJMixerEngine {
   // Master FX chain (inserted between masterGain and limiter)
   private masterEffectsNodes: Tone.ToneAudioNode[] = [];
   private masterEffectsRebuildVersion = 0;
+
+  // Cue engine (injected from DJEngine)
+  private cueEngine: DJCueEngine | null = null;
+  
+  // PFL connections: deck input → cue output (pre-fader tap)
+  private pflConnections = new Map<DeckId, Tone.Gain>();
 
   // State
   private position = 0.5;
@@ -161,6 +169,56 @@ export class DJMixerEngine {
     return this.masterGain;
   }
 
+  /** Inject the cue engine (called from DJEngine constructor) */
+  setCueEngine(engine: DJCueEngine): void {
+    this.cueEngine = engine;
+  }
+
+  /** Enable/disable PFL for a deck (pre-fader listen to headphones) */
+  setPFL(deck: DeckId, enabled: boolean): void {
+    if (!this.cueEngine) {
+      console.warn('[DJMixerEngine] Cannot set PFL: cue engine not initialized');
+      return;
+    }
+
+    const input = this.getInputForDeck(deck);
+    if (!input) return;
+
+    if (enabled) {
+      // Create a gain node to tap the signal pre-fader
+      let tapGain = this.pflConnections.get(deck);
+      if (!tapGain) {
+        tapGain = new Tone.Gain(1);
+        this.pflConnections.set(deck, tapGain);
+        
+        // Connect deck input → tap gain → cue engine
+        input.connect(tapGain);
+        tapGain.connect(this.cueEngine.getCueInput());
+      }
+    } else {
+      // Disconnect and remove the tap
+      const tapGain = this.pflConnections.get(deck);
+      if (tapGain) {
+        tapGain.disconnect();
+        tapGain.dispose();
+        this.pflConnections.delete(deck);
+      }
+    }
+
+    // Update cue engine PFL state
+    this.cueEngine.setPFL(deck, enabled);
+  }
+
+  /** Get the input node for a specific deck */
+  private getInputForDeck(deck: DeckId): Tone.Gain | null {
+    switch (deck) {
+      case 'A': return this.inputA;
+      case 'B': return this.inputB;
+      case 'C': return this.inputC;
+      default: return null;
+    }
+  }
+
   // ==========================================================================
   // MASTER FX CHAIN
   // ==========================================================================
@@ -240,6 +298,13 @@ export class DJMixerEngine {
   // ==========================================================================
 
   dispose(): void {
+    // Clean up PFL connections
+    this.pflConnections.forEach((gain) => {
+      gain.disconnect();
+      gain.dispose();
+    });
+    this.pflConnections.clear();
+
     // Dispose FX nodes
     for (const node of this.masterEffectsNodes) {
       try { node.disconnect(); node.dispose(); } catch { /* */ }
