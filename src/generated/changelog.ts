@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-23T22:58:26.010Z
+ * Generated: 2026-02-23T23:21:20.975Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1141';
-export const BUILD_NUMBER = '1141';
-export const BUILD_HASH = '6d00d07d';
+export const BUILD_VERSION = '1.0.1142';
+export const BUILD_NUMBER = '1142';
+export const BUILD_HASH = '8fc02302';
 export const BUILD_DATE = '2026-02-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,7 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1141',
+    version: '1.0.1142',
+    date: '2026-02-24',
+    changes: [
+      {
+        type: 'improvement',
+        "description": "Remove Open303 duplicate TB-303 implementation"
+      }
+    ]
+  },
+  {
+    version: '2026-02-23',
     date: '2026-02-23',
     changes: [
       {
@@ -234,10 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Update PT2/FT2 WASM sample editors"
-      },
-      {
-        type: 'improvement',
-        "description": "Add WebGL UI enhancement progress tracking document"
       }
     ]
   }

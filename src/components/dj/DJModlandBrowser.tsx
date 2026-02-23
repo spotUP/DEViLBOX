@@ -122,24 +122,25 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         cacheSong(cacheKey, song);
 
         const engine = getDJEngine();
-        await engine.loadToDeck(deckId, song);
 
-        // Fire background pipeline for render + analysis (BPM, key, beat grid, waveform)
-        void getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high').catch((err) => {
-          console.warn(`[DJModlandBrowser] Pipeline for ${file.filename}:`, err);
-        });
-
+        // Set loading state immediately
         useDJStore.getState().setDeckState(deckId, {
           fileName: cacheKey,
           trackName: song.name || file.filename,
           detectedBPM: bpmResult.bpm,
           effectiveBPM: bpmResult.bpm,
-          totalPositions: song.songLength,
-          songPos: 0,
-          pattPos: 0,
-          elapsedMs: 0,
+          analysisState: 'rendering',
           isPlaying: false,
         });
+
+        // Render + analyze FIRST, then load audio directly (skip tracker mode)
+        // This eliminates the "tracker bug window" — user hears perfect audio immediately
+        const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high');
+
+        // Load the pre-rendered WAV directly in audio mode
+        await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || file.filename, result.analysis?.bpm || bpmResult.bpm);
+
+        console.log(`[DJModlandBrowser] Loaded ${file.filename} in audio mode (skipped tracker bugs)`);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load');
       } finally {

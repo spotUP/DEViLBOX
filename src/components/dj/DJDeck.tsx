@@ -272,8 +272,30 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         const song = await parseModuleToSong(file);
         cacheSong(file.name, song);
         const bpmResult = detectBPM(song);
+        const moduleBuffer = await file.arrayBuffer();
 
-        await engine.loadToDeck(deckId, song);
+        // Set loading state
+        useDJStore.getState().setDeckState(deckId, {
+          fileName: file.name,
+          trackName: song.name || file.name,
+          detectedBPM: bpmResult.bpm,
+          effectiveBPM: bpmResult.bpm,
+          analysisState: 'rendering',
+          isPlaying: false,
+        });
+
+        // Render FIRST, then load audio directly (eliminates tracker bugs)
+        try {
+          const result = await getDJPipeline().loadOrEnqueue(moduleBuffer, file.name, deckId, 'high');
+          await engine.loadAudioToDeck(deckId, result.wavData, file.name, song.name || file.name, result.analysis?.bpm || bpmResult.bpm);
+          console.log(`[DJDeck] Loaded ${file.name} in audio mode (skipped tracker bugs)`);
+          return;
+        } catch (err) {
+          console.warn(`[DJDeck] Pipeline failed, falling back to tracker mode:`, err);
+        }
+
+        // Fallback: tracker mode if pipeline fails
+        await engine.loadToDeck(deckId, song, file.name, bpmResult.bpm);
 
         // Compute note density peaks for overview waveform
         const { computeTrackerPeaks } = await import('@/engine/dj/computeTrackerPeaks');
@@ -293,12 +315,6 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
           durationMs: 0,
           audioPosition: 0,
           waveformPeaks: trackerPeaks,
-        });
-
-        // Pipeline render + analysis in background (all tracker formats)
-        const buffer = await file.arrayBuffer();
-        void getDJPipeline().loadOrEnqueue(buffer, file.name, deckId, 'high').catch((err) => {
-          console.warn(`[DJDeck] Background pipeline for ${file.name}:`, err);
         });
       }
     } catch (err) {

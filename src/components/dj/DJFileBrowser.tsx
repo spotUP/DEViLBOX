@@ -103,12 +103,24 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
           f.name === file.name ? { ...f, isCached: result.cached } : f
         ));
       } else if (file.rawBuffer) {
-        // Non-UADE tracker (XM/IT/S3M/etc.) — load immediately as tracker,
-        // then pipeline render + analysis in background
-        await engine.loadToDeck(deckId, file.song, file.name, file.bpm);
-        void getDJPipeline().loadOrEnqueue(file.rawBuffer, file.name, deckId, 'high').catch((err) => {
-          console.warn(`[DJFileBrowser] Background pipeline for ${file.name}:`, err);
+        // Non-UADE tracker (XM/IT/S3M/etc.) — render FIRST, then load audio directly
+        useDJStore.getState().setDeckState(deckId, {
+          fileName: file.name,
+          trackName: file.song.name || file.name,
+          detectedBPM: file.bpm,
+          effectiveBPM: file.bpm,
+          analysisState: 'rendering',
+          isPlaying: false,
         });
+
+        try {
+          const result = await getDJPipeline().loadOrEnqueue(file.rawBuffer, file.name, deckId, 'high');
+          await engine.loadAudioToDeck(deckId, result.wavData, file.name, file.song.name || file.name, result.analysis?.bpm || file.bpm);
+          console.log(`[DJFileBrowser] Loaded ${file.name} in audio mode (skipped tracker bugs)`);
+        } catch (err) {
+          console.warn(`[DJFileBrowser] Pipeline failed for ${file.name}, falling back to tracker:`, err);
+          await engine.loadToDeck(deckId, file.song, file.name, file.bpm);
+        }
       } else {
         // Fallback: standard tracker loading (no pipeline)
         await engine.loadToDeck(deckId, file.song, file.name, file.bpm);
