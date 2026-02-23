@@ -53,15 +53,34 @@ export interface DJControllerPreset {
 
 /** Transport actions triggered by MIDI notes */
 export type DJAction =
+  // Basic transport
   | 'play_a' | 'play_b'
   | 'cue_a' | 'cue_b'
   | 'sync_a' | 'sync_b'
+  // Hot cues (8 per deck)
   | 'hotcue1_a' | 'hotcue2_a' | 'hotcue3_a' | 'hotcue4_a'
   | 'hotcue5_a' | 'hotcue6_a' | 'hotcue7_a' | 'hotcue8_a'
   | 'hotcue1_b' | 'hotcue2_b' | 'hotcue3_b' | 'hotcue4_b'
   | 'hotcue5_b' | 'hotcue6_b' | 'hotcue7_b' | 'hotcue8_b'
+  // Loop controls
   | 'loop_a' | 'loop_b'
-  | 'scratch_a' | 'scratch_b';
+  | 'loop_roll_4_a' | 'loop_roll_8_a' | 'loop_roll_16_a' | 'loop_roll_32_a'
+  | 'loop_roll_4_b' | 'loop_roll_8_b' | 'loop_roll_16_b' | 'loop_roll_32_b'
+  // Beat jump
+  | 'beatjump_back_a' | 'beatjump_fwd_a'
+  | 'beatjump_back_b' | 'beatjump_fwd_b'
+  // PFL (headphone cue)
+  | 'pfl_a' | 'pfl_b'
+  // Quantized FX
+  | 'fx_echo_a' | 'fx_reverb_a' | 'fx_delay_a' | 'fx_flanger_a'
+  | 'fx_echo_b' | 'fx_reverb_b' | 'fx_delay_b' | 'fx_flanger_b'
+  // Scratch controls
+  | 'scratch_a' | 'scratch_b'
+  // Tracker scratch patterns (work without DJ engine)
+  | 'tracker_fader_cut' | 'tracker_fader_cut_on' | 'tracker_fader_cut_off'
+  | 'tracker_scratch_trans' | 'tracker_scratch_crab' | 'tracker_scratch_flare'
+  | 'tracker_scratch_chirp' | 'tracker_scratch_stab' | 'tracker_scratch_8crab'
+  | 'tracker_scratch_twdl' | 'tracker_scratch_stop';
 
 // ============================================================================
 // CONTROLLER PRESETS
@@ -353,13 +372,22 @@ const ROLAND_DJ_202: DJControllerPreset = {
 // PRESET REGISTRY
 // ============================================================================
 
-export const DJ_CONTROLLER_PRESETS: DJControllerPreset[] = [
+export const DJ_HARDWARE_PRESETS: DJControllerPreset[] = [
   PIONEER_DDJ_SB3,
   PIONEER_DDJ_FLX4,
   PIONEER_DDJ_1000,
   NUMARK_MIXTRACK_PRO_FX,
   NUMARK_DJ2GO2,
   ROLAND_DJ_202,
+];
+
+// Import generic controllers
+import { DJ_GENERIC_CONTROLLERS } from './djGenericControllers';
+
+// Combined registry (hardware + generic)
+export const DJ_CONTROLLER_PRESETS: DJControllerPreset[] = [
+  ...DJ_HARDWARE_PRESETS,
+  ...DJ_GENERIC_CONTROLLERS,
 ];
 
 export function getPresetById(id: string): DJControllerPreset | null {

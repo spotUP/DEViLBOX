@@ -874,8 +874,9 @@ export class TrackerReplayer {
       this.stereoSeparation = 100;
     }
 
-    // FT2 XM period system: use for XM files, not for MOD/HVL/AHX
-    this.useXMPeriods = song.format === 'XM';
+    // FT2 XM period system: use for XM/IT/S3M files, not for MOD/HVL/AHX
+    // XM, IT, and S3M all use note numbers (1-96/120) instead of Amiga periods
+    this.useXMPeriods = song.format === 'XM' || song.format === 'IT' || song.format === 'S3M';
     this.linearPeriods = song.linearPeriods ?? (song.format === 'XM'); // Default XM to linear
 
     // Set initial playback state
@@ -1755,7 +1756,8 @@ export class TrackerReplayer {
         }
 
         // Same-pitch slide detection for 303 synths
-        const newNoteName = is303Synth ? xmNoteToNoteName(noteValue ?? 0) : periodToNoteName(usePeriod);
+        // XM uses note numbers directly; MOD uses Amiga periods
+        const newNoteName = (this.useXMPeriods || is303Synth) ? xmNoteToNoteName(noteValue ?? 0) : periodToNoteName(usePeriod);
         ch.lastPlayedNoteName = newNoteName;
 
         // Trigger note
@@ -1833,7 +1835,8 @@ export class TrackerReplayer {
           );
         }
 
-        const newNoteName = is303Synth ? xmNoteToNoteName(noteValue ?? 0) : periodToNoteName(usePeriod);
+        // XM uses note numbers directly; MOD uses Amiga periods
+        const newNoteName = (this.useXMPeriods || is303Synth) ? xmNoteToNoteName(noteValue ?? 0) : periodToNoteName(usePeriod);
         ch.lastPlayedNoteName = newNoteName;
 
         this.triggerNote(ch, time, offset, chIndex, accent, slideActive, effectiveSlide, hammer);
@@ -3561,10 +3564,11 @@ export class TrackerReplayer {
 
     const engine = getToneEngine();
     
-    // For synth instruments, use XM note directly (avoids period table issues)
-    // For sample-based, use period-to-note conversion
+    // For XM files or synth instruments, use XM note directly (avoids period table issues)
+    // For MOD sample-based, use period-to-note conversion
     const isSynthInstrument = ch.instrument.synthType && ch.instrument.synthType !== 'Sampler';
-    const noteName = isSynthInstrument && ch.xmNote > 0 && ch.xmNote < 97
+    const useXMNote = (this.useXMPeriods || isSynthInstrument) && ch.xmNote > 0 && ch.xmNote < 97;
+    const noteName = useXMNote
       ? xmNoteToNoteName(ch.xmNote)
       : periodToNoteName(ch.period);
     
