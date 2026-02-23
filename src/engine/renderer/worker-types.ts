@@ -195,6 +195,8 @@ export interface OverviewState {
   audioPosition: number;
   durationMs: number;
   waveformPeaks: number[] | null;
+  /** 3-band frequency peaks: [low[], mid[], high[]] — null until analysis completes */
+  frequencyPeaks: number[][] | null;
 }
 
 export type OverviewMsg =
@@ -226,10 +228,18 @@ export interface BeatMarker {
   beatsUntilNextMarker: number;
 }
 
+/** Analysis-derived beat grid (from essentia.js) */
+export interface AnalysisBeatGrid {
+  beats: number[];      // Beat positions in seconds
+  downbeats: number[];  // Downbeat/bar-start positions in seconds
+  bpm: number;
+  timeSignature: number;
+}
+
 export type BeatGridMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; beatGrid: BeatMarker[]; durationMs: number; audioPosition: number }
-  | { type: 'beatGrid'; beatGrid: BeatMarker[]; durationMs: number }
-  | { type: 'position'; audioPosition: number }
+  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; beatGrid: BeatMarker[]; analysisBeatGrid: AnalysisBeatGrid | null; durationMs: number; audioPosition: number; positionFraction: number }
+  | { type: 'beatGrid'; beatGrid: BeatMarker[]; analysisBeatGrid: AnalysisBeatGrid | null; durationMs: number }
+  | { type: 'position'; audioPosition: number; positionFraction: number }
   | { type: 'resize'; w: number; h: number; dpr: number };
 
 // ─── Piano Keyboard ──────────────────────────────────────────────────────────
