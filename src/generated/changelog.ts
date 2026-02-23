@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-23T23:21:20.975Z
+ * Generated: 2026-02-23T23:30:21.270Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1142';
-export const BUILD_NUMBER = '1142';
-export const BUILD_HASH = '8fc02302';
+export const BUILD_VERSION = '1.0.1143';
+export const BUILD_NUMBER = '1143';
+export const BUILD_HASH = 'ffab92c7';
 export const BUILD_DATE = '2026-02-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1142',
+    version: '1.0.1143',
     date: '2026-02-24',
     changes: [
+      {
+        type: 'fix',
+        "description": "Eliminate tracker playback bugs by rendering MOD files first"
+      },
       {
         type: 'improvement',
         "description": "Remove Open303 duplicate TB-303 implementation"
@@ -240,10 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Update UADE engine, worklet, and Amiga format parsers"
-      },
-      {
-        type: 'feature',
-        "description": "Update PT2/FT2 WASM sample editors"
       }
     ]
   }
