@@ -11,7 +11,7 @@
  */
 
 import * as Tone from 'tone';
-import { decodeAudio, DecodeResult } from '../../lib/audio/UnifiedAudioDecoder';
+import { decodeAudio, type DecodeResult } from '../../lib/audio/UnifiedAudioDecoder';
 
 export interface AudioFileInfo {
   duration: number;        // seconds

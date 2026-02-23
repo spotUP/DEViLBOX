@@ -50,6 +50,9 @@ function snapshotDeck(d: ReturnType<typeof useDJStore.getState>['decks']['A']): 
 }
 
 export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) => {
+  const analysisState = useDJStore((s) => s.decks[deckId].analysisState);
+  const analysisProgress = useDJStore((s) => s.decks[deckId].analysisProgress);
+  
   const canvasRef    = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const bridgeRef    = useRef<OffscreenBridge<OverviewMsg, { type: string }> | null>(null);
@@ -194,9 +197,26 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
   return (
     <div
       ref={containerRef}
-      className="w-full cursor-pointer"
+      className="w-full cursor-pointer relative"
       style={{ height: BAR_HEIGHT }}
       onMouseDown={handleMouseDown}
-    />
+    >
+      {(analysisState === 'rendering' || analysisState === 'analyzing') && (
+        <div 
+          className="absolute inset-0 pointer-events-none z-10 overflow-hidden rounded-sm"
+          style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+        >
+          <div 
+            className={`h-full transition-all duration-300 ${analysisState === 'rendering' ? 'bg-blue-500/40' : 'bg-purple-500/40'}`}
+            style={{ width: `${analysisProgress}%` }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-[10px] font-bold text-white/70 tracking-tighter uppercase">
+              {analysisState} {analysisProgress}%
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };

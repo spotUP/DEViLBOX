@@ -22,6 +22,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Tone from 'tone';
+import { usePianoRollKeyboard } from '@/hooks/pianoroll/usePianoRollKeyboard';
 import { PianoKeyboardCanvas } from './PianoKeyboardCanvas';
 import { PianoRollCanvas } from './PianoRollCanvas';
 import { VelocityLaneCanvas } from './VelocityLaneCanvas';
@@ -70,6 +71,9 @@ interface PianoRollProps {
 }
 
 export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
+  // Register keyboard shortcuts for piano roll view
+  usePianoRollKeyboard();
+
   const {
     view,
     selection,

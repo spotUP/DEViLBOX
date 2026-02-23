@@ -209,21 +209,6 @@ registerVSTBridge({
 });
 
 // ---------------------------------------------------------------------------
-// Open303 — Roland TB-303 Bass Synthesizer by Robin Schmidt (MIT)
-// Saw/Square blend, resonant TeeBee filter, accent, slide, decay envelope
-// 21 parameters across 7 groups
-// ---------------------------------------------------------------------------
-registerVSTBridge({
-  id: 'Open303',
-  name: 'Open303 (TB-303)',
-  wasmDir: 'open303',
-  wasmFile: 'Open303',
-  synthClassName: 'Open303Synth',
-  moduleFactoryName: 'createOpen303Module',
-  volumeOffsetDb: 0,
-});
-
-// ---------------------------------------------------------------------------
 // OB-Xd — Oberheim OB-X/OB-Xa Modeling by discoDSP (GPL3)
 // 2 oscillators (saw/pulse/tri/noise), biquad filter, LFO, 8-voice polyphonic
 // 45 parameters across 10 groups

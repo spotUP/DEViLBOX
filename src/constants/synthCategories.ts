@@ -1304,15 +1304,6 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Speaker',
     color: 'text-indigo-500',
   },
-  Open303: {
-    type: 'Open303',
-    name: 'Open303 (TB-303)',
-    shortName: 'O303',
-    description: 'Roland TB-303 by Robin Schmidt - saw/square blend, resonant TeeBee filter, accent, slide, decay envelope',
-    bestFor: ['Acid bass', 'TB-303 sound', 'Techno', 'House'],
-    icon: 'Zap',
-    color: 'text-red-500',
-  },
   // Buzzmachine Generators (new)
   Buzz3o3DF: {
     type: 'Buzz3o3DF',
@@ -1934,7 +1925,6 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.Sorcer,
       SYNTH_INFO.Amsynth,
       SYNTH_INFO.OBXf,
-      SYNTH_INFO.Open303,
       SYNTH_INFO.TonewheelOrgan,
       SYNTH_INFO.Melodica,
       SYNTH_INFO.Monique,

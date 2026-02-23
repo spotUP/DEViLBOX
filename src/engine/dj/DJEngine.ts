@@ -7,7 +7,8 @@
 
 import { DeckEngine, type DeckId } from './DeckEngine';
 import { DJMixerEngine, type CrossfaderCurve } from './DJMixerEngine';
-import { DJCueEngine, type CueMode } from './DJCueEngine';
+import { DJCueEngine } from './DJCueEngine';
+import { useDJStore } from '@/stores/useDJStore';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { AudioFileInfo } from './DeckAudioPlayer';
 
@@ -61,7 +62,7 @@ export class DJEngine {
   // LOAD
   // ==========================================================================
 
-  async loadToDeck(id: DeckId, song: TrackerSong): Promise<void> {
+  async loadToDeck(id: DeckId, song: TrackerSong, filename: string, bpm: number): Promise<void> {
     // Remap instrument IDs to a deck-specific range so they don't collide
     // with the main tracker view or the other deck's instruments.
     const offset = DECK_ID_OFFSETS[id];
@@ -69,6 +70,21 @@ export class DJEngine {
 
     const deck = this.getDeck(id);
     await deck.loadSong(song);
+
+    // Update store state
+    useDJStore.getState().setDeckState(id, {
+      fileName: filename,
+      trackName: song.name || filename,
+      detectedBPM: bpm,
+      effectiveBPM: bpm,
+      playbackMode: 'tracker',
+      durationMs: 0,
+      waveformPeaks: null,
+      totalPositions: song.songLength,
+      songPos: 0,
+      pattPos: 0,
+      elapsedMs: 0,
+    });
   }
 
   /**
@@ -102,9 +118,24 @@ export class DJEngine {
    * Load an audio file (MP3, WAV, FLAC, etc.) to a deck.
    * Switches the deck to audio playback mode.
    */
-  async loadAudioToDeck(id: DeckId, buffer: ArrayBuffer, filename: string): Promise<AudioFileInfo> {
+  async loadAudioToDeck(id: DeckId, buffer: ArrayBuffer, filename: string, trackName?: string, bpm?: number): Promise<AudioFileInfo> {
     const deck = this.getDeck(id);
-    return deck.loadAudioFile(buffer, filename);
+    const info = await deck.loadAudioFile(buffer, filename);
+
+    // Update store state
+    useDJStore.getState().setDeckState(id, {
+      fileName: filename,
+      trackName: trackName || filename,
+      detectedBPM: bpm || 125,
+      effectiveBPM: bpm || 125,
+      playbackMode: 'audio',
+      durationMs: info.duration * 1000,
+      waveformPeaks: info.waveformPeaks,
+      audioPosition: 0,
+      elapsedMs: 0,
+    });
+
+    return info;
   }
 
   // ==========================================================================

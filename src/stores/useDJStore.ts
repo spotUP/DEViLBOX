@@ -108,6 +108,7 @@ export interface DeckState {
 
   // Analysis state (populated by DJPipeline background analysis)
   analysisState: 'none' | 'pending' | 'rendering' | 'analyzing' | 'ready';
+  analysisProgress: number; // 0-100
   beatGrid: BeatGridData | null;
   musicalKey: string | null;
   keyConfidence: number;
@@ -186,6 +187,7 @@ const defaultDeckState: DeckState = {
 
   // Analysis
   analysisState: 'none',
+  analysisProgress: 0,
   beatGrid: null,
   musicalKey: null,
   keyConfidence: 0,
@@ -271,6 +273,7 @@ interface DJActions {
 
   // Pipeline
   setPipelineState: (queue: number, currentTask: string | null) => void;
+  setDeckAnalysisProgress: (deck: DeckId, progress: number) => void;
 
   // Headphone cueing
   setCueMode: (mode: CueMode) => void;
@@ -528,6 +531,11 @@ export const useDJStore = create<DJStore>()(
         state.pipelineQueue = queue;
         state.pipelineCurrentTask = currentTask;
         state.pipelineActive = queue > 0 || currentTask !== null;
+      }),
+
+    setDeckAnalysisProgress: (deck, progress) =>
+      set((state) => {
+        state.decks[deck].analysisProgress = progress;
       }),
   })))
 );

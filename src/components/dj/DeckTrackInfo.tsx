@@ -28,6 +28,7 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
   const musicalKey = useDJStore((s) => s.decks[deckId].musicalKey);
   const seratoKey = useDJStore((s) => s.decks[deckId].seratoKey);
   const analysisState = useDJStore((s) => s.decks[deckId].analysisState);
+  const analysisProgress = useDJStore((s) => s.decks[deckId].analysisProgress);
   const analysisBPM = useDJStore((s) => s.decks[deckId].beatGrid?.bpm ?? 0);
   const pitchOffset = useDJStore((s) => s.decks[deckId].pitchOffset);
 
@@ -100,13 +101,14 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
 
   // Analysis state indicator
   const analysisIndicator = useMemo(() => {
+    const pct = analysisProgress > 0 ? ` ${analysisProgress}%` : '';
     switch (analysisState) {
       case 'pending':   return { text: 'QUEUE', color: 'text-yellow-600' };
-      case 'rendering': return { text: 'REND',  color: 'text-blue-400' };
-      case 'analyzing': return { text: 'ANLZ',  color: 'text-purple-400' };
+      case 'rendering': return { text: `REND${pct}`,  color: 'text-blue-400' };
+      case 'analyzing': return { text: `ANLZ${pct}`,  color: 'text-purple-400' };
       default:          return null;
     }
-  }, [analysisState]);
+  }, [analysisState, analysisProgress]);
 
   return (
     <div className="flex flex-col gap-1 min-w-0">

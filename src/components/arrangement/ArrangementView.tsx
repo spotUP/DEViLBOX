@@ -10,12 +10,16 @@ import { useArrangementStore } from '@stores/useArrangementStore';
 import { useTrackerStore } from '@stores';
 import { useTransportStore } from '@stores';
 import { notify } from '@stores/useNotificationStore';
+import { useArrangementKeyboard } from '@/hooks/arrangement/useArrangementKeyboard';
 import { ArrangementToolbar } from './ArrangementToolbar';
 import { TrackHeaderPanel } from './TrackHeaderPanel';
 import { ArrangementCanvas } from './ArrangementCanvas';
 import { ArrangementContextMenu } from './ArrangementContextMenu';
 
 export const ArrangementView: React.FC = () => {
+  // Register keyboard shortcuts for arrangement view
+  useArrangementKeyboard();
+
   const {
     tracks, groups, automationLanes, view,
     setTool,

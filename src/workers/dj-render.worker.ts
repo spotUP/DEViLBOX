@@ -115,6 +115,11 @@ async function initUADE(): Promise<void> {
   jsCode = jsCode.replace(/export\s+default\s+/g, 'var createUADE = ');
   jsCode = jsCode.replace(/export\s*\{[^}]*\}/g, '');
 
+  // Fix environment detection and mock document for worker scope
+  jsCode = jsCode.replace(/ENVIRONMENT_IS_WEB\s*=\s*!0/g, 'ENVIRONMENT_IS_WEB=false');
+  jsCode = jsCode.replace(/ENVIRONMENT_IS_WORKER\s*=\s*!1/g, 'ENVIRONMENT_IS_WORKER=true');
+  jsCode = 'var document = { currentScript: { src: "' + baseUrl + '/uade/UADE.js" }, title: "" };\n' + jsCode;
+
   // Execute the glue code to get factory function
   const factory = new Function(jsCode + '\n;return typeof createUADE !== "undefined" ? createUADE : Module;')();
 
@@ -125,6 +130,12 @@ async function initUADE(): Promise<void> {
     print: (msg: string) => console.log('[DJRenderWorker/UADE]', msg),
     printErr: (msg: string) => console.warn('[DJRenderWorker/UADE]', msg),
   });
+
+  // Initialize UADE engine (CRITICAL: Loading fails if this isn't called)
+  const initRet = uadeInstance._uade_wasm_init(44100);
+  if (initRet !== 0) {
+    throw new Error(`uade_wasm_init failed with code ${initRet}`);
+  }
 
   // Store for reuse
   uadeWasm = await WebAssembly.compile(wasmBinary);
@@ -149,12 +160,9 @@ async function renderWithUADE(
   wasm.HEAPU8.set(fileBytes, filePtr);
 
   // Create a filename in WASM memory
-  const fnameLen = filename.length + 1;
+  const fnameLen = filename.length * 3 + 1;
   const fnamePtr = wasm._malloc(fnameLen);
-  for (let i = 0; i < filename.length; i++) {
-    wasm.HEAP8[fnamePtr + i] = filename.charCodeAt(i);
-  }
-  wasm.HEAP8[fnamePtr + filename.length] = 0;
+  wasm.stringToUTF8(filename, fnamePtr, fnameLen);
 
   // Load the module
   const loadResult = wasm._uade_wasm_load(filePtr, fileSize, fnamePtr);
@@ -256,12 +264,12 @@ async function initLibopenmpt(): Promise<void> {
 }
 
 /** Helper: write ASCII string to WASM stack */
-function asciiToStack(lib: { stackAlloc: (n: number) => number; HEAP8: Int8Array }, str: string): number {
+function asciiToStack(lib: { stackAlloc: (n: number) => number; HEAPU8: Uint8Array }, str: string): number {
   const ptr = lib.stackAlloc(str.length + 1);
   for (let i = 0; i < str.length; i++) {
-    lib.HEAP8[ptr + i] = str.charCodeAt(i);
+    lib.HEAPU8[ptr + i] = str.charCodeAt(i);
   }
-  lib.HEAP8[ptr + str.length] = 0;
+  lib.HEAPU8[ptr + str.length] = 0;
   return ptr;
 }
 

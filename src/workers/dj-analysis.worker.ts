@@ -70,6 +70,10 @@ async function initEssentia(): Promise<void> {
   wasmGlueCode = wasmGlueCode.replace(/export\s+default\s+/g, 'var EssentiaWASM = ');
   wasmGlueCode = wasmGlueCode.replace(/export\s*\{[^}]*\}/g, '');
 
+  // Fix environment detection and mock document for worker scope
+  wasmGlueCode = wasmGlueCode.replace(/var ENVIRONMENT_IS_WEB=true;var ENVIRONMENT_IS_WORKER=false;/g, 'var ENVIRONMENT_IS_WEB=false;var ENVIRONMENT_IS_WORKER=true;');
+  wasmGlueCode = 'var document = { currentScript: { src: "' + wasmGlueUrl + '" }, title: "" };\n' + wasmGlueCode;
+
   const wasmFactory = new Function(wasmGlueCode + '\n;return typeof EssentiaWASM !== "undefined" ? EssentiaWASM : Module;')();
   essentiaModule = await wasmFactory();
 
@@ -261,7 +265,7 @@ function computeLoudness(mono: Float32Array): { rmsDb: number; peakDb: number } 
 
 /**
  * Compute frequency-band waveform peaks (low/mid/high) for colored waveform display.
- * Uses simple FFT-based band splitting.
+ * Optimized for speed: single pass with simple recursive filters.
  */
 function computeFrequencyPeaks(
   left: Float32Array,
@@ -271,86 +275,69 @@ function computeFrequencyPeaks(
 ): number[][] {
   const totalSamples = left.length;
   const samplesPerBin = Math.floor(totalSamples / numBins);
-  if (samplesPerBin < 1) return [[], [], []];
+  if (samplesPerBin < 1) return [[0], [0], [0]];
 
-  // Frequency band boundaries
-  const lowCutoff = 200;    // 0-200 Hz (bass)
-  const midCutoff = 4000;   // 200-4000 Hz (mids)
-  // 4000+ Hz (treble)
+  const lowPeaks = new Float32Array(numBins);
+  const midPeaks = new Float32Array(numBins);
+  const highPeaks = new Float32Array(numBins);
 
-  const lowPeaks = new Array<number>(numBins);
-  const midPeaks = new Array<number>(numBins);
-  const highPeaks = new Array<number>(numBins);
+  // Simple IIR filter coefficients (First-order)
+  // Low: ~200Hz, Mid: ~2000Hz (at 44.1kHz)
+  const lpFreq = 200;
+  const hpFreq = 2000;
+  
+  // Alpha for lowpass: dt / (RC + dt)
+  const dt = 1 / sampleRate;
+  const alphaLP = (2 * Math.PI * dt * lpFreq) / (2 * Math.PI * dt * lpFreq + 1);
+  const alphaHP = 1 / (2 * Math.PI * dt * hpFreq + 1);
 
-  // FFT size for analyzing frequency content
-  const fftSize = 2048;
-  const halfFFT = fftSize / 2;
-
-  // Hann window
-  const window = new Float32Array(fftSize);
-  for (let i = 0; i < fftSize; i++) {
-    window[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (fftSize - 1)));
-  }
-
-  // Frequency bin boundaries
-  const freqPerBin = sampleRate / fftSize;
-  const lowBinEnd = Math.floor(lowCutoff / freqPerBin);
-  const midBinEnd = Math.floor(midCutoff / freqPerBin);
+  let lowState = 0;
+  let highState = 0;
 
   for (let bin = 0; bin < numBins; bin++) {
     const start = bin * samplesPerBin;
     const end = Math.min(start + samplesPerBin, totalSamples);
-    const center = Math.floor((start + end) / 2);
+    
+    let maxLow = 0;
+    let maxMid = 0;
+    let maxHigh = 0;
 
-    // Extract a window of samples centered on this bin
-    const fftStart = Math.max(0, center - halfFFT);
-    const frame = new Float32Array(fftSize);
-    for (let i = 0; i < fftSize && fftStart + i < totalSamples; i++) {
-      let sample = left[fftStart + i];
-      if (right) sample = (sample + right[fftStart + i]) * 0.5;
-      frame[i] = sample * window[i];
+    for (let i = start; i < end; i++) {
+      let sample = left[i];
+      if (right) sample = (sample + right[i]) * 0.5;
+      
+      const absSample = Math.abs(sample);
+
+      // Low pass (simple RC)
+      lowState = lowState + alphaLP * (absSample - lowState);
+      const lowVal = lowState;
+
+      // High pass (simple RC)
+      const highVal = alphaHP * (highState + absSample - (i > 0 ? Math.abs(left[i-1]) : 0));
+      highState = highVal;
+
+      // Mid is what's left
+      const midVal = Math.max(0, absSample - lowVal - Math.abs(highVal));
+
+      if (lowVal > maxLow) maxLow = lowVal;
+      if (midVal > maxMid) maxMid = midVal;
+      const absHigh = Math.abs(highVal);
+      if (absHigh > maxHigh) maxHigh = absHigh;
     }
 
-    // Simple DFT magnitude estimation for the three bands
-    // (Not a full FFT — we compute energy in each band using Goertzel-like sums)
-    let lowEnergy = 0;
-    let midEnergy = 0;
-    let highEnergy = 0;
-
-    // Compute power in each band using overlapping frame analysis
-    for (let k = 0; k < halfFFT; k++) {
-      // Goertzel-style: compute magnitude at frequency bin k
-      let realSum = 0;
-      let imagSum = 0;
-      const omega = (2 * Math.PI * k) / fftSize;
-      // Subsample for speed (every 4th sample)
-      for (let n = 0; n < fftSize; n += 4) {
-        realSum += frame[n] * Math.cos(omega * n);
-        imagSum -= frame[n] * Math.sin(omega * n);
-      }
-      const mag = Math.sqrt(realSum * realSum + imagSum * imagSum);
-
-      if (k < lowBinEnd) {
-        lowEnergy += mag;
-      } else if (k < midBinEnd) {
-        midEnergy += mag;
-      } else {
-        highEnergy += mag;
-      }
-    }
-
-    // Normalize by number of bins in each band
-    lowPeaks[bin] = lowBinEnd > 0 ? lowEnergy / lowBinEnd : 0;
-    midPeaks[bin] = (midBinEnd - lowBinEnd) > 0 ? midEnergy / (midBinEnd - lowBinEnd) : 0;
-    highPeaks[bin] = (halfFFT - midBinEnd) > 0 ? highEnergy / (halfFFT - midBinEnd) : 0;
+    lowPeaks[bin] = maxLow;
+    midPeaks[bin] = maxMid;
+    highPeaks[bin] = maxHigh;
   }
 
-  // Normalize each band to 0-1 range
-  const normalize = (arr: number[]): number[] => {
+  // Helper to normalize and convert to number[]
+  const normalize = (arr: Float32Array): number[] => {
     let max = 0;
-    for (const v of arr) if (v > max) max = v;
-    if (max === 0) return arr;
-    return arr.map(v => v / max);
+    for (let i = 0; i < arr.length; i++) if (arr[i] > max) max = arr[i];
+    if (max === 0) return Array.from(arr);
+    const result = new Array(arr.length);
+    for (let i = 0; i < arr.length; i++) result[i] = arr[i] / max;
+    return result;
   };
 
   return [normalize(lowPeaks), normalize(midPeaks), normalize(highPeaks)];

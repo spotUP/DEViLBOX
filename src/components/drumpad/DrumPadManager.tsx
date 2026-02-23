@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useDrumPadKeyboard } from '@/hooks/drumpad/useDrumPadKeyboard';
 import { PadGrid } from './PadGrid';
 import { PadEditor } from './PadEditor';
 import { SamplePackBrowser } from '../instruments/SamplePackBrowser';
@@ -23,6 +24,9 @@ interface DrumPadManagerProps {
 }
 
 export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
+  // Register keyboard shortcuts for drum pad view
+  useDrumPadKeyboard();
+
   const [selectedPadId, setSelectedPadId] = useState<number | null>(null);
   const [showSampleBrowser, setShowSampleBrowser] = useState(false);
   const [showPadEditor, setShowPadEditor] = useState(false);

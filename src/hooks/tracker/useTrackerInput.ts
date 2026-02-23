@@ -386,6 +386,12 @@ export const useTrackerInput = () => {
   // Handle keyboard input
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // Only handle keys when tracker view is active
+      const activeView = useUIStore.getState().activeView;
+      if (activeView !== 'tracker') {
+        return;
+      }
+
       // Ignore if typing in input field or operating a dropdown
       if (
         e.target instanceof HTMLInputElement ||
@@ -1453,6 +1459,12 @@ export const useTrackerInput = () => {
   // Handle key release for note off
   const handleKeyUp = useCallback(
     (e: KeyboardEvent) => {
+      // Only handle keys when tracker view is active
+      const activeView = useUIStore.getState().activeView;
+      if (activeView !== 'tracker') {
+        return;
+      }
+
       const keyLower = e.key.toLowerCase();
 
       // Release note if this is a note key

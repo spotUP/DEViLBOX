@@ -23,7 +23,6 @@ import { DJCachePanel } from './DJCachePanel';
 import { MasterEffectsModal } from '@/components/effects';
 import { DJFxQuickPresets } from './DJFxQuickPresets';
 import { DJControllerSelector } from './DJControllerSelector';
-import { DJScenarioSelector } from './DJScenarioSelector';
 import { DJSamplerPanel } from './DJSamplerPanel';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
@@ -124,7 +123,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
   }, []);
 
   // DJ keyboard shortcuts
-  useDJKeyboardHandler(true);
+  useDJKeyboardHandler();
 
   // ── Sync master FX presets to DJ mixer ──────────────────────────────────
   // When user selects an FX preset via DJFxQuickPresets or MasterEffectsModal,
