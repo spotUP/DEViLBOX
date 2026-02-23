@@ -152,16 +152,20 @@ async function renderWithUADE(
   await initUADE();
   const wasm = uadeInstance;
 
-  // Root cause fix: sanitize filename. Spaces or special chars can break eagleplayer 
-  // command parsing in the 68k core.
-  const ext = filename.split('.').pop() || 'mod';
-  const nameBase = filename.slice(0, filename.lastIndexOf('.')).replace(/[^a-zA-Z0-9]/g, '_');
-  const safeFilename = `${nameBase}.${ext}`;
-  console.log(`[DJRenderWorker/UADE] Rendering ${filename} as ${safeFilename}`);
+  // Root cause fix: aggressive filename sanitization. 
+  // Many 68k eagleplayers have 32-char limits and break on paths or special chars.
+  const baseName = filename.split(/[\\/]/).pop() || filename;
+  const dotIdx = baseName.lastIndexOf('.');
+  const ext = dotIdx !== -1 ? baseName.slice(dotIdx + 1) : 'mod';
+  const nameOnly = dotIdx !== -1 ? baseName.slice(0, dotIdx) : baseName;
+  const safeName = nameOnly.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 20);
+  const safeFilename = `${safeName}.${ext}`;
+  
+  console.log(`[DJRenderWorker/UADE] Rendering ${filename} as ${safeFilename} (${fileBuffer.byteLength} bytes)`);
 
   // Stabilize IPC after fresh init
   if (isNewInit) {
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   // Load the file into UADE WASM memory
@@ -175,23 +179,20 @@ async function renderWithUADE(
   const fnamePtr = wasm._malloc(fnameLen);
   wasm.stringToUTF8(safeFilename, fnamePtr, fnameLen);
 
-  // Stop any previous playback/loading state to clear IPC buffers
-  if (wasm._uade_wasm_stop) wasm._uade_wasm_stop();
-
-  // Load the module with retry logic for IPC sync issues
+  // Load the module (don't call stop() before load, it can confuse some players)
   let loadResult = wasm._uade_wasm_load(filePtr, fileSize, fnamePtr);
   
   if (loadResult !== 0) {
-    console.warn(`[DJRenderWorker/UADE] First load failed (${loadResult}), attempting IPC buffer clear...`);
-    // If it failed with IPC issues (likely 'cmd buffer full'), try to pump the 
-    // render loop a few times to clear the command queue, then retry.
+    console.warn(`[DJRenderWorker/UADE] First load failed (${loadResult}), attempting IPC buffer clear and retry...`);
+    // Clear IPC state
+    if (wasm._uade_wasm_stop) wasm._uade_wasm_stop();
     const dummyL = wasm._malloc(1024 * 4);
     const dummyR = wasm._malloc(1024 * 4);
-    for (let i = 0; i < 5; i++) wasm._uade_wasm_render(dummyL, dummyR, 1024);
+    for (let i = 0; i < 3; i++) wasm._uade_wasm_render(dummyL, dummyR, 1024);
     wasm._free(dummyL);
     wasm._free(dummyR);
     
-    if (wasm._uade_wasm_stop) wasm._uade_wasm_stop();
+    // Final attempt
     loadResult = wasm._uade_wasm_load(filePtr, fileSize, fnamePtr);
   }
 
@@ -199,7 +200,7 @@ async function renderWithUADE(
   wasm._free(fnamePtr);
 
   if (loadResult !== 0) {
-    throw new Error(`UADE failed to load ${safeFilename} (orig: ${filename}) (error: ${loadResult})`);
+    throw new Error(`UADE failed to load ${safeFilename} (error: ${loadResult})`);
   }
 
   // Set subsong if specified
