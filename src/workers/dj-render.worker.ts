@@ -124,7 +124,7 @@ async function initUADE(): Promise<void> {
   // Instantiate UADE WASM
   uadeInstance = await factory({
     wasmBinary,
-    noInitialRun: true,
+    noInitialRun: false,
     print: (msg: string) => console.log('[DJRenderWorker/UADE]', msg),
     printErr: (msg: string) => console.warn('[DJRenderWorker/UADE]', msg),
   });
@@ -148,8 +148,21 @@ async function renderWithUADE(
   subsong: number,
   id: string,
 ): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
+  const isNewInit = !uadeReady;
   await initUADE();
   const wasm = uadeInstance;
+
+  // Root cause fix: sanitize filename. Spaces or special chars can break eagleplayer 
+  // command parsing in the 68k core.
+  const ext = filename.split('.').pop() || 'mod';
+  const nameBase = filename.slice(0, filename.lastIndexOf('.')).replace(/[^a-zA-Z0-9]/g, '_');
+  const safeFilename = `${nameBase}.${ext}`;
+  console.log(`[DJRenderWorker/UADE] Rendering ${filename} as ${safeFilename}`);
+
+  // Stabilize IPC after fresh init
+  if (isNewInit) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
 
   // Load the file into UADE WASM memory
   const fileSize = fileBuffer.byteLength;
@@ -158,9 +171,9 @@ async function renderWithUADE(
   wasm.HEAPU8.set(fileBytes, filePtr);
 
   // Create a filename in WASM memory
-  const fnameLen = filename.length * 3 + 1;
+  const fnameLen = safeFilename.length * 3 + 1;
   const fnamePtr = wasm._malloc(fnameLen);
-  wasm.stringToUTF8(filename, fnamePtr, fnameLen);
+  wasm.stringToUTF8(safeFilename, fnamePtr, fnameLen);
 
   // Stop any previous playback/loading state to clear IPC buffers
   if (wasm._uade_wasm_stop) wasm._uade_wasm_stop();
@@ -186,7 +199,7 @@ async function renderWithUADE(
   wasm._free(fnamePtr);
 
   if (loadResult !== 0) {
-    throw new Error(`UADE failed to load ${filename} (error: ${loadResult})`);
+    throw new Error(`UADE failed to load ${safeFilename} (orig: ${filename}) (error: ${loadResult})`);
   }
 
   // Set subsong if specified
