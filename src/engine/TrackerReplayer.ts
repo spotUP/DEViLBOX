@@ -27,6 +27,7 @@ import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/au
 import type { GrooveTemplate } from '@/types/audio';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate, ft2ArpeggioPeriod, ft2Period2NotePeriod, FT2_ARPEGGIO_TAB } from './effects/FT2Tables';
+import { HivelyEngine } from './hively/HivelyEngine';
 
 // ============================================================================
 // CONSTANTS
@@ -374,6 +375,8 @@ export interface TrackerSong {
     speedMultiplier: number;
     version: number;
   };
+  /** Raw HVL/AHX binary for loading into the HivelyEngine WASM */
+  hivelyFileData?: ArrayBuffer;
 
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
@@ -407,6 +410,7 @@ export class TrackerReplayer {
 
   // Playback state
   private playing = false;
+  private _songEndFiredThisBatch = false;
   private songPos = 0;           // Current position in song order
   private pattPos = 0;           // Current row in pattern
   private currentTick = 0;       // Current tick (0 to speed-1)
@@ -1088,6 +1092,32 @@ export class TrackerReplayer {
     const engine = getToneEngine();
     await engine.ensureWASMSynthsReady(this.song.instruments);
 
+    // HVL/AHX: Load the raw tune binary into the HivelyEngine WASM before playback.
+    // The WASM engine does all synthesis; TrackerReplayer just triggers play/stop.
+    // We pre-create ONE HivelySynth here so the audio graph is connected BEFORE
+    // play() is called — otherwise the first few rows could be silent.
+    if (this.song.hivelyFileData && (this.song.format === 'HVL' || this.song.format === 'AHX')) {
+      try {
+        const hivelyEngine = HivelyEngine.getInstance();
+        await hivelyEngine.ready();
+        const stereoMode = this.song.hivelyMeta?.stereoMode ?? 2;
+        await hivelyEngine.loadTune(this.song.hivelyFileData.slice(0), stereoMode);
+
+        // Pre-create a HivelySynth so its output is routed through the audio graph
+        // before we call play(). This ensures engine.output → synthBus is connected.
+        const firstHVL = this.song.instruments.find(i => i.synthType === 'HivelySynth');
+        if (firstHVL) {
+          engine.getInstrument(firstHVL.id, firstHVL);
+        }
+
+        // Start WASM playback immediately — don't wait for a note trigger
+        hivelyEngine.play();
+        console.log('[TrackerReplayer] HivelyEngine tune loaded & playing for', this.song.format);
+      } catch (err) {
+        console.error('[TrackerReplayer] Failed to load HVL tune into WASM engine:', err);
+      }
+    }
+
     // Route UADE/Hively native engine output through the stereo separation chain
     // so the Amiga stereo mix (hard-pan LRRL) gets narrowed by stereoSeparation.
     // In DJ mode, DeckEngine.loadSong() handles this; only do it for tracker view.
@@ -1119,6 +1149,15 @@ export class TrackerReplayer {
     if (this.schedulerTimerId !== null) {
       clearInterval(this.schedulerTimerId);
       this.schedulerTimerId = null;
+    }
+
+    // Stop HivelyEngine if this is an HVL/AHX song
+    if (this.song?.hivelyFileData && (this.song.format === 'HVL' || this.song.format === 'AHX')) {
+      try {
+        if (HivelyEngine.hasInstance()) {
+          HivelyEngine.getInstance().stop();
+        }
+      } catch { /* HivelyEngine may not be loaded */ }
     }
 
     // Stop all channels (release synth notes + stop sample players)
@@ -1184,6 +1223,7 @@ export class TrackerReplayer {
 
     const schedulerTick = () => {
       if (!this.playing) return;
+      this._songEndFiredThisBatch = false;
 
       const scheduleUntil = Tone.now() + this.scheduleAheadTime;
       const transportState = useTransportStore.getState();
@@ -4114,7 +4154,11 @@ export class TrackerReplayer {
         this.songPos = this.song.restartPosition < this.song.songLength
           ? this.song.restartPosition
           : 0;
-        this.onSongEnd?.();
+        // Debounce: only fire onSongEnd once per actual song loop (not per scheduler batch)
+        if (!this._songEndFiredThisBatch) {
+          this._songEndFiredThisBatch = true;
+          this.onSongEnd?.();
+        }
       }
     }
 

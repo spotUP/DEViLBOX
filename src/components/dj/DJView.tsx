@@ -26,6 +26,7 @@ import { DJControllerSelector } from './DJControllerSelector';
 import { DJSamplerPanel } from './DJSamplerPanel';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
+import { getDJPipeline } from '@/engine/dj/DJPipeline';
 
 // ============================================================================
 // MAIN DJ VIEW
@@ -154,6 +155,11 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
 
         cacheSong(cacheKey, song);
         await engine.loadToDeck(deckId, song);
+
+        // Fire background pipeline for render + analysis
+        void getDJPipeline().loadOrEnqueue(buffer.slice(0), filename, deckId, 'high').catch((err) => {
+          console.warn(`[DJView] Pipeline for Serato tracker ${filename}:`, err);
+        });
 
         // Compute note density peaks for overview waveform
         const { computeTrackerPeaks } = await import('@/engine/dj/computeTrackerPeaks');

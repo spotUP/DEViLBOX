@@ -24,12 +24,29 @@ export class HivelySynth implements DevilboxSynth {
   private _playerHandle = -1;
   private _instrumentMode = false;
 
+  /**
+   * Track whether the singleton engine output is already connected to a
+   * HivelySynth output.  Only the FIRST instance bridges the engine audio
+   * into the Tone.js graph — additional instances share the same routing
+   * and avoid duplicate connections that would multiply the volume.
+   */
+  private static _engineConnectedToSynth = false;
+  private _ownsEngineConnection = false;
+
   constructor() {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
 
     this.engine = HivelyEngine.getInstance();
-    this.engine.output.connect(this.output);
+
+    // Only the first live HivelySynth bridges engine → synth output.
+    // Subsequent instances get a silent output node (they don't need their
+    // own audio path because the engine is a singleton whole-song player).
+    if (!HivelySynth._engineConnectedToSynth) {
+      this.engine.output.connect(this.output);
+      HivelySynth._engineConnectedToSynth = true;
+      this._ownsEngineConnection = true;
+    }
   }
 
   /**
@@ -168,6 +185,15 @@ export class HivelySynth implements DevilboxSynth {
       this._playerHandle = -1;
     }
 
-    this.engine.output.disconnect();
+    // Only disconnect THIS synth's output from the engine — never call
+    // engine.output.disconnect() which would sever the singleton's
+    // connection to all other destinations (synthBus, stereo separation, etc.).
+    if (this._ownsEngineConnection) {
+      try {
+        this.engine.output.disconnect(this.output);
+      } catch { /* may already be disconnected */ }
+      HivelySynth._engineConnectedToSynth = false;
+      this._ownsEngineConnection = false;
+    }
   }
 }

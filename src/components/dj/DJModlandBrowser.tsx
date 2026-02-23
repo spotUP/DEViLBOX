@@ -21,6 +21,7 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { cacheSong } from '@/engine/dj/DJSongCache';
+import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -122,6 +123,11 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
 
         const engine = getDJEngine();
         await engine.loadToDeck(deckId, song);
+
+        // Fire background pipeline for render + analysis (BPM, key, beat grid, waveform)
+        void getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high').catch((err) => {
+          console.warn(`[DJModlandBrowser] Pipeline for ${file.filename}:`, err);
+        });
 
         useDJStore.getState().setDeckState(deckId, {
           fileName: cacheKey,
