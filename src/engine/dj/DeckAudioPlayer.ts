@@ -1,11 +1,17 @@
 /**
- * DeckAudioPlayer - Audio file playback for DJ decks (MP3, WAV, FLAC, OGG, AAC)
+ * DeckAudioPlayer - Audio file playback for DJ decks (MP3, WAV, FLAC, OGG, AAC, OPUS)
  *
  * Uses Tone.Player (AudioBuffer-based) for sample-accurate playback.
  * Connects to DeckEngine's deckGain node — same point TrackerReplayer connects.
+ *
+ * Cross-browser codec support via WASM fallback decoders:
+ * - FLAC: @wasm-audio-decoders/flac
+ * - OGG Vorbis: @wasm-audio-decoders/ogg-vorbis
+ * - Opus: @wasm-audio-decoders/opus-ml
  */
 
 import * as Tone from 'tone';
+import { decodeAudio, DecodeResult } from '../../lib/audio/UnifiedAudioDecoder';
 
 export interface AudioFileInfo {
   duration: number;        // seconds
@@ -39,11 +45,17 @@ export class DeckAudioPlayer {
   /**
    * Load an audio file from an ArrayBuffer.
    * Decodes the audio and computes overview waveform peaks.
+   * Uses WASM fallback decoders for cross-browser format support.
    */
-  async loadAudioFile(buffer: ArrayBuffer, _filename: string): Promise<AudioFileInfo> {
-    // Decode audio
+  async loadAudioFile(buffer: ArrayBuffer, filename: string): Promise<AudioFileInfo> {
+    // Decode audio with cross-browser support
     const audioContext = Tone.getContext().rawContext as AudioContext;
-    const audioBuffer = await audioContext.decodeAudioData(buffer.slice(0));
+    const result: DecodeResult = await decodeAudio(audioContext, buffer, { filename });
+    const audioBuffer = result.audioBuffer;
+
+    if (result.usedWasm) {
+      console.log(`[DeckAudioPlayer] Decoded ${result.format} using WASM fallback`);
+    }
 
     // Store in Tone.Player
     const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);

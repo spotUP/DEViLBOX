@@ -7,6 +7,7 @@
 
 import { DeckEngine, type DeckId } from './DeckEngine';
 import { DJMixerEngine, type CrossfaderCurve } from './DJMixerEngine';
+import { DJCueEngine, type CueMode } from './DJCueEngine';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { AudioFileInfo } from './DeckAudioPlayer';
 
@@ -19,17 +20,29 @@ export class DJEngine {
   readonly deckB: DeckEngine;
   readonly deckC: DeckEngine;
   readonly mixer: DJMixerEngine;
+  readonly cueEngine: DJCueEngine;
 
   private disposed = false;
 
   constructor() {
+    // Create cue engine for headphone monitoring
+    this.cueEngine = new DJCueEngine();
+
     // Create mixer first (provides the input nodes for decks)
     this.mixer = new DJMixerEngine();
+
+    // Wire cue engine to mixer
+    this.mixer.setCueEngine(this.cueEngine);
 
     // Create decks connected to mixer inputs
     this.deckA = new DeckEngine({ id: 'A', outputNode: this.mixer.inputA });
     this.deckB = new DeckEngine({ id: 'B', outputNode: this.mixer.inputB });
     this.deckC = new DeckEngine({ id: 'C', outputNode: this.mixer.inputC });
+
+    // Initialize cue engine (async, but non-blocking)
+    void this.cueEngine.init().catch(err => {
+      console.warn('[DJEngine] Cue engine init failed:', err);
+    });
   }
 
   // ==========================================================================
@@ -129,6 +142,7 @@ export class DJEngine {
     this.deckB.dispose();
     this.deckC.dispose();
     this.mixer.dispose();
+    this.cueEngine.dispose();
   }
 }
 
