@@ -3322,14 +3322,35 @@ export class ToneEngine {
       try {
         // Handle Player/GrainPlayer - they use stop() not releaseAll()
         if (instrument instanceof Tone.Player || instrument instanceof Tone.GrainPlayer) {
+          // Disable loop BEFORE stopping to prevent looped samples from continuing
+          instrument.loop = false;
           if (instrument.state === 'started') {
             instrument.stop(now);
+          }
+        } else if (instrument instanceof Tone.Sampler) {
+          // Sampler: releaseAll() only triggers envelope release, looped samples keep playing
+          // Force-stop all voices by accessing internal _activeSources
+          (instrument as any).releaseAll(now);
+          // Also try to stop all active buffer sources (internal Tone.js implementation detail)
+          const activeSources = (instrument as any)._activeSources;
+          if (activeSources && activeSources instanceof Map) {
+            activeSources.forEach((sources: any[]) => {
+              if (Array.isArray(sources)) {
+                sources.forEach((source: any) => {
+                  try {
+                    if (source && typeof source.stop === 'function') {
+                      source.stop(now + 0.05); // Stop after short fade
+                    }
+                  } catch { /* ignore */ }
+                });
+              }
+            });
           }
         } else if (instrument instanceof JC303Synth) {
           // TB303 has its own release method
           instrument.releaseAll();
         } else if ((instrument as any).releaseAll) {
-          // Synths and Samplers use releaseAll()
+          // Synths use releaseAll()
           (instrument as any).releaseAll(now);
         } else if (isDevilboxSynth(instrument) && instrument.triggerRelease) {
           // DevilboxSynths don't have releaseAll(), use triggerRelease()
@@ -3345,6 +3366,14 @@ export class ToneEngine {
         const instAny = instrument as any;
         if (instAny.volume && typeof instAny.volume.rampTo === 'function') {
           const currentVolume = instAny.volume.value;
+          // Guard against null volume value (can happen if instrument is in bad state)
+          if (currentVolume === null || currentVolume === undefined) {
+            return; // Skip this instrument in forEach
+          }
+          // Cancel any scheduled automation before ramping to prevent conflicts
+          if (typeof instAny.volume.cancelScheduledValues === 'function') {
+            instAny.volume.cancelScheduledValues(now);
+          }
           instAny.volume.rampTo(-Infinity, 0.05, now); // 50ms fade out
           // Cancel any pending restore for this key to prevent race conditions
           const prevTimeout = this.releaseRestoreTimeouts.get(key);
@@ -3403,7 +3432,16 @@ export class ToneEngine {
     // engine outputGain, not through individual synth .output GainNodes
     this.muteChipEngineOutputs(now);
 
-    // Also clear pitch state and active player tracking for all channels
+    // Stop all active looping players before clearing the map
+    // This is critical for samples with loops - they continue playing until explicitly stopped
+    this.channelActivePlayer.forEach((player) => {
+      try {
+        player.loop = false; // Disable loop first to prevent restart
+        if (player.state === 'started') {
+          player.stop(now);
+        }
+      } catch { /* ignored */ }
+    });
     this.channelPitchState.clear();
     this.channelActivePlayer.clear();
 
@@ -3531,6 +3569,13 @@ export class ToneEngine {
     this.channelLastNote.clear();
     this.channelMuteStates.clear();
     this.channelPitchState.clear();
+    // Stop all active looping players before clearing
+    this.channelActivePlayer.forEach((player) => {
+      try {
+        player.loop = false;
+        if (player.state === 'started') player.stop();
+      } catch { /* ignored */ }
+    });
     this.channelActivePlayer.clear();
     this.lastTriggerTime = 0;
   }

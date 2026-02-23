@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-23T20:47:11.269Z
+ * Generated: 2026-02-23T21:30:38.549Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1134';
-export const BUILD_NUMBER = '1134';
-export const BUILD_HASH = '7a1f52a6';
+export const BUILD_VERSION = '1.0.1137';
+export const BUILD_NUMBER = '1137';
+export const BUILD_HASH = '53378dfd';
 export const BUILD_DATE = '2026-02-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,21 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1134',
+    version: '1.0.1137',
     date: '2026-02-23',
     changes: [
+      {
+        type: 'fix',
+        "description": "Actually fix TypeScript errors in loadInstrumentFile"
+      },
+      {
+        type: 'fix',
+        "description": "Fix remaining TypeScript errors in UnifiedFileLoader"
+      },
+      {
+        type: 'improvement',
+        "description": "Update changelog for unified file loader"
+      },
       {
         type: 'fix',
         "description": "Fix TypeScript errors in unified file loader"
@@ -226,24 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add WASM hardware UI modules and instrument components"
-      },
-      {
-        type: 'feature',
-        "description": "Expand UADE WASM engine and Amiga format parsers"
-      }
-    ]
-  },
-  {
-    version: '2026-02-21',
-    date: '2026-02-21',
-    changes: [
-      {
-        type: 'feature',
-        "description": "Add UADE playback layer and Amiga format parsers/exporters"
-      },
-      {
-        type: 'feature',
-        "description": "Add Furnace order matrix Pixi view component"
       }
     ]
   }

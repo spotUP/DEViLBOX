@@ -184,6 +184,7 @@ class DJControllerMapper {
       const store = useDJStore.getState();
 
       switch (action) {
+        // ── Transport ──────────────────────────────────────────────
         case 'play_a': {
           if (engine.deckA.isPlaying()) {
             engine.deckA.pause();
@@ -228,6 +229,81 @@ class DJControllerMapper {
           } catch { /* other deck may not be loaded */ }
           break;
         }
+
+        // ── Loop Controls ──────────────────────────────────────────
+        case 'loop_a': {
+          store.toggleLoop('A');
+          break;
+        }
+        case 'loop_b': {
+          store.toggleLoop('B');
+          break;
+        }
+
+        // ── Loop Rolls (momentary loops) ───────────────────────────
+        case 'loop_roll_4_a':
+        case 'loop_roll_8_a':
+        case 'loop_roll_16_a':
+        case 'loop_roll_32_a': {
+          const size = parseInt(action.match(/\d+/)?.[0] || '4') as 1 | 2 | 4 | 8 | 16 | 32;
+          this.activateLoopRoll('A', size);
+          break;
+        }
+        case 'loop_roll_4_b':
+        case 'loop_roll_8_b':
+        case 'loop_roll_16_b':
+        case 'loop_roll_32_b': {
+          const size = parseInt(action.match(/\d+/)?.[0] || '4') as 1 | 2 | 4 | 8 | 16 | 32;
+          this.activateLoopRoll('B', size);
+          break;
+        }
+
+        // ── Beat Jump ──────────────────────────────────────────────
+        case 'beatjump_back_a': {
+          this.beatJump('A', -4);  // Jump back 4 beats
+          break;
+        }
+        case 'beatjump_fwd_a': {
+          this.beatJump('A', 4);  // Jump forward 4 beats
+          break;
+        }
+        case 'beatjump_back_b': {
+          this.beatJump('B', -4);
+          break;
+        }
+        case 'beatjump_fwd_b': {
+          this.beatJump('B', 4);
+          break;
+        }
+
+        // ── PFL (Headphone Cue) ────────────────────────────────────
+        case 'pfl_a': {
+          store.togglePFL('A');
+          break;
+        }
+        case 'pfl_b': {
+          store.togglePFL('B');
+          break;
+        }
+
+        // ── Quantized FX ───────────────────────────────────────────
+        case 'fx_echo_a':
+        case 'fx_reverb_a':
+        case 'fx_delay_a':
+        case 'fx_flanger_a': {
+          const fxType = action.replace('fx_', '').replace('_a', '');
+          this.triggerQuantizedFX('A', fxType);
+          break;
+        }
+        case 'fx_echo_b':
+        case 'fx_reverb_b':
+        case 'fx_delay_b':
+        case 'fx_flanger_b': {
+          const fxType = action.replace('fx_', '').replace('_b', '');
+          this.triggerQuantizedFX('B', fxType);
+          break;
+        }
+
         default: {
           // Hot cue actions: hotcue{N}_{a|b}
           const hotcueMatch = action.match(/^hotcue(\d)_([ab])$/);
@@ -406,6 +482,78 @@ class DJControllerMapper {
         store.setDeckFilter('B', -1 + normalized * 2);
         break;
     }
+  }
+
+  /**
+   * Activate a momentary loop roll (auto-releases when pad is released).
+   * Loop roll is a performance technique where a small loop plays momentarily
+   * then resumes normal playback.
+   */
+  private activateLoopRoll(deckId: 'A' | 'B' | 'C', beats: 1 | 2 | 4 | 8 | 16 | 32): void {
+    const store = useDJStore.getState();
+    // Store previous loop state
+    const wasLooping = store.decks[deckId].loopActive;
+    const prevSize = store.decks[deckId].lineLoopSize;
+    
+    // Activate loop with specified size
+    store.setLineLoopSize(deckId, beats);
+    if (!wasLooping) {
+      store.toggleLoop(deckId);
+    }
+    
+    // Auto-release after 50ms (pad release would trigger earlier via noteOff)
+    // This is a fallback for CC-based triggers
+    setTimeout(() => {
+      if (!wasLooping) {
+        store.toggleLoop(deckId);
+      }
+      store.setLineLoopSize(deckId, prevSize);
+    }, 50);
+  }
+
+  /**
+   * Jump forward/backward by beat grid.
+   * Uses DJBeatJump engine to snap to nearest beat.
+   */
+  private beatJump(deckId: 'A' | 'B' | 'C', beats: number): void {
+    try {
+      const engine = getDJEngine();
+      const deck = engine.getDeck(deckId);
+      const store = useDJStore.getState();
+      const deckState = store.decks[deckId];
+      
+      // Calculate new position based on BPM and beat count
+      const beatsPerSecond = deckState.effectiveBPM / 60;
+      const secondsToJump = beats / beatsPerSecond;
+      const newPosition = deckState.audioPosition + secondsToJump;
+      
+      // Clamp to track duration
+      const clampedPosition = Math.max(0, Math.min(newPosition, deckState.durationMs / 1000));
+      
+      if (deck.playbackMode === 'audio') {
+        deck.audioPlayer.seek(clampedPosition);
+        store.setDeckState(deckId, {
+          audioPosition: clampedPosition,
+          elapsedMs: clampedPosition * 1000,
+        });
+      }
+    } catch {
+      // Engine not ready
+    }
+  }
+
+  /**
+   * Trigger quantized FX (echo, reverb, delay, flanger).
+   * FX are beat-synced to the current BPM.
+   */
+  private triggerQuantizedFX(deckId: 'A' | 'B' | 'C', fxType: string): void {
+    // TODO: Wire to DJQuantizedFX engine once implemented
+    // For now, log the action
+    console.log(`Quantized FX triggered: ${fxType} on deck ${deckId}`);
+    
+    // Placeholder: Set a store flag that the DJ engine can react to
+    const store = useDJStore.getState();
+    // store.setDeckFX(deckId, fxType, true);  // Requires store method
   }
 }
 

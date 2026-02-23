@@ -10,7 +10,7 @@
  * that imports specialized controls as needed.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import type { InstrumentConfig, SynthType, EffectConfig } from '@typedefs/instrument';
 import {
   DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
@@ -24,44 +24,8 @@ import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { PresetDropdown } from '../presets/PresetDropdown';
 import { useAutoPreview } from '@hooks/useAutoPreview';
 import { SynthEditorTabs, type SynthEditorTab } from '../shared/SynthEditorTabs';
-import { TB303Controls } from '../controls/TB303Controls';
-import { FurnaceControls } from '../controls/FurnaceControls';
-import { BuzzmachineControls } from '../controls/BuzzmachineControls';
-import { SampleControls } from '../controls/SampleControls';
-import { DrumKitEditor } from './DrumKitEditor';
-import { DubSirenControls } from '../controls/DubSirenControls';
-import { SpaceLaserControls } from '../controls/SpaceLaserControls';
-import { V2Controls } from '../controls/V2Controls';
-import { V2SpeechControls } from '../controls/V2SpeechControls';
-import { SAMControls } from '../controls/SAMControls';
-import { SynareControls } from '../controls/SynareControls';
-import { MAMEControls } from '../controls/MAMEControls';
-import { ChipSynthControls } from '../controls/ChipSynthControls';
-import { DexedControls } from '../controls/DexedControls';
-import { OBXdControls } from '../controls/OBXdControls';
-import { WAMControls } from '../controls/WAMControls';
-import { VSTBridgePanel } from '../controls/VSTBridgePanel';
-import { HarmonicSynthControls } from '../controls/HarmonicSynthControls';
-import { ModularSynthControls } from '../synths/modular/ModularSynthControls';
-import { TonewheelOrganControls } from '../controls/TonewheelOrganControls';
-import { MelodicaControls } from '../controls/MelodicaControls';
-import { VitalControls } from '../controls/VitalControls';
-import { Odin2Controls } from '../controls/Odin2Controls';
-import { SurgeControls } from '../controls/SurgeControls';
-import { HivelyControls } from '../controls/HivelyControls';
-import { HivelyHardware } from '../hardware/HivelyHardware';
-import { PT2Hardware } from '../hardware/PT2Hardware';
-import { FT2Hardware } from '../hardware/FT2Hardware';
-import { FurnaceFMHardware, isFurnaceFMType } from '../hardware/FurnaceFMHardware';
-import { FurnacePSGHardware, isFurnacePSGType } from '../hardware/FurnacePSGHardware';
-import { FurnaceWaveHardware, isFurnaceWaveType } from '../hardware/FurnaceWaveHardware';
-import { FurnacePCMHardware, isFurnacePCMType } from '../hardware/FurnacePCMHardware';
-import { FurnaceMacroHardware } from '../hardware/FurnaceMacroHardware';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
 import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
-import { MAMEOscilloscope } from '../../visualization/MAMEOscilloscope';
-import { MAMEMacroEditor, type MacroData } from './MAMEMacroEditor';
-import { WavetableListEditor, type WavetableData } from './WavetableEditor';
 import { useThemeStore, useInstrumentStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 import { isMAMEChipType, getChipSynthDef } from '@constants/chipParameters';
@@ -72,8 +36,73 @@ import { Box, Drum, Megaphone, Zap, Radio, MessageSquare, Music, Mic, Monitor, C
 // We'll keep the existing tab content implementations
 import { renderSpecialParameters, renderGenericTabContent } from './VisualSynthEditorContent';
 
-// Import hardware UI components
+// Import hardware UI components (lightweight, always needed for detection)
 import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';
+
+// ============================================================================
+// LAZY-LOADED CONTROL COMPONENTS
+// These are loaded on-demand based on synthType to reduce initial bundle size
+// ============================================================================
+
+// Loading spinner for lazy components
+const LoadingControls = () => (
+  <div className="flex items-center justify-center py-8 text-gray-400">
+    <div className="animate-spin w-6 h-6 border-2 border-current border-t-transparent rounded-full" />
+    <span className="ml-2">Loading controls...</span>
+  </div>
+);
+
+// Lazy-loaded synth-specific controls
+const TB303Controls = lazy(() => import('../controls/TB303Controls').then(m => ({ default: m.TB303Controls })));
+const FurnaceControls = lazy(() => import('../controls/FurnaceControls').then(m => ({ default: m.FurnaceControls })));
+const BuzzmachineControls = lazy(() => import('../controls/BuzzmachineControls').then(m => ({ default: m.BuzzmachineControls })));
+const SampleControls = lazy(() => import('../controls/SampleControls').then(m => ({ default: m.SampleControls })));
+const DrumKitEditor = lazy(() => import('./DrumKitEditor').then(m => ({ default: m.DrumKitEditor })));
+const DubSirenControls = lazy(() => import('../controls/DubSirenControls').then(m => ({ default: m.DubSirenControls })));
+const SpaceLaserControls = lazy(() => import('../controls/SpaceLaserControls').then(m => ({ default: m.SpaceLaserControls })));
+const V2Controls = lazy(() => import('../controls/V2Controls').then(m => ({ default: m.V2Controls })));
+const V2SpeechControls = lazy(() => import('../controls/V2SpeechControls').then(m => ({ default: m.V2SpeechControls })));
+const SAMControls = lazy(() => import('../controls/SAMControls').then(m => ({ default: m.SAMControls })));
+const SynareControls = lazy(() => import('../controls/SynareControls').then(m => ({ default: m.SynareControls })));
+const MAMEControls = lazy(() => import('../controls/MAMEControls').then(m => ({ default: m.MAMEControls })));
+const ChipSynthControls = lazy(() => import('../controls/ChipSynthControls').then(m => ({ default: m.ChipSynthControls })));
+const DexedControls = lazy(() => import('../controls/DexedControls').then(m => ({ default: m.DexedControls })));
+const OBXdControls = lazy(() => import('../controls/OBXdControls').then(m => ({ default: m.OBXdControls })));
+const WAMControls = lazy(() => import('../controls/WAMControls').then(m => ({ default: m.WAMControls })));
+const VSTBridgePanel = lazy(() => import('../controls/VSTBridgePanel').then(m => ({ default: m.VSTBridgePanel })));
+const HarmonicSynthControls = lazy(() => import('../controls/HarmonicSynthControls').then(m => ({ default: m.HarmonicSynthControls })));
+const ModularSynthControls = lazy(() => import('../synths/modular/ModularSynthControls').then(m => ({ default: m.ModularSynthControls })));
+const TonewheelOrganControls = lazy(() => import('../controls/TonewheelOrganControls').then(m => ({ default: m.TonewheelOrganControls })));
+const MelodicaControls = lazy(() => import('../controls/MelodicaControls').then(m => ({ default: m.MelodicaControls })));
+const VitalControls = lazy(() => import('../controls/VitalControls').then(m => ({ default: m.VitalControls })));
+const Odin2Controls = lazy(() => import('../controls/Odin2Controls').then(m => ({ default: m.Odin2Controls })));
+const SurgeControls = lazy(() => import('../controls/SurgeControls').then(m => ({ default: m.SurgeControls })));
+const HivelyControls = lazy(() => import('../controls/HivelyControls').then(m => ({ default: m.HivelyControls })));
+
+// Lazy-loaded hardware UI components
+const HivelyHardware = lazy(() => import('../hardware/HivelyHardware').then(m => ({ default: m.HivelyHardware })));
+const PT2Hardware = lazy(() => import('../hardware/PT2Hardware').then(m => ({ default: m.PT2Hardware })));
+const FT2Hardware = lazy(() => import('../hardware/FT2Hardware').then(m => ({ default: m.FT2Hardware })));
+const FurnaceFMHardware = lazy(() => import('../hardware/FurnaceFMHardware').then(m => ({ default: m.FurnaceFMHardware })));
+const FurnacePSGHardware = lazy(() => import('../hardware/FurnacePSGHardware').then(m => ({ default: m.FurnacePSGHardware })));
+const FurnaceWaveHardware = lazy(() => import('../hardware/FurnaceWaveHardware').then(m => ({ default: m.FurnaceWaveHardware })));
+const FurnacePCMHardware = lazy(() => import('../hardware/FurnacePCMHardware').then(m => ({ default: m.FurnacePCMHardware })));
+const FurnaceMacroHardware = lazy(() => import('../hardware/FurnaceMacroHardware').then(m => ({ default: m.FurnaceMacroHardware })));
+
+// Lazy-loaded specialized components
+const MAMEOscilloscope = lazy(() => import('../../visualization/MAMEOscilloscope').then(m => ({ default: m.MAMEOscilloscope })));
+const MAMEMacroEditor = lazy(() => import('./MAMEMacroEditor').then(m => ({ default: m.MAMEMacroEditor })));
+const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ default: m.WavetableListEditor })));
+
+// Re-export types that were imported from MAMEMacroEditor/WavetableEditor
+import type { MacroData } from './MAMEMacroEditor';
+import type { WavetableData } from './WavetableEditor';
+
+// Import type detection functions (lightweight)
+import { isFurnaceFMType } from '../hardware/FurnaceFMHardware';
+import { isFurnacePSGType } from '../hardware/FurnacePSGHardware';
+import { isFurnaceWaveType } from '../hardware/FurnaceWaveHardware';
+import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
 
 // Types
 type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively';
@@ -711,15 +740,17 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       <div className={`synth-editor-container ${mainBg}`}>
         {/* Tab Content - Use TB303Controls (Full JC303 Panel) */}
         <div className="synth-editor-content p-4 flex items-center justify-center">
-          <TB303Controls
-            config={instrument.tb303}
-            onChange={handleTB303Change}
-            onPresetLoad={handleTB303PresetLoad}
-            showFilterCurve={false}
-            showHeader={false}
-            isJC303={true}
-            isBuzz3o3={instrument.synthType === 'Buzz3o3'}
-          />
+          <Suspense fallback={<LoadingControls />}>
+            <TB303Controls
+              config={instrument.tb303}
+              onChange={handleTB303Change}
+              onPresetLoad={handleTB303PresetLoad}
+              showFilterCurve={false}
+              showHeader={false}
+              isJC303={true}
+              isBuzz3o3={instrument.synthType === 'Buzz3o3'}
+            />
+          </Suspense>
         </div>
       </div>
     );
@@ -749,16 +780,16 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     // Render the correct Furnace hardware UI based on chip category
     const renderFurnaceHardware = () => {
       if (isFurnaceFMType(instrument.synthType)) {
-        return <FurnaceFMHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} />;
+        return <Suspense fallback={<LoadingControls />}><FurnaceFMHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} /></Suspense>;
       }
       if (isFurnacePSGType(instrument.synthType)) {
-        return <FurnacePSGHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} />;
+        return <Suspense fallback={<LoadingControls />}><FurnacePSGHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} /></Suspense>;
       }
       if (isFurnaceWaveType(instrument.synthType)) {
-        return <FurnaceWaveHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} synthType={instrument.synthType} />;
+        return <Suspense fallback={<LoadingControls />}><FurnaceWaveHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} synthType={instrument.synthType} /></Suspense>;
       }
       if (isFurnacePCMType(instrument.synthType)) {
-        return <FurnacePCMHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} />;
+        return <Suspense fallback={<LoadingControls />}><FurnacePCMHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} /></Suspense>;
       }
       return null;
     };
@@ -811,18 +842,22 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
               {renderFurnaceHardware()}
               {/* Macro editor below the main hardware UI */}
               {furnaceConfig.macros && furnaceConfig.macros.length > 0 && (
-                <FurnaceMacroHardware
-                  config={furnaceConfig}
-                  onChange={handleFurnaceHardwareChange}
-                />
+                <Suspense fallback={<LoadingControls />}>
+                  <FurnaceMacroHardware
+                    config={furnaceConfig}
+                    onChange={handleFurnaceHardwareChange}
+                  />
+                </Suspense>
               )}
             </div>
           ) : (
-            <FurnaceControls
-              config={furnaceConfig}
-              instrumentId={instrument.id}
-              onChange={handleFurnaceChange}
-            />
+            <Suspense fallback={<LoadingControls />}>
+              <FurnaceControls
+                config={furnaceConfig}
+                instrumentId={instrument.id}
+                onChange={handleFurnaceChange}
+              />
+            </Suspense>
           )}
         </div>
       </div>
@@ -846,10 +881,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
         {/* Buzzmachine Controls */}
         <div className="synth-editor-content overflow-y-auto p-4">
-          <BuzzmachineControls
-            config={instrument}
-            onChange={handleChange}
-          />
+          <Suspense fallback={<LoadingControls />}>
+            <BuzzmachineControls
+              config={instrument}
+              onChange={handleChange}
+            />
+          </Suspense>
         </div>
       </div>
     );
@@ -875,10 +912,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
           {/* DrumKit Editor (full height) */}
           <div className="flex-1 overflow-hidden">
-            <DrumKitEditor
-              instrument={instrument}
-              onUpdate={handleChange}
-            />
+            <Suspense fallback={<LoadingControls />}>
+              <DrumKitEditor
+                instrument={instrument}
+                onUpdate={handleChange}
+              />
+            </Suspense>
           </div>
         </div>
       );
@@ -921,15 +960,17 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
              !instrument.metadata?.originalEnvelope &&
              !instrument.metadata?.panningEnvelope &&
              !instrument.metadata?.autoVibrato) ? (
-              <PT2Hardware instrument={instrument} onChange={handleChange} />
+              <Suspense fallback={<LoadingControls />}><PT2Hardware instrument={instrument} onChange={handleChange} /></Suspense>
             ) : (
-              <FT2Hardware instrument={instrument} onChange={handleChange} />
+              <Suspense fallback={<LoadingControls />}><FT2Hardware instrument={instrument} onChange={handleChange} /></Suspense>
             )
           ) : (
-            <SampleControls
-              instrument={instrument}
-              onChange={handleChange}
-            />
+            <Suspense fallback={<LoadingControls />}>
+              <SampleControls
+                instrument={instrument}
+                onChange={handleChange}
+              />
+            </Suspense>
           )}
         </div>
       </div>
@@ -945,11 +986,13 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         {renderDubSirenHeader()}
-        <DubSirenControls
-          config={dubSirenConfig}
-          instrumentId={instrument.id}
-          onChange={handleDubSirenChange}
-        />
+        <Suspense fallback={<LoadingControls />}>
+          <DubSirenControls
+            config={dubSirenConfig}
+            instrumentId={instrument.id}
+            onChange={handleDubSirenChange}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -985,16 +1028,20 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           }
         />
         {uiMode === 'hardware' ? (
-          <HivelyHardware
-            config={hivelyConfig}
-            onChange={handleHivelyHardwareChange}
-          />
+          <Suspense fallback={<LoadingControls />}>
+            <HivelyHardware
+              config={hivelyConfig}
+              onChange={handleHivelyHardwareChange}
+            />
+          </Suspense>
         ) : (
-          <HivelyControls
-            config={hivelyConfig}
-            instrumentId={instrument.id}
-            onChange={handleHivelyChange}
-          />
+          <Suspense fallback={<LoadingControls />}>
+            <HivelyControls
+              config={hivelyConfig}
+              instrumentId={instrument.id}
+              onChange={handleHivelyChange}
+            />
+          </Suspense>
         )}
       </div>
     );
@@ -1009,10 +1056,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         {renderSpaceLaserHeader()}
-        <SpaceLaserControls
-          config={spaceLaserConfig}
-          onChange={handleSpaceLaserChange}
-        />
+        <Suspense fallback={<LoadingControls />}>
+          <SpaceLaserControls
+            config={spaceLaserConfig}
+            onChange={handleSpaceLaserChange}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -1088,10 +1137,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
               </div>
             }
           />
-          <V2SpeechControls
-            config={deepMerge(DEFAULT_V2_SPEECH, instrument.v2Speech || {})}
-            onChange={(updates) => handleChange({ v2Speech: { ...instrument.v2Speech!, ...updates } })}
-          />
+          <Suspense fallback={<LoadingControls />}>
+            <V2SpeechControls
+              config={deepMerge(DEFAULT_V2_SPEECH, instrument.v2Speech || {})}
+              onChange={(updates) => handleChange({ v2Speech: { ...instrument.v2Speech!, ...updates } })}
+            />
+          </Suspense>
         </div>
       );
     }
@@ -1099,10 +1150,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         {renderV2Header()}
-        <V2Controls
-          config={deepMerge(DEFAULT_V2, instrument.v2 || {})}
-          onChange={handleV2Change}
-        />
+        <Suspense fallback={<LoadingControls />}>
+          <V2Controls
+            config={deepMerge(DEFAULT_V2, instrument.v2 || {})}
+            onChange={handleV2Change}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -1165,10 +1218,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             </div>
           }
         />
-        <SAMControls
-          config={samConfig}
-          onChange={(updates) => handleChange({ sam: { ...instrument.sam!, ...updates } })}
-        />
+        <Suspense fallback={<LoadingControls />}>
+          <SAMControls
+            config={samConfig}
+            onChange={(updates) => handleChange({ sam: { ...instrument.sam!, ...updates } })}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -1178,11 +1233,13 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
         {renderSynareHeader()}
-        <SynareControls
-          config={synareConfig}
-          instrumentId={instrument.id}
-          onChange={handleSynareChange}
-        />
+        <Suspense fallback={<LoadingControls />}>
+          <SynareControls
+            config={synareConfig}
+            instrumentId={instrument.id}
+            onChange={handleSynareChange}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -1262,35 +1319,40 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             /* Simple Controls Mode */
             <>
               {/* Oscilloscope */}
-              <MAMEOscilloscope
-                instrumentId={instrument.id}
-                height={100}
-                color={chipDef?.color}
-              />
+              <Suspense fallback={<LoadingControls />}>
+                <MAMEOscilloscope
+                  instrumentId={instrument.id}
+                  height={100}
+                  color={chipDef?.color}
+                />
+              </Suspense>
 
               {/* Chip Parameters */}
-              <ChipSynthControls
-                synthType={instrument.synthType}
-                parameters={(instrument.parameters || {}) as Record<string, number | string>}
-                instrumentId={instrument.id}
-                onParamChange={handleChipParamChange}
-                onTextChange={handleChipTextChange}
-                onLoadPreset={handleChipPresetLoad}
-                onRomUpload={handleChipRomUpload}
-                onSpeak={handleChipSpeak}
-              />
+              <Suspense fallback={<LoadingControls />}>
+                <ChipSynthControls
+                  synthType={instrument.synthType}
+                  parameters={(instrument.parameters || {}) as Record<string, number | string>}
+                  instrumentId={instrument.id}
+                  onParamChange={handleChipParamChange}
+                  onTextChange={handleChipTextChange}
+                  onLoadPreset={handleChipPresetLoad}
+                  onRomUpload={handleChipRomUpload}
+                  onSpeak={handleChipSpeak}
+                />
+              </Suspense>
 
               {/* Macro Editor */}
-              <MAMEMacroEditor
-                instrumentId={instrument.id}
-                macros={macros}
-                onChange={handleMacrosChange}
-                chipCapabilities={{
-                  hasWavetable: chipCaps.hasWavetable,
-                  hasFM: chipCaps.hasFM,
-                  hasNoise: chipCaps.hasNoise,
-                  hasPanning: chipCaps.hasPanning,
-                }}
+              <Suspense fallback={<LoadingControls />}>
+                <MAMEMacroEditor
+                  instrumentId={instrument.id}
+                  macros={macros}
+                  onChange={handleMacrosChange}
+                  chipCapabilities={{
+                    hasWavetable: chipCaps.hasWavetable,
+                    hasFM: chipCaps.hasFM,
+                    hasNoise: chipCaps.hasNoise,
+                    hasPanning: chipCaps.hasPanning,
+                  }}
               />
 
               {/* Wavetable Editor (for chips that support it) */}
@@ -1339,11 +1401,13 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
         {/* MAME Controls */}
         <div className="synth-editor-content overflow-y-auto p-4">
-          <MAMEControls
-            config={mameConfig}
-            handle={mameHandle}
-            onChange={handleMAMEChange}
-          />
+          <Suspense fallback={<LoadingControls />}>
+            <MAMEControls
+              config={mameConfig}
+              handle={mameHandle}
+              onChange={handleMAMEChange}
+            />
+          </Suspense>
         </div>
       </div>
     );
@@ -1373,10 +1437,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
         {/* Dexed Controls */}
         <div className="synth-editor-content overflow-y-auto">
-          <DexedControls
-            config={dexedConfig}
-            onChange={handleDexedChange}
-          />
+          <Suspense fallback={<LoadingControls />}>
+            <DexedControls
+              config={dexedConfig}
+              onChange={handleDexedChange}
+            />
+          </Suspense>
         </div>
       </div>
     );
@@ -1406,10 +1472,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
         {/* OBXd Controls */}
         <div className="synth-editor-content overflow-y-auto">
-          <OBXdControls
-            config={obxdConfig}
-            onChange={handleOBXdChange}
-          />
+          <Suspense fallback={<LoadingControls />}>
+            <OBXdControls
+              config={obxdConfig}
+              onChange={handleOBXdChange}
+            />
+          </Suspense>
         </div>
       </div>
     );
@@ -1488,17 +1556,19 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           }
         />
         <div className="synth-editor-content overflow-y-auto">
-          {vstUiMode === 'custom' ? (
-            <TonewheelOrganControls
-              instrument={instrument}
-              onChange={handleChange}
-            />
-          ) : (
-            <VSTBridgePanel
-              instrument={instrument}
-              onChange={handleChange}
-            />
-          )}
+          <Suspense fallback={<LoadingControls />}>
+            {vstUiMode === 'custom' ? (
+              <TonewheelOrganControls
+                instrument={instrument}
+                onChange={handleChange}
+              />
+            ) : (
+              <VSTBridgePanel
+                instrument={instrument}
+                onChange={handleChange}
+              />
+            )}
+          </Suspense>
         </div>
       </div>
     );
@@ -1577,17 +1647,19 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           }
         />
         <div className="synth-editor-content overflow-y-auto">
-          {vstUiMode === 'custom' ? (
-            <MelodicaControls
-              instrument={instrument}
-              onChange={handleChange}
-            />
-          ) : (
-            <VSTBridgePanel
-              instrument={instrument}
-              onChange={handleChange}
-            />
-          )}
+          <Suspense fallback={<LoadingControls />}>
+            {vstUiMode === 'custom' ? (
+              <MelodicaControls
+                instrument={instrument}
+                onChange={handleChange}
+              />
+            ) : (
+              <VSTBridgePanel
+                instrument={instrument}
+                onChange={handleChange}
+              />
+            )}
+          </Suspense>
         </div>
       </div>
     );
@@ -1665,17 +1737,19 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           }
         />
         <div className="synth-editor-content overflow-y-auto">
-          {vstUiMode === 'custom' ? (
-            <VitalControls
-              instrument={instrument}
-              onChange={handleChange}
-            />
-          ) : (
-            <VSTBridgePanel
-              instrument={instrument}
-              onChange={handleChange}
-            />
-          )}
+          <Suspense fallback={<LoadingControls />}>
+            {vstUiMode === 'custom' ? (
+              <VitalControls
+                instrument={instrument}
+                onChange={handleChange}
+              />
+            ) : (
+              <VSTBridgePanel
+                instrument={instrument}
+                onChange={handleChange}
+              />
+            )}
+          </Suspense>
         </div>
       </div>
     );
@@ -1753,17 +1827,19 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           }
         />
         <div className="synth-editor-content overflow-y-auto">
-          {vstUiMode === 'custom' ? (
-            <Odin2Controls
-              instrument={instrument}
-              onChange={handleChange}
-            />
-          ) : (
-            <VSTBridgePanel
-              instrument={instrument}
-              onChange={handleChange}
-            />
-          )}
+          <Suspense fallback={<LoadingControls />}>
+            {vstUiMode === 'custom' ? (
+              <Odin2Controls
+                instrument={instrument}
+                onChange={handleChange}
+              />
+            ) : (
+              <VSTBridgePanel
+                instrument={instrument}
+                onChange={handleChange}
+              />
+            )}
+          </Suspense>
         </div>
       </div>
     );
@@ -1841,17 +1917,19 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           }
         />
         <div className="synth-editor-content overflow-y-auto">
-          {vstUiMode === 'custom' ? (
-            <SurgeControls
-              instrument={instrument}
-              onChange={handleChange}
-            />
-          ) : (
-            <VSTBridgePanel
-              instrument={instrument}
-              onChange={handleChange}
-            />
-          )}
+          <Suspense fallback={<LoadingControls />}>
+            {vstUiMode === 'custom' ? (
+              <SurgeControls
+                instrument={instrument}
+                onChange={handleChange}
+              />
+            ) : (
+              <VSTBridgePanel
+                instrument={instrument}
+                onChange={handleChange}
+              />
+            )}
+          </Suspense>
         </div>
       </div>
     );
@@ -1876,10 +1954,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           isBaking={isBaking}
         />
         <div className="synth-editor-content overflow-y-auto">
-          <VSTBridgePanel
-            instrument={instrument}
-            onChange={handleChange}
-          />
+          <Suspense fallback={<LoadingControls />}>
+            <VSTBridgePanel
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          </Suspense>
         </div>
       </div>
     );
@@ -1899,10 +1979,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           showHelpButton={false}
         />
         <div className="synth-editor-content overflow-hidden">
-          <WAMControls
-            instrument={instrument}
-            onChange={handleChange}
-          />
+          <Suspense fallback={<LoadingControls />}>
+            <WAMControls
+              instrument={instrument}
+              onChange={handleChange}
+            />
+          </Suspense>
         </div>
       </div>
     );
@@ -1929,11 +2011,13 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           isBaking={isBaking}
         />
         <div className="synth-editor-content overflow-y-auto p-3">
-          <HarmonicSynthControls
-            config={harmonicConfig}
-            instrumentId={instrument.id}
-            onChange={(updates) => handleChange({ harmonicSynth: { ...harmonicConfig, ...updates } })}
-          />
+          <Suspense fallback={<LoadingControls />}>
+            <HarmonicSynthControls
+              config={harmonicConfig}
+              instrumentId={instrument.id}
+              onChange={(updates) => handleChange({ harmonicSynth: { ...harmonicConfig, ...updates } })}
+            />
+          </Suspense>
         </div>
       </div>
     );
@@ -1945,10 +2029,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   if (editorMode === 'modular') {
     return (
       <div className="synth-editor-container flex flex-col h-full">
-        <ModularSynthControls
-          config={instrument}
-          onChange={handleChange}
-        />
+        <Suspense fallback={<LoadingControls />}>
+          <ModularSynthControls
+            config={instrument}
+            onChange={handleChange}
+          />
+        </Suspense>
       </div>
     );
   }
