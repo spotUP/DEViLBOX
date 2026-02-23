@@ -232,9 +232,11 @@ export class DeckEngine {
   // ==========================================================================
 
   async loadSong(song: TrackerSong): Promise<void> {
-    // Stop any audio file playback and switch to tracker mode
+    // Stop any audio file playback
     this.audioPlayer.stop();
-    this._playbackMode = 'tracker';
+    // In DJ view, we ALWAYS use audio mode for sound output.
+    // Tracker replayer is only used for position tracking and visual feedback.
+    this._playbackMode = 'audio';
 
     this.unregisterOutputOverrides();
     this.restoreNativeRouting();
@@ -309,33 +311,30 @@ export class DeckEngine {
   async play(): Promise<void> {
     if (this._playbackMode === 'audio') {
       this.audioPlayer.play();
+      // Start replayer for position tracking/visuals (it's connected to deckGain, but we can rely on audio mode being the master)
+      if (this.replayer.getSong()) {
+        await this.replayer.play();
+      }
     } else {
-      await this.replayer.play();
+      console.warn(`[DeckEngine] play() called while not in audio mode (current: ${this._playbackMode})`);
     }
   }
 
   pause(): void {
-    if (this._playbackMode === 'audio') {
-      this.audioPlayer.pause();
-    } else {
-      this.replayer.pause();
-    }
+    this.audioPlayer.pause();
+    this.replayer.pause();
   }
 
   resume(): void {
     if (this._playbackMode === 'audio') {
       this.audioPlayer.play();
-    } else {
       this.replayer.resume();
     }
   }
 
   stop(): void {
-    if (this._playbackMode === 'audio') {
-      this.audioPlayer.stop();
-    } else {
-      this.replayer.stop();
-    }
+    this.audioPlayer.stop();
+    this.replayer.stop();
   }
 
   isPlaying(): boolean {
