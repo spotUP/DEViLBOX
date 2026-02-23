@@ -7,7 +7,7 @@ import { registerViewHandler } from '@/engine/keyboard/KeyboardRouter';
 import type { NormalizedKeyEvent } from '@/engine/keyboard/types';
 
 export function useDrumPadKeyboard(): void {
-  const handleKeyDown = useCallback((normalized: NormalizedKeyEvent, originalEvent: KeyboardEvent): boolean => {
+  const handleKeyDown = useCallback((_normalized: NormalizedKeyEvent, _originalEvent: KeyboardEvent): boolean => {
     // TODO: Implement drum pad-specific keyboard shortcuts
     // - QWERTY pad triggering
     // - Bank switching

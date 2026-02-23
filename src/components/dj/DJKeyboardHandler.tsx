@@ -27,7 +27,7 @@ type LoopSize = 1 | 2 | 4 | 8 | 16 | 32;
 const LOOP_SIZES: LoopSize[] = [1, 2, 4, 8, 16, 32];
 
 export function useDJKeyboardHandler(): void {
-  const handleKeyDown = useCallback((normalized: NormalizedKeyEvent, originalEvent: KeyboardEvent): boolean => {
+  const handleKeyDown = useCallback((_normalized: NormalizedKeyEvent, originalEvent: KeyboardEvent): boolean => {
     const e = originalEvent;
 
     const engine = getDJEngine();
