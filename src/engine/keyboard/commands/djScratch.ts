@@ -13,13 +13,14 @@ import { useDJStore } from '@stores/useDJStore';
 import { useUIStore } from '@stores/useUIStore';
 import { SCRATCH_PATTERNS } from '@engine/dj/DJScratchEngine';
 
-type DeckId = 'A' | 'B';
+type DeckId = 'A' | 'B' | 'C';
 type FaderLFODivision = '1/4' | '1/8' | '1/16' | '1/32';
 
-/** Returns whichever deck is currently playing, preferring A over B. */
+/** Returns whichever deck is currently playing, preferring A > B > C. */
 function getActiveDeck(): DeckId {
   const { decks } = useDJStore.getState();
   if (decks.B.isPlaying && !decks.A.isPlaying) return 'B';
+  if (decks.C.isPlaying && !decks.A.isPlaying && !decks.B.isPlaying) return 'C';
   return 'A';
 }
 

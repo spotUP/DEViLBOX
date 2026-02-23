@@ -110,7 +110,21 @@
       "Ctrl+Alt+0": "dj_scratch_stop",
       "Ctrl+Alt+7": "dj_fader_lfo_14",
       "Ctrl+Alt+8": "dj_fader_lfo_18",
-      "Ctrl+Alt+9": "dj_fader_lfo_116"
+      "Ctrl+Alt+9": "dj_fader_lfo_116",
+      "Shift+Alt+F": "tracker_fader_cut",
+      "Shift+Alt+C": "tracker_crab",
+      "Shift+Alt+T": "tracker_transformer",
+      "Shift+Alt+R": "tracker_flare",
+      "Shift+Alt+1": "tracker_scratch_trans",
+      "Shift+Alt+2": "tracker_scratch_crab",
+      "Shift+Alt+3": "tracker_scratch_flare",
+      "Shift+Alt+4": "tracker_scratch_chirp",
+      "Shift+Alt+5": "tracker_scratch_stab",
+      "Shift+Alt+6": "tracker_scratch_8crab",
+      "Shift+Alt+7": "tracker_scratch_twdl",
+      "Shift+Alt+0": "tracker_scratch_stop",
+      "Shift+Alt+B": "tracker_spinback",
+      "Shift+Space": "power_cut_stop"
     },
     "mac": {
       "F1": "layout_preset_1",
@@ -222,7 +236,21 @@
       "Ctrl+Alt+0": "dj_scratch_stop",
       "Ctrl+Alt+7": "dj_fader_lfo_14",
       "Ctrl+Alt+8": "dj_fader_lfo_18",
-      "Ctrl+Alt+9": "dj_fader_lfo_116"
+      "Ctrl+Alt+9": "dj_fader_lfo_116",
+      "Shift+Alt+F": "tracker_fader_cut",
+      "Shift+Alt+C": "tracker_crab",
+      "Shift+Alt+T": "tracker_transformer",
+      "Shift+Alt+R": "tracker_flare",
+      "Shift+Alt+1": "tracker_scratch_trans",
+      "Shift+Alt+2": "tracker_scratch_crab",
+      "Shift+Alt+3": "tracker_scratch_flare",
+      "Shift+Alt+4": "tracker_scratch_chirp",
+      "Shift+Alt+5": "tracker_scratch_stab",
+      "Shift+Alt+6": "tracker_scratch_8crab",
+      "Shift+Alt+7": "tracker_scratch_twdl",
+      "Shift+Alt+0": "tracker_scratch_stop",
+      "Shift+Alt+B": "tracker_spinback",
+      "Shift+Space": "power_cut_stop"
     }
   }
 }

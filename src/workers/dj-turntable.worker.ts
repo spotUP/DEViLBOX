@@ -12,8 +12,8 @@ type DeckColors = DeckColorsExt;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DECK_ACCENT: Record<'A' | 'B', string> = { A: '#60a5fa', B: '#f87171' };
-const DECK_LABEL:  Record<'A' | 'B', string> = { A: '#1e2a3f', B: '#3f1e2a' };
+const DECK_ACCENT: Record<'A' | 'B' | 'C', string> = { A: '#60a5fa', B: '#f87171', C: '#34d399' };
+const DECK_LABEL:  Record<'A' | 'B' | 'C', string> = { A: '#1e2a3f', B: '#3f1e2a', C: '#1e3f2a' };
 const BASE_RPS  = 0.5556;   // 33⅓ RPM
 const BASE_BPM  = 120;
 const GROOVE_COUNT = 14;
@@ -27,7 +27,7 @@ let colors: DeckColors = {
   bg: '#0b0909', bgSecondary: '#131010', bgTertiary: '#1d1818',
   border: '#2f2525', borderLight: '#403535',
 };
-let deckId: 'A' | 'B' = 'A';
+let deckId: 'A' | 'B' | 'C' = 'A';
 let isPlaying = false, effectiveBPM = 120;
 let scratchVelocity = 1, isScratchActive = false;
 let angle = 0, lastTimestamp = 0, dirty = true;

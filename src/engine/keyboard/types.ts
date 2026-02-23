@@ -17,6 +17,8 @@ export interface Command {
   handler: () => boolean;
   description: string;
   undoable?: boolean;
+  /** If set, this handler is called on keyup for hold-to-activate commands (e.g., fader cut) */
+  releaseHandler?: () => boolean;
 }
 
 export interface KeyboardScheme {

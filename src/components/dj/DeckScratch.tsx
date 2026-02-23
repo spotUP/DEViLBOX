@@ -19,7 +19,7 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { SCRATCH_PATTERNS } from '@/engine/dj/DJScratchEngine';
 
 interface DeckScratchProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 type FaderLFODivision = '1/4' | '1/8' | '1/16' | '1/32';
