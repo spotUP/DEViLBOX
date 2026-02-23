@@ -9,7 +9,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 
 interface MixerVUMeterProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 const VU_SEGMENTS = 20;

@@ -10,7 +10,7 @@ import React, { useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 
 interface DeckChannelTogglesProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 const NUM_CHANNELS = 4;

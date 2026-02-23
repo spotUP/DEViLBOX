@@ -5,7 +5,7 @@
  * Layout mirrors between A (left-aligned) and B (right-aligned).
  */
 
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState, Suspense, lazy } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
@@ -19,6 +19,7 @@ import { DeckTrackInfo } from './DeckTrackInfo';
 import { DeckTrackOverview } from './DeckTrackOverview';
 import { DeckVisualizer } from './DeckVisualizer';
 import { DeckTurntable } from './DeckTurntable';
+import { DeckVinylView } from './DeckVinylView';
 import { DeckLoopControls } from './DeckLoopControls';
 import { DeckScopes } from './DeckScopes';
 import { DeckScratch } from './DeckScratch';
@@ -26,8 +27,11 @@ import { DeckCuePoints } from './DeckCuePoints';
 import { DeckBeatGrid } from './DeckBeatGrid';
 import { DeckAudioWaveform } from './DeckAudioWaveform';
 
+// Lazy-load 3D view to avoid Three.js bundle bloat for users who don't use it
+const DeckVinyl3DView = lazy(() => import('./DeckVinyl3DView'));
+
 interface DJDeckProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
@@ -36,6 +40,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
   const [isLoadingDrop, setIsLoadingDrop] = useState(false);
   const [vizResetKey, setVizResetKey] = useState(0);
   const dragCountRef = useRef(0);
+  const deckViewMode = useDJStore((s) => s.deckViewMode);
 
   // Poll playback position and update store at ~30fps
   useEffect(() => {
@@ -292,10 +297,10 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
   }, [deckId]);
 
   const isB = deckId === 'B';
-  const deckNum = isB ? '2' : '1';
-  const deckColor = isB ? 'text-red-400' : 'text-blue-400';
-  const deckBorderColor = isB ? 'border-red-900/30' : 'border-blue-900/30';
-  const deckHighlight = isB ? 'border-red-500/60' : 'border-blue-500/60';
+  const deckNum = deckId === 'A' ? '1' : deckId === 'B' ? '2' : '3';
+  const deckColor = deckId === 'A' ? 'text-blue-400' : deckId === 'B' ? 'text-red-400' : 'text-emerald-400';
+  const deckBorderColor = deckId === 'A' ? 'border-blue-900/30' : deckId === 'B' ? 'border-red-900/30' : 'border-emerald-900/30';
+  const deckHighlight = deckId === 'A' ? 'border-blue-500/60' : deckId === 'B' ? 'border-red-500/60' : 'border-emerald-500/60';
 
   return (
     <div
@@ -333,7 +338,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
           <DeckTrackInfo deckId={deckId} />
         </div>
         <DeckScopes deckId={deckId} size={64} />
-        <DeckTurntable deckId={deckId} />
+        {deckViewMode === 'visualizer' && <DeckTurntable deckId={deckId} />}
       </div>
 
       {/* Track overview bar (with beatgrid overlay for audio mode) */}
@@ -345,11 +350,23 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       {/* Scrolling audio waveform (audio mode only, shown above the visualizer) */}
       <DeckAudioWaveform deckId={deckId} />
 
-      {/* Main controls area: pattern display + pitch slider */}
+      {/* Main controls area: pattern display / vinyl + pitch slider */}
       <div className={`flex gap-2 flex-1 min-h-0 ${isB ? 'flex-row-reverse' : ''}`}>
-        {/* Pattern display / Visualizer */}
-        <div className="flex-1 min-w-0 min-h-0">
-          <DeckVisualizer deckId={deckId} resetKey={vizResetKey} />
+        {/* Pattern display / Visualizer / Vinyl */}
+        <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center">
+          {deckViewMode === '3d' ? (
+            <Suspense fallback={
+              <div className="flex items-center justify-center w-full h-full text-text-muted text-xs font-mono">
+                Loading 3D...
+              </div>
+            }>
+              <DeckVinyl3DView deckId={deckId} />
+            </Suspense>
+          ) : deckViewMode === 'vinyl' ? (
+            <DeckVinylView deckId={deckId} />
+          ) : (
+            <DeckVisualizer deckId={deckId} resetKey={vizResetKey} />
+          )}
         </div>
 
         {/* Pitch slider */}

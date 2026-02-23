@@ -139,12 +139,12 @@ export class DJCueEngine {
 
   /** Enable/disable PFL for a deck. The caller (DJEngine) must connect/disconnect
    *  the deck's channel gain to/from this.cueGain accordingly. */
-  setPFL(deck: 'A' | 'B', enabled: boolean): void {
+  setPFL(deck: 'A' | 'B' | 'C', enabled: boolean): void {
     if (deck === 'A') this.pflA = enabled;
     else this.pflB = enabled;
   }
 
-  getPFL(deck: 'A' | 'B'): boolean {
+  getPFL(deck: 'A' | 'B' | 'C'): boolean {
     return deck === 'A' ? this.pflA : this.pflB;
   }
 

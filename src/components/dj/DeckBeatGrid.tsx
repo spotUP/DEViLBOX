@@ -11,7 +11,7 @@ import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import BeatGridWorkerFactory from '@/workers/dj-beatgrid.worker.ts?worker';
 
 interface DeckBeatGridProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
   height?: number;
 }
 

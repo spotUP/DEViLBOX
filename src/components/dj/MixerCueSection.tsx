@@ -27,7 +27,7 @@ export const MixerCueSection: React.FC = () => {
     stateRef.current = { pflA, pflB, cueVolume };
   }, [pflA, pflB, cueVolume]);
 
-  const handlePFLToggle = useCallback((deck: 'A' | 'B') => {
+  const handlePFLToggle = useCallback((deck: 'A' | 'B' | 'C') => {
     const current = deck === 'A' ? stateRef.current.pflA : stateRef.current.pflB;
     useDJStore.getState().setDeckPFL(deck, !current);
   }, []);

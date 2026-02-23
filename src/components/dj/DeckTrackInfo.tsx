@@ -9,7 +9,7 @@ import React, { useMemo } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 
 interface DeckTrackInfoProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 const BPM_MATCH_THRESHOLD = 0.5; // BPM within 0.5 = "matched"

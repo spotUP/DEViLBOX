@@ -11,7 +11,7 @@ import { getDJEngine } from '@/engine/dj/DJEngine';
 import { DJBeatSync } from '@/engine/dj/DJBeatSync';
 
 interface DeckTransportProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {

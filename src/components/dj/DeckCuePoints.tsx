@@ -10,7 +10,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 
 interface DeckCuePointsProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 export const DeckCuePoints: React.FC<DeckCuePointsProps> = ({ deckId }) => {

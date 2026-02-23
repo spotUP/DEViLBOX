@@ -10,7 +10,7 @@ import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 
 interface DeckPitchSliderProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 const PITCH_MIN = -16;

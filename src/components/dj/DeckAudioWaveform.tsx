@@ -12,7 +12,7 @@ import WaveformWorkerFactory from '@/workers/dj-waveform.worker.ts?worker';
 import type { WaveformMsg } from '@engine/renderer/worker-types';
 
 interface DeckAudioWaveformProps {
-  deckId: 'A' | 'B';
+  deckId: 'A' | 'B' | 'C';
 }
 
 export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) => {
