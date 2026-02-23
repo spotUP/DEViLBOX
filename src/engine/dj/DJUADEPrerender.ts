@@ -11,6 +11,7 @@ import type { DJEngine } from './DJEngine';
 import { getCachedAudio, isCached } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
 import type { TaskPriority } from './DJPipeline';
+import { useDJStore } from '@/stores/useDJStore';
 
 /**
  * Load a tracker module to a DJ deck, using cached pre-rendered audio if available.
@@ -56,21 +57,36 @@ export async function loadUADEToDeck(
     return { cached: true, duration: info.duration };
   }
 
-  // Not cached — fall back to tracker mode for immediate playback
-  console.log(`[DJPrerender] ${filename} not cached, loading as tracker song`);
-
-  const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-  const file = new File([fileBuffer], filename);
-  const song = await parseModuleToSong(file);
-  await engine.loadToDeck(deckId, song, filename, bpm || 125);
-
-  // Render + analyze in background via pipeline
+  // Not cached
   if (renderIfMissing) {
-    void getDJPipeline().loadOrEnqueue(fileBuffer, filename, deckId, 'high').catch((err) => {
-      console.warn(`[DJPrerender] Background pipeline failed for ${filename}:`, err);
+    console.log(`[DJPrerender] ${filename} not cached, triggering background render + wait`);
+    
+    // Set loading state in UI immediately
+    useDJStore.getState().setDeckState(deckId, {
+      fileName: filename,
+      trackName: trackName || filename,
+      detectedBPM: bpm || 125,
+      effectiveBPM: bpm || 125,
+      analysisState: 'rendering',
+      isPlaying: false,
     });
+
+    try {
+      // Use the high-priority pipeline to render and analyze
+      const result = await getDJPipeline().loadOrEnqueue(fileBuffer, filename, deckId, 'high');
+      
+      // Load the resulting WAV directly into audio mode
+      const info = await engine.loadAudioToDeck(deckId, result.wavData, filename, trackName || filename, result.analysis?.bpm || bpm || 125);
+      
+      return { cached: true, duration: info.duration };
+    } catch (err) {
+      console.error(`[DJPrerender] Failed to render ${filename}:`, err);
+      throw err;
+    }
   }
 
+  // Not cached and not rendering — this shouldn't really happen in the current DJ UI
+  console.warn(`[DJPrerender] ${filename} not cached and renderIfMissing=false`);
   return { cached: false, duration: 0 };
 }
 
