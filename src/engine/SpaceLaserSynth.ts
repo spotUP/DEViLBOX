@@ -144,6 +144,13 @@ export class SpaceLaserSynth implements DevilboxSynth {
     this.synth.triggerRelease(t);
   }
 
+  /**
+   * Release all voices (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    this.triggerRelease();
+  }
+
   dispose(): void {
     // Stop noise before disposing to ensure clean shutdown
     this.noise.stop();

@@ -466,6 +466,13 @@ export class RdPianoSynth implements DevilboxSynth {
     }
   }
 
+  /**
+   * Release all voices (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    this._worklet?.port.postMessage({ type: 'allNotesOff' });
+  }
+
   controlChange(cc: number, value: number): void {
     this._worklet?.port.postMessage({
       type: 'controlChange',

@@ -93,6 +93,7 @@ export class InstrumentAnalyser {
     if (this.disposed) return 0;
 
     const waveform = this.getWaveform();
+    if (waveform.length === 0) return 0;
     let sum = 0;
     for (let i = 0; i < waveform.length; i++) {
       sum += waveform[i] * waveform[i];

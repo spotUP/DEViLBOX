@@ -163,6 +163,16 @@ export class V2Synth implements DevilboxSynth {
     // For now, we'll send All Notes Off if needed or handle via explicit note.
   }
 
+  /**
+   * Release all voices (panic button, song stop, etc.)
+   * Sends MIDI All Notes Off (CC 123) on all channels
+   */
+  public releaseAll(): void {
+    if (!this._initialized || !this._worklet) return;
+    // MIDI All Notes Off: CC 123 on channel 0
+    this._sendMIDI([0xB0, 123, 0]);
+  }
+
   public triggerAttackRelease(note: string | number, duration: number, _time?: number, velocity: number = 1) {
     this.triggerAttack(note, undefined, velocity);
     // V2 is polyphonic and stateful, better to send Note Off

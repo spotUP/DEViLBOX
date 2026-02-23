@@ -265,6 +265,17 @@ export class MAMESynth implements DevilboxSynth {
     return this;
   }
 
+  /**
+   * Release all active voices (panic button, song stop, etc.)
+   */
+  public releaseAll(): void {
+    if (!this.isInitialized || this.handle === 0) return;
+    
+    for (const voice of this.voices.filter(v => v.active)) {
+      this.triggerRelease(voice.note);
+    }
+  }
+
   public dispose(): void {
     if (this.handle !== 0) {
       this.engine.deleteInstance(this.handle);

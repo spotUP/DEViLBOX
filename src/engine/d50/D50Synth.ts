@@ -392,6 +392,16 @@ export class D50Synth implements DevilboxSynth {
   }
 
   /**
+   * Release all active voices (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    if (!this.isInitialized) return;
+    for (const voice of this.voices.filter(v => v.active)) {
+      this.triggerRelease(voice.note);
+    }
+  }
+
+  /**
    * Set effects parameters
    */
   setChorus(rate: number, depth: number): void {

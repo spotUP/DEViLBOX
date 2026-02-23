@@ -255,6 +255,13 @@ export class SAMSynth implements DevilboxSynth {
     // Non-sing mode: one-shot plays to completion
   }
 
+  /**
+   * Release all / stop playback (panic button, song stop, etc.)
+   */
+  public releaseAll(): void {
+    this._stopSource();
+  }
+
   public dispose(): void {
     if (this._renderTimer) {
       clearTimeout(this._renderTimer);

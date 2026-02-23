@@ -275,6 +275,13 @@ export class V2SpeechSynth implements DevilboxSynth {
     }
   }
 
+  /**
+   * Release all / stop playback (panic button, song stop, etc.)
+   */
+  public releaseAll(): void {
+    this._stopSource();
+  }
+
   public triggerAttackRelease(note: string | number, _duration: number | string, time?: number, velocity: number = 1) {
     this.triggerAttack(note, time, velocity);
     // Player will play until the buffer ends or we stop it

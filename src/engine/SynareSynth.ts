@@ -196,6 +196,13 @@ export class SynareSynth implements DevilboxSynth {
     this.ampEnv.triggerRelease(t);
   }
 
+  /**
+   * Release all / stop playback (panic button, song stop, etc.)
+   */
+  releaseAll(): void {
+    this.triggerRelease();
+  }
+
   // Update methods
   updateParameter(key: string, value: number) {
     void key; void value;
@@ -204,6 +211,11 @@ export class SynareSynth implements DevilboxSynth {
   }
 
   dispose(): void {
+    // Stop running audio sources before disposing
+    try { this.osc1.stop(); } catch { /* ignore */ }
+    try { this.osc2.stop(); } catch { /* ignore */ }
+    try { this.noise.stop(); } catch { /* ignore */ }
+    try { this.lfo.stop(); } catch { /* ignore */ }
     this.osc1.dispose();
     this.osc2.dispose();
     this.noise.dispose();
