@@ -224,15 +224,50 @@ async function renderWithUADE(
 
   const audioChunks: { left: Float32Array; right: Float32Array }[] = [];
   let totalFrames = 0;
+  let leadingZeros = 0;
+  let trailingSilenceFrames = 0;
+  const SILENCE_THRESHOLD = 0.0001;
+  const MAX_SILENCE_SECONDS = 2; // stop after 2s of silence
 
   while (totalFrames < maxFrames) {
     const ret = wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
-    if (ret <= 0) break;
+    
+    if (ret <= 0) {
+      // Some eagleplayers take a few ticks to start. 
+      // Allow up to 50 leading zero-frame returns before giving up.
+      if (totalFrames === 0 && leadingZeros < 50) {
+        leadingZeros++;
+        // Briefly pump core
+        continue;
+      }
+      break; 
+    }
 
     const leftData = new Float32Array(ret);
     const rightData = new Float32Array(ret);
-    leftData.set(new Float32Array(wasm.HEAPF32.buffer, tmpL, ret));
-    rightData.set(new Float32Array(wasm.HEAPF32.buffer, tmpR, ret));
+    const heapL = new Float32Array(wasm.HEAPF32.buffer, tmpL, ret);
+    const heapR = new Float32Array(wasm.HEAPF32.buffer, tmpR, ret);
+    leftData.set(heapL);
+    rightData.set(heapR);
+
+    // Check for trailing silence to detect natural song end
+    let isSilent = true;
+    for (let i = 0; i < ret; i++) {
+      if (Math.abs(leftData[i]) > SILENCE_THRESHOLD || Math.abs(rightData[i]) > SILENCE_THRESHOLD) {
+        isSilent = false;
+        break;
+      }
+    }
+
+    if (isSilent && totalFrames > 0) {
+      trailingSilenceFrames += ret;
+      if (trailingSilenceFrames > sampleRate * MAX_SILENCE_SECONDS) {
+        console.log(`[DJRenderWorker/UADE] Stopping render due to ${MAX_SILENCE_SECONDS}s trailing silence`);
+        break;
+      }
+    } else {
+      trailingSilenceFrames = 0;
+    }
 
     audioChunks.push({ left: leftData, right: rightData });
     totalFrames += ret;
