@@ -17,7 +17,7 @@ import {
   detectFileFormat,
   type ExportOptions,
 } from './exporters';
-import { exportPatternAsWav, exportSongAsWav } from './audioExport';
+import { exportPatternAsWav, exportSongAsWav, getUADEInstrument, exportUADEAsWav } from './audioExport';
 import { exportPatternToMIDI, exportSongToMIDI } from './midiExport';
 import { exportAsXM, type XMExportOptions } from './XMExporter';
 import { exportAsMOD, type MODExportOptions } from './MODExporter';
@@ -44,7 +44,7 @@ interface ExportDialogProps {
 }
 
 export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) => {
-  const { patterns, currentPatternIndex, importPattern, setCurrentPattern, loadPatterns } = useTrackerStore();
+  const { patterns, currentPatternIndex, importPattern, setCurrentPattern, loadPatterns, originalModuleData } = useTrackerStore();
   const { instruments, currentInstrumentId, addInstrument, setCurrentInstrument, loadInstruments } = useInstrumentStore();
   const { metadata, setMetadata } = useProjectStore();
   const { bpm, setBPM, isPlaying, stop } = useTransportStore();
@@ -243,7 +243,33 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
           setIsRendering(true);
           setRenderProgress(0);
           try {
-            if (exportFullSong) {
+            // Check if this is a UADE-backed module — render through UADE for accurate output
+            const uadeInst = getUADEInstrument(instruments);
+            if (uadeInst?.uade?.fileData) {
+              // Module was loaded via UADE parser — use its stored fileData
+              await exportUADEAsWav(
+                uadeInst.uade.fileData,
+                uadeInst.uade.filename,
+                `${metadata.name || 'song'}.wav`,
+                uadeInst.uade.currentSubsong ?? 0,
+                (progress) => setRenderProgress(progress)
+              );
+            } else if (originalModuleData?.base64) {
+              // Module was loaded via native parser but we have original bytes —
+              // render through UADE for accurate effects/mixing
+              const binaryStr = atob(originalModuleData.base64);
+              const bytes = new Uint8Array(binaryStr.length);
+              for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+              const fileData = bytes.buffer;
+              const sourceFilename = originalModuleData.sourceFile || `module.${originalModuleData.format.toLowerCase()}`;
+              await exportUADEAsWav(
+                fileData,
+                sourceFilename,
+                `${metadata.name || 'song'}.wav`,
+                0,
+                (progress) => setRenderProgress(progress)
+              );
+            } else if (exportFullSong) {
               // Export all patterns in sequence
               const sequence = patterns.map((_, index) => index);
               await exportSongAsWav(

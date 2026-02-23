@@ -398,27 +398,23 @@ export class TrackerScratchController {
   private engageScratchAudio(replayer: TrackerReplayer): void {
     if (!this.scratchBufferReady || !this.scratchBuffer) return;
 
-    // INSTANT mute - no ramp (we want immediate silence)
+    // CRITICAL ORDER: freeze capture FIRST, before muting replayer.
+    // Otherwise the capture writes silence frames between mute and freeze,
+    // and startFromWrite reads from the silence zone → user hears nothing.
+    const rate = this.physics.playbackRate;
+    this.scratchBuffer.startScratch(rate);
+    this.scratchBuffer.snapScratchRate(rate);
+
+    // NOW mute replayer (capture is frozen, so this silence won't be captured)
     const now = Tone.getContext().rawContext.currentTime;
     const gainParam = replayer.getMasterGain().gain;
     gainParam.cancelScheduledValues(now);
     gainParam.setValueAtTime(0, now);
-    console.log('[TrackerScratch] Replayer gain muted to 0, buffer gain:', this.scratchBuffer.playbackGain.gain.value);
-    
+
     // Slow replayer to crawl + suppress notes (safety)
     replayer.setSuppressNotes(true);
     replayer.setTempoMultiplier(0.001);
     replayer.setPitchMultiplier(0.001);
-
-    // Start scratch playback (handles freeze + gain ramp internally)
-    const rate = this.physics.playbackRate;
-    this.scratchBuffer.startScratch(rate);
-    this.scratchBuffer.snapScratchRate(rate);
-    
-    // Log final gain values after scratch starts
-    setTimeout(() => {
-      console.log('[TrackerScratch] Post-engage: replayer gain:', gainParam.value, 'buffer gain:', this.scratchBuffer?.playbackGain.gain.value);
-    }, 10);
   }
 
   /** Duration of the crossfade when exiting scratch mode (seconds).
@@ -432,7 +428,7 @@ export class TrackerScratchController {
     const fadeSec = TrackerScratchController.EXIT_CROSSFADE_SEC;
     const fadeMs = fadeSec * 1000;
 
-    console.log('[TrackerScratch] Exiting scratch mode, starting crossfade...');
+    console.debug('[TrackerScratch] Exiting scratch mode');
 
     // Restore tempo/pitch to normal (quick catch-up from 0.1% to 100%)
     replayer.setTempoMultiplier(1.0);
@@ -441,7 +437,6 @@ export class TrackerScratchController {
 
     // Crossfade — scratch buffer out, live tracker in.
     replayer.getMasterGain().gain.rampTo(this.originalGainValue, fadeSec);
-    console.log('[TrackerScratch] Restoring replayer gain to:', this.originalGainValue);
 
     // Crossfade: ramp scratch buffer gain down over the same duration
     if (this.scratchBuffer) {
@@ -454,14 +449,12 @@ export class TrackerScratchController {
       gain.cancelScheduledValues(now);
       gain.setValueAtTime(gain.value, now);
       gain.linearRampToValueAtTime(0, now + fadeSec);
-      console.log('[TrackerScratch] Ramping buffer gain:', gain.value, '→ 0 over', fadeSec, 'sec');
 
       // Stop worklet + unfreeze capture after crossfade completes
       setTimeout(() => {
         if (this.scratchBuffer) {
           this.scratchBuffer['playbackNode'].port.postMessage({ type: 'stop' });
           this.scratchBuffer.unfreezeCapture();
-          console.log('[TrackerScratch] Crossfade complete, buffer stopped');
         }
       }, fadeMs + 10);
     }
@@ -504,7 +497,7 @@ export class TrackerScratchController {
         !this.physics.touching &&
         !this.physics.spinbackActive &&
         !this.physics.powerCutActive &&
-        Math.abs(rate - 1.0) < 0.001 // Much tighter tolerance - must be virtually perfect
+        Math.abs(rate - 1.0) < 0.02 // 2% tolerance — matches DJ view; tighter values take too long
       ) {
         const replayer = getTrackerReplayer();
         this.exitScratchMode(replayer);

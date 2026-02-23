@@ -1745,9 +1745,10 @@ export class TrackerReplayer {
     if (noteValue && noteValue !== 0 && noteValue !== 97 && !probabilitySkip) {
       ch.xmNote = noteValue;
 
-      // E5x finetune override
+      // E5x finetune override (MOD: 0-15 → signed -8..+7, matching PT2's SetFineTone)
       if (effect === 0xE && (param & 0xF0) === 0x50) {
-        ch.finetune = ((param & 0x0F) * 16) - 128;
+        const raw = param & 0x0F;
+        ch.finetune = raw > 7 ? raw - 16 : raw;
       }
 
       const usePeriod = this.noteToPlaybackPeriod(noteValue, rawPeriod, ch);
@@ -3658,12 +3659,14 @@ export class TrackerReplayer {
       const c4Rate = ft2GetSampleC4Rate(ch.relativeNote, ch.finetune, this.linearPeriods);
       playbackRate = c4Rate > 0 ? hz / c4Rate : 1.0;
     } else {
-      // MOD mode: basePeriod / currentPeriod * finetuneMultiplier
-      // MOD samples are recorded at ~8363 Hz for C-2 (period 428)
-      const basePeriod = 428;
-      const finetune = ch.finetune;
-      const finetuneMultiplier = FINETUNE_MULTIPLIERS[Math.min(15, Math.max(0, finetune + 8))] ?? 1;
-      playbackRate = (basePeriod / ch.period) * finetuneMultiplier;
+      // MOD mode: Amiga period → frequency → playback rate.
+      // Finetune is already baked into ch.period via rawPeriodToFinetuned().
+      // Uses the same formula as updatePeriodDirect() for consistency —
+      // otherwise there's a ~15 cent pitch jump when effects start on tick 1.
+      // Clamp period to minimum 113 (PT2 Paula behavior)
+      const clampedPeriod = ch.period < 113 ? 113 : ch.period;
+      const sampleRate = ch.instrument?.sample?.sampleRate || 8363;
+      playbackRate = AMIGA_PAL_FREQUENCY / clampedPeriod / sampleRate;
     }
 
     // Get or create cached ToneAudioBuffer wrapper (avoids re-wrapping per note)
@@ -3828,8 +3831,10 @@ export class TrackerReplayer {
       ch.player.playbackRate = (hz / c4Rate) * rate;
     } else {
       // MOD mode: original Amiga conversion
+      // Clamp period to minimum 113 (PT2 Paula behavior)
+      const clampedPeriod = period < 113 ? 113 : period;
       const sampleRate = ch.instrument?.sample?.sampleRate || 8363;
-      const frequency = AMIGA_PAL_FREQUENCY / period;
+      const frequency = AMIGA_PAL_FREQUENCY / clampedPeriod;
       ch.player.playbackRate = (frequency / sampleRate) * rate;
     }
   }
@@ -3849,8 +3854,9 @@ export class TrackerReplayer {
           const c4Rate = ft2GetSampleC4Rate(ch.relativeNote, ch.finetune, this.linearPeriods);
           ch.player.playbackRate = (hz / c4Rate) * rate;
         } else {
+          const clampedPeriod = ch.period < 113 ? 113 : ch.period;
           const sampleRate = ch.instrument?.sample?.sampleRate || 8363;
-          const frequency = AMIGA_PAL_FREQUENCY / ch.period;
+          const frequency = AMIGA_PAL_FREQUENCY / clampedPeriod;
           ch.player.playbackRate = (frequency / sampleRate) * rate;
         }
       }
@@ -3894,7 +3900,39 @@ export class TrackerReplayer {
     // MOD mode: Priority rawPeriod → old noteToPeriod
     // MOD import stores both note (2-octave-shifted XM number) and period (original Amiga period).
     // Using noteToPeriod first would double-shift the pitch — period 428 → XM 49 → period 107.
-    return rawPeriod || this.noteToPeriod(noteValue, ch.finetune) || 0;
+    //
+    // PT2's setPeriod: MOD pattern data stores finetune-0 periods. Convert to
+    // the finetune-specific period so that ALL downstream code (triggerNote,
+    // updatePeriodDirect, arpeggio tick-0, vibrato centre) uses the right pitch.
+    if (rawPeriod) {
+      return this.rawPeriodToFinetuned(rawPeriod, ch.finetune);
+    }
+    return this.noteToPeriod(noteValue, ch.finetune) || 0;
+  }
+
+  /**
+   * PT2's setPeriod equivalent: convert a raw pattern period (finetune-0) to
+   * the correct period from the finetune-specific table.
+   *
+   * MOD pattern data always stores periods from the finetune-0 table.
+   * The replayer must re-lookup the note index in finetune-0 and then pull
+   * the period from the sample's finetune table.
+   */
+  private rawPeriodToFinetuned(rawPeriod: number, finetune: number): number {
+    if (finetune === 0 || rawPeriod <= 0) return rawPeriod;
+
+    // Search finetune-0 table (first 36 entries) for the note index
+    let noteIndex = 0;
+    for (let i = 0; i < 36; i++) {
+      if (rawPeriod >= PERIOD_TABLE[i]) {
+        noteIndex = i;
+        break;
+      }
+    }
+
+    // Look up the period from the finetune-specific table section
+    const ftIndex = finetune >= 0 ? finetune : finetune + 16;
+    return PERIOD_TABLE[ftIndex * 36 + noteIndex];
   }
 
   private noteToPeriod(note: number | string, finetune: number): number {
