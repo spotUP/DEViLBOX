@@ -43,7 +43,7 @@ export class DeckEngine {
   readonly id: DeckId;
   readonly replayer: TrackerReplayer;
   readonly audioPlayer: DeckAudioPlayer;
-  private _playbackMode: PlaybackMode = 'tracker';
+  private _playbackMode: PlaybackMode = 'audio';
 
   // Audio chain nodes
   private deckGain: Tone.Gain;
@@ -201,7 +201,7 @@ export class DeckEngine {
     if (wasPlaying) {
       // CRITICAL: Stop tracker BEFORE starting audio to prevent double audio / echo
       this.replayer.stop();
-      this.audioPlayer.play();
+      await this.audioPlayer.play();
     } else {
       this.replayer.stop();
     }
@@ -311,7 +311,7 @@ export class DeckEngine {
 
   async play(): Promise<void> {
     if (this._playbackMode === 'audio') {
-      this.audioPlayer.play();
+      await this.audioPlayer.play();
       // Start replayer for position tracking/visuals (it's connected to deckGain, but we can rely on audio mode being the master)
       if (this.replayer.getSong()) {
         await this.replayer.play();
@@ -326,9 +326,9 @@ export class DeckEngine {
     this.replayer.pause();
   }
 
-  resume(): void {
+  async resume(): Promise<void> {
     if (this._playbackMode === 'audio') {
-      this.audioPlayer.play();
+      await this.audioPlayer.play();
       this.replayer.resume();
     }
   }
