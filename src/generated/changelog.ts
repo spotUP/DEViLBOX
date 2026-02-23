@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-23T22:20:46.583Z
+ * Generated: 2026-02-23T22:58:26.010Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1140';
-export const BUILD_NUMBER = '1140';
-export const BUILD_HASH = 'ad747392';
+export const BUILD_VERSION = '1.0.1141';
+export const BUILD_NUMBER = '1141';
+export const BUILD_HASH = '6d00d07d';
 export const BUILD_DATE = '2026-02-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1140',
+    version: '1.0.1141',
     date: '2026-02-23',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add 5 missing VSTBridge synths to synth selector"
+      },
       {
         type: 'feature',
         "description": "Implement headphone cueing (PFL) system"
@@ -234,10 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Add WebGL UI enhancement progress tracking document"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update stores, engine, and supporting files"
       }
     ]
   }

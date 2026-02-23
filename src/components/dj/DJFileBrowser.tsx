@@ -92,38 +92,27 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
     if (!file.song) return;
 
     const engine = getDJEngine();
-    const store = useDJStore.getState();
 
     try {
       if (file.isUADE && file.rawBuffer) {
-        // UADE path — loadUADEToDeck handles cache + pipeline
-        const result = await loadUADEToDeck(engine, deckId, file.rawBuffer, file.name, true);
+        // UADE path — loadUADEToDeck handles cache + pipeline + store updates
+        const result = await loadUADEToDeck(
+          engine, deckId, file.rawBuffer, file.name, true, file.bpm, file.song.name
+        );
         setFiles(prev => prev.map(f =>
           f.name === file.name ? { ...f, isCached: result.cached } : f
         ));
       } else if (file.rawBuffer) {
         // Non-UADE tracker (XM/IT/S3M/etc.) — load immediately as tracker,
         // then pipeline render + analysis in background
-        await engine.loadToDeck(deckId, file.song);
+        await engine.loadToDeck(deckId, file.song, file.name, file.bpm);
         void getDJPipeline().loadOrEnqueue(file.rawBuffer, file.name, deckId, 'high').catch((err) => {
           console.warn(`[DJFileBrowser] Background pipeline for ${file.name}:`, err);
         });
       } else {
         // Fallback: standard tracker loading (no pipeline)
-        await engine.loadToDeck(deckId, file.song);
+        await engine.loadToDeck(deckId, file.song, file.name, file.bpm);
       }
-
-      store.setDeckState(deckId, {
-        fileName: file.name,
-        trackName: file.song.name || file.name,
-        detectedBPM: file.bpm,
-        effectiveBPM: file.bpm,
-        totalPositions: file.song.songLength,
-        songPos: 0,
-        pattPos: 0,
-        elapsedMs: 0,
-        isPlaying: false,
-      });
     } catch (err) {
       console.error(`[DJFileBrowser] Failed to load ${file.name} to deck ${deckId}:`, err);
       setError(`Failed to load to deck: ${err instanceof Error ? err.message : 'unknown error'}`);

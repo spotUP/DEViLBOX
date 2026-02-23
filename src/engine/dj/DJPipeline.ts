@@ -19,6 +19,7 @@
 import { getCachedAudio, cacheAudio, updateCacheAnalysis } from './DJAudioCache';
 import { useDJStore } from '@/stores/useDJStore';
 import type { DeckId } from './DeckEngine';
+import { getDJEngineIfActive } from './DJEngine';
 import type { BeatGridData } from './DJAudioCache';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -586,6 +587,9 @@ export class DJPipeline {
         `[DJPipeline] Rendered ${task.filename} in ${Math.round(performance.now() - startTime)}ms ` +
         `(${Math.round(duration)}s audio, ${Math.round(wavData.byteLength / 1024)}KB)`,
       );
+
+      // Brief breather between heavy render and heavy analysis to prevent UI/audio jank
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     // ── Analysis phase ───────────────────────────────────────────────────
@@ -620,35 +624,53 @@ export class DJPipeline {
     }
 
     // ── Update deck state ────────────────────────────────────────────────
-    if (task.deckId && analysis) {
-      // Auto-gain: target -14 dB RMS (standard DJ loudness reference)
-      const TARGET_RMS_DB = -14;
-      const autoTrimDb = analysis.rmsDb > -80
-        ? Math.max(-12, Math.min(12, TARGET_RMS_DB - analysis.rmsDb))
-        : 0;
-      const deckState = useDJStore.getState().decks[task.deckId];
-      const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
+    if (task.deckId) {
+      if (analysis) {
+        // Auto-gain: target -14 dB RMS (standard DJ loudness reference)
+        const TARGET_RMS_DB = -14;
+        const autoTrimDb = analysis.rmsDb > -80
+          ? Math.max(-12, Math.min(12, TARGET_RMS_DB - analysis.rmsDb))
+          : 0;
+        const deckState = useDJStore.getState().decks[task.deckId];
+        const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
 
-      useDJStore.getState().setDeckState(task.deckId, {
-        analysisState: 'ready',
-        beatGrid: {
-          beats: analysis.beats,
-          downbeats: analysis.downbeats,
-          bpm: analysis.bpm,
-          timeSignature: analysis.timeSignature,
-        },
-        musicalKey: analysis.musicalKey,
-        keyConfidence: analysis.keyConfidence,
-        frequencyPeaks: analysis.frequencyPeaks.map(b => new Float32Array(b)),
-        rmsDb: analysis.rmsDb,
-        peakDb: analysis.peakDb,
-        trimGain,
-      });
-    } else if (task.deckId) {
-      // Analysis failed but render succeeded
-      useDJStore.getState().setDeckState(task.deckId, {
-        analysisState: 'ready',
-      });
+        useDJStore.getState().setDeckState(task.deckId, {
+          analysisState: 'ready',
+          beatGrid: {
+            beats: analysis.beats,
+            downbeats: analysis.downbeats,
+            bpm: analysis.bpm,
+            timeSignature: analysis.timeSignature,
+          },
+          musicalKey: analysis.musicalKey,
+          keyConfidence: analysis.keyConfidence,
+          frequencyPeaks: analysis.frequencyPeaks.map(b => new Float32Array(b)),
+          rmsDb: analysis.rmsDb,
+          peakDb: analysis.peakDb,
+          trimGain,
+        });
+      } else {
+        // Analysis failed but render succeeded
+        useDJStore.getState().setDeckState(task.deckId, {
+          analysisState: 'ready',
+        });
+      }
+
+      // ── Hot-swap from Tracker engine to Audio engine ───────────────────
+      // If the DJ engine is still active and this track is still on that deck,
+      // seamlessly switch to the pre-rendered high-quality WAV stream.
+      const djEngine = getDJEngineIfActive();
+      if (djEngine) {
+        const deck = djEngine.getDeck(task.deckId);
+        const currentState = useDJStore.getState().decks[task.deckId];
+        
+        // Only swap if the track hasn't changed while we were rendering
+        if (currentState.fileName === task.filename && currentState.playbackMode === 'tracker') {
+          void deck.hotSwapToAudio(wavData, task.filename).catch(err => {
+            console.warn(`[DJPipeline] Hot-swap failed for ${task.filename}:`, err);
+          });
+        }
+      }
     }
 
     const totalTime = Math.round(performance.now() - startTime);
@@ -743,8 +765,13 @@ export class DJPipeline {
     return null;
   }
 
-  private emitTaskProgress(_taskId: string, _progress: number): void {
-    // Could emit events for UI progress bars in the future
-    // For now, the analysis state updates are sufficient
+  private emitTaskProgress(taskId: string, progress: number): void {
+    const deckId = (taskId === this.currentTaskId && this.currentDeckId) 
+      ? this.currentDeckId 
+      : this.findDeckForTask(taskId);
+
+    if (deckId) {
+      useDJStore.getState().setDeckAnalysisProgress(deckId, Math.round(progress));
+    }
   }
 }

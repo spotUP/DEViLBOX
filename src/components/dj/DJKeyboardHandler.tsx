@@ -2,11 +2,13 @@
  * DJKeyboardHandler - Keyboard shortcuts for DJ mode
  *
  * Left-hand keys = Deck A, right-hand keys = Deck B.
- * Installs a keydown listener when DJ mode is active.
+ * Integrates with KeyboardRouter for view-isolated key handling.
  */
 
 import { useEffect, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { registerViewHandler } from '@/engine/keyboard/KeyboardRouter';
+import type { NormalizedKeyEvent } from '@/engine/keyboard/types';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { DJBeatSync } from '@/engine/dj/DJBeatSync';
 import { beatJump, triggerHotCue, activateSeratoLoop } from '@/engine/dj/DJBeatJump';
@@ -24,13 +26,9 @@ type LoopSize = 1 | 2 | 4 | 8 | 16 | 32;
 
 const LOOP_SIZES: LoopSize[] = [1, 2, 4, 8, 16, 32];
 
-export function useDJKeyboardHandler(active: boolean): void {
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Don't handle if typing in an input field
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
-      return;
-    }
+export function useDJKeyboardHandler(): void {
+  const handleKeyDown = useCallback((normalized: NormalizedKeyEvent, originalEvent: KeyboardEvent): boolean => {
+    const e = originalEvent;
 
     const engine = getDJEngine();
     const store = useDJStore.getState();
@@ -78,9 +76,7 @@ export function useDJKeyboardHandler(active: boolean): void {
         default: handled = false;
       }
       if (handled) {
-        e.preventDefault();
-        e.stopPropagation();
-        return;
+        return true;
       }
       handled = true; // reset for main switch
     }
@@ -435,18 +431,11 @@ export function useDJKeyboardHandler(active: boolean): void {
         handled = false;
     }
 
-    if (handled) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+    return handled;
   }, []);
 
   useEffect(() => {
-    if (!active) return;
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown, true);
-    };
-  }, [active, handleKeyDown]);
+    const unregister = registerViewHandler('dj', handleKeyDown);
+    return unregister;
+  }, [handleKeyDown]);
 }
