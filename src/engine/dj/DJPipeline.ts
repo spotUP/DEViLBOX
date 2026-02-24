@@ -572,14 +572,6 @@ export class DJPipeline {
       wavData = encodePCMToWAV(left, right, sampleRate);
       waveformPeaks = computeWaveformFromPCM(left, right, 800);
 
-      // Diagnostic: Check PCM amplitude to ensure it's not silent
-      let maxAmp = 0;
-      for (let i = 0; i < Math.min(left.length, 44100); i++) {
-        const amp = Math.max(Math.abs(left[i]), Math.abs(right[i]));
-        if (amp > maxAmp) maxAmp = amp;
-      }
-      console.log(`[DJPipeline] First second max amplitude: ${maxAmp.toFixed(4)}`);
-
       // Cache the audio immediately (before analysis)
       await cacheAudio(
         task.fileBuffer,
