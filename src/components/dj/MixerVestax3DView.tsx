@@ -287,7 +287,7 @@ function MixerScene() {
       },
       {
         meshName: 'hfader1', label: 'Crossfader',
-        axis: 'z', dragAxis: 'x', travel: 5.0, defaultValue: 0.5,
+        axis: 'x', dragAxis: 'x', travel: 5.0, defaultValue: 0.5,
         action: (v) => {
           const hamster = store().hamsterSwitch;
           const pos = hamster ? 1 - v : v;
@@ -303,7 +303,7 @@ function MixerScene() {
       },
       {
         meshName: 'exp_hfader1', label: 'Crossfader Alt',
-        axis: 'z', dragAxis: 'x', travel: 5.0, defaultValue: 0.5,
+        axis: 'x', dragAxis: 'x', travel: 5.0, defaultValue: 0.5,
         action: (v) => {
           const hamster = store().hamsterSwitch;
           const pos = hamster ? 1 - v : v;
@@ -319,7 +319,7 @@ function MixerScene() {
       },
       {
         meshName: 'knob14', label: 'CF Monitor',
-        axis: 'z', dragAxis: 'x', travel: 3.0, defaultValue: 1,
+        axis: 'x', dragAxis: 'x', travel: 3.0, defaultValue: 1,
         action: (v) => store().setSessionMonitorVolume(v),
         readValue: () => store().sessionMonitorVolume,
         min: 0, max: 1.5,
