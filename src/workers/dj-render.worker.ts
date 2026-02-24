@@ -234,20 +234,27 @@ async function renderWithUADE(
     const ret = wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
     
     if (ret <= 0) {
-      // Allow up to 100 leading zero-frame returns (~9s) to accommodate slow player initialization.
-      if (totalFrames === 0 && leadingZeros < 100) {
+      // Allow up to 1000 leading zero-frame returns (~90s) to accommodate extremely slow player initialization.
+      // Some exotic formats or eagleplayers may perform significant startup processing.
+      if (totalFrames === 0 && leadingZeros < 1000) {
         leadingZeros++;
         continue;
       }
       break; 
     }
 
+    if (totalFrames === 0) {
+      console.log(`[DJRenderWorker/UADE] First audio frames received after ${leadingZeros} zero-returns. Chunk size: ${ret}`);
+    }
+
     const leftData = new Float32Array(ret);
     const rightData = new Float32Array(ret);
-    const heapL = new Float32Array(wasm.HEAPF32.buffer, tmpL, ret);
-    const heapR = new Float32Array(wasm.HEAPF32.buffer, tmpR, ret);
-    leftData.set(heapL);
-    rightData.set(heapR);
+    
+    // Use HEAPF32.subarray for safe memory access (avoids issues if WASM memory grows)
+    const baseL = tmpL >> 2;
+    const baseR = tmpR >> 2;
+    leftData.set(wasm.HEAPF32.subarray(baseL, baseL + ret));
+    rightData.set(wasm.HEAPF32.subarray(baseR, baseR + ret));
 
     // Check for trailing silence to detect natural song end
     let isSilent = true;
