@@ -283,8 +283,11 @@ async function renderWithUADE(
       // Only stop for silence after we've rendered at least MIN_RENDER_SECONDS
       if (totalFrames > sampleRate * MIN_RENDER_SECONDS && 
           trailingSilenceFrames > sampleRate * MAX_SILENCE_SECONDS) {
-        console.log(`[DJRenderWorker/UADE] Stopping render due to ${MAX_SILENCE_SECONDS}s trailing silence`);
+        console.log(`[DJRenderWorker/UADE] Stopping render due to ${MAX_SILENCE_SECONDS}s trailing silence at ${(totalFrames/sampleRate).toFixed(2)}s`);
         break;
+      }
+      if (totalFrames < sampleRate) {
+        console.log(`[DJRenderWorker/UADE] Silent chunk at ${totalFrames} frames, ${trailingSilenceFrames} trailing silence frames`);
       }
     } else {
       trailingSilenceFrames = 0;
