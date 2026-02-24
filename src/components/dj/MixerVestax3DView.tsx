@@ -251,12 +251,6 @@ function MixerScene() {
 
       // Far-right — headphone / monitor
       {
-        meshName: 'knob14', label: 'CF Monitor',
-        action: (v) => store().setSessionMonitorVolume(v),
-        readValue: () => store().sessionMonitorVolume,
-        min: 0, max: 1.5, defaultValue: 1,
-      },
-      {
         meshName: 'knob15', label: 'Filter',
         action: (v) => {
           // Map 0-1 to filter position -1 to +1
@@ -326,6 +320,13 @@ function MixerScene() {
           return hamster ? 1 - pos : pos;
         },
         min: 0, max: 1,
+      },
+      {
+        meshName: 'knob14', label: 'CF Monitor',
+        axis: 'z', dragAxis: 'x', defaultValue: 1,
+        action: (v) => store().setSessionMonitorVolume(v),
+        readValue: () => store().sessionMonitorVolume,
+        min: 0, max: 1.5,
       },
     ];
 
