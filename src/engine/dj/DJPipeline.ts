@@ -484,6 +484,7 @@ export class DJPipeline {
   }
 
   dispose(): void {
+    this.stopProgressTicker();
     this.cancelAll();
     this.renderWorker?.terminate();
     this.analysisWorker?.terminate();
@@ -502,6 +503,11 @@ export class DJPipeline {
     this.currentTaskId = task.id;
     this.currentDeckId = task.deckId ?? null;
 
+    // Start progress interpolation ticker
+    if (this.currentDeckId) {
+      this.startProgressTicker(this.currentDeckId);
+    }
+
     this.updateStoreQueue();
 
     try {
@@ -511,6 +517,7 @@ export class DJPipeline {
       console.error(`[DJPipeline] Task failed: ${task.filename}`, err);
       reject(err instanceof Error ? err : new Error(String(err)));
     } finally {
+      this.stopProgressTicker();
       this.processing = false;
       this.currentTaskId = null;
       this.currentDeckId = null;
@@ -566,6 +573,7 @@ export class DJPipeline {
       duration = renderResult.duration;
 
       // Encode to WAV
+      this.emitTaskProgress(task.id, 48);
       wavData = encodePCMToWAV(left, right, sampleRate);
       waveformPeaks = computeWaveformFromPCM(left, right, 800);
 
@@ -573,6 +581,7 @@ export class DJPipeline {
       console.log(`[DJPipeline] WAV encoded: ${wavData.byteLength} bytes, duration: ${duration.toFixed(2)}s, PCM frames: ${left.length}`);
 
       // Cache the audio immediately (before analysis)
+      this.emitTaskProgress(task.id, 49);
       await cacheAudio(
         task.fileBuffer,
         task.filename,
@@ -765,13 +774,63 @@ export class DJPipeline {
     return null;
   }
 
+  // ── Progress interpolation ────────────────────────────────────────────────
+  // Workers report progress in large jumps (e.g. 55% → 70% with nothing in between
+  // during a multi-second WASM call). A ticker gradually advances the displayed
+  // progress toward the last reported target so the bar never appears frozen.
+
+  private progressTarget = 0;
+  private progressDisplayed = 0;
+  private progressTickTimer: ReturnType<typeof setInterval> | null = null;
+  private progressDeckId: DeckId | null = null;
+
+  private startProgressTicker(deckId: DeckId): void {
+    this.stopProgressTicker();
+    this.progressTarget = 0;
+    this.progressDisplayed = 0;
+    this.progressDeckId = deckId;
+    this.progressTickTimer = setInterval(() => {
+      if (this.progressDisplayed >= this.progressTarget) return;
+      // Ease toward target: close 30% of the remaining gap each tick (200ms)
+      // This means we approach but never quite reach the target until a real update bumps it
+      const gap = this.progressTarget - this.progressDisplayed;
+      const step = Math.max(0.5, gap * 0.3);
+      this.progressDisplayed = Math.min(this.progressTarget, this.progressDisplayed + step);
+      if (this.progressDeckId) {
+        useDJStore.getState().setDeckAnalysisProgress(this.progressDeckId, Math.round(this.progressDisplayed));
+      }
+    }, 200);
+  }
+
+  private stopProgressTicker(): void {
+    if (this.progressTickTimer) {
+      clearInterval(this.progressTickTimer);
+      this.progressTickTimer = null;
+    }
+  }
+
   private emitTaskProgress(taskId: string, progress: number): void {
     const deckId = (taskId === this.currentTaskId && this.currentDeckId) 
       ? this.currentDeckId 
       : this.findDeckForTask(taskId);
 
     if (deckId) {
-      useDJStore.getState().setDeckAnalysisProgress(deckId, Math.round(progress));
+      this.progressTarget = progress;
+      this.progressDeckId = deckId;
+      // If displayed is behind target, the ticker will animate toward it.
+      // If this is a big jump forward, snap displayed to at least the last shown value
+      // (the ticker handles the rest).
+      // For the final 100%, snap immediately.
+      if (progress >= 100) {
+        this.progressDisplayed = 100;
+        this.stopProgressTicker();
+        useDJStore.getState().setDeckAnalysisProgress(deckId, 100);
+      } else if (this.progressDisplayed < progress) {
+        // Immediately show at least 60% of the jump so the bar isn't completely stale
+        const jump = progress - this.progressDisplayed;
+        this.progressDisplayed += jump * 0.6;
+        useDJStore.getState().setDeckAnalysisProgress(deckId, Math.round(this.progressDisplayed));
+      }
     }
   }
 }
