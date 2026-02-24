@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-23T23:38:31.706Z
+ * Generated: 2026-02-23T23:59:01.473Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1145';
-export const BUILD_NUMBER = '1145';
-export const BUILD_HASH = '58bb4e0a';
+export const BUILD_VERSION = '1.0.1157';
+export const BUILD_NUMBER = '1157';
+export const BUILD_HASH = 'c8daa5d2';
 export const BUILD_DATE = '2026-02-23';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,57 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1145',
+    version: '1.0.1157',
     date: '2026-02-24',
     changes: [
+      {
+        type: 'fix',
+        "description": "Robustify UADE render loop to prevent premature termination"
+      },
+      {
+        type: 'fix',
+        "description": "Expand audio support and prevent misrouting modern formats"
+      },
+      {
+        type: 'fix',
+        "description": "Correctly route regular audio files in DJ UI components"
+      },
+      {
+        type: 'fix',
+        "description": "Implementation of aggressive UADE filename sanitization and refined initialization"
+      },
+      {
+        type: 'fix',
+        "description": "Sanitize UADE filenames and ensure full WASM initialization"
+      },
+      {
+        type: 'fix',
+        "description": "Ensure AudioContext is running before deck playback"
+      },
+      {
+        type: 'fix',
+        "description": "Restore all amiga formats to UADE and add loading retry mechanism"
+      },
+      {
+        type: 'fix',
+        "description": "Debug(dj): add diagnostic logging for audio pipeline and player"
+      },
+      {
+        type: 'fix',
+        "description": "Add buffer check and fade-in/out to DeckAudioPlayer"
+      },
+      {
+        type: 'fix',
+        "description": "Mute tracker replayer and ensure visuals load during rendering"
+      },
+      {
+        type: 'feature',
+        "description": "Remove tracker mode fallback from UI components"
+      },
+      {
+        type: 'fix',
+        "description": "Ensure tracker-as-source mode and eliminate audio glitches"
+      },
       {
         type: 'fix',
         "description": "Resolve keyboard hook unused variables and incorrect argument count"
@@ -196,54 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Tracker view routing, editor controls, and drag-drop updates"
-      },
-      {
-        type: 'feature',
-        "description": "Add FT2 sample editor WASM module source"
-      },
-      {
-        type: 'fix',
-        "description": "Update PT2 sample editor WASM source and binary"
-      },
-      {
-        type: 'feature',
-        "description": "Add native Pixi pattern editors with full DOM parity"
-      },
-      {
-        type: 'fix',
-        "description": "Fix speed/BPM detection and all-zero PCM for VBlank formats"
-      },
-      {
-        type: 'fix',
-        "description": "Remove placeholder instruments for unextracted sample pointers"
-      },
-      {
-        type: 'fix',
-        "description": "Correct sample rate formula for PCM extraction"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve 9 TypeScript errors in UADE parsers and format types"
-      },
-      {
-        type: 'improvement',
-        "description": "Build(uade): rebuild WASM with extended channel, CIA timer, and memory read exports"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
-      },
-      {
-        type: 'feature',
-        "description": "Complete DOM/GL pixel-perfect parity + real FPS monitor"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve canvas null narrowing in FT2/PT2 hardware UIs"
-      },
-      {
-        type: 'feature',
-        "description": "Enhance editor controls, dialogs, and settings"
       }
     ]
   }

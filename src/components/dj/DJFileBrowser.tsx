@@ -111,6 +111,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
         if (!file.song) {
           // Regular audio file path
           await engine.loadAudioToDeck(deckId, file.rawBuffer, file.name);
+          useDJStore.getState().setDeckViewMode('vinyl');
           console.log(`[DJFileBrowser] Loaded ${file.name} as audio file`);
           return;
         }
@@ -120,6 +121,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
           const result = await loadUADEToDeck(
             engine, deckId, file.rawBuffer, file.name, true, file.bpm, file.song.name
           );
+          useDJStore.getState().setDeckViewMode('visualizer');
           setFiles(prev => prev.map(f =>
             f.name === file.name ? { ...f, isCached: result.cached } : f
           ));
@@ -136,6 +138,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
 
           const result = await getDJPipeline().loadOrEnqueue(file.rawBuffer, file.name, deckId, 'high');
           await engine.loadAudioToDeck(deckId, result.wavData, file.name, file.song.name || file.name, result.analysis?.bpm || file.bpm);
+          useDJStore.getState().setDeckViewMode('visualizer');
           console.log(`[DJFileBrowser] Loaded ${file.name} in audio mode (skipped tracker bugs)`);
         }
       } else {
