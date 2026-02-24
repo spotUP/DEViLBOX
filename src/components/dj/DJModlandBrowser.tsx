@@ -138,7 +138,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         const result = await getDJPipeline().loadOrEnqueue(buffer, file.filename, deckId, 'high');
 
         // Load the pre-rendered WAV directly in audio mode
-        await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || file.filename, result.analysis?.bpm || bpmResult.bpm);
+        await engine.loadAudioToDeck(deckId, result.wavData, cacheKey, song.name || file.filename, result.analysis?.bpm || bpmResult.bpm, song);
 
         // Switch to visualizer view for modules
         useDJStore.getState().setDeckViewMode('visualizer');
