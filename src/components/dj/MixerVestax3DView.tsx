@@ -212,7 +212,7 @@ function MixerScene() {
       },
       {
         meshName: 'knob7', label: 'Master Level',
-        action: (v) => { store().setMasterVolume(v); try { void 0; } catch {} },
+        action: (v) => { store().setMasterVolume(v); try { getDJEngine().mixer.setMasterVolume(v); } catch {} },
         readValue: () => store().masterVolume,
         min: 0, max: 1.5, defaultValue: 1,
       },
@@ -281,7 +281,7 @@ function MixerScene() {
       {
         meshName: 'fader4', label: 'Master Volume',
         axis: 'z', dragAxis: 'y', travel: 5.0, defaultValue: 0,
-        action: (v) => { store().setMasterVolume(v); try { void 0; } catch {} },
+        action: (v) => { store().setMasterVolume(v); try { getDJEngine().mixer.setMasterVolume(v); } catch {} },
         readValue: () => store().masterVolume,
         min: 0, max: 1.5,
       },
@@ -329,22 +329,42 @@ function MixerScene() {
     const buttons: ButtonControl[] = [
       {
         meshName: 'button1', label: 'CUE CH1',
-        action: () => { store().togglePFL('A'); },
+        action: () => {
+          const s = store();
+          const next = !s.decks.A.pflEnabled;
+          s.togglePFL('A');
+          try { getDJEngine().mixer.setPFL('A', next); } catch {}
+        },
         readActive: () => store().decks.A.pflEnabled,
       },
       {
         meshName: 'button2', label: 'CUE CH2',
-        action: () => { store().togglePFL('B'); },
+        action: () => {
+          const s = store();
+          const next = !s.decks.B.pflEnabled;
+          s.togglePFL('B');
+          try { getDJEngine().mixer.setPFL('B', next); } catch {}
+        },
         readActive: () => store().decks.B.pflEnabled,
       },
       {
         meshName: 'exp_button1', label: 'CUE CH1 Alt',
-        action: () => { store().togglePFL('A'); },
+        action: () => {
+          const s = store();
+          const next = !s.decks.A.pflEnabled;
+          s.togglePFL('A');
+          try { getDJEngine().mixer.setPFL('A', next); } catch {}
+        },
         readActive: () => store().decks.A.pflEnabled,
       },
       {
         meshName: 'exp_button2', label: 'CUE CH2 Alt',
-        action: () => { store().togglePFL('B'); },
+        action: () => {
+          const s = store();
+          const next = !s.decks.B.pflEnabled;
+          s.togglePFL('B');
+          try { getDJEngine().mixer.setPFL('B', next); } catch {}
+        },
         readActive: () => store().decks.B.pflEnabled,
       },
     ];
@@ -601,7 +621,9 @@ function MixerScene() {
       const controlName = raycastControl(e as unknown as PointerEvent);
       if (!controlName) return;
       const knob = knobMap.get(controlName);
-      if (knob) knob.action(knob.defaultValue);
+      if (knob) { knob.action(knob.defaultValue); return; }
+      const fader = faderMap.get(controlName);
+      if (fader) fader.action(fader.defaultValue);
     };
 
     const onPointerMove = (e: PointerEvent) => {
