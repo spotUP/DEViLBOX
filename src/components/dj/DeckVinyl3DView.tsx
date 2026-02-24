@@ -134,7 +134,8 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
     cloned.updateMatrixWorld(true);
 
     const getMaterialName = (mesh: THREE.Mesh): string => {
-      return (mesh.material instanceof THREE.Material) ? mesh.material.name.toLowerCase() : '';
+      const mat = mesh.material as THREE.Material;
+      return mat && mat.name ? mat.name.toLowerCase() : '';
     };
 
     // Classify meshes by material name
@@ -147,22 +148,23 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
     let counterweight: THREE.Mesh | null = null as THREE.Mesh | null;  // 'poids' — near the actual pivot bearing
 
     cloned.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return;
-      const matName = getMaterialName(child);
+      if (!('isMesh' in child && child.isMesh)) return;
+      const mesh = child as THREE.Mesh;
+      const matName = getMaterialName(mesh);
 
       if (PLATTER_MATERIALS.has(matName)) {
-        platters.push(child);
+        platters.push(mesh);
       } else if (TONEARM_MATERIALS.has(matName)) {
-        tonearms.push(child);
-        if (matName === 'poids') counterweight = child;
+        tonearms.push(mesh);
+        if (matName === 'poids') counterweight = mesh;
       } else if (POWER_LED_MATERIALS.has(matName)) {
-        led = child;
+        led = mesh;
       } else if (POWER_BUTTON_MATERIALS.has(matName)) {
-        powerBtn = child;
+        powerBtn = mesh;
       } else if (PITCH_SLIDER_MATERIALS.has(matName)) {
-        slider = child;
+        slider = mesh;
       } else if (RPM_BUTTON_MATERIALS.has(matName)) {
-        rpmBtn = child;
+        rpmBtn = mesh;
       }
     });
 
@@ -247,15 +249,16 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
   useEffect(() => {
     if (!powerLedMesh) return;
     const mat = powerLedMesh.material;
-    if (mat instanceof THREE.MeshStandardMaterial) {
+    if (mat && 'emissive' in mat) {
+      const stdMat = mat as THREE.MeshStandardMaterial;
       if (isPlaying) {
-        mat.emissive = new THREE.Color('#ff2020');
-        mat.emissiveIntensity = 2;
+        stdMat.emissive = new THREE.Color('#ff2020');
+        stdMat.emissiveIntensity = 2;
       } else {
-        mat.emissive = new THREE.Color('#200000');
-        mat.emissiveIntensity = 0.3;
+        stdMat.emissive = new THREE.Color('#200000');
+        stdMat.emissiveIntensity = 0.3;
       }
-      mat.needsUpdate = true;
+      stdMat.needsUpdate = true;
     }
   }, [isPlaying, powerLedMesh]);
 
@@ -437,10 +440,11 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
     // Visual feedback — update the RPM button material color
     if (rpmButtonMesh) {
       const mat = rpmButtonMesh.material;
-      if (mat instanceof THREE.MeshStandardMaterial) {
-        mat.emissive = new THREE.Color(newRpm === RPM_45 ? '#ffaa00' : '#444444');
-        mat.emissiveIntensity = newRpm === RPM_45 ? 0.8 : 0.2;
-        mat.needsUpdate = true;
+      if (mat && 'emissive' in mat) {
+        const stdMat = mat as THREE.MeshStandardMaterial;
+        stdMat.emissive = new THREE.Color(newRpm === RPM_45 ? '#ffaa00' : '#444444');
+        stdMat.emissiveIntensity = newRpm === RPM_45 ? 0.8 : 0.2;
+        stdMat.needsUpdate = true;
       }
     }
   }, [rpmButtonMesh]);
@@ -470,7 +474,7 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
       {/* The turntable model (untouched hierarchy) */}
       <primitive object={clonedScene} />
 
-      {/* Invisible interaction meshes */}
+      {/* Invisible interaction meshes — must NOT use visible={false} (breaks raycasting) */}
       {/* Platter — large cylinder for scratch interaction */}
       <mesh
         position={[0, 0.045, 0]}
@@ -480,51 +484,21 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
         onPointerUp={handlePlatterPointerUp}
         onPointerCancel={handlePlatterPointerUp}
         onWheel={handleWheel}
-        visible={false}
       >
         <circleGeometry args={[0.15, 32]} />
-        <meshBasicMaterial transparent opacity={0} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* Power button — clickable on the actual model mesh */}
-      {powerButtonMesh && (
-        <mesh
-          geometry={powerButtonMesh.geometry}
-          material={powerButtonMesh.material}
-          position={powerButtonMesh.position}
-          rotation={powerButtonMesh.rotation}
-          scale={powerButtonMesh.scale}
-          onClick={handlePowerClick}
-          visible={false}
-        />
-      )}
-      {/* Power button fallback invisible hitbox */}
+      {/* Power button — use hitbox only (model-cloned meshes with visible=false can't raycast) */}
       <mesh
         position={[0.14, 0.035, 0.12]}
         onClick={handlePowerClick}
-        visible={false}
       >
         <boxGeometry args={[0.03, 0.025, 0.03]} />
-        <meshBasicMaterial transparent opacity={0} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
       {/* Pitch slider — draggable, double-click to reset */}
-      {pitchSliderMesh && (
-        <mesh
-          geometry={pitchSliderMesh.geometry}
-          material={pitchSliderMesh.material}
-          position={pitchSliderMesh.position}
-          rotation={pitchSliderMesh.rotation}
-          scale={pitchSliderMesh.scale}
-          onPointerDown={handlePitchPointerDown}
-          onPointerMove={handlePitchPointerMove}
-          onPointerUp={handlePitchPointerUp}
-          onPointerCancel={handlePitchPointerUp}
-          onDoubleClick={handlePitchDoubleClick}
-          visible={false}
-        />
-      )}
-      {/* Pitch slider fallback invisible hitbox */}
       <mesh
         position={[-0.16, 0.035, 0.0]}
         onPointerDown={handlePitchPointerDown}
@@ -532,32 +506,18 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
         onPointerUp={handlePitchPointerUp}
         onPointerCancel={handlePitchPointerUp}
         onDoubleClick={handlePitchDoubleClick}
-        visible={false}
       >
         <boxGeometry args={[0.025, 0.025, 0.12]} />
-        <meshBasicMaterial transparent opacity={0} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
       {/* 33/45 RPM speed selector — clickable to toggle */}
-      {rpmButtonMesh && (
-        <mesh
-          geometry={rpmButtonMesh.geometry}
-          material={rpmButtonMesh.material}
-          position={rpmButtonMesh.position}
-          rotation={rpmButtonMesh.rotation}
-          scale={rpmButtonMesh.scale}
-          onClick={handleRpmClick}
-          visible={false}
-        />
-      )}
-      {/* RPM button fallback invisible hitbox */}
       <mesh
         position={[0.14, 0.035, 0.06]}
         onClick={handleRpmClick}
-        visible={false}
       >
         <boxGeometry args={[0.04, 0.02, 0.025]} />
-        <meshBasicMaterial transparent opacity={0} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
       {/* Camera controls — scroll-wheel zoom disabled to avoid scratch conflict */}
