@@ -5,8 +5,9 @@
  * Falls back to null when no waveform data exists (unchanged behaviour).
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
+import { getDJEngine } from '@/engine/dj/DJEngine';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import WaveformWorkerFactory from '@/workers/dj-waveform.worker.ts?worker';
 import type { WaveformMsg } from '@engine/renderer/worker-types';
@@ -101,9 +102,33 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
   }, [deckId]);
 
   const waveformPeaks = useDJStore((s) => s.decks[deckId].waveformPeaks);
+
+  // Click-to-seek: waveform shows a 10s window centered on playhead
+  const WINDOW_SEC = 10;
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const frac = (e.clientX - rect.left) / rect.width;
+    const state = useDJStore.getState().decks[deckId];
+    const seekSec = Math.max(0, Math.min(
+      state.audioPosition - WINDOW_SEC / 2 + frac * WINDOW_SEC,
+      (state.durationMs / 1000) - 0.01
+    ));
+    try {
+      const deck = getDJEngine().getDeck(deckId);
+      deck.audioPlayer.seek(seekSec);
+      useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
+    } catch { /* engine not ready */ }
+  }, [deckId]);
+
   if (!waveformPeaks || waveformPeaks.length === 0) return null;
 
   return (
-    <div ref={containerRef} className="w-full h-16 shrink-0 bg-dark-bg border border-dark-border rounded-sm overflow-hidden" />
+    <div
+      ref={containerRef}
+      className="w-full h-16 shrink-0 bg-dark-bg border border-dark-border rounded-sm overflow-hidden cursor-pointer"
+      onClick={handleClick}
+    />
   );
 };
