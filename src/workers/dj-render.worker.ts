@@ -148,7 +148,11 @@ async function renderWithUADE(
   subsong: number,
   id: string,
 ): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
-  const isNewInit = !uadeReady;
+  // ALWAYS reinit UADE for each render to ensure clean state
+  // Reusing the instance causes it to return 1 frame per call
+  uadeReady = false;
+  uadeInstance = null;
+  
   await initUADE();
   const wasm = uadeInstance;
 
@@ -163,10 +167,7 @@ async function renderWithUADE(
   
   console.log(`[DJRenderWorker/UADE] Rendering ${filename} as ${safeFilename} (${fileBuffer.byteLength} bytes)`);
 
-  // Stabilize IPC after fresh init
-  if (isNewInit) {
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
+  // No stabilization delay needed when reiniting fresh each time
 
   // Load the file into UADE WASM memory
   const fileSize = fileBuffer.byteLength;
