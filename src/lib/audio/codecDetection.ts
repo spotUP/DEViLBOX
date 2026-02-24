@@ -55,6 +55,7 @@ export const EXTENSION_TO_FORMAT: Record<string, AudioFormat> = {
   '.aac': 'aac',
   '.m4a': 'm4a',
   '.m4b': 'm4a',
+  '.mp4': 'm4a',
   '.aif': 'aiff',
   '.aiff': 'aiff',
   '.alac': 'alac',

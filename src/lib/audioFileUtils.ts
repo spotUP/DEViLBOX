@@ -3,18 +3,13 @@
  */
 
 const AUDIO_EXTENSIONS = new Set([
-  '.mp3', '.wav', '.flac', '.ogg', '.oga', '.aac', '.m4a', '.m4b', '.aif', '.aiff', '.opus', '.alac', '.wma', '.webm',
+  '.mp3', '.wav', '.flac', '.ogg', '.oga', '.aac', '.m4a', '.m4b', '.mp4', '.aif', '.aiff', '.opus', '.alac', '.wma', '.webm',
 ]);
 
-/**
- * Check if a filename is a recognized audio file format.
- */
 export function isAudioFile(filename: string): boolean {
   if (!filename || !filename.includes('.')) return false;
   const ext = filename.slice(filename.lastIndexOf('.')).toLowerCase();
-  const supported = AUDIO_EXTENSIONS.has(ext);
-  console.log(`[isAudioFile] Checking ${filename}: ext=${ext}, supported=${supported}`);
-  return supported;
+  return AUDIO_EXTENSIONS.has(ext);
 }
 
 /**
