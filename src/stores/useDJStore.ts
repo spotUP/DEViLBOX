@@ -115,7 +115,7 @@ export interface DeckState {
   frequencyPeaks: Float32Array[] | null;  // [low, mid, high] band peaks
 }
 
-type DeckId = 'A' | 'B' | 'C';
+export type DeckId = 'A' | 'B' | 'C';
 
 export type CueMode = 'multi-output' | 'split-stereo' | 'none';
 export type CrossfaderCurve = 'linear' | 'cut' | 'smooth';
@@ -207,7 +207,10 @@ interface DJState {
   thirdDeckActive: boolean;
   crossfaderPosition: number;
   crossfaderCurve: CrossfaderCurve;
+  hamsterSwitch: boolean; // Reverse crossfader direction
   masterVolume: number;
+  boothVolume: number; // Booth/monitor output 0-1.5
+  cueMix: number; // Headphone cue/mix blend: 0=cue only, 1=master only
   jogWheelSensitivity: number; // 0.5-2.0x multiplier (1.0 = default)
 
   // Per-deck
@@ -232,7 +235,10 @@ interface DJActions {
   setThirdDeckActive: (active: boolean) => void;
   setCrossfader: (position: number) => void;
   setCrossfaderCurve: (curve: CrossfaderCurve) => void;
+  setHamsterSwitch: (enabled: boolean) => void;
   setMasterVolume: (volume: number) => void;
+  setBoothVolume: (volume: number) => void;
+  setCueMix: (mix: number) => void;
   setJogWheelSensitivity: (multiplier: number) => void;
 
   // Per-deck
@@ -292,7 +298,10 @@ export const useDJStore = create<DJStore>()(
     thirdDeckActive: false,
     crossfaderPosition: 0.5,
     crossfaderCurve: 'smooth' as CrossfaderCurve,
+    hamsterSwitch: false,
     masterVolume: 1,
+    boothVolume: 1,
+    cueMix: 0.5,
     jogWheelSensitivity: 1.0, // default 1.0x
 
     decks: {
@@ -346,9 +355,24 @@ export const useDJStore = create<DJStore>()(
         state.crossfaderCurve = curve;
       }),
 
+    setHamsterSwitch: (enabled) =>
+      set((state) => {
+        state.hamsterSwitch = enabled;
+      }),
+
     setMasterVolume: (volume) =>
       set((state) => {
         state.masterVolume = Math.max(0, Math.min(1.5, volume));
+      }),
+
+    setBoothVolume: (volume) =>
+      set((state) => {
+        state.boothVolume = Math.max(0, Math.min(1.5, volume));
+      }),
+
+    setCueMix: (mix) =>
+      set((state) => {
+        state.cueMix = Math.max(0, Math.min(1, mix));
       }),
 
     setJogWheelSensitivity: (multiplier) =>
