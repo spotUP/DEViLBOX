@@ -34,10 +34,10 @@ const KNOB_MAX_ANGLE = Math.PI * 0.75;  // +135°
 const KNOB_RANGE = KNOB_MAX_ANGLE - KNOB_MIN_ANGLE;
 
 // Fader travel (model units along Z-axis for vertical faders)
-const VFADER_TRAVEL = 4.0; // approximate travel distance
+const VFADER_TRAVEL = 1.5;
 
 // Crossfader travel (model units along X-axis)
-const HFADER_TRAVEL = 3.0;
+const HFADER_TRAVEL = 1.5;
 
 // Pre-allocated matrices for per-frame rotation
 const _knobRotMat = new THREE.Matrix4();
@@ -89,18 +89,21 @@ interface ButtonControl {
 
 // ── Mesh Name Helpers ────────────────────────────────────────────────────────
 
-/** Check if a mesh name comes from the EXP namespace duplicate layer.
- * These are duplicate geometry from a 3D export namespace that occupy different positions. */
-function isExpDuplicate(name: string): boolean {
+/** Check if a mesh name comes from the EXP namespace layer. */
+function isExpNamespace(name: string): boolean {
   return /Klamz_uv_Death_DJ_02/i.test(name);
 }
 
 /** Simplify verbose mesh names to control identifiers.
  * GLTFLoader sanitizes names: spaces→underscores, colons→removed.
- * Runtime names look like "Mixer_knob1", "Mixer_fader1_1" */
+ * Runtime names look like "Mixer_knob1", "Mixer_fader1_1",
+ * "Mixer_Klamz_uv_Death_DJ_02mixer_EXPfader1_1" */
 function simplifyName(name: string): string {
   // Strip "Mixer_" or "Mixer " prefix
   let s = name.replace(/^Mixer[\s_]+/, '');
+  // Handle long namespaced EXP names: extract control name after the EXP prefix
+  const expMatch = s.match(/Klamz_uv_Death_DJ_02mixer_EXP(.+)/);
+  if (expMatch) s = expMatch[1];
   // Strip FBXASC032 → space
   s = s.replace(/FBXASC032/g, ' ').trim();
   // Strip trailing _N suffixes (multi-primitive indices) until we match a control name
@@ -114,20 +117,18 @@ function simplifyName(name: string): string {
 }
 
 /** Get the best control name for a mesh, checking itself and parent (for multi-primitive groups).
- * Returns 'static' for EXP namespace duplicates to prevent double-mapping. */
+ * EXP-namespace controls get an "exp_" prefix so they don't collide with the simple-namespace
+ * controls that share the same base name but occupy different physical positions. */
 function getControlName(mesh: THREE.Object3D): string {
-  // Skip EXP namespace duplicates — they occupy different positions and cause double-mapping
-  if (isExpDuplicate(mesh.name) || (mesh.parent && isExpDuplicate(mesh.parent.name))) {
-    return 'static';
-  }
+  const isExp = isExpNamespace(mesh.name) || (mesh.parent != null && isExpNamespace(mesh.parent.name));
   const selfName = simplifyName(mesh.name);
-  // For multi-primitive meshes, the parent Group has the real control name
   const parentName = mesh.parent ? simplifyName(mesh.parent.name) : '';
-  // Check if self name matches a known control pattern
   const controlRe = /^(knob|fader|hfader|button|window)\d*$/;
-  if (controlRe.test(selfName)) return selfName;
-  if (controlRe.test(parentName)) return parentName;
-  return selfName;
+  let base = selfName;
+  if (!controlRe.test(base) && controlRe.test(parentName)) base = parentName;
+  // Prefix EXP-namespace interactive controls to distinguish from simple-namespace
+  if (isExp && controlRe.test(base)) return 'exp_' + base;
+  return base;
 }
 
 // ── Inner 3D Scene Component ─────────────────────────────────────────────────
@@ -272,21 +273,44 @@ function MixerScene() {
 
     const faders: FaderControl[] = [
       {
-        meshName: 'fader1', label: 'CH1 Volume',
+        meshName: 'exp_fader1', label: 'CH1 Volume',
         axis: 'z',
         action: (v) => { store().setDeckVolume('A', v); try { getDJEngine().getDeck('A').setVolume(v); } catch {} },
         readValue: () => store().decks.A.volume,
         min: 0, max: 1.5,
       },
       {
-        meshName: 'fader4', label: 'CH2 Volume',
+        meshName: 'fader1', label: 'CH2 Volume',
         axis: 'z',
         action: (v) => { store().setDeckVolume('B', v); try { getDJEngine().getDeck('B').setVolume(v); } catch {} },
         readValue: () => store().decks.B.volume,
         min: 0, max: 1.5,
       },
       {
+        meshName: 'fader4', label: 'Master Volume',
+        axis: 'z',
+        action: (v) => { store().setMasterVolume(v); try { getDJEngine().getMixer().setMasterGain(v); } catch {} },
+        readValue: () => store().masterVolume,
+        min: 0, max: 1.5,
+      },
+      {
         meshName: 'hfader1', label: 'Crossfader',
+        axis: 'x',
+        action: (v) => {
+          const hamster = store().hamsterSwitch;
+          const pos = hamster ? 1 - v : v;
+          store().setCrossfader(pos);
+          try { getDJEngine().getMixer().setCrossfader(pos); } catch {};
+        },
+        readValue: () => {
+          const hamster = store().hamsterSwitch;
+          const pos = store().crossfaderPosition;
+          return hamster ? 1 - pos : pos;
+        },
+        min: 0, max: 1,
+      },
+      {
+        meshName: 'exp_hfader1', label: 'Crossfader Alt',
         axis: 'x',
         action: (v) => {
           const hamster = store().hamsterSwitch;
@@ -311,6 +335,16 @@ function MixerScene() {
       },
       {
         meshName: 'button2', label: 'CUE CH2',
+        action: () => { store().togglePFL('B'); },
+        readActive: () => store().decks.B.pflEnabled,
+      },
+      {
+        meshName: 'exp_button1', label: 'CUE CH1 Alt',
+        action: () => { store().togglePFL('A'); },
+        readActive: () => store().decks.A.pflEnabled,
+      },
+      {
+        meshName: 'exp_button2', label: 'CUE CH2 Alt',
         action: () => { store().togglePFL('B'); },
         readActive: () => store().decks.B.pflEnabled,
       },
@@ -367,15 +401,15 @@ function MixerScene() {
 
       let type: 'knob' | 'fader' | 'hfader' | 'button' | 'vu' | 'static' = 'static';
 
-      if (sName.startsWith('knob')) {
+      if (sName.startsWith('knob') || sName.startsWith('exp_knob')) {
         type = 'knob';
-      } else if (sName === 'fader1' || sName === 'fader4') {
+      } else if (/^(exp_)?fader\d+$/.test(sName)) {
         type = 'fader';
-      } else if (sName === 'hfader1') {
+      } else if (/^(exp_)?hfader\d+$/.test(sName)) {
         type = 'hfader';
-      } else if (sName.startsWith('button')) {
+      } else if (sName.startsWith('button') || sName.startsWith('exp_button')) {
         type = 'button';
-      } else if (sName === 'window') {
+      } else if (sName === 'window' || sName === 'exp_window') {
         type = 'vu';
       }
 
