@@ -338,9 +338,9 @@ function MixerScene() {
     // Registry: meshName → { mesh, center, type }
     const registry = new Map<string, {
       meshes: THREE.Mesh[];
+      restMatrices: THREE.Matrix4[];
       center: THREE.Vector3;
       type: 'knob' | 'fader' | 'hfader' | 'button' | 'vu' | 'static';
-      restMatrix?: THREE.Matrix4;
     }>();
 
     // Classify meshes
@@ -371,16 +371,20 @@ function MixerScene() {
         type = 'vu';
       }
 
+      // Force local matrix computation from position/rotation/scale
+      mesh.updateMatrix();
+
       // Group meshes by control name (some names appear multiple times for multi-material)
       const existing = registry.get(sName);
       if (existing) {
         existing.meshes.push(mesh);
+        existing.restMatrices.push(mesh.matrix.clone());
       } else {
         registry.set(sName, {
           meshes: [mesh],
+          restMatrices: [mesh.matrix.clone()],
           center,
           type,
-          restMatrix: mesh.matrix.clone(),
         });
       }
 
@@ -417,10 +421,11 @@ function MixerScene() {
       const normalized = (value - control.min) / (control.max - control.min);
       const angle = KNOB_MIN_ANGLE + normalized * KNOB_RANGE;
 
-      // Rotate around Y-axis at the knob's center
+      // Rotate around Y-axis at the knob's center, composed with each mesh's rest matrix
       makeRotationAroundPivotY(angle, entry.center, _knobCompositeMat);
-      for (const mesh of entry.meshes) {
-        mesh.matrix.copy(_knobCompositeMat);
+      for (let i = 0; i < entry.meshes.length; i++) {
+        const mesh = entry.meshes[i];
+        mesh.matrix.copy(entry.restMatrices[i]).multiply(_knobCompositeMat);
         mesh.matrixWorldNeedsUpdate = true;
       }
     }
@@ -428,7 +433,7 @@ function MixerScene() {
     // Update fader positions based on current values
     for (const [meshName, control] of faderMap) {
       const entry = meshRegistry.get(meshName);
-      if (!entry || entry.meshes.length === 0 || !entry.restMatrix) continue;
+      if (!entry || entry.meshes.length === 0) continue;
 
       const value = control.readValue();
       const normalized = (value - control.min) / (control.max - control.min);
@@ -441,8 +446,9 @@ function MixerScene() {
         _faderTransMat.makeTranslation(0, 0, offset);
       }
 
-      for (const mesh of entry.meshes) {
-        mesh.matrix.copy(entry.restMatrix).multiply(_faderTransMat);
+      for (let i = 0; i < entry.meshes.length; i++) {
+        const mesh = entry.meshes[i];
+        mesh.matrix.copy(entry.restMatrices[i]).multiply(_faderTransMat);
         mesh.matrixWorldNeedsUpdate = true;
       }
     }
