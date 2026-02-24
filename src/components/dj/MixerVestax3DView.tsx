@@ -371,6 +371,13 @@ function MixerScene() {
       }
     });
 
+    // Debug: log classified controls
+    const interactiveCount = [...registry.entries()].filter(([, v]) => v.type !== 'static').length;
+    console.log('[Mixer3D] classified', registry.size, 'mesh groups,', interactiveCount, 'interactive');
+    for (const [name, entry] of registry) {
+      if (entry.type !== 'static') console.log('  ', name, '→', entry.type, '(' + entry.meshes.length + ' meshes)');
+    }
+
     return { sceneGroup: cloned, meshRegistry: registry };
   }, [gltfScene]);
 
@@ -392,6 +399,7 @@ function MixerScene() {
       makeRotationAroundPivotY(angle, entry.center, _knobCompositeMat);
       for (const mesh of entry.meshes) {
         mesh.matrix.copy(_knobCompositeMat);
+        mesh.matrixWorldNeedsUpdate = true;
       }
     }
 
@@ -413,6 +421,7 @@ function MixerScene() {
 
       for (const mesh of entry.meshes) {
         mesh.matrix.copy(entry.restMatrix).multiply(_faderTransMat);
+        mesh.matrixWorldNeedsUpdate = true;
       }
     }
 
@@ -470,22 +479,30 @@ function MixerScene() {
       pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObjects(sceneGroup.children, true);
+      // Raycast against the full R3F scene to pick up the scaled group
+      const hits = raycaster.intersectObjects(r3fScene.children, true);
       for (const hit of hits) {
-        const cn = hit.object.userData.controlName as string | undefined;
-        if (cn) return cn;
+        // Walk up parent chain to find controlName
+        let obj: THREE.Object3D | null = hit.object;
+        while (obj) {
+          const cn = obj.userData.controlName as string | undefined;
+          if (cn) return cn;
+          obj = obj.parent;
+        }
       }
       return null;
     },
-    [camera, gl, raycaster, pointer, sceneGroup]
+    [camera, gl, raycaster, pointer, r3fScene]
   );
 
   useEffect(() => {
     const canvas = gl.domElement;
 
     const onPointerDown = (e: PointerEvent) => {
+      console.log('[Mixer3D] raw pointerdown, button:', e.button);
       if (e.button !== 0) return; // left-click only
       const controlName = raycastControl(e);
+      console.log('[Mixer3D] pointerdown hit:', controlName);
       if (!controlName) return;
 
       const button = buttonMap.get(controlName);
@@ -517,6 +534,7 @@ function MixerScene() {
         const dy = dragStartRef.current.y - e.clientY;
         const delta = (dy / 200) * (knob.max - knob.min);
         const newValue = Math.max(knob.min, Math.min(knob.max, dragStartValueRef.current + delta));
+        console.log('[Mixer3D] knob drag:', knobName, 'value:', newValue.toFixed(3));
         knob.action(newValue);
         return;
       }
