@@ -244,11 +244,17 @@ async function renderWithUADE(
       if (consecutiveZeros < maxPatience) {
         continue;
       }
+      console.log(`[DJRenderWorker/UADE] Stopping after ${consecutiveZeros} consecutive zero returns at ${totalFrames} frames`);
       break; 
     }
 
     if (totalFrames === 0) {
       console.log(`[DJRenderWorker/UADE] First audio frames received after ${consecutiveZeros} zero-returns. Chunk size: ${ret}`);
+    }
+    
+    // Debug: log every chunk for first second
+    if (totalFrames < sampleRate) {
+      console.log(`[DJRenderWorker/UADE] Chunk ${audioChunks.length}: ret=${ret}, totalFrames=${totalFrames}`);
     }
     
     consecutiveZeros = 0; // Reset on successful frame delivery
@@ -297,7 +303,7 @@ async function renderWithUADE(
   wasm._free(tmpR);
 
   if (totalFrames === 0) {
-    throw new Error(`UADE rendered 0 frames for ${safeFilename} after ${leadingZeros} attempts`);
+    throw new Error(`UADE rendered 0 frames for ${safeFilename} after ${consecutiveZeros} attempts`);
   }
 
   // Concatenate chunks
