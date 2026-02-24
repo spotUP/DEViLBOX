@@ -196,6 +196,7 @@ int uade_wasm_init(int sample_rate) {
 
     uade_config_set_option(cfg, UC_BASE_DIR, "/uade");
     uade_config_set_option(cfg, UC_FREQUENCY, s_sample_rate == 44100 ? "44100" : "48000");
+    uade_config_set_option(cfg, UC_PANNING_VALUE, "0.0"); /* Mono — no stereo separation */
 
     if (guarded_new_state(cfg) != 0) {
         free(cfg);
