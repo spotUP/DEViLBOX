@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-23T23:59:01.473Z
+ * Generated: 2026-02-24T05:49:08.185Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1157';
-export const BUILD_NUMBER = '1157';
-export const BUILD_HASH = 'c8daa5d2';
-export const BUILD_DATE = '2026-02-23';
+export const BUILD_VERSION = '1.0.1165';
+export const BUILD_NUMBER = '1165';
+export const BUILD_HASH = '64983254';
+export const BUILD_DATE = '2026-02-24';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,41 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1157',
+    version: '1.0.1165',
     date: '2026-02-24',
     changes: [
+      {
+        type: 'fix',
+        "description": "Enable UADE looping to prevent premature song termination"
+      },
+      {
+        type: 'fix',
+        "description": "Debug(dj): Add detailed UADE render loop logging"
+      },
+      {
+        type: 'fix',
+        "description": "Fix audio playback after skipping tracker mode"
+      },
+      {
+        type: 'feature',
+        "description": "Automatically switch view mode based on loaded file type"
+      },
+      {
+        type: 'feature',
+        "description": "Add setDeckViewMode action to DJ store"
+      },
+      {
+        type: 'fix',
+        "description": "Robustify UADE background renderer startup and memory access"
+      },
+      {
+        type: 'fix',
+        "description": "Robustify UADE render loop and clean up diagnostic logs"
+      },
+      {
+        type: 'fix',
+        "description": "Expand audio extensions and add misrouting guard"
+      },
       {
         type: 'fix',
         "description": "Robustify UADE render loop to prevent premature termination"
@@ -206,44 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Always overlay pattern display on visualizers with nav buttons instead of click-to-cycle"
-      },
-      {
-        type: 'feature',
-        "description": "Add master FX chain support to DJMixerEngine with preset watcher in DJView"
-      },
-      {
-        type: 'fix',
-        "description": "Route UADE/Hively through stereo separation chain for proper master FX processing"
-      },
-      {
-        type: 'fix',
-        "description": "Gate DeckScopes animation on isPlaying to pause when stopped"
-      },
-      {
-        type: 'feature',
-        "description": "Add 2D/3D vinyl turntable views with Three.js GLB model and deck view mode switching"
-      },
-      {
-        type: 'feature',
-        "description": "Add turntable physics engine, scratch buffer worklet, and keyboard/MIDI controls"
-      }
-    ]
-  },
-  {
-    version: '2026-02-22',
-    date: '2026-02-22',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Resolve 5 bugs from Swedish beta testing"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update gitignore for WASM build dirs, update CLAUDE.md"
-      },
-      {
-        type: 'fix',
-        "description": "Tracker view routing, editor controls, and drag-drop updates"
       }
     ]
   }
