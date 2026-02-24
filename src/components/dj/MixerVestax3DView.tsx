@@ -89,15 +89,18 @@ interface ButtonControl {
 
 // ── Mesh Name Helpers ────────────────────────────────────────────────────────
 
+/** Check if a mesh name comes from the EXP namespace duplicate layer.
+ * These are duplicate geometry from a 3D export namespace that occupy different positions. */
+function isExpDuplicate(name: string): boolean {
+  return /Klamz_uv_Death_DJ_02/i.test(name);
+}
+
 /** Simplify verbose mesh names to control identifiers.
  * GLTFLoader sanitizes names: spaces→underscores, colons→removed.
- * Runtime names look like "Mixer_knob1", "Mixer_Klamz_uv_Death_DJ_02mixer_EXPfader1_1" */
+ * Runtime names look like "Mixer_knob1", "Mixer_fader1_1" */
 function simplifyName(name: string): string {
   // Strip "Mixer_" or "Mixer " prefix
   let s = name.replace(/^Mixer[\s_]+/, '');
-  // Handle long namespaced names: extract after the EXP prefix
-  const expMatch = s.match(/Klamz_uv_Death_DJ_02mixer_EXP(.+)/);
-  if (expMatch) s = expMatch[1];
   // Strip FBXASC032 → space
   s = s.replace(/FBXASC032/g, ' ').trim();
   // Strip trailing _N suffixes (multi-primitive indices) until we match a control name
@@ -110,8 +113,13 @@ function simplifyName(name: string): string {
   return s;
 }
 
-/** Get the best control name for a mesh, checking itself and parent (for multi-primitive groups) */
+/** Get the best control name for a mesh, checking itself and parent (for multi-primitive groups).
+ * Returns 'static' for EXP namespace duplicates to prevent double-mapping. */
 function getControlName(mesh: THREE.Object3D): string {
+  // Skip EXP namespace duplicates — they occupy different positions and cause double-mapping
+  if (isExpDuplicate(mesh.name) || (mesh.parent && isExpDuplicate(mesh.parent.name))) {
+    return 'static';
+  }
   const selfName = simplifyName(mesh.name);
   // For multi-primitive meshes, the parent Group has the real control name
   const parentName = mesh.parent ? simplifyName(mesh.parent.name) : '';
@@ -443,7 +451,7 @@ function MixerScene() {
       if (control.axis === 'x') {
         _faderTransMat.makeTranslation(offset, 0, 0);
       } else {
-        _faderTransMat.makeTranslation(0, 0, offset);
+        _faderTransMat.makeTranslation(0, 0, -offset);
       }
 
       for (let i = 0; i < entry.meshes.length; i++) {
