@@ -227,17 +227,16 @@ async function renderWithUADE(
   let leadingZeros = 0;
   let trailingSilenceFrames = 0;
   const SILENCE_THRESHOLD = 0.0001;
-  const MAX_SILENCE_SECONDS = 2; // stop after 2s of silence
+  const MAX_SILENCE_SECONDS = 2; 
+  const MIN_RENDER_SECONDS = 2; // don't stop for silence until at least 2s rendered
 
   while (totalFrames < maxFrames) {
     const ret = wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
     
     if (ret <= 0) {
-      // Some eagleplayers take a few ticks to start. 
-      // Allow up to 50 leading zero-frame returns before giving up.
-      if (totalFrames === 0 && leadingZeros < 50) {
+      // Allow up to 100 leading zero-frame returns (~9s) to accommodate slow player initialization.
+      if (totalFrames === 0 && leadingZeros < 100) {
         leadingZeros++;
-        // Briefly pump core
         continue;
       }
       break; 
@@ -261,7 +260,9 @@ async function renderWithUADE(
 
     if (isSilent && totalFrames > 0) {
       trailingSilenceFrames += ret;
-      if (trailingSilenceFrames > sampleRate * MAX_SILENCE_SECONDS) {
+      // Only stop for silence after we've rendered at least MIN_RENDER_SECONDS
+      if (totalFrames > sampleRate * MIN_RENDER_SECONDS && 
+          trailingSilenceFrames > sampleRate * MAX_SILENCE_SECONDS) {
         console.log(`[DJRenderWorker/UADE] Stopping render due to ${MAX_SILENCE_SECONDS}s trailing silence`);
         break;
       }
@@ -283,7 +284,7 @@ async function renderWithUADE(
   wasm._free(tmpR);
 
   if (totalFrames === 0) {
-    throw new Error(`UADE rendered 0 frames for ${filename}`);
+    throw new Error(`UADE rendered 0 frames for ${safeFilename} after ${leadingZeros} attempts`);
   }
 
   // Concatenate chunks
