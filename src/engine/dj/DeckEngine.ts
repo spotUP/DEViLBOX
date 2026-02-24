@@ -545,25 +545,37 @@ export class DeckEngine {
     }
 
     // Jog wheel scratch: full pitch + tempo control
-    if (v >= 0) {
-      // Floor at 0.15 — lower values cause Tone.js StateTimeline errors because
-      // the huge rate ratio (e.g. 0.02→1.0 = 50×) confuses sample buffer end-time tracking.
-      // 0.15 still sounds like a slow drag-back while keeping the ratio ≤ ~7×.
-      if (this.scratchDirection === -1) {
-        // Transitioning from backward → forward
-        void this._switchToForward(Math.max(0.15, v));
+    if (this._playbackMode === 'audio') {
+      // Audio mode: manipulate audioPlayer rate, not replayer
+      if (v >= 0) {
+        if (this.scratchDirection === -1) {
+          void this._switchToForward(Math.max(0.15, v));
+        } else {
+          this.audioPlayer.setPlaybackRate(Math.max(0.15, v));
+        }
       } else {
-        const fwdRate = Math.max(0.15, v);
-        this.replayer.setPitchMultiplier(fwdRate);
-        this.replayer.setTempoMultiplier(fwdRate);
+        if (this.scratchDirection !== -1) {
+          this._switchToBackward(Math.abs(v));
+        } else {
+          this.scratchBuffer?.setRate(Math.abs(v));
+        }
       }
     } else {
-      if (this.scratchDirection !== -1) {
-        // Transitioning from forward → backward
-        this._switchToBackward(Math.abs(v));
+      // Tracker mode: manipulate replayer
+      if (v >= 0) {
+        if (this.scratchDirection === -1) {
+          void this._switchToForward(Math.max(0.15, v));
+        } else {
+          const fwdRate = Math.max(0.15, v);
+          this.replayer.setPitchMultiplier(fwdRate);
+          this.replayer.setTempoMultiplier(fwdRate);
+        }
       } else {
-        // Already going backward — update rate
-        this.scratchBuffer?.setRate(Math.abs(v));
+        if (this.scratchDirection !== -1) {
+          this._switchToBackward(Math.abs(v));
+        } else {
+          this.scratchBuffer?.setRate(Math.abs(v));
+        }
       }
     }
   }
@@ -591,14 +603,20 @@ export class DeckEngine {
   private _switchToBackward(rate: number): void {
     if (!this.scratchBufferReady || !this.scratchBuffer) {
       // Graceful fallback: clamp to near-stop forward
-      this.replayer.setPitchMultiplier(0.02);
-      this.replayer.setTempoMultiplier(0.02);
+      if (this._playbackMode === 'audio') {
+        this.audioPlayer.setPlaybackRate(0.02);
+      } else {
+        this.replayer.setPitchMultiplier(0.02);
+        this.replayer.setTempoMultiplier(0.02);
+      }
       return;
     }
 
     this.backwardStartSongPos   = this.replayer.getSongPos();
     this.backwardStartPattPos   = this.replayer.getPattPos();
-    this.backwardStartElapsedMs = this.replayer.getElapsedMs();
+    this.backwardStartElapsedMs = this._playbackMode === 'audio'
+      ? this.audioPlayer.getPosition() * 1000
+      : this.replayer.getElapsedMs();
 
     // Stop any running preset scratch pattern
     this.scratchPlayback.stopPattern();
@@ -611,14 +629,20 @@ export class DeckEngine {
 
     this.scratchDirection = -1;
 
-    // Pause replayer after fade so new note events are silent
+    // Pause source after fade so new output is silent
     this.backwardPauseTimeoutId = setTimeout(() => {
       this.backwardPauseTimeoutId = null;
-      if (this.scratchDirection === -1) this.replayer.pause();
+      if (this.scratchDirection === -1) {
+        if (this._playbackMode === 'audio') {
+          this.audioPlayer.setPlaybackRate(0.001);
+        } else {
+          this.replayer.pause();
+        }
+      }
     }, 25);
   }
 
-  /** Switch from backward playback to forward, seeking replayer to estimated position. */
+  /** Switch from backward playback to forward, seeking to estimated position. */
   private async _switchToForward(fwdRate: number): Promise<void> {
     this.scratchDirection = 1; // Mark early to prevent re-entry
 
@@ -630,31 +654,37 @@ export class DeckEngine {
     const msBack = (framesBack / ctx.sampleRate) * 1000;
     const targetMs = Math.max(0, this.backwardStartElapsedMs - msBack);
 
-    const song = this.replayer.getSong();
-    if (song && this.songTimeIndex.length > 1) {
-      // Binary search for the song position that contains targetMs
-      let lo = 0, hi = this.songTimeIndex.length - 2;
-      while (lo < hi) {
-        const mid = (lo + hi + 1) >> 1;
-        if ((this.songTimeIndex[mid] ?? 0) <= targetMs) lo = mid; else hi = mid - 1;
-      }
-      const songPos = lo;
-      const rowMs   = ((song.initialSpeed ?? 6) * 2.5 / (song.initialBPM ?? 125)) * 1000;
-      const rowsIn  = Math.max(0,
-        Math.floor((targetMs - (this.songTimeIndex[songPos] ?? 0)) / rowMs),
-      );
-      const patternIdx = song.songPositions[songPos];
-      const pattern    = song.patterns[patternIdx];
-      const pattPos    = Math.min(rowsIn, (pattern?.length ?? 64) - 1);
-      this.replayer.seekTo(songPos, pattPos);
+    if (this._playbackMode === 'audio') {
+      // Audio mode: seek the audio player to the estimated position
+      this.audioPlayer.seek(targetMs / 1000);
+      this.deckGain.gain.rampTo(1, 0.02);
+      this.audioPlayer.setPlaybackRate(fwdRate);
     } else {
-      this.replayer.seekTo(this.backwardStartSongPos, this.backwardStartPattPos);
+      // Tracker mode: seek the replayer
+      const song = this.replayer.getSong();
+      if (song && this.songTimeIndex.length > 1) {
+        let lo = 0, hi = this.songTimeIndex.length - 2;
+        while (lo < hi) {
+          const mid = (lo + hi + 1) >> 1;
+          if ((this.songTimeIndex[mid] ?? 0) <= targetMs) lo = mid; else hi = mid - 1;
+        }
+        const songPos = lo;
+        const rowMs   = ((song.initialSpeed ?? 6) * 2.5 / (song.initialBPM ?? 125)) * 1000;
+        const rowsIn  = Math.max(0,
+          Math.floor((targetMs - (this.songTimeIndex[songPos] ?? 0)) / rowMs),
+        );
+        const patternIdx = song.songPositions[songPos];
+        const pattern    = song.patterns[patternIdx];
+        const pattPos    = Math.min(rowsIn, (pattern?.length ?? 64) - 1);
+        this.replayer.seekTo(songPos, pattPos);
+      } else {
+        this.replayer.seekTo(this.backwardStartSongPos, this.backwardStartPattPos);
+      }
+      this.replayer.resume();
+      this.deckGain.gain.rampTo(1, 0.02);
+      this.replayer.setPitchMultiplier(fwdRate);
+      this.replayer.setTempoMultiplier(fwdRate);
     }
-
-    this.replayer.resume();
-    this.deckGain.gain.rampTo(1, 0.02);
-    this.replayer.setPitchMultiplier(fwdRate);
-    this.replayer.setTempoMultiplier(fwdRate);
   }
 
   /**
@@ -669,13 +699,20 @@ export class DeckEngine {
       this.decayRafId = null;
     }
 
-    const startVal = this.replayer.getTempoMultiplier();
+    const isAudio = this._playbackMode === 'audio';
+    const startVal = isAudio
+      ? this.audioPlayer.getPlaybackRate()
+      : this.replayer.getTempoMultiplier();
     const targetVal = this.restMultiplier;
 
     // Already at target — nothing to do
     if (Math.abs(startVal - targetVal) < 0.001) {
-      this.replayer.setPitchMultiplier(targetVal);
-      this.replayer.setTempoMultiplier(targetVal);
+      if (isAudio) {
+        this.audioPlayer.setPlaybackRate(targetVal);
+      } else {
+        this.replayer.setPitchMultiplier(targetVal);
+        this.replayer.setTempoMultiplier(targetVal);
+      }
       return;
     }
 
@@ -684,8 +721,12 @@ export class DeckEngine {
       const t = Math.min(1, (performance.now() - startTime) / decayMs);
       const ease = 1 - Math.pow(1 - t, 3); // cubic ease-out
       const val = startVal + (targetVal - startVal) * ease;
-      this.replayer.setPitchMultiplier(val);
-      this.replayer.setTempoMultiplier(val);
+      if (isAudio) {
+        this.audioPlayer.setPlaybackRate(val);
+      } else {
+        this.replayer.setPitchMultiplier(val);
+        this.replayer.setTempoMultiplier(val);
+      }
       if (t < 1) {
         this.decayRafId = requestAnimationFrame(animate);
       } else {
