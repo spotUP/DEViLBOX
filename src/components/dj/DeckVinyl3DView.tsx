@@ -18,11 +18,12 @@
 
 import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
-import { useGLTF, OrbitControls } from '@react-three/drei';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
+import { CameraController, CameraControlOverlay, type CameraControllerHandle } from './DJ3DCameraControls';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -90,9 +91,10 @@ function makeRotationAroundPivot(angle: number, pivot: THREE.Vector3, out: THREE
 
 interface TurntableSceneProps {
   deckId: 'A' | 'B' | 'C';
+  cameraRef: React.RefObject<CameraControllerHandle | null>;
 }
 
-function TurntableScene({ deckId }: TurntableSceneProps) {
+function TurntableScene({ deckId, cameraRef }: TurntableSceneProps) {
   const { scene: gltfScene } = useGLTF(MODEL_PATH);
 
   // Refs
@@ -557,20 +559,14 @@ function TurntableScene({ deckId }: TurntableSceneProps) {
         <meshBasicMaterial transparent opacity={0} />
       </mesh>
 
-      {/* Camera controls */}
-      <OrbitControls
-        enablePan={false}
-        enableDamping
-        dampingFactor={0.1}
-        minPolarAngle={Math.PI * 0.1}
+      {/* Camera controls — no scroll wheel, use overlay buttons instead */}
+      <CameraController
+        ref={cameraRef}
+        target={[0, -0.02, 0]}
+        minDistance={0.1}
+        maxDistance={2.0}
+        minPolarAngle={Math.PI * 0.05}
         maxPolarAngle={Math.PI * 0.45}
-        minDistance={0.25}
-        maxDistance={0.7}
-        mouseButtons={{
-          LEFT: undefined as unknown as THREE.MOUSE,
-          MIDDLE: THREE.MOUSE.DOLLY,
-          RIGHT: THREE.MOUSE.ROTATE,
-        }}
       />
     </>
   );
@@ -583,8 +579,10 @@ interface DeckVinyl3DViewProps {
 }
 
 function DeckVinyl3DView({ deckId }: DeckVinyl3DViewProps) {
+  const cameraRef = useRef<CameraControllerHandle>(null);
+
   return (
-    <div className="w-full h-full min-h-[200px]" style={{ touchAction: 'none' }}>
+    <div className="relative w-full h-full min-h-[200px]" style={{ touchAction: 'none' }}>
       <Canvas
         camera={{
           position: [0.15, 0.35, 0.35],
@@ -599,8 +597,9 @@ function DeckVinyl3DView({ deckId }: DeckVinyl3DViewProps) {
           gl.toneMappingExposure = 1.2;
         }}
       >
-        <TurntableScene deckId={deckId} />
+        <TurntableScene deckId={deckId} cameraRef={cameraRef} />
       </Canvas>
+      <CameraControlOverlay controllerRef={cameraRef} />
     </div>
   );
 }

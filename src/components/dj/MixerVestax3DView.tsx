@@ -13,10 +13,11 @@
 
 import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
-import { useGLTF, OrbitControls } from '@react-three/drei';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore, type DeckId } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import { CameraController, CameraControlOverlay, type CameraControllerHandle } from './DJ3DCameraControls';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -551,11 +552,13 @@ function MixerScene() {
 // ── Outer Component (Canvas wrapper) ─────────────────────────────────────────
 
 export function MixerVestax3DView() {
+  const cameraRef = useRef<CameraControllerHandle>(null);
+
   return (
-    <div className="w-full h-full min-h-[200px]" style={{ touchAction: 'none' }}>
+    <div className="relative w-full h-full min-h-[200px]" style={{ touchAction: 'none' }}>
       <Canvas
         camera={{
-          position: [0, 0.35, 0.3],
+          position: [0, 0.45, 0.45],
           fov: 42,
           near: 0.01,
           far: 10,
@@ -574,17 +577,16 @@ export function MixerVestax3DView() {
 
         <MixerScene />
 
-        <OrbitControls
-          enablePan={false}
-          enableZoom={true}
-          enableRotate={true}
-          minPolarAngle={Math.PI * 0.1}
-          maxPolarAngle={Math.PI * 0.6}
-          minDistance={0.15}
-          maxDistance={0.8}
+        <CameraController
+          ref={cameraRef}
           target={[0, -0.05, 0]}
+          minDistance={0.1}
+          maxDistance={2.0}
+          minPolarAngle={Math.PI * 0.05}
+          maxPolarAngle={Math.PI * 0.6}
         />
       </Canvas>
+      <CameraControlOverlay controllerRef={cameraRef} />
     </div>
   );
 }
