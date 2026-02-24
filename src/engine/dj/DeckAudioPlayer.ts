@@ -48,7 +48,6 @@ export class DeckAudioPlayer {
    * Uses WASM fallback decoders for cross-browser format support.
    */
   async loadAudioFile(buffer: ArrayBuffer, filename: string): Promise<AudioFileInfo> {
-    console.log(`[DeckAudioPlayer] Loading audio file: ${filename}, size: ${buffer.byteLength} bytes`);
     // Decode audio with cross-browser support
     const audioContext = Tone.getContext().rawContext as AudioContext;
     const result: DecodeResult = await decodeAudio(audioContext, buffer, { filename });
@@ -57,8 +56,6 @@ export class DeckAudioPlayer {
     if (result.usedWasm) {
       console.log(`[DeckAudioPlayer] Decoded ${result.format} using WASM fallback`);
     }
-
-    console.log(`[DeckAudioPlayer] Decoded buffer: ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels} channels`);
 
     // Store in Tone.Player
     const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
@@ -82,7 +79,6 @@ export class DeckAudioPlayer {
 
   async play(): Promise<void> {
     if (!this._loaded || !this.player.buffer.loaded) {
-      console.warn('[DeckAudioPlayer] Cannot play: audio not loaded');
       return;
     }
     if (this.player.state === 'started') {
@@ -92,11 +88,9 @@ export class DeckAudioPlayer {
     
     // Ensure AudioContext is running (essential for audio output)
     if (Tone.getContext().state !== 'running') {
-      console.log('[DeckAudioPlayer] Resuming AudioContext...');
       await Tone.start();
     }
 
-    console.log('[DeckAudioPlayer] Starting playback');
     // Tiny fade-in (10ms) to prevent DC offset clicks/ticks
     this.player.fadeIn = 0.01;
     this.player.start();
