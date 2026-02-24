@@ -13,11 +13,12 @@
 
 import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
-import { useGLTF } from '@react-three/drei';
+import { useGLTF, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore, type DeckId } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
-import { CameraController, CameraControlOverlay, type CameraControllerHandle } from './DJ3DCameraControls';
+import { CameraControlOverlay } from './DJ3DCameraControls';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -552,7 +553,7 @@ function MixerScene() {
 // ── Outer Component (Canvas wrapper) ─────────────────────────────────────────
 
 export function MixerVestax3DView() {
-  const cameraRef = useRef<CameraControllerHandle>(null);
+  const orbitRef = useRef<OrbitControlsImpl>(null);
 
   return (
     <div className="relative w-full h-full min-h-[200px]" style={{ touchAction: 'none' }}>
@@ -577,16 +578,25 @@ export function MixerVestax3DView() {
 
         <MixerScene />
 
-        <CameraController
-          ref={cameraRef}
-          target={[0, -0.05, 0]}
-          minDistance={0.1}
-          maxDistance={2.0}
+        <OrbitControls
+          ref={orbitRef}
+          enablePan={false}
+          enableZoom={false}
+          enableDamping
+          dampingFactor={0.1}
           minPolarAngle={Math.PI * 0.05}
           maxPolarAngle={Math.PI * 0.6}
+          minDistance={0.1}
+          maxDistance={2.0}
+          target={[0, -0.05, 0] as unknown as THREE.Vector3}
+          mouseButtons={{
+            LEFT: undefined as unknown as THREE.MOUSE,
+            MIDDLE: undefined as unknown as THREE.MOUSE,
+            RIGHT: THREE.MOUSE.ROTATE,
+          }}
         />
       </Canvas>
-      <CameraControlOverlay controllerRef={cameraRef} />
+      <CameraControlOverlay orbitRef={orbitRef} />
     </div>
   );
 }
