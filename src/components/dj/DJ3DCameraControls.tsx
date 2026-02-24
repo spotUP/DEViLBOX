@@ -1,204 +1,57 @@
 /**
  * DJ3DCameraControls — On-screen zoom/rotate/reset buttons for 3D DJ views.
  *
- * Replaces scroll-wheel zoom (which conflicts with vinyl scratching) with
- * click-and-drag or click-to-step buttons overlaid on each 3D canvas.
+ * Works alongside OrbitControls (from @react-three/drei) which handles the
+ * actual camera math. The overlay buttons programmatically adjust the
+ * OrbitControls instance. Scroll-wheel zoom is disabled on OrbitControls
+ * to avoid conflict with vinyl scratching.
  *
  * Usage:
- *   // Inside the Canvas:
- *   <CameraController ref={controllerRef} target={[0,0,0]} minDist={0.1} maxDist={2} />
+ *   const orbitRef = useRef<OrbitControlsImpl>(null);
  *
- *   // Outside the Canvas (HTML overlay):
- *   <CameraControlOverlay controllerRef={controllerRef} />
+ *   <Canvas>
+ *     <OrbitControls ref={orbitRef} enableZoom={false} ... />
+ *   </Canvas>
+ *   <CameraControlOverlay orbitRef={orbitRef} />
  */
 
-import React, { useRef, useImperativeHandle, forwardRef, useCallback, useEffect } from 'react';
-import { useThree, useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
+import React, { useRef, useCallback, useEffect } from 'react';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export interface CameraControllerHandle {
-  zoomIn: () => void;
-  zoomOut: () => void;
-  rotateLeft: () => void;
-  rotateRight: () => void;
-  rotateUp: () => void;
-  rotateDown: () => void;
-  resetView: () => void;
-}
-
-interface CameraControllerProps {
-  target?: [number, number, number];
-  minDistance?: number;
-  maxDistance?: number;
-  minPolarAngle?: number;
-  maxPolarAngle?: number;
-  enableDamping?: boolean;
-  /** Allow right-click drag to rotate (default true) */
-  enableMouseRotate?: boolean;
-}
-
-// ── R3F Camera Controller (goes inside Canvas) ──────────────────────────────
-
-/**
- * Spherical-coordinate camera controller without scroll-wheel zoom.
- * Supports right-click drag rotation and imperative zoom/rotate via ref.
- */
-export const CameraController = forwardRef<CameraControllerHandle, CameraControllerProps>(
-  function CameraController(
-    {
-      target = [0, 0, 0],
-      minDistance = 0.1,
-      maxDistance = 2.0,
-      minPolarAngle = Math.PI * 0.05,
-      maxPolarAngle = Math.PI * 0.45,
-      enableDamping = true,
-      enableMouseRotate = true,
-    },
-    ref
-  ) {
-    const { camera, gl } = useThree();
-    const targetVec = useRef(new THREE.Vector3(...target));
-
-    // Spherical coordinates (radius, polar, azimuthal)
-    const spherical = useRef(new THREE.Spherical());
-    const sphericalTarget = useRef(new THREE.Spherical());
-    const initialSpherical = useRef(new THREE.Spherical());
-    const isDragging = useRef(false);
-    const dragStart = useRef({ x: 0, y: 0 });
-    const dragSphericalStart = useRef(new THREE.Spherical());
-
-    // Initialize spherical from current camera position
-    useEffect(() => {
-      const offset = new THREE.Vector3().subVectors(camera.position, targetVec.current);
-      spherical.current.setFromVector3(offset);
-      sphericalTarget.current.copy(spherical.current);
-      initialSpherical.current.copy(spherical.current);
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    // Clamp helper
-    const clampSpherical = useCallback(
-      (s: THREE.Spherical) => {
-        s.radius = Math.max(minDistance, Math.min(maxDistance, s.radius));
-        s.phi = Math.max(minPolarAngle, Math.min(maxPolarAngle, s.phi));
-      },
-      [minDistance, maxDistance, minPolarAngle, maxPolarAngle]
-    );
-
-    // Expose imperative controls
-    const ZOOM_STEP = 0.06;
-    const ROTATE_STEP = Math.PI / 24; // 7.5°
-
-    useImperativeHandle(
-      ref,
-      () => ({
-        zoomIn: () => {
-          sphericalTarget.current.radius -= ZOOM_STEP;
-          clampSpherical(sphericalTarget.current);
-        },
-        zoomOut: () => {
-          sphericalTarget.current.radius += ZOOM_STEP;
-          clampSpherical(sphericalTarget.current);
-        },
-        rotateLeft: () => {
-          sphericalTarget.current.theta -= ROTATE_STEP;
-        },
-        rotateRight: () => {
-          sphericalTarget.current.theta += ROTATE_STEP;
-        },
-        rotateUp: () => {
-          sphericalTarget.current.phi -= ROTATE_STEP;
-          clampSpherical(sphericalTarget.current);
-        },
-        rotateDown: () => {
-          sphericalTarget.current.phi += ROTATE_STEP;
-          clampSpherical(sphericalTarget.current);
-        },
-        resetView: () => {
-          sphericalTarget.current.copy(initialSpherical.current);
-        },
-      }),
-      [clampSpherical]
-    );
-
-    // Right-click drag rotation
-    useEffect(() => {
-      if (!enableMouseRotate) return;
-      const canvas = gl.domElement;
-
-      const onContextMenu = (e: MouseEvent) => e.preventDefault();
-
-      const onPointerDown = (e: PointerEvent) => {
-        if (e.button !== 2) return; // right-click only
-        isDragging.current = true;
-        dragStart.current = { x: e.clientX, y: e.clientY };
-        dragSphericalStart.current.copy(sphericalTarget.current);
-        canvas.setPointerCapture(e.pointerId);
-      };
-
-      const onPointerMove = (e: PointerEvent) => {
-        if (!isDragging.current) return;
-        const dx = (e.clientX - dragStart.current.x) / canvas.clientWidth;
-        const dy = (e.clientY - dragStart.current.y) / canvas.clientHeight;
-        sphericalTarget.current.theta = dragSphericalStart.current.theta - dx * Math.PI;
-        sphericalTarget.current.phi = dragSphericalStart.current.phi + dy * Math.PI * 0.5;
-        clampSpherical(sphericalTarget.current);
-      };
-
-      const onPointerUp = (e: PointerEvent) => {
-        if (e.button !== 2) return;
-        isDragging.current = false;
-        canvas.releasePointerCapture(e.pointerId);
-      };
-
-      canvas.addEventListener('contextmenu', onContextMenu);
-      canvas.addEventListener('pointerdown', onPointerDown);
-      canvas.addEventListener('pointermove', onPointerMove);
-      canvas.addEventListener('pointerup', onPointerUp);
-      return () => {
-        canvas.removeEventListener('contextmenu', onContextMenu);
-        canvas.removeEventListener('pointerdown', onPointerDown);
-        canvas.removeEventListener('pointermove', onPointerMove);
-        canvas.removeEventListener('pointerup', onPointerUp);
-      };
-    }, [gl, enableMouseRotate, clampSpherical]);
-
-    const _offset = useRef(new THREE.Vector3());
-
-    // Per-frame: lerp spherical → camera position
-    useFrame(() => {
-      const s = spherical.current;
-      const st = sphericalTarget.current;
-      const factor = enableDamping ? 0.12 : 1;
-      s.radius += (st.radius - s.radius) * factor;
-      s.phi += (st.phi - s.phi) * factor;
-      s.theta += (st.theta - s.theta) * factor;
-
-      _offset.current.setFromSpherical(s);
-      camera.position.copy(targetVec.current).add(_offset.current);
-      camera.lookAt(targetVec.current);
-    });
-
-    return null;
-  }
-);
-
-// ── HTML Overlay (goes outside Canvas) ──────────────────────────────────────
-
 interface CameraControlOverlayProps {
-  controllerRef: React.RefObject<CameraControllerHandle | null>;
+  orbitRef: React.RefObject<OrbitControlsImpl | null>;
+  zoomStep?: number;
+  rotateStep?: number;
+}
+
+// Saved initial state for reset
+const initialStates = new WeakMap<OrbitControlsImpl, { target: [number, number, number]; position: [number, number, number] }>();
+
+function saveInitialState(controls: OrbitControlsImpl) {
+  if (!initialStates.has(controls)) {
+    const { target, object } = controls;
+    initialStates.set(controls, {
+      target: [target.x, target.y, target.z],
+      position: [object.position.x, object.position.y, object.position.z],
+    });
+  }
 }
 
 /** Compact zoom/rotate buttons overlaid in the corner of a 3D view */
-export const CameraControlOverlay: React.FC<CameraControlOverlayProps> = ({ controllerRef }) => {
+export const CameraControlOverlay: React.FC<CameraControlOverlayProps> = ({
+  orbitRef,
+  zoomStep = 0.06,
+  rotateStep = Math.PI / 24,
+}) => {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Force re-render once controller is available
-  const [, setMounted] = React.useState(false);
-  useEffect(() => { const t = setTimeout(() => setMounted(true), 100); return () => clearTimeout(t); }, []);
+  // Force re-render once orbit controls are available
+  const [, setReady] = React.useState(false);
+  useEffect(() => { const t = setTimeout(() => setReady(true), 200); return () => clearTimeout(t); }, []);
 
   const startRepeat = useCallback((action: () => void) => {
-    action(); // immediate first
+    action();
     intervalRef.current = setInterval(action, 80);
   }, []);
 
@@ -209,88 +62,96 @@ export const CameraControlOverlay: React.FC<CameraControlOverlayProps> = ({ cont
     }
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => () => stopRepeat(), [stopRepeat]);
 
-  const btn = "w-6 h-6 flex items-center justify-center rounded bg-black/50 hover:bg-white/20 text-white/70 hover:text-white text-xs select-none cursor-pointer border border-white/10 transition-colors";
+  const getControls = useCallback(() => {
+    const c = orbitRef.current;
+    if (c) saveInitialState(c);
+    return c;
+  }, [orbitRef]);
 
-  const call = (method: keyof CameraControllerHandle) => () => controllerRef.current?.[method]();
+  const zoomIn = useCallback(() => {
+    const c = getControls();
+    if (!c) return;
+    // Move camera closer along the view direction
+    const dir = c.object.position.clone().sub(c.target).normalize();
+    c.object.position.addScaledVector(dir, -zoomStep);
+    c.update();
+  }, [getControls, zoomStep]);
+
+  const zoomOut = useCallback(() => {
+    const c = getControls();
+    if (!c) return;
+    const dir = c.object.position.clone().sub(c.target).normalize();
+    c.object.position.addScaledVector(dir, zoomStep);
+    c.update();
+  }, [getControls, zoomStep]);
+
+  const rotateLeft = useCallback(() => {
+    const c = getControls();
+    if (!c) return;
+    c.setAzimuthalAngle(c.getAzimuthalAngle() - rotateStep);
+    c.update();
+  }, [getControls, rotateStep]);
+
+  const rotateRight = useCallback(() => {
+    const c = getControls();
+    if (!c) return;
+    c.setAzimuthalAngle(c.getAzimuthalAngle() + rotateStep);
+    c.update();
+  }, [getControls, rotateStep]);
+
+  const rotateUp = useCallback(() => {
+    const c = getControls();
+    if (!c) return;
+    c.setPolarAngle(c.getPolarAngle() - rotateStep);
+    c.update();
+  }, [getControls, rotateStep]);
+
+  const rotateDown = useCallback(() => {
+    const c = getControls();
+    if (!c) return;
+    c.setPolarAngle(c.getPolarAngle() + rotateStep);
+    c.update();
+  }, [getControls, rotateStep]);
+
+  const resetView = useCallback(() => {
+    const c = getControls();
+    if (!c) return;
+    const saved = initialStates.get(c);
+    if (saved) {
+      c.target.set(...saved.target);
+      c.object.position.set(...saved.position);
+      c.update();
+    }
+  }, [getControls]);
+
+  const btn = "w-6 h-6 flex items-center justify-center rounded bg-black/50 hover:bg-white/20 text-white/70 hover:text-white text-xs select-none cursor-pointer border border-white/10 transition-colors";
 
   return (
     <div
       className="absolute bottom-1 right-1 flex flex-col gap-0.5 z-10 pointer-events-auto"
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {/* Zoom buttons */}
       <div className="flex gap-0.5">
-        <button
-          className={btn}
-          title="Zoom in"
-          onPointerDown={() => startRepeat(call('zoomIn'))}
-          onPointerUp={stopRepeat}
-          onPointerLeave={stopRepeat}
-        >
-          +
-        </button>
-        <button
-          className={btn}
-          title="Zoom out"
-          onPointerDown={() => startRepeat(call('zoomOut'))}
-          onPointerUp={stopRepeat}
-          onPointerLeave={stopRepeat}
-        >
-          −
-        </button>
-      </div>
-      {/* Rotate buttons */}
-      <div className="flex gap-0.5">
-        <button
-          className={btn}
-          title="Rotate left"
-          onPointerDown={() => startRepeat(call('rotateLeft'))}
-          onPointerUp={stopRepeat}
-          onPointerLeave={stopRepeat}
-        >
-          ◀
-        </button>
-        <button
-          className={btn}
-          title="Rotate right"
-          onPointerDown={() => startRepeat(call('rotateRight'))}
-          onPointerUp={stopRepeat}
-          onPointerLeave={stopRepeat}
-        >
-          ▶
-        </button>
+        <button className={btn} title="Zoom in"
+          onPointerDown={() => startRepeat(zoomIn)} onPointerUp={stopRepeat} onPointerLeave={stopRepeat}>+</button>
+        <button className={btn} title="Zoom out"
+          onPointerDown={() => startRepeat(zoomOut)} onPointerUp={stopRepeat} onPointerLeave={stopRepeat}>−</button>
       </div>
       <div className="flex gap-0.5">
-        <button
-          className={btn}
-          title="Tilt up"
-          onPointerDown={() => startRepeat(call('rotateUp'))}
-          onPointerUp={stopRepeat}
-          onPointerLeave={stopRepeat}
-        >
-          ▲
-        </button>
-        <button
-          className={btn}
-          title="Tilt down"
-          onPointerDown={() => startRepeat(call('rotateDown'))}
-          onPointerUp={stopRepeat}
-          onPointerLeave={stopRepeat}
-        >
-          ▼
-        </button>
+        <button className={btn} title="Rotate left"
+          onPointerDown={() => startRepeat(rotateLeft)} onPointerUp={stopRepeat} onPointerLeave={stopRepeat}>◀</button>
+        <button className={btn} title="Rotate right"
+          onPointerDown={() => startRepeat(rotateRight)} onPointerUp={stopRepeat} onPointerLeave={stopRepeat}>▶</button>
       </div>
-      {/* Reset */}
-      <button
-        className={btn + " w-full"}
-        title="Reset camera"
-        onClick={call('resetView')}
-      >
-        ⊙
-      </button>
+      <div className="flex gap-0.5">
+        <button className={btn} title="Tilt up"
+          onPointerDown={() => startRepeat(rotateUp)} onPointerUp={stopRepeat} onPointerLeave={stopRepeat}>▲</button>
+        <button className={btn} title="Tilt down"
+          onPointerDown={() => startRepeat(rotateDown)} onPointerUp={stopRepeat} onPointerLeave={stopRepeat}>▼</button>
+      </div>
+      <button className={btn + " w-full"} title="Reset camera" onClick={resetView}>⊙</button>
     </div>
   );
 };
