@@ -1,3 +1,4 @@
+/* @refresh reset */
 /**
  * DeckVinyl3DView — 3D WebGL turntable for DJ mode.
  *
