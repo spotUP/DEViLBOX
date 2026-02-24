@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-24T05:49:08.185Z
+ * Generated: 2026-02-24T05:53:54.972Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1165';
-export const BUILD_NUMBER = '1165';
-export const BUILD_HASH = '64983254';
+export const BUILD_VERSION = '1.0.1167';
+export const BUILD_NUMBER = '1167';
+export const BUILD_HASH = '2a751792';
 export const BUILD_DATE = '2026-02-24';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1165',
+    version: '1.0.1167',
     date: '2026-02-24',
     changes: [
+      {
+        type: 'fix',
+        "description": "Restart UADE playback after setting looping mode"
+      },
+      {
+        type: 'fix',
+        "description": "Debug(dj): Add more detailed silence detection logging"
+      },
       {
         type: 'fix',
         "description": "Enable UADE looping to prevent premature song termination"
@@ -230,14 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Update Pixi DJ/tracker views, navigation, theming, and performance"
-      },
-      {
-        type: 'feature',
-        "description": "DJ engine improvements, audio cache, UADE prerender, and UI component updates"
-      },
-      {
-        type: 'feature',
-        "description": "Always overlay pattern display on visualizers with nav buttons instead of click-to-cycle"
       }
     ]
   }
