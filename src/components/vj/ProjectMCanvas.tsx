@@ -175,7 +175,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
         const buf = pcmBufferRef.current;
         if (engine && analyser && buf) {
           // Get PCM time-domain data and push to projectM
-          analyser.getFloatTimeDomainData(buf);
+          analyser.getFloatTimeDomainData(buf as Float32Array<ArrayBuffer>);
           // Create stereo interleaved buffer (duplicate mono → stereo)
           const stereo = new Float32Array(buf.length * 2);
           for (let i = 0; i < buf.length; i++) {
