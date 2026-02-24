@@ -16,7 +16,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as Tone from 'tone';
 import { AudioDataBus } from '@engine/vj/AudioDataBus';
-import { ExternalLink, SkipForward, Shuffle, Pause, Play, List } from 'lucide-react';
+import { ExternalLink, SkipForward, Shuffle, Pause, Play, List, Maximize, Minimize } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useDJStore } from '@stores/useDJStore';
 import { focusPopout } from '@components/ui/PopOutWindow';
@@ -274,6 +274,8 @@ interface VJControlsProps {
   onPopOut?: () => void;
   onToggleBrowser?: () => void;
   onSwitchLayer?: (layer: VJLayer) => void;
+  onFullscreen?: () => void;
+  isFullscreen?: boolean;
   browserOpen?: boolean;
 }
 
@@ -290,6 +292,8 @@ export const VJControls: React.FC<VJControlsProps> = ({
   onPopOut,
   onToggleBrowser,
   onSwitchLayer,
+  onFullscreen,
+  isFullscreen,
   browserOpen,
 }) => {
   const [showControls, setShowControls] = useState(true);
@@ -444,6 +448,16 @@ export const VJControls: React.FC<VJControlsProps> = ({
                 <ExternalLink size={18} />
               </button>
             )}
+
+            {onFullscreen && (
+              <button
+                onClick={onFullscreen}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              >
+                {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -471,6 +485,8 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [browserOpen, setBrowserOpen] = useState(false);
   const autoAdvanceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Audio debug meter
   const debugBusRef = useRef<AudioDataBus | null>(null);
@@ -523,6 +539,23 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
       cancelAnimationFrame(debugRafRef.current);
       bus.disable();
     };
+  }, []);
+
+  // Fullscreen toggle
+  const handleFullscreen = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      el.requestFullscreen().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
   // ISF state
@@ -598,7 +631,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   }, [activeLayer]);
 
   return (
-    <div className="relative w-full h-full bg-black overflow-hidden">
+    <div ref={containerRef} className="relative w-full h-full bg-black overflow-hidden">
       {/* Milkdrop layer */}
       <div className={`absolute inset-0 ${activeLayer === 'milkdrop' ? '' : 'hidden'}`}>
         <VJCanvas
@@ -638,7 +671,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
         ref={debugCanvasRef}
         width={180}
         height={60}
-        className="absolute top-2 left-2 z-50 rounded"
+        className="absolute bottom-16 right-2 z-50 rounded"
         style={{ imageRendering: 'pixelated' }}
       />
       <VJControls
@@ -654,6 +687,8 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
         onPopOut={handlePopOut}
         onToggleBrowser={() => setBrowserOpen(v => !v)}
         onSwitchLayer={setActiveLayer}
+        onFullscreen={handleFullscreen}
+        isFullscreen={isFullscreen}
         browserOpen={browserOpen}
       />
       {activeLayer === 'milkdrop' && (
