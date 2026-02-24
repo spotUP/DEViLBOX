@@ -104,6 +104,6 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
   if (!waveformPeaks || waveformPeaks.length === 0) return null;
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-dark-bg border border-dark-border rounded-sm overflow-hidden" />
+    <div ref={containerRef} className="w-full h-16 shrink-0 bg-dark-bg border border-dark-border rounded-sm overflow-hidden" />
   );
 };
