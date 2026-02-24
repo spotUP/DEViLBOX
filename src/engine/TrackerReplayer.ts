@@ -3709,6 +3709,12 @@ export class TrackerReplayer {
     }
 
     if (!decodedBuffer) {
+      // URL-based sample (e.g. from samplepack) — trigger engine to load it.
+      // getInstrument() creates a Tone.Sampler/Player which loads the URL,
+      // and stores the decoded buffer in decodedAudioBuffers when ready.
+      if (sample?.url && !sample.audioBuffer) {
+        engine.getInstrument(ch.instrument.id, ch.instrument);
+      }
       console.warn('[TrackerReplayer] No decoded buffer for instrument:', ch.instrument.id, ch.instrument.name);
       return;
     }
