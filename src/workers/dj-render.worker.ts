@@ -208,9 +208,10 @@ async function renderWithUADE(
     wasm._uade_wasm_set_subsong(subsong);
   }
 
-  // Enable looping for offline render
-  // We'll detect natural song end via silence, but looping prevents early termination
-  wasm._uade_wasm_set_looping(1);
+  // Disable looping for offline render (this is correct behavior)
+  // Some MODs have early loop points, but they should still render their full arrangement first
+  // We'll rely on the silence detector to stop at the natural end
+  wasm._uade_wasm_set_looping(0);
 
   // Give eagleplayer time to fully initialize after load + config changes
   await new Promise(resolve => setTimeout(resolve, 350));
@@ -231,8 +232,8 @@ async function renderWithUADE(
   let consecutiveZeros = 0;
   let trailingSilenceFrames = 0;
   const SILENCE_THRESHOLD = 0.0001;
-  const MAX_SILENCE_SECONDS = 2; 
-  const MIN_RENDER_SECONDS = 2; // don't stop for silence until at least 2s rendered
+  const MAX_SILENCE_SECONDS = 4;  // Allow more silence before stopping (MODs can have gaps)
+  const MIN_RENDER_SECONDS = 1; // Minimum render time before considering silence
 
   while (totalFrames < maxFrames) {
     const ret = wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
