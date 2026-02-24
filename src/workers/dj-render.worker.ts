@@ -203,26 +203,17 @@ async function renderWithUADE(
     throw new Error(`UADE failed to load ${safeFilename} (error: ${loadResult})`);
   }
 
-  // Give eagleplayer time to settle after successful load
-  await new Promise(resolve => setTimeout(resolve, 250));
-
   // Set subsong if specified
   if (subsong > 0) {
     wasm._uade_wasm_set_subsong(subsong);
   }
 
-  // Enable looping for now - we'll detect end via silence
-  // (disabling looping causes some MODs to stop at first pattern end)
+  // Enable looping for offline render
+  // We'll detect natural song end via silence, but looping prevents early termination
   wasm._uade_wasm_set_looping(1);
 
-  // CRITICAL: After changing looping mode, we need to restart playback
-  // or the setting won't take effect on already-loaded modules
-  if (wasm._uade_wasm_stop) {
-    wasm._uade_wasm_stop();
-  }
-  
-  // Give time for the looping change to propagate before rendering
-  await new Promise(resolve => setTimeout(resolve, 100));
+  // Give eagleplayer time to fully initialize after load + config changes
+  await new Promise(resolve => setTimeout(resolve, 350));
 
   postProgress(id, 10);
 
