@@ -315,7 +315,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
 
   return (
     <div
-      className={`relative flex flex-col gap-2 p-3 bg-dark-bg rounded-lg border min-w-0 h-full transition-all ${
+      className={`relative flex flex-col gap-2 p-3 bg-dark-bg rounded-lg border min-w-0 h-full overflow-hidden transition-all ${
         isDragOver ? deckHighlight : deckBorderColor
       }`}
       onDragEnter={handleDragEnter}

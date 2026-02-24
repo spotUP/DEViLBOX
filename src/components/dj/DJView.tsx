@@ -394,7 +394,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
               ? 'grid grid-cols-2 gap-2'
               : '';
         return (
-          <div className="flex flex-col gap-2 shrink-0 px-2 pt-2">
+          <div className="flex flex-col gap-2 shrink-0 px-2 pt-2 max-h-[25vh] overflow-auto">
             {/* Cache status panel */}
             <DJCachePanel />
             
