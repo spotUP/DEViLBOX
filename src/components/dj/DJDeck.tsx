@@ -232,6 +232,9 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         const buffer = await file.arrayBuffer();
         const info = await engine.loadAudioToDeck(deckId, buffer, file.name);
 
+        // Switch to turntable view for audio files
+        useDJStore.getState().setDeckViewMode('vinyl');
+
         // Try to parse Serato metadata (cue points, beatgrid, BPM)
         let seratoBPM = 0;
         let seratoCues: import('@/lib/serato/seratoMetadata').SeratoCuePoint[] = [];
@@ -288,6 +291,10 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         try {
           const result = await getDJPipeline().loadOrEnqueue(moduleBuffer, file.name, deckId, 'high');
           await engine.loadAudioToDeck(deckId, result.wavData, file.name, song.name || file.name, result.analysis?.bpm || bpmResult.bpm);
+          
+          // Switch to visualizer view for modules
+          useDJStore.getState().setDeckViewMode('visualizer');
+          
           console.log(`[DJDeck] Loaded ${file.name} in audio mode (skipped tracker bugs)`);
         } catch (err) {
           console.error(`[DJDeck] Pipeline failed:`, err);

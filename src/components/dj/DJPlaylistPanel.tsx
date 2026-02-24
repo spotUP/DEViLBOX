@@ -152,6 +152,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
         try {
           const result = await getDJPipeline().loadOrEnqueue(rawBuffer, fileName, deckId, 'high');
           await engine.loadAudioToDeck(deckId, result.wavData, fileName, song.name || fileName, result.analysis?.bpm || bpmResult.bpm);
+          useDJStore.getState().setDeckViewMode('visualizer');
           console.log(`[DJPlaylistPanel] Loaded ${fileName} in audio mode (skipped tracker bugs)`);
         } catch (err) {
           console.error(`[DJPlaylistPanel] Pipeline failed for ${fileName}:`, err);
@@ -177,6 +178,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
           
           if (isAudioFile(filename)) {
             await engine.loadAudioToDeck(deckId, buffer, track.fileName);
+            useDJStore.getState().setDeckViewMode('vinyl');
           } else {
             const blob = new File([buffer], filename, { type: 'application/octet-stream' });
             const song = await parseModuleToSong(blob);
@@ -200,10 +202,12 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
           const rawBuffer = await file.arrayBuffer();
           if (isAudioFile(file.name)) {
             await engine.loadAudioToDeck(deckId, rawBuffer, file.name);
+            useDJStore.getState().setDeckViewMode('vinyl');
           } else {
             const song = await parseModuleToSong(file);
             cacheSong(file.name, song);
             await loadSongToDeck(song, file.name, deckId, rawBuffer);
+            // loadSongToDeck already sets 'visualizer'
           }
         } catch (err) {
           console.error(`[DJPlaylistPanel] Failed to load track:`, err);
