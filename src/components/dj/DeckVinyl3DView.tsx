@@ -129,7 +129,7 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
 
   // ── Clone scene and classify meshes (NO reparenting) ──────────────────────
 
-  const { clonedScene, platterMeshes, tonearmMeshes, platterCenter, tonearmPivot, powerLedMesh, powerButtonMesh, rpmButtonMesh, pitchSliderMesh } = useMemo(() => {
+  const { clonedScene, platterMeshes, tonearmMeshes, platterCenter, tonearmPivot, powerLedMesh, powerButtonMesh: _powerButtonMesh, rpmButtonMesh, pitchSliderMesh: _pitchSliderMesh } = useMemo(() => {
     const cloned = gltfScene.clone(true);
     cloned.updateMatrixWorld(true);
 
