@@ -211,8 +211,9 @@ async function renderWithUADE(
     wasm._uade_wasm_set_subsong(subsong);
   }
 
-  // Disable looping for offline render
-  wasm._uade_wasm_set_looping(0);
+  // Enable looping for now - we'll detect end via silence
+  // (disabling looping causes some MODs to stop at first pattern end)
+  wasm._uade_wasm_set_looping(1);
 
   postProgress(id, 10);
 
