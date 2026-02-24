@@ -228,6 +228,7 @@ interface DJActions {
   // Global
   setDJModeActive: (active: boolean) => void;
   cycleDeckViewMode: () => void;
+  setDeckViewMode: (mode: DeckViewMode) => void;
   setThirdDeckActive: (active: boolean) => void;
   setCrossfader: (position: number) => void;
   setCrossfaderCurve: (curve: CrossfaderCurve) => void;
@@ -323,6 +324,11 @@ export const useDJStore = create<DJStore>()(
         const order: DeckViewMode[] = ['visualizer', 'vinyl', '3d'];
         const idx = order.indexOf(state.deckViewMode);
         state.deckViewMode = order[(idx + 1) % order.length];
+      }),
+
+    setDeckViewMode: (mode) =>
+      set((state) => {
+        state.deckViewMode = mode;
       }),
 
     setThirdDeckActive: (active) =>
