@@ -89,15 +89,37 @@ interface ButtonControl {
 
 // ── Mesh Name Helpers ────────────────────────────────────────────────────────
 
-/** Simplify verbose mesh names: "Mixer Klamz_uv_Death_DJ_02:mixer_EXP:fader1" → "fader1" */
+/** Simplify verbose mesh names to control identifiers.
+ * GLTFLoader sanitizes names: spaces→underscores, colons→removed.
+ * Runtime names look like "Mixer_knob1", "Mixer_Klamz_uv_Death_DJ_02mixer_EXPfader1_1" */
 function simplifyName(name: string): string {
-  // Strip "Mixer " prefix and namespace prefix
-  let s = name.replace(/^Mixer\s+/, '');
-  const colonIdx = s.lastIndexOf(':');
-  if (colonIdx >= 0) s = s.substring(colonIdx + 1);
-  // Strip trailing _1 (GLB artifact)
-  s = s.replace(/_1$/, '');
+  // Strip "Mixer_" or "Mixer " prefix
+  let s = name.replace(/^Mixer[\s_]+/, '');
+  // Handle long namespaced names: extract after the EXP prefix
+  const expMatch = s.match(/Klamz_uv_Death_DJ_02mixer_EXP(.+)/);
+  if (expMatch) s = expMatch[1];
+  // Strip FBXASC032 → space
+  s = s.replace(/FBXASC032/g, ' ').trim();
+  // Strip trailing _N suffixes (multi-primitive indices) until we match a control name
+  const controlRe = /^(knob|fader|hfader|button|window)\d*$/;
+  let stripped = s;
+  while (!controlRe.test(stripped) && /_\d+$/.test(stripped)) {
+    stripped = stripped.replace(/_\d+$/, '');
+  }
+  if (controlRe.test(stripped)) return stripped;
   return s;
+}
+
+/** Get the best control name for a mesh, checking itself and parent (for multi-primitive groups) */
+function getControlName(mesh: THREE.Object3D): string {
+  const selfName = simplifyName(mesh.name);
+  // For multi-primitive meshes, the parent Group has the real control name
+  const parentName = mesh.parent ? simplifyName(mesh.parent.name) : '';
+  // Check if self name matches a known control pattern
+  const controlRe = /^(knob|fader|hfader|button|window)\d*$/;
+  if (controlRe.test(selfName)) return selfName;
+  if (controlRe.test(parentName)) return parentName;
+  return selfName;
 }
 
 // ── Inner 3D Scene Component ─────────────────────────────────────────────────
@@ -327,7 +349,7 @@ function MixerScene() {
       if (!('isMesh' in child && child.isMesh)) return;
       meshCount++;
       const mesh = child as THREE.Mesh;
-      const sName = simplifyName(mesh.name);
+      const sName = getControlName(mesh);
 
       // Compute bounding box center
       mesh.geometry.computeBoundingBox();
@@ -349,7 +371,7 @@ function MixerScene() {
         type = 'vu';
       }
 
-      // Group meshes by simplified name (some names appear multiple times for multi-material)
+      // Group meshes by control name (some names appear multiple times for multi-material)
       const existing = registry.get(sName);
       if (existing) {
         existing.meshes.push(mesh);
@@ -464,11 +486,13 @@ function MixerScene() {
     }
   });
 
-  // ── Interaction via R3F events on <primitive> + DOM drag continuation ────────
-  // R3F fires events on <primitive> children; e.object = the actual hit mesh.
-  // For continuous drag (mouse may leave the mesh), we use DOM pointer capture.
+  // ── Interaction via manual raycasting on canvas DOM element ──────────────────
+  // R3F event bubbling through <primitive> is unreliable for cloned scenes.
+  // Instead, we raycast manually on pointerdown and walk the hit mesh's userData.
 
-  const { gl } = useThree();
+  const { gl, camera, scene } = useThree();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const pointer = useMemo(() => new THREE.Vector2(), []);
 
   /** Walk up from hit object to find the controlName in userData */
   const findControl = useCallback((hitObj: THREE.Object3D): string | null => {
@@ -480,45 +504,58 @@ function MixerScene() {
     return null;
   }, []);
 
-  const handlePointerDown = useCallback((e: { object: THREE.Object3D; nativeEvent: PointerEvent; stopPropagation: () => void }) => {
-    if (e.nativeEvent.button !== 0) return;
-    e.stopPropagation();
-
-    const controlName = findControl(e.object);
-    if (!controlName) return;
-
-    // Buttons: toggle immediately
-    const button = buttonMap.get(controlName);
-    if (button) { button.action(); return; }
-
-    // Knobs/Faders: start drag
-    const knob = knobMap.get(controlName);
-    if (knob) {
-      activeKnobRef.current = controlName;
-      dragStartRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
-      dragStartValueRef.current = knob.readValue();
-      return;
+  // Manual raycast helper
+  const raycastControl = useCallback((e: PointerEvent): string | null => {
+    const rect = gl.domElement.getBoundingClientRect();
+    pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(scene.children, true);
+    for (const hit of hits) {
+      const name = findControl(hit.object);
+      if (name) return name;
     }
-    const fader = faderMap.get(controlName);
-    if (fader) {
-      activeFaderRef.current = controlName;
-      dragStartRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
-      dragStartValueRef.current = fader.readValue();
-    }
-  }, [findControl, knobMap, faderMap, buttonMap]);
+    return null;
+  }, [gl, camera, scene, raycaster, pointer, findControl]);
 
-  const handleDblClick = useCallback((e: { object: THREE.Object3D; stopPropagation: () => void }) => {
-    e.stopPropagation();
-    const controlName = findControl(e.object);
-    if (!controlName) return;
-    const knob = knobMap.get(controlName);
-    if (knob) knob.action(knob.defaultValue);
-  }, [findControl, knobMap]);
-
-  // DOM listeners for drag continuation (pointermove/pointerup on document)
-  // Using document-level listeners ensures we get events even if R3F's event
-  // system intercepts canvas events during raycasting.
+  // DOM pointer events on the canvas element
   useEffect(() => {
+    const canvas = gl.domElement;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+
+      const controlName = raycastControl(e);
+      if (!controlName) return;
+
+      // Buttons: toggle immediately
+      const button = buttonMap.get(controlName);
+      if (button) { button.action(); return; }
+
+      // Knobs: start drag
+      const knob = knobMap.get(controlName);
+      if (knob) {
+        activeKnobRef.current = controlName;
+        dragStartRef.current = { x: e.clientX, y: e.clientY };
+        dragStartValueRef.current = knob.readValue();
+        return;
+      }
+      // Faders: start drag
+      const fader = faderMap.get(controlName);
+      if (fader) {
+        activeFaderRef.current = controlName;
+        dragStartRef.current = { x: e.clientX, y: e.clientY };
+        dragStartValueRef.current = fader.readValue();
+      }
+    };
+
+    const onDblClick = (e: MouseEvent) => {
+      const controlName = raycastControl(e as unknown as PointerEvent);
+      if (!controlName) return;
+      const knob = knobMap.get(controlName);
+      if (knob) knob.action(knob.defaultValue);
+    };
+
     const onPointerMove = (e: PointerEvent) => {
       const knobName = activeKnobRef.current;
       if (knobName) {
@@ -543,27 +580,25 @@ function MixerScene() {
     };
 
     const onPointerUp = () => {
-      if (activeKnobRef.current || activeFaderRef.current) {
-        activeKnobRef.current = null;
-        activeFaderRef.current = null;
-      }
+      activeKnobRef.current = null;
+      activeFaderRef.current = null;
     };
 
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('dblclick', onDblClick);
     document.addEventListener('pointermove', onPointerMove);
     document.addEventListener('pointerup', onPointerUp);
     return () => {
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('dblclick', onDblClick);
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
     };
-  }, [gl, knobMap, faderMap]);
+  }, [gl, raycastControl, knobMap, faderMap, buttonMap]);
 
   return (
     <group scale={[MODEL_SCALE, MODEL_SCALE, MODEL_SCALE]}>
-      <primitive
-        object={sceneGroup}
-        onPointerDown={handlePointerDown}
-        onDoubleClick={handleDblClick}
-      />
+      <primitive object={sceneGroup} />
     </group>
   );
 }
@@ -598,20 +633,21 @@ export function MixerVestax3DView() {
 
         <OrbitControls
           ref={orbitRef}
-          enablePan={false}
-          enableZoom={false}
-          enableDamping
-          dampingFactor={0.1}
-          minPolarAngle={Math.PI * 0.05}
-          maxPolarAngle={Math.PI * 0.6}
-          minDistance={0.1}
-          maxDistance={2.0}
-          target={[0, -0.05, 0] as unknown as THREE.Vector3}
-          mouseButtons={{
-            LEFT: undefined as unknown as THREE.MOUSE,
-            MIDDLE: undefined as unknown as THREE.MOUSE,
-            RIGHT: THREE.MOUSE.ROTATE,
-          }}
+        enablePan={false}
+        enableZoom={false}
+        enableRotate={false}
+        enableDamping
+        dampingFactor={0.1}
+        minPolarAngle={Math.PI * 0.05}
+        maxPolarAngle={Math.PI * 0.6}
+        minDistance={0.1}
+        maxDistance={2.0}
+        target={[0, -0.05, 0] as unknown as THREE.Vector3}
+        mouseButtons={{
+          LEFT: undefined as unknown as THREE.MOUSE,
+          MIDDLE: undefined as unknown as THREE.MOUSE,
+          RIGHT: undefined as unknown as THREE.MOUSE,
+        }}
         />
       </Canvas>
       <CameraControlOverlay orbitRef={orbitRef} />
