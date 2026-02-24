@@ -97,15 +97,29 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
       const canvas = canvasRef.current;
       if (!canvas) return;
 
-      (async () => {
+      // Wait for layout so canvas has real dimensions (avoids 0×0 WebGL textures)
+      const initRaf = requestAnimationFrame(() => {
+        if (cancelled) return;
+        doInit();
+      });
+
+      async function doInit() {
         try {
           const { butterchurn, presetMap, presetNames } = await loadButterchurn();
           if (cancelled) return;
 
+          // Enforce minimum canvas dimensions to avoid zero-size WebGL textures
+          const cw = Math.max(canvas.clientWidth, 320);
+          const ch = Math.max(canvas.clientHeight, 240);
+          const w = Math.round(cw * devicePixelRatio);
+          const h = Math.round(ch * devicePixelRatio);
+          canvas.width = w;
+          canvas.height = h;
+
           const ctx = Tone.getContext().rawContext as AudioContext;
           const visualizer = butterchurn.createVisualizer(ctx, canvas, {
-            width: canvas.clientWidth * devicePixelRatio,
-            height: canvas.clientHeight * devicePixelRatio,
+            width: w,
+            height: h,
             pixelRatio: devicePixelRatio,
           });
 
@@ -136,9 +150,9 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
         } catch (err) {
           console.error('[VJCanvas] Failed to initialize butterchurn:', err);
         }
-      })();
+      }
 
-      return () => { cancelled = true; };
+      return () => { cancelled = true; cancelAnimationFrame(initRaf); };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Render loop
@@ -158,8 +172,8 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
       const canvas = canvasRef.current;
       if (!canvas || !visualizerRef.current) return;
       const handleResize = () => {
-        const w = canvas.clientWidth * devicePixelRatio;
-        const h = canvas.clientHeight * devicePixelRatio;
+        const w = Math.round(Math.max(canvas.clientWidth, 320) * devicePixelRatio);
+        const h = Math.round(Math.max(canvas.clientHeight, 240) * devicePixelRatio);
         canvas.width = w;
         canvas.height = h;
         visualizerRef.current?.setRendererSize(w, h);
