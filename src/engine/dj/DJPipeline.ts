@@ -77,7 +77,7 @@ export interface PipelineResult {
  */
 function encodePCMToWAV(
   left: Float32Array,
-  right: Float32Array,
+  _right: Float32Array,
   sampleRate: number,
 ): ArrayBuffer {
   const numChannels = 1; // Mono — mix L+R for DJ use
