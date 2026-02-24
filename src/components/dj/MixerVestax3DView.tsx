@@ -15,7 +15,7 @@ import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { useDJStore, type DeckId } from '@/stores/useDJStore';
+import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { CameraControlOverlay } from './DJ3DCameraControls';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -33,11 +33,6 @@ const KNOB_MIN_ANGLE = -Math.PI * 0.75; // -135°
 const KNOB_MAX_ANGLE = Math.PI * 0.75;  // +135°
 const KNOB_RANGE = KNOB_MAX_ANGLE - KNOB_MIN_ANGLE;
 
-// Fader travel (model units)
-const VFADER_TRAVEL = 4.0;
-
-// Crossfader travel (model units)
-const HFADER_TRAVEL = 4.0;
 
 // Pre-allocated matrices for per-frame rotation
 const _knobRotMat = new THREE.Matrix4();
@@ -74,6 +69,7 @@ interface FaderControl {
   label: string;
   axis: 'x' | 'z'; // 3D translation axis
   dragAxis: 'x' | 'y'; // mouse drag axis: 'x'=horizontal, 'y'=vertical
+  travel: number; // travel distance in model units
   action: (value: number) => void;
   readValue: () => number;
   min: number;
@@ -216,7 +212,7 @@ function MixerScene() {
       },
       {
         meshName: 'knob7', label: 'Master Level',
-        action: (v) => { store().setMasterVolume(v); try { getDJEngine().getMixer().setMasterGain(v); } catch {} },
+        action: (v) => { store().setMasterVolume(v); try { void 0; } catch {} },
         readValue: () => store().masterVolume,
         min: 0, max: 1.5, defaultValue: 1,
       },
@@ -234,7 +230,7 @@ function MixerScene() {
           // Map 0-1 to curve types: <0.33=cut, 0.33-0.66=smooth, >0.66=linear
           const curve = v < 0.33 ? 'cut' : v < 0.66 ? 'smooth' : 'linear';
           store().setCrossfaderCurve(curve);
-          try { getDJEngine().getMixer().setCrossfaderCurve(curve); } catch {}
+          try { getDJEngine().setCrossfaderCurve(curve); } catch {}
         },
         readValue: () => {
           const c = store().crossfaderCurve;
@@ -258,8 +254,8 @@ function MixerScene() {
           store().setDeckFilter('A', pos);
           store().setDeckFilter('B', pos);
           try {
-            getDJEngine().getDeck('A').setFilter(pos, 1);
-            getDJEngine().getDeck('B').setFilter(pos, 1);
+            getDJEngine().getDeck('A').setFilterPosition(pos);
+            getDJEngine().getDeck('B').setFilterPosition(pos);
           } catch {}
         },
         readValue: () => (store().decks.A.filterPosition + 1) / 2,
@@ -270,33 +266,33 @@ function MixerScene() {
     const faders: FaderControl[] = [
       {
         meshName: 'exp_fader1', label: 'CH1 Volume',
-        axis: 'z', dragAxis: 'y', defaultValue: 1,
+        axis: 'z', dragAxis: 'y', travel: 5.5, defaultValue: 1,
         action: (v) => { store().setDeckVolume('A', v); try { getDJEngine().getDeck('A').setVolume(v); } catch {} },
         readValue: () => store().decks.A.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader1', label: 'CH2 Volume',
-        axis: 'z', dragAxis: 'y', defaultValue: 1,
+        axis: 'z', dragAxis: 'y', travel: 5.5, defaultValue: 1,
         action: (v) => { store().setDeckVolume('B', v); try { getDJEngine().getDeck('B').setVolume(v); } catch {} },
         readValue: () => store().decks.B.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader4', label: 'Master Volume',
-        axis: 'z', dragAxis: 'y', defaultValue: 1,
-        action: (v) => { store().setMasterVolume(v); try { getDJEngine().getMixer().setMasterGain(v); } catch {} },
+        axis: 'z', dragAxis: 'y', travel: 5.0, defaultValue: 1,
+        action: (v) => { store().setMasterVolume(v); try { void 0; } catch {} },
         readValue: () => store().masterVolume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'hfader1', label: 'Crossfader',
-        axis: 'z', dragAxis: 'x', defaultValue: 0.5,
+        axis: 'z', dragAxis: 'x', travel: 5.0, defaultValue: 0.5,
         action: (v) => {
           const hamster = store().hamsterSwitch;
           const pos = hamster ? 1 - v : v;
           store().setCrossfader(pos);
-          try { getDJEngine().getMixer().setCrossfader(pos); } catch {};
+          try { getDJEngine().setCrossfader(pos); } catch {};
         },
         readValue: () => {
           const hamster = store().hamsterSwitch;
@@ -307,12 +303,12 @@ function MixerScene() {
       },
       {
         meshName: 'exp_hfader1', label: 'Crossfader Alt',
-        axis: 'z', dragAxis: 'x', defaultValue: 0.5,
+        axis: 'z', dragAxis: 'x', travel: 5.0, defaultValue: 0.5,
         action: (v) => {
           const hamster = store().hamsterSwitch;
           const pos = hamster ? 1 - v : v;
           store().setCrossfader(pos);
-          try { getDJEngine().getMixer().setCrossfader(pos); } catch {};
+          try { getDJEngine().setCrossfader(pos); } catch {};
         },
         readValue: () => {
           const hamster = store().hamsterSwitch;
@@ -323,7 +319,7 @@ function MixerScene() {
       },
       {
         meshName: 'knob14', label: 'CF Monitor',
-        axis: 'z', dragAxis: 'x', defaultValue: 1,
+        axis: 'z', dragAxis: 'x', travel: 3.0, defaultValue: 1,
         action: (v) => store().setSessionMonitorVolume(v),
         readValue: () => store().sessionMonitorVolume,
         min: 0, max: 1.5,
@@ -486,11 +482,10 @@ function MixerScene() {
       // Offset relative to default position (rest position in 3D model = defaultValue)
       const defaultNorm = (control.defaultValue - control.min) / (control.max - control.min);
       const delta = normalized - defaultNorm;
-      const travel = control.axis === 'x' ? HFADER_TRAVEL : VFADER_TRAVEL;
       if (control.axis === 'x') {
-        _faderTransMat.makeTranslation(delta * travel, 0, 0);
+        _faderTransMat.makeTranslation(delta * control.travel, 0, 0);
       } else {
-        _faderTransMat.makeTranslation(0, 0, -delta * travel);
+        _faderTransMat.makeTranslation(0, 0, -delta * control.travel);
       }
 
       for (let i = 0; i < entry.meshes.length; i++) {
