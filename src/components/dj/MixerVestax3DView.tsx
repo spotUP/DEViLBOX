@@ -267,21 +267,21 @@ function MixerScene() {
     const faders: FaderControl[] = [
       {
         meshName: 'exp_fader1', label: 'CH1 Volume',
-        axis: 'z', dragAxis: 'y', travel: 5.5, defaultValue: 0,
+        axis: 'z', dragAxis: 'y', travel: 5.5, defaultValue: 1,
         action: (v) => { store().setDeckVolume('A', v); try { getDJEngine().getDeck('A').setVolume(v); } catch {} },
         readValue: () => store().decks.A.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader1', label: 'CH2 Volume',
-        axis: 'z', dragAxis: 'y', travel: 5.5, defaultValue: 0,
+        axis: 'z', dragAxis: 'y', travel: 5.5, defaultValue: 1,
         action: (v) => { store().setDeckVolume('B', v); try { getDJEngine().getDeck('B').setVolume(v); } catch {} },
         readValue: () => store().decks.B.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader4', label: 'Master Volume',
-        axis: 'z', dragAxis: 'y', travel: 5.0, defaultValue: 0,
+        axis: 'z', dragAxis: 'y', travel: 5.0, defaultValue: 1,
         action: (v) => { store().setMasterVolume(v); try { getDJEngine().mixer.setMasterVolume(v); } catch {} },
         readValue: () => store().masterVolume,
         min: 0, max: 1.5,
