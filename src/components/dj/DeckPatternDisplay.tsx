@@ -24,6 +24,7 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
   const pattPos = useDJStore((s) => s.decks[deckId].pattPos);
   const isPlaying = useDJStore((s) => s.decks[deckId].isPlaying);
   const fileName = useDJStore((s) => s.decks[deckId].fileName);
+  const totalPositions = useDJStore((s) => s.decks[deckId].totalPositions);
   const activePatternName = useDJStore((s) => s.decks[deckId].activePatternName);
 
   // During backward scratch phases, accumulate a visual backward offset.
@@ -88,7 +89,7 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
     } catch {
       return { patternData: null, numChannels: 4, numRows: 64 };
     }
-  }, [deckId, songPos, fileName]);
+  }, [deckId, songPos, fileName, totalPositions]);
 
   // Compute visual row: during backward scratch, subtract offset from pattPos
   const visualRow = activePatternName && visualOffset > 0
