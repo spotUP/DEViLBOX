@@ -79,3 +79,6 @@ turntable.glb
 
 # Backup files
 *.bak
+
+# ProjectM WASM build artifacts
+projectm-wasm/build/
