@@ -16,7 +16,7 @@ import {
   type ModlandFormat,
   type ModlandStatus,
 } from '@/lib/modlandApi';
-import { useDJStore } from '@/stores/useDJStore';
+import { useDJStore, useThirdDeckActive } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { detectBPM, estimateSongDuration } from '@/engine/dj/DJBeatDetector';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
@@ -41,8 +41,12 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [downloadingPaths, setDownloadingPaths] = useState<Set<string>>(new Set());
+  const [selectedIndex, setSelectedIndex] = useState(-1);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const thirdDeckActive = useThirdDeckActive();
   const LIMIT = 50;
 
   // ── Init: fetch status + formats ────────────────────────────────────────
@@ -50,6 +54,8 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   useEffect(() => {
     getModlandStatus().then(setStatus).catch(() => {});
     getModlandFormats().then(setFormats).catch(() => {});
+    // Auto-focus search input
+    requestAnimationFrame(() => inputRef.current?.focus());
   }, []);
 
   // ── Debounced search ────────────────────────────────────────────────────
@@ -93,6 +99,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
       doSearch(query, format, 0, false);
+      setSelectedIndex(0);
     }, 300);
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -103,6 +110,13 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
     const newOffset = offset + LIMIT;
     doSearch(query, format, newOffset, true);
   }, [query, format, offset, doSearch]);
+
+  // ── Scroll selected item into view ───────────────────────────────────
+  useEffect(() => {
+    if (selectedIndex < 0 || !listRef.current) return;
+    const items = listRef.current.querySelectorAll('[data-result-item]');
+    items[selectedIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [selectedIndex]);
 
   // ── Download → Parse → Load to Deck ─────────────────────────────────────
 
@@ -198,12 +212,48 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
     [],
   );
 
+  // ── Keyboard navigation ─────────────────────────────────────────────
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(i + 1, results.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(i - 1, 0));
+      } else if (e.key === 'Enter' && selectedIndex >= 0 && selectedIndex < results.length) {
+        e.preventDefault();
+        const file = results[selectedIndex];
+        if (!downloadingPaths.has(file.full_path)) {
+          loadToDeck(file, e.shiftKey ? 'B' : 'A');
+        }
+      } else if ((e.key === '1' || e.key === '2' || e.key === '3') && selectedIndex >= 0 && selectedIndex < results.length) {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT') return; // Don't intercept number keys while typing
+        e.preventDefault();
+        const file = results[selectedIndex];
+        if (downloadingPaths.has(file.full_path)) return;
+        const deckMap = { '1': 'A', '2': 'B', '3': 'C' } as const;
+        const deckId = deckMap[e.key as '1' | '2' | '3'];
+        if (deckId === 'C' && !thirdDeckActive) {
+          useDJStore.getState().setThirdDeckActive(true);
+        }
+        loadToDeck(file, deckId);
+      }
+    },
+    [results, selectedIndex, downloadingPaths, thirdDeckActive, loadToDeck],
+  );
+
   // ── Render ──────────────────────────────────────────────────────────────
 
   const isDownloading = (path: string) => downloadingPaths.has(path);
 
   return (
-    <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-3 flex flex-col gap-2 max-h-[400px]">
+    <div
+      className="bg-dark-bgSecondary border border-dark-border rounded-lg p-3 flex flex-col gap-2 max-h-[400px]"
+      onKeyDown={handleKeyDown}
+      tabIndex={-1}
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -234,6 +284,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         <div className="flex-1 relative">
           <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
+            ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search modules..."
@@ -266,7 +317,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
       )}
 
       {/* Results list */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div ref={listRef} className="flex-1 overflow-y-auto min-h-0">
         {results.length === 0 && !loading ? (
           <div className="flex flex-col items-center justify-center py-8 text-text-muted">
             <Globe size={24} className="mb-2 opacity-40" />
@@ -276,11 +327,16 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
           </div>
         ) : (
           <div className="flex flex-col gap-0.5">
-            {results.map((file) => (
+            {results.map((file, idx) => (
               <div
                 key={file.full_path}
-                className="flex items-center gap-2 px-2 py-1.5 bg-dark-bg rounded border border-dark-borderLight
-                           hover:border-dark-border transition-colors group"
+                data-result-item
+                onClick={() => setSelectedIndex(idx)}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-colors group cursor-pointer ${
+                  idx === selectedIndex
+                    ? 'bg-green-900/20 border-green-700/50'
+                    : 'bg-dark-bg border-dark-borderLight hover:border-dark-border'
+                }`}
               >
                 {/* File info */}
                 <div className="flex-1 min-w-0">
@@ -293,13 +349,13 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
                   </div>
                 </div>
 
-                {/* Actions (visible on hover) */}
+                {/* Actions */}
                 {isDownloading(file.full_path) ? (
                   <Loader2 size={12} className="animate-spin text-green-400" />
                 ) : (
                   <>
                     <button
-                      onClick={() => addToPlaylist(file)}
+                      onClick={(e) => { e.stopPropagation(); addToPlaylist(file); }}
                       className="p-1 text-text-muted hover:text-amber-400 transition-colors
                                  opacity-0 group-hover:opacity-100"
                       title="Add to active playlist"
@@ -307,7 +363,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
                       <ListPlus size={12} />
                     </button>
                     <button
-                      onClick={() => loadToDeck(file, 'A')}
+                      onClick={(e) => { e.stopPropagation(); loadToDeck(file, 'A'); }}
                       className="px-2 py-1 text-[10px] font-mono font-bold rounded
                                  bg-blue-900/30 text-blue-400 border border-blue-800/50
                                  hover:bg-blue-800/40 hover:text-blue-300 transition-colors
@@ -316,7 +372,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
                       1
                     </button>
                     <button
-                      onClick={() => loadToDeck(file, 'B')}
+                      onClick={(e) => { e.stopPropagation(); loadToDeck(file, 'B'); }}
                       className="px-2 py-1 text-[10px] font-mono font-bold rounded
                                  bg-red-900/30 text-red-400 border border-red-800/50
                                  hover:bg-red-800/40 hover:text-red-300 transition-colors
@@ -324,17 +380,19 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
                     >
                       2
                     </button>
-                    {useDJStore.getState().thirdDeckActive && (
-                      <button
-                        onClick={() => loadToDeck(file, 'C')}
-                        className="px-2 py-1 text-[10px] font-mono font-bold rounded
-                                   bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
-                                   hover:bg-emerald-800/40 hover:text-emerald-300 transition-colors
-                                   opacity-0 group-hover:opacity-100"
-                      >
-                        3
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!thirdDeckActive) useDJStore.getState().setThirdDeckActive(true);
+                        loadToDeck(file, 'C');
+                      }}
+                      className={`px-2 py-1 text-[10px] font-mono font-bold rounded
+                                 bg-emerald-900/30 text-emerald-400 border border-emerald-800/50
+                                 hover:bg-emerald-800/40 hover:text-emerald-300 transition-colors
+                                 opacity-0 group-hover:opacity-100 ${!thirdDeckActive ? 'opacity-0 group-hover:opacity-50' : ''}`}
+                    >
+                      3
+                    </button>
                   </>
                 )}
               </div>
@@ -368,6 +426,15 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
           </div>
         )}
       </div>
+
+      {/* Keyboard hints */}
+      {results.length > 0 && (
+        <div className="text-[9px] font-mono text-text-muted/50 flex gap-3 px-1">
+          <span>↑↓ navigate</span>
+          <span>⏎ deck 1</span>
+          <span>⇧⏎ deck 2</span>
+        </div>
+      )}
     </div>
   );
 };
