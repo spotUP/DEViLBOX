@@ -572,6 +572,9 @@ export class DJPipeline {
       wavData = encodePCMToWAV(left, right, sampleRate);
       waveformPeaks = computeWaveformFromPCM(left, right, 800);
 
+      // Debug: Check WAV output
+      console.log(`[DJPipeline] WAV encoded: ${wavData.byteLength} bytes, duration: ${duration.toFixed(2)}s, PCM frames: ${left.length}`);
+
       // Cache the audio immediately (before analysis)
       await cacheAudio(
         task.fileBuffer,

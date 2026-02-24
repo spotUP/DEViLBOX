@@ -203,6 +203,9 @@ async function renderWithUADE(
     throw new Error(`UADE failed to load ${safeFilename} (error: ${loadResult})`);
   }
 
+  // Give eagleplayer time to settle after successful load
+  await new Promise(resolve => setTimeout(resolve, 250));
+
   // Set subsong if specified
   if (subsong > 0) {
     wasm._uade_wasm_set_subsong(subsong);
@@ -224,7 +227,7 @@ async function renderWithUADE(
 
   const audioChunks: { left: Float32Array; right: Float32Array }[] = [];
   let totalFrames = 0;
-  let leadingZeros = 0;
+  let consecutiveZeros = 0;
   let trailingSilenceFrames = 0;
   const SILENCE_THRESHOLD = 0.0001;
   const MAX_SILENCE_SECONDS = 2; 
@@ -234,18 +237,21 @@ async function renderWithUADE(
     const ret = wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
     
     if (ret <= 0) {
-      // Allow up to 1000 leading zero-frame returns (~90s) to accommodate extremely slow player initialization.
-      // Some exotic formats or eagleplayers may perform significant startup processing.
-      if (totalFrames === 0 && leadingZeros < 1000) {
-        leadingZeros++;
+      consecutiveZeros++;
+      // Be extremely patient during the first 5 seconds of the song.
+      // Some eagleplayers take time to start or have large gaps between initial bursts.
+      const maxPatience = totalFrames < (sampleRate * 5) ? 1000 : 20;
+      if (consecutiveZeros < maxPatience) {
         continue;
       }
       break; 
     }
 
     if (totalFrames === 0) {
-      console.log(`[DJRenderWorker/UADE] First audio frames received after ${leadingZeros} zero-returns. Chunk size: ${ret}`);
+      console.log(`[DJRenderWorker/UADE] First audio frames received after ${consecutiveZeros} zero-returns. Chunk size: ${ret}`);
     }
+    
+    consecutiveZeros = 0; // Reset on successful frame delivery
 
     const leftData = new Float32Array(ret);
     const rightData = new Float32Array(ret);
@@ -305,6 +311,17 @@ async function renderWithUADE(
   }
 
   postProgress(id, 85);
+
+  // Debug: check audio quality
+  let nonZero = 0;
+  let maxAmp = 0;
+  for (let i = 0; i < Math.min(left.length, 44100); i++) {
+    const amp = Math.abs(left[i]) + Math.abs(right[i]);
+    if (amp > 0.0001) nonZero++;
+    if (amp > maxAmp) maxAmp = amp;
+  }
+  console.log(`[DJRenderWorker/UADE] ${safeFilename} rendered: ${totalFrames} frames (${(totalFrames/sampleRate).toFixed(1)}s), nonZero: ${nonZero}/${Math.min(totalFrames, 44100)}, maxAmp: ${maxAmp.toFixed(4)}`);
+
   return { left, right, sampleRate };
 }
 

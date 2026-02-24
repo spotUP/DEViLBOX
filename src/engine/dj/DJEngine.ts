@@ -119,8 +119,10 @@ export class DJEngine {
    * Switches the deck to audio playback mode.
    */
   async loadAudioToDeck(id: DeckId, buffer: ArrayBuffer, filename: string, trackName?: string, bpm?: number): Promise<AudioFileInfo> {
+    console.log(`[DJEngine] loadAudioToDeck: ${filename}, buffer size: ${buffer.byteLength} bytes`);
     const deck = this.getDeck(id);
     const info = await deck.loadAudioFile(buffer, filename);
+    console.log(`[DJEngine] loadAudioFile returned: duration=${info.duration.toFixed(2)}s, sampleRate=${info.sampleRate}, channels=${info.numberOfChannels}`);
 
     // Update store state
     useDJStore.getState().setDeckState(id, {
