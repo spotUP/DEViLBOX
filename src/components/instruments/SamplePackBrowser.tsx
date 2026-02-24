@@ -407,6 +407,14 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
       // Engine may not be available
     }
 
+    // Preload all instruments so decoded audio buffers are ready before playback
+    try {
+      const allInstruments = useInstrumentStore.getState().instruments;
+      getToneEngine().preloadInstruments(allInstruments).catch(() => {});
+    } catch {
+      // Engine may not be available
+    }
+
     onClose();
   };
 
