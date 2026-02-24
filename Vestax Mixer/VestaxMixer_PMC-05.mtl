@@ -1,0 +1,79 @@
+# MTL file for Vestax PMC-05 Mixer
+
+newmtl pCylinder1SG
+Ka 0.1 0.1 0.1
+Kd 0.3 0.3 0.3
+Ks 0.8 0.8 0.8
+Ns 200
+map_Kd Textures/nOISEpaTTERN.jpg
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:FaceplateSG
+Ka 0.1 0.1 0.1
+Kd 0.8 0.8 0.8
+Ks 0.3 0.3 0.3
+Ns 50
+map_Kd Textures/Faceplate_Diff_01_2.png
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:windowSG
+Ka 0.05 0.05 0.05
+Kd 0.1 0.1 0.1
+Ks 0.9 0.9 0.9
+Ns 300
+d 0.3
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:Cylinder06SG
+Ka 0.1 0.1 0.1
+Kd 0.5 0.5 0.5
+Ks 0.9 0.9 0.9
+Ns 250
+map_Ks Textures/Anis_Metal_Spec.jpg
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:Rectangle01SG
+Ka 0.05 0.05 0.05
+Kd 0.15 0.15 0.15
+Ks 0.4 0.4 0.4
+Ns 100
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:BoxFBXASC032OuterSG
+Ka 0.05 0.05 0.05
+Kd 0.1 0.1 0.1
+Ks 0.2 0.2 0.2
+Ns 50
+map_Kd Textures/Backplate_GFX_01.jpg
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:fader1SG
+Ka 0.1 0.1 0.1
+Kd 0.6 0.6 0.6
+Ks 0.8 0.8 0.8
+Ns 200
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:button1SG
+Ka 0.1 0.1 0.1
+Kd 0.7 0.2 0.2
+Ks 0.5 0.5 0.5
+Ns 100
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:button2SG
+Ka 0.1 0.1 0.1
+Kd 0.2 0.2 0.7
+Ks 0.5 0.5 0.5
+Ns 100
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:hfader1SG
+Ka 0.1 0.1 0.1
+Kd 0.6 0.6 0.6
+Ks 0.8 0.8 0.8
+Ns 200
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:knobSG
+Ka 0.1 0.1 0.1
+Kd 0.4 0.4 0.4
+Ks 0.9 0.9 0.9
+Ns 250
+
+newmtl Klamz_uv_Death_DJ_02:mixer_EXP:pCylinder8SG
+Ka 0.1 0.1 0.1
+Kd 0.5 0.5 0.5
+Ks 0.7 0.7 0.7
+Ns 150
+map_Kd Textures/InputLevel.jpg
