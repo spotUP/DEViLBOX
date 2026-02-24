@@ -28,6 +28,7 @@ import { DeckFXPads } from './DeckFXPads';
 import { DeckCuePoints } from './DeckCuePoints';
 import { DeckBeatGrid } from './DeckBeatGrid';
 import { DeckAudioWaveform } from './DeckAudioWaveform';
+import { DeckPatternDisplay } from './DeckPatternDisplay';
 
 // Lazy-load 3D view to avoid Three.js bundle bloat for users who don't use it
 const DeckVinyl3DView = lazy(() => import('./DeckVinyl3DView'));
@@ -43,6 +44,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
   const [vizResetKey, setVizResetKey] = useState(0);
   const dragCountRef = useRef(0);
   const deckViewMode = useDJStore((s) => s.deckViewMode);
+  const hasPatternData = useDJStore((s) => s.decks[deckId].totalPositions > 0);
 
   // Poll playback position and update store at ~30fps
   useEffect(() => {
@@ -371,7 +373,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       {/* Main controls area: pattern display / vinyl + pitch slider */}
       <div className={`flex gap-2 flex-1 min-h-0 ${isB ? 'flex-row-reverse' : ''}`}>
         {/* Pattern display / Visualizer / Vinyl */}
-        <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center">
+        <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center relative">
           {deckViewMode === '3d' ? (
             <Suspense fallback={
               <div className="flex items-center justify-center w-full h-full text-text-muted text-xs font-mono">
@@ -384,6 +386,13 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
             <DeckVinylView deckId={deckId} />
           ) : (
             <DeckVisualizer deckId={deckId} resetKey={vizResetKey} />
+          )}
+
+          {/* Pattern overlay — shows for tracker modules in any view mode except visualizer (which has its own) */}
+          {hasPatternData && deckViewMode !== 'visualizer' && (
+            <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.55 }}>
+              <DeckPatternDisplay deckId={deckId} />
+            </div>
           )}
         </div>
 
