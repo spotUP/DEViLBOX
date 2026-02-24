@@ -2,9 +2,9 @@
 
 .tb303-view {
   width: 100%;
-  height: 100%;
+  max-width: 900px;
+  margin: 0 auto;
   padding: 24px;
-  overflow-y: auto;
   background: var(--color-bg-primary);
 }
 
