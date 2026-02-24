@@ -311,31 +311,40 @@ export class DeckEngine {
 
   async play(): Promise<void> {
     if (this._playbackMode === 'audio') {
+      console.log(`[DeckEngine] play() in audio mode`);
       await this.audioPlayer.play();
-      // Start replayer for position tracking/visuals (it's connected to deckGain, but we can rely on audio mode being the master)
-      if (this.replayer.getSong()) {
-        await this.replayer.play();
-      }
+      // DON'T start replayer if there's no song loaded (we skipped tracker mode)
+      // The replayer is only for tracker mode playback
+    } else if (this._playbackMode === 'tracker') {
+      console.log(`[DeckEngine] play() in tracker mode`);
+      await this.replayer.play();
     } else {
-      console.warn(`[DeckEngine] play() called while not in audio mode (current: ${this._playbackMode})`);
+      console.warn(`[DeckEngine] play() called in unknown mode: ${this._playbackMode}`);
     }
   }
 
   pause(): void {
-    this.audioPlayer.pause();
-    this.replayer.pause();
+    if (this._playbackMode === 'audio') {
+      this.audioPlayer.pause();
+    } else if (this._playbackMode === 'tracker') {
+      this.replayer.pause();
+    }
   }
 
   async resume(): Promise<void> {
     if (this._playbackMode === 'audio') {
       await this.audioPlayer.play();
+    } else if (this._playbackMode === 'tracker') {
       this.replayer.resume();
     }
   }
 
   stop(): void {
-    this.audioPlayer.stop();
-    this.replayer.stop();
+    if (this._playbackMode === 'audio') {
+      this.audioPlayer.stop();
+    } else if (this._playbackMode === 'tracker') {
+      this.replayer.stop();
+    }
   }
 
   isPlaying(): boolean {

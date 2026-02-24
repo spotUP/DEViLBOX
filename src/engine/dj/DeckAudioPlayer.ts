@@ -48,10 +48,14 @@ export class DeckAudioPlayer {
    * Uses WASM fallback decoders for cross-browser format support.
    */
   async loadAudioFile(buffer: ArrayBuffer, filename: string): Promise<AudioFileInfo> {
+    console.log(`[DeckAudioPlayer] loadAudioFile: ${filename}, buffer size: ${buffer.byteLength} bytes`);
+    
     // Decode audio with cross-browser support
     const audioContext = Tone.getContext().rawContext as AudioContext;
     const result: DecodeResult = await decodeAudio(audioContext, buffer, { filename });
     const audioBuffer = result.audioBuffer;
+
+    console.log(`[DeckAudioPlayer] Decoded: duration=${audioBuffer.duration.toFixed(2)}s, sampleRate=${audioBuffer.sampleRate}, channels=${audioBuffer.numberOfChannels}, frames=${audioBuffer.length}`);
 
     if (result.usedWasm) {
       console.log(`[DeckAudioPlayer] Decoded ${result.format} using WASM fallback`);
