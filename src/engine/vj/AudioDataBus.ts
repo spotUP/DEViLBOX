@@ -49,9 +49,9 @@ const BASS_END = 12;    // ~65-258 Hz
 const MID_END = 186;    // ~258-4000 Hz
 // HIGH = 186..512
 
-const SMOOTHING = 0.3;            // Exponential smoothing factor for levels
-const BEAT_THRESHOLD = 1.4;       // Energy must be N× the running average
-const BEAT_COOLDOWN_MS = 120;     // Min ms between beats
+const SMOOTHING = 0.6;            // Exponential smoothing factor for levels (higher = more responsive)
+const BEAT_THRESHOLD = 1.3;       // Energy must be N× the running average
+const BEAT_COOLDOWN_MS = 100;     // Min ms between beats
 const ENERGY_HISTORY_LEN = 43;    // ~0.7s at 60fps for running average
 
 // ── Shared singleton tap ──────────────────────────────────────────────────────
@@ -91,6 +91,9 @@ function acquireAnalysers(): { waveform: AnalyserNode; fft: AnalyserNode } {
     // Side-branch tap: destInput → analyser (no output, doesn't affect audio)
     destInput.connect(sharedWaveformAnalyser);
     destInput.connect(sharedFFTAnalyser);
+    console.log('[AudioDataBus] Tapped native node:', destInput.constructor.name,
+      'channelCount:', destInput.channelCount,
+      'context state:', ctx.state);
   }
   sharedRefCount++;
   return { waveform: sharedWaveformAnalyser, fft: sharedFFTAnalyser };
@@ -161,6 +164,8 @@ export class AudioDataBus {
     }
   }
 
+  private _diagCounter = 0;
+
   /** Call once per rAF frame. Returns the current audio frame. */
   update(): VJAudioFrame {
     const now = performance.now();
@@ -187,20 +192,30 @@ export class AudioDataBus {
     }
     const rawRms = Math.sqrt(sumSq / waveform.length);
 
-    // Band energies from FFT (convert dB to linear 0..1)
+    // Band energies from FFT (convert dB to linear, use peak + average blend)
+    // Noise floor is ~-90dB, so use -80 as floor for better dynamic range
     let sub = 0, bass = 0, mid = 0, high = 0;
+    let subPk = 0, bassPk = 0, midPk = 0, highPk = 0;
     const halfBins = fft.length; // getFloatFrequencyData returns fftSize/2 bins
     for (let i = 0; i < halfBins; i++) {
-      const v = Math.max(0, (fft[i] + 100) / 100); // dB → 0..1
-      if (i < SUB_END) sub += v;
-      else if (i < BASS_END) bass += v;
-      else if (i < MID_END) mid += v;
-      else high += v;
+      const v = Math.max(0, (fft[i] + 80) / 80); // dB → 0..1 (floor at -80dB for more range)
+      if (i < SUB_END) { sub += v; if (v > subPk) subPk = v; }
+      else if (i < BASS_END) { bass += v; if (v > bassPk) bassPk = v; }
+      else if (i < MID_END) { mid += v; if (v > midPk) midPk = v; }
+      else { high += v; if (v > highPk) highPk = v; }
     }
-    sub /= SUB_END;
-    bass /= (BASS_END - SUB_END);
-    mid /= (MID_END - BASS_END);
-    high /= (halfBins - MID_END);
+    // Blend peak (60%) + average (40%) for each band — peaks give punch, average gives body
+    sub = (subPk * 0.6 + (sub / SUB_END) * 0.4);
+    bass = (bassPk * 0.6 + (bass / (BASS_END - SUB_END)) * 0.4);
+    mid = (midPk * 0.6 + (mid / (MID_END - BASS_END)) * 0.4);
+    high = (highPk * 0.6 + (high / (halfBins - MID_END)) * 0.4);
+
+    // Apply gain boost (typical music sits in 0.2-0.6 range, boost to fill 0-1)
+    const boost = 1.8;
+    sub = Math.min(1, sub * boost);
+    bass = Math.min(1, bass * boost);
+    mid = Math.min(1, mid * boost);
+    high = Math.min(1, high * boost);
 
     // Smooth all values
     const s = SMOOTHING;
@@ -229,6 +244,17 @@ export class AudioDataBus {
       now - this.lastBeatTime > BEAT_COOLDOWN_MS;
 
     if (beat) this.lastBeatTime = now;
+
+    // Periodic diagnostic (every ~2 seconds)
+    this._diagCounter++;
+    if (this._diagCounter % 120 === 0) {
+      console.log('[AudioDataBus] rms:', rawRms.toFixed(4),
+        'peak:', rawPeak.toFixed(4),
+        'sub:', sub.toFixed(3), 'bass:', bass.toFixed(3),
+        'mid:', mid.toFixed(3), 'high:', high.toFixed(3),
+        'fft[0..3]:', fft[0]?.toFixed(1), fft[1]?.toFixed(1), fft[2]?.toFixed(1), fft[3]?.toFixed(1),
+        'ctx:', this.waveformAnalyser?.context?.state);
+    }
 
     // Update frame
     this.frame.waveform = waveform;

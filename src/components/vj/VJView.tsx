@@ -472,6 +472,59 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   const [browserOpen, setBrowserOpen] = useState(false);
   const autoAdvanceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  // Audio debug meter
+  const debugBusRef = useRef<AudioDataBus | null>(null);
+  const debugCanvasRef = useRef<HTMLCanvasElement>(null);
+  const debugRafRef = useRef<number>(0);
+
+  useEffect(() => {
+    const bus = new AudioDataBus();
+    bus.enable();
+    debugBusRef.current = bus;
+    const canvas = debugCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const draw = () => {
+      const frame = bus.update();
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(0, 0, w, h);
+
+      const bars = [
+        { label: 'SUB', val: frame.subEnergy, color: '#f44' },
+        { label: 'BASS', val: frame.bassEnergy, color: '#f80' },
+        { label: 'MID', val: frame.midEnergy, color: '#ff0' },
+        { label: 'HIGH', val: frame.highEnergy, color: '#0f8' },
+        { label: 'RMS', val: frame.rms, color: '#08f' },
+        { label: 'PEAK', val: frame.peak, color: '#f0f' },
+      ];
+      const barW = (w - 8) / bars.length;
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      for (let i = 0; i < bars.length; i++) {
+        const x = 4 + i * barW;
+        const barH = Math.min(1, bars[i].val) * (h - 14);
+        ctx.fillStyle = bars[i].color;
+        ctx.fillRect(x + 1, h - 2 - barH, barW - 2, barH);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(bars[i].label, x + barW / 2, 10);
+      }
+      if (frame.beat) {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, 4, h);
+      }
+      debugRafRef.current = requestAnimationFrame(draw);
+    };
+    debugRafRef.current = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(debugRafRef.current);
+      bus.disable();
+    };
+  }, []);
+
   // ISF state
   const [isfPresetName, setISFPresetName] = useState('');
   const [isfPresetIdx, setISFPresetIdx] = useState(0);
@@ -580,6 +633,14 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
           />
         </React.Suspense>
       </div>
+      {/* Audio debug meter */}
+      <canvas
+        ref={debugCanvasRef}
+        width={180}
+        height={60}
+        className="absolute top-2 left-2 z-50 rounded"
+        style={{ imageRendering: 'pixelated' }}
+      />
       <VJControls
         currentName={currentName}
         currentIdx={currentIdx}
