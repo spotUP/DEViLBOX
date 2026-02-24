@@ -15,8 +15,8 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import * as Tone from 'tone';
 import { ProjectMEngine } from '@engine/vj/ProjectMEngine';
+import { AudioDataBus } from '@engine/vj/AudioDataBus';
 import type { VJCanvasHandle } from './VJView';
 
 // ── Built-in preset collection (Milkdrop .milk format strings) ──────────────
@@ -97,8 +97,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
     const currentIdxRef = useRef(0);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const analyserRef = useRef<AnalyserNode | null>(null);
-    const pcmBufferRef = useRef<Float32Array | null>(null);
+    const audioBusRef = useRef<AudioDataBus | null>(null);
 
     // Init — wait until canvas has real dimensions (layout complete)
     useEffect(() => {
@@ -124,17 +123,10 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
 
           engineRef.current = engine;
 
-          // Connect Web Audio analyser for PCM extraction
-          const ctx = Tone.getContext().rawContext as AudioContext;
-          const analyser = ctx.createAnalyser();
-          analyser.fftSize = 2048;
-          const dest = Tone.getDestination();
-          const nativeNode = (dest as any).output?.input || (dest as any)._gainNode || (dest as any).input;
-          if (nativeNode) {
-            try { nativeNode.connect(analyser); } catch { /* may already be connected */ }
-          }
-          analyserRef.current = analyser;
-          pcmBufferRef.current = new Float32Array(analyser.fftSize);
+          // Connect audio analysis via AudioDataBus (proven tap on Tone.Destination)
+          const bus = new AudioDataBus();
+          bus.enable();
+          audioBusRef.current = bus;
 
           // Load initial preset
           if (PRESET_NAMES.length > 0) {
@@ -161,6 +153,8 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
         cancelled = true;
         cancelAnimationFrame(raf);
         cancelAnimationFrame(rafRef.current);
+        audioBusRef.current?.disable();
+        audioBusRef.current = null;
         engineRef.current?.destroy();
         engineRef.current = null;
       };
@@ -171,18 +165,18 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       if (!ready) return;
       const render = () => {
         const engine = engineRef.current;
-        const analyser = analyserRef.current;
-        const buf = pcmBufferRef.current;
-        if (engine && analyser && buf) {
-          // Get PCM time-domain data and push to projectM
-          analyser.getFloatTimeDomainData(buf as Float32Array<ArrayBuffer>);
+        const bus = audioBusRef.current;
+        if (engine && bus) {
+          // Get audio frame from AudioDataBus (proven tap on Tone.Destination)
+          const frame = bus.update();
+          const waveform = frame.waveform;
           // Create stereo interleaved buffer (duplicate mono → stereo)
-          const stereo = new Float32Array(buf.length * 2);
-          for (let i = 0; i < buf.length; i++) {
-            stereo[i * 2] = buf[i];
-            stereo[i * 2 + 1] = buf[i];
+          const stereo = new Float32Array(waveform.length * 2);
+          for (let i = 0; i < waveform.length; i++) {
+            stereo[i * 2] = waveform[i];
+            stereo[i * 2 + 1] = waveform[i];
           }
-          engine.pushAudio(stereo, buf.length);
+          engine.pushAudio(stereo, waveform.length);
           engine.renderFrame();
         }
         rafRef.current = requestAnimationFrame(render);
