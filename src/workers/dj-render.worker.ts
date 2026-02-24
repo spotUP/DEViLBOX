@@ -118,13 +118,18 @@ async function initUADE(): Promise<void> {
   jsCode = jsCode.replace(/ENVIRONMENT_IS_WORKER\s*=\s*!1/g, 'ENVIRONMENT_IS_WORKER=true');
   jsCode = 'var document = { currentScript: { src: "' + baseUrl + '/uade/UADE.js" }, title: "" };\n' + jsCode;
 
-  // Execute the glue code to get factory function
-  const factory = new Function(jsCode + '\n;return typeof createUADE !== "undefined" ? createUADE : Module;')();
+  // Execute the glue code in global scope (same as worklet)
+  // eslint-disable-next-line no-eval
+  eval(jsCode);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const factory = (globalThis as any).createUADE || (globalThis as any).Module;
+  if (!factory) {
+    throw new Error('UADE factory not found after eval');
+  }
 
-  // Instantiate UADE WASM
+  // Instantiate UADE WASM (match worklet exactly)
   uadeInstance = await factory({
     wasmBinary,
-    noInitialRun: false,
     print: (msg: string) => console.log('[DJRenderWorker/UADE]', msg),
     printErr: (msg: string) => console.warn('[DJRenderWorker/UADE]', msg),
   });
