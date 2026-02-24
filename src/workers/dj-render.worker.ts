@@ -148,7 +148,10 @@ async function renderWithUADE(
   subsong: number,
   id: string,
 ): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
-  // Initialize UADE if needed (instance can be reused across renders)
+  // Force fresh UADE instance for each render — the IPC state machine
+  // gets corrupted after a render cycle and cannot be reused.
+  uadeReady = false;
+  uadeInstance = null;
   await initUADE();
   const wasm = uadeInstance;
 
