@@ -1,3 +1,4 @@
+/* @refresh reset */
 /**
  * MixerVestax3DView — 3D WebGL Vestax PMC-05 Pro III mixer for DJ mode.
  *
