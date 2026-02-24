@@ -245,12 +245,17 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
             value="dj"
             onChange={(e) => {
               const val = e.target.value;
-              if (val === 'arrangement') {
-                useUIStore.getState().setActiveView('arrangement');
-              } else if (val === 'drumpad') {
-                useUIStore.getState().setActiveView('drumpad');
-              } else if (val !== 'dj') {
-                useUIStore.getState().setActiveView('tracker');
+              if (val !== 'dj') {
+                // VJ is safe — DJ engine stays alive in background
+                if (val !== 'vj') {
+                  const { decks } = useDJStore.getState();
+                  const anyPlaying = decks.A.isPlaying || decks.B.isPlaying || decks.C.isPlaying;
+                  if (anyPlaying && !window.confirm('Audio is playing. Switch view? This will stop DJ playback.')) {
+                    e.target.value = 'dj';
+                    return;
+                  }
+                }
+                useUIStore.getState().setActiveView(val as any);
               }
             }}
             className="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-dark-bgTertiary text-text-muted border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer"
@@ -263,6 +268,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
             <option value="arrangement">Arrangement</option>
             <option value="dj">DJ Mixer</option>
             <option value="drumpad">Drum Pads</option>
+            <option value="vj">VJ View</option>
           </select>
           <div className="h-4 w-px bg-dark-border" />
           <span className="font-mono text-sm font-bold tracking-widest uppercase text-accent-primary">
