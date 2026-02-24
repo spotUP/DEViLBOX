@@ -152,7 +152,6 @@ export const useAudioStore = create<AudioStore>()(
 
     updateMasterEffect: (effectId, updates) =>
       set((state) => {
-        console.warn('[AudioStore] updateMasterEffect:', effectId, updates);
         const effect = state.masterEffects.find((e) => e.id === effectId);
         if (effect) {
           // Ensure defaults are populated for effects with sparse parameters
@@ -161,10 +160,16 @@ export const useAudioStore = create<AudioStore>()(
           }
           Object.assign(effect, updates);
 
+          // When `enabled` changes, a full rebuildMasterEffects is triggered by the
+          // masterEffectsKey useEffect in usePatternPlayback / DJView. Calling
+          // updateMasterEffectParams here would fail because disabled effects don't
+          // have Tone nodes. Skip the per-param update path for enable/disable toggles.
+          if ('enabled' in updates) return;
+
           // Clone before passing to ToneEngine — Immer revokes draft proxies after set()
           const effectCopy = JSON.parse(JSON.stringify(effect)) as EffectConfig;
 
-          // Notify ToneEngine to update effect
+          // Notify ToneEngine to update effect parameters
           const engine = get().toneEngineInstance;
           if (engine) {
             engine.updateMasterEffectParams(effectId, effectCopy);

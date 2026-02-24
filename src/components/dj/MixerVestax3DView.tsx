@@ -464,67 +464,62 @@ function MixerScene() {
     }
   });
 
-  // ── Interaction via DOM events + manual raycasting ──────────────────────────
-  // R3F pointer events don't propagate from Three.js objects inside <primitive>
-  // to React parent elements. We raycast manually on DOM pointer events instead.
+  // ── Interaction via R3F events on <primitive> + DOM drag continuation ────────
+  // R3F fires events on <primitive> children; e.object = the actual hit mesh.
+  // For continuous drag (mouse may leave the mesh), we use DOM pointer capture.
 
-  const { camera, gl, scene: r3fScene } = useThree();
-  const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const pointer = useMemo(() => new THREE.Vector2(), []);
+  const { gl } = useThree();
 
-  /** Raycast into the mixer scene and return the controlName of the hit mesh */
-  const raycastControl = useCallback(
-    (e: PointerEvent): string | null => {
-      const rect = gl.domElement.getBoundingClientRect();
-      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(pointer, camera);
-      // Raycast against the full R3F scene to pick up the scaled group
-      const hits = raycaster.intersectObjects(r3fScene.children, true);
-      for (const hit of hits) {
-        // Walk up parent chain to find controlName
-        let obj: THREE.Object3D | null = hit.object;
-        while (obj) {
-          const cn = obj.userData.controlName as string | undefined;
-          if (cn) return cn;
-          obj = obj.parent;
-        }
-      }
-      return null;
-    },
-    [camera, gl, raycaster, pointer, r3fScene]
-  );
+  /** Walk up from hit object to find the controlName in userData */
+  const findControl = useCallback((hitObj: THREE.Object3D): string | null => {
+    let obj: THREE.Object3D | null = hitObj;
+    while (obj) {
+      if (obj.userData.controlName) return obj.userData.controlName as string;
+      obj = obj.parent;
+    }
+    return null;
+  }, []);
 
+  const handlePointerDown = useCallback((e: { object: THREE.Object3D; nativeEvent: PointerEvent; stopPropagation: () => void }) => {
+    if (e.nativeEvent.button !== 0) return;
+    e.stopPropagation(); // prevent OrbitControls from capturing this click
+
+    const controlName = findControl(e.object);
+    if (!controlName) return;
+
+    // Buttons: toggle immediately
+    const button = buttonMap.get(controlName);
+    if (button) { button.action(); return; }
+
+    // Knobs/Faders: start drag
+    const knob = knobMap.get(controlName);
+    if (knob) {
+      activeKnobRef.current = controlName;
+      dragStartRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+      dragStartValueRef.current = knob.readValue();
+      gl.domElement.setPointerCapture(e.nativeEvent.pointerId);
+      return;
+    }
+    const fader = faderMap.get(controlName);
+    if (fader) {
+      activeFaderRef.current = controlName;
+      dragStartRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+      dragStartValueRef.current = fader.readValue();
+      gl.domElement.setPointerCapture(e.nativeEvent.pointerId);
+    }
+  }, [findControl, knobMap, faderMap, buttonMap, gl]);
+
+  const handleDblClick = useCallback((e: { object: THREE.Object3D; stopPropagation: () => void }) => {
+    e.stopPropagation();
+    const controlName = findControl(e.object);
+    if (!controlName) return;
+    const knob = knobMap.get(controlName);
+    if (knob) knob.action(knob.defaultValue);
+  }, [findControl, knobMap]);
+
+  // DOM listeners for drag continuation (pointermove/pointerup on canvas)
   useEffect(() => {
     const canvas = gl.domElement;
-
-    const onPointerDown = (e: PointerEvent) => {
-      console.log('[Mixer3D] raw pointerdown, button:', e.button);
-      if (e.button !== 0) return; // left-click only
-      const controlName = raycastControl(e);
-      console.log('[Mixer3D] pointerdown hit:', controlName);
-      if (!controlName) return;
-
-      const button = buttonMap.get(controlName);
-      if (button) { button.action(); return; }
-
-      const knob = knobMap.get(controlName);
-      if (knob) {
-        activeKnobRef.current = controlName;
-        dragStartRef.current = { x: e.clientX, y: e.clientY };
-        dragStartValueRef.current = knob.readValue();
-        canvas.setPointerCapture(e.pointerId);
-        return;
-      }
-
-      const fader = faderMap.get(controlName);
-      if (fader) {
-        activeFaderRef.current = controlName;
-        dragStartRef.current = { x: e.clientX, y: e.clientY };
-        dragStartValueRef.current = fader.readValue();
-        canvas.setPointerCapture(e.pointerId);
-      }
-    };
 
     const onPointerMove = (e: PointerEvent) => {
       const knobName = activeKnobRef.current;
@@ -533,12 +528,9 @@ function MixerScene() {
         if (!knob) return;
         const dy = dragStartRef.current.y - e.clientY;
         const delta = (dy / 200) * (knob.max - knob.min);
-        const newValue = Math.max(knob.min, Math.min(knob.max, dragStartValueRef.current + delta));
-        console.log('[Mixer3D] knob drag:', knobName, 'value:', newValue.toFixed(3));
-        knob.action(newValue);
+        knob.action(Math.max(knob.min, Math.min(knob.max, dragStartValueRef.current + delta)));
         return;
       }
-
       const faderName = activeFaderRef.current;
       if (faderName) {
         const fader = faderMap.get(faderName);
@@ -547,8 +539,7 @@ function MixerScene() {
           ? e.clientX - dragStartRef.current.x
           : dragStartRef.current.y - e.clientY;
         const delta = (d / 150) * (fader.max - fader.min);
-        const newValue = Math.max(fader.min, Math.min(fader.max, dragStartValueRef.current + delta));
-        fader.action(newValue);
+        fader.action(Math.max(fader.min, Math.min(fader.max, dragStartValueRef.current + delta)));
       }
     };
 
@@ -557,30 +548,21 @@ function MixerScene() {
       activeFaderRef.current = null;
     };
 
-    const onDblClick = (e: MouseEvent) => {
-      const controlName = raycastControl(e as unknown as PointerEvent);
-      if (!controlName) return;
-      const knob = knobMap.get(controlName);
-      if (knob) knob.action(knob.defaultValue);
-    };
-
-    canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
     canvas.addEventListener('pointerup', onPointerUp);
-    canvas.addEventListener('dblclick', onDblClick);
     return () => {
-      canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);
-      canvas.removeEventListener('dblclick', onDblClick);
     };
-  }, [gl, raycastControl, knobMap, faderMap, buttonMap]);
+  }, [gl, knobMap, faderMap]);
 
   return (
-    <group
-      scale={[MODEL_SCALE, MODEL_SCALE, MODEL_SCALE]}
-    >
-      <primitive object={sceneGroup} />
+    <group scale={[MODEL_SCALE, MODEL_SCALE, MODEL_SCALE]}>
+      <primitive
+        object={sceneGroup}
+        onPointerDown={handlePointerDown}
+        onDoubleClick={handleDblClick}
+      />
     </group>
   );
 }
