@@ -118,16 +118,11 @@ async function initUADE(): Promise<void> {
   jsCode = jsCode.replace(/ENVIRONMENT_IS_WORKER\s*=\s*!1/g, 'ENVIRONMENT_IS_WORKER=true');
   jsCode = 'var document = { currentScript: { src: "' + baseUrl + '/uade/UADE.js" }, title: "" };\n' + jsCode;
 
-  // Execute the glue code in global scope (same as worklet)
-  // eslint-disable-next-line no-eval
-  eval(jsCode);
+  // Execute the glue code to get factory function (same pattern as worklet)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const factory = (globalThis as any).createUADE || (globalThis as any).Module;
-  if (!factory) {
-    throw new Error('UADE factory not found after eval');
-  }
+  const factory = new Function(jsCode + '\n;return typeof createUADE !== "undefined" ? createUADE : Module;')();
 
-  // Instantiate UADE WASM (match worklet exactly)
+  // Instantiate UADE WASM
   uadeInstance = await factory({
     wasmBinary,
     print: (msg: string) => console.log('[DJRenderWorker/UADE]', msg),
@@ -153,11 +148,7 @@ async function renderWithUADE(
   subsong: number,
   id: string,
 ): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
-  // ALWAYS reinit UADE for each render to ensure clean state
-  // Reusing the instance causes it to return 1 frame per call
-  uadeReady = false;
-  uadeInstance = null;
-  
+  // Initialize UADE if needed (instance can be reused across renders)
   await initUADE();
   const wasm = uadeInstance;
 
@@ -235,50 +226,42 @@ async function renderWithUADE(
 
   const audioChunks: { left: Float32Array; right: Float32Array }[] = [];
   let totalFrames = 0;
-  let consecutiveZeros = 0;
   let trailingSilenceFrames = 0;
   const SILENCE_THRESHOLD = 0.0001;
   const MAX_SILENCE_SECONDS = 4;  // Allow more silence before stopping (MODs can have gaps)
   const MIN_RENDER_SECONDS = 1; // Minimum render time before considering silence
 
   while (totalFrames < maxFrames) {
+    // uade_wasm_render returns: 1 = success (buffer filled), 0 = song ended, -1 = error
+    // It does NOT return the number of frames! The buffer is always filled with CHUNK frames on success.
     const ret = wasm._uade_wasm_render(tmpL, tmpR, CHUNK);
     
-    if (ret <= 0) {
-      consecutiveZeros++;
-      // Be extremely patient during the first 5 seconds of the song.
-      // Some eagleplayers take time to start or have large gaps between initial bursts.
-      const maxPatience = totalFrames < (sampleRate * 5) ? 1000 : 20;
-      if (consecutiveZeros < maxPatience) {
-        continue;
-      }
-      console.log(`[DJRenderWorker/UADE] Stopping after ${consecutiveZeros} consecutive zero returns at ${totalFrames} frames`);
-      break; 
+    if (ret === 0) {
+      // Song ended naturally
+      console.log(`[DJRenderWorker/UADE] Song ended at ${totalFrames} frames (${(totalFrames/sampleRate).toFixed(1)}s)`);
+      break;
+    }
+    
+    if (ret < 0) {
+      console.warn(`[DJRenderWorker/UADE] Render error (ret=${ret}) at ${totalFrames} frames`);
+      break;
     }
 
     if (totalFrames === 0) {
-      console.log(`[DJRenderWorker/UADE] First audio frames received after ${consecutiveZeros} zero-returns. Chunk size: ${ret}`);
+      console.log(`[DJRenderWorker/UADE] First audio chunk received (${CHUNK} frames)`);
     }
-    
-    // Debug: log every chunk for first second
-    if (totalFrames < sampleRate) {
-      console.log(`[DJRenderWorker/UADE] Chunk ${audioChunks.length}: ret=${ret}, totalFrames=${totalFrames}`);
-    }
-    
-    consecutiveZeros = 0; // Reset on successful frame delivery
 
-    const leftData = new Float32Array(ret);
-    const rightData = new Float32Array(ret);
-    
-    // Copy from WASM heap (same approach as working UADE.worklet.js)
-    const heapL = new Float32Array(wasm.HEAPF32.buffer, tmpL, ret);
-    const heapR = new Float32Array(wasm.HEAPF32.buffer, tmpR, ret);
+    // Copy CHUNK frames from WASM heap (ret=1 means success, buffer has CHUNK frames)
+    const leftData = new Float32Array(CHUNK);
+    const rightData = new Float32Array(CHUNK);
+    const heapL = new Float32Array(wasm.HEAPF32.buffer, tmpL, CHUNK);
+    const heapR = new Float32Array(wasm.HEAPF32.buffer, tmpR, CHUNK);
     leftData.set(heapL);
     rightData.set(heapR);
 
     // Check for trailing silence to detect natural song end
     let isSilent = true;
-    for (let i = 0; i < ret; i++) {
+    for (let i = 0; i < CHUNK; i++) {
       if (Math.abs(leftData[i]) > SILENCE_THRESHOLD || Math.abs(rightData[i]) > SILENCE_THRESHOLD) {
         isSilent = false;
         break;
@@ -286,22 +269,18 @@ async function renderWithUADE(
     }
 
     if (isSilent && totalFrames > 0) {
-      trailingSilenceFrames += ret;
-      // Only stop for silence after we've rendered at least MIN_RENDER_SECONDS
+      trailingSilenceFrames += CHUNK;
       if (totalFrames > sampleRate * MIN_RENDER_SECONDS && 
           trailingSilenceFrames > sampleRate * MAX_SILENCE_SECONDS) {
         console.log(`[DJRenderWorker/UADE] Stopping render due to ${MAX_SILENCE_SECONDS}s trailing silence at ${(totalFrames/sampleRate).toFixed(2)}s`);
         break;
-      }
-      if (totalFrames < sampleRate) {
-        console.log(`[DJRenderWorker/UADE] Silent chunk at ${totalFrames} frames, ${trailingSilenceFrames} trailing silence frames`);
       }
     } else {
       trailingSilenceFrames = 0;
     }
 
     audioChunks.push({ left: leftData, right: rightData });
-    totalFrames += ret;
+    totalFrames += CHUNK;
 
     // Progress: 10-80% during render
     if (totalFrames % (sampleRate * 5) < CHUNK) {
@@ -314,7 +293,7 @@ async function renderWithUADE(
   wasm._free(tmpR);
 
   if (totalFrames === 0) {
-    throw new Error(`UADE rendered 0 frames for ${safeFilename} after ${consecutiveZeros} attempts`);
+    throw new Error(`UADE rendered 0 frames for ${safeFilename}`);
   }
 
   // Concatenate chunks
