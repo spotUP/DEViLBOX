@@ -2,7 +2,7 @@
  * VJ Scene type definitions and audio hooks for Three.js scenes.
  */
 
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { AudioDataBus, type VJAudioFrame } from '@engine/vj/AudioDataBus';
 
@@ -30,12 +30,16 @@ export function useVJAudio(): React.RefObject<VJAudioFrame | null> {
   const busRef = useRef<AudioDataBus | null>(null);
   const frameRef = useRef<VJAudioFrame | null>(null);
 
-  // Create bus once
+  // Create bus once (useMemo for synchronous init before first render)
   useMemo(() => {
     const bus = new AudioDataBus();
     bus.enable();
     busRef.current = bus;
-    return () => bus.disable();
+  }, []);
+
+  // Cleanup on unmount (useEffect handles cleanup, not useMemo)
+  useEffect(() => {
+    return () => busRef.current?.disable();
   }, []);
 
   // Update each frame
