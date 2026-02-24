@@ -22,7 +22,7 @@ import {
   Activity, LayoutGrid, Cpu, SlidersHorizontal,
 } from 'lucide-react';
 
-type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'arrangement' | 'dj' | 'drumpad';
+type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'arrangement' | 'dj' | 'drumpad' | 'vj';
 
 export interface EditorControlsBarProps {
   viewMode: ViewMode;
