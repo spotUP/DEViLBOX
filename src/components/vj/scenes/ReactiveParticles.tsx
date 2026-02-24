@@ -48,10 +48,13 @@ export const ReactiveParticles: React.FC<VJSceneProps> = ({ audioRef }) => {
 
     mat.uniforms.uTime.value = state.clock.elapsedTime;
     if (audio) {
-      mat.uniforms.uBass.value = audio.bassEnergy + audio.subEnergy * 0.5;
-      mat.uniforms.uMid.value = audio.midEnergy;
-      mat.uniforms.uHigh.value = audio.highEnergy;
-      mat.uniforms.uBeat.value = audio.beat ? 1.0 : mat.uniforms.uBeat.value * 0.9;
+      const bass = Math.min(1, (audio.bassEnergy + audio.subEnergy) * 2.5);
+      const mid = Math.min(1, audio.midEnergy * 3);
+      const high = Math.min(1, audio.highEnergy * 3);
+      mat.uniforms.uBass.value = bass;
+      mat.uniforms.uMid.value = mid;
+      mat.uniforms.uHigh.value = high;
+      mat.uniforms.uBeat.value = audio.beat ? 1.0 : mat.uniforms.uBeat.value * 0.85;
     }
 
     // Animate positions
@@ -69,8 +72,8 @@ export const ReactiveParticles: React.FC<VJSceneProps> = ({ audioRef }) => {
         // Pull back toward sphere
         const x = arr[i3], y = arr[i3 + 1], z = arr[i3 + 2];
         const dist = Math.sqrt(x * x + y * y + z * z);
-        const targetR = 2.0 + (audio?.bassEnergy || 0) * 1.5;
-        const pull = (dist - targetR) * 0.01;
+        const targetR = 2.0 + (audio?.bassEnergy || 0) * 3.0;
+        const pull = (dist - targetR) * 0.015;
         arr[i3] -= (x / dist) * pull;
         arr[i3 + 1] -= (y / dist) * pull;
         arr[i3 + 2] -= (z / dist) * pull;
@@ -99,7 +102,7 @@ export const ReactiveParticles: React.FC<VJSceneProps> = ({ audioRef }) => {
             vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
             float dist = length(position);
             vLife = 1.0 - smoothstep(1.0, 4.0, dist);
-            gl_PointSize = (3.0 + uBass * 4.0 + uBeat * 2.0) * (300.0 / -mvPos.z);
+            gl_PointSize = (4.0 + uBass * 8.0 + uBeat * 4.0) * (300.0 / -mvPos.z);
             gl_Position = projectionMatrix * mvPos;
           }
         `}
