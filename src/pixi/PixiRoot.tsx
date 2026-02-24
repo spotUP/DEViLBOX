@@ -19,6 +19,7 @@ import { PixiTrackerView } from './views/PixiTrackerView';
 import { PixiDJView } from './views/PixiDJView';
 import { PixiArrangementView } from './views/PixiArrangementView';
 import { PixiPianoRollView } from './views/PixiPianoRollView';
+import { PixiVJView } from './views/PixiVJView';
 import { PixiDOMOverlay } from './components/PixiDOMOverlay';
 import { PixiPeerCursor } from './views/collaboration/PixiPeerCursor';
 import { CollaborationToolbar } from '@components/collaboration/CollaborationToolbar';
@@ -64,6 +65,7 @@ const PixiViewContent: React.FC<{
   if (view === 'arrangement') return <PixiArrangementView />;
   if (view === 'dj') return <PixiDJView />;
   if (view === 'pianoroll') return <PixiPianoRollView />;
+  if (view === 'vj') return <PixiVJView />;
   return null;
 };
 

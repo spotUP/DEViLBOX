@@ -606,6 +606,7 @@ const _LegacyPixiEditorControlsBar: React.FC<EditorControlsBarOverlayProps> = ({
           <option value="arrangement">Arrangement</option>
           <option value="dj">DJ Mixer</option>
           <option value="drumpad">Drum Pads</option>
+          <option value="vj">VJ View</option>
         </select>
       </PixiDOMOverlay>
 

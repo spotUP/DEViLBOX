@@ -65,8 +65,8 @@ interface UIStore {
   scratchAcceleration: boolean; // Scroll acceleration for scratch (true = smoothed, false = raw 1:1)
   platterMass: number; // Turntable platter mass 0-1 (0=CDJ light, 0.5=Technics 1200, 1=heavy)
 
-  // View switching (tracker vs arrangement vs DJ vs drum pads vs piano roll)
-  activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll';
+  // View switching (tracker vs arrangement vs DJ vs drum pads vs piano roll vs VJ)
+  activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj';
 
   // Pop-out window state
   tb303PoppedOut: boolean;
@@ -76,6 +76,7 @@ interface UIStore {
   pianoRollPoppedOut: boolean;
   oscilloscopePoppedOut: boolean;
   arrangementPoppedOut: boolean;
+  vjPoppedOut: boolean;
 
   // Transient UI state (not persisted)
   statusMessage: string;
@@ -120,7 +121,7 @@ interface UIStore {
   setPlatterMass: (mass: number) => void;
 
   // View switching actions
-  setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll') => void;
+  setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj') => void;
   toggleActiveView: () => void;
 
   // Pop-out window actions
@@ -131,6 +132,7 @@ interface UIStore {
   setPianoRollPoppedOut: (v: boolean) => void;
   setOscilloscopePoppedOut: (v: boolean) => void;
   setArrangementPoppedOut: (v: boolean) => void;
+  setVJPoppedOut: (v: boolean) => void;
 
   // Module import actions
   setPendingModuleFile: (file: File | null) => void;
@@ -194,6 +196,7 @@ export const useUIStore = create<UIStore>()(
       pianoRollPoppedOut: false,
       oscilloscopePoppedOut: false,
       arrangementPoppedOut: false,
+      vjPoppedOut: false,
 
       // Transient state
       statusMessage: 'All Right',
@@ -448,6 +451,11 @@ export const useUIStore = create<UIStore>()(
       setArrangementPoppedOut: (v) =>
         set((state) => {
           state.arrangementPoppedOut = v;
+        }),
+
+      setVJPoppedOut: (v) =>
+        set((state) => {
+          state.vjPoppedOut = v;
         }),
 
       // Module import actions
