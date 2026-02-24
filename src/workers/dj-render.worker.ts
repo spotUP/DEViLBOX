@@ -215,6 +215,15 @@ async function renderWithUADE(
   // (disabling looping causes some MODs to stop at first pattern end)
   wasm._uade_wasm_set_looping(1);
 
+  // CRITICAL: After changing looping mode, we need to restart playback
+  // or the setting won't take effect on already-loaded modules
+  if (wasm._uade_wasm_stop) {
+    wasm._uade_wasm_stop();
+  }
+  
+  // Give time for the looping change to propagate before rendering
+  await new Promise(resolve => setTimeout(resolve, 100));
+
   postProgress(id, 10);
 
   // Render loop
