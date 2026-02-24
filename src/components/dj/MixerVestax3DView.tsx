@@ -12,7 +12,7 @@
  */
 
 import { useRef, useEffect, useCallback, useMemo } from 'react';
-import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore, type DeckId } from '@/stores/useDJStore';
@@ -455,95 +455,112 @@ function MixerScene() {
     }
   });
 
-  // ── Interaction Handlers ──────────────────────────────────────────────────
+  // ── Interaction via DOM events + manual raycasting ──────────────────────────
+  // R3F pointer events don't propagate from Three.js objects inside <primitive>
+  // to React parent elements. We raycast manually on DOM pointer events instead.
 
-  const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
-    e.stopPropagation();
-    const mesh = e.object as THREE.Mesh;
-    const controlName = mesh.userData.controlName as string | undefined;
-    if (!controlName) return;
+  const { camera, gl, scene: r3fScene } = useThree();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const pointer = useMemo(() => new THREE.Vector2(), []);
 
-    // Check if it's a knob or fader
-    const knob = knobMap.get(controlName);
-    const fader = faderMap.get(controlName);
-    const button = buttonMap.get(controlName);
+  /** Raycast into the mixer scene and return the controlName of the hit mesh */
+  const raycastControl = useCallback(
+    (e: PointerEvent): string | null => {
+      const rect = gl.domElement.getBoundingClientRect();
+      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(sceneGroup.children, true);
+      for (const hit of hits) {
+        const cn = hit.object.userData.controlName as string | undefined;
+        if (cn) return cn;
+      }
+      return null;
+    },
+    [camera, gl, raycaster, pointer, sceneGroup]
+  );
 
-    if (button) {
-      button.action();
-      return;
-    }
+  useEffect(() => {
+    const canvas = gl.domElement;
 
-    if (knob) {
-      activeKnobRef.current = controlName;
-      dragStartRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
-      dragStartValueRef.current = knob.readValue();
-      (e.nativeEvent.target as HTMLElement)?.setPointerCapture?.(e.nativeEvent.pointerId);
-    } else if (fader) {
-      activeFaderRef.current = controlName;
-      dragStartRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
-      dragStartValueRef.current = fader.readValue();
-      (e.nativeEvent.target as HTMLElement)?.setPointerCapture?.(e.nativeEvent.pointerId);
-    }
-  }, [knobMap, faderMap, buttonMap]);
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return; // left-click only
+      const controlName = raycastControl(e);
+      if (!controlName) return;
 
-  const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
-    const knobName = activeKnobRef.current;
-    const faderName = activeFaderRef.current;
+      const button = buttonMap.get(controlName);
+      if (button) { button.action(); return; }
 
-    if (knobName) {
-      const knob = knobMap.get(knobName);
-      if (!knob) return;
+      const knob = knobMap.get(controlName);
+      if (knob) {
+        activeKnobRef.current = controlName;
+        dragStartRef.current = { x: e.clientX, y: e.clientY };
+        dragStartValueRef.current = knob.readValue();
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
 
-      // Vertical drag maps to value change (drag up = increase)
-      const dy = dragStartRef.current.y - e.nativeEvent.clientY;
-      const sensitivity = 200; // pixels for full range
-      const delta = (dy / sensitivity) * (knob.max - knob.min);
-      const newValue = Math.max(knob.min, Math.min(knob.max, dragStartValueRef.current + delta));
-      knob.action(newValue);
-    }
+      const fader = faderMap.get(controlName);
+      if (fader) {
+        activeFaderRef.current = controlName;
+        dragStartRef.current = { x: e.clientX, y: e.clientY };
+        dragStartValueRef.current = fader.readValue();
+        canvas.setPointerCapture(e.pointerId);
+      }
+    };
 
-    if (faderName) {
-      const fader = faderMap.get(faderName);
-      if (!fader) return;
+    const onPointerMove = (e: PointerEvent) => {
+      const knobName = activeKnobRef.current;
+      if (knobName) {
+        const knob = knobMap.get(knobName);
+        if (!knob) return;
+        const dy = dragStartRef.current.y - e.clientY;
+        const delta = (dy / 200) * (knob.max - knob.min);
+        const newValue = Math.max(knob.min, Math.min(knob.max, dragStartValueRef.current + delta));
+        knob.action(newValue);
+        return;
+      }
 
-      // Map drag direction to fader axis
-      const d = fader.axis === 'x'
-        ? e.nativeEvent.clientX - dragStartRef.current.x
-        : dragStartRef.current.y - e.nativeEvent.clientY; // Y inverted: drag up = increase
+      const faderName = activeFaderRef.current;
+      if (faderName) {
+        const fader = faderMap.get(faderName);
+        if (!fader) return;
+        const d = fader.axis === 'x'
+          ? e.clientX - dragStartRef.current.x
+          : dragStartRef.current.y - e.clientY;
+        const delta = (d / 150) * (fader.max - fader.min);
+        const newValue = Math.max(fader.min, Math.min(fader.max, dragStartValueRef.current + delta));
+        fader.action(newValue);
+      }
+    };
 
-      const sensitivity = 150;
-      const delta = (d / sensitivity) * (fader.max - fader.min);
-      const newValue = Math.max(fader.min, Math.min(fader.max, dragStartValueRef.current + delta));
-      fader.action(newValue);
-    }
-  }, [knobMap, faderMap]);
+    const onPointerUp = () => {
+      activeKnobRef.current = null;
+      activeFaderRef.current = null;
+    };
 
-  const handlePointerUp = useCallback(() => {
-    activeKnobRef.current = null;
-    activeFaderRef.current = null;
-  }, []);
+    const onDblClick = (e: MouseEvent) => {
+      const controlName = raycastControl(e as unknown as PointerEvent);
+      if (!controlName) return;
+      const knob = knobMap.get(controlName);
+      if (knob) knob.action(knob.defaultValue);
+    };
 
-  const handleDoubleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation();
-    const mesh = e.object as THREE.Mesh;
-    const controlName = mesh.userData.controlName as string | undefined;
-    if (!controlName) return;
-
-    // Double-click resets knob to default
-    const knob = knobMap.get(controlName);
-    if (knob) {
-      knob.action(knob.defaultValue);
-    }
-  }, [knobMap]);
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('dblclick', onDblClick);
+    return () => {
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('dblclick', onDblClick);
+    };
+  }, [gl, raycastControl, knobMap, faderMap, buttonMap]);
 
   return (
     <group
       scale={[MODEL_SCALE, MODEL_SCALE, MODEL_SCALE]}
-      rotation={[0, 0, 0]}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onDoubleClick={handleDoubleClick}
     >
       <primitive object={sceneGroup} />
     </group>
