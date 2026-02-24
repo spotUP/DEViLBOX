@@ -77,6 +77,7 @@ interface FaderControl {
   readValue: () => number;
   min: number;
   max: number;
+  defaultValue: number; // value at rest position in the 3D model
 }
 
 /** What a button controls */
@@ -274,28 +275,28 @@ function MixerScene() {
     const faders: FaderControl[] = [
       {
         meshName: 'exp_fader1', label: 'CH1 Volume',
-        axis: 'z',
+        axis: 'z', defaultValue: 1,
         action: (v) => { store().setDeckVolume('A', v); try { getDJEngine().getDeck('A').setVolume(v); } catch {} },
         readValue: () => store().decks.A.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader1', label: 'CH2 Volume',
-        axis: 'z',
+        axis: 'z', defaultValue: 1,
         action: (v) => { store().setDeckVolume('B', v); try { getDJEngine().getDeck('B').setVolume(v); } catch {} },
         readValue: () => store().decks.B.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader4', label: 'Master Volume',
-        axis: 'z',
+        axis: 'z', defaultValue: 1,
         action: (v) => { store().setMasterVolume(v); try { getDJEngine().getMixer().setMasterGain(v); } catch {} },
         readValue: () => store().masterVolume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'hfader1', label: 'Crossfader',
-        axis: 'x',
+        axis: 'x', defaultValue: 0.5,
         action: (v) => {
           const hamster = store().hamsterSwitch;
           const pos = hamster ? 1 - v : v;
@@ -311,7 +312,7 @@ function MixerScene() {
       },
       {
         meshName: 'exp_hfader1', label: 'Crossfader Alt',
-        axis: 'x',
+        axis: 'x', defaultValue: 0.5,
         action: (v) => {
           const hamster = store().hamsterSwitch;
           const pos = hamster ? 1 - v : v;
@@ -480,12 +481,14 @@ function MixerScene() {
       const value = control.readValue();
       const normalized = (value - control.min) / (control.max - control.min);
 
-      // Fader slides along its axis
-      const offset = (normalized - 0.5) * (control.axis === 'x' ? HFADER_TRAVEL : VFADER_TRAVEL);
+      // Offset relative to default position (rest position in 3D model = defaultValue)
+      const defaultNorm = (control.defaultValue - control.min) / (control.max - control.min);
+      const delta = normalized - defaultNorm;
+      const travel = control.axis === 'x' ? HFADER_TRAVEL : VFADER_TRAVEL;
       if (control.axis === 'x') {
-        _faderTransMat.makeTranslation(offset, 0, 0);
+        _faderTransMat.makeTranslation(delta * travel, 0, 0);
       } else {
-        _faderTransMat.makeTranslation(0, 0, -offset);
+        _faderTransMat.makeTranslation(0, 0, -delta * travel);
       }
 
       for (let i = 0; i < entry.meshes.length; i++) {
