@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-24T05:53:54.972Z
+ * Generated: 2026-02-24T08:56:22.144Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1167';
-export const BUILD_NUMBER = '1167';
-export const BUILD_HASH = '2a751792';
+export const BUILD_VERSION = '1.0.1178';
+export const BUILD_NUMBER = '1178';
+export const BUILD_HASH = '5ab5bfed';
 export const BUILD_DATE = '2026-02-24';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,53 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1167',
+    version: '1.0.1178',
     date: '2026-02-24',
     changes: [
+      {
+        type: 'feature',
+        "description": "Modland browser keyboard navigation + deck 3 button"
+      },
+      {
+        type: 'fix',
+        "description": "Restore tracker visuals in audio mode"
+      },
+      {
+        type: 'fix',
+        "description": "UADE panning 1.0 = mono, not 0.0"
+      },
+      {
+        type: 'fix',
+        "description": "Restore fresh UADE init per render — IPC corrupts on reuse"
+      },
+      {
+        type: 'feature',
+        "description": "UADE renders mono via panning=0.0, WAV encodes mono"
+      },
+      {
+        type: 'fix',
+        "description": "Uade_wasm_render returns 1=success, not frame count"
+      },
+      {
+        type: 'fix',
+        "description": "Match worklet UADE instantiation exactly"
+      },
+      {
+        type: 'fix',
+        "description": "Force fresh UADE instance for each render"
+      },
+      {
+        type: 'fix',
+        "description": "Use HEAPF32.buffer approach matching working UADE worklet"
+      },
+      {
+        type: 'fix',
+        "description": "Revert to looping disabled, increase silence tolerance"
+      },
+      {
+        type: 'fix',
+        "description": "Remove stop() call that was corrupting UADE IPC"
+      },
       {
         type: 'fix',
         "description": "Restart UADE playback after setting looping mode"
@@ -194,50 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Integrate DJ audio routing with tracker and export"
-      },
-      {
-        type: 'feature',
-        "description": "Add comprehensive keyboard shortcuts and inline sampler"
-      },
-      {
-        type: 'feature',
-        "description": "Add mixer controls with EQ, filter, VU meters, and transitions"
-      },
-      {
-        type: 'feature',
-        "description": "Add frequency-colored waveforms and 3D vinyl visualization"
-      },
-      {
-        type: 'feature',
-        "description": "Add deck controls with hot cues, loops, and FX pads"
-      },
-      {
-        type: 'feature',
-        "description": "Update core DJ view layout and file browser"
-      },
-      {
-        type: 'feature',
-        "description": "Add beat sync, quantized FX, and beat jump utilities"
-      },
-      {
-        type: 'feature',
-        "description": "Enhance DJ store and audio engine with advanced features"
-      },
-      {
-        type: 'feature',
-        "description": "Add DJ pipeline orchestrator with render and analysis workers"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: gitignore turntable source models and backup files"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: tracker UI tweaks, import fixes, engine updates, and changelog"
-      },
-      {
-        type: 'improvement',
-        "description": "Update Pixi DJ/tracker views, navigation, theming, and performance"
       }
     ]
   }
