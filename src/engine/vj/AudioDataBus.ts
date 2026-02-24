@@ -1,16 +1,21 @@
 /**
- * VJ AudioDataBus — Enhanced audio analysis for VJ visualizations.
+ * VJ AudioDataBus — Zero-latency audio analysis for VJ visualizations.
  *
- * Wraps ToneEngine's analyser/FFT with:
+ * Uses native Web Audio AnalyserNodes tapped directly from Tone.js destination
+ * (the final mix point before hardware output). This captures ALL audio —
+ * tracker, DJ mixer, synths — regardless of which engine is playing.
+ *
+ * Features:
  * - Beat detection (energy threshold + debounce)
  * - Band energy extraction (sub, bass, mid, high)
  * - RMS / peak with exponential smoothing
  * - Frame-rate independent timing
+ * - No Tone.js Analyser wrapper overhead (native getFloatTimeDomainData)
  *
  * All data is computed once per frame and cached until next update().
  */
 
-import { getToneEngine } from '../ToneEngine';
+import * as Tone from 'tone';
 
 export interface VJAudioFrame {
   /** Raw waveform samples (-1..1), 1024 length */
@@ -38,15 +43,69 @@ export interface VJAudioFrame {
 }
 
 // FFT bin ranges (assuming 44100 Hz sample rate, 1024 bins → ~21.5 Hz per bin)
-const SUB_END = 3;     // ~0-65 Hz
-const BASS_END = 12;   // ~65-258 Hz
-const MID_END = 186;   // ~258-4000 Hz
+const FFT_SIZE = 2048;  // 1024 frequency bins
+const SUB_END = 3;      // ~0-65 Hz
+const BASS_END = 12;    // ~65-258 Hz
+const MID_END = 186;    // ~258-4000 Hz
 // HIGH = 186..512
 
 const SMOOTHING = 0.3;            // Exponential smoothing factor for levels
 const BEAT_THRESHOLD = 1.4;       // Energy must be N× the running average
 const BEAT_COOLDOWN_MS = 120;     // Min ms between beats
 const ENERGY_HISTORY_LEN = 43;    // ~0.7s at 60fps for running average
+
+// ── Shared singleton tap ──────────────────────────────────────────────────────
+// One pair of native AnalyserNodes shared across all AudioDataBus instances.
+// Taps from Tone.Destination's input GainNode — captures ALL audio (tracker + DJ).
+
+let sharedWaveformAnalyser: AnalyserNode | null = null;
+let sharedFFTAnalyser: AnalyserNode | null = null;
+let sharedRefCount = 0;
+
+function acquireAnalysers(): { waveform: AnalyserNode; fft: AnalyserNode } {
+  if (sharedRefCount === 0 || !sharedWaveformAnalyser || !sharedFFTAnalyser) {
+    const ctx = Tone.getContext().rawContext as AudioContext;
+
+    // Tone.Destination wraps a GainNode → AudioContext.destination.
+    // All audio (tracker masterChannel, DJ limiter, synths) connects to this GainNode.
+    const dest = Tone.getDestination();
+    const destInput: AudioNode =
+      (dest as any).output?.input ??
+      (dest as any)._gainNode ??
+      (dest as any).input;
+
+    if (!destInput) {
+      throw new Error('[AudioDataBus] Cannot find Tone.Destination native input node');
+    }
+
+    // Waveform analyser — zero smoothing for instantaneous response
+    sharedWaveformAnalyser = ctx.createAnalyser();
+    sharedWaveformAnalyser.fftSize = FFT_SIZE;
+    sharedWaveformAnalyser.smoothingTimeConstant = 0;
+
+    // FFT analyser — slight smoothing for visual stability
+    sharedFFTAnalyser = ctx.createAnalyser();
+    sharedFFTAnalyser.fftSize = FFT_SIZE;
+    sharedFFTAnalyser.smoothingTimeConstant = 0.4;
+
+    // Side-branch tap: destInput → analyser (no output, doesn't affect audio)
+    destInput.connect(sharedWaveformAnalyser);
+    destInput.connect(sharedFFTAnalyser);
+  }
+  sharedRefCount++;
+  return { waveform: sharedWaveformAnalyser, fft: sharedFFTAnalyser };
+}
+
+function releaseAnalysers(): void {
+  sharedRefCount--;
+  if (sharedRefCount <= 0) {
+    sharedRefCount = 0;
+    try { sharedWaveformAnalyser?.disconnect(); } catch { /* */ }
+    try { sharedFFTAnalyser?.disconnect(); } catch { /* */ }
+    sharedWaveformAnalyser = null;
+    sharedFFTAnalyser = null;
+  }
+}
 
 export class AudioDataBus {
   private startTime = performance.now();
@@ -60,10 +119,15 @@ export class AudioDataBus {
   private energyHistory: number[] = [];
   private lastBeatTime = 0;
   private enabled = false;
+  private waveformAnalyser: AnalyserNode | null = null;
+  private fftAnalyser: AnalyserNode | null = null;
+  // Pre-allocated typed arrays (avoid GC pressure in render loop)
+  private waveformBuf = new Float32Array(FFT_SIZE);
+  private fftBuf = new Float32Array(FFT_SIZE / 2);
 
   private frame: VJAudioFrame = {
-    waveform: new Float32Array(1024),
-    fft: new Float32Array(1024),
+    waveform: new Float32Array(FFT_SIZE),
+    fft: new Float32Array(FFT_SIZE / 2),
     rms: 0,
     peak: 0,
     subEnergy: 0,
@@ -77,14 +141,22 @@ export class AudioDataBus {
 
   enable(): void {
     if (!this.enabled) {
-      getToneEngine().enableAnalysers();
-      this.enabled = true;
+      try {
+        const analysers = acquireAnalysers();
+        this.waveformAnalyser = analysers.waveform;
+        this.fftAnalyser = analysers.fft;
+        this.enabled = true;
+      } catch (e) {
+        console.warn('[AudioDataBus] enable failed:', e);
+      }
     }
   }
 
   disable(): void {
     if (this.enabled) {
-      getToneEngine().disableAnalysers();
+      releaseAnalysers();
+      this.waveformAnalyser = null;
+      this.fftAnalyser = null;
       this.enabled = false;
     }
   }
@@ -95,9 +167,14 @@ export class AudioDataBus {
     const dt = (now - this.lastTime) / 1000;
     this.lastTime = now;
 
-    const engine = getToneEngine();
-    const waveform = engine.getWaveform();
-    const fft = engine.getFFT();
+    if (!this.waveformAnalyser || !this.fftAnalyser) return this.frame;
+
+    // Read raw data directly from native AnalyserNodes (zero-copy into pre-allocated buffers)
+    this.waveformAnalyser.getFloatTimeDomainData(this.waveformBuf);
+    this.fftAnalyser.getFloatFrequencyData(this.fftBuf);
+
+    const waveform = this.waveformBuf;
+    const fft = this.fftBuf;
 
     // RMS + peak from waveform
     let sumSq = 0;
@@ -112,7 +189,7 @@ export class AudioDataBus {
 
     // Band energies from FFT (convert dB to linear 0..1)
     let sub = 0, bass = 0, mid = 0, high = 0;
-    const halfBins = fft.length >> 1; // Only use first half (Nyquist)
+    const halfBins = fft.length; // getFloatFrequencyData returns fftSize/2 bins
     for (let i = 0; i < halfBins; i++) {
       const v = Math.max(0, (fft[i] + 100) / 100); // dB → 0..1
       if (i < SUB_END) sub += v;
