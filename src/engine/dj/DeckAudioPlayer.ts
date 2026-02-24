@@ -29,6 +29,9 @@ export class DeckAudioPlayer {
   private _loaded = false;
   private _playbackRate = 1;
 
+  // Pending seek offset for when player is stopped
+  private _pendingOffset: number | null = null;
+
   // Audio loop region (seconds)
   private _loopIn: number | null = null;
   private _loopOut: number | null = null;
@@ -97,7 +100,12 @@ export class DeckAudioPlayer {
 
     // Tiny fade-in (10ms) to prevent DC offset clicks/ticks
     this.player.fadeIn = 0.01;
-    this.player.start();
+    if (this._pendingOffset !== null) {
+      this.player.start(undefined, this._pendingOffset);
+      this._pendingOffset = null;
+    } else {
+      this.player.start();
+    }
   }
 
   pause(): void {
@@ -112,6 +120,7 @@ export class DeckAudioPlayer {
       this.player.fadeOut = 0.01;
       this.player.stop();
     }
+    this._pendingOffset = null;
     this.player.seek(0);
   }
 
@@ -120,13 +129,13 @@ export class DeckAudioPlayer {
    */
   seek(seconds: number): void {
     const wasPlaying = this.player.state === 'started';
+    const clamped = Math.max(0, Math.min(seconds, this._duration));
     if (wasPlaying) {
       this.player.stop();
-    }
-    const clamped = Math.max(0, Math.min(seconds, this._duration));
-    this.player.seek(clamped);
-    if (wasPlaying) {
-      this.player.start();
+      this.player.start(undefined, clamped);
+    } else {
+      // Tone.Player.seek() only works during playback — store offset for next start()
+      this._pendingOffset = clamped;
     }
   }
 
@@ -148,6 +157,8 @@ export class DeckAudioPlayer {
    */
   getPosition(): number {
     if (!this._loaded) return 0;
+    // If we have a pending seek offset (player is stopped), return that
+    if (this._pendingOffset !== null) return this._pendingOffset;
     // Tone.Player doesn't expose a clean position getter,
     // but we can calculate from the buffer source's progress
     try {
