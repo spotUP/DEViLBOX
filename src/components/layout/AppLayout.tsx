@@ -45,7 +45,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 }) => {
   const { isMobile } = useResponsive();
   const activeView = useUIStore((s) => s.activeView);
-  const isFullscreenView = activeView === 'dj' || activeView === 'drumpad';
+  const isFullscreenView = activeView === 'dj' || activeView === 'drumpad' || activeView === 'vj';
 
   return (
     <div className="h-screen w-screen flex flex-col bg-dark-bg text-text-primary overflow-hidden">

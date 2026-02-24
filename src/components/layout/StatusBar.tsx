@@ -177,7 +177,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) =
   return (
     <div className="flex flex-col">
       {/* MIDI Knob Controls - Expanded (tracker/arrangement only) */}
-      {activeView !== 'dj' && hasMIDIDevice && showKnobBar && (
+      {activeView !== 'dj' && activeView !== 'vj' && hasMIDIDevice && showKnobBar && (
         <div className="bg-dark-bgTertiary border-t border-dark-border px-4 py-2 flex flex-col gap-2">
           {/* Bank Tabs */}
           <div className="flex items-center gap-1">
@@ -227,12 +227,17 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) =
       {/* Main Status Bar */}
       <div className="bg-dark-bgSecondary border-t border-dark-border flex items-center justify-between px-4 py-1.5 text-xs font-mono">
         {/* Left: View-specific content */}
-        {activeView === 'dj' ? <DJStatusContent /> : <TrackerStatusContent />}
+        {activeView === 'dj' ? <DJStatusContent /> : activeView === 'vj' ? (
+          <div className="flex items-center gap-3 text-text-muted">
+            <span className="text-accent">VJ</span>
+            <span className="text-[10px]">Esc: back • ⌘⇧V: toggle • Milkdrop | ISF | 3D</span>
+          </div>
+        ) : <TrackerStatusContent />}
 
         {/* Right: MIDI Device, Audio State & Tips */}
         <div className="flex items-center gap-4">
           {/* MIDI Device Status */}
-          {hasMIDIDevice && activeView !== 'dj' && (
+          {hasMIDIDevice && activeView !== 'dj' && activeView !== 'vj' && (
             <>
               <button
                 onClick={() => setShowKnobBar(!showKnobBar)}

@@ -289,6 +289,7 @@ export const PixiArrangementView: React.FC = () => {
             <option value="pianoroll">Piano Roll</option>
             <option value="dj">DJ Mixer</option>
             <option value="drumpad">Drum Pads</option>
+            <option value="vj">VJ View</option>
           </select>
         </PixiDOMOverlay>
 
