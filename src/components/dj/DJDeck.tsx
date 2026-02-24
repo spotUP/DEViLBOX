@@ -61,11 +61,18 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
           if (deck.audioPlayer.isCurrentlyPlaying()) {
             const pos = deck.audioPlayer.getPosition();
             const dur = deck.audioPlayer.getDuration();
-            store.setDeckState(deckId, {
+            const update: Record<string, unknown> = {
               audioPosition: pos,
               elapsedMs: pos * 1000,
               durationMs: dur * 1000,
-            });
+            };
+            // Derive pattern position from audio time for pre-rendered modules
+            const tp = deck.getPositionAtTime(pos * 1000);
+            if (tp) {
+              update.songPos = tp.songPos;
+              update.pattPos = tp.pattPos;
+            }
+            store.setDeckState(deckId, update);
           }
           // Detect end of audio playback
           if (!deck.audioPlayer.isCurrentlyPlaying() && store.decks[deckId].isPlaying) {
