@@ -9,6 +9,7 @@ import { TrackerView } from '@components/tracker/TrackerView';
 import { StatusBar } from '@components/layout/StatusBar';
 import { useAudioStore, useTrackerStore, useUIStore } from './stores';
 import { useMIDIStore } from './stores/useMIDIStore';
+import { useDJStore } from './stores/useDJStore';
 import { useSettingsStore } from './stores/useSettingsStore';
 import { useHistoryStore } from './stores/useHistoryStore';
 import { useLiveModeStore } from './stores/useLiveModeStore';
@@ -56,6 +57,7 @@ const PianoRoll = lazy(() => import('./components/pianoroll/PianoRoll').then(m =
 const OscilloscopePopout = lazy(() => import('./components/visualization/OscilloscopePopout').then(m => ({ default: m.OscilloscopePopout })));
 const ArrangementView = lazy(() => import('./components/arrangement').then(m => ({ default: m.ArrangementView })));
 const DJView = lazy(() => import('./components/dj/DJView').then(m => ({ default: m.DJView })));
+const VJView = lazy(() => import('./components/vj/VJView').then(m => ({ default: m.VJView })));
 const FileBrowser = lazy(() => import('@components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser })));
 const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => ({ default: m.AuthModal })));
 const SettingsModal = lazy(() => import('@components/dialogs/SettingsModal').then(m => ({ default: m.SettingsModal })));
@@ -89,6 +91,7 @@ function App() {
     pianoRollPoppedOut, setPianoRollPoppedOut,
     oscilloscopePoppedOut, setOscilloscopePoppedOut,
     arrangementPoppedOut, setArrangementPoppedOut,
+    vjPoppedOut, setVJPoppedOut,
     showFileBrowser, setShowFileBrowser,
   } = useUIStore();
   const collabStatus = useCollaborationStore((s) => s.status);
@@ -99,6 +102,7 @@ function App() {
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
   const [pendingSongFile, setPendingSongFile] = useState<File | null>(null);
   const [showSongLoadConfirm, setShowSongLoadConfirm] = useState(false);
+  const djModeActive = useDJStore(s => s.djModeActive);
 
   // Modal state from store (single source of truth for DOM + WebGL)
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -251,12 +255,13 @@ function App() {
         return;
       }
 
-      // Escape: Close modals (highest priority)
+      // Escape: Close modals (highest priority), or exit fullscreen views
       if (e.key === 'Escape') {
         e.preventDefault();
         const state = useUIStore.getState();
         if (state.modalOpen) state.closeModal();
         else if (state.showPatterns) state.togglePatterns();
+        else if (state.activeView === 'vj' || state.activeView === 'drumpad') state.setActiveView('tracker');
         return;
       }
 
@@ -293,6 +298,14 @@ function App() {
         e.preventDefault();
         const uiStore = useUIStore.getState();
         uiStore.setActiveView(uiStore.activeView === 'dj' ? 'tracker' : 'dj');
+        return;
+      }
+
+      // Ctrl+Shift+V: Toggle VJ View
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'V') {
+        e.preventDefault();
+        const uiStore = useUIStore.getState();
+        uiStore.setActiveView(uiStore.activeView === 'vj' ? 'tracker' : 'vj');
         return;
       }
 
@@ -616,6 +629,21 @@ function App() {
               </PopOutWindow>
             </Suspense>
           )}
+          {vjPoppedOut && (
+            <Suspense fallback={null}>
+              <PopOutWindow
+                isOpen={true}
+                onClose={() => setVJPoppedOut(false)}
+                title="DEViLBOX — VJ"
+                width={1280}
+                height={720}
+              >
+                <div className="h-screen w-screen bg-black">
+                  <VJView isPopout />
+                </div>
+              </PopOutWindow>
+            </Suspense>
+          )}
         </GlobalDragDropHandler>
       </Suspense>
     );
@@ -814,9 +842,11 @@ function App() {
               </Suspense>
             )}
 
-            {activeView === 'dj' && (
+            {(activeView === 'dj' || (activeView === 'vj' && djModeActive)) && (
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading DJ mode...</div>}>
-                <DJView onShowDrumpads={() => openModal('drumpads')} />
+                <div style={{ display: activeView === 'dj' ? 'contents' : 'none' }}>
+                  <DJView onShowDrumpads={() => openModal('drumpads')} />
+                </div>
               </Suspense>
             )}
 
@@ -829,6 +859,12 @@ function App() {
             {activeView === 'pianoroll' && (
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading piano roll...</div>}>
                 <PianoRoll />
+              </Suspense>
+            )}
+
+            {activeView === 'vj' && (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted bg-black">Loading VJ...</div>}>
+                <VJView />
               </Suspense>
             )}
           </div>
