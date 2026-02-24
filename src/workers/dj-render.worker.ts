@@ -264,11 +264,11 @@ async function renderWithUADE(
     const leftData = new Float32Array(ret);
     const rightData = new Float32Array(ret);
     
-    // Use HEAPF32.subarray for safe memory access (avoids issues if WASM memory grows)
-    const baseL = tmpL >> 2;
-    const baseR = tmpR >> 2;
-    leftData.set(wasm.HEAPF32.subarray(baseL, baseL + ret));
-    rightData.set(wasm.HEAPF32.subarray(baseR, baseR + ret));
+    // Copy from WASM heap (same approach as working UADE.worklet.js)
+    const heapL = new Float32Array(wasm.HEAPF32.buffer, tmpL, ret);
+    const heapR = new Float32Array(wasm.HEAPF32.buffer, tmpR, ret);
+    leftData.set(heapL);
+    rightData.set(heapR);
 
     // Check for trailing silence to detect natural song end
     let isSilent = true;
