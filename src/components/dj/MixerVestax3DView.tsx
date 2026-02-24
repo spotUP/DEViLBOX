@@ -42,6 +42,7 @@ const _knobRotMat = new THREE.Matrix4();
 const _knobTransMat = new THREE.Matrix4();
 const _knobInvTransMat = new THREE.Matrix4();
 const _knobCompositeMat = new THREE.Matrix4();
+const _faderTransMat = new THREE.Matrix4();
 
 /** Compute rotation matrix around a Y-axis pivot point (model is Y-up) */
 function makeRotationAroundPivotY(angle: number, pivot: THREE.Vector3, out: THREE.Matrix4): void {
@@ -402,15 +403,14 @@ function MixerScene() {
 
       // Fader slides along its axis
       const offset = (normalized - 0.5) * (control.axis === 'x' ? HFADER_TRAVEL : VFADER_TRAVEL);
-      const translation = new THREE.Matrix4();
       if (control.axis === 'x') {
-        translation.makeTranslation(offset, 0, 0);
+        _faderTransMat.makeTranslation(offset, 0, 0);
       } else {
-        translation.makeTranslation(0, 0, offset);
+        _faderTransMat.makeTranslation(0, 0, offset);
       }
 
       for (const mesh of entry.meshes) {
-        mesh.matrix.copy(entry.restMatrix).multiply(translation);
+        mesh.matrix.copy(entry.restMatrix).multiply(_faderTransMat);
       }
     }
 
@@ -552,16 +552,25 @@ function MixerScene() {
 
 export function MixerVestax3DView() {
   return (
-    <div className="w-full h-full bg-black rounded-lg overflow-hidden">
+    <div className="w-full h-full min-h-[200px]" style={{ touchAction: 'none' }}>
       <Canvas
-        camera={{ fov: 40, near: 0.01, far: 20, position: [0, 0.4, 0.25] }}
-        gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
+        camera={{
+          position: [0, 0.35, 0.3],
+          fov: 42,
+          near: 0.01,
+          far: 10,
+        }}
+        gl={{ alpha: true, antialias: true }}
         style={{ background: 'transparent' }}
+        onCreated={({ gl }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.2;
+        }}
       >
         <ambientLight intensity={0.4} />
-        <directionalLight position={[2, 4, 2]} intensity={0.8} />
+        <directionalLight position={[2, 4, 2]} intensity={0.8} castShadow={false} />
         <directionalLight position={[-1, 2, -1]} intensity={0.3} />
-        <pointLight position={[0, 0.1, 0]} color="#60a5fa" intensity={0.3} distance={0.5} />
+        <pointLight position={[0, 0.05, 0]} color="#60a5fa" intensity={0.4} distance={0.5} />
 
         <MixerScene />
 
@@ -573,7 +582,7 @@ export function MixerVestax3DView() {
           maxPolarAngle={Math.PI * 0.6}
           minDistance={0.15}
           maxDistance={0.8}
-          target={[0, -0.1, 0]}
+          target={[0, -0.05, 0]}
         />
       </Canvas>
     </div>
