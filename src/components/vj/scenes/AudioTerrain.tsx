@@ -40,15 +40,18 @@ export const AudioTerrain: React.FC<VJSceneProps> = ({ audioRef }) => {
 
     mat.uniforms.uTime.value = state.clock.elapsedTime;
     if (audio) {
-      mat.uniforms.uBass.value += (audio.bassEnergy - mat.uniforms.uBass.value) * 0.15;
-      mat.uniforms.uMid.value += (audio.midEnergy - mat.uniforms.uMid.value) * 0.15;
-      mat.uniforms.uHigh.value += (audio.highEnergy - mat.uniforms.uHigh.value) * 0.15;
-      mat.uniforms.uBeat.value = audio.beat ? 1.0 : mat.uniforms.uBeat.value * 0.92;
+      const bass = Math.min(1, (audio.bassEnergy + audio.subEnergy) * 2.5);
+      const mid = Math.min(1, audio.midEnergy * 3);
+      const high = Math.min(1, audio.highEnergy * 3);
+      mat.uniforms.uBass.value += (bass - mat.uniforms.uBass.value) * 0.3;
+      mat.uniforms.uMid.value += (mid - mat.uniforms.uMid.value) * 0.3;
+      mat.uniforms.uHigh.value += (high - mat.uniforms.uHigh.value) * 0.3;
+      mat.uniforms.uBeat.value = audio.beat ? 1.0 : mat.uniforms.uBeat.value * 0.88;
     }
 
     // Move camera forward
     state.camera.position.z = -5 + Math.sin(state.clock.elapsedTime * 0.2) * 2;
-    state.camera.position.y = 3 + (audio?.bassEnergy || 0) * 1.5;
+    state.camera.position.y = 3 + (audio?.bassEnergy || 0) * 4;
     state.camera.lookAt(0, 0, 5);
   });
 
@@ -75,17 +78,17 @@ export const AudioTerrain: React.FC<VJSceneProps> = ({ audioRef }) => {
             vec3 pos = position;
             
             // Bass: large rolling waves
-            float bass = sin(pos.z * 0.5 + uTime * 2.0) * uBass * 2.0;
-            bass += cos(pos.x * 0.3 + uTime) * uBass * 1.0;
+            float bass = sin(pos.z * 0.5 + uTime * 2.0) * uBass * 4.0;
+            bass += cos(pos.x * 0.3 + uTime) * uBass * 2.0;
             
             // Mid: medium detail
-            float mid = noise(pos.xz * 0.5) * uMid * 1.0;
+            float mid = noise(pos.xz * 0.5) * uMid * 2.5;
             
             // High: fine shimmer
-            float high = sin(pos.x * 3.0 + pos.z * 2.0 + uTime * 4.0) * uHigh * 0.3;
+            float high = sin(pos.x * 3.0 + pos.z * 2.0 + uTime * 4.0) * uHigh * 0.8;
             
             // Beat: pulse
-            float beat = sin(length(pos.xz) * 2.0 - uTime * 6.0) * uBeat * 0.5;
+            float beat = sin(length(pos.xz) * 2.0 - uTime * 6.0) * uBeat * 1.5;
             
             pos.y += bass + mid + high + beat;
             vHeight = pos.y;
