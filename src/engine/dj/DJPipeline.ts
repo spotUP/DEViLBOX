@@ -80,7 +80,7 @@ function encodePCMToWAV(
   right: Float32Array,
   sampleRate: number,
 ): ArrayBuffer {
-  const numChannels = 2;
+  const numChannels = 1; // Mono — mix L+R for DJ use
   const bitsPerSample = 16;
   const numSamples = left.length;
   const dataSize = numSamples * numChannels * (bitsPerSample / 8);
@@ -107,14 +107,11 @@ function encodePCMToWAV(
   writeString(view, 36, 'data');
   view.setUint32(40, dataSize, true);
 
-  // Interleave stereo samples as 16-bit
+  // Write mono 16-bit (UADE renders with panning=0.0 so L≡R)
   let offset = 44;
   for (let i = 0; i < numSamples; i++) {
-    const l = Math.max(-1, Math.min(1, left[i]));
-    const r = Math.max(-1, Math.min(1, right[i]));
-    view.setInt16(offset, l < 0 ? l * 0x8000 : l * 0x7FFF, true);
-    offset += 2;
-    view.setInt16(offset, r < 0 ? r * 0x8000 : r * 0x7FFF, true);
+    const s = Math.max(-1, Math.min(1, left[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
     offset += 2;
   }
 
