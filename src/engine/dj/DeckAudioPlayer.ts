@@ -36,7 +36,7 @@ export class DeckAudioPlayer {
 
   constructor(outputNode: Tone.ToneAudioNode) {
     this.player = new Tone.Player({
-      loop: false,
+      loop: true,
       autostart: false,
     });
     this.player.connect(outputNode);
@@ -166,7 +166,8 @@ export class DeckAudioPlayer {
               if (evt.state === 'started') {
                 const elapsed = (now - evt.time) * this._playbackRate;
                 const offset = evt.offset || 0;
-                return Math.min(offset + elapsed, this._duration);
+                const raw = offset + elapsed;
+                return this._duration > 0 ? raw % this._duration : 0;
               }
             }
           }
