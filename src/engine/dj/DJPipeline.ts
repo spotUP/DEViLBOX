@@ -16,7 +16,7 @@
  * @module DJPipeline
  */
 
-import { getCachedAudio, cacheAudio, updateCacheAnalysis } from './DJAudioCache';
+import { getCachedAudio, cacheAudio, updateCacheAnalysis, hashFile } from './DJAudioCache';
 import { useDJStore } from '@/stores/useDJStore';
 import type { DeckId } from './DeckEngine';
 import { getDJEngineIfActive } from './DJEngine';
@@ -188,6 +188,9 @@ export class DJPipeline {
     resolve: (result: PipelineResult['analysis']) => void;
     reject: (err: Error) => void;
   }>();
+
+  // In-flight render dedup: hash → promise (prevents re-rendering the same file concurrently)
+  private inflight = new Map<string, Promise<PipelineResult>>();
 
   constructor() {
     this.initWorkers();
@@ -450,8 +453,19 @@ export class DJPipeline {
       }
     }
 
+    // Dedup: if the same file is already being rendered, piggyback on that promise
+    const hash = await hashFile(fileBuffer);
+    const existing = this.inflight.get(hash);
+    if (existing) {
+      console.log(`[DJPipeline] In-flight dedup hit for ${filename} — waiting for existing render`);
+      return existing;
+    }
+
     // Full render + analysis needed
-    return this.renderAndAnalyze(fileBuffer, filename, deckId, priority);
+    const promise = this.renderAndAnalyze(fileBuffer, filename, deckId, priority);
+    this.inflight.set(hash, promise);
+    promise.finally(() => this.inflight.delete(hash));
+    return promise;
   }
 
   /** Number of queued tasks (not counting current). */
