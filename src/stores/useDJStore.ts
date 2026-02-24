@@ -210,6 +210,7 @@ interface DJState {
   hamsterSwitch: boolean; // Reverse crossfader direction
   masterVolume: number;
   boothVolume: number; // Booth/monitor output 0-1.5
+  sessionMonitorVolume: number; // Session/CF monitor output 0-1.5
   cueMix: number; // Headphone cue/mix blend: 0=cue only, 1=master only
   jogWheelSensitivity: number; // 0.5-2.0x multiplier (1.0 = default)
 
@@ -238,6 +239,7 @@ interface DJActions {
   setHamsterSwitch: (enabled: boolean) => void;
   setMasterVolume: (volume: number) => void;
   setBoothVolume: (volume: number) => void;
+  setSessionMonitorVolume: (volume: number) => void;
   setCueMix: (mix: number) => void;
   setJogWheelSensitivity: (multiplier: number) => void;
 
@@ -301,6 +303,7 @@ export const useDJStore = create<DJStore>()(
     hamsterSwitch: false,
     masterVolume: 1,
     boothVolume: 1,
+    sessionMonitorVolume: 1,
     cueMix: 0.5,
     jogWheelSensitivity: 1.0, // default 1.0x
 
@@ -368,6 +371,11 @@ export const useDJStore = create<DJStore>()(
     setBoothVolume: (volume) =>
       set((state) => {
         state.boothVolume = Math.max(0, Math.min(1.5, volume));
+      }),
+
+    setSessionMonitorVolume: (volume) =>
+      set((state) => {
+        state.sessionMonitorVolume = Math.max(0, Math.min(1.5, volume));
       }),
 
     setCueMix: (mix) =>
