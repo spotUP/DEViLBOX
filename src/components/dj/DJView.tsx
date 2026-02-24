@@ -5,7 +5,7 @@
  * Inspired by Pioneer DJM-900 hardware mixer aesthetic.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine, disposeDJEngine } from '@/engine/dj/DJEngine';
 import { clearSongCache } from '@/engine/dj/DJSongCache';
@@ -27,6 +27,8 @@ import { DJSamplerPanel } from './DJSamplerPanel';
 import { useDJKeyboardHandler } from './DJKeyboardHandler';
 import type { SeratoTrack } from '@/lib/serato';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
+
+const MixerVestax3DView = lazy(() => import('./MixerVestax3DView'));
 
 // ============================================================================
 // MAIN DJ VIEW
@@ -432,8 +434,12 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
       {/* ================================================================== */}
       <div className={`flex-1 grid gap-2 p-2 overflow-hidden min-h-0 ${
         thirdDeckActive
-          ? 'grid-cols-[1fr_280px_1fr_1fr]'
-          : 'grid-cols-[1fr_280px_1fr]'
+          ? deckViewMode === '3d'
+            ? 'grid-cols-[1fr_1fr_1fr_1fr]'
+            : 'grid-cols-[1fr_280px_1fr_1fr]'
+          : deckViewMode === '3d'
+            ? 'grid-cols-[1fr_1fr_1fr]'
+            : 'grid-cols-[1fr_280px_1fr]'
       }`}>
         {/* ---- Deck A (left) ---- */}
         <div className="min-h-0 min-w-0 overflow-hidden">
@@ -442,7 +448,13 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
 
         {/* ---- Center Mixer ---- */}
         <div className="min-h-0 min-w-0 overflow-hidden">
-          <DJMixer />
+          {deckViewMode === '3d' ? (
+            <Suspense fallback={<div className="w-full h-full bg-black flex items-center justify-center text-text-muted text-xs">Loading 3D mixer...</div>}>
+              <MixerVestax3DView />
+            </Suspense>
+          ) : (
+            <DJMixer />
+          )}
         </div>
 
         {/* ---- Deck B (right) ---- */}
