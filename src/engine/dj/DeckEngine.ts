@@ -443,6 +443,24 @@ export class DeckEngine {
     return times;
   }
 
+  /** Map elapsed ms to { songPos, pattPos } using the pre-built time index */
+  getPositionAtTime(ms: number): { songPos: number; pattPos: number } | null {
+    const song = this.replayer.getSong();
+    if (!song || this.songTimeIndex.length <= 1) return null;
+    let lo = 0, hi = this.songTimeIndex.length - 2;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if ((this.songTimeIndex[mid] ?? 0) <= ms) lo = mid; else hi = mid - 1;
+    }
+    const songPos = lo;
+    const rowMs = ((song.initialSpeed ?? 6) * 2.5 / (song.initialBPM ?? 125)) * 1000;
+    const rowsIn = Math.max(0, Math.floor((ms - (this.songTimeIndex[songPos] ?? 0)) / rowMs));
+    const patternIdx = song.songPositions[songPos];
+    const pattern = song.patterns[patternIdx];
+    const pattPos = Math.min(rowsIn, (pattern?.length ?? 64) - 1);
+    return { songPos, pattPos };
+  }
+
   /** Returns effective BPM: replayer BPM × tempo multiplier */
   getEffectiveBPM(): number {
     return this.replayer.getBPM() * this.replayer.getTempoMultiplier();
