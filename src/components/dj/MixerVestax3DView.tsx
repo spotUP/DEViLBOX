@@ -322,13 +322,16 @@ function MixerScene() {
     }>();
 
     // Classify meshes
+    let meshCount = 0;
     cloned.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return;
-      const sName = simplifyName(child.name);
+      if (!('isMesh' in child && child.isMesh)) return;
+      meshCount++;
+      const mesh = child as THREE.Mesh;
+      const sName = simplifyName(mesh.name);
 
       // Compute bounding box center
-      child.geometry.computeBoundingBox();
-      const box = child.geometry.boundingBox!;
+      mesh.geometry.computeBoundingBox();
+      const box = mesh.geometry.boundingBox!;
       const center = new THREE.Vector3();
       box.getCenter(center);
 
@@ -349,34 +352,31 @@ function MixerScene() {
       // Group meshes by simplified name (some names appear multiple times for multi-material)
       const existing = registry.get(sName);
       if (existing) {
-        existing.meshes.push(child);
+        existing.meshes.push(mesh);
       } else {
         registry.set(sName, {
-          meshes: [child],
+          meshes: [mesh],
           center,
           type,
-          restMatrix: child.matrix.clone(),
+          restMatrix: mesh.matrix.clone(),
         });
       }
 
       // Disable auto-update on interactive meshes for manual matrix control
       if (type === 'knob' || type === 'fader' || type === 'hfader') {
-        child.matrixAutoUpdate = false;
+        mesh.matrixAutoUpdate = false;
       }
 
       // Make interactive meshes have pointer cursor
       if (type !== 'static' && type !== 'vu') {
-        child.userData.interactive = true;
-        child.userData.controlName = sName;
+        mesh.userData.interactive = true;
+        mesh.userData.controlName = sName;
       }
     });
 
-    // Debug: log classified controls
+    // Log classified controls
     const interactiveCount = [...registry.entries()].filter(([, v]) => v.type !== 'static').length;
-    console.log('[Mixer3D] classified', registry.size, 'mesh groups,', interactiveCount, 'interactive');
-    for (const [name, entry] of registry) {
-      if (entry.type !== 'static') console.log('  ', name, '→', entry.type, '(' + entry.meshes.length + ' meshes)');
-    }
+    console.log(`[Mixer3D] ${meshCount} meshes, ${registry.size} groups, ${interactiveCount} interactive`);
 
     return { sceneGroup: cloned, meshRegistry: registry };
   }, [gltfScene]);
@@ -482,7 +482,7 @@ function MixerScene() {
 
   const handlePointerDown = useCallback((e: { object: THREE.Object3D; nativeEvent: PointerEvent; stopPropagation: () => void }) => {
     if (e.nativeEvent.button !== 0) return;
-    e.stopPropagation(); // prevent OrbitControls from capturing this click
+    e.stopPropagation();
 
     const controlName = findControl(e.object);
     if (!controlName) return;
@@ -497,7 +497,6 @@ function MixerScene() {
       activeKnobRef.current = controlName;
       dragStartRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
       dragStartValueRef.current = knob.readValue();
-      gl.domElement.setPointerCapture(e.nativeEvent.pointerId);
       return;
     }
     const fader = faderMap.get(controlName);
@@ -505,9 +504,8 @@ function MixerScene() {
       activeFaderRef.current = controlName;
       dragStartRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
       dragStartValueRef.current = fader.readValue();
-      gl.domElement.setPointerCapture(e.nativeEvent.pointerId);
     }
-  }, [findControl, knobMap, faderMap, buttonMap, gl]);
+  }, [findControl, knobMap, faderMap, buttonMap]);
 
   const handleDblClick = useCallback((e: { object: THREE.Object3D; stopPropagation: () => void }) => {
     e.stopPropagation();
@@ -517,10 +515,10 @@ function MixerScene() {
     if (knob) knob.action(knob.defaultValue);
   }, [findControl, knobMap]);
 
-  // DOM listeners for drag continuation (pointermove/pointerup on canvas)
+  // DOM listeners for drag continuation (pointermove/pointerup on document)
+  // Using document-level listeners ensures we get events even if R3F's event
+  // system intercepts canvas events during raycasting.
   useEffect(() => {
-    const canvas = gl.domElement;
-
     const onPointerMove = (e: PointerEvent) => {
       const knobName = activeKnobRef.current;
       if (knobName) {
@@ -528,7 +526,8 @@ function MixerScene() {
         if (!knob) return;
         const dy = dragStartRef.current.y - e.clientY;
         const delta = (dy / 200) * (knob.max - knob.min);
-        knob.action(Math.max(knob.min, Math.min(knob.max, dragStartValueRef.current + delta)));
+        const newVal = Math.max(knob.min, Math.min(knob.max, dragStartValueRef.current + delta));
+        knob.action(newVal);
         return;
       }
       const faderName = activeFaderRef.current;
@@ -544,15 +543,17 @@ function MixerScene() {
     };
 
     const onPointerUp = () => {
-      activeKnobRef.current = null;
-      activeFaderRef.current = null;
+      if (activeKnobRef.current || activeFaderRef.current) {
+        activeKnobRef.current = null;
+        activeFaderRef.current = null;
+      }
     };
 
-    canvas.addEventListener('pointermove', onPointerMove);
-    canvas.addEventListener('pointerup', onPointerUp);
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
     return () => {
-      canvas.removeEventListener('pointermove', onPointerMove);
-      canvas.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
     };
   }, [gl, knobMap, faderMap]);
 
