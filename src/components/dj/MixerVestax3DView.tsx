@@ -33,11 +33,11 @@ const KNOB_MIN_ANGLE = -Math.PI * 0.75; // -135°
 const KNOB_MAX_ANGLE = Math.PI * 0.75;  // +135°
 const KNOB_RANGE = KNOB_MAX_ANGLE - KNOB_MIN_ANGLE;
 
-// Fader travel (model units along Z-axis for vertical faders)
-const VFADER_TRAVEL = 1.5;
+// Fader travel (model units)
+const VFADER_TRAVEL = 4.0;
 
-// Crossfader travel (model units along X-axis)
-const HFADER_TRAVEL = 1.5;
+// Crossfader travel (model units)
+const HFADER_TRAVEL = 4.0;
 
 // Pre-allocated matrices for per-frame rotation
 const _knobRotMat = new THREE.Matrix4();
@@ -72,7 +72,8 @@ interface KnobControl {
 interface FaderControl {
   meshName: string;
   label: string;
-  axis: 'x' | 'z'; // which axis the fader travels on
+  axis: 'x' | 'z'; // 3D translation axis
+  dragAxis: 'x' | 'y'; // mouse drag axis: 'x'=horizontal, 'y'=vertical
   action: (value: number) => void;
   readValue: () => number;
   min: number;
@@ -250,9 +251,9 @@ function MixerScene() {
 
       // Far-right — headphone / monitor
       {
-        meshName: 'knob14', label: 'Monitor Level',
-        action: (v) => store().setBoothVolume(v),
-        readValue: () => store().boothVolume,
+        meshName: 'knob14', label: 'CF Monitor',
+        action: (v) => store().setSessionMonitorVolume(v),
+        readValue: () => store().sessionMonitorVolume,
         min: 0, max: 1.5, defaultValue: 1,
       },
       {
@@ -275,28 +276,28 @@ function MixerScene() {
     const faders: FaderControl[] = [
       {
         meshName: 'exp_fader1', label: 'CH1 Volume',
-        axis: 'z', defaultValue: 1,
+        axis: 'z', dragAxis: 'y', defaultValue: 1,
         action: (v) => { store().setDeckVolume('A', v); try { getDJEngine().getDeck('A').setVolume(v); } catch {} },
         readValue: () => store().decks.A.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader1', label: 'CH2 Volume',
-        axis: 'z', defaultValue: 1,
+        axis: 'z', dragAxis: 'y', defaultValue: 1,
         action: (v) => { store().setDeckVolume('B', v); try { getDJEngine().getDeck('B').setVolume(v); } catch {} },
         readValue: () => store().decks.B.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader4', label: 'Master Volume',
-        axis: 'z', defaultValue: 1,
+        axis: 'z', dragAxis: 'y', defaultValue: 1,
         action: (v) => { store().setMasterVolume(v); try { getDJEngine().getMixer().setMasterGain(v); } catch {} },
         readValue: () => store().masterVolume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'hfader1', label: 'Crossfader',
-        axis: 'x', defaultValue: 0.5,
+        axis: 'z', dragAxis: 'x', defaultValue: 0.5,
         action: (v) => {
           const hamster = store().hamsterSwitch;
           const pos = hamster ? 1 - v : v;
@@ -312,7 +313,7 @@ function MixerScene() {
       },
       {
         meshName: 'exp_hfader1', label: 'Crossfader Alt',
-        axis: 'x', defaultValue: 0.5,
+        axis: 'z', dragAxis: 'x', defaultValue: 0.5,
         action: (v) => {
           const hamster = store().hamsterSwitch;
           const pos = hamster ? 1 - v : v;
@@ -622,7 +623,7 @@ function MixerScene() {
       if (faderName) {
         const fader = faderMap.get(faderName);
         if (!fader) return;
-        const d = fader.axis === 'x'
+        const d = fader.dragAxis === 'x'
           ? e.clientX - dragStartRef.current.x
           : dragStartRef.current.y - e.clientY;
         const delta = (d / 150) * (fader.max - fader.min);
