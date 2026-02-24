@@ -290,7 +290,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         // Render FIRST, then load audio directly (eliminates tracker bugs)
         try {
           const result = await getDJPipeline().loadOrEnqueue(moduleBuffer, file.name, deckId, 'high');
-          await engine.loadAudioToDeck(deckId, result.wavData, file.name, song.name || file.name, result.analysis?.bpm || bpmResult.bpm);
+          await engine.loadAudioToDeck(deckId, result.wavData, file.name, song.name || file.name, result.analysis?.bpm || bpmResult.bpm, song);
           
           // Switch to visualizer view for modules
           useDJStore.getState().setDeckViewMode('visualizer');

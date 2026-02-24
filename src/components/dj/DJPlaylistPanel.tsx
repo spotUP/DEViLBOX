@@ -151,7 +151,7 @@ export const DJPlaylistPanel: React.FC<DJPlaylistPanelProps> = ({ onClose }) => 
 
         try {
           const result = await getDJPipeline().loadOrEnqueue(rawBuffer, fileName, deckId, 'high');
-          await engine.loadAudioToDeck(deckId, result.wavData, fileName, song.name || fileName, result.analysis?.bpm || bpmResult.bpm);
+          await engine.loadAudioToDeck(deckId, result.wavData, fileName, song.name || fileName, result.analysis?.bpm || bpmResult.bpm, song);
           useDJStore.getState().setDeckViewMode('visualizer');
           console.log(`[DJPlaylistPanel] Loaded ${fileName} in audio mode (skipped tracker bugs)`);
         } catch (err) {

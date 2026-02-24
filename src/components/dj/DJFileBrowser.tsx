@@ -137,7 +137,7 @@ export const DJFileBrowser: React.FC<DJFileBrowserProps> = ({ onClose }) => {
           });
 
           const result = await getDJPipeline().loadOrEnqueue(file.rawBuffer, file.name, deckId, 'high');
-          await engine.loadAudioToDeck(deckId, result.wavData, file.name, file.song.name || file.name, result.analysis?.bpm || file.bpm);
+          await engine.loadAudioToDeck(deckId, result.wavData, file.name, file.song.name || file.name, result.analysis?.bpm || file.bpm, file.song);
           useDJStore.getState().setDeckViewMode('visualizer');
           console.log(`[DJFileBrowser] Loaded ${file.name} in audio mode (skipped tracker bugs)`);
         }
