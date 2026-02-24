@@ -525,6 +525,7 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
         ref={orbitRef}
         enablePan={false}
         enableZoom={false}
+        enableRotate={false}
         enableDamping
         dampingFactor={0.1}
         minPolarAngle={Math.PI * 0.05}
@@ -534,7 +535,7 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
         mouseButtons={{
           LEFT: undefined as unknown as THREE.MOUSE,
           MIDDLE: undefined as unknown as THREE.MOUSE,
-          RIGHT: THREE.MOUSE.ROTATE,
+          RIGHT: undefined as unknown as THREE.MOUSE,
         }}
       />
     </>
