@@ -6,6 +6,7 @@
  * which is posted back as Float32Array transferables.
  *
  * Format routing:
+ *   - AHX, HVL → HivelyTracker WASM engine
  *   - MOD + exotic Amiga formats → UADE engine
  *   - XM, IT, S3M + other PC formats → libopenmpt engine
  *
@@ -83,10 +84,20 @@ const AMIGA_EXTENSIONS = new Set([
   'tp', 'tp1', 'tp2', 'tp3', 'un2', 'unic', 'unic2', 'wn', 'xan', 'xann',
 ]);
 
+/** HivelyTracker formats — these have a dedicated WASM replayer, don't route to UADE */
+const HIVELY_EXTENSIONS = new Set(['ahx', 'hvl']);
+
 /** Check if a filename should use UADE (Amiga formats) vs libopenmpt (PC formats) */
 function isAmigaFormat(filename: string): boolean {
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  if (HIVELY_EXTENSIONS.has(ext)) return false; // handled by Hively renderer
   return AMIGA_EXTENSIONS.has(ext);
+}
+
+/** Check if a filename should use the HivelyTracker WASM renderer */
+function isHivelyFormat(filename: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  return HIVELY_EXTENSIONS.has(ext);
 }
 
 // ── UADE Engine State ────────────────────────────────────────────────────────
@@ -324,6 +335,139 @@ async function renderWithUADE(
   return { left, right, sampleRate };
 }
 
+// ── Hively Engine State ──────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let hivelyInstance: any = null;
+let hivelyReady = false;
+
+async function initHively(): Promise<void> {
+  if (hivelyReady) return;
+
+  const baseUrl = self.location.origin;
+  const [wasmResponse, jsResponse] = await Promise.all([
+    fetch(`${baseUrl}/hively/Hively.wasm`),
+    fetch(`${baseUrl}/hively/Hively.js`),
+  ]);
+
+  const wasmBinary = await wasmResponse.arrayBuffer();
+  let jsCode = await jsResponse.text();
+
+  // Transform Emscripten glue for worker scope
+  jsCode = jsCode.replace(/import\.meta\.url/g, `"${baseUrl}/hively/Hively.js"`);
+  jsCode = jsCode.replace(/export\s+default\s+/g, 'var createHively = ');
+  jsCode = jsCode.replace(/export\s*\{[^}]*\}/g, '');
+  jsCode = jsCode.replace(/ENVIRONMENT_IS_WEB\s*=\s*!0/g, 'ENVIRONMENT_IS_WEB=false');
+  jsCode = jsCode.replace(/ENVIRONMENT_IS_WORKER\s*=\s*!1/g, 'ENVIRONMENT_IS_WORKER=true');
+  jsCode = 'var document = { currentScript: { src: "' + baseUrl + '/hively/Hively.js" }, title: "" };\n' + jsCode;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const factory = new Function(jsCode + '\n;return typeof createHively !== "undefined" ? createHively : Module;')();
+
+  hivelyInstance = await factory({
+    wasmBinary,
+    print: (msg: string) => console.log('[DJRenderWorker/Hively]', msg),
+    printErr: (msg: string) => console.warn('[DJRenderWorker/Hively]', msg),
+  });
+
+  hivelyInstance._hively_init(44100);
+  hivelyReady = true;
+  console.log('[DJRenderWorker] Hively engine initialized');
+}
+
+async function renderWithHively(
+  fileBuffer: ArrayBuffer,
+  filename: string,
+  subsong: number,
+  id: string,
+): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
+  await initHively();
+  const wasm = hivelyInstance;
+  const sampleRate = 44100;
+
+  // Copy tune data to WASM heap
+  const data = new Uint8Array(fileBuffer);
+  const ptr = wasm._malloc(data.length);
+  wasm.HEAPU8.set(data, ptr);
+
+  const ok = wasm._hively_load_tune(ptr, data.length, 2); // defStereo=2
+  wasm._free(ptr);
+
+  if (!ok) {
+    throw new Error(`Hively failed to load ${filename}`);
+  }
+
+  console.log(`[DJRenderWorker/Hively] Loaded ${filename} — positions: ${wasm._hively_get_positions()}, channels: ${wasm._hively_get_channels()}`);
+
+  if (subsong > 0) {
+    wasm._hively_init_subsong(subsong);
+  }
+
+  postProgress(id, 10);
+
+  // Allocate decode buffers (one frame = sampleRate/50 samples)
+  const frameSamples = Math.floor(sampleRate / 50);
+  const floatBytes = frameSamples * 4;
+  const decodePtrL = wasm._malloc(floatBytes);
+  const decodePtrR = wasm._malloc(floatBytes);
+
+  // Render all frames until song end (max 10 minutes safety limit)
+  const maxFrames = sampleRate * 600;
+  const chunks: { left: Float32Array; right: Float32Array }[] = [];
+  let totalFrames = 0;
+  const positions = wasm._hively_get_positions();
+  let lastProgressPct = 10;
+
+  while (totalFrames < maxFrames) {
+    if (wasm._hively_is_song_end()) break;
+
+    const samples = wasm._hively_decode_frame(decodePtrL, decodePtrR);
+    if (samples <= 0) break;
+
+    const heapF32 = wasm.HEAPF32;
+    const offsetL = decodePtrL >> 2;
+    const offsetR = decodePtrR >> 2;
+
+    const chunkL = new Float32Array(samples);
+    const chunkR = new Float32Array(samples);
+    for (let i = 0; i < samples; i++) {
+      chunkL[i] = heapF32[offsetL + i];
+      chunkR[i] = heapF32[offsetR + i];
+    }
+
+    chunks.push({ left: chunkL, right: chunkR });
+    totalFrames += samples;
+
+    // Report progress based on position
+    if (positions > 0) {
+      const pos = wasm._hively_get_position();
+      const pct = Math.round(10 + (pos / positions) * 75);
+      if (pct > lastProgressPct) {
+        postProgress(id, pct);
+        lastProgressPct = pct;
+      }
+    }
+  }
+
+  wasm._free(decodePtrL);
+  wasm._free(decodePtrR);
+  wasm._hively_free_tune();
+
+  // Concatenate chunks
+  const left = new Float32Array(totalFrames);
+  const right = new Float32Array(totalFrames);
+  let offset = 0;
+  for (const chunk of chunks) {
+    left.set(chunk.left, offset);
+    right.set(chunk.right, offset);
+    offset += chunk.left.length;
+  }
+
+  postProgress(id, 85);
+  console.log(`[DJRenderWorker/Hively] Rendered ${filename}: ${(totalFrames / sampleRate).toFixed(1)}s, ${chunks.length} frames`);
+  return { left, right, sampleRate };
+}
+
 // ── libopenmpt Engine State ──────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -473,7 +617,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       try {
         let result: { left: Float32Array; right: Float32Array; sampleRate: number };
 
-        if (isAmigaFormat(filename)) {
+        if (isHivelyFormat(filename)) {
+          result = await renderWithHively(fileBuffer, filename, subsong, id);
+        } else if (isAmigaFormat(filename)) {
           result = await renderWithUADE(fileBuffer, filename, subsong, id);
         } else {
           result = await renderWithLibopenmpt(fileBuffer, filename, id);
