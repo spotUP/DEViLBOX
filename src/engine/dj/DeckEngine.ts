@@ -86,6 +86,7 @@ export class DeckEngine {
   private patternScratchDir: 1 | -1 = 1;  // current direction in pattern scratch
   private patternStartSongPos = 0;
   private patternStartPattPos = 0;
+  private patternStartAudioPos = 0; // audio player position (seconds) at pattern start
 
   // Reverse scratch state
   private scratchBuffer: DeckScratchBuffer | null = null;
@@ -494,20 +495,23 @@ export class DeckEngine {
   setScratchVelocity(velocity: number): void {
     const v = Math.max(-4, Math.min(4, velocity));
 
-    // Pattern scratch: forward phases use LIVE tracker audio (full quality),
+    // Pattern scratch: forward phases use audio source at variable rate,
     // backward phases use ring-buffer reverse playback.
     // Dead zone (±0.1) around zero prevents rapid direction switching during
     // smooth velocity interpolation zero-crossings.
     if (this.patternScratchActive) {
       const absV = Math.abs(v);
+      const isAudio = this._playbackMode === 'audio';
 
       if (absV < 0.1) {
         // Dead zone: hold current direction at minimum rate.
-        // During interpolated zero-crossings the velocity passes smoothly through
-        // this zone, so both the tracker and ring buffer are near-silent here.
         if (this.patternScratchDir === 1) {
-          this.replayer.setTempoMultiplier(0.15);
-          this.replayer.setPitchMultiplier(0.15);
+          if (isAudio) {
+            this.audioPlayer.setPlaybackRate(0.15);
+          } else {
+            this.replayer.setTempoMultiplier(0.15);
+            this.replayer.setPitchMultiplier(0.15);
+          }
         } else {
           this.scratchBuffer?.setRate(0.05);
         }
@@ -515,7 +519,7 @@ export class DeckEngine {
       }
 
       if (v > 0) {
-        // ── FORWARD: live tracker audio at scratch speed ──
+        // ── FORWARD: audio at scratch speed ──
         const fwdRate = Math.max(0.15, v);
         if (this.patternScratchDir === -1) {
           // Transition backward → forward
@@ -524,18 +528,26 @@ export class DeckEngine {
           this.deckGain.gain.rampTo(1, 0.005);
           this.patternScratchDir = 1;
         }
-        this.replayer.setTempoMultiplier(fwdRate);
-        this.replayer.setPitchMultiplier(fwdRate);
+        if (isAudio) {
+          this.audioPlayer.setPlaybackRate(fwdRate);
+        } else {
+          this.replayer.setTempoMultiplier(fwdRate);
+          this.replayer.setPitchMultiplier(fwdRate);
+        }
       } else {
         // ── BACKWARD: ring-buffer reverse playback ──
         if (this.patternScratchDir === 1) {
-          // Transition forward → backward: freeze capture, mute tracker,
+          // Transition forward → backward: freeze capture, mute forward source,
           // start ring buffer backward from the exact worklet write position.
           this.scratchBuffer?.freezeCapture();
           this.deckGain.gain.rampTo(0, 0.005);
           this.scratchBuffer?.startReverseFromWritePos(absV);
-          this.replayer.setTempoMultiplier(0.001);
-          this.replayer.setPitchMultiplier(0.001);
+          if (isAudio) {
+            this.audioPlayer.setPlaybackRate(0.001);
+          } else {
+            this.replayer.setTempoMultiplier(0.001);
+            this.replayer.setPitchMultiplier(0.001);
+          }
           this.patternScratchDir = -1;
         } else {
           this.scratchBuffer?.setRate(absV);
@@ -752,9 +764,12 @@ export class DeckEngine {
       this.decayRafId = null;
     }
 
-    // Save replayer position so we can return here when the scratch ends.
+    // Save position so we can return here when the scratch ends.
     this.patternStartSongPos = this.replayer.getSongPos();
     this.patternStartPattPos = this.replayer.getPattPos();
+    if (this._playbackMode === 'audio') {
+      this.patternStartAudioPos = this.audioPlayer.getPosition();
+    }
     this.patternScratchActive = true;
     this.patternScratchDir = 1;  // start in forward mode
 
@@ -787,24 +802,28 @@ export class DeckEngine {
     }
   }
 
-  /** Clean up pattern scratch state: stop ring buffer, unmute tracker, seek back. */
+  /** Clean up pattern scratch state: stop ring buffer, restore audio source, seek back. */
   private _endPatternScratch(): void {
     if (!this.patternScratchActive) return;
     this.patternScratchActive = false;
 
-    // If we ended in a backward phase, stop ring buffer and unmute tracker
+    // If we ended in a backward phase, stop ring buffer and unmute forward chain
     if (this.patternScratchDir === -1 && this.scratchBufferReady && this.scratchBuffer) {
       this.scratchBuffer.silenceAndStop();
       this.scratchBuffer.unfreezeCapture();
       this.deckGain.gain.rampTo(1, 0.005);
     }
 
-    // Seek replayer back to where the scratch started so the song resumes seamlessly
-    this.replayer.seekTo(this.patternStartSongPos, this.patternStartPattPos);
-
-    // Snap multipliers back to the pitch-slider value immediately.
-    this.replayer.setTempoMultiplier(this.restMultiplier);
-    this.replayer.setPitchMultiplier(this.restMultiplier);
+    if (this._playbackMode === 'audio') {
+      // Seek audio player back to where the scratch started
+      this.audioPlayer.seek(this.patternStartAudioPos);
+      this.audioPlayer.setPlaybackRate(this.restMultiplier);
+    } else {
+      // Seek replayer back so the song resumes seamlessly
+      this.replayer.seekTo(this.patternStartSongPos, this.patternStartPattPos);
+      this.replayer.setTempoMultiplier(this.restMultiplier);
+      this.replayer.setPitchMultiplier(this.restMultiplier);
+    }
     this.patternScratchDir = 1;
   }
 
