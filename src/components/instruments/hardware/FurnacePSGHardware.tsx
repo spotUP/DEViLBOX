@@ -16,6 +16,7 @@ import type { FurnaceConfig, SynthType } from '@typedefs/instrument';
 interface FurnacePSGHardwareProps {
   config: FurnaceConfig;
   onChange: (config: FurnaceConfig) => void;
+  synthType?: SynthType;
 }
 
 /* ── SynthType → PSG subtype index (must match furnace_psg.h PSG_CHIP_* constants) ── */
@@ -102,7 +103,12 @@ const PARAM = {
 
 /* ── chipType number → PSG subtype helper ──────────────────────────────── */
 
-function getChipSubtype(config: FurnaceConfig): number {
+function getChipSubtype(config: FurnaceConfig, synthType?: SynthType): number {
+  // Prefer synthType lookup — config.chipType uses a different numbering system
+  // (Furnace engine chip IDs) that can collide with SYNTH_TO_CHIP values.
+  if (synthType && synthType in SYNTH_TO_SUBTYPE) {
+    return SYNTH_TO_SUBTYPE[synthType];
+  }
   return CHIP_SUBTYPE_MAP[config.chipType] ?? 0;
 }
 
@@ -135,10 +141,10 @@ function getChipSubtype(config: FurnaceConfig): number {
  *   [21] reserved
  */
 
-function configToBuffer(config: FurnaceConfig): Uint8Array {
+function configToBuffer(config: FurnaceConfig, synthType?: SynthType): Uint8Array {
   const buf = new Uint8Array(22); // PSG_CONFIG_SIZE
 
-  const subtype = getChipSubtype(config);
+  const subtype = getChipSubtype(config, synthType);
 
   /* --- Header (4 bytes) --- */
   buf[0] = subtype;
@@ -263,19 +269,19 @@ function configToBuffer(config: FurnaceConfig): Uint8Array {
 
 /* ── Component ─────────────────────────────────────────────────────────── */
 
-export const FurnacePSGHardware: React.FC<FurnacePSGHardwareProps> = ({ config, onChange }) => {
+export const FurnacePSGHardware: React.FC<FurnacePSGHardwareProps> = ({ config, onChange, synthType }) => {
   const configRef = useRef(config);
   const onChangeRef = useRef(onChange);
 
   useEffect(() => { configRef.current = config; }, [config]);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
-  const configBuffer = useMemo(() => configToBuffer(config), [config]);
+  const configBuffer = useMemo(() => configToBuffer(config, synthType), [config, synthType]);
 
   const handleModuleReady = useCallback((mod: SDLModule) => {
     mod.onParamChange = (paramId: number, value: number) => {
       const c = { ...configRef.current };
-      const subtype = getChipSubtype(c);
+      const subtype = getChipSubtype(c, synthType);
 
       switch (paramId) {
         /* ── General params ────────────────────────────── */
@@ -447,7 +453,7 @@ export const FurnacePSGHardware: React.FC<FurnacePSGHardwareProps> = ({ config, 
       configRef.current = c;
       onChangeRef.current(c);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [synthType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <SDLHardwareWrapper
