@@ -316,7 +316,7 @@ export async function parseSoundMonFile(
       let volume = 0;
 
       if (length > 0) {
-        loop = u16BE(buf, pos); pos += 2;
+        loop = u16BE(buf, pos) << 1; pos += 2;  // words → bytes (same as repeat below)
         repeat = u16BE(buf, pos) << 1; pos += 2;
         volume = u16BE(buf, pos); pos += 2;
 
