@@ -91,6 +91,9 @@ export class UADEEngine {
   private _renderPromise: Promise<ArrayBuffer> | null = null;
   private _resolveRender: ((buffer: ArrayBuffer) => void) | null = null;
   private _rejectRender: ((err: Error) => void) | null = null;
+  private _subsongScanPromise: Promise<{ subsong: number; scanResult: UADEEnhancedScanData & { rows: unknown[][] } }> | null = null;
+  private _resolveSubsongScan: ((result: { subsong: number; scanResult: UADEEnhancedScanData & { rows: unknown[][] } }) => void) | null = null;
+  private _rejectSubsongScan: ((err: Error) => void) | null = null;
   private _positionCallbacks: Set<PositionCallback> = new Set();
   private _channelCallbacks: Set<ChannelCallback> = new Set();
   private _songEndCallbacks: Set<() => void> = new Set();
@@ -271,6 +274,22 @@ export class UADEEngine {
             this._rejectRender = null;
           }
           break;
+
+        case 'subsongScanned':
+          if (this._resolveSubsongScan) {
+            this._resolveSubsongScan({ subsong: data.subsong, scanResult: data.scanResult });
+            this._resolveSubsongScan = null;
+            this._rejectSubsongScan = null;
+          }
+          break;
+
+        case 'subsongScanError':
+          if (this._rejectSubsongScan) {
+            this._rejectSubsongScan(new Error(data.message));
+            this._resolveSubsongScan = null;
+            this._rejectSubsongScan = null;
+          }
+          break;
       }
     };
 
@@ -369,6 +388,24 @@ export class UADEEngine {
     this.workletNode.port.postMessage({ type: 'renderFull', subsong });
 
     return this._renderPromise;
+  }
+
+  /**
+   * Re-scan a specific subsong using the last loaded file (no re-transfer needed).
+   * Returns the enhanced scan result for that subsong.
+   * @param subsong - Subsong index to scan (0-based, relative to minSubsong)
+   */
+  async scanSubsong(subsong: number): Promise<{ subsong: number; scanResult: UADEEnhancedScanData & { rows: unknown[][] } }> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('UADEEngine not initialized');
+
+    this._subsongScanPromise = new Promise((resolve, reject) => {
+      this._resolveSubsongScan = resolve;
+      this._rejectSubsongScan = reject;
+    });
+
+    this.workletNode.port.postMessage({ type: 'scanSubsong', subsong });
+    return this._subsongScanPromise;
   }
 
   dispose(): void {
