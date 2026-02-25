@@ -442,9 +442,21 @@ function App() {
     const result = await loadFile(file, { requireConfirmation: true });
     
     if (result.success === 'pending-confirmation') {
-      // Song format — show confirmation dialog
-      setPendingSongFile(result.file);
-      setShowSongLoadConfirm(true);
+      const dropFilename = result.file.name.toLowerCase();
+      const isTrackerModule = !dropFilename.endsWith('.dbx') &&
+        !dropFilename.endsWith('.mid') && !dropFilename.endsWith('.midi') &&
+        !dropFilename.endsWith('.sqs') && !dropFilename.endsWith('.seq');
+      // In WebGL mode, module drops go through UIStore so WebGLModalBridge renders
+      // ImportModuleDialog via its portal (z-100 on body), above PixiDOMOverlay divs.
+      // Dialogs rendered inside the React root sit at stacking layer 0 and are
+      // invisible behind PixiDOMOverlay elements even with a high z-index class.
+      if (useSettingsStore.getState().renderMode === 'webgl' && isTrackerModule) {
+        useUIStore.getState().setPendingModuleFile(result.file);
+      } else {
+        // DOM mode or non-module formats: show local confirm dialog
+        setPendingSongFile(result.file);
+        setShowSongLoadConfirm(true);
+      }
     } else if (result.success === true) {
       notify.success(result.message);
     } else if (result.success === false) {
