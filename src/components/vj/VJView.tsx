@@ -106,7 +106,7 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
       async function doInit() {
         try {
           const { butterchurn, presetMap, presetNames } = await loadButterchurn();
-          if (cancelled) return;
+          if (cancelled || !canvas) return;
 
           // Enforce minimum canvas dimensions to avoid zero-size WebGL textures
           const cw = Math.max(canvas.clientWidth, 320);
