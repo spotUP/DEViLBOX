@@ -148,7 +148,7 @@ export function createSamplerInstrument(
     sample: {
       audioBuffer: wavBuf,  // Used as fast-path for the current session
       url: dataUrl,         // Survives save/reload via IndexedDB (string is serializable)
-      baseNote: 'C-3',
+      baseNote: 'C3',
       detune: 0,
       loop: hasLoop,
       loopType: hasLoop ? 'forward' as const : 'off' as const,

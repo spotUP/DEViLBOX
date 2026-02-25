@@ -515,7 +515,7 @@ export async function parseSoundFXFile(
       }
 
       // Amiga LRRL panning
-      const pan = (ch === 0 || ch === 3) ? -25 : 25;
+      const pan = (ch === 0 || ch === 3) ? -50 : 50;
 
       channels.push({
         id: `channel-${ch}`,
@@ -563,7 +563,7 @@ export async function parseSoundFXFile(
         solo: false,
         collapsed: false,
         volume: 100,
-        pan: (ch === 0 || ch === 3) ? -25 : 25,
+        pan: (ch === 0 || ch === 3) ? -50 : 50,
         instrumentId: null,
         color: null,
         rows: Array.from({ length: 64 }, (): TrackerCell => ({
