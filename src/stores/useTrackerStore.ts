@@ -269,6 +269,7 @@ interface TrackerStore {
   // Multi-format editor support
   setEditorMode: (mode: EditorMode) => void;
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
+  setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
   setHivelyNative: (data: HivelyNativeData | null) => void;
   applyEditorMode: (song: { furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData }) => void;
 
@@ -2633,6 +2634,16 @@ export const useTrackerStore = create<TrackerStore>()(
     setFurnaceNative: (data) =>
       set((state) => {
         state.furnaceNative = data;
+      }),
+
+    setFurnaceOrderEntry: (channel, position, patternIndex) =>
+      set((state) => {
+        if (!state.furnaceNative) return;
+        const sub = state.furnaceNative.subsongs[state.furnaceNative.activeSubsong];
+        if (!sub) return;
+        if (channel < 0 || channel >= sub.orders.length) return;
+        if (position < 0 || position >= sub.ordersLen) return;
+        sub.orders[channel][position] = patternIndex;
       }),
 
     setHivelyNative: (data) =>

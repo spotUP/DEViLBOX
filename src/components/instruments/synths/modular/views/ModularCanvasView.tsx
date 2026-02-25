@@ -34,6 +34,7 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
   const { positions, registerPort, recalculateAll } = usePortPositions(containerRef);
   const {
     selectedModuleId,
+    hoveredPortId,
     wiringSource,
     wiringPreview,
     selectedConnectionId,
@@ -353,7 +354,8 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
     );
   const isWiringSource = (portRef: PortRef) =>
     wiringSource ? getPortId(wiringSource) === getPortId(portRef) : false;
-  const isPortHovered = (_portRef: PortRef) => false; // TODO: implement hover tracking
+  const isPortHovered = (portRef: PortRef) =>
+    hoveredPortId !== null && getPortId(hoveredPortId) === getPortId(portRef);
 
   return (
     <div

@@ -818,16 +818,45 @@ export class CommandInserter {
   }
 
   /**
-   * Validate that a command sequence won't create infinite loops
+   * Validate that a command sequence won't create obvious infinite loops.
+   *
+   * Full cycle detection requires knowing the pattern's position in the song order
+   * (which is not available here). We catch the most common degenerate cases:
+   *  - A B command targeting order position 0 (always loops from song start)
+   *  - Multiple B commands in the same channel (only the first reached fires;
+   *    the rest are dead code and likely a logic error)
    */
-  static validateNoInfiniteLoops(_commands: CellCommand[]): { valid: boolean; error?: string } {
-    // Check for suspicious patterns:
-    // 1. B command jumping to same position
-    // 2. D command breaking to same row in same pattern
-    
-    // For now, just allow all commands - full loop detection would require pattern order analysis
-    // TODO: Implement more sophisticated loop detection
-    
+  static validateNoInfiniteLoops(commands: CellCommand[]): { valid: boolean; error?: string } {
+    // effTyp 0xB (=11) = B command: jump to absolute pattern order position eff
+    const bCommands = commands.filter(c => c.effTyp === 0xB);
+
+    if (bCommands.length === 0) return { valid: true };
+
+    // B command jumping to position 0 always loops the song from the beginning
+    const jumpsToStart = bCommands.filter(c => c.eff === 0);
+    if (jumpsToStart.length > 0) {
+      return {
+        valid: false,
+        error: 'B command jumps to order position 0 — song will loop from the beginning indefinitely',
+      };
+    }
+
+    // Multiple B commands in the same channel: only the first one reached executes,
+    // the rest are unreachable dead code (likely a generation error)
+    const byChannel = new Map<number, CellCommand[]>();
+    for (const cmd of bCommands) {
+      if (!byChannel.has(cmd.channel)) byChannel.set(cmd.channel, []);
+      byChannel.get(cmd.channel)!.push(cmd);
+    }
+    for (const [, cmds] of byChannel) {
+      if (cmds.length > 1) {
+        return {
+          valid: false,
+          error: `Channel ${cmds[0].channel} has ${cmds.length} B commands — only the first reached will execute`,
+        };
+      }
+    }
+
     return { valid: true };
   }
 }
