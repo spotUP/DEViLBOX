@@ -784,14 +784,10 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       isFurnaceWaveType(instrument.synthType) ||
       isFurnacePCMType(instrument.synthType);
 
-    // Render the correct Furnace hardware UI based on chip category
-    // Prefer the real insEdit WASM (ImGui) when available; fall back to per-category modules
+    // Render the correct Furnace hardware UI based on chip category.
+    // Dedicated hardware modules (FM/PSG/Wave/PCM) take priority over the generic
+    // InsEdit WASM, which serves as a fallback for types without a dedicated UI.
     const renderFurnaceHardware = () => {
-      const isInsEd = isFurnaceInsEdType(instrument.synthType);
-      console.log(`[UnifiedInsEditor] renderFurnaceHardware: synthType=${instrument.synthType} isInsEd=${isInsEd}`);
-      if (isInsEd) {
-        return <Suspense fallback={<LoadingControls />}><FurnaceInsEdHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} synthType={instrument.synthType} /></Suspense>;
-      }
       if (isFurnaceFMType(instrument.synthType)) {
         return <Suspense fallback={<LoadingControls />}><FurnaceFMHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} /></Suspense>;
       }
@@ -803,6 +799,9 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
       }
       if (isFurnacePCMType(instrument.synthType)) {
         return <Suspense fallback={<LoadingControls />}><FurnacePCMHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} /></Suspense>;
+      }
+      if (isFurnaceInsEdType(instrument.synthType)) {
+        return <Suspense fallback={<LoadingControls />}><FurnaceInsEdHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} synthType={instrument.synthType} /></Suspense>;
       }
       return null;
     };
