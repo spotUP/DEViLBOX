@@ -163,27 +163,50 @@ void hwui_reset_state(void) {
 
 static int s_fb_w = 4096;  /* Default large to not clip if not set */
 static int s_fb_h = 4096;
+static int s_scale = 1;    /* Pixel scale factor (1 = normal, 2 = Retina 2×) */
 
 void hwui_set_fb_size(int w, int h) {
     s_fb_w = w;
     s_fb_h = h;
 }
 
+void hwui_set_scale(int s) {
+    s_scale = (s >= 1) ? s : 1;
+}
+
 /* ── Primitive Drawing ─────────────────────────────────────────────────── */
 
 void hwui_pixel(uint32_t *fb, int stride, int x, int y, uint32_t col) {
-    if (x >= 0 && x < s_fb_w && y >= 0 && y < s_fb_h)
-        fb[y * stride + x] = col;
+    int px = x * s_scale;
+    int py = y * s_scale;
+    for (int dy = 0; dy < s_scale; dy++) {
+        for (int dx = 0; dx < s_scale; dx++) {
+            int fx = px + dx, fy = py + dy;
+            if (fx >= 0 && fx < s_fb_w && fy >= 0 && fy < s_fb_h)
+                fb[fy * stride + fx] = col;
+        }
+    }
 }
 
 void hwui_pixel_safe(uint32_t *fb, int stride, int max_w, int max_h, int x, int y, uint32_t col) {
-    if (x >= 0 && x < max_w && y >= 0 && y < max_h)
-        fb[y * stride + x] = col;
+    int px = x * s_scale;
+    int py = y * s_scale;
+    int pmw = max_w * s_scale;
+    int pmh = max_h * s_scale;
+    for (int dy = 0; dy < s_scale; dy++) {
+        for (int dx = 0; dx < s_scale; dx++) {
+            int fx = px + dx, fy = py + dy;
+            if (fx >= 0 && fx < pmw && fy >= 0 && fy < pmh)
+                fb[fy * stride + fx] = col;
+        }
+    }
 }
 
 void hwui_rect(uint32_t *fb, int stride, int x, int y, int w, int h, uint32_t col) {
-    for (int row = y; row < y + h; row++)
-        for (int cx = x; cx < x + w; cx++)
+    int px = x * s_scale, py = y * s_scale;
+    int pw = w * s_scale, ph = h * s_scale;
+    for (int row = py; row < py + ph; row++)
+        for (int cx = px; cx < px + pw; cx++)
             if (cx >= 0 && cx < s_fb_w && row >= 0 && row < s_fb_h)
                 fb[row * stride + cx] = col;
 }
@@ -196,17 +219,27 @@ void hwui_rect_outline(uint32_t *fb, int stride, int x, int y, int w, int h, uin
 }
 
 void hwui_hline(uint32_t *fb, int stride, int x, int y, int w, uint32_t col) {
-    if (y < 0 || y >= s_fb_h) return;
-    for (int i = 0; i < w; i++)
-        if (x + i >= 0 && x + i < s_fb_w)
-            fb[y * stride + x + i] = col;
+    int px = x * s_scale;
+    int py = y * s_scale;
+    int pw = w * s_scale;
+    for (int dy = 0; dy < s_scale; dy++) {
+        if (py + dy < 0 || py + dy >= s_fb_h) continue;
+        for (int i = 0; i < pw; i++)
+            if (px + i >= 0 && px + i < s_fb_w)
+                fb[(py + dy) * stride + px + i] = col;
+    }
 }
 
 void hwui_vline(uint32_t *fb, int stride, int x, int y, int h, uint32_t col) {
-    if (x < 0 || x >= s_fb_w) return;
-    for (int i = 0; i < h; i++)
-        if (y + i >= 0 && y + i < s_fb_h)
-            fb[(y + i) * stride + x] = col;
+    int px = x * s_scale;
+    int py = y * s_scale;
+    int ph = h * s_scale;
+    for (int dx = 0; dx < s_scale; dx++) {
+        if (px + dx < 0 || px + dx >= s_fb_w) continue;
+        for (int i = 0; i < ph; i++)
+            if (py + i >= 0 && py + i < s_fb_h)
+                fb[(py + i) * stride + px + dx] = col;
+    }
 }
 
 void hwui_line(uint32_t *fb, int stride, int x0, int y0, int x1, int y1, uint32_t col) {

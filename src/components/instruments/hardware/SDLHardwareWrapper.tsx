@@ -406,6 +406,20 @@ export const SDLHardwareWrapper: React.FC<SDLHardwareWrapperProps> = ({
     canvasRef.current?.focus();
   }, []);
 
+  /* Non-passive wheel handler — prevents browser scroll so SDL receives wheel
+   * events. SDL2/Emscripten fires SDL_MOUSEWHEEL on the canvas, but the browser
+   * will hijack scroll if the default isn't prevented. */
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      canvasRef.current?.focus();
+    };
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => container.removeEventListener('wheel', onWheel);
+  }, []);
+
   return (
     <div className={`sdl-hardware-wrapper ${className ?? ''}`}>
       <div
