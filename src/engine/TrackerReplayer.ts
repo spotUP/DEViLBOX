@@ -690,6 +690,13 @@ export class TrackerReplayer {
     this.updateAllPlaybackRates();
   }
 
+  /** Re-sync the scheduler timeline to now so the next tick fires immediately.
+   *  Call after restoring tempoMultiplier from a very low scratch value,
+   *  otherwise nextScheduleTime may be seconds/minutes in the future. */
+  resyncSchedulerToNow(): void {
+    this.nextScheduleTime = Tone.now();
+  }
+
   /** Set per-deck synth detune in cents */
   setDetuneCents(cents: number): void {
     this.deckDetuneCents = cents;
