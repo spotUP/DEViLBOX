@@ -29,6 +29,8 @@ import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
 import { RomUploadDialog } from '@components/ui/RomUploadDialog';
+import { ImportDBXDialog } from '@components/dialogs/ImportDBXDialog';
+import { ImportInstrumentDialog } from '@components/dialogs/ImportInstrumentDialog';
 import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
 import { usePatternPlayback } from '@hooks/audio/usePatternPlayback';
@@ -100,8 +102,8 @@ function App() {
   const [initError, setInitError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [editingEffect, setEditingEffect] = useState<{ effect: EffectConfig; channelIndex: number | null } | null>(null);
-  const [pendingSongFile, setPendingSongFile] = useState<File | null>(null);
-  const [showSongLoadConfirm, setShowSongLoadConfirm] = useState(false);
+  const [pendingSongFile, setPendingSongFile]             = useState<File | null>(null);
+  const [pendingInstrumentFile, setPendingInstrumentFile] = useState<File | null>(null);
   const djModeActive = useDJStore(s => s.djModeActive);
 
   // Modal state from store (single source of truth for DOM + WebGL)
@@ -451,23 +453,27 @@ function App() {
       return;
     }
 
+    // .dbi instrument files get a preview dialog before being added
+    if (/\.dbi$/i.test(file.name)) {
+      setPendingInstrumentFile(file);
+      return;
+    }
+
+    // .dbx project files get a preview dialog showing song info before replacing
+    if (/\.dbx$/i.test(file.name)) {
+      setPendingSongFile(file);
+      return;
+    }
+
     const result = await loadFile(file, { requireConfirmation: true });
-    
+
     if (result.success === 'pending-confirmation') {
-      const dropFilename = result.file.name.toLowerCase();
-      const isTrackerModule = !dropFilename.endsWith('.dbx');
       // Tracker modules (including .mid/.midi) open ImportModuleDialog (full UADE scan,
       // subsong picker, engine selector, MIDI options).  In WebGL mode this is rendered as
       // a portal by WebGLModalBridge (z-100 on body) so it sits above PixiDOMOverlay;
       // in DOM mode TrackerView renders the same dialog inside the React tree — both share
       // the pendingModuleFile store key.
-      if (isTrackerModule) {
-        useUIStore.getState().setPendingModuleFile(result.file);
-      } else {
-        // Non-module song formats (.dbx, .sqs, .seq): simple confirm dialog
-        setPendingSongFile(result.file);
-        setShowSongLoadConfirm(true);
-      }
+      useUIStore.getState().setPendingModuleFile(result.file);
     } else if (result.success === true) {
       notify.success(result.message);
     } else if (result.success === false) {
@@ -531,43 +537,27 @@ function App() {
             )}
           </Suspense>
 
-          {/* Song Load Confirmation Dialog */}
-          {showSongLoadConfirm && pendingSongFile && (
-            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in">
-              <div className="bg-dark-bgPrimary border-2 border-accent-primary rounded-xl p-6 max-w-md mx-4 animate-slide-in-up shadow-2xl">
-                <h2 className="text-xl font-bold text-white mb-4">Load Song File?</h2>
-                <p className="text-text-secondary mb-6">
-                  Loading <span className="text-accent-primary font-mono">{pendingSongFile.name}</span> will replace your current project.
-                </p>
-                <p className="text-text-muted text-sm mb-6">
-                  Make sure you've saved any unsaved changes before continuing.
-                </p>
-                <div className="flex gap-3 justify-end">
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setShowSongLoadConfirm(false);
-                      setPendingSongFile(null);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={async () => {
-                      if (pendingSongFile) {
-                        await loadSongFile(pendingSongFile);
-                      }
-                      setShowSongLoadConfirm(false);
-                      setPendingSongFile(null);
-                    }}
-                  >
-                    Load File
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* .dbx project preview dialog */}
+          <ImportDBXDialog
+            isOpen={pendingSongFile !== null}
+            file={pendingSongFile}
+            onCancel={() => setPendingSongFile(null)}
+            onConfirm={async () => {
+              if (pendingSongFile) await loadSongFile(pendingSongFile);
+              setPendingSongFile(null);
+            }}
+          />
+
+          {/* .dbi instrument preview dialog */}
+          <ImportInstrumentDialog
+            isOpen={pendingInstrumentFile !== null}
+            file={pendingInstrumentFile}
+            onCancel={() => setPendingInstrumentFile(null)}
+            onConfirm={async () => {
+              if (pendingInstrumentFile) await loadFile(pendingInstrumentFile);
+              setPendingInstrumentFile(null);
+            }}
+          />
 
           {/* Pop-out windows — rendered outside WebGL canvas as separate browser windows */}
           {instrumentEditorPoppedOut && (
@@ -972,43 +962,27 @@ function App() {
           </div>
         )}
 
-        {/* Song Load Confirmation Dialog */}
-        {showSongLoadConfirm && pendingSongFile && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in">
-            <div className="bg-dark-bgPrimary border-2 border-accent-primary rounded-xl p-6 max-w-md mx-4 animate-slide-in-up shadow-2xl">
-              <h2 className="text-xl font-bold text-white mb-4">Load Song File?</h2>
-              <p className="text-text-secondary mb-6">
-                Loading <span className="text-accent-primary font-mono">{pendingSongFile.name}</span> will replace your current project.
-              </p>
-              <p className="text-text-muted text-sm mb-6">
-                Make sure you've saved any unsaved changes before continuing.
-              </p>
-              <div className="flex gap-3 justify-end">
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setShowSongLoadConfirm(false);
-                    setPendingSongFile(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={async () => {
-                    if (pendingSongFile) {
-                      await loadSongFile(pendingSongFile);
-                    }
-                    setShowSongLoadConfirm(false);
-                    setPendingSongFile(null);
-                  }}
-                >
-                  Load File
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* .dbx project preview dialog */}
+        <ImportDBXDialog
+          isOpen={pendingSongFile !== null}
+          file={pendingSongFile}
+          onCancel={() => setPendingSongFile(null)}
+          onConfirm={async () => {
+            if (pendingSongFile) await loadSongFile(pendingSongFile);
+            setPendingSongFile(null);
+          }}
+        />
+
+        {/* .dbi instrument preview dialog */}
+        <ImportInstrumentDialog
+          isOpen={pendingInstrumentFile !== null}
+          file={pendingInstrumentFile}
+          onCancel={() => setPendingInstrumentFile(null)}
+          onConfirm={async () => {
+            if (pendingInstrumentFile) await loadFile(pendingInstrumentFile);
+            setPendingInstrumentFile(null);
+          }}
+        />
       </Suspense>
 
       {/* Popped-out Instrument Editor (rendered outside layout) */}
