@@ -398,10 +398,9 @@ export const useDrumPadStore = create<DrumPadStore>((set, get) => ({
         preferences,
       };
 
-      // NOTE: AudioBuffer is not JSON-serializable and will be lost.
-      // Sample data (audioBuffer) needs to be reloaded from original files.
-      // Only pad names and parameters persist across page reloads.
-      // TODO: Implement sample library with persistent references
+      // NOTE: AudioBuffer is not JSON-serializable — audio data is NOT stored here.
+      // Full audio persistence (including samples) is handled by saveToIndexedDB().
+      // This localStorage entry only persists pad parameters, names, and MIDI mappings.
       localStorage.setItem('devilbox_drumpad', JSON.stringify(state));
     } catch (error) {
       console.error('[DrumPadStore] Failed to save to storage:', error);

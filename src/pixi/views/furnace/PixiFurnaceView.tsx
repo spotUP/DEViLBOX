@@ -35,6 +35,7 @@ export const PixiFurnaceView: React.FC<FurnaceViewProps> = ({ width, height }) =
   const nativeData = useTrackerStore(s => s.furnaceNative);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
+  const setFurnaceOrderEntry = useTrackerStore(s => s.setFurnaceOrderEntry);
   const isPlaying = useTransportStore(s => s.isPlaying);
   const displayRow = useTransportStore(s => s.currentRow);
 
@@ -51,9 +52,8 @@ export const PixiFurnaceView: React.FC<FurnaceViewProps> = ({ width, height }) =
   }, [isPlaying, setCurrentPosition]);
 
   const handleOrderChange = useCallback((channel: number, position: number, patternIndex: number) => {
-    // TODO: Implement order editing (requires adding a store action)
-    console.log(`[FurnaceView] Order change: ch=${channel} pos=${position} pat=${patternIndex}`);
-  }, []);
+    setFurnaceOrderEntry(channel, position, patternIndex);
+  }, [setFurnaceOrderEntry]);
 
   if (!nativeData) {
     return (
