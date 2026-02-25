@@ -309,8 +309,7 @@ export function periodToXMNote(period: number, finetune: number = 0): number {
   }
 
   // ProTracker period table (Extended range C-0 to B-5)
-  // Maps to DEViLBOX C-2 to B-7 (2 octaves up) to align with standard trackers
-  // 1712 = C-2 (Note 25), 428 = C-4 (Note 49)
+  // 1-based index is the XM note number: 1712 = C-0 (Note 1), 428 = C-2 (Note 25), 214 = C-3 (Note 37)
   const PT_PERIODS = [
     // Octave 0 (Extended)
     1712, 1616, 1525, 1440, 1357, 1281, 1209, 1141, 1077, 1017, 961, 907,
@@ -339,9 +338,10 @@ export function periodToXMNote(period: number, finetune: number = 0): number {
   }
 
   // Convert to XM note
-  // Index 1 (1712) corresponds to XM Note 25 (C-2)
-  // Index 25 (428) corresponds to XM Note 49 (C-4)
-  const xmNote = closestNote + 24; 
+  // Index 1 (period 1712) = XM note 1 (C-0), index 13 (period 856) = XM note 13 (C-1),
+  // index 25 (period 428) = XM note 25 (C-2), index 37 (period 214) = XM note 37 (C-3)
+  // This matches UADEParser and amigaNoteToXM conventions — base 'C3' produces correct rates.
+  const xmNote = closestNote;
 
   return Math.min(96, Math.max(1, xmNote));
 }
@@ -361,20 +361,10 @@ export function xmNoteToPeriod(xmNote: number, finetune: number = 0): number {
   }
 
   // Calculate period using Amiga formula
-  // Aligned to: C-4 (Note 49) = 428
-  // Formula: period = 428 * 2 ^ ((49 - note) / 12)
-  // For integer math: 428 corresponds to Note 49
-  // Note 1 (C-0) -> Period 6848 (approx)
-  
-  // Note 49 (C-4) is 428
-  // Note 25 (C-2) is 1712
-  
-  // Period table base (C-2 = 1712)
-  // Note 25 = 1712
-  // We need to calculate how many semitones away from C-2 we are
-  
-  const semitonesFromC2 = xmNote - 25;
-  const period = 1712 * Math.pow(2, -semitonesFromC2 / 12);
+  // Anchor: XM note 1 (C-0) = period 1712, note 25 (C-2) = period 428, note 37 (C-3) = period 214
+  // Consistent with the periodToXMNote convention (1-based index = XM note).
+  const semitonesFromC0 = xmNote - 1;
+  const period = 1712 * Math.pow(2, -semitonesFromC0 / 12);
 
   return Math.max(28, Math.min(1712, Math.round(period)));
 }
