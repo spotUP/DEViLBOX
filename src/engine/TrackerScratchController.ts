@@ -39,6 +39,26 @@ const IDLE_TIMEOUT_MS = 300; // 300ms — responsive exit without being too aggr
 /** Minimum number of touch points for "grab" mode on trackpad (3 fingers on Mac) */
 const GRAB_TOUCH_COUNT = 3;
 
+/** Minimum scroll delta (pixels) to count as intentional input.
+ *  Mac trackpad sends inertial scroll events with tiny deltas for 2-3s after
+ *  the user lifts their fingers. These must NOT reset the idle timer, otherwise
+ *  scratch mode stays active long after the user stopped interacting. */
+const SCROLL_IDLE_THRESHOLD = 3;
+
+/** Minimum scroll delta to reset the idle timer (pixels).
+ *  Must be higher than SCROLL_IDLE_THRESHOLD to filter out the tail end of
+ *  Mac trackpad inertial decay (< 5px), while still capturing intentional
+ *  scrolls. Since exit no longer requires rate convergence, this just needs
+ *  to detect "user is still actively scrolling." */
+const SCROLL_SIGNIFICANT_THRESHOLD = 10;
+
+/** Cooldown after exiting scratch mode (ms).
+ *  Mac trackpad inertial scroll can send events with large deltas (5-20px) for
+ *  seconds after the user lifts their fingers. Without a cooldown, these events
+ *  immediately re-enter scratch mode after exit, causing a rapid enter/exit loop
+ *  that makes the tracker position oscillate and audio go silent. */
+const SCRATCH_EXIT_COOLDOWN_MS = 1500;
+
 // ─── Controller ──────────────────────────────────────────────────────────────
 
 export class TrackerScratchController {
@@ -69,6 +89,9 @@ export class TrackerScratchController {
 
   /** The transport's original smoothScrolling state before scratch started */
   private originalSmoothScrolling = false;
+
+  /** Timestamp when scratch mode was last exited (for cooldown) */
+  private lastExitTime = 0;
 
   /** Previous touch Y position for delta calculation (grab mode) */
   private grabLastY = 0;
@@ -132,14 +155,46 @@ export class TrackerScratchController {
    * @returns true if the event was consumed (scratch active), false if passthrough
    */
   onScrollDelta(deltaY: number, timestamp: number, deltaMode: number = 0): boolean {
+    const absDelta = Math.abs(deltaY);
+
+    // Ignore tiny inertial scroll events when scratch is not active.
+    // Mac trackpad sends decaying deltas for seconds after lifting fingers —
+    // these must not re-enter scratch mode after a clean exit.
+    if (!this._isActive && absDelta < SCROLL_IDLE_THRESHOLD) {
+      return false; // passthrough — let normal scroll handling take over
+    }
+
+    // Cooldown: after exiting scratch, ignore ALL scroll events for a period.
+    // Mac trackpad inertial scroll sends large deltas (5-20px) for 1-2 seconds
+    // that would otherwise immediately re-enter scratch mode, causing a rapid
+    // enter/exit oscillation loop.
+    if (!this._isActive && (timestamp - this.lastExitTime) < SCRATCH_EXIT_COOLDOWN_MS) {
+      console.warn(`[TrackerScratch] Cooldown blocking re-entry, delta=${deltaY.toFixed(1)}, remaining=${(SCRATCH_EXIT_COOLDOWN_MS - (timestamp - this.lastExitTime)).toFixed(0)}ms`);
+      return false; // passthrough — still in cooldown from last scratch
+    }
+
+    // When active and the idle timer has expired (no significant input for 300ms),
+    // consume the event but DON'T apply impulses. This lets the motor bring the
+    // rate back to 1.0 without interference from inertial scroll events —
+    // matching how the DJ vinyl view works after pointer release.
+    if (this._isActive && (timestamp - this.lastEventTime) > IDLE_TIMEOUT_MS) {
+      return true; // consume event, no impulse
+    }
+
     const replayer = getTrackerReplayer();
 
-    // First event — enter scratch mode
+    // First significant event — enter scratch mode
     if (!this._isActive) {
+      console.warn(`[TrackerScratch] Entering scratch mode, delta=${deltaY.toFixed(1)}`);
       this.enterScratchMode(replayer);
     }
 
-    this.lastEventTime = timestamp;
+    // Only reset idle timer for clearly intentional deltas.
+    // Mac trackpad inertial decay events (5-20px) must NOT reset the timer,
+    // otherwise the idle timer never expires and scratch mode stays active forever.
+    if (absDelta >= SCROLL_SIGNIFICANT_THRESHOLD) {
+      this.lastEventTime = timestamp;
+    }
 
     // Read acceleration preference from store
     this._accelerationEnabled = useUIStore.getState().scratchAcceleration;
@@ -331,6 +386,7 @@ export class TrackerScratchController {
    */
   private exitScratchModeAndStop(): void {
     this._isActive = false;
+    this.lastExitTime = performance.now();
     this.stopPhysicsLoop();
 
     // Silence the scratch buffer immediately (it's already at/near zero rate)
@@ -358,6 +414,7 @@ export class TrackerScratchController {
   private enterScratchMode(replayer: TrackerReplayer): void {
     this._isActive = true;
     this.originalGainValue = 1;
+    this.lastEventTime = performance.now();
 
     // Store and enable smooth scrolling for scratch mode
     const transportState = useTransportStore.getState();
@@ -423,23 +480,33 @@ export class TrackerScratchController {
 
   private exitScratchMode(replayer: TrackerReplayer): void {
     this._isActive = false;
+    this.lastExitTime = performance.now();
     this.stopPhysicsLoop();
 
     const fadeSec = TrackerScratchController.EXIT_CROSSFADE_SEC;
     const fadeMs = fadeSec * 1000;
 
-    console.debug('[TrackerScratch] Exiting scratch mode');
+    console.warn(`[TrackerScratch] Exiting scratch mode, rate=${this.physics.playbackRate.toFixed(3)}`);
 
-    // Restore tempo/pitch to normal (quick catch-up from 0.1% to 100%)
+    // IMPORTANT ORDER: resync BEFORE unsuppressing notes.
+    // At 0.001x tempo, nextScheduleTime is far in the future.
+    // Resync snaps it to now. Then restore normal tempo so the
+    // next scheduler tick processes at the right speed.
+    replayer.resyncSchedulerToNow();
     replayer.setTempoMultiplier(1.0);
     replayer.setPitchMultiplier(1.0);
     replayer.setSuppressNotes(false);
 
     // Crossfade — scratch buffer out, live tracker in.
-    replayer.getMasterGain().gain.rampTo(this.originalGainValue, fadeSec);
+    const masterGain = replayer.getMasterGain();
+    if (masterGain) {
+      // Force gain to 1 immediately (no ramp — just restore it)
+      masterGain.gain.value = this.originalGainValue;
+      console.warn(`[TrackerScratch] Gain restored to ${this.originalGainValue}`);
+    }
 
     // Crossfade: ramp scratch buffer gain down over the same duration
-    if (this.scratchBuffer) {
+    if (this.scratchBuffer && this.scratchBufferReady) {
       // Set rate to 1.0 so the buffer plays at normal speed during crossfade
       this.scratchBuffer.setScratchRate(1.0);
 
@@ -489,15 +556,13 @@ export class TrackerScratchController {
       // The worklet does per-sample smoothing for click-free audio.
       this.applyPlaybackRate(rate);
 
-      // Check if we can exit scratch mode
-      // (motor has brought platter back to normal, no recent input, not touching)
+      // Exit when idle (no recent significant input) and not in a special mode
       const idleMs = now - this.lastEventTime;
       if (
         idleMs > IDLE_TIMEOUT_MS &&
         !this.physics.touching &&
         !this.physics.spinbackActive &&
-        !this.physics.powerCutActive &&
-        Math.abs(rate - 1.0) < 0.02 // 2% tolerance — matches DJ view; tighter values take too long
+        !this.physics.powerCutActive
       ) {
         const replayer = getTrackerReplayer();
         this.exitScratchMode(replayer);
