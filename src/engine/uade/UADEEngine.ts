@@ -332,6 +332,21 @@ export class UADEEngine {
     return this._loadPromise;
   }
 
+  /**
+   * Cancel an in-progress load/scan.
+   * The WASM scan continues in the worklet (it's synchronous and can't be stopped),
+   * but the result will be discarded when it arrives — the returned promise is rejected
+   * immediately so the caller can clean up.
+   */
+  cancelLoad(): void {
+    if (this._rejectLoad) {
+      this._rejectLoad(new Error('Scan cancelled'));
+    }
+    this._resolveLoad = null;
+    this._rejectLoad = null;
+    this._loadPromise = null;
+  }
+
   play(): void {
     this.workletNode?.port.postMessage({ type: 'play' });
   }
