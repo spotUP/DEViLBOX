@@ -37,23 +37,47 @@ const SYNTH_TO_DIV_INS_TYPE: Record<string, number> = {
   FurnaceOPNBB:   1,  // DIV_INS_FM=1
   FurnaceOPL:    14,  // DIV_INS_OPL=14
   FurnaceOPLL:   13,  // DIV_INS_OPLL=13
+  FurnaceVRC7:   13,  // DIV_INS_OPLL=13 (VRC7 uses OPLL format)
   FurnaceOPZ:    19,  // DIV_INS_OPZ=19
   FurnaceOPL4:   14,  // DIV_INS_OPL=14
   FurnaceY8950:  32,  // DIV_INS_OPL_DRUMS=32
   FurnaceESFM:   55,  // DIV_INS_ESFM=55
 
-  // PSG
-  FurnacePSG:     6,  // DIV_INS_AY=6
-  FurnaceAY:      6,  // DIV_INS_AY=6
-  FurnaceSN:      0,  // DIV_INS_STD=0 (SN76489 uses STD type)
-  FurnaceNES:    34,  // DIV_INS_NES=34
-  FurnaceGB:      2,  // DIV_INS_GB=2
-  FurnaceC64:     3,  // DIV_INS_C64=3
-  FurnacePOKEY:  20,  // DIV_INS_POKEY=20
-  FurnaceTED:    52,  // DIV_INS_TED=52
-  FurnaceVIC:    10,  // DIV_INS_VIC=10
-  FurnaceVERA:   24,  // DIV_INS_VERA=24
-  FurnaceSAA:     9,  // DIV_INS_SAA1099=9
+  // PSG / Chip
+  FurnacePSG:      6,  // DIV_INS_AY=6
+  FurnaceAY:       6,  // DIV_INS_AY=6
+  FurnaceAY8930:   7,  // DIV_INS_AY8930=7
+  FurnaceSN:       0,  // DIV_INS_STD=0
+  FurnaceNES:     34,  // DIV_INS_NES=34
+  FurnaceMMC5:    34,  // DIV_INS_NES=34 (MMC5 uses NES type)
+  FurnaceGB:       2,  // DIV_INS_GB=2
+  FurnaceC64:      3,  // DIV_INS_C64=3
+  FurnaceSID6581:  3,  // DIV_INS_C64=3 (6581 variant)
+  FurnaceSID8580:  3,  // DIV_INS_C64=3 (8580 variant)
+  FurnacePOKEY:   20,  // DIV_INS_POKEY=20
+  FurnaceTED:     52,  // DIV_INS_TED=52
+  FurnaceVIC:     10,  // DIV_INS_VIC=10
+  FurnaceVERA:    24,  // DIV_INS_VERA=24
+  FurnaceSAA:      9,  // DIV_INS_SAA1099=9
+  FurnaceTIA:      8,  // DIV_INS_TIA=8
+  FurnacePET:     11,  // DIV_INS_PET=11
+  FurnacePCSPKR:  21,  // DIV_INS_BEEPER=21
+  FurnaceZXBEEPER:21,  // DIV_INS_BEEPER=21
+  FurnaceSCVTONE: 21,  // DIV_INS_BEEPER=21 (closest match)
+  FurnaceSM8521:  48,  // DIV_INS_SM8521=48
+  FurnacePONG:     0,  // DIV_INS_STD=0
+  FurnacePV1000:  49,  // DIV_INS_PV1000=49
+  FurnaceDAVE:    58,  // DIV_INS_DAVE=58
+  FurnaceNDS:     59,  // DIV_INS_NDS=59
+  FurnaceGBA:     60,  // DIV_INS_GBA_DMA=60
+  FurnacePOKEMINI:47,  // DIV_INS_POKEMINI=47
+  FurnaceLynx:    23,  // DIV_INS_MIKEY=23
+  FurnaceSWAN:    22,  // DIV_INS_SWAN=22
+  FurnaceSU:      30,  // DIV_INS_SU=30
+  FurnacePOWERNOISE:56, // DIV_INS_POWERNOISE=56
+  FurnaceT6W28:   44,  // DIV_INS_T6W28=44
+  FurnaceSUPERVISION:64, // DIV_INS_SUPERVISION=64
+  FurnaceUPD1771: 65,  // DIV_INS_UPD1771C=65
 
   // Wavetable
   FurnaceSCC:    18,  // DIV_INS_SCC=18
@@ -61,18 +85,28 @@ const SYNTH_TO_DIV_INS_TYPE: Record<string, number> = {
   FurnaceFDS:    15,  // DIV_INS_FDS=15
   FurnacePCE:     5,  // DIV_INS_PCE=5
   FurnaceVB:     16,  // DIV_INS_VBOY=16
-  FurnaceWS:     22,  // DIV_INS_SWAN=22
+  FurnaceVRC6:   12,  // DIV_INS_VRC6=12
   FurnaceBubSys: 21,  // DIV_INS_BEEPER=21
+  FurnaceX1_010: 25,  // DIV_INS_X1_010=25
+  FurnaceNAMCO:  31,  // DIV_INS_NAMCO=31
+  FurnacePCMDAC: 28,  // DIV_INS_MULTIPCM=28 (closest match)
 
   // PCM
-  FurnaceSegaPCM: 39, // DIV_INS_SEGAPCM=39
-  FurnaceQSound:  40, // DIV_INS_QSOUND=40
-  FurnaceES5506:  27, // DIV_INS_ES5506=27
-  FurnaceRF5C68:  42, // DIV_INS_RF5C68=42
-  FurnaceC140:    53, // DIV_INS_C140=53
-  FurnaceK053260: 50, // DIV_INS_K053260=50
-  FurnaceAmiga:    4, // DIV_INS_AMIGA=4
-  FurnaceSNES:    29, // DIV_INS_SNES=29
+  FurnaceAMIGA:    4,  // DIV_INS_AMIGA=4
+  FurnaceSNES:    29,  // DIV_INS_SNES=29
+  FurnaceSEGAPCM: 39,  // DIV_INS_SEGAPCM=39
+  FurnaceQSOUND:  40,  // DIV_INS_QSOUND=40
+  FurnaceES5506:  27,  // DIV_INS_ES5506=27
+  FurnaceRF5C68:  42,  // DIV_INS_RF5C68=42
+  FurnaceC140:    53,  // DIV_INS_C140=53
+  FurnaceK053260: 50,  // DIV_INS_K053260=50
+  FurnaceK007232: 45,  // DIV_INS_K007232=45
+  FurnaceGA20:    46,  // DIV_INS_GA20=46
+  FurnaceOKI:     36,  // DIV_INS_MSM6295=36
+  FurnaceYMZ280B: 41,  // DIV_INS_YMZ280B=41
+  FurnaceMSM6258: 35,  // DIV_INS_MSM6258=35
+  FurnaceMSM5232: 43,  // DIV_INS_MSM5232=43
+  FurnaceMULTIPCM:28,  // DIV_INS_MULTIPCM=28
 };
 
 /* ── Field-by-field binary format (0xDE) ───────────────────────────────── *
