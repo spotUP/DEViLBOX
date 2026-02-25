@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 /* ── Basic types ─────────────────────────────────────────────────────── */
 typedef enum { SDL_FALSE = 0, SDL_TRUE = 1 } SDL_bool;
@@ -87,6 +88,69 @@ typedef enum {
 #define SDLK_KP_ENTER       1073741912
 #define SDLK_KP_PLUS        1073741911
 #define SDLK_KP_MINUS       1073741910
+#define SDLK_PLUS            '+'
+#define SDLK_MINUS           '-'
+#define SDLK_PERIOD          '.'
+#define SDLK_COMMA           ','
+#define SDLK_SEMICOLON       ';'
+#define SDLK_SLASH           '/'
+#define SDLK_BACKSLASH       '\\'
+#define SDLK_QUOTE           '\''
+#define SDLK_BACKQUOTE       '`'
+#define SDLK_LEFTBRACKET     '['
+#define SDLK_RIGHTBRACKET    ']'
+#define SDLK_EQUALS          '='
+#define SDLK_INSERT          1073741897
+#define SDLK_F2              1073741883
+#define SDLK_F3              1073741884
+#define SDLK_F4              1073741885
+#define SDLK_F5              1073741886
+#define SDLK_F6              1073741887
+#define SDLK_F7              1073741888
+#define SDLK_F8              1073741889
+#define SDLK_F9              1073741890
+#define SDLK_F10             1073741891
+#define SDLK_F11             1073741892
+
+/* Letter keys (lowercase ASCII) */
+#define SDLK_a 'a'
+#define SDLK_b 'b'
+#define SDLK_c 'c'
+#define SDLK_d 'd'
+#define SDLK_e 'e'
+#define SDLK_f 'f'
+#define SDLK_g 'g'
+#define SDLK_h 'h'
+#define SDLK_i 'i'
+#define SDLK_j 'j'
+#define SDLK_k 'k'
+#define SDLK_l 'l'
+#define SDLK_m 'm'
+#define SDLK_n 'n'
+#define SDLK_o 'o'
+#define SDLK_p 'p'
+#define SDLK_q 'q'
+#define SDLK_r 'r'
+#define SDLK_s 's'
+#define SDLK_t 't'
+#define SDLK_u 'u'
+#define SDLK_v 'v'
+#define SDLK_w 'w'
+#define SDLK_x 'x'
+#define SDLK_y 'y'
+#define SDLK_z 'z'
+
+/* Number keys */
+#define SDLK_0 '0'
+#define SDLK_1 '1'
+#define SDLK_2 '2'
+#define SDLK_3 '3'
+#define SDLK_4 '4'
+#define SDLK_5 '5'
+#define SDLK_6 '6'
+#define SDLK_7 '7'
+#define SDLK_8 '8'
+#define SDLK_9 '9'
 
 /* Key modifier flags */
 #define KMOD_NONE   0
@@ -290,9 +354,34 @@ static inline int  SDL_UpdateTexture(SDL_Texture *t, const SDL_Rect *r, const vo
 static inline int  SDL_LockTexture(SDL_Texture *t, const SDL_Rect *r, void **p, int *s) { (void)t;(void)r;if(p)*p=NULL;if(s)*s=0; return -1; }
 static inline void SDL_UnlockTexture(SDL_Texture *t)              { (void)t; }
 
-/* ── Surface no-ops ──────────────────────────────────────────────────── */
-static inline SDL_Surface *SDL_CreateRGBSurface(uint32_t f, int w, int h, int d, uint32_t rm, uint32_t gm, uint32_t bm, uint32_t am) { (void)f;(void)w;(void)h;(void)d;(void)rm;(void)gm;(void)bm;(void)am; return NULL; }
-static inline void SDL_FreeSurface(SDL_Surface *s)                { (void)s; }
+/* ── Surface ─────────────────────────────────────────────────────────── */
+static inline SDL_Surface *SDL_CreateRGBSurface(uint32_t f, int w, int h, int d, uint32_t rm, uint32_t gm, uint32_t bm, uint32_t am)
+{
+    (void)f;
+    SDL_Surface *s = (SDL_Surface *)calloc(1, sizeof(SDL_Surface));
+    if (!s) return NULL;
+    SDL_PixelFormat *fmt = (SDL_PixelFormat *)calloc(1, sizeof(SDL_PixelFormat));
+    if (!fmt) { free(s); return NULL; }
+    fmt->BitsPerPixel = (uint8_t)d;
+    fmt->BytesPerPixel = (uint8_t)(d / 8);
+    fmt->Rmask = rm; fmt->Gmask = gm; fmt->Bmask = bm; fmt->Amask = am;
+    s->format = fmt;
+    s->w = w;
+    s->h = h;
+    s->pitch = w * (d / 8);
+    s->pixels = calloc((size_t)(w * h), (size_t)(d / 8));
+    if (!s->pixels) { free(fmt); free(s); return NULL; }
+    return s;
+}
+static inline void SDL_FreeSurface(SDL_Surface *s) {
+    if (s) { free(s->pixels); free(s->format); free(s); }
+}
+static inline uint32_t SDL_MapRGB(const SDL_PixelFormat *fmt, uint8_t r, uint8_t g, uint8_t b)
+{
+    (void)fmt;
+    /* ARGB8888: 0xAARRGGBB (matches FT2's framebuffer format) */
+    return 0xFF000000u | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+}
 static inline int  SDL_SetSurfaceBlendMode(SDL_Surface *s, int m) { (void)s;(void)m; return 0; }
 static inline int  SDL_SetColorKey(SDL_Surface *s, int f, uint32_t k) { (void)s;(void)f;(void)k; return 0; }
 static inline int  SDL_SetSurfaceRLE(SDL_Surface *s, int f)       { (void)s;(void)f; return 0; }
@@ -341,6 +430,11 @@ static inline SDL_sem *SDL_CreateSemaphore(uint32_t val)          { (void)val; r
 static inline void SDL_DestroySemaphore(SDL_sem *s)               { free(s); }
 static inline int  SDL_SemWait(SDL_sem *s)                        { (void)s; return 0; }
 static inline int  SDL_SemPost(SDL_sem *s)                        { (void)s; return 0; }
+
+/* ── Clipboard no-ops ────────────────────────────────────────────────── */
+static inline int  SDL_SetClipboardText(const char *text)          { (void)text; return 0; }
+static inline char *SDL_GetClipboardText(void)                     { return (char*)calloc(1,1); }
+static inline int  SDL_HasClipboardText(void)                      { return 0; }
 
 /* ── Misc ────────────────────────────────────────────────────────────── */
 static inline void SDL_SetMainReady(void)                         {}

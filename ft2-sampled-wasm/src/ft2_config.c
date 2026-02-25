@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "ft2_config.h"
+#include "ft2_audio.h"
 
 config_t config;
 

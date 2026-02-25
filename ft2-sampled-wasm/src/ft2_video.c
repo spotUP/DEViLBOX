@@ -44,7 +44,7 @@ void endFPSCounter(void)    {}
 
 void updateWindowTitle(bool forceUpdate) { (void)forceUpdate; }
 void showErrorMsgBox(const char *fmt, ...) { (void)fmt; }
-void handleScopesFromChQueue(void *a, uint8_t *b) { (void)a; (void)b; }
+void handleScopesFromChQueue(chSyncData_t *a, uint8_t *b) { (void)a; (void)b; }
 
 void enterFullscreen(void)  {}
 void leaveFullscreen(void)  {}
