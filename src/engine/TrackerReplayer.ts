@@ -859,6 +859,19 @@ export class TrackerReplayer {
     this._warnedMissingInstruments = undefined;
     this.instrumentMap = new Map(song.instruments.map(i => [i.id, i]));
 
+    // Pre-load any embedded-buffer Sampler instruments so ToneEngine begins decoding
+    // immediately on song load rather than lazily on first note trigger.
+    // Without this, the first note fired per instrument is always dropped while
+    // decodeAudioData() runs asynchronously.
+    {
+      const engine = getToneEngine();
+      for (const inst of song.instruments) {
+        if (inst.synthType === 'Sampler' && inst.sample?.audioBuffer && !engine.getDecodedBuffer(inst.id)) {
+          engine.getInstrument(inst.id, inst);
+        }
+      }
+    }
+
     // Dispose old channels before creating new ones (prevent Web Audio node leaks)
     for (const ch of this.channels) {
       for (const p of ch.playerPool) {
