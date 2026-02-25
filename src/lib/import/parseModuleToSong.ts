@@ -95,16 +95,22 @@ export async function parseModuleToSong(file: File): Promise<TrackerSong> {
   }
 
   // ── Future Composer ──────────────────────────────────────────────────────
-  // UADE has real FutureComposer1.3/1.4 eagleplayers that handle FC timing
-  // and Paula output correctly. The JS FCParser is a partial reimplementation
-  // with timing issues. Engine preference controls which path is used.
+  // FCParser handles FC 1.3 (magic "FC13"/"SMOD") and FC 1.4 (magic "FC14").
+  // Future Composer 2 and other FC variants have different magic bytes and
+  // fall through to UADE automatically when the native parser rejects them.
   if (isFCFormat(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.fc === 'native') {
-      const { parseFCFile } = await import('@lib/import/formats/FCParser');
-      return parseFCFile(buffer, file.name);
+      try {
+        const { parseFCFile } = await import('@lib/import/formats/FCParser');
+        return parseFCFile(buffer, file.name);
+      } catch (err) {
+        // FC2 / unknown FC variant — native parser doesn't support it, use UADE
+        console.warn(`[FCParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, file.name);
+    return parseUADEFile(buffer, file.name, uadeMode);
   }
 
   // ── SoundMon (Brian Postma) ─────────────────────────────────────────────
