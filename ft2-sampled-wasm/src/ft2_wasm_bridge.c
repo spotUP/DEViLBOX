@@ -165,8 +165,11 @@ void ft2_sampled_load_pcm(int16_t *pcmData, int32_t numSamples)
     /* Fix interpolation edge taps */
     fixSample(s);
 
-    /* Redraw the waveform */
-    updateSampleEditor();
+    /* Reset view to show the full sample and redraw the waveform.
+     * updateSampleEditorSample() sets smpEd_ViewSize = numSamples and
+     * calls writeSample(true) directly. updateSampleEditor() alone only
+     * redraws labels/buttons and never triggers a waveform repaint. */
+    updateSampleEditorSample();
 }
 
 /* ── Parameter access ──────────────────────────────────────────────────── */
