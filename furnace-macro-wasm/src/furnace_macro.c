@@ -266,13 +266,20 @@ static void render_macro_editor(void) {
 static void render_scrollbar(void) {
     int sb_y = EDITOR_Y + EDITOR_H;
 
+    /* Guard against empty macro — must check before dividing */
+    if (g_macro_len <= 0) {
+        hwui_rect(g_fb, SCREEN_W, 0, sb_y, SCREEN_W, SCROLLBAR_H, HWUI_GRAY_DARK);
+        g_scroll_x = 0;
+        return;
+    }
+
     /* Only show scrollbar if macro is longer than visible area */
     int step_w = (SCREEN_W - 4) / g_macro_len;
     if (step_w < 3) step_w = 3;
     if (step_w > 20) step_w = 20;
     int visible_steps = (SCREEN_W - 4) / step_w;
 
-    if (g_macro_len <= visible_steps || g_macro_len == 0) {
+    if (g_macro_len <= visible_steps) {
         /* No scrollbar needed — draw flat bar */
         hwui_rect(g_fb, SCREEN_W, 0, sb_y, SCREEN_W, SCROLLBAR_H, HWUI_GRAY_DARK);
         g_scroll_x = 0;
