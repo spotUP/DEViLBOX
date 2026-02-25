@@ -4,6 +4,7 @@
 
 const AUDIO_EXTENSIONS = new Set([
   '.mp3', '.wav', '.flac', '.ogg', '.oga', '.aac', '.m4a', '.m4b', '.mp4', '.aif', '.aiff', '.opus', '.alac', '.wma', '.webm',
+  '.iff', '.8svx',  // Amiga IFF/8SVX samples
 ]);
 
 export function isAudioFile(filename: string): boolean {
@@ -25,6 +26,7 @@ export function getAudioFormatName(filename: string): string {
     case '.aac': return 'AAC';
     case '.m4a': return 'AAC/M4A';
     case '.aif': case '.aiff': return 'AIFF';
+    case '.iff': case '.8svx': return 'Amiga IFF/8SVX';
     case '.opus': return 'Opus';
     case '.wma': return 'WMA';
     default: return 'Audio';
