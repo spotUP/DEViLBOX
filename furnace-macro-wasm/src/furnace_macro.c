@@ -50,6 +50,14 @@ EM_JS(void, js_on_tab_change, (int tab), {
 #define SCREEN_W 640
 #define SCREEN_H 200
 
+/* SCALE=2: framebuffer rendered at 2× logical resolution for Retina displays.
+ * hwui_set_scale(SCALE) makes all drawing primitives multiply logical coords
+ * by SCALE — layout code stays fully in logical (SCREEN_W × SCREEN_H) space.
+ * Mouse events are divided by SCALE in handle_event. */
+#define SCALE   2
+#define PHYS_W  (SCREEN_W * SCALE)
+#define PHYS_H  (SCREEN_H * SCALE)
+
 #define TAB_BAR_H       18
 #define EDITOR_Y        20
 #define EDITOR_H        160  /* y=20..179 */
@@ -62,7 +70,7 @@ EM_JS(void, js_on_tab_change, (int tab), {
 static SDL_Window   *g_win;
 static SDL_Renderer *g_ren;
 static SDL_Texture  *g_tex;
-static uint32_t      g_fb[SCREEN_W * SCREEN_H];
+static uint32_t      g_fb[PHYS_W * PHYS_H];
 
 static int    g_active_macro = 0;
 static int    g_macro_len = 0;
@@ -106,12 +114,12 @@ static void render_tabs(void) {
         uint32_t bg = (i == g_active_macro) ? MACRO_COLORS[i] : HWUI_GRAY_DARK;
         uint32_t fg = (i == g_active_macro) ? HWUI_BLACK : HWUI_GRAY_LIGHT;
 
-        hwui_rect(g_fb, SCREEN_W, tx, 0, tw - 1, TAB_BAR_H, bg);
-        hwui_text_centered(g_fb, SCREEN_W, tx, 0, tw - 1, TAB_BAR_H, MACRO_NAMES[i], fg);
+        hwui_rect(g_fb, PHYS_W, tx, 0, tw - 1, TAB_BAR_H, bg);
+        hwui_text_centered(g_fb, PHYS_W, tx, 0, tw - 1, TAB_BAR_H, MACRO_NAMES[i], fg);
 
         /* 1px separator between tabs */
         if (i < MACRO_COUNT - 1) {
-            hwui_vline(g_fb, SCREEN_W, tx + tw - 1, 0, TAB_BAR_H, HWUI_BLACK);
+            hwui_vline(g_fb, PHYS_W, tx + tw - 1, 0, TAB_BAR_H, HWUI_BLACK);
         }
     }
 }
@@ -141,10 +149,10 @@ static void render_macro_editor(void) {
     int h = EDITOR_H;
 
     /* Sunken panel background */
-    hwui_panel_sunken(g_fb, SCREEN_W, x, y, w, h);
+    hwui_panel_sunken(g_fb, PHYS_W, x, y, w, h);
 
     if (g_macro_len == 0) {
-        hwui_text_centered(g_fb, SCREEN_W, x, y, w, h, "Empty macro", HWUI_GRAY_MED);
+        hwui_text_centered(g_fb, PHYS_W, x, y, w, h, "Empty macro", HWUI_GRAY_MED);
         return;
     }
 
@@ -172,14 +180,14 @@ static void render_macro_editor(void) {
     /* Gridlines at quarter intervals */
     for (int g = 1; g < 4; g++) {
         int gy = inner_y + inner_h - (g * inner_h / 4);
-        hwui_hline(g_fb, SCREEN_W, inner_x, gy, inner_w, 0xFF2A2A2A);
+        hwui_hline(g_fb, PHYS_W, inner_x, gy, inner_w, 0xFF2A2A2A);
     }
 
     /* Zero-line for signed macros (pitch, arp) */
     if (g_min_val < 0) {
         int zero_y = inner_y + inner_h - (-g_min_val) * inner_h / range;
         if (zero_y > inner_y && zero_y < inner_y + inner_h) {
-            hwui_hline(g_fb, SCREEN_W, inner_x, zero_y, inner_w, HWUI_GRAY_MED);
+            hwui_hline(g_fb, PHYS_W, inner_x, zero_y, inner_w, HWUI_GRAY_MED);
         }
     }
 
@@ -202,15 +210,15 @@ static void render_macro_editor(void) {
 
         /* Bar fill */
         if (bar_h > 0) {
-            hwui_rect(g_fb, SCREEN_W, bx, by, step_w - 1, bar_h, bar_fill);
+            hwui_rect(g_fb, PHYS_W, bx, by, step_w - 1, bar_h, bar_fill);
             /* Bright top edge */
-            hwui_hline(g_fb, SCREEN_W, bx, by, step_w - 1, bar_color);
+            hwui_hline(g_fb, PHYS_W, bx, by, step_w - 1, bar_color);
         }
 
         /* Step number labels (every 4th step, or every step if wide enough) */
         if (step_w >= 10 || (si % 4 == 0 && step_w >= 5)) {
             const char *label = hwui_fmt_int(si);
-            hwui_text(g_fb, SCREEN_W, bx + 1, inner_y + inner_h - 7, label, 0xFF444444);
+            hwui_text(g_fb, PHYS_W, bx + 1, inner_y + inner_h - 7, label, 0xFF444444);
         }
     }
 
@@ -219,9 +227,9 @@ static void render_macro_editor(void) {
         int loop_screen = g_loop_pos - g_scroll_x;
         if (loop_screen >= 0 && loop_screen < visible_steps) {
             int lx = inner_x + loop_screen * step_w;
-            hwui_vline(g_fb, SCREEN_W, lx, inner_y, inner_h, HWUI_BLUE);
-            hwui_vline(g_fb, SCREEN_W, lx + 1, inner_y, inner_h, HWUI_BLUE);
-            hwui_char(g_fb, SCREEN_W, lx + 3, inner_y + 1, 'L', HWUI_BLUE_LIGHT);
+            hwui_vline(g_fb, PHYS_W, lx, inner_y, inner_h, HWUI_BLUE);
+            hwui_vline(g_fb, PHYS_W, lx + 1, inner_y, inner_h, HWUI_BLUE);
+            hwui_char(g_fb, PHYS_W, lx + 3, inner_y + 1, 'L', HWUI_BLUE_LIGHT);
         }
     }
 
@@ -230,9 +238,9 @@ static void render_macro_editor(void) {
         int rel_screen = g_rel_pos - g_scroll_x;
         if (rel_screen >= 0 && rel_screen < visible_steps) {
             int rx = inner_x + rel_screen * step_w;
-            hwui_vline(g_fb, SCREEN_W, rx, inner_y, inner_h, HWUI_RED);
-            hwui_vline(g_fb, SCREEN_W, rx + 1, inner_y, inner_h, HWUI_RED);
-            hwui_char(g_fb, SCREEN_W, rx + 3, inner_y + 1, 'R', 0xFFFF6666);
+            hwui_vline(g_fb, PHYS_W, rx, inner_y, inner_h, HWUI_RED);
+            hwui_vline(g_fb, PHYS_W, rx + 1, inner_y, inner_h, HWUI_RED);
+            hwui_char(g_fb, PHYS_W, rx + 3, inner_y + 1, 'R', 0xFFFF6666);
         }
     }
 
@@ -268,7 +276,7 @@ static void render_scrollbar(void) {
 
     /* Guard against empty macro — must check before dividing */
     if (g_macro_len <= 0) {
-        hwui_rect(g_fb, SCREEN_W, 0, sb_y, SCREEN_W, SCROLLBAR_H, HWUI_GRAY_DARK);
+        hwui_rect(g_fb, PHYS_W, 0, sb_y, SCREEN_W, SCROLLBAR_H, HWUI_GRAY_DARK);
         g_scroll_x = 0;
         return;
     }
@@ -281,13 +289,13 @@ static void render_scrollbar(void) {
 
     if (g_macro_len <= visible_steps) {
         /* No scrollbar needed — draw flat bar */
-        hwui_rect(g_fb, SCREEN_W, 0, sb_y, SCREEN_W, SCROLLBAR_H, HWUI_GRAY_DARK);
+        hwui_rect(g_fb, PHYS_W, 0, sb_y, SCREEN_W, SCROLLBAR_H, HWUI_GRAY_DARK);
         g_scroll_x = 0;
         return;
     }
 
     int new_scroll = g_scroll_x;
-    if (hwui_scrollbar_h(g_fb, SCREEN_W, 0, sb_y, SCREEN_W, SCROLLBAR_H,
+    if (hwui_scrollbar_h(g_fb, PHYS_W, 0, sb_y, SCREEN_W, SCROLLBAR_H,
                           g_macro_len, visible_steps, g_scroll_x,
                           g_mouse_x, g_mouse_y, g_mouse_down, &new_scroll)) {
         g_scroll_x = new_scroll;
@@ -298,7 +306,7 @@ static void render_scrollbar(void) {
 /* ── Bottom Status Bar ─────────────────────────────────────────────────── */
 
 static void render_bottom_bar(void) {
-    hwui_rect(g_fb, SCREEN_W, 0, BOTTOM_BAR_Y, SCREEN_W, BOTTOM_BAR_H, HWUI_GRAY_DARK);
+    hwui_rect(g_fb, PHYS_W, 0, BOTTOM_BAR_Y, SCREEN_W, BOTTOM_BAR_H, HWUI_GRAY_DARK);
 
     int tx = 4;
     int ty = BOTTOM_BAR_Y + 2;
@@ -306,7 +314,7 @@ static void render_bottom_bar(void) {
     /* Length display */
     char len_buf[16];
     snprintf(len_buf, sizeof(len_buf), "Len:%d", g_macro_len);
-    tx += hwui_text(g_fb, SCREEN_W, tx, ty, len_buf, HWUI_GRAY_LIGHT) + 8;
+    tx += hwui_text(g_fb, PHYS_W, tx, ty, len_buf, HWUI_GRAY_LIGHT) + 8;
 
     /* Loop position */
     char loop_buf[16];
@@ -314,7 +322,7 @@ static void render_bottom_bar(void) {
         snprintf(loop_buf, sizeof(loop_buf), "Loop:%d", g_loop_pos);
     else
         snprintf(loop_buf, sizeof(loop_buf), "Loop:--");
-    tx += hwui_text(g_fb, SCREEN_W, tx, ty, loop_buf, HWUI_BLUE_LIGHT) + 8;
+    tx += hwui_text(g_fb, PHYS_W, tx, ty, loop_buf, HWUI_BLUE_LIGHT) + 8;
 
     /* Release position */
     char rel_buf[16];
@@ -322,26 +330,26 @@ static void render_bottom_bar(void) {
         snprintf(rel_buf, sizeof(rel_buf), "Rel:%d", g_rel_pos);
     else
         snprintf(rel_buf, sizeof(rel_buf), "Rel:--");
-    tx += hwui_text(g_fb, SCREEN_W, tx, ty, rel_buf, 0xFFFF6666) + 8;
+    tx += hwui_text(g_fb, PHYS_W, tx, ty, rel_buf, 0xFFFF6666) + 8;
 
     /* Mode display */
     int mode_idx = g_macro_mode;
     if (mode_idx < 0 || mode_idx >= MODE_COUNT) mode_idx = 0;
     char mode_buf[16];
     snprintf(mode_buf, sizeof(mode_buf), "Mode:%s", MODE_NAMES[mode_idx]);
-    tx += hwui_text(g_fb, SCREEN_W, tx, ty, mode_buf, HWUI_AMBER) + 8;
+    tx += hwui_text(g_fb, PHYS_W, tx, ty, mode_buf, HWUI_AMBER) + 8;
 
     /* Value range on the right */
     char range_buf[24];
     snprintf(range_buf, sizeof(range_buf), "Range:%d..%d", g_min_val, g_max_val);
-    hwui_text_right(g_fb, SCREEN_W, SCREEN_W - 4, ty, range_buf, HWUI_GRAY_LIGHT);
+    hwui_text_right(g_fb, PHYS_W, SCREEN_W - 4, ty, range_buf, HWUI_GRAY_LIGHT);
 }
 
 /* ── Main Render ───────────────────────────────────────────────────────── */
 
 static void render(void) {
     /* Clear framebuffer */
-    for (int i = 0; i < SCREEN_W * SCREEN_H; i++)
+    for (int i = 0; i < PHYS_W * PHYS_H; i++)
         g_fb[i] = HWUI_BLACK;
 
     hwui_frame_begin(g_mouse_x, g_mouse_y, g_mouse_down);
@@ -354,7 +362,7 @@ static void render(void) {
     hwui_frame_end();
 
     /* Push framebuffer to SDL texture */
-    SDL_UpdateTexture(g_tex, NULL, g_fb, SCREEN_W * sizeof(uint32_t));
+    SDL_UpdateTexture(g_tex, NULL, g_fb, PHYS_W * sizeof(uint32_t));
     SDL_RenderClear(g_ren);
     SDL_RenderCopy(g_ren, g_tex, NULL, NULL);
     SDL_RenderPresent(g_ren);
@@ -365,23 +373,23 @@ static void render(void) {
 static void handle_event(SDL_Event *e) {
     switch (e->type) {
     case SDL_MOUSEBUTTONDOWN:
-        g_mouse_x = e->button.x;
-        g_mouse_y = e->button.y;
+        g_mouse_x = e->button.x / SCALE;
+        g_mouse_y = e->button.y / SCALE;
         g_mouse_down = 1;
         g_dirty = 1;
         handle_tab_click();
         break;
 
     case SDL_MOUSEBUTTONUP:
-        g_mouse_x = e->button.x;
-        g_mouse_y = e->button.y;
+        g_mouse_x = e->button.x / SCALE;
+        g_mouse_y = e->button.y / SCALE;
         g_mouse_down = 0;
         g_dirty = 1;
         break;
 
     case SDL_MOUSEMOTION:
-        g_mouse_x = e->motion.x;
-        g_mouse_y = e->motion.y;
+        g_mouse_x = e->motion.x / SCALE;
+        g_mouse_y = e->motion.y / SCALE;
         if (g_mouse_down) g_dirty = 1;
         break;
 
@@ -424,20 +432,19 @@ void furnace_macro_init(int w, int h) {
     (void)w; (void)h;
 
     SDL_Init(SDL_INIT_VIDEO);
-    /* Window is 2× the logical size so the canvas fills Retina displays without
-     * requiring CSS upscaling. SDL_RenderSetLogicalSize keeps mouse coords and
-     * all drawing in the 640×200 logical space — no layout changes needed. */
+    /* SCALE=2: window = physical dimensions (1280×400). hwui_set_scale(SCALE)
+     * makes drawing primitives render each logical pixel as a SCALE×SCALE block.
+     * Mouse events are divided by SCALE in handle_event to get logical coords. */
     g_win = SDL_CreateWindow("Furnace Macro Editor",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        SCREEN_W * 2, SCREEN_H * 2, 0);
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
+        PHYS_W, PHYS_H, 0);
     g_ren = SDL_CreateRenderer(g_win, -1, SDL_RENDERER_SOFTWARE);
-    SDL_RenderSetLogicalSize(g_ren, SCREEN_W, SCREEN_H);
     g_tex = SDL_CreateTexture(g_ren, SDL_PIXELFORMAT_ARGB8888,
-        SDL_TEXTUREACCESS_STREAMING, SCREEN_W, SCREEN_H);
+        SDL_TEXTUREACCESS_STREAMING, PHYS_W, PHYS_H);
 
     memset(g_fb, 0, sizeof(g_fb));
-    hwui_set_fb_size(SCREEN_W, SCREEN_H);
+    hwui_set_fb_size(PHYS_W, PHYS_H);
+    hwui_set_scale(SCALE);
     memset(g_macro_data, 0, sizeof(g_macro_data));
 
     g_active_macro = 0;
