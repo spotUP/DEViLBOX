@@ -293,8 +293,9 @@ export async function parseFredEditorFile(
       if ((samplePointer < readPos && samplePointer !== 0) || samplePointer >= byteLength) {
         break;
       }
+      // Track minimum raw pointer (NOT basePtr-adjusted) so comparisons stay in consistent units
       if (samplePointer < minSamplePointer) {
-        minSamplePointer = basePtr + samplePointer;
+        minSamplePointer = samplePointer;
       }
     }
 
@@ -365,23 +366,18 @@ export async function parseFredEditorFile(
   // FlodJS: mixer.store(stream, stream.length - pos) where pos = basePtr + minSamplePointer
   // Then adjusts sample pointers relative to the stored memory base.
 
-  const pcmBase = minSamplePointer < 0x7fffffff ? minSamplePointer : 0;
+  // minSamplePointer is raw (relative to basePtr); convert to absolute file offset
+  const pcmBase = minSamplePointer < 0x7fffffff ? (basePtr + minSamplePointer) : 0;
   const pcmData = pcmBase > 0 && pcmBase < byteLength
     ? new Uint8Array(buffer, pcmBase, byteLength - pcmBase)
     : new Uint8Array(0);
 
   // Adjust sample pointers to be relative to pcmBase
+  // sample.pointer is raw (relative to basePtr); absolute = basePtr + sample.pointer
   if (pcmBase > 0) {
-    const adjustBase = basePtr + (minSamplePointer < 0x7fffffff
-      ? (minSamplePointer - basePtr)  // minSamplePointer is already basePtr + value
-      : 0);
     for (const sample of samples) {
       if (sample.pointer > 0) {
-        // FlodJS: sample.pointer -= (basePtr + pos) where pos was the raw min pointer offset
-        // Our minSamplePointer = basePtr + rawPointer, so pcmBase = minSamplePointer
-        // sample.pointer is raw (relative to basePtr)
-        // Adjusted pointer = (basePtr + sample.pointer) - pcmBase
-        sample.pointer = (basePtr + sample.pointer) - adjustBase;
+        sample.pointer = (basePtr + sample.pointer) - pcmBase;
       }
     }
   }
