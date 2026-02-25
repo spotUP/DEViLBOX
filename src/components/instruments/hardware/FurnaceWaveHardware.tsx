@@ -164,6 +164,7 @@ export const FurnaceWaveHardware: React.FC<FurnaceWaveHardwareProps & { synthTyp
 
   return (
     <SDLHardwareWrapper
+      imageRendering="auto"
       moduleUrl="/furnace/FurnaceWave.js"
       factoryName="createFurnaceWave"
       canvasWidth={560}
