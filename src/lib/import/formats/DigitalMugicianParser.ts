@@ -768,7 +768,7 @@ export async function parseDigitalMugicianFile(
         solo: false,
         collapsed: false,
         volume: 100,
-        pan: ch === 0 || ch === 3 ? -25 : 25, // LRRL Amiga panning
+        pan: (ch === 0 || ch === 3) ? -50 : 50, // LRRL Amiga panning
         instrumentId: null,
         color: null,
         rows,
@@ -827,7 +827,7 @@ function makeEmptyPattern(filename: string): Pattern {
       solo: false,
       collapsed: false,
       volume: 100,
-      pan: ch === 0 || ch === 3 ? -25 : 25,
+      pan: (ch === 0 || ch === 3) ? -50 : 50,
       instrumentId: null,
       color: null,
       rows: Array.from({ length: 64 }, (): TrackerCell => ({

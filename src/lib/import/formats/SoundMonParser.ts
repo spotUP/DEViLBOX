@@ -683,7 +683,7 @@ export async function parseSoundMonFile(
         solo: false,
         collapsed: false,
         volume: 100,
-        pan: ch % 2 === 0 ? -25 : 25, // Amiga LRRL panning
+        pan: (ch === 0 || ch === 3) ? -50 : 50, // Amiga LRRL panning
         instrumentId: null,
         color: null,
         rows,
@@ -752,7 +752,7 @@ function createEmptyPattern(filename: string): Pattern {
       solo: false,
       collapsed: false,
       volume: 100,
-      pan: ch % 2 === 0 ? -25 : 25,
+      pan: (ch === 0 || ch === 3) ? -50 : 50,
       instrumentId: null,
       color: null,
       rows: Array.from({ length: 16 }, () => emptyCell()),
