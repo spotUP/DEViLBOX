@@ -15,7 +15,7 @@ import {
   type ModuleInfo,
 } from '@lib/import/ModuleLoader';
 import { isUADEFormat } from '@lib/import/formats/UADEParser';
-import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
 
 export interface ImportOptions {
   useLibopenmpt: boolean;  // Use libopenmpt for sample-accurate playback
@@ -28,20 +28,47 @@ interface ImportModuleDialogProps {
   initialFile?: File | null; // Pre-loaded file (from drag-drop)
 }
 
+// ── Format detection ──────────────────────────────────────────────────────────
+
+type NativeFormatKey = 'fc' | 'soundmon' | 'sidmon2' | 'fred' | 'soundfx' | 'mugician';
+
+const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label: string; description: string }> = [
+  { key: 'fc',       regex: /\.(fc|fc2|fc3|fc4|fc13|fc14|sfc|smod|bfc|bsi)$/i, label: 'Future Composer', description: 'Handles FC 1.3/1.4. FC2 auto-falls back to UADE.' },
+  { key: 'soundmon', regex: /\.(bp|bp3|sndmon)$/i,                              label: 'SoundMon',        description: 'Brian Postma\'s SoundMon V1/V2/V3.' },
+  { key: 'sidmon2',  regex: /\.(sid2|smn)$/i,                                   label: 'SidMon II',       description: 'SidMon II — MIDI version.' },
+  { key: 'fred',     regex: /\.fred$/i,                                          label: 'Fred Editor',     description: 'Fred Editor by Software of Sweden.' },
+  { key: 'soundfx',  regex: /\.(sfx|sfx13)$/i,                                  label: 'Sound-FX',        description: 'Sound-FX v1.0 and v2.0.' },
+  { key: 'mugician', regex: /\.(dmu|dmu2|mug|mug2)$/i,                          label: 'Digital Mugician', description: 'Digital Mugician V1/V2 by Rob Hubbard.' },
+];
+
+function detectNativeFormat(filename: string): (typeof NATIVE_FORMAT_PATTERNS)[number] | null {
+  return NATIVE_FORMAT_PATTERNS.find(f => f.regex.test(filename)) ?? null;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   isOpen,
   onClose,
   onImport,
   initialFile,
 }) => {
-  const [moduleInfo, setModuleInfo] = useState<ModuleInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [useLibopenmpt, setUseLibopenmpt] = useState(true); // Default to libopenmpt for accuracy
+  const [moduleInfo, setModuleInfo]     = useState<ModuleInfo | null>(null);
+  const [loadedFileName, setLoadedFileName] = useState('');
+  const [isLoading, setIsLoading]       = useState(false);
+  const [error, setError]               = useState<string | null>(null);
+  const [isPlaying, setIsPlaying]       = useState(false);
+  const [useLibopenmpt, setUseLibopenmpt] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const uadeMode = useSettingsStore((s) => s.formatEngine.uade) ?? 'enhanced';
+
+  const formatEngine   = useSettingsStore((s) => s.formatEngine);
   const setFormatEngine = useSettingsStore((s) => s.setFormatEngine);
+
+  // Derived format state
+  const nativeFmt  = detectNativeFormat(loadedFileName);
+  const isUADE     = !nativeFmt && isUADEFormat(loadedFileName);
+  const isNativeSelected = nativeFmt ? (formatEngine[nativeFmt.key] as string) !== 'uade' : false;
+  const uadeMode   = formatEngine.uade ?? 'enhanced';
 
   const handleFileSelect = useCallback(async (file: File) => {
     if (!isSupportedModule(file.name)) {
@@ -52,6 +79,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setIsLoading(true);
     setError(null);
     setModuleInfo(null);
+    setLoadedFileName(file.name.toLowerCase());
 
     try {
       const info = await loadModuleFile(file);
@@ -87,7 +115,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
   const handlePreview = useCallback(() => {
     if (!moduleInfo) return;
-
     if (isPlaying) {
       stopPreview(moduleInfo);
       setIsPlaying(false);
@@ -99,27 +126,27 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
   const handleImport = useCallback(() => {
     if (!moduleInfo) return;
-
     if (isPlaying) {
       stopPreview(moduleInfo);
       setIsPlaying(false);
     }
-
     onImport(moduleInfo, { useLibopenmpt });
     onClose();
   }, [moduleInfo, isPlaying, onImport, onClose, useLibopenmpt]);
 
   const handleClose = useCallback(() => {
-    if (moduleInfo && isPlaying) {
-      stopPreview(moduleInfo);
-    }
+    if (moduleInfo && isPlaying) stopPreview(moduleInfo);
     setModuleInfo(null);
+    setLoadedFileName('');
     setError(null);
     setIsPlaying(false);
     onClose();
   }, [moduleInfo, isPlaying, onClose]);
 
   if (!isOpen) return null;
+
+  // Whether to show UADE enhanced/classic sub-selector
+  const showUADEModeSelector = isUADE || (nativeFmt && !isNativeSelected);
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
@@ -130,18 +157,13 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
             <FileAudio size={18} className="text-accent-primary" />
             <h2 className="text-sm font-semibold text-text-primary">Import Tracker Module</h2>
           </div>
-          <Button
-            variant="icon"
-            size="icon"
-            onClick={handleClose}
-            aria-label="Close dialog"
-          >
+          <Button variant="icon" size="icon" onClick={handleClose} aria-label="Close dialog">
             <X size={16} />
           </Button>
         </div>
 
         {/* Body */}
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(80vh-110px)]">
           {/* Drop zone */}
           <div
             onDrop={handleDrop}
@@ -159,7 +181,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
               onChange={handleInputChange}
               className="hidden"
             />
-
             {isLoading ? (
               <div className="flex flex-col items-center gap-2">
                 <div className="w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
@@ -168,12 +189,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
             ) : (
               <div className="flex flex-col items-center gap-2">
                 <Upload size={32} className="text-text-muted" />
-                <p className="text-sm text-text-primary">
-                  Drop a tracker file here or click to browse
-                </p>
-                <p className="text-xs text-text-muted">
-                  Supports MOD, XM, IT, S3M and 20+ other formats
-                </p>
+                <p className="text-sm text-text-primary">Drop a tracker file here or click to browse</p>
+                <p className="text-xs text-text-muted">Supports MOD, XM, IT, S3M and 20+ other formats</p>
               </div>
             )}
           </div>
@@ -192,9 +209,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Music size={16} className="text-accent-primary" />
-                  <span className="font-medium text-text-primary">
-                    {moduleInfo.metadata.title}
-                  </span>
+                  <span className="font-medium text-text-primary">{moduleInfo.metadata.title}</span>
                 </div>
                 <span className="text-xs px-2 py-0.5 bg-accent-primary/20 text-accent-primary rounded">
                   {moduleInfo.metadata.type}
@@ -249,10 +264,82 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
             </div>
           )}
 
-          {/* UADE Engine Selector — shown for exotic Amiga formats */}
-          {moduleInfo && isUADEFormat(moduleInfo.metadata.title || initialFile?.name || '') && (
+          {/* ── Engine selector for formats with a native parser ── */}
+          {moduleInfo && nativeFmt && (
             <div className="bg-dark-bg rounded-lg p-3 space-y-2">
-              <p className="text-xs font-medium text-text-primary mb-2">Import Engine</p>
+              <p className="text-xs font-medium text-text-primary">
+                Import Engine — <span className="text-accent-primary">{nativeFmt.label}</span>
+              </p>
+
+              {/* Native parser option */}
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="nativeEngine"
+                  checked={isNativeSelected}
+                  onChange={() => setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'native')}
+                  className="mt-0.5 accent-accent-primary"
+                />
+                <div>
+                  <span className="text-sm text-text-primary">Native Parser (Fully Editable)</span>
+                  <p className="text-xs text-text-muted">{nativeFmt.description}</p>
+                </div>
+              </label>
+
+              {/* UADE option */}
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="nativeEngine"
+                  checked={!isNativeSelected}
+                  onChange={() => setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'uade')}
+                  className="mt-0.5 accent-accent-primary"
+                />
+                <div>
+                  <span className="text-sm text-text-primary">UADE (Amiga Emulation)</span>
+                  <p className="text-xs text-text-muted">Use UADE emulator instead of native parser.</p>
+                </div>
+              </label>
+
+              {/* UADE mode sub-selector — shown when UADE is chosen for this format */}
+              {showUADEModeSelector && (
+                <div className="mt-2 ml-5 pl-3 border-l border-dark-border space-y-1.5">
+                  <p className="text-xs text-text-muted font-medium">UADE Mode</p>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="uadeMode"
+                      checked={uadeMode === 'enhanced'}
+                      onChange={() => setFormatEngine('uade', 'enhanced')}
+                      className="mt-0.5 accent-accent-primary"
+                    />
+                    <div>
+                      <span className="text-sm text-text-primary">Enhanced (Editable)</span>
+                      <p className="text-xs text-text-muted">Extracts real samples, detects effects.</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="uadeMode"
+                      checked={uadeMode === 'classic'}
+                      onChange={() => setFormatEngine('uade', 'classic')}
+                      className="mt-0.5 accent-accent-primary"
+                    />
+                    <div>
+                      <span className="text-sm text-text-primary">Classic (Playback Only)</span>
+                      <p className="text-xs text-text-muted">Authentic emulation, display-only patterns.</p>
+                    </div>
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Engine selector for pure UADE formats (no native parser) ── */}
+          {moduleInfo && isUADE && (
+            <div className="bg-dark-bg rounded-lg p-3 space-y-2">
+              <p className="text-xs font-medium text-text-primary">Import Engine</p>
               <label className="flex items-start gap-2 cursor-pointer">
                 <input
                   type="radio"
@@ -286,8 +373,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
             </div>
           )}
 
-          {/* Playback options — shown for non-UADE formats */}
-          {moduleInfo && !isUADEFormat(moduleInfo.metadata.title || initialFile?.name || '') && (
+          {/* ── Playback options for standard tracker formats (MOD/XM/IT/S3M) ── */}
+          {moduleInfo && !nativeFmt && !isUADE && (
             <div className="bg-dark-bg rounded-lg p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <input
@@ -312,7 +399,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
           )}
 
           {/* Import note */}
-          {moduleInfo && !useLibopenmpt && !isUADEFormat(moduleInfo.metadata.title || initialFile?.name || '') && (
+          {moduleInfo && !nativeFmt && !isUADE && !useLibopenmpt && (
             <p className="text-xs text-text-muted">
               Note: Importing will create patterns and sampler instruments from this module.
               Complex effects may not translate perfectly.
@@ -322,19 +409,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
         {/* Footer */}
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-dark-border">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClose}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleImport}
-            disabled={!moduleInfo}
-          >
+          <Button variant="ghost" size="sm" onClick={handleClose}>Cancel</Button>
+          <Button variant="primary" size="sm" onClick={handleImport} disabled={!moduleInfo}>
             Import Module
           </Button>
         </div>
