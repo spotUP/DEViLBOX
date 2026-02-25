@@ -65,6 +65,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
   const [selectedSubsong, setSelectedSubsong] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Track whether a UADE scan is in-flight so handleClose can cancel it
+  const uadeScanActiveRef = useRef(false);
 
   const formatEngine   = useSettingsStore((s) => s.formatEngine);
   const setFormatEngine = useSettingsStore((s) => s.setFormatEngine);
@@ -99,6 +101,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
         const { UADEEngine } = await import('@engine/uade/UADEEngine');
         const engine = UADEEngine.getInstance();
         await engine.ready();
+        uadeScanActiveRef.current = true;
         const uadeMeta = await engine.load(buf, file.name);
         setUadeMetadata(uadeMeta);
         // Create a minimal ModuleInfo so the Import button is enabled
@@ -117,8 +120,12 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
           file,
         });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load UADE format');
+        // Don't show "Scan cancelled" as an error — that's expected from handleClose
+        if (!(err instanceof Error && err.message === 'Scan cancelled')) {
+          setError(err instanceof Error ? err.message : 'Failed to load UADE format');
+        }
       } finally {
+        uadeScanActiveRef.current = false;
         setIsLoading(false);
       }
       return;
@@ -180,6 +187,12 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
   const handleClose = useCallback(() => {
     if (moduleInfo && isPlaying) stopPreview(moduleInfo);
+    // Cancel any in-flight UADE scan so it doesn't resolve after the dialog closes
+    if (uadeScanActiveRef.current) {
+      import('@engine/uade/UADEEngine').then(({ UADEEngine }) => {
+        if (UADEEngine.hasInstance()) UADEEngine.getInstance().cancelLoad();
+      }).catch(() => {});
+    }
     setModuleInfo(null);
     setLoadedFileName('');
     setError(null);

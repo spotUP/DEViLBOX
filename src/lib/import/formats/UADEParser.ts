@@ -522,11 +522,16 @@ function buildEnhancedSong(
           return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
         }
 
-        // Convert Amiga period to note for TrackerReplayer.
-        // periodToNoteIndex returns 1-based index into the Amiga period table (1-36).
-        // noteToPeriod(n) uses noteIndex = n-1, so we must NOT add another +1.
+        // Convert Amiga period to XM-compatible note number for TrackerReplayer.
+        // periodToNoteIndex returns an internal absolute index (C-1=36, C-2=48, C-3=60).
+        // TrackerReplayer.noteToPeriod expects XM-style 1-based note numbers (C-1=13, C-2=25, C-3=37).
+        // Offset: xmNote = noteIdx - 23.
+        // We also store the raw Amiga period so TrackerReplayer.noteToPeriod uses it
+        // directly (via rawPeriodToFinetuned) rather than going through noteToPeriod,
+        // which ensures correct period → playbackRate calculation in MOD mode.
         const noteIdx = periodToNoteIndex(ch.period);
-        const note = noteIdx > 0 ? Math.min(96, noteIdx) : 0;
+        const xmNote = noteIdx > 0 ? noteIdx - 23 : 0;
+        const note = (xmNote > 0 && xmNote <= 96) ? xmNote : 0;
         const instrId = ch.samplePtr > 0 ? (sampleMap.get(ch.samplePtr) ?? 0) : 0;
         const rawVol = Math.min(0x50, 0x10 + ch.volume);
         // Only write volume when it changes from the previous row — reduces pattern bloat
@@ -539,6 +544,7 @@ function buildEnhancedSong(
 
         return {
           note,
+          period: ch.period > 0 ? ch.period : undefined,  // Raw Amiga period for pitch-correct MOD-mode playback
           instrument: instrId,
           volume,
           effTyp,
@@ -698,7 +704,9 @@ function buildClassicSong(
         }
 
         const noteIdx = periodToNoteIndex(ch.period);
-        const note = noteIdx >= 0 ? Math.min(96, Math.max(1, noteIdx + 1)) : 0;
+        // Convert internal note index to XM-compatible note number: C-1=36→13, C-2=48→25 (offset -23)
+        const xmNote = noteIdx > 0 ? noteIdx - 23 : 0;
+        const note = (xmNote > 0 && xmNote <= 96) ? xmNote : 0;
         const instrId = ch.samplePtr > 0 ? (sampleMap.get(ch.samplePtr) ?? 0) : 0;
         const volume = Math.min(0x50, 0x10 + ch.volume);
 
