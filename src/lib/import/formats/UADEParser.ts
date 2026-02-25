@@ -345,9 +345,25 @@ export async function parseUADEFile(
 
   // If enhanced scan data is available AND mode is 'enhanced', build editable song
   if (mode === 'enhanced' && metadata.enhancedScan) {
-    return buildEnhancedSong(
+    const song = buildEnhancedSong(
       name, ext, filename, buffer, metadata, scanRows, periodToNoteIndex,
     );
+    // Fall back to classic if enhanced scan yielded no playable instruments.
+    // This happens for synthesis-only formats, all-zero PCM, or pure VBlank formats
+    // where no chip RAM samples were extracted.
+    const hasPlayableInstruments = song.instruments.some(
+      i => i.synthType === 'Sampler' && i.sample?.audioBuffer,
+    );
+    if (hasPlayableInstruments) {
+      // Surface any scan-quality warnings in the song name so the user sees them
+      const warnings = metadata.enhancedScan?.warnings ?? [];
+      if (warnings.length > 0) {
+        console.warn('[UADEParser] Scan warnings:', warnings);
+        song.name = `${song.name} [${warnings.join('; ')}]`;
+      }
+      return song;
+    }
+    console.warn('[UADEParser] Enhanced scan yielded no playable instruments, falling back to classic');
   }
 
   // Classic mode: UADESynth playback with display-only patterns

@@ -553,6 +553,21 @@ class UADEProcessor extends AudioWorkletProcessor {
           }
         }
 
+        // Detect loop reload: lc changed while DMA was active.
+        // The new lc is the loop-start address; offset from the original sample start
+        // gives us the loop start in bytes within the cached PCM buffer.
+        const prevLc = prevSamplePtrs[ch];
+        if (prevLc !== lc && prevLc > 0 && lc > 0 && dma) {
+          const prevSample = sampleCache.get(prevLc);
+          if (prevSample && prevSample.loopStart === 0 && lc >= prevLc) {
+            const relLoopStart = lc - prevLc;
+            if (relLoopStart < prevSample.length) {
+              prevSample.loopStart = relLoopStart;
+              prevSample.loopLength = wlen > 1 ? wlen * 2 : 0;
+            }
+          }
+        }
+
         const triggered = per !== prevPeriods[ch] && per > 0 && dma;
         const sampleChanged = lc !== prevSamplePtrs[ch] && lc > 0;
 
@@ -598,6 +613,8 @@ class UADEProcessor extends AudioWorkletProcessor {
     // BPM = (vblankHz * 2.5 * PAL_CLOCK_CONSTANT) / ciaBTA  or heuristic
     // For CIA timer: BPM ≈ 1773447 / (ciaBTA + 1)  [PAL systems]
     // For VBlank-based: fixed 125 BPM at speed 6
+
+    const warnings = []; // Degradation notices collected during scan
 
     // Detect BPM from most common CIA-B Timer A value.
     // ciaReliable=true when CIA-B is actually driving BPM (most MOD/XM/S3M formats).
@@ -657,6 +674,40 @@ class UADEProcessor extends AudioWorkletProcessor {
       }
     }
 
+    // VBlank-based BPM estimation for formats where CIA-B doesn't drive timing.
+    // For PAL Amiga: 50 Hz VBlank; NTSC: 60 Hz. Speed = VBlanks between note triggers.
+    if (!ciaReliable) {
+      const vblankHz = tickSnapshots[0]?.vblankHz || 50;
+      const vblankInterval = Math.round(sr / vblankHz);
+      const triggerFrames = [];
+      let lastTriggerFrame = 0;
+      for (let i = 0; i < tickSnapshots.length; i++) {
+        const tick = tickSnapshots[i];
+        const anyTrigger = tick.channels.some(ch => ch.triggered);
+        if (anyTrigger) {
+          if (lastTriggerFrame > 0) {
+            triggerFrames.push(tick.frame - lastTriggerFrame);
+          }
+          lastTriggerFrame = tick.frame;
+        }
+      }
+      if (triggerFrames.length > 5) {
+        triggerFrames.sort((a, b) => a - b);
+        const median = triggerFrames[Math.floor(triggerFrames.length / 2)];
+        const estimatedSpeed = Math.max(1, Math.min(31, Math.round(median / vblankInterval)));
+        if (estimatedSpeed >= 1 && estimatedSpeed <= 31) {
+          detectedSpeed = estimatedSpeed;
+          // BPM back-calculated: standard Amiga formula BPM = vblankHz * 2.5 / speed
+          detectedBPM = Math.max(32, Math.min(999, Math.round(vblankHz * 2.5 / estimatedSpeed)));
+          warnings.push('CIA unreliable — VBlank BPM estimated: ' + detectedBPM + ' BPM / speed ' + detectedSpeed);
+        } else {
+          warnings.push('CIA unreliable — tempo unknown, defaulted to 125 BPM / speed 6');
+        }
+      } else {
+        warnings.push('CIA unreliable — too few note triggers to estimate tempo, defaulted to 125 BPM / speed 6');
+      }
+    }
+
     const actualFPR = Math.round(sr * 2.5 * detectedSpeed / detectedBPM);
 
     // Phase 3: Group tick snapshots into rows and detect effects
@@ -710,6 +761,7 @@ class UADEProcessor extends AudioWorkletProcessor {
       tempoChanges,
       bpm: detectedBPM,
       speed: detectedSpeed,
+      warnings,
       isEnhanced: true,
     };
   }
@@ -770,30 +822,29 @@ class UADEProcessor extends AudioWorkletProcessor {
       let eff = 0;
 
       if (periods.length >= 3) {
-        // Check for arpeggio: 3-step period cycling
+        // Check for arpeggio: detect repeating period cycles of length 1, 2, or 3.
+        // Most Amiga arpeggios run every 1 or 2 ticks (not just 3).
         const uniquePeriods = [...new Set(periods)];
-        if (uniquePeriods.length === 3 || uniquePeriods.length === 2) {
-          // Check if periods cycle (arpeggio pattern)
-          const sorted = [...uniquePeriods].sort((a, b) => a - b);
-          const base = sorted[0];
-          // Convert period differences to semitones
-          // period_ratio = 2^(semitones/12)
-          if (sorted.length >= 2) {
-            const semi1 = Math.round(12 * Math.log2(base / sorted[Math.min(1, sorted.length - 1)]));
-            const semi2 = sorted.length >= 3 ? Math.round(12 * Math.log2(base / sorted[2])) : 0;
-            if (Math.abs(semi1) > 0 && Math.abs(semi1) <= 15 &&
-                Math.abs(semi2) >= 0 && Math.abs(semi2) <= 15) {
-              // Check if periods actually cycle (not just varying)
-              let cycling = false;
-              if (periods.length >= 4) {
-                // At least 2 full cycles
-                cycling = periods[0] === periods[3] || (periods.length >= 6 && periods[0] === periods[3]);
-              }
-              if (cycling) {
-                effTyp = 0; // Arpeggio (effect 0)
-                eff = (Math.abs(semi1) << 4) | Math.abs(semi2);
-              }
-            }
+        for (const cycleLen of [1, 2, 3]) {
+          if (effTyp !== 0) break;
+          if (periods.length < cycleLen + 1) continue;
+          const cycle = periods.slice(0, cycleLen);
+          // Verify the rest of the period array repeats this cycle
+          let repeating = true;
+          for (let t = cycleLen; t < periods.length; t++) {
+            if (periods[t] !== cycle[t % cycleLen]) { repeating = false; break; }
+          }
+          if (!repeating) continue;
+          // Found a repeating cycle — convert to semitone offsets from base period
+          const sortedCycle = [...new Set(cycle)].sort((a, b) => a - b);
+          if (sortedCycle.length < 2) continue; // All same period = no arpeggio
+          const base = sortedCycle[0];
+          const semi1 = Math.round(12 * Math.log2(base / sortedCycle[Math.min(1, sortedCycle.length - 1)]));
+          const semi2 = sortedCycle.length >= 3 ? Math.round(12 * Math.log2(base / sortedCycle[2])) : 0;
+          if (Math.abs(semi1) > 0 && Math.abs(semi1) <= 15 &&
+              Math.abs(semi2) >= 0 && Math.abs(semi2) <= 15) {
+            effTyp = 0; // Arpeggio (effect 0)
+            eff = (Math.abs(semi1) << 4) | Math.abs(semi2);
           }
         }
 
