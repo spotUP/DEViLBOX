@@ -386,7 +386,7 @@ export async function parseDigitalMugicianFile(
       if (sample.wave < 32) continue;
 
       const headerOff = instrHeaderStart + ((sample.wave - 32) << 5);
-      if (headerOff + 20 > buf.length) continue;
+      if (headerOff + 24 > buf.length) continue;  // ptrStart(4)+ptrEnd(4)+loopPtr(4)+name(12)
 
       const ptrStart = u32BE(buf, headerOff);
       const ptrEnd = u32BE(buf, headerOff + 4);
