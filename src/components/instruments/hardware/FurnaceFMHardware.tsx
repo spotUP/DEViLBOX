@@ -180,7 +180,7 @@ export const FurnaceFMHardware: React.FC<FurnaceFMHardwareProps> = ({ config, on
 
   return (
     <SDLHardwareWrapper
-      imageRendering="auto"
+      imageRendering="pixelated"
       moduleUrl="/furnace/FurnaceFM.js"
       factoryName="createFurnaceFM"
       canvasWidth={640}

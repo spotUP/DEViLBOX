@@ -491,7 +491,7 @@ export const FurnaceInsEdHardware: React.FC<FurnaceInsEdHardwareProps> = ({
 
   return (
     <SDLHardwareWrapper
-      imageRendering="auto"
+      imageRendering="pixelated"
       moduleUrl={`/furnace-gui/FurnaceInsEd.js?v=${WASM_VERSION}`}
       factoryName="createFurnaceInsEd"
       canvasWidth={1280}
