@@ -20,6 +20,8 @@ import { useMIDIStore } from '@/stores/useMIDIStore';
 import { notify } from '@stores/useNotificationStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { InstrumentConfig } from '@/types/instrument';
+import type { ModuleInfo } from '@/lib/import/ModuleLoader';
+import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 
 const LazySettingsModal = lazy(() =>
   import('@/components/dialogs/SettingsModal').then(m => ({ default: m.SettingsModal }))
@@ -117,6 +119,9 @@ const LazyCollaborationModal = lazy(() =>
 const LazyDownloadModal = lazy(() =>
   import('@/components/dialogs/DownloadModal').then(m => ({ default: m.DownloadModal }))
 );
+const LazyImportModuleDialog = lazy(() =>
+  import('@/components/dialogs/ImportModuleDialog').then(m => ({ default: m.ImportModuleDialog }))
+);
 
 export const WebGLModalBridge: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -132,6 +137,8 @@ export const WebGLModalBridge: React.FC = () => {
   const activeView = useUIStore(s => s.activeView);
   const showTD3Pattern = useMIDIStore(s => s.showPatternDialog);
   const closePatternDialog = useMIDIStore(s => s.closePatternDialog);
+  const pendingModuleFile = useUIStore(s => s.pendingModuleFile);
+  const setPendingModuleFile = useUIStore(s => s.setPendingModuleFile);
 
   // Portal container on document.body — ensures modals render above
   // PixiDOMOverlay divs (z-index 10) which are also direct body children.
@@ -247,6 +254,24 @@ export const WebGLModalBridge: React.FC = () => {
       notify.error('Failed to load project');
     }
   }, [setShowFileBrowser]);
+
+  // Handler for ImportModuleDialog in GL mode — called when user confirms import.
+  // Uses UnifiedFileLoader to keep behaviour identical to the DOM mode confirm path.
+  const handleModuleImportGL = useCallback(async (info: ModuleInfo, _options: ImportOptions) => {
+    setPendingModuleFile(null);
+    try {
+      const { loadFile } = await import('@lib/file/UnifiedFileLoader');
+      const result = await loadFile(info.file, {});
+      if (result.success === true) {
+        notify.success(result.message);
+      } else if (result.success === false) {
+        notify.error(result.error);
+      }
+    } catch (error) {
+      console.error('[WebGLModalBridge] Module import failed:', error);
+      notify.error('Failed to import file');
+    }
+  }, [setPendingModuleFile]);
 
   const handleLoadTrackerModule = useCallback(async (buffer: ArrayBuffer, filename: string) => {
     const { isPlaying, stop } = useTransportStore.getState();
@@ -500,6 +525,16 @@ export const WebGLModalBridge: React.FC = () => {
       )}
       {modalOpen === 'download' && (
         <LazyDownloadModal isOpen={true} onClose={closeModal} />
+      )}
+      {/* Module file drop — ImportModuleDialog routed through portal so it renders
+          above PixiDOMOverlay elements (modals inside React root sit below them) */}
+      {pendingModuleFile && (
+        <LazyImportModuleDialog
+          isOpen={true}
+          onClose={() => setPendingModuleFile(null)}
+          onImport={handleModuleImportGL}
+          initialFile={pendingModuleFile}
+        />
       )}
       {/* Always-mounted dialogs */}
       <LazySynthErrorDialog />
