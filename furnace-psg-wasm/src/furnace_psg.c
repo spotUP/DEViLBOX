@@ -1152,7 +1152,7 @@ void furnace_psg_init(int w, int h) {
 }
 
 void furnace_psg_start(void) {
-    emscripten_set_main_loop(tick, 60, 0);
+    emscripten_set_main_loop(tick, 0, 0);
 }
 
 void furnace_psg_shutdown(void) {
