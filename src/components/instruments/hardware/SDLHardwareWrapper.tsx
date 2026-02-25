@@ -143,6 +143,9 @@ export interface SDLHardwareWrapperProps {
 
   /** Optional CSS class for the container */
   className?: string;
+  /** Image rendering mode for the canvas when scaled. Default: 'pixelated' (good for retro UIs).
+   *  Use 'auto' for smooth bilinear scaling (better for ImGui-based UIs at non-native resolution). */
+  imageRendering?: 'pixelated' | 'auto';
 }
 
 /* ── Component ─────────────────────────────────────────────────────────── */
@@ -164,6 +167,7 @@ export const SDLHardwareWrapper: React.FC<SDLHardwareWrapperProps> = ({
   pcmData,
   loadPcmFn,
   className,
+  imageRendering = 'pixelated',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -261,7 +265,7 @@ export const SDLHardwareWrapper: React.FC<SDLHardwareWrapperProps> = ({
         canvas.height = canvasHeight;
         canvas.style.width = '100%';
         canvas.style.height = 'auto';
-        canvas.style.imageRendering = 'pixelated';
+        canvas.style.imageRendering = imageRendering;
         canvas.tabIndex = 0;
         localCanvas = canvas;
         localContainer = containerRef.current;

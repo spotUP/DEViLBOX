@@ -196,6 +196,7 @@ export const FurnacePCMHardware: React.FC<FurnacePCMHardwareProps> = ({ config, 
 
   return (
     <SDLHardwareWrapper
+      imageRendering="auto"
       moduleUrl="/furnace/FurnacePCM.js"
       factoryName="createFurnacePCM"
       canvasWidth={480}
