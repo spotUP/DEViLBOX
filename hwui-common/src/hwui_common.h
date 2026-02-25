@@ -60,10 +60,19 @@ extern "C" {
 /**
  * Set framebuffer dimensions for bounds checking.
  * Must be called before any drawing to prevent out-of-bounds writes.
- * @param w  Framebuffer width in pixels
- * @param h  Framebuffer height in pixels
+ * @param w  Framebuffer width in pixels (physical)
+ * @param h  Framebuffer height in pixels (physical)
  */
 void hwui_set_fb_size(int w, int h);
+
+/**
+ * Set pixel scale factor for Retina/HiDPI rendering.
+ * When set to 2, each logical pixel is rendered as a 2×2 physical block.
+ * Call this after hwui_set_fb_size (which should receive physical dimensions).
+ * All drawing calls continue to use logical coordinates; scaling is transparent.
+ * @param s  Scale factor (1 = normal, 2 = Retina 2×)
+ */
+void hwui_set_scale(int s);
 
 /* ── Primitive Drawing ─────────────────────────────────────────────────── */
 

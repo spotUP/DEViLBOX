@@ -66,6 +66,14 @@ EM_JS(void, js_on_param_change, (int param_id, int value), {
 #define SCREEN_W  480
 #define SCREEN_H  360
 
+/* SCALE=2: framebuffer rendered at 2× logical resolution for Retina displays.
+ * hwui_set_scale(SCALE) makes all drawing primitives multiply logical coords
+ * by SCALE — layout code stays fully in logical (SCREEN_W × SCREEN_H) space.
+ * Mouse events are divided by SCALE in handle_event. */
+#define SCALE   2
+#define PHYS_W  (SCREEN_W * SCALE)
+#define PHYS_H  (SCREEN_H * SCALE)
+
 /* ── Envelope Types ────────────────────────────────────────────────────── */
 
 #define ENV_NONE  0
@@ -115,7 +123,7 @@ static const PSGChipInfo PSG_CHIPS[PSG_CHIP_COUNT] = {
 static SDL_Window   *g_win;
 static SDL_Renderer *g_ren;
 static SDL_Texture  *g_tex;
-static uint32_t      g_fb[SCREEN_W * SCREEN_H];
+static uint32_t      g_fb[PHYS_W * PHYS_H];
 
 /* Config state from buffer layout */
 static int g_chip_subtype = PSG_CHIP_NES;
@@ -177,7 +185,7 @@ static int is_sid(void) {
 static void render_waveform_section(int x, int y, int w, int h) {
     const PSGChipInfo *chip = &PSG_CHIPS[g_chip_subtype];
 
-    hwui_group_box(g_fb, SCREEN_W, x, y, w, h, "WAVEFORM", HWUI_CYAN);
+    hwui_group_box(g_fb, PHYS_W, x, y, w, h, "WAVEFORM", HWUI_CYAN);
 
     /* Waveform selector buttons */
     int btn_x = x + 6;
@@ -195,7 +203,7 @@ static void render_waveform_section(int x, int y, int w, int h) {
             pressed = (g_waveform & (1 << i)) ? 1 : 0;
         }
 
-        if (hwui_button(g_fb, SCREEN_W, btn_x, btn_y, btn_w, btn_h,
+        if (hwui_button(g_fb, PHYS_W, btn_x, btn_y, btn_w, btn_h,
                         chip->wave_names[i], pressed,
                         g_mouse_x, g_mouse_y, g_mouse_down)) {
             if (is_sid()) {
@@ -231,7 +239,7 @@ static void render_waveform_section(int x, int y, int w, int h) {
         int knob_y = y + 16;
 
         new_val = (float)duty_full;
-        if (hwui_knob(g_fb, SCREEN_W, knob_x, knob_y, 14,
+        if (hwui_knob(g_fb, PHYS_W, knob_x, knob_y, 14,
                       (float)duty_full, 0, (float)duty_max, "DUTY",
                       HWUI_AMBER, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
             int new_duty = (int)new_val;
@@ -250,14 +258,14 @@ static void render_waveform_section(int x, int y, int w, int h) {
         /* Numeric value display */
         char duty_str[16];
         snprintf(duty_str, sizeof(duty_str), "%d", duty_full);
-        hwui_text_centered(g_fb, SCREEN_W, knob_x - 10, knob_y + 36, 48, HWUI_FONT_H,
+        hwui_text_centered(g_fb, PHYS_W, knob_x - 10, knob_y + 36, 48, HWUI_FONT_H,
                            duty_str, HWUI_GRAY_LIGHT);
     }
 
     /* Noise toggle (if supported) */
     if (chip->has_noise) {
         int noise_on = flag_get(FLAG_NOISE);
-        if (hwui_checkbox(g_fb, SCREEN_W, x + 6, y + h - 16,
+        if (hwui_checkbox(g_fb, PHYS_W, x + 6, y + h - 16,
                           "NOISE", noise_on,
                           g_mouse_x, g_mouse_y, g_mouse_down)) {
             flag_toggle(FLAG_NOISE);
@@ -273,7 +281,7 @@ static void render_waveform_section(int x, int y, int w, int h) {
         int pvw = w - (chip->has_duty && chip->duty_max > 0 ? 80 : 12);
         int pvh = h - 58;
         if (pvh > 6) {
-            hwui_panel_sunken(g_fb, SCREEN_W, pvx, pvy, pvw, pvh);
+            hwui_panel_sunken(g_fb, PHYS_W, pvx, pvy, pvw, pvh);
 
             int cx = pvx + 2, cw = pvw - 4;
             int cy = pvy + 2, ch = pvh - 4;
@@ -287,16 +295,16 @@ static void render_waveform_section(int x, int y, int w, int h) {
                 if (wave & 1) {
                     /* Triangle */
                     int qw = cw / 4;
-                    hwui_line(g_fb, SCREEN_W, cx, mid, cx + qw, cy + 1, col);
-                    hwui_line(g_fb, SCREEN_W, cx + qw, cy + 1, cx + qw * 3, cy + ch - 1, col);
-                    hwui_line(g_fb, SCREEN_W, cx + qw * 3, cy + ch - 1, cx + cw, mid, col);
+                    hwui_line(g_fb, PHYS_W, cx, mid, cx + qw, cy + 1, col);
+                    hwui_line(g_fb, PHYS_W, cx + qw, cy + 1, cx + qw * 3, cy + ch - 1, col);
+                    hwui_line(g_fb, PHYS_W, cx + qw * 3, cy + ch - 1, cx + cw, mid, col);
                 }
                 if (wave & 2) {
                     /* Sawtooth */
                     int half = cw / 2;
-                    hwui_line(g_fb, SCREEN_W, cx, cy + ch - 1, cx + half, cy + 1, col);
-                    hwui_vline(g_fb, SCREEN_W, cx + half, cy + 1, ch - 2, col);
-                    hwui_line(g_fb, SCREEN_W, cx + half, cy + ch - 1, cx + cw, cy + 1, col);
+                    hwui_line(g_fb, PHYS_W, cx, cy + ch - 1, cx + half, cy + 1, col);
+                    hwui_vline(g_fb, PHYS_W, cx + half, cy + 1, ch - 2, col);
+                    hwui_line(g_fb, PHYS_W, cx + half, cy + ch - 1, cx + cw, cy + 1, col);
                 }
                 if (wave & 4) {
                     /* Pulse */
@@ -304,15 +312,15 @@ static void render_waveform_section(int x, int y, int w, int h) {
                     int duty_pct = full_duty * 100 / 4095;
                     if (duty_pct < 5) duty_pct = 5;
                     int hi_w = cw * duty_pct / 100;
-                    hwui_hline(g_fb, SCREEN_W, cx, cy + 1, hi_w, col);
-                    hwui_vline(g_fb, SCREEN_W, cx + hi_w, cy + 1, ch - 2, col);
-                    hwui_hline(g_fb, SCREEN_W, cx + hi_w, cy + ch - 1, cw - hi_w, col);
+                    hwui_hline(g_fb, PHYS_W, cx, cy + 1, hi_w, col);
+                    hwui_vline(g_fb, PHYS_W, cx + hi_w, cy + 1, ch - 2, col);
+                    hwui_hline(g_fb, PHYS_W, cx + hi_w, cy + ch - 1, cw - hi_w, col);
                 }
                 if (wave & 8) {
                     /* Noise */
                     for (int px = 0; px < cw; px += 2) {
                         int ny = cy + 1 + (((px * 7 + 13) * 31337) % (ch - 2));
-                        hwui_pixel(g_fb, SCREEN_W, cx + px, ny, col);
+                        hwui_pixel(g_fb, PHYS_W, cx + px, ny, col);
                     }
                 }
             } else if (g_chip_subtype == PSG_CHIP_NES || g_chip_subtype == PSG_CHIP_MMC5) {
@@ -320,50 +328,50 @@ static void render_waveform_section(int x, int y, int w, int h) {
                     /* Pulse with NES duty (12.5/25/50/75%) */
                     int duty_pct = 12 + g_duty * 25;
                     int hi_w = cw * duty_pct / 100;
-                    hwui_hline(g_fb, SCREEN_W, cx, cy + 1, hi_w, col);
-                    hwui_vline(g_fb, SCREEN_W, cx + hi_w, cy + 1, ch - 2, col);
-                    hwui_hline(g_fb, SCREEN_W, cx + hi_w, cy + ch - 1, cw - hi_w, col);
+                    hwui_hline(g_fb, PHYS_W, cx, cy + 1, hi_w, col);
+                    hwui_vline(g_fb, PHYS_W, cx + hi_w, cy + 1, ch - 2, col);
+                    hwui_hline(g_fb, PHYS_W, cx + hi_w, cy + ch - 1, cw - hi_w, col);
                 } else if (wave == 1) {
                     /* Triangle */
                     int qw = cw / 4;
-                    hwui_line(g_fb, SCREEN_W, cx, mid, cx + qw, cy + 1, col);
-                    hwui_line(g_fb, SCREEN_W, cx + qw, cy + 1, cx + qw * 3, cy + ch - 1, col);
-                    hwui_line(g_fb, SCREEN_W, cx + qw * 3, cy + ch - 1, cx + cw, mid, col);
+                    hwui_line(g_fb, PHYS_W, cx, mid, cx + qw, cy + 1, col);
+                    hwui_line(g_fb, PHYS_W, cx + qw, cy + 1, cx + qw * 3, cy + ch - 1, col);
+                    hwui_line(g_fb, PHYS_W, cx + qw * 3, cy + ch - 1, cx + cw, mid, col);
                 } else {
                     /* Noise */
                     for (int px = 0; px < cw; px += 3) {
                         int ny = cy + 1 + (((px * 7 + 13) * 31337) % (ch - 2));
-                        hwui_pixel(g_fb, SCREEN_W, cx + px, ny, col);
+                        hwui_pixel(g_fb, PHYS_W, cx + px, ny, col);
                     }
                 }
             } else if (g_chip_subtype == PSG_CHIP_GB) {
                 if (wave == 0) {
                     int duty_pct = 12 + g_duty * 25;
                     int hi_w = cw * duty_pct / 100;
-                    hwui_hline(g_fb, SCREEN_W, cx, cy + 1, hi_w, col);
-                    hwui_vline(g_fb, SCREEN_W, cx + hi_w, cy + 1, ch - 2, col);
-                    hwui_hline(g_fb, SCREEN_W, cx + hi_w, cy + ch - 1, cw - hi_w, col);
+                    hwui_hline(g_fb, PHYS_W, cx, cy + 1, hi_w, col);
+                    hwui_vline(g_fb, PHYS_W, cx + hi_w, cy + 1, ch - 2, col);
+                    hwui_hline(g_fb, PHYS_W, cx + hi_w, cy + ch - 1, cw - hi_w, col);
                 } else {
                     /* Wave channel placeholder (sine shape) */
                     for (int px = 0; px < cw; px++) {
                         float t = (float)px / (float)cw * 6.28f;
                         int sy = mid - (int)(sinf(t) * (ch / 2 - 1));
-                        hwui_pixel(g_fb, SCREEN_W, cx + px, sy, col);
+                        hwui_pixel(g_fb, PHYS_W, cx + px, sy, col);
                     }
                 }
             } else if (g_chip_subtype == PSG_CHIP_VRC6) {
                 if (wave == 0) {
                     int duty_pct = (g_duty + 1) * 100 / 8;
                     int hi_w = cw * duty_pct / 100;
-                    hwui_hline(g_fb, SCREEN_W, cx, cy + 1, hi_w, col);
-                    hwui_vline(g_fb, SCREEN_W, cx + hi_w, cy + 1, ch - 2, col);
-                    hwui_hline(g_fb, SCREEN_W, cx + hi_w, cy + ch - 1, cw - hi_w, col);
+                    hwui_hline(g_fb, PHYS_W, cx, cy + 1, hi_w, col);
+                    hwui_vline(g_fb, PHYS_W, cx + hi_w, cy + 1, ch - 2, col);
+                    hwui_hline(g_fb, PHYS_W, cx + hi_w, cy + ch - 1, cw - hi_w, col);
                 } else {
                     /* Sawtooth */
                     int half = cw / 2;
-                    hwui_line(g_fb, SCREEN_W, cx, cy + ch - 1, cx + half, cy + 1, col);
-                    hwui_vline(g_fb, SCREEN_W, cx + half, cy + 1, ch - 2, col);
-                    hwui_line(g_fb, SCREEN_W, cx + half, cy + ch - 1, cx + cw, cy + 1, col);
+                    hwui_line(g_fb, PHYS_W, cx, cy + ch - 1, cx + half, cy + 1, col);
+                    hwui_vline(g_fb, PHYS_W, cx + half, cy + 1, ch - 2, col);
+                    hwui_line(g_fb, PHYS_W, cx + half, cy + ch - 1, cx + cw, cy + 1, col);
                 }
             } else if (g_chip_subtype == PSG_CHIP_VERA) {
                 if (wave == 0) {
@@ -371,34 +379,34 @@ static void render_waveform_section(int x, int y, int w, int h) {
                     int duty_pct = (g_duty + 1) * 100 / 64;
                     if (duty_pct < 5) duty_pct = 5;
                     int hi_w = cw * duty_pct / 100;
-                    hwui_hline(g_fb, SCREEN_W, cx, cy + 1, hi_w, col);
-                    hwui_vline(g_fb, SCREEN_W, cx + hi_w, cy + 1, ch - 2, col);
-                    hwui_hline(g_fb, SCREEN_W, cx + hi_w, cy + ch - 1, cw - hi_w, col);
+                    hwui_hline(g_fb, PHYS_W, cx, cy + 1, hi_w, col);
+                    hwui_vline(g_fb, PHYS_W, cx + hi_w, cy + 1, ch - 2, col);
+                    hwui_hline(g_fb, PHYS_W, cx + hi_w, cy + ch - 1, cw - hi_w, col);
                 } else if (wave == 1) {
                     /* Saw */
                     int half = cw / 2;
-                    hwui_line(g_fb, SCREEN_W, cx, cy + ch - 1, cx + half, cy + 1, col);
-                    hwui_vline(g_fb, SCREEN_W, cx + half, cy + 1, ch - 2, col);
-                    hwui_line(g_fb, SCREEN_W, cx + half, cy + ch - 1, cx + cw, cy + 1, col);
+                    hwui_line(g_fb, PHYS_W, cx, cy + ch - 1, cx + half, cy + 1, col);
+                    hwui_vline(g_fb, PHYS_W, cx + half, cy + 1, ch - 2, col);
+                    hwui_line(g_fb, PHYS_W, cx + half, cy + ch - 1, cx + cw, cy + 1, col);
                 } else if (wave == 2) {
                     /* Triangle */
                     int qw = cw / 4;
-                    hwui_line(g_fb, SCREEN_W, cx, mid, cx + qw, cy + 1, col);
-                    hwui_line(g_fb, SCREEN_W, cx + qw, cy + 1, cx + qw * 3, cy + ch - 1, col);
-                    hwui_line(g_fb, SCREEN_W, cx + qw * 3, cy + ch - 1, cx + cw, mid, col);
+                    hwui_line(g_fb, PHYS_W, cx, mid, cx + qw, cy + 1, col);
+                    hwui_line(g_fb, PHYS_W, cx + qw, cy + 1, cx + qw * 3, cy + ch - 1, col);
+                    hwui_line(g_fb, PHYS_W, cx + qw * 3, cy + ch - 1, cx + cw, mid, col);
                 } else {
                     /* Noise */
                     for (int px = 0; px < cw; px += 2) {
                         int ny = cy + 1 + (((px * 7 + 13) * 31337) % (ch - 2));
-                        hwui_pixel(g_fb, SCREEN_W, cx + px, ny, col);
+                        hwui_pixel(g_fb, PHYS_W, cx + px, ny, col);
                     }
                 }
             } else {
                 /* Default: square wave */
                 int half = cw / 2;
-                hwui_hline(g_fb, SCREEN_W, cx, cy + 1, half, col);
-                hwui_vline(g_fb, SCREEN_W, cx + half, cy + 1, ch - 2, col);
-                hwui_hline(g_fb, SCREEN_W, cx + half, cy + ch - 1, half, col);
+                hwui_hline(g_fb, PHYS_W, cx, cy + 1, half, col);
+                hwui_vline(g_fb, PHYS_W, cx + half, cy + 1, ch - 2, col);
+                hwui_hline(g_fb, PHYS_W, cx + half, cy + ch - 1, half, col);
             }
         }
     }
@@ -407,14 +415,14 @@ static void render_waveform_section(int x, int y, int w, int h) {
 /* ── NES Envelope (y=92..200) ──────────────────────────────────────────── */
 
 static void render_env_nes(int x, int y, int w, int h) {
-    hwui_group_box(g_fb, SCREEN_W, x, y, w, h, "NES ENVELOPE", HWUI_RED);
+    hwui_group_box(g_fb, PHYS_W, x, y, w, h, "NES ENVELOPE", HWUI_RED);
 
     float new_val;
     int ky = y + 14;
 
     /* envValue (0-15) — volume or envelope divider period */
     new_val = (float)g_env[0];
-    if (hwui_knob(g_fb, SCREEN_W, x + 20, ky, 14,
+    if (hwui_knob(g_fb, PHYS_W, x + 20, ky, 14,
                   (float)g_env[0], 0, 15, "VOL",
                   HWUI_GREEN, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
         g_env[0] = (int)new_val;
@@ -425,7 +433,7 @@ static void render_env_nes(int x, int y, int w, int h) {
     /* envMode toggle (0=length counter / 1=constant volume) */
     {
         const char *mode_label = g_env[1] ? "CONST" : "DECAY";
-        if (hwui_button(g_fb, SCREEN_W, x + 70, ky + 6, 52, 16,
+        if (hwui_button(g_fb, PHYS_W, x + 70, ky + 6, 52, 16,
                         mode_label, g_env[1],
                         g_mouse_x, g_mouse_y, g_mouse_down)) {
             g_env[1] = !g_env[1];
@@ -435,13 +443,13 @@ static void render_env_nes(int x, int y, int w, int h) {
     }
 
     /* Sweep controls */
-    hwui_text(g_fb, SCREEN_W, x + 150, y + 10, "SWEEP", HWUI_GRAY_LIGHT);
+    hwui_text(g_fb, PHYS_W, x + 150, y + 10, "SWEEP", HWUI_GRAY_LIGHT);
 
     int sy = ky + 4;
 
     /* Sweep enable */
     int sweep_en = g_env[7] & 1;
-    if (hwui_checkbox(g_fb, SCREEN_W, x + 150, sy,
+    if (hwui_checkbox(g_fb, PHYS_W, x + 150, sy,
                       "ON", sweep_en,
                       g_mouse_x, g_mouse_y, g_mouse_down)) {
         g_env[7] ^= 1;
@@ -451,7 +459,7 @@ static void render_env_nes(int x, int y, int w, int h) {
 
     /* Sweep negate */
     int sweep_neg = (g_env[7] >> 1) & 1;
-    if (hwui_checkbox(g_fb, SCREEN_W, x + 200, sy,
+    if (hwui_checkbox(g_fb, PHYS_W, x + 200, sy,
                       "NEG", sweep_neg,
                       g_mouse_x, g_mouse_y, g_mouse_down)) {
         g_env[7] ^= 2;
@@ -461,7 +469,7 @@ static void render_env_nes(int x, int y, int w, int h) {
 
     /* Sweep period (0-7) */
     new_val = (float)g_env[5];
-    if (hwui_knob(g_fb, SCREEN_W, x + 270, ky, 12,
+    if (hwui_knob(g_fb, PHYS_W, x + 270, ky, 12,
                   (float)g_env[5], 0, 7, "PERIOD",
                   HWUI_CYAN, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
         g_env[5] = (int)new_val;
@@ -471,7 +479,7 @@ static void render_env_nes(int x, int y, int w, int h) {
 
     /* Sweep shift (0-7) */
     new_val = (float)g_env[6];
-    if (hwui_knob(g_fb, SCREEN_W, x + 340, ky, 12,
+    if (hwui_knob(g_fb, PHYS_W, x + 340, ky, 12,
                   (float)g_env[6], 0, 7, "SHIFT",
                   HWUI_CYAN, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
         g_env[6] = (int)new_val;
@@ -484,7 +492,7 @@ static void render_env_nes(int x, int y, int w, int h) {
     int viz_y = y + h - 50;
     int viz_w = 110;
     int viz_h = 42;
-    hwui_panel_sunken(g_fb, SCREEN_W, viz_x, viz_y, viz_w, viz_h);
+    hwui_panel_sunken(g_fb, PHYS_W, viz_x, viz_y, viz_w, viz_h);
 
     int vol = g_env[0];
     int env_mode = g_env[1];
@@ -492,10 +500,10 @@ static void render_env_nes(int x, int y, int w, int h) {
 
     if (env_mode) {
         /* Constant volume — flat line */
-        hwui_hline(g_fb, SCREEN_W, viz_x + 2, level_y, viz_w - 4, HWUI_GREEN);
+        hwui_hline(g_fb, PHYS_W, viz_x + 2, level_y, viz_w - 4, HWUI_GREEN);
     } else {
         /* Decay — ramp from level down to zero */
-        hwui_line(g_fb, SCREEN_W, viz_x + 2, level_y,
+        hwui_line(g_fb, PHYS_W, viz_x + 2, level_y,
                   viz_x + viz_w - 2, viz_y + viz_h - 2, HWUI_GREEN);
     }
 }
@@ -503,7 +511,7 @@ static void render_env_nes(int x, int y, int w, int h) {
 /* ── GB Envelope (y=92..200) ───────────────────────────────────────────── */
 
 static void render_env_gb(int x, int y, int w, int h) {
-    hwui_group_box(g_fb, SCREEN_W, x, y, w, h, "GB ENVELOPE", HWUI_GREEN);
+    hwui_group_box(g_fb, PHYS_W, x, y, w, h, "GB ENVELOPE", HWUI_GREEN);
 
     float new_val;
     int ky = y + 14;
@@ -511,7 +519,7 @@ static void render_env_gb(int x, int y, int w, int h) {
 
     /* envVol (0-15) */
     new_val = (float)g_env[0];
-    if (hwui_knob(g_fb, SCREEN_W, kx, ky, 14,
+    if (hwui_knob(g_fb, PHYS_W, kx, ky, 14,
                   (float)g_env[0], 0, 15, "VOL",
                   HWUI_GREEN, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
         g_env[0] = (int)new_val;
@@ -523,7 +531,7 @@ static void render_env_gb(int x, int y, int w, int h) {
     /* envDir toggle (0=decrease, 1=increase) */
     {
         const char *dir_label = g_env[1] ? "UP" : "DOWN";
-        if (hwui_button(g_fb, SCREEN_W, kx, ky + 6, 48, 16,
+        if (hwui_button(g_fb, PHYS_W, kx, ky + 6, 48, 16,
                         dir_label, g_env[1],
                         g_mouse_x, g_mouse_y, g_mouse_down)) {
             g_env[1] = !g_env[1];
@@ -535,7 +543,7 @@ static void render_env_gb(int x, int y, int w, int h) {
 
     /* envLen (0-7) */
     new_val = (float)g_env[2];
-    if (hwui_knob(g_fb, SCREEN_W, kx, ky, 14,
+    if (hwui_knob(g_fb, PHYS_W, kx, ky, 14,
                   (float)g_env[2], 0, 7, "LEN",
                   HWUI_AMBER, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
         g_env[2] = (int)new_val;
@@ -548,7 +556,7 @@ static void render_env_gb(int x, int y, int w, int h) {
     int viz_y = y + 14;
     int viz_w = 150;
     int viz_h = h - 22;
-    hwui_panel_sunken(g_fb, SCREEN_W, viz_x, viz_y, viz_w, viz_h);
+    hwui_panel_sunken(g_fb, PHYS_W, viz_x, viz_y, viz_w, viz_h);
 
     int vol = g_env[0];
     int env_dir = g_env[1];
@@ -558,7 +566,7 @@ static void render_env_gb(int x, int y, int w, int h) {
     if (env_len == 0) {
         /* No envelope — constant volume */
         int ly = viz_y + viz_h - 2 - (vol * (viz_h - 4)) / 15;
-        hwui_hline(g_fb, SCREEN_W, vx, ly, viz_w - 4, HWUI_GREEN);
+        hwui_hline(g_fb, PHYS_W, vx, ly, viz_w - 4, HWUI_GREEN);
     } else {
         /* Stepped envelope */
         int step_w = (viz_w - 4) / 8;
@@ -568,11 +576,11 @@ static void render_env_gb(int x, int y, int w, int h) {
 
         for (int s = 0; s < 8 && vx < viz_x + viz_w - 2; s++) {
             int ly = viz_y + viz_h - 2 - (cur_vol * (viz_h - 4)) / 15;
-            hwui_hline(g_fb, SCREEN_W, vx, ly, step_w, HWUI_GREEN);
+            hwui_hline(g_fb, PHYS_W, vx, ly, step_w, HWUI_GREEN);
             if (s > 0) {
                 int top = prev_ly < ly ? prev_ly : ly;
                 int span = abs(ly - prev_ly) + 1;
-                hwui_vline(g_fb, SCREEN_W, vx, top, span, HWUI_GREEN);
+                hwui_vline(g_fb, PHYS_W, vx, top, span, HWUI_GREEN);
             }
             prev_ly = ly;
             vx += step_w;
@@ -585,7 +593,7 @@ static void render_env_gb(int x, int y, int w, int h) {
 /* ── C64 ADSR Envelope (y=92..200) ─────────────────────────────────────── */
 
 static void render_env_c64(int x, int y, int w, int h) {
-    hwui_group_box(g_fb, SCREEN_W, x, y, w, h, "SID ADSR", HWUI_MAGENTA);
+    hwui_group_box(g_fb, PHYS_W, x, y, w, h, "SID ADSR", HWUI_MAGENTA);
 
     float new_val;
     int ky = y + 14;
@@ -594,7 +602,7 @@ static void render_env_c64(int x, int y, int w, int h) {
 
     /* Attack (0-15) */
     new_val = (float)g_env[0];
-    if (hwui_knob(g_fb, SCREEN_W, kx, ky, 14,
+    if (hwui_knob(g_fb, PHYS_W, kx, ky, 14,
                   (float)g_env[0], 0, 15, "ATK",
                   HWUI_GREEN, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
         g_env[0] = (int)new_val;
@@ -605,7 +613,7 @@ static void render_env_c64(int x, int y, int w, int h) {
 
     /* Decay (0-15) */
     new_val = (float)g_env[1];
-    if (hwui_knob(g_fb, SCREEN_W, kx, ky, 14,
+    if (hwui_knob(g_fb, PHYS_W, kx, ky, 14,
                   (float)g_env[1], 0, 15, "DEC",
                   HWUI_AMBER, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
         g_env[1] = (int)new_val;
@@ -616,7 +624,7 @@ static void render_env_c64(int x, int y, int w, int h) {
 
     /* Sustain (0-15) */
     new_val = (float)g_env[2];
-    if (hwui_knob(g_fb, SCREEN_W, kx, ky, 14,
+    if (hwui_knob(g_fb, PHYS_W, kx, ky, 14,
                   (float)g_env[2], 0, 15, "SUS",
                   HWUI_CYAN, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
         g_env[2] = (int)new_val;
@@ -627,7 +635,7 @@ static void render_env_c64(int x, int y, int w, int h) {
 
     /* Release (0-15) */
     new_val = (float)g_env[3];
-    if (hwui_knob(g_fb, SCREEN_W, kx, ky, 14,
+    if (hwui_knob(g_fb, PHYS_W, kx, ky, 14,
                   (float)g_env[3], 0, 15, "REL",
                   HWUI_ORANGE, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
         g_env[3] = (int)new_val;
@@ -641,7 +649,7 @@ static void render_env_c64(int x, int y, int w, int h) {
     int viz_w = 150;
     int viz_h = h - 22;
 
-    hwui_adsr_viz(g_fb, SCREEN_W, viz_x, viz_y, viz_w, viz_h,
+    hwui_adsr_viz(g_fb, PHYS_W, viz_x, viz_y, viz_w, viz_h,
                   g_env[0], g_env[1], g_env[2], 0, g_env[3],
                   15, 15, 15, 15,
                   HWUI_MAGENTA, (HWUI_MAGENTA & 0x00FFFFFF) | 0x30000000);
@@ -650,7 +658,7 @@ static void render_env_c64(int x, int y, int w, int h) {
 /* ── SNES Envelope (y=92..200) ─────────────────────────────────────────── */
 
 static void render_env_snes(int x, int y, int w, int h) {
-    hwui_group_box(g_fb, SCREEN_W, x, y, w, h, "SNES ADSR / GAIN", HWUI_BLUE_LIGHT);
+    hwui_group_box(g_fb, PHYS_W, x, y, w, h, "SNES ADSR / GAIN", HWUI_BLUE_LIGHT);
 
     float new_val;
     int ky = y + 14;
@@ -664,7 +672,7 @@ static void render_env_snes(int x, int y, int w, int h) {
     if (gain_mode > 5) gain_mode = 5;
 
     int new_mode = gain_mode;
-    if (hwui_dropdown(g_fb, SCREEN_W, x + 6, y + 10, 80,
+    if (hwui_dropdown(g_fb, PHYS_W, x + 6, y + 10, 80,
                       gain_modes, 6, gain_mode,
                       g_mouse_x, g_mouse_y, g_mouse_down, &new_mode)) {
         g_env[4] = new_mode;
@@ -679,7 +687,7 @@ static void render_env_snes(int x, int y, int w, int h) {
 
         /* Attack (0-15) */
         new_val = (float)g_env[0];
-        if (hwui_knob(g_fb, SCREEN_W, kx, ky, 12,
+        if (hwui_knob(g_fb, PHYS_W, kx, ky, 12,
                       (float)g_env[0], 0, 15, "ATK",
                       HWUI_GREEN, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
             g_env[0] = (int)new_val;
@@ -690,7 +698,7 @@ static void render_env_snes(int x, int y, int w, int h) {
 
         /* Decay (0-7) */
         new_val = (float)g_env[1];
-        if (hwui_knob(g_fb, SCREEN_W, kx, ky, 12,
+        if (hwui_knob(g_fb, PHYS_W, kx, ky, 12,
                       (float)g_env[1], 0, 7, "DEC",
                       HWUI_AMBER, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
             g_env[1] = (int)new_val;
@@ -701,7 +709,7 @@ static void render_env_snes(int x, int y, int w, int h) {
 
         /* Sustain (0-7) */
         new_val = (float)g_env[2];
-        if (hwui_knob(g_fb, SCREEN_W, kx, ky, 12,
+        if (hwui_knob(g_fb, PHYS_W, kx, ky, 12,
                       (float)g_env[2], 0, 7, "SUS",
                       HWUI_CYAN, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
             g_env[2] = (int)new_val;
@@ -712,7 +720,7 @@ static void render_env_snes(int x, int y, int w, int h) {
 
         /* Release (0-31) */
         new_val = (float)g_env[3];
-        if (hwui_knob(g_fb, SCREEN_W, kx, ky, 12,
+        if (hwui_knob(g_fb, PHYS_W, kx, ky, 12,
                       (float)g_env[3], 0, 31, "REL",
                       HWUI_ORANGE, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
             g_env[3] = (int)new_val;
@@ -726,14 +734,14 @@ static void render_env_snes(int x, int y, int w, int h) {
         int viz_w = 110;
         int viz_h = 42;
 
-        hwui_adsr_viz(g_fb, SCREEN_W, viz_x, viz_y, viz_w, viz_h,
+        hwui_adsr_viz(g_fb, PHYS_W, viz_x, viz_y, viz_w, viz_h,
                       g_env[0], g_env[1], g_env[2], 0, g_env[3],
                       15, 7, 7, 31,
                       HWUI_BLUE_LIGHT, (HWUI_BLUE_LIGHT & 0x00FFFFFF) | 0x30000000);
     } else {
         /* GAIN mode: just show the gain value knob */
         new_val = (float)g_env[5];
-        if (hwui_knob(g_fb, SCREEN_W, x + 140, ky, 18,
+        if (hwui_knob(g_fb, PHYS_W, x + 140, ky, 18,
                       (float)g_env[5], 0, 127, "GAIN",
                       HWUI_BLUE_LIGHT, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
             g_env[5] = (int)new_val;
@@ -744,7 +752,7 @@ static void render_env_snes(int x, int y, int w, int h) {
         /* Numeric value */
         char gain_str[16];
         snprintf(gain_str, sizeof(gain_str), "%d", g_env[5]);
-        hwui_text_centered(g_fb, SCREEN_W, x + 120, ky + 44, 60, HWUI_FONT_H,
+        hwui_text_centered(g_fb, PHYS_W, x + 120, ky + 44, 60, HWUI_FONT_H,
                            gain_str, HWUI_GRAY_LIGHT);
 
         /* Mode description */
@@ -752,7 +760,7 @@ static void render_env_snes(int x, int y, int w, int h) {
             "", "Set directly", "Linear decrease", "Exp decrease", "Linear increase", "Bent increase"
         };
         if (gain_mode >= 1 && gain_mode <= 5) {
-            hwui_text(g_fb, SCREEN_W, x + 240, ky + 20,
+            hwui_text(g_fb, PHYS_W, x + 240, ky + 20,
                       gain_descs[gain_mode], HWUI_GRAY_MED);
         }
     }
@@ -761,14 +769,14 @@ static void render_env_snes(int x, int y, int w, int h) {
 /* ── AY Envelope (y=92..200) ──────────────────────────────────────────── */
 
 static void render_env_ay(int x, int y, int w, int h) {
-    hwui_group_box(g_fb, SCREEN_W, x, y, w, h, "AY ENVELOPE", HWUI_YELLOW);
+    hwui_group_box(g_fb, PHYS_W, x, y, w, h, "AY ENVELOPE", HWUI_YELLOW);
 
     float new_val;
     int ky = y + 16;
 
     /* Envelope shape (0-15) */
     new_val = (float)g_ay_env_shape;
-    if (hwui_knob(g_fb, SCREEN_W, x + 30, ky, 16,
+    if (hwui_knob(g_fb, PHYS_W, x + 30, ky, 16,
                   (float)g_ay_env_shape, 0, 15, "SHAPE",
                   HWUI_YELLOW, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
         g_ay_env_shape = (int)new_val;
@@ -779,7 +787,7 @@ static void render_env_ay(int x, int y, int w, int h) {
     /* Numeric shape display */
     char shape_str[8];
     snprintf(shape_str, sizeof(shape_str), "%d", g_ay_env_shape);
-    hwui_text_centered(g_fb, SCREEN_W, x + 10, ky + 40, 60, HWUI_FONT_H,
+    hwui_text_centered(g_fb, PHYS_W, x + 10, ky + 40, 60, HWUI_FONT_H,
                        shape_str, HWUI_GRAY_LIGHT);
 
     /* AY envelope shape visualization */
@@ -787,7 +795,7 @@ static void render_env_ay(int x, int y, int w, int h) {
     int viz_y = y + 14;
     int viz_w = w - 112;
     int viz_h = h - 22;
-    hwui_panel_sunken(g_fb, SCREEN_W, viz_x, viz_y, viz_w, viz_h);
+    hwui_panel_sunken(g_fb, PHYS_W, viz_x, viz_y, viz_w, viz_h);
 
     int shape = g_ay_env_shape & 0x0F;
     int half_w = (viz_w - 4) / 2;
@@ -806,7 +814,7 @@ static void render_env_ay(int x, int y, int w, int h) {
             level = (px * max_h) / half_w;
         else
             level = max_h - (px * max_h) / half_w;
-        hwui_pixel(g_fb, SCREEN_W, viz_x + 2 + px, base_y - level, HWUI_YELLOW);
+        hwui_pixel(g_fb, PHYS_W, viz_x + 2 + px, base_y - level, HWUI_YELLOW);
     }
 
     /* Second half (continue bit = shape >= 8) */
@@ -817,7 +825,7 @@ static void render_env_ay(int x, int y, int w, int h) {
         if (hold) {
             /* Hold at final level */
             int final_level = second_attack ? max_h : 0;
-            hwui_hline(g_fb, SCREEN_W, viz_x + 2 + half_w,
+            hwui_hline(g_fb, PHYS_W, viz_x + 2 + half_w,
                        base_y - final_level, half_w, HWUI_YELLOW);
         } else {
             /* Repeat the ramp */
@@ -827,24 +835,24 @@ static void render_env_ay(int x, int y, int w, int h) {
                     level = (px * max_h) / half_w;
                 else
                     level = max_h - (px * max_h) / half_w;
-                hwui_pixel(g_fb, SCREEN_W, viz_x + 2 + half_w + px,
+                hwui_pixel(g_fb, PHYS_W, viz_x + 2 + half_w + px,
                            base_y - level, HWUI_YELLOW);
             }
         }
     } else {
         /* Shape < 8: hold at 0 */
-        hwui_hline(g_fb, SCREEN_W, viz_x + 2 + half_w, base_y, half_w, HWUI_YELLOW);
+        hwui_hline(g_fb, PHYS_W, viz_x + 2 + half_w, base_y, half_w, HWUI_YELLOW);
     }
 }
 
 /* ── Filter Section (y=202..300) — C64/SID only ────────────────────────── */
 
 static void render_filter_section(int x, int y, int w, int h) {
-    hwui_group_box(g_fb, SCREEN_W, x, y, w, h, "SID FILTER", HWUI_RED);
+    hwui_group_box(g_fb, PHYS_W, x, y, w, h, "SID FILTER", HWUI_RED);
 
     /* Filter ON toggle */
     int filter_on = flag_get(FLAG_FILTER_ON);
-    if (hwui_checkbox(g_fb, SCREEN_W, x + w - 48, y + 1,
+    if (hwui_checkbox(g_fb, PHYS_W, x + w - 48, y + 1,
                       "ON", filter_on,
                       g_mouse_x, g_mouse_y, g_mouse_down)) {
         flag_toggle(FLAG_FILTER_ON);
@@ -853,7 +861,7 @@ static void render_filter_section(int x, int y, int w, int h) {
     }
 
     if (!filter_on) {
-        hwui_text_centered(g_fb, SCREEN_W, x, y + h / 2 - 3, w, HWUI_FONT_H,
+        hwui_text_centered(g_fb, PHYS_W, x, y + h / 2 - 3, w, HWUI_FONT_H,
                            "[ FILTER OFF ]", HWUI_GRAY_MED);
         return;
     }
@@ -862,9 +870,9 @@ static void render_filter_section(int x, int y, int w, int h) {
     int row_y = y + 14;
 
     /* Cutoff slider (11-bit, 0-2047) */
-    hwui_text(g_fb, SCREEN_W, x + 6, row_y + 2, "CUT", HWUI_GRAY_LIGHT);
+    hwui_text(g_fb, PHYS_W, x + 6, row_y + 2, "CUT", HWUI_GRAY_LIGHT);
     new_val = (float)g_filter_cutoff;
-    if (hwui_slider_h(g_fb, SCREEN_W, x + 32, row_y, w - 100, 14,
+    if (hwui_slider_h(g_fb, PHYS_W, x + 32, row_y, w - 100, 14,
                       (float)g_filter_cutoff, 0, 2047, HWUI_RED,
                       g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
         g_filter_cutoff = (int)new_val;
@@ -875,14 +883,14 @@ static void render_filter_section(int x, int y, int w, int h) {
     {
         char cut_str[8];
         snprintf(cut_str, sizeof(cut_str), "%d", g_filter_cutoff);
-        hwui_text(g_fb, SCREEN_W, x + w - 60, row_y + 4, cut_str, HWUI_WHITE);
+        hwui_text(g_fb, PHYS_W, x + w - 60, row_y + 4, cut_str, HWUI_WHITE);
     }
 
     row_y += 22;
 
     /* Resonance knob (0-15) */
     new_val = (float)g_filter_res;
-    if (hwui_knob(g_fb, SCREEN_W, x + 20, row_y, 14,
+    if (hwui_knob(g_fb, PHYS_W, x + 20, row_y, 14,
                   (float)g_filter_res, 0, 15, "RES",
                   HWUI_ORANGE, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
         g_filter_res = (int)new_val;
@@ -896,7 +904,7 @@ static void render_filter_section(int x, int y, int w, int h) {
 
     {
         int lp = flag_get(FLAG_FILTER_LP);
-        if (hwui_button(g_fb, SCREEN_W, tog_x, tog_y, 36, 16, "LP", lp,
+        if (hwui_button(g_fb, PHYS_W, tog_x, tog_y, 36, 16, "LP", lp,
                         g_mouse_x, g_mouse_y, g_mouse_down)) {
             flag_toggle(FLAG_FILTER_LP);
             js_on_param_change(PARAM_FILTER_LP, flag_get(FLAG_FILTER_LP));
@@ -907,7 +915,7 @@ static void render_filter_section(int x, int y, int w, int h) {
 
     {
         int bp = flag_get(FLAG_FILTER_BP);
-        if (hwui_button(g_fb, SCREEN_W, tog_x, tog_y, 36, 16, "BP", bp,
+        if (hwui_button(g_fb, PHYS_W, tog_x, tog_y, 36, 16, "BP", bp,
                         g_mouse_x, g_mouse_y, g_mouse_down)) {
             flag_toggle(FLAG_FILTER_BP);
             js_on_param_change(PARAM_FILTER_BP, flag_get(FLAG_FILTER_BP));
@@ -918,7 +926,7 @@ static void render_filter_section(int x, int y, int w, int h) {
 
     {
         int hp = flag_get(FLAG_FILTER_HP);
-        if (hwui_button(g_fb, SCREEN_W, tog_x, tog_y, 36, 16, "HP", hp,
+        if (hwui_button(g_fb, PHYS_W, tog_x, tog_y, 36, 16, "HP", hp,
                         g_mouse_x, g_mouse_y, g_mouse_down)) {
             flag_toggle(FLAG_FILTER_HP);
             js_on_param_change(PARAM_FILTER_HP, flag_get(FLAG_FILTER_HP));
@@ -930,7 +938,7 @@ static void render_filter_section(int x, int y, int w, int h) {
     /* Ring mod / Osc sync / Route to filter toggles */
     {
         int ring = flag_get(FLAG_RING_MOD);
-        if (hwui_checkbox(g_fb, SCREEN_W, tog_x, tog_y + 1,
+        if (hwui_checkbox(g_fb, PHYS_W, tog_x, tog_y + 1,
                           "RING", ring,
                           g_mouse_x, g_mouse_y, g_mouse_down)) {
             flag_toggle(FLAG_RING_MOD);
@@ -942,7 +950,7 @@ static void render_filter_section(int x, int y, int w, int h) {
 
     {
         int sync = flag_get(FLAG_OSC_SYNC);
-        if (hwui_checkbox(g_fb, SCREEN_W, tog_x, tog_y + 1,
+        if (hwui_checkbox(g_fb, PHYS_W, tog_x, tog_y + 1,
                           "SYNC", sync,
                           g_mouse_x, g_mouse_y, g_mouse_down)) {
             flag_toggle(FLAG_OSC_SYNC);
@@ -954,7 +962,7 @@ static void render_filter_section(int x, int y, int w, int h) {
     /* Route to filter */
     {
         int to_filt = flag_get(FLAG_TO_FILTER);
-        if (hwui_checkbox(g_fb, SCREEN_W, x + 80, tog_y + 22,
+        if (hwui_checkbox(g_fb, PHYS_W, x + 80, tog_y + 22,
                           "ROUTE TO FILTER", to_filt,
                           g_mouse_x, g_mouse_y, g_mouse_down)) {
             flag_toggle(FLAG_TO_FILTER);
@@ -969,7 +977,7 @@ static void render_filter_section(int x, int y, int w, int h) {
 static void render_extras_section(int x, int y, int w, int h) {
     const PSGChipInfo *chip = &PSG_CHIPS[g_chip_subtype];
 
-    hwui_group_box(g_fb, SCREEN_W, x, y, w, h, "EXTRAS", HWUI_GRAY_LIGHT);
+    hwui_group_box(g_fb, PHYS_W, x, y, w, h, "EXTRAS", HWUI_GRAY_LIGHT);
 
     int cx = x + 8;
     int cy = y + 12;
@@ -978,7 +986,7 @@ static void render_extras_section(int x, int y, int w, int h) {
     if (chip->has_noise) {
         static const char *noise_modes[] = { "White", "Periodic" };
         int new_mode = g_noise_mode;
-        if (hwui_dropdown(g_fb, SCREEN_W, cx, cy, 90,
+        if (hwui_dropdown(g_fb, PHYS_W, cx, cy, 90,
                           noise_modes, 2, g_noise_mode,
                           g_mouse_x, g_mouse_y, g_mouse_down, &new_mode)) {
             g_noise_mode = new_mode;
@@ -993,7 +1001,7 @@ static void render_extras_section(int x, int y, int w, int h) {
         g_chip_subtype == PSG_CHIP_AY ||
         g_chip_subtype == PSG_CHIP_AY8930) {
         float new_val = (float)g_psg_width;
-        if (hwui_knob(g_fb, SCREEN_W, cx + 10, cy - 2, 10,
+        if (hwui_knob(g_fb, PHYS_W, cx + 10, cy - 2, 10,
                       (float)g_psg_width, 0, 255, "WIDTH",
                       HWUI_CYAN, g_mouse_x, g_mouse_y, g_mouse_down, &new_val)) {
             g_psg_width = (int)new_val;
@@ -1007,7 +1015,7 @@ static void render_extras_section(int x, int y, int w, int h) {
     {
         char info[64];
         snprintf(info, sizeof(info), "Chip: %s", chip->name);
-        hwui_text(g_fb, SCREEN_W, cx + 20, cy + 6, info, HWUI_GRAY_MED);
+        hwui_text(g_fb, PHYS_W, cx + 20, cy + 6, info, HWUI_GRAY_MED);
     }
 }
 
@@ -1017,14 +1025,14 @@ static void render(void) {
     const PSGChipInfo *chip = &PSG_CHIPS[g_chip_subtype];
 
     /* Clear framebuffer */
-    for (int i = 0; i < SCREEN_W * SCREEN_H; i++)
+    for (int i = 0; i < PHYS_W * PHYS_H; i++)
         g_fb[i] = HWUI_BLACK;
 
     hwui_frame_begin(g_mouse_x, g_mouse_y, g_mouse_down);
 
     /* ── Header bar (y=0..14) ─────────────────────────────────────────── */
-    hwui_rect(g_fb, SCREEN_W, 0, 0, SCREEN_W, 16, HWUI_BLUE_DARK);
-    hwui_text_centered(g_fb, SCREEN_W, 0, 0, SCREEN_W, 16, chip->name, HWUI_WHITE);
+    hwui_rect(g_fb, PHYS_W, 0, 0, SCREEN_W, 16, HWUI_BLUE_DARK);
+    hwui_text_centered(g_fb, PHYS_W, 0, 0, SCREEN_W, 16, chip->name, HWUI_WHITE);
 
     int margin = 4;
     int content_w = SCREEN_W - margin * 2;
@@ -1057,9 +1065,9 @@ static void render(void) {
             break;
         default:
             /* No envelope for this chip */
-            hwui_group_box(g_fb, SCREEN_W, env_x, env_y, env_w, env_h,
+            hwui_group_box(g_fb, PHYS_W, env_x, env_y, env_w, env_h,
                            "ENVELOPE", HWUI_GRAY_MED);
-            hwui_text_centered(g_fb, SCREEN_W, env_x, env_y + env_h / 2 - 3,
+            hwui_text_centered(g_fb, PHYS_W, env_x, env_y + env_h / 2 - 3,
                                env_w, HWUI_FONT_H,
                                "[ No envelope for this chip ]", HWUI_GRAY_MED);
             break;
@@ -1071,7 +1079,7 @@ static void render(void) {
         render_filter_section(margin, 202, content_w, 100);
     } else {
         /* Subtle separator line */
-        hwui_hline(g_fb, SCREEN_W, margin, 202, content_w, HWUI_GRAY_DARK);
+        hwui_hline(g_fb, PHYS_W, margin, 202, content_w, HWUI_GRAY_DARK);
     }
 
     /* ── Extras section (y=302..358) ──────────────────────────────────── */
@@ -1080,7 +1088,7 @@ static void render(void) {
     hwui_frame_end();
 
     /* Push framebuffer to SDL texture */
-    SDL_UpdateTexture(g_tex, NULL, g_fb, SCREEN_W * sizeof(uint32_t));
+    SDL_UpdateTexture(g_tex, NULL, g_fb, PHYS_W * sizeof(uint32_t));
     SDL_RenderClear(g_ren);
     SDL_RenderCopy(g_ren, g_tex, NULL, NULL);
     SDL_RenderPresent(g_ren);
@@ -1091,20 +1099,20 @@ static void render(void) {
 static void handle_event(SDL_Event *e) {
     switch (e->type) {
     case SDL_MOUSEBUTTONDOWN:
-        g_mouse_x = e->button.x;
-        g_mouse_y = e->button.y;
+        g_mouse_x = e->button.x / SCALE;
+        g_mouse_y = e->button.y / SCALE;
         g_mouse_down = 1;
         g_dirty = 1;
         break;
     case SDL_MOUSEBUTTONUP:
-        g_mouse_x = e->button.x;
-        g_mouse_y = e->button.y;
+        g_mouse_x = e->button.x / SCALE;
+        g_mouse_y = e->button.y / SCALE;
         g_mouse_down = 0;
         g_dirty = 1;
         break;
     case SDL_MOUSEMOTION:
-        g_mouse_x = e->motion.x;
-        g_mouse_y = e->motion.y;
+        g_mouse_x = e->motion.x / SCALE;
+        g_mouse_y = e->motion.y / SCALE;
         if (g_mouse_down) g_dirty = 1;
         break;
     default:
@@ -1127,19 +1135,18 @@ static void tick(void) {
 void furnace_psg_init(int w, int h) {
     (void)w; (void)h;
     SDL_Init(SDL_INIT_VIDEO);
-    /* Window is 2× the logical size so the canvas fills Retina displays without
-     * requiring CSS upscaling. SDL_RenderSetLogicalSize keeps mouse coords and
-     * all drawing in the 480×360 logical space — no layout changes needed. */
+    /* SCALE=2: window = physical dimensions (960×720). hwui_set_scale(SCALE)
+     * makes drawing primitives render each logical pixel as a SCALE×SCALE block.
+     * Mouse events are divided by SCALE in handle_event to get logical coords. */
     g_win = SDL_CreateWindow("Furnace PSG Editor",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        SCREEN_W * 2, SCREEN_H * 2, 0);
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
+        PHYS_W, PHYS_H, 0);
     g_ren = SDL_CreateRenderer(g_win, -1, SDL_RENDERER_SOFTWARE);
-    SDL_RenderSetLogicalSize(g_ren, SCREEN_W, SCREEN_H);
     g_tex = SDL_CreateTexture(g_ren, SDL_PIXELFORMAT_ARGB8888,
-        SDL_TEXTUREACCESS_STREAMING, SCREEN_W, SCREEN_H);
+        SDL_TEXTUREACCESS_STREAMING, PHYS_W, PHYS_H);
     memset(g_fb, 0, sizeof(g_fb));
-    hwui_set_fb_size(SCREEN_W, SCREEN_H);
+    hwui_set_fb_size(PHYS_W, PHYS_H);
+    hwui_set_scale(SCALE);
     memset(g_env, 0, sizeof(g_env));
     g_chip_subtype = PSG_CHIP_NES;
     g_waveform = 0;
