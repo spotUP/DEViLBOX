@@ -439,21 +439,32 @@ function App() {
     // In DJ mode, deck-level drop zones handle file loading — ignore here
     if (useUIStore.getState().activeView === 'dj') return;
 
+    // Audio files get a dedicated import dialog (adds a Sampler instrument)
+    if (/\.(wav|mp3|ogg|flac|aiff?|m4a|iff|8svx)$/i.test(file.name)) {
+      useUIStore.getState().setPendingAudioFile(file);
+      return;
+    }
+
+    // TD-3 / TB-303 pattern files get a dedicated import dialog
+    if (/\.(sqs|seq)$/i.test(file.name)) {
+      useUIStore.getState().setPendingTD3File(file);
+      return;
+    }
+
     const result = await loadFile(file, { requireConfirmation: true });
     
     if (result.success === 'pending-confirmation') {
       const dropFilename = result.file.name.toLowerCase();
-      const isTrackerModule = !dropFilename.endsWith('.dbx') &&
-        !dropFilename.endsWith('.mid') && !dropFilename.endsWith('.midi') &&
-        !dropFilename.endsWith('.sqs') && !dropFilename.endsWith('.seq');
-      // In WebGL mode, module drops go through UIStore so WebGLModalBridge renders
-      // ImportModuleDialog via its portal (z-100 on body), above PixiDOMOverlay divs.
-      // Dialogs rendered inside the React root sit at stacking layer 0 and are
-      // invisible behind PixiDOMOverlay elements even with a high z-index class.
-      if (useSettingsStore.getState().renderMode === 'webgl' && isTrackerModule) {
+      const isTrackerModule = !dropFilename.endsWith('.dbx');
+      // Tracker modules (including .mid/.midi) open ImportModuleDialog (full UADE scan,
+      // subsong picker, engine selector, MIDI options).  In WebGL mode this is rendered as
+      // a portal by WebGLModalBridge (z-100 on body) so it sits above PixiDOMOverlay;
+      // in DOM mode TrackerView renders the same dialog inside the React tree — both share
+      // the pendingModuleFile store key.
+      if (isTrackerModule) {
         useUIStore.getState().setPendingModuleFile(result.file);
       } else {
-        // DOM mode or non-module formats: show local confirm dialog
+        // Non-module song formats (.dbx, .sqs, .seq): simple confirm dialog
         setPendingSongFile(result.file);
         setShowSongLoadConfirm(true);
       }
