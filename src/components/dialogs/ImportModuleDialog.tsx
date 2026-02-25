@@ -16,9 +16,11 @@ import {
 } from '@lib/import/ModuleLoader';
 import { isUADEFormat } from '@lib/import/formats/UADEParser';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
+import type { UADEMetadata } from '@engine/uade/UADEEngine';
 
 export interface ImportOptions {
   useLibopenmpt: boolean;  // Use libopenmpt for sample-accurate playback
+  subsong?: number;        // UADE subsong index (0-based)
 }
 
 interface ImportModuleDialogProps {
@@ -59,6 +61,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [error, setError]               = useState<string | null>(null);
   const [isPlaying, setIsPlaying]       = useState(false);
   const [useLibopenmpt, setUseLibopenmpt] = useState(true);
+  const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
+  const [selectedSubsong, setSelectedSubsong] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatEngine   = useSettingsStore((s) => s.formatEngine);
@@ -76,11 +80,50 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       return;
     }
 
+    const fname = file.name.toLowerCase();
+    const nativeFmtForFile = detectNativeFormat(fname);
+    const isUADEExclusive = !nativeFmtForFile && isUADEFormat(fname);
+
     setIsLoading(true);
     setError(null);
     setModuleInfo(null);
-    setLoadedFileName(file.name.toLowerCase());
+    setUadeMetadata(null);
+    setSelectedSubsong(0);
+    setLoadedFileName(fname);
 
+    if (isUADEExclusive) {
+      // UADE-exclusive format: libopenmpt cannot parse it; use UADEEngine directly
+      try {
+        const buf = await file.arrayBuffer();
+        const { UADEEngine } = await import('@engine/uade/UADEEngine');
+        const engine = UADEEngine.getInstance();
+        await engine.ready();
+        const uadeMeta = await engine.load(buf, file.name);
+        setUadeMetadata(uadeMeta);
+        // Create a minimal ModuleInfo so the Import button is enabled
+        setModuleInfo({
+          metadata: {
+            title: file.name.replace(/\.[^/.]+$/, ''),
+            type: uadeMeta.formatName || 'UADE',
+            channels: 4,
+            patterns: 1,
+            orders: uadeMeta.subsongCount,
+            instruments: 0,
+            samples: 0,
+            duration: 0,
+          },
+          arrayBuffer: buf,
+          file,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load UADE format');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Standard path: libopenmpt (MOD, XM, IT, S3M, HVL, OKT, MED, native FC, etc.)
     try {
       const info = await loadModuleFile(file);
       setModuleInfo(info);
@@ -130,9 +173,9 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       stopPreview(moduleInfo);
       setIsPlaying(false);
     }
-    onImport(moduleInfo, { useLibopenmpt });
+    onImport(moduleInfo, { useLibopenmpt, subsong: selectedSubsong });
     onClose();
-  }, [moduleInfo, isPlaying, onImport, onClose, useLibopenmpt]);
+  }, [moduleInfo, isPlaying, onImport, onClose, useLibopenmpt, selectedSubsong]);
 
   const handleClose = useCallback(() => {
     if (moduleInfo && isPlaying) stopPreview(moduleInfo);
@@ -140,6 +183,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setLoadedFileName('');
     setError(null);
     setIsPlaying(false);
+    setUadeMetadata(null);
+    setSelectedSubsong(0);
     onClose();
   }, [moduleInfo, isPlaying, onClose]);
 
@@ -212,38 +257,83 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                   <span className="font-medium text-text-primary">{moduleInfo.metadata.title}</span>
                 </div>
                 <span className="text-xs px-2 py-0.5 bg-accent-primary/20 text-accent-primary rounded">
-                  {moduleInfo.metadata.type}
+                  {uadeMetadata ? (uadeMetadata.formatName || 'UADE') : moduleInfo.metadata.type}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex justify-between text-text-muted">
-                  <span>Channels:</span>
-                  <span className="text-text-primary font-mono">{moduleInfo.metadata.channels}</span>
-                </div>
-                <div className="flex justify-between text-text-muted">
-                  <span>Patterns:</span>
-                  <span className="text-text-primary font-mono">{moduleInfo.metadata.patterns}</span>
-                </div>
-                <div className="flex justify-between text-text-muted">
-                  <span>Instruments:</span>
-                  <span className="text-text-primary font-mono">{moduleInfo.metadata.instruments}</span>
-                </div>
-                <div className="flex justify-between text-text-muted">
-                  <span>Samples:</span>
-                  <span className="text-text-primary font-mono">{moduleInfo.metadata.samples}</span>
-                </div>
-                <div className="flex justify-between text-text-muted">
-                  <span>Orders:</span>
-                  <span className="text-text-primary font-mono">{moduleInfo.metadata.orders}</span>
-                </div>
-                <div className="flex justify-between text-text-muted">
-                  <span>Duration:</span>
-                  <span className="text-text-primary font-mono">
-                    {Math.floor(moduleInfo.metadata.duration / 60)}:{String(Math.floor(moduleInfo.metadata.duration % 60)).padStart(2, '0')}
-                  </span>
-                </div>
+                {uadeMetadata ? (
+                  // UADE-specific metadata
+                  <>
+                    <div className="flex justify-between text-text-muted">
+                      <span>Player:</span>
+                      <span className="text-text-primary font-mono">{uadeMetadata.player || 'Unknown'}</span>
+                    </div>
+                    <div className="flex justify-between text-text-muted">
+                      <span>Subsongs:</span>
+                      <span className="text-text-primary font-mono">{uadeMetadata.subsongCount}</span>
+                    </div>
+                    <div className="flex justify-between text-text-muted">
+                      <span>Channels:</span>
+                      <span className="text-text-primary font-mono">4 (Paula)</span>
+                    </div>
+                    <div className="flex justify-between text-text-muted">
+                      <span>Samples:</span>
+                      <span className="text-text-primary font-mono">
+                        {Object.keys(uadeMetadata.enhancedScan?.samples ?? {}).length}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  // Standard libopenmpt metadata
+                  <>
+                    <div className="flex justify-between text-text-muted">
+                      <span>Channels:</span>
+                      <span className="text-text-primary font-mono">{moduleInfo.metadata.channels}</span>
+                    </div>
+                    <div className="flex justify-between text-text-muted">
+                      <span>Patterns:</span>
+                      <span className="text-text-primary font-mono">{moduleInfo.metadata.patterns}</span>
+                    </div>
+                    <div className="flex justify-between text-text-muted">
+                      <span>Instruments:</span>
+                      <span className="text-text-primary font-mono">{moduleInfo.metadata.instruments}</span>
+                    </div>
+                    <div className="flex justify-between text-text-muted">
+                      <span>Samples:</span>
+                      <span className="text-text-primary font-mono">{moduleInfo.metadata.samples}</span>
+                    </div>
+                    <div className="flex justify-between text-text-muted">
+                      <span>Orders:</span>
+                      <span className="text-text-primary font-mono">{moduleInfo.metadata.orders}</span>
+                    </div>
+                    <div className="flex justify-between text-text-muted">
+                      <span>Duration:</span>
+                      <span className="text-text-primary font-mono">
+                        {Math.floor(moduleInfo.metadata.duration / 60)}:{String(Math.floor(moduleInfo.metadata.duration % 60)).padStart(2, '0')}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
+
+              {/* Subsong picker — shown when UADE pre-scan detected multiple subsongs */}
+              {uadeMetadata && uadeMetadata.subsongCount > 1 && (
+                <div className="flex items-center gap-3">
+                  <label className="text-xs text-text-muted whitespace-nowrap">Import subsong:</label>
+                  <select
+                    value={selectedSubsong}
+                    onChange={(e) => setSelectedSubsong(Number(e.target.value))}
+                    className="flex-1 text-xs bg-dark-bgSecondary border border-dark-border rounded px-2 py-1.5 text-text-primary"
+                  >
+                    {Array.from({ length: uadeMetadata.subsongCount }, (_, i) => (
+                      <option key={i} value={i}>
+                        {`Subsong ${i + 1}${i === 0 ? ' (default)' : ''}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {moduleInfo.metadata.message && (
                 <div className="text-xs text-text-muted bg-dark-bgSecondary p-2 rounded max-h-20 overflow-y-auto font-mono whitespace-pre-wrap">
@@ -251,16 +341,18 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                 </div>
               )}
 
-              {/* Preview button */}
-              <Button
-                variant="ghost"
-                fullWidth
-                onClick={handlePreview}
-                icon={isPlaying ? <Square size={14} /> : <Play size={14} />}
-                className={isPlaying ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}
-              >
-                {isPlaying ? 'Stop Preview' : 'Preview'}
-              </Button>
+              {/* Preview button — hidden for UADE-exclusive formats (libopenmpt can't play them) */}
+              {!uadeMetadata && (
+                <Button
+                  variant="ghost"
+                  fullWidth
+                  onClick={handlePreview}
+                  icon={isPlaying ? <Square size={14} /> : <Play size={14} />}
+                  className={isPlaying ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}
+                >
+                  {isPlaying ? 'Stop Preview' : 'Preview'}
+                </Button>
+              )}
             </div>
           )}
 
@@ -331,6 +423,18 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                       <p className="text-xs text-text-muted">Authentic emulation, display-only patterns.</p>
                     </div>
                   </label>
+                  {/* Subsong input for native-fallback-to-UADE formats (no pre-scan available) */}
+                  <div className="flex items-center gap-3 pt-1">
+                    <label className="text-xs text-text-muted whitespace-nowrap">Subsong:</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={selectedSubsong + 1}
+                      onChange={(e) => setSelectedSubsong(Math.max(0, Number(e.target.value) - 1))}
+                      className="w-16 text-xs bg-dark-bgSecondary border border-dark-border rounded px-2 py-1 text-text-primary"
+                    />
+                    <span className="text-xs text-text-muted">(1 = default)</span>
+                  </div>
                 </div>
               )}
             </div>
