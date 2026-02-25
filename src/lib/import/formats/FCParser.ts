@@ -33,18 +33,22 @@ function s8(v: number): number {
 }
 
 /**
- * Map an FC note (1-72) to an XM-style note number (13-84).
- * FC note 1 = Amiga C-1 = XM note 13 (C-1).
- * FC note 0 = empty, FC note 0x49 = pattern end marker.
+ * Convert an FC period table index to an XM note number.
+ *
+ * Mirrors FlodJS FCPlayer.process exactly:
+ *   periodIdx = (frqTranspose_unsigned + fcNote + seqTranspose) & 0x7F
+ *   xmNote    = periodIdx + 13
+ *
+ * Derivation (createSamplerInstrument uses baseNote:'C3' = XM note 37, sampleRate=8287 Hz):
+ *   - FC period index 24 → period 428 → 8287 Hz → plays at natural rate → XM note 37
+ *   - 37 - 24 = 13 → offset is +13
+ *
+ * frqTranspose MUST be the raw unsigned byte value (0-255) from the freq macro,
+ * NOT sign-extended. In FlodJS all bytes are read unsigned, so the & 0x7F wrap
+ * handles the full range including "negative" offsets stored as 0x80-0xFF.
  */
-function fcNoteToXM(fcNote: number, transpose: number): number {
-  if (fcNote === 0) return 0;
-  if (fcNote >= 0x49) return 97; // note off
-  // FC note numbering: note 1 = C-0 (period 1712), note 13 = C-1 (period 856), etc.
-  // XM note numbering: note 1 = C-0, note 13 = C-1. Same base — no offset needed.
-  // The previous +12 shifted every note one octave too high (C-1 → C-2, etc.)
-  const xm = fcNote + transpose;
-  return Math.max(1, Math.min(96, xm));
+function fcPeriodIdxToXM(periodIdx: number): number {
+  return Math.max(1, Math.min(96, (periodIdx & 0x7F) + 13));
 }
 
 // ── FC Period Table (from FlodJS FCPlayer) ────────────────────────────────
@@ -368,10 +372,13 @@ function processFreqMacro(voice: FCVoiceState, freqMacros: Uint8Array[]): void {
           break;
       }
 
-      // Read freq transpose value (unless sustain or loop effect interrupted)
+      // Read freq transpose value (unless sustain or loop effect interrupted).
+      // Store as UNSIGNED byte (0-255), exactly as FlodJS does with readUbyte().
+      // The & 0x7F wrap in the period-index formula handles "negative" offsets
+      // stored as bytes 0x80-0xDF without any sign extension.
       if (!loopSustain && !loopEffect) {
         if (voice.frqStep < 64) {
-          voice.frqTranspose = s8(fm[voice.frqStep]);
+          voice.frqTranspose = fm[voice.frqStep]; // unsigned, range 0-255
           voice.frqStep++;
         }
       }
@@ -441,7 +448,7 @@ function processVolMacro(voice: FCVoiceState, volMacros: Uint8Array[]): void {
       case 0xE0: { // volume loop
         loopEffect = true;
         const target = pos + 1 < 64 ? vm[pos + 1] & 0x3F : 5;
-        voice.volStep = target - 5; // convert absolute offset to relative-to-data-start
+        voice.volStep = Math.max(0, target - 5); // convert absolute offset to relative-to-data-start; clamp to data region
         break;
       }
 
@@ -495,6 +502,51 @@ function processVoicePitch(voice: FCVoiceState): void {
     voice.pitchBendTime--;
     voice.pitch -= voice.pitchBendSpeed;
   }
+}
+
+// ── Fast Metadata Extraction (no simulation) ──────────────────────────────
+
+export interface FCMetadata {
+  channels: number;
+  patterns: number;
+  orders: number;
+  instruments: number;
+  samples: number;
+}
+
+/**
+ * Extract module counts from an FC header without running the macro simulation.
+ * Returns null if the buffer doesn't start with a recognised FC magic.
+ */
+export function parseFCMetadata(buffer: ArrayBuffer): FCMetadata | null {
+  const buf = new Uint8Array(buffer);
+  if (buf.length < 100) return null;
+
+  const magic = String.fromCharCode(buf[0], buf[1], buf[2], buf[3]);
+  if (magic !== 'FC13' && magic !== 'FC14' && magic !== 'SMOD') return null;
+
+  const seqLen      = u32BE(buf, 4);
+  const patLen      = u32BE(buf, 12);
+  const volMacroLen = u32BE(buf, 28);
+
+  const numSeqs       = Math.floor(seqLen / 13);
+  const numPatterns   = Math.floor(patLen / 64);
+  const numVolMacros  = Math.floor(volMacroLen / 64);
+
+  // 10 sample definitions start at offset 40 (4 magic + 9×4-byte pointers)
+  let numSamples = 0;
+  for (let i = 0; i < 10; i++) {
+    const len = u16BE(buf, 40 + i * 6);
+    if (len > 0) numSamples++;
+  }
+
+  return {
+    channels:    4,
+    patterns:    numPatterns,
+    orders:      numSeqs,
+    instruments: numVolMacros,
+    samples:     numSamples,
+  };
 }
 
 // ── Main Parser ───────────────────────────────────────────────────────────
@@ -585,6 +637,10 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
   }
 
   // ── Sample PCM data (8-bit signed, len*2 bytes per sample) ───────────────
+  // FC14 format note (from libtfmxaudiodecoder reference):
+  //   Each non-empty sample is followed by a 2-byte silent padding word.
+  //   Skipping it is required; without it every subsequent sample reads from
+  //   the wrong offset (shifted by 2 bytes per preceding non-empty sample).
   const samplePCMs: Uint8Array[] = [];
   let sampleReadOff = samplePtr;
   for (let i = 0; i < 10; i++) {
@@ -595,6 +651,8 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
       samplePCMs.push(new Uint8Array(0));
     }
     sampleReadOff += byteLen;
+    // FC14: skip the 2-byte silent word appended after each non-empty sample
+    if (isFC14 && byteLen > 0) sampleReadOff += 2;
   }
 
   // ── FC14 wavetable PCM data ───────────────────────────────────────────────
@@ -627,8 +685,11 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
       // PCM sample (indices 0-9)
       if (sampleDefs[waveIdx].len > 0) {
         const def = sampleDefs[waveIdx];
-        const loopStart = def.loopLen > 1 ? def.loopStart * 2 : 0;
-        const loopEnd   = def.loopLen > 1 ? (def.loopStart + def.loopLen) * 2 : 0;
+        // FC format (from libtfmxaudiodecoder reference):
+        //   repOffs (loopStart) is stored in BYTES — do NOT multiply by 2.
+        //   repLen  (loopLen)   is stored in WORDS — multiply by 2 for bytes.
+        const loopStart = def.loopLen > 1 ? def.loopStart : 0;
+        const loopEnd   = def.loopLen > 1 ? def.loopStart + def.loopLen * 2 : 0;
         instruments.push(createSamplerInstrument(
           id, `Sample ${waveIdx}`, samplePCMs[waveIdx], 64, 8287, loopStart, loopEnd
         ));
@@ -730,8 +791,9 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
             voice.vibratoFlag = 0;
             voice.vibratoSpeed = vm[2];
             voice.vibratoDepth = vm[3];
-            voice.vibrato = vm[3];
+            voice.vibrato = 0;  // start at 0, not depth
             voice.vibratoDelay = vm[4];
+            voice.frqTranspose = 0; // reset on new note — macro will set it on first tick
 
             voice.volBendFlag = 0;
             voice.volBendSpeed = 0;
@@ -770,7 +832,9 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
 
         let xmNote = 0;
         if (triggered[ch]) {
-          xmNote = fcNoteToXM(voice.note, seq.transpose[ch]);
+          // Mirror FlodJS: periodIdx = (frqTranspose_unsigned + note + seqTranspose) & 0x7F
+          const periodIdx = (voice.frqTranspose + voice.note + seq.transpose[ch]) & 0x7F;
+          xmNote = fcPeriodIdxToXM(periodIdx);
         } else if (fcNote === 0x49 || (fcPat && fcPat.val[row] === 0xF0)) {
           xmNote = 97; // note off
         }

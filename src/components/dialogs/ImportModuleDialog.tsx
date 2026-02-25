@@ -15,6 +15,7 @@ import {
   type ModuleInfo,
 } from '@lib/import/ModuleLoader';
 import { isUADEFormat } from '@lib/import/formats/UADEParser';
+import { getNativeFormatMetadata } from '@lib/import/NativeFormatMetadata';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 
@@ -22,6 +23,12 @@ export interface ImportOptions {
   useLibopenmpt: boolean;     // Use libopenmpt for sample-accurate playback
   subsong?: number;           // UADE subsong index (0-based)
   uadeMetadata?: UADEMetadata; // Pre-scanned UADE metadata (avoids double scan on import)
+  midiOptions?: {             // MIDI-specific import settings
+    quantize?: number;
+    mergeChannels?: boolean;
+    velocityToVolume?: boolean;
+    defaultPatternLength?: number;
+  };
 }
 
 interface ImportModuleDialogProps {
@@ -33,16 +40,24 @@ interface ImportModuleDialogProps {
 
 // ── Format detection ──────────────────────────────────────────────────────────
 
-type NativeFormatKey = 'fc' | 'soundmon' | 'sidmon2' | 'fred' | 'soundfx' | 'mugician';
+type NativeFormatKey = 'fc' | 'soundmon' | 'sidmon2' | 'fred' | 'soundfx' | 'mugician' | 'tfmx' | 'hvl' | 'okt' | 'med' | 'digi';
 
 const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label: string; description: string }> = [
+  { key: 'hvl',      regex: /\.(hvl|ahx)$/i,                                    label: 'HivelyTracker',   description: 'HivelyTracker/AHX — native parser or UADE.' },
+  { key: 'okt',      regex: /\.okt$/i,                                           label: 'Oktalyzer',       description: 'Oktalyzer 8-channel — native parser or UADE.' },
+  { key: 'med',      regex: /\.(med|mmd[0-3])$/i,                                label: 'OctaMED',         description: 'OctaMED/MED — native parser or UADE.' },
+  { key: 'digi',     regex: /\.digi$/i,                                          label: 'DigiBooster',     description: 'DigiBooster Pro — native parser or UADE.' },
   { key: 'fc',       regex: /\.(fc|fc2|fc3|fc4|fc13|fc14|sfc|smod|bfc|bsi)$/i, label: 'Future Composer', description: 'Handles FC 1.3/1.4. FC2 auto-falls back to UADE.' },
   { key: 'soundmon', regex: /\.(bp|bp3|sndmon)$/i,                              label: 'SoundMon',        description: 'Brian Postma\'s SoundMon V1/V2/V3.' },
   { key: 'sidmon2',  regex: /\.(sid2|smn)$/i,                                   label: 'SidMon II',       description: 'SidMon II — MIDI version.' },
   { key: 'fred',     regex: /\.fred$/i,                                          label: 'Fred Editor',     description: 'Fred Editor by Software of Sweden.' },
   { key: 'soundfx',  regex: /\.(sfx|sfx13)$/i,                                  label: 'Sound-FX',        description: 'Sound-FX v1.0 and v2.0.' },
   { key: 'mugician', regex: /\.(dmu|dmu2|mug|mug2)$/i,                          label: 'Digital Mugician', description: 'Digital Mugician V1/V2 by Rob Hubbard.' },
+  { key: 'tfmx',     regex: /\.(tfmx|mdat|tfx)$/i,                              label: 'TFMX',            description: 'Jochen Hippel TFMX — native parser or UADE.' },
 ];
+
+/** Furnace / DefleMask — always use native parser, no libopenmpt or UADE option. */
+const FURNACE_FORMAT_RE = /\.(fur|dmf)$/i;
 
 function detectNativeFormat(filename: string): (typeof NATIVE_FORMAT_PATTERNS)[number] | null {
   return NATIVE_FORMAT_PATTERNS.find(f => f.regex.test(filename)) ?? null;
@@ -85,7 +100,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
     const fname = file.name.toLowerCase();
     const nativeFmtForFile = detectNativeFormat(fname);
-    const isUADEExclusive = !nativeFmtForFile && isUADEFormat(fname);
+    const isFurnace = FURNACE_FORMAT_RE.test(fname);
+    const isUADEExclusive = !nativeFmtForFile && !isFurnace && isUADEFormat(fname);
 
     setIsLoading(true);
     setError(null);
@@ -131,7 +147,42 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       return;
     }
 
-    // Standard path: libopenmpt (MOD, XM, IT, S3M, HVL, OKT, MED, native FC, etc.)
+    // Native-parser formats + Furnace: skip libopenmpt (it can't parse these correctly).
+    // Create a minimal ModuleInfo so the Import button is enabled; the actual parsing
+    // happens via parseModuleToSong() in the handleModuleImport callback.
+    // Extract what header counts we can without running a full simulation.
+    if (nativeFmtForFile || isFurnace) {
+      try {
+        const buf = await file.arrayBuffer();
+
+        // Fast header-only metadata extraction per format
+        const meta = nativeFmtForFile
+          ? getNativeFormatMetadata(nativeFmtForFile.key, buf)
+          : { channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1 };
+
+        setModuleInfo({
+          metadata: {
+            title: file.name.replace(/\.[^/.]+$/, ''),
+            type: isFurnace ? 'Furnace' : nativeFmtForFile!.label,
+            channels:    meta.channels,
+            patterns:    meta.patterns,
+            orders:      meta.orders,
+            instruments: meta.instruments,
+            samples:     meta.samples,
+            duration: 0,
+          },
+          arrayBuffer: buf,
+          file,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to read file');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Standard path: libopenmpt (MOD, XM, IT, S3M, etc.)
     try {
       const info = await loadModuleFile(file);
       setModuleInfo(info);
@@ -299,34 +350,37 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                     </div>
                   </>
                 ) : (
-                  // Standard libopenmpt metadata
+                  // Standard libopenmpt metadata (or native format with header-extracted counts)
+                  // -1 is the sentinel for "not available" — show '--' instead of a number
                   <>
                     <div className="flex justify-between text-text-muted">
                       <span>Channels:</span>
-                      <span className="text-text-primary font-mono">{moduleInfo.metadata.channels}</span>
+                      <span className="text-text-primary font-mono">{moduleInfo.metadata.channels < 0 ? '--' : moduleInfo.metadata.channels}</span>
                     </div>
                     <div className="flex justify-between text-text-muted">
                       <span>Patterns:</span>
-                      <span className="text-text-primary font-mono">{moduleInfo.metadata.patterns}</span>
+                      <span className="text-text-primary font-mono">{moduleInfo.metadata.patterns < 0 ? '--' : moduleInfo.metadata.patterns}</span>
                     </div>
                     <div className="flex justify-between text-text-muted">
                       <span>Instruments:</span>
-                      <span className="text-text-primary font-mono">{moduleInfo.metadata.instruments}</span>
+                      <span className="text-text-primary font-mono">{moduleInfo.metadata.instruments < 0 ? '--' : moduleInfo.metadata.instruments}</span>
                     </div>
                     <div className="flex justify-between text-text-muted">
                       <span>Samples:</span>
-                      <span className="text-text-primary font-mono">{moduleInfo.metadata.samples}</span>
+                      <span className="text-text-primary font-mono">{moduleInfo.metadata.samples < 0 ? '--' : moduleInfo.metadata.samples}</span>
                     </div>
                     <div className="flex justify-between text-text-muted">
                       <span>Orders:</span>
-                      <span className="text-text-primary font-mono">{moduleInfo.metadata.orders}</span>
+                      <span className="text-text-primary font-mono">{moduleInfo.metadata.orders < 0 ? '--' : moduleInfo.metadata.orders}</span>
                     </div>
-                    <div className="flex justify-between text-text-muted">
-                      <span>Duration:</span>
-                      <span className="text-text-primary font-mono">
-                        {Math.floor(moduleInfo.metadata.duration / 60)}:{String(Math.floor(moduleInfo.metadata.duration % 60)).padStart(2, '0')}
-                      </span>
-                    </div>
+                    {moduleInfo.metadata.duration > 0 && (
+                      <div className="flex justify-between text-text-muted">
+                        <span>Duration:</span>
+                        <span className="text-text-primary font-mono">
+                          {Math.floor(moduleInfo.metadata.duration / 60)}:{String(Math.floor(moduleInfo.metadata.duration % 60)).padStart(2, '0')}
+                        </span>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
