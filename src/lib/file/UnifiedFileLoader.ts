@@ -18,12 +18,26 @@ import { useAudioStore } from '@/stores/useAudioStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { notify } from '@/stores/useNotificationStore';
 import { isSupportedModule } from '@/lib/import/ModuleLoader';
+import type { UADEMetadata } from '@engine/uade/UADEEngine';
 
 export interface FileLoadOptions {
   /** Whether to show confirmation dialog before replacing project (song formats only) */
   requireConfirmation?: boolean;
   /** Whether to preserve existing instruments (for additive imports like TD-3 in some UX flows) */
   preserveInstruments?: boolean;
+  /** 0-based subsong index for multi-subsong formats (passed to parseModuleToSong) */
+  subsong?: number;
+  /** Pre-scanned UADE metadata — avoids a redundant scan when the dialog already ran one */
+  uadeMetadata?: UADEMetadata;
+  /** MIDI-specific import settings (quantize, mergeChannels, etc.) */
+  midiOptions?: {
+    quantize?: number;
+    mergeChannels?: boolean;
+    velocityToVolume?: boolean;
+    defaultPatternLength?: number;
+  };
+  /** TD-3: if true, clear existing patterns before importing */
+  replacePatterns?: boolean;
 }
 
 export type FileLoadResult = 
@@ -93,7 +107,7 @@ function isSongFormat(filename: string): boolean {
  * Check if a file is an audio sample.
  */
 function isAudioFile(filename: string): boolean {
-  return /\.(wav|mp3|ogg|flac|aiff?|m4a)$/i.test(filename);
+  return /\.(wav|mp3|ogg|flac|aiff?|m4a|iff|8svx)$/i.test(filename);
 }
 
 /**
@@ -161,10 +175,10 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   if (filename.endsWith('.mid') || filename.endsWith('.midi')) {
     const { importMIDIFile } = await import('@lib/import/MIDIImporter');
     const result = await importMIDIFile(file, {
-      quantize: 1,
-      mergeChannels: true,
-      velocityToVolume: true,
-      defaultPatternLength: 64,
+      quantize: options.midiOptions?.quantize ?? 1,
+      mergeChannels: options.midiOptions?.mergeChannels ?? false,
+      velocityToVolume: options.midiOptions?.velocityToVolume ?? true,
+      defaultPatternLength: options.midiOptions?.defaultPatternLength ?? 64,
     });
 
     if (result.patterns.length === 0) {
@@ -245,9 +259,11 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       };
     });
 
-    loadPatterns(importedPatterns);
-    setCurrentPattern(0);
-    setPatternOrder(importedPatterns.map((_, i) => i));
+    const existingPatterns = options.replacePatterns ? [] : useTrackerStore.getState().patterns;
+    const allPatterns = [...existingPatterns, ...importedPatterns];
+    loadPatterns(allPatterns);
+    setCurrentPattern(existingPatterns.length);
+    setPatternOrder(allPatterns.map((_, i) => i));
 
     return {
       success: true,
@@ -258,7 +274,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   // === All other tracker/module formats ===
   if (isSupportedModule(filename)) {
     const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-    const song = await parseModuleToSong(file);
+    const song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata);
 
     loadInstruments(song.instruments);
     loadPatterns(song.patterns);
