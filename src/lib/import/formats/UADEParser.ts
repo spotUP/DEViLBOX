@@ -453,7 +453,10 @@ function buildEnhancedSong(
       ? sample.pcm
       : new Uint8Array(sample.pcm);
 
-    const loopEnd = sample.loopLength > 0 ? sample.loopStart + sample.loopLength : 0;
+    // Clamp loopEnd to pcm.length — wlen from DMA can exceed extracted bytes if sample
+    // was truncated by MEM_READ_BUF_SIZE during capture.
+    const rawLoopEnd = sample.loopLength > 0 ? sample.loopStart + sample.loopLength : 0;
+    const loopEnd = rawLoopEnd > 0 ? Math.min(rawLoopEnd, pcm.length) : 0;
 
     instruments.push(createSamplerInstrument(
       instrId,
