@@ -366,6 +366,19 @@ export async function parseUADEFile(
   // Build the subsong name: append subsong index when it's not the default
   const songName = subsong > 0 ? `${name} (${subsong + 1})` : name;
 
+  // Synthesis-based formats use short macro-driven waveforms (16-32 bytes) that the
+  // enhanced scan cannot reliably extract. Force classic (UADE playback) for these.
+  const SYNTHESIS_FORMATS = new Set([
+    'fc', 'fc3', 'sfc', 'bfc', 'bsi',        // Future Composer variants
+    'bp', 'bp3', 'sm', 'sm2', 'sm3', 'sm4',  // SoundMon / BPSoundMon variants
+    'fred',                                    // Fred Editor
+    'sid', 'sid2',                             // SidMon variants
+  ]);
+  if (mode === 'enhanced' && SYNTHESIS_FORMATS.has(ext)) {
+    console.warn(`[UADEParser] ${ext.toUpperCase()} uses synthesis waveforms; using classic mode for accurate playback`);
+    return buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+  }
+
   // If enhanced scan data is available AND mode is 'enhanced', build editable song
   if (mode === 'enhanced' && activeEnhancedScan) {
     const song = buildEnhancedSong(

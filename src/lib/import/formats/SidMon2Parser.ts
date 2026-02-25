@@ -730,7 +730,7 @@ export async function parseSidMon2File(
         solo: false,
         collapsed: false,
         volume: 100,
-        pan: ch % 2 === 0 ? -25 : 25, // Amiga LRRL panning
+        pan: (ch === 0 || ch === 3) ? -50 : 50, // Amiga LRRL panning
         instrumentId: null,
         color: null,
         rows,
@@ -759,7 +759,7 @@ export async function parseSidMon2File(
         solo: false,
         collapsed: false,
         volume: 100,
-        pan: ch % 2 === 0 ? -25 : 25,
+        pan: (ch === 0 || ch === 3) ? -50 : 50,
         instrumentId: null,
         color: null,
         rows: Array.from({ length: PATTERN_LEN }, (): TrackerCell => ({

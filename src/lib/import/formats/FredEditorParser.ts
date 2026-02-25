@@ -92,22 +92,14 @@ interface FESong {
 }
 
 // ── Map a Fred Editor note to XM note ───────────────────────────────────────
-// FE notes are 0-71 (6 octaves). Note 0 = lowest.
-// We want XM note 1=C-0, so FE note 0 -> C-1 = XM 13.
-// But the period table starts at a very high period (8192) which corresponds to
-// a very low octave. We map FE note N to XM note N+1 (1-based, C-0 = 1).
-// Actually with the period table: index 0 = extremely low C, index 36 = C-3 (428-ish).
-// Index 36 in FE_PERIODS = 1024, with relative=428 -> period ~= 428 (C-3 standard).
-// Let's map: FE note 0 -> XM note 1 (C-0), etc. This gives 6 octaves.
-// But FE notes already start from the sub-bass octave, so:
-//   FE note 0 -> XM 1 (C-0)
-//   FE note 12 -> XM 13 (C-1)
-//   FE note 24 -> XM 25 (C-2)
-//   FE note 36 -> XM 37 (C-3)
+// FE notes are stored as 1-based values in the file (1-72, 6 octaves).
+// FE note 1 = C-1 (period 856) = XM note 13
+// FE note 13 = C-2 (period 428) = XM note 25
+// FE note 25 = C-3 = XM note 37
 
 function feNoteToXM(feNote: number): number {
-  if (feNote < 0 || feNote > 71) return 0;
-  return feNote + 1; // 1-based: FE note 0 = XM note 1 (C-0)
+  if (feNote < 1 || feNote > 72) return 0;
+  return feNote + 12; // 1-based: FE note 1 (C-1) → XM note 13
 }
 
 // ── Format detection ────────────────────────────────────────────────────────
@@ -625,7 +617,7 @@ export async function parseFredEditorFile(
         solo: false,
         collapsed: false,
         volume: 100,
-        pan: ch % 2 === 0 ? -25 : 25,  // Amiga LRRL panning
+        pan: (ch === 0 || ch === 3) ? -50 : 50, // Amiga LRRL hard stereo
         instrumentId: null,
         color: null,
         rows,
@@ -861,7 +853,7 @@ function makeEmptyPattern(filename: string): Pattern {
       solo: false,
       collapsed: false,
       volume: 100,
-      pan: ch % 2 === 0 ? -25 : 25,
+      pan: (ch === 0 || ch === 3) ? -50 : 50, // Amiga LRRL hard stereo
       instrumentId: null,
       color: null,
       rows: Array.from({ length: 64 }, () => emptyCell()),
