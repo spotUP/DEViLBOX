@@ -3018,6 +3018,7 @@ export interface InstrumentConfig {
   lfo?: LFOConfig; // Global LFO for filter/pitch/volume modulation
   parameters?: Record<string, unknown>; // Additional synth-specific parameters (e.g., sample URLs)
   metadata?: InstrumentMetadata; // Import metadata and transformation history
+  rawBinaryData?: Uint8Array;   // Raw binary instrument data for WASM upload (e.g. native .fur format)
 }
 
 export interface InstrumentPreset {

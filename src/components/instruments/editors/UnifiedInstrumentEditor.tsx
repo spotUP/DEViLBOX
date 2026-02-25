@@ -88,6 +88,7 @@ const FurnacePSGHardware = lazy(() => import('../hardware/FurnacePSGHardware').t
 const FurnaceWaveHardware = lazy(() => import('../hardware/FurnaceWaveHardware').then(m => ({ default: m.FurnaceWaveHardware })));
 const FurnacePCMHardware = lazy(() => import('../hardware/FurnacePCMHardware').then(m => ({ default: m.FurnacePCMHardware })));
 const FurnaceMacroHardware = lazy(() => import('../hardware/FurnaceMacroHardware').then(m => ({ default: m.FurnaceMacroHardware })));
+const FurnaceInsEdHardware = lazy(() => import('../hardware/FurnaceInsEdHardware').then(m => ({ default: m.FurnaceInsEdHardware })));
 
 // Lazy-loaded specialized components
 const MAMEOscilloscope = lazy(() => import('../../visualization/MAMEOscilloscope').then(m => ({ default: m.MAMEOscilloscope })));
@@ -103,6 +104,7 @@ import { isFurnaceFMType } from '../hardware/FurnaceFMHardware';
 import { isFurnacePSGType } from '../hardware/FurnacePSGHardware';
 import { isFurnaceWaveType } from '../hardware/FurnaceWaveHardware';
 import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
+import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 
 // Types
 type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively';
@@ -761,6 +763,10 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // ============================================================================
   if (editorMode === 'furnace') {
     const furnaceConfig = deepMerge(DEFAULT_FURNACE, instrument.furnace || {});
+    // rawBinaryData lives at the instrument level, not inside furnace — copy it through
+    if (instrument.rawBinaryData) {
+      furnaceConfig.rawBinaryData = instrument.rawBinaryData;
+    }
 
     // Determine channel names for oscilloscope based on synth type
     const isNativeDispatch = instrument.synthType === 'FurnaceGB';
@@ -772,13 +778,20 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     };
 
     // Determine if this Furnace chip has a hardware UI
-    const hasFurnaceHardware = isFurnaceFMType(instrument.synthType) ||
+    const hasFurnaceHardware = isFurnaceInsEdType(instrument.synthType) ||
+      isFurnaceFMType(instrument.synthType) ||
       isFurnacePSGType(instrument.synthType) ||
       isFurnaceWaveType(instrument.synthType) ||
       isFurnacePCMType(instrument.synthType);
 
     // Render the correct Furnace hardware UI based on chip category
+    // Prefer the real insEdit WASM (ImGui) when available; fall back to per-category modules
     const renderFurnaceHardware = () => {
+      const isInsEd = isFurnaceInsEdType(instrument.synthType);
+      console.log(`[UnifiedInsEditor] renderFurnaceHardware: synthType=${instrument.synthType} isInsEd=${isInsEd}`);
+      if (isInsEd) {
+        return <Suspense fallback={<LoadingControls />}><FurnaceInsEdHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} synthType={instrument.synthType} /></Suspense>;
+      }
       if (isFurnaceFMType(instrument.synthType)) {
         return <Suspense fallback={<LoadingControls />}><FurnaceFMHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} /></Suspense>;
       }

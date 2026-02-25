@@ -28,51 +28,51 @@ interface FurnaceInsEdHardwareProps {
  */
 
 const SYNTH_TO_DIV_INS_TYPE: Record<string, number> = {
-  // FM
-  FurnaceOPN:    0,   // DIV_INS_FM
-  FurnaceOPM:    0,   // DIV_INS_FM (OPM uses same type, different system)
-  FurnaceOPNA:   0,   // DIV_INS_FM
-  FurnaceOPNB:   0,   // DIV_INS_FM
-  FurnaceOPN2203: 0,  // DIV_INS_FM
-  FurnaceOPNBB:  0,   // DIV_INS_FM
-  FurnaceOPL:    4,   // DIV_INS_OPL
-  FurnaceOPLL:   6,   // DIV_INS_OPLL
-  FurnaceOPZ:    17,  // DIV_INS_OPZ
-  FurnaceOPL4:   4,   // DIV_INS_OPL
-  FurnaceY8950:  19,  // DIV_INS_OPL_DRUMS
-  FurnaceESFM:   62,  // DIV_INS_ESFM
+  // FM — values from furnace-insed-wasm/src/engine/instrument.h enum DivInstrumentType
+  FurnaceOPN:     1,  // DIV_INS_FM=1
+  FurnaceOPM:    33,  // DIV_INS_OPM=33
+  FurnaceOPNA:    1,  // DIV_INS_FM=1 (OPN family shares FM type)
+  FurnaceOPNB:    1,  // DIV_INS_FM=1
+  FurnaceOPN2203: 1,  // DIV_INS_FM=1
+  FurnaceOPNBB:   1,  // DIV_INS_FM=1
+  FurnaceOPL:    14,  // DIV_INS_OPL=14
+  FurnaceOPLL:   13,  // DIV_INS_OPLL=13
+  FurnaceOPZ:    19,  // DIV_INS_OPZ=19
+  FurnaceOPL4:   14,  // DIV_INS_OPL=14
+  FurnaceY8950:  32,  // DIV_INS_OPL_DRUMS=32
+  FurnaceESFM:   55,  // DIV_INS_ESFM=55
 
   // PSG
-  FurnacePSG:    2,   // DIV_INS_AY
-  FurnaceAY:     2,   // DIV_INS_AY
-  FurnaceSN:     8,   // DIV_INS_SN
-  FurnaceNES:    1,   // DIV_INS_STD
-  FurnaceGB:     3,   // DIV_INS_GB
-  FurnaceC64:    5,   // DIV_INS_C64
-  FurnacePOKEY:  25,  // DIV_INS_POKEY
-  FurnaceTED:    32,  // DIV_INS_TED
-  FurnaceVIC:    28,  // DIV_INS_VIC
-  FurnaceVERA:   23,  // DIV_INS_VERA
-  FurnaceSAA:    24,  // DIV_INS_SAA1099
+  FurnacePSG:     6,  // DIV_INS_AY=6
+  FurnaceAY:      6,  // DIV_INS_AY=6
+  FurnaceSN:      0,  // DIV_INS_STD=0 (SN76489 uses STD type)
+  FurnaceNES:    34,  // DIV_INS_NES=34
+  FurnaceGB:      2,  // DIV_INS_GB=2
+  FurnaceC64:     3,  // DIV_INS_C64=3
+  FurnacePOKEY:  20,  // DIV_INS_POKEY=20
+  FurnaceTED:    52,  // DIV_INS_TED=52
+  FurnaceVIC:    10,  // DIV_INS_VIC=10
+  FurnaceVERA:   24,  // DIV_INS_VERA=24
+  FurnaceSAA:     9,  // DIV_INS_SAA1099=9
 
   // Wavetable
-  FurnaceSCC:    10,  // DIV_INS_SCC
-  FurnaceN163:   11,  // DIV_INS_N163
-  FurnaceFDS:    12,  // DIV_INS_FDS
-  FurnacePCE:    7,   // DIV_INS_PCE
-  FurnaceVB:     29,  // DIV_INS_VBOY
-  FurnaceWS:     22,  // DIV_INS_SWAN
-  FurnaceBubSys: 26,  // DIV_INS_BEEPER
+  FurnaceSCC:    18,  // DIV_INS_SCC=18
+  FurnaceN163:   17,  // DIV_INS_N163=17
+  FurnaceFDS:    15,  // DIV_INS_FDS=15
+  FurnacePCE:     5,  // DIV_INS_PCE=5
+  FurnaceVB:     16,  // DIV_INS_VBOY=16
+  FurnaceWS:     22,  // DIV_INS_SWAN=22
+  FurnaceBubSys: 21,  // DIV_INS_BEEPER=21
 
   // PCM
-  FurnaceSegaPCM: 14, // DIV_INS_SEGAPCM
-  FurnaceQSound: 16,  // DIV_INS_QSOUND
-  FurnaceES5506: 42,  // DIV_INS_ES5506
-  FurnaceRF5C68: 35,  // DIV_INS_RF5C68
-  FurnaceC140:   43,  // DIV_INS_NAMCO
-  FurnaceK053260: 48, // DIV_INS_K053260
-  FurnaceAmiga:  9,   // DIV_INS_AMIGA
-  FurnaceSNES:   18,  // DIV_INS_SNES
+  FurnaceSegaPCM: 39, // DIV_INS_SEGAPCM=39
+  FurnaceQSound:  40, // DIV_INS_QSOUND=40
+  FurnaceES5506:  27, // DIV_INS_ES5506=27
+  FurnaceRF5C68:  42, // DIV_INS_RF5C68=42
+  FurnaceC140:    53, // DIV_INS_C140=53
+  FurnaceK053260: 50, // DIV_INS_K053260=50
+  FurnaceAmiga:    4, // DIV_INS_AMIGA=4
+  FurnaceSNES:    29, // DIV_INS_SNES=29
 };
 
 /* ── Field-by-field binary format (0xDE) ───────────────────────────────── *
@@ -92,6 +92,8 @@ const SYNTH_TO_DIV_INS_TYPE: Record<string, number> = {
 function configToBuffer(config: FurnaceConfig, synthType?: SynthType): Uint8Array {
   // Prefer rawBinaryData (native Furnace format) when available
   if (config.rawBinaryData && config.rawBinaryData.length > 4) {
+    const magic = String.fromCharCode(...config.rawBinaryData.slice(0, 4));
+    console.log(`[FurnaceInsEd] configToBuffer: using rawBinaryData (${config.rawBinaryData.length} bytes, magic="${magic}")`);
     return config.rawBinaryData;
   }
 
@@ -105,6 +107,7 @@ function configToBuffer(config: FurnaceConfig, synthType?: SynthType): Uint8Arra
   dv.setUint16(2, 240, true);
   const divInsType = synthType ? (SYNTH_TO_DIV_INS_TYPE[synthType] ?? config.chipType) : config.chipType;
   buf[4] = divInsType & 0xFF;
+  console.log(`[FurnaceInsEd] configToBuffer: 0xDE format, synthType=${synthType}, divInsType=${divInsType}`);
 
   // FM section (offset 8)
   buf[8] = config.algorithm;
@@ -393,6 +396,9 @@ function bufferToConfig(data: Uint8Array, existingConfig: FurnaceConfig): Furnac
   };
 }
 
+/* ── Cache-busting version — bump when rebuilding WASM ────────────────── */
+const WASM_VERSION = 2;
+
 /* ── Component ─────────────────────────────────────────────────────────── */
 
 export const FurnaceInsEdHardware: React.FC<FurnaceInsEdHardwareProps> = ({
@@ -412,16 +418,11 @@ export const FurnaceInsEdHardware: React.FC<FurnaceInsEdHardwareProps> = ({
     [config, synthType],
   );
 
+  // NOTE: handleModuleReady runs BEFORE init — do NOT call WASM functions
+  // that need g_engine here. The chip type is set via load_config's buffer.
   const handleModuleReady = useCallback((mod: SDLModule) => {
     moduleRef.current = mod;
-
-    // Set the chip type via the dedicated exported function
-    const divInsType = synthType ? (SYNTH_TO_DIV_INS_TYPE[synthType] ?? 0) : 0;
-    const setChipType = mod['_furnace_insed_set_chip_type'] as ((t: number) => void) | undefined;
-    if (typeof setChipType === 'function') {
-      setChipType.call(mod, divInsType);
-    }
-  }, [synthType]);
+  }, []);
 
   // Dump config from WASM on unmount — captures any edits made in the ImGui UI
   useEffect(() => {
@@ -456,16 +457,17 @@ export const FurnaceInsEdHardware: React.FC<FurnaceInsEdHardwareProps> = ({
 
   return (
     <SDLHardwareWrapper
-      moduleUrl="/furnace-gui/FurnaceInsEd.js"
+      moduleUrl={`/furnace-gui/FurnaceInsEd.js?v=${WASM_VERSION}`}
       factoryName="createFurnaceInsEd"
-      canvasWidth={800}
-      canvasHeight={600}
+      canvasWidth={1280}
+      canvasHeight={800}
       initFn="_furnace_insed_init"
       startFn="_furnace_insed_start"
       shutdownFn="_furnace_insed_shutdown"
       loadConfigFn="_furnace_insed_load_config"
       configBuffer={configBuffer}
       onModuleReady={handleModuleReady}
+      className="w-full"
     />
   );
 };
