@@ -727,6 +727,14 @@ class UADEProcessor extends AudioWorkletProcessor {
     let currentRowTicks = []; // Ticks within current row
     let currentBPM = detectedBPM;
 
+    // Fingerprint-based loop detection: stops scanning when the song loops back.
+    // Uses a sliding window of LOOP_WINDOW consecutive row fingerprints.
+    // Each fingerprint encodes all 4 channel periods + samplePtrs.
+    const LOOP_WINDOW = 16;
+    const LOOP_MIN_ROWS = 128; // Don't check until at least 2 patterns of data
+    const _fpHistory = []; // Per-row fingerprint strings
+    const _seenWindows = new Set(); // Registered window keys
+
     for (let i = 0; i < tickSnapshots.length && rows.length < MAX_ROWS; i++) {
       const tick = tickSnapshots[i];
       currentRowTicks.push(tick);
@@ -745,6 +753,23 @@ class UADEProcessor extends AudioWorkletProcessor {
         frameSinceRow -= actualFPR;
         rows.push(this._processRowTicks(currentRowTicks));
         currentRowTicks = [];
+
+        // Build fingerprint for the row just pushed
+        const _row = rows[rows.length - 1];
+        const _fp = _row.map(ch => `${ch.period | 0},${ch.samplePtr | 0}`).join('|');
+        _fpHistory.push(_fp);
+
+        if (_fpHistory.length >= LOOP_WINDOW) {
+          const _windowKey = _fpHistory.slice(-LOOP_WINDOW).join('\n');
+          if (_fpHistory.length > LOOP_MIN_ROWS && _seenWindows.has(_windowKey)) {
+            // Detected a loop: this exact sequence of rows was seen before — stop scanning
+            break;
+          }
+          // Register the window ending one row earlier to avoid same-position false positives
+          if (_fpHistory.length > LOOP_WINDOW) {
+            _seenWindows.add(_fpHistory.slice(-LOOP_WINDOW - 1, -1).join('\n'));
+          }
+        }
       }
     }
 

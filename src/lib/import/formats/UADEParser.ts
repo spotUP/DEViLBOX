@@ -333,6 +333,7 @@ export async function parseUADEFile(
   filename: string,
   mode: 'enhanced' | 'classic' = 'enhanced',
   subsong = 0,
+  preScannedMeta?: UADEMetadata,
 ): Promise<TrackerSong> {
   const { UADEEngine } = await import('@engine/uade/UADEEngine');
   const { periodToNoteIndex } = await import('@engine/effects/PeriodTables');
@@ -340,10 +341,11 @@ export async function parseUADEFile(
   const name = filename.replace(/\.[^/.]+$/, '');
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
 
-  // Initialize UADE engine and load + scan the file (always scans subsong 0 first)
+  // Initialize UADE engine; reuse pre-scanned metadata from the dialog when available
+  // (avoids a second full scan which can take several seconds per file)
   const engine = UADEEngine.getInstance();
   await engine.ready();
-  const metadata = await engine.load(buffer, filename);
+  const metadata = preScannedMeta ?? await engine.load(buffer, filename);
   const scanRows = metadata.scanData ?? [];
 
   // Resolve scan data for the requested subsong.
@@ -485,6 +487,8 @@ function buildEnhancedSong(
 
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
+  // Track previous volume per channel across all patterns — only write volume on change
+  const prevVolPerChannel: number[] = [-1, -1, -1, -1];
 
   for (let pat = 0; pat < numPatterns; pat++) {
     const rowStart = pat * ROWS_PER_PATTERN;
@@ -497,7 +501,8 @@ function buildEnhancedSong(
       solo: false,
       collapsed: false,
       volume: 100,
-      pan: 0,
+      // Amiga hard stereo: channels 0,3 = left, channels 1,2 = right
+      pan: (chIdx === 0 || chIdx === 3) ? -50 : 50,
       instrumentId: null,
       color: null,
       rows: Array.from({ length: ROWS_PER_PATTERN }, (_, rowIdx) => {
@@ -523,7 +528,10 @@ function buildEnhancedSong(
         const noteIdx = periodToNoteIndex(ch.period);
         const note = noteIdx > 0 ? Math.min(96, noteIdx) : 0;
         const instrId = ch.samplePtr > 0 ? (sampleMap.get(ch.samplePtr) ?? 0) : 0;
-        const volume = Math.min(0x50, 0x10 + ch.volume);
+        const rawVol = Math.min(0x50, 0x10 + ch.volume);
+        // Only write volume when it changes from the previous row — reduces pattern bloat
+        const volume = rawVol !== prevVolPerChannel[chIdx] ? rawVol : 0;
+        prevVolPerChannel[chIdx] = rawVol;
 
         // Use detected effects from enhanced scan
         const effTyp = (ch as UADEEnhancedScanRow)?.effTyp ?? 0;
@@ -674,7 +682,8 @@ function buildClassicSong(
       solo: false,
       collapsed: false,
       volume: 100,
-      pan: 0,
+      // Amiga hard stereo: channels 0,3 = left, channels 1,2 = right
+      pan: (chIdx === 0 || chIdx === 3) ? -50 : 50,
       instrumentId: null,
       color: null,
       rows: Array.from({ length: ROWS_PER_PATTERN }, (_, rowIdx) => {

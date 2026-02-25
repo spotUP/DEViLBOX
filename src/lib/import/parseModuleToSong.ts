@@ -10,6 +10,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig } from '@/types';
+import type { UADEMetadata } from '@/engine/uade/UADEEngine';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
 import { isAudioFile } from '@/lib/audioFileUtils';
 
@@ -31,7 +32,7 @@ function isFCFormat(filename: string): boolean {
  * Format engine preferences (Settings → Format Engine) control which parser
  * is used for formats supported by multiple engines (MOD, HVL, MED, FC, etc.).
  */
-export async function parseModuleToSong(file: File, subsong = 0): Promise<TrackerSong> {
+export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?: UADEMetadata): Promise<TrackerSong> {
   const filename = file.name.toLowerCase();
   const buffer = await file.arrayBuffer();
   const prefs = getFormatEngine();
@@ -52,7 +53,7 @@ export async function parseModuleToSong(file: File, subsong = 0): Promise<Tracke
   if (filename.endsWith('.hvl') || filename.endsWith('.ahx')) {
     if (prefs.hvl === 'uade') {
       const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-      return parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong);
+      return parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
     }
     const { parseHivelyFile } = await import('@lib/import/formats/HivelyParser');
     return parseHivelyFile(buffer, file.name);
@@ -67,7 +68,7 @@ export async function parseModuleToSong(file: File, subsong = 0): Promise<Tracke
   if (filename.endsWith('.okt')) {
     if (prefs.okt === 'uade') {
       const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-      return parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong);
+      return parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
     }
     const { parseOktalyzerFile } = await import('@lib/import/formats/OktalyzerParser');
     return parseOktalyzerFile(buffer, file.name);
@@ -78,7 +79,7 @@ export async function parseModuleToSong(file: File, subsong = 0): Promise<Tracke
     || filename.endsWith('.mmd2') || filename.endsWith('.mmd3')) {
     if (prefs.med === 'uade') {
       const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-      return parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong);
+      return parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
     }
     const { parseMEDFile } = await import('@lib/import/formats/MEDParser');
     return parseMEDFile(buffer, file.name);
@@ -88,7 +89,7 @@ export async function parseModuleToSong(file: File, subsong = 0): Promise<Tracke
   if (filename.endsWith('.digi')) {
     if (prefs.digi === 'uade') {
       const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-      return parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong);
+      return parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
     }
     const { parseDigiBoosterFile } = await import('@lib/import/formats/DigiBoosterParser');
     return parseDigiBoosterFile(buffer, file.name);
@@ -110,7 +111,7 @@ export async function parseModuleToSong(file: File, subsong = 0): Promise<Tracke
       }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, file.name, uadeMode, subsong);
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── SoundMon (Brian Postma) ─────────────────────────────────────────────
@@ -125,7 +126,7 @@ export async function parseModuleToSong(file: File, subsong = 0): Promise<Tracke
       }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, file.name, uadeMode, subsong);
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── SidMon II ─────────────────────────────────────────────────────────────
@@ -140,7 +141,7 @@ export async function parseModuleToSong(file: File, subsong = 0): Promise<Tracke
       }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, file.name, uadeMode, subsong);
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── Fred Editor ───────────────────────────────────────────────────────────
@@ -155,7 +156,7 @@ export async function parseModuleToSong(file: File, subsong = 0): Promise<Tracke
       }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, file.name, uadeMode, subsong);
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── Sound-FX ──────────────────────────────────────────────────────────────
@@ -170,7 +171,7 @@ export async function parseModuleToSong(file: File, subsong = 0): Promise<Tracke
       }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, file.name, uadeMode, subsong);
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── Digital Mugician ──────────────────────────────────────────────────────
@@ -185,7 +186,7 @@ export async function parseModuleToSong(file: File, subsong = 0): Promise<Tracke
       }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, file.name, uadeMode, subsong);
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
@@ -194,20 +195,20 @@ export async function parseModuleToSong(file: File, subsong = 0): Promise<Tracke
   const { isUADEFormat, parseUADEFile } = await import('@lib/import/formats/UADEParser');
   if (isUADEFormat(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
-    return await parseUADEFile(buffer, file.name, uadeMode, subsong);
+    return await parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── MOD, XM, IT, S3M, and other tracker formats ────────────────────────
   // MOD files can be routed to UADE for authentic Amiga playback
   if (filename.endsWith('.mod') && prefs.mod === 'uade') {
-    return await parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong);
+    return await parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   try {
     return await parseTrackerModule(buffer, file.name);
   } catch {
     // If libopenmpt fails, try UADE as last resort (magic byte detection)
-    return await parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong);
+    return await parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 }
 
