@@ -40,7 +40,10 @@ function s8(v: number): number {
 function fcNoteToXM(fcNote: number, transpose: number): number {
   if (fcNote === 0) return 0;
   if (fcNote >= 0x49) return 97; // note off
-  const xm = fcNote + transpose + 12;
+  // FC note numbering: note 1 = C-0 (period 1712), note 13 = C-1 (period 856), etc.
+  // XM note numbering: note 1 = C-0, note 13 = C-1. Same base — no offset needed.
+  // The previous +12 shifted every note one octave too high (C-1 → C-2, etc.)
+  const xm = fcNote + transpose;
   return Math.max(1, Math.min(96, xm));
 }
 
@@ -848,7 +851,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
         solo: false,
         collapsed: false,
         volume: 100,
-        pan: ch % 2 === 0 ? -25 : 25,
+        pan: (ch === 0 || ch === 3) ? -50 : 50, // Amiga LRRL hard stereo
         instrumentId: null,
         color: null,
         rows,
@@ -877,7 +880,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
         solo: false,
         collapsed: false,
         volume: 100,
-        pan: ch % 2 === 0 ? -25 : 25,
+        pan: (ch === 0 || ch === 3) ? -50 : 50, // Amiga LRRL hard stereo
         instrumentId: null,
         color: null,
         rows: Array.from({ length: 32 }, () => ({
