@@ -43,8 +43,8 @@ static FurnaceGUI*   g_gui      = nullptr;
 static bool          g_running  = false;
 
 // Default canvas dimensions — resizable at runtime via CSS / JS
-static constexpr int INIT_WIDTH  = 800;
-static constexpr int INIT_HEIGHT = 600;
+static constexpr int INIT_WIDTH  = 1280;
+static constexpr int INIT_HEIGHT = 800;
 
 // ---------------------------------------------------------------------------
 // Forward declarations
@@ -212,6 +212,13 @@ static void mainLoopIteration() {
     }
   }
 
+  // --- Sync canvas size from actual SDL window ---
+  {
+    int w, h;
+    SDL_GetWindowSize(g_window, &w, &h);
+    g_gui->wasmSetCanvasSize(w, h);
+  }
+
   // --- Start a new ImGui frame ---
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplSDL2_NewFrame();
@@ -219,7 +226,7 @@ static void mainLoopIteration() {
 
   // --- Draw the Furnace instrument editor ---
   // drawInsEdit() renders the full instrument editor panel.
-  // It reads curIns, insEditOpen, dpiScale, and e->song from FurnaceGUI internals.
+  // wasmDrawInsEdit() forces the window to fill the viewport.
   g_gui->wasmDrawInsEdit();
 
   // --- Render ImGui draw data ---
