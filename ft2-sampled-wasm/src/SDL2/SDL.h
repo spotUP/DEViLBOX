@@ -15,7 +15,19 @@ typedef enum { SDL_FALSE = 0, SDL_TRUE = 1 } SDL_bool;
 typedef void* SDL_Window;
 typedef void* SDL_Renderer;
 typedef void* SDL_Texture;
-typedef void* SDL_Surface;
+typedef struct SDL_PixelFormat {
+    uint32_t format;
+    uint8_t  BitsPerPixel, BytesPerPixel;
+    uint32_t Rmask, Gmask, Bmask, Amask;
+} SDL_PixelFormat;
+
+typedef struct SDL_Surface {
+    uint32_t flags;
+    SDL_PixelFormat *format;
+    int w, h, pitch;
+    void *pixels;
+} SDL_Surface;
+
 typedef void* SDL_Cursor;
 typedef void* SDL_RWops;
 typedef void* SDL_Thread;
@@ -150,6 +162,14 @@ typedef enum {
 #define SDL_KEYDOWN         0x300
 #define SDL_KEYUP           0x301
 #define SDL_QUIT            0x100
+#define SDL_DROPFILE        0x1000
+#define SDL_DROPCOMPLETE    0x1003
+
+/* Event state */
+#define SDL_DISABLE 0
+#define SDL_ENABLE  1
+#define SDL_QUERY   -1
+static inline uint8_t SDL_EventState(uint32_t type, int state) { (void)type; (void)state; return 0; }
 
 typedef struct SDL_MouseButtonEvent {
     uint32_t type, timestamp;
@@ -196,7 +216,8 @@ typedef union SDL_Event {
 #define SDL_BLENDMODE_BLEND 1
 
 /* ── Thread ──────────────────────────────────────────────────────────── */
-typedef int (*SDL_ThreadFunction)(void *data);
+#define SDLCALL /* empty — not __stdcall on non-Windows */
+typedef int (SDLCALL *SDL_ThreadFunction)(void *data);
 
 /* SDL_CreateThread: run synchronously in WASM (no real threading needed) */
 static inline SDL_Thread *SDL_CreateThread(SDL_ThreadFunction fn, const char *name, void *data)
@@ -209,6 +230,10 @@ static inline void SDL_WaitThread(SDL_Thread *thread, int *status)
 {
     (void)thread;
     if (status) *status = 0;
+}
+static inline void SDL_DetachThread(SDL_Thread *thread)
+{
+    (void)thread; /* already ran synchronously */
 }
 static inline SDL_Thread *SDL_CreateThreadWithStackSize(SDL_ThreadFunction fn, const char *name, size_t stackSize, void *data)
 {
