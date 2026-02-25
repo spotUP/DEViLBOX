@@ -115,56 +115,76 @@ export async function parseModuleToSong(file: File): Promise<TrackerSong> {
 
   // ── SoundMon (Brian Postma) ─────────────────────────────────────────────
   if (/\.(bp|bp3|sndmon)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.soundmon === 'native') {
-      const { parseSoundMonFile } = await import('@lib/import/formats/SoundMonParser');
-      return parseSoundMonFile(buffer, file.name);
+      try {
+        const { parseSoundMonFile } = await import('@lib/import/formats/SoundMonParser');
+        return parseSoundMonFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[SoundMonParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const uadeMode = prefs.uade ?? 'enhanced';
     return parseUADEFile(buffer, file.name, uadeMode);
   }
 
   // ── SidMon II ─────────────────────────────────────────────────────────────
   if (/\.(sid2|smn)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.sidmon2 === 'native') {
-      const { parseSidMon2File } = await import('@lib/import/formats/SidMon2Parser');
-      return parseSidMon2File(buffer, file.name);
+      try {
+        const { parseSidMon2File } = await import('@lib/import/formats/SidMon2Parser');
+        return parseSidMon2File(buffer, file.name);
+      } catch (err) {
+        console.warn(`[SidMon2Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const uadeMode = prefs.uade ?? 'enhanced';
     return parseUADEFile(buffer, file.name, uadeMode);
   }
 
   // ── Fred Editor ───────────────────────────────────────────────────────────
   if (/\.fred$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.fred === 'native') {
-      const { parseFredEditorFile } = await import('@lib/import/formats/FredEditorParser');
-      return parseFredEditorFile(buffer, file.name);
+      try {
+        const { parseFredEditorFile } = await import('@lib/import/formats/FredEditorParser');
+        return parseFredEditorFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[FredEditorParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const uadeMode = prefs.uade ?? 'enhanced';
     return parseUADEFile(buffer, file.name, uadeMode);
   }
 
   // ── Sound-FX ──────────────────────────────────────────────────────────────
   if (/\.(sfx|sfx13)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.soundfx === 'native') {
-      const { parseSoundFXFile } = await import('@lib/import/formats/SoundFXParser');
-      return parseSoundFXFile(buffer, file.name);
+      try {
+        const { parseSoundFXFile } = await import('@lib/import/formats/SoundFXParser');
+        return parseSoundFXFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[SoundFXParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const uadeMode = prefs.uade ?? 'enhanced';
     return parseUADEFile(buffer, file.name, uadeMode);
   }
 
   // ── Digital Mugician ──────────────────────────────────────────────────────
   if (/\.(dmu|dmu2|mug|mug2)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.mugician === 'native') {
-      const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
-      return parseDigitalMugicianFile(buffer, file.name);
+      try {
+        const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
+        return parseDigitalMugicianFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[DigitalMugicianParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const uadeMode = prefs.uade ?? 'enhanced';
     return parseUADEFile(buffer, file.name, uadeMode);
   }
 
