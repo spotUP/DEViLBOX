@@ -68,6 +68,7 @@ mame-generic-wasm/build/
 pt2-sampled-wasm/build/
 vstbridge-generic-wasm/build/
 uade-wasm/build/
+furnace-insed-wasm/build/
 
 # Stray audio files
 *.wav
