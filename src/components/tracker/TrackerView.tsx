@@ -42,6 +42,7 @@ import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
 import { notify } from '@stores/useNotificationStore';
+import type { TrackerSong } from '@engine/TrackerReplayer';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
 import type { XMNote } from '@lib/import/formats/XMParser';
@@ -782,11 +783,38 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       return;
     }
 
-    // Fallback to libopenmpt path for other formats (IT, S3M, etc.)
+    // UADE / exotic Amiga path — no native parser data, no libopenmpt song data
+    // (UADE-exclusive formats produce a synthetic ModuleInfo with no metadata.song)
     if (!info.metadata.song) {
-      notify.error(`Module "${info.metadata.title}" loaded but no pattern data found.`);
+      if (!info.file) {
+        notify.error('File reference lost — cannot import');
+        return;
+      }
+      const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
+      let song: TrackerSong;
+      try {
+        song = await parseModuleToSong(info.file, options.subsong ?? 0);
+      } catch (err) {
+        notify.error(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        return;
+      }
+      stop();
+      loadInstruments(song.instruments);
+      loadPatterns(song.patterns);
+      if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
+      setOriginalModuleData(null);
+      setBPM(song.initialBPM);
+      setSpeed(song.initialSpeed);
+      setMetadata({ name: song.name, author: '', description: `Imported via UADE` });
+      const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
+      if (samplerCount > 0) {
+        await getToneEngine().preloadInstruments(song.instruments);
+      }
+      notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
       return;
     }
+
+    // Fallback to libopenmpt path for other formats (IT, S3M, etc.)
 
     console.log('[Import] Using libopenmpt fallback');
 
