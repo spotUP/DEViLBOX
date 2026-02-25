@@ -126,6 +126,17 @@ export function createSamplerInstrument(
   const hasLoop = loopEnd > loopStart && loopEnd > 2;
   const wavBuf = pcm8ToWAV(pcm, sampleRate, loopStart, loopEnd);
 
+  // Convert WAV to base64 data URL so the sample survives project save/reload.
+  // Persistence strips sample.audioBuffer (not JSON-serializable) but keeps
+  // sample.url strings, and ToneEngine can load data URLs just like blob URLs.
+  const wavBytes = new Uint8Array(wavBuf);
+  let binary = '';
+  const CHUNK = 8192;
+  for (let i = 0; i < wavBytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...Array.from(wavBytes.subarray(i, Math.min(i + CHUNK, wavBytes.length))));
+  }
+  const dataUrl = `data:audio/wav;base64,${btoa(binary)}`;
+
   return {
     id,
     name: name.replace(/\0/g, '').trim() || `Sample ${id}`,
@@ -135,8 +146,8 @@ export function createSamplerInstrument(
     volume: volume > 0 ? 20 * Math.log10(volume / 64) : -60,
     pan: 0,
     sample: {
-      audioBuffer: wavBuf,
-      url: '',
+      audioBuffer: wavBuf,  // Used as fast-path for the current session
+      url: dataUrl,         // Survives save/reload via IndexedDB (string is serializable)
       baseNote: 'C-3',
       detune: 0,
       loop: hasLoop,

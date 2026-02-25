@@ -30,6 +30,8 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._ready = false;
     this._playing = false;
     this._paused = false;
+    this._lastData = null;       // Last loaded file bytes (for subsong re-scan)
+    this._lastHint = '';
 
     // Float32 output buffers allocated in WASM heap
     this._outL = null;
@@ -88,6 +90,10 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       case 'renderFull':
         this._renderFullSong(data.subsong);
+        break;
+
+      case 'scanSubsong':
+        this._scanSubsong(data.subsong);
         break;
     }
   }
@@ -278,6 +284,9 @@ class UADEProcessor extends AudioWorkletProcessor {
       console.log('[UADE.worklet] _load called: ' + filenameHint + ' (' + buffer.byteLength + ' bytes)');
 
       const data = new Uint8Array(buffer);
+      // Keep a copy so _scanSubsong() can reload without transferring back from main thread
+      this._lastData = data;
+      this._lastHint = filenameHint;
       const ret = this._loadIntoWasm(data, filenameHint);
       console.log('[UADE.worklet] _uade_wasm_load returned: ' + ret);
 
@@ -343,6 +352,7 @@ class UADEProcessor extends AudioWorkletProcessor {
           tempoChanges: scanResult.tempoChanges,
           bpm: scanResult.bpm,
           speed: scanResult.speed,
+          warnings: scanResult.warnings || [],
         };
       }
 
@@ -921,6 +931,65 @@ class UADEProcessor extends AudioWorkletProcessor {
     }
 
     return result;
+  }
+
+  /**
+   * Re-scan a specific subsong without re-transferring the file data.
+   * Reloads from this._lastData, seeks to the requested subsong, runs the
+   * enhanced scan, then reloads again for normal playback.
+   * Posts { type: 'subsongScanned', subsong, scanResult } on success,
+   * or { type: 'subsongScanError', subsong, message } on failure.
+   */
+  _scanSubsong(subsong) {
+    if (!this._wasm || !this._ready) {
+      this.port.postMessage({ type: 'subsongScanError', subsong, message: 'WASM not ready' });
+      return;
+    }
+    if (!this._lastData || !this._lastHint) {
+      this.port.postMessage({ type: 'subsongScanError', subsong, message: 'No file loaded' });
+      return;
+    }
+
+    try {
+      // Stop current playback and reload for scanning
+      this._wasm._uade_wasm_stop();
+      const ret = this._loadIntoWasm(this._lastData, this._lastHint);
+      if (ret !== 0) {
+        this.port.postMessage({ type: 'subsongScanError', subsong, message: 'Reload failed (ret=' + ret + ')' });
+        return;
+      }
+
+      // Seek to the requested subsong before scanning
+      if (subsong > 0) {
+        this._wasm._uade_wasm_set_subsong(subsong);
+      }
+
+      const scanResult = this._scanSongEnhanced();
+
+      // Reload for playback (scan consumed the WASM state)
+      this._wasm._uade_wasm_stop();
+      const ret2 = this._loadIntoWasm(this._lastData, this._lastHint);
+      if (ret2 !== 0) {
+        console.warn('[UADE.worklet] Post-scan reload failed (ret=' + ret2 + ')');
+      }
+      this._playing = false;
+
+      this.port.postMessage({
+        type: 'subsongScanned',
+        subsong,
+        scanResult: {
+          rows: scanResult.rows,
+          samples: scanResult.samples,
+          tempoChanges: scanResult.tempoChanges,
+          bpm: scanResult.bpm,
+          speed: scanResult.speed,
+          warnings: scanResult.warnings || [],
+        },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.port.postMessage({ type: 'subsongScanError', subsong, message: msg });
+    }
   }
 
   /**

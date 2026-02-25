@@ -324,12 +324,15 @@ export function isUADEFormat(filename: string): boolean {
  *
  * Otherwise falls back to classic mode: display-only patterns with UADESynth playback.
  *
- * @param mode - 'enhanced' (default) for editable output, 'classic' for UADESynth playback-only
+ * @param mode    - 'enhanced' (default) for editable output, 'classic' for UADESynth playback-only
+ * @param subsong - Subsong index to import (0 = default/first). When > 0, triggers a separate
+ *                  re-scan of that subsong without re-transferring the file data.
  */
 export async function parseUADEFile(
   buffer: ArrayBuffer,
   filename: string,
   mode: 'enhanced' | 'classic' = 'enhanced',
+  subsong = 0,
 ): Promise<TrackerSong> {
   const { UADEEngine } = await import('@engine/uade/UADEEngine');
   const { periodToNoteIndex } = await import('@engine/effects/PeriodTables');
@@ -337,16 +340,36 @@ export async function parseUADEFile(
   const name = filename.replace(/\.[^/.]+$/, '');
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
 
-  // Initialize UADE engine and load + scan the file
+  // Initialize UADE engine and load + scan the file (always scans subsong 0 first)
   const engine = UADEEngine.getInstance();
   await engine.ready();
   const metadata = await engine.load(buffer, filename);
   const scanRows = metadata.scanData ?? [];
 
+  // Resolve scan data for the requested subsong.
+  // subsong=0 reuses the data from the initial load; subsong>0 triggers a worklet re-scan.
+  let activeScanRows = scanRows;
+  let activeEnhancedScan = metadata.enhancedScan;
+
+  if (subsong > 0 && mode === 'enhanced') {
+    try {
+      const result = await engine.scanSubsong(subsong);
+      activeScanRows = result.scanResult.rows as Array<Array<{ period: number; volume: number; samplePtr: number }>>;
+      activeEnhancedScan = result.scanResult;
+    } catch (err) {
+      console.warn(`[UADEParser] subsong ${subsong} re-scan failed, using subsong 0 data:`, err);
+    }
+  }
+
+  // Build the subsong name: append subsong index when it's not the default
+  const songName = subsong > 0 ? `${name} (${subsong + 1})` : name;
+
   // If enhanced scan data is available AND mode is 'enhanced', build editable song
-  if (mode === 'enhanced' && metadata.enhancedScan) {
+  if (mode === 'enhanced' && activeEnhancedScan) {
     const song = buildEnhancedSong(
-      name, ext, filename, buffer, metadata, scanRows, periodToNoteIndex,
+      songName, ext, filename, buffer,
+      { ...metadata, enhancedScan: activeEnhancedScan },
+      activeScanRows, periodToNoteIndex,
     );
     // Fall back to classic if enhanced scan yielded no playable instruments.
     // This happens for synthesis-only formats, all-zero PCM, or pure VBlank formats
@@ -356,7 +379,7 @@ export async function parseUADEFile(
     );
     if (hasPlayableInstruments) {
       // Surface any scan-quality warnings in the song name so the user sees them
-      const warnings = metadata.enhancedScan?.warnings ?? [];
+      const warnings = activeEnhancedScan?.warnings ?? [];
       if (warnings.length > 0) {
         console.warn('[UADEParser] Scan warnings:', warnings);
         song.name = `${song.name} [${warnings.join('; ')}]`;
@@ -368,7 +391,7 @@ export async function parseUADEFile(
 
   // Classic mode: UADESynth playback with display-only patterns
   return buildClassicSong(
-    name, ext, filename, buffer, metadata, scanRows, periodToNoteIndex,
+    songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex,
   );
 }
 
@@ -494,9 +517,11 @@ function buildEnhancedSong(
           return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
         }
 
-        // Convert Amiga period to XM note (1-96)
+        // Convert Amiga period to note for TrackerReplayer.
+        // periodToNoteIndex returns 1-based index into the Amiga period table (1-36).
+        // noteToPeriod(n) uses noteIndex = n-1, so we must NOT add another +1.
         const noteIdx = periodToNoteIndex(ch.period);
-        const note = noteIdx >= 0 ? Math.min(96, Math.max(1, noteIdx + 1)) : 0;
+        const note = noteIdx > 0 ? Math.min(96, noteIdx) : 0;
         const instrId = ch.samplePtr > 0 ? (sampleMap.get(ch.samplePtr) ?? 0) : 0;
         const volume = Math.min(0x50, 0x10 + ch.volume);
 
