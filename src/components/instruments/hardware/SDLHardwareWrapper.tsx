@@ -3,16 +3,30 @@
  *
  * Eliminates ~200 lines of boilerplate per synth by handling:
  * - Script injection + factory function caching
- * - Canvas creation with id="canvas", pixelated scaling
+ * - Canvas creation with unique IDs (prevents #canvas conflicts when multiple modules coexist)
  * - configRef pattern (CLAUDE.md) for stable callbacks
  * - Module lifecycle (init/start/shutdown)
  * - Config buffer push on prop changes
  * - Cleanup on unmount
  *
  * Each synth-specific wrapper just provides configToBuffer() and callback mapping.
+ *
+ * ### Canvas ID Management
+ * Emscripten's SDL2 registers mouse/keyboard event handlers via `document.querySelector('#canvas')`.
+ * When multiple SDL modules are on screen simultaneously, duplicate id="canvas" elements cause
+ * event handlers from one module to land on another module's canvas. Fix: each instance gets a
+ * unique canvas ID (canvas-sdl-N). Factory calls are serialized via sdlFactoryLock — the canvas
+ * is temporarily renamed to id="canvas" during the factory() window (the only time Emscripten
+ * queries the ID for event registration), then restored to its unique ID afterward. The same
+ * temporary rename happens during shutdown so Emscripten can unregister cleanly.
+ *
+ * ### React StrictMode
+ * React StrictMode double-invokes effects. If cleanup fires while factory() is still running,
+ * the canvas MUST stay in DOM so SDL can register its event handlers cleanly. Canvas removal
+ * is deferred to inside init() if cleanup fires mid-factory.
  */
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 
 /* ── Factory Cache ─────────────────────────────────────────────────────── */
 
@@ -57,6 +71,21 @@ async function loadModuleFactory(
   loadPromises.set(moduleUrl, promise);
   return promise;
 }
+
+/* ── Serialized Factory Lock ───────────────────────────────────────────── */
+/*
+ * Emscripten calls document.querySelector('#canvas') during SDL initialization
+ * to register event handlers. If two SDL modules initialize concurrently, both
+ * would rename their canvases to id="canvas" at the same time, causing one module
+ * to register event handlers on the wrong canvas.
+ *
+ * sdlFactoryLock serializes factory() calls so only one module has id="canvas" at
+ * a time. Modules queue up and each gets exclusive use of the '#canvas' ID.
+ */
+let sdlFactoryLock: Promise<void> = Promise.resolve();
+
+/** Unique instance counter — incremented once per SDLHardwareWrapper mount */
+let sdlInstanceCounter = 0;
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
@@ -151,6 +180,10 @@ export const SDLHardwareWrapper: React.FC<SDLHardwareWrapperProps> = ({
   useEffect(() => { onModuleReadyRef.current = onModuleReady; }, [onModuleReady]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
 
+  /* Unique canvas ID — prevents '#canvas' querySelector conflicts between
+   * concurrent SDL instances. Computed once per component mount. */
+  const uniqueCanvasId = useMemo(() => `canvas-sdl-${++sdlInstanceCounter}`, []);
+
   /* Push config to WASM when configBuffer changes externally */
   useEffect(() => {
     const mod = moduleRef.current;
@@ -186,33 +219,116 @@ export const SDLHardwareWrapper: React.FC<SDLHardwareWrapperProps> = ({
     let cancelled = false;
     let mod: SDLModule | null = null;
 
+    /* Track canvas/container locally so cleanup can act even after refs are cleared */
+    let localCanvas: HTMLCanvasElement | null = null;
+    let localContainer: HTMLElement | null = null;
+
+    /* True once factory() has resolved — controls deferred canvas removal */
+    let factoryCompleted = false;
+
+    /* ── Canvas removal helper ──────────────────────────────────────────── */
+    function removeCanvas() {
+      if (localCanvas) {
+        const parent = localContainer ?? (localCanvas.parentNode as HTMLElement | null);
+        if (parent) {
+          try { parent.removeChild(localCanvas); } catch { /* already removed */ }
+        }
+        canvasRef.current = null;
+        localCanvas = null;
+      }
+    }
+
+    /* ── Shutdown helper — temporarily restores id="canvas" for Emscripten ─ */
+    function doShutdown(m: SDLModule) {
+      const prevId = localCanvas?.id;
+      /* Emscripten's unregisterOrRemoveHandler queries '#canvas' to find the element.
+       * Temporarily restore the expected ID so unregistration succeeds. */
+      if (localCanvas) localCanvas.id = 'canvas';
+      try {
+        const fn = m[shutdownFn] as (() => void) | undefined;
+        if (typeof fn === 'function') fn.call(m);
+      } catch { /* ignore shutdown errors */ }
+      /* Restore unique ID so the element doesn't conflict with other modules */
+      if (localCanvas && prevId !== undefined) localCanvas.id = prevId;
+    }
+
     async function init() {
       try {
-        /* Create canvas for SDL — must have id="canvas" for Emscripten event registration */
+        /* Create canvas with a unique ID to avoid '#canvas' querySelector conflicts */
         const canvas = document.createElement('canvas');
-        canvas.id = 'canvas';
+        canvas.id = uniqueCanvasId;
         canvas.width = canvasWidth;
         canvas.height = canvasHeight;
         canvas.style.width = '100%';
         canvas.style.height = 'auto';
         canvas.style.imageRendering = 'pixelated';
         canvas.tabIndex = 0;
+        localCanvas = canvas;
+        localContainer = containerRef.current;
 
         if (containerRef.current && !cancelled) {
           containerRef.current.appendChild(canvas);
           canvasRef.current = canvas;
         }
 
-        if (cancelled) return;
+        if (cancelled) {
+          removeCanvas();
+          return;
+        }
 
-        /* Load module factory */
+        /* Load module factory (script injection + caching) */
         const factory = await loadModuleFactory(moduleUrl, factoryName);
-        if (cancelled) return;
+        if (cancelled) {
+          removeCanvas();
+          return;
+        }
 
-        mod = await factory({ canvas }) as SDLModule;
+        /* Serialize this factory() call through the global lock.
+         * Inside our turn: rename canvas to 'canvas', call factory(), rename back.
+         * This ensures only one module has id="canvas" at a time, so Emscripten's
+         * querySelector('#canvas') always finds the correct element. */
+        let factoryResult: SDLModule | null = null;
+        let factoryError: unknown = null;
+
+        const myTurn = sdlFactoryLock.then(async () => {
+          if (cancelled) return; // Skip if cancelled while waiting in queue
+          canvas.id = 'canvas'; // Temporarily become '#canvas' for Emscripten SDL init
+          try {
+            factoryResult = await factory({ canvas }) as SDLModule;
+          } catch (e) {
+            factoryError = e;
+          } finally {
+            canvas.id = uniqueCanvasId; // Restore unique ID immediately after factory resolves
+          }
+        });
+
+        /* Extend the global lock so subsequent factory calls queue behind us */
+        sdlFactoryLock = myTurn.then(
+          () => undefined,
+          () => undefined, // Don't break the lock chain on error
+        );
+
+        await myTurn;
+        factoryCompleted = true;
+
+        if (factoryError) throw factoryError;
+
+        if (!factoryResult) {
+          /* Cancelled while waiting in the lock queue */
+          removeCanvas();
+          return;
+        }
+
+        mod = factoryResult;
         moduleRef.current = mod;
 
-        if (cancelled) return;
+        if (cancelled) {
+          /* Cleanup fired while factory() was running — shut down immediately now
+           * that factory is done. Canvas is still in DOM, shutdown will succeed. */
+          doShutdown(mod);
+          removeCanvas();
+          return;
+        }
 
         /* Set up callbacks BEFORE init, so they're available during first render */
         if (onModuleReadyRef.current) {
@@ -270,16 +386,13 @@ export const SDLHardwareWrapper: React.FC<SDLHardwareWrapperProps> = ({
     return () => {
       cancelled = true;
       if (mod) {
-        try {
-          const shutdown = mod[shutdownFn] as (() => void) | undefined;
-          if (typeof shutdown === 'function') {
-            shutdown.call(mod);
-          }
-        } catch { /* ignore shutdown errors */ }
+        doShutdown(mod);
       }
-      if (canvasRef.current && containerRef.current) {
-        try { containerRef.current.removeChild(canvasRef.current); } catch { /* ignore */ }
-        canvasRef.current = null;
+      /* If factory() completed (or was never started), remove canvas now.
+       * If factory() is still running, canvas removal is deferred to init()
+       * so SDL can register its event handlers on a valid DOM element first. */
+      if (factoryCompleted || !localCanvas) {
+        removeCanvas();
       }
       moduleRef.current = null;
     };
@@ -290,20 +403,27 @@ export const SDLHardwareWrapper: React.FC<SDLHardwareWrapperProps> = ({
   }, []);
 
   return (
-    <div className={`sdl-hardware-wrapper flex flex-col items-center ${className ?? ''}`}>
+    <div className={`sdl-hardware-wrapper ${className ?? ''}`}>
       <div
         ref={containerRef}
-        className="relative bg-black overflow-hidden"
+        className="relative overflow-hidden"
         style={{
-          maxWidth: canvasWidth,
           width: '100%',
           aspectRatio: `${canvasWidth} / ${canvasHeight}`,
+          background: loaded ? 'transparent' : '#111',
         }}
         onClick={handleClick}
-      />
-      {!loaded && !error && (
-        <div className="text-gray-500 text-xs mt-1">Loading hardware UI...</div>
-      )}
+      >
+        {/* Loading overlay — shown while WASM initializes, hiding the black canvas underneath */}
+        {!loaded && !error && (
+          <div
+            className="absolute inset-0 flex items-center justify-center text-gray-500 text-xs"
+            style={{ pointerEvents: 'none' }}
+          >
+            Loading hardware UI…
+          </div>
+        )}
+      </div>
       {error && (
         <div className="text-red-400 text-sm mt-2 text-center">
           Failed to load hardware UI: {error}
