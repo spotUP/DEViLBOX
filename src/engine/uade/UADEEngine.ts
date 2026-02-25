@@ -42,6 +42,7 @@ export interface UADEEnhancedScanData {
   tempoChanges: Array<{ row: number; bpm: number; speed: number }>;
   bpm: number;          // Detected BPM
   speed: number;        // Detected speed
+  warnings?: string[];  // Degradation notices (e.g. VBlank fallback, no PCM extracted)
 }
 
 export interface UADEMetadata {
@@ -211,7 +212,10 @@ export class UADEEngine {
             };
             // Include enhanced scan data if available
             if (data.enhancedScan) {
-              meta.enhancedScan = data.enhancedScan;
+              meta.enhancedScan = {
+                ...data.enhancedScan,
+                warnings: data.enhancedScan.warnings ?? [],
+              };
             }
             this._resolveLoad(meta);
             this._resolveLoad = null;
