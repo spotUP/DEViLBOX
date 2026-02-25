@@ -1,6 +1,7 @@
 /* ft2_diskop.c — WASM stub: disk operations handled by JS bridge */
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "ft2_unicode.h"
 #include "ft2_diskop.h"
 
