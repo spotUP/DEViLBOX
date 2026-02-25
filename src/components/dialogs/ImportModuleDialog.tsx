@@ -19,8 +19,9 @@ import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSett
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 
 export interface ImportOptions {
-  useLibopenmpt: boolean;  // Use libopenmpt for sample-accurate playback
-  subsong?: number;        // UADE subsong index (0-based)
+  useLibopenmpt: boolean;     // Use libopenmpt for sample-accurate playback
+  subsong?: number;           // UADE subsong index (0-based)
+  uadeMetadata?: UADEMetadata; // Pre-scanned UADE metadata (avoids double scan on import)
 }
 
 interface ImportModuleDialogProps {
@@ -173,7 +174,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       stopPreview(moduleInfo);
       setIsPlaying(false);
     }
-    onImport(moduleInfo, { useLibopenmpt, subsong: selectedSubsong });
+    onImport(moduleInfo, { useLibopenmpt, subsong: selectedSubsong, uadeMetadata: uadeMetadata ?? undefined });
     onClose();
   }, [moduleInfo, isPlaying, onImport, onClose, useLibopenmpt, selectedSubsong]);
 
@@ -321,17 +322,35 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
               {uadeMetadata && uadeMetadata.subsongCount > 1 && (
                 <div className="flex items-center gap-3">
                   <label className="text-xs text-text-muted whitespace-nowrap">Import subsong:</label>
-                  <select
-                    value={selectedSubsong}
-                    onChange={(e) => setSelectedSubsong(Number(e.target.value))}
-                    className="flex-1 text-xs bg-dark-bgSecondary border border-dark-border rounded px-2 py-1.5 text-text-primary"
-                  >
-                    {Array.from({ length: uadeMetadata.subsongCount }, (_, i) => (
-                      <option key={i} value={i}>
-                        {`Subsong ${i + 1}${i === 0 ? ' (default)' : ''}`}
-                      </option>
-                    ))}
-                  </select>
+                  {uadeMetadata.subsongCount > 20 ? (
+                    // Number input for formats with many subsongs (avoids rendering hundreds of options)
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="number"
+                        min={1}
+                        max={uadeMetadata.subsongCount}
+                        value={selectedSubsong + 1}
+                        onChange={(e) => {
+                          const v = Math.max(1, Math.min(uadeMetadata.subsongCount, Number(e.target.value)));
+                          setSelectedSubsong(v - 1);
+                        }}
+                        className="w-20 text-xs bg-dark-bgSecondary border border-dark-border rounded px-2 py-1.5 text-text-primary"
+                      />
+                      <span className="text-xs text-text-muted">of {uadeMetadata.subsongCount}</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedSubsong}
+                      onChange={(e) => setSelectedSubsong(Number(e.target.value))}
+                      className="flex-1 text-xs bg-dark-bgSecondary border border-dark-border rounded px-2 py-1.5 text-text-primary"
+                    >
+                      {Array.from({ length: uadeMetadata.subsongCount }, (_, i) => (
+                        <option key={i} value={i}>
+                          {`Subsong ${i + 1}${i === 0 ? ' (default)' : ''}`}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
 
