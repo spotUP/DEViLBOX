@@ -1127,10 +1127,15 @@ static void tick(void) {
 void furnace_psg_init(int w, int h) {
     (void)w; (void)h;
     SDL_Init(SDL_INIT_VIDEO);
+    /* Window is 2× the logical size so the canvas fills Retina displays without
+     * requiring CSS upscaling. SDL_RenderSetLogicalSize keeps mouse coords and
+     * all drawing in the 480×360 logical space — no layout changes needed. */
     g_win = SDL_CreateWindow("Furnace PSG Editor",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        SCREEN_W, SCREEN_H, 0);
+        SCREEN_W * 2, SCREEN_H * 2, 0);
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
     g_ren = SDL_CreateRenderer(g_win, -1, SDL_RENDERER_SOFTWARE);
+    SDL_RenderSetLogicalSize(g_ren, SCREEN_W, SCREEN_H);
     g_tex = SDL_CreateTexture(g_ren, SDL_PIXELFORMAT_ARGB8888,
         SDL_TEXTUREACCESS_STREAMING, SCREEN_W, SCREEN_H);
     memset(g_fb, 0, sizeof(g_fb));
