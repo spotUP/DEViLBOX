@@ -70,8 +70,33 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseHivelyFile(buffer, file.name);
   }
 
+  // ── X-Tracker DMF (.dmf only — magic "DDMF"; version 1–10) ─────────────
+  // Must come BEFORE Furnace/DefleMask because both use .dmf extension.
+  // DefleMask DMF starts with a different magic; X-Tracker starts with "DDMF".
+  if (filename.endsWith('.dmf')) {
+    const bytes = new Uint8Array(buffer);
+    if (prefs.xTracker === 'native') {
+      try {
+        const { isXTrackerFormat, parseXTrackerFile } = await import('@lib/import/formats/XTrackerParser');
+        if (isXTrackerFormat(bytes)) {
+          const result = parseXTrackerFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[XTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    // DefleMask DMF (non-DDMF magic) falls through to Furnace parser
+    if (!bytes[0] || !(bytes[0] === 0x44 && bytes[1] === 0x44 && bytes[2] === 0x4D && bytes[3] === 0x46)) {
+      return parseFurnaceFile(buffer, file.name, subsong);
+    }
+    // X-Tracker DMF that wasn't handled above → UADE fallback
+    const { parseUADEFile: parseUADE_dmf } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_dmf(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
   // ── Furnace / DefleMask ─────────────────────────────────────────────────
-  if (filename.endsWith('.fur') || filename.endsWith('.dmf')) {
+  if (filename.endsWith('.fur')) {
     return parseFurnaceFile(buffer, file.name, subsong);
   }
 
@@ -1087,6 +1112,50 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     // Fall through to libopenmpt
   }
 
+  // ── Ultimate SoundTracker (.stk) ──────────────────────────────────────────
+  if (/\.stk$/.test(filename)) {
+    try {
+      const { isSTKFormat, parseSTKFile } = await import('@lib/import/formats/STKParser');
+      if (isSTKFormat(buffer)) return parseSTKFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[STKParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── SoundTracker Pro II (.stp) ─────────────────────────────────────────────
+  if (/\.stp$/.test(filename)) {
+    try {
+      const { isSTPFormat, parseSTPFile } = await import('@lib/import/formats/STPParser');
+      if (isSTPFormat(buffer)) return parseSTPFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[STPParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── DigiTrakker (.mdl) ────────────────────────────────────────────────────
+  if (/\.mdl$/i.test(filename)) {
+    try {
+      const { isMDLFormat, parseMDLFile } = await import('@lib/import/formats/MDLParser');
+      if (isMDLFormat(buffer)) return parseMDLFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[MDLParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── Advanced Music Format (.amf) ──────────────────────────────────────────
+  if (/\.amf$/i.test(filename)) {
+    try {
+      const { isAMFFormat, parseAMFFile } = await import('@lib/import/formats/AMFParser');
+      if (isAMFFormat(buffer)) return parseAMFFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[AMFParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
   // ── Imago Orpheus (.imf) ──────────────────────────────────────────────────
   if (/\.imf$/.test(filename)) {
     if (prefs.imagoOrpheus === 'native') {
@@ -1153,6 +1222,28 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       }
     }
     // Fall through to libopenmpt
+  }
+
+  // ── AMS (Extreme's Tracker / Velvet Studio) ───────────────────────────────
+  // PC format — no UADE fallback.  Two magic variants:
+  //   "Extreme"    → AMS 1.x (Extreme's Tracker)
+  //   "AMShdr\x1A" → AMS 2.x (Velvet Studio 2.00–2.02)
+  if (/\.ams$/i.test(filename)) {
+    if (prefs.ams === 'native') {
+      try {
+        const { isAMSFormat, parseAMSFile } = await import('@lib/import/formats/AMSParser');
+        const bytes = new Uint8Array(buffer);
+        if (isAMSFormat(bytes)) {
+          const result = parseAMSFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[AMSParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    // PC format — fall back to UADE
+    const { parseUADEFile: parseUADE_ams } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_ams(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
