@@ -32,4 +32,33 @@ describe('VGMParser', () => {
     expect(song.instruments[0].synthType).toBe('FurnaceOPN');
     expect(song.patterns.length).toBeGreaterThan(0);
   });
+
+  it('extracts SN76489 PSG notes from a minimal VGM', async () => {
+    const vgm = new Uint8Array(0x100).fill(0);
+    // Magic
+    vgm[0] = 0x56; vgm[1] = 0x67; vgm[2] = 0x6D; vgm[3] = 0x20;
+    // Version 1.00 at offset 8
+    vgm[8] = 0x00; vgm[9] = 0x01; vgm[10] = 0x00; vgm[11] = 0x00;
+    // SN76489 clock at 0x0C: 3579545 Hz
+    const clk = 3579545;
+    vgm[0x0C] = clk & 0xFF; vgm[0x0D] = (clk >> 8) & 0xFF;
+    vgm[0x0E] = (clk >> 16) & 0xFF; vgm[0x0F] = (clk >> 24) & 0xFF;
+    // Data at 0x40 (VGM 1.00 has fixed data offset 0x40)
+    // Channel 0, tone: counter = 254 → freq ≈ 441 Hz ≈ A4
+    // Latch byte: 0x80 | (0<<5) | (0<<4) | (254 & 0x0F) = 0x8E
+    // Data byte: (254 >> 4) & 0x3F = 0x0F → plain data byte = 0x0F
+    vgm[0x40] = 0x50; vgm[0x41] = 0x8E;  // latch ch0 tone lo = 0xE
+    vgm[0x42] = 0x50; vgm[0x43] = 0x0F;  // data hi = 0x0F
+    // Set volume on ch0: latch byte 0x90 | 0 = 0x90 (vol=0=max)
+    vgm[0x44] = 0x50; vgm[0x45] = 0x90;
+    vgm[0x46] = 0x63; // wait 735 samples
+    vgm[0x47] = 0x66; // end
+
+    const song = await parseVGMFile(vgm.buffer, 'test.vgm');
+    // Should detect SN76489 and create a PSG instrument
+    expect(song.instruments.some(i => i.name.toLowerCase().includes('sn') || i.name.toLowerCase().includes('psg'))).toBe(true);
+    // Should have at least one non-zero note
+    const hasNote = song.patterns[0].channels.some(ch => ch.rows.some(r => r.note > 0 && r.note < 97));
+    expect(hasNote).toBe(true);
+  });
 });
