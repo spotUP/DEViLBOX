@@ -42,7 +42,7 @@ import { SineScroller } from '@components/visualization/SineScroller';
 import { AudioMotionVisualizer } from '@components/visualization/AudioMotionVisualizer';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
-import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
+import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
 import { importSong, exportSong } from '@lib/export/exporters';
 import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
@@ -268,6 +268,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const [showGrooveSettings, setShowGrooveSettings] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [showRevisions, setShowRevisions] = useState(false);
@@ -364,7 +365,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     }
   };
 
-  const handleModuleImport = async (moduleInfo: ModuleInfo) => {
+  const handleModuleImport = async (moduleInfo: ModuleInfo, options: ImportOptions = { useLibopenmpt: true }) => {
     // Always clean up before import to prevent stale state from previous imports
     if (isPlaying) stop();
     engine.releaseAll();
@@ -436,7 +437,22 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       } else if (moduleInfo.metadata.song) {
         result = convertModule(moduleInfo.metadata.song);
       } else {
-        notify.error(`Module "${moduleInfo.metadata.title}" has no pattern data`);
+        // UADE-exclusive or native-parser-only format (no libopenmpt data available).
+        // Delegate to parseModuleToSong which routes to UADEParser, FCParser, etc.
+        // based on format engine prefs, passing the pre-scanned UADE metadata if present.
+        const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
+        const file = moduleInfo.file || new File([moduleInfo.arrayBuffer], moduleInfo.metadata.title || 'track');
+        const song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata);
+        loadInstruments(song.instruments);
+        loadPatterns(song.patterns);
+        setCurrentPattern(0);
+        if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
+        setBPM(song.initialBPM);
+        setSpeed(song.initialSpeed);
+        setMetadata({ name: song.name, author: '', description: `Imported from ${moduleInfo.metadata.title || 'module'}` });
+        useTrackerStore.getState().applyEditorMode(song);
+        await engine.preloadInstruments(song.instruments);
+        notify.success(`Imported: ${song.name} — ${song.instruments.length} instrument(s)`, 3000);
         return;
       }
       let instruments: InstrumentConfig[];
@@ -479,6 +495,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     if (!file) return;
     e.target.value = '';
     if (isSupportedModule(file.name)) {
+      setPendingFile(file);
       setShowImportDialog(true);
       return;
     }
@@ -605,16 +622,19 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
     // before any async work (engine.init fetches WASM). Fire-and-forget is fine.
     Tone.start();
-    
-    // Toggle: if already playing song, stop. Otherwise start song.
-    if (isPlaying && !isLooping) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
-    else {
-      if (isPlaying) { getTrackerReplayer().stop(); stop(); engine.releaseAll(); }
-      setIsLooping(false);
-      setCurrentRow(0); // Always start from first row of current pattern
-      await engine.init();
-      await play();
+
+    // Toggle: if already playing, stop only. If not playing, start from beginning.
+    // This allows the "Stop Song" button to actually stop instead of always restarting.
+    if (isPlaying) {
+      getTrackerReplayer().stop();
+      stop();
+      engine.releaseAll();
+      return;
     }
+    setIsLooping(false);
+    setCurrentRow(0); // Always start from first row of current pattern
+    await engine.init();
+    await play();
   };
 
   const handlePlayPattern = async () => {
@@ -849,7 +869,12 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       <RevisionBrowserDialog isOpen={showRevisions} onClose={() => setShowRevisions(false)} />
-      <ImportModuleDialog isOpen={showImportDialog} onClose={() => setShowImportDialog(false)} onImport={handleModuleImport} />
+      <ImportModuleDialog
+        isOpen={showImportDialog}
+        onClose={() => { setShowImportDialog(false); setPendingFile(null); }}
+        onImport={handleModuleImport}
+        initialFile={pendingFile}
+      />
       <FileBrowser isOpen={showFileBrowser} onClose={() => setShowFileBrowser(false)} mode="load" onLoad={async (data, filename) => {
         if (isPlaying) { stop(); engine.releaseAll(); }
         try {
@@ -1130,9 +1155,37 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               `Imported: ${result.metadata.name} — ${result.instruments.length} instrument(s), BPM: ${result.bpm}`
             );
           } else {
-            const { loadModuleFile } = await import('@lib/import/ModuleLoader');
-            const moduleInfo = await loadModuleFile(new File([buffer], filename));
-            if (moduleInfo) await handleModuleImport(moduleInfo);
+            // For supported tracker modules, show the import dialog so the user
+            // can choose the engine (native parser / UADE enhanced / UADE classic).
+            if (isSupportedModule(filename)) {
+              setPendingFile(new File([buffer], filename));
+              setShowImportDialog(true);
+              return;
+            }
+            // Unsupported extension — try parseModuleToSong as a last resort
+            // (UADE can detect some formats by magic bytes regardless of extension).
+            const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
+            engine.releaseAll();
+            resetAutomation();
+            resetTransport();
+            resetInstruments();
+            engine.disposeAllInstruments();
+            setIsLoading(true);
+            try {
+              const song = await parseModuleToSong(new File([buffer], filename));
+              loadInstruments(song.instruments);
+              loadPatterns(song.patterns);
+              setCurrentPattern(0);
+              if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
+              setBPM(song.initialBPM);
+              setSpeed(song.initialSpeed);
+              setMetadata({ name: song.name, author: '', description: `Imported from ${filename}` });
+              useTrackerStore.getState().applyEditorMode(song);
+              await engine.preloadInstruments(song.instruments);
+              notify.success(`Imported: ${song.name} — ${song.instruments.length} instrument(s)`, 3000);
+            } finally {
+              setIsLoading(false);
+            }
           }
         } catch { notify.error('Failed to load file'); }
       }} />
