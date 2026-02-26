@@ -37,6 +37,8 @@ const SAMPLER_H = SCREEN_H - SAMPLER_Y; // 134 rows visible
 interface PT2Module {
   onParamChange?: (paramId: number, value: number) => void;
   onLoopChange?: (loopStart: number, loopLength: number, loopType: number) => void;
+  onPlaySample?: (ptr: number, len: number, loopStart: number, loopLength: number, loopType: number) => void;
+  onStopSample?: () => void;
   _pt2_sampled_init: (w: number, h: number) => void;
   _pt2_sampled_start: () => void;
   _pt2_sampled_shutdown: () => void;
@@ -111,19 +113,17 @@ function configToBuffer(inst: InstrumentConfig): Uint8Array {
 
 /* ── Audio decode: Float32 → Int8Array ─────────────────────────── */
 
-async function decodePCM(instrument: InstrumentConfig): Promise<Int8Array | null> {
+async function decodePCM(instrument: InstrumentConfig): Promise<{ pcm: Int8Array; sampleRate: number } | null> {
   const sample = instrument.sample;
   if (!sample) return null;
 
   let audioBuffer: AudioBuffer | null = null;
 
   try {
-    // Try decoding from audioBuffer first
     if (sample.audioBuffer && sample.audioBuffer.byteLength > 0) {
       const ctx = new OfflineAudioContext(1, 1, 44100);
       audioBuffer = await ctx.decodeAudioData(sample.audioBuffer.slice(0));
     } else if (sample.url) {
-      // Fetch from URL
       const resp = await fetch(sample.url);
       const arrayBuf = await resp.arrayBuffer();
       const ctx = new OfflineAudioContext(1, 1, 44100);
@@ -135,7 +135,6 @@ async function decodePCM(instrument: InstrumentConfig): Promise<Int8Array | null
 
   if (!audioBuffer) return null;
 
-  // Convert Float32 → Int8 (signed 8-bit)
   const float32 = audioBuffer.getChannelData(0);
   const int8 = new Int8Array(float32.length);
   for (let i = 0; i < float32.length; i++) {
@@ -145,7 +144,7 @@ async function decodePCM(instrument: InstrumentConfig): Promise<Int8Array | null
     int8[i] = v;
   }
 
-  return int8;
+  return { pcm: int8, sampleRate: audioBuffer.sampleRate };
 }
 
 /* ── Component ─────────────────────────────────────────────────── */
@@ -158,6 +157,9 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
   const [error, setError] = useState<string | null>(null);
   const onChangeRef = useRef(onChange);
   const pcmLoadedRef = useRef(false);
+  const sampleRateRef = useRef(44100);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   /* Keep refs in sync — CLAUDE.md configRef pattern */
   useEffect(() => { configRef.current = instrument; }, [instrument]);
@@ -283,6 +285,42 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
           onChangeRef.current(updates);
         };
 
+        /* Audio playback callbacks */
+        mod.onPlaySample = (ptr: number, len: number, loopStart: number, loopLength: number, loopType: number) => {
+          if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+          const ctx = audioCtxRef.current;
+          // Stop previous playback
+          if (currentSourceRef.current) {
+            try { currentSourceRef.current.stop(); } catch { /* already stopped */ }
+            currentSourceRef.current = null;
+          }
+          if (len <= 0) return;
+          // Copy Int8 sample data from WASM heap into a Float32 AudioBuffer
+          const raw = new Int8Array(mod.HEAP8.buffer, ptr, len);
+          const sr = sampleRateRef.current;
+          const buf = ctx.createBuffer(1, len, sr);
+          const ch = buf.getChannelData(0);
+          for (let i = 0; i < len; i++) ch[i] = raw[i] / 128.0;
+          const src = ctx.createBufferSource();
+          src.buffer = buf;
+          if (loopType !== 0 && loopLength > 2) {
+            src.loop = true;
+            src.loopStart = loopStart / sr;
+            src.loopEnd   = (loopStart + loopLength) / sr;
+          }
+          src.connect(ctx.destination);
+          src.start();
+          currentSourceRef.current = src;
+          src.onended = () => { if (currentSourceRef.current === src) currentSourceRef.current = null; };
+        };
+
+        mod.onStopSample = () => {
+          if (currentSourceRef.current) {
+            try { currentSourceRef.current.stop(); } catch { /* already stopped */ }
+            currentSourceRef.current = null;
+          }
+        };
+
         /* Init */
         mod._pt2_sampled_init(SCREEN_W, SCREEN_H);
         mod._pt2_sampled_start();
@@ -367,8 +405,10 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
         if (!cancelled) setLoaded(true);
 
         /* Decode and push PCM data */
-        const pcm = await decodePCM(configRef.current);
-        if (pcm && !cancelled && mod) {
+        const decoded = await decodePCM(configRef.current);
+        if (decoded && !cancelled && mod) {
+          const { pcm, sampleRate } = decoded;
+          sampleRateRef.current = sampleRate;
           const pcmPtr = mod._malloc(pcm.length);
           if (pcmPtr) {
             mod.HEAP8.set(pcm, pcmPtr);
@@ -387,6 +427,10 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
     return () => {
       cancelled = true;
       eventCleanups.forEach(fn => fn());
+      if (currentSourceRef.current) {
+        try { currentSourceRef.current.stop(); } catch { /* ignore */ }
+        currentSourceRef.current = null;
+      }
       if (mod) {
         try { mod._pt2_sampled_shutdown(); } catch { /* ignore */ }
       }
