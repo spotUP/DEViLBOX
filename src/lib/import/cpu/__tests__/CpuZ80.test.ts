@@ -334,6 +334,17 @@ describe('CpuZ80', () => {
     expect(cpu.getC()).toBe(0x34);
   });
 
+  it('setB / getB round-trips 8-bit B value and masks to byte', () => {
+    const mem = makeRAM({});
+    const cpu = new CpuZ80(mem);
+    cpu.reset(0x0000);
+    cpu.setB(0xAB);
+    expect(cpu.getB()).toBe(0xAB);
+    // values wider than 8 bits are masked
+    cpu.setB(0x1FF);
+    expect(cpu.getB()).toBe(0xFF);
+  });
+
   it('RST 38h pushes PC and jumps to $0038', () => {
     // 0x0200: FF   RST $38
     const mem = makeRAM({ 0x0200: 0xFF, 0x0038: 0x00 });
