@@ -259,11 +259,15 @@ export async function parseNSFFile(buffer: ArrayBuffer, filename: string): Promi
   }
 
   const instruments = buildNESInstruments(expansion);
-  const numCh = Math.min(instruments.length, 13);
+  // Clamp to 4: only the 4 base APU channels are emulated below.
+  // Expansion chip instruments are built for future use but not yet extracted.
+  const numCh = 4;
 
   let pattern: Pattern;
   if (loadAddr > 0 && initAddr > 0 && playAddr > 0) {
     try {
+      // Note: runNSFEmulation only extracts notes for the 4 base APU channels.
+      // Expansion chip channel emulation (VRC6, VRC7, FDS, MMC5, N163, 5B) is not yet implemented.
       const frameStates = runNSFEmulation(buf, loadAddr, initAddr, playAddr, isPAL, numCh);
       pattern = framesToPattern(frameStates, instruments, numCh);
     } catch {

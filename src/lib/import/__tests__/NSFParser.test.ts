@@ -17,8 +17,9 @@ describe('NSFParser', () => {
     const NSF_HEADER_SIZE = 128;
     const LOAD_ADDR = 0x8000;
 
-    // Play routine: enable pulse 1, set vol=15, set timer for ~A4 (timer=253)
-    // timer = 253 → freq = 1789773 / (16*254) ≈ 440.3 Hz ≈ A4 (MIDI 69)
+    // Play routine: enable pulse 1, set vol=15, set timer for ~A3
+    // $4002 = $FD (timer lo = 253), $4003 = $41 (timer hi bits = $41 & $07 = 1)
+    // timer = (1 << 8) | 253 = 509 → freq = 1789773 / (16 * 510) ≈ 219 Hz ≈ A3 (MIDI 57)
     const playCode = new Uint8Array([
       0xA9, 0x01, 0x8D, 0x15, 0x40,  // LDA #1, STA $4015 (enable pulse 1)
       0xA9, 0x8F, 0x8D, 0x00, 0x40,  // LDA #$8F, STA $4000 (vol=15, duty=0)
