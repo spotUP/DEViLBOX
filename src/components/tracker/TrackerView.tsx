@@ -16,6 +16,10 @@ import { InterpolateDialog } from '@components/dialogs/InterpolateDialog';
 import { HumanizeDialog } from '@components/dialogs/HumanizeDialog';
 import { FindReplaceDialog } from '@components/dialogs/FindReplaceDialog';
 import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
+import { ImportFurnaceDialog } from '@components/dialogs/ImportFurnaceDialog';
+import { ImportMIDIDialog } from '@components/dialogs/ImportMIDIDialog';
+import { ImportAudioDialog } from '@components/dialogs/ImportAudioDialog';
+import { ImportTD3Dialog } from '@components/dialogs/ImportTD3Dialog';
 import { ScaleVolumeDialog } from './ScaleVolumeDialog';
 import { FadeVolumeDialog } from './FadeVolumeDialog';
 import { RemapInstrumentDialog } from './RemapInstrumentDialog';
@@ -383,6 +387,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const statusMessage = useUIStore((state) => state.statusMessage);
   const pendingModuleFile = useUIStore((state) => state.pendingModuleFile);
   const setPendingModuleFile = useUIStore((state) => state.setPendingModuleFile);
+  const pendingAudioFile = useUIStore((state) => state.pendingAudioFile);
+  const setPendingAudioFile = useUIStore((state) => state.setPendingAudioFile);
+  const pendingTD3File = useUIStore((state) => state.pendingTD3File);
+  const setPendingTD3File = useUIStore((state) => state.setPendingTD3File);
   const setActiveView = useUIStore((state) => state.setActiveView);
   const dialogOpen = useUIStore((state) => state.dialogOpen);
   const closeDialogCommand = useUIStore((state) => state.closeDialogCommand);
@@ -574,6 +582,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const blockOps = useBlockOperations();
 
   // NOTE: usePatternPlayback() is called in App.tsx so it persists across view switches
+
+  // TD-3 pattern import handler
+  const handleTD3Import = useCallback(async (file: File, replacePatterns: boolean) => {
+    const { loadFile } = await import('@lib/file/UnifiedFileLoader');
+    const result = await loadFile(file, { requireConfirmation: false, replacePatterns });
+    if (result.success === true) notify.success(result.message);
+    else if (result.success === false) notify.error(result.error);
+  }, []);
 
   // Module import handler - used by both mobile and desktop views
   const handleModuleImport = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
@@ -793,7 +809,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
       let song: TrackerSong;
       try {
-        song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata);
+        song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions);
       } catch (err) {
         notify.error(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
         return;
@@ -946,14 +962,40 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       />
       <UndoHistoryPanel isOpen={showUndoHistory} onClose={() => setShowUndoHistory(false)} />
       <PatternMatrix isOpen={showPatternMatrix} onClose={() => setShowPatternMatrix(false)} />
-        <ImportModuleDialog
-          isOpen={showImportModule}
-          onClose={() => {
-            setShowImportModule(false);
-            setPendingModuleFile(null); // Clear pending file on close
-          }}
-          onImport={handleModuleImport}
-          initialFile={pendingModuleFile}
+        {/\.(fur|dmf)$/i.test(pendingModuleFile?.name ?? '') ? (
+          <ImportFurnaceDialog
+            isOpen={showImportModule}
+            onClose={() => { setShowImportModule(false); setPendingModuleFile(null); }}
+            onImport={handleModuleImport}
+            initialFile={pendingModuleFile}
+          />
+        ) : /\.(mid|midi)$/i.test(pendingModuleFile?.name ?? '') ? (
+          <ImportMIDIDialog
+            isOpen={showImportModule}
+            onClose={() => { setShowImportModule(false); setPendingModuleFile(null); }}
+            onImport={handleModuleImport}
+            initialFile={pendingModuleFile}
+          />
+        ) : (
+          <ImportModuleDialog
+            isOpen={showImportModule}
+            onClose={() => { setShowImportModule(false); setPendingModuleFile(null); }}
+            onImport={handleModuleImport}
+            initialFile={pendingModuleFile}
+          />
+        )}
+        {/* Audio sample import dialog */}
+        <ImportAudioDialog
+          isOpen={!!pendingAudioFile}
+          onClose={() => setPendingAudioFile(null)}
+          initialFile={pendingAudioFile}
+        />
+        {/* TD-3 / TB-303 pattern import dialog */}
+        <ImportTD3Dialog
+          isOpen={!!pendingTD3File}
+          onClose={() => setPendingTD3File(null)}
+          initialFile={pendingTD3File}
+          onImport={handleTD3Import}
         />
         {/* FT2 Dialogs */}
         {showScaleVolume && (
@@ -1393,14 +1435,41 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       />
       <UndoHistoryPanel isOpen={showUndoHistory} onClose={() => setShowUndoHistory(false)} />
       <PatternMatrix isOpen={showPatternMatrix} onClose={() => setShowPatternMatrix(false)} />
-      <ImportModuleDialog
-        isOpen={showImportModule}
-        onClose={() => {
-          setShowImportModule(false);
-          setPendingModuleFile(null);
-        }}
-        onImport={handleModuleImport}
-        initialFile={pendingModuleFile}
+      {/\.(fur|dmf)$/i.test(pendingModuleFile?.name ?? '') ? (
+        <ImportFurnaceDialog
+          isOpen={showImportModule}
+          onClose={() => { setShowImportModule(false); setPendingModuleFile(null); }}
+          onImport={handleModuleImport}
+          initialFile={pendingModuleFile}
+        />
+      ) : /\.(mid|midi)$/i.test(pendingModuleFile?.name ?? '') ? (
+        <ImportMIDIDialog
+          isOpen={showImportModule}
+          onClose={() => { setShowImportModule(false); setPendingModuleFile(null); }}
+          onImport={handleModuleImport}
+          initialFile={pendingModuleFile}
+        />
+      ) : (
+        <ImportModuleDialog
+          isOpen={showImportModule}
+          onClose={() => { setShowImportModule(false); setPendingModuleFile(null); }}
+          onImport={handleModuleImport}
+          initialFile={pendingModuleFile}
+        />
+      )}
+
+      {/* Audio sample import dialog */}
+      <ImportAudioDialog
+        isOpen={!!pendingAudioFile}
+        onClose={() => setPendingAudioFile(null)}
+        initialFile={pendingAudioFile}
+      />
+      {/* TD-3 / TB-303 pattern import dialog */}
+      <ImportTD3Dialog
+        isOpen={!!pendingTD3File}
+        onClose={() => setPendingTD3File(null)}
+        initialFile={pendingTD3File}
+        onImport={handleTD3Import}
       />
 
       {/* FT2 Dialogs */}
