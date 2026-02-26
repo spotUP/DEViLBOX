@@ -13,8 +13,8 @@
  */
 
 import { useRef, useEffect, useCallback, useMemo } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { useGLTF, OrbitControls } from '@react-three/drei';
+import { useFrame, useThree } from '@react-three/fiber';
+import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
@@ -132,7 +132,7 @@ function getControlName(mesh: THREE.Object3D): string {
 
 // ── Inner 3D Scene Component ─────────────────────────────────────────────────
 
-function MixerScene() {
+function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElement> }) {
   const { scene: gltfScene } = useGLTF(MODEL_PATH);
 
   // Drag state refs
@@ -559,7 +559,7 @@ function MixerScene() {
   // R3F event bubbling through <primitive> is unreliable for cloned scenes.
   // Instead, we raycast manually on pointerdown and walk the hit mesh's userData.
 
-  const { gl, camera, scene } = useThree();
+  const { camera, scene } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const pointer = useMemo(() => new THREE.Vector2(), []);
 
@@ -573,9 +573,11 @@ function MixerScene() {
     return null;
   }, []);
 
-  // Manual raycast helper
+  // Manual raycast helper — uses the View div bounds (not gl.domElement) so NDC
+  // is computed relative to the mixer's viewport, not the full shared canvas.
   const raycastControl = useCallback((e: PointerEvent): string | null => {
-    const rect = gl.domElement.getBoundingClientRect();
+    const rect = viewRef.current?.getBoundingClientRect();
+    if (!rect) return null;
     pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
@@ -585,11 +587,14 @@ function MixerScene() {
       if (name) return name;
     }
     return null;
-  }, [gl, camera, scene, raycaster, pointer, findControl]);
+  }, [viewRef, camera, scene, raycaster, pointer, findControl]);
 
-  // DOM pointer events on the canvas element
+  // DOM pointer events on the View div element (not gl.domElement — that's the
+  // shared canvas which is pointer-events:none). The View div sits on top and
+  // receives clicks for the mixer's screen region.
   useEffect(() => {
-    const canvas = gl.domElement;
+    const target = viewRef.current;
+    if (!target) return;
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
@@ -655,17 +660,17 @@ function MixerScene() {
       activeFaderRef.current = null;
     };
 
-    canvas.addEventListener('pointerdown', onPointerDown);
-    canvas.addEventListener('dblclick', onDblClick);
+    target.addEventListener('pointerdown', onPointerDown);
+    target.addEventListener('dblclick', onDblClick);
     document.addEventListener('pointermove', onPointerMove);
     document.addEventListener('pointerup', onPointerUp);
     return () => {
-      canvas.removeEventListener('pointerdown', onPointerDown);
-      canvas.removeEventListener('dblclick', onDblClick);
+      target.removeEventListener('pointerdown', onPointerDown);
+      target.removeEventListener('dblclick', onDblClick);
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
     };
-  }, [gl, raycastControl, knobMap, faderMap, buttonMap]);
+  }, [viewRef, raycastControl, knobMap, faderMap, buttonMap]);
 
   return (
     <group scale={[MODEL_SCALE, MODEL_SCALE, MODEL_SCALE]}>
@@ -674,55 +679,51 @@ function MixerScene() {
   );
 }
 
-// ── Outer Component (Canvas wrapper) ─────────────────────────────────────────
+// ── Outer Component ───────────────────────────────────────────────────────────
 
 export function MixerVestax3DView() {
   const orbitRef = useRef<OrbitControlsImpl>(null);
+  // viewDivRef is passed to MixerScene so it can attach DOM listeners and
+  // compute NDC relative to the mixer's viewport (not the shared canvas bounds).
+  const viewDivRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="relative w-full h-full min-h-[200px]" style={{ touchAction: 'none' }}>
-      <Canvas
-        camera={{
-          position: [0, 0.45, 0.45],
-          fov: 42,
-          near: 0.01,
-          far: 10,
-        }}
-        gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
-        style={{ background: 'transparent' }}
-        onCreated={({ gl }) => {
-          gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.2;
-          // Prevent browser default on context loss (which would permanently halt rendering).
-          gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault(), false);
-        }}
-      >
+      {/* View registers with the shared Canvas in DJView via View.Port. */}
+      <View ref={viewDivRef} className="absolute inset-0">
+        <PerspectiveCamera
+          makeDefault
+          position={[0, 0.45, 0.45]}
+          fov={42}
+          near={0.01}
+          far={10}
+        />
         <ambientLight intensity={0.4} />
         <directionalLight position={[2, 4, 2]} intensity={0.8} castShadow={false} />
         <directionalLight position={[-1, 2, -1]} intensity={0.3} />
         <pointLight position={[0, 0.05, 0]} color="#60a5fa" intensity={0.4} distance={0.5} />
 
-        <MixerScene />
+        <MixerScene viewRef={viewDivRef} />
 
         <OrbitControls
           ref={orbitRef}
-        enablePan={false}
-        enableZoom={false}
-        enableRotate={false}
-        enableDamping
-        dampingFactor={0.1}
-        minPolarAngle={Math.PI * 0.05}
-        maxPolarAngle={Math.PI * 0.6}
-        minDistance={0.1}
-        maxDistance={2.0}
-        target={[0, -0.05, 0] as unknown as THREE.Vector3}
-        mouseButtons={{
-          LEFT: undefined as unknown as THREE.MOUSE,
-          MIDDLE: undefined as unknown as THREE.MOUSE,
-          RIGHT: undefined as unknown as THREE.MOUSE,
-        }}
+          enablePan={false}
+          enableZoom={false}
+          enableRotate={false}
+          enableDamping
+          dampingFactor={0.1}
+          minPolarAngle={Math.PI * 0.05}
+          maxPolarAngle={Math.PI * 0.6}
+          minDistance={0.1}
+          maxDistance={2.0}
+          target={[0, -0.05, 0] as unknown as THREE.Vector3}
+          mouseButtons={{
+            LEFT: undefined as unknown as THREE.MOUSE,
+            MIDDLE: undefined as unknown as THREE.MOUSE,
+            RIGHT: undefined as unknown as THREE.MOUSE,
+          }}
         />
-      </Canvas>
+      </View>
       <CameraControlOverlay orbitRef={orbitRef} />
     </div>
   );
