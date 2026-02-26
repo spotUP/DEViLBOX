@@ -503,10 +503,10 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
           const chData = audioBuf.getChannelData(0);
           if (is16bit) {
             /* ptr is a WASM byte offset; HEAP16 is Int16Array over the same buffer */
-            const raw = mod.HEAP16.subarray(ptr >> 1, (ptr >> 1) + len);
+            const raw = mod!.HEAP16.subarray(ptr >> 1, (ptr >> 1) + len);
             for (let i = 0; i < len; i++) chData[i] = raw[i] / 32768.0;
           } else {
-            const raw = new Int8Array(mod.HEAPU8.buffer, ptr, len);
+            const raw = new Int8Array(mod!.HEAPU8.buffer, ptr, len);
             for (let i = 0; i < len; i++) chData[i] = raw[i] / 128.0;
           }
           const src = ctx.createBufferSource();

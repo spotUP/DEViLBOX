@@ -296,7 +296,7 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
           }
           if (len <= 0) return;
           // Copy Int8 sample data from WASM heap into a Float32 AudioBuffer
-          const raw = new Int8Array(mod.HEAP8.buffer, ptr, len);
+          const raw = new Int8Array(mod!.HEAP8.buffer, ptr, len);
           const sr = sampleRateRef.current;
           const buf = ctx.createBuffer(1, len, sr);
           const ch = buf.getChannelData(0);
