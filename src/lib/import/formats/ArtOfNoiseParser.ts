@@ -309,7 +309,6 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
   let off = 46;
 
   let songName = '';
-  let author = '';
   let numberOfPositions = 0;
   let restartPosition = 0;
   let arpeggios: number[][] | null = null;
@@ -338,7 +337,7 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
       }
 
       case 'AUTH': {
-        author = readString(bytes, off, chunkSize);
+        // Author string — not used in TrackerSong output
         break;
       }
 

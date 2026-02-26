@@ -163,7 +163,7 @@ function psfNoteToXm(noteByte: number): number {
 /** Calculate Amiga period from PSF instrument sampling period + note.
  *  Uses the SampleTable and MultiplyTable from Tables.cs.
  */
-function calculatePeriod(samplingPeriod: number, noteIdx: number): number {
+function _calculatePeriod(samplingPeriod: number, noteIdx: number): number {
   if (samplingPeriod === 0) {
     // No fixed sampling period: use period table directly
     const idx = Math.max(0, Math.min(PSF_PERIODS.length - 1, noteIdx));

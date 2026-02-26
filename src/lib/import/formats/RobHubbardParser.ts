@@ -85,7 +85,7 @@ function u32BE(buf: Uint8Array, off: number): number {
        +  (buf[off + 3] & 0xFF);
 }
 
-function readU16(buf: Uint8Array, off: number): number {
+function _readU16(buf: Uint8Array, off: number): number {
   return u16BE(buf, off);
 }
 
@@ -392,7 +392,7 @@ export async function parseRobHubbardFile(
     wavesHeaders,
     wavesPointers,
     vibrato,
-    periods: periodsOff,
+    periods: _periodsOff,
     loopLen: _loopLen,
     variant,
   } = scan;
@@ -411,7 +411,7 @@ export async function parseRobHubbardFile(
 
   // ── Parse samples ────────────────────────────────────────────────────────
   const samples: RHSample[] = [];
-  let sampleDataOff = samplesData;
+  let _sampleDataOff = samplesData;
 
   // Variant 0: all samples start at samplesData, sequential
   // Variant 1+: wave samples are loaded separately (synthetic waveforms from wavesHeaders)
@@ -662,7 +662,7 @@ export async function parseRobHubbardFile(
     let currentVolume = samples[0]?.volume ?? 64;
     const MAX_EVENTS = 2048; // guard against infinite loops in malformed files
     let evCount = 0;
-    let portaSpeed = 0;
+    let _portaSpeed = 0;
 
     let patPos = patternOff;
 
@@ -728,7 +728,7 @@ export async function parseRobHubbardFile(
           case -127: {
             // Portamento: next byte = signed speed
             if (patPos < buf.length) {
-              portaSpeed = s8(buf, patPos);
+              _portaSpeed = s8(buf, patPos);
               patPos++;
             }
             break;
@@ -773,7 +773,7 @@ export async function parseRobHubbardFile(
           });
         }
         evCount++;
-        portaSpeed = 0; // reset after note
+        _portaSpeed = 0; // reset after note
       }
     }
   }

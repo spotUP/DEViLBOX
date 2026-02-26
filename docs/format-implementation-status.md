@@ -107,6 +107,8 @@ Track which formats have native parsers vs UADE-only.
 | `.etx` | EasyTrax | EasyTraxParser.ts | NostalgicPlayer | Amiga; UADE fallback |
 | `.mus` | Karl Morton Music | KarlMortonParser.ts | NostalgicPlayer | OpenMPT fallback |
 | `.rjp`, `.sng`, `RJP.*` | Richard Joseph Player | RichardJosephParser.ts | UADE eagleplayer asm | Two-file (song+SMP); UADE fallback |
+| `.ufo`, `.mus` | UFO / MicroProse | UFOParser.ts | UADE eagleplayer asm | IFF FORM+DDAT magic; two-file; UADE fallback |
+| `.dl`, `.dl_deli`, `DL.*` | Dave Lowe | DaveLoweParser.ts | UADE eagleplayer asm | Three 68k opcode magic bytes; UADE fallback |
 
 ---
 

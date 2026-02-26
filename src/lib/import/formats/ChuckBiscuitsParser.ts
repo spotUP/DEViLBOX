@@ -79,9 +79,7 @@ const NOTE_CUT_BYTE = 255;
 // Effect commands
 const CMD_NOTE_CUT    = 254;   // DEViLBOX note cut
 const CMD_SET_SPEED   = 0x0F;  // Fxx — set speed
-const CMD_SET_TEMPO   = 0x1D;  // no direct XM cmd; use Fxx with value >= 20 as BPM
 const CMD_RETRIG      = 0x1B;  // Qxx — retrigger note
-const CMD_DUMMY       = 0x00;  // dummy/ignore
 
 // ── Format detection ─────────────────────────────────────────────────────────
 
@@ -228,7 +226,6 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
   // ── Header fields ────────────────────────────────────────────────────────
 
   const title         = readMaybeNullString(v, 4, 32);
-  const messageLength = u16le(v, 37);
   const numChannels   = u8(v, 39);
   const lastPattern   = u8(v, 40);
   const numOrders     = u8(v, 41);

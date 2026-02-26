@@ -26,7 +26,6 @@ import { createSamplerInstrument, periodToNoteIndex } from './AmigaUtils';
 
 // -- Binary helpers -----------------------------------------------------------
 
-function u8(view: DataView, off: number): number  { return view.getUint8(off); }
 function u16(view: DataView, off: number): number { return view.getUint16(off, false); }
 function u32(view: DataView, off: number): number { return view.getUint32(off, false); }
 

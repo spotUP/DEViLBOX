@@ -69,7 +69,7 @@ const XM_VIBRATO     = 0x04;  // 4xx
 const XM_TREMOLO     = 0x07;  // 7xx
 const XM_OFFSET      = 0x09;  // 9xx
 const XM_VOL_SLIDE   = 0x0A;  // Axx
-const XM_POS_JUMP    = 0x0B;  // Bxx
+const _XM_POS_JUMP    = 0x0B;  // Bxx
 const XM_SET_VOLUME  = 0x0C;  // Cxx
 const XM_PAT_BREAK   = 0x0D;  // Dxx
 const XM_EXTENDED    = 0x0E;  // Exx
@@ -230,7 +230,7 @@ export function isULTFormat(buffer: ArrayBuffer): boolean {
 // ── WAV encoding for 16-bit signed LE PCM ────────────────────────────────────
 
 /** Encode raw 16-bit signed LE PCM bytes into a WAV ArrayBuffer. */
-function pcm16ToWAV(pcmBytes: Uint8Array, sampleRate: number): ArrayBuffer {
+function _pcm16ToWAV(pcmBytes: Uint8Array, sampleRate: number): ArrayBuffer {
   const numFrames = pcmBytes.length >> 1;   // 2 bytes per frame
   const dataSize  = numFrames * 2;
   const fileSize  = 44 + dataSize;
@@ -308,7 +308,7 @@ function buildWAV16(
 
 // ── 8-bit signed PCM → WAV (inline, matching AmigaUtils.pcm8ToWAV style) ────
 
-function pcm8ToWAV(pcm: Uint8Array, sampleRate: number): ArrayBuffer {
+function _pcm8ToWAV(pcm: Uint8Array, sampleRate: number): ArrayBuffer {
   const numSamples = pcm.length;
   const dataSize   = numSamples * 2;  // upconvert to 16-bit
   const fileSize   = 44 + dataSize;

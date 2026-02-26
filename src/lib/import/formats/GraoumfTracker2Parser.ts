@@ -40,7 +40,7 @@ import { createSamplerInstrument } from './AmigaUtils';
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
 function u8(buf: Uint8Array, off: number): number  { return buf[off] ?? 0; }
-function s8(buf: Uint8Array, off: number): number  { const v = buf[off] ?? 0; return v < 128 ? v : v - 256; }
+function _s8(buf: Uint8Array, off: number): number  { const v = buf[off] ?? 0; return v < 128 ? v : v - 256; }
 function u16be(buf: Uint8Array, off: number): number {
   return ((buf[off] ?? 0) << 8) | (buf[off + 1] ?? 0);
 }
@@ -527,8 +527,8 @@ interface GT2Chunk {
   offset: number;   // byte offset in buf where payload starts
 }
 
-const CHUNK_XCOM = 0x58434F4D; // "XCOM"
-const CHUNK_TCN1 = 0x54434E31; // "TCN1"
+const _CHUNK_XCOM = 0x58434F4D; // "XCOM"
+const _CHUNK_TCN1 = 0x54434E31; // "TCN1"
 const CHUNK_TCN2 = 0x54434E32; // "TCN2"
 const CHUNK_TVOL = 0x54564F4C; // "TVOL"
 const CHUNK_MIXP = 0x4D495850; // "MIXP"
@@ -728,12 +728,12 @@ function parseGT2File(buf: Uint8Array, filename: string): TrackerSong | null {
     const name        = readString(buf, b + 2, 28);
     const type        = u16be(buf, b + 30);
     const bits        = u16be(buf, b + 32);
-    const endian      = u16be(buf, b + 34);
+    const _endian      = u16be(buf, b + 34);
     const numChan     = u16be(buf, b + 36);
     const volume      = u16be(buf, b + 40);
     const loopType    = u16be(buf, b + 44);
     const sampleCoding = u16be(buf, b + 48);
-    const filenameLen = u16be(buf, b + 50);
+    const _filenameLen = u16be(buf, b + 50);
     const sampleFreq  = u32be(buf, b + 54) * 2;  // nC5Speed = sampleFreq * 2
     const length      = u32be(buf, b + 58);
     const loopStart   = u32be(buf, b + 62);

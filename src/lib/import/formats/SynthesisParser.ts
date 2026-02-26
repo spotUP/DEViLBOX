@@ -52,7 +52,7 @@ const PAL_CLOCK = 3546895;
  * Index 49 = 856 = XM C-3 reference period.
  * Copied verbatim from NostalgicPlayer Synthesis/Tables.cs.
  */
-const SYN_PERIODS: number[] = [
+const _SYN_PERIODS: number[] = [
       0,
   13696, 12928, 12192, 11520, 10848, 10240,  9664,  9120,  8608,  8128,  7680,  7248,
    6848,  6464,  6096,  5760,  5424,  5120,  4832,  4560,  4304,  4064,  3840,  3624,
@@ -437,7 +437,7 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
   // Each position entry defines the starting track row for each of 4 voices.
   // The track plays rowsPerTrack rows. We build one pattern per position.
   const rowsPerTrack = song.rowsPerTrack || 16;
-  const numPositions = song.lastPosition - song.firstPosition + 1;
+  const _numPositions = song.lastPosition - song.firstPosition + 1;
   const firstPos     = song.firstPosition;
 
   const patterns: Pattern[] = [];

@@ -70,7 +70,6 @@ function readString(bytes: Uint8Array, off: number, len: number): string {
 
 const HDR_SIZE           = 1954;   // sizeof(C67FileHeader)
 const PAT_OFFSETS_SIZE   = 128 * 4;
-const PAT_LENGTHS_SIZE   = 128 * 4;
 const PAT_DATA_BASE      = 2978;   // 1954 + 512 + 512 = 2978
 const NUM_PCM_CHANNELS   = 4;
 const NUM_FM_CHANNELS    = 9;
