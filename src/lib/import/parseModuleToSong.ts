@@ -439,6 +439,46 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADE(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── Art of Noise ──────────────────────────────────────────────────────────
+  // AON4 (.aon) and AON8 (.aon8) — identified by "AON4"/"AON8" magic bytes at offset 0.
+  if (/\.(aon|aon8)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.artOfNoise === 'native') {
+      try {
+        const { isArtOfNoiseFormat, parseArtOfNoiseFile } = await import('@lib/import/formats/ArtOfNoiseParser');
+        const bytes = new Uint8Array(buffer);
+        if (isArtOfNoiseFormat(bytes)) {
+          const result = parseArtOfNoiseFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[ArtOfNoiseParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Ben Daglish ───────────────────────────────────────────────────────────
+  // .bd files — identified by M68k assembler signatures (no magic bytes).
+  if (/\.bd$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.benDaglish === 'native') {
+      try {
+        const { isBenDaglishFormat, parseBenDaglishFile } = await import('@lib/import/formats/BenDaglishParser');
+        const bytes = new Uint8Array(buffer);
+        if (isBenDaglishFormat(bytes)) {
+          const result = parseBenDaglishFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[BenDaglishParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
