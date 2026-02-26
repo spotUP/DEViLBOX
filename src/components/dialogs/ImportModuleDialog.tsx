@@ -59,6 +59,9 @@ const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label
 /** Furnace / DefleMask — always use native parser, no libopenmpt or UADE option. */
 const FURNACE_FORMAT_RE = /\.(fur|dmf)$/i;
 
+/** Chip-dump formats with dedicated native parsers — no UADE mode selector needed. */
+const CHIP_DUMP_FORMAT_RE = /\.(vgm|vgz|ym|nsf|nsfe|sid1?|sap|ay)$/i;
+
 function detectNativeFormat(filename: string): (typeof NATIVE_FORMAT_PATTERNS)[number] | null {
   return NATIVE_FORMAT_PATTERNS.find(f => f.regex.test(filename)) ?? null;
 }
@@ -88,7 +91,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
   // Derived format state
   const nativeFmt  = detectNativeFormat(loadedFileName);
-  const isUADE     = !nativeFmt && isUADEFormat(loadedFileName);
+  const isChipDump = CHIP_DUMP_FORMAT_RE.test(loadedFileName);
+  const isUADE     = !nativeFmt && !isChipDump && isUADEFormat(loadedFileName);
   const isNativeSelected = nativeFmt ? (formatEngine[nativeFmt.key] as string) !== 'uade' : false;
   const uadeMode   = formatEngine.uade ?? 'enhanced';
 
@@ -101,7 +105,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     const fname = file.name.toLowerCase();
     const nativeFmtForFile = detectNativeFormat(fname);
     const isFurnace = FURNACE_FORMAT_RE.test(fname);
-    const isUADEExclusive = !nativeFmtForFile && !isFurnace && isUADEFormat(fname);
+    const isChipDumpFile = CHIP_DUMP_FORMAT_RE.test(fname);
+    const isUADEExclusive = !nativeFmtForFile && !isFurnace && !isChipDumpFile && isUADEFormat(fname);
 
     setIsLoading(true);
     setError(null);
