@@ -2531,7 +2531,6 @@ export class FurnaceSynth implements DevilboxSynth {
 
       case FurnaceChipType.K053260: { // 40
         // Key-off: clear key-on mask
-        const voiceK53Off = chan & 3;
         this.chipEngine.write(FurnaceChipType.K053260, 0x28, 0);  // Clear all key-on bits
         break;
       }

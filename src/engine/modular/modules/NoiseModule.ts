@@ -67,7 +67,7 @@ export const NoiseDescriptor: ModuleDescriptor = {
         : type === 1
           ? generatePinkNoise(bufferSize)
           : generateBrownNoise(bufferSize);
-      ab.copyToChannel(data, 0);
+      ab.copyToChannel(data as Float32Array<ArrayBuffer>, 0);
       return ab;
     });
 
