@@ -554,6 +554,26 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── Graoumf Tracker 1/2 ───────────────────────────────────────────────────
+  // .gt2 files (GT2 format) and .gtk files (GTK format) — identified by "GT2" / "GTK" magic.
+  if (/\.(gt2|gtk)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.graoumfTracker2 === 'native') {
+      try {
+        const { isGraoumfTracker2Format, parseGraoumfTracker2File } = await import('@lib/import/formats/GraoumfTracker2Parser');
+        const bytes = new Uint8Array(buffer);
+        if (isGraoumfTracker2Format(bytes)) {
+          const result = parseGraoumfTracker2File(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[GraoumfTracker2Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── PumaTracker ───────────────────────────────────────────────────────────
   // .puma files — no magic bytes; heuristic header validation (mirrors OpenMPT).
   if (/\.puma$/.test(filename)) {
