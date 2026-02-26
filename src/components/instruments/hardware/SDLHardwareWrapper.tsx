@@ -146,6 +146,17 @@ export interface SDLHardwareWrapperProps {
   /** Image rendering mode for the canvas when scaled. Default: 'pixelated' (good for retro UIs).
    *  Use 'auto' for smooth bilinear scaling (better for ImGui-based UIs at non-native resolution). */
   imageRendering?: 'pixelated' | 'auto';
+
+  /**
+   * Optional CSS display dimensions (logical pixels). When set, the canvas is constrained to
+   * max-width × max-height CSS pixels and the aspect ratio uses these dimensions.
+   *
+   * Use this when the canvas buffer is larger than the logical layout (e.g., SCALE=2 for Retina):
+   *   canvasWidth=960, canvasHeight=720, displayWidth=480, displayHeight=360
+   * On a 2× Retina display: 480 CSS × 2 DPR = 960 physical = exact buffer size → pixel-perfect.
+   */
+  displayWidth?: number;
+  displayHeight?: number;
 }
 
 /* ── Component ─────────────────────────────────────────────────────────── */
@@ -168,6 +179,8 @@ export const SDLHardwareWrapper: React.FC<SDLHardwareWrapperProps> = ({
   loadPcmFn,
   className,
   imageRendering = 'pixelated',
+  displayWidth,
+  displayHeight,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -323,56 +336,59 @@ export const SDLHardwareWrapper: React.FC<SDLHardwareWrapperProps> = ({
           return;
         }
 
-        mod = factoryResult;
-        moduleRef.current = mod;
+        /* Explicit cast: factoryResult is a let captured by a then() callback so tsc -b
+         * loses narrowing across the await boundary; null was already guarded above. */
+        const sdlMod = factoryResult as SDLModule;
+        mod = sdlMod;
+        moduleRef.current = sdlMod;
 
         if (cancelled) {
           /* Cleanup fired while factory() was running — shut down immediately now
            * that factory is done. Canvas is still in DOM, shutdown will succeed. */
-          doShutdown(mod);
+          doShutdown(sdlMod);
           removeCanvas();
           return;
         }
 
         /* Set up callbacks BEFORE init, so they're available during first render */
         if (onModuleReadyRef.current) {
-          onModuleReadyRef.current(mod);
+          onModuleReadyRef.current(sdlMod);
         }
 
         /* Initialize — either with data buffer or plain */
         if (initBuffer && initWithDataFn) {
-          const initWithData = mod[initWithDataFn] as ((ptr: number, len: number) => void) | undefined;
+          const initWithData = sdlMod[initWithDataFn] as ((ptr: number, len: number) => void) | undefined;
           if (typeof initWithData === 'function') {
-            const ptr = mod._malloc(initBuffer.length);
+            const ptr = sdlMod._malloc(initBuffer.length);
             if (ptr) {
-              mod.HEAPU8.set(initBuffer, ptr);
-              initWithData.call(mod, ptr, initBuffer.length);
-              mod._free(ptr);
+              sdlMod.HEAPU8.set(initBuffer, ptr);
+              initWithData.call(sdlMod, ptr, initBuffer.length);
+              sdlMod._free(ptr);
             }
           }
         } else {
-          const initFunc = mod[initFn] as ((w: number, h: number) => void) | undefined;
+          const initFunc = sdlMod[initFn] as ((w: number, h: number) => void) | undefined;
           if (typeof initFunc === 'function') {
-            initFunc.call(mod, canvasWidth, canvasHeight);
+            initFunc.call(sdlMod, canvasWidth, canvasHeight);
           }
         }
 
         /* Push initial config */
         const cfgBuf = configBufferRef.current;
-        const loadCfg = mod[loadConfigFn] as ((ptr: number, len: number) => void) | undefined;
+        const loadCfg = sdlMod[loadConfigFn] as ((ptr: number, len: number) => void) | undefined;
         if (typeof loadCfg === 'function' && cfgBuf.length > 0) {
-          const ptr = mod._malloc(cfgBuf.length);
+          const ptr = sdlMod._malloc(cfgBuf.length);
           if (ptr) {
-            mod.HEAPU8.set(cfgBuf, ptr);
-            loadCfg.call(mod, ptr, cfgBuf.length);
-            mod._free(ptr);
+            sdlMod.HEAPU8.set(cfgBuf, ptr);
+            loadCfg.call(sdlMod, ptr, cfgBuf.length);
+            sdlMod._free(ptr);
           }
         }
 
         /* Start the SDL main loop */
-        const startFunc = mod[startFn] as (() => void) | undefined;
+        const startFunc = sdlMod[startFn] as (() => void) | undefined;
         if (typeof startFunc === 'function') {
-          startFunc.call(mod);
+          startFunc.call(sdlMod);
         }
 
         if (!cancelled) setLoaded(true);
@@ -406,19 +422,28 @@ export const SDLHardwareWrapper: React.FC<SDLHardwareWrapperProps> = ({
     canvasRef.current?.focus();
   }, []);
 
-  /* Non-passive wheel handler — prevents browser scroll so SDL receives wheel
-   * events. SDL2/Emscripten fires SDL_MOUSEWHEEL on the canvas, but the browser
-   * will hijack scroll if the default isn't prevented. */
+  /* Focus canvas on mouseenter so SDL's wheel callback can fire immediately
+   * when the user starts scrolling — focus() inside the wheel handler is too
+   * late if SDL checks focus before dispatching SDL_MOUSEWHEEL.
+   * Non-passive wheel handler prevents browser scroll (e.preventDefault). */
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      canvasRef.current?.focus();
-    };
+    const onMouseEnter = () => { canvasRef.current?.focus(); };
+    const onWheel = (e: WheelEvent) => { e.preventDefault(); };
+    container.addEventListener('mouseenter', onMouseEnter);
     container.addEventListener('wheel', onWheel, { passive: false });
-    return () => container.removeEventListener('wheel', onWheel);
+    return () => {
+      container.removeEventListener('mouseenter', onMouseEnter);
+      container.removeEventListener('wheel', onWheel);
+    };
   }, []);
+
+  /* Derive display dimensions: if displayWidth/displayHeight are provided they
+   * define the max CSS size (e.g., logical 480px for a 960px HiDPI buffer).
+   * Aspect ratio uses display dims when set so the container height is correct. */
+  const cssAspectW = displayWidth ?? canvasWidth;
+  const cssAspectH = displayHeight ?? canvasHeight;
 
   return (
     <div className={`sdl-hardware-wrapper ${className ?? ''}`}>
@@ -427,7 +452,8 @@ export const SDLHardwareWrapper: React.FC<SDLHardwareWrapperProps> = ({
         className="relative overflow-hidden"
         style={{
           width: '100%',
-          aspectRatio: `${canvasWidth} / ${canvasHeight}`,
+          maxWidth: displayWidth ? `${displayWidth}px` : undefined,
+          aspectRatio: `${cssAspectW} / ${cssAspectH}`,
           background: loaded ? 'transparent' : '#111',
         }}
         onClick={handleClick}

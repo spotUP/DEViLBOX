@@ -458,36 +458,44 @@ export const FurnaceInsEdHardware: React.FC<FurnaceInsEdHardwareProps> = ({
     moduleRef.current = mod;
   }, []);
 
-  // Dump config from WASM on unmount — captures any edits made in the ImGui UI
-  useEffect(() => {
-    return () => {
-      const mod = moduleRef.current;
-      if (!mod) return;
+  /** Read config out of the WASM module and push to onChange if it changed */
+  const dumpConfigFromWasm = useCallback(() => {
+    const mod = moduleRef.current;
+    if (!mod) return;
 
-      const dumpConfig = mod['_furnace_insed_dump_config'] as
-        ((ptr: number, maxLen: number) => number) | undefined;
-      const malloc = mod['_malloc'] as ((size: number) => number) | undefined;
-      const free = mod['_free'] as ((ptr: number) => void) | undefined;
-      const HEAPU8 = mod['HEAPU8'] as Uint8Array | undefined;
+    const dumpConfig = mod['_furnace_insed_dump_config'] as
+      ((ptr: number, maxLen: number) => number) | undefined;
+    const malloc = mod['_malloc'] as ((size: number) => number) | undefined;
+    const free = mod['_free'] as ((ptr: number) => void) | undefined;
+    const HEAPU8 = mod['HEAPU8'] as Uint8Array | undefined;
 
-      if (!dumpConfig || !malloc || !free || !HEAPU8) return;
+    if (!dumpConfig || !malloc || !free || !HEAPU8) return;
 
-      const ptr = malloc(240);
-      if (!ptr) return;
+    const ptr = malloc(240);
+    if (!ptr) return;
 
-      try {
-        const written = dumpConfig(ptr, 240);
-        if (written === 240) {
-          const dumpData = new Uint8Array(240);
-          dumpData.set(HEAPU8.subarray(ptr, ptr + 240));
-          const updatedConfig = bufferToConfig(dumpData, configRef.current);
-          onChangeRef.current(updatedConfig);
-        }
-      } finally {
-        free(ptr);
+    try {
+      const written = dumpConfig(ptr, 240);
+      if (written === 240) {
+        const dumpData = new Uint8Array(240);
+        dumpData.set(HEAPU8.subarray(ptr, ptr + 240));
+        const updatedConfig = bufferToConfig(dumpData, configRef.current);
+        onChangeRef.current(updatedConfig);
       }
+    } finally {
+      free(ptr);
+    }
+  }, []);
+
+  // Poll WASM for config changes every 200ms while mounted,
+  // and also dump on unmount to capture any final edits.
+  useEffect(() => {
+    const interval = setInterval(dumpConfigFromWasm, 200);
+    return () => {
+      clearInterval(interval);
+      dumpConfigFromWasm(); // Final dump on unmount
     };
-  }, []); // Empty deps — runs cleanup only on unmount
+  }, [dumpConfigFromWasm]);
 
   return (
     <SDLHardwareWrapper

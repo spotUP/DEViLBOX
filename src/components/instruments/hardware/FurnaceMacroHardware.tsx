@@ -249,11 +249,13 @@ export const FurnaceMacroHardware: React.FC<FurnaceMacroHardwareProps> = ({
 
   return (
     <SDLHardwareWrapper
-      imageRendering="pixelated"
+      imageRendering="auto"
       moduleUrl="/furnace/FurnaceMacro.js"
       factoryName="createFurnaceMacro"
       canvasWidth={1280}
       canvasHeight={400}
+      displayWidth={640}
+      displayHeight={200}
       initFn="_furnace_macro_init"
       startFn="_furnace_macro_start"
       shutdownFn="_furnace_macro_shutdown"

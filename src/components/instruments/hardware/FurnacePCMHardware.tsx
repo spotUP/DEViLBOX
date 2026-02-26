@@ -69,7 +69,7 @@ function configToBuffer(config: FurnaceConfig, synthType?: SynthType): Uint8Arra
   buf[0] = subtype;
   buf[1] = pcm?.bitDepth ?? 8;
   buf[2] = pcm?.loopEnabled ? 1 : 0;
-  buf[3] = 0; // loop mode — default forward
+  buf[3] = pcm?.loopMode ?? 0; // 0=forward, 1=backward, 2=ping-pong
 
   const sampleRate = pcm?.sampleRate ?? 22050;
   buf[4] = sampleRate & 0xFF;
@@ -155,8 +155,7 @@ export const FurnacePCMHardware: React.FC<FurnacePCMHardwareProps> = ({ config, 
           break;
 
         case PARAM.LOOP_MODE:
-          // Loop mode stored locally — no direct FurnaceConfig field,
-          // but we propagate it via the config buffer
+          c.pcm = { ...c.pcm!, loopMode: value };
           break;
 
         case PARAM.LOOP_START:
