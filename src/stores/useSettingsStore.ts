@@ -92,6 +92,9 @@ export interface FormatEnginePreferences {
   zoundMonitor: FormatEngineChoice;   // sng.* → ZoundMonitorParser vs UADE
   tcbTracker: FormatEngineChoice;     // tcb.* → TCBTrackerParser vs UADE
   jasonPage: FormatEngineChoice;      // jpn.*/jpnd.*/jp.* → JasonPageParser vs UADE
+  mmdc: FormatEngineChoice;           // mmdc.* → MMDCParser vs UADE
+  psa: FormatEngineChoice;            // psa.* → PSAParser vs UADE
+  steveTurner: FormatEngineChoice;    // jpo.*/jpold.* → SteveTurnerParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -215,6 +218,9 @@ export const useSettingsStore = create<SettingsStore>()(
         zoundMonitor: 'native', // ZoundMonitorParser — native parser available
         tcbTracker: 'native',   // TCBTrackerParser — native parser available
         jasonPage: 'native',    // JasonPageParser — native parser available
+        mmdc: 'native',         // MMDCParser — native parser available
+        psa: 'native',          // PSAParser — native parser available
+        steveTurner: 'native',  // SteveTurnerParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
