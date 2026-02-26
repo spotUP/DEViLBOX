@@ -1515,6 +1515,78 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
   }
 
+  // ── Mark Cooksey / Don Adan (mc.* / mcr.* / mco.* prefix) ─────────────────
+  // Compiled 68k Amiga music format. Three sub-variants: Old (D040D040 magic),
+  // New/Medium (601A + 48E780F0), and Rare (4DFA + DFF000 hardware register).
+  {
+    const _mcBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    const _mightBeMC = _mcBase.startsWith('mc.') || _mcBase.startsWith('mcr.') || _mcBase.startsWith('mco.');
+    if (_mightBeMC) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.markCooksey === 'native') {
+        try {
+          const { isMarkCookseyFormat, parseMarkCookseyFile } = await import('@lib/import/formats/MarkCookseyParser');
+          if (isMarkCookseyFormat(buffer, filename)) {
+            const result = await parseMarkCookseyFile(buffer, file.name);
+            if (result) return result;
+          }
+        } catch (err) {
+          console.warn(`[MarkCookseyParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_mc } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_mc(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Jeroen Tel (jt.* / mon_old.* prefix) ────────────────────────────────────
+  // Compiled 68k Amiga music format (Maniacs of Noise / Jeroen Tel).
+  // Detection: scan first 40 bytes for 0x02390001 + structural checks.
+  {
+    const _jtBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    const _mightBeJT = _jtBase.startsWith('jt.') || _jtBase.startsWith('mon_old.');
+    if (_mightBeJT) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.jeroenTel === 'native') {
+        try {
+          const { isJeroenTelFormat, parseJeroenTelFile } = await import('@lib/import/formats/JeroenTelParser');
+          if (isJeroenTelFormat(buffer, filename)) {
+            const result = await parseJeroenTelFile(buffer, file.name);
+            if (result) return result;
+          }
+        } catch (err) {
+          console.warn(`[JeroenTelParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_jt } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_jt(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Quartet / Quartet PSG / Quartet ST (qpa.* / sqt.* / qts.* prefix) ──────
+  // Amiga/ST 4-channel format family. QPA uses tempo+0x50 detection;
+  // SQT uses four BRA.W instructions + LEA pattern; QTS uses speed word + 0x0056.
+  {
+    const _qBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    const _mightBeQuartet = _qBase.startsWith('qpa.') || _qBase.startsWith('sqt.') || _qBase.startsWith('qts.');
+    if (_mightBeQuartet) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.quartet === 'native') {
+        try {
+          const { isQuartetFormat, parseQuartetFile } = await import('@lib/import/formats/QuartetParser');
+          if (isQuartetFormat(buffer, filename)) {
+            const result = await parseQuartetFile(buffer, file.name);
+            if (result) return result;
+          }
+        } catch (err) {
+          console.warn(`[QuartetParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_quartet } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_quartet(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
