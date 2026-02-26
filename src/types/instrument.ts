@@ -204,6 +204,7 @@ export type SynthType =
   | 'TFMXSynth'       // TFMX / Jochen Hippel (SndMod/VolMod sequences)
   | 'HippelCoSoSynth' // Jochen Hippel CoSo (frequency/volume sequence synthesis)
   | 'RobHubbardSynth' // Rob Hubbard (Amiga PCM sample + vibrato/wobble synthesis)
+  | 'SidMon1Synth'    // SidMon 1.0 (ADSR + arpeggio + wavetable synthesis)
   // Modular Synthesis
   | 'ModularSynth';   // Modular synthesizer with patch editor
 
@@ -1071,6 +1072,57 @@ export const DEFAULT_ROB_HUBBARD: RobHubbardConfig = {
   loPos: 0,
   vibTable: [],
   sampleData: [],
+};
+
+// ── SidMon 1.0 ──────────────────────────────────────────────────────────────
+
+/**
+ * SidMon 1.0 synthesizer configuration.
+ *
+ * SidMon 1.0 uses a wavetable oscillator with:
+ *   - 16-step arpeggio table cycled each tick (50Hz)
+ *   - ADSR envelope: attack→decay→sustain countdown→release
+ *   - Phase shift (period LFO) using a 32-byte phaseWave
+ *   - Pitch fall: signed byte accumulated each tick
+ *   - 32-byte mainWave PCM wavetable for audio output
+ *   - Finetune: pre-multiplied (finetune_0_15 * 67)
+ */
+export interface SidMon1Config {
+  arpeggio?: number[];    // 16 entries, 0-255
+  attackSpeed?: number;   // 0-255
+  attackMax?: number;     // 0-64
+  decaySpeed?: number;    // 0-255
+  decayMin?: number;      // 0-64
+  sustain?: number;       // 0-255 (countdown ticks)
+  releaseSpeed?: number;  // 0-255
+  releaseMin?: number;    // 0-64
+  phaseShift?: number;    // 0-255 (0 = disabled)
+  phaseSpeed?: number;    // 0-255
+  finetune?: number;      // 0-1005 (finetune_0_15 * 67)
+  pitchFall?: number;     // signed -128..127
+  mainWave?: number[];    // 32 signed bytes (-128..127)
+  phaseWave?: number[];   // 32 signed bytes (-128..127)
+}
+
+export const DEFAULT_SIDMON1: SidMon1Config = {
+  arpeggio: new Array(16).fill(0),
+  attackSpeed: 8,
+  attackMax: 64,
+  decaySpeed: 4,
+  decayMin: 32,
+  sustain: 0,
+  releaseSpeed: 4,
+  releaseMin: 0,
+  phaseShift: 0,
+  phaseSpeed: 0,
+  finetune: 0,
+  pitchFall: 0,
+  mainWave: [
+    127, 100, 71, 41, 9, -22, -53, -82, -108, -127, -127, -127,
+    -108, -82, -53, -22, 9, 41, 71, 100, 127, 100, 71, 41,
+    9, -22, -53, -82, -108, -127, -127, -127,
+  ],
+  phaseWave: new Array(32).fill(0),
 };
 
 /**
@@ -3406,6 +3458,7 @@ export interface InstrumentConfig {
   tfmx?: TFMXConfig;
   hippelCoso?: HippelCoSoConfig;
   robHubbard?: RobHubbardConfig;
+  sidmon1?: SidMon1Config;
   // Modular Synthesis
   modularSynth?: import('./modular').ModularPatchConfig;
   // Sampler config

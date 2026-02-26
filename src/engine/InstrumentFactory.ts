@@ -37,6 +37,7 @@ import { TFMXSynth } from './tfmx/TFMXSynth';
 import { FredSynth } from './fred/FredSynth';
 import { HippelCoSoSynth } from './hippelcoso/HippelCoSoSynth';
 import { RobHubbardSynth } from './robhubbard/RobHubbardSynth';
+import { SidMon1Synth } from './sidmon1/SidMon1Synth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -932,6 +933,17 @@ export class InstrumentFactory {
           );
         }
         instrument = rhSynth;
+        break;
+      }
+
+      case 'SidMon1Synth': {
+        const sm1Synth = new SidMon1Synth();
+        if (config.sidmon1) {
+          sm1Synth.setInstrument(config.sidmon1).catch(err =>
+            console.error('[InstrumentFactory] SidMon1 load failed:', err)
+          );
+        }
+        instrument = sm1Synth;
         break;
       }
 
