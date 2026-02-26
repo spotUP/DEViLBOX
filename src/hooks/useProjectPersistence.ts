@@ -271,17 +271,33 @@ function buildSavedProject(): SavedProject {
         cleanedInst.sample = { ...inst.sample, url: '' };
         return cleanedInst;
       }
-      // Strip non-serializable audioBuffer (IndexedDB uses structured clone
-      // which handles more types than JSON, but AudioBuffer isn't clonable).
-      // The base64 data URL (sample.url) is the serializable equivalent.
-      if (inst.sample?.audioBuffer) {
+      // Strip raw ArrayBuffer fields before saving — data URLs (sample.url) are
+      // the serializable equivalent and survive both IDB and JSON round-trips.
+      const needsClean =
+        inst.sample?.audioBuffer ||
+        inst.metadata?.preservedSample?.audioBuffer ||
+        inst.metadata?.multiSamples?.some(ms => ms.sample?.audioBuffer);
+      if (needsClean) {
         const cleanedInst = { ...inst };
-        cleanedInst.sample = { ...inst.sample, audioBuffer: undefined };
-        if (cleanedInst.metadata?.preservedSample?.audioBuffer) {
-          cleanedInst.metadata = {
-            ...cleanedInst.metadata,
-            preservedSample: { ...cleanedInst.metadata.preservedSample, audioBuffer: undefined as unknown as ArrayBuffer },
-          };
+        if (cleanedInst.sample?.audioBuffer) {
+          cleanedInst.sample = { ...cleanedInst.sample, audioBuffer: undefined };
+        }
+        if (cleanedInst.metadata) {
+          const cleanedMeta = { ...cleanedInst.metadata };
+          if (cleanedMeta.preservedSample?.audioBuffer) {
+            cleanedMeta.preservedSample = {
+              ...cleanedMeta.preservedSample,
+              audioBuffer: undefined as unknown as ArrayBuffer,
+            };
+          }
+          if (cleanedMeta.multiSamples) {
+            cleanedMeta.multiSamples = cleanedMeta.multiSamples.map(ms =>
+              ms.sample?.audioBuffer
+                ? { ...ms, sample: { ...ms.sample, audioBuffer: undefined } }
+                : ms
+            );
+          }
+          cleanedInst.metadata = cleanedMeta;
         }
         return cleanedInst;
       }

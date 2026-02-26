@@ -410,18 +410,11 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── Rob Hubbard ───────────────────────────────────────────────────────────
+  // RobHubbardParser is metadata-only (compiled 68k executable, no parseable
+  // instrument data). UADE always handles audio; native parse is not used.
   if (/\.(rh|rhp)$/.test(filename)) {
-    const uadeMode = prefs.uade ?? 'enhanced';
-    if (prefs.robHubbard !== 'uade') {
-      try {
-        const { parseRobHubbardFile } = await import('@lib/import/formats/RobHubbardParser');
-        return parseRobHubbardFile(buffer, file.name);
-      } catch (err) {
-        console.warn(`[RobHubbardParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    return parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── TFMX (Jochen Hippel) ─────────────────────────────────────────────────
@@ -741,21 +734,13 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── Ben Daglish (bd.* prefix) ────────────────────────────────────────────
-  // Amiga compiled 68k format. UADE prefix: bd.
+  // BenDaglishParser is metadata-only (compiled 68k executable, no parseable
+  // instrument data). UADE always handles audio; native parse is not used.
   {
     const _bdBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_bdBase.startsWith('bd.')) {
-      const uadeMode = prefs.uade ?? 'enhanced';
-      if (prefs.benDaglish === 'native') {
-        try {
-          const { isBenDaglishFormat, parseBenDaglishFile } = await import('@lib/import/formats/BenDaglishParser');
-          if (isBenDaglishFormat(buffer, filename)) return parseBenDaglishFile(buffer, file.name);
-        } catch (err) {
-          console.warn(`[BenDaglishParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-        }
-      }
       const { parseUADEFile: parseUADE_bd } = await import('@lib/import/formats/UADEParser');
-      return parseUADE_bd(buffer, file.name, uadeMode, subsong, preScannedMeta);
+      return parseUADE_bd(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
     }
   }
 
@@ -1658,21 +1643,13 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── TCB Tracker (tcb.*) ──────────────────────────────────────────────────────
-  // Amiga 4-channel format ("AN COOL!" tracker). "AN C" + "OOL!"/"OOL." header.
+  // TCBTrackerParser is metadata-only (single-file 68k executable, no parseable
+  // instrument data). UADE always handles audio; native parse is not used.
   {
     const _tcbBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_tcbBase.startsWith('tcb.')) {
-      const uadeMode = prefs.uade ?? 'enhanced';
-      if (prefs.tcbTracker === 'native') {
-        try {
-          const { isTCBTrackerFormat, parseTCBTrackerFile } = await import('@lib/import/formats/TCBTrackerParser');
-          if (isTCBTrackerFormat(buffer, filename)) return parseTCBTrackerFile(buffer, file.name);
-        } catch (err) {
-          console.warn(`[TCBTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-        }
-      }
       const { parseUADEFile: parseUADE_tcb } = await import('@lib/import/formats/UADEParser');
-      return parseUADE_tcb(buffer, file.name, uadeMode, subsong, preScannedMeta);
+      return parseUADE_tcb(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
     }
   }
 
@@ -1849,6 +1826,159 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
     const { parseUADEFile: parseUADE_jpo } = await import('@lib/import/formats/UADEParser');
     return parseUADE_jpo(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── TimeTracker (TMK.* prefix) ───────────────────────────────────────────
+  // Amiga format by BrainWasher & FireBlade. UADE prefix: TMK.
+  {
+    const _tmkBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_tmkBase.startsWith('tmk.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.timeTracker === 'native') {
+        try {
+          const { isTimeTrackerFormat, parseTimeTrackerFile } = await import('@lib/import/formats/TimeTrackerParser');
+          if (isTimeTrackerFormat(buffer)) return parseTimeTrackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[TimeTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_tmk } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_tmk(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── ChipTracker (KRIS.* prefix) ──────────────────────────────────────────
+  // Amiga format identified by 'KRIS' at offset 952. UADE prefix: KRIS.
+  {
+    const _krisBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_krisBase.startsWith('kris.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.chipTracker === 'native') {
+        try {
+          const { isChipTrackerFormat, parseChipTrackerFile } = await import('@lib/import/formats/ChipTrackerParser');
+          if (isChipTrackerFormat(buffer)) return parseChipTrackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[ChipTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_kris } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_kris(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Cinemaware (CIN.* prefix) ─────────────────────────────────────────────
+  // Amiga format with 'IBLK'+'ASEQ' magic. UADE prefix: CIN.
+  {
+    const _cinBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_cinBase.startsWith('cin.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.cinemaware === 'native') {
+        try {
+          const { isCinemawareFormat, parseCinemawareFile } = await import('@lib/import/formats/CinemawareParser');
+          if (isCinemawareFormat(buffer)) return parseCinemawareFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[CinemawareParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_cin } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_cin(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── NovoTrade Packer (NTP.* prefix) ──────────────────────────────────────
+  // Amiga chunked format: MODU/BODY/SAMP chunks. UADE prefix: NTP.
+  {
+    const _ntpBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_ntpBase.startsWith('ntp.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.novoTradePacker === 'native') {
+        try {
+          const { isNovoTradePackerFormat, parseNovoTradePackerFile } = await import('@lib/import/formats/NovoTradePackerParser');
+          if (isNovoTradePackerFormat(buffer)) return parseNovoTradePackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[NovoTradePackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_ntp } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_ntp(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Alcatraz Packer (ALP.* prefix) ───────────────────────────────────────
+  // Amiga format with 'PAn\x10' magic. UADE prefix: ALP.
+  {
+    const _alpBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_alpBase.startsWith('alp.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.alcatrazPacker === 'native') {
+        try {
+          const { isAlcatrazPackerFormat, parseAlcatrazPackerFile } = await import('@lib/import/formats/AlcatrazPackerParser');
+          if (isAlcatrazPackerFormat(buffer)) return parseAlcatrazPackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[AlcatrazPackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_alp } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_alp(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Blade Packer (UDS.* prefix) ──────────────────────────────────────────
+  // Amiga 8-channel format with 0x538F4E47 magic. UADE prefix: UDS.
+  {
+    const _udsBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_udsBase.startsWith('uds.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.bladePacker === 'native') {
+        try {
+          const { isBladePackerFormat, parseBladePackerFile } = await import('@lib/import/formats/BladePackerParser');
+          if (isBladePackerFormat(buffer)) return parseBladePackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[BladePackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_uds } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_uds(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Tomy Tracker (SG.* prefix) ────────────────────────────────────────────
+  // Amiga format with size-based structural detection. UADE prefix: SG.
+  {
+    const _sgBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_sgBase.startsWith('sg.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.tomyTracker === 'native') {
+        try {
+          const { isTomyTrackerFormat, parseTomyTrackerFile } = await import('@lib/import/formats/TomyTrackerParser');
+          if (isTomyTrackerFormat(buffer)) return parseTomyTrackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[TomyTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_sg } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_sg(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Images Music System (IMS.* prefix) ────────────────────────────────────
+  // Amiga format with offset-arithmetic detection. UADE prefix: IMS.
+  // Note: .ims extension files are handled earlier with native IMSParser.
+  {
+    const _imspBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_imspBase.startsWith('ims.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.imagesMusicSystem === 'native') {
+        try {
+          const { isImagesMusicSystemFormat, parseImagesMusicSystemFile } = await import('@lib/import/formats/ImagesMusicSystemParser');
+          if (isImagesMusicSystemFormat(buffer)) return parseImagesMusicSystemFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[ImagesMusicSystemParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_imsp } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_imsp(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
   }
 
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
