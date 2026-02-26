@@ -76,8 +76,6 @@ export function parseLMEFile(buffer: ArrayBuffer, filename: string): TrackerSong
 
   // ── Format version from bytes[3] ──────────────────────────────────────
 
-  const _version = buf[3]; // available if needed for diagnostics
-
   // ── Module name from filename ─────────────────────────────────────────
 
   const baseName = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;

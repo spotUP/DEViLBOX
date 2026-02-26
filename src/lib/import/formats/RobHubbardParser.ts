@@ -210,8 +210,7 @@ function scanRHFile(buf: Uint8Array): RHScanResult | null {
         } else {
           samplesData = i;
           loopLen = 512;
-          // back up: v3 is actually the next instruction start
-          pos -= 2;
+          // v3 was consumed (reference does NOT back up pos here)
         }
 
         if (pos + 2 > buf.length) break;
