@@ -20,8 +20,15 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+function parseCorsOrigin(envVal: string | undefined): string | string[] | RegExp {
+  if (!envVal || envVal === '*') return '*';
+  // Support comma-separated list for multiple dev ports
+  const parts = envVal.split(',').map(s => s.trim()).filter(Boolean);
+  return parts.length === 1 ? parts[0] : parts;
+}
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: parseCorsOrigin(process.env.CORS_ORIGIN),
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
