@@ -43,6 +43,7 @@ export interface FormatEnginePreferences {
   sonicArranger: FormatEngineChoice;  // .sa/.sonic → SonicArrangerParser vs UADE
   inStereo1: FormatEngineChoice;      // .is/.is10 → InStereo1Parser vs UADE
   inStereo2: FormatEngineChoice;      // .is/.is20 → InStereo2Parser vs UADE
+  pumaTracker: FormatEngineChoice;    // .puma → PumaTrackerParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -118,6 +119,7 @@ export const useSettingsStore = create<SettingsStore>()(
         sonicArranger: 'native', // SonicArrangerParser — dedicated Sonic Arranger support
         inStereo1: 'native',    // InStereo1Parser — dedicated InStereo! 1.0 support
         inStereo2: 'native',    // InStereo2Parser — dedicated InStereo! 2.0 support
+        pumaTracker: 'native',  // PumaTrackerParser — dedicated PumaTracker support
         uade: 'enhanced',       // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',

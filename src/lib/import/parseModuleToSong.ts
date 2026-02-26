@@ -534,6 +534,26 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── PumaTracker ───────────────────────────────────────────────────────────
+  // .puma files — no magic bytes; heuristic header validation (mirrors OpenMPT).
+  if (/\.puma$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.pumaTracker === 'native') {
+      try {
+        const { isPumaTrackerFormat, parsePumaTrackerFile } = await import('@lib/import/formats/PumaTrackerParser');
+        const bytes = new Uint8Array(buffer);
+        if (isPumaTrackerFormat(bytes)) {
+          const result = parsePumaTrackerFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[PumaTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── Ben Daglish ───────────────────────────────────────────────────────────
   // .bd files — identified by M68k assembler signatures (no magic bytes).
   if (/\.bd$/.test(filename)) {
