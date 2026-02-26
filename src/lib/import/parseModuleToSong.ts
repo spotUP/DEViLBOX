@@ -106,6 +106,27 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseDigiBoosterFile(buffer, file.name);
   }
 
+  // ── Delta Music 2.0 ──────────────────────────────────────────────────────
+  // DM2Parser handles .dm2 files (magic ".FNL" at 0xBC6).
+  // .dm and .dm1 are Delta Music 1.x — different format, handled by UADE.
+  if (filename.endsWith('.dm2')) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.deltaMusic2 === 'native') {
+      try {
+        const { isDeltaMusic2Format, parseDeltaMusic2File } = await import('@lib/import/formats/DeltaMusic2Parser');
+        const bytes = new Uint8Array(buffer);
+        if (isDeltaMusic2Format(bytes)) {
+          const result = parseDeltaMusic2File(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[DeltaMusic2Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── Future Composer ──────────────────────────────────────────────────────
   // FCParser handles FC 1.3 (magic "FC13"/"SMOD") and FC 1.4 (magic "FC14").
   // Future Composer 2 and other FC variants have different magic bytes and
