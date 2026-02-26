@@ -18,7 +18,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
-import { createSamplerInstrument } from './AmigaUtils';
+import type { DigMugConfig } from '@/types/instrument';
 
 // -- Binary reading helpers (Big Endian) ------------------------------------
 
@@ -498,6 +498,8 @@ export async function parseDigitalMugicianFile(
   }
 
   // -- Build instruments from samples + wavetable ---------------------------
+  // Each DM sample index becomes one DigMugSynth instrument.
+  // Instrument IDs use a simple counter; sampleToInstrumentId deduplicates.
   const instruments: InstrumentConfig[] = [];
   const sampleToInstrumentId = new Map<number, number>();
   let nextInstrId = 1;
@@ -510,62 +512,93 @@ export async function parseDigitalMugicianFile(
     const id = nextInstrId++;
     sampleToInstrumentId.set(sampleIdx, id);
 
+    // Extract arpeggio table (8 entries from arpeggios, starting at sample.arpeggio index)
+    const arpTableArr: number[] = [];
+    for (let a = 0; a < 8; a++) {
+      const aidx = sample.arpeggio + a;
+      arpTableArr.push(aidx < arpeggios.length ? arpeggios[aidx] : 0);
+    }
+
+    const vol = Math.min(64, sample.volume);
+
     if (sample.wave >= 32 && sample.sampleLength > 0) {
-      // PCM sample -- extract from buffer
+      // PCM instrument (type=1)
       const pcmStart = sample.pointer;
       const pcmEnd = pcmStart + sample.sampleLength;
-      if (pcmEnd <= buf.length && sample.sampleLength > 0) {
-        const pcm = buf.slice(pcmStart, pcmEnd);
-        const loopStart = sample.loopOffset;
-        const loopEnd = sample.repeat > 0 ? sample.loopOffset + sample.repeat : 0;
-        instruments.push(createSamplerInstrument(
-          id,
-          sample.name || `PCM ${sampleIdx}`,
-          pcm,
-          64,
-          8287,
-          loopStart,
-          loopEnd,
-        ));
-      } else {
-        instruments.push(makePlaceholder(id, sample.name || `PCM ${sampleIdx}`));
-      }
+      const pcm = (pcmEnd <= buf.length && sample.sampleLength > 0)
+        ? buf.slice(pcmStart, pcmEnd)
+        : undefined;
+
+      const config: DigMugConfig = {
+        wavetable: [0, 0, 0, 0],
+        waveBlend: 0,
+        waveSpeed: 0,
+        volume: vol,
+        arpTable: arpTableArr,
+        arpSpeed: Math.min(15, sample.pitchSpeed),
+        vibSpeed: 0,
+        vibDepth: 0,
+        pcmData: pcm,
+        loopStart: sample.loopOffset,
+        loopLength: sample.repeat > 0 ? sample.repeat : 0,
+      };
+
+      instruments.push({
+        id,
+        name: sample.name || `PCM ${sampleIdx}`,
+        type: 'synth' as const,
+        synthType: 'DigMugSynth' as const,
+        digMug: config,
+        effects: [],
+        volume: -6,
+        pan: 0,
+      } as InstrumentConfig);
+
     } else if (sample.wave < 32) {
-      // Wavetable synth -- extract 128-byte waveform from wavetable data
+      // Wavetable synth instrument (type=0) — embed 128-byte waveform
       const waveOffset = sample.wave << 7; // wave * 128
-      if (waveOffset + 128 <= wavetableData.length) {
-        // Use the waveLen field to determine actual playback length
-        const waveLen = sample.waveLen > 0 ? Math.min(sample.waveLen, 128) : 128;
-        const pcm = wavetableData.slice(waveOffset, waveOffset + waveLen);
-        instruments.push(createSamplerInstrument(
-          id,
-          `Wave ${sample.wave}`,
-          pcm,
-          64,
-          8287,
-          0,
-          pcm.length, // loop the full waveform for wavetable synths
-        ));
-      } else {
-        instruments.push(makePlaceholder(id, `Wave ${sample.wave}`));
-      }
+      const waveLen = sample.waveLen > 0 ? Math.min(sample.waveLen, 128) : 128;
+      const waveformData = (waveOffset + waveLen <= wavetableData.length)
+        ? wavetableData.slice(waveOffset, waveOffset + waveLen)
+        : undefined;
+
+      const config: DigMugConfig = {
+        wavetable: [sample.wave, sample.wave, sample.wave, sample.wave],
+        waveBlend: 0,
+        waveSpeed: 0,
+        volume: vol,
+        arpTable: arpTableArr,
+        arpSpeed: Math.min(15, sample.pitchSpeed),
+        vibSpeed: 0,
+        vibDepth: 0,
+        waveformData,
+      };
+
+      instruments.push({
+        id,
+        name: `Wave ${sample.wave}`,
+        type: 'synth' as const,
+        synthType: 'DigMugSynth' as const,
+        digMug: config,
+        effects: [],
+        volume: -6,
+        pan: 0,
+      } as InstrumentConfig);
+
     } else {
-      instruments.push(makePlaceholder(id, `Instrument ${sampleIdx}`));
+      // Placeholder for empty/unknown instrument
+      instruments.push({
+        id,
+        name: `Instrument ${sampleIdx}`,
+        type: 'synth' as const,
+        synthType: 'Synth' as const,
+        effects: [],
+        volume: -6,
+        pan: 0,
+      } as InstrumentConfig);
     }
 
     return id;
-  }
-
-  function makePlaceholder(id: number, name: string): InstrumentConfig {
-    return {
-      id,
-      name,
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: -6,
-      pan: 0,
-    } as InstrumentConfig;
   }
 
   // -- Use the first (or paired first two for V2) song ----------------------
