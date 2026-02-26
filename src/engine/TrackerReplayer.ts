@@ -893,7 +893,7 @@ export class TrackerReplayer {
     // sounds harsh on headphones; 20% gives pleasant width without hard panning)
     // HVL = derived from stereo mode in file header (0=center, 1-4=increasing separation)
     // XM/IT/S3M = 100% (these formats have their own per-channel panning)
-    if (song.format === 'MOD' || song.format === 'AHX') {
+    if (song.format === 'MOD' || song.format === 'AHX' || song.format === 'FC') {
       this.stereoSeparation = 20; // Amiga LRRL with pt2-clone-style narrowing
     } else if (song.format === 'HVL') {
       // HVL stereo mode 0=center, 1-4 = increasing separation
@@ -1242,12 +1242,18 @@ export class TrackerReplayer {
     }
     this.playing = false;
 
-    // Stop routed native engines (UADE/Hively) on pause
+    // Pause routed native engines (UADE/Hively) on pause
     if (this.routedNativeEngines.size > 0) {
       const engine = getToneEngine();
       for (const st of this.routedNativeEngines) {
         try {
-          engine.stopNativeEngine(st);
+          if (st === 'HivelySynth') {
+            // Use pause() — not stop() — so the ring buffer is preserved and
+            // resume() can restart playback without reloading the tune.
+            HivelyEngine.getInstance().pause();
+          } else {
+            engine.stopNativeEngine(st);
+          }
         } catch { /* ignored */ }
       }
     }
@@ -1256,6 +1262,13 @@ export class TrackerReplayer {
   resume(): void {
     if (this.song && !this.playing) {
       this.playing = true;
+
+      // Restart WASM playback for HVL/AHX — the worklet won't output audio
+      // until play() is called after a pause().
+      if (this.routedNativeEngines.has('HivelySynth') && !this._muted) {
+        HivelyEngine.getInstance().play();
+      }
+
       this.startScheduler();
     }
   }
@@ -1968,6 +1981,13 @@ export class TrackerReplayer {
     if ((effect2 !== 0 || param2 !== 0) && !volColDerived) {
       this.processEffect0(chIndex, ch, effect2, param2, time);
     }
+    // Extra effect slots 3-8 (Furnace imports)
+    if (row.effTyp3 || row.eff3) this.processEffect0(chIndex, ch, row.effTyp3 ?? 0, row.eff3 ?? 0, time);
+    if (row.effTyp4 || row.eff4) this.processEffect0(chIndex, ch, row.effTyp4 ?? 0, row.eff4 ?? 0, time);
+    if (row.effTyp5 || row.eff5) this.processEffect0(chIndex, ch, row.effTyp5 ?? 0, row.eff5 ?? 0, time);
+    if (row.effTyp6 || row.eff6) this.processEffect0(chIndex, ch, row.effTyp6 ?? 0, row.eff6 ?? 0, time);
+    if (row.effTyp7 || row.eff7) this.processEffect0(chIndex, ch, row.effTyp7 ?? 0, row.eff7 ?? 0, time);
+    if (row.effTyp8 || row.eff8) this.processEffect0(chIndex, ch, row.effTyp8 ?? 0, row.eff8 ?? 0, time);
   }
 
   // ==========================================================================
@@ -2430,6 +2450,13 @@ export class TrackerReplayer {
     if ((effect2 !== 0 || param2 !== 0) && !volColDerived) {
       this.processEffectTickSingle(chIndex, ch, row, effect2, param2, time);
     }
+    // Extra effect slots 3-8 (Furnace imports)
+    if (row.effTyp3 || row.eff3) this.processEffectTickSingle(chIndex, ch, row, row.effTyp3 ?? 0, row.eff3 ?? 0, time);
+    if (row.effTyp4 || row.eff4) this.processEffectTickSingle(chIndex, ch, row, row.effTyp4 ?? 0, row.eff4 ?? 0, time);
+    if (row.effTyp5 || row.eff5) this.processEffectTickSingle(chIndex, ch, row, row.effTyp5 ?? 0, row.eff5 ?? 0, time);
+    if (row.effTyp6 || row.eff6) this.processEffectTickSingle(chIndex, ch, row, row.effTyp6 ?? 0, row.eff6 ?? 0, time);
+    if (row.effTyp7 || row.eff7) this.processEffectTickSingle(chIndex, ch, row, row.effTyp7 ?? 0, row.eff7 ?? 0, time);
+    if (row.effTyp8 || row.eff8) this.processEffectTickSingle(chIndex, ch, row, row.effTyp8 ?? 0, row.eff8 ?? 0, time);
 
     // Route continuous effects to Furnace dispatch engine (ticks 1+)
     // The dispatch engine needs per-tick commands for pitch slides, vibrato, etc.
@@ -3706,7 +3733,10 @@ export class TrackerReplayer {
     // but getDecodedBuffer returned a different one (or none), decode from the sample's ArrayBuffer.
     // This handles when sampleMap resolved to a non-primary sample.
     const sample = ch.instrument.sample;
-    if (!decodedBuffer && sample?.audioBuffer) {
+    // Guard: after JSON round-trip, audioBuffer is {} (empty object), not a real ArrayBuffer.
+    // Only treat it as valid if it's actually an ArrayBuffer instance.
+    const hasValidAudioBuffer = sample?.audioBuffer instanceof ArrayBuffer;
+    if (!decodedBuffer && hasValidAudioBuffer) {
       // Check multi-sample cache first
       const cacheKey = `${ch.instrument.id}:${sample.url}`;
       decodedBuffer = this.multiSampleBufferCache.get(cacheKey) ?? undefined;
@@ -3719,7 +3749,7 @@ export class TrackerReplayer {
           if (ctx instanceof AudioContext) {
             // Decode asynchronously — for this tick, skip playback
             // Buffer will be ready for next trigger
-            ctx.decodeAudioData(sample.audioBuffer.slice(0)).then(ab => {
+            ctx.decodeAudioData((sample.audioBuffer as ArrayBuffer).slice(0)).then(ab => {
               this.multiSampleBufferCache.set(cacheKey, ab);
             }).catch(() => { /* ignored */ });
           }
@@ -3729,10 +3759,10 @@ export class TrackerReplayer {
     }
 
     if (!decodedBuffer) {
-      // URL-based sample (e.g. from samplepack) — trigger engine to load it.
+      // URL-based sample (e.g. from samplepack or post-reload data URL) — trigger engine to load it.
       // getInstrument() creates a Tone.Sampler/Player which loads the URL,
       // and stores the decoded buffer in decodedAudioBuffers when ready.
-      if (sample?.url && !sample.audioBuffer) {
+      if (sample?.url && !hasValidAudioBuffer) {
         engine.getInstrument(ch.instrument.id, ch.instrument);
       }
       console.warn('[TrackerReplayer] No decoded buffer for instrument:', ch.instrument.id, ch.instrument.name);
