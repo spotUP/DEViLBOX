@@ -294,17 +294,92 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── Sonic Arranger ────────────────────────────────────────────────────────
-  if (/\.sa$/.test(filename)) {
-    try {
-      const { isSonicArrangerFormat, parseSonicArrangerFile } = await import('@lib/import/formats/SonicArrangerParser');
-      if (isSonicArrangerFormat(buffer)) {
-        return parseSonicArrangerFile(buffer, file.name);
+  // Magic "SOARV1.0" at offset 0. "@OARV1.0" is LH-compressed — falls to UADE.
+  if (/\.(sa|sonic)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.sonicArranger === 'native') {
+      try {
+        const { isSonicArrangerFormat, parseSonicArrangerFile } = await import('@lib/import/formats/SonicArrangerParser');
+        const bytes = new Uint8Array(buffer);
+        if (isSonicArrangerFormat(bytes)) {
+          const result = parseSonicArrangerFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[SonicArrangerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
       }
-    } catch (err) {
-      console.warn(`[SonicArrangerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── InStereo! 2.0 (.is20 — unambiguous) ──────────────────────────────────
+  // Magic "IS20DF10" at offset 0.
+  if (/\.is20$/.test(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.inStereo2 === 'native') {
+      try {
+        const { isInStereo2Format, parseInStereo2File } = await import('@lib/import/formats/InStereo2Parser');
+        const bytes = new Uint8Array(buffer);
+        if (isInStereo2Format(bytes)) {
+          const result = parseInStereo2File(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[InStereo2Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── InStereo! 1.0 (.is10 — unambiguous) ──────────────────────────────────
+  // Magic "ISM!V1.2" at offset 0.
+  if (/\.is10$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.inStereo1 === 'native') {
+      try {
+        const { isInStereo1Format, parseInStereo1File } = await import('@lib/import/formats/InStereo1Parser');
+        const bytes = new Uint8Array(buffer);
+        if (isInStereo1Format(bytes)) {
+          const result = parseInStereo1File(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[InStereo1Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── InStereo! (.is — ambiguous: detect by magic) ─────────────────────────
+  if (/\.is$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    const bytes = new Uint8Array(buffer);
+    if (prefs.inStereo2 === 'native') {
+      try {
+        const { isInStereo2Format, parseInStereo2File } = await import('@lib/import/formats/InStereo2Parser');
+        if (isInStereo2Format(bytes)) {
+          const result = parseInStereo2File(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[InStereo2Parser] failed for ${filename}, trying IS10:`, err);
+      }
+    }
+    if (prefs.inStereo1 === 'native') {
+      try {
+        const { isInStereo1Format, parseInStereo1File } = await import('@lib/import/formats/InStereo1Parser');
+        if (isInStereo1Format(bytes)) {
+          const result = parseInStereo1File(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[InStereo1Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
