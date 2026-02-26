@@ -9,6 +9,7 @@ import { useTrackerStore, useTransportStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { Music2 } from 'lucide-react';
 import { notify } from '@stores/useNotificationStore';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
 export const SubsongSelector: React.FC = React.memo(() => {
   const { loadPatterns, setPatternOrder, furnaceSubsongs, furnaceActiveSubsong, setFurnaceActiveSubsong } = useTrackerStore(
@@ -38,6 +39,10 @@ export const SubsongSelector: React.FC = React.memo(() => {
       setPatternOrder(sub.songPositions);
       setBPM(sub.initialBPM);
       setSpeed(sub.initialSpeed);
+      // Apply Furnace speed alternation — speed2 is subsong-specific
+      getTrackerReplayer().setSpeed2(
+        sub.speed2 !== undefined && sub.speed2 !== sub.initialSpeed ? sub.speed2 : null
+      );
       setFurnaceActiveSubsong(newIdx);
       notify.success(`Switched to: ${sub.name || `Subsong ${newIdx + 1}`}`);
     },
