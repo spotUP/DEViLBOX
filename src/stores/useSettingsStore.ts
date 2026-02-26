@@ -46,6 +46,7 @@ export interface FormatEnginePreferences {
   pumaTracker: FormatEngineChoice;    // .puma → PumaTrackerParser vs UADE
   synthesis: FormatEngineChoice;      // .syn → SynthesisParser vs UADE
   musicAssembler: FormatEngineChoice; // .ma → MusicAssemblerParser vs UADE
+  digitalSoundStudio: FormatEngineChoice; // .dss → DigitalSoundStudioParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -124,6 +125,7 @@ export const useSettingsStore = create<SettingsStore>()(
         pumaTracker: 'native',      // PumaTrackerParser — dedicated PumaTracker support
         synthesis: 'native',        // SynthesisParser — dedicated Synthesis support
         musicAssembler: 'native',   // MusicAssemblerParser — dedicated Music Assembler support
+        digitalSoundStudio: 'native', // DigitalSoundStudioParser — dedicated Digital Sound Studio support
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
