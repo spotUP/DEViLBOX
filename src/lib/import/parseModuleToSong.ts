@@ -257,6 +257,21 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── TCB Tracker ───────────────────────────────────────────────────────────
+  if (/\.tcb$/.test(filename)) {
+    try {
+      const { isTCBTrackerFormat, parseTCBTrackerFile } = await import('@lib/import/formats/TCBTrackerParser');
+      if (isTCBTrackerFormat(buffer)) {
+        return parseTCBTrackerFile(buffer, file.name);
+      }
+    } catch (err) {
+      console.warn(`[TCBTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const uadeMode = prefs.uade ?? 'enhanced';
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── Jochen Hippel CoSo ────────────────────────────────────────────────────
   if (/\.(hipc|soc|coso)$/.test(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
