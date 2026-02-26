@@ -35,6 +35,12 @@ export interface CellSnapshot {
   eff: number;
   effTyp2: number;
   eff2: number;
+  effTyp3?: number;  eff3?: number;
+  effTyp4?: number;  eff4?: number;
+  effTyp5?: number;  eff5?: number;
+  effTyp6?: number;  eff6?: number;
+  effTyp7?: number;  eff7?: number;
+  effTyp8?: number;  eff8?: number;
   flag1?: number;
   flag2?: number;
   probability?: number;
