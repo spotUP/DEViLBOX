@@ -206,6 +206,7 @@ export type SynthType =
   | 'RobHubbardSynth' // Rob Hubbard (Amiga PCM sample + vibrato/wobble synthesis)
   | 'SidMon1Synth'    // SidMon 1.0 (ADSR + arpeggio + wavetable synthesis)
   | 'OctaMEDSynth'   // OctaMED SynthInstr (vol/wf command table oscillator)
+  | 'DavidWhittakerSynth' // David Whittaker (Amiga period-based frq/vol sequence synthesis)
   // Modular Synthesis
   | 'ModularSynth';   // Modular synthesizer with patch editor
 
@@ -1152,6 +1153,36 @@ export const DEFAULT_OCTAMED: OctaMEDConfig = {
   voltbl: new Uint8Array(128).fill(0xFF),   // single FF = loop at current volume
   wftbl: new Uint8Array(128).fill(0xFF),    // single FF = loop on waveform 0
   waveforms: [new Int8Array(256)],          // one silent waveform
+};
+
+/**
+ * David Whittaker synthesizer configuration.
+ *
+ * David Whittaker is an Amiga music format using per-instrument:
+ *   - frqseq: frequency sequence (signed-byte offsets added to note index)
+ *     -128 = loop marker (next byte = loop target & 0x7f)
+ *   - volseq: volume sequence (0-64 = volume level)
+ *     -128 = loop marker (next byte = loop target & 0x7f)
+ *   - relative: tuning multiplier (~8364 for standard A-440 tuning)
+ *     relative = 3579545 / tuning_period (e.g., 428 → 8364)
+ *   - Vibrato: triangle LFO via vibratoSpeed/vibratoDepth
+ */
+export interface DavidWhittakerConfig {
+  defaultVolume?: number;   // 0-64
+  relative?: number;        // tuning multiplier (~8364 for standard A-440)
+  vibratoSpeed?: number;    // 0-255
+  vibratoDepth?: number;    // 0-255
+  volseq?: number[];        // volume sequence bytes (0-64 or -128 for loop)
+  frqseq?: number[];        // frequency sequence bytes (signed, semitone offsets)
+}
+
+export const DEFAULT_DAVID_WHITTAKER: DavidWhittakerConfig = {
+  defaultVolume: 64,
+  relative: 8364,           // 3579545 / 428 — standard A-440 tuning
+  vibratoSpeed: 0,
+  vibratoDepth: 0,
+  volseq: [64, -128, 0],   // constant volume, loop at 0
+  frqseq: [-128, 0],        // static pitch, loop at 0
 };
 
 /**
@@ -3489,6 +3520,7 @@ export interface InstrumentConfig {
   robHubbard?: RobHubbardConfig;
   sidmon1?: SidMon1Config;
   octamed?: OctaMEDConfig;
+  davidWhittaker?: DavidWhittakerConfig;
   // Modular Synthesis
   modularSynth?: import('./modular').ModularPatchConfig;
   // Sampler config

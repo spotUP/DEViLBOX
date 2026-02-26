@@ -1658,6 +1658,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Waveform',
     color: 'text-cyan-300',
   },
+  DavidWhittakerSynth: {
+    type: 'DavidWhittakerSynth',
+    name: 'David Whittaker',
+    shortName: 'DW',
+    description: 'David Whittaker Amiga synthesis engine with period-based frequency/volume sequences and vibrato',
+    bestFor: ['Amiga chiptune', 'Game music', 'David Whittaker'],
+    icon: 'Disc',
+    color: 'text-green-400',
+  },
 };
 
 // Organized categories
@@ -1895,6 +1904,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.HivelySynth,
       SYNTH_INFO.HippelCoSoSynth,
       SYNTH_INFO.RobHubbardSynth,
+      SYNTH_INFO.DavidWhittakerSynth,
     ],
   },
   {
