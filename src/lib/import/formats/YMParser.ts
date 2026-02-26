@@ -122,6 +122,7 @@ function decodeLZH5(src: Uint8Array): Uint8Array {
           let k = 0x1000;
           while (k & bitBuf) { k >>= 1; c++; }
         }
+        c = Math.min(c, 15);  // cap bit-length to prevent overflow on corrupted input
         fillBuf(c < 7 ? 3 : c - 3);
         pLen[i++] = c;
         if (i === special) {
@@ -161,7 +162,7 @@ function decodeLZH5(src: Uint8Array): Uint8Array {
   }
 
   let blockSize = 0;
-  while (out.length < 4 * 1024 * 1024) {
+  while (out.length < 256 * 1024) {  // 256 KB max: 60 min × 50 Hz × 16 regs = 288 KB worst-case
     if (blockSize === 0) {
       blockSize = getBits(16);
       if (blockSize === 0) break;
