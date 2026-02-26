@@ -2601,24 +2601,30 @@ function buildChannelChipIdMap(module: FurnaceModule): number[] {
  */
 function scanInstrumentChannels(module: FurnaceModule): Map<number, Set<number>> {
   const result = new Map<number, Set<number>>();
-  const subsong = module.subsongs[0];
-  if (!subsong) return result;
 
-  for (let orderPos = 0; orderPos < subsong.ordersLen; orderPos++) {
-    for (let ch = 0; ch < module.chans; ch++) {
-      const patIdx = subsong.orders[ch]?.[orderPos] ?? 0;
-      const key = `0_${ch}_${patIdx}`;
-      const pattern = module.patterns.get(key);
-      if (!pattern) continue;
+  // Scan ALL subsongs so DIV_INS_STD instruments in secondary subsongs are correctly typed.
+  // Instruments are shared across subsongs (module-level), but a given instrument may only
+  // appear in subsong 2 — scanning only subsong 0 would leave its chip type unresolved.
+  for (let subIdx = 0; subIdx < module.subsongs.length; subIdx++) {
+    const subsong = module.subsongs[subIdx];
+    if (!subsong) continue;
 
-      for (const row of pattern.rows) {
-        if (row.instrument >= 0) {
-          let channels = result.get(row.instrument);
-          if (!channels) {
-            channels = new Set<number>();
-            result.set(row.instrument, channels);
+    for (let orderPos = 0; orderPos < subsong.ordersLen; orderPos++) {
+      for (let ch = 0; ch < module.chans; ch++) {
+        const patIdx = subsong.orders[ch]?.[orderPos] ?? 0;
+        const key = `${subIdx}_${ch}_${patIdx}`;
+        const pattern = module.patterns.get(key);
+        if (!pattern) continue;
+
+        for (const row of pattern.rows) {
+          if (row.instrument >= 0) {
+            let channels = result.get(row.instrument);
+            if (!channels) {
+              channels = new Set<number>();
+              result.set(row.instrument, channels);
+            }
+            channels.add(ch);
           }
-          channels.add(ch);
         }
       }
     }
@@ -3057,17 +3063,26 @@ function buildFurnaceNativeData(module: FurnaceModule): FurnaceNativeData {
 }
 
 /**
- * Lightweight pattern extraction for a single subsong.
- * Used to pre-convert all subsongs at import time without re-running instrument conversion.
+ * Convert pattern data and timing for a single subsong.
+ *
+ * Use this when pre-converting secondary subsongs at import time.
+ * Instruments, wavetables, and samples are MODULE-LEVEL in Furnace — shared across
+ * all subsongs — so only patterns and timing metadata are subsong-specific.
+ * The full convertFurnaceToDevilbox() result already covers those; this function
+ * avoids redundant re-conversion of instruments for every additional subsong.
  */
-export function extractSubsongPatterns(module: FurnaceModule, subsongIndex: number): ConvertedPatternCell[][][] {
-  const subsong = module.subsongs[subsongIndex];
-  if (!subsong) return [];
-
+export function convertSubsongForPlayback(module: FurnaceModule, subsongIndex: number): {
+  patterns: ConvertedPatternCell[][][];
+  metadata: ImportMetadata;
+} {
   const primaryChipId = module.systems[0] || 0;
   const isChipSynth = CHIP_SYNTH_IDS.has(primaryChipId);
-  const patterns: ConvertedPatternCell[][][] = [];
+  const subsong = module.subsongs[subsongIndex] || module.subsongs[0];
+  if (!subsong) {
+    return { patterns: [], metadata: createMetadata(module, subsongIndex) };
+  }
 
+  const patterns: ConvertedPatternCell[][][] = [];
   for (let orderPos = 0; orderPos < subsong.ordersLen; orderPos++) {
     const patternRows: ConvertedPatternCell[][] = [];
     for (let row = 0; row < subsong.patLen; row++) {
@@ -3079,7 +3094,11 @@ export function extractSubsongPatterns(module: FurnaceModule, subsongIndex: numb
         if (pattern && pattern.rows[row]) {
           rowCells.push(convertFurnaceCell(pattern.rows[row], isChipSynth, module.grooves));
         } else {
-          rowCells.push({ note: 0, instrument: 0, volume: 0, effectType: 0, effectParam: 0, effectType2: 0, effectParam2: 0 } as ConvertedPatternCell);
+          rowCells.push({
+            note: 0, instrument: 0, volume: 0,
+            effectType: 0, effectParam: 0,
+            effectType2: 0, effectParam2: 0,
+          } as ConvertedPatternCell);
         }
       }
       patternRows.push(rowCells);
@@ -3087,43 +3106,7 @@ export function extractSubsongPatterns(module: FurnaceModule, subsongIndex: numb
     patterns.push(patternRows);
   }
 
-  return patterns;
-}
-
-/**
- * Get timing and metadata for a specific subsong.
- * Used alongside extractSubsongPatterns when pre-converting all subsongs at import time.
- */
-export function getSubsongTiming(module: FurnaceModule, subsongIndex: number): {
-  name: string;
-  initialSpeed: number;
-  initialBPM: number;
-  speed2: number;
-  hz: number;
-  virtualTempoN: number;
-  virtualTempoD: number;
-  grooves?: number[][];
-  ordersLen: number;
-} {
-  const subsong = module.subsongs[subsongIndex] || module.subsongs[0];
-  const virtualTempo = subsong?.virtualTempo || 150;
-  const virtualTempoD = subsong?.virtualTempoD || 150;
-  const hz = subsong?.hz || 60;
-  const speed = subsong?.speed1 || 6;
-  const bpm = Math.round(2.5 * hz * (virtualTempo / virtualTempoD));
-  return {
-    name: subsong?.name || `Subsong ${subsongIndex}`,
-    initialSpeed: speed,
-    initialBPM: bpm,
-    speed2: subsong?.speed2 || 0,
-    hz,
-    virtualTempoN: virtualTempo,
-    virtualTempoD,
-    grooves: module.grooves.length > 0
-      ? module.grooves.map(g => g.val.slice(0, g.len))
-      : undefined,
-    ordersLen: subsong?.ordersLen || 1,
-  };
+  return { patterns, metadata: createMetadata(module, subsongIndex) };
 }
 
 /**
