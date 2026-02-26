@@ -67,26 +67,6 @@ const AMIGA_PERIODS: number[] = [
    53,  50,  47,  45,  42,  40,  37,  35,  33,  31,  30,  28,
 ];
 
-/**
- * Map an Amiga period value to an XM note number (1-96).
- * AMIGA_PERIODS[24] = 214 = C-3, which maps to MIDI 60 (C-4) = XM note 49.
- */
-function _amigaPeriodToXM(period: number): number {
-  if (period <= 0) return 0;
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < AMIGA_PERIODS.length; i++) {
-    const d = Math.abs(AMIGA_PERIODS[i] - period);
-    if (d < bestDist) {
-      bestDist = d;
-      bestIdx = i;
-    }
-  }
-  // AMIGA_PERIODS[0] = 856 = C-1 = XM note 13
-  const xmNote = bestIdx + 13;
-  return Math.max(1, Math.min(96, xmNote));
-}
-
 // ── Format detection ──────────────────────────────────────────────────────────
 
 /**
@@ -177,12 +157,8 @@ interface DWParseResult {
 function scanDWStructures(buf: Uint8Array): DWParseResult | null {
   let base = 0;
   let variant = 0;
-  let info = 0;
   let headers = 0;
   let size = 10;
-  let flag = 0;
-  let channels = 4;
-  let readLen = 2;
   let periodTableOffset = 0;
   let frqseqsOffset = 0;
   let volseqsOffset = 0;
@@ -216,9 +192,9 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
       }
       case 0x6100: {  // bsr.w — info pointer
         pos += 2;
-        info = pos;
+        _info = pos;
         if (u16BE(buf, pos - 2 - 2) === 0x6100) {
-          info = pos + s16BE(buf, pos - 2);
+          _info = pos + s16BE(buf, pos - 2);
           pos += 2;
         }
         break;
@@ -227,7 +203,7 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
         size = u16BE(buf, pos);
         pos += 2;
         if (size === 18) {
-          readLen = 4;
+          _readLen = 4;
         } else {
           variant = 10;
         }
@@ -236,7 +212,7 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
           headers = pos + s16BE(buf, pos);
           pos += 2;
         }
-        if (u16BE(buf, pos) === 0x1230) flag = 1;
+        if (u16BE(buf, pos) === 0x1230) _flag = 1;
         break;
       }
       case 0x1230: {  // move.b (a0,d0.w),d1
@@ -245,13 +221,13 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
           pos += 2;
           headers = pos + s16BE(buf, pos);
           pos += 2;
-          flag = 1;
+          _flag = 1;
         }
         pos += 4;
         break;
       }
       case 0xbe7c: {  // cmp.w #x,d7
-        channels = u16BE(buf, pos);
+        _channels = u16BE(buf, pos);
         pos += 4;
         break;
       }
@@ -298,7 +274,6 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
 
   // ── Third pass: scan for period table, frqseqs, volseqs ──────────────────
   pos = 0;
-  let com2 = 0xb0;
   let com3 = 0xa0;
   let com4 = 0x90;
   safeLimit = 0;
@@ -329,7 +304,7 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
         const wval = u16BE(buf, pos);
         pos += 2;
         if (wval === 0x00c0 || wval === 0x0040) {
-          com2 = 0xc0; com3 = 0xb0; com4 = 0xa0;
+          _com2 = 0xc0; com3 = 0xb0; com4 = 0xa0;
         } else if (wval === com3) {
           pos += 2;
           if (u16BE(buf, pos) === 0x45fa) {  // lea x,a2

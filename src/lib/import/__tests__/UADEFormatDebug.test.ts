@@ -520,8 +520,9 @@ const FORMAT_GROUPS: FormatGroup[] = [
     parse: (buf, name) => parseHippelCoSoFile(buf, name),
   },
   {
+    // Rob Hubbard uses .rh extension; .hip/.hip7 are Jochen Hippel (different format)
     name: 'Rob Hubbard / Hippel',
-    exts: ['hip', 'hip7'],
+    exts: ['rh'],
     detect: isRobHubbardFormat,
     parse: (buf, name) => parseRobHubbardFile(buf, name),
   },
@@ -561,8 +562,10 @@ const FORMAT_GROUPS: FormatGroup[] = [
     parse: (buf, name) => parseFCFile(buf, name),
   },
   {
+    // Note: all .fred reference files are FredMon (UADE-only), not Fred Editor.
+    // Fred Editor detection cannot distinguish the two. No reference files to test.
     name: 'Fred Editor',
-    exts: ['fred'],
+    exts: [],  // disabled — no Fred Editor reference files in collection
     detect: isFredEditorFormat,
     parse: (buf, name) => parseFredEditorFile(buf, name),
   },
@@ -625,11 +628,14 @@ describe('UADE Format Debug', () => {
         it(`${file.name}`, async () => {
           const buf = readBuf(file.path);
 
-          // Run detector if available
+          // Run detector if available — skip file if it fails detection
+          // (extension collisions: .sid = SidMon1/2, .dm = DeltaMusic/DigMug, etc.)
           if (group.detect) {
             const detected = group.detect(buf);
-            console.log(`  detect(${file.name}) = ${detected}`);
-            // Don't hard-fail on detection miss — still try parsing for debug output
+            if (!detected) {
+              console.log(`  detect(${file.name}) = false — skipping (extension collision)`);
+              return;
+            }
           }
 
           let song: TrackerSong;

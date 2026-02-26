@@ -221,7 +221,7 @@ export async function parseHippelCoSoFile(
   const numSongs = Math.max(1, Math.floor((headersOff - songsOff) / 6));
 
   // numSamples = (samplesData - headers) / 10 - 1
-  const numSamples = Math.max(0, Math.floor((samplesOff - headersOff) / 10) - 1);
+  const _numSamples = Math.max(0, Math.floor((samplesOff - headersOff) / 10) - 1);
 
   // ── Parse songs ───────────────────────────────────────────────────────────
   interface CoSoSong {

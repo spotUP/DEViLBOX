@@ -52,11 +52,11 @@ function readString(v: DataView, off: number, len: number): string {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const MAGIC_OFFSET      = 952;
-const MAGIC             = 'KRIS';
+const _MAGIC             = 'KRIS';
 const NUM_SAMPLES       = 31;
 const SAMPLE_HDR_SIZE   = 30;
 const TRACK_REF_OFFSET  = 958;
-const TRACK_REF_SIZE    = 128 * 4 * 2;   // 1024 bytes
+const _TRACK_REF_SIZE    = 128 * 4 * 2;   // 1024 bytes
 const SYNTH_WAV_OFFSET  = 1982;          // where synth waveforms begin (or tracks if none)
 const SYNTH_WAV_SIZE    = 64;
 const ROWS_PER_TRACK    = 64;

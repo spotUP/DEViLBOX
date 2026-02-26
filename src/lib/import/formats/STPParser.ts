@@ -165,7 +165,7 @@ export async function parseSTPFile(
   const defaultPatLen = u8(v, 7);
   // orderList[128] at +8
   const speed         = u16be(v, 136);
-  const speedFracRaw  = u16be(v, 138);  // low byte = fractional speed
+  const _speedFracRaw  = u16be(v, 138);  // low byte = fractional speed
   const timerCount    = u16be(v, 140);
   // flags at +142, reserved at +144
   // midi[50] at +150
@@ -500,10 +500,10 @@ function parsePatternChannels(
   dataOff: number,
   numCh: number,
   numRows: number,
-  filename: string,
-  patIdx: number,
-  totalPats: number,
-  totalInstr: number,
+  _filename: string,
+  _patIdx: number,
+  _totalPats: number,
+  _totalInstr: number,
 ): ChannelData[] {
   const channels: ChannelData[] = [];
 

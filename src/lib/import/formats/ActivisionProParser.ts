@@ -467,13 +467,6 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
   const len = bytes.length;
 
-  // ── Speed variation speed init ─────────────────────────────────────────
-  let speedVariationSpeedInit = 0;
-  if (info.speedVariationVersion === 2 && info.speedVariationSpeedIncrementOffset >= 0 &&
-      info.speedVariationSpeedIncrementOffset < len) {
-    speedVariationSpeedInit = bytes[info.speedVariationSpeedIncrementOffset];
-  }
-
   // ── Sub-song list and position lists ──────────────────────────────────
   const subSongListOffset = info.subSongListOffset;
   const positionListsOffset = info.positionListsOffset;

@@ -625,7 +625,6 @@ function parseDSMIAMF(v: DataView, raw: Uint8Array, filename: string): TrackerSo
   // Order/pattern length table and per-order track assignment table
   // Version ≥ 14: each order entry starts with uint16le patLength
   // Then: numChannels × uint16le track references (1-based index into numTracks)
-  const trackStartPos  = off + (version >= 14 ? 2 : 0); // actually: offset after optional patLength read
   const patternLengths: number[] = [];
 
   // We need to record the file position of each order's track table
@@ -637,7 +636,6 @@ function parseDSMIAMF(v: DataView, raw: Uint8Array, filename: string): TrackerSo
 
   // First pass: read all order entries
   const orderEntries: OrderEntry[] = [];
-  const orderTableStart = off;
   for (let ord = 0; ord < numOrders; ord++) {
     let patLength = 64;
     if (version >= 14) {
@@ -685,7 +683,6 @@ function parseDSMIAMF(v: DataView, raw: Uint8Array, filename: string): TrackerSo
     // Peek: read headers as new and validate each; if invalid, switch to old struct size
     const peekOff = off;
     const AMF_NEW_HDR = 65;
-    const AMF_OLD_HDR = 59;
     for (let s = 0; s < numSamples; s++) {
       const hdrOff = peekOff + s * AMF_NEW_HDR;
       if (hdrOff + AMF_NEW_HDR > fileLen) break;
