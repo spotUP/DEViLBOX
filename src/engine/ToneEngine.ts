@@ -478,6 +478,11 @@ export class ToneEngine {
       if (HivelyEngine.hasInstance()) {
         HivelyEngine.getInstance().stop();
       }
+    } else if (type === 'SymphonieSynth') {
+      const { SymphonieEngine } = await import('./symphonie/SymphonieEngine');
+      if (SymphonieEngine.hasInstance()) {
+        SymphonieEngine.getInstance().stop();
+      }
     }
   }
 
@@ -870,7 +875,7 @@ export class ToneEngine {
    */
   public async ensureWASMSynthsReady(configs: InstrumentConfig[]): Promise<void> {
     const wasmConfigs = configs.filter((c) => 
-      ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth', 'SoundMonSynth'].includes(c.synthType || '') ||
+      ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth', 'SymphonieSynth', 'SoundMonSynth'].includes(c.synthType || '') ||
       c.synthType?.startsWith('Furnace')
     );
     if (wasmConfigs.length === 0) return;
@@ -880,7 +885,7 @@ export class ToneEngine {
     // is a singleton that handles all channels internally.
     const seenNativePlayers = new Set<string>();
     const deduped = wasmConfigs.filter(c => {
-      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth') {
+      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth' || c.synthType === 'SymphonieSynth') {
         if (seenNativePlayers.has(c.synthType!)) return false;
         seenNativePlayers.add(c.synthType!);
       }
@@ -1837,6 +1842,7 @@ export class ToneEngine {
       // WASM song players (full-module playback via AudioWorklet)
       case 'HivelySynth':
       case 'UADESynth':
+      case 'SymphonieSynth':
       // UADE format-specific synths (per-note WASM synthesis)
       case 'SoundMonSynth':
       case 'SidMonSynth':
