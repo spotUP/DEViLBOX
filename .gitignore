@@ -95,3 +95,4 @@ projectm-wasm/build/
 
 # Git worktrees
 .worktrees/
+fred-wasm/build/
