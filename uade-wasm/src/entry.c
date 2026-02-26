@@ -590,3 +590,30 @@ void uade_wasm_cleanup(void) {
     }
     s_playing = 0;
 }
+
+/*
+ * Write a companion file into MEMFS root ("/") so UADE can find it when
+ * the Amiga-side player requests it as a relative path.
+ *
+ * TFMX-Pro uses two files: mdat.* (module) and smpl.* (samples).
+ * The eagleplayer requests "smpl.filename" as a relative path, which
+ * uade_find_amiga_file resolves via "./smpl.filename" (CWD = "/").
+ * Writing the file here as "/filename" makes it findable.
+ *
+ * Returns 0 on success, -1 on failure.
+ */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_add_extra_file(const char *filename, const uint8_t *data, size_t len) {
+    char path[512];
+    snprintf(path, sizeof(path), "/%s", filename);
+
+    FILE *f = fopen(path, "wb");
+    if (!f) {
+        fprintf(stderr, "[uade-wasm] Cannot write companion file: %s\n", path);
+        return -1;
+    }
+    fwrite(data, 1, len, f);
+    fclose(f);
+    fprintf(stderr, "[uade-wasm] Companion file written: %s (%zu bytes)\n", path, len);
+    return 0;
+}

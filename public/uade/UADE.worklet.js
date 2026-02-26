@@ -37,6 +37,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._outL = null;
     this._outR = null;
     this._outFrames = 256;    // Larger than 128 to handle render calls > quantum size
+    this._needsReload = false; // Set after stop so next play() reloads from _lastData
 
     this.port.onmessage = (event) => this._handleMessage(event.data);
   }
@@ -51,7 +52,24 @@ class UADEProcessor extends AudioWorkletProcessor {
         this._load(data.buffer, data.filenameHint);
         break;
 
+      case 'addCompanionFile':
+        this._addCompanionFile(data.filename, data.buffer);
+        break;
+
       case 'play':
+        // If the song was stopped (or ended), reload it from _lastData before playing.
+        // _uade_wasm_stop() tears down the WASM player state; just setting _playing=true
+        // would cause _uade_wasm_render() to return 0 (ended) immediately → silence.
+        if (this._needsReload && this._lastData && this._wasm && this._ready) {
+          this._wasm._uade_wasm_stop();
+          const reloadRet = this._loadIntoWasm(this._lastData, this._lastHint);
+          if (reloadRet !== 0) {
+            console.error('[UADE.worklet] Failed to reload song for play (ret=' + reloadRet + ')');
+            this.port.postMessage({ type: 'error', message: 'Failed to reload song for playback' });
+            break;
+          }
+          this._needsReload = false;
+        }
         this._playing = true;
         this._paused = false;
         break;
@@ -62,6 +80,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         }
         this._playing = false;
         this._paused = false;
+        this._needsReload = true; // Next play() must reload — stop tears down WASM state
         break;
 
       case 'pause':
@@ -253,6 +272,39 @@ class UADEProcessor extends AudioWorkletProcessor {
       }
       console.error('[UADE.worklet] Init failed:', errMsg);
       this.port.postMessage({ type: 'error', message: errMsg });
+    }
+  }
+
+  _addCompanionFile(filename, buffer) {
+    if (!this._wasm || !this._ready) {
+      console.warn('[UADE.worklet] addCompanionFile called before WASM ready — ignoring');
+      return;
+    }
+    const data = new Uint8Array(buffer);
+    const ptr = this._wasm._malloc(data.byteLength);
+    if (!ptr) {
+      console.error('[UADE.worklet] malloc failed for companion file: ' + filename);
+      return;
+    }
+    this._wasm.HEAPU8.set(data, ptr);
+
+    const nameLen = filename.length * 3 + 1;
+    const namePtr = this._wasm._malloc(nameLen);
+    if (!namePtr) {
+      this._wasm._free(ptr);
+      console.error('[UADE.worklet] malloc failed for companion filename');
+      return;
+    }
+    this._wasm.stringToUTF8(filename, namePtr, nameLen);
+
+    const ret = this._wasm._uade_wasm_add_extra_file(namePtr, ptr, data.byteLength);
+    this._wasm._free(ptr);
+    this._wasm._free(namePtr);
+
+    if (ret === 0) {
+      console.log('[UADE.worklet] Companion file written: ' + filename + ' (' + data.byteLength + ' bytes)');
+    } else {
+      console.error('[UADE.worklet] Failed to write companion file: ' + filename);
     }
   }
 
@@ -1162,8 +1214,9 @@ class UADEProcessor extends AudioWorkletProcessor {
       const ret = this._wasm._uade_wasm_render(this._ptrL, this._ptrR, frames);
 
       if (ret === 0) {
-        // Song ended
+        // Song ended — mark needsReload so play() reloads from beginning
         this._playing = false;
+        this._needsReload = true;
         this.port.postMessage({ type: 'songEnd' });
         outL.fill(0);
         if (outR !== outL) outR.fill(0);
