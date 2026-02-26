@@ -468,7 +468,7 @@ async function decodePCM(instrument: InstrumentConfig): Promise<Int8Array | null
 }
 
 /* ── Cache-busting version — bump when rebuilding WASM ────────────────── */
-const WASM_VERSION = 2;
+const WASM_VERSION = 3;
 
 /* ── Component ─────────────────────────────────────────────────────────── */
 
