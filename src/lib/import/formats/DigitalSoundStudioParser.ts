@@ -52,7 +52,6 @@ const SAMPLE_INFO_SIZE = 0x2e;        // 46 bytes per sample info entry
 const SAMPLE_INFO_BASE = 0x0a;        // offset where sample info begins
 const NUM_POSITIONS_OFF= 0x59c;
 const POSITION_LIST_OFF= 0x59e;
-const _POSITION_LIST_LEN= 128;
 const PATTERN_DATA_OFF = 0x61e;
 const ROWS_PER_PATTERN = 64;
 const CHANNELS         = 4;

@@ -46,24 +46,6 @@ import { createSamplerInstrument } from './AmigaUtils';
 /** PAL Amiga clock frequency (Hz) */
 const PAL_CLOCK = 3546895;
 
-/**
- * Synthesis period table — 109 entries.
- * Index 0 = no note (0). Indices 1–108 are valid periods.
- * Index 49 = 856 = XM C-3 reference period.
- * Copied verbatim from NostalgicPlayer Synthesis/Tables.cs.
- */
-const _SYN_PERIODS: number[] = [
-      0,
-  13696, 12928, 12192, 11520, 10848, 10240,  9664,  9120,  8608,  8128,  7680,  7248,
-   6848,  6464,  6096,  5760,  5424,  5120,  4832,  4560,  4304,  4064,  3840,  3624,
-   3424,  3232,  3048,  2880,  2712,  2560,  2416,  2280,  2152,  2032,  1920,  1812,
-   1712,  1616,  1524,  1440,  1356,  1280,  1208,  1140,  1076,  1016,   960,   906,
-    856,   808,   762,   720,   678,   640,   604,   570,   538,   508,   480,   453,
-    428,   404,   381,   360,   339,   320,   302,   285,   269,   254,   240,   226,
-    214,   202,   190,   180,   170,   160,   151,   143,   135,   127,   120,   113,
-    107,   101,    95,    90,    85,    80,    75,    71,    67,    63,    60,    56,
-     53,    50,    47,    45,    42,    40,    37,    35,    33,    31,    30,    28,
-];
 
 /**
  * Index in SYN_PERIODS corresponding to XM note 37 (C-3, period 856).
@@ -437,7 +419,6 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
   // Each position entry defines the starting track row for each of 4 voices.
   // The track plays rowsPerTrack rows. We build one pattern per position.
   const rowsPerTrack = song.rowsPerTrack || 16;
-  const _numPositions = song.lastPosition - song.firstPosition + 1;
   const firstPos     = song.firstPosition;
 
   const patterns: Pattern[] = [];

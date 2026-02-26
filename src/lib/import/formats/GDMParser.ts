@@ -81,7 +81,6 @@ const ROWS_PER_PATTERN   = 64;
 const SMP_LOOP    = 0x01;
 const SMP_16BIT   = 0x02;
 const SMP_VOLUME  = 0x04;
-const _SMP_PANNING = 0x08;
 
 // Pattern cell channel-byte flags
 const ROW_DONE     = 0x00;
@@ -380,9 +379,6 @@ export async function parseGDMFile(
   const sampleHeaderOffset  = u32le(v, 128);
   const sampleDataOffset    = u32le(v, 132);
   const lastSample          = u8(v, 136);
-  const _messageTextOffset   = u32le(v, 137);
-  const _messageTextLength   = u32le(v, 141);
-
   const numOrders   = lastOrder   + 1;
   const numPatterns = lastPattern + 1;
   const numSamples  = lastSample  + 1;

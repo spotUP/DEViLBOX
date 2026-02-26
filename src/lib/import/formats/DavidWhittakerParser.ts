@@ -57,15 +57,6 @@ function u32BE(buf: Uint8Array, off: number): number {
           (buf[off + 3] & 0xFF);
 }
 
-// ── Standard Amiga period table (60 entries, PAL) ────────────────────────────
-
-const AMIGA_PERIODS: number[] = [
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-  107, 101,  95,  90,  85,  80,  75,  71,  67,  63,  60,  56,
-   53,  50,  47,  45,  42,  40,  37,  35,  33,  31,  30,  28,
-];
 
 // ── Format detection ──────────────────────────────────────────────────────────
 
@@ -192,9 +183,7 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
       }
       case 0x6100: {  // bsr.w — info pointer
         pos += 2;
-        _info = pos;
         if (u16BE(buf, pos - 2 - 2) === 0x6100) {
-          _info = pos + s16BE(buf, pos - 2);
           pos += 2;
         }
         break;
@@ -202,9 +191,7 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
       case 0xc0fc: {  // mulu.w #x,d0
         size = u16BE(buf, pos);
         pos += 2;
-        if (size === 18) {
-          _readLen = 4;
-        } else {
+        if (size !== 18) {
           variant = 10;
         }
         if (u16BE(buf, pos) === 0x41fa) {  // lea x,a0
@@ -212,7 +199,6 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
           headers = pos + s16BE(buf, pos);
           pos += 2;
         }
-        if (u16BE(buf, pos) === 0x1230) _flag = 1;
         break;
       }
       case 0x1230: {  // move.b (a0,d0.w),d1
@@ -221,13 +207,11 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
           pos += 2;
           headers = pos + s16BE(buf, pos);
           pos += 2;
-          _flag = 1;
         }
         pos += 4;
         break;
       }
       case 0xbe7c: {  // cmp.w #x,d7
-        _channels = u16BE(buf, pos);
         pos += 4;
         break;
       }
@@ -304,7 +288,7 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
         const wval = u16BE(buf, pos);
         pos += 2;
         if (wval === 0x00c0 || wval === 0x0040) {
-          _com2 = 0xc0; com3 = 0xb0; com4 = 0xa0;
+          com3 = 0xb0; com4 = 0xa0;
         } else if (wval === com3) {
           pos += 2;
           if (u16BE(buf, pos) === 0x45fa) {  // lea x,a2

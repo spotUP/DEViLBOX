@@ -59,7 +59,6 @@ import { createSamplerInstrument } from './AmigaUtils';
 const PAL_CLOCK = 3546895;
 
 function u8(buf: Uint8Array, off: number): number { return buf[off]; }
-function _s8(v: number): number { return v < 128 ? v : v - 256; }
 function u16BE(buf: Uint8Array, off: number): number { return (buf[off] << 8) | buf[off + 1]; }
 function s16BE(buf: Uint8Array, off: number): number {
   const v = u16BE(buf, off); return v < 32768 ? v : v - 65536;

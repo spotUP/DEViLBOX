@@ -64,7 +64,6 @@ const FILE_HDR_SIZE = 66;
 const CHUNK_HDR_SIZE = 8;
 
 // Chunk identifiers (little-endian 32-bit values of ASCII strings)
-const _ID_CMSG = charCode4('C', 'M', 'S', 'G');
 const ID_SEQU = charCode4('S', 'E', 'Q', 'U');
 const ID_PATT = charCode4('P', 'A', 'T', 'T');
 const ID_SMPI = charCode4('S', 'M', 'P', 'I');
@@ -416,7 +415,6 @@ const XM_VIBRATO       = 0x04;
 const XM_TREMOR        = 0x1D;   // IT tremor — TrackerReplayer knows it
 const XM_OFFSET        = 0x09;
 const XM_VOL_SLIDE     = 0x0A;
-const _XM_VOLUME        = 0x0C;   // Cxx set volume
 const XM_RETRIG        = 0x1B;   // IT retrig (matches S3M/IT Qxx)
 const XM_PANNING8      = 0x08;   // Xxx panning
 const XM_PAN_SLIDE     = 0x19;   // IT pan slide (Pxx)
@@ -424,11 +422,6 @@ const XM_PANBRELLO     = 0x1A;   // IT panbrello (Yxx)
 const XM_TEMPO         = 0x0F;   // Fxx (>= 0x20 = BPM, < 0x20 = speed)
 const XM_SPEED         = 0x0F;
 const XM_S3MCMDEX      = 0x13;   // Sxx extended
-
-/** Encode an S3M-style extended param as XM/IT Sxx */
-function _s3mCmd(param: number): { effTyp: number; eff: number } {
-  return { effTyp: XM_S3MCMDEX, eff: param };
-}
 
 // ── Pattern conversion ────────────────────────────────────────────────────────
 
