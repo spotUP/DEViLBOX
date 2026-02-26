@@ -570,6 +570,26 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── Digital Sound Studio ──────────────────────────────────────────────────
+  // .dss files — identified by "MMU2" magic at offset 0.
+  if (/\.dss$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.digitalSoundStudio === 'native') {
+      try {
+        const { isDigitalSoundStudioFormat, parseDigitalSoundStudioFile } = await import('@lib/import/formats/DigitalSoundStudioParser');
+        const bytes = new Uint8Array(buffer);
+        if (isDigitalSoundStudioFormat(bytes)) {
+          const result = parseDigitalSoundStudioFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[DigitalSoundStudioParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── Music Assembler ────────────────────────────────────────────────────────
   // .ma files — identified by M68k player bytecode scanning (no magic bytes).
   if (/\.ma$/.test(filename)) {
