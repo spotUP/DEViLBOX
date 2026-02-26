@@ -825,6 +825,14 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
         color:        null,
         rows:         cells.map(row => row[chIdx]),
       })),
+      importMetadata: {
+        sourceFormat:            'MusicAssembler' as const,
+        sourceFile:              filename,
+        importedAt:              new Date().toISOString(),
+        originalChannelCount:    4,
+        originalPatternCount:    maxPositions,
+        originalInstrumentCount: numberOfInstruments,
+      },
     });
 
     songPositions.push(patIdx);
@@ -845,13 +853,5 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
     numChannels:     4,
     initialSpeed:    primarySong.startSpeed || 6,
     initialBPM:      125,
-    importMetadata: {
-      sourceFormat:            'MusicAssembler',
-      sourceFile:              filename,
-      importedAt:              new Date().toISOString(),
-      originalChannelCount:    4,
-      originalPatternCount:    maxPositions,
-      originalInstrumentCount: numberOfInstruments,
-    },
   };
 }

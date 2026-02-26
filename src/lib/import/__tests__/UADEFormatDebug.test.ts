@@ -212,10 +212,6 @@ function printInstrument(ic: InstrumentConfig, index: number) {
       console.log(`    fseq(${c.fseq.length}): ${decodeCoSeq(c.fseq)}`);
       if (VERBOSE) console.log(`    fseq hex: ${hexDump(new Uint8Array(c.fseq.map(v => v & 0xFF)))}`);
     }
-    if (c.waveform?.length) {
-      console.log(`    waveform: ${waveformAscii(c.waveform)}`);
-      if (VERBOSE) console.log(`    waveform hex: ${hexDump(new Uint8Array(c.waveform.map(v => v & 0xFF)))}`);
-    }
   }
 
   // ── SoundMonSynth ─────────────────────────────────────────────────────────
@@ -417,11 +413,12 @@ function printInstrument(ic: InstrumentConfig, index: number) {
   // ── Sampler ───────────────────────────────────────────────────────────────
   else if (ic.synthType === 'Sampler' && ic.sample) {
     const s = ic.sample;
-    const len = s.audioBuffer ? `${s.audioBuffer.length}smp` : `${s.url ?? '?'}`;
+    const len = s.audioBuffer ? `${s.audioBuffer.byteLength}smp` : `${s.url ?? '?'}`;
     console.log(`    sampler: ${len}  loopStart=${s.loopStart ?? 0}  loopEnd=${s.loopEnd ?? 0}`);
-    if (s.audioBuffer && s.audioBuffer.length > 0) {
-      const view = new Int8Array(s.audioBuffer.length);
-      for (let k = 0; k < view.length; k++) view[k] = (s.audioBuffer[k] * 127) | 0;
+    if (s.audioBuffer && s.audioBuffer.byteLength > 0) {
+      const abuf = new Uint8Array(s.audioBuffer);
+      const view = new Int8Array(abuf.length);
+      for (let k = 0; k < view.length; k++) view[k] = (abuf[k] * 127) | 0;
       console.log(`    waveform: ${waveformAscii(view)}`);
     }
   }
@@ -433,8 +430,8 @@ function printInstrument(ic: InstrumentConfig, index: number) {
       'hippelCoso', 'robHubbard', 'sidmon1', 'octamed', 'hively', 'uade',
     ] as const;
     for (const key of known) {
-      if ((ic as Record<string, unknown>)[key]) {
-        const val = (ic as Record<string, unknown>)[key];
+      if ((ic as unknown as Record<string, unknown>)[key]) {
+        const val = (ic as unknown as Record<string, unknown>)[key];
         const short = JSON.stringify(val, (_k, v) => {
           // Truncate large arrays in JSON output
           if (Array.isArray(v) && v.length > 16) return `[…${v.length} entries]`;
