@@ -34,6 +34,7 @@ import { SidMonSynth } from './sidmon/SidMonSynth';
 import { DigMugSynth } from './digmug/DigMugSynth';
 import { FCSynth } from './fc/FCSynth';
 import { TFMXSynth } from './tfmx/TFMXSynth';
+import { FredSynth } from './fred/FredSynth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -896,6 +897,17 @@ export class InstrumentFactory {
           );
         }
         instrument = tfmxSynth;
+        break;
+      }
+
+      case 'FredSynth': {
+        const fredSynth = new FredSynth();
+        if (config.fred) {
+          fredSynth.setInstrument(config.fred).catch(err =>
+            console.error('[InstrumentFactory] Fred load failed:', err)
+          );
+        }
+        instrument = fredSynth;
         break;
       }
 
