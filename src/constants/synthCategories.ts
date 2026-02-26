@@ -1622,6 +1622,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Disc',
     color: 'text-gray-500',
   },
+  HippelCoSoSynth: {
+    type: 'HippelCoSoSynth',
+    name: 'Hippel CoSo',
+    shortName: 'CoSo',
+    description: 'Jochen Hippel CoSo pure synthesis engine with frequency/volume sequences, vibrato and portamento',
+    bestFor: ['Amiga chiptune', 'Game music', 'Jochen Hippel'],
+    icon: 'Disc',
+    color: 'text-amber-400',
+  },
 };
 
 // Organized categories
@@ -1857,6 +1866,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.FurnaceAMIGA,
       SYNTH_INFO.FurnacePCSPKR,
       SYNTH_INFO.HivelySynth,
+      SYNTH_INFO.HippelCoSoSynth,
     ],
   },
   {

@@ -359,7 +359,7 @@ export function getSupportedExtensions(): string[] {
     '.fc', '.fc13', '.fc14', '.sfc',
     // ── UADE exotic Amiga formats (130+ via 68k emulation) ──────────────────
     '.fc2', '.fc3', '.fc4', '.smod',
-    '.hip', '.hip7', '.sog', '.s7g', '.hipc', '.hst', '.soc',
+    '.hip', '.hip7', '.sog', '.s7g', '.hipc', '.hst', '.soc', '.coso',
     '.tfmx', '.mdat', '.tfmxpro', '.tfhd1.5', '.tfhd7v', '.tfhdpro',
     '.fred', '.gray',
     '.sm', '.sm1', '.sm2', '.sm3', '.smpro',
