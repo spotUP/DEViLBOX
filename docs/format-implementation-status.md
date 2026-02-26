@@ -106,6 +106,7 @@ Track which formats have native parsers vs UADE-only.
 | `.c67` | CDFM Composer 670 | CDFM67Parser.ts | **OpenMPT** Load_c67.cpp | OpenMPT fallback |
 | `.etx` | EasyTrax | EasyTraxParser.ts | NostalgicPlayer | Amiga; UADE fallback |
 | `.mus` | Karl Morton Music | KarlMortonParser.ts | NostalgicPlayer | OpenMPT fallback |
+| `.rjp`, `.sng`, `RJP.*` | Richard Joseph Player | RichardJosephParser.ts | UADE eagleplayer asm | Two-file (song+SMP); UADE fallback |
 
 ---
 
@@ -127,7 +128,6 @@ Track which formats have native parsers vs UADE-only.
 
 | Extension(s) | Format | OpenMPT Loader | Notes |
 |---|---|---|---|
-| `.rjp`, `.sng` | Richard Joseph | NP source available | Two-file format (.sng+.ins) |
 
 
 ## ❌ Not Parseable (compiled 68k executables — UADE only)
@@ -212,3 +212,4 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | CDFM Composer 670 | CDFM67Parser.ts | **OpenMPT** Load_c67.cpp |
 | 2026-02-26 | EasyTrax | EasyTraxParser.ts | NostalgicPlayer |
 | 2026-02-26 | Karl Morton Music | KarlMortonParser.ts | NostalgicPlayer |
+| 2026-02-26 | Richard Joseph Player | RichardJosephParser.ts | UADE eagleplayer asm |
