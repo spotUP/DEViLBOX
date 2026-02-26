@@ -32,6 +32,7 @@ import { HivelySynth } from './hively/HivelySynth';
 import { SoundMonSynth } from './soundmon/SoundMonSynth';
 import { SidMonSynth } from './sidmon/SidMonSynth';
 import { DigMugSynth } from './digmug/DigMugSynth';
+import { FCSynth } from './fc/FCSynth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -872,6 +873,17 @@ export class InstrumentFactory {
           );
         }
         instrument = dmSynth;
+        break;
+      }
+
+      case 'FCSynth': {
+        const fcSynth = new FCSynth();
+        if (config.fc) {
+          fcSynth.setInstrument(config.fc).catch(err =>
+            console.error('[InstrumentFactory] FC load failed:', err)
+          );
+        }
+        instrument = fcSynth;
         break;
       }
 

@@ -72,6 +72,7 @@ furnace-insed-wasm/build/
 soundmon-wasm/build/
 sidmon-wasm/build/
 digmug-wasm/build/
+fc-wasm/build/
 
 # Stray audio files
 *.wav
