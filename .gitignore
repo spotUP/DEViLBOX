@@ -38,6 +38,11 @@ hively-insed-wasm/build/
 spacey-delayer-wasm/build/
 re-tape-echo-wasm/build/
 ami-sampler-wasm/build/
+soundmon-wasm/build/
+sidmon-wasm/build/
+digmug-wasm/build/
+fc-wasm/build/
+tfmx-wasm/build/
 public/rdpiano/roms/
 public/onnx-wasm/
 
@@ -69,6 +74,10 @@ pt2-sampled-wasm/build/
 vstbridge-generic-wasm/build/
 uade-wasm/build/
 furnace-insed-wasm/build/
+soundmon-wasm/build/
+sidmon-wasm/build/
+digmug-wasm/build/
+fc-wasm/build/
 
 # Stray audio files
 *.wav
@@ -86,3 +95,4 @@ projectm-wasm/build/
 
 # Git worktrees
 .worktrees/
+fred-wasm/build/
