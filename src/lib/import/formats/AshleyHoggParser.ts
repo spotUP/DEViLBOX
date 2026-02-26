@@ -12,14 +12,19 @@
  *   then checks for $48E7FFFE (movem.l push), $6100 (bsr), and $4DF9/$00DFF000 (lea $DFF000).
  *
  * Old format (Format = 0):
- *   At current position (after backing up 2): $303C0000 followed by $662233C0
+ *   At offset 16 (the 5th pair opcode slot): $303C0000 followed by $662233C0.
+ *   The ASM does subq.l #2,A0 after reading (and failing) the 5th opcode word,
+ *   which winds A0 back to offset 16 (18-2=16).
  *
  * The assembly loop (loop1) checks 4 pairs of words:
  *   for i in 0..3: word[2i] == $6000, word[2i+1] > 0, even, non-negative
  * Then tries new-format checks; on failure, falls to OldCheck.
  *
- * Minimum file size: the new-format check reads at least 10+2+4+1 = ~20 bytes before
- * the MOVEM check; old format just needs 8 bytes for the two longs.
+ * New format preamble offset: after reading the 6th pair's opcode (at 20) the ASM
+ * does move.w (A0),D2 (no post-increment, reads at 22), then add.w D2,A0 (A0=22+D2).
+ * So preambleOff = 22 + dist6.
+ *
+ * Minimum file size: old format needs 24 bytes; new format needs substantially more.
  * Using 20 bytes as a conservative minimum.
  */
 
@@ -66,25 +71,33 @@ export function isAshleyHoggFormat(buffer: ArrayBuffer | Uint8Array): boolean {
     if (d2 & 1) return false;      // btst #0 → odd
   }
 
-  // Try new format: one more pair
+  // Try new format: check 5th pair opcode at off (= 16).
+  // ASM: cmp.w (A0)+,D3  → A0 advances from 16 to 18.
+  // If opcode == $6000 → continue new-format checks.
+  // Otherwise A0 = 18 → OldCheck does subq.l #2,A0 → A0 = 16.
   if (off + 4 <= buf.length) {
     const w0 = u16BE(buf, off);
     if (w0 === 0x6000) {
+      // 5th pair distance at off+2
       const d2a = u16BE(buf, off + 2);
       if (d2a !== 0 && !(d2a & 0x8000) && !(d2a & 1)) {
+        // off2 = off+4 = 20: start of 6th pair opcode
         const off2 = off + 4;
         if (off2 + 4 <= buf.length) {
           const w1 = u16BE(buf, off2);
           if (w1 === 0x6000) {
+            // 6th pair: ASM reads distance with move.w (A0),D2 — no post-increment.
+            // A0 is at off2+2 = 22 after reading the opcode. add.w D2,A0 → A0 = 22+d2b.
             const d2b = u16BE(buf, off2 + 2);
             if (d2b !== 0 && !(d2b & 0x8000) && !(d2b & 1)) {
-              // advance by d2b to reach code
-              const codeOff = off2 + 4 + d2b;
+              // preamble starts at off2+2+d2b = 22+d2b
+              const codeOff = off2 + 2 + d2b;
               if (codeOff + 10 <= buf.length) {
                 if (u32BE(buf, codeOff) === 0x48E7FFFE &&
                     u16BE(buf, codeOff + 4) === 0x6100) {
-                  // bsr offset, then check for lea $DFF000
+                  // add.w (A0),A0: displacement at codeOff+6 (A0 at codeOff+6 after +4+2)
                   const bsrOff = u16BE(buf, codeOff + 6);
+                  // LEA target: A0 = (codeOff+6) + bsrOff = codeOff+6+bsrOff
                   const leaOff = codeOff + 6 + bsrOff;
                   if (leaOff + 6 <= buf.length &&
                       u16BE(buf, leaOff) === 0x4DF9 &&
@@ -100,11 +113,12 @@ export function isAshleyHoggFormat(buffer: ArrayBuffer | Uint8Array): boolean {
     }
   }
 
-  // OldCheck: backup 2 bytes from current off, check $303C0000 / $662233C0
-  const oldOff = off - 2;
-  if (oldOff + 8 <= buf.length) {
-    if (u32BE(buf, oldOff) === 0x303C0000 &&
-        u32BE(buf, oldOff + 4) === 0x662233C0) {
+  // OldCheck: 5th pair opcode was not $6000.
+  // ASM: after cmp.w (A0)+,D3 the A0 was at 18; subq.l #2,A0 → A0 = 16.
+  // So OldCheck reads at off = 16 (not off-2 = 14).
+  if (off + 8 <= buf.length) {
+    if (u32BE(buf, off) === 0x303C0000 &&
+        u32BE(buf, off + 4) === 0x662233C0) {
       return true;
     }
   }
