@@ -76,6 +76,10 @@ Track which formats have native parsers vs UADE-only.
 | `.ptm` | PolyTracker | PTMParser.ts | **OpenMPT** Load_ptm.cpp | OpenMPT fallback |
 | `.gdm` | General DigiMusic | GDMParser.ts | **OpenMPT** Load_gdm.cpp | OpenMPT fallback |
 | `.dss` | Digital Sound Studio | DigitalSoundStudioParser.ts | NostalgicPlayer + DSS.txt spec | UADE fallback |
+| `.dsym` | Digital Symphony | DigitalSymphonyParser.ts | **OpenMPT** Load_dsym.cpp | UADE fallback |
+| `.ims` | Images Music System | IMSParser.ts | **OpenMPT** Load_ims.cpp | heuristic; UADE fallback |
+| `.ice` | Ice Tracker / SoundTracker 2.6 | ICEParser.ts | **OpenMPT** Load_ice.cpp | MTN/IT10 magic; UADE fallback |
+| `.kris` | ChipTracker / KRIS | KRISParser.ts | **OpenMPT** Load_kris.cpp | KRIS magic at +952; UADE fallback |
 
 ---
 
@@ -97,10 +101,8 @@ Track which formats have native parsers vs UADE-only.
 
 | Extension(s) | Format | OpenMPT Loader | Notes |
 |---|---|---|---|
-| `.dm`, `.dlm1` | Delta Music 1.x | — | NP: DeltaMusic10 player available |
-| `.dsym` | Digital Symphony | Load_dsym.cpp (615 ln) | |
-| `.gt2` | Graoumf Tracker 2 | Load_gt2.cpp (1566 ln) | |
-| `.symmod` | Symphonie Pro | Load_symmod.cpp (1947 ln) | |
+| `.gt2` | Graoumf Tracker 2 | Load_gt2.cpp (1566 ln) | 🔄 in progress |
+| `.symmod` | Symphonie Pro | Load_symmod.cpp (1947 ln) | 🔄 in progress |
 | `.rjp`, `.sng` | Richard Joseph | NP source available | Two-file format (.sng+.ins) |
 | `.trc` | Tronic | — | Same author as PumaTracker |
 
@@ -164,3 +166,6 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | General DigiMusic | GDMParser.ts | **OpenMPT** Load_gdm.cpp |
 | 2026-02-26 | Digital Sound Studio | DigitalSoundStudioParser.ts | NostalgicPlayer + DSS.txt spec |
 | 2026-02-26 | Digital Symphony | DigitalSymphonyParser.ts | **OpenMPT** Load_dsym.cpp |
+| 2026-02-26 | Images Music System | IMSParser.ts | **OpenMPT** Load_ims.cpp |
+| 2026-02-26 | Ice Tracker / SoundTracker 2.6 | ICEParser.ts | **OpenMPT** Load_ice.cpp |
+| 2026-02-26 | ChipTracker / KRIS | KRISParser.ts | **OpenMPT** Load_kris.cpp |

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-26T13:22:01.491Z
+ * Generated: 2026-02-26T16:59:42.843Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1335';
-export const BUILD_NUMBER = '1335';
-export const BUILD_HASH = '34519234';
+export const BUILD_VERSION = '1.0.1356';
+export const BUILD_NUMBER = '1356';
+export const BUILD_HASH = 'a875acd5';
 export const BUILD_DATE = '2026-02-26';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,89 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1335',
+    version: '1.0.1356',
     date: '2026-02-26',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix puma routing — ArrayBuffer types, remove prefs toggle"
+      },
+      {
+        type: 'feature',
+        "description": "PumaTracker native parser (OpenMPT Load_puma.cpp reference)"
+      },
+      {
+        type: 'feature',
+        "description": "InStereo! 1.0/2.0 native parsers; fix SA routing with prefs toggle"
+      },
+      {
+        type: 'feature',
+        "description": "Art of Noise and Ben Daglish native parsers"
+      },
+      {
+        type: 'feature',
+        "description": "Add Sonic Arranger (.sa) native parser"
+      },
+      {
+        type: 'feature',
+        "description": "Delta Music 2.0 native parser"
+      },
+      {
+        type: 'fix',
+        "description": "Correct TCBTracker and SoundFX parsers against OpenMPT sources"
+      },
+      {
+        type: 'fix',
+        "description": "Correct SynthInstr binary layout and wire waveform pointer table"
+      },
+      {
+        type: 'feature',
+        "description": "Phase B4 — TCB Tracker (.tcb) native parser"
+      },
+      {
+        type: 'feature',
+        "description": "Add David Whittaker native synthesis engine"
+      },
+      {
+        type: 'feature',
+        "description": "Phase B3 — AMOS Music Bank (.abk) routing in parseModuleToSong"
+      },
+      {
+        type: 'feature',
+        "description": "OctaMED SynthInstr extraction + UADE format debug test + AMOS/DavidWhittaker parsers"
+      },
+      {
+        type: 'feature',
+        "description": "Phase B2 — Quadra Composer (.emod, .qc) native parser"
+      },
+      {
+        type: 'feature',
+        "description": "Add OctaMED SynthInstr native synthesis engine"
+      },
+      {
+        type: 'feature',
+        "description": "Phase B1 — JamCracker (.jam, .jc) native parser"
+      },
+      {
+        type: 'feature',
+        "description": "Phase 6 PCM instrument naming — JamCracker, TCB, EMOD, AMOS"
+      },
+      {
+        type: 'feature',
+        "description": "Native Rob Hubbard synthesis engine"
+      },
+      {
+        type: 'fix',
+        "description": "Guard emscripten.h with __EMSCRIPTEN__ to suppress IDE false positives"
+      },
+      {
+        type: 'feature',
+        "description": "Native Jochen Hippel CoSo synthesis engine"
+      },
+      {
+        type: 'improvement',
+        "description": "Update masterplan — all phases 0-7 complete except PCM naming"
+      },
       {
         type: 'fix',
         "description": "Standalone instrument players now produce audio"
@@ -144,86 +224,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add SN76489 PSG and OPM note extraction to VGMParser"
-      },
-      {
-        type: 'fix',
-        "description": "Cap LZH-5 bit-length at 15, tighten output cap, fix plan doc error"
-      },
-      {
-        type: 'fix',
-        "description": "Remove mesh debug logging and improve WebGL context loss resilience"
-      },
-      {
-        type: 'fix',
-        "description": "Correct LZH-5 decoder in YMParser for YM5!/YM6! files"
-      },
-      {
-        type: 'feature',
-        "description": "Phase 3 — Future Composer synthesis engine"
-      },
-      {
-        type: 'feature',
-        "description": "Phase 2 — SidMon II + Digital Mugician real-time WASM synthesis"
-      },
-      {
-        type: 'fix',
-        "description": "Embed Backplate_GFX_01 texture into vestax-mixer GLB"
-      },
-      {
-        type: 'feature',
-        "description": "Exclude chip-dump formats from UADE mode selector in ImportModuleDialog"
-      },
-      {
-        type: 'feature',
-        "description": "Wire VGM/YM/NSF/SID/SAP/AY parsers into dispatch + extension list"
-      },
-      {
-        type: 'feature',
-        "description": "Add SIDParser, SAPParser, AYParser — C64/Atari/ZX Spectrum instrument stubs"
-      },
-      {
-        type: 'feature',
-        "description": "Add NSFParser — NES Sound Format with expansion chip instrument stubs"
-      },
-      {
-        type: 'feature',
-        "description": "Add YMParser — Atari ST AY/YM register dump format"
-      },
-      {
-        type: 'feature',
-        "description": "Add VGMParser — VGM/VGZ chip-dump with OPN2 pattern extraction"
-      },
-      {
-        type: 'fix',
-        "description": "Support comma-separated CORS origins for multi-port dev"
-      },
-      {
-        type: 'feature',
-        "description": "Phase 1 — SoundMon II real-time WASM synthesis pilot"
-      },
-      {
-        type: 'fix',
-        "description": "Apply speed2 alternation when switching subsongs"
-      },
-      {
-        type: 'feature',
-        "description": "Phase 0 — define format-specific synth types and C API"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add .worktrees/ to .gitignore"
-      },
-      {
-        type: 'improvement',
-        "description": "Add missing format imports design doc (VGM, YM, NSF, SAP, SID, AY)"
-      },
-      {
-        type: 'fix',
-        "description": "Proper subsong conversion — shared instruments, per-subsong patterns"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(furnace-insed): bump WASM cache-bust version to 3"
       }
     ]
   }
