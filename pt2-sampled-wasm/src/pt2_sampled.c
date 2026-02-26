@@ -120,9 +120,57 @@ static void initDefaultPalette(void)
 	video.palette[PAL_COLORKEY]  = 0x0000FF;
 }
 
+/* ---- Button press state (inverted while held, restored on mouse-up) ---- */
+
+static struct { int x1, y1, x2, y2, active; } g_pressedBtn;
+
+static void invertRect(int x1, int y1, int x2, int y2)
+{
+	for (int y = y1; y <= y2; y++)
+	{
+		uint32_t *row = &video.frameBuffer[y * SCREEN_W];
+		for (int x = x1; x <= x2; x++)
+			row[x] ^= 0x00FFFFFF;
+	}
+}
+
+static void pressButton(int x1, int y1, int x2, int y2)
+{
+	g_pressedBtn.x1 = x1; g_pressedBtn.y1 = y1;
+	g_pressedBtn.x2 = x2; g_pressedBtn.y2 = y2;
+	g_pressedBtn.active = 1;
+	invertRect(x1, y1, x2, y2);
+}
+
+static void releasePressedButton(void)
+{
+	if (!g_pressedBtn.active || samplerScreenBMP == NULL) return;
+	g_pressedBtn.active = 0;
+	int relY = g_pressedBtn.y1 - 121;
+	int w    = g_pressedBtn.x2 - g_pressedBtn.x1 + 1;
+	for (int row = 0; row <= g_pressedBtn.y2 - g_pressedBtn.y1; row++)
+	{
+		memcpy(
+			&video.frameBuffer[(g_pressedBtn.y1 + row) * SCREEN_W + g_pressedBtn.x1],
+			&samplerScreenBMP[(relY + row) * SCREEN_W + g_pressedBtn.x1],
+			w * sizeof(uint32_t)
+		);
+	}
+}
+
+/* ---- EM_JS callbacks for audio playback (defined before the play stubs that call them) ---- */
+
+EM_JS(void, js_onPlaySample, (int ptr, int len, int loopStart, int loopLength, int loopType), {
+	if (Module.onPlaySample) Module.onPlaySample(ptr, len, loopStart, loopLength, loopType);
+});
+
+EM_JS(void, js_onStopSample, (void), {
+	if (Module.onStopSample) Module.onStopSample();
+});
+
 /* ---- Stub functions ---- */
 
-void turnOffVoices(void) { }
+void turnOffVoices(void) { js_onStopSample(); }
 void lockAudio(void) { }
 void unlockAudio(void) { }
 
@@ -330,10 +378,60 @@ void renderSamplerFiltersBox(void) { displayMsg("FILTERS N/A"); }
 void recalcChordLength(void) { }
 void updatePaulaLoops(void) { }
 
-/* Play stubs (no audio in WASM extraction) */
-static void samplerPlayWaveform(void) { displayMsg("PLAY WAVEFORM"); }
-static void samplerPlayDisplay(void) { displayMsg("PLAY DISPLAY"); }
-static void samplerPlayRange(void) { displayMsg("PLAY RANGE"); }
+/* Play functions — delegate to JS via callbacks */
+
+static void samplerPlayWaveform(void)
+{
+	moduleSample_t *s = &song->samples[editor.currSample];
+	if (s->length == 0) { displayMsg("SAMPLE IS EMPTY"); return; }
+	displayMsg("PLAY WAVEFORM");
+	int loopType = (s->loopStart + s->loopLength > 2) ? 1 : 0;
+	js_onPlaySample(
+		(int)((uint8_t *)&song->sampleData[s->offset]),
+		s->length,
+		s->loopStart,
+		s->loopLength,
+		loopType
+	);
+}
+
+static void samplerPlayDisplay(void)
+{
+	moduleSample_t *s = &song->samples[editor.currSample];
+	if (s->length == 0) { displayMsg("SAMPLE IS EMPTY"); return; }
+	displayMsg("PLAY DISPLAY");
+	/* sampler.samStart points into the WASM heap; pass as-is */
+	int loopType = (s->loopStart + s->loopLength > 2) ? 1 : 0;
+	int32_t dispOffset = (int32_t)(sampler.samStart - &song->sampleData[s->offset]);
+	int32_t adjLoopStart = s->loopStart - dispOffset;
+	js_onPlaySample(
+		(int)((uint8_t *)sampler.samStart),
+		sampler.samDisplay,
+		adjLoopStart >= 0 ? adjLoopStart : 0,
+		s->loopLength,
+		(adjLoopStart >= 0) ? loopType : 0
+	);
+}
+
+static void samplerPlayRange(void)
+{
+	moduleSample_t *s = &song->samples[editor.currSample];
+	if (s->length == 0) { displayMsg("SAMPLE IS EMPTY"); return; }
+	int32_t start = editor.markStartOfs;
+	int32_t end   = editor.markEndOfs;
+	if (start < 0 || start >= end)
+	{
+		samplerPlayWaveform(); /* no mark → play all */
+		return;
+	}
+	displayMsg("PLAY RANGE");
+	js_onPlaySample(
+		(int)((uint8_t *)&song->sampleData[s->offset + start]),
+		end - start,
+		0, 0, 0
+	);
+}
+
 static void toggleTuningTone(void) { displayMsg("TUNING TONE"); }
 static void samplerResample(void) { displayMsg("RESAMPLE N/A"); }
 static void exitFromSam(void) { /* no-op: sampler is always shown */ }
@@ -658,6 +756,7 @@ void pt2_sampled_on_mouse_down(int x, int y)
 	/* ---- EXIT button (y 124-134) ---- */
 	if (y >= 124 && y <= 134 && x >= 6 && x <= 25)
 	{
+		pressButton(6, 124, 25, 134);
 		exitFromSam();
 		return;
 	}
@@ -665,15 +764,16 @@ void pt2_sampled_on_mouse_down(int x, int y)
 	/* ---- Row: PLAY WAV / SHOW RANGE / ZOOM OUT (y 211-221) ---- */
 	if (y >= 211 && y <= 221)
 	{
-		if (x >= 32 && x <= 95) samplerPlayWaveform();
-		else if (x >= 96 && x <= 175) samplerShowRange();
-		else if (x >= 176 && x <= 245) samplerZoomOut2x();
+		if      (x >= 32  && x <= 95)  { pressButton( 32, 211,  95, 221); samplerPlayWaveform(); }
+		else if (x >= 96  && x <= 175) { pressButton( 96, 211, 175, 221); samplerShowRange();    }
+		else if (x >= 176 && x <= 245) { pressButton(176, 211, 245, 221); samplerZoomOut2x();    }
 		return;
 	}
 
 	/* ---- STOP button spans rows 222-243 (x 0-30) ---- */
 	if (y >= 222 && y <= 243 && x >= 0 && x <= 30)
 	{
+		pressButton(0, 222, 30, 243);
 		turnOffVoices();
 		displayMsg("ALL RIGHT");
 		return;
@@ -682,36 +782,36 @@ void pt2_sampled_on_mouse_down(int x, int y)
 	/* ---- Row: PLAY DISP / SHOW ALL / RANGE ALL / LOOP (y 222-232) ---- */
 	if (y >= 222 && y <= 232)
 	{
-		if (x >= 32 && x <= 95) samplerPlayDisplay();
-		else if (x >= 96 && x <= 175) samplerShowAll();
-		else if (x >= 176 && x <= 245) samplerRangeAll();
-		else if (x >= 246 && x <= 319) samplerLoopToggle();
+		if      (x >= 32  && x <= 95)  { pressButton( 32, 222,  95, 232); samplerPlayDisplay(); }
+		else if (x >= 96  && x <= 175) { pressButton( 96, 222, 175, 232); samplerShowAll();     }
+		else if (x >= 176 && x <= 245) { pressButton(176, 222, 245, 232); samplerRangeAll();    }
+		else if (x >= 246 && x <= 319) { pressButton(246, 222, 319, 232); samplerLoopToggle();  }
 		return;
 	}
 
 	/* ---- Row: PLAY RNG / BEG / END / CENTER / SAMPLE / RESAMPLE / NOTE (y 233-243) ---- */
 	if (y >= 233 && y <= 243)
 	{
-		if (x >= 32 && x <= 94) samplerPlayRange();
-		else if (x >= 96 && x <= 115) sampleMarkerToBeg();
-		else if (x >= 116 && x <= 135) sampleMarkerToEnd();
-		else if (x >= 136 && x <= 174) sampleMarkerToCenter();
-		else if (x >= 176 && x <= 210) displayMsg("SAMPLING N/A");
-		else if (x >= 211 && x <= 245) samplerResample();
-		else if (x >= 246 && x <= 319) samplerResample();
+		if      (x >= 32  && x <= 94)  { pressButton( 32, 233,  94, 243); samplerPlayRange();          }
+		else if (x >= 96  && x <= 115) { pressButton( 96, 233, 115, 243); sampleMarkerToBeg();         }
+		else if (x >= 116 && x <= 135) { pressButton(116, 233, 135, 243); sampleMarkerToEnd();         }
+		else if (x >= 136 && x <= 174) { pressButton(136, 233, 174, 243); sampleMarkerToCenter();      }
+		else if (x >= 176 && x <= 210) { pressButton(176, 233, 210, 243); displayMsg("SAMPLING N/A"); }
+		else if (x >= 211 && x <= 245) { pressButton(211, 233, 245, 243); samplerResample();           }
+		else if (x >= 246 && x <= 319) { pressButton(246, 233, 319, 243); samplerResample();           }
 		return;
 	}
 
 	/* ---- Row: CUT / COPY / PASTE / VOLUME / TUNE / DC / FILTERS (y 244-254) ---- */
 	if (y >= 244 && y <= 254)
 	{
-		if (x >= 0 && x <= 31) samplerSamDelete(SAMPLE_CUT);
-		else if (x >= 32 && x <= 63) samplerSamCopy();
-		else if (x >= 64 && x <= 95) samplerSamPaste();
-		else if (x >= 96 && x <= 135) renderSamplerVolBox();
-		else if (x >= 136 && x <= 175) toggleTuningTone();
-		else if (x >= 176 && x <= 210) samplerRemoveDcOffset();
-		else if (x >= 211 && x <= 245) renderSamplerFiltersBox();
+		if      (x >= 0   && x <= 31)  { pressButton(  0, 244,  31, 254); samplerSamDelete(SAMPLE_CUT); }
+		else if (x >= 32  && x <= 63)  { pressButton( 32, 244,  63, 254); samplerSamCopy();             }
+		else if (x >= 64  && x <= 95)  { pressButton( 64, 244,  95, 254); samplerSamPaste();            }
+		else if (x >= 96  && x <= 135) { pressButton( 96, 244, 135, 254); renderSamplerVolBox();        }
+		else if (x >= 136 && x <= 175) { pressButton(136, 244, 175, 254); toggleTuningTone();           }
+		else if (x >= 176 && x <= 210) { pressButton(176, 244, 210, 254); samplerRemoveDcOffset();      }
+		else if (x >= 211 && x <= 245) { pressButton(211, 244, 245, 254); renderSamplerFiltersBox();    }
 		return;
 	}
 }
@@ -720,6 +820,7 @@ EMSCRIPTEN_KEEPALIVE
 void pt2_sampled_on_mouse_up(int x, int y)
 {
 	(void)x; (void)y;
+	releasePressedButton();
 	mouse.leftButtonPressed = false;
 	mouse.rightButtonPressed = false;
 	mouse.buttonState = 0;
