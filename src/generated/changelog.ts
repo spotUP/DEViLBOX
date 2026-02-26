@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-26T12:46:56.564Z
+ * Generated: 2026-02-26T12:54:44.330Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1323';
-export const BUILD_NUMBER = '1323';
-export const BUILD_HASH = '060a48bb';
+export const BUILD_VERSION = '1.0.1326';
+export const BUILD_NUMBER = '1326';
+export const BUILD_HASH = '4867bb50';
 export const BUILD_DATE = '2026-02-26';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,21 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1323',
+    version: '1.0.1326',
     date: '2026-02-26',
     changes: [
+      {
+        type: 'fix',
+        "description": "Add missing Z80 individual register setters (B,C,D,E,H,L,AF,F)"
+      },
+      {
+        type: 'feature',
+        "description": "Add Z80 CPU emulator for AY ZX Spectrum pattern extraction"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
       {
         type: 'fix',
         "description": "Fix RefObject null type errors for React 19 strict typing"
@@ -150,10 +162,6 @@ export const CHANGELOG: ChangelogEntry[] = [
         "description": "Support comma-separated CORS origins for multi-port dev"
       },
       {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
-      },
-      {
         type: 'feature',
         "description": "Phase 1 — SoundMon II real-time WASM synthesis pilot"
       },
@@ -212,18 +220,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore: changelog update, FT2 WASM patches, FT2Hardware volume/pan edit, cleanup"
-      },
-      {
-        type: 'feature',
-        "description": "FileBrowser previews, Modland API, UIStore imports, Pixi fixes"
-      },
-      {
-        type: 'fix',
-        "description": "WASM config polling, Retina canvas, and Hively layout fixes"
-      },
-      {
-        type: 'feature',
-        "description": "Per-format import dialogs in TrackerView and FT2Toolbar"
       }
     ]
   }

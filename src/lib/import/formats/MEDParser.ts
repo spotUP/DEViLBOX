@@ -288,16 +288,35 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
     const name = instrNames[i] || `Instrument ${i + 1}`;
 
     if (instr.synth || instr.waveLen === 0) {
-      // Synth instrument — create silent placeholder
-      instruments.push({
-        id: i + 1,
-        name,
-        type: 'synth' as const,
-        synthType: 'Synth' as const,
-        effects: [],
-        volume: -6,
-        pan: 0,
-      } as InstrumentConfig);
+      const synthBase = samplePos;
+      const synthLen  = u32(buf, synthBase);  // total struct size in bytes
+
+      if (synthLen > 0 && synthBase + synthLen <= buf.length) {
+        const loopStart = u16(buf, synthBase + 0x06) * 2;
+        const loopLen   = u16(buf, synthBase + 0x08) * 2;
+        // First waveform at offset 0x114, 256 bytes signed int8 PCM
+        const waveOff  = synthBase + 0x114;
+        const waveData = waveOff + 256 <= buf.length
+          ? buf.slice(waveOff, waveOff + 256)
+          : new Uint8Array(256);
+        instruments.push(createSamplerInstrument(
+          i + 1, name, waveData, instr.volume, 8287,
+          loopStart, loopStart + loopLen,
+        ));
+        samplePos += synthLen;
+        if (samplePos & 1) samplePos++;  // word-align
+      } else {
+        // Malformed SynthInstr — silent placeholder, don't advance
+        instruments.push({
+          id: i + 1,
+          name,
+          type: 'synth' as const,
+          synthType: 'Synth' as const,
+          effects: [],
+          volume: -6,
+          pan: 0,
+        } as InstrumentConfig);
+      }
       continue;
     }
 
