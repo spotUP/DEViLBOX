@@ -233,7 +233,14 @@ export type TrackerFormat =
   | 'FRED'  // Fred Editor
   | 'DMUG'  // Digital Mugician
   // UADE catch-all (playback-only, 130+ formats)
-  | 'UADE';
+  | 'UADE'
+  // Chip-dump / CPU-code formats (metadata + stub patterns)
+  | 'VGM'  // Video Game Music (OPN2/OPL/SN register dumps)
+  | 'YM'   // Atari ST AY/YM2149 register dumps
+  | 'NSF'  // NES Sound Format (2A03 + expansion chips)
+  | 'SID'  // Commodore 64 SID (PSID/RSID)
+  | 'SAP'  // Atari 8-bit POKEY
+  | 'AY';  // ZX Spectrum AY (ZXAYEMUL)
 
 /**
  * Channel state - all the per-channel data needed for playback
