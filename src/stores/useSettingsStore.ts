@@ -87,6 +87,7 @@ export interface FormatEnginePreferences {
   markCooksey: FormatEngineChoice;    // mc.*/mcr.*/mco.* → MarkCookseyParser vs UADE
   jeroenTel: FormatEngineChoice;      // jt.*/mon_old.* → JeroenTelParser vs UADE
   quartet: FormatEngineChoice;        // qpa.*/sqt.*/qts.* → QuartetParser vs UADE
+  jasonPage: FormatEngineChoice;      // jpn.*/jpnd.*/jp.* → JasonPageParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -205,6 +206,7 @@ export const useSettingsStore = create<SettingsStore>()(
         markCooksey: 'native',  // MarkCookseyParser — native parser available
         jeroenTel: 'native',    // JeroenTelParser — native parser available
         quartet: 'native',      // QuartetParser — native parser available
+        jasonPage: 'native',    // JasonPageParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
