@@ -38,6 +38,8 @@ export interface FormatEnginePreferences {
   sidmon1: FormatEngineChoice;    // .sid1/.smn (magic) → SidMon1Parser vs UADE
   davidWhittaker: FormatEngineChoice; // .dw/.dwold → DavidWhittakerParser vs UADE
   deltaMusic2: FormatEngineChoice;    // .dm2 → DeltaMusic2Parser vs UADE
+  artOfNoise: FormatEngineChoice;     // .aon/.aon8 → ArtOfNoiseParser vs UADE
+  benDaglish: FormatEngineChoice;     // .bd → BenDaglishParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -108,6 +110,8 @@ export const useSettingsStore = create<SettingsStore>()(
         sidmon1: 'native',      // SidMon1Parser — dedicated SidMon 1.0 support
         davidWhittaker: 'native', // DavidWhittakerParser — dedicated David Whittaker support
         deltaMusic2: 'native',  // DeltaMusic2Parser — dedicated Delta Music 2.0 support
+        artOfNoise: 'native',   // ArtOfNoiseParser — dedicated Art of Noise support
+        benDaglish: 'native',   // BenDaglishParser — dedicated Ben Daglish support
         uade: 'enhanced',       // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
