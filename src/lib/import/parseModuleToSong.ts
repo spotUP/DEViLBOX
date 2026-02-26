@@ -1606,6 +1606,29 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADE_fp(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── Jason Page (jpn.* / jpnd.* / jp.*) ──────────────────────────────────────
+  // Amiga 4-channel format. Three sub-variants (old/new/raw binary).
+  {
+    const _jpBase = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
+    const _mightBeJP =
+      _jpBase.toLowerCase().startsWith('jpn.') ||
+      _jpBase.toLowerCase().startsWith('jpnd.') ||
+      _jpBase.toLowerCase().startsWith('jp.');
+    if (_mightBeJP) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.jasonPage === 'native') {
+        try {
+          const { isJasonPageFormat, parseJasonPageFile } = await import('@lib/import/formats/JasonPageParser');
+          if (isJasonPageFormat(buffer, filename)) return parseJasonPageFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[JasonPageParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_jp } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_jp(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
