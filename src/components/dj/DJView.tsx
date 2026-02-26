@@ -478,26 +478,27 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
       <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />
 
       {/* ================================================================== */}
-      {/* SHARED WEBGL CANVAS — one context for all turntable 3D views       */}
-      {/* Only mounted in 3D mode. Views inside DeckVinyl3DView register via  */}
-      {/* View.Port (drei scissor rendering). pointer-events:none so HTML     */}
-      {/* controls in DJDeck still receive events normally.                  */}
+      {/* SHARED WEBGL CANVAS — one context for all 3D views in DJ mode     */}
+      {/* Mounted for the lifetime of DJView (never conditionally unmounted) */}
+      {/* so R3F never calls forceContextLoss() mid-session. Views inside    */}
+      {/* DeckVinyl3DView/MixerVestax3DView register via View.Port (drei     */}
+      {/* scissor rendering) and unregister automatically when unmounted.   */}
+      {/* background:transparent prevents the canvas element covering HTML.  */}
+      {/* pointer-events:none lets HTML controls receive events normally.    */}
       {/* ================================================================== */}
-      {deckViewMode === '3d' && (
-        <Canvas
-          style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-          eventSource={djViewRef}
-          eventPrefix="client"
-          gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
-          onCreated={({ gl }) => {
-            gl.toneMapping = THREE.ACESFilmicToneMapping;
-            gl.toneMappingExposure = 1.2;
-            gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault(), false);
-          }}
-        >
-          <View.Port />
-        </Canvas>
-      )}
+      <Canvas
+        style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'transparent' }}
+        eventSource={djViewRef}
+        eventPrefix="client"
+        gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
+        onCreated={({ gl }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.2;
+          gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault(), false);
+        }}
+      >
+        <View.Port />
+      </Canvas>
     </div>
   );
 };
