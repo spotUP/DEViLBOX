@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-25T10:13:40.575Z
+ * Generated: 2026-02-26T00:20:16.297Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1229';
-export const BUILD_NUMBER = '1229';
-export const BUILD_HASH = 'bd630aa1';
-export const BUILD_DATE = '2026-02-25';
+export const BUILD_VERSION = '1.0.1262';
+export const BUILD_NUMBER = '1262';
+export const BUILD_HASH = 'e3d6e331';
+export const BUILD_DATE = '2026-02-26';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,7 +30,151 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1229',
+    version: '1.0.1262',
+    date: '2026-02-26',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Button press animation and sample playback in hardware UI"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve four outstanding TODOs (Furnace order editing, modular port hover, drum pad comment, BD loop detection)"
+      },
+      {
+        type: 'feature',
+        "description": "Preview dialogs for .dbx projects and .dbi instruments"
+      },
+      {
+        type: 'feature',
+        "description": "Extract real metadata for all 11 native tracker formats"
+      },
+      {
+        type: 'feature',
+        "description": "Add Amiga IFF/8SVX sample import support"
+      },
+      {
+        type: 'fix',
+        "description": "Correct MOD native parser pitch — remove erroneous +24 octave shift"
+      }
+    ]
+  },
+  {
+    version: '2026-02-25',
+    date: '2026-02-25',
+    changes: [
+      {
+        type: 'fix',
+        "description": "2× Retina scale for PSG/Macro editors + wheel scroll fix"
+      },
+      {
+        type: 'fix',
+        "description": "2x Retina rendering via SDL logical size"
+      },
+      {
+        type: 'fix',
+        "description": "Smooth canvas scaling for ImGui SDL modules"
+      },
+      {
+        type: 'fix',
+        "description": "RAF loop + full-width SDL canvas"
+      },
+      {
+        type: 'fix',
+        "description": "Fix PSGHardware showing VERA for C64 instruments"
+      },
+      {
+        type: 'fix',
+        "description": "Restore C64/SID to PSGHardware by inverting renderFurnaceHardware priority"
+      },
+      {
+        type: 'fix',
+        "description": "Call updateSampleEditorSample() after loading PCM to show waveform"
+      },
+      {
+        type: 'fix',
+        "description": "Expand SYNTH_TO_DIV_INS_TYPE to cover all chip families"
+      },
+      {
+        type: 'fix',
+        "description": "Chip type routing, rawBinaryData flow, div-by-zero, log flood"
+      },
+      {
+        type: 'fix',
+        "description": "Instrument/sample audit round 2 fixes"
+      },
+      {
+        type: 'fix',
+        "description": "Correct note mapping and panning in all Amiga format parsers"
+      },
+      {
+        type: 'fix',
+        "description": "Correct note octave and channel panning in FCParser"
+      },
+      {
+        type: 'fix',
+        "description": "Correct note indices, playback pitch, and add scan cancel"
+      },
+      {
+        type: 'feature',
+        "description": "Full JS↔WASM serialization protocol"
+      },
+      {
+        type: 'feature',
+        "description": "5 UADE production-readiness fixes"
+      },
+      {
+        type: 'feature',
+        "description": "Subsong selection UI and full import pipeline wiring"
+      },
+      {
+        type: 'feature',
+        "description": "Complete UADE editability — pitch fix, persistence, pre-load, multi-subsong"
+      },
+      {
+        type: 'feature',
+        "description": "Close enhanced scan gaps — loops, VBlank BPM, arpeggio, warnings, fallback"
+      },
+      {
+        type: 'feature',
+        "description": "Per-format engine selectors in import dialog"
+      },
+      {
+        type: 'fix',
+        "description": "Ft2-sampled compilation patches for Emscripten"
+      },
+      {
+        type: 'fix',
+        "description": "Correct DigitalMugician header bounds check from +20 to +24"
+      },
+      {
+        type: 'fix',
+        "description": "Add UADE fallback try-catch to all native format parsers"
+      },
+      {
+        type: 'fix',
+        "description": "FC2/unknown FC variants fall back to UADE instead of error toast"
+      },
+      {
+        type: 'fix',
+        "description": "VJView null canvas guard + changelog update"
+      },
+      {
+        type: 'feature',
+        "description": "Ft2-sampled build system overhaul and WASM bridge"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve tracker scratch exit hang and re-entry oscillation"
+      },
+      {
+        type: 'fix',
+        "description": "Route module drops through WebGLModalBridge portal"
+      }
+    ]
+  },
+  {
+    version: '2026-02-24',
     date: '2026-02-24',
     changes: [
       {
@@ -100,138 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Wire up all 3D mixer controls to DJ engine"
-      },
-      {
-        type: 'fix',
-        "description": "DJ scratch now manipulates audio stream, not module replayer"
-      },
-      {
-        type: 'fix',
-        "description": "Restore pattern data overlay for pre-rendered modules in DJ view"
-      },
-      {
-        type: 'fix',
-        "description": "DJ deck layout overflow — records pushed down when songs loaded"
-      },
-      {
-        type: 'fix',
-        "description": "Crossfader and CF monitor translate along X axis (left/right)"
-      },
-      {
-        type: 'fix',
-        "description": "Fader rest position at bottom of groove (defaultValue=0)"
-      },
-      {
-        type: 'fix',
-        "description": "Remaining build errors in EditorControlsBar and ProjectMCanvas"
-      },
-      {
-        type: 'fix',
-        "description": "Build errors, per-fader travel distances from GLB geometry"
-      },
-      {
-        type: 'fix',
-        "description": "CF Monitor control moves left/right as horizontal slider"
-      },
-      {
-        type: 'fix',
-        "description": "Crossfader axis, fader travel, and duplicate knob mappings"
-      },
-      {
-        type: 'fix',
-        "description": "Faders offset from rest position — compute delta from defaultValue"
-      },
-      {
-        type: 'fix',
-        "description": "Map all 5 mixer faders with EXP namespace distinction"
-      },
-      {
-        type: 'fix',
-        "description": "Skip EXP duplicate meshes and invert fader Z axis"
-      },
-      {
-        type: 'fix',
-        "description": "Per-mesh rest matrices for 3D mixer faders and knobs"
-      },
-      {
-        type: 'fix',
-        "description": "3D mixer interactions and camera controls"
-      },
-      {
-        type: 'fix',
-        "description": "Fix 3D mixer/turntable interactions not working"
-      },
-      {
-        type: 'fix',
-        "description": "Route AHX/HVL files to Hively WASM instead of UADE"
-      },
-      {
-        type: 'fix',
-        "description": "Smooth progress bar during long analysis WASM calls"
-      },
-      {
-        type: 'fix',
-        "description": "Tap audio from Tone.Destination for all-source reactivity"
-      },
-      {
-        type: 'fix',
-        "description": "Skip updateMasterEffectParams on enable/disable toggle"
-      },
-      {
-        type: 'fix',
-        "description": "Debug(dj): add console logging to diagnose mixer 3D interaction"
-      },
-      {
-        type: 'fix',
-        "description": "Use DOM raycasting for mixer 3D knob/fader interaction"
-      },
-      {
-        type: 'fix',
-        "description": "Restore OrbitControls for 3D interaction, add overlay buttons"
-      },
-      {
-        type: 'feature',
-        "description": "Replace scroll-wheel zoom with on-screen camera controls"
-      },
-      {
-        type: 'fix',
-        "description": "Polish 3D mixer lighting, camera, and perf"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate 3D mixer in DJ view when in 3D mode"
-      },
-      {
-        type: 'feature',
-        "description": "Add 3D Vestax PMC-05 Pro III mixer component"
-      },
-      {
-        type: 'feature',
-        "description": "Add hamsterSwitch, cueMix, boothVolume to DJ store"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: gitignore projectm-wasm build artifacts"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update changelog"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add VJ dependencies (butterchurn, ISF, react-three postprocessing)"
-      },
-      {
-        type: 'fix',
-        "description": "Enable deck looping and simplify view switcher"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate VJ view into app navigation and layout"
-      },
-      {
-        type: 'feature',
-        "description": "Add VJ view UI with Milkdrop, ISF, and 3D scene modes"
       }
     ]
   }

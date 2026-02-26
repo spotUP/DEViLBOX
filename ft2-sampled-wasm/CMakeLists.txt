@@ -34,6 +34,10 @@ set(SOURCES
     src/gfxdata/ft2_bmp_looppins.c
     src/gfxdata/ft2_bmp_mouse.c
     src/gfxdata/ft2_bmp_instr.c
+    src/gfxdata/ft2_bmp_logo.c
+    src/gfxdata/ft2_bmp_midi.c
+    src/gfxdata/ft2_bmp_nibbles.c
+    src/gfxdata/ft2_bmp_scopes.c
 
     # WASM stubs (replacing SDL2/audio/file I/O subsystems)
     src/ft2_video.c
