@@ -38,6 +38,7 @@ import { FredSynth } from './fred/FredSynth';
 import { HippelCoSoSynth } from './hippelcoso/HippelCoSoSynth';
 import { RobHubbardSynth } from './robhubbard/RobHubbardSynth';
 import { SidMon1Synth } from './sidmon1/SidMon1Synth';
+import { OctaMEDSynth } from './octamed/OctaMEDSynth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -421,6 +422,7 @@ export class InstrumentFactory {
     'MAMERF5C400': 0,      // Silent (sample-playback chip, needs ROM + mapping)
     'ModularSynth': 0,     // Not yet calibrated
     'HivelySynth': 0,     // WASM song player — volume managed internally
+    'OctaMEDSynth': 0,   // OctaMED synth instrument — volume managed internally
     'UADESynth': 0,       // UADE exotic Amiga player — volume managed internally
   };
 
@@ -944,6 +946,17 @@ export class InstrumentFactory {
           );
         }
         instrument = sm1Synth;
+        break;
+      }
+
+      case 'OctaMEDSynth': {
+        const octaSynth = new OctaMEDSynth();
+        if (config.octamed) {
+          octaSynth.setInstrument(config.octamed).catch(err =>
+            console.error('[InstrumentFactory] OctaMED load failed:', err)
+          );
+        }
+        instrument = octaSynth;
         break;
       }
 

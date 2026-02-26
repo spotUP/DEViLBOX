@@ -205,6 +205,7 @@ export type SynthType =
   | 'HippelCoSoSynth' // Jochen Hippel CoSo (frequency/volume sequence synthesis)
   | 'RobHubbardSynth' // Rob Hubbard (Amiga PCM sample + vibrato/wobble synthesis)
   | 'SidMon1Synth'    // SidMon 1.0 (ADSR + arpeggio + wavetable synthesis)
+  | 'OctaMEDSynth'   // OctaMED SynthInstr (vol/wf command table oscillator)
   // Modular Synthesis
   | 'ModularSynth';   // Modular synthesizer with patch editor
 
@@ -1123,6 +1124,34 @@ export const DEFAULT_SIDMON1: SidMon1Config = {
     9, -22, -53, -82, -108, -127, -127, -127,
   ],
   phaseWave: new Array(32).fill(0),
+};
+
+/**
+ * OctaMED SynthInstr Configuration
+ * Real-time oscillator driven by vol/wf command tables, up to 10 waveforms.
+ */
+export interface OctaMEDConfig {
+  volume: number;         // 0-64
+  voltblSpeed: number;    // vol-table execute rate (0=every output block)
+  wfSpeed: number;        // wf-table execute rate
+  vibratoSpeed: number;   // 0-255
+  loopStart: number;      // bytes (reference only)
+  loopLen: number;        // bytes (reference only)
+  voltbl: Uint8Array;     // 128 bytes vol command table
+  wftbl: Uint8Array;      // 128 bytes wf command table
+  waveforms: Int8Array[]; // 1-10 × 256 signed bytes
+}
+
+export const DEFAULT_OCTAMED: OctaMEDConfig = {
+  volume: 64,
+  voltblSpeed: 0,
+  wfSpeed: 0,
+  vibratoSpeed: 0,
+  loopStart: 0,
+  loopLen: 0,
+  voltbl: new Uint8Array(128).fill(0xFF),   // single FF = loop at current volume
+  wftbl: new Uint8Array(128).fill(0xFF),    // single FF = loop on waveform 0
+  waveforms: [new Int8Array(256)],          // one silent waveform
 };
 
 /**
@@ -3459,6 +3488,7 @@ export interface InstrumentConfig {
   hippelCoso?: HippelCoSoConfig;
   robHubbard?: RobHubbardConfig;
   sidmon1?: SidMon1Config;
+  octamed?: OctaMEDConfig;
   // Modular Synthesis
   modularSynth?: import('./modular').ModularPatchConfig;
   // Sampler config
