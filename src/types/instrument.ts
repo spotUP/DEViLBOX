@@ -195,9 +195,15 @@ export type SynthType =
   | 'HivelySynth'     // HivelyTracker 16-channel chip synth (WASM)
   // UADE - Universal Amiga Demod-player (130+ exotic Amiga formats)
   | 'UADESynth'       // UADE catch-all (playback-only via 68k emulation)
+  // UADE Format-Specific Synths (native DSP via WASM)
+  | 'SoundMonSynth'   // SoundMon II / Brian Postma (wavetable + ADSR)
+  | 'SidMonSynth'     // SidMon II (SID-like synthesis)
+  | 'DigMugSynth'     // Digital Mugician (4-wave blending wavetable)
+  | 'FCSynth'         // Future Composer 1.3/1.4 (47 waveforms + synth macro)
+  | 'FredSynth'       // Fred Editor (macro-driven wavetable)
+  | 'TFMXSynth'       // TFMX / Jochen Hippel (SndMod/VolMod sequences)
   // Modular Synthesis
-  | 'ModularSynth'    // Modular synthesizer with patch editor
-  | 'UADESynth';      // UADE playback-only (exotic Amiga formats)
+  | 'ModularSynth';   // Modular synthesizer with patch editor
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 
@@ -689,6 +695,240 @@ export interface UADEConfig {
     maxSubsong: number;
   };
 }
+
+// =============================================================================
+// UADE Format-Specific Synth Configs
+// Each represents a native Amiga tracker instrument with real DSP parameters.
+// TypeScript sends these to a WASM engine that renders the audio in real-time.
+// All volume values: 0-64 (Amiga standard). Speed/delay values: 0-63 or 0-255.
+// =============================================================================
+
+/**
+ * SoundMon II (Brian Postma) instrument configuration.
+ * Supports both wavetable synth and raw PCM instruments.
+ */
+export interface SoundMonConfig {
+  type: 'synth' | 'pcm';
+  // Synth fields (type === 'synth')
+  waveType: number;          // 0-15: oscillator waveform (square, saw, triangle, noise, pulse variants)
+  waveSpeed: number;         // 0-15: waveform morph rate
+  arpTable: number[];        // 16 entries: semitone offsets per tick
+  arpSpeed: number;          // 0-15: ticks per arpeggio step
+  attackVolume: number;      // 0-64
+  decayVolume: number;       // 0-64
+  sustainVolume: number;     // 0-64
+  releaseVolume: number;     // 0-64
+  attackSpeed: number;       // 0-63
+  decaySpeed: number;        // 0-63
+  sustainLength: number;     // 0-255 ticks
+  releaseSpeed: number;      // 0-63
+  vibratoDelay: number;      // 0-255 ticks before vibrato starts
+  vibratoSpeed: number;      // 0-63
+  vibratoDepth: number;      // 0-63
+  portamentoSpeed: number;   // 0-63 (0 = disabled)
+  // PCM fields (type === 'pcm')
+  pcmData?: Uint8Array;      // Raw 8-bit signed PCM
+  loopStart?: number;        // Loop start in samples
+  loopLength?: number;       // Loop length in samples (0 = no loop)
+  finetune?: number;         // -8..+7
+  volume?: number;           // 0-64
+  transpose?: number;        // -12..+12 semitones
+}
+
+export const DEFAULT_SOUNDMON: SoundMonConfig = {
+  type: 'synth',
+  waveType: 0,
+  waveSpeed: 0,
+  arpTable: new Array(16).fill(0),
+  arpSpeed: 0,
+  attackVolume: 64,
+  decayVolume: 32,
+  sustainVolume: 32,
+  releaseVolume: 0,
+  attackSpeed: 4,
+  decaySpeed: 4,
+  sustainLength: 16,
+  releaseSpeed: 4,
+  vibratoDelay: 0,
+  vibratoSpeed: 0,
+  vibratoDepth: 0,
+  portamentoSpeed: 0,
+};
+
+/**
+ * SidMon II instrument configuration.
+ * SID-like synthesis with waveform + ADSR + filter + arpeggio.
+ */
+export interface SidMonConfig {
+  type: 'synth' | 'pcm';
+  // Synth fields
+  waveform: 0 | 1 | 2 | 3;  // 0=triangle, 1=sawtooth, 2=pulse, 3=noise
+  pulseWidth: number;         // 0-255 (for pulse waveform)
+  attack: number;             // 0-15 (SID ADSR format)
+  decay: number;              // 0-15
+  sustain: number;            // 0-15
+  release: number;            // 0-15
+  arpTable: number[];         // 8 entries: semitone offsets
+  arpSpeed: number;           // 0-15 ticks per step
+  vibDelay: number;           // 0-255 ticks
+  vibSpeed: number;           // 0-63
+  vibDepth: number;           // 0-63
+  filterCutoff: number;       // 0-255
+  filterResonance: number;    // 0-15
+  filterMode: number;         // 0=LP, 1=HP, 2=BP
+  // PCM fields
+  pcmData?: Uint8Array;
+  loopStart?: number;
+  loopLength?: number;
+  finetune?: number;          // -8..+7
+}
+
+export const DEFAULT_SIDMON: SidMonConfig = {
+  type: 'synth',
+  waveform: 1,               // sawtooth
+  pulseWidth: 128,
+  attack: 2,
+  decay: 4,
+  sustain: 8,
+  release: 4,
+  arpTable: new Array(8).fill(0),
+  arpSpeed: 0,
+  vibDelay: 0,
+  vibSpeed: 0,
+  vibDepth: 0,
+  filterCutoff: 255,
+  filterResonance: 0,
+  filterMode: 0,
+};
+
+/**
+ * Digital Mugician (V1/V2) instrument configuration.
+ * 4-wave blending wavetable + per-step volume envelope.
+ */
+export interface DigMugConfig {
+  wavetable: [number, number, number, number]; // 4 waveform indices (0-14 built-in waves each)
+  waveBlend: number;         // 0-63: blend position across 4 waves
+  waveSpeed: number;         // 0-63: morph rate
+  volume: number;            // 0-64
+  arpTable: number[];        // 8 entries: semitone offsets
+  arpSpeed: number;          // 0-15
+  vibSpeed: number;          // 0-63
+  vibDepth: number;          // 0-63
+  // V2 optional PCM layer
+  pcmData?: Uint8Array;
+  loopStart?: number;
+  loopLength?: number;
+}
+
+export const DEFAULT_DIGMUG: DigMugConfig = {
+  wavetable: [0, 2, 4, 6],
+  waveBlend: 0,
+  waveSpeed: 0,
+  volume: 64,
+  arpTable: new Array(8).fill(0),
+  arpSpeed: 0,
+  vibSpeed: 0,
+  vibDepth: 0,
+};
+
+/**
+ * Future Composer 1.3/1.4 instrument configuration.
+ * 47 built-in waveforms + synth macro sequencer + ADSR + vibrato + arpeggio.
+ */
+export interface FCConfig {
+  waveNumber: number;        // 0-46: initial waveform (0=saw, 1=sq, 2=tri, 3=noise, 4-46=composite)
+  synthTable: Array<{        // 16 synth macro steps
+    waveNum: number;         // 0-46: waveform for this step
+    transposition: number;   // semitone offset
+    effect: number;          // effect code (0=none, 1=slide, 2=vibrato, etc.)
+  }>;
+  synthSpeed: number;        // 0-15: ticks per synth macro step
+  atkLength: number;         // 0-255: attack length in ticks
+  atkVolume: number;         // 0-64: attack peak volume
+  decLength: number;         // 0-255: decay length in ticks
+  decVolume: number;         // 0-64: decay end volume (= sustain level)
+  sustVolume: number;        // 0-64: sustain volume
+  relLength: number;         // 0-255: release length in ticks
+  vibDelay: number;          // 0-255: ticks before vibrato starts
+  vibSpeed: number;          // 0-63
+  vibDepth: number;          // 0-63
+  arpTable: number[];        // 16 entries: semitone offsets
+}
+
+export const DEFAULT_FC: FCConfig = {
+  waveNumber: 0,
+  synthTable: Array.from({ length: 16 }, () => ({ waveNum: 0, transposition: 0, effect: 0 })),
+  synthSpeed: 1,
+  atkLength: 4,
+  atkVolume: 64,
+  decLength: 8,
+  decVolume: 32,
+  sustVolume: 32,
+  relLength: 8,
+  vibDelay: 0,
+  vibSpeed: 0,
+  vibDepth: 0,
+  arpTable: new Array(16).fill(0),
+};
+
+/**
+ * Fred Editor instrument configuration.
+ * Waveform oscillator + per-tick macro sequence + LFO.
+ */
+export interface FredConfig {
+  waveType: number;          // 0=sine, 1=square, 2=triangle, 3=saw, 4=noise, 5=PWM
+  speed: number;             // 0-63: ticks per macro step
+  macroTable: Array<{        // per-tick macro entries
+    pitchMod: number;        // semitone pitch modulation
+    volume: number;          // 0-64
+    effectCode: number;      // effect identifier
+    effectParam: number;     // effect parameter
+  }>;
+  vibSpeed: number;          // 0-63
+  vibDepth: number;          // 0-63
+  vibDelay: number;          // 0-255 ticks
+  portamentoType: 0 | 1 | 2; // 0=none, 1=linear, 2=exponential
+}
+
+export const DEFAULT_FRED: FredConfig = {
+  waveType: 0,
+  speed: 1,
+  macroTable: [{ pitchMod: 0, volume: 64, effectCode: 0, effectParam: 0 }],
+  vibSpeed: 0,
+  vibDepth: 0,
+  vibDelay: 0,
+  portamentoType: 0,
+};
+
+/**
+ * TFMX (Jochen Hippel) instrument configuration.
+ * Sound Modifier Sequence (SndModSeq) + Volume Modifier Sequence (VolModSeq)
+ * with optional PCM sample reference.
+ */
+export interface TFMXConfig {
+  sndModSeq: Array<{         // Sound Modifier Sequence steps
+    multiEffect: number;     // multi-effect byte (pitch + effect packed)
+    speed: number;           // ticks per step
+    length: number;          // sequence length
+    volume: number;          // 0-64
+  }>;
+  volModSeq: Array<{         // Volume Modifier Sequence steps
+    sndModRef: number;       // index into sndModSeq
+    volume: number;          // 0-64
+    speed: number;
+    length: number;
+  }>;
+  pcmSampleId?: number;      // Index into companion .smpl PCM bank (if any)
+  transpose: number;         // semitone transpose (-24..+24)
+  detune: number;            // fine detune in cents (-100..+100)
+}
+
+export const DEFAULT_TFMX: TFMXConfig = {
+  sndModSeq: [{ multiEffect: 0, speed: 1, length: 1, volume: 64 }],
+  volModSeq: [{ sndModRef: 0, volume: 64, speed: 1, length: 1 }],
+  transpose: 0,
+  detune: 0,
+};
 
 /**
  * SuperSaw Synthesizer Configuration
@@ -3014,6 +3254,13 @@ export interface InstrumentConfig {
   hively?: HivelyConfig;
   // UADE exotic Amiga format (playback-only)
   uade?: UADEConfig;
+  // UADE Format-Specific Synths (native DSP via WASM)
+  soundMon?: SoundMonConfig;
+  sidMon?: SidMonConfig;
+  digMug?: DigMugConfig;
+  fc?: FCConfig;
+  fred?: FredConfig;
+  tfmx?: TFMXConfig;
   // Modular Synthesis
   modularSynth?: import('./modular').ModularPatchConfig;
   // Sampler config
