@@ -1015,14 +1015,26 @@ function _decodeDelta8(bytes: Uint8Array): Float32Array {
 }
 
 function _decodeDelta16(bytes: Uint8Array): Float32Array {
-  const count = bytes.length >> 1;
-  const out = new Float32Array(count);
-  let acc = 0;
-  for (let i = 0; i < count; i++) {
-    const raw = (bytes[i * 2] << 8) | (bytes[i * 2 + 1] & 0xFF);
-    const delta = raw > 32767 ? raw - 65536 : raw;
-    acc = ((acc + delta) + 65536) & 0xFFFF;
-    out[i] = (acc < 32768 ? acc : acc - 65536) / 32768.0;
+  const BLOCK_BYTES = 4096;
+  const BLOCK_SAMPLES = BLOCK_BYTES / 2; // 2048 samples per block
+  const numBlocks = Math.floor(bytes.length / BLOCK_BYTES);
+  const out = new Float32Array(numBlocks * BLOCK_SAMPLES);
+  const lsbBuf = new Uint8Array(BLOCK_SAMPLES);
+
+  for (let block = 0; block < numBlocks; block++) {
+    const offset = block * BLOCK_BYTES;
+    let lastVal = 0;
+    // Decode LSBs (first half of block)
+    for (let i = 0; i < BLOCK_SAMPLES; i++) {
+      lastVal = (lastVal + bytes[offset + i]) & 0xFF;
+      lsbBuf[i] = lastVal;
+    }
+    // Decode MSBs (second half of block), continuing lastVal
+    for (let i = 0; i < BLOCK_SAMPLES; i++) {
+      lastVal = (lastVal + bytes[offset + BLOCK_SAMPLES + i]) & 0xFF;
+      const raw = (lastVal << 8) | lsbBuf[i];
+      out[block * BLOCK_SAMPLES + i] = (raw > 32767 ? raw - 65536 : raw) / 32768.0;
+    }
   }
   return out;
 }
@@ -1308,9 +1320,10 @@ export async function parseSymphonieForPlayback(
     // newLoopSystem: bit 4 of lineSampleFlags
     const newLoopSystem = (lineSampleFlags & 0x10) !== 0;
 
-    // Loop values: percentage × 256×256
-    const loopStart = loopStartHigh * 256 * 256;
-    const loopLen   = loopLenHigh   * 256 * 256;
+    // loopStart = loopStartHigh * 65536  (percentage × 65536)
+    // loopLen   = loopLenHigh   * 65536  (percentage × 65536)
+    const loopStart = loopStartHigh * 65536;
+    const loopLen   = loopLenHigh   * 65536;
 
     // Determine whether this instrument has PCM
     const hasPCM = si.type !== -8 && si.type !== -4 && si.type !== 0;

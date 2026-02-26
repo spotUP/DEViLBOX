@@ -8,8 +8,8 @@ export interface SymphonieInstrumentData {
   fineTune: number;          // signed fine tune
   noDsp: boolean;            // if true, voice bypasses DSP ring buffer
   multiChannel: number;      // 0=mono, 1=stereoL, 2=stereoR, 3=lineSrc
-  loopStart: number;         // raw file value (percentage × 100×256×256) — loop calc in worklet
-  loopLen: number;           // raw file value
+  loopStart: number;   // percentage × 65536 (0%=0, 100%=6553600); worklet: floor(loopStart*N/(100*65536))
+  loopLen: number;     // percentage × 65536 (same encoding as loopStart)
   numLoops: number;          // 0=infinite
   newLoopSystem: boolean;    // bit 4 of LineSampleFlags
   samples: Float32Array | null;       // null if type is -8/-4/0 (no PCM)
