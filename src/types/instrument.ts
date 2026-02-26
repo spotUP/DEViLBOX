@@ -203,6 +203,7 @@ export type SynthType =
   | 'FredSynth'       // Fred Editor (macro-driven wavetable)
   | 'TFMXSynth'       // TFMX / Jochen Hippel (SndMod/VolMod sequences)
   | 'HippelCoSoSynth' // Jochen Hippel CoSo (frequency/volume sequence synthesis)
+  | 'RobHubbardSynth' // Rob Hubbard (Amiga PCM sample + vibrato/wobble synthesis)
   // Modular Synthesis
   | 'ModularSynth';   // Modular synthesizer with patch editor
 
@@ -1033,6 +1034,43 @@ export const DEFAULT_HIPPEL_COSO: HippelCoSoConfig = {
   vibSpeed: 0,
   vibDepth: 0,
   vibDelay: 0,
+};
+
+/**
+ * Rob Hubbard synthesizer configuration.
+ *
+ * Rob Hubbard's Amiga music system uses PCM sample playback with:
+ *   - period-based frequency (Amiga Paula-style)
+ *   - per-instrument relative tuning (3579545 / freqHz)
+ *   - vibrato driven by a shared table, indexed per instrument
+ *   - wobble oscillator: synthPos bouncing between loPos and hiPos
+ *     sets sample bytes to 60 to create waveform morphing
+ *   - portamento: signed period delta each tick
+ */
+export interface RobHubbardConfig {
+  sampleLen: number;      // PCM data length in bytes
+  loopOffset: number;     // loop start offset from sample start; <0 = no loop
+  sampleVolume: number;   // Amiga volume 0-64
+  relative: number;       // integer: 3579545 / freqHz (for period scaling)
+  divider: number;        // vibrato depth divisor; 0 = no vibrato
+  vibratoIdx: number;     // starting index within vibTable
+  hiPos: number;          // wobble upper bound; 0 = no wobble
+  loPos: number;          // wobble lower bound
+  vibTable: number[];     // vibrato wave table (signed int8 values)
+  sampleData: number[];   // PCM data (signed int8 values)
+}
+
+export const DEFAULT_ROB_HUBBARD: RobHubbardConfig = {
+  sampleLen: 0,
+  loopOffset: -1,
+  sampleVolume: 64,
+  relative: 256,
+  divider: 0,
+  vibratoIdx: 0,
+  hiPos: 0,
+  loPos: 0,
+  vibTable: [],
+  sampleData: [],
 };
 
 /**
@@ -3367,6 +3405,7 @@ export interface InstrumentConfig {
   fred?: FredConfig;
   tfmx?: TFMXConfig;
   hippelCoso?: HippelCoSoConfig;
+  robHubbard?: RobHubbardConfig;
   // Modular Synthesis
   modularSynth?: import('./modular').ModularPatchConfig;
   // Sampler config
