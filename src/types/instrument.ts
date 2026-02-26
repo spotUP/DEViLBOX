@@ -904,32 +904,33 @@ export const DEFAULT_FRED: FredConfig = {
 
 /**
  * TFMX (Jochen Hippel) instrument configuration.
- * Sound Modifier Sequence (SndModSeq) + Volume Modifier Sequence (VolModSeq)
- * with optional PCM sample reference.
+ *
+ * Stores the raw binary data needed for real-time WASM synthesis via TFMXSynth.
+ * The WASM module builds a minimal TFMX module from these blobs on each note_on.
+ *
+ * - sndSeqsCount:  total number of SndModSeqs in the original file
+ * - sndModSeqData: all SndModSeqs concatenated (sndSeqsCount × 64 bytes)
+ * - volModSeqData: this instrument's VolModSeq (64 bytes)
+ * - sampleCount:   number of PCM sample slots in the bank
+ * - sampleHeaders: raw sample header bytes (sampleCount × 30 bytes)
+ * - sampleData:    raw 8-bit signed PCM bank (all samples concatenated)
  */
 export interface TFMXConfig {
-  sndModSeq: Array<{         // Sound Modifier Sequence steps
-    multiEffect: number;     // multi-effect byte (pitch + effect packed)
-    speed: number;           // ticks per step
-    length: number;          // sequence length
-    volume: number;          // 0-64
-  }>;
-  volModSeq: Array<{         // Volume Modifier Sequence steps
-    sndModRef: number;       // index into sndModSeq
-    volume: number;          // 0-64
-    speed: number;
-    length: number;
-  }>;
-  pcmSampleId?: number;      // Index into companion .smpl PCM bank (if any)
-  transpose: number;         // semitone transpose (-24..+24)
-  detune: number;            // fine detune in cents (-100..+100)
+  sndSeqsCount:  number;
+  sndModSeqData: Uint8Array;  // sndSeqsCount × 64 bytes
+  volModSeqData: Uint8Array;  // 64 bytes — this instrument's VolModSeq
+  sampleCount:   number;
+  sampleHeaders: Uint8Array;  // sampleCount × 30 bytes
+  sampleData:    Uint8Array;  // raw PCM bank
 }
 
 export const DEFAULT_TFMX: TFMXConfig = {
-  sndModSeq: [{ multiEffect: 0, speed: 1, length: 1, volume: 64 }],
-  volModSeq: [{ sndModRef: 0, volume: 64, speed: 1, length: 1 }],
-  transpose: 0,
-  detune: 0,
+  sndSeqsCount:  1,
+  sndModSeqData: new Uint8Array(64),
+  volModSeqData: new Uint8Array(64),
+  sampleCount:   0,
+  sampleHeaders: new Uint8Array(0),
+  sampleData:    new Uint8Array(0),
 };
 
 /**
