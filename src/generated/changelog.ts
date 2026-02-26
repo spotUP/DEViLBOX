@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-26T08:22:46.213Z
+ * Generated: 2026-02-26T12:46:56.564Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1290';
-export const BUILD_NUMBER = '1290';
-export const BUILD_HASH = '4c2e88ac';
+export const BUILD_VERSION = '1.0.1323';
+export const BUILD_NUMBER = '1323';
+export const BUILD_HASH = '060a48bb';
 export const BUILD_DATE = '2026-02-26';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,12 +30,140 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1290',
+    version: '1.0.1323',
     date: '2026-02-26',
     changes: [
       {
         type: 'fix',
+        "description": "Fix RefObject null type errors for React 19 strict typing"
+      },
+      {
+        type: 'fix',
+        "description": "Clamp NSF channels to base APU, fix SAP play-addr fallback"
+      },
+      {
+        type: 'feature',
+        "description": "NSF/SID/SAP pattern extraction via 6502 CPU emulation"
+      },
+      {
+        type: 'fix',
+        "description": "Always mount shared Canvas; add background:transparent"
+      },
+      {
+        type: 'fix',
+        "description": "Rebuild vestax-mixer GLB with full texture set"
+      },
+      {
+        type: 'improvement',
+        "description": "Build(soundmon): compile SoundMon.wasm from soundmon_synth.c"
+      },
+      {
+        type: 'feature',
+        "description": "Phase 7 — instrument editor UI for all new synth types"
+      },
+      {
+        type: 'feature',
+        "description": "Add 6502 CPU emulator for NSF/SID/SAP pattern extraction"
+      },
+      {
+        type: 'fix',
+        "description": "Correct OPM test comment (nibble A = B4, not A#4)"
+      },
+      {
+        type: 'fix',
+        "description": "Correct OPM KC note encoding and add OPM test"
+      },
+      {
+        type: 'fix',
+        "description": "Move mixer into shared WebGL canvas via drei View"
+      },
+      {
+        type: 'feature',
+        "description": "Phase 6 — instrument naming for enhanced scan"
+      },
+      {
+        type: 'fix',
+        "description": "Share single WebGL context across all turntable 3D views"
+      },
+      {
+        type: 'feature',
+        "description": "Add FredSynth — real-time PWM synthesis for Fred Editor type-1 instruments"
+      },
+      {
+        type: 'feature',
+        "description": "Add TFMXSynth — per-note TFMX synthesis via libtfmxaudiodecoder WASM"
+      },
+      {
+        type: 'feature',
+        "description": "Add SN76489 PSG and OPM note extraction to VGMParser"
+      },
+      {
+        type: 'fix',
+        "description": "Cap LZH-5 bit-length at 15, tighten output cap, fix plan doc error"
+      },
+      {
+        type: 'fix',
+        "description": "Remove mesh debug logging and improve WebGL context loss resilience"
+      },
+      {
+        type: 'fix',
+        "description": "Correct LZH-5 decoder in YMParser for YM5!/YM6! files"
+      },
+      {
+        type: 'feature',
+        "description": "Phase 3 — Future Composer synthesis engine"
+      },
+      {
+        type: 'feature',
+        "description": "Phase 2 — SidMon II + Digital Mugician real-time WASM synthesis"
+      },
+      {
+        type: 'fix',
+        "description": "Embed Backplate_GFX_01 texture into vestax-mixer GLB"
+      },
+      {
+        type: 'feature',
+        "description": "Exclude chip-dump formats from UADE mode selector in ImportModuleDialog"
+      },
+      {
+        type: 'feature',
+        "description": "Wire VGM/YM/NSF/SID/SAP/AY parsers into dispatch + extension list"
+      },
+      {
+        type: 'feature',
+        "description": "Add SIDParser, SAPParser, AYParser — C64/Atari/ZX Spectrum instrument stubs"
+      },
+      {
+        type: 'feature',
+        "description": "Add NSFParser — NES Sound Format with expansion chip instrument stubs"
+      },
+      {
+        type: 'feature',
+        "description": "Add YMParser — Atari ST AY/YM register dump format"
+      },
+      {
+        type: 'feature',
+        "description": "Add VGMParser — VGM/VGZ chip-dump with OPN2 pattern extraction"
+      },
+      {
+        type: 'fix',
+        "description": "Support comma-separated CORS origins for multi-port dev"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'feature',
+        "description": "Phase 1 — SoundMon II real-time WASM synthesis pilot"
+      },
+      {
+        type: 'fix',
         "description": "Apply speed2 alternation when switching subsongs"
+      },
+      {
+        type: 'feature',
+        "description": "Phase 0 — define format-specific synth types and C API"
       },
       {
         type: 'feature',
@@ -52,10 +180,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore(furnace-insed): bump WASM cache-bust version to 3"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
       },
       {
         type: 'fix',
@@ -100,140 +224,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Per-format import dialogs in TrackerView and FT2Toolbar"
-      },
-      {
-        type: 'feature',
-        "description": "TFMX format routing, MIDI options, and multi-effect slots 3-8"
-      },
-      {
-        type: 'fix',
-        "description": "ToneEngine Sampler reload decode and looped Player stop"
-      },
-      {
-        type: 'feature',
-        "description": "Expand FurnaceEffectRouter platform family coverage"
-      },
-      {
-        type: 'feature',
-        "description": "Implement all 5 remaining gap fixes for UADE enhanced imports"
-      },
-      {
-        type: 'fix',
-        "description": "Native parser playback — period-based audio, volume, stereo, portamento"
-      },
-      {
-        type: 'fix',
-        "description": "Remove per-note console.log flood from FurnaceSynth and RegisterMapper"
-      },
-      {
-        type: 'fix',
-        "description": "Close AudioContext on unmount (parity with FT2)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix false arpeggio, clean up feature blocks, add groove parsing"
-      },
-      {
-        type: 'fix',
-        "description": "Implement 15 outstanding stubs from FIXES.md"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SDL_CreateMutex stub allocation size warning"
-      },
-      {
-        type: 'feature',
-        "description": "Button press animation and sample playback in hardware UI"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve four outstanding TODOs (Furnace order editing, modular port hover, drum pad comment, BD loop detection)"
-      },
-      {
-        type: 'feature',
-        "description": "Preview dialogs for .dbx projects and .dbi instruments"
-      },
-      {
-        type: 'feature',
-        "description": "Extract real metadata for all 11 native tracker formats"
-      },
-      {
-        type: 'feature',
-        "description": "Add Amiga IFF/8SVX sample import support"
-      },
-      {
-        type: 'fix',
-        "description": "Correct MOD native parser pitch — remove erroneous +24 octave shift"
-      }
-    ]
-  },
-  {
-    version: '2026-02-25',
-    date: '2026-02-25',
-    changes: [
-      {
-        type: 'fix',
-        "description": "2× Retina scale for PSG/Macro editors + wheel scroll fix"
-      },
-      {
-        type: 'fix',
-        "description": "2x Retina rendering via SDL logical size"
-      },
-      {
-        type: 'fix',
-        "description": "Smooth canvas scaling for ImGui SDL modules"
-      },
-      {
-        type: 'fix',
-        "description": "RAF loop + full-width SDL canvas"
-      },
-      {
-        type: 'fix',
-        "description": "Fix PSGHardware showing VERA for C64 instruments"
-      },
-      {
-        type: 'fix',
-        "description": "Restore C64/SID to PSGHardware by inverting renderFurnaceHardware priority"
-      },
-      {
-        type: 'fix',
-        "description": "Call updateSampleEditorSample() after loading PCM to show waveform"
-      },
-      {
-        type: 'fix',
-        "description": "Expand SYNTH_TO_DIV_INS_TYPE to cover all chip families"
-      },
-      {
-        type: 'fix',
-        "description": "Chip type routing, rawBinaryData flow, div-by-zero, log flood"
-      },
-      {
-        type: 'fix',
-        "description": "Instrument/sample audit round 2 fixes"
-      },
-      {
-        type: 'fix',
-        "description": "Correct note mapping and panning in all Amiga format parsers"
-      },
-      {
-        type: 'fix',
-        "description": "Correct note octave and channel panning in FCParser"
-      },
-      {
-        type: 'fix',
-        "description": "Correct note indices, playback pitch, and add scan cancel"
-      },
-      {
-        type: 'feature',
-        "description": "Full JS↔WASM serialization protocol"
-      },
-      {
-        type: 'feature',
-        "description": "5 UADE production-readiness fixes"
-      },
-      {
-        type: 'feature',
-        "description": "Subsong selection UI and full import pipeline wiring"
       }
     ]
   }
