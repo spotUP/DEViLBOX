@@ -803,6 +803,116 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADE_rk(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── UNIC Tracker (.unic) ─────────────────────────────────────────────────
+  if (/\.unic$/.test(filename)) {
+    try {
+      const { isUNICFormat, parseUNICFile } = await import('@lib/import/formats/UNICParser');
+      if (isUNICFormat(buffer)) return parseUNICFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[UNICParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── MultiTracker (.mtm) ──────────────────────────────────────────────────
+  if (/\.mtm$/.test(filename)) {
+    try {
+      const { isMTMFormat, parseMTMFile } = await import('@lib/import/formats/MTMParser');
+      if (isMTMFormat(buffer)) return parseMTMFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[MTMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── Composer 669 (.669) ──────────────────────────────────────────────────
+  if (/\.669$/.test(filename)) {
+    try {
+      const { is669Format, parse669File } = await import('@lib/import/formats/Format669Parser');
+      if (is669Format(buffer)) return parse669File(buffer, file.name);
+    } catch (err) {
+      console.warn(`[Format669Parser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── Farandole Composer (.far) ─────────────────────────────────────────────
+  if (/\.far$/.test(filename)) {
+    try {
+      const { isFARFormat, parseFARFile } = await import('@lib/import/formats/FARParser');
+      if (isFARFormat(buffer)) return parseFARFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[FARParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── Disorder Tracker 2 (.plm) ─────────────────────────────────────────────
+  if (/\.plm$/.test(filename)) {
+    try {
+      const { isPLMFormat, parsePLMFile } = await import('@lib/import/formats/PLMParser');
+      if (isPLMFormat(buffer)) return parsePLMFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[PLMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── Ultra Tracker (.ult) ──────────────────────────────────────────────────
+  if (/\.ult$/.test(filename)) {
+    try {
+      const { isULTFormat, parseULTFile } = await import('@lib/import/formats/ULTParser');
+      if (isULTFormat(buffer)) return parseULTFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[ULTParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── Reality Tracker (.rtm) ────────────────────────────────────────────────
+  if (/\.rtm$/.test(filename)) {
+    try {
+      const { isRTMFormat, parseRTMFile } = await import('@lib/import/formats/RTMParser');
+      if (isRTMFormat(buffer)) return parseRTMFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[RTMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── DSIK Sound Module (.dsm) ──────────────────────────────────────────────
+  if (/\.dsm$/.test(filename)) {
+    try {
+      const { isDSMFormat, parseDSMFile } = await import('@lib/import/formats/DSMParser');
+      if (isDSMFormat(buffer)) return parseDSMFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[DSMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── Digital Tracker (.dtm) ────────────────────────────────────────────────
+  if (/\.dtm$/.test(filename)) {
+    try {
+      const { isDTMFormat, parseDTMFile } = await import('@lib/import/formats/DTMParser');
+      if (isDTMFormat(buffer)) return parseDTMFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[DTMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── ScreamTracker 2 (.stm) ────────────────────────────────────────────────
+  if (/\.stm$/.test(filename)) {
+    try {
+      const { isSTMFormat, parseSTMFile } = await import('@lib/import/formats/STMParser');
+      if (isSTMFormat(buffer)) return parseSTMFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[STMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
