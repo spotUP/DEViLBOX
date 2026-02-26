@@ -1472,6 +1472,29 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADE_trc(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
+  // ── Dave Lowe (.dl / DL.* prefix) ─────────────────────────────────────────
+  // Compiled 68k Amiga music format. Magic: three specific opcodes at offsets 0,4,8.
+  {
+    const _dlBase = (filename.split('/').pop() ?? filename).toLowerCase();
+    const _mightBeDL = /\.dl$/i.test(filename) || /\.dl_deli$/i.test(filename) || _dlBase.startsWith('dl.');
+    if (_mightBeDL) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.daveLowe === 'native') {
+        try {
+          const { isDaveLoweFormat, parseDaveLoweFile } = await import('@lib/import/formats/DaveLoweParser');
+          if (isDaveLoweFormat(new Uint8Array(buffer))) {
+            const result = await parseDaveLoweFile(buffer, file.name);
+            if (result) return result;
+          }
+        } catch (err) {
+          console.warn(`[DaveLoweParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_dl } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_dl(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
