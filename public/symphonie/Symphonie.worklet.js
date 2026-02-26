@@ -1117,7 +1117,6 @@ class VoiceExpander {
         SampleMix += this.getNextVoiceSample(idx);
       }
     }
-    this.checkSongEvent(); // check if song is playing, drive events
     return SampleMix;
   }
 
@@ -1251,6 +1250,9 @@ class SymphonieProcessor extends AudioWorkletProcessor {
     const len = L.length;
 
     for (let i = 0; i < len; i++) {
+      // Advance sequencer once per output sample (not once per channel)
+      this._expander.checkSongEvent();
+
       // Mirror PlayActualMixThread (VoiceExpander.ts lines 1229-1245):
       // Left channel
       const dryL = this._expander.getNextMixSample(0);
