@@ -97,6 +97,14 @@ export interface FormatEnginePreferences {
   steveTurner: FormatEngineChoice;    // jpo.*/jpold.* → SteveTurnerParser vs UADE
   tme: FormatEngineChoice;            // .tme/TME.* → TMEParser vs UADE
   infogrames: FormatEngineChoice;     // .dum → InfogramesParser vs UADE
+  timeTracker: FormatEngineChoice;    // TMK.* → TimeTrackerParser vs UADE
+  chipTracker: FormatEngineChoice;    // KRIS.* → ChipTrackerParser vs UADE
+  cinemaware: FormatEngineChoice;     // CIN.* → CinemawareParser vs UADE
+  novoTradePacker: FormatEngineChoice; // NTP.* → NovoTradePackerParser vs UADE
+  alcatrazPacker: FormatEngineChoice; // ALP.* → AlcatrazPackerParser vs UADE
+  bladePacker: FormatEngineChoice;    // UDS.* → BladePackerParser vs UADE
+  tomyTracker: FormatEngineChoice;    // SG.* → TomyTrackerParser vs UADE
+  imagesMusicSystem: FormatEngineChoice; // IMS.* (prefix) → ImagesMusicSystemParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -225,6 +233,14 @@ export const useSettingsStore = create<SettingsStore>()(
         steveTurner: 'native',  // SteveTurnerParser — native parser available
         tme: 'native',          // TMEParser — native parser available
         infogrames: 'native',   // InfogramesParser — native parser available
+        timeTracker: 'native',  // TimeTrackerParser — native parser available
+        chipTracker: 'native',  // ChipTrackerParser — native parser available
+        cinemaware: 'native',   // CinemawareParser — native parser available
+        novoTradePacker: 'native', // NovoTradePackerParser — native parser available
+        alcatrazPacker: 'native', // AlcatrazPackerParser — native parser available
+        bladePacker: 'native',  // BladePackerParser — native parser available
+        tomyTracker: 'native',  // TomyTrackerParser — native parser available
+        imagesMusicSystem: 'native', // ImagesMusicSystemParser (IMS.* prefix) — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
