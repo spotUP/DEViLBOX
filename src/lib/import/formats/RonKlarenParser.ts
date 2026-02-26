@@ -386,18 +386,15 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   // Each sub-song entry: 4 × uint32 BE (track list pointers from file start)
   const subSongTrackOffsets: number[][] = [];
 
-  let _actualSubSongs = numberOfSubSongs;
   for (let i = 0; i < numberOfSubSongs; i++) {
     const base = subSongInfoOffset + i * 16;
     if (base + 16 > fileLen) {
-      _actualSubSongs = i;
       break;
     }
     const offsets: number[] = [];
     for (let j = 0; j < 4; j++) {
       const trackListOffset = u32BE(bytes, base + j * 4) + AMIGA_HUNK_SIZE;
       if (trackListOffset >= fileLen) {
-        _actualSubSongs = i;
         break;
       }
       offsets.push(trackListOffset);
@@ -410,41 +407,6 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
   // ── Load track lists for each sub-song ──────────────────────────────────
   const subSongs: RkSongInfo[] = [];
-
-  function _loadSingleTrackList(offset: number): RkTrack[] | null {
-    const tracks: RkTrack[] = [];
-    let off = offset;
-    for (;;) {
-      if (off + 4 > fileLen) return null;
-      const trackOffset = s32BE(bytes, off);
-      if (trackOffset < 0) break; // sentinel
-
-      const trackAbsOffset = trackOffset + AMIGA_HUNK_SIZE;
-      off += 2; // skip 2 bytes (reserved/padding)
-      if (off + 2 > fileLen) return null;
-      const _transpose = s16BE(bytes, off + 2); // actually at off+2 since we skipped 2
-      // Per NostalgicPlayer: seek(2) then read int16 transpose
-      // Re-reading the code:
-      //   trackOffset = Read_B_INT32() → 4 bytes consumed, off moved by 4
-      //   seek(2) → skip 2
-      //   transpose = Read_B_INT16() → 2 bytes
-      //   seek(2) → skip 2
-      //   repeatTimes = Read_B_UINT16() → 2 bytes
-      // Total per entry: 4 + 2 + 2 + 2 + 2 = 12 bytes
-      off -= 2; // undo the premature advance
-      // Correct parsing from scratch at the entry start:
-      // Let's redo: we advanced off by 0 yet (s32BE doesn't advance), so:
-      if (off + 12 > fileLen) return null;
-      const transposeVal = s16BE(bytes, off + 6);
-      const repeatTimes = u16BE(bytes, off + 10);
-
-      if (trackAbsOffset < fileLen) {
-        tracks.push({ trackNumber: trackAbsOffset, transpose: transposeVal, repeatTimes });
-      }
-      off += 12;
-    }
-    return tracks;
-  }
 
   // Re-implement track list loading correctly (was muddled above)
   function loadTrackListClean(offset: number): RkTrack[] | null {
@@ -844,7 +806,6 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       const decodedRows = decodeTrackToRows(trackData, ROWS_PER_TRACK, entry.transpose);
 
       for (const row of decodedRows) {
-        const _xmNote = row.noteIdx > 0 ? rkNoteToXM(row.noteIdx - 1) : 0;
         // Note byte in RK is 0-based index into period table; 0 means C-0 (lowest note)
         // Actually in RK, the note byte is the period table index directly (no special 0=empty)
         // But 0x80+ are effects. So note 0 means period[0] which is 6848 (very low).

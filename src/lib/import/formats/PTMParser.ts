@@ -71,7 +71,6 @@ const MAX_CHANNELS       = 32;
 const SMP_TYPE_MASK  = 0x03;
 const SMP_PCM        = 0x01;
 const SMP_LOOP       = 0x04;
-const _SMP_PING_PONG  = 0x08;
 const SMP_16BIT      = 0x10;
 
 // Order-list sentinel values

@@ -69,7 +69,6 @@ const XM_VIBRATO     = 0x04;  // 4xx
 const XM_TREMOLO     = 0x07;  // 7xx
 const XM_OFFSET      = 0x09;  // 9xx
 const XM_VOL_SLIDE   = 0x0A;  // Axx
-const _XM_POS_JUMP    = 0x0B;  // Bxx
 const XM_SET_VOLUME  = 0x0C;  // Cxx
 const XM_PAT_BREAK   = 0x0D;  // Dxx
 const XM_EXTENDED    = 0x0E;  // Exx
@@ -227,45 +226,6 @@ export function isULTFormat(buffer: ArrayBuffer): boolean {
   return true;
 }
 
-// ── WAV encoding for 16-bit signed LE PCM ────────────────────────────────────
-
-/** Encode raw 16-bit signed LE PCM bytes into a WAV ArrayBuffer. */
-function _pcm16ToWAV(pcmBytes: Uint8Array, sampleRate: number): ArrayBuffer {
-  const numFrames = pcmBytes.length >> 1;   // 2 bytes per frame
-  const dataSize  = numFrames * 2;
-  const fileSize  = 44 + dataSize;
-  const buf  = new ArrayBuffer(fileSize);
-  const view = new DataView(buf);
-
-  const writeStr = (off: number, s: string) => {
-    for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
-  };
-
-  writeStr(0, 'RIFF');
-  view.setUint32(4,  fileSize - 8, true);
-  writeStr(8, 'WAVE');
-  writeStr(12, 'fmt ');
-  view.setUint32(16, 16,              true);  // chunk size
-  view.setUint16(20, 1,               true);  // PCM
-  view.setUint16(22, 1,               true);  // mono
-  view.setUint32(24, sampleRate,      true);  // sample rate
-  view.setUint32(28, sampleRate * 2,  true);  // byte rate (16-bit mono)
-  view.setUint16(32, 2,               true);  // block align
-  view.setUint16(34, 16,              true);  // bit depth
-  writeStr(36, 'data');
-  view.setUint32(40, dataSize, true);
-
-  // Copy raw 16-bit signed LE samples directly
-  for (let i = 0; i < numFrames; i++) {
-    const sample = view.constructor === DataView
-      ? new DataView(pcmBytes.buffer, pcmBytes.byteOffset + i * 2, 2).getInt16(0, true)
-      : (pcmBytes[i * 2] | (pcmBytes[i * 2 + 1] << 8));
-    view.setInt16(44 + i * 2, sample < 0x8000 ? sample : sample - 0x10000, true);
-  }
-
-  return buf;
-}
-
 /** Read raw signed 16-bit LE samples and encode as WAV. */
 function buildWAV16(
   pcmBytes: Uint8Array,
@@ -303,42 +263,6 @@ function buildWAV16(
   const dst = new Uint8Array(buf, 44);
   dst.set(pcmBytes.subarray(0, numFrames * 2));
 
-  return buf;
-}
-
-// ── 8-bit signed PCM → WAV (inline, matching AmigaUtils.pcm8ToWAV style) ────
-
-function _pcm8ToWAV(pcm: Uint8Array, sampleRate: number): ArrayBuffer {
-  const numSamples = pcm.length;
-  const dataSize   = numSamples * 2;  // upconvert to 16-bit
-  const fileSize   = 44 + dataSize;
-  const buf  = new ArrayBuffer(fileSize);
-  const view = new DataView(buf);
-
-  const writeStr = (off: number, s: string) => {
-    for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
-  };
-
-  writeStr(0, 'RIFF');
-  view.setUint32(4,  fileSize - 8, true);
-  writeStr(8, 'WAVE');
-  writeStr(12, 'fmt ');
-  view.setUint32(16, 16,            true);
-  view.setUint16(20, 1,             true);
-  view.setUint16(22, 1,             true);
-  view.setUint32(24, sampleRate,    true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2,             true);
-  view.setUint16(34, 16,            true);
-  writeStr(36, 'data');
-  view.setUint32(40, dataSize, true);
-
-  let off = 44;
-  for (let i = 0; i < numSamples; i++) {
-    const s8 = pcm[i] < 128 ? pcm[i] : pcm[i] - 256;
-    view.setInt16(off, s8 * 256, true);
-    off += 2;
-  }
   return buf;
 }
 

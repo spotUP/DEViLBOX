@@ -105,9 +105,6 @@ const HEADER_SIZE = 126;
 // MT2DrumsData is 274 bytes
 const DRUMS_DATA_SIZE = 274;
 
-// MT2TrackSettings is 1030 bytes
-const _TRACK_SETTINGS_SIZE = 1030;
-
 // MT2Command is 7 bytes
 const CMD_SIZE = 7;
 
@@ -122,9 +119,6 @@ const INSTR_HEADER_SIZE = 106;
 
 // MT2IEnvelope is 72 bytes
 const ENVELOPE_SIZE = 72;
-
-// MT2InstrSynth is 32 bytes
-const _INSTR_SYNTH_SIZE = 32;
 
 // MT2EnvPoint is 4 bytes (x uint16LE, y uint16LE)
 const ENV_POINT_SIZE = 4;
@@ -255,11 +249,6 @@ function _parseMadTracker2(bytes: Uint8Array, filename: string): TrackerSong | n
   // signature[4] at 0
   // userID uint32LE at 4
   const version        = u16le(bytes, 6);
-  // trackerName[32] at 8
-  const _songName       = readString(bytes, 8 + 32, 64);  // trackerName[32] + songName[64], songName at offset 40
-  const _numOrders      = u16le(bytes, 38);
-  const _restartPos     = u16le(bytes, 40);
-  const _numPatterns    = u16le(bytes, 42);
   // wait — let me re-read the struct carefully:
   // offset 0: signature[4]
   // offset 4: userID uint32LE
@@ -429,7 +418,6 @@ function _parseMadTracker2(bytes: Uint8Array, filename: string): TrackerSong | n
 
   // ── Parse extra data chunks (BPM+, TRKS, SUM, PATN, MSG) ─────────────────
   let bpmOverride = 0.0;
-  let _artistName  = '';
 
   {
     let xp = extraDataStart;
@@ -461,8 +449,7 @@ function _parseMadTracker2(bytes: Uint8Array, filename: string): TrackerSong | n
             const nameStart = xp + 6;
             let nameEnd = nameStart;
             while (nameEnd < chunkBodyEnd && u8(bytes, nameEnd) !== 0) nameEnd++;
-            const name = readString(bytes, nameStart, nameEnd - nameStart);
-            if (name !== 'Unregistered') _artistName = name;
+            // Artist name not used in TrackerSong output
           }
         }
       }

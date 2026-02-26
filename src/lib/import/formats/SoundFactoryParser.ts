@@ -108,27 +108,6 @@ const Op = {
 } as const;
 type Op = typeof Op[keyof typeof Op];
 
-// Period table for note-to-XM mapping (12 notes × 8 octaves, PAL Amiga)
-// SampleTable from Tables.cs: used with MultiplyTable for period calculation
-// Standard period table for note-to-frequency:
-const PSF_PERIODS = [
-  // Octave 1 (C-1 to B-1)
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  // Octave 2
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  // Octave 3
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-  // Octave 4
-  107, 101,  95,  90,  85,  80,  75,  71,  67,  63,  60,  56,
-  // Octave 5
-   53,  50,  47,  45,  42,  40,  37,  35,  33,  31,  30,  28,
-  // Octave 6
-   26,  25,  23,  22,  21,  20,  18,  17,  16,  15,  15,  14,
-  // Octave 7
-   13,  12,  11,  11,  10,  10,   9,   8,   8,   7,   7,   7,
-  // Octave 8
-    6,   6,   5,   5,   5,   5,   4,   4,   4,   3,   3,   3,
-];
 
 // ── Utility ────────────────────────────────────────────────────────────────
 
@@ -158,21 +137,6 @@ function psfNoteToXm(noteByte: number): number {
   // Map to XM: note 0 → C-1 (XM note 13)
   const xmNote = noteByte + 13;
   return Math.max(1, Math.min(96, xmNote));
-}
-
-/** Calculate Amiga period from PSF instrument sampling period + note.
- *  Uses the SampleTable and MultiplyTable from Tables.cs.
- */
-function _calculatePeriod(samplingPeriod: number, noteIdx: number): number {
-  if (samplingPeriod === 0) {
-    // No fixed sampling period: use period table directly
-    const idx = Math.max(0, Math.min(PSF_PERIODS.length - 1, noteIdx));
-    return PSF_PERIODS[idx];
-  }
-  // With sampling period: C3 = samplingPeriod at octave/note offset
-  // Tables.MultiplyTable[12] and SampleTable[12] used in the player
-  // Simplified: return fixed period based on samplingPeriod
-  return samplingPeriod;
 }
 
 // ── Format Identification ──────────────────────────────────────────────────

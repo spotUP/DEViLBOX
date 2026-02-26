@@ -59,7 +59,6 @@ import { createSamplerInstrument } from './AmigaUtils';
 function u8(v: DataView, off: number): number  { return v.getUint8(off); }
 function i8(v: DataView, off: number): number  { return v.getInt8(off); }
 function u16(v: DataView, off: number): number { return v.getUint16(off, false); }
-function _i16(v: DataView, off: number): number { return v.getInt16(off, false); }
 function u32(v: DataView, off: number): number { return v.getUint32(off, false); }
 function i32(v: DataView, off: number): number { return v.getInt32(off, false); }
 

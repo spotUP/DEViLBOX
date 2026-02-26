@@ -85,10 +85,6 @@ function u32BE(buf: Uint8Array, off: number): number {
        +  (buf[off + 3] & 0xFF);
 }
 
-function _readU16(buf: Uint8Array, off: number): number {
-  return u16BE(buf, off);
-}
-
 // ── Amiga period table (84 entries, from RHPlayer.js) ───────────────────────
 
 const RH_PERIODS: number[] = [
@@ -411,7 +407,6 @@ export async function parseRobHubbardFile(
 
   // ── Parse samples ────────────────────────────────────────────────────────
   const samples: RHSample[] = [];
-  let _sampleDataOff = samplesData;
 
   // Variant 0: all samples start at samplesData, sequential
   // Variant 1+: wave samples are loaded separately (synthetic waveforms from wavesHeaders)
@@ -662,7 +657,6 @@ export async function parseRobHubbardFile(
     let currentVolume = samples[0]?.volume ?? 64;
     const MAX_EVENTS = 2048; // guard against infinite loops in malformed files
     let evCount = 0;
-    let _portaSpeed = 0;
 
     let patPos = patternOff;
 
@@ -726,9 +720,8 @@ export async function parseRobHubbardFile(
             break;
           }
           case -127: {
-            // Portamento: next byte = signed speed
+            // Portamento: next byte = signed speed (consumed but not applied)
             if (patPos < buf.length) {
-              _portaSpeed = s8(buf, patPos);
               patPos++;
             }
             break;
@@ -773,7 +766,6 @@ export async function parseRobHubbardFile(
           });
         }
         evCount++;
-        _portaSpeed = 0; // reset after note
       }
     }
   }
