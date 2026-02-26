@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-26T20:11:38.328Z
+ * Generated: 2026-02-26T22:51:24.303Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1397';
-export const BUILD_NUMBER = '1397';
-export const BUILD_HASH = '5cc7a9ae';
+export const BUILD_VERSION = '1.0.1424';
+export const BUILD_NUMBER = '1424';
+export const BUILD_HASH = '7b2ae20f';
 export const BUILD_DATE = '2026-02-26';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,117 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1397',
+    version: '1.0.1424',
     date: '2026-02-26',
     changes: [
+      {
+        type: 'fix',
+        "description": "Remove 23 silent stub native parsers — route to UADE/libopenmpt"
+      },
+      {
+        type: 'feature',
+        "description": "Add instrument editor panels for OctaMED, SidMon1, HippelCoSo, RobHubbard, DavidWhittaker"
+      },
+      {
+        type: 'fix',
+        "description": "Correct 68k ASM bugs in AshleyHogg, JochenHippel7V, JochenHippelST parsers"
+      },
+      {
+        type: 'fix',
+        "description": "Route Magnetic Fields Packer directly to UADE"
+      },
+      {
+        type: 'feature',
+        "description": "40 new UADE format parsers + prefix routing"
+      },
+      {
+        type: 'fix',
+        "description": "Route Sawteeth to UADE and .667 to libopenmpt"
+      },
+      {
+        type: 'feature',
+        "description": "Add prefix routing for 18 UADE formats + wire native parser prefs"
+      },
+      {
+        type: 'fix',
+        "description": "Read initial cycle from position data instead of hardcoding 6"
+      },
+      {
+        type: 'fix',
+        "description": "Remove metadata-only native parse calls for 28 UADE formats"
+      },
+      {
+        type: 'feature',
+        "description": "Fashion Tracker, MultiMedia Sound parsers + dialog + UADE ext updates"
+      },
+      {
+        type: 'feature',
+        "description": "Add 9 UADE format parsers (TimeTracker, ChipTracker, Cinemaware, NTP, Alcatraz, Blade, TomyTracker, IMS, TME)"
+      },
+      {
+        type: 'fix',
+        "description": "Metadata-only parsers always delegate to UADE; fix XM multiSample persistence"
+      },
+      {
+        type: 'feature',
+        "description": "TME, Infogrames (DUM) native parsers + routing"
+      },
+      {
+        type: 'fix',
+        "description": "Halve playback speed - checkSongEvent was firing twice per sample"
+      },
+      {
+        type: 'fix',
+        "description": "Use bd.* prefix routing for Ben Daglish instead of .bd extension"
+      },
+      {
+        type: 'feature',
+        "description": "MMDC, PSA, Steve Turner parsers + routing"
+      },
+      {
+        type: 'feature',
+        "description": "SoundMaster, ZoundMonitor, TCB Tracker, Medley, RobHubbard parsers"
+      },
+      {
+        type: 'improvement',
+        "description": "Rewrite TCBTracker/RobHubbard/BenDaglish as metadata-only; add tcb.* routing"
+      },
+      {
+        type: 'feature',
+        "description": "Wire SoundMaster + ZoundMonitor parsers; update status doc"
+      },
+      {
+        type: 'improvement',
+        "description": "Add Furnace, Jeroen Tel, Mark Cooksey, Quartet to status; fix Symphonie duplicate"
+      },
+      {
+        type: 'improvement',
+        "description": "Add Symphonie Pro (.symmod) to format-implementation-status.md"
+      },
+      {
+        type: 'improvement',
+        "description": "Add Jason Page (jpn.*/jp.*) to format-implementation-status.md"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'improvement',
+        "description": "Add Medley (.ml) to format-implementation-status.md"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused _version in LMEParser; fix RobHubbard v3 pos logic"
+      },
+      {
+        type: 'feature',
+        "description": "Medley native parser (.ml) + routing + settings key"
+      },
+      {
+        type: 'fix',
+        "description": "Register SymphonieSynth in ToneEngine; single instrument"
+      },
       {
         type: 'fix',
         "description": "Deep-merge formatEngine on persist hydration"
@@ -124,114 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "FM Tracker, XMF, UAX native parsers"
-      },
-      {
-        type: 'feature',
-        "description": "X-Tracker DMF native parser (OpenMPT)"
-      },
-      {
-        type: 'feature',
-        "description": "Imago Orpheus, C67/CDFM, EasyTrax, Karl Morton native parsers"
-      },
-      {
-        type: 'feature',
-        "description": "9 new format parsers — PT36, SpeedySystem, STK, IMF, STP, AMF, MDL, Tronic"
-      },
-      {
-        type: 'feature',
-        "description": "DigiBooster Pro (.dbm) native parser (OpenMPT)"
-      },
-      {
-        type: 'feature',
-        "description": "Composer 667 and Chuck Biscuits / Black Artist native parsers"
-      },
-      {
-        type: 'feature',
-        "description": "DigiBooster Pro (.dbm) and Imago Orpheus (.imf) native parsers"
-      },
-      {
-        type: 'feature',
-        "description": "STK (Ultimate SoundTracker) and STP (SoundTracker Pro II) native parsers"
-      },
-      {
-        type: 'feature',
-        "description": "Symphonie Pro native parser (OpenMPT)"
-      },
-      {
-        type: 'feature',
-        "description": "Graoumf Tracker 2 native parser (OpenMPT)"
-      },
-      {
-        type: 'improvement',
-        "description": "Update format status — add IMS, ICE, KRIS; sync all implemented parsers"
-      },
-      {
-        type: 'feature',
-        "description": "Wire NRU, PTM, GDM parsers; add Digital Symphony and Digital Sound Studio"
-      },
-      {
-        type: 'feature',
-        "description": "Digital Sound Studio native parser"
-      },
-      {
-        type: 'feature',
-        "description": "10 PC/DOS tracker format parsers — UNIC, MTM, 669, FAR, PLM, ULT, RTM, DSM, DTM, STM"
-      },
-      {
-        type: 'feature',
-        "description": "Synthesis and Music Assembler native parsers"
-      },
-      {
-        type: 'feature',
-        "description": "Actionamics, Activision Pro, Ron Klaren native parsers"
-      },
-      {
-        type: 'feature',
-        "description": "Game Music Creator and Face The Music native parsers (OpenMPT)"
-      },
-      {
-        type: 'improvement',
-        "description": "Update format implementation status with all recent parsers and in-progress agents"
-      },
-      {
-        type: 'feature',
-        "description": "Add IMS, ICE, KRIS, GMC native parsers"
-      },
-      {
-        type: 'fix',
-        "description": "Fix puma routing — ArrayBuffer types, remove prefs toggle"
-      },
-      {
-        type: 'feature',
-        "description": "PumaTracker native parser (OpenMPT Load_puma.cpp reference)"
-      },
-      {
-        type: 'feature',
-        "description": "InStereo! 1.0/2.0 native parsers; fix SA routing with prefs toggle"
-      },
-      {
-        type: 'feature',
-        "description": "Art of Noise and Ben Daglish native parsers"
-      },
-      {
-        type: 'feature',
-        "description": "Add Sonic Arranger (.sa) native parser"
-      },
-      {
-        type: 'feature',
-        "description": "Delta Music 2.0 native parser"
-      },
-      {
-        type: 'fix',
-        "description": "Correct TCBTracker and SoundFX parsers against OpenMPT sources"
-      },
-      {
-        type: 'fix',
-        "description": "Correct SynthInstr binary layout and wire waveform pointer table"
-      },
-      {
-        type: 'feature',
-        "description": "Phase B4 — TCB Tracker (.tcb) native parser"
       }
     ]
   }
