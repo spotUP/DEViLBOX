@@ -325,9 +325,8 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     if (prefs.sonicArranger === 'native') {
       try {
         const { isSonicArrangerFormat, parseSonicArrangerFile } = await import('@lib/import/formats/SonicArrangerParser');
-        const bytes = new Uint8Array(buffer);
-        if (isSonicArrangerFormat(bytes)) {
-          const result = parseSonicArrangerFile(bytes, file.name);
+        if (isSonicArrangerFormat(buffer)) {
+          const result = parseSonicArrangerFile(buffer, file.name);
           if (result) return result;
         }
       } catch (err) {
@@ -1273,6 +1272,43 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       }
     }
     return null;
+  }
+
+  // ── MadTracker 2 (.mt2) ───────────────────────────────────────────────────
+  // PC format — identified by "MT20" magic at offset 0. Falls through to libopenmpt.
+  if (/\.mt2$/i.test(filename)) {
+    if (prefs.madTracker2 === 'native') {
+      try {
+        const { isMadTracker2Format, parseMadTracker2File } = await import('@lib/import/formats/MadTracker2Parser');
+        const bytes = new Uint8Array(buffer);
+        if (isMadTracker2Format(bytes)) {
+          const result = parseMadTracker2File(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[MadTracker2Parser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+      }
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── PSM / PSM16 (Epic MegaGames MASI) (.psm) ─────────────────────────────
+  // Handles both new PSM ("PSM " magic) and PSM16 ("PSM\xFE" magic).
+  // Falls through to libopenmpt on failure.
+  if (/\.psm$/i.test(filename)) {
+    if (prefs.psm === 'native') {
+      try {
+        const { isPSMFormat, parsePSMFile } = await import('@lib/import/formats/PSMParser');
+        const bytes = new Uint8Array(buffer);
+        if (isPSMFormat(bytes)) {
+          const result = parsePSMFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[PSMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+      }
+    }
+    // Fall through to libopenmpt
   }
 
   // ── AMS (Extreme's Tracker / Velvet Studio) ───────────────────────────────
