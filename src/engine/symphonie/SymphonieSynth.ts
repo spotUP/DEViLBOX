@@ -25,7 +25,6 @@ export class SymphonieSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _disposed = false;
 
-  private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
 
   constructor() {
@@ -46,7 +45,6 @@ export class SymphonieSynth implements DevilboxSynth {
         try { node.disconnect(this.output); } catch { /* ignore */ }
       }
       node.connect(this.output);
-      SymphonieSynth._engineConnectedToSynth = true;
       this._ownsEngineConnection = true;
     }
   }
@@ -98,7 +96,6 @@ export class SymphonieSynth implements DevilboxSynth {
       if (node) {
         try { node.disconnect(this.output); } catch { /* may already be disconnected */ }
       }
-      SymphonieSynth._engineConnectedToSynth = false;
       this._ownsEngineConnection = false;
     }
 
