@@ -43,6 +43,7 @@ sidmon-wasm/build/
 digmug-wasm/build/
 fc-wasm/build/
 tfmx-wasm/build/
+robhubbard-wasm/build/
 public/rdpiano/roms/
 public/onnx-wasm/
 

@@ -389,7 +389,7 @@ export function getSupportedExtensions(): string[] {
     '.ps', '.psf',
     '.pt', '.ptm',
     '.puma',
-    '.rh', '.rho', '.riff',
+    '.rh', '.rhp', '.rho', '.riff',
     '.sas', '.sb', '.scr', '.sdr', '.sg',
     '.snk', '.ss',
     '.st26', '.sun', '.syn',
