@@ -594,6 +594,27 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── DigiBooster Pro ───────────────────────────────────────────────────────
+  // .dbm files — identified by "DBM0" magic at offset 0.
+  // NOTE: .digi (DigiBooster 1.x) is handled separately above; this is DBM Pro only.
+  if (/\.dbm$/i.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.digiBoosterPro === 'native') {
+      try {
+        const { isDigiBoosterProFormat, parseDigiBoosterProFile } = await import('@lib/import/formats/DigiBoosterProParser');
+        const bytes = new Uint8Array(buffer);
+        if (isDigiBoosterProFormat(bytes)) {
+          const result = parseDigiBoosterProFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[DigiBoosterProParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── PumaTracker ───────────────────────────────────────────────────────────
   // .puma files — no magic bytes; heuristic header validation (mirrors OpenMPT).
   if (/\.puma$/.test(filename)) {
@@ -1068,22 +1089,52 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
 
   // ── Ultimate SoundTracker (.stk) ──────────────────────────────────────────
   if (/\.stk$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.soundTracker === 'native') {
+      try {
+        const { isSoundTrackerFormat, parseSoundTrackerFile } = await import('@lib/import/formats/SoundTrackerParser');
+        if (isSoundTrackerFormat(buffer)) return parseSoundTrackerFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[SoundTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_stk } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_stk(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── ProTracker 3.6 (.pt36) ────────────────────────────────────────────────
+  if (/\.pt36$/.test(filename)) {
     try {
-      const { isSTKFormat, parseSTKFile } = await import('@lib/import/formats/STKParser');
-      if (isSTKFormat(buffer)) return parseSTKFile(buffer, file.name);
+      const { isPT36Format, parsePT36File } = await import('@lib/import/formats/PT36Parser');
+      if (isPT36Format(buffer)) return parsePT36File(buffer, file.name);
     } catch (err) {
-      console.warn(`[STKParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+      console.warn(`[PT36Parser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
     // Fall through to libopenmpt
+  }
+
+  // ── SpeedySystem (.ss) ────────────────────────────────────────────────────
+  if (/\.ss$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.speedySystem === 'native') {
+      try {
+        const { isSpeedySystemFormat, parseSpeedySystemFile } = await import('@lib/import/formats/SpeedySystemParser');
+        if (isSpeedySystemFormat(buffer)) return parseSpeedySystemFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[SpeedySystemParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_ss } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_ss(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── SoundTracker Pro II (.stp) ─────────────────────────────────────────────
   if (/\.stp$/.test(filename)) {
     try {
-      const { isSTPFormat, parseSTPFile } = await import('@lib/import/formats/STPParser');
+      const { isSTPFormat, parseSTPFile } = await import('@lib/import/formats/SamplerTrackerPlusParser');
       if (isSTPFormat(buffer)) return parseSTPFile(buffer, file.name);
     } catch (err) {
-      console.warn(`[STPParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+      console.warn(`[SamplerTrackerPlusParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
     // Fall through to libopenmpt
   }
@@ -1099,15 +1150,52 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     // Fall through to libopenmpt
   }
 
-  // ── Imago Orpheus (.imf) ──────────────────────────────────────────────────
-  if (/\.imf$/.test(filename)) {
+  // ── Imago Orpheus (.imf, .imff) ───────────────────────────────────────────
+  if (/\.imff?$/.test(filename)) {
     try {
-      const { isIMFFormat, parseIMFFile } = await import('@lib/import/formats/IMFParser');
-      if (isIMFFormat(buffer)) return parseIMFFile(buffer, file.name);
+      const { isImagoOrpheusFormat, parseImagoOrpheusFile } = await import('@lib/import/formats/ImagoOrpheusParser');
+      if (isImagoOrpheusFormat(buffer)) return parseImagoOrpheusFile(buffer, file.name);
     } catch (err) {
-      console.warn(`[IMFParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+      console.warn(`[ImagoOrpheusParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
     // Fall through to libopenmpt
+  }
+
+  // ── ASYLUM/DSMI AMF (.amf) ────────────────────────────────────────────────
+  if (/\.amf$/.test(filename)) {
+    try {
+      const { isAMFFormat, parseAMFFile } = await import('@lib/import/formats/AMFParser');
+      if (isAMFFormat(buffer)) return parseAMFFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[AMFParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── Digitrakker / Madness (.mdl) ──────────────────────────────────────────
+  if (/\.mdl$/.test(filename)) {
+    try {
+      const { isMDLFormat, parseMDLFile } = await import('@lib/import/formats/MadnessParser');
+      if (isMDLFormat(buffer)) return parseMDLFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[MadnessParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── Tronic (.trc, .dp, .tro) ─────────────────────────────────────────────
+  if (/\.(trc|dp|tro)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.tronic === 'native') {
+      try {
+        const { isTronicFormat, parseTronicFile } = await import('@lib/import/formats/TronicParser');
+        if (isTronicFormat(buffer)) return parseTronicFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[TronicParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_tro } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_tro(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── Mark Cooksey (.mc, .mcr, .mco) — plain ProTracker MOD with game extension ──
