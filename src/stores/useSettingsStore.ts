@@ -74,7 +74,6 @@ export interface FormatEnginePreferences {
   psm: FormatEngineChoice;                // .psm → PSMParser vs OpenMPT
   deltaMusic1: FormatEngineChoice;    // .dm/.dm1 → DeltaMusic1Parser vs UADE
   iffSmus: FormatEngineChoice;        // .smus/.snx/.tiny → IffSmusParser vs UADE
-  mfp: FormatEngineChoice;            // mfp.* → MFPParser vs UADE
   pt36: FormatEngineChoice;           // FORM+MODL → PT36Parser vs libopenmpt
   // Newly wired parsers (2026-02-26 batch)
   fashionTracker: FormatEngineChoice;          // ex.* → FashionTrackerParser vs UADE
@@ -223,7 +222,6 @@ export const useSettingsStore = create<SettingsStore>()(
         psm: 'native',              // PSMParser — dedicated PSM / PSM16 (Epic MegaGames MASI) support
         deltaMusic1: 'native',  // DeltaMusic1Parser — native parser available
         iffSmus: 'native',      // IffSmusParser — native parser available
-        mfp: 'native',          // MFPParser — native parser available
         pt36: 'native',         // PT36Parser — native parser available
         fashionTracker: 'native',            // FashionTrackerParser — native parser available
         multiMediaSound: 'native',           // MultiMediaSoundParser — native parser available
