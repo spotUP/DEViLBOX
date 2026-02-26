@@ -149,12 +149,24 @@ Format DSP Source → thin WASM wrapper → TypeScript engine → TypeScript syn
 
 ---
 
-### Group 8: PCM Format Instrument Naming — ❌ NOT STARTED
+### Group 8: PCM Format Instrument Naming — ⚠️ PARTIAL
 
 **Formats:** 100+ UADE formats (Richard Joseph `.rj`, Dave Lowe `.dl`, Mark Cooksey `.mc`, Delta Music `.dm`, etc.)
 **Goal:** Parse format-specific header name tables so Sampler instruments get real names instead of "Instrument 1"
-**Where:** `UADEParser.ts` — `buildEnhancedSong()` already uses enhanced scan; add `instrumentNames[]` extraction per format
+**Where:** `UADEParser.ts` — `tryExtractInstrumentNames()` at line ~439
 **Priority:** Low (polish — playback works fine without names)
+
+**Implemented (2026-02-26):**
+- **Sonic Arranger** (`.sa`, `.sa-p`, `.sa_old`, `.sonic`, `.lion`) — `SOAR` chunk-format files: walk `STBL→OVTB→NTBL→INST` chunks, extract 30-char names from `INST` structs at stride 152, offset +122. Old-format SA files (Amiga binary, magic `0x4EFA`) fall through to generic scanner.
+- **Delta Music 2** (`.dm2`) — `DM2!` magic case retained but NOTE: real-world `.dm2` files are compiled Amiga binaries without this magic; this case is effectively dead code.
+
+**Not parseable (compiled Amiga binaries — no static name table):**
+- Richard Joseph (`.rjp`, `.rj`) — loadseg binary; names come from IFF sample headers loaded at runtime
+- Dave Lowe (`.dl`) — compiled binary
+- Mark Cooksey (`.mc`) — compiled binary
+- Delta Music 1 (`.dm`) — compiled binary, no name table
+
+**Generic fallback** (already in place): MOD-style 22-byte ASCII name block scanner catches ProTracker-derived formats.
 
 ---
 

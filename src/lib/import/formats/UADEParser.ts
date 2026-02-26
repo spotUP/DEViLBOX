@@ -427,6 +427,10 @@ export async function parseUADEFile(
  *
  * Strategy 1 — Format-specific parsers for well-known formats:
  *   • Delta Music 2 (.dm2): "DM2!" magic, 22-byte names at fixed stride
+ *     NOTE: "DM2!" magic has not been observed in real-world files — real .dm2 files
+ *     appear to be compiled Amiga binaries with no static name table.
+ *   • Sonic Arranger (.sa, .sa-p, .sa_old, .sonic, .lion): "SOAR" chunk format,
+ *     INST chunk with 152-byte structs, name at offset +122, max 30 chars.
  *
  * Strategy 2 — Generic MOD-style name scan:
  *   Many Amiga formats store instrument names as blocks of 22-byte null-terminated
@@ -452,6 +456,8 @@ function tryExtractInstrumentNames(buffer: ArrayBuffer, ext: string): string[] |
     //   [7]     pad
     //   [8..29] name (22 bytes, null-terminated ASCII)
     // The instrument table starts at offset 0x3A.
+    // NOTE: real-world .dm2 files are typically compiled Amiga binaries and do NOT
+    // carry the "DM2!" magic. This case is retained for hypothetical bare-format files.
     const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
     if (magic === 'DM2!') {
       const INSTR_TABLE = 0x3A;
@@ -464,6 +470,96 @@ function tryExtractInstrumentNames(buffer: ArrayBuffer, ext: string): string[] |
         const name = readFixedAscii(bytes, off, 22);
         if (!name) continue;
         names.push(name);
+      }
+      if (names.length > 0) return names;
+    }
+  }
+
+  /* ── Sonic Arranger (.sa, .sa-p, .sa_old, .sonic, .lion) ──────────────── */
+  if (ext === 'sa' || ext === 'sa-p' || ext === 'sa_old' || ext === 'sonic' || ext === 'lion') {
+    // New-format SA files start with 'SOAR' + 'V1.0' followed by named chunks.
+    // Old-format SA files are compiled Amiga binaries (start with JMP instruction
+    // 0x4EFA) — those have no static name table and fall through to the generic scan.
+    const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+    if (magic === 'SOAR' && buffer.byteLength >= 16) {
+      // Chunk layout:
+      //   +0   'SOAR' (4)
+      //   +4   'V1.0' (4)
+      //   +8   'STBL' tag (4)
+      //   +12  subsong count (u32BE)
+      //   +16  subsong table (count × 12 bytes)
+      //   then sequential chunks: TAG(4) + count(4) + data
+      //     'OVTB' — count × 16 bytes
+      //     'NTBL' — count × 4 bytes
+      //     'INST' — count × 152 bytes; name at offset +122, max 30 chars
+      const subsongCount = view.getUint32(12, false);
+      let pos = 16 + subsongCount * 12;  // skip past STBL data
+
+      // Walk chunks until INST or EOF
+      while (pos + 8 <= bytes.length) {
+        const tag   = String.fromCharCode(bytes[pos], bytes[pos+1], bytes[pos+2], bytes[pos+3]);
+        const count = view.getUint32(pos + 4, false);
+        pos += 8;
+
+        if (tag === 'OVTB') { pos += count * 16; continue; }
+        if (tag === 'NTBL') { pos += count * 4;  continue; }
+        if (tag === 'INST') {
+          const INST_STRIDE = 152;
+          const NAME_OFF    = 122;
+          const NAME_LEN    = 30;
+          const names: string[] = [];
+          for (let i = 0; i < count; i++) {
+            const base = pos + i * INST_STRIDE;
+            if (base + INST_STRIDE > bytes.length) break;
+            // SA name fields may contain garbage bytes after the null terminator.
+            // Read only up to the first null; discard anything after it.
+            let name = '';
+            for (let j = 0; j < NAME_LEN; j++) {
+              const c = bytes[base + NAME_OFF + j];
+              if (c === 0) break;
+              if (c < 0x20 || c > 0x7e) { name = ''; break; }
+              name += String.fromCharCode(c);
+            }
+            const trimmed = name.trim();
+            if (trimmed) names.push(trimmed);
+          }
+          if (names.length > 0) return names;
+          break;
+        }
+        // Unknown chunk — stop navigating to avoid misreading binary data
+        break;
+      }
+    }
+  }
+
+  /* ── SoundFX (.sfx, .sfx13) ───────────────────────────────────────────── */
+  // Format spec (libxmp): sfx-format.txt
+  // Two variants, detected by where 'SONG' magic appears:
+  //   SFX 1.3: sample size table = 15×4 = 60 bytes → 'SONG' at offset 60
+  //            instrument table at offset 80, 15 × 30-byte entries
+  //   SFX 2.0: sample size table = 31×4 = 124 bytes → 'SONG' at offset 124
+  //            instrument table at offset 144, 31 × 30-byte entries
+  // Each instrument entry: name[22] + len(2) + finetune(1) + vol(1) + loopStart(2) + loopLen(2)
+  if (ext === 'sfx' || ext === 'sfx13') {
+    const INSTR_STRIDE = 30;
+    const INSTR_NAME   = 22;
+    let instrCount = 0;
+    let instrTable  = 0;
+    if (bytes.length >= 64) {
+      const songOff = String.fromCharCode(bytes[60], bytes[61], bytes[62], bytes[63]);
+      if (songOff === 'SONG') { instrCount = 15; instrTable = 80; }   // SFX 1.3
+    }
+    if (instrCount === 0 && bytes.length >= 128) {
+      const songOff = String.fromCharCode(bytes[124], bytes[125], bytes[126], bytes[127]);
+      if (songOff === 'SONG') { instrCount = 31; instrTable = 144; }  // SFX 2.0
+    }
+    if (instrCount > 0) {
+      const names: string[] = [];
+      for (let i = 0; i < instrCount; i++) {
+        const off = instrTable + i * INSTR_STRIDE;
+        if (off + INSTR_NAME > bytes.length) break;
+        const name = readFixedAscii(bytes, off, INSTR_NAME);
+        if (name) names.push(name);
       }
       if (names.length > 0) return names;
     }
