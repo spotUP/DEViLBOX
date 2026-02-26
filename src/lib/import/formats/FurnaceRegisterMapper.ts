@@ -54,10 +54,7 @@ export class FurnaceRegisterMapper {
     // So: Op1→slot0→0x00, Op2→slot2→0x08, Op3→slot1→0x04, Op4→slot3→0x0C
     const opOffsets = [0x00, 0x08, 0x04, 0x0C];
 
-    console.log(`[mapOPN2] config.operators.length: ${config.operators.length}, operators:`, config.operators.map(op => ({ mult: op.mult, tl: op.tl, ar: op.ar })));
-
     config.operators.forEach((op: FurnaceOperatorConfig, i: number) => {
-      console.log(`[mapOPN2] Writing operator ${i+1}, opOff=${opOffsets[i] + chanOffset}, mult=${op.mult}, tl=${op.tl}`);
       const opOff = opOffsets[i] + chanOffset;
 
       // 0x30: DT (bits 4-6), MULT (bits 0-3)
@@ -561,15 +558,12 @@ export class FurnaceRegisterMapper {
       // 0x07: Carrier SL(4-7), RR(0-3)
       engine.write(chip, 0x07, ((car.sl & 0x0F) << 4) | (car.rr & 0x0F));
 
-      console.log(`[mapOPLL] User instrument: mod.mult=${mod.mult}, car.mult=${car.mult}, fb=${config.feedback}`);
     }
 
     engine.write(chip, 0x30 + channel, ((instrument & 0x0F) << 4) | (volume & 0x0F));
 
     // Ensure rhythm mode is off
     engine.write(chip, 0x0E, 0x00);
-
-    console.log(`[mapOPLL] channel=${channel}, instrument=${instrument}, volume=${volume}`);
   }
 
   /**
@@ -627,7 +621,6 @@ export class FurnaceRegisterMapper {
       engine.write(chip, regBase | (0x90 + opOff), (op.ssg ?? 0) & 0x0F);
     });
 
-    console.log(`[mapOPNA] channel=${channel}, algorithm=${config.algorithm}, feedback=${config.feedback}, operators=${config.operators.length}`);
   }
 
   /**
@@ -683,7 +676,6 @@ export class FurnaceRegisterMapper {
       engine.write(chip, 0x90 + opOff, (op.ssg ?? 0) & 0x0F);
     });
 
-    console.log(`[mapOPN] channel=${channel}, algorithm=${config.algorithm}, feedback=${config.feedback}, operators=${config.operators.length}`);
   }
 
   /**
@@ -725,7 +717,6 @@ export class FurnaceRegisterMapper {
       engine.write(chip, regBase | (0x90 + opOff), (op.ssg ?? 0) & 0x0F);
     });
 
-    console.log(`[mapOPNB] channel=${channel}, algorithm=${config.algorithm}, feedback=${config.feedback}, operators=${config.operators.length}`);
   }
 
   /**
