@@ -1,29 +1,25 @@
 /**
- * TMEParser.ts — The Musical Enlightenment (TME) Amiga music format native parser
+ * AlcatrazPackerParser.ts — Alcatraz Packer (ALP) Amiga music format native parser
  *
- * TME is an Amiga music format created by N.J. Luuring jr (1989-90),
- * adapted by Wanted Team for EaglePlayer / DeliTracker compatibility.
- * Files are typically named with a "TME." prefix (e.g. "TME.SomeSong").
+ * Alcatraz Packer is an Amiga music format by Alcatraz/NEO (c) 1995.
+ * Files are prefixed with "ALP." (e.g. ALP.SomeSong).
  *
- * Detection (from DTP_Check2 in TME_v3.s):
- *   1. File must be >= 7000 bytes
- *   2. buf[0] must equal 0 (first byte is zero)
- *   3. At least one of the following structural patterns must match:
- *      Pattern 1: u32BE(0x3C) == 0x0000050F  AND  u32BE(0x40) == 0x0000050F
- *      Pattern 2: u32BE(0x1284) == 0x00040B11 AND u32BE(0x1188) == 0x181E2329
- *                 AND u32BE(0x128C) == 0x2F363C41
- *   (The 7000-byte minimum implies the file is always large enough for pattern 2
- *   checks at offset 0x1290 = 4752, so both patterns are checked unconditionally.)
+ * Detection (from EP_Check5 in Alcatraz_Packer.AMP.asm):
+ *   buf[0..3] == 0x50416E10  ("PAn\x10")
+ *   u32BE(buf, 4): total size D1 — must be non-zero and non-negative (bit 31 clear)
+ *   Minimum file size: 8 bytes
  *
- * Metadata extraction (from DTP_InitPlayer in TME_v3.s):
- *   Subsong count: read buf[5] (second byte of the longword at offset 4).
- *   Valid range is 0-15; a value of 0 means one subsong (slot 0 only).
- *   Total subsong count = buf[5] + 1, clamped to 1-16.
+ * Metadata extraction (from DTP_InitPlayer):
+ *   addq.l #8,A0  → A0 now points to offset 8
+ *   move.w (A0),D3  → word at offset 8
+ *   lsr.w #4,D3    → sample count = u16BE(buf, 8) >> 4  (max 31)
+ *   move.w 2(A0),D1 → word at offset 10
+ *   lsr.w #1,D1    → song length = u16BE(buf, 10) >> 1  (max 128)
  *
  * Single-file format: player code + music data in one binary.
  * Actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/TME/src/TME_v3.s
+ * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/Alcatraz_Packer/Alcatraz_Packer.AMP.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -31,16 +27,17 @@ import type { InstrumentConfig } from '@/types';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
-/** Minimum file size required by DTP_Check2. */
-const MIN_FILE_SIZE = 7000;
+/** Minimum file size to hold the ALP magic and the total-size word. */
+const MIN_FILE_SIZE = 8;
 
-/** Fixed number of placeholder instruments for this format. */
-const INSTRUMENT_COUNT = 31;
-
-/** Maximum subsong count (slots 0-15 → max 16 subsongs). */
-const MAX_SUBSONGS = 16;
+/** Maximum sample (instrument) count reported by the player (MI_MaxSamples). */
+const MAX_SAMPLES = 31;
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
+
+function u16BE(buf: Uint8Array, off: number): number {
+  return ((buf[off] << 8) | buf[off + 1]) >>> 0;
+}
 
 function u32BE(buf: Uint8Array, off: number): number {
   return (
@@ -51,73 +48,79 @@ function u32BE(buf: Uint8Array, off: number): number {
 // ── Format detection ───────────────────────────────────────────────────────
 
 /**
- * Return true if the buffer is a The Musical Enlightenment (TME) module.
+ * Return true if the buffer is an Alcatraz Packer (ALP) module.
  *
- * Detection mirrors DTP_Check2 from TME_v3.s:
- *   - File length >= 7000 bytes
- *   - First byte is 0x00
- *   - Structural magic matches Pattern 1 or Pattern 2
+ * Detection mirrors EP_Check5 from Alcatraz_Packer.AMP.asm:
+ *   cmp.l #$50416E10,(A0)+  → buf[0..3] == 0x50416E10
+ *   move.l (A0),D1          → u32BE(buf, 4)
+ *   beq fail                → must be non-zero
+ *   bmi fail                → must be non-negative (bit 31 clear)
  */
-export function isTMEFormat(buffer: ArrayBuffer | Uint8Array): boolean {
+export function isAlcatrazPackerFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-
   if (buf.length < MIN_FILE_SIZE) return false;
-  if (buf[0] !== 0x00) return false;
 
-  // Pattern 1: u32BE(0x3C) == 0x0000050F AND u32BE(0x40) == 0x0000050F
-  const pattern1 =
-    u32BE(buf, 0x3c) === 0x0000050f &&
-    u32BE(buf, 0x40) === 0x0000050f;
+  // Magic: 0x50416E10 = bytes [0x50, 0x41, 0x6E, 0x10]
+  if (buf[0] !== 0x50 || buf[1] !== 0x41 || buf[2] !== 0x6e || buf[3] !== 0x10) return false;
 
-  if (pattern1) return true;
+  // Total size at offset 4: must be non-zero and bit 31 must be clear (non-negative)
+  const totalSize = u32BE(buf, 4);
+  if (totalSize === 0) return false;
+  if (totalSize & 0x80000000) return false;
 
-  // Pattern 2: u32BE(0x1284) == 0x00040B11 AND u32BE(0x1188) == 0x181E2329
-  //            AND u32BE(0x128C) == 0x2F363C41
-  // (0x1290 = 4752 < 7000, so these offsets are always in bounds)
-  const pattern2 =
-    u32BE(buf, 0x1284) === 0x00040b11 &&
-    u32BE(buf, 0x1188) === 0x181e2329 &&
-    u32BE(buf, 0x128c) === 0x2f363c41;
-
-  return pattern2;
+  return true;
 }
 
 // ── Main parser ─────────────────────────────────────────────────────────────
 
 /**
- * Parse a TME module file into a TrackerSong.
+ * Parse an Alcatraz Packer (ALP) module file into a TrackerSong.
  *
- * Extracts the subsong count from the binary header and builds 31 placeholder
- * instruments. Actual audio playback is always delegated to UADE.
+ * Extracts sample count and song length from the binary header.
+ * Actual audio playback is always delegated to UADE.
  *
  * @param buffer   Raw file bytes (ArrayBuffer)
  * @param filename Original filename (used to derive the module name)
  */
-export function parseTMEFile(buffer: ArrayBuffer, filename: string): TrackerSong {
+export function parseAlcatrazPackerFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
 
-  if (!isTMEFormat(buf)) {
-    throw new Error('Not a TME module');
+  if (!isAlcatrazPackerFormat(buf)) {
+    throw new Error('Not an Alcatraz Packer module');
   }
 
   // ── Module name from filename ─────────────────────────────────────────────
 
   const baseName = filename.split('/').pop() ?? filename;
-  // Strip "TME." prefix (case-insensitive) or ".tme" extension
+  // Strip "ALP." prefix (case-insensitive) or ".alp" extension
   const moduleName =
-    baseName.replace(/^tme\./i, '').replace(/\.tme$/i, '') || baseName;
+    baseName.replace(/^alp\./i, '').replace(/\.alp$/i, '') || baseName;
 
   // ── Metadata extraction ───────────────────────────────────────────────────
 
-  // From InitPlayer: subsong slots are encoded in byte 5 (second byte of the
-  // longword at offset 4). Valid range is 0-15; add 1 for total subsong count.
-  const rawSubsongs = buf[5];
-  const subsongCount = Math.min(Math.max(rawSubsongs + 1, 1), MAX_SUBSONGS);
+  // From InitPlayer:
+  //   addq.l #8,A0           → A0 at offset 8 (past magic + total-size longword)
+  //   move.w (A0),D3         → word at offset 8
+  //   lsr.w #4,D3            → sample count
+  //   move.w 2(A0),D1        → word at offset 10
+  //   lsr.w #1,D1            → song length
+  let sampleCount = 0;
+  let songLength = 1;
+
+  if (buf.length >= MIN_FILE_SIZE + 4) {
+    const rawSamples = u16BE(buf, 8) >> 4;
+    if (rawSamples > 0) sampleCount = Math.min(rawSamples, MAX_SAMPLES);
+
+    const rawLength = u16BE(buf, 10) >> 1;
+    if (rawLength > 0) songLength = rawLength;
+  }
 
   // ── Instrument placeholders ──────────────────────────────────────────────
 
+  const instrumentCount = Math.max(sampleCount, 1);
+
   const instruments: InstrumentConfig[] = Array.from(
-    { length: INSTRUMENT_COUNT },
+    { length: instrumentCount },
     (_, i) =>
       ({
         id: i + 1,
@@ -164,14 +167,14 @@ export function parseTMEFile(buffer: ArrayBuffer, filename: string): TrackerSong
       importedAt: new Date().toISOString(),
       originalChannelCount: 4,
       originalPatternCount: 1,
-      originalInstrumentCount: INSTRUMENT_COUNT,
+      originalInstrumentCount: sampleCount,
     },
   };
 
   // ── Song name ─────────────────────────────────────────────────────────────
 
-  const nameParts: string[] = [`${moduleName} [TME]`];
-  if (subsongCount > 1) nameParts.push(`(${subsongCount} subsongs)`);
+  const nameParts: string[] = [`${moduleName} [Alcatraz Packer]`];
+  if (sampleCount > 0) nameParts.push(`(${sampleCount} smp)`);
 
   return {
     name: nameParts.join(' '),
@@ -179,7 +182,7 @@ export function parseTMEFile(buffer: ArrayBuffer, filename: string): TrackerSong
     patterns: [pattern],
     instruments,
     songPositions: [0],
-    songLength: 1,
+    songLength,
     restartPosition: 0,
     numChannels: 4,
     initialSpeed: 6,
