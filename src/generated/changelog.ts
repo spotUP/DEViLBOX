@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-26T07:30:17.081Z
+ * Generated: 2026-02-26T08:22:46.213Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1286';
-export const BUILD_NUMBER = '1286';
-export const BUILD_HASH = '31562c67';
+export const BUILD_VERSION = '1.0.1290';
+export const BUILD_NUMBER = '1290';
+export const BUILD_HASH = '4c2e88ac';
 export const BUILD_DATE = '2026-02-26';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,25 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1286',
+    version: '1.0.1290',
     date: '2026-02-26',
     changes: [
+      {
+        type: 'fix',
+        "description": "Apply speed2 alternation when switching subsongs"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add .worktrees/ to .gitignore"
+      },
+      {
+        type: 'improvement',
+        "description": "Add missing format imports design doc (VGM, YM, NSF, SAP, SID, AY)"
+      },
+      {
+        type: 'fix',
+        "description": "Proper subsong conversion — shared instruments, per-subsong patterns"
+      },
       {
         type: 'improvement',
         "description": "Chore(furnace-insed): bump WASM cache-bust version to 3"
@@ -218,22 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Subsong selection UI and full import pipeline wiring"
-      },
-      {
-        type: 'feature',
-        "description": "Complete UADE editability — pitch fix, persistence, pre-load, multi-subsong"
-      },
-      {
-        type: 'feature',
-        "description": "Close enhanced scan gaps — loops, VBlank BPM, arpeggio, warnings, fallback"
-      },
-      {
-        type: 'feature',
-        "description": "Per-format engine selectors in import dialog"
-      },
-      {
-        type: 'fix',
-        "description": "Ft2-sampled compilation patches for Emscripten"
       }
     ]
   }
