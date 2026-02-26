@@ -4403,6 +4403,12 @@ export class TrackerReplayer {
   getCurrentPosition(): number { return this.songPos; }
   getCurrentTick(): number { return this.currentTick; }
 
+  /** Update Furnace speed alternation for live subsong switching (no song reload needed). */
+  setSpeed2(value: number | null): void {
+    this.speed2 = value;
+    this.speedAB = value !== null;
+  }
+
   /**
    * Hot-swap pattern data without stopping playback.
    * The scheduler reads this.song.patterns on every tick, so updating the
