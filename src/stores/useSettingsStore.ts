@@ -110,6 +110,14 @@ export interface FormatEnginePreferences {
   sonixMusicDriver: FormatEngineChoice;        // smus.*/snx.*/tiny.* → SonixMusicDriverParser vs UADE
   jesperOlsen: FormatEngineChoice;             // jo.* → JesperOlsenParser vs UADE
   kimChristensen: FormatEngineChoice;          // kim.* → KimChristensenParser vs UADE
+  martinWalker: FormatEngineChoice;            // avp.*/mw.* (prefix) → MartinWalkerParser vs UADE
+  paulShields: FormatEngineChoice;             // ps.* → PaulShieldsParser vs UADE
+  paulRobotham: FormatEngineChoice;            // dat.* → PaulRobothamParser vs UADE
+  pierreAdane: FormatEngineChoice;             // pap.* → PierreAdaneParser vs UADE
+  anders0land: FormatEngineChoice;             // hot.* → Anders0landParser vs UADE
+  andrewParton: FormatEngineChoice;            // bye.* → AndrewPartonParser vs UADE
+  customMade: FormatEngineChoice;              // cm.*/rk.*/rkb.* (prefix) → CustomMadeParser vs UADE
+  benDaglishSID: FormatEngineChoice;           // bds.* → BenDaglishSIDParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -250,6 +258,14 @@ export const useSettingsStore = create<SettingsStore>()(
         sonixMusicDriver: 'native',          // SonixMusicDriverParser — native parser available
         jesperOlsen: 'native',               // JesperOlsenParser — native parser available
         kimChristensen: 'native',            // KimChristensenParser — native parser available
+        martinWalker: 'native',              // MartinWalkerParser — native parser available
+        paulShields: 'native',               // PaulShieldsParser — native parser available
+        paulRobotham: 'native',              // PaulRobothamParser — native parser available
+        pierreAdane: 'native',               // PierreAdaneParser — native parser available
+        anders0land: 'native',               // Anders0landParser — native parser available
+        andrewParton: 'native',              // AndrewPartonParser — native parser available
+        customMade: 'native',                // CustomMadeParser — native parser available
+        benDaglishSID: 'native',             // BenDaglishSIDParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
