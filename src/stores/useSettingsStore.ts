@@ -39,7 +39,7 @@ export interface FormatEnginePreferences {
   davidWhittaker: FormatEngineChoice; // .dw/.dwold → DavidWhittakerParser vs UADE
   deltaMusic2: FormatEngineChoice;    // .dm2 → DeltaMusic2Parser vs UADE
   artOfNoise: FormatEngineChoice;     // .aon/.aon8 → ArtOfNoiseParser vs UADE
-  benDaglish: FormatEngineChoice;     // .bd → BenDaglishParser vs UADE
+  benDaglish: FormatEngineChoice;     // bd.* → BenDaglishParser vs UADE
   sonicArranger: FormatEngineChoice;  // .sa/.sonic → SonicArrangerParser vs UADE
   inStereo1: FormatEngineChoice;      // .is/.is10 → InStereo1Parser vs UADE
   inStereo2: FormatEngineChoice;      // .is/.is20 → InStereo2Parser vs UADE
