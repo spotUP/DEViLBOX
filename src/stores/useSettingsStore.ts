@@ -72,6 +72,24 @@ export interface FormatEnginePreferences {
   deltaMusic1: FormatEngineChoice;    // .dm/.dm1 → DeltaMusic1Parser vs UADE
   pt36: FormatEngineChoice;           // FORM+MODL → PT36Parser vs libopenmpt
   // Newly wired parsers (2026-02-26 batch)
+  medley: FormatEngineChoice;         // .ml → MedleyParser vs UADE
+  markCooksey: FormatEngineChoice;    // mc.*/mcr.*/mco.* → MarkCookseyParser vs UADE
+  jeroenTel: FormatEngineChoice;      // jt.*/mon_old.* → JeroenTelParser vs UADE
+  quartet: FormatEngineChoice;        // qpa.*/sqt.*/qts.* → QuartetParser vs UADE
+  soundMaster: FormatEngineChoice;    // sm.*/sm1.*/sm2.*/sm3.*/smpro.* → SoundMasterParser vs UADE
+  zoundMonitor: FormatEngineChoice;   // sng.* → ZoundMonitorParser vs UADE
+  synthPack: FormatEngineChoice;      // osp.* → SynthPackParser vs UADE
+  tcbTracker: FormatEngineChoice;     // tcb.* → TCBTrackerParser vs UADE
+  mmdc: FormatEngineChoice;           // mmdc.* → MMDCParser vs UADE
+  psa: FormatEngineChoice;            // psa.* → PSAParser vs UADE
+  steveTurner: FormatEngineChoice;    // jpo.*/jpold.* → SteveTurnerParser vs UADE
+  tme: FormatEngineChoice;            // .tme/tme.* → TMEParser vs UADE
+  jasonBrooke: FormatEngineChoice;    // jcb.*/jcbo.*/jb.* → JasonBrookeParser vs UADE
+  laxity: FormatEngineChoice;         // powt.*/pt.* → LaxityParser vs UADE
+  fredGray: FormatEngineChoice;       // gray.* → FredGrayParser vs UADE
+  musicMaker4V: FormatEngineChoice;   // mm4.*/sdata.* → MusicMaker4V vs UADE
+  musicMaker8V: FormatEngineChoice;   // mm8.* → MusicMaker8V vs UADE
+  maniacsOfNoise: FormatEngineChoice; // mon.* → ManiacsOfNoiseParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -174,6 +192,24 @@ export const useSettingsStore = create<SettingsStore>()(
         ronKlaren: 'native',        // RonKlarenParser — native parser available
         deltaMusic1: 'native',  // DeltaMusic1Parser — native parser available
         pt36: 'native',         // PT36Parser — native parser available
+        medley: 'native',         // MedleyParser — dedicated Medley support
+        markCooksey: 'native',    // MarkCookseyParser — dedicated Mark Cooksey support
+        jeroenTel: 'native',      // JeroenTelParser — dedicated Jeroen Tel support
+        quartet: 'native',        // QuartetParser — dedicated Quartet support
+        soundMaster: 'native',    // SoundMasterParser — dedicated SoundMaster support
+        zoundMonitor: 'native',   // ZoundMonitorParser — dedicated ZoundMonitor support
+        synthPack: 'native',      // SynthPackParser — dedicated SynthPack support
+        tcbTracker: 'native',     // TCBTrackerParser — dedicated TCB Tracker support
+        mmdc: 'native',           // MMDCParser — dedicated MMDC support
+        psa: 'native',            // PSAParser — dedicated PSA support
+        steveTurner: 'native',    // SteveTurnerParser — dedicated Steve Turner support
+        tme: 'native',            // TMEParser — dedicated TME support
+        jasonBrooke: 'native',    // JasonBrookeParser — dedicated Jason Brooke support
+        laxity: 'native',         // LaxityParser — dedicated Laxity support
+        fredGray: 'native',       // FredGrayParser — dedicated Fred Gray support
+        musicMaker4V: 'native',   // MusicMakerParser — dedicated Music Maker 4V support
+        musicMaker8V: 'native',   // MusicMakerParser — dedicated Music Maker 8V support
+        maniacsOfNoise: 'native', // ManiacsOfNoiseParser — dedicated Maniacs of Noise support
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
