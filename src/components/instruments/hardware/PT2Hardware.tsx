@@ -431,6 +431,10 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
         try { currentSourceRef.current.stop(); } catch { /* ignore */ }
         currentSourceRef.current = null;
       }
+      if (audioCtxRef.current) {
+        try { audioCtxRef.current.close(); } catch { /* ignore */ }
+        audioCtxRef.current = null;
+      }
       if (mod) {
         try { mod._pt2_sampled_shutdown(); } catch { /* ignore */ }
       }
