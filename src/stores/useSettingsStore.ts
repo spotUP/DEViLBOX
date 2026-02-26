@@ -37,6 +37,7 @@ export interface FormatEnginePreferences {
   robHubbard: FormatEngineChoice; // .rh/.rhp → RobHubbardParser vs UADE
   sidmon1: FormatEngineChoice;    // .sid1/.smn (magic) → SidMon1Parser vs UADE
   davidWhittaker: FormatEngineChoice; // .dw/.dwold → DavidWhittakerParser vs UADE
+  deltaMusic2: FormatEngineChoice;    // .dm2 → DeltaMusic2Parser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -106,6 +107,7 @@ export const useSettingsStore = create<SettingsStore>()(
         robHubbard: 'native',   // RobHubbardParser — dedicated Rob Hubbard support
         sidmon1: 'native',      // SidMon1Parser — dedicated SidMon 1.0 support
         davidWhittaker: 'native', // DavidWhittakerParser — dedicated David Whittaker support
+        deltaMusic2: 'native',  // DeltaMusic2Parser — dedicated Delta Music 2.0 support
         uade: 'enhanced',       // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
