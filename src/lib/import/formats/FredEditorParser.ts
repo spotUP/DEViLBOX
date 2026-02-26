@@ -13,7 +13,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
-import type { InstrumentConfig } from '@/types/instrument';
+import type { InstrumentConfig, FredConfig } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Fred Editor period table (from FEPlayer.js) ─────────────────────────────
@@ -514,10 +514,59 @@ export async function parseFredEditorFile(
       } else {
         instruments.push(makePlaceholderInstrument(instId, name));
       }
-    } else if (sample.type === 1 || sample.type === 2) {
-      // Synth (PWM or blending) -- create placeholder since we cannot
-      // replicate the real-time waveform generation
-      instruments.push(makePlaceholderInstrument(instId, `${name} (Synth ${sample.type})`));
+    } else if (sample.type === 1) {
+      // PWM synth instrument — use FredSynth
+      const fredCfg: FredConfig = {
+        envelopeVol:   sample.envelopeVol,
+        attackSpeed:   sample.attackSpeed,
+        attackVol:     sample.attackVol,
+        decaySpeed:    sample.decaySpeed,
+        decayVol:      sample.decayVol,
+        sustainTime:   sample.sustainTime,
+        releaseSpeed:  sample.releaseSpeed,
+        releaseVol:    sample.releaseVol,
+        vibratoDelay:  sample.vibratoDelay,
+        vibratoSpeed:  sample.vibratoSpeed,
+        vibratoDepth:  sample.vibratoDepth,
+        arpeggio:      Array.from(sample.arpeggio),
+        arpeggioLimit: sample.arpeggioLimit,
+        arpeggioSpeed: sample.arpeggioSpeed,
+        pulseRateNeg:  sample.pulseRateNeg,
+        pulseRatePos:  sample.pulseRatePos,
+        pulseSpeed:    sample.pulseSpeed,
+        pulsePosL:     sample.pulsePosL,
+        pulsePosH:     sample.pulsePosH,
+        pulseDelay:    sample.pulseDelay,
+        relative:      sample.relative,
+      };
+      instruments.push({
+        id:        instId,
+        name:      `${name} (PWM)`,
+        type:      'synth' as const,
+        synthType: 'FredSynth' as const,
+        fred:      fredCfg,
+        effects:   [],
+        volume:    -6,
+        pan:       0,
+      } as unknown as InstrumentConfig);
+    } else if (sample.type === 2) {
+      // Wavetable blend — use Sampler approximation with the PCM data if available
+      const start = sample.pointer;
+      const end   = start + sample.length;
+      if (sample.length > 0 && start >= 0 && end <= pcmData.length) {
+        const pcm = pcmData.slice(start, end);
+        instruments.push(createSamplerInstrument(
+          instId,
+          `${name} (Blend)`,
+          pcm,
+          Math.min(64, sample.envelopeVol || 64),
+          8287,
+          0,
+          0
+        ));
+      } else {
+        instruments.push(makePlaceholderInstrument(instId, `${name} (Blend)`));
+      }
     } else {
       instruments.push(makePlaceholderInstrument(instId, name));
     }

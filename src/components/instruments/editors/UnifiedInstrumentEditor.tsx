@@ -17,6 +17,7 @@ import {
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
   DEFAULT_HIVELY,
+  DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC, DEFAULT_FRED, DEFAULT_TFMX,
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
@@ -78,6 +79,12 @@ const VitalControls = lazy(() => import('../controls/VitalControls').then(m => (
 const Odin2Controls = lazy(() => import('../controls/Odin2Controls').then(m => ({ default: m.Odin2Controls })));
 const SurgeControls = lazy(() => import('../controls/SurgeControls').then(m => ({ default: m.SurgeControls })));
 const HivelyControls = lazy(() => import('../controls/HivelyControls').then(m => ({ default: m.HivelyControls })));
+const SoundMonControls = lazy(() => import('../controls/SoundMonControls').then(m => ({ default: m.SoundMonControls })));
+const SidMonControls = lazy(() => import('../controls/SidMonControls').then(m => ({ default: m.SidMonControls })));
+const DigMugControls = lazy(() => import('../controls/DigMugControls').then(m => ({ default: m.DigMugControls })));
+const FCControls = lazy(() => import('../controls/FCControls').then(m => ({ default: m.FCControls })));
+const FredControls = lazy(() => import('../controls/FredControls').then(m => ({ default: m.FredControls })));
+const TFMXControls = lazy(() => import('../controls/TFMXControls').then(m => ({ default: m.TFMXControls })));
 
 // Lazy-loaded hardware UI components
 const HivelyHardware = lazy(() => import('../hardware/HivelyHardware').then(m => ({ default: m.HivelyHardware })));
@@ -107,7 +114,7 @@ import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
 import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'fred' | 'tfmx';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -173,6 +180,36 @@ function isHivelyType(synthType: SynthType): boolean {
   return synthType === 'HivelySynth';
 }
 
+/** Check if synth type is SoundMon II */
+function isSoundMonType(synthType: SynthType): boolean {
+  return synthType === 'SoundMonSynth';
+}
+
+/** Check if synth type is SidMon II */
+function isSidMonType(synthType: SynthType): boolean {
+  return synthType === 'SidMonSynth';
+}
+
+/** Check if synth type is Digital Mugician */
+function isDigMugType(synthType: SynthType): boolean {
+  return synthType === 'DigMugSynth';
+}
+
+/** Check if synth type is Future Composer */
+function isFCType(synthType: SynthType): boolean {
+  return synthType === 'FCSynth';
+}
+
+/** Check if synth type is Fred Editor */
+function isFredType(synthType: SynthType): boolean {
+  return synthType === 'FredSynth';
+}
+
+/** Check if synth type is TFMX */
+function isTFMXType(synthType: SynthType): boolean {
+  return synthType === 'TFMXSynth';
+}
+
 /** Get the editor mode for a synth type */
 function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'TB303' || synthType === 'Buzz3o3') return 'tb303';
@@ -189,6 +226,12 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isDexedType(synthType)) return 'dexed';
   if (isOBXdType(synthType)) return 'obxd';
   if (isHivelyType(synthType)) return 'hively';
+  if (isSoundMonType(synthType)) return 'soundmon';
+  if (isSidMonType(synthType)) return 'sidmon';
+  if (isDigMugType(synthType)) return 'digmug';
+  if (isFCType(synthType)) return 'fc';
+  if (isFredType(synthType)) return 'fred';
+  if (isTFMXType(synthType)) return 'tfmx';
   if (synthType === 'HarmonicSynth') return 'harmonicsynth';
   if (synthType === 'ModularSynth') return 'modular';
   if (synthType === 'WAM') return 'wam';
@@ -560,6 +603,36 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const handleHivelyHardwareChange = useCallback((fullConfig: typeof DEFAULT_HIVELY) => {
     handleChange({ hively: fullConfig });
   }, [handleChange]);
+
+  // Handle SoundMon config updates
+  const handleSoundMonChange = useCallback((updates: Partial<typeof instrument.soundMon>) => {
+    const current = instrument.soundMon || DEFAULT_SOUNDMON;
+    handleChange({ soundMon: { ...current, ...updates } });
+  }, [instrument.soundMon, handleChange]);
+
+  // Handle SidMon config updates
+  const handleSidMonChange = useCallback((updates: Partial<typeof instrument.sidMon>) => {
+    const current = instrument.sidMon || DEFAULT_SIDMON;
+    handleChange({ sidMon: { ...current, ...updates } });
+  }, [instrument.sidMon, handleChange]);
+
+  // Handle DigMug config updates
+  const handleDigMugChange = useCallback((updates: Partial<typeof instrument.digMug>) => {
+    const current = instrument.digMug || DEFAULT_DIGMUG;
+    handleChange({ digMug: { ...current, ...updates } });
+  }, [instrument.digMug, handleChange]);
+
+  // Handle FC config updates
+  const handleFCChange = useCallback((updates: Partial<typeof instrument.fc>) => {
+    const current = instrument.fc || DEFAULT_FC;
+    handleChange({ fc: { ...current, ...updates } });
+  }, [instrument.fc, handleChange]);
+
+  // Handle Fred config updates
+  const handleFredChange = useCallback((updates: Partial<typeof instrument.fred>) => {
+    const current = instrument.fred || DEFAULT_FRED;
+    handleChange({ fred: { ...current, ...updates } });
+  }, [instrument.fred, handleChange]);
 
   // Handle Space Laser config updates
   const handleSpaceLaserChange = useCallback((updates: Partial<typeof instrument.spaceLaser>) => {
@@ -1004,6 +1077,141 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             instrumentId={instrument.id}
             onChange={handleDubSirenChange}
           />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SOUNDMON II EDITOR
+  // ============================================================================
+  if (editorMode === 'soundmon') {
+    const soundMonConfig = deepMerge(DEFAULT_SOUNDMON, instrument.soundMon || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#000e1a] to-[#000508]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <SoundMonControls
+            config={soundMonConfig}
+            onChange={handleSoundMonChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SIDMON II EDITOR
+  // ============================================================================
+  if (editorMode === 'sidmon') {
+    const sidMonConfig = deepMerge(DEFAULT_SIDMON, instrument.sidMon || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a0010] to-[#080005]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <SidMonControls
+            config={sidMonConfig}
+            onChange={handleSidMonChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // DIGITAL MUGICIAN EDITOR
+  // ============================================================================
+  if (editorMode === 'digmug') {
+    const digMugConfig = deepMerge(DEFAULT_DIGMUG, instrument.digMug || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0a1400] to-[#040800]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <DigMugControls
+            config={digMugConfig}
+            onChange={handleDigMugChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // FUTURE COMPOSER EDITOR
+  // ============================================================================
+  if (editorMode === 'fc') {
+    const fcConfig = deepMerge(DEFAULT_FC, instrument.fc || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a1500] to-[#080600]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <FCControls
+            config={fcConfig}
+            onChange={handleFCChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // FRED EDITOR
+  // ============================================================================
+  if (editorMode === 'fred') {
+    const fredConfig = deepMerge(DEFAULT_FRED, instrument.fred || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a0e00] to-[#080500]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <FredControls
+            config={fredConfig}
+            onChange={handleFredChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // TFMX EDITOR (read-only viewer)
+  // ============================================================================
+  if (editorMode === 'tfmx') {
+    const tfmxConfig = instrument.tfmx || DEFAULT_TFMX;
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a0800] to-[#080300]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <TFMXControls config={tfmxConfig} />
         </Suspense>
       </div>
     );

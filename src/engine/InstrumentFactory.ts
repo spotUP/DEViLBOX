@@ -29,6 +29,12 @@ import {
 } from '@/types/instrument';
 import { TapeSaturation } from './effects/TapeSaturation';
 import { HivelySynth } from './hively/HivelySynth';
+import { SoundMonSynth } from './soundmon/SoundMonSynth';
+import { SidMonSynth } from './sidmon/SidMonSynth';
+import { DigMugSynth } from './digmug/DigMugSynth';
+import { FCSynth } from './fc/FCSynth';
+import { TFMXSynth } from './tfmx/TFMXSynth';
+import { FredSynth } from './fred/FredSynth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -838,6 +844,72 @@ export class InstrumentFactory {
       case 'HivelySynth':
         instrument = new HivelySynth();
         break;
+
+      case 'SoundMonSynth': {
+        const smSynth = new SoundMonSynth();
+        if (config.soundMon) {
+          smSynth.setInstrument(config.soundMon).catch(err =>
+            console.error('[InstrumentFactory] SoundMon load failed:', err)
+          );
+        }
+        instrument = smSynth;
+        break;
+      }
+
+      case 'SidMonSynth': {
+        const sidSynth = new SidMonSynth();
+        if (config.sidMon) {
+          sidSynth.setInstrument(config.sidMon).catch(err =>
+            console.error('[InstrumentFactory] SidMon load failed:', err)
+          );
+        }
+        instrument = sidSynth;
+        break;
+      }
+
+      case 'DigMugSynth': {
+        const dmSynth = new DigMugSynth();
+        if (config.digMug) {
+          dmSynth.setInstrument(config.digMug).catch(err =>
+            console.error('[InstrumentFactory] DigMug load failed:', err)
+          );
+        }
+        instrument = dmSynth;
+        break;
+      }
+
+      case 'FCSynth': {
+        const fcSynth = new FCSynth();
+        if (config.fc) {
+          fcSynth.setInstrument(config.fc).catch(err =>
+            console.error('[InstrumentFactory] FC load failed:', err)
+          );
+        }
+        instrument = fcSynth;
+        break;
+      }
+
+      case 'TFMXSynth': {
+        const tfmxSynth = new TFMXSynth();
+        if (config.tfmx) {
+          tfmxSynth.setInstrument(config.tfmx).catch(err =>
+            console.error('[InstrumentFactory] TFMX load failed:', err)
+          );
+        }
+        instrument = tfmxSynth;
+        break;
+      }
+
+      case 'FredSynth': {
+        const fredSynth = new FredSynth();
+        if (config.fred) {
+          fredSynth.setInstrument(config.fred).catch(err =>
+            console.error('[InstrumentFactory] Fred load failed:', err)
+          );
+        }
+        instrument = fredSynth;
+        break;
+      }
 
       case 'UADESynth': {
         const uadeSynth = new UADESynth();
