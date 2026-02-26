@@ -207,6 +207,7 @@ export type SynthType =
   | 'SidMon1Synth'    // SidMon 1.0 (ADSR + arpeggio + wavetable synthesis)
   | 'OctaMEDSynth'   // OctaMED SynthInstr (vol/wf command table oscillator)
   | 'DavidWhittakerSynth' // David Whittaker (Amiga period-based frq/vol sequence synthesis)
+  | 'SymphonieSynth'  // Symphonie / Symphonie Pro (native AudioWorklet replayer)
   // Modular Synthesis
   | 'ModularSynth';   // Modular synthesizer with patch editor
 
@@ -3521,6 +3522,7 @@ export interface InstrumentConfig {
   sidmon1?: SidMon1Config;
   octamed?: OctaMEDConfig;
   davidWhittaker?: DavidWhittakerConfig;
+  symphonie?: import('@/engine/symphonie/SymphoniePlaybackData').SymphoniePlaybackData;
   // Modular Synthesis
   modularSynth?: import('./modular').ModularPatchConfig;
   // Sampler config
