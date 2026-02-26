@@ -1515,6 +1515,22 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
   }
 
+  // ── Medley (.ml) ─────────────────────────────────────────────────────────
+  // Amiga 4-channel format (Medley tracker). Magic: "MSOB" at bytes[0..3].
+  if (/\.ml$/i.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.medley === 'native') {
+      try {
+        const { isMedleyFormat, parseMedleyFile } = await import('@lib/import/formats/MedleyParser');
+        if (isMedleyFormat(buffer)) return parseMedleyFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[MedleyParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_ml } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_ml(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── Mark Cooksey / Don Adan (mc.* / mcr.* / mco.* prefix) ─────────────────
   // Compiled 68k Amiga music format. Three sub-variants: Old (D040D040 magic),
   // New/Medium (601A + 48E780F0), and Rare (4DFA + DFF000 hardware register).
