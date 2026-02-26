@@ -814,6 +814,8 @@ export interface DigMugConfig {
   arpSpeed: number;          // 0-15
   vibSpeed: number;          // 0-63
   vibDepth: number;          // 0-63
+  // Embedded waveform bytes extracted from DM file (128 bytes, signed int8)
+  waveformData?: Uint8Array;
   // V2 optional PCM layer
   pcmData?: Uint8Array;
   loopStart?: number;

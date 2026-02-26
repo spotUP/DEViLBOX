@@ -30,6 +30,8 @@ import {
 import { TapeSaturation } from './effects/TapeSaturation';
 import { HivelySynth } from './hively/HivelySynth';
 import { SoundMonSynth } from './soundmon/SoundMonSynth';
+import { SidMonSynth } from './sidmon/SidMonSynth';
+import { DigMugSynth } from './digmug/DigMugSynth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -848,6 +850,28 @@ export class InstrumentFactory {
           );
         }
         instrument = smSynth;
+        break;
+      }
+
+      case 'SidMonSynth': {
+        const sidSynth = new SidMonSynth();
+        if (config.sidMon) {
+          sidSynth.setInstrument(config.sidMon).catch(err =>
+            console.error('[InstrumentFactory] SidMon load failed:', err)
+          );
+        }
+        instrument = sidSynth;
+        break;
+      }
+
+      case 'DigMugSynth': {
+        const dmSynth = new DigMugSynth();
+        if (config.digMug) {
+          dmSynth.setInstrument(config.digMug).catch(err =>
+            console.error('[InstrumentFactory] DigMug load failed:', err)
+          );
+        }
+        instrument = dmSynth;
         break;
       }
 
