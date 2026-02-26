@@ -52,6 +52,7 @@ export interface FormatEnginePreferences {
   cdfm67: FormatEngineChoice;             // .c67 → CDFM67Parser vs OpenMPT
   easyTrax: FormatEngineChoice;           // .etx → EasyTraxParser vs OpenMPT
   karlMorton: FormatEngineChoice;         // .mus → KarlMortonParser vs OpenMPT
+  xTracker: FormatEngineChoice;           // .dmf (X-Tracker) → XTrackerParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -136,6 +137,7 @@ export const useSettingsStore = create<SettingsStore>()(
         cdfm67: 'native',           // CDFM67Parser — dedicated CDFM Composer 670 support
         easyTrax: 'native',         // EasyTraxParser — dedicated EasyTrax support
         karlMorton: 'native',       // KarlMortonParser — dedicated Karl Morton Music Format support
+        xTracker: 'native',         // XTrackerParser — dedicated X-Tracker DMF support
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
