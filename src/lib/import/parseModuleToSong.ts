@@ -607,15 +607,43 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── Game Music Creator (.gmc) ─────────────────────────────────────────────
+  // No magic bytes — identified by structural heuristics (mirrors OpenMPT).
   if (/\.gmc$/.test(filename)) {
-    try {
-      const { isGMCFormat, parseGMCFile } = await import('@lib/import/formats/GMCParser');
-      if (isGMCFormat(buffer)) return parseGMCFile(buffer, file.name);
-    } catch (err) {
-      console.warn(`[GMCParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.gameMusicCreator === 'native') {
+      try {
+        const { isGameMusicCreatorFormat, parseGameMusicCreatorFile } = await import('@lib/import/formats/GameMusicCreatorParser');
+        const bytes = new Uint8Array(buffer);
+        if (isGameMusicCreatorFormat(bytes)) {
+          const result = parseGameMusicCreatorFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[GameMusicCreatorParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
     }
     const { parseUADEFile: parseUADE_gmc } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_gmc(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    return parseUADE_gmc(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Face The Music (.ftm) ─────────────────────────────────────────────────
+  // Magic "FTMN" at offset 0; embedded-sample variant only.
+  if (/\.ftm$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.faceTheMusic === 'native') {
+      try {
+        const { isFaceTheMusicFormat, parseFaceTheMusicFile } = await import('@lib/import/formats/FaceTheMusicParser');
+        const bytes = new Uint8Array(buffer);
+        if (isFaceTheMusicFormat(bytes)) {
+          const result = parseFaceTheMusicFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[FaceTheMusicParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_ftm } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_ftm(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────

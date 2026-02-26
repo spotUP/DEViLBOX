@@ -43,6 +43,8 @@ Track which formats have native parsers vs UADE-only.
 | `.sa`, `.sonic` | Sonic Arranger | SonicArrangerParser.ts | NostalgicPlayer | LH-compressed → UADE |
 | `.puma` | PumaTracker | PumaTrackerParser.ts | **OpenMPT** Load_puma.cpp | UADE fallback |
 | `.dm2` | Delta Music 2.0 | DeltaMusic2Parser.ts | NostalgicPlayer + spec | .dm/.dm1 → UADE |
+| `.gmc` | Game Music Creator | GameMusicCreatorParser.ts | **OpenMPT** Load_gmc.cpp | UADE fallback |
+| `.ftm` | Face The Music | FaceTheMusicParser.ts | **OpenMPT** Load_ftm.cpp | embedded samples only; external → UADE |
 | `.is`, `.is10` | InStereo! 1.0 | InStereo1Parser.ts | NostalgicPlayer | UADE fallback |
 | `.is`, `.is20` | InStereo! 2.0 | InStereo2Parser.ts | NostalgicPlayer | IS20 magic tried first |
 | `.ay` | AY / ZX Spectrum | AYParser.ts | — | native only |
@@ -59,8 +61,6 @@ Track which formats have native parsers vs UADE-only.
 
 | Format | Parser File | Reference | Extensions |
 |---|---|---|---|
-| Game Music Creator | GameMusicCreatorParser.ts | **OpenMPT** Load_gmc.cpp | `.gmc` |
-| Face The Music | FaceTheMusicParser.ts | **OpenMPT** Load_ftm.cpp | `.ftm` |
 | Actionamics | ActionamicsParser.ts | NostalgicPlayer | `.act` |
 | Activision Pro | ActivisionProParser.ts | NostalgicPlayer | `.sng` |
 | Ron Klaren | RonKlarenParser.ts | NostalgicPlayer | `.rk`, `.rkb` |
@@ -85,17 +85,26 @@ Track which formats have native parsers vs UADE-only.
 | Extension(s) | Format | OpenMPT Loader | Notes |
 |---|---|---|---|
 | `.dm`, `.dlm1` | Delta Music 1.x | — | NP: DeltaMusic10 player available |
-| `.ims` | Images Music System | Load_ims.cpp (158 ln) | |
 | `.dsym` | Digital Symphony | Load_dsym.cpp (615 ln) | |
-| `.dtm` | Digital Tracker | Load_dtm.cpp (596 ln) | |
-| `.dsm` | DSIK Sound Module | Load_dsm.cpp (525 ln) | |
 | `.gt2` | Graoumf Tracker 2 | Load_gt2.cpp (1566 ln) | |
-| `.plm` | Disorder Tracker | Load_plm.cpp (409 ln) | |
-| `.rtm` | Reality Tracker | Load_rtm.cpp (443 ln) | |
 | `.symmod` | Symphonie Pro | Load_symmod.cpp (1947 ln) | |
-| `.unic` | UNIC Tracker | Load_unic.cpp (251 ln) | |
 | `.rjp`, `.sng` | Richard Joseph | NP source available | Two-file format (.sng+.ins) |
 | `.trc` | Tronic | — | Same author as PumaTracker |
+
+## 🚧 Claimed — In Progress (this session, 2026-02-26)
+
+| Extension(s) | Format | OpenMPT Loader | Parser File |
+|---|---|---|---|
+| `.unic` | UNIC Tracker | Load_unic.cpp (251 ln) | UNICParser.ts |
+| `.mtm` | MultiTracker | Load_mtm.cpp (318 ln) | MTMParser.ts |
+| `.669` | Composer 669 | Load_669.cpp (332 ln) | Format669Parser.ts |
+| `.far` | Farandole Composer | Load_far.cpp (336 ln) | FARParser.ts |
+| `.plm` | Disorder Tracker 2 | Load_plm.cpp (409 ln) | PLMParser.ts |
+| `.ult` | Ultra Tracker | Load_ult.cpp (435 ln) | ULTParser.ts |
+| `.rtm` | Reality Tracker | Load_rtm.cpp (443 ln) | RTMParser.ts |
+| `.dsm` | DSIK Sound Module | Load_dsm.cpp (525 ln) | DSMParser.ts |
+| `.dtm` | Digital Tracker | Load_dtm.cpp (596 ln) | DTMParser.ts |
+| `.stm` | ScreamTracker 2 | Load_stm.cpp (615 ln) | STMParser.ts |
 
 ---
 
@@ -127,3 +136,5 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | Rob Hubbard | RobHubbardParser.ts | FlodJS + WASM synth |
 | 2026-02-26 | Hippel CoSo | HippelCoSoParser.ts | FlodJS + WASM synth |
 | 2026-02-26 | TCB Tracker | TCBTrackerParser.ts | **OpenMPT** Load_tcb.cpp |
+| 2026-02-26 | Game Music Creator | GameMusicCreatorParser.ts | **OpenMPT** Load_gmc.cpp |
+| 2026-02-26 | Face The Music | FaceTheMusicParser.ts | **OpenMPT** Load_ftm.cpp |
