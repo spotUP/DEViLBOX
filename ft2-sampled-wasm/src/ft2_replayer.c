@@ -3,9 +3,24 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
+#include <emscripten.h>
 #include "ft2_header.h"
 #include "ft2_replayer.h"
 #include "ft2_audio.h"
+
+/* ── JS audio callbacks ─────────────────────────────────────────── */
+/* ptr   = WASM byte offset of sample data
+ * len   = sample count (NOT byte count)
+ * loopStart/loopLength = in samples, loopType 0=off 1=fwd 2=bidi
+ * is16bit = 1 for 16-bit, 0 for 8-bit */
+EM_JS(void, js_onPlaySample, (int ptr, int len, int loopStart, int loopLength, int loopType, int is16bit), {
+    if (Module.onPlaySample) Module.onPlaySample(ptr, len, loopStart, loopLength, loopType, is16bit);
+});
+
+EM_JS(void, js_onStopSample, (void), {
+    if (Module.onStopSample) Module.onStopSample();
+});
 
 /* Required globals declared extern in ft2_replayer.h */
 int8_t playMode = PLAYMODE_IDLE;
@@ -101,15 +116,52 @@ void closeReplayer(void)   {}
 void resetMusic(void)      {}
 void startPlaying(int8_t mode, int16_t row)     { (void)mode; (void)row; }
 void stopPlaying(void)     {}
-void stopVoices(void)      {}
+void stopVoices(void)      { js_onStopSample(); }
 void setPos(int16_t songPos, int16_t row, bool resetTimer) { (void)songPos;(void)row;(void)resetTimer; }
 void pauseMusic(void)      {}
 void resumeMusic(void)     {}
 void setSongModifiedFlag(void)    {}
 void removeSongModifiedFlag(void) {}
 void playTone(uint8_t ch, uint8_t ins, uint8_t note, int8_t vol, uint16_t midiVib, uint16_t midiPitch) { (void)ch;(void)ins;(void)note;(void)vol;(void)midiVib;(void)midiPitch; }
-void playSample(uint8_t ch, uint8_t ins, uint8_t smp, uint8_t note, uint16_t midiVib, uint16_t midiPitch) { (void)ch;(void)ins;(void)smp;(void)note;(void)midiVib;(void)midiPitch; }
-void playRange(uint8_t ch, uint8_t ins, uint8_t smp, uint8_t note, uint16_t midiVib, uint16_t midiPitch, int32_t offset, int32_t len) { (void)ch;(void)ins;(void)smp;(void)note;(void)midiVib;(void)midiPitch;(void)offset;(void)len; }
+
+void playSample(uint8_t ch, uint8_t ins, uint8_t smp, uint8_t note, uint16_t midiVib, uint16_t midiPitch)
+{
+    (void)ch; (void)note; (void)midiVib; (void)midiPitch;
+    if (ins < 1 || ins > MAX_INST || instr[ins] == NULL) return;
+    if (smp >= MAX_SMP_PER_INST) return;
+    sample_t *s = &instr[ins]->smp[smp];
+    if (s->dataPtr == NULL || s->length == 0) return;
+
+    int is16bit = (s->flags & SAMPLE_16BIT) ? 1 : 0;
+    int bytesPerSmp = is16bit ? 2 : 1;
+    int loopType = 0;
+    uint8_t lt = GET_LOOPTYPE(s->flags);
+    if      (lt == LOOP_FWD)  loopType = 1;
+    else if (lt == LOOP_BIDI) loopType = 2;
+
+    js_onPlaySample((int)(uintptr_t)s->dataPtr, (int)s->length,
+                    (int)s->loopStart, (int)s->loopLength, loopType, is16bit);
+    (void)bytesPerSmp;
+}
+
+void playRange(uint8_t ch, uint8_t ins, uint8_t smp, uint8_t note, uint16_t midiVib, uint16_t midiPitch, int32_t offset, int32_t len)
+{
+    (void)ch; (void)note; (void)midiVib; (void)midiPitch;
+    if (ins < 1 || ins > MAX_INST || instr[ins] == NULL) return;
+    if (smp >= MAX_SMP_PER_INST) return;
+    sample_t *s = &instr[ins]->smp[smp];
+    if (s->dataPtr == NULL || s->length == 0) return;
+
+    int is16bit = (s->flags & SAMPLE_16BIT) ? 1 : 0;
+    int bytesPerSmp = is16bit ? 2 : 1;
+
+    if (offset < 0) offset = 0;
+    if (len <= 0 || offset >= (int32_t)s->length) return;
+    if (offset + len > (int32_t)s->length) len = (int32_t)s->length - offset;
+
+    int ptr = (int)(uintptr_t)(s->dataPtr + (int32_t)(offset * bytesPerSmp));
+    js_onPlaySample(ptr, (int)len, 0, 0, 0, is16bit); /* play range once, no loop */
+}
 void keyOff(channel_t *ch)                      { (void)ch; }
 void conv8BitSample(int8_t *p, int32_t len, bool stereo)  { (void)p;(void)len;(void)stereo; }
 void conv16BitSample(int8_t *p, int32_t len, bool stereo) { (void)p;(void)len;(void)stereo; }

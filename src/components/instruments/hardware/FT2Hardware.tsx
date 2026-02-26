@@ -54,9 +54,12 @@ interface FT2Module {
   onPanEnvChange?: (index: number, tick: number, value: number) => void;
   onVolEnvFlagsChange?: (enabled: number, sustain: number, loopStart: number, loopEnd: number, numPoints: number) => void;
   onPanEnvFlagsChange?: (enabled: number, sustain: number, loopStart: number, loopEnd: number, numPoints: number) => void;
+  onPlaySample?: (ptr: number, len: number, loopStart: number, loopLength: number, loopType: number, is16bit: number) => void;
+  onStopSample?: () => void;
   _ft2_sampled_init: (w: number, h: number) => void;
   _ft2_sampled_start: () => void;
   _ft2_sampled_shutdown: () => void;
+  _ft2_sampled_tick?: () => void;
   _ft2_sampled_load_pcm: (ptr: number, length: number) => void;
   _ft2_sampled_set_param: (paramId: number, value: number) => void;
   _ft2_sampled_get_param: (paramId: number) => number;
@@ -191,7 +194,7 @@ function configToBuffer(inst: InstrumentConfig): Uint8Array {
 
 /* ── Audio decode: Float32 → Int16Array ────────────────────────── */
 
-async function decodePCM(instrument: InstrumentConfig): Promise<Int16Array | null> {
+async function decodePCM(instrument: InstrumentConfig): Promise<{ pcm: Int16Array; sampleRate: number } | null> {
   const sample = instrument.sample;
   if (!sample) return null;
 
@@ -222,7 +225,7 @@ async function decodePCM(instrument: InstrumentConfig): Promise<Int16Array | nul
     int16[i] = v;
   }
 
-  return int16;
+  return { pcm: int16, sampleRate: audioBuffer.sampleRate };
 }
 
 /* ── Helper: update envelope in metadata ───────────────────────── */
@@ -299,6 +302,9 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const onChangeRef = useRef(onChange);
+  const sampleRateRef = useRef(44100);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   /* Keep refs in sync — CLAUDE.md configRef pattern */
   useEffect(() => { configRef.current = instrument; }, [instrument]);
@@ -484,6 +490,47 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
           onChangeRef.current(updates);
         };
 
+        mod.onPlaySample = (ptr: number, len: number, loopStart: number, loopLength: number, loopType: number, is16bit: number) => {
+          if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+          const ctx = audioCtxRef.current;
+          if (currentSourceRef.current) {
+            try { currentSourceRef.current.stop(); } catch { /* ignore */ }
+            currentSourceRef.current = null;
+          }
+          if (len <= 0) return;
+          const sr = sampleRateRef.current;
+          const audioBuf = ctx.createBuffer(1, len, sr);
+          const chData = audioBuf.getChannelData(0);
+          if (is16bit) {
+            /* ptr is a WASM byte offset; HEAP16 is Int16Array over the same buffer */
+            const raw = mod.HEAP16.subarray(ptr >> 1, (ptr >> 1) + len);
+            for (let i = 0; i < len; i++) chData[i] = raw[i] / 32768.0;
+          } else {
+            const raw = new Int8Array(mod.HEAPU8.buffer, ptr, len);
+            for (let i = 0; i < len; i++) chData[i] = raw[i] / 128.0;
+          }
+          const src = ctx.createBufferSource();
+          src.buffer = audioBuf;
+          if (loopType !== 0 && loopLength > 2) {
+            src.loop = true;
+            src.loopStart = loopStart / sr;
+            src.loopEnd = (loopStart + loopLength) / sr;
+          }
+          src.connect(ctx.destination);
+          src.start();
+          currentSourceRef.current = src;
+          src.onended = () => {
+            if (currentSourceRef.current === src) currentSourceRef.current = null;
+          };
+        };
+
+        mod.onStopSample = () => {
+          if (currentSourceRef.current) {
+            try { currentSourceRef.current.stop(); } catch { /* ignore */ }
+            currentSourceRef.current = null;
+          }
+        };
+
         /* Init */
         mod._ft2_sampled_init(FT2_SCREEN_W, FT2_SCREEN_H);
         mod._ft2_sampled_start();
@@ -516,15 +563,15 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
         };
 
         canvas.addEventListener('mousedown', onMouseDown);
-        canvas.addEventListener('mouseup', onMouseUp);
-        canvas.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        document.addEventListener('mousemove', onMouseMove);
         canvas.addEventListener('wheel', onWheel, { passive: false });
         canvas.addEventListener('keydown', onKeyDown);
 
         eventCleanups.push(
           () => canvas.removeEventListener('mousedown', onMouseDown),
-          () => canvas.removeEventListener('mouseup', onMouseUp),
-          () => canvas.removeEventListener('mousemove', onMouseMove),
+          () => document.removeEventListener('mouseup', onMouseUp),
+          () => document.removeEventListener('mousemove', onMouseMove),
           () => canvas.removeEventListener('wheel', onWheel),
           () => canvas.removeEventListener('keydown', onKeyDown),
         );
@@ -550,6 +597,7 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
         let rafId = 0;
         const renderLoop = () => {
           if (cancelled) return;
+          if (m._ft2_sampled_tick) m._ft2_sampled_tick();
           blitFramebuffer(m, ctx, imgData);
           rafId = requestAnimationFrame(renderLoop);
         };
@@ -559,8 +607,10 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
         if (!cancelled) setLoaded(true);
 
         /* Decode and push PCM data */
-        const pcm = await decodePCM(configRef.current);
-        if (pcm && !cancelled && mod) {
+        const decoded = await decodePCM(configRef.current);
+        if (decoded && !cancelled && mod) {
+          sampleRateRef.current = decoded.sampleRate;
+          const pcm = decoded.pcm;
           const pcmPtr = mod._malloc(pcm.length * 2); // 2 bytes per int16
           if (pcmPtr) {
             mod.HEAP16.set(pcm, pcmPtr >> 1); // Divide by 2 for int16 alignment
@@ -580,6 +630,14 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
       eventCleanups.forEach(fn => fn());
       if (mod) {
         try { mod._ft2_sampled_shutdown(); } catch { /* ignore */ }
+      }
+      if (currentSourceRef.current) {
+        try { currentSourceRef.current.stop(); } catch { /* ignore */ }
+        currentSourceRef.current = null;
+      }
+      if (audioCtxRef.current) {
+        try { audioCtxRef.current.close(); } catch { /* ignore */ }
+        audioCtxRef.current = null;
       }
       moduleRef.current = null;
     };
