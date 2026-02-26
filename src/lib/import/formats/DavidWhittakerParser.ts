@@ -397,7 +397,7 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string): 
       // If we found a frqseq table, try to extract sequence for this sample
       if (scanResult.frqseqsOffset > 0 && scanResult.frqseqsOffset < buf.length) {
         // Each entry in the frqseq table is a 2-byte relative pointer
-        const seqPtr = base + u16BE(buf, scanResult.frqseqsOffset + i * 2);
+        const seqPtr = scanResult.base + u16BE(buf, scanResult.frqseqsOffset + i * 2);
         if (seqPtr > 0 && seqPtr < buf.length) {
           const extracted = extractSequence(buf, seqPtr, 64);
           if (extracted.length > 0) {
@@ -408,7 +408,7 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string): 
 
       // If we found a volseq table, try to extract sequence for this sample
       if (scanResult.volseqsOffset > 0 && scanResult.volseqsOffset < buf.length) {
-        const seqPtr = base + u16BE(buf, scanResult.volseqsOffset + i * 2);
+        const seqPtr = scanResult.base + u16BE(buf, scanResult.volseqsOffset + i * 2);
         if (seqPtr > 0 && seqPtr < buf.length) {
           const extracted = extractSequence(buf, seqPtr, 64);
           if (extracted.length > 0) {
@@ -496,5 +496,3 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string): 
   };
 }
 
-// Local reference to base used in scanResult context
-let base = 0;

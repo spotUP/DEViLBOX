@@ -39,6 +39,7 @@ import { HippelCoSoSynth } from './hippelcoso/HippelCoSoSynth';
 import { RobHubbardSynth } from './robhubbard/RobHubbardSynth';
 import { SidMon1Synth } from './sidmon1/SidMon1Synth';
 import { OctaMEDSynth } from './octamed/OctaMEDSynth';
+import { DavidWhittakerSynth } from './davidwhittaker/DavidWhittakerSynth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -957,6 +958,17 @@ export class InstrumentFactory {
           );
         }
         instrument = octaSynth;
+        break;
+      }
+
+      case 'DavidWhittakerSynth': {
+        const dwSynth = new DavidWhittakerSynth();
+        if (config.davidWhittaker) {
+          dwSynth.setInstrument(config.davidWhittaker).catch(err =>
+            console.error('[InstrumentFactory] DavidWhittaker load failed:', err)
+          );
+        }
+        instrument = dwSynth;
         break;
       }
 
