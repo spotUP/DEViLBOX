@@ -83,3 +83,6 @@ turntable.glb
 
 # ProjectM WASM build artifacts
 projectm-wasm/build/
+
+# Git worktrees
+.worktrees/
