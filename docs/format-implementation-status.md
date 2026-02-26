@@ -113,6 +113,7 @@ Track which formats have native parsers vs UADE-only.
 | `.fp`, `FP.*` | Future Player | FuturePlayerParser.ts | UADE eagleplayer | 0x000003F3 + "F.PLAYER" magic; UADE fallback |
 | `.ml` | Medley | MedleyParser.ts | UADE eagleplayer | "MSOB" magic; subsong count at offset word; UADE fallback |
 | `jpn.*`, `jpnd.*`, `jp.*` | Jason Page | JasonPageParser.ts | UADE eagleplayer asm | 3 sub-variants; binary signature heuristic; UADE fallback |
+| `.symmod` | Symphonie Pro | SymphonieProParser.ts | **OpenMPT** Load_symmod.cpp | "SymM" magic; chunk-based; custom AudioWorklet synth; UADE fallback |
 
 ---
 
@@ -223,3 +224,4 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | Future Player | FuturePlayerParser.ts | UADE eagleplayer |
 | 2026-02-26 | Medley | MedleyParser.ts | UADE eagleplayer |
 | 2026-02-26 | Jason Page | JasonPageParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Symphonie Pro | SymphonieProParser.ts | **OpenMPT** Load_symmod.cpp |
