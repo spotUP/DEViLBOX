@@ -93,6 +93,13 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type {
+  SymphoniePlaybackData,
+  SymphonieInstrumentData,
+  SymphoniePattern,
+  SymphoniePatternEvent,
+  SymphonieDSPEvent,
+} from '@/engine/symphonie/SymphoniePlaybackData';
 
 // ── Binary reader ─────────────────────────────────────────────────────────────
 
@@ -1006,4 +1013,483 @@ function clampNote(n: number): number {
   if (n < 1) return 0;
   if (n > 119) return 119;
   return n;
+}
+
+// ── Delta / raw decode helpers (for parseSymphonieForPlayback) ────────────────
+
+function _decodeDelta8(bytes: Uint8Array): Float32Array {
+  const out = new Float32Array(bytes.length);
+  let acc = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    acc = (acc + bytes[i]) & 0xFF;
+    out[i] = (acc < 128 ? acc : acc - 256) / 128.0;
+  }
+  return out;
+}
+
+function _decodeDelta16(bytes: Uint8Array): Float32Array {
+  const count = bytes.length >> 1;
+  const out = new Float32Array(count);
+  let acc = 0;
+  for (let i = 0; i < count; i++) {
+    const raw = (bytes[i * 2] << 8) | (bytes[i * 2 + 1] & 0xFF);
+    const delta = raw > 32767 ? raw - 65536 : raw;
+    acc = ((acc + delta) + 65536) & 0xFFFF;
+    out[i] = (acc < 32768 ? acc : acc - 65536) / 32768.0;
+  }
+  return out;
+}
+
+function _decodeRaw8(bytes: Uint8Array): Float32Array {
+  const out = new Float32Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    out[i] = (b < 128 ? b : b - 256) / 128.0;
+  }
+  return out;
+}
+
+// ── Playback-data parser ──────────────────────────────────────────────────────
+
+/**
+ * Parse a Symphonie Pro (.symmod) file into SymphoniePlaybackData for use
+ * by the native AudioWorklet replayer.  Unlike parseSymphonieProFile() this
+ * function extracts PCM sample data and full command/DSP event streams.
+ */
+export async function parseSymphonieForPlayback(
+  buffer: ArrayBuffer,
+  filename: string,
+): Promise<SymphoniePlaybackData> {
+  const bytes = new Uint8Array(buffer);
+
+  if (!isSymphonieProFormat(bytes)) {
+    throw new Error(`parseSymphonieForPlayback: not a SymMOD file (${filename})`);
+  }
+
+  const r = new Reader(bytes);
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  r.skip(4); // "SymM"
+  r.skip(4); // version = 1
+  r.skip(4); // firstChunkID = -1 (NumChannels)
+  const numChannels = Math.min(r.u32be(), 256);
+
+  // ── Chunk type constants (mirrored from _parseSymphonieProFile) ───────────
+  const CHUNK_NUM_CHANNELS     = -1;
+  const CHUNK_TRACK_LENGTH     = -2;
+  const CHUNK_PATTERN_SIZE     = -3;
+  const CHUNK_NUM_INSTRUMENTS  = -4;
+  const CHUNK_EVENT_SIZE       = -5;
+  const CHUNK_TEMPO            = -6;
+  const CHUNK_EXTERNAL_SAMPLES = -7;
+  const CHUNK_POSITION_LIST    = -10;
+  const CHUNK_SAMPLE_FILE      = -11;
+  const CHUNK_EMPTY_SAMPLE     = -12;
+  const CHUNK_PATTERN_EVENTS   = -13;
+  const CHUNK_INSTRUMENT_LIST  = -14;
+  const CHUNK_SEQUENCES        = -15;
+  const CHUNK_INFO_TEXT        = -16;
+  const CHUNK_SAMPLE_PACKED    = -17;
+  const CHUNK_SAMPLE_PACKED16  = -18;
+  const CHUNK_INFO_TYPE        = -19;
+  const CHUNK_INFO_BINARY      = -20;
+  const CHUNK_INFO_STRING      = -21;
+  const CHUNK_SAMPLE_BOOST     = 10;
+  const CHUNK_STEREO_DETUNE    = 11;
+  const CHUNK_STEREO_PHASE     = 12;
+
+  // DSP command IDs
+  const CMD_DSP_ECHO  = 24;
+  const CMD_DSP_DELAY = 25;
+
+  // ── Accumulated state ─────────────────────────────────────────────────────
+  let trackLen        = 0;
+  let initialBPM      = 125;
+  let positionsData   = new Uint8Array(0);
+  let sequencesData   = new Uint8Array(0);
+  let patternData     = new Uint8Array(0);
+  let instrumentData  = new Uint8Array(0);
+  let infoText        = '';
+
+  // Instruments with type -8 (Silent) or -4 (Kill) or 0 (None) have no PCM.
+  // Sample chunks arrive in instrument order; we collect them into this array
+  // indexed by sampleIndex, then merge with instrument metadata later.
+  const rawSampleData: Array<{ kind: 'raw8' | 'delta8' | 'delta16'; bytes: Uint8Array }> = [];
+  // emptySampleCount is used to advance sampleIndex for CHUNK_EMPTY_SAMPLE
+  let sampleIndex = 0;
+
+  // ── Chunk walk ────────────────────────────────────────────────────────────
+  while (r.canRead(4)) {
+    const chunkType = r.s32be();
+
+    switch (chunkType) {
+      case CHUNK_NUM_CHANNELS:
+        r.skip(4);
+        break;
+
+      case CHUNK_TRACK_LENGTH: {
+        const tl = r.u32be();
+        if (tl > 1024) throw new Error('trackLen > 1024');
+        trackLen = tl;
+        break;
+      }
+
+      case CHUNK_EVENT_SIZE: {
+        const es = r.u32be() & 0xFFFF;
+        if (es !== 4) throw new Error(`eventSize must be 4, got ${es}`);
+        break;
+      }
+
+      case CHUNK_TEMPO: {
+        const rawTempo = r.u32be();
+        const clamped  = Math.min(rawTempo, 800);
+        initialBPM = Math.floor(1.24 * clamped);
+        if (initialBPM < 32)  initialBPM = 32;
+        if (initialBPM > 999) initialBPM = 999;
+        break;
+      }
+
+      case CHUNK_PATTERN_SIZE:
+      case CHUNK_NUM_INSTRUMENTS:
+        r.skip(4);
+        break;
+
+      case CHUNK_SAMPLE_BOOST:
+      case CHUNK_STEREO_DETUNE:
+      case CHUNK_STEREO_PHASE:
+      case CHUNK_EXTERNAL_SAMPLES:
+        r.skip(4);
+        break;
+
+      case CHUNK_POSITION_LIST:
+        if (positionsData.length === 0) {
+          positionsData = new Uint8Array(decodeSymArray(r));
+        } else {
+          if (r.canRead(4)) { const l = r.u32be(); r.skip(l); }
+        }
+        break;
+
+      case CHUNK_SAMPLE_FILE: {
+        // Raw 8-bit signed PCM (not delta-compressed)
+        const bytes2 = decodeSymChunk(r);
+        rawSampleData[sampleIndex] = { kind: 'raw8', bytes: bytes2 };
+        sampleIndex++;
+        break;
+      }
+
+      case CHUNK_SAMPLE_PACKED: {
+        // Delta-compressed 8-bit PCM
+        const bytes2 = decodeSymChunk(r);
+        rawSampleData[sampleIndex] = { kind: 'delta8', bytes: bytes2 };
+        sampleIndex++;
+        break;
+      }
+
+      case CHUNK_SAMPLE_PACKED16: {
+        // Delta-compressed 16-bit PCM
+        const bytes2 = decodeSymChunk(r);
+        rawSampleData[sampleIndex] = { kind: 'delta16', bytes: bytes2 };
+        sampleIndex++;
+        break;
+      }
+
+      case CHUNK_EMPTY_SAMPLE:
+        // Marks a slot with no PCM — advance index without storing data
+        sampleIndex++;
+        break;
+
+      case CHUNK_PATTERN_EVENTS:
+        if (patternData.length === 0) {
+          patternData = new Uint8Array(decodeSymArray(r));
+        } else {
+          if (r.canRead(4)) { const l = r.u32be(); r.skip(l); }
+        }
+        break;
+
+      case CHUNK_INSTRUMENT_LIST:
+        if (instrumentData.length === 0) {
+          instrumentData = new Uint8Array(decodeSymArray(r));
+        } else {
+          if (r.canRead(4)) { const l = r.u32be(); r.skip(l); }
+        }
+        break;
+
+      case CHUNK_SEQUENCES:
+        if (sequencesData.length === 0) {
+          sequencesData = new Uint8Array(decodeSymArray(r));
+        } else {
+          if (r.canRead(4)) { const l = r.u32be(); r.skip(l); }
+        }
+        break;
+
+      case CHUNK_INFO_TEXT: {
+        const textData = decodeSymChunk(r);
+        if (textData.length > 0) {
+          let end = 0;
+          while (end < textData.length && textData[end] !== 0x0A && textData[end] !== 0x0D && textData[end] !== 0) {
+            end++;
+          }
+          infoText = readAmigaString(textData, 0, end);
+        }
+        break;
+      }
+
+      case CHUNK_INFO_TYPE:
+      case CHUNK_INFO_BINARY:
+      case CHUNK_INFO_STRING:
+        if (r.canRead(4)) { const l = r.u32be(); r.skip(l); }
+        break;
+
+      default:
+        // Unknown chunk — stop reading (same policy as existing parser)
+        break;
+    }
+  }
+
+  // ── Validate ──────────────────────────────────────────────────────────────
+  if (trackLen === 0 || instrumentData.length === 0) {
+    throw new Error('parseSymphonieForPlayback: missing trackLen or instrument data');
+  }
+  if (positionsData.length === 0 || patternData.length === 0 || sequencesData.length === 0) {
+    throw new Error('parseSymphonieForPlayback: missing position/pattern/sequence data');
+  }
+
+  // ── Parse structs (reuse existing helpers) ────────────────────────────────
+  const symInstrumentsRaw = readSymInstruments(instrumentData);
+  const symEventsRaw      = readSymEvents(patternData);
+  const symSequences      = readSymSequences(sequencesData);
+  const symPositions      = readSymPositions(positionsData);
+
+  const numInstruments = Math.min(symInstrumentsRaw.length, 255);
+  const patternSize    = numChannels * trackLen;
+
+  // ── Build SymphonieInstrumentData list ────────────────────────────────────
+  //
+  // The instrument chunk contains 256-byte records.  The raw struct is already
+  // partially decoded by readSymInstruments(); we need additional fields that
+  // _parseSymphonieProFile doesn't extract:
+  //   offset 128  type (int8)            — already in .type
+  //   offset 129  loopStartHigh (uint8)  — × 256×256 = raw loopStart
+  //   offset 130  loopLenHigh (uint8)    — × 256×256 = raw loopLen
+  //   offset 131  numRepetitions (uint8)
+  //   offset 132  multiChannel (int8)    — already in .channel
+  //   offset 134  volume (uint8)         — already in .volume
+  //   offset 138  fineTune (int8)
+  //   offset 139  tune (int8)            — already in .transpose
+  //   offset 140  lineSampleFlags (uint8)— bit4 = newLoopSystem
+  //   offset 142  instFlags (uint8)      — bit1 = noDsp  — already in .instFlags
+  //   offset 143  downsample (uint8)     — subtract 12×downsample from tune
+  //
+  // We re-read these fields from the raw instrumentData bytes.
+
+  const INST_SIZE = 256;
+
+  // Assign PCM to instruments in order; instruments with type <=0 that are
+  // -8 (Silent), -4 (Kill), or 0 (None) receive no sample data — they still
+  // advance sampleIndex in the chunk loop above (via CHUNK_EMPTY_SAMPLE).
+  // Instruments with type > 0 (4=Loop, 8=Sustain) or undefined have PCM.
+
+  // We need a second sampleIndex pass that mirrors the chunk walk.
+  // However, since we already collected rawSampleData[] indexed by sampleIndex
+  // during the chunk walk, we just need to know which instruments have PCM.
+  // Instruments whose type is -8, -4, or 0 have no PCM; all others may have PCM.
+  // We assign rawSampleData entries in instrument order, skipping no-PCM ones.
+
+  let pcmIdx = 0;
+  const instruments: SymphonieInstrumentData[] = [];
+
+  for (let i = 0; i < numInstruments; i++) {
+    const si  = symInstrumentsRaw[i];
+    const base = i * INST_SIZE;
+
+    const loopStartHigh  = instrumentData[base + 129];
+    const loopLenHigh    = instrumentData[base + 130];
+    const numRepetitions = instrumentData[base + 131];
+    const fineTune       = instrumentData[base + 138] >= 128 ? instrumentData[base + 138] - 256 : instrumentData[base + 138];
+    const lineSampleFlags = instrumentData[base + 140];
+    const downsample     = instrumentData[base + 143];
+
+    // Apply downsample correction to tune (si.transpose is already int8)
+    const tune = si.transpose - 12 * downsample;
+
+    // Volume: 0 means default to 100; cap at 100
+    const volume = si.volume === 0 ? 100 : Math.min(si.volume, 100);
+
+    // noDsp: bit 1 of instFlags (SPLAYFLAG_NODSP)
+    const noDsp = (si.instFlags & 0x02) !== 0;
+
+    // newLoopSystem: bit 4 of lineSampleFlags
+    const newLoopSystem = (lineSampleFlags & 0x10) !== 0;
+
+    // Loop values: percentage × 256×256
+    const loopStart = loopStartHigh * 256 * 256;
+    const loopLen   = loopLenHigh   * 256 * 256;
+
+    // Determine whether this instrument has PCM
+    const hasPCM = si.type !== -8 && si.type !== -4 && si.type !== 0;
+
+    let samples: Float32Array | null = null;
+    if (hasPCM) {
+      const entry = rawSampleData[pcmIdx];
+      if (entry) {
+        if (entry.kind === 'raw8') {
+          samples = _decodeRaw8(entry.bytes);
+        } else if (entry.kind === 'delta8') {
+          samples = _decodeDelta8(entry.bytes);
+        } else {
+          samples = _decodeDelta16(entry.bytes);
+        }
+      }
+      pcmIdx++;
+    }
+
+    instruments.push({
+      name:           si.name || `Instrument ${i + 1}`,
+      type:           si.type,
+      volume,
+      tune,
+      fineTune,
+      noDsp,
+      multiChannel:   si.channel,
+      loopStart,
+      loopLen,
+      numLoops:       numRepetitions,
+      newLoopSystem,
+      samples,
+      sampledFrequency: 0,  // unknown → worklet assumes 8363 Hz
+    });
+  }
+
+  // ── Build patterns + order list ───────────────────────────────────────────
+  //
+  // Mirror the logic in _parseSymphonieProFile but emit SymphoniePattern
+  // objects (with flat event arrays) instead of TrackerSong patterns.
+
+  const patternMap = new Map<string, number>();
+  const patterns: SymphoniePattern[] = [];
+  const orderList: number[] = [];
+
+  for (const seq of symSequences) {
+    if (seq.info === 1) continue;
+    if (seq.info === -1) break;
+
+    if (
+      seq.start >= symPositions.length ||
+      seq.length === 0 ||
+      seq.length > symPositions.length ||
+      symPositions.length - seq.length < seq.start
+    ) {
+      continue;
+    }
+
+    for (let pi = seq.start; pi < seq.start + seq.length; pi++) {
+      const pos = symPositions[pi];
+      if (!pos) continue;
+
+      const effectiveTranspose = pos.transpose + seq.transpose;
+      const key = `${pos.pattern}-${pos.start}-${pos.length}-${effectiveTranspose}-${pos.speed}`;
+
+      if (!patternMap.has(key)) {
+        const patIdx  = patterns.length;
+        patternMap.set(key, patIdx);
+
+        const numRows  = pos.length;
+        const rowStart = pos.start;
+
+        const events: SymphoniePatternEvent[] = [];
+        const dspEvents: SymphonieDSPEvent[]  = [];
+
+        for (let row = 0; row < numRows; row++) {
+          for (let ch = 0; ch < numChannels; ch++) {
+            const srcRow   = rowStart + row;
+            const eventIdx = pos.pattern * patternSize + srcRow * numChannels + ch;
+
+            if (eventIdx < 0 || eventIdx >= symEventsRaw.length) continue;
+
+            const ev = symEventsRaw[eventIdx];
+
+            if (ev.command === CMD_DSP_ECHO || ev.command === CMD_DSP_DELAY) {
+              // DSP event: type=note, feedback=instrument, bufLen=param
+              dspEvents.push({
+                row,
+                channel: ch,
+                type:     ev.note,
+                feedback: ev.inst,
+                bufLen:   ev.param,
+              });
+            } else {
+              // Regular pattern event
+              let note       = 0;
+              let instrument = 0;
+              let volume     = 255; // 255 = no volume change
+
+              if (ev.command === CMD_KEYON) {
+                if (ev.note >= 0 && ev.note <= 84) {
+                  note = clampNote(ev.note + 25 + effectiveTranspose);
+                }
+                if (ev.inst > 0 && ev.inst <= numInstruments) {
+                  instrument = ev.inst; // keep 1-based
+                }
+                if (ev.param <= 100 && ev.param > 0) {
+                  volume = ev.param;
+                } else if (ev.param === 0) {
+                  volume = 255; // no explicit volume
+                }
+              } else if (ev.command === CMD_ADD_HALFTONE) {
+                if (ev.note >= 0 && ev.note <= 84) {
+                  note = clampNote(ev.note + 25 + effectiveTranspose);
+                }
+              } else {
+                // All other commands: pass raw note field as 0, carry cmd/param
+                if (ev.note >= 0 && ev.note <= 84) {
+                  // Some commands encode note
+                }
+              }
+
+              events.push({
+                row,
+                channel:    ch,
+                note,
+                instrument,
+                volume,
+                cmd:        ev.command,
+                param:      ev.param,
+              });
+            }
+          }
+        }
+
+        patterns.push({ numRows, events, dspEvents });
+      }
+
+      const patIdx = patternMap.get(key)!;
+      const loopCount = Math.max(pos.loopNum, 1);
+      for (let lp = 0; lp < loopCount; lp++) {
+        orderList.push(patIdx);
+      }
+    }
+  }
+
+  // Ensure at least one pattern
+  if (patterns.length === 0) {
+    patterns.push({ numRows: 64, events: [], dspEvents: [] });
+    orderList.push(0);
+  }
+
+  // ── Song name ─────────────────────────────────────────────────────────────
+  const baseName = filename.replace(/\.[^/.]+$/, '');
+  const title    = infoText.trim() || baseName;
+
+  return {
+    title,
+    bpm:              initialBPM,
+    cycle:            6,     // default rows-per-tick; speed commands in events override per-row
+    numChannels,
+    orderList,
+    patterns,
+    instruments,
+    globalDspType:     0,
+    globalDspFeedback: 0,
+    globalDspBufLen:   0,
+  };
 }
