@@ -242,6 +242,21 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── AMOS Music Bank ───────────────────────────────────────────────────────
+  if (/\.abk$/.test(filename)) {
+    try {
+      const { isAMOSMusicBankFormat, parseAMOSMusicBankFile } = await import('@lib/import/formats/AMOSMusicBankParser');
+      if (isAMOSMusicBankFormat(buffer)) {
+        return parseAMOSMusicBankFile(buffer, file.name);
+      }
+    } catch (err) {
+      console.warn(`[AMOSMusicBankParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const uadeMode = prefs.uade ?? 'enhanced';
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── Jochen Hippel CoSo ────────────────────────────────────────────────────
   if (/\.(hipc|soc|coso)$/.test(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
@@ -356,6 +371,21 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   if (/\.ay$/.test(filename)) {
     const { parseAYFile } = await import('@lib/import/formats/AYParser');
     return parseAYFile(buffer, file.name);
+  }
+
+  // ── David Whittaker (.dw / .dwold) ───────────────────────────────────────
+  if (/\.(dw|dwold)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.davidWhittaker !== 'uade') {
+      try {
+        const { parseDavidWhittakerFile } = await import('@lib/import/formats/DavidWhittakerParser');
+        return parseDavidWhittakerFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[DavidWhittakerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE } = await import('@lib/import/formats/UADEParser');
+    return parseUADE(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
