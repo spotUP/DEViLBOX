@@ -59,14 +59,12 @@ export interface FormatEnginePreferences {
   // Additional Amiga formats with native parsers
   graoumfTracker2: FormatEngineChoice;    // .gt2/.gtk → GraoumfTracker2Parser vs UADE
   symphoniePro: FormatEngineChoice;       // .symmod → SymphonieProParser vs UADE
-  composer667: FormatEngineChoice;        // .667 → Composer667Parser vs UADE
   chuckBiscuits: FormatEngineChoice;      // .cba → ChuckBiscuitsParser vs UADE
   speedySystem: FormatEngineChoice;       // .ss → SpeedySystemParser vs UADE
   tronic: FormatEngineChoice;             // .trc/.dp/.tro → TronicParser vs UADE
   digiBoosterPro: FormatEngineChoice;     // .dbm → DigiBoosterProParser vs UADE
   gameMusicCreator: FormatEngineChoice;   // .gmc → GameMusicCreatorParser vs UADE
   faceTheMusic: FormatEngineChoice;       // .ftm → FaceTheMusicParser vs UADE
-  sawteeth: FormatEngineChoice;           // .st (SWTD magic) → SawteethParser vs UADE
   soundControl: FormatEngineChoice;       // .sc/.sct → SoundControlParser vs UADE
   soundFactory: FormatEngineChoice;       // .psf → SoundFactoryParser vs UADE
   actionamics: FormatEngineChoice;        // .act → ActionamicsParser vs UADE
@@ -78,6 +76,40 @@ export interface FormatEnginePreferences {
   iffSmus: FormatEngineChoice;        // .smus/.snx/.tiny → IffSmusParser vs UADE
   mfp: FormatEngineChoice;            // mfp.* → MFPParser vs UADE
   pt36: FormatEngineChoice;           // FORM+MODL → PT36Parser vs libopenmpt
+  // Newly wired parsers (2026-02-26 batch)
+  fashionTracker: FormatEngineChoice;          // ex.* → FashionTrackerParser vs UADE
+  multiMediaSound: FormatEngineChoice;         // mms.*/sfx20.* → MultiMediaSoundParser vs UADE
+  timeTracker: FormatEngineChoice;             // tmk.* → TimeTrackerParser vs UADE
+  chipTracker: FormatEngineChoice;             // kris.* → ChipTrackerParser vs UADE
+  cinemaware: FormatEngineChoice;              // cin.* → CinemawareParser vs UADE
+  novoTradePacker: FormatEngineChoice;         // ntp.* → NovoTradePackerParser vs UADE
+  alcatrazPacker: FormatEngineChoice;          // alp.* → AlcatrazPackerParser vs UADE
+  bladePacker: FormatEngineChoice;             // uds.* → BladePackerParser vs UADE
+  tomyTracker: FormatEngineChoice;             // sg.* → TomyTrackerParser vs UADE
+  imagesMusicSystem: FormatEngineChoice;       // ims.* → ImagesMusicSystemParser vs UADE
+  seanConran: FormatEngineChoice;              // scr.* → SeanConranParser vs UADE
+  thomasHermann: FormatEngineChoice;           // thm.* → ThomasHermannParser vs UADE
+  titanicsPacker: FormatEngineChoice;          // tits.* → TitanicsPackerParser vs UADE
+  krisHatlelid: FormatEngineChoice;            // kh.* → KrisHatlelidParser vs UADE
+  ntspSystem: FormatEngineChoice;              // two.* → NTSPParser vs UADE
+  ufoFormat: FormatEngineChoice;               // mus.*/ufo.* → UFOParser vs UADE
+  moshPacker: FormatEngineChoice;              // mosh.* → MoshPackerParser vs UADE
+  daveLowe: FormatEngineChoice;                // dl.* → DaveLoweParser vs UADE
+  coreDesign: FormatEngineChoice;              // core.* → CoreDesignParser vs UADE
+  jankoMrsicFlogel: FormatEngineChoice;        // jmf.* → JankoMrsicFlogelParser vs UADE
+  specialFX: FormatEngineChoice;               // jd.* → SpecialFXParser vs UADE
+  soundPlayer: FormatEngineChoice;             // sjs.* → SoundPlayerParser vs UADE
+  nickPellingPacker: FormatEngineChoice;       // npp.* → NickPellingPackerParser vs UADE
+  peterVerswyvelenPacker: FormatEngineChoice;  // pvp.* → PeterVerswyvelenPackerParser vs UADE
+  wallyBeben: FormatEngineChoice;              // wb.* → WallyBebenParser vs UADE
+  steveBarrett: FormatEngineChoice;            // sb.* → SteveBarrettParser vs UADE
+  paulSummers: FormatEngineChoice;             // snk.* → PaulSummersParser vs UADE
+  desire: FormatEngineChoice;                  // dsr.* → DesireParser vs UADE
+  daveLoweNew: FormatEngineChoice;             // dln.* → DaveLoweNewParser vs UADE
+  digitalSonixChrome: FormatEngineChoice;      // dsc.* → DigitalSonixChromeParser vs UADE
+  sonixMusicDriver: FormatEngineChoice;        // smus.*/snx.*/tiny.* → SonixMusicDriverParser vs UADE
+  jesperOlsen: FormatEngineChoice;             // jo.* → JesperOlsenParser vs UADE
+  kimChristensen: FormatEngineChoice;          // kim.* → KimChristensenParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -168,14 +200,12 @@ export const useSettingsStore = create<SettingsStore>()(
         uax: 'native',              // UAXParser — Unreal Audio Package sound ripper
         graoumfTracker2: 'native',  // GraoumfTracker2Parser — dedicated Graoumf Tracker 1/2 support
         symphoniePro: 'native',     // SymphonieProParser — dedicated Symphonie Pro support
-        composer667: 'native',      // Composer667Parser — dedicated Composer 667 support
         chuckBiscuits: 'native',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support
         speedySystem: 'uade',       // SpeedySystemParser — prefer UADE (DOC RAM samples required)
         tronic: 'uade',             // TronicParser — no native parser; always UADE
         digiBoosterPro: 'native',   // DigiBoosterProParser — dedicated DigiBooster Pro (.dbm) support
         gameMusicCreator: 'uade',   // GameMusicCreatorParser — prefer UADE (complex synthesis)
         faceTheMusic: 'native',     // FaceTheMusicParser — native parser available
-        sawteeth: 'native',         // SawteethParser — native parser available
         soundControl: 'native',     // SoundControlParser — native parser available
         soundFactory: 'native',     // SoundFactoryParser — native parser available
         actionamics: 'native',      // ActionamicsParser — native parser available
@@ -187,6 +217,39 @@ export const useSettingsStore = create<SettingsStore>()(
         iffSmus: 'native',      // IffSmusParser — native parser available
         mfp: 'native',          // MFPParser — native parser available
         pt36: 'native',         // PT36Parser — native parser available
+        fashionTracker: 'native',            // FashionTrackerParser — native parser available
+        multiMediaSound: 'native',           // MultiMediaSoundParser — native parser available
+        timeTracker: 'native',               // TimeTrackerParser — native parser available
+        chipTracker: 'native',               // ChipTrackerParser — native parser available
+        cinemaware: 'native',                // CinemawareParser — native parser available
+        novoTradePacker: 'native',           // NovoTradePackerParser — native parser available
+        alcatrazPacker: 'native',            // AlcatrazPackerParser — native parser available
+        bladePacker: 'native',               // BladePackerParser — native parser available
+        tomyTracker: 'native',               // TomyTrackerParser — native parser available
+        imagesMusicSystem: 'native',         // ImagesMusicSystemParser — native parser available
+        seanConran: 'native',                // SeanConranParser — native parser available
+        thomasHermann: 'native',             // ThomasHermannParser — native parser available
+        titanicsPacker: 'native',            // TitanicsPackerParser — native parser available
+        krisHatlelid: 'native',              // KrisHatlelidParser — native parser available
+        ntspSystem: 'native',                // NTSPParser — native parser available
+        ufoFormat: 'native',                 // UFOParser — native parser available
+        moshPacker: 'native',                // MoshPackerParser — native parser available
+        daveLowe: 'native',                  // DaveLoweParser — native parser available
+        coreDesign: 'native',                // CoreDesignParser — native parser available
+        jankoMrsicFlogel: 'native',          // JankoMrsicFlogelParser — native parser available
+        specialFX: 'native',                 // SpecialFXParser — native parser available
+        soundPlayer: 'native',               // SoundPlayerParser — native parser available
+        nickPellingPacker: 'native',         // NickPellingPackerParser — native parser available
+        peterVerswyvelenPacker: 'native',    // PeterVerswyvelenPackerParser — native parser available
+        wallyBeben: 'native',                // WallyBebenParser — native parser available
+        steveBarrett: 'native',              // SteveBarrettParser — native parser available
+        paulSummers: 'native',               // PaulSummersParser — native parser available
+        desire: 'native',                    // DesireParser — native parser available
+        daveLoweNew: 'native',               // DaveLoweNewParser — native parser available
+        digitalSonixChrome: 'native',        // DigitalSonixChromeParser — native parser available
+        sonixMusicDriver: 'native',          // SonixMusicDriverParser — native parser available
+        jesperOlsen: 'native',               // JesperOlsenParser — native parser available
+        kimChristensen: 'native',            // KimChristensenParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
