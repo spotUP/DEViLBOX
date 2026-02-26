@@ -46,29 +46,25 @@ function ayPeriodToNote(period: number): number {
 // Based on the public-domain LZHUF algorithm used by the YM format.
 
 function decodeLZH5(src: Uint8Array): Uint8Array {
-  // LH5 constants
   const DICBIT = 13, DICSIZ = 1 << DICBIT, THRESHOLD = 3;
   const NC = 510, CBIT = 9, NT = DICBIT + 1, TBIT = 5, NP = DICBIT + 1, PBIT = 4;
+  const MAX_TABLE = 4096;
 
-  const dic = new Uint8Array(DICSIZ).fill(0x20); // init with spaces
-  const output: number[] = [];
-  let dicPos = 0;
-  let srcPos = 0;
-
-  let bitBuf  = 0;
-  let subBuf  = 0;
-  let bitCount = 0;
+  const dic = new Uint8Array(DICSIZ).fill(0x20);
+  const out: number[] = [];
+  let dicPos = 0, srcPos = 0;
+  let bitBuf = 0, subBuf = 0, bitCount = 0;
 
   function fillBuf(n: number): void {
-    bitBuf = (bitBuf << n) & 0xFFFF;
+    bitBuf = ((bitBuf << n) >>> 0) & 0xFFFF;
     while (n > bitCount) {
       n -= bitCount;
-      bitBuf |= (subBuf << n) & 0xFFFF;
+      bitBuf |= ((subBuf << n) >>> 0) & 0xFFFF;
       subBuf = srcPos < src.length ? src[srcPos++] : 0;
       bitCount = 8;
     }
     bitCount -= n;
-    bitBuf |= subBuf >> bitCount;
+    bitBuf |= (subBuf >> bitCount) & 0xFFFF;
     bitBuf &= 0xFFFF;
   }
 
@@ -78,63 +74,36 @@ function decodeLZH5(src: Uint8Array): Uint8Array {
     return r;
   }
 
-  function peekBit(): number {
-    return (bitBuf >> 15) & 1;
-  }
-
+  // Prime the bit buffer
+  subBuf = srcPos < src.length ? src[srcPos++] : 0;
   fillBuf(16);
 
-  // Decode Huffman tree from bit stream
   const cLen  = new Uint8Array(NC);
-  const cTable = new Uint16Array(4096);
+  const cTable = new Uint16Array(MAX_TABLE);
   const pLen  = new Uint8Array(NP);
   const pTable = new Uint16Array(256);
 
   function makeTable(nchar: number, bitlen: Uint8Array, tablebits: number, table: Uint16Array): void {
-    const count = new Uint16Array(17);
-    const weight = new Uint16Array(17);
-    const next = new Uint16Array(nchar);
-    let avail = nchar;
-
-    for (let i = 1; i <= 16; i++) count[i] = 0;
-    for (let i = 0; i < nchar; i++) count[bitlen[i]]++;
-
-    let total = 0;
-    for (let i = 1; i <= 16; i++) {
-      weight[i] = total;
-      total += count[i];
-    }
-
     const tableSize = 1 << tablebits;
-    for (let i = 0; i < tableSize; i++) table[i] = 0;
+    const count = new Uint16Array(17);
+    for (let i = 0; i < nchar; i++) count[Math.min(bitlen[i], 16)]++;
 
-    let nextCode = 0;
+    const start = new Uint16Array(18);
+    start[1] = 0;
+    for (let i = 1; i <= 16; i++) start[i + 1] = start[i] + count[i];
+
+    for (let i = 0; i < tableSize; i++) table[i] = 0xFFFF;
     for (let p = 0; p < nchar; p++) {
       const len = bitlen[p];
       if (len === 0) continue;
-      const k = nextCode;
-      nextCode += 1;
+      const startIdx = start[len];
+      start[len]++;
       if (len <= tablebits) {
-        const step = 1 << (tablebits - len);
-        for (let i = weight[len]; i < tableSize; i += step) {
-          if ((i >> (tablebits - len)) === (k >> 0)) {
-            // simplified: just fill in
-          }
+        const fillCount = 1 << (tablebits - len);
+        const base = startIdx << (tablebits - len);
+        for (let i = 0; i < fillCount; i++) {
+          if (base + i < tableSize) table[base + i] = p;
         }
-      }
-    }
-    // Reset and use simple approach
-    for (let i = 0; i < tableSize; i++) table[i] = 0xFFFF;
-
-    let start = 0;
-    for (let len = 1; len <= tablebits; len++) {
-      for (let p = 0; p < nchar; p++) {
-        if (bitlen[p] !== len) continue;
-        const step = 1 << (tablebits - len);
-        for (let i = start; i < start + step; i++) {
-          if (i < tableSize) table[i] = p;
-        }
-        start += step;
       }
     }
   }
@@ -148,18 +117,19 @@ function decodeLZH5(src: Uint8Array): Uint8Array {
     } else {
       let i = 0;
       while (i < n) {
-        let c = (bitBuf >> 13) & 0x07;
+        let c = (bitBuf >> 13) & 7;
         if (c === 7) {
-          let k = 1 << 12;
+          let k = 0x1000;
           while (k & bitBuf) { k >>= 1; c++; }
         }
         fillBuf(c < 7 ? 3 : c - 3);
         pLen[i++] = c;
         if (i === special) {
           c = getBits(2);
-          while (--c >= 0) pLen[i++] = 0;
+          while (--c >= 0 && i < nn) pLen[i++] = 0;
         }
       }
+      while (i < nn) pLen[i++] = 0;
       makeTable(nn, pLen, 8, pTable);
     }
   }
@@ -169,34 +139,29 @@ function decodeLZH5(src: Uint8Array): Uint8Array {
     if (n === 0) {
       const c = getBits(CBIT);
       for (let i = 0; i < NC; i++) cLen[i] = 0;
-      for (let i = 0; i < 4096; i++) cTable[i] = c;
+      for (let i = 0; i < MAX_TABLE; i++) cTable[i] = c;
     } else {
       let i = 0;
       while (i < n) {
         let c = pTable[(bitBuf >> 8) & 0xFF];
-        if (c >= NT) {
-          let k = 1 << 7;
-          do {
-            c = (bitBuf & k) ? /* right */ 0 : 0; // simplified
-            k >>= 1;
-          } while (c >= NT);
-        }
+        if (c === 0xFFFF || c >= NT) { c = NT - 1; }
         fillBuf(pLen[c]);
         if (c <= 2) {
-          if (c === 0) c = 1;
-          else if (c === 1) c = getBits(4) + 3;
-          else c = getBits(CBIT) + 20;
-          while (--c >= 0) cLen[i++] = 0;
+          if      (c === 0) { c = 1; }
+          else if (c === 1) { c = getBits(4) + 3; }
+          else              { c = getBits(CBIT) + 20; }
+          while (--c >= 0 && i < NC) cLen[i++] = 0;
         } else {
           cLen[i++] = c - 2;
         }
       }
+      while (i < NC) cLen[i++] = 0;
       makeTable(NC, cLen, 12, cTable);
     }
   }
 
   let blockSize = 0;
-  while (true) {
+  while (out.length < 4 * 1024 * 1024) {
     if (blockSize === 0) {
       blockSize = getBits(16);
       if (blockSize === 0) break;
@@ -206,32 +171,33 @@ function decodeLZH5(src: Uint8Array): Uint8Array {
     }
     blockSize--;
 
-    const j = cTable[(bitBuf >> 4) & 0xFFF];
-    if (j < 0xFFFF) {
-      fillBuf(cLen[j]);
-    } else {
-      break; // decode error
-    }
+    let j = cTable[(bitBuf >> 4) & 0xFFF];
+    if (j === 0xFFFF || j >= NC) break;
+    fillBuf(cLen[j]);
 
     if (j <= 255) {
       dic[dicPos] = j;
-      output.push(j);
+      out.push(j);
       dicPos = (dicPos + 1) & (DICSIZ - 1);
     } else {
-      let matchLen = j - 256 + THRESHOLD;
-      const pVal = pTable[(bitBuf >> 8) & 0xFF];
-      fillBuf(pLen[pVal]);
-      let matchPos = (dicPos - pVal - 1) & (DICSIZ - 1);
+      const matchLen = j - 256 + THRESHOLD;
+      let pv = pTable[(bitBuf >> 8) & 0xFF];
+      if (pv === 0xFFFF || pv >= NP) break;
+      fillBuf(pLen[pv]);
+      if (pv >= 2) {
+        pv = ((pv - 1) << 1) | getBits(1);
+      }
+      const matchPos = (dicPos - pv - 1) & (DICSIZ - 1);
       for (let k = 0; k < matchLen; k++) {
         const c = dic[(matchPos + k) & (DICSIZ - 1)];
         dic[dicPos] = c;
-        output.push(c);
+        out.push(c);
         dicPos = (dicPos + 1) & (DICSIZ - 1);
       }
     }
   }
 
-  return new Uint8Array(output);
+  return new Uint8Array(out);
 }
 
 // ── YM Header ─────────────────────────────────────────────────────────────────
