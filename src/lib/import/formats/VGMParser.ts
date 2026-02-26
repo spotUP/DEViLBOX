@@ -3,7 +3,8 @@
  *
  * Supports VGM 1.00–1.71 and VGZ (gzip-compressed).
  * Detects chip type from header clocks, reconstructs note events from
- * YM2612 key-on/off + F-number writes, and builds a TrackerSong with
+ * YM2612 key-on/off + F-number writes, SN76489 tone/volume writes,
+ * and YM2151 key-code/key-on writes. Builds a TrackerSong with
  * one pattern per track and one instrument per detected chip.
  */
 
@@ -48,6 +49,23 @@ function ym2612FnumToNote(fnum: number, block: number): number {
   if (freq <= 0) return 0;
   const note = Math.round(12 * Math.log2(freq / 440) + 69);
   return Math.max(1, Math.min(96, note));
+}
+
+/** Convert SN76489 10-bit counter to MIDI note (1–96). */
+function sn76489CounterToNote(counter: number, clock: number): number {
+  if (counter <= 0) return 0;
+  const freq = clock / (32 * counter);
+  if (freq <= 0) return 0;
+  const note = Math.round(12 * Math.log2(freq / 440) + 69);
+  return Math.max(1, Math.min(96, note));
+}
+
+/** Convert YM2151 key code to MIDI note (1–96). */
+function opmKeyCodeToNote(kc: number): number {
+  const octave = (kc >> 4) & 0x07;
+  const semi = Math.min(kc & 0x0F, 11);
+  const midiNote = octave * 12 + semi + 12;
+  return Math.max(1, Math.min(96, midiNote));
 }
 
 // ── GD3 Metadata ──────────────────────────────────────────────────────────────
@@ -105,7 +123,29 @@ function detectChips(dv: DataView, version: number): VGMChips {
   };
 }
 
-function buildInstruments(chips: VGMChips): InstrumentConfig[] {
+/**
+ * Result of buildInstruments: instrument list plus per-chip starting channel
+ * and instrument indices (or -1 if the chip is absent).
+ */
+interface InstrumentLayout {
+  instruments: InstrumentConfig[];
+  /** Starting output channel index for OPN2 (6 channels, 0-5). -1 if absent. */
+  opn2ChStart: number;
+  /** Starting output channel index for SN76489 (3 tone channels). -1 if absent. */
+  snChStart: number;
+  /** Starting output channel index for OPM (8 channels). -1 if absent. */
+  opmChStart: number;
+  /** Instrument index for OPN2 in the instruments array. -1 if absent. */
+  opn2InstIdx: number;
+  /** Instrument index for SN76489 in the instruments array. -1 if absent. */
+  snInstIdx: number;
+  /** Instrument index for OPM in the instruments array. -1 if absent. */
+  opmInstIdx: number;
+  /** Total number of output channels needed. */
+  totalChannels: number;
+}
+
+function buildInstruments(chips: VGMChips): InstrumentLayout {
   const insts: InstrumentConfig[] = [];
   let id = 1;
   const add = (name: string, synthType: InstrumentConfig['synthType'], chipType: number, ops: number = 4) => {
@@ -114,35 +154,97 @@ function buildInstruments(chips: VGMChips): InstrumentConfig[] {
       furnace: { ...DEFAULT_FURNACE, chipType, ops } as FurnaceConfig,
     });
   };
-  if (chips.ym2612)  add('OPN2 FM',  'FurnaceOPN',    1);
-  if (chips.ym2151)  add('OPM FM',   'FurnaceOPM',    33);
+
+  let opn2InstIdx = -1;
+  let opmInstIdx  = -1;
+  let snInstIdx   = -1;
+
+  if (chips.ym2612)  { opn2InstIdx = insts.length; add('OPN2 FM',  'FurnaceOPN',    1); }
+  if (chips.ym2151)  { opmInstIdx  = insts.length; add('OPM FM',   'FurnaceOPM',    33); }
   if (chips.ym2203)  add('OPN FM',   'FurnaceOPN2203', 1);
   if (chips.ym2608)  add('OPNA FM',  'FurnaceOPNA',   1);
   if (chips.ym2610)  add('OPNB FM',  'FurnaceOPNB',   1);
   if (chips.ym3812)  add('OPL2 FM',  'FurnaceOPL',    14, 2);
   if (chips.ymf262)  add('OPL3 FM',  'FurnaceOPL',    14, 2);
   if (chips.ym2413)  add('OPLL FM',  'FurnaceOPLL',   13, 2);
-  if (chips.sn76489) add('SN PSG',   'FurnaceSN',     0,  2);
+  if (chips.sn76489) { snInstIdx   = insts.length; add('SN PSG',   'FurnaceSN',     0,  2); }
   if (chips.ay8910)  add('AY PSG',   'FurnaceAY',     6,  2);
   // Default if nothing detected
-  if (insts.length === 0) add('FM', 'FurnaceOPN', 1);
-  return insts;
+  if (insts.length === 0) { opn2InstIdx = 0; add('FM', 'FurnaceOPN', 1); }
+
+  // Assign output channel ranges:
+  // OPN2: 6 channels (0-5)
+  // OPM:  8 channels (after OPN2)
+  // SN:   3 tone channels (after OPM, or after OPN2 if no OPM)
+  let nextCh = 0;
+
+  let opn2ChStart = -1;
+  if (chips.ym2612 || opn2InstIdx >= 0) {
+    opn2ChStart = nextCh;
+    nextCh += 6;
+  }
+
+  let opmChStart = -1;
+  if (chips.ym2151) {
+    opmChStart = nextCh;
+    nextCh += 8;
+  }
+
+  let snChStart = -1;
+  if (chips.sn76489) {
+    snChStart = nextCh;
+    nextCh += 3; // channels 0-2 are tone; channel 3 (noise) is skipped
+  }
+
+  const totalChannels = Math.max(nextCh, 1);
+
+  return {
+    instruments: insts,
+    opn2ChStart, opmChStart, snChStart,
+    opn2InstIdx, opmInstIdx, snInstIdx,
+    totalChannels,
+  };
 }
 
 // ── VGM Command Walker ────────────────────────────────────────────────────────
 
 interface NoteEvent { tick: number; ch: number; note: number; on: boolean; instIdx: number; }
 
-function walkCommands(buf: Uint8Array, dataStart: number, chips: VGMChips): NoteEvent[] {
+interface WalkOptions {
+  snClock: number;       // SN76489 clock in Hz (from header offset 0x0C)
+  snChStart: number;     // output channel start for SN (or -1)
+  snInstIdx: number;     // instrument index for SN (or -1)
+  opmChStart: number;    // output channel start for OPM (or -1)
+  opmInstIdx: number;    // instrument index for OPM (or -1)
+  opn2ChStart: number;   // output channel start for OPN2 (or -1)
+  opn2InstIdx: number;   // instrument index for OPN2 (or -1)
+}
+
+function walkCommands(buf: Uint8Array, dataStart: number, chips: VGMChips, opts: WalkOptions): NoteEvent[] {
   const events: NoteEvent[] = [];
   let pos = dataStart;
   let tick = 0;
 
-  // YM2612 per-channel state (6 channels: 0-2 port0, 3-5 port1)
-  const opn2FnumLo = new Uint8Array(6);
-  const opn2FnumHi = new Uint8Array(6); // bits[2:0]=block, bits[5:0]=fnum hi
-  const opn2KeyOn  = new Uint8Array(6);
-  const opn2InstIdx = 0; // first instrument
+  // ── OPN2 (YM2612) per-channel state ──────────────────────────────────────
+  // 6 channels: 0-2 port0, 3-5 port1
+  const opn2FnumLo  = new Uint8Array(6);
+  const opn2FnumHi  = new Uint8Array(6); // bits[2:0]=block, bits[5:0]=fnum hi
+  const opn2KeyOn   = new Uint8Array(6);
+  const opn2ChStart = opts.opn2ChStart >= 0 ? opts.opn2ChStart : 0;
+  const opn2InstIdx = opts.opn2InstIdx >= 0 ? opts.opn2InstIdx : 0;
+
+  // ── SN76489 per-channel state ─────────────────────────────────────────────
+  // 4 channels: 0-2 tone, 3 noise
+  const snCounter  = new Uint16Array(4);  // 10-bit frequency counter per channel
+  const snVolume   = new Uint8Array(4).fill(15); // 4-bit attenuation; 15=silent, 0=max
+  const snPlaying  = new Uint8Array(4);   // whether a note-on has been emitted
+  let   snLatchCh  = 0;                   // channel currently latched (for data bytes)
+  let   snLatchTyp = 0;                   // latch type: 0=tone, 1=vol
+
+  // ── OPM (YM2151) per-channel state ───────────────────────────────────────
+  // 8 channels: 0-7
+  const opmKeyCode = new Uint8Array(8);   // key code per channel
+  const opmKeyOn   = new Uint8Array(8);   // 1 if channel is on
 
   while (pos < buf.length) {
     const cmd = buf[pos++];
@@ -160,10 +262,70 @@ function walkCommands(buf: Uint8Array, dataStart: number, chips: VGMChips): Note
     // 1-byte skip
     if (cmd === 0x4F) { pos++; continue; } // Game Gear stereo
 
-    // SN76489 write (opcode + 1 data byte)
-    if (cmd === 0x50) { pos++; continue; }
+    // ── SN76489 write (opcode 0x50 + 1 data byte) ──────────────────────────
+    if (cmd === 0x50) {
+      if (pos >= buf.length) break;
+      const data = buf[pos++];
 
-    // YM2612 port 0/1 write (opcode + reg + data)
+      if (data & 0x80) {
+        // Latch byte: bits[6:5]=channel, bit[4]=type (0=tone,1=vol), bits[3:0]=lo value
+        snLatchCh  = (data >> 5) & 0x03;
+        snLatchTyp = (data >> 4) & 0x01;
+        const lo   = data & 0x0F;
+
+        if (snLatchTyp === 1) {
+          // Volume latch: lower 4 bits ARE the complete 4-bit attenuation
+          const prevVol = snVolume[snLatchCh];
+          snVolume[snLatchCh] = lo;
+
+          if (chips.sn76489 && opts.snChStart >= 0 && snLatchCh < 3) {
+            const outCh = opts.snChStart + snLatchCh;
+            if (lo === 15 && snPlaying[snLatchCh]) {
+              // Silence → note-off
+              events.push({ tick, ch: outCh, note: 97, on: false, instIdx: opts.snInstIdx });
+              snPlaying[snLatchCh] = 0;
+            } else if (lo < 15 && prevVol === 15 && snCounter[snLatchCh] > 0) {
+              // Was silent, now audible → note-on if we have a counter
+              const note = sn76489CounterToNote(snCounter[snLatchCh], opts.snClock);
+              if (note > 0) {
+                events.push({ tick, ch: outCh, note, on: true, instIdx: opts.snInstIdx });
+                snPlaying[snLatchCh] = 1;
+              }
+            }
+          }
+        } else {
+          // Tone latch: lower nibble = bits[3:0] of counter
+          snCounter[snLatchCh] = (snCounter[snLatchCh] & 0x3F0) | lo;
+          // Note emission happens after data byte arrives (or immediately for single-nibble writes)
+        }
+      } else {
+        // Data byte: bits[5:0] = upper 6 bits of frequency counter for latched tone channel
+        if (snLatchTyp === 0 && snLatchCh < 3) {
+          // Update upper 6 bits of counter
+          snCounter[snLatchCh] = ((data & 0x3F) << 4) | (snCounter[snLatchCh] & 0x0F);
+
+          if (chips.sn76489 && opts.snChStart >= 0) {
+            const outCh = opts.snChStart + snLatchCh;
+            // If channel is audible, emit note-on with new frequency
+            if (snVolume[snLatchCh] < 15 && snCounter[snLatchCh] > 0) {
+              const note = sn76489CounterToNote(snCounter[snLatchCh], opts.snClock);
+              if (note > 0) {
+                if (snPlaying[snLatchCh]) {
+                  // Already playing — emit note-off then note-on for new pitch
+                  events.push({ tick, ch: outCh, note: 97, on: false, instIdx: opts.snInstIdx });
+                }
+                events.push({ tick, ch: outCh, note, on: true, instIdx: opts.snInstIdx });
+                snPlaying[snLatchCh] = 1;
+              }
+            }
+          }
+        }
+        // For tone channels with snLatchTyp=1 (vol data byte), no extra action needed
+      }
+      continue;
+    }
+
+    // ── YM2612 port 0/1 write (opcode + reg + data) ────────────────────────
     if (cmd === 0x52 || cmd === 0x53) {
       if (pos + 1 >= buf.length) break;
       const reg = buf[pos++];
@@ -183,7 +345,8 @@ function walkCommands(buf: Uint8Array, dataStart: number, chips: VGMChips): Note
           if (on !== (opn2KeyOn[ch] !== 0)) {
             const fnum  = opn2FnumLo[ch] | ((opn2FnumHi[ch] & 0x07) << 8);
             const block = (opn2FnumHi[ch] >> 3) & 0x07;
-            events.push({ tick, ch, note: ym2612FnumToNote(fnum, block), on, instIdx: opn2InstIdx });
+            const outCh = opn2ChStart + ch;
+            events.push({ tick, ch: outCh, note: ym2612FnumToNote(fnum, block), on, instIdx: opn2InstIdx });
             opn2KeyOn[ch] = on ? 1 : 0;
           }
         }
@@ -191,7 +354,34 @@ function walkCommands(buf: Uint8Array, dataStart: number, chips: VGMChips): Note
       continue;
     }
 
+    // ── YM2151 (OPM) write (opcode 0x54 + reg + data) ─────────────────────
+    if (cmd === 0x54) {
+      if (pos + 1 >= buf.length) break;
+      const reg = buf[pos++];
+      const val = buf[pos++];
+
+      if (chips.ym2151 && opts.opmChStart >= 0) {
+        if (reg >= 0x28 && reg <= 0x2F) {
+          // Key code register for channel (reg - 0x28)
+          const ch = reg - 0x28;
+          opmKeyCode[ch] = val;
+        } else if (reg === 0x08) {
+          // Key On/Off: bits[6:3] = operator enables, bits[2:0] = channel
+          const ch = val & 0x07;
+          const on = (val & 0x78) !== 0;
+          if (on !== (opmKeyOn[ch] !== 0)) {
+            const note  = opmKeyCodeToNote(opmKeyCode[ch]);
+            const outCh = opts.opmChStart + ch;
+            events.push({ tick, ch: outCh, note, on, instIdx: opts.opmInstIdx });
+            opmKeyOn[ch] = on ? 1 : 0;
+          }
+        }
+      }
+      continue;
+    }
+
     // Other 3-byte register writes (reg + data after opcode)
+    // Skip 0x54 already handled above; exclude 0x52/0x53 already handled
     if ((cmd >= 0x51 && cmd <= 0x5F) || (cmd >= 0xA0 && cmd <= 0xBF)) {
       pos += 2; continue;
     }
@@ -284,6 +474,9 @@ export async function parseVGMFile(buffer: ArrayBuffer, filename: string): Promi
   const gd3RelOff  = dv.getUint32(0x14, true);
   const gd3AbsOff  = gd3RelOff > 0 ? 0x14 + gd3RelOff : 0;
 
+  // SN76489 clock: header offset 0x0C, lower 30 bits
+  const snClock = dv.byteLength > 0x10 ? dv.getUint32(0x0C, true) & 0x3FFFFFFF : 0;
+
   // VGM data start offset
   let dataStart: number;
   if (version >= 0x150 && buf.length > 0x38) {
@@ -297,11 +490,22 @@ export async function parseVGMFile(buffer: ArrayBuffer, filename: string): Promi
     ? parseGd3(buf, gd3AbsOff)
     : { trackName: '', gameName: '', systemName: '', author: '', date: '' };
 
-  const chips = detectChips(dv, version);
-  const instruments = buildInstruments(chips);
-  const numCh = Math.min(8, instruments.length > 0 ? 6 : 1);
+  const chips  = detectChips(dv, version);
+  const layout = buildInstruments(chips);
 
-  const events  = walkCommands(buf, dataStart, chips);
+  const { instruments, opn2ChStart, opmChStart, snChStart,
+          opn2InstIdx, opmInstIdx, snInstIdx, totalChannels } = layout;
+
+  const numCh = totalChannels;
+
+  const opts: WalkOptions = {
+    snClock,
+    snChStart, snInstIdx,
+    opmChStart, opmInstIdx,
+    opn2ChStart, opn2InstIdx,
+  };
+
+  const events  = walkCommands(buf, dataStart, chips, opts);
   const maxTick = events.length > 0 ? Math.max(...events.map(e => e.tick)) : 0;
   const numRows = Math.min(MAX_ROWS, Math.max(64, Math.ceil(maxTick / TICKS_PER_ROW) + 1));
   const pattern = eventsToPattern(events, numCh, numRows);
