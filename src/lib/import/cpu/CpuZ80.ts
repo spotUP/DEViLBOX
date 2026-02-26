@@ -38,9 +38,10 @@ export class CpuZ80 {
   // ── special registers ──────────────────────────────────────────────────────
   private I = 0; private R = 0;
   private SP = 0xFFFF; private PC = 0;
-  private IFF1 = false; private IFF2 = false;
+  private IFF2 = false;
+  private mem: Z80MemoryMap;
 
-  constructor(private mem: Z80MemoryMap) {}
+  constructor(mem: Z80MemoryMap) { this.mem = mem; }
 
   // ── Public interface (mirrors Cpu6502.ts style) ───────────────────────────
 
@@ -53,7 +54,7 @@ export class CpuZ80 {
     this.H = 0; this.L = 0;
     this.IX = 0; this.IY = 0;
     this.I = 0; this.R = 0;
-    this.IFF1 = false; this.IFF2 = false;
+    this.IFF2 = false;
   }
 
   getA(): number  { return this.A; }
@@ -403,7 +404,6 @@ export class CpuZ80 {
       }
       // RETI / RETN
       case 0x45: case 0x55: case 0x65: case 0x75: case 0x4D: case 0x5D: case 0x6D: case 0x7D: {
-        this.IFF1 = this.IFF2;
         this.PC = this.pop16();
         return 14;
       }
@@ -962,8 +962,8 @@ export class CpuZ80 {
       }
 
       // ── EI / DI ───────────────────────────────────────────────────────────
-      case 0xFB: { this.IFF1 = true;  this.IFF2 = true;  return 4; }
-      case 0xF3: { this.IFF1 = false; this.IFF2 = false; return 4; }
+      case 0xFB: { this.IFF2 = true;  return 4; }
+      case 0xF3: { this.IFF2 = false; return 4; }
 
       // ── Prefix dispatch ──────────────────────────────────────────────────
       case 0xCB: { return this.execCB(this.fetch()); }

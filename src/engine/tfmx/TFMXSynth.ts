@@ -27,7 +27,6 @@ export class TFMXSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _disposed = false;
   private _playerHandle = -1;
-  private _config: TFMXConfig | null = null;
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
@@ -46,8 +45,6 @@ export class TFMXSynth implements DevilboxSynth {
   }
 
   async setInstrument(config: TFMXConfig): Promise<void> {
-    this._config = config;
-
     await this.engine.ready();
 
     // Destroy old player if we have one

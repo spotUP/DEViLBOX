@@ -156,6 +156,7 @@ function buildInstruments(chips: VGMChips): InstrumentLayout {
     insts.push({
       id: id++, name, type: 'synth', synthType,
       furnace: { ...DEFAULT_FURNACE, chipType, ops } as FurnaceConfig,
+      effects: [], volume: 0, pan: 0,
     });
   };
 
@@ -171,7 +172,7 @@ function buildInstruments(chips: VGMChips): InstrumentLayout {
   if (chips.ym3812)  add('OPL2 FM',  'FurnaceOPL',    14, 2);
   if (chips.ymf262)  add('OPL3 FM',  'FurnaceOPL',    14, 2);
   if (chips.ym2413)  add('OPLL FM',  'FurnaceOPLL',   13, 2);
-  if (chips.sn76489) { snInstIdx   = insts.length; add('SN PSG',   'FurnaceSN',     0,  2); }
+  if (chips.sn76489) { snInstIdx   = insts.length; add('SN PSG',   'FurnacePSG',    0,  2); }
   if (chips.ay8910)  add('AY PSG',   'FurnaceAY',     6,  2);
   // Default if nothing detected
   if (insts.length === 0) { opn2InstIdx = 0; add('FM', 'FurnaceOPN', 1); }
@@ -224,7 +225,7 @@ interface WalkOptions {
   opn2InstIdx: number;   // instrument index for OPN2 (or -1)
 }
 
-function walkCommands(buf: Uint8Array, dataStart: number, chips: VGMChips, opts: WalkOptions): NoteEvent[] {
+function walkCommands(buf: Uint8Array, dataStart: number, _chips: VGMChips, opts: WalkOptions): NoteEvent[] {
   const events: NoteEvent[] = [];
   let pos = dataStart;
   let tick = 0;

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { isVGMFormat, parseVGMFile } from '../formats/VGMParser';
 
-function makeVGMHeader(overrides: Partial<Record<string, number>> = {}): ArrayBuffer {
+function makeVGMHeader(_overrides: Partial<Record<string, number>> = {}): ArrayBuffer {
   const buf = new Uint8Array(0x100);
   const dv = new DataView(buf.buffer);
   // Magic
