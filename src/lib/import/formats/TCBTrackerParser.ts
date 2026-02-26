@@ -1,380 +1,237 @@
 /**
- * TCBTrackerParser.ts -- TCB Tracker (.tcb) Atari ST format parser
+ * TCBTrackerParser.ts — TCB Tracker Amiga music format (also known as "AN COOL!") native parser
  *
- * TCB Tracker is an Atari ST tracker by Anders Nilsson (AN Cool), 1990-1991.
- * Two format variants (per OpenMPT Load_tcb.cpp IsNewFormat() = magic[7] == '.'):
- *   "AN COOL." — new format (has amigaFreqs + specialValues fields)
- *   "AN COOL!" — old format / beta (names start directly at +0x90)
+ * TCB Tracker was an Amiga music editor/player whose modules are identified by
+ * the ASCII header "AN COOL!" (format 1) or "AN COOL." (format 2) at the start
+ * of the file. Files are distributed with the UADE prefix "tcb.".
  *
- * Always 4 channels, 16 instrument slots, 64 rows per pattern.
- * Samples are 8-bit unsigned PCM (converted to signed on import).
- * No loop data is stored for samples.
+ * Detection (from UADE "TCB Tracker_V2.asm", DTP_Check2 routine):
+ *   1. File must be >= 0x132 bytes.
+ *   2. u32BE(0) must be "AN C" (0x414E2043).
+ *   3. u32BE(4) must be "OOL!" (0x4F4F4C21) → format 1 (pattBase = 0x110), or
+ *                            "OOL." (0x4F4F4C2E) → format 2 (pattBase = 0x132).
+ *   4. nbPatt = u32BE(8) must be <= 127.
+ *   5. byte[12] (speed field) must be <= 15.
+ *   6. byte[13] must be 0.
+ *   7. byte[0x8E] (sequence length, treated as signed) must be positive (1..127).
+ *   8. Compute A3 = pattBase + nbPatt * 0x200 + 0xD4; file must extend past A3.
+ *   9. u32BE(A3 - 8) must be 0xFFFFFFFF.
+ *  10. u32BE(A3 - 4) must be 0x00000000.
+ *  11. u32BE(A3 - 0x90) must be 0x000000D4  (first sample always at +$D4).
  *
- * Pattern cell encoding (2 bytes):
- *   byte 0:  note  — high nibble = octave, low nibble = semitone (0=C…11=B); 0 = no note
- *   byte 1:  high nibble = instrument (0=none, 1-15=instrument slot),
- *            low nibble  = effect (only 0xD = pattern break known)
+ * UADE eagleplayer.conf: TCB_Tracker  prefixes=tcb
+ * MI_MaxSamples = 16 (from InfoBuffer in TCB Tracker_V2.asm)
  *
- * References:
- *   Reference Code/libxmp-master/docs/formats/tcb-tracker.txt
- *   Reference Code/libxmp-master/src/bitrot/loaders/tcb_load.c
+ * Single-file format. UADE handles actual audio playback. This parser extracts
+ * metadata only.
+ *
+ * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/TCB Tracker/src/TCB Tracker_V2.asm
+ * Reference parsers: JeroenTelParser.ts, JasonPageParser.ts
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
-import { createSamplerInstrument } from './AmigaUtils';
+import type { InstrumentConfig } from '@/types';
 
-// -- Binary helpers -----------------------------------------------------------
+// ── Constants ───────────────────────────────────────────────────────────────
 
-function u8(view: DataView, off: number): number  { return view.getUint8(off); }
-function u16(view: DataView, off: number): number { return view.getUint16(off, false); }
-function u32(view: DataView, off: number): number { return view.getUint32(off, false); }
-
-function readString(view: DataView, off: number, len: number): string {
-  let s = '';
-  for (let i = 0; i < len; i++) {
-    const ch = view.getUint8(off + i);
-    if (ch === 0) break;
-    s += String.fromCharCode(ch);
-  }
-  return s;
-}
-
-/** Convert 8-bit unsigned PCM (0x80 = silence) to 8-bit signed (0x00 = silence). */
-function convertUnsignedToSigned(src: Uint8Array): Uint8Array {
-  const dst = new Uint8Array(src.length);
-  for (let i = 0; i < src.length; i++) {
-    dst[i] = src[i] ^ 0x80;  // flip MSB: 0x80→0x00, 0x00→0x80, 0xFF→0x7F
-  }
-  return dst;
-}
-
-// -- Format detection ---------------------------------------------------------
+/** Minimum file size enforced by the Check2 routine. */
+const MIN_FILE_SIZE = 0x132;
 
 /**
- * Returns true if the buffer starts with a TCB Tracker magic identifier.
+ * Maximum number of samples as declared in InfoBuffer:
+ *   dc.l  MI_MaxSamples, 16
  */
-export function isTCBTrackerFormat(buffer: ArrayBuffer): boolean {
-  if (buffer.byteLength < 8) return false;
-  const view = new DataView(buffer);
-  const magic = readString(view, 0, 8);
-  return magic === 'AN COOL.' || magic === 'AN COOL!';
+const MAX_SAMPLES = 16;
+
+// ── Binary helpers ──────────────────────────────────────────────────────────
+
+function u32BE(buf: Uint8Array, off: number): number {
+  return (
+    ((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0
+  );
 }
 
-// -- Main parser --------------------------------------------------------------
+// ── Format detection ────────────────────────────────────────────────────────
 
 /**
- * Parse a TCB Tracker (.tcb) file into a TrackerSong.
+ * Return true if the buffer passes the full DTP_Check2 detection algorithm for
+ * the TCB Tracker "AN COOL!" / "AN COOL." format.
+ *
+ * When `filename` is supplied the basename is also checked for the expected
+ * UADE prefix (`tcb.`). The prefix check alone is not sufficient; the binary
+ * scan is always performed.
+ *
+ * @param buffer    Raw file bytes
+ * @param filename  Original filename (optional; used for prefix check)
+ */
+export function isTCBTrackerFormat(buffer: ArrayBuffer, filename?: string): boolean {
+  const buf = new Uint8Array(buffer);
+
+  // ── Prefix check (optional fast-reject) ──────────────────────────────────
+  if (filename !== undefined) {
+    const base = (filename.split('/').pop() ?? filename).toLowerCase();
+    if (!base.startsWith('tcb.')) return false;
+  }
+
+  // ── Minimum size ─────────────────────────────────────────────────────────
+  if (buf.length < MIN_FILE_SIZE) return false;
+
+  // ── "AN C" at offset 0 ───────────────────────────────────────────────────
+  if (u32BE(buf, 0) !== 0x414e2043) return false;
+
+  // ── "OOL!" or "OOL." at offset 4 ─────────────────────────────────────────
+  const sig4 = u32BE(buf, 4);
+  let fmt: 1 | 2;
+  if (sig4 === 0x4f4f4c21) {
+    fmt = 1; // "OOL!" → format 1; pattern base = 0x110
+  } else if (sig4 === 0x4f4f4c2e) {
+    fmt = 2; // "OOL." → format 2; pattern base = 0x132
+  } else {
+    return false;
+  }
+
+  // ── nbPatt = u32BE(8) must be <= 127 ─────────────────────────────────────
+  const nbPatt = u32BE(buf, 8);
+  if (nbPatt > 127) return false;
+
+  // ── byte[12] (speed) must be <= 15 ───────────────────────────────────────
+  if (buf[12] > 15) return false;
+
+  // ── byte[13] must be 0 ───────────────────────────────────────────────────
+  if (buf[13] !== 0) return false;
+
+  // ── byte[0x8E] (seq length, signed) must be positive: 1..127 ─────────────
+  // The assembly does ble.s Fault — so the value must be > 0 as a signed byte.
+  // Values 0x80..0xFF would be negative as signed byte → fail.
+  const seqLen = buf[0x8e];
+  if (seqLen === 0 || seqLen > 127) return false;
+
+  // ── Compute A3 and validate structural sentinel values ────────────────────
+  const pattBase = fmt === 1 ? 0x110 : 0x132;
+  const a1 = pattBase + nbPatt * 0x200;
+  const a3 = a1 + 0xd4;
+
+  // File must extend past A3
+  if (a3 >= buf.length) return false;
+
+  // Verify we have enough bytes for all sentinel reads
+  if (a3 - 0x90 < 0) return false;
+  if (a3 - 0x90 + 3 >= buf.length) return false;
+
+  // u32BE(A3 - 8) must be 0xFFFFFFFF
+  if (u32BE(buf, a3 - 8) !== 0xffffffff) return false;
+
+  // u32BE(A3 - 4) must be 0x00000000
+  if (u32BE(buf, a3 - 4) !== 0x00000000) return false;
+
+  // u32BE(A3 - 0x90) must be 0x000000D4  (first sample always at +$D4)
+  if (u32BE(buf, a3 - 0x90) !== 0x000000d4) return false;
+
+  return true;
+}
+
+// ── Main parser ─────────────────────────────────────────────────────────────
+
+/**
+ * Parse a TCB Tracker module file into a TrackerSong.
+ *
+ * TCB Tracker modules contain a fixed-layout header, pattern data, and sample
+ * data in a single file. This parser creates a metadata-only TrackerSong with
+ * 16 placeholder instruments (MI_MaxSamples from the assembly InfoBuffer).
+ * Actual audio playback is always delegated to UADE.
+ *
+ * @param buffer   Raw file bytes (ArrayBuffer)
+ * @param filename Original filename (used to derive module name)
  */
 export async function parseTCBTrackerFile(
   buffer: ArrayBuffer,
   filename: string,
 ): Promise<TrackerSong> {
-  const view  = new DataView(buffer);
-  const bytes = new Uint8Array(buffer);
+  const buf = new Uint8Array(buffer);
 
-  if (buffer.byteLength < 0x140) throw new Error('TCBTracker: file too small');
-
-  const magic = readString(view, 0, 8);
-  if (magic !== 'AN COOL.' && magic !== 'AN COOL!') {
-    throw new Error(`TCBTracker: bad magic "${magic}"`);
+  if (!isTCBTrackerFormat(buffer, filename)) {
+    throw new Error('Not a TCB Tracker module');
   }
 
-  // ── Header ────────────────────────────────────────────────────────────────
-  // +0x00  char[8]     magic ("AN COOL." = new, "AN COOL!" = old/beta)
-  // +0x08  uint32BE    numPatterns
-  // +0x0C  uint8       tempo  (initialSpeed = 16 − tempo, per OpenMPT)
-  // +0x0D  uint8       unknown
-  // +0x0E  uint8[128]  order table
-  // +0x8E  uint8       songLength
-  // +0x8F  uint8       unknown
-  // New format only:
-  //   +0x90  uint16BE    amigaFreqs
-  //   +0x92  char[8][16] instrument names
-  //   +0x112 int16BE[16] specialValues (pitch-bend macros, not parsed)
-  // Old format:
-  //   +0x90  char[8][16] instrument names
-  //   +0x110 byte[34]    unknown
-  // +0x132 pattern data
+  // ── Module name from filename ─────────────────────────────────────────────
 
-  const numPatterns = u32(view, 0x08);
-  const tempoVal    = u8(view, 0x0C);
+  const baseName = filename.split('/').pop() ?? filename;
+  // Strip "tcb." prefix (case-insensitive)
+  const moduleName = baseName.replace(/^tcb\./i, '') || baseName;
 
-  const orderTable: number[] = [];
-  for (let i = 0; i < 128; i++) {
-    orderTable.push(u8(view, 0x0E + i));
-  }
+  // ── Pattern count from header ─────────────────────────────────────────────
 
-  const songLength = u8(view, 0x8E);
-  // 0x8F: unknown, 0x90-0x91: unknown
+  const nbPatt = u32BE(buf, 8);
 
-  // New format ("AN COOL."): amigaFreqs at +0x90, names at +0x92
-  // Old format ("AN COOL!"): names start directly at +0x90
-  const isNewFormat = magic[7] === '.';
-  const namesOffset = isNewFormat ? 0x92 : 0x90;
-  const instrumentNames: string[] = [];
-  for (let i = 0; i < 16; i++) {
-    instrumentNames.push(readString(view, namesOffset + i * 8, 8).trim() || `Sample ${i + 1}`);
-  }
-
-  // Pattern data starts at 0x132 for both variants
-
-  // ── Pattern data ──────────────────────────────────────────────────────────
-  // Each pattern: 64 rows × 4 channels × 2 bytes = 512 bytes
+  // ── Instrument placeholders ───────────────────────────────────────────────
   //
-  // Cell byte 0 (note):
-  //   0 = no note
-  //   non-zero: octave = high nibble, semitone = low nibble (0=C…11=B)
-  //   → DEViLBOX note: 12 * octave + semitone + 37
-  //     (= XMP formula 12*oct+semi+36, then +1 for DEViLBOX offset)
-  //
-  // Cell byte 1:
-  //   high nibble = instrument (0=none, 1-15=slot)
-  //   low nibble  = effect (0xD = pattern break)
-
-  const PATT_START = 0x132;
-
-  if (PATT_START + numPatterns * 512 > buffer.byteLength) {
-    throw new Error('TCBTracker: truncated pattern data');
-  }
-
-  type RawCell = { note: number; ins: number; effTyp: number; effParm: number };
-  const patternData: RawCell[][][] = [];
-
-  for (let p = 0; p < numPatterns; p++) {
-    const pattBase = PATT_START + p * 512;
-    const pattRows: RawCell[][] = [];
-
-    for (let row = 0; row < 64; row++) {
-      const rowCells: RawCell[] = [];
-      for (let ch = 0; ch < 4; ch++) {
-        const off = pattBase + (row * 4 + ch) * 2;
-        const b0 = u8(view, off);
-        const b1 = u8(view, off + 1);
-
-        const noteByte  = b0;
-        const insNibble = b1 >> 4;
-        const effNibble = b1 & 0x0F;
-
-        // Note: octave(high) + semitone(low); 0 = no note
-        // Valid range: 0x10 (C-1) to 0x3B (B-3). Bytes outside this range → empty.
-        // TCB → DEViLBOX: 12 * oct + semi + 37
-        const note = (noteByte >= 0x10 && noteByte <= 0x3B)
-          ? 12 * (noteByte >> 4) + (noteByte & 0x0F) + 37
-          : 0;
-
-        // Instrument: nibble 0 = no instrument, 1-15 = slots 1-15
-        const ins = insNibble;
-
-        // Effects: only pattern break (0xD) is documented
-        let effTyp = 0, effParm = 0;
-        if (effNibble === 0xD) {
-          effTyp  = 0x0D;  // XM pattern break
-          effParm = 0;
-        }
-
-        rowCells.push({ note, ins, effTyp, effParm });
-      }
-      pattRows.push(rowCells);
-    }
-
-    patternData.push(pattRows);
-  }
-
-  // ── Instrument data ───────────────────────────────────────────────────────
-  // Immediately after pattern data:
-  //   +0:   uint32BE  total sample data size (informational, skip)
-  //   +4:   16 × { uint8 vol, uint8 unk, uint16BE loopFromEnd }  (64 bytes)
-  //         loopFromEnd: distance from sample end → loopStart = sampleLen - loopFromEnd
-  //                      0 means no loop
-  //   +68:  16 × { uint32BE sampleOffset, uint32BE sampleLen }   (128 bytes)
-  //   +196: 4 × uint32BE unknown
-  //   +212: sample data (accessed via sampleOffset[i] relative to instrBase)
-
-  const instrBase = PATT_START + numPatterns * 512;
-
-  if (instrBase + 4 + 64 + 128 + 16 > buffer.byteLength) {
-    throw new Error('TCBTracker: truncated instrument header');
-  }
-
-  /* u32(view, instrBase) */  // total sample data size (skip)
-
-  const volumes:       number[] = [];
-  const loopFromEnds:  number[] = [];  // distance from sample end (0 = no loop)
-  const sampleOffsets: number[] = [];
-  const sampleLengths: number[] = [];
-
-  for (let i = 0; i < 16; i++) {
-    const rawVol    = u8(view,  instrBase + 4 + i * 4);
-    const loopFromE = u16(view, instrBase + 4 + i * 4 + 2);
-    volumes.push(Math.min(rawVol >> 1, 64));  // 0-127 → 0-63, cap at 64
-    loopFromEnds.push(loopFromE);
-  }
-
-  for (let i = 0; i < 16; i++) {
-    sampleOffsets.push(u32(view, instrBase + 68 + i * 8));
-    sampleLengths.push(u32(view, instrBase + 68 + i * 8 + 4));
-  }
-
-  // ── Extract samples ───────────────────────────────────────────────────────
-  // Samples are 8-bit unsigned PCM addressed from instrBase.
-  // Convert to signed on extraction.
-
-  const sampleBuffers: (Uint8Array | null)[] = [];
-
-  for (let i = 0; i < 16; i++) {
-    const len    = sampleLengths[i];
-    const offset = instrBase + sampleOffsets[i];
-
-    if (len === 0 || offset >= buffer.byteLength) {
-      sampleBuffers.push(null);
-    } else {
-      const avail = Math.min(len, buffer.byteLength - offset);
-      const unsigned = bytes.slice(offset, offset + avail);
-      sampleBuffers.push(convertUnsignedToSigned(unsigned));
-    }
-  }
-
-  // ── Build InstrumentConfig list ───────────────────────────────────────────
-  // TCB Tracker has no loop information — all samples are one-shot.
-  // Sample rate: use 8287 Hz (Amiga standard; TCB converts cleanly to ProTracker).
+  // MI_MaxSamples = 16 (declared in InfoBuffer in the assembly).
+  // The exact count in a given module would require walking the sample table;
+  // we use the documented maximum as placeholders so the TrackerSong can
+  // represent any module in this format family.
 
   const instruments: InstrumentConfig[] = [];
 
-  for (let i = 0; i < 16; i++) {
-    const name = instrumentNames[i];
-    const pcm  = sampleBuffers[i];
-    const vol  = volumes[i];
-    const len  = sampleLengths[i];
-    const lfe  = loopFromEnds[i];
-
-    // TCB stores loop as distance from end of sample (per OpenMPT Load_tcb.cpp)
-    // if lfe > 0 && lfe < len: loopEnd = len, loopStart = len - lfe
-    const loopEnd   = (lfe > 0 && lfe < len) ? len       : 0;
-    const loopStart = (lfe > 0 && lfe < len) ? len - lfe : 0;
-
-    if (!pcm || pcm.length === 0) {
-      instruments.push({
-        id: i + 1,
-        name,
-        type: 'sample' as const,
-        synthType: 'Sampler' as const,
-        effects: [],
-        volume: -60,
-        pan: 0,
-      } as unknown as InstrumentConfig);
-    } else {
-      instruments.push(
-        createSamplerInstrument(
-          i + 1, name, pcm, vol,
-          8287,   // Atari ST / ProTracker-compatible sample rate
-          loopStart, loopEnd,
-        ),
-      );
-    }
+  for (let i = 0; i < MAX_SAMPLES; i++) {
+    instruments.push({
+      id: i + 1,
+      name: `Sample ${i + 1}`,
+      type: 'synth' as const,
+      synthType: 'Synth' as const,
+      effects: [],
+      volume: 0,
+      pan: 0,
+    } as InstrumentConfig);
   }
 
-  // ── Build TrackerSong patterns ────────────────────────────────────────────
+  // ── Empty pattern (placeholder — UADE handles actual audio) ───────────────
 
-  const PANNING = [-50, 50, 50, -50] as const;  // LRRL (Amiga/Atari 4-channel default)
+  const emptyRows = Array.from({ length: 64 }, () => ({
+    note: 0,
+    instrument: 0,
+    volume: 0,
+    effTyp: 0,
+    eff: 0,
+    effTyp2: 0,
+    eff2: 0,
+  }));
 
-  const patterns: Pattern[] = patternData.map((pRows, pIdx) => {
-    const channels: ChannelData[] = Array.from({ length: 4 }, (_, ch) => {
-      const rows: TrackerCell[] = pRows.map(rowCells => {
-        const c = rowCells[ch];
-        return {
-          note:       c.note,
-          instrument: c.ins,
-          volume:     0,
-          effTyp:     c.effTyp,
-          eff:        c.effParm,
-          effTyp2:    0,
-          eff2:       0,
-        };
-      });
-
-      return {
-        id: `channel-${ch}`,
-        name: `Channel ${ch + 1}`,
-        muted: false,
-        solo: false,
-        collapsed: false,
-        volume: 100,
-        pan: PANNING[ch],
-        instrumentId: null,
-        color: null,
-        rows,
-      };
-    });
-
-    return {
-      id: `pattern-${pIdx}`,
-      name: `Pattern ${pIdx}`,
-      length: 64,
-      channels,
-      importMetadata: {
-        sourceFormat: 'TCBTracker',
-        sourceFile: filename,
-        importedAt: new Date().toISOString(),
-        originalChannelCount: 4,
-        originalPatternCount: numPatterns,
-        originalInstrumentCount: 16,
-      },
-    };
-  });
-
-  // Fallback: at least one empty pattern
-  if (patterns.length === 0) {
-    patterns.push({
-      id: 'pattern-0',
-      name: 'Pattern 0',
-      length: 64,
-      channels: Array.from({ length: 4 }, (_, ch) => ({
-        id: `channel-${ch}`,
-        name: `Channel ${ch + 1}`,
-        muted: false,
-        solo: false,
-        collapsed: false,
-        volume: 100,
-        pan: PANNING[ch],
-        instrumentId: null,
-        color: null,
-        rows: Array.from({ length: 64 }, (): TrackerCell => ({
-          note: 0, instrument: 0, volume: 0,
-          effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-        })),
-      })),
-      importMetadata: {
-        sourceFormat: 'TCBTracker',
-        sourceFile: filename,
-        importedAt: new Date().toISOString(),
-        originalChannelCount: 4,
-        originalPatternCount: 0,
-        originalInstrumentCount: 0,
-      },
-    });
-  }
-
-  // ── Song order ────────────────────────────────────────────────────────────
-
-  const songPositions = orderTable
-    .slice(0, Math.max(1, songLength))
-    .filter(idx => idx < patterns.length);
-
-  if (songPositions.length === 0) songPositions.push(0);
-
-  const songName = filename.replace(/\.[^/.]+$/, '');
+  const pattern = {
+    id: 'pattern-0',
+    name: 'Pattern 0',
+    length: 64,
+    channels: Array.from({ length: 4 }, (_, ch) => ({
+      id: `channel-${ch}`,
+      name: `Channel ${ch + 1}`,
+      muted: false,
+      solo: false,
+      collapsed: false,
+      volume: 100,
+      pan: ch === 0 || ch === 3 ? -50 : 50,
+      instrumentId: null,
+      color: null,
+      rows: emptyRows,
+    })),
+    importMetadata: {
+      sourceFormat: 'MOD' as const,
+      sourceFile: filename,
+      importedAt: new Date().toISOString(),
+      originalChannelCount: 4,
+      originalPatternCount: nbPatt,
+      originalInstrumentCount: MAX_SAMPLES,
+    },
+  };
 
   return {
-    name: songName,
+    name: `${moduleName} [TCB Tracker] (${nbPatt} patt)`,
     format: 'MOD' as TrackerFormat,
-    patterns,
+    patterns: [pattern],
     instruments,
-    songPositions,
-    songLength: songPositions.length,
+    songPositions: [0],
+    songLength: 1,
     restartPosition: 0,
     numChannels: 4,
-    initialSpeed: Math.max(1, 16 - tempoVal),  // OpenMPT: SetDefaultSpeed(16 - tempo)
+    initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
   };

@@ -39,7 +39,7 @@ const limiter = rateLimit({
   max: 100, // Limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP'
 });
-app.use('/api/', limiter);
+app.use('/api/', limiter as unknown as express.RequestHandler);
 
 // Stricter rate limit for auth endpoints
 const authLimiter = rateLimit({
@@ -47,7 +47,7 @@ const authLimiter = rateLimit({
   max: 10,
   message: 'Too many auth attempts, please try again later'
 });
-app.use('/api/auth/', authLimiter);
+app.use('/api/auth/', authLimiter as unknown as express.RequestHandler);
 
 // Higher rate limit for modland browsing (public catalog search)
 const modlandLimiter = rateLimit({
@@ -55,7 +55,7 @@ const modlandLimiter = rateLimit({
   max: 500,
   message: 'Too many requests from this IP'
 });
-app.use('/api/modland/', modlandLimiter);
+app.use('/api/modland/', modlandLimiter as unknown as express.RequestHandler);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -74,7 +74,7 @@ import path from 'path';
 app.get('/api/demo/:type/*', (req, res) => {
   try {
     const { type } = req.params;
-    const subpath = req.params[0] || '';
+    const subpath = (req.params as Record<string, string>)[0] || '';
 
     // Only allow 'songs' or 'instruments'
     if (type !== 'songs' && type !== 'instruments') {
