@@ -19,7 +19,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
-import { createSamplerInstrument } from './AmigaUtils';
+import type { SidMonConfig } from '@/types/instrument';
 
 // -- SidMon II period table (from S2Player.js) --------------------------------
 // Index 0 is unused (0). Indices 1-72 cover 6 octaves (C-1 to B-6).
@@ -456,43 +456,68 @@ export async function parseSidMon2File(
   const songLength = length + 1; // S2Player increments length by 1
 
   // -- Build TrackerSong instruments ------------------------------------------
+  // One SidMonSynth instrument per S2Instrument (indices 1..numInstruments-1).
+  // Instrument IDs match S2Instrument indices (1-based) so pattern notes map directly.
 
   const trackerInstruments: InstrumentConfig[] = [];
-  const sampleToInstrId = new Map<number, number>();
-  let nextInstrId = 1;
 
-  // Create instruments for PCM samples
-  for (let i = 0; i < sampleCount; i++) {
-    const smp = samples[i];
-    const id = nextInstrId++;
-    sampleToInstrId.set(i, id);
+  for (let i = 1; i < numInstruments; i++) {
+    const instr = instruments[i];
 
-    if (smp.length > 0 && samplePCMs[i].length > 0) {
-      const loopStart = smp.repeat > 2 ? smp.loop : 0;
-      const loopEnd = smp.repeat > 2 ? smp.loop + smp.repeat : 0;
-      trackerInstruments.push(
-        createSamplerInstrument(
-          id,
-          smp.name || `Sample ${i + 1}`,
-          samplePCMs[i],
-          64,
-          8287,
-          loopStart,
-          loopEnd
-        )
-      );
-    } else {
-      // Empty sample placeholder
-      trackerInstruments.push({
-        id,
-        name: smp.name || `Sample ${i + 1}`,
-        type: 'synth' as const,
-        synthType: 'Synth' as const,
-        effects: [],
-        volume: -6,
-        pan: 0,
-      } as InstrumentConfig);
+    // Look up the first PCM sample from the wave table
+    const firstWaveIdx = instr.wave < waves.length ? waves[instr.wave] : -1;
+    const pcm = (firstWaveIdx >= 0 && firstWaveIdx < sampleCount && samplePCMs[firstWaveIdx].length > 0)
+      ? samplePCMs[firstWaveIdx]
+      : undefined;
+    const smp = (firstWaveIdx >= 0 && firstWaveIdx < sampleCount) ? samples[firstWaveIdx] : null;
+
+    // Map S2 ADSR speeds (0-255, higher = faster) to SID index (0-15, lower = faster)
+    const attack  = Math.max(0, Math.min(15, 15 - Math.floor(instr.attackSpeed  * 16 / 256)));
+    const decay   = Math.max(0, Math.min(15, 15 - Math.floor(instr.decaySpeed   * 16 / 256)));
+    const sustain = Math.max(0, Math.min(15, Math.round(instr.decayMin * 15 / 255)));
+    const release = Math.max(0, Math.min(15, 15 - Math.floor(instr.releaseSpeed * 16 / 256)));
+
+    // Extract arpeggio table (8 entries from arpeggios table)
+    const arpTable: number[] = [];
+    const arpStart = instr.arpeggio;
+    for (let a = 0; a < 8; a++) {
+      arpTable.push(arpStart + a < arpeggios.length ? arpeggios[arpStart + a] : 0);
     }
+
+    // Vibrato: use vibratoLen as depth proxy, vibratoSpeed and vibratoDelay directly
+    const vibDelay = Math.min(255, instr.vibratoDelay);
+    const vibSpeed = Math.min(63, instr.vibratoSpeed);
+    const vibDepth = Math.min(63, instr.vibratoLen);
+
+    const loopStart  = smp && smp.repeat > 2 ? smp.loop : 0;
+    const loopLength = smp && smp.repeat > 2 ? smp.repeat : 0;
+
+    const config: SidMonConfig = {
+      type: 'pcm',
+      waveform: 1,       // sawtooth (unused for pcm type)
+      pulseWidth: 128,
+      attack, decay, sustain, release,
+      arpTable,
+      arpSpeed: Math.min(15, instr.arpeggioSpeed),
+      vibDelay, vibSpeed, vibDepth,
+      filterCutoff: 255,
+      filterResonance: 0,
+      filterMode: 0,
+      pcmData: pcm,
+      loopStart,
+      loopLength,
+    };
+
+    trackerInstruments.push({
+      id: i,
+      name: smp?.name || `Instrument ${i}`,
+      type: 'synth' as const,
+      synthType: 'SidMonSynth' as const,
+      sidMon: config,
+      effects: [],
+      volume: -6,
+      pan: 0,
+    } as InstrumentConfig);
   }
 
   // -- Simulate playback to extract pattern data ------------------------------
@@ -508,9 +533,8 @@ export async function parseSidMon2File(
     patternPtr: number;
     speed: number;         // per-voice row speed counter
     note: number;
-    instrument: number;    // instrument index (SidMon)
+    instrument: number;    // S2Instrument index (1-based = TrackerSong instrument ID)
     instr: S2Instrument;
-    sampleIdx: number;     // resolved sample index
     volume: number;
     adsrPos: number;
     sustainCtr: number;
@@ -523,7 +547,6 @@ export async function parseSidMon2File(
     note: 0,
     instrument: 0,
     instr: instruments[0],
-    sampleIdx: -1,
     volume: 0,
     adsrPos: 0,
     sustainCtr: 0,
@@ -577,22 +600,12 @@ export async function parseSidMon2File(
                 const instrIdx = voice.instrument + soundTranspose;
                 if (instrIdx >= 0 && instrIdx < numInstruments) {
                   voice.instr = instruments[instrIdx];
-                }
-
-                // Resolve the sample from the wave table
-                const waveIdx = voice.instr.wave;
-                if (waveIdx < waves.length) {
-                  voice.sampleIdx = waves[waveIdx];
+                  instrId = instrIdx; // S2Instrument index = TrackerSong instrument ID
                 }
               }
 
               // Map note to XM using period table for accuracy
               xmNote = sidmonNoteToXM(voice.note, 0);
-
-              // Map sample to instrument
-              if (voice.sampleIdx >= 0 && sampleToInstrId.has(voice.sampleIdx)) {
-                instrId = sampleToInstrId.get(voice.sampleIdx)!;
-              }
 
               // Reset ADSR
               voice.adsrPos = 4;
