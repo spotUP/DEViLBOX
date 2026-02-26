@@ -202,6 +202,7 @@ export type SynthType =
   | 'FCSynth'         // Future Composer 1.3/1.4 (47 waveforms + synth macro)
   | 'FredSynth'       // Fred Editor (macro-driven wavetable)
   | 'TFMXSynth'       // TFMX / Jochen Hippel (SndMod/VolMod sequences)
+  | 'HippelCoSoSynth' // Jochen Hippel CoSo (frequency/volume sequence synthesis)
   // Modular Synthesis
   | 'ModularSynth';   // Modular synthesizer with patch editor
 
@@ -993,6 +994,45 @@ export const DEFAULT_TFMX: TFMXConfig = {
   sampleCount:   0,
   sampleHeaders: new Uint8Array(0),
   sampleData:    new Uint8Array(0),
+};
+
+/**
+ * Jochen Hippel CoSo instrument configuration.
+ *
+ * Pure synthesis format: frequency and volume sequences stepped each tick at
+ * 50 Hz (Amiga timer), with optional vibrato and portamento.
+ *
+ * - fseq: frequency sequence (signed bytes). Normal values are transpose
+ *   offsets added to the base note period. Special codes:
+ *     -32 = loop (next byte = target position & 63)
+ *     -31 = end (reset to start)
+ *     -24 = delay (next byte = tick count)
+ * - vseq: volume sequence (signed bytes). Normal values are 0-63.
+ *   Special codes:
+ *     -32 = loop (next byte = target position & 63)
+ *     -24 = sustain (next byte = tick count)
+ *     -31..-25 = end/stop (hold current volume)
+ * - volSpeed: ticks between each vseq step (≥1)
+ * - vibSpeed: vibrato LFO step per tick (signed: negative toggles direction)
+ * - vibDepth: vibrato depth in period units
+ * - vibDelay: ticks before vibrato activates
+ */
+export interface HippelCoSoConfig {
+  fseq:     number[];   // frequency sequence (signed bytes)
+  vseq:     number[];   // volume sequence (signed bytes, 0-63)
+  volSpeed: number;     // ticks per vseq step (1-16)
+  vibSpeed: number;     // vibrato speed (signed, -128..127)
+  vibDepth: number;     // vibrato depth (0-255)
+  vibDelay: number;     // vibrato delay ticks (0-255)
+}
+
+export const DEFAULT_HIPPEL_COSO: HippelCoSoConfig = {
+  fseq:     [0],
+  vseq:     [32, -31],
+  volSpeed: 1,
+  vibSpeed: 0,
+  vibDepth: 0,
+  vibDelay: 0,
 };
 
 /**
@@ -3326,6 +3366,7 @@ export interface InstrumentConfig {
   fc?: FCConfig;
   fred?: FredConfig;
   tfmx?: TFMXConfig;
+  hippelCoso?: HippelCoSoConfig;
   // Modular Synthesis
   modularSynth?: import('./modular').ModularPatchConfig;
   // Sampler config

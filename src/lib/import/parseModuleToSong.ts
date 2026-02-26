@@ -185,6 +185,23 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── Jochen Hippel CoSo ────────────────────────────────────────────────────
+  if (/\.(hipc|soc|coso)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.hippelCoso !== 'uade') {
+      try {
+        const { isHippelCoSoFormat, parseHippelCoSoFile } = await import('@lib/import/formats/HippelCoSoParser');
+        if (isHippelCoSoFormat(buffer)) {
+          return parseHippelCoSoFile(buffer, file.name);
+        }
+      } catch (err) {
+        console.warn(`[HippelCoSoParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── TFMX (Jochen Hippel) ─────────────────────────────────────────────────
   if (/\.(tfmx|mdat|tfx)$/.test(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
