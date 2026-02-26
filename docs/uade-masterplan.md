@@ -2,49 +2,52 @@
 date: 2026-02-26
 topic: uade-format-synths
 tags: [uade, amiga, synth, wasm, architecture]
-status: draft
+status: mostly-complete
 ---
 
 # UADE Format-Specific Synth Architecture — Living Masterplan
 
-## Context & Problem
+## Status Summary
 
-**Current state (the "ugly hack"):**
-UADE import stores the entire raw file in `UADEConfig.fileData` and plays it as one opaque audio stream. The "instruments" visible in the instrument list are either muted Samplers (display-only) or a single `UADESynth` that plays the whole song. Users cannot edit, export, or interact with individual instruments. The import is playback-only, not editable.
-
-**Goal:**
-Every UADE format import should produce a `TrackerSong` where:
-- Each instrument slot is populated with a real, format-specific synth config
-- The instrument editor shows that format's actual parameters (waveform, ADSR, arpeggio, etc.)
-- Notes can be triggered individually per instrument (not just whole-song playback)
-- The format-specific synth is 1:1 with the original hardware/software parameters
-- Users can edit, transpose, re-sequence, and re-export instrument by instrument
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 0 | Architecture & Types | ✅ Complete |
+| 1 | SoundMon pilot | ✅ Complete |
+| 2 | SidMon II + Digital Mugician | ✅ Complete |
+| 2b | OctaMED synth instruments | ⚠️ Partial — waveform extracted as Sampler; no real-time synthesis |
+| 3 | Future Composer (FC13/FC14) | ✅ Complete |
+| 4 | TFMX — Jochen Hippel | ✅ Complete |
+| 5 | Fred Editor | ✅ Complete |
+| 6 | PCM format instrument naming | ❌ Not started |
+| 7 | Instrument editor UI | ✅ Complete |
 
 ---
 
-## The Furnace Pattern — Architecture Blueprint
+## Context & Problem
 
-Applied to UADE format families:
+**Original problem ("the ugly hack"):**
+UADE import stored the entire raw file in `UADEConfig.fileData` and played it as one opaque audio stream. Users couldn't edit, export, or interact with individual instruments. Import was playback-only.
+
+**Goal achieved:**
+Every format import produces a `TrackerSong` where each instrument slot has a real, format-specific synth config. The instrument editor shows format-specific parameters. Notes can be triggered individually per instrument.
+
+---
+
+## Architecture Blueprint
 
 ```
 Format DSP Source → thin WASM wrapper → TypeScript engine → TypeScript synth class
        ↓                                       ↓                      ↓
- hvl_replay.c  →   Hively.wasm      →   HivelyEngine    →   HivelySynth    ← DONE ✅
- soundmon.c    →   SoundMon.wasm    →   SoundMonEngine  →   SoundMonSynth  ← Phase 2
- tfmx_player.c →   TFMX.wasm       →   TFMXEngine      →   TFMXSynth      ← Phase 4
- fc_player.c   →   FC.wasm         →   FCEngine        →   FCSynth        ← Phase 3
+ hvl_replay.c  →   Hively.wasm      →   HivelyEngine    →   HivelySynth    ✅
+ soundmon_synth.c → SoundMon.wasm   →   SoundMonEngine  →   SoundMonSynth  ✅
+ sidmon_synth.c →  SidMon.wasm      →   SidMonEngine    →   SidMonSynth    ✅
+ digmug_synth.c →  DigMug.wasm      →   DigMugEngine    →   DigMugSynth    ✅
+ fc_synth.c    →   FC.wasm          →   FCEngine        →   FCSynth        ✅
+ tfmx_synth.cpp →  TFMX.wasm        →   TFMXEngine      →   TFMXSynth      ✅
+ fred_synth.c  →   Fred.wasm        →   FredEngine      →   FredSynth      ✅
 ```
 
-**The WASM wrapper C API pattern** — see `soundmon-wasm/include/format_synth_api.h`:
-```c
-void* format_init(int sampleRate);
-int   format_load_instrument(void* ctx, const uint8_t* data, int len);
-void  format_note_on(void* ctx, int note, int velocity);
-void  format_note_off(void* ctx);
-int   format_render(void* ctx, float* outL, float* outR, int numSamples);
-void  format_set_param(void* ctx, int paramId, float value);
-void  format_dispose(void* ctx);
-```
+**WASM C API contract:** `soundmon-wasm/include/format_synth_api.h`
 
 ---
 
@@ -53,192 +56,204 @@ void  format_dispose(void* ctx);
 ### Group 1: AHX / HivelyTracker — ✅ COMPLETE
 
 **Formats:** `.ahx`, `.hvl`, `.thx`
-**Source:** `Reference Code/hivelytracker-master/replayer/hvl_replay.c`
-**WASM:** `public/hively/Hively.wasm` ✅
-**Engine:** `src/engine/hively/HivelyEngine.ts` ✅
-**Synth:** `src/engine/hively/HivelySynth.ts` ✅ (reference implementation)
-**Parser:** `src/lib/import/formats/HivelyParser.ts` ✅
-**Type:** `HivelyConfig` in `src/types/instrument.ts`
+**WASM:** `public/hively/Hively.wasm`
+**Engine:** `src/engine/hively/HivelyEngine.ts`
+**Synth:** `src/engine/hively/HivelySynth.ts`
+**Parser:** `src/lib/import/formats/HivelyParser.ts`
+**UI:** `src/components/instruments/hardware/HivelyHardware.tsx`
 
 ---
 
-### Group 2: SoundMon II / Brian Postma — Phase 1
+### Group 2: SoundMon II / Brian Postma — ✅ COMPLETE
 
 **Formats:** `.bp`, `.bp3`, `.sndmon`
-**Parser:** `src/lib/import/formats/SoundMonParser.ts`
-**Target Type:** `SoundMonConfig`
-**Target Synth:** `SoundMonSynth`
-**WASM Target:** `public/soundmon/SoundMon.wasm`
-**Status:** Phase 1 — implementation pending
-
-**Instrument Types:**
-1. Synth: wavetable oscillator + macro-driven ADSR + arpeggio + vibrato
-2. PCM: raw 8-bit signed + loop + finetune
+**WASM source:** `soundmon-wasm/src/soundmon_synth.c`
+**WASM:** `public/soundmon/SoundMon.wasm`
+**Worklet:** `public/soundmon/SoundMon.worklet.js`
+**Engine:** `src/engine/soundmon/SoundMonEngine.ts`
+**Synth:** `src/engine/soundmon/SoundMonSynth.ts`
+**Parser:** `src/lib/import/formats/SoundMonParser.ts` — emits `SoundMonConfig`
+**UI:** `src/components/instruments/controls/SoundMonControls.tsx`
+**Type:** `SoundMonConfig` in `src/types/instrument.ts:710`
 
 ---
 
-### Group 3: SidMon II — Phase 2
+### Group 3: SidMon II — ✅ COMPLETE
 
 **Formats:** `.sid`, `.sid2`, `.smn`
-**Parser:** `src/lib/import/formats/SidMon2Parser.ts`
-**Target Type:** `SidMonConfig`
-**Target Synth:** `SidMonSynth`
-**Status:** Phase 2 — type defined, implementation pending
+**WASM source:** `sidmon-wasm/src/sidmon_synth.c`
+**WASM:** `public/sidmon/SidMon.wasm`
+**Worklet:** `public/sidmon/SidMon.worklet.js`
+**Engine:** `src/engine/sidmon/SidMonEngine.ts`
+**Synth:** `src/engine/sidmon/SidMonSynth.ts`
+**Parser:** `src/lib/import/formats/SidMon2Parser.ts` — emits `SidMonConfig`
+**UI:** `src/components/instruments/controls/SidMonControls.tsx`
+**Type:** `SidMonConfig` in `src/types/instrument.ts:762`
 
 ---
 
-### Group 4: Digital Mugician — Phase 2
+### Group 4: Digital Mugician — ✅ COMPLETE
 
 **Formats:** `.dmu`, `.dmu2`, `.mug`, `.mug2`
-**Parser:** `src/lib/import/formats/DigitalMugicianParser.ts`
-**Target Type:** `DigMugConfig`
-**Target Synth:** `DigMugSynth`
-**Status:** Phase 2 — type defined, implementation pending
+**WASM source:** `digmug-wasm/src/digmug_synth.c`
+**WASM:** `public/digmug/DigMug.wasm`
+**Worklet:** `public/digmug/DigMug.worklet.js`
+**Engine:** `src/engine/digmug/DigMugEngine.ts`
+**Synth:** `src/engine/digmug/DigMugSynth.ts`
+**Parser:** `src/lib/import/formats/DigitalMugicianParser.ts` — emits `DigMugConfig`
+**UI:** `src/components/instruments/controls/DigMugControls.tsx`
+**Type:** `DigMugConfig` in `src/types/instrument.ts:808`
+**Note:** `.dmu`/`.dmu2`/`.mug`/`.mug2` added to `SYNTHESIS_FORMATS` in `UADEParser.ts` (2026-02-26)
 
 ---
 
-### Group 5: Future Composer (FC13/FC14) — Phase 3
+### Group 5: Future Composer (FC13/FC14) — ✅ COMPLETE
 
 **Formats:** `.fc`, `.fc13`, `.fc14`, `.smod`, `.bsi`
-**Parser:** `src/lib/import/formats/FCParser.ts`
-**Target Type:** `FCConfig`
-**Target Synth:** `FCSynth`
-**Status:** Phase 3 — type defined, implementation pending
+**WASM source:** `fc-wasm/src/fc_synth.c`
+**WASM:** `public/fc/FC.wasm`
+**Worklet:** `public/fc/FC.worklet.js`
+**Engine:** `src/engine/fc/FCEngine.ts`
+**Synth:** `src/engine/fc/FCSynth.ts`
+**Parser:** `src/lib/import/formats/FCParser.ts` — emits `FCConfig`
+**UI:** `src/components/instruments/controls/FCControls.tsx`
+**Type:** `FCConfig` in `src/types/instrument.ts:840`
 
 ---
 
-### Group 6: Fred Editor — Phase 5
+### Group 6: Fred Editor — ✅ COMPLETE
 
 **Formats:** `.fred`
-**Parser:** `src/lib/import/formats/FredEditorParser.ts`
-**Target Type:** `FredConfig`
-**Target Synth:** `FredSynth`
-**Status:** Phase 5 — type defined, implementation pending
+**WASM source:** `fred-wasm/src/fred_synth.c`
+**WASM:** `public/fred/Fred.wasm`
+**Worklet:** `public/fred/Fred.worklet.js`
+**Engine:** `src/engine/fred/FredEngine.ts`
+**Synth:** `src/engine/fred/FredSynth.ts`
+**Parser:** `src/lib/import/formats/FredEditorParser.ts` — emits `FredConfig`
+**UI:** `src/components/instruments/controls/FredControls.tsx`
+**Type:** `FredConfig` in `src/types/instrument.ts:910`
 
 ---
 
-### Group 7: TFMX — Jochen Hippel — Phase 4
+### Group 7: TFMX — Jochen Hippel — ✅ COMPLETE
 
 **Formats:** `.tfmx`, `.mdat`, `.tfmx1.5`, `.tfmx7v`, `.tfmxpro`, `.tfhd1.5`
-**Parser:** `src/lib/import/formats/TFMXParser.ts`
-**Target Type:** `TFMXConfig`
-**Target Synth:** `TFMXSynth`
-**Key asset:** `Reference Code/libtfmxaudiodecoder-main/` — complete standalone C++ TFMX decoder
-**Status:** Phase 4 — type defined, implementation pending
+**WASM source:** `tfmx-wasm/src/tfmx_synth.cpp` (C++ wrapper over `Reference Code/libtfmxaudiodecoder-main/`)
+**WASM:** `public/tfmx/TFMX.wasm`
+**Worklet:** `public/tfmx/TFMX.worklet.js`
+**Engine:** `src/engine/tfmx/TFMXEngine.ts`
+**Synth:** `src/engine/tfmx/TFMXSynth.ts`
+**Parser:** `src/lib/import/formats/TFMXParser.ts` — emits `TFMXConfig`
+**UI:** `src/components/instruments/controls/TFMXControls.tsx` (read-only viewer)
+**Type:** `TFMXConfig` in `src/types/instrument.ts:980`
 
 ---
 
-### Group 8: PCM Format Name/Metadata Enhancement — Phase 6
+### Group 8: PCM Format Instrument Naming — ❌ NOT STARTED
 
-**Formats:** 100+ UADE formats (Richard Joseph, Dave Lowe, Mark Cooksey, Delta Music, etc.)
-**Strategy:** Better loop point detection, instrument naming, period accuracy
-**Status:** Phase 6 — enhancement pending
+**Formats:** 100+ UADE formats (Richard Joseph `.rj`, Dave Lowe `.dl`, Mark Cooksey `.mc`, Delta Music `.dm`, etc.)
+**Goal:** Parse format-specific header name tables so Sampler instruments get real names instead of "Instrument 1"
+**Where:** `UADEParser.ts` — `buildEnhancedSong()` already uses enhanced scan; add `instrumentNames[]` extraction per format
+**Priority:** Low (polish — playback works fine without names)
 
 ---
 
-### Group 9: OctaMED Synth Instruments — Phase 2
+### Group 9: OctaMED Synth Instruments — ⚠️ PARTIAL
 
-**Formats:** `.med`, `.mmd0`, `.mmd1`, `.mmd2`, `.mmd3`, `.octamed`
+**Formats:** `.med`, `.mmd0`, `.mmd1`, `.mmd2`, `.mmd3`
 **Parser:** `src/lib/import/formats/MEDParser.ts`
-**Target Type:** `OctaMEDConfig`
-**Gap:** Synth instruments (10 built-in waveforms + ADSR table) currently skipped
-**Status:** Phase 2 — enhancement pending
+**Current state (2026-02-26):** `SynthInstr` binary block is now parsed — the first waveform (256-byte signed PCM at offset `+0x114`) is extracted as a `Sampler` instrument with correct loop points. `samplePos` is advanced by `synthLen` so subsequent PCM instruments load at correct offsets.
+**Gap:** No `OctaMEDConfig` type, no real-time synthesis — instruments play the captured waveform rather than the full 10-waveform oscillator + 32-step ADSR table
+**Priority:** Low — the waveform extraction gives a usable (if approximate) sound
 
 ---
 
 ## Implementation Phases
 
-### Phase 0 — Architecture & Living Document ✅ IN PROGRESS
+### Phase 0 — Architecture & Types ✅ COMPLETE
 
-- [x] Write `docs/uade-masterplan.md`
-- [ ] Define `SoundMonConfig`, `SidMonConfig`, `DigMugConfig`, `FCConfig`, `FredConfig`, `TFMXConfig` in `src/types/instrument.ts`
-- [ ] Add synthType values: `'SoundMonSynth'`, `'SidMonSynth'`, `'DigMugSynth'`, `'FCSynth'`, `'FredSynth'`, `'TFMXSynth'`
-- [ ] Design C API header `soundmon-wasm/include/format_synth_api.h`
-- [ ] `npx tsc --noEmit` — zero errors
+- [x] `docs/uade-masterplan.md` — this document
+- [x] `SoundMonConfig`, `SidMonConfig`, `DigMugConfig`, `FCConfig`, `FredConfig`, `TFMXConfig` in `src/types/instrument.ts`
+- [x] SynthType values: `'SoundMonSynth'`, `'SidMonSynth'`, `'DigMugSynth'`, `'FCSynth'`, `'FredSynth'`, `'TFMXSynth'`
+- [x] `soundmon-wasm/include/format_synth_api.h` — C API contract
 
-### Phase 1 — SoundMon Pilot (Reference Implementation)
+### Phase 1 — SoundMon Pilot ✅ COMPLETE
 
-- [ ] **WASM module:** `soundmon-wasm/src/soundmon_synth.c` — wavetable + ADSR + LFO + arpeggio
-- [ ] **Engine:** `src/engine/soundmon/SoundMonEngine.ts`
-- [ ] **Worklet:** `public/soundmon/SoundMon.worklet.js`
-- [ ] **Synth:** `src/engine/soundmon/SoundMonSynth.ts`
-- [ ] **Parser:** Update `SoundMonParser.ts` to emit `SoundMonConfig` (not Sampler)
-- [ ] **ToneEngine:** Register `SoundMonSynth`
-- [ ] **InstrumentFactory:** Handle `synthType === 'SoundMonSynth'`
-- [ ] `npx tsc --noEmit` — zero errors
+- [x] `soundmon-wasm/src/soundmon_synth.c` — wavetable + ADSR + LFO + arpeggio
+- [x] `public/soundmon/SoundMon.wasm` — compiled
+- [x] `public/soundmon/SoundMon.worklet.js`
+- [x] `src/engine/soundmon/SoundMonEngine.ts`
+- [x] `src/engine/soundmon/SoundMonSynth.ts`
+- [x] `SoundMonParser.ts` emits `SoundMonConfig`
+- [x] ToneEngine + InstrumentFactory registered
 
-### Phase 2 — Wavetable Format Suite
+### Phase 2 — SidMon + DigMug ✅ COMPLETE
 
-- [ ] SidMon II: WASM + engine + worklet + synth + parser update
-- [ ] Digital Mugician: WASM + engine + worklet + synth + parser update
-- [ ] OctaMED synth instruments: parser update + OctaMEDSynth
-- [ ] Register all in ToneEngine + InstrumentFactory
+- [x] SidMon: WASM + engine + worklet + synth + parser
+- [x] Digital Mugician: WASM + engine + worklet + synth + parser
+- [x] Both registered in ToneEngine + InstrumentFactory
 
-### Phase 3 — FC Synthesis Engine
+### Phase 3 — FC Synthesis Engine ✅ COMPLETE
 
-- [ ] Extract FC waveform ROM (47 built-in waveforms)
-- [ ] `fc-wasm/src/fc_synth.c` — 47 waveforms + synth macro sequencer + ADSR + vibrato + arpeggio
-- [ ] Build FC.wasm, create engine/worklet/synth TypeScript
-- [ ] Update `FCParser.ts` to emit `FCConfig`
-- [ ] Register in ToneEngine + InstrumentFactory
+- [x] `fc-wasm/src/fc_synth.c` — 47 waveforms + synth macro sequencer + ADSR + vibrato + arpeggio
+- [x] `public/fc/FC.wasm` — compiled
+- [x] `src/engine/fc/FCEngine.ts` + `FCSynth.ts`
+- [x] `FCParser.ts` emits `FCConfig`
+- [x] Registered in ToneEngine + InstrumentFactory
 
-### Phase 4 — TFMX Synthesis Engine
+### Phase 4 — TFMX Synthesis Engine ✅ COMPLETE
 
-- [ ] Study `Reference Code/libtfmxaudiodecoder-main/` API surface
-- [ ] Write thin C wrapper: `tfmx-wasm/src/tfmx_wrapper.cpp`
-- [ ] Build `TFMX.wasm`, create `TFMXEngine.ts`, `TFMX.worklet.js`, `TFMXSynth.ts`
-- [ ] Update `TFMXParser.ts` to emit `TFMXConfig` per instrument
-- [ ] Register in ToneEngine + InstrumentFactory
+- [x] `tfmx-wasm/src/tfmx_synth.cpp` — C++ wrapper over libtfmxaudiodecoder
+- [x] `public/tfmx/TFMX.wasm` — compiled
+- [x] `src/engine/tfmx/TFMXEngine.ts` + `TFMXSynth.ts`
+- [x] `TFMXParser.ts` emits `TFMXConfig`
+- [x] Registered in ToneEngine + InstrumentFactory
 
-### Phase 5 — Fred Editor Synthesis Engine
+### Phase 5 — Fred Editor Synthesis Engine ✅ COMPLETE
 
-- [ ] Study Fred format from `FredEditorParser.ts` + UADE eagleplayer source
-- [ ] `fred-wasm/src/fred_synth.c` — waveform + per-tick macro sequencer
-- [ ] Build Fred.wasm, create engine/worklet/synth
-- [ ] Update `FredEditorParser.ts` to emit `FredConfig`
-- [ ] Register in ToneEngine + InstrumentFactory
+- [x] `fred-wasm/src/fred_synth.c` — waveform + per-tick macro sequencer
+- [x] `public/fred/Fred.wasm` — compiled
+- [x] `src/engine/fred/FredEngine.ts` + `FredSynth.ts`
+- [x] `FredEditorParser.ts` emits `FredConfig`
+- [x] Registered in ToneEngine + InstrumentFactory
 
-### Phase 6 — PCM Format Name/Metadata Enhancement
+### Phase 6 — PCM Format Instrument Naming ❌ NOT STARTED
 
-- [ ] Add format-specific header parsers in `UADEParser.ts` for major PCM formats
-- [ ] Populate `instrumentNames` from format headers
-- [ ] `buildEnhancedSong()` uses names to label Sampler instruments
+- [ ] Add format-specific header parsers in `UADEParser.ts` for major PCM formats (Richard Joseph `.rj`/`.rjp`, Dave Lowe `.dl`, Mark Cooksey `.mc`, Delta Music `.dm`, SonicArranger `.sa`, etc.)
+- [ ] Extract `instrumentNames: string[]` per format
+- [ ] `buildEnhancedSong()` labels Sampler instruments with real names
 
-### Phase 7 — Instrument Editor UI
+### Phase 7 — Instrument Editor UI ✅ COMPLETE
 
-- [ ] `SoundMonHardware.tsx` — wavetable + ADSR controls
-- [ ] `SidMonHardware.tsx`, `DigMugHardware.tsx`, `FCHardware.tsx`, `FredHardware.tsx`, `TFMXHardware.tsx`
-- [ ] Register in instrument editor routing alongside `HivelySynth` UI
-- [ ] Live parameter updates: knob change → Synth.set(paramId, value) → WASM
+- [x] `src/components/instruments/controls/SoundMonControls.tsx`
+- [x] `src/components/instruments/controls/SidMonControls.tsx`
+- [x] `src/components/instruments/controls/DigMugControls.tsx`
+- [x] `src/components/instruments/controls/FCControls.tsx`
+- [x] `src/components/instruments/controls/FredControls.tsx`
+- [x] `src/components/instruments/controls/TFMXControls.tsx`
+- [x] All registered in `src/components/instruments/editors/UnifiedInstrumentEditor.tsx`
 
 ---
 
-## Critical Files
+## Remaining Work
+
+### High value
+- **Phase 6** — PCM format instrument naming (polish; low risk, mostly string parsing)
+
+### Low priority / future
+- **OctaMED real-time synthesis** — Add `OctaMEDConfig` type, 10-waveform oscillator + 32-step ADSR table; would require an `octamed-wasm/` build
+- **TFMX UI** — `TFMXControls.tsx` is currently read-only (VolModSeq/SndModSeq hex viewer); editable controls would require reverse-engineering the macro format further
+
+---
+
+## Critical Files Reference
 
 | File | Role |
 |------|------|
-| `src/types/instrument.ts` | All new config types + synthType values |
-| `src/engine/ToneEngine.ts` | Register new synth types in instrument factory |
-| `src/engine/InstrumentFactory.ts` | Instantiate new synths |
-| `src/lib/import/formats/SoundMonParser.ts` | Emit SoundMonConfig (not Sampler) |
-| `src/lib/import/formats/SidMon2Parser.ts` | Emit SidMonConfig |
-| `src/lib/import/formats/DigitalMugicianParser.ts` | Emit DigMugConfig |
-| `src/lib/import/formats/FCParser.ts` | Emit FCConfig |
-| `src/lib/import/formats/FredEditorParser.ts` | Emit FredConfig |
-| `src/lib/import/formats/TFMXParser.ts` | Emit TFMXConfig |
-| `src/engine/hively/HivelySynth.ts` | **REFERENCE** — copy pattern for all new synths |
-| `public/hively/Hively.worklet.js` | **REFERENCE** — copy ring buffer + player pattern |
-| `Reference Code/libtfmxaudiodecoder-main/` | TFMX C++ source for WASM compilation |
+| `src/types/instrument.ts` | All format config types + SynthType values |
+| `src/engine/ToneEngine.ts` | Synth type registration |
+| `src/engine/InstrumentFactory.ts` | Synth instantiation |
+| `src/engine/hively/HivelySynth.ts` | **Reference implementation** — pattern for all synths |
+| `public/hively/Hively.worklet.js` | **Reference worklet** — ring buffer + player pattern |
 | `soundmon-wasm/include/format_synth_api.h` | C API contract for all WASM wrappers |
-
----
-
-## Verification Checklist (after each phase)
-
-- [ ] `npx tsc --noEmit` — zero errors
-- [ ] Load a `.bp` (SoundMon) → instrument list shows SoundMon params → play note → synthesized sound
-- [ ] Load a `.hvl` (AHX) → still works (regression check)
-- [ ] Load a `.tfmx` → instruments show TFMX macro parameters → play note
-- [ ] Load a standard UADE exotic format (e.g. `.rj`) → PCM fallback works
-- [ ] Save a SoundMon import as `.dbx` → reload → synth instruments retain parameters
-- [ ] Edit a SoundMon instrument parameter → playback changes immediately
+| `Reference Code/libtfmxaudiodecoder-main/` | TFMX C++ source (already compiled to TFMX.wasm) |
