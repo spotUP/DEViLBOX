@@ -48,14 +48,10 @@ export interface FormatEnginePreferences {
   musicAssembler: FormatEngineChoice; // .ma → MusicAssemblerParser vs UADE
   digitalSoundStudio: FormatEngineChoice; // .dss → DigitalSoundStudioParser vs UADE
   digitalSymphony: FormatEngineChoice;    // .dsym → DigitalSymphonyParser vs UADE
-  graoumfTracker2: FormatEngineChoice;    // .gt2/.gtk → GraoumfTracker2Parser vs UADE
-  symphoniePro: FormatEngineChoice;       // .symmod → SymphonieProParser vs UADE
-  composer667: FormatEngineChoice;        // .667 → Composer667Parser vs UADE
-  chuckBiscuits: FormatEngineChoice;      // .cba → ChuckBiscuitsParser vs UADE
-  soundTracker: FormatEngineChoice;       // .stk → SoundTrackerParser vs UADE
-  speedySystem: FormatEngineChoice;       // .ss → SpeedySystemParser vs UADE
-  tronic: FormatEngineChoice;             // .trc/.dp/.tro → TronicParser vs UADE
-  digiBoosterPro: FormatEngineChoice;     // .dbm → DigiBoosterProParser vs UADE
+  imagoOrpheus: FormatEngineChoice;       // .imf → ImagoOrpheusParser vs OpenMPT
+  cdfm67: FormatEngineChoice;             // .c67 → CDFM67Parser vs OpenMPT
+  easyTrax: FormatEngineChoice;           // .etx → EasyTraxParser vs OpenMPT
+  karlMorton: FormatEngineChoice;         // .mus → KarlMortonParser vs OpenMPT
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -136,14 +132,10 @@ export const useSettingsStore = create<SettingsStore>()(
         musicAssembler: 'native',   // MusicAssemblerParser — dedicated Music Assembler support
         digitalSoundStudio: 'native', // DigitalSoundStudioParser — dedicated Digital Sound Studio support
         digitalSymphony: 'native',    // DigitalSymphonyParser — dedicated Digital Symphony support
-        graoumfTracker2: 'native',  // GraoumfTracker2Parser — dedicated Graoumf Tracker 1/2 support
-        symphoniePro: 'native',     // SymphonieProParser — dedicated Symphonie Pro support
-        composer667: 'native',      // Composer667Parser — dedicated Composer 667 support
-        chuckBiscuits: 'native',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support
-        soundTracker: 'uade',       // SoundTrackerParser — prefer UADE for authentic original STK playback
-        speedySystem: 'uade',       // SpeedySystemParser — prefer UADE (DOC RAM samples required)
-        tronic: 'uade',             // TronicParser — no native parser; always UADE
-        digiBoosterPro: 'native',   // DigiBoosterProParser — dedicated DigiBooster Pro (.dbm) support
+        imagoOrpheus: 'native',     // ImagoOrpheusParser — dedicated Imago Orpheus support
+        cdfm67: 'native',           // CDFM67Parser — dedicated CDFM Composer 670 support
+        easyTrax: 'native',         // EasyTraxParser — dedicated EasyTrax support
+        karlMorton: 'native',       // KarlMortonParser — dedicated Karl Morton Music Format support
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
