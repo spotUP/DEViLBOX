@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-26T12:54:44.330Z
+ * Generated: 2026-02-26T13:22:01.491Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1326';
-export const BUILD_NUMBER = '1326';
-export const BUILD_HASH = '4867bb50';
+export const BUILD_VERSION = '1.0.1335';
+export const BUILD_NUMBER = '1335';
+export const BUILD_HASH = '34519234';
 export const BUILD_DATE = '2026-02-26';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,45 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1326',
+    version: '1.0.1335',
     date: '2026-02-26',
     changes: [
+      {
+        type: 'fix',
+        "description": "Standalone instrument players now produce audio"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(assets): delete turntable_old.glb placeholder backup"
+      },
+      {
+        type: 'feature',
+        "description": "Chore(assets): add Technics SL-1200GR 3D model files and archive old turntable"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(docs): remove completed plan documents"
+      },
+      {
+        type: 'feature',
+        "description": "Replace turntable model with Technics SL-1200GR; calibrate hitboxes"
+      },
+      {
+        type: 'feature',
+        "description": "MED synth instrument waveform extraction + UADE Digital Mugician formats"
+      },
+      {
+        type: 'fix',
+        "description": "Guard AY address coverage, strengthen emulation test"
+      },
+      {
+        type: 'feature',
+        "description": "AY ZX Spectrum pattern extraction via Z80 CPU emulation"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 25 pre-existing TypeScript errors to restore clean build"
+      },
       {
         type: 'fix',
         "description": "Add missing Z80 individual register setters (B,C,D,E,H,L,AF,F)"
@@ -188,38 +224,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore(furnace-insed): bump WASM cache-bust version to 3"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused fields and dead header reads (TS6133)"
-      },
-      {
-        type: 'feature',
-        "description": "Add sample preview playback to FurnaceInsEd hardware UI"
-      },
-      {
-        type: 'feature',
-        "description": "Implement full multi-subsong support with in-editor switching"
-      },
-      {
-        type: 'fix',
-        "description": "SoundMon synth loop covers full ADSR expansion not base cycle"
-      },
-      {
-        type: 'feature',
-        "description": "Add sample playback — PLAY/STOP buttons + Web Audio API"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve all TypeScript TS6133/TS2345/TS18047 errors"
-      },
-      {
-        type: 'feature',
-        "description": "FurnaceInsEd WASM module + import dialogs + TFMX parser"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: changelog update, FT2 WASM patches, FT2Hardware volume/pan edit, cleanup"
       }
     ]
   }

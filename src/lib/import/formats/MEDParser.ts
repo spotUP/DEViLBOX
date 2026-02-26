@@ -23,6 +23,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { OctaMEDConfig } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 const TEXT_DECODER = new TextDecoder('iso-8859-1');
@@ -292,17 +293,65 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
       const synthLen  = u32(buf, synthBase);  // total struct size in bytes
 
       if (synthLen > 0 && synthBase + synthLen <= buf.length) {
-        const loopStart = u16(buf, synthBase + 0x06) * 2;
-        const loopLen   = u16(buf, synthBase + 0x08) * 2;
-        // First waveform at offset 0x114, 256 bytes signed int8 PCM
-        const waveOff  = synthBase + 0x114;
-        const waveData = waveOff + 256 <= buf.length
-          ? buf.slice(waveOff, waveOff + 256)
-          : new Uint8Array(256);
-        instruments.push(createSamplerInstrument(
-          i + 1, name, waveData, instr.volume, 8287,
-          loopStart, loopStart + loopLen,
-        ));
+        // SynthInstr layout (from proplayer.a analysis):
+        //   +0    u32  synthLen
+        //   +4    s16  type (-1=synth, -2=hybrid)
+        //   +6    u16  loopStart (words)
+        //   +8    u16  loopLen (words)
+        //   +10   8 bytes unknown
+        //   +18   u16  vibratoSpeed
+        //   +20   1 byte unknown
+        //   +21   128 bytes voltbl
+        //   +149  128 bytes wftbl (127 bytes + 1)
+        //   +276  10 × 256 signed bytes waveforms
+        const loopStartBytes = u16(buf, synthBase + 6) * 2;
+        const loopLenBytes   = u16(buf, synthBase + 8) * 2;
+        const vibratoSpeed   = u16(buf, synthBase + 18) & 0xFF;
+
+        // Vol table: 128 bytes at offset 21
+        const voltbl = buf.slice(synthBase + 21, synthBase + 21 + 128);
+
+        // Wf table: 128 bytes at offset 149
+        const wftbl  = buf.slice(synthBase + 149, synthBase + 149 + 128);
+
+        // Waveforms: up to 10 × 256 bytes at offset 276
+        const wfBaseOff = synthBase + 276;
+        const waveforms: Int8Array[] = [];
+        for (let w = 0; w < 10; w++) {
+          const off = wfBaseOff + w * 256;
+          if (off + 256 > buf.length) break;
+          const slice = buf.slice(off, off + 256);
+          // Skip all-zero trailing waveforms (but always include first)
+          if (w > 0 && slice.every(b => b === 0)) break;
+          waveforms.push(new Int8Array(slice.buffer, slice.byteOffset, slice.byteLength));
+        }
+        if (waveforms.length === 0) {
+          waveforms.push(new Int8Array(256)); // silent fallback
+        }
+
+        const octamedConfig: OctaMEDConfig = {
+          volume: instr.volume & 0x3F,
+          voltblSpeed: 0,
+          wfSpeed: 0,
+          vibratoSpeed,
+          loopStart: loopStartBytes,
+          loopLen: loopLenBytes,
+          voltbl,
+          wftbl,
+          waveforms,
+        };
+
+        instruments.push({
+          id: i + 1,
+          name,
+          type: 'synth' as const,
+          synthType: 'OctaMEDSynth' as const,
+          octamed: octamedConfig,
+          effects: [],
+          volume: 0,
+          pan: 0,
+        } as InstrumentConfig);
+
         samplePos += synthLen;
         if (samplePos & 1) samplePos++;  // word-align
       } else {
