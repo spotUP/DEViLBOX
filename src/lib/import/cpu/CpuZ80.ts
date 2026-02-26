@@ -73,6 +73,14 @@ export class CpuZ80 {
   getIY(): number { return this.IY; }
 
   setA(v: number):   void { this.A = v & 0xFF; }
+  setF(v: number):   void { this.F = v & 0xFF; }
+  setB(v: number):   void { this.B = v & 0xFF; }
+  setC(v: number):   void { this.C = v & 0xFF; }
+  setD(v: number):   void { this.D = v & 0xFF; }
+  setE(v: number):   void { this.E = v & 0xFF; }
+  setH(v: number):   void { this.H = v & 0xFF; }
+  setL(v: number):   void { this.L = v & 0xFF; }
+  setAF(v: number):  void { this.A = (v >> 8) & 0xFF; this.F = v & 0xFF; }
   setBC(v: number):  void { this.B = (v >> 8) & 0xFF; this.C = v & 0xFF; }
   setDE(v: number):  void { this.D = (v >> 8) & 0xFF; this.E = v & 0xFF; }
   setHL(v: number):  void { this.H = (v >> 8) & 0xFF; this.L = v & 0xFF; }
