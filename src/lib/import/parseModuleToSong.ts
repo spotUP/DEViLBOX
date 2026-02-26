@@ -1703,6 +1703,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _tmkBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_tmkBase.startsWith('tmk.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.timeTracker === 'native') {
+        try {
+          const { isTimeTrackerFormat, parseTimeTrackerFile } = await import('@lib/import/formats/TimeTrackerParser');
+          if (isTimeTrackerFormat(buffer)) return parseTimeTrackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[TimeTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_tmk } = await import('@lib/import/formats/UADEParser');
       return parseUADE_tmk(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1714,6 +1722,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _krisBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_krisBase.startsWith('kris.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.kris === 'native') {
+        try {
+          const { isKRISFormat, parseKRISFile } = await import('@lib/import/formats/KRISParser');
+          if (isKRISFormat(buffer)) return await parseKRISFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[KRISParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_kris } = await import('@lib/import/formats/UADEParser');
       return parseUADE_kris(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1725,6 +1741,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _cinBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_cinBase.startsWith('cin.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.cinemaware === 'native') {
+        try {
+          const { isCinemawareFormat, parseCinemawareFile } = await import('@lib/import/formats/CinemawareParser');
+          if (isCinemawareFormat(buffer)) return parseCinemawareFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[CinemawareParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_cin } = await import('@lib/import/formats/UADEParser');
       return parseUADE_cin(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1736,6 +1760,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _ntpBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_ntpBase.startsWith('ntp.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.novoTradePacker === 'native') {
+        try {
+          const { isNovoTradePackerFormat, parseNovoTradePackerFile } = await import('@lib/import/formats/NovoTradePackerParser');
+          if (isNovoTradePackerFormat(buffer)) return parseNovoTradePackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[NovoTradePackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_ntp } = await import('@lib/import/formats/UADEParser');
       return parseUADE_ntp(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1747,6 +1779,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _alpBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_alpBase.startsWith('alp.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.alcatrazPacker === 'native') {
+        try {
+          const { isAlcatrazPackerFormat, parseAlcatrazPackerFile } = await import('@lib/import/formats/AlcatrazPackerParser');
+          if (isAlcatrazPackerFormat(buffer)) return parseAlcatrazPackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[AlcatrazPackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_alp } = await import('@lib/import/formats/UADEParser');
       return parseUADE_alp(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1758,6 +1798,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _udsBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_udsBase.startsWith('uds.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.bladePacker === 'native') {
+        try {
+          const { isBladePackerFormat, parseBladePackerFile } = await import('@lib/import/formats/BladePackerParser');
+          if (isBladePackerFormat(buffer)) return parseBladePackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[BladePackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_uds } = await import('@lib/import/formats/UADEParser');
       return parseUADE_uds(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1769,6 +1817,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _sgBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_sgBase.startsWith('sg.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.tomyTracker === 'native') {
+        try {
+          const { isTomyTrackerFormat, parseTomyTrackerFile } = await import('@lib/import/formats/TomyTrackerParser');
+          if (isTomyTrackerFormat(buffer)) return parseTomyTrackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[TomyTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_sg } = await import('@lib/import/formats/UADEParser');
       return parseUADE_sg(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1781,6 +1837,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _imspBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_imspBase.startsWith('ims.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.imagesMusicSystem === 'native') {
+        try {
+          const { isImagesMusicSystemFormat, parseImagesMusicSystemFile } = await import('@lib/import/formats/ImagesMusicSystemParser');
+          if (isImagesMusicSystemFormat(buffer)) return parseImagesMusicSystemFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[ImagesMusicSystemParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_imsp } = await import('@lib/import/formats/UADEParser');
       return parseUADE_imsp(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1791,6 +1855,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _exBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_exBase.startsWith('ex.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.fashionTracker === 'native') {
+        try {
+          const { isFashionTrackerFormat, parseFashionTrackerFile } = await import('@lib/import/formats/FashionTrackerParser');
+          if (isFashionTrackerFormat(buffer)) return parseFashionTrackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[FashionTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_ex } = await import('@lib/import/formats/UADEParser');
       return parseUADE_ex(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1801,6 +1873,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _mmsBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_mmsBase.startsWith('mms.') || _mmsBase.startsWith('sfx20.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.multiMediaSound === 'native') {
+        try {
+          const { isMultiMediaSoundFormat, parseMultiMediaSoundFile } = await import('@lib/import/formats/MultiMediaSoundParser');
+          if (isMultiMediaSoundFormat(buffer)) return parseMultiMediaSoundFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[MultiMediaSoundParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_mms } = await import('@lib/import/formats/UADEParser');
       return parseUADE_mms(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1812,6 +1892,15 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _scrBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_scrBase.startsWith('scr.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.seanConran === 'native') {
+        try {
+          const { isSeanConranFormat, parseSeanConranFile } = await import('@lib/import/formats/SeanConranParser');
+          const _scrBuf = new Uint8Array(buffer);
+          if (isSeanConranFormat(_scrBuf)) return await parseSeanConranFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[SeanConranParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_scr } = await import('@lib/import/formats/UADEParser');
       return parseUADE_scr(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1823,6 +1912,15 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _thmBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_thmBase.startsWith('thm.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.thomasHermann === 'native') {
+        try {
+          const { isThomasHermannFormat, parseThomasHermannFile } = await import('@lib/import/formats/ThomasHermannParser');
+          const _thmBuf = new Uint8Array(buffer);
+          if (isThomasHermannFormat(_thmBuf)) return await parseThomasHermannFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[ThomasHermannParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_thm } = await import('@lib/import/formats/UADEParser');
       return parseUADE_thm(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1834,6 +1932,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _titsBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_titsBase.startsWith('tits.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.titanicsPacker === 'native') {
+        try {
+          const { isTitanicsPackerFormat, parseTitanicsPackerFile } = await import('@lib/import/formats/TitanicsPackerParser');
+          if (isTitanicsPackerFormat(buffer)) return parseTitanicsPackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[TitanicsPackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_tits } = await import('@lib/import/formats/UADEParser');
       return parseUADE_tits(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1845,6 +1951,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _khBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_khBase.startsWith('kh.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.krisHatlelid === 'native') {
+        try {
+          const { isKrisHatlelidFormat, parseKrisHatlelidFile } = await import('@lib/import/formats/KrisHatlelidParser');
+          if (isKrisHatlelidFormat(buffer)) return parseKrisHatlelidFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[KrisHatlelidParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_kh } = await import('@lib/import/formats/UADEParser');
       return parseUADE_kh(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1856,6 +1970,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _twoBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_twoBase.startsWith('two.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.ntsp === 'native') {
+        try {
+          const { isNTSPFormat, parseNTSPFile } = await import('@lib/import/formats/NTSPParser');
+          if (isNTSPFormat(buffer)) return parseNTSPFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[NTSPParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_two } = await import('@lib/import/formats/UADEParser');
       return parseUADE_two(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
