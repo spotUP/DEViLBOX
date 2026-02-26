@@ -18,7 +18,7 @@ status: mostly-complete
 | 3 | Future Composer (FC13/FC14) | ✅ Complete |
 | 4 | TFMX — Jochen Hippel | ✅ Complete |
 | 5 | Fred Editor | ✅ Complete |
-| 6 | PCM format instrument naming | ❌ Not started |
+| 6 | PCM format instrument naming | ⚠️ Partial — SA, SFX, JamCracker, TCB, EMOD, ABK done; binaries not parseable |
 | 7 | Instrument editor UI | ✅ Complete |
 
 ---
@@ -158,6 +158,11 @@ Format DSP Source → thin WASM wrapper → TypeScript engine → TypeScript syn
 
 **Implemented (2026-02-26):**
 - **Sonic Arranger** (`.sa`, `.sa-p`, `.sa_old`, `.sonic`, `.lion`) — `SOAR` chunk-format files: walk `STBL→OVTB→NTBL→INST` chunks, extract 30-char names from `INST` structs at stride 152, offset +122. Old-format SA files (Amiga binary, magic `0x4EFA`) fall through to generic scanner.
+- **SoundFX** (`.sfx`, `.sfx13`) — `SONG` magic at +60 (SFX 1.3, 15 instruments) or +124 (SFX 2.0, 31 instruments); 22-byte names, 30-byte stride.
+- **JamCracker** (`.jam`, `.jc`) — `BeEp` magic; 31-byte names in sample header entries at stride 40, offset +6.
+- **TCB Tracker** (`.tcb`) — `AN COO` prefix magic; 16 × 8-byte names at fixed offset +0x92.
+- **Quadra Composer** (`.emod`, `.qc`) — IFF `FORM/EMOD/EMIC` format; 20-byte names in EMIC sample entries at stride 34, offset +4 within entry.
+- **AMOS Music Bank** (`.abk`) — `AmBk` magic; 16-byte names in instrument entries at offset +0x10 within each 32-byte entry; instrument section located via main header pointer.
 - **Delta Music 2** (`.dm2`) — `DM2!` magic case retained but NOTE: real-world `.dm2` files are compiled Amiga binaries without this magic; this case is effectively dead code.
 
 **Not parseable (compiled Amiga binaries — no static name table):**

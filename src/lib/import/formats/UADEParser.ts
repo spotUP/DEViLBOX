@@ -565,6 +565,137 @@ function tryExtractInstrumentNames(buffer: ArrayBuffer, ext: string): string[] |
     }
   }
 
+  /* ── JamCracker (.jam, .jc) ──────────────────────────────────────────── */
+  // Format spec: Reference Code/libxmp-master/docs/formats/JamCracker.txt
+  // Header: "BeEp" magic + 2-byte sample count + N×40-byte sample entries.
+  // Each entry: 31-byte name (null-terminated ASCII) + 1-byte flags + 4-byte size + 4-byte addr.
+  if (ext === 'jam' || ext === 'jc') {
+    const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+    if (magic === 'BeEp' && bytes.length >= 6) {
+      const sampleCount = view.getUint16(4, false);
+      const ENTRY_STRIDE = 40;
+      const ENTRY_START  = 6;   // first entry follows magic(4) + count(2)
+      const NAME_LEN     = 31;
+      const names: string[] = [];
+      for (let i = 0; i < sampleCount; i++) {
+        const base = ENTRY_START + i * ENTRY_STRIDE;
+        if (base + NAME_LEN > bytes.length) break;
+        let name = '';
+        for (let j = 0; j < NAME_LEN; j++) {
+          const c = bytes[base + j];
+          if (c === 0) break;
+          if (c < 0x20 || c > 0x7e) { name = ''; break; }
+          name += String.fromCharCode(c);
+        }
+        const trimmed = name.trim();
+        if (trimmed) names.push(trimmed);
+      }
+      if (names.length > 0) return names;
+    }
+  }
+
+  /* ── TCB Tracker (.tcb) ───────────────────────────────────────────────── */
+  // Format spec: Reference Code/libxmp-master/docs/formats/tcb-tracker.txt
+  // Magic: "AN COOL." or "AN COOL!" at offset 0.
+  // Instrument names: 16 × 8 bytes starting at offset 0x92, space-padded (no null terminator).
+  if (ext === 'tcb') {
+    if (bytes.length >= 0x92 + 16 * 8) {
+      const magic6 = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]);
+      if (magic6 === 'AN COO') {
+        const names: string[] = [];
+        for (let i = 0; i < 16; i++) {
+          const base = 0x92 + i * 8;
+          let name = '';
+          for (let j = 0; j < 8; j++) {
+            const c = bytes[base + j];
+            if (c === 0) break;
+            if (c < 0x20 || c > 0x7e) { name = ''; break; }
+            name += String.fromCharCode(c);
+          }
+          const trimmed = name.trim();
+          if (trimmed) names.push(trimmed);
+        }
+        if (names.length > 0) return names;
+      }
+    }
+  }
+
+  /* ── Quadra Composer / EMOD (.emod, .qc) ─────────────────────────────── */
+  // Format spec: Reference Code/libxmp-master/docs/formats/QuadraComposer.txt
+  // IFF FORM-EMOD file. The EMIC chunk starts at offset 0x0C.
+  // EMIC structure (offsets from start of EMIC data, after the 4-byte size field):
+  //   +0    2 bytes  version
+  //   +2   20 bytes  song name
+  //   +22  20 bytes  composer
+  //   +42   1 byte   tempo
+  //   +43   1 byte   sample count (N)
+  //   [N × 34-byte sample entries, starting at +44]
+  //     +0   1 byte   sample number
+  //     +1   1 byte   volume
+  //     +2   2 bytes  sample length (words)
+  //     +4  20 bytes  sample name  ← NAME HERE
+  //     +24  1 byte   control (loop flag)
+  //     +25  1 byte   finetune
+  //     +26  2 bytes  repeat start (words)
+  //     +28  2 bytes  repeat length (words)
+  //     +30  4 bytes  sample offset (from file start)
+  if (ext === 'emod' || ext === 'qc') {
+    const FORM = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+    if (FORM === 'FORM' && bytes.length >= 0x30) {
+      const TYPE = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
+      const CHK  = String.fromCharCode(bytes[12], bytes[13], bytes[14], bytes[15]);
+      if (TYPE === 'EMOD' && CHK === 'EMIC') {
+        // EMIC chunk data starts at offset 20 (12 bytes FORM+size+type + 4 bytes EMIC tag + 4 bytes chunk size)
+        const EMIC_DATA = 20;
+        const sampleCount = bytes[EMIC_DATA + 43];
+        const ENTRY_START = EMIC_DATA + 44;
+        const ENTRY_SIZE  = 34;
+        const NAME_OFF    = 4;
+        const NAME_LEN    = 20;
+        const names: string[] = [];
+        for (let i = 0; i < sampleCount; i++) {
+          const base = ENTRY_START + i * ENTRY_SIZE + NAME_OFF;
+          if (base + NAME_LEN > bytes.length) break;
+          const name = readFixedAscii(bytes, base, NAME_LEN);
+          if (name) names.push(name);
+        }
+        if (names.length > 0) return names;
+      }
+    }
+  }
+
+  /* ── AMOS Music Bank (.abk) ───────────────────────────────────────────── */
+  // Format spec: Reference Code/libxmp-master/docs/formats/AMOS_Music_Bank_format.txt
+  // "AmBk" magic at offset 0. Main header starts at offset 0x14.
+  // Main header[0..3] = offset to instruments section (from main header start).
+  // Instruments section: 2-byte count + N × 32-byte entries.
+  // Each entry: sample_off(4)+repeat_off(4)+loop_off(2)+loop_len(2)+volume(2)+len(2)+name(16)
+  if (ext === 'abk') {
+    const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+    if (magic === 'AmBk' && bytes.length >= 0x20) {
+      const MAIN_HDR    = 0x14;
+      const instrRelOff = view.getUint32(MAIN_HDR + 0, false);
+      const instrAbsOff = MAIN_HDR + instrRelOff;
+      if (instrAbsOff + 2 > bytes.length) {
+        // fall through to generic scanner
+      } else {
+        const instrCount = view.getUint16(instrAbsOff, false);
+        const INSTR_DATA = instrAbsOff + 2;
+        const STRIDE     = 32;
+        const NAME_OFF   = 0x10;  // offset +16 within each 32-byte entry
+        const NAME_LEN   = 16;
+        const names: string[] = [];
+        for (let i = 0; i < instrCount; i++) {
+          const base = INSTR_DATA + i * STRIDE + NAME_OFF;
+          if (base + NAME_LEN > bytes.length) break;
+          const name = readFixedAscii(bytes, base, NAME_LEN);
+          if (name) names.push(name);
+        }
+        if (names.length > 0) return names;
+      }
+    }
+  }
+
   /* ── Generic: scan for MOD-style 22-byte ASCII name blocks ───────────── */
   // Many Amiga trackers use the same 22-byte fixed-length string convention
   // for instrument names (ProTracker, NoiseTracker, etc. and derivatives).
