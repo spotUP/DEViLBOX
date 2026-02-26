@@ -34,7 +34,6 @@ export interface FormatEnginePreferences {
   mugician: FormatEngineChoice;  // .dmu/.mug → DigitalMugicianParser vs UADE
   tfmx: FormatEngineChoice;    // .tfmx/.mdat/.tfx → TFMXParser vs UADE
   hippelCoso: FormatEngineChoice; // .hipc/.soc/.coso → HippelCoSoParser vs UADE
-  robHubbard: FormatEngineChoice; // .rh/.rhp → RobHubbardParser vs UADE
   sidmon1: FormatEngineChoice;    // .sid1/.smn (magic) → SidMon1Parser vs UADE
   davidWhittaker: FormatEngineChoice; // .dw/.dwold → DavidWhittakerParser vs UADE
   deltaMusic2: FormatEngineChoice;    // .dm2 → DeltaMusic2Parser vs UADE
@@ -73,12 +72,6 @@ export interface FormatEnginePreferences {
   deltaMusic1: FormatEngineChoice;    // .dm/.dm1 → DeltaMusic1Parser vs UADE
   pt36: FormatEngineChoice;           // FORM+MODL → PT36Parser vs libopenmpt
   // Newly wired parsers (2026-02-26 batch)
-  ufoFormat: FormatEngineChoice;               // mus.*/ufo.* → UFOParser vs UADE
-  daveLowe: FormatEngineChoice;                // dl.* → DaveLoweParser vs UADE
-  tcbTracker: FormatEngineChoice;              // tcb.* → TCBTrackerParser vs UADE
-  tfmxST: FormatEngineChoice;                  // mdst.* → TFMXSTParser vs UADE
-  quartet: FormatEngineChoice;                 // qpa.*/sqt.*/qts.* → QuartetParser vs UADE
-  soundMaster: FormatEngineChoice;             // sm.*/sm1.*/sm2.*/sm3.*/smpro.* → SoundMasterParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -145,7 +138,6 @@ export const useSettingsStore = create<SettingsStore>()(
         mugician: 'native', // DigitalMugicianParser — dedicated Digital Mugician support
         tfmx: 'native',         // TFMXParser — dedicated Jochen Hippel TFMX support
         hippelCoso: 'native',   // HippelCoSoParser — dedicated Jochen Hippel CoSo support
-        robHubbard: 'native',   // RobHubbardParser — dedicated Rob Hubbard support
         sidmon1: 'native',      // SidMon1Parser — dedicated SidMon 1.0 support
         davidWhittaker: 'native', // DavidWhittakerParser — dedicated David Whittaker support
         deltaMusic2: 'native',  // DeltaMusic2Parser — dedicated Delta Music 2.0 support
@@ -182,12 +174,6 @@ export const useSettingsStore = create<SettingsStore>()(
         ronKlaren: 'native',        // RonKlarenParser — native parser available
         deltaMusic1: 'native',  // DeltaMusic1Parser — native parser available
         pt36: 'native',         // PT36Parser — native parser available
-        ufoFormat: 'native',                 // UFOParser — native parser available
-        daveLowe: 'native',                  // DaveLoweParser — native parser available
-        tcbTracker: 'native',                // TCBTrackerParser — native parser available
-        tfmxST: 'native',                    // TFMXSTParser — native parser available
-        quartet: 'native',                   // QuartetParser — native parser available
-        soundMaster: 'native',               // SoundMasterParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
