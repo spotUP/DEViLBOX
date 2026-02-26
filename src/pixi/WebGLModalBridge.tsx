@@ -122,6 +122,18 @@ const LazyDownloadModal = lazy(() =>
 const LazyImportModuleDialog = lazy(() =>
   import('@/components/dialogs/ImportModuleDialog').then(m => ({ default: m.ImportModuleDialog }))
 );
+const LazyImportFurnaceDialog = lazy(() =>
+  import('@/components/dialogs/ImportFurnaceDialog').then(m => ({ default: m.ImportFurnaceDialog }))
+);
+const LazyImportMIDIDialog = lazy(() =>
+  import('@/components/dialogs/ImportMIDIDialog').then(m => ({ default: m.ImportMIDIDialog }))
+);
+const LazyImportAudioDialog = lazy(() =>
+  import('@/components/dialogs/ImportAudioDialog').then(m => ({ default: m.ImportAudioDialog }))
+);
+const LazyImportTD3Dialog = lazy(() =>
+  import('@/components/dialogs/ImportTD3Dialog').then(m => ({ default: m.ImportTD3Dialog }))
+);
 
 export const WebGLModalBridge: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -139,6 +151,10 @@ export const WebGLModalBridge: React.FC = () => {
   const closePatternDialog = useMIDIStore(s => s.closePatternDialog);
   const pendingModuleFile = useUIStore(s => s.pendingModuleFile);
   const setPendingModuleFile = useUIStore(s => s.setPendingModuleFile);
+  const pendingAudioFile = useUIStore(s => s.pendingAudioFile);
+  const setPendingAudioFile = useUIStore(s => s.setPendingAudioFile);
+  const pendingTD3File = useUIStore(s => s.pendingTD3File);
+  const setPendingTD3File = useUIStore(s => s.setPendingTD3File);
 
   // Portal container on document.body — ensures modals render above
   // PixiDOMOverlay divs (z-index 10) which are also direct body children.
@@ -255,13 +271,31 @@ export const WebGLModalBridge: React.FC = () => {
     }
   }, [setShowFileBrowser]);
 
+  // Handler for ImportTD3Dialog in GL mode
+  const handleTD3ImportGL = useCallback(async (file: File, replacePatterns: boolean) => {
+    setPendingTD3File(null);
+    try {
+      const { loadFile } = await import('@lib/file/UnifiedFileLoader');
+      const result = await loadFile(file, { requireConfirmation: false, replacePatterns });
+      if (result.success === true) notify.success(result.message);
+      else if (result.success === false) notify.error(result.error);
+    } catch (err) {
+      notify.error('Failed to import TD-3 file');
+      console.error('[WebGLModalBridge] TD-3 import failed:', err);
+    }
+  }, [setPendingTD3File]);
+
   // Handler for ImportModuleDialog in GL mode — called when user confirms import.
   // Uses UnifiedFileLoader to keep behaviour identical to the DOM mode confirm path.
-  const handleModuleImportGL = useCallback(async (info: ModuleInfo, _options: ImportOptions) => {
+  const handleModuleImportGL = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
     setPendingModuleFile(null);
     try {
       const { loadFile } = await import('@lib/file/UnifiedFileLoader');
-      const result = await loadFile(info.file, {});
+      const result = await loadFile(info.file, {
+        subsong: options.subsong,
+        uadeMetadata: options.uadeMetadata,
+        midiOptions: options.midiOptions,
+      });
       if (result.success === true) {
         notify.success(result.message);
       } else if (result.success === false) {
@@ -526,14 +560,46 @@ export const WebGLModalBridge: React.FC = () => {
       {modalOpen === 'download' && (
         <LazyDownloadModal isOpen={true} onClose={closeModal} />
       )}
-      {/* Module file drop — ImportModuleDialog routed through portal so it renders
-          above PixiDOMOverlay elements (modals inside React root sit below them) */}
+      {/* Module file drop — dialog routed through portal to sit above PixiDOMOverlay */}
       {pendingModuleFile && (
-        <LazyImportModuleDialog
+        /\.(fur|dmf)$/i.test(pendingModuleFile.name) ? (
+          <LazyImportFurnaceDialog
+            isOpen={true}
+            onClose={() => setPendingModuleFile(null)}
+            onImport={handleModuleImportGL}
+            initialFile={pendingModuleFile}
+          />
+        ) : /\.(mid|midi)$/i.test(pendingModuleFile.name) ? (
+          <LazyImportMIDIDialog
+            isOpen={true}
+            onClose={() => setPendingModuleFile(null)}
+            onImport={handleModuleImportGL}
+            initialFile={pendingModuleFile}
+          />
+        ) : (
+          <LazyImportModuleDialog
+            isOpen={true}
+            onClose={() => setPendingModuleFile(null)}
+            onImport={handleModuleImportGL}
+            initialFile={pendingModuleFile}
+          />
+        )
+      )}
+      {/* Audio sample import dialog */}
+      {pendingAudioFile && (
+        <LazyImportAudioDialog
           isOpen={true}
-          onClose={() => setPendingModuleFile(null)}
-          onImport={handleModuleImportGL}
-          initialFile={pendingModuleFile}
+          onClose={() => setPendingAudioFile(null)}
+          initialFile={pendingAudioFile}
+        />
+      )}
+      {/* TD-3 / TB-303 pattern import dialog */}
+      {pendingTD3File && (
+        <LazyImportTD3Dialog
+          isOpen={true}
+          onClose={() => setPendingTD3File(null)}
+          initialFile={pendingTD3File}
+          onImport={handleTD3ImportGL}
         />
       )}
       {/* Always-mounted dialogs */}

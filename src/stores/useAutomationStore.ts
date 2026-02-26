@@ -326,13 +326,16 @@ export const useAutomationStore = create<AutomationStore>()(
     },
 
     // Reset to initial state (for new project/tab)
+    // NOTE: Use direct set({}) rather than Immer producer to avoid Immer proxying
+    // the new Map. An Immer-proxied Map passed to PixiJS React causes a BindingError
+    // ("Expected null or instance of Node, got an instance of Node").
     reset: () =>
-      set((state) => {
-        state.curves = [];
-        state.selectedCurveId = null;
-        state.editMode = 'pencil';
-        state.automation = {};
-        state.channelLanes = new Map();
+      set({
+        curves: [],
+        selectedCurveId: null,
+        editMode: 'pencil' as const,
+        automation: {},
+        channelLanes: new Map<number, ChannelLaneState>(),
       }),
   }))
 );

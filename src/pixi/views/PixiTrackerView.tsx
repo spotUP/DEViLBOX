@@ -373,12 +373,15 @@ const AutoSizeFurnaceView: React.FC = () => {
     if (!el) return;
     const obs = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+        const w = entry.contentRect.width;
+        const h = entry.contentRect.height;
+        if (w > 0 && h > 0) setSize({ width: w, height: h });
       }
     });
     obs.observe(el);
-    // Set initial size
-    setSize({ width: el.clientWidth, height: el.clientHeight });
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    if (w > 0 && h > 0) setSize({ width: w, height: h });
     return () => obs.disconnect();
   }, []);
 
@@ -398,11 +401,18 @@ const AutoSizeHivelyView: React.FC = () => {
     if (!el) return;
     const obs = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+        const w = entry.contentRect.width;
+        const h = entry.contentRect.height;
+        // Only update when we have real dimensions — the PixiDOMOverlay portal
+        // starts with display:none, so clientWidth/Height are 0 until the Yoga
+        // layout is computed. Updating to (0,0) would make the view black.
+        if (w > 0 && h > 0) setSize({ width: w, height: h });
       }
     });
     obs.observe(el);
-    setSize({ width: el.clientWidth, height: el.clientHeight });
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    if (w > 0 && h > 0) setSize({ width: w, height: h });
     return () => obs.disconnect();
   }, []);
 

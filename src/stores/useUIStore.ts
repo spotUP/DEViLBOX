@@ -82,6 +82,8 @@ interface UIStore {
   statusMessage: string;
   prevStatusMessage: string;
   pendingModuleFile: File | null; // Module file pending import (set by drag-drop, consumed by TrackerView)
+  pendingAudioFile: File | null;  // Audio sample file pending import (adds sampler instrument)
+  pendingTD3File: File | null;    // TD-3 pattern file pending import (.sqs/.seq)
 
   // Actions
   togglePanel: (panel: PanelType) => void;
@@ -136,6 +138,8 @@ interface UIStore {
 
   // Module import actions
   setPendingModuleFile: (file: File | null) => void;
+  setPendingAudioFile: (file: File | null) => void;
+  setPendingTD3File: (file: File | null) => void;
 
   // Dialog command (keyboard → dialog bridge)
   dialogOpen: DialogCommand | null;
@@ -202,6 +206,8 @@ export const useUIStore = create<UIStore>()(
       statusMessage: 'All Right',
       prevStatusMessage: 'All Right',
       pendingModuleFile: null,
+      pendingAudioFile: null,
+      pendingTD3File: null,
 
       // Dialog bridge (keyboard → dialog)
       dialogOpen: null,
@@ -462,6 +468,14 @@ export const useUIStore = create<UIStore>()(
       setPendingModuleFile: (file) =>
         set((state) => {
           state.pendingModuleFile = file;
+        }),
+      setPendingAudioFile: (file) =>
+        set((state) => {
+          state.pendingAudioFile = file;
+        }),
+      setPendingTD3File: (file) =>
+        set((state) => {
+          state.pendingTD3File = file;
         }),
 
       // Dialog bridge actions

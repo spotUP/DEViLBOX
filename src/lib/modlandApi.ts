@@ -82,6 +82,36 @@ export async function downloadModlandFile(fullPath: string): Promise<ArrayBuffer
   return response.arrayBuffer();
 }
 
+/**
+ * TFMX companion file support.
+ *
+ * TFMX-Pro songs use two files in the same directory:
+ *   mdat.<name>  – module/pattern data (the primary file)
+ *   smpl.<name>  – sample data (required companion)
+ *
+ * Returns null if the file is not a TFMX mdat, or if the companion download fails.
+ */
+export async function downloadTFMXCompanion(
+  mdatPath: string,
+): Promise<{ filename: string; buffer: ArrayBuffer } | null> {
+  const lastSlash = mdatPath.lastIndexOf('/');
+  const dir = lastSlash >= 0 ? mdatPath.slice(0, lastSlash + 1) : '';
+  const basename = lastSlash >= 0 ? mdatPath.slice(lastSlash + 1) : mdatPath;
+
+  if (!basename.toLowerCase().startsWith('mdat.')) return null;
+
+  const smplBasename = 'smpl.' + basename.slice(5);
+  const smplPath = dir + smplBasename;
+
+  try {
+    const buffer = await downloadModlandFile(smplPath);
+    return { filename: smplBasename, buffer };
+  } catch {
+    // Companion not found or download error — proceed without it
+    return null;
+  }
+}
+
 export async function getModlandStatus(): Promise<ModlandStatus> {
   const response = await fetch(`${API_URL}/modland/status`);
   if (!response.ok) {
