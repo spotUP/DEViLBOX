@@ -3057,6 +3057,76 @@ function buildFurnaceNativeData(module: FurnaceModule): FurnaceNativeData {
 }
 
 /**
+ * Lightweight pattern extraction for a single subsong.
+ * Used to pre-convert all subsongs at import time without re-running instrument conversion.
+ */
+export function extractSubsongPatterns(module: FurnaceModule, subsongIndex: number): ConvertedPatternCell[][][] {
+  const subsong = module.subsongs[subsongIndex];
+  if (!subsong) return [];
+
+  const primaryChipId = module.systems[0] || 0;
+  const isChipSynth = CHIP_SYNTH_IDS.has(primaryChipId);
+  const patterns: ConvertedPatternCell[][][] = [];
+
+  for (let orderPos = 0; orderPos < subsong.ordersLen; orderPos++) {
+    const patternRows: ConvertedPatternCell[][] = [];
+    for (let row = 0; row < subsong.patLen; row++) {
+      const rowCells: ConvertedPatternCell[] = [];
+      for (let ch = 0; ch < module.chans; ch++) {
+        const patIdx = subsong.orders[ch]?.[orderPos] ?? 0;
+        const key = `${subsongIndex}_${ch}_${patIdx}`;
+        const pattern = module.patterns.get(key);
+        if (pattern && pattern.rows[row]) {
+          rowCells.push(convertFurnaceCell(pattern.rows[row], isChipSynth, module.grooves));
+        } else {
+          rowCells.push({ note: 0, instrument: 0, volume: 0, effectType: 0, effectParam: 0, effectType2: 0, effectParam2: 0 } as ConvertedPatternCell);
+        }
+      }
+      patternRows.push(rowCells);
+    }
+    patterns.push(patternRows);
+  }
+
+  return patterns;
+}
+
+/**
+ * Get timing and metadata for a specific subsong.
+ * Used alongside extractSubsongPatterns when pre-converting all subsongs at import time.
+ */
+export function getSubsongTiming(module: FurnaceModule, subsongIndex: number): {
+  name: string;
+  initialSpeed: number;
+  initialBPM: number;
+  speed2: number;
+  hz: number;
+  virtualTempoN: number;
+  virtualTempoD: number;
+  grooves?: number[][];
+  ordersLen: number;
+} {
+  const subsong = module.subsongs[subsongIndex] || module.subsongs[0];
+  const virtualTempo = subsong?.virtualTempo || 150;
+  const virtualTempoD = subsong?.virtualTempoD || 150;
+  const hz = subsong?.hz || 60;
+  const speed = subsong?.speed1 || 6;
+  const bpm = Math.round(2.5 * hz * (virtualTempo / virtualTempoD));
+  return {
+    name: subsong?.name || `Subsong ${subsongIndex}`,
+    initialSpeed: speed,
+    initialBPM: bpm,
+    speed2: subsong?.speed2 || 0,
+    hz,
+    virtualTempoN: virtualTempo,
+    virtualTempoD,
+    grooves: module.grooves.length > 0
+      ? module.grooves.map(g => g.val.slice(0, g.len))
+      : undefined,
+    ordersLen: subsong?.ordersLen || 1,
+  };
+}
+
+/**
  * Convert a FurnacePatternCell's note+octave to a flat note value for native data.
  * Returns: -1=empty, 0-179=notes, 253=off, 254=release, 255=macro-release
  */

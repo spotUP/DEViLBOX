@@ -14,6 +14,7 @@ import type {
   EditorMode,
   FurnaceNativeData,
   HivelyNativeData,
+  FurnaceSubsongPlayback,
 } from '@typedefs';
 import { DEFAULT_COLUMN_VISIBILITY, EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
 import { xmNoteToMidi, midiToXMNote } from '@/lib/xmConversions';
@@ -120,6 +121,8 @@ interface TrackerStore {
   editorMode: EditorMode;
   furnaceNative: FurnaceNativeData | null;
   hivelyNative: HivelyNativeData | null;
+  furnaceSubsongs: FurnaceSubsongPlayback[] | null;
+  furnaceActiveSubsong: number;
 
   // Actions
   setCurrentPattern: (index: number, fromReplayer?: boolean) => void;
@@ -271,7 +274,8 @@ interface TrackerStore {
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
   setHivelyNative: (data: HivelyNativeData | null) => void;
-  applyEditorMode: (song: { furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData }) => void;
+  applyEditorMode: (song: { furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number }) => void;
+  setFurnaceActiveSubsong: (index: number) => void;
 
   // Undo/Redo support
   replacePattern: (index: number, pattern: Pattern) => void;
@@ -355,6 +359,8 @@ export const useTrackerStore = create<TrackerStore>()(
     editorMode: 'classic' as EditorMode,
     furnaceNative: null,
     hivelyNative: null,
+    furnaceSubsongs: null,
+    furnaceActiveSubsong: 0,
 
     // Actions
     setCurrentPattern: (index, fromReplayer) =>
@@ -2657,15 +2663,26 @@ export const useTrackerStore = create<TrackerStore>()(
           state.editorMode = 'furnace';
           state.furnaceNative = song.furnaceNative;
           state.hivelyNative = null;
+          state.furnaceSubsongs = song.furnaceSubsongs ?? null;
+          state.furnaceActiveSubsong = song.furnaceActiveSubsong ?? 0;
         } else if (song.hivelyNative) {
           state.editorMode = 'hively';
           state.hivelyNative = song.hivelyNative;
           state.furnaceNative = null;
+          state.furnaceSubsongs = null;
+          state.furnaceActiveSubsong = 0;
         } else {
           state.editorMode = 'classic';
           state.furnaceNative = null;
           state.hivelyNative = null;
+          state.furnaceSubsongs = null;
+          state.furnaceActiveSubsong = 0;
         }
+      }),
+
+    setFurnaceActiveSubsong: (index) =>
+      set((state) => {
+        state.furnaceActiveSubsong = index;
       }),
 
     importPattern: (pattern) => {
@@ -2842,6 +2859,8 @@ export const useTrackerStore = create<TrackerStore>()(
         state.editorMode = 'classic';
         state.furnaceNative = null;
         state.hivelyNative = null;
+        state.furnaceSubsongs = null;
+        state.furnaceActiveSubsong = 0;
       }),
   }))
 );
