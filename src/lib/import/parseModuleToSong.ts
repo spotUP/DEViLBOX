@@ -670,6 +670,46 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── Composer 667 ─────────────────────────────────────────────────────────
+  // .667 files — identified by 'gf' magic (0x67, 0x66) at offset 0.
+  if (/\.667$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.composer667 === 'native') {
+      try {
+        const { isComposer667Format, parseComposer667File } = await import('@lib/import/formats/Composer667Parser');
+        const bytes = new Uint8Array(buffer);
+        if (isComposer667Format(bytes)) {
+          const result = parseComposer667File(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[Composer667Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Chuck Biscuits / Black Artist ────────────────────────────────────────
+  // .cba files — identified by 'CBA\xF9' magic at offset 0.
+  if (/\.cba$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.chuckBiscuits === 'native') {
+      try {
+        const { isChuckBiscuitsFormat, parseChuckBiscuitsFile } = await import('@lib/import/formats/ChuckBiscuitsParser');
+        const bytes = new Uint8Array(buffer);
+        if (isChuckBiscuitsFormat(bytes)) {
+          const result = parseChuckBiscuitsFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[ChuckBiscuitsParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── Ben Daglish ───────────────────────────────────────────────────────────
   // .bd files — identified by M68k assembler signatures (no magic bytes).
   if (/\.bd$/.test(filename)) {
@@ -1051,10 +1091,10 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   // ── DigiBooster Pro (.dbm) ────────────────────────────────────────────────
   if (/\.dbm$/.test(filename)) {
     try {
-      const { isDBMFormat, parseDBMFile } = await import('@lib/import/formats/DBMParser');
+      const { isDBMFormat, parseDBMFile } = await import('@lib/import/formats/DigiBoosterProParser');
       if (isDBMFormat(buffer)) return parseDBMFile(buffer, file.name);
     } catch (err) {
-      console.warn(`[DBMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+      console.warn(`[DigiBoosterProParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
     // Fall through to libopenmpt
   }
@@ -1068,6 +1108,22 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       console.warn(`[IMFParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
     // Fall through to libopenmpt
+  }
+
+  // ── Mark Cooksey (.mc, .mcr, .mco) — plain ProTracker MOD with game extension ──
+  // Mark Cooksey composed music for Psycho Pinball, Micro Machines 2, etc.
+  // These are standard 4-channel ProTracker modules — detect via MOD magic and route to libopenmpt.
+  if (/\.(mc|mcr|mco)$/.test(filename) && buffer.byteLength >= 1084) {
+    const magic = new TextDecoder().decode(new Uint8Array(buffer, 1080, 4));
+    if (magic === 'M.K.' || magic === 'M!K!' || magic === 'FLT4' ||
+        magic === '4CHN' || magic === '6CHN' || magic === '8CHN') {
+      try {
+        return await parseTrackerModule(buffer, file.name);
+      } catch (err) {
+        console.warn(`[MarkCooksey] libopenmpt failed for ${filename}, falling back to UADE:`, err);
+        // fall through to UADE catch-all
+      }
+    }
   }
 
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
