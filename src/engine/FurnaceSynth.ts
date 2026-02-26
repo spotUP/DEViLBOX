@@ -778,7 +778,6 @@ export class FurnaceSynth implements DevilboxSynth {
       // Our freqToGB already returns the value to write directly
       const freqVal = FurnacePitchUtils.freqToGB(freq);
       this.gbFreqVal = freqVal;
-      console.log(`[FurnaceSynth] updateFrequency GB: freq=${freq}, freqVal=${freqVal} (will write in writeKeyOn)`);
       // Note: Actual register writes happen in writeKeyOn, matching Furnace's tick() behavior
     } else if (this.config.chipType === FurnaceChipType.PCE) { // PCE (6)
       // PC Engine frequency register is 12-bit
@@ -1087,7 +1086,6 @@ export class FurnaceSynth implements DevilboxSynth {
         }
         // Write init parameters if not already done
         this.updateParameters();
-        console.log('[FurnaceSynth] ✓ Using pre-initialized WASM engine, chipType:', this.config.chipType);
       } else if (!this.initInProgress) {
         // WASM not available - error was already reported during init
         // Try to re-init in case context is now available
@@ -1115,13 +1113,10 @@ export class FurnaceSynth implements DevilboxSynth {
     this.applyVelocityToCarriers();
 
     // 1. Setup registers (with velocity-scaled TL)
-    console.log(`[FurnaceSynth.triggerAttack] chipType=${this.config.chipType}, operators.length=${this.config.operators.length}, freq=${freq.toFixed(1)}`);
-    console.log(`[FurnaceSynth.triggerAttack] chipEngine.isInitialized()=${this.chipEngine.isInitialized()}, diag:`, this.chipEngine.getDiagnostics());
     this.updateParameters();
     this.updateFrequency(freq);
 
     // 2. Write Key ON (chip-specific)
-    console.log(`[FurnaceSynth.triggerAttack] Writing KEY ON`);
     this.writeKeyOn(velocity);
     this.wasmNoteTriggered = true;
 
@@ -2198,10 +2193,8 @@ export class FurnaceSynth implements DevilboxSynth {
     // Enforce minimum gate time to ensure audio has time to render
     const now = audioNow();
     const timeSinceNoteOn = now - this.noteOnTime;
-    console.log(`[FurnaceSynth] Gate check: now=${now.toFixed(3)}, noteOnTime=${this.noteOnTime.toFixed(3)}, elapsed=${(timeSinceNoteOn * 1000).toFixed(0)}ms, min=${FurnaceSynth.MIN_GATE_TIME * 1000}ms`);
     if (timeSinceNoteOn < FurnaceSynth.MIN_GATE_TIME) {
       const delayMs = (FurnaceSynth.MIN_GATE_TIME - timeSinceNoteOn) * 1000;
-      console.log(`[FurnaceSynth] Delaying keyOff by ${delayMs.toFixed(0)}ms for minimum gate time`);
       setTimeout(() => this.writeKeyOff(), delayMs);
     } else {
       this.writeKeyOff();
@@ -2220,10 +2213,8 @@ export class FurnaceSynth implements DevilboxSynth {
    * Write chip-specific key-off command
    */
   private writeKeyOff(): void {
-    console.log(`[FurnaceSynth] writeKeyOff called, chipType=${this.config.chipType}, wasmNoteTriggered=${this.wasmNoteTriggered}`);
     // Only write key-off if we actually triggered a note via WASM
     if (!this.wasmNoteTriggered) {
-      console.log(`[FurnaceSynth] writeKeyOff skipped - wasmNoteTriggered is false`);
       return;
     }
     this.wasmNoteTriggered = false;
@@ -2237,7 +2228,6 @@ export class FurnaceSynth implements DevilboxSynth {
         const part = chan < 3 ? 0 : 1;
         const regBase = part === 0 ? 0x000 : 0x100;
         const keyOffVal = (part << 2) | chanOffset;
-        console.log(`[FurnaceSynth] OPN2 KEY OFF: chan=${chan}, reg=0x28, val=0x${keyOffVal.toString(16)}`);
 
         // Send key-off
         this.chipEngine.write(FurnaceChipType.OPN2, 0x28, keyOffVal);
@@ -2254,7 +2244,6 @@ export class FurnaceSynth implements DevilboxSynth {
       }
       case FurnaceChipType.OPM: { // 1
         const keyOffVal = chan & 7;  // Channel only, no operator bits = key off
-        console.log(`[FurnaceSynth] OPM KEY OFF: chan=${chan}, reg=0x08, val=0x${keyOffVal.toString(16)}`);
 
         // Send key-off
         this.chipEngine.write(FurnaceChipType.OPM, 0x08, keyOffVal);
@@ -2322,7 +2311,6 @@ export class FurnaceSynth implements DevilboxSynth {
         const fb = (this.config.feedback ?? 0) & 7;
         const chVolR = 1; // Right channel enabled
         const keyOffVal = alg | (fb << 3) | (chVolR << 7); // No 0x40 = key off
-        console.log(`[FurnaceSynth] OPZ KEY OFF: chan=${chan}, reg=0x${(0x20 + (chan & 7)).toString(16)}, val=0x${keyOffVal.toString(16)}`);
         this.chipEngine.write(FurnaceChipType.OPZ, 0x20 + (chan & 7), keyOffVal);
 
         break;
@@ -2441,7 +2429,6 @@ export class FurnaceSynth implements DevilboxSynth {
       }
       case FurnaceChipType.VERA: { // 36
         const chanBase = chan * 4;
-        console.log(`[VERA keyOff] chan=${chan}, reg=${chanBase + 2}, val=0x00`);
         this.chipEngine.write(FurnaceChipType.VERA, chanBase + 2, 0x00); // Volume = 0
         break;
       }
@@ -2505,7 +2492,6 @@ export class FurnaceSynth implements DevilboxSynth {
       case FurnaceChipType.UPD1771: { // 42
         // Send Mode 0 (silence) - single byte packet
         this.chipEngine.write(FurnaceChipType.UPD1771, 0, 0x00);
-        console.log(`[UPD1771 keyOff]`);
         break;
       }
 
@@ -2513,14 +2499,12 @@ export class FurnaceSynth implements DevilboxSynth {
         // Key-off: clear keyon bit
         const regBase = chan * 4;
         this.chipEngine.write(FurnaceChipType.YMZ280B, 0x01 + regBase, 0x40);  // PCM8 format, key-off
-        console.log(`[YMZ280B keyOff] chan=${chan}`);
         break;
       }
 
       case FurnaceChipType.RF5C68: { // 29
         // Key-off channel (bit SET = disabled due to inverted logic)
         this.chipEngine.write(FurnaceChipType.RF5C68, 0x08, 0xFF);  // Disable all channels
-        console.log(`[RF5C68 keyOff] chan=${chan}`);
         break;
       }
 
@@ -2529,7 +2513,6 @@ export class FurnaceSynth implements DevilboxSynth {
         const regBaseGA20 = chan * 8;
         this.chipEngine.write(FurnaceChipType.GA20, regBaseGA20 + 5, 0);
         this.chipEngine.write(FurnaceChipType.GA20, regBaseGA20 + 6, 0);
-        console.log(`[GA20 keyOff] chan=${chan}`);
         break;
       }
 
@@ -2537,14 +2520,12 @@ export class FurnaceSynth implements DevilboxSynth {
         // Key-off: control register = 0 (stop playback)
         const regBaseSega = (chan & 15) * 8;
         this.chipEngine.write(FurnaceChipType.SEGAPCM, 0x86 + regBaseSega, 0);
-        console.log(`[SegaPCM keyOff] chan=${chan}`);
         break;
       }
 
       case FurnaceChipType.K007232: { // 39
         // Key-off: just set volume to 0
         this.chipEngine.write(FurnaceChipType.K007232, 0x0C, 0);
-        console.log(`[K007232 keyOff] chan=${chan}`);
         break;
       }
 
@@ -2552,7 +2533,6 @@ export class FurnaceSynth implements DevilboxSynth {
         // Key-off: clear key-on mask
         const voiceK53Off = chan & 3;
         this.chipEngine.write(FurnaceChipType.K053260, 0x28, 0);  // Clear all key-on bits
-        console.log(`[K053260 keyOff] voice=${voiceK53Off}`);
         break;
       }
 
@@ -2563,7 +2543,6 @@ export class FurnaceSynth implements DevilboxSynth {
         this.chipEngine.write(FurnaceChipType.QSOUND, 0, 0);
         this.chipEngine.write(FurnaceChipType.QSOUND, 1, 0);
         this.chipEngine.write(FurnaceChipType.QSOUND, 2, volRegQS);
-        console.log(`[QSound keyOff] voice=${voiceQSOff}`);
         break;
       }
 
@@ -2572,7 +2551,6 @@ export class FurnaceSynth implements DevilboxSynth {
         const voiceC140Off = chan % 24;
         const regBaseC140Off = voiceC140Off * 0x10;
         this.chipEngine.write(FurnaceChipType.C140, regBaseC140Off + 0x05, 0);
-        console.log(`[C140 keyOff] voice=${voiceC140Off}`);
         break;
       }
 
