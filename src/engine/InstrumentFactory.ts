@@ -40,6 +40,7 @@ import { RobHubbardSynth } from './robhubbard/RobHubbardSynth';
 import { SidMon1Synth } from './sidmon1/SidMon1Synth';
 import { OctaMEDSynth } from './octamed/OctaMEDSynth';
 import { DavidWhittakerSynth } from './davidwhittaker/DavidWhittakerSynth';
+import { SymphonieSynth } from './symphonie/SymphonieSynth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -903,6 +904,17 @@ export class InstrumentFactory {
           );
         }
         instrument = tfmxSynth;
+        break;
+      }
+
+      case 'SymphonieSynth': {
+        const symphSynth = new SymphonieSynth();
+        if (config.symphonie) {
+          symphSynth.load({ symphonie: config.symphonie }).catch((err: unknown) =>
+            console.error('[InstrumentFactory] Symphonie load failed:', err)
+          );
+        }
+        instrument = symphSynth;
         break;
       }
 

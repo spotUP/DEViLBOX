@@ -607,7 +607,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
         const { isSymphonieProFormat, parseSymphonieProFile } = await import('@lib/import/formats/SymphonieProParser');
         const bytes = new Uint8Array(buffer);
         if (isSymphonieProFormat(bytes)) {
-          const result = parseSymphonieProFile(bytes, file.name);
+          const result = await parseSymphonieProFile(bytes, file.name);
           if (result) return result;
         }
       } catch (err) {
