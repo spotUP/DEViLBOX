@@ -70,10 +70,7 @@ export interface FormatEnginePreferences {
   actionamics: FormatEngineChoice;        // .act → ActionamicsParser vs UADE
   activisionPro: FormatEngineChoice;      // .avp/.mw → ActivisionProParser vs UADE
   ronKlaren: FormatEngineChoice;          // .rk/.rkb → RonKlarenParser vs UADE
-  madTracker2: FormatEngineChoice;        // .mt2 → MadTracker2Parser vs OpenMPT
-  psm: FormatEngineChoice;                // .psm → PSMParser vs OpenMPT
   deltaMusic1: FormatEngineChoice;    // .dm/.dm1 → DeltaMusic1Parser vs UADE
-  iffSmus: FormatEngineChoice;        // .smus/.snx/.tiny → IffSmusParser vs UADE
   pt36: FormatEngineChoice;           // FORM+MODL → PT36Parser vs libopenmpt
   // Newly wired parsers (2026-02-26 batch)
   fashionTracker: FormatEngineChoice;          // ex.* → FashionTrackerParser vs UADE
@@ -104,19 +101,17 @@ export interface FormatEnginePreferences {
   steveBarrett: FormatEngineChoice;            // sb.* → SteveBarrettParser vs UADE
   paulSummers: FormatEngineChoice;             // snk.* → PaulSummersParser vs UADE
   desire: FormatEngineChoice;                  // dsr.* → DesireParser vs UADE
-  daveLoweNew: FormatEngineChoice;             // dln.* → DaveLoweNewParser vs UADE
   digitalSonixChrome: FormatEngineChoice;      // dsc.* → DigitalSonixChromeParser vs UADE
   sonixMusicDriver: FormatEngineChoice;        // smus.*/snx.*/tiny.* → SonixMusicDriverParser vs UADE
   jesperOlsen: FormatEngineChoice;             // jo.* → JesperOlsenParser vs UADE
   kimChristensen: FormatEngineChoice;          // kim.* → KimChristensenParser vs UADE
-  martinWalker: FormatEngineChoice;            // avp.*/mw.* (prefix) → MartinWalkerParser vs UADE
-  paulShields: FormatEngineChoice;             // ps.* → PaulShieldsParser vs UADE
-  paulRobotham: FormatEngineChoice;            // dat.* → PaulRobothamParser vs UADE
-  pierreAdane: FormatEngineChoice;             // pap.* → PierreAdaneParser vs UADE
-  anders0land: FormatEngineChoice;             // hot.* → Anders0landParser vs UADE
-  andrewParton: FormatEngineChoice;            // bye.* → AndrewPartonParser vs UADE
-  customMade: FormatEngineChoice;              // cm.*/rk.*/rkb.* (prefix) → CustomMadeParser vs UADE
-  benDaglishSID: FormatEngineChoice;           // bds.* → BenDaglishSIDParser vs UADE
+  amComposer: FormatEngineChoice;              // amc.* → AMComposerParser vs UADE
+  tcbTracker: FormatEngineChoice;              // tcb.* → TCBTrackerParser vs UADE
+  mmdc: FormatEngineChoice;                    // mmdc.* → MMDCParser vs UADE
+  psa: FormatEngineChoice;                     // psa.* → PSAParser vs UADE
+  tme: FormatEngineChoice;                     // tme.*/.tme → TMEParser vs UADE
+  specialFXST: FormatEngineChoice;             // doda.* → SpecialFXSTParser vs UADE
+  tfmxST: FormatEngineChoice;                  // mdst.* → TFMXSTParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -218,10 +213,7 @@ export const useSettingsStore = create<SettingsStore>()(
         actionamics: 'native',      // ActionamicsParser — native parser available
         activisionPro: 'native',    // ActivisionProParser — native parser available
         ronKlaren: 'native',        // RonKlarenParser — native parser available
-        madTracker2: 'native',      // MadTracker2Parser — dedicated MadTracker 2 (.mt2) support
-        psm: 'native',              // PSMParser — dedicated PSM / PSM16 (Epic MegaGames MASI) support
         deltaMusic1: 'native',  // DeltaMusic1Parser — native parser available
-        iffSmus: 'native',      // IffSmusParser — native parser available
         pt36: 'native',         // PT36Parser — native parser available
         fashionTracker: 'native',            // FashionTrackerParser — native parser available
         multiMediaSound: 'native',           // MultiMediaSoundParser — native parser available
@@ -251,19 +243,17 @@ export const useSettingsStore = create<SettingsStore>()(
         steveBarrett: 'native',              // SteveBarrettParser — native parser available
         paulSummers: 'native',               // PaulSummersParser — native parser available
         desire: 'native',                    // DesireParser — native parser available
-        daveLoweNew: 'native',               // DaveLoweNewParser — native parser available
         digitalSonixChrome: 'native',        // DigitalSonixChromeParser — native parser available
         sonixMusicDriver: 'native',          // SonixMusicDriverParser — native parser available
         jesperOlsen: 'native',               // JesperOlsenParser — native parser available
         kimChristensen: 'native',            // KimChristensenParser — native parser available
-        martinWalker: 'native',              // MartinWalkerParser — native parser available
-        paulShields: 'native',               // PaulShieldsParser — native parser available
-        paulRobotham: 'native',              // PaulRobothamParser — native parser available
-        pierreAdane: 'native',               // PierreAdaneParser — native parser available
-        anders0land: 'native',               // Anders0landParser — native parser available
-        andrewParton: 'native',              // AndrewPartonParser — native parser available
-        customMade: 'native',                // CustomMadeParser — native parser available
-        benDaglishSID: 'native',             // BenDaglishSIDParser — native parser available
+        amComposer: 'native',                // AMComposerParser — native parser available
+        tcbTracker: 'native',                // TCBTrackerParser — native parser available
+        mmdc: 'native',                      // MMDCParser — native parser available
+        psa: 'native',                       // PSAParser — native parser available
+        tme: 'native',                       // TMEParser — native parser available
+        specialFXST: 'native',               // SpecialFXSTParser — native parser available
+        tfmxST: 'native',                    // TFMXSTParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
