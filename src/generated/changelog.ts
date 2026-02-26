@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-26T16:59:42.843Z
+ * Generated: 2026-02-26T20:11:38.328Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1356';
-export const BUILD_NUMBER = '1356';
-export const BUILD_HASH = 'a875acd5';
+export const BUILD_VERSION = '1.0.1397';
+export const BUILD_NUMBER = '1397';
+export const BUILD_HASH = '5cc7a9ae';
 export const BUILD_DATE = '2026-02-26';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,173 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1356',
+    version: '1.0.1397',
     date: '2026-02-26',
     changes: [
+      {
+        type: 'fix',
+        "description": "Deep-merge formatEngine on persist hydration"
+      },
+      {
+        type: 'fix',
+        "description": "Add SymphonieSynth to SYNTH_INFO; fix ArrayBufferLike cast"
+      },
+      {
+        type: 'feature',
+        "description": "Wire SymphonieSynth into InstrumentFactory, types, and parser"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove unused _engineConnectedToSynth dead state"
+      },
+      {
+        type: 'feature',
+        "description": "SymphonieEngine singleton + SymphonieSynth wrapper"
+      },
+      {
+        type: 'feature',
+        "description": "Symphonie.worklet.js — VoiceExpander AudioWorklet processor"
+      },
+      {
+        type: 'feature',
+        "description": "Jason Page parser + routing"
+      },
+      {
+        type: 'feature',
+        "description": "Future Player native parser (.fp/FP.*)"
+      },
+      {
+        type: 'fix',
+        "description": "Correct _decodeDelta16 block-interleaved algorithm; fix loop comment"
+      },
+      {
+        type: 'fix',
+        "description": "Remove dead code and unused variables from parser files"
+      },
+      {
+        type: 'feature',
+        "description": "Mark Cooksey, Jeroen Tel, Quartet native parsers"
+      },
+      {
+        type: 'feature',
+        "description": "Leggless Music Editor (LME) native parser"
+      },
+      {
+        type: 'feature',
+        "description": "ParseSymphonieForPlayback() with PCM extraction and DSP events"
+      },
+      {
+        type: 'feature',
+        "description": "GDM, MDL, NRU, PTM native parsers + parser bug fixes"
+      },
+      {
+        type: 'feature',
+        "description": "SymphoniePlaybackData interfaces"
+      },
+      {
+        type: 'feature',
+        "description": "Dave Lowe (.dl) native parser with UADE fallback"
+      },
+      {
+        type: 'feature',
+        "description": "UFO/MicroProse (.ufo/.mus) native parser with UADE fallback"
+      },
+      {
+        type: 'feature',
+        "description": "Richard Joseph Player (.rjp/.sng) native parser"
+      },
+      {
+        type: 'fix',
+        "description": "Routing fixes + parser bug fixes"
+      },
+      {
+        type: 'feature',
+        "description": "Wire IFF SMUS, MFP, Delta Music 1.0 parsers; cleanup duplicates"
+      },
+      {
+        type: 'feature',
+        "description": "AMS (Extreme Tracker / Velvet Studio) native parser (OpenMPT)"
+      },
+      {
+        type: 'feature',
+        "description": "MadTracker 2 and PSM native parsers (OpenMPT)"
+      },
+      {
+        type: 'feature',
+        "description": "FM Tracker, XMF, UAX native parsers"
+      },
+      {
+        type: 'feature',
+        "description": "X-Tracker DMF native parser (OpenMPT)"
+      },
+      {
+        type: 'feature',
+        "description": "Imago Orpheus, C67/CDFM, EasyTrax, Karl Morton native parsers"
+      },
+      {
+        type: 'feature',
+        "description": "9 new format parsers — PT36, SpeedySystem, STK, IMF, STP, AMF, MDL, Tronic"
+      },
+      {
+        type: 'feature',
+        "description": "DigiBooster Pro (.dbm) native parser (OpenMPT)"
+      },
+      {
+        type: 'feature',
+        "description": "Composer 667 and Chuck Biscuits / Black Artist native parsers"
+      },
+      {
+        type: 'feature',
+        "description": "DigiBooster Pro (.dbm) and Imago Orpheus (.imf) native parsers"
+      },
+      {
+        type: 'feature',
+        "description": "STK (Ultimate SoundTracker) and STP (SoundTracker Pro II) native parsers"
+      },
+      {
+        type: 'feature',
+        "description": "Symphonie Pro native parser (OpenMPT)"
+      },
+      {
+        type: 'feature',
+        "description": "Graoumf Tracker 2 native parser (OpenMPT)"
+      },
+      {
+        type: 'improvement',
+        "description": "Update format status — add IMS, ICE, KRIS; sync all implemented parsers"
+      },
+      {
+        type: 'feature',
+        "description": "Wire NRU, PTM, GDM parsers; add Digital Symphony and Digital Sound Studio"
+      },
+      {
+        type: 'feature',
+        "description": "Digital Sound Studio native parser"
+      },
+      {
+        type: 'feature',
+        "description": "10 PC/DOS tracker format parsers — UNIC, MTM, 669, FAR, PLM, ULT, RTM, DSM, DTM, STM"
+      },
+      {
+        type: 'feature',
+        "description": "Synthesis and Music Assembler native parsers"
+      },
+      {
+        type: 'feature',
+        "description": "Actionamics, Activision Pro, Ron Klaren native parsers"
+      },
+      {
+        type: 'feature',
+        "description": "Game Music Creator and Face The Music native parsers (OpenMPT)"
+      },
+      {
+        type: 'improvement',
+        "description": "Update format implementation status with all recent parsers and in-progress agents"
+      },
+      {
+        type: 'feature',
+        "description": "Add IMS, ICE, KRIS, GMC native parsers"
+      },
       {
         type: 'fix',
         "description": "Fix puma routing — ArrayBuffer types, remove prefs toggle"
@@ -68,162 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Phase B4 — TCB Tracker (.tcb) native parser"
-      },
-      {
-        type: 'feature',
-        "description": "Add David Whittaker native synthesis engine"
-      },
-      {
-        type: 'feature',
-        "description": "Phase B3 — AMOS Music Bank (.abk) routing in parseModuleToSong"
-      },
-      {
-        type: 'feature',
-        "description": "OctaMED SynthInstr extraction + UADE format debug test + AMOS/DavidWhittaker parsers"
-      },
-      {
-        type: 'feature',
-        "description": "Phase B2 — Quadra Composer (.emod, .qc) native parser"
-      },
-      {
-        type: 'feature',
-        "description": "Add OctaMED SynthInstr native synthesis engine"
-      },
-      {
-        type: 'feature',
-        "description": "Phase B1 — JamCracker (.jam, .jc) native parser"
-      },
-      {
-        type: 'feature',
-        "description": "Phase 6 PCM instrument naming — JamCracker, TCB, EMOD, AMOS"
-      },
-      {
-        type: 'feature',
-        "description": "Native Rob Hubbard synthesis engine"
-      },
-      {
-        type: 'fix',
-        "description": "Guard emscripten.h with __EMSCRIPTEN__ to suppress IDE false positives"
-      },
-      {
-        type: 'feature',
-        "description": "Native Jochen Hippel CoSo synthesis engine"
-      },
-      {
-        type: 'improvement',
-        "description": "Update masterplan — all phases 0-7 complete except PCM naming"
-      },
-      {
-        type: 'fix',
-        "description": "Standalone instrument players now produce audio"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(assets): delete turntable_old.glb placeholder backup"
-      },
-      {
-        type: 'feature',
-        "description": "Chore(assets): add Technics SL-1200GR 3D model files and archive old turntable"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(docs): remove completed plan documents"
-      },
-      {
-        type: 'feature',
-        "description": "Replace turntable model with Technics SL-1200GR; calibrate hitboxes"
-      },
-      {
-        type: 'feature',
-        "description": "MED synth instrument waveform extraction + UADE Digital Mugician formats"
-      },
-      {
-        type: 'fix',
-        "description": "Guard AY address coverage, strengthen emulation test"
-      },
-      {
-        type: 'feature',
-        "description": "AY ZX Spectrum pattern extraction via Z80 CPU emulation"
-      },
-      {
-        type: 'fix',
-        "description": "Fix 25 pre-existing TypeScript errors to restore clean build"
-      },
-      {
-        type: 'fix',
-        "description": "Add missing Z80 individual register setters (B,C,D,E,H,L,AF,F)"
-      },
-      {
-        type: 'feature',
-        "description": "Add Z80 CPU emulator for AY ZX Spectrum pattern extraction"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
-      },
-      {
-        type: 'fix',
-        "description": "Fix RefObject null type errors for React 19 strict typing"
-      },
-      {
-        type: 'fix',
-        "description": "Clamp NSF channels to base APU, fix SAP play-addr fallback"
-      },
-      {
-        type: 'feature',
-        "description": "NSF/SID/SAP pattern extraction via 6502 CPU emulation"
-      },
-      {
-        type: 'fix',
-        "description": "Always mount shared Canvas; add background:transparent"
-      },
-      {
-        type: 'fix',
-        "description": "Rebuild vestax-mixer GLB with full texture set"
-      },
-      {
-        type: 'improvement',
-        "description": "Build(soundmon): compile SoundMon.wasm from soundmon_synth.c"
-      },
-      {
-        type: 'feature',
-        "description": "Phase 7 — instrument editor UI for all new synth types"
-      },
-      {
-        type: 'feature',
-        "description": "Add 6502 CPU emulator for NSF/SID/SAP pattern extraction"
-      },
-      {
-        type: 'fix',
-        "description": "Correct OPM test comment (nibble A = B4, not A#4)"
-      },
-      {
-        type: 'fix',
-        "description": "Correct OPM KC note encoding and add OPM test"
-      },
-      {
-        type: 'fix',
-        "description": "Move mixer into shared WebGL canvas via drei View"
-      },
-      {
-        type: 'feature',
-        "description": "Phase 6 — instrument naming for enhanced scan"
-      },
-      {
-        type: 'fix',
-        "description": "Share single WebGL context across all turntable 3D views"
-      },
-      {
-        type: 'feature',
-        "description": "Add FredSynth — real-time PWM synthesis for Fred Editor type-1 instruments"
-      },
-      {
-        type: 'feature',
-        "description": "Add TFMXSynth — per-note TFMX synthesis via libtfmxaudiodecoder WASM"
-      },
-      {
-        type: 'feature',
-        "description": "Add SN76489 PSG and OPM note extraction to VGMParser"
       }
     ]
   }
