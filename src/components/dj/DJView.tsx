@@ -488,7 +488,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
       {/* ================================================================== */}
       <Canvas
         style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'transparent' }}
-        eventSource={djViewRef}
+        eventSource={djViewRef as React.RefObject<HTMLElement>}
         eventPrefix="client"
         gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
         onCreated={({ gl }) => {

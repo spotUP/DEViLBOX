@@ -132,7 +132,7 @@ function getControlName(mesh: THREE.Object3D): string {
 
 // ── Inner 3D Scene Component ─────────────────────────────────────────────────
 
-function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElement> }) {
+function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElement | null> }) {
   const { scene: gltfScene } = useGLTF(MODEL_PATH);
 
   // Drag state refs
