@@ -33,6 +33,7 @@ export interface FormatEnginePreferences {
   soundfx: FormatEngineChoice;  // .sfx/.sfx13 → SoundFXParser vs UADE
   mugician: FormatEngineChoice;  // .dmu/.mug → DigitalMugicianParser vs UADE
   tfmx: FormatEngineChoice;    // .tfmx/.mdat/.tfx → TFMXParser vs UADE
+  hippelCoso: FormatEngineChoice; // .hipc/.soc/.coso → HippelCoSoParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -97,8 +98,9 @@ export const useSettingsStore = create<SettingsStore>()(
         fred: 'native',     // FredEditorParser — dedicated Fred Editor support
         soundfx: 'native',  // SoundFXParser — dedicated Sound-FX support
         mugician: 'native', // DigitalMugicianParser — dedicated Digital Mugician support
-        tfmx: 'native',    // TFMXParser — dedicated Jochen Hippel TFMX support
-        uade: 'enhanced',   // UADE formats — enhanced (editable) by default
+        tfmx: 'native',         // TFMXParser — dedicated Jochen Hippel TFMX support
+        hippelCoso: 'native',   // HippelCoSoParser — dedicated Jochen Hippel CoSo support
+        uade: 'enhanced',       // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
       useBLEP: false,  // Default: BLEP disabled (enable in Settings for band-limited synthesis)

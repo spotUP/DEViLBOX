@@ -35,6 +35,7 @@ import { DigMugSynth } from './digmug/DigMugSynth';
 import { FCSynth } from './fc/FCSynth';
 import { TFMXSynth } from './tfmx/TFMXSynth';
 import { FredSynth } from './fred/FredSynth';
+import { HippelCoSoSynth } from './hippelcoso/HippelCoSoSynth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -908,6 +909,17 @@ export class InstrumentFactory {
           );
         }
         instrument = fredSynth;
+        break;
+      }
+
+      case 'HippelCoSoSynth': {
+        const hcSynth = new HippelCoSoSynth();
+        if (config.hippelCoso) {
+          hcSynth.setInstrument(config.hippelCoso).catch(err =>
+            console.error('[InstrumentFactory] HippelCoSo load failed:', err)
+          );
+        }
+        instrument = hcSynth;
         break;
       }
 
