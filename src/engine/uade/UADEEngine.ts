@@ -333,6 +333,21 @@ export class UADEEngine {
   }
 
   /**
+   * Write a companion file into the WASM virtual filesystem before loading.
+   * Required for multi-file formats like TFMX (mdat.* + smpl.*).
+   * Must be called BEFORE load() for the companion to be available.
+   */
+  async addCompanionFile(filename: string, data: ArrayBuffer): Promise<void> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('UADEEngine not initialized');
+    const transferBuf = data.slice(0);
+    this.workletNode.port.postMessage(
+      { type: 'addCompanionFile', filename, buffer: transferBuf },
+      [transferBuf],
+    );
+  }
+
+  /**
    * Cancel an in-progress load/scan.
    * The WASM scan continues in the worklet (it's synchronous and can't be stopped),
    * but the result will be discarded when it arrives — the returned promise is rejected
