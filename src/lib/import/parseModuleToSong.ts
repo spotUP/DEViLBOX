@@ -1288,21 +1288,10 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── Magnetic Fields Packer (.mfp / mfp.*) ────────────────────────────────
-  // Amiga 4-channel format (Shaun Southern). Files use either 'mfp.songname'
-  // prefix naming or conventional 'songname.mfp' extension naming.
+  // Two-file format: song data in .mfp, PCM samples in companion smp.* file.
+  // Native parser produces placeholder instruments (no PCM). Delegates to UADE.
   if (/\.mfp$/i.test(filename) || /^mfp\./i.test((filename.split('/').pop() ?? filename).split('\\').pop() ?? filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
-    if (prefs.mfp === 'native') {
-      try {
-        const { isMFPFormat, parseMFPFile } = await import('@lib/import/formats/MFPParser');
-        if (isMFPFormat(buffer, file.name)) {
-          const result = await parseMFPFile(buffer, file.name);
-          if (result) return result;
-        }
-      } catch (err) {
-        console.warn(`[MFPParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
     const { parseUADEFile: parseUADE_mfp } = await import('@lib/import/formats/UADEParser');
     return parseUADE_mfp(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
@@ -2170,6 +2159,158 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
   }
 
+  // ── Martin Walker (AVP.* / MW.* prefix) ──────────────────────────────────
+  // Amiga 5-variant format. UADE prefixes: avp, mw (different from .avp/.mw extensions).
+  {
+    const _mwBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_mwBase.startsWith('avp.') || _mwBase.startsWith('mw.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.martinWalker === 'native') {
+        try {
+          const { isMartinWalkerFormat, parseMartinWalkerFile } = await import('@lib/import/formats/MartinWalkerParser');
+          if (isMartinWalkerFormat(buffer)) return parseMartinWalkerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[MartinWalkerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_mw } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_mw(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Paul Shields (PS.* prefix) ────────────────────────────────────────────
+  // Amiga 3-variant format with zero-prefix header. UADE prefix: ps.
+  {
+    const _psBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_psBase.startsWith('ps.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.paulShields === 'native') {
+        try {
+          const { isPaulShieldsFormat, parsePaulShieldsFile } = await import('@lib/import/formats/PaulShieldsParser');
+          if (isPaulShieldsFormat(buffer)) return parsePaulShieldsFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[PaulShieldsParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_ps } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_ps(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Paul Robotham (DAT.* prefix) ──────────────────────────────────────────
+  // Amiga format with structured pointer table. UADE prefix: dat.
+  {
+    const _datBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_datBase.startsWith('dat.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.paulRobotham === 'native') {
+        try {
+          const { isPaulRobothamFormat, parsePaulRobothamFile } = await import('@lib/import/formats/PaulRobothamParser');
+          if (isPaulRobothamFormat(buffer)) return parsePaulRobothamFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[PaulRobothamParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_dat } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_dat(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Pierre Adane Packer (PAP.* prefix) ────────────────────────────────────
+  // Amiga format with 4-word offset header. UADE prefix: pap.
+  {
+    const _papBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_papBase.startsWith('pap.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.pierreAdane === 'native') {
+        try {
+          const { isPierreAdaneFormat, parsePierreAdaneFile } = await import('@lib/import/formats/PierreAdaneParser');
+          if (isPierreAdaneFormat(buffer)) return parsePierreAdaneFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[PierreAdaneParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_pap } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_pap(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Anders 0land (HOT.* prefix) ───────────────────────────────────────────
+  // Amiga 3-chunk format (mpl/mdt/msm). UADE prefix: hot.
+  {
+    const _hotBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_hotBase.startsWith('hot.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.anders0land === 'native') {
+        try {
+          const { isAnders0landFormat, parseAnders0landFile } = await import('@lib/import/formats/Anders0landParser');
+          if (isAnders0landFormat(buffer)) return await parseAnders0landFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[Anders0landParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_hot } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_hot(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Andrew Parton (BYE.* prefix) ──────────────────────────────────────────
+  // Amiga format with 'BANK' magic + chip-RAM pointer table. UADE prefix: bye.
+  {
+    const _byeBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_byeBase.startsWith('bye.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.andrewParton === 'native') {
+        try {
+          const { isAndrewPartonFormat, parseAndrewPartonFile } = await import('@lib/import/formats/AndrewPartonParser');
+          if (isAndrewPartonFormat(buffer)) return await parseAndrewPartonFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[AndrewPartonParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_bye } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_bye(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Custom Made (CM.* / RK.* / RKB.* prefix) ─────────────────────────────
+  // Amiga format with BRA/JMP opcode detection. UADE prefixes: cm, rk, rkb.
+  {
+    const _cmBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_cmBase.startsWith('cm.') || _cmBase.startsWith('rk.') || _cmBase.startsWith('rkb.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.customMade === 'native') {
+        try {
+          const { isCustomMadeFormat, parseCustomMadeFile } = await import('@lib/import/formats/CustomMadeParser');
+          if (isCustomMadeFormat(buffer)) return await parseCustomMadeFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[CustomMadeParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_cm } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_cm(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Ben Daglish SID (BDS.* prefix) ────────────────────────────────────────
+  // Amiga HUNK-based SID-style 3-voice format. UADE prefix: BDS.
+  {
+    const _bdsBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_bdsBase.startsWith('bds.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.benDaglishSID === 'native') {
+        try {
+          const { isBenDaglishSIDFormat, parseBenDaglishSIDFile } = await import('@lib/import/formats/BenDaglishSIDParser');
+          if (isBenDaglishSIDFormat(buffer)) return await parseBenDaglishSIDFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[BenDaglishSIDParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_bds } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_bds(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
   // ── Digital Sonix & Chrome (DSC.* prefix) ────────────────────────────────
   // Amiga format with sample-table structural detection. UADE prefix: DSC.
   {
@@ -2243,6 +2384,106 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       }
       const { parseUADEFile: parseUADE_kim } = await import('@lib/import/formats/UADEParser');
       return parseUADE_kim(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Ashley Hogg (ASH.* prefix) ────────────────────────────────────────────
+  {
+    const _ashBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_ashBase.startsWith('ash.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_ash } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_ash(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── ADPCM Mono (ADPCM.* prefix) ───────────────────────────────────────────
+  {
+    const _adpcmBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_adpcmBase.startsWith('adpcm.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_adpcm } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_adpcm(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Janne Salmijarvi Optimizer (JS.* prefix) ──────────────────────────────
+  {
+    const _jsBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_jsBase.startsWith('js.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_js } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_js(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Jochen Hippel 7V (HIP7.* / S7G.* prefix) ─────────────────────────────
+  {
+    const _hip7Base = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_hip7Base.startsWith('hip7.') || _hip7Base.startsWith('s7g.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_hip7 } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_hip7(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Jochen Hippel ST (HST.* prefix) ───────────────────────────────────────
+  {
+    const _hstBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_hstBase.startsWith('hst.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_hst } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_hst(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Maximum Effect (MAX.* prefix) ─────────────────────────────────────────
+  {
+    const _maxBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_maxBase.startsWith('max.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_max } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_max(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── MIDI Loriciel (MIDI.* prefix) ─────────────────────────────────────────
+  {
+    const _midiBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_midiBase.startsWith('midi.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_midi } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_midi(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── onEscapee (ONE.* prefix) ──────────────────────────────────────────────
+  {
+    const _oneBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_oneBase.startsWith('one.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_one } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_one(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Paul Tonge (PAT.* prefix) ─────────────────────────────────────────────
+  {
+    const _patBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_patBase.startsWith('pat.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_pat } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_pat(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Rob Hubbard ST (RHO.* prefix) ─────────────────────────────────────────
+  {
+    const _rhoBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_rhoBase.startsWith('rho.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_rho } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_rho(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
   }
 
