@@ -474,7 +474,7 @@ export async function parseSoundMonFile(
         signedPCM[j] = rendered[j]; // pcm8ToWAV handles unsigned→signed internally
       }
 
-      const loopLen = waveLen;
+      const loopLen = totalSamples; // Loop entire ADSR-expanded waveform, not just the base cycle
       instrConfigs.push(createSamplerInstrument(
         id,
         `Synth ${i + 1}`,
