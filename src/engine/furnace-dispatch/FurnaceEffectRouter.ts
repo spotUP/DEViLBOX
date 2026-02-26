@@ -29,28 +29,37 @@ export interface DispatchCommand {
 /**
  * Platform family for effect routing.
  * Derived from Furnace sysDef.cpp effect handler map assignments.
+ * Families with dedicated handlers: fm_opn2, fm_opn, fm_opm, fm_opl, fm_opll,
+ *   psg, sms, c64, snes, gb, nes, fds, vrc6, mmc5, pce, namco, amiga,
+ *   segapcm, sample, scc, x1010, wavetable, beeper.
  */
 export type PlatformFamily =
-  | 'fm_opn2'   // YM2612 (Genesis/Mega Drive) — fmOPN2PostEffectHandlerMap
-  | 'fm_opn'    // YM2203, YM2608, YM2610 (with AY PSG) — fmOPNPostEffectHandlerMap
-  | 'fm_opm'    // YM2151, TX81Z (Arcade) — fmOPMPostEffectHandlerMap
-  | 'fm_opl'    // OPL, OPL2, OPL3, ESFM — fmOPLPostEffectHandlerMap
-  | 'fm_opll'   // OPLL, VRC7 — fmOPLLPostEffectHandlerMap
-  | 'psg'       // AY-3-8910, AY8930 — ayPostEffectHandlerMap
-  | 'sms'       // SN76489, T6W28
-  | 'c64'       // SID 6581/8580 — c64PostEffectHandlerMap
-  | 'snes'      // SNES S-DSP
-  | 'gb'        // Game Boy APU
-  | 'nes'       // NES APU
-  | 'fds'       // Famicom Disk System
-  | 'vrc6'      // VRC6 expansion
-  | 'mmc5'      // MMC5 expansion
-  | 'pce'       // PC Engine / HuC6280
-  | 'namco'     // Namco WSG / N163
-  | 'amiga'     // Amiga Paula
-  | 'segapcm'   // Sega PCM
-  | 'sample'    // Other sample-based chips
-  | 'other';
+  | 'fm_opn2'    // YM2612 (Genesis/Mega Drive) — fmOPN2PostEffectHandlerMap
+  | 'fm_opn'     // YM2203, YM2608, YM2610 (with AY PSG) — fmOPNPostEffectHandlerMap
+  | 'fm_opm'     // YM2151, TX81Z (Arcade) — fmOPMPostEffectHandlerMap
+  | 'fm_opl'     // OPL, OPL2, OPL3, ESFM — fmOPLPostEffectHandlerMap
+  | 'fm_opll'    // OPLL, VRC7 — fmOPLLPostEffectHandlerMap
+  | 'psg'        // AY-3-8910, AY8930 — ayPostEffectHandlerMap
+  | 'sms'        // SN76489, T6W28
+  | 'c64'        // SID 6581/8580 — c64PostEffectHandlerMap
+  | 'snes'       // SNES S-DSP
+  | 'gb'         // Game Boy APU
+  | 'nes'        // NES APU
+  | 'fds'        // Famicom Disk System
+  | 'vrc6'       // VRC6 expansion
+  | 'mmc5'       // MMC5 expansion
+  | 'pce'        // PC Engine / HuC6280
+  | 'namco'      // Namco WSG / N163
+  | 'amiga'      // Amiga Paula
+  | 'segapcm'    // Sega PCM
+  | 'sample'     // Generic sample-based chips (QSound, ES5506, etc.)
+  | 'scc'        // Konami SCC / SCC+
+  | 'x1010'      // Seta X1-010
+  | 'wavetable'  // Generic wavetable chips (VERA, Sound Unit, BubSys WSG)
+  | 'pokey'      // Atari POKEY
+  | 'tia'        // Atari TIA
+  | 'beeper'     // ZX Spectrum beeper / PC Speaker
+  | 'other';     // Unclassified — platform-specific effects dropped
 
 /**
  * Get the platform family for a given platform type
@@ -171,6 +180,7 @@ export function getPlatformFamily(platform: number): PlatformFamily {
 
     // Sega PCM
     case FurnaceDispatchPlatform.SEGAPCM:
+    case FurnaceDispatchPlatform.SEGAPCM_COMPAT:
       return 'segapcm';
 
     // Sample-based
@@ -184,9 +194,47 @@ export function getPlatformFamily(platform: number): PlatformFamily {
     case FurnaceDispatchPlatform.K053260:
     case FurnaceDispatchPlatform.GA20:
     case FurnaceDispatchPlatform.C140:
+    case FurnaceDispatchPlatform.C219:
     case FurnaceDispatchPlatform.ES5506:
     case FurnaceDispatchPlatform.PCM_DAC:
+    case FurnaceDispatchPlatform.GBA_DMA:     // GBA DMA — sample playback
+    case FurnaceDispatchPlatform.GBA_MINMOD:  // GBA MinMod — sample playback
+    case FurnaceDispatchPlatform.VERA:        // VERA PSG+PCM
       return 'sample';
+
+    // Konami SCC / SCC+
+    case FurnaceDispatchPlatform.SCC:
+    case FurnaceDispatchPlatform.SCC_PLUS:
+      return 'scc';
+
+    // Seta X1-010
+    case FurnaceDispatchPlatform.X1_010:
+      return 'x1010';
+
+    // Generic wavetable (BubSys WSG, Sound Unit)
+    case FurnaceDispatchPlatform.BUBSYS_WSG:
+    case FurnaceDispatchPlatform.SOUND_UNIT:
+      return 'wavetable';
+
+    // Atari POKEY
+    case FurnaceDispatchPlatform.POKEY:
+      return 'pokey';
+
+    // Atari TIA
+    case FurnaceDispatchPlatform.TIA:
+      return 'tia';
+
+    // ZX Beeper / PC Speaker (simple square wave, no platform-specific effects)
+    case FurnaceDispatchPlatform.SFX_BEEPER:
+    case FurnaceDispatchPlatform.SFX_BEEPER_QUADTONE:
+    case FurnaceDispatchPlatform.PCSPKR:
+      return 'beeper';
+
+    // PSG-like simple chips (Commodore)
+    case FurnaceDispatchPlatform.VIC20:
+    case FurnaceDispatchPlatform.PET:
+    case FurnaceDispatchPlatform.TED:
+      return 'psg';
 
     default:
       return 'other';
@@ -318,9 +366,15 @@ export class FurnaceEffectRouter {
         commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: x, val2: y });
         break;
 
+      case 0x0B: // Position jump — handled by sequencer, no chip dispatch
+        break;
+
       case 0x0C: // Set volume
         commands.push({ cmd: DivCmd.VOLUME, chan, val1: param, val2: 0 });
         commands.push({ cmd: DivCmd.HINT_VOLUME, chan, val1: param, val2: 0 });
+        break;
+
+      case 0x0D: // Pattern break — handled by sequencer, no chip dispatch
         break;
 
       case 0x0E: // Extended effects (Exy)
@@ -409,11 +463,17 @@ export class FurnaceEffectRouter {
       case 'vrc6':     return this.routeVRC6Effect(chan, effect, param);
       case 'mmc5':     return this.routeMMC5Effect(chan, effect, param);
       case 'pce':      return this.routePCEEffect(chan, effect, param);
-      case 'namco':    return this.routeNamcoEffect(chan, effect, param);
-      case 'amiga':    return this.routeAmigaEffect(chan, effect, param);
-      case 'segapcm':  return this.routeSegaPCMEffect(chan, effect, param);
-      case 'sample':   return this.routeSampleEffect(chan, effect, param);
-      default:         return [];
+      case 'namco':      return this.routeNamcoEffect(chan, effect, param);
+      case 'amiga':      return this.routeAmigaEffect(chan, effect, param);
+      case 'segapcm':    return this.routeSegaPCMEffect(chan, effect, param);
+      case 'sample':     return this.routeSampleEffect(chan, effect, param);
+      case 'scc':        return this.routeSCCEffect(chan, effect, param);
+      case 'x1010':      return this.routeX1010Effect(chan, effect, param);
+      case 'wavetable':  return this.routeWavetableEffect(chan, effect, param);
+      case 'pokey':      return this.routePOKEYEffect(chan, effect, param);
+      case 'tia':        return this.routeTIAEffect(chan, effect, param);
+      case 'beeper':     return [];  // No platform-specific effects for beeper chips
+      default:           return [];
     }
   }
 
@@ -1252,6 +1312,70 @@ export class FurnaceEffectRouter {
       case 0x17: commands.push({ cmd: DivCmd.QSOUND_ECHO_FEEDBACK, chan, val1: param, val2: 0 }); break;
       case 0x18: commands.push({ cmd: DivCmd.QSOUND_ECHO_LEVEL, chan, val1: param, val2: 0 }); break;
       case 0x19: commands.push({ cmd: DivCmd.QSOUND_SURROUND, chan, val1: param, val2: 0 }); break;
+    }
+    return commands;
+  }
+
+  /**
+   * Konami SCC / SCC+
+   * Post: 0x10→WAVE
+   * From Furnace src/engine/platform/scc.cpp
+   */
+  private routeSCCEffect(chan: number, effect: number, param: number): DispatchCommand[] {
+    const commands: DispatchCommand[] = [];
+    if (effect === 0x10) commands.push({ cmd: DivCmd.WAVE, chan, val1: param, val2: 0 });
+    return commands;
+  }
+
+  /**
+   * Seta X1-010
+   * Post: 0x10→WAVE, 0x11→SAMPLE_MODE, 0x12→SAMPLE_BANK
+   * From Furnace src/engine/platform/x1_010.cpp
+   */
+  private routeX1010Effect(chan: number, effect: number, param: number): DispatchCommand[] {
+    const commands: DispatchCommand[] = [];
+    switch (effect) {
+      case 0x10: commands.push({ cmd: DivCmd.WAVE, chan, val1: param, val2: 0 }); break;
+      case 0x11: commands.push({ cmd: DivCmd.SAMPLE_MODE, chan, val1: param, val2: 0 }); break;
+      case 0x12: commands.push({ cmd: DivCmd.SAMPLE_BANK, chan, val1: param, val2: 0 }); break;
+    }
+    return commands;
+  }
+
+  /**
+   * Generic wavetable chips (BubSys WSG, Sound Unit)
+   * Post: 0x10→WAVE
+   */
+  private routeWavetableEffect(chan: number, effect: number, param: number): DispatchCommand[] {
+    const commands: DispatchCommand[] = [];
+    if (effect === 0x10) commands.push({ cmd: DivCmd.WAVE, chan, val1: param, val2: 0 });
+    return commands;
+  }
+
+  /**
+   * Atari POKEY
+   * Post: 0x20→STD_NOISE_MODE (AUDCTL), 0x21→STD_NOISE_FREQ (AUDCTL high bits)
+   * From Furnace src/engine/platform/pokey.cpp
+   */
+  private routePOKEYEffect(chan: number, effect: number, param: number): DispatchCommand[] {
+    const commands: DispatchCommand[] = [];
+    switch (effect) {
+      case 0x20: commands.push({ cmd: DivCmd.STD_NOISE_MODE, chan, val1: param, val2: 0 }); break;
+      case 0x21: commands.push({ cmd: DivCmd.STD_NOISE_FREQ, chan, val1: param, val2: 0 }); break;
+    }
+    return commands;
+  }
+
+  /**
+   * Atari TIA
+   * Post: 0x20→TIA AUDC (noise control), 0x21→TIA AUDV (volume override)
+   * From Furnace src/engine/platform/tia.cpp
+   */
+  private routeTIAEffect(chan: number, effect: number, param: number): DispatchCommand[] {
+    const commands: DispatchCommand[] = [];
+    switch (effect) {
+      case 0x20: commands.push({ cmd: DivCmd.STD_NOISE_MODE, chan, val1: param, val2: 0 }); break;
+      case 0x21: commands.push({ cmd: DivCmd.VOLUME, chan, val1: param, val2: 0 }); break;
     }
     return commands;
   }
