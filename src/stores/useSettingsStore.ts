@@ -95,6 +95,8 @@ export interface FormatEnginePreferences {
   mmdc: FormatEngineChoice;           // mmdc.* → MMDCParser vs UADE
   psa: FormatEngineChoice;            // psa.* → PSAParser vs UADE
   steveTurner: FormatEngineChoice;    // jpo.*/jpold.* → SteveTurnerParser vs UADE
+  tme: FormatEngineChoice;            // .tme/TME.* → TMEParser vs UADE
+  infogrames: FormatEngineChoice;     // .dum → InfogramesParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -221,6 +223,8 @@ export const useSettingsStore = create<SettingsStore>()(
         mmdc: 'native',         // MMDCParser — native parser available
         psa: 'native',          // PSAParser — native parser available
         steveTurner: 'native',  // SteveTurnerParser — native parser available
+        tme: 'native',          // TMEParser — native parser available
+        infogrames: 'native',   // InfogramesParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',

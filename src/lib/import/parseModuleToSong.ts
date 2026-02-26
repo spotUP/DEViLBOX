@@ -1756,6 +1756,43 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
   }
 
+  // ── TME (.tme / TME.*) ───────────────────────────────────────────────────────
+  // The Musical Enlightenment Amiga format. Detection: buf[0]==0, size>=7000,
+  // u32BE(0)!=0, and specific longwords at 0x3C/0x40 or 0x1284/0x1188/0x128C.
+  if (
+    /\.tme$/i.test(filename) ||
+    /^tme\./i.test((filename.split('/').pop() ?? filename).split('\\').pop() ?? filename)
+  ) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.tme === 'native') {
+      try {
+        const { isTMEFormat, parseTMEFile } = await import('@lib/import/formats/TMEParser');
+        if (isTMEFormat(buffer)) return parseTMEFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[TMEParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_tme } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_tme(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Infogrames DUM (.dum) ────────────────────────────────────────────────────
+  // Infogrames music format used in Gobliins, Ween, etc. Two-file format
+  // with external .dum.set sample data. Detection: header offset at u16BE(0).
+  if (/\.dum$/i.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.infogrames === 'native') {
+      try {
+        const { isInfogramesFormat, parseInfogramesFile } = await import('@lib/import/formats/InfogramesParser');
+        if (isInfogramesFormat(buffer)) return parseInfogramesFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[InfogramesParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_dum } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_dum(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── PSA (.psa / PSA.*) ───────────────────────────────────────────────────────
   // Professional Sound Artists format. Magic: bytes[0..3] == 0x50534100 ("PSA\0").
   if (
