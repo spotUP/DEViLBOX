@@ -1,117 +1,129 @@
-# UADE Format Implementation Status
+# Format Implementation Status
 
-Track which formats have native parsers vs UADE-only, and which are claimed by which tab.
-**Update this file when you start or finish work on a format.**
-
----
-
-## How to Claim a Format
-
-Add your tab ID and the date to the "Claimed by" column before starting work.
-Release it (clear the column) when done.
-
----
-
-## ✅ Implemented (native parser integrated in parseModuleToSong.ts)
-
-| Extension(s) | Format | Parser File | Notes |
-|---|---|---|---|
-| `.hvl`, `.ahx` | HivelyTracker / AHX | HivelyParser.ts | UADE fallback available |
-| `.okt` | Oktalyzer | OktalyzerParser.ts | UADE fallback available |
-| `.med`, `.mmd0`–`.mmd3` | OctaMED / MED | MEDParser.ts | UADE fallback available |
-| `.digi` | DigiBooster | DigiBoosterParser.ts | UADE fallback available |
-| `.dm2` | Delta Music 2.0 | DeltaMusic2Parser.ts | dm/dm1 still UADE-only |
-| `.sa` | Sonic Arranger | SonicArrangerParser.ts | sa-p, sa_old still UADE |
-| `.bp`, `.bp3`, `.sndmon` | SoundMon | SoundMonParser.ts | UADE fallback |
-| `.sid2`, `.smn` | SidMon II | SidMon2Parser.ts | UADE fallback |
-| `.smn` | SidMon 1.0 | SidMon1Parser.ts | magic detection; smn tried first |
-| `.fred` | Fred Editor | FredEditorParser.ts | UADE fallback |
-| `.sfx`, `.sfx13` | Sound-FX | SoundFXParser.ts | UADE fallback |
-| `.dmu`, `.dmu2`, `.mug`, `.mug2` | Digital Mugician | DigitalMugicianParser.ts | UADE fallback |
-| `.tfmx`, `.mdat` | TFMX (Jochen Hippel) | TFMXParser.ts | UADE fallback |
-| `.hipc`, `.soc`, `.coso` | Hippel CoSo | HippelCoSoParser.ts | UADE fallback |
-| `.rh`, `.rhp` | Rob Hubbard | RobHubbardParser.ts | UADE fallback |
-| `.dw`, `.dwold` | David Whittaker | DavidWhittakerParser.ts | UADE fallback |
-| `.aon`, `.aon8` | Art of Noise | ArtOfNoiseParser.ts | UADE fallback |
-| `.bd`, `.bds` | Ben Daglish | BenDaglishParser.ts | UADE fallback |
-| `.jam`, `.jc` | JamCracker | JamCrackerParser.ts | UADE fallback |
-| `.emod`, `.qc` | Quadra Composer | QuadraComposerParser.ts | UADE fallback |
-| `.abk` | AMOS Music Bank | AMOSMusicBankParser.ts | UADE fallback |
-| `.tcb` | TCB Tracker | TCBTrackerParser.ts | UADE fallback |
-| `.fc`, `.fc13`, `.fc14`, `.sfc`, etc. | Future Composer | FCParser.ts | FC2/3/4 UADE fallback |
-| `.puma` | PumaTracker | PumaTrackerParser.ts | ✅ Just implemented 2026-02-26 |
-| `.is`, `.is10` | InStereo! 1.0 | InStereo1Parser.ts | |
-| `.is20` | InStereo! 2.0 | InStereo2Parser.ts | |
-| `.ims` | Images Music System | IMSParser.ts | No magic; structural validation. 3-byte cells. ✅ 2026-02-26 |
-| `.ice` | ICE Tracker / SoundTracker 2.6 | ICEParser.ts | Magic "MTN\0"/"IT10" at +1464. Track-based. ✅ 2026-02-26 |
-| `.kris` | ChipTracker | KRISParser.ts | Magic "KRIS" at +952. Track-based w/ transpose. ✅ 2026-02-26 |
-| `.gmc` | Game Music Creator | GMCParser.ts | No magic; 15 samples, 444-byte header. ✅ 2026-02-26 |
-
----
-
-## 🔧 Good Candidates (structured, parseable, reference code available)
-
-Formats that would benefit from native parsing. Check OpenMPT (`Reference Code/openmpt-master/soundlib/`) and NostalgicPlayer first.
-
-| Extension(s) | Format | Reference Code | Claimed by | Notes |
-|---|---|---|---|---|
-| `.rj`, `.rjp` | Richard Joseph | ? | — | Two-file format (.sng+.ins). NostalgicPlayer has source. Complex synthesis. |
-| `.dm`, `.dlm1` | Delta Music 1.x | openmpt: Load_dm.cpp? | — | Different from dm2; check if OpenMPT has a loader |
-| `.ams` | AMS Synthesizer | openmpt: Load_ams.cpp | — | Check if this is the Amiga format |
-| `.qpa`, `.qts`, `.sqt` | Quartet | ? | — | Atari ST quartet module |
-| `.sng` | ZoundMonitor | openmpt? | — | Not to be confused with Richard Joseph .sng |
-| `.mon` | Manics of Noise | NostalgicPlayer? | — | Complex synth format |
-| `.trc`, `.tronic` | Tronic | ? | — | Dirk Bialluch format (same author as PumaTracker!) |
-| `.tpu` | DirkBialluch | ? | — | Another Dirk Bialluch format |
-| `.is`, `.is20` | InStereo! | Already have parsers | — | Check if wired into parseModuleToSong |
-| `.jmf` | Janko Mrsic-Flogel | ? | — | Check NostalgicPlayer |
-| `.gmc` | GMC | GMCParser.ts | — | ✅ Implemented 2026-02-26 — moved to Implemented table |
-
----
-
-## ❌ Not Parseable (compiled 68k players / binary executables)
-
-These are Amiga binary executables with embedded player code. They cannot be parsed as structured data without 68k disassembly. UADE handles them by running the actual Amiga player code.
-
-| Extension(s) | Format | Reason |
-|---|---|---|
-| `.hip` | Jochen Hippel | Compiled 68k binary |
-| `.hip7` | Jochen Hippel 7V | Compiled 68k binary |
-| `.hst` | Hippel ST | Compiled 68k binary |
-| `.sog` | Hippel ST (sog) | Compiled 68k binary |
-| `.ash` | Ashley Hogg | Likely compiled binary |
-| `.gray` | Fred Gray | Compiled binary |
-| `.cin` | Cinemaware | Likely compiled binary |
-| `.dum` | Infogrames | Likely compiled binary |
-| `.fw` | ForgottenWorlds | Likely compiled binary |
-| `.scumm` | SCUMM | Complex game engine format |
-| `.wb` | Wally Beben | Likely binary |
-
----
-
-## 🔄 UADE Catch-All (no native parser, lowest priority)
-
-These go through UADE's catch-all. They work for playback but produce placeholder patterns for editing.
-
-Most packed MOD variants (`.ac1`, `.p40a`, `.pm`, etc.), obscure one-offs (`.aps`, `.hot`, `.aam`, etc.), and formats without good reference code.
+Track which formats have native parsers vs UADE-only.
+**Update this file when starting or finishing work on a format.**
 
 ---
 
 ## Reference Code Priority
 
-1. **OpenMPT** (`Reference Code/openmpt-master/soundlib/Load_*.cpp`) — most accurate, C++
-2. **NostalgicPlayer** (`Reference Code/NostalgicPlayer/`) — second choice, C#
-3. **libxmp** — third choice
-4. **UADE assembly** — most authentic but hardest to read (68k asm)
+1. **OpenMPT** (`Reference Code/openmpt-master/soundlib/Load_*.cpp`) — most accurate, use first
+2. **NostalgicPlayer** (`thoughts/shared/research/nostalgicplayer/sources/{Format}/`) — second choice, C#
+3. **libxmp** (`Reference Code/libxmp-master/`) — third choice
+4. **UADE** — most authentic but hardest to read (68k asm)
+
+---
+
+## ✅ Implemented (native parser in parseModuleToSong.ts)
+
+| Extension(s) | Format | Parser File | Reference | Notes |
+|---|---|---|---|---|
+| `.mod` | ProTracker / MOD | MODParser.ts + libopenmpt | OpenMPT | UADE fallback |
+| `.hvl`, `.ahx` | HivelyTracker / AHX | HivelyParser.ts | HivelyTracker src | UADE fallback |
+| `.okt` | Oktalyzer | OktalyzerParser.ts | NostalgicPlayer | UADE fallback |
+| `.med`, `.mmd0`–`.mmd3` | OctaMED / MED | MEDParser.ts | libxmp med.h | OctaMEDSynth for SynthInstr |
+| `.digi` | DigiBooster | DigiBoosterParser.ts | NostalgicPlayer | UADE fallback |
+| `.bp`, `.bp3`, `.sndmon` | SoundMon | SoundMonParser.ts | NostalgicPlayer | UADE fallback |
+| `.sid2`, `.smn` | SidMon II | SidMon2Parser.ts | NostalgicPlayer | UADE fallback |
+| `.smn`, `.sid1` | SidMon 1.0 | SidMon1Parser.ts | FlodJS S1Player | .smn tries SM1 magic first |
+| `.fred` | Fred Editor | FredEditorParser.ts | NostalgicPlayer | UADE fallback |
+| `.sfx`, `.sfx13` | Sound-FX | SoundFXParser.ts | OpenMPT | UADE fallback |
+| `.dmu`, `.dmu2`, `.mug`, `.mug2` | Digital Mugician | DigitalMugicianParser.ts | NostalgicPlayer | UADE fallback |
+| `.tfmx`, `.mdat` | TFMX (Jochen Hippel) | TFMXParser.ts | libtfmxaudiodecoder | UADE fallback |
+| `.hipc`, `.soc`, `.coso` | Hippel CoSo | HippelCoSoParser.ts | FlodJS + WASM synth | UADE fallback |
+| `.rh`, `.rhp` | Rob Hubbard | RobHubbardParser.ts | FlodJS + WASM synth | UADE fallback |
+| `.dw`, `.dwold` | David Whittaker | DavidWhittakerParser.ts | FlodJS + WASM synth | UADE fallback |
+| `.aon`, `.aon8` | Art of Noise | ArtOfNoiseParser.ts | NostalgicPlayer | UADE fallback |
+| `.bd`, `.bds` | Ben Daglish | BenDaglishParser.ts | NostalgicPlayer | UADE fallback |
+| `.jam`, `.jc` | JamCracker | JamCrackerParser.ts | NostalgicPlayer | UADE fallback |
+| `.emod`, `.qc` | Quadra Composer | QuadraComposerParser.ts | NostalgicPlayer | UADE fallback |
+| `.abk` | AMOS Music Bank | AMOSMusicBankParser.ts | — | routing only |
+| `.tcb` | TCB Tracker | TCBTrackerParser.ts | **OpenMPT** Load_tcb.cpp | UADE fallback |
+| `.fc`, `.fc13`, `.fc14`, `.sfc` | Future Composer | FCParser.ts | FlodJS | FC2/3/4 → UADE |
+| `.sa`, `.sonic` | Sonic Arranger | SonicArrangerParser.ts | NostalgicPlayer | LH-compressed → UADE |
+| `.puma` | PumaTracker | PumaTrackerParser.ts | **OpenMPT** Load_puma.cpp | UADE fallback |
+| `.dm2` | Delta Music 2.0 | DeltaMusic2Parser.ts | NostalgicPlayer + spec | .dm/.dm1 → UADE |
+| `.is`, `.is10` | InStereo! 1.0 | InStereo1Parser.ts | NostalgicPlayer | UADE fallback |
+| `.is`, `.is20` | InStereo! 2.0 | InStereo2Parser.ts | NostalgicPlayer | IS20 magic tried first |
+| `.ay` | AY / ZX Spectrum | AYParser.ts | — | native only |
+| `.sap` | SAP (Atari POKEY) | SAPParser.ts | — | native only |
+| `.sid` | SID (C64) | SIDParser.ts | — | native only |
+| `.vgm`, `.vgz` | VGM | VGMParser.ts | — | native only |
+| `.ym` | YM (Atari ST) | YMParser.ts | — | native only |
+| `.nsf`, `.nsfe` | NSF (NES) | NSFParser.ts | — | native only |
+| `.xm` | XM (FastTracker II) | XMParser.ts | — | native only |
+
+---
+
+## 🔄 In Progress (agents currently implementing)
+
+| Format | Parser File | Reference | Extensions |
+|---|---|---|---|
+| Game Music Creator | GameMusicCreatorParser.ts | **OpenMPT** Load_gmc.cpp | `.gmc` |
+| Face The Music | FaceTheMusicParser.ts | **OpenMPT** Load_ftm.cpp | `.ftm` |
+| Actionamics | ActionamicsParser.ts | NostalgicPlayer | `.act` |
+| Activision Pro | ActivisionProParser.ts | NostalgicPlayer | `.sng` |
+| Ron Klaren | RonKlarenParser.ts | NostalgicPlayer | `.rk`, `.rkb` |
+| Sawteeth | SawteethParser.ts | NostalgicPlayer | `.sdt` |
+| Sound Control | SoundControlParser.ts | NostalgicPlayer | `.sc`, `.sct` |
+| Sound Factory | SoundFactoryParser.ts | NostalgicPlayer | `.sf` |
+
+---
+
+## 🎯 Queued (NostalgicPlayer reference already downloaded)
+
+| Format | Parser File (planned) | Reference | Notes |
+|---|---|---|---|
+| Synthesis | SynthesisParser.ts | NostalgicPlayer | check Synthesis.cs for extension |
+| Music Assembler | MusicAssemblerParser.ts | NostalgicPlayer | `.amc` |
+| Digital Sound Studio | DigitalSoundStudioParser.ts | NostalgicPlayer + DSS.txt spec | `.dss` |
+
+---
+
+## 🔧 Good Candidates (reference not yet downloaded)
+
+| Extension(s) | Format | OpenMPT Loader | Notes |
+|---|---|---|---|
+| `.dm`, `.dlm1` | Delta Music 1.x | — | NP: DeltaMusic10 player available |
+| `.ims` | Images Music System | Load_ims.cpp (158 ln) | |
+| `.dsym` | Digital Symphony | Load_dsym.cpp (615 ln) | |
+| `.dtm` | Digital Tracker | Load_dtm.cpp (596 ln) | |
+| `.dsm` | DSIK Sound Module | Load_dsm.cpp (525 ln) | |
+| `.gt2` | Graoumf Tracker 2 | Load_gt2.cpp (1566 ln) | |
+| `.plm` | Disorder Tracker | Load_plm.cpp (409 ln) | |
+| `.rtm` | Reality Tracker | Load_rtm.cpp (443 ln) | |
+| `.symmod` | Symphonie Pro | Load_symmod.cpp (1947 ln) | |
+| `.unic` | UNIC Tracker | Load_unic.cpp (251 ln) | |
+| `.rjp`, `.sng` | Richard Joseph | NP source available | Two-file format (.sng+.ins) |
+| `.trc` | Tronic | — | Same author as PumaTracker |
+
+---
+
+## ❌ Not Parseable (compiled 68k executables — UADE only)
+
+| Extension(s) | Format |
+|---|---|
+| `.hip`, `.hip7`, `.hst`, `.sog` | Jochen Hippel variants (other than CoSo) |
+| `.ash` | Ashley Hogg |
+| `.gray` | Fred Gray |
+| `.cin` | Cinemaware |
+| `.dm`, `.dm1`, `.dlm1`, `.dlm2` | Delta Music 1.x (compiled player binary) |
 
 ---
 
 ## Recently Completed
 
-- **2026-02-26**: IMSParser.ts — Images Music System (.ims), no magic, structural validation, 3-byte pattern cells. OpenMPT Load_ims.cpp reference.
-- **2026-02-26**: ICEParser.ts — ICE Tracker / SoundTracker 2.6 (.ice), "MTN\0"/"IT10" magic at +1464, track-based patterns. OpenMPT Load_ice.cpp reference.
-- **2026-02-26**: KRISParser.ts — ChipTracker (.kris), "KRIS" magic at +952, track-based with per-track transpose. OpenMPT Load_kris.cpp reference.
-- **2026-02-26**: GMCParser.ts — Game Music Creator (.gmc), 15 samples, 444-byte header, loop from sample end. OpenMPT Load_gmc.cpp reference.
-- **2026-02-26**: PumaTrackerParser.ts — PumaTracker (.puma), 4-channel Amiga tracker by Dirk Bialluch. Uses OpenMPT Load_puma.cpp as reference. 42 built-in waveforms embedded. RLE pattern decoding, vol/pitch script parsing for initial waveform assignment.
-- **2026-02-26**: SonicArrangerParser.ts — Sonic Arranger (.sa), implemented by other tab
-- **2026-02-26**: DeltaMusic2Parser.ts — Delta Music 2.0 (.dm2), implemented by other tab
+| Date | Format | Parser | Reference used |
+|---|---|---|---|
+| 2026-02-26 | InStereo! 1.0 & 2.0 | InStereo1Parser.ts, InStereo2Parser.ts | NostalgicPlayer |
+| 2026-02-26 | PumaTracker | PumaTrackerParser.ts | **OpenMPT** Load_puma.cpp |
+| 2026-02-26 | Sonic Arranger | SonicArrangerParser.ts | NostalgicPlayer |
+| 2026-02-26 | Art of Noise | ArtOfNoiseParser.ts | NostalgicPlayer |
+| 2026-02-26 | Ben Daglish | BenDaglishParser.ts | NostalgicPlayer |
+| 2026-02-26 | Delta Music 2.0 | DeltaMusic2Parser.ts | NostalgicPlayer + format spec |
+| 2026-02-26 | MEDParser → OctaMEDSynth | MEDParser.ts fix | libxmp med.h |
+| 2026-02-26 | David Whittaker | DavidWhittakerParser.ts | FlodJS DWPlayer + WASM synth |
+| 2026-02-26 | SidMon 1.0 | SidMon1Parser.ts | FlodJS S1Player + WASM synth |
+| 2026-02-26 | Rob Hubbard | RobHubbardParser.ts | FlodJS + WASM synth |
+| 2026-02-26 | Hippel CoSo | HippelCoSoParser.ts | FlodJS + WASM synth |
+| 2026-02-26 | TCB Tracker | TCBTrackerParser.ts | **OpenMPT** Load_tcb.cpp |
