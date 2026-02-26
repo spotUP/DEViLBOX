@@ -14,7 +14,7 @@ status: mostly-complete
 | 0 | Architecture & Types | ✅ Complete |
 | 1 | SoundMon pilot | ✅ Complete |
 | 2 | SidMon II + Digital Mugician | ✅ Complete |
-| 2b | OctaMED synth instruments | ⚠️ Partial — waveform extracted as Sampler; no real-time synthesis |
+| 2b | OctaMED synth instruments | ✅ Complete — full real-time vol/wf command-table oscillator via WASM |
 | 3 | Future Composer (FC13/FC14) | ✅ Complete |
 | 4 | TFMX — Jochen Hippel | ✅ Complete |
 | 5 | Fred Editor | ✅ Complete |
@@ -175,13 +175,18 @@ Format DSP Source → thin WASM wrapper → TypeScript engine → TypeScript syn
 
 ---
 
-### Group 9: OctaMED Synth Instruments — ⚠️ PARTIAL
+### Group 9: OctaMED Synth Instruments — ✅ COMPLETE
 
 **Formats:** `.med`, `.mmd0`, `.mmd1`, `.mmd2`, `.mmd3`
 **Parser:** `src/lib/import/formats/MEDParser.ts`
-**Current state (2026-02-26):** `SynthInstr` binary block is now parsed — the first waveform (256-byte signed PCM at offset `+0x114`) is extracted as a `Sampler` instrument with correct loop points. `samplePos` is advanced by `synthLen` so subsequent PCM instruments load at correct offsets.
-**Gap:** No `OctaMEDConfig` type, no real-time synthesis — instruments play the captured waveform rather than the full 10-waveform oscillator + 32-step ADSR table
-**Priority:** Low — the waveform extraction gives a usable (if approximate) sound
+**Completed (2026-02-27):** Full real-time synthesis pipeline implemented end-to-end:
+- `OctaMEDConfig` type in `src/types/instrument.ts` — voltbl (128 bytes), wftbl (128 bytes), up to 10×256-byte waveforms, volume, voltblSpeed, wfSpeed, vibratoSpeed, loopStart, loopLen
+- `octamed-wasm/src/octamed_synth.c` — vol/wf command-table oscillator, Amiga period table, vibrato (sine), arpeggio; up to 16 simultaneous players
+- `public/octamed/OctaMED.wasm` + `OctaMED.js` + `OctaMED.worklet.js` — compiled WASM + AudioWorklet
+- `src/engine/octamed/OctaMEDEngine.ts` + `OctaMEDSynth.ts` — singleton engine, binary serialization, note-on/off
+- `MEDParser.ts` parses all SynthInstr fields (voltbl at +22, wftbl at +150, waveform pointer table at +278) into OctaMEDConfig
+- `src/components/instruments/controls/OctaMEDControls.tsx` — 4-tab UI (Params, Vol Table, WF Table, Waveforms)
+- Registered in ToneEngine, InstrumentFactory, and UnifiedInstrumentEditor
 
 ---
 
@@ -272,7 +277,7 @@ Format DSP Source → thin WASM wrapper → TypeScript engine → TypeScript syn
 - **Phase B4** — TCB Tracker native parser (Atari ST)
 
 ### Low priority / future
-- **OctaMED real-time synthesis** — Add `OctaMEDConfig` type, 10-waveform oscillator + 32-step ADSR table; would require an `octamed-wasm/` build
+- ~~**OctaMED real-time synthesis**~~ — Complete as of 2026-02-27
 - **TFMX UI** — `TFMXControls.tsx` is currently read-only (VolModSeq/SndModSeq hex viewer); editable controls would require reverse-engineering the macro format further
 
 ---
