@@ -368,8 +368,10 @@ export async function parseUADEFile(
 
   // Synthesis-based formats use short macro-driven waveforms (16-32 bytes) that the
   // enhanced scan cannot reliably extract. Force classic (UADE playback) for these.
+  // NOTE: bare 'fc' is excluded here because .fc covers both FC 1.x (synthesis) and FC 2.0
+  // (real PCM samples). FC 2.0 should get enhanced treatment; only FC 1.x is synthesis.
   const SYNTHESIS_FORMATS = new Set([
-    'fc', 'fc3', 'sfc', 'bfc', 'bsi',        // Future Composer variants
+    'fc3', 'sfc', 'bfc', 'bsi',              // Future Composer 1.x variants (synthesis only)
     'bp', 'bp3', 'sm', 'sm2', 'sm3', 'sm4',  // SoundMon / BPSoundMon variants
     'fred',                                    // Fred Editor
     'sid', 'sid2',                             // SidMon variants
@@ -377,6 +379,15 @@ export async function parseUADEFile(
   if (mode === 'enhanced' && SYNTHESIS_FORMATS.has(ext)) {
     console.warn(`[UADEParser] ${ext.toUpperCase()} uses synthesis waveforms; using classic mode for accurate playback`);
     return buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+  }
+  // For .fc files, distinguish FC 1.x (synthesis: FC13/FC14/SMOD magic) from FC 2.0 (real PCM).
+  if (mode === 'enhanced' && ext === 'fc') {
+    const fcBytes = new Uint8Array(buffer, 0, 4);
+    const fcMagic = String.fromCharCode(fcBytes[0], fcBytes[1], fcBytes[2], fcBytes[3]);
+    if (fcMagic === 'FC13' || fcMagic === 'FC14' || fcMagic === 'SMOD') {
+      console.warn('[UADEParser] FC 1.x synthesis format (wavetable-only); using classic mode for accurate playback');
+      return buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    }
   }
 
   // If enhanced scan data is available AND mode is 'enhanced', build editable song
@@ -469,6 +480,22 @@ function buildEnhancedSong(
     ));
   }
 
+  // Build reverse-lookup: loop-start Amiga address → original sample pointer.
+  // After a DMA loop reload the Paula `lc` register changes to the loop-start
+  // address, so scan rows captured during looped playback have samplePtr equal
+  // to that loop-start address — NOT the original sample start that is the key
+  // in sampleMap.  Use the loopStart byte-offset (already computed by the
+  // worklet's loop-reload detector) to reconstruct the loop address and map it
+  // back to the original pointer so the correct instrument ID is found.
+  const loopAliasMap = new Map<number, number>(); // loopAddr → original samplePtr
+  for (const ptrStr of Object.keys(enhanced.samples)) {
+    const ptr = Number(ptrStr);
+    const s = enhanced.samples[ptr];
+    if (s?.loopStart > 0) {
+      loopAliasMap.set(ptr + s.loopStart, ptr);
+    }
+  }
+
   // Add a muted UADE reference instrument for comparison playback
   const uadeRefId = nextInstrId++;
   const uadeConfig: UADEConfig = {
@@ -548,7 +575,14 @@ function buildEnhancedSong(
         const noteIdx = periodToNoteIndex(ch.period);
         const xmNote = noteIdx > 0 ? noteIdx - 23 : 0;
         const note = (xmNote > 0 && xmNote <= 96) ? xmNote : 0;
-        const instrId = ch.samplePtr > 0 ? (sampleMap.get(ch.samplePtr) ?? 0) : 0;
+        // Resolve samplePtr → instrument ID.  After a DMA loop reload the
+        // samplePtr becomes the loop-start address; fall back to loopAliasMap
+        // so looped notes still get the correct instrument instead of id=0.
+        const rawPtr = ch.samplePtr;
+        const resolvedPtr = (rawPtr > 0 && !sampleMap.has(rawPtr))
+          ? (loopAliasMap.get(rawPtr) ?? rawPtr)
+          : rawPtr;
+        const instrId = resolvedPtr > 0 ? (sampleMap.get(resolvedPtr) ?? 0) : 0;
         const rawVol = Math.min(0x50, 0x10 + ch.volume);
         // Only write volume when it changes from the previous row — reduces pattern bloat
         const volume = rawVol !== prevVolPerChannel[chIdx] ? rawVol : 0;
