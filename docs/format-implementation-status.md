@@ -42,6 +42,10 @@ Release it (clear the column) when done.
 | `.puma` | PumaTracker | PumaTrackerParser.ts | ✅ Just implemented 2026-02-26 |
 | `.is`, `.is10` | InStereo! 1.0 | InStereo1Parser.ts | |
 | `.is20` | InStereo! 2.0 | InStereo2Parser.ts | |
+| `.ims` | Images Music System | IMSParser.ts | No magic; structural validation. 3-byte cells. ✅ 2026-02-26 |
+| `.ice` | ICE Tracker / SoundTracker 2.6 | ICEParser.ts | Magic "MTN\0"/"IT10" at +1464. Track-based. ✅ 2026-02-26 |
+| `.kris` | ChipTracker | KRISParser.ts | Magic "KRIS" at +952. Track-based w/ transpose. ✅ 2026-02-26 |
+| `.gmc` | Game Music Creator | GMCParser.ts | No magic; 15 samples, 444-byte header. ✅ 2026-02-26 |
 
 ---
 
@@ -61,7 +65,7 @@ Formats that would benefit from native parsing. Check OpenMPT (`Reference Code/o
 | `.tpu` | DirkBialluch | ? | — | Another Dirk Bialluch format |
 | `.is`, `.is20` | InStereo! | Already have parsers | — | Check if wired into parseModuleToSong |
 | `.jmf` | Janko Mrsic-Flogel | ? | — | Check NostalgicPlayer |
-| `.gmc` | GMC | ? | — | Check reference |
+| `.gmc` | GMC | GMCParser.ts | — | ✅ Implemented 2026-02-26 — moved to Implemented table |
 
 ---
 
@@ -104,6 +108,10 @@ Most packed MOD variants (`.ac1`, `.p40a`, `.pm`, etc.), obscure one-offs (`.aps
 
 ## Recently Completed
 
+- **2026-02-26**: IMSParser.ts — Images Music System (.ims), no magic, structural validation, 3-byte pattern cells. OpenMPT Load_ims.cpp reference.
+- **2026-02-26**: ICEParser.ts — ICE Tracker / SoundTracker 2.6 (.ice), "MTN\0"/"IT10" magic at +1464, track-based patterns. OpenMPT Load_ice.cpp reference.
+- **2026-02-26**: KRISParser.ts — ChipTracker (.kris), "KRIS" magic at +952, track-based with per-track transpose. OpenMPT Load_kris.cpp reference.
+- **2026-02-26**: GMCParser.ts — Game Music Creator (.gmc), 15 samples, 444-byte header, loop from sample end. OpenMPT Load_gmc.cpp reference.
 - **2026-02-26**: PumaTrackerParser.ts — PumaTracker (.puma), 4-channel Amiga tracker by Dirk Bialluch. Uses OpenMPT Load_puma.cpp as reference. 42 built-in waveforms embedded. RLE pattern decoding, vol/pitch script parsing for initial waveform assignment.
 - **2026-02-26**: SonicArrangerParser.ts — Sonic Arranger (.sa), implemented by other tab
 - **2026-02-26**: DeltaMusic2Parser.ts — Delta Music 2.0 (.dm2), implemented by other tab

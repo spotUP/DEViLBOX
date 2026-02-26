@@ -570,6 +570,54 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── Images Music System (.ims) ────────────────────────────────────────────
+  if (/\.ims$/.test(filename)) {
+    try {
+      const { isIMSFormat, parseIMSFile } = await import('@lib/import/formats/IMSParser');
+      if (isIMSFormat(buffer)) return parseIMSFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[IMSParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    }
+    const { parseUADEFile: parseUADE_ims } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_ims(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── ICE Tracker / SoundTracker 2.6 (.ice) ────────────────────────────────
+  if (/\.ice$/.test(filename)) {
+    try {
+      const { isICEFormat, parseICEFile } = await import('@lib/import/formats/ICEParser');
+      if (isICEFormat(buffer)) return parseICEFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[ICEParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    }
+    const { parseUADEFile: parseUADE_ice } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_ice(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── ChipTracker (.kris) ───────────────────────────────────────────────────
+  if (/\.kris$/.test(filename)) {
+    try {
+      const { isKRISFormat, parseKRISFile } = await import('@lib/import/formats/KRISParser');
+      if (isKRISFormat(buffer)) return parseKRISFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[KRISParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    }
+    const { parseUADEFile: parseUADE_kris } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_kris(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── Game Music Creator (.gmc) ─────────────────────────────────────────────
+  if (/\.gmc$/.test(filename)) {
+    try {
+      const { isGMCFormat, parseGMCFile } = await import('@lib/import/formats/GMCParser');
+      if (isGMCFormat(buffer)) return parseGMCFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[GMCParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    }
+    const { parseUADEFile: parseUADE_gmc } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_gmc(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
