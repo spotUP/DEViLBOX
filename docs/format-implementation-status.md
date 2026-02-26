@@ -31,7 +31,7 @@ Track which formats have native parsers vs UADE-only.
 | `.dmu`, `.dmu2`, `.mug`, `.mug2` | Digital Mugician | DigitalMugicianParser.ts | NostalgicPlayer | UADE fallback |
 | `.tfmx`, `.mdat` | TFMX (Jochen Hippel) | TFMXParser.ts | libtfmxaudiodecoder | UADE fallback |
 | `.hipc`, `.soc`, `.coso` | Hippel CoSo | HippelCoSoParser.ts | FlodJS + WASM synth | UADE fallback |
-| `.rh`, `.rhp` | Rob Hubbard | RobHubbardParser.ts | FlodJS + WASM synth | UADE fallback |
+| `.rh`, `.rhp` | Rob Hubbard | RobHubbardParser.ts | UADE eagleplayer asm | UADE fallback |
 | `.dw`, `.dwold` | David Whittaker | DavidWhittakerParser.ts | FlodJS + WASM synth | UADE fallback |
 | `.aon`, `.aon8` | Art of Noise | ArtOfNoiseParser.ts | NostalgicPlayer | UADE fallback |
 | `.bd`, `.bds` | Ben Daglish | BenDaglishParser.ts | NostalgicPlayer | UADE fallback |
@@ -226,7 +226,7 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | MEDParser → OctaMEDSynth | MEDParser.ts fix | libxmp med.h |
 | 2026-02-26 | David Whittaker | DavidWhittakerParser.ts | FlodJS DWPlayer + WASM synth |
 | 2026-02-26 | SidMon 1.0 | SidMon1Parser.ts | FlodJS S1Player + WASM synth |
-| 2026-02-26 | Rob Hubbard | RobHubbardParser.ts | FlodJS + WASM synth |
+| 2026-02-26 | Rob Hubbard | RobHubbardParser.ts | UADE eagleplayer asm |
 | 2026-02-26 | Hippel CoSo | HippelCoSoParser.ts | FlodJS + WASM synth |
 | 2026-02-26 | TCB Tracker | TCBTrackerParser.ts | **OpenMPT** Load_tcb.cpp |
 | 2026-02-26 | Game Music Creator | GameMusicCreatorParser.ts | **OpenMPT** Load_gmc.cpp |
@@ -307,3 +307,49 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | Alcatraz Packer | AlcatrazPackerParser.ts | UADE eagleplayer asm |
 | 2026-02-26 | Blade Packer | BladePackerParser.ts | UADE eagleplayer asm |
 | 2026-02-26 | Images Music System (prefix) | ImagesMusicSystemParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | UFO / MicroProse | UFOParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Dave Lowe | DaveLoweParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Sean Conran | SeanConranParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Thomas Hermann | ThomasHermannParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Titanics Packer | TitanicsPackerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Kris Hatlelid | KrisHatlelidParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | NTSP System | NTSPParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | UFO prefix routing (MUS.*, UFO.*) | UFOParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Mosh Packer | MoshPackerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Mugician prefix routing (MUG.*, MUG2.*) | DigitalMugicianParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Core Design | CoreDesignParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Janko Mrsic-Flogel | JankoMrsicFlogelParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Special FX (Jonathan Dunn) | SpecialFXParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Sound Player (Steve Barrett) | SoundPlayerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Nick Pelling Packer | NickPellingPackerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Peter Verswyvelen Packer | PeterVerswyvelenPackerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Wally Beben | WallyBebenParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Steve Barrett | SteveBarrettParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Paul Summers | PaulSummersParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Desire | DesireParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Dave Lowe New | DaveLoweNewParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Martin Walker | MartinWalkerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Paul Shields | PaulShieldsParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Paul Robotham | PaulRobothamParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Pierre Adane Packer | PierreAdaneParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Anders Oland | Anders0landParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Andrew Parton | AndrewPartonParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Custom Made | CustomMadeParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Ben Daglish prefix routing (BD.*) | BenDaglishParser.ts | NostalgicPlayer |
+| 2026-02-26 | Ben Daglish SID | BenDaglishSIDParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Magnetic Fields Packer prefix routing (MFP.*) | MagneticFieldsPackerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Digital Sonix Chrome | DigitalSonixChromeParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Sonix Music Driver | SonixMusicDriverParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Jesper Olsen | JesperOlsenParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Kim Christensen | KimChristensenParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Ashley Hogg | AshleyHoggParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | ADPCM Mono | ADPCMmonoParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Janne Salmijarvi | JanneSalmijarviParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Jochen Hippel 7V | JochenHippel7VParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Jochen Hippel ST | JochenHippelSTParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Maximum Effect | MaximumEffectParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | MIDI Loriciel | MIDILoricielParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | onEscapee | OnEscapeeParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Paul Tonge | PaulTongeParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Rob Hubbard ST | RobHubbardSTParser.ts | UADE eagleplayer asm |
+| 2026-02-27 | Routing audit: 108 silent stub parsers rerouted | — | All metadata-only native parser paths removed; formats now correctly fall through to UADE/libopenmpt instead of returning silent placeholder TrackerSongs |
