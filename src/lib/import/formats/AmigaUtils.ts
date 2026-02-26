@@ -158,5 +158,13 @@ export function createSamplerInstrument(
       reverse: false,
       playbackRate: 1.0,
     },
+    metadata: {
+      modPlayback: {
+        usePeriodPlayback: true,      // Amiga samples use period-based frequency (not note-name)
+        periodMultiplier: 3546895,    // AMIGA_PALFREQUENCY_HALF (PAL: 3546895, NTSC: 3579545)
+        finetune: 0,
+        defaultVolume: volume,        // Instrument default volume (0-64) for MOD channel init
+      },
+    },
   } as InstrumentConfig;
 }
