@@ -69,37 +69,6 @@ const PAL_CLOCK = 3546895;
 /** Minimum file size for a Ben Daglish module */
 const BD_MIN_SIZE = 0x1600;
 
-/**
- * Ben Daglish FineTune table (from NostalgicPlayer Tables.cs).
- * 96 entries (8 octaves × 12 notes), each a 32-bit fixed-point value:
- *   high 16 bits = integer part, low 16 bits = fractional part.
- * Period = ((finetune[j] & 0xffff) * fineTunePeriod >> 16) + (finetune[j] >> 16) * fineTunePeriod
- * where fineTunePeriod is per-sample.
- *
- * We use the upper 16 bits (integer part) as the Amiga period for note mapping.
- * The table covers C-0 to B-7 (8 octaves starting at the lowest playable note).
- */
-const BD_FINETUNE_TABLE: number[] = [
-  // These are the 32-bit fixed-point period multipliers from NostalgicPlayer.
-  // Upper 16 bits = base period at this note (in Amiga period units relative to sample rate).
-  // Values from BenDaglishWorker.cs Tables.FineTune[]
-  0x06B00000, 0x06540000, 0x05FC0000, 0x05A80000, 0x05580000, 0x050C0000,
-  0x04C40000, 0x04800000, 0x04400000, 0x04020000, 0x03C80000, 0x03920000,
-  0x03580000, 0x032A0000, 0x02FE0000, 0x02D40000, 0x02AC0000, 0x02860000,
-  0x02620000, 0x02400000, 0x02200000, 0x02010000, 0x01E40000, 0x01C90000,
-  0x01AC0000, 0x01950000, 0x017F0000, 0x016A0000, 0x01560000, 0x01430000,
-  0x01310000, 0x01200000, 0x01100000, 0x01010000, 0x00F20000, 0x00E50000,
-  0x00D60000, 0x00CA0000, 0x00BF0000, 0x00B50000, 0x00AB0000, 0x00A20000,
-  0x00990000, 0x00900000, 0x00880000, 0x00800000, 0x00790000, 0x00720000,
-  0x006B0000, 0x00650000, 0x005F0000, 0x005A0000, 0x00550000, 0x00510000,
-  0x004C0000, 0x00480000, 0x00440000, 0x00400000, 0x003C0000, 0x00390000,
-  0x00360000, 0x00320000, 0x002F0000, 0x002D0000, 0x002A0000, 0x00280000,
-  0x00260000, 0x00240000, 0x00220000, 0x00200000, 0x001E0000, 0x001C0000,
-  0x001B0000, 0x00190000, 0x00170000, 0x00160000, 0x00150000, 0x00140000,
-  0x00130000, 0x00120000, 0x00110000, 0x00100000, 0x000F0000, 0x000E0000,
-  0x000D0000, 0x000C0000, 0x000B0000, 0x000B0000, 0x000A0000, 0x000A0000,
-  0x00090000, 0x00090000, 0x00080000, 0x00080000, 0x00080000, 0x00070000,
-];
 
 // ── Utility ────────────────────────────────────────────────────────────────
 
@@ -658,18 +627,6 @@ function loadTrack(bytes: Uint8Array, start: number, features: BDFeatures): numb
 }
 
 // ── Position list interpretation ───────────────────────────────────────────
-
-interface BDVoiceState {
-  positionList: number[];
-  positionIdx: number;
-  trackLoopCounter: number;
-  transpose: number;
-  /** map from track position index (0..7 or similar) to sample index */
-  sampleMapping: number[];
-  playingTrackIndex: number;   // which track is currently active
-  trackBuf: number[];
-  trackPos: number;
-}
 
 /**
  * Walk a position list once (no looping) and collect (trackIndex, transpose) pairs.

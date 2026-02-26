@@ -386,18 +386,18 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   // Each sub-song entry: 4 × uint32 BE (track list pointers from file start)
   const subSongTrackOffsets: number[][] = [];
 
-  let actualSubSongs = numberOfSubSongs;
+  let _actualSubSongs = numberOfSubSongs;
   for (let i = 0; i < numberOfSubSongs; i++) {
     const base = subSongInfoOffset + i * 16;
     if (base + 16 > fileLen) {
-      actualSubSongs = i;
+      _actualSubSongs = i;
       break;
     }
     const offsets: number[] = [];
     for (let j = 0; j < 4; j++) {
       const trackListOffset = u32BE(bytes, base + j * 4) + AMIGA_HUNK_SIZE;
       if (trackListOffset >= fileLen) {
-        actualSubSongs = i;
+        _actualSubSongs = i;
         break;
       }
       offsets.push(trackListOffset);
@@ -411,7 +411,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   // ── Load track lists for each sub-song ──────────────────────────────────
   const subSongs: RkSongInfo[] = [];
 
-  function loadSingleTrackList(offset: number): RkTrack[] | null {
+  function _loadSingleTrackList(offset: number): RkTrack[] | null {
     const tracks: RkTrack[] = [];
     let off = offset;
     for (;;) {
@@ -422,7 +422,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       const trackAbsOffset = trackOffset + AMIGA_HUNK_SIZE;
       off += 2; // skip 2 bytes (reserved/padding)
       if (off + 2 > fileLen) return null;
-      const transpose = s16BE(bytes, off + 2); // actually at off+2 since we skipped 2
+      const _transpose = s16BE(bytes, off + 2); // actually at off+2 since we skipped 2
       // Per NostalgicPlayer: seek(2) then read int16 transpose
       // Re-reading the code:
       //   trackOffset = Read_B_INT32() → 4 bytes consumed, off moved by 4
@@ -844,7 +844,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       const decodedRows = decodeTrackToRows(trackData, ROWS_PER_TRACK, entry.transpose);
 
       for (const row of decodedRows) {
-        const xmNote = row.noteIdx > 0 ? rkNoteToXM(row.noteIdx - 1) : 0;
+        const _xmNote = row.noteIdx > 0 ? rkNoteToXM(row.noteIdx - 1) : 0;
         // Note byte in RK is 0-based index into period table; 0 means C-0 (lowest note)
         // Actually in RK, the note byte is the period table index directly (no special 0=empty)
         // But 0x80+ are effects. So note 0 means period[0] which is 6848 (very low).

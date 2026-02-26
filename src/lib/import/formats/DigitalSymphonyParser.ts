@@ -93,7 +93,7 @@ const ULAW_TABLE: Int16Array = (() => {
 
 // ── Binary reader class ────────────────────────────────────────────────────────
 
-class Reader {
+class _Reader {
   public pos: number;
   private data: Uint8Array;
   private view: DataView;

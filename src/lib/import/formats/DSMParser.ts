@@ -379,7 +379,7 @@ function parseRiffDSMF(v: DataView, bytes: Uint8Array, filename: string): Tracke
   }
 
   // Global volume: 0–64 → 0–256; if 0 → max
-  const globalVol = Math.min(songHeader.globalVol, 64) * 4 || 256;
+  const _globalVol = Math.min(songHeader.globalVol, 64) * 4 || 256;
 
   // Parse remaining chunks: PATT and INST
   const patterns:    Pattern[]          = [];
