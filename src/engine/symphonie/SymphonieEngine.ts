@@ -21,6 +21,10 @@ export class SymphonieEngine {
 
   private constructor() {}
 
+  static hasInstance(): boolean {
+    return SymphonieEngine.instance !== null && !SymphonieEngine.instance._disposed;
+  }
+
   static getInstance(): SymphonieEngine {
     if (!SymphonieEngine.instance || SymphonieEngine.instance._disposed) {
       SymphonieEngine.instance = new SymphonieEngine();
