@@ -134,6 +134,50 @@ Track which formats have native parsers vs UADE-only.
 | `ALP.*` | Alcatraz Packer | AlcatrazPackerParser.ts | UADE eagleplayer asm | 'PAn\x10' magic + size check; UADE fallback |
 | `UDS.*` | Blade Packer | BladePackerParser.ts | UADE eagleplayer asm | 0x538F4E47 magic; 8-channel; UADE fallback |
 | `IMS.*` | Images Music System (prefix) | ImagesMusicSystemParser.ts | UADE eagleplayer asm | offset-arithmetic detection; UADE fallback |
+| `SCR.*` | Sean Conran | SeanConranParser.ts | UADE eagleplayer asm | 3-path 68k signature + 128-word scan; UADE fallback |
+| `THM.*` | Thomas Hermann | ThomasHermannParser.ts | UADE eagleplayer asm | relocation table offset arithmetic; UADE fallback |
+| `TITS.*` | Titanics Packer | TitanicsPackerParser.ts | UADE eagleplayer asm | 128-word scan at offset 180; UADE fallback |
+| `KH.*` | Kris Hatlelid | KrisHatlelidParser.ts | UADE eagleplayer asm | 11 fixed-offset checks; UADE fallback |
+| `TWO.*` | NTSP System | NTSPParser.ts | UADE eagleplayer asm | 'SPNT' magic + non-zero; UADE fallback |
+| `MUS.*`, `UFO.*` | UFO / MicroProse (prefix) | UFOParser.ts | UADE eagleplayer asm | IFF FORM+DDAT+BODY+CHAN; UADE fallback |
+| `MOSH.*` | Mosh Packer | MoshPackerParser.ts | UADE eagleplayer asm | 31 sample headers + M.K. at 378; UADE fallback |
+| `MUG.*` | Mugician (prefix) | DigitalMugicianParser.ts | UADE eagleplayer asm | reuses DigitalMugician; UADE fallback |
+| `MUG2.*` | Mugician II (prefix) | DigitalMugicianParser.ts | UADE eagleplayer asm | reuses DigitalMugician; UADE fallback |
+| `CORE.*` | Core Design | CoreDesignParser.ts | UADE eagleplayer asm | 0x000003F3 + 'S.PH'+'IPPS' + 5 non-zero ptrs; UADE fallback |
+| `JMF.*` | Janko Mrsic-Flogel | JankoMrsicFlogelParser.ts | UADE eagleplayer asm | 0x000003F3 + 'J.FL'+'OGEL'; UADE fallback |
+| `JD.*` | Special FX (Jonathan Dunn) | SpecialFXParser.ts | UADE eagleplayer asm | 4×BRA opcode + even offsets; UADE fallback |
+| `SJS.*` | Sound Player (Steve Barrett) | SoundPlayerParser.ts | UADE eagleplayer asm | byte constraints at offsets 1–14; UADE fallback |
+| `NPP.*` | Nick Pelling Packer | NickPellingPackerParser.ts | UADE eagleplayer asm | 'COMP' + size range + decompSize check; UADE fallback |
+| `PVP.*` | Peter Verswyvelen Packer | PeterVerswyvelenPackerParser.ts | UADE eagleplayer asm | 31 sample headers + step validation; UADE fallback |
+| `WB.*` | Wally Beben | WallyBebenParser.ts | UADE eagleplayer asm | BRA + MOVEM.L + BSR opcodes; UADE fallback |
+| `SB.*` | Steve Barrett | SteveBarrettParser.ts | UADE eagleplayer asm | 4×BRA loop + MOVE.L DMA register; UADE fallback |
+| `SNK.*` | Paul Summers | PaulSummersParser.ts | UADE eagleplayer asm | 0x46FC2700 scan + RTE check; UADE fallback |
+| `DSR.*` | Desire | DesireParser.ts | UADE eagleplayer asm | 4×0x00010101 + code scan; UADE fallback |
+| `DLN.*` | Dave Lowe New | DaveLoweNewParser.ts | UADE eagleplayer asm | table-based detection; UADE fallback |
+| `AVP.*`, `MW.*` | Martin Walker (prefix) | MartinWalkerParser.ts | UADE eagleplayer asm | 5 sub-variants; LSLW + LEA + MOVEM checks; UADE fallback |
+| `PS.*` | Paul Shields | PaulShieldsParser.ts | UADE eagleplayer asm | 10 zero bytes + 3 sub-variants; UADE fallback |
+| `DAT.*` | Paul Robotham | PaulRobothamParser.ts | UADE eagleplayer asm | structured header + 127×0x3F3F check; UADE fallback |
+| `PAP.*` | Pierre Adane Packer | PierreAdaneParser.ts | UADE eagleplayer asm | 4-word offset header + gap equality; UADE fallback |
+| `HOT.*` | Anders 0land | Anders0landParser.ts | UADE eagleplayer asm | 3-chunk chain (mpl+mdt+msm); UADE fallback |
+| `BYE.*` | Andrew Parton | AndrewPartonParser.ts | UADE eagleplayer asm | 'BANK' magic + 20+40 word range checks; UADE fallback |
+| `CM.*`, `RK.*`, `RKB.*` | Custom Made | CustomMadeParser.ts | UADE eagleplayer asm | JMP/JSR/BRA.W + CLR.B scan; UADE fallback |
+| `BD.*` | Ben Daglish (prefix) | BenDaglishParser.ts | NostalgicPlayer | 3×BRA + branch target checks; UADE fallback |
+| `BDS.*` | Ben Daglish SID | BenDaglishSIDParser.ts | UADE eagleplayer asm | 0x000003F3 + 'DAGL'+'ISH!' magic; UADE fallback |
+| `MFP.*` | Magnetic Fields Packer (prefix) | MagneticFieldsPackerParser.ts | UADE eagleplayer asm | pattern count + restart byte checks; UADE fallback |
+| `DSC.*` | Digital Sonix Chrome | DigitalSonixChromeParser.ts | UADE eagleplayer asm | nLengths/nSamples + song size + sample loop; UADE fallback |
+| `SMUS.*`, `SNX.*`, `TINY.*` | Sonix Music Driver | SonixMusicDriverParser.ts | UADE eagleplayer asm | 3-path (IFF SMUS, tiny binary, snx binary); UADE fallback |
+| `JO.*` | Jesper Olsen | JesperOlsenParser.ts | UADE eagleplayer asm | 2-branch (new pointer table; old 3×BRA/marker scan); UADE fallback |
+| `KIM.*` | Kim Christensen | KimChristensenParser.ts | UADE eagleplayer asm | MOVEA.L scan + 6-opcode sequence; UADE fallback |
+| `ASH.*` | Ashley Hogg | AshleyHoggParser.ts | UADE eagleplayer asm | 4-pair BRA + new/old format check; UADE fallback |
+| `ADPCM.*` | ADPCM Mono | ADPCMmonoParser.ts | UADE eagleplayer asm | extension check, excludes ADPC magic; UADE fallback |
+| `JS.*` | Janne Salmijarvi Optimizer | JanneSalmijarviParser.ts | UADE eagleplayer asm | 'JS92' at offset 1080 + size > 2112; UADE fallback |
+| `HIP7.*`, `S7G.*` | Jochen Hippel 7V | JochenHippel7VParser.ts | UADE eagleplayer asm | loader stub or bare TFMX + mulu #28 structure; UADE fallback |
+| `HST.*` | Jochen Hippel ST | JochenHippelSTParser.ts | UADE eagleplayer asm | MCMD or SOG/TFMX-ST + mulu #12 structure; UADE fallback |
+| `MAX.*` | Maximum Effect | MaximumEffectParser.ts | UADE eagleplayer asm | sub-song count 1–15 + pointer divisibility; UADE fallback |
+| `MIDI.*` | MIDI Loriciel | MIDILoricielParser.ts | UADE eagleplayer asm | Standard MIDI MThd + MTrk validation; UADE fallback |
+| `ONE.*` | onEscapee | OnEscapeeParser.ts | UADE eagleplayer asm | 24× $AA55FF00 or $55AA00FF sentinel; UADE fallback |
+| `PAT.*` | Paul Tonge | PaulTongeParser.ts | UADE eagleplayer asm | $000C header + 3 indirect $80/$8F byte checks; UADE fallback |
+| `RHO.*` | Rob Hubbard ST | RobHubbardSTParser.ts | UADE eagleplayer asm | 3 hardcoded 68k instruction longs; UADE fallback |
 
 ---
 
@@ -161,8 +205,7 @@ Track which formats have native parsers vs UADE-only.
 
 | Extension(s) | Format |
 |---|---|
-| `.hip`, `.hip7`, `.hst`, `.sog` | Jochen Hippel variants (other than CoSo) |
-| `.ash` | Ashley Hogg |
+| `.hip`, `.sog` | Jochen Hippel (standard .hip extension — compiled loader, not prefix-based) |
 | `.gray` | Fred Gray |
 | `.dlm1`, `.dlm2` | Delta Music Loader variants (compiled 68k loader binary) |
 
