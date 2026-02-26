@@ -550,6 +550,46 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── Synthesis ─────────────────────────────────────────────────────────────
+  // .syn files — identified by "Synth4.0" at offset 0 or "Synth4.2" at 0x1f0e.
+  if (/\.syn$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.synthesis === 'native') {
+      try {
+        const { isSynthesisFormat, parseSynthesisFile } = await import('@lib/import/formats/SynthesisParser');
+        const bytes = new Uint8Array(buffer);
+        if (isSynthesisFormat(bytes)) {
+          const result = parseSynthesisFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[SynthesisParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Music Assembler ────────────────────────────────────────────────────────
+  // .ma files — identified by M68k player bytecode scanning (no magic bytes).
+  if (/\.ma$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.musicAssembler === 'native') {
+      try {
+        const { isMusicAssemblerFormat, parseMusicAssemblerFile } = await import('@lib/import/formats/MusicAssemblerParser');
+        const bytes = new Uint8Array(buffer);
+        if (isMusicAssemblerFormat(bytes)) {
+          const result = parseMusicAssemblerFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[MusicAssemblerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── Ben Daglish ───────────────────────────────────────────────────────────
   // .bd files — identified by M68k assembler signatures (no magic bytes).
   if (/\.bd$/.test(filename)) {
