@@ -1026,6 +1026,28 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     // Fall through to libopenmpt
   }
 
+  // ── Ultimate SoundTracker (.stk) ──────────────────────────────────────────
+  if (/\.stk$/.test(filename)) {
+    try {
+      const { isSTKFormat, parseSTKFile } = await import('@lib/import/formats/STKParser');
+      if (isSTKFormat(buffer)) return parseSTKFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[STKParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── SoundTracker Pro II (.stp) ─────────────────────────────────────────────
+  if (/\.stp$/.test(filename)) {
+    try {
+      const { isSTPFormat, parseSTPFile } = await import('@lib/import/formats/STPParser');
+      if (isSTPFormat(buffer)) return parseSTPFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[STPParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
