@@ -1409,6 +1409,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _mightBeDL = /\.dl$/i.test(filename) || /\.dl_deli$/i.test(filename) || _dlBase.startsWith('dl.');
     if (_mightBeDL) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.daveLowe === 'native') {
+        try {
+          const { isDaveLoweFormat, parseDaveLoweFile } = await import('@lib/import/formats/DaveLoweParser');
+          if (isDaveLoweFormat(new Uint8Array(buffer))) return await parseDaveLoweFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[DaveLoweParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_dl } = await import('@lib/import/formats/UADEParser');
       return parseUADE_dl(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1633,6 +1641,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _tmkBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_tmkBase.startsWith('tmk.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.timeTracker === 'native') {
+        try {
+          const { isTimeTrackerFormat, parseTimeTrackerFile } = await import('@lib/import/formats/TimeTrackerParser');
+          if (isTimeTrackerFormat(buffer)) return parseTimeTrackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[TimeTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_tmk } = await import('@lib/import/formats/UADEParser');
       return parseUADE_tmk(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1644,6 +1660,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _krisBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_krisBase.startsWith('kris.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.chipTracker === 'native') {
+        try {
+          const { isChipTrackerFormat, parseChipTrackerFile } = await import('@lib/import/formats/ChipTrackerParser');
+          if (isChipTrackerFormat(buffer)) return parseChipTrackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[ChipTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_kris } = await import('@lib/import/formats/UADEParser');
       return parseUADE_kris(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1655,6 +1679,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _cinBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_cinBase.startsWith('cin.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.cinemaware === 'native') {
+        try {
+          const { isCinemawareFormat, parseCinemawareFile } = await import('@lib/import/formats/CinemawareParser');
+          if (isCinemawareFormat(buffer)) return parseCinemawareFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[CinemawareParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_cin } = await import('@lib/import/formats/UADEParser');
       return parseUADE_cin(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1666,6 +1698,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _ntpBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_ntpBase.startsWith('ntp.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.novoTradePacker === 'native') {
+        try {
+          const { isNovoTradePackerFormat, parseNovoTradePackerFile } = await import('@lib/import/formats/NovoTradePackerParser');
+          if (isNovoTradePackerFormat(buffer)) return parseNovoTradePackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[NovoTradePackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_ntp } = await import('@lib/import/formats/UADEParser');
       return parseUADE_ntp(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1677,6 +1717,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _alpBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_alpBase.startsWith('alp.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.alcatrazPacker === 'native') {
+        try {
+          const { isAlcatrazPackerFormat, parseAlcatrazPackerFile } = await import('@lib/import/formats/AlcatrazPackerParser');
+          if (isAlcatrazPackerFormat(buffer)) return parseAlcatrazPackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[AlcatrazPackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_alp } = await import('@lib/import/formats/UADEParser');
       return parseUADE_alp(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1688,6 +1736,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _udsBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_udsBase.startsWith('uds.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.bladePacker === 'native') {
+        try {
+          const { isBladePackerFormat, parseBladePackerFile } = await import('@lib/import/formats/BladePackerParser');
+          if (isBladePackerFormat(buffer)) return parseBladePackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[BladePackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_uds } = await import('@lib/import/formats/UADEParser');
       return parseUADE_uds(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1699,6 +1755,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _sgBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_sgBase.startsWith('sg.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.tomyTracker === 'native') {
+        try {
+          const { isTomyTrackerFormat, parseTomyTrackerFile } = await import('@lib/import/formats/TomyTrackerParser');
+          if (isTomyTrackerFormat(buffer)) return parseTomyTrackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[TomyTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_sg } = await import('@lib/import/formats/UADEParser');
       return parseUADE_sg(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1711,6 +1775,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _imspBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_imspBase.startsWith('ims.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.imagesMusicSystem === 'native') {
+        try {
+          const { isImagesMusicSystemFormat, parseImagesMusicSystemFile } = await import('@lib/import/formats/ImagesMusicSystemParser');
+          if (isImagesMusicSystemFormat(buffer)) return parseImagesMusicSystemFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[ImagesMusicSystemParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_imsp } = await import('@lib/import/formats/UADEParser');
       return parseUADE_imsp(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1721,6 +1793,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _exBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_exBase.startsWith('ex.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.fashionTracker === 'native') {
+        try {
+          const { isFashionTrackerFormat, parseFashionTrackerFile } = await import('@lib/import/formats/FashionTrackerParser');
+          if (isFashionTrackerFormat(buffer)) return parseFashionTrackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[FashionTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_ex } = await import('@lib/import/formats/UADEParser');
       return parseUADE_ex(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1731,8 +1811,245 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const _mmsBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_mmsBase.startsWith('mms.') || _mmsBase.startsWith('sfx20.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.multiMediaSound === 'native') {
+        try {
+          const { isMultiMediaSoundFormat, parseMultiMediaSoundFile } = await import('@lib/import/formats/MultiMediaSoundParser');
+          if (isMultiMediaSoundFormat(buffer)) return parseMultiMediaSoundFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[MultiMediaSoundParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_mms } = await import('@lib/import/formats/UADEParser');
       return parseUADE_mms(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Sean Conran (SCR.* prefix) ───────────────────────────────────────────
+  // Compiled 68k Amiga music. Three detection paths with specific 68k opcodes + scan.
+  {
+    const _scrBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_scrBase.startsWith('scr.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.seanConran === 'native') {
+        try {
+          const { isSeanConranFormat, parseSeanConranFile } = await import('@lib/import/formats/SeanConranParser');
+          if (isSeanConranFormat(new Uint8Array(buffer))) return await parseSeanConranFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[SeanConranParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_scr } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_scr(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Thomas Hermann (THM.* prefix) ────────────────────────────────────────
+  // Compiled 68k Amiga music. Relocation table structure with arithmetic checks.
+  {
+    const _thmBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_thmBase.startsWith('thm.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.thomasHermann === 'native') {
+        try {
+          const { isThomasHermannFormat, parseThomasHermannFile } = await import('@lib/import/formats/ThomasHermannParser');
+          if (isThomasHermannFormat(new Uint8Array(buffer))) return await parseThomasHermannFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[ThomasHermannParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_thm } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_thm(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Titanics Packer (TITS.* prefix) ──────────────────────────────────────
+  // Amiga packed music format. Detection: 128 words at offset 180 (even, non-zero).
+  {
+    const _titsBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_titsBase.startsWith('tits.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.titanicsPacker === 'native') {
+        try {
+          const { isTitanicsPackerFormat, parseTitanicsPackerFile } = await import('@lib/import/formats/TitanicsPackerParser');
+          if (isTitanicsPackerFormat(buffer)) return parseTitanicsPackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[TitanicsPackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_tits } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_tits(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Kris Hatlelid (KH.* prefix) ──────────────────────────────────────────
+  // Compiled 68k Amiga music. Fixed-offset pattern with 0x000003F3 header.
+  {
+    const _khBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_khBase.startsWith('kh.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_kh } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_kh(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── NTSP System (TWO.* prefix) ───────────────────────────────────────────
+  // Amiga 2-file packed format. Magic: 'SPNT' at offset 0 + non-zero at offset 4.
+  {
+    const _twoBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_twoBase.startsWith('two.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_two } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_two(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── UFO / MicroProse (MUS.* / UFO.* prefix) ──────────────────────────────
+  // IFF-based 4-channel Amiga format. FORM+DDAT+BODY+CHAN structure.
+  {
+    const _ufoBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_ufoBase.startsWith('mus.') || _ufoBase.startsWith('ufo.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_ufop } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_ufop(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Mosh Packer (MOSH.* prefix) ──────────────────────────────────────────
+  // SoundTracker-compatible Amiga packed format. 31 sample headers + M.K. at 378.
+  {
+    const _moshBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_moshBase.startsWith('mosh.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_mosh } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_mosh(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Mugician (MUG.* prefix) ───────────────────────────────────────────────
+  // Same format as .mug/.dmu — " MUGICIAN/SOFTEYES 1990" signature at offset 0.
+  {
+    const _mugBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_mugBase.startsWith('mug.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.mugician === 'native') {
+        try {
+          const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
+          return parseDigitalMugicianFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[DigitalMugicianParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_mug } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_mug(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Mugician II (MUG2.* prefix) ───────────────────────────────────────────
+  // Same format as .mug2/.dmu2 — " MUGICIAN2/SOFTEYES 1990" signature at offset 0.
+  {
+    const _mug2Base = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_mug2Base.startsWith('mug2.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.mugician === 'native') {
+        try {
+          const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
+          return parseDigitalMugicianFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[DigitalMugicianParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_mug2 } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_mug2(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Core Design (CORE.* prefix) ───────────────────────────────────────────
+  {
+    const _coreBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_coreBase.startsWith('core.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_core } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_core(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Janko Mrsic-Flogel (JMF.* prefix) ────────────────────────────────────
+  {
+    const _jmfBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_jmfBase.startsWith('jmf.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_jmf } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_jmf(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Special FX (JD.* prefix) ──────────────────────────────────────────────
+  {
+    const _jdBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_jdBase.startsWith('jd.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_jd } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_jd(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Sound Player / Steve Barrett (SJS.* prefix) ───────────────────────────
+  {
+    const _sjsBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_sjsBase.startsWith('sjs.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_sjs } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_sjs(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Nick Pelling Packer (NPP.* prefix) ────────────────────────────────────
+  {
+    const _nppBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_nppBase.startsWith('npp.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_npp } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_npp(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Peter Verswyvelen Packer (PVP.* prefix) ───────────────────────────────
+  {
+    const _pvpBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_pvpBase.startsWith('pvp.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_pvp } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_pvp(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Wally Beben (WB.* prefix) ─────────────────────────────────────────────
+  {
+    const _wbBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_wbBase.startsWith('wb.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_wb } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_wb(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Steve Barrett (SB.* prefix) ───────────────────────────────────────────
+  {
+    const _sbBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_sbBase.startsWith('sb.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_sb } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_sb(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Paul Summers (SNK.* prefix) ───────────────────────────────────────────
+  {
+    const _snkBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_snkBase.startsWith('snk.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_snk } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_snk(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
   }
 
