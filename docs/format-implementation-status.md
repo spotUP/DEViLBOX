@@ -82,13 +82,30 @@ Track which formats have native parsers vs UADE-only.
 | `.kris` | ChipTracker / KRIS | KRISParser.ts | **OpenMPT** Load_kris.cpp | KRIS magic at +952; UADE fallback |
 | `.pt36` | ProTracker 3.6 | PT36Parser.ts | **OpenMPT** Load_pt36.cpp | FORM/MODL IFF; OpenMPT fallback |
 | `.ss` | SpeedySystem / SoundSmith | SpeedySystemParser.ts | **OpenMPT** Load_ss.cpp | DOC RAM samples → UADE |
-| `.stk` | Ultimate SoundTracker | SoundTrackerParser.ts | **OpenMPT** Load_stk.cpp | structural heuristic; UADE fallback |
+| `.stk` | Ultimate SoundTracker | STKParser.ts | **OpenMPT** Load_stk.cpp | structural heuristic; OpenMPT fallback |
 | `.imf`, `.imff` | Imago Orpheus | ImagoOrpheusParser.ts | **OpenMPT** Load_imf.cpp | IM10/IM20 magic at +60; OpenMPT fallback |
-| `.stp` | Sampler Tracker Plus | SamplerTrackerPlusParser.ts | **OpenMPT** Load_stp.cpp | STP3 magic; OpenMPT fallback |
+| `.stp` | Sampler Tracker Plus | STPParser.ts | **OpenMPT** Load_stp.cpp | STP3 magic; OpenMPT fallback |
 | `.dbm` | DigiBooster Pro | DigiBoosterProParser.ts | **OpenMPT** Load_dbm.cpp | DBM0 IFF; OpenMPT fallback |
 | `.amf` | ASYLUM/DSMI AMF | AMFParser.ts | **OpenMPT** Load_amf.cpp | ASYLUM sig or AMF+version; OpenMPT fallback |
-| `.mdl` | Digitrakker / Madness | MadnessParser.ts | **OpenMPT** Load_mdl.cpp | DMDL magic + version; OpenMPT fallback |
+| `.mdl` | DigiTrakker | MDLParser.ts | **OpenMPT** Load_mdl.cpp | DMDL magic + version; OpenMPT fallback |
 | `.trc`, `.dp`, `.tro` | Tronic | TronicParser.ts | UADE eagleplayer | no magic; extension-only; UADE |
+| `.dmf` | X-Tracker DMF | XTrackerParser.ts | **OpenMPT** Load_dmf.cpp | DDMF magic; must precede Furnace .dmf; UADE fallback |
+| `.fmt` | FM Tracker | FMTrackerParser.ts | **OpenMPT** Load_fmt.cpp | FM Tracker by Davey W Taylor; OpenMPT fallback |
+| `.xmf` | Astroidea XMF | XMFParser.ts | **OpenMPT** Load_xmf.cpp | Imperium Galactica; OpenMPT fallback |
+| `.uax` | Unreal Audio Package | UAXParser.ts | custom | Unreal Engine 1 sound ripper |
+| `.mt2` | Mad Tracker 2 | MadTracker2Parser.ts | **OpenMPT** Load_mt2.cpp | MT20 magic; OpenMPT fallback |
+| `.psm` | PSM / PSM16 (MASI) | PSMParser.ts | **OpenMPT** Load_psm.cpp | "PSM " or "PSM\xFE" magic; OpenMPT fallback |
+| `.ams` | AMS (Extreme's / Velvet) | AMSParser.ts | **OpenMPT** Load_ams.cpp | "Extreme" or "AMShdr" magic; UADE fallback |
+| `.gt2`, `.gtk` | Graoumf Tracker 2 | GraoumfTracker2Parser.ts | **OpenMPT** Load_gt2.cpp | GT2.0 magic; UADE fallback |
+| `.symmod` | Symphonie Pro | SymphonieProParser.ts | **OpenMPT** Load_symmod.cpp | MODU magic; UADE fallback |
+| `.667` | Composer 667 | Composer667Parser.ts | NostalgicPlayer | 6-channel; UADE fallback |
+| `.cba` | Chuck Biscuits / Black Artist | ChuckBiscuitsParser.ts | NostalgicPlayer | UADE fallback |
+| `.dm`, `.dm1` | Delta Music 1.0 | DeltaMusic1Parser.ts | NostalgicPlayer | "ALL " magic; UADE fallback |
+| `.smus`, `.snx`, `.tiny` | IFF SMUS / Sonix | IffSmusParser.ts | NostalgicPlayer | FORM+SMUS IFF; UADE fallback |
+| `mfp.*` | Magnetic Fields Packer | MFPParser.ts | NostalgicPlayer | prefix naming; companion smp.* file; UADE fallback |
+| `.c67` | CDFM Composer 670 | CDFM67Parser.ts | **OpenMPT** Load_c67.cpp | OpenMPT fallback |
+| `.etx` | EasyTrax | EasyTraxParser.ts | NostalgicPlayer | Amiga; UADE fallback |
+| `.mus` | Karl Morton Music | KarlMortonParser.ts | NostalgicPlayer | OpenMPT fallback |
 
 ---
 
@@ -110,16 +127,8 @@ Track which formats have native parsers vs UADE-only.
 
 | Extension(s) | Format | OpenMPT Loader | Notes |
 |---|---|---|---|
-| `.gt2` | Graoumf Tracker 2 | Load_gt2.cpp (1566 ln) | 🔄 in progress |
-| `.symmod` | Symphonie Pro | Load_symmod.cpp (1947 ln) | 🔄 in progress |
 | `.rjp`, `.sng` | Richard Joseph | NP source available | Two-file format (.sng+.ins) |
 
-## 🚧 Claimed — In Progress (this session, 2026-02-26)
-
-| Extension(s) | Format | OpenMPT Loader | Parser File |
-|---|---|---|---|
-
----
 
 ## ❌ Not Parseable (compiled 68k executables — UADE only)
 
@@ -129,7 +138,7 @@ Track which formats have native parsers vs UADE-only.
 | `.ash` | Ashley Hogg |
 | `.gray` | Fred Gray |
 | `.cin` | Cinemaware |
-| `.dm`, `.dm1`, `.dlm1`, `.dlm2` | Delta Music 1.x (compiled player binary) |
+| `.dlm1`, `.dlm2` | Delta Music Loader variants (compiled 68k loader binary) |
 
 ---
 
@@ -186,3 +195,20 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | ASYLUM/DSMI AMF | AMFParser.ts | **OpenMPT** Load_amf.cpp |
 | 2026-02-26 | Digitrakker / Madness | MadnessParser.ts | **OpenMPT** Load_mdl.cpp |
 | 2026-02-26 | Tronic | TronicParser.ts | UADE eagleplayer |
+| 2026-02-26 | X-Tracker DMF | XTrackerParser.ts | **OpenMPT** Load_dmf.cpp |
+| 2026-02-26 | FM Tracker | FMTrackerParser.ts | **OpenMPT** Load_fmt.cpp |
+| 2026-02-26 | Astroidea XMF | XMFParser.ts | **OpenMPT** Load_xmf.cpp |
+| 2026-02-26 | Unreal Audio Package | UAXParser.ts | custom |
+| 2026-02-26 | Mad Tracker 2 | MadTracker2Parser.ts | **OpenMPT** Load_mt2.cpp |
+| 2026-02-26 | PSM / PSM16 (MASI) | PSMParser.ts | **OpenMPT** Load_psm.cpp |
+| 2026-02-26 | AMS (Extreme's / Velvet) | AMSParser.ts | **OpenMPT** Load_ams.cpp |
+| 2026-02-26 | Graoumf Tracker 2 | GraoumfTracker2Parser.ts | **OpenMPT** Load_gt2.cpp |
+| 2026-02-26 | Symphonie Pro | SymphonieProParser.ts | **OpenMPT** Load_symmod.cpp |
+| 2026-02-26 | Composer 667 | Composer667Parser.ts | NostalgicPlayer |
+| 2026-02-26 | Chuck Biscuits / Black Artist | ChuckBiscuitsParser.ts | NostalgicPlayer |
+| 2026-02-26 | Delta Music 1.0 | DeltaMusic1Parser.ts | NostalgicPlayer |
+| 2026-02-26 | IFF SMUS / Sonix | IffSmusParser.ts | NostalgicPlayer |
+| 2026-02-26 | Magnetic Fields Packer | MFPParser.ts | NostalgicPlayer |
+| 2026-02-26 | CDFM Composer 670 | CDFM67Parser.ts | **OpenMPT** Load_c67.cpp |
+| 2026-02-26 | EasyTrax | EasyTraxParser.ts | NostalgicPlayer |
+| 2026-02-26 | Karl Morton Music | KarlMortonParser.ts | NostalgicPlayer |

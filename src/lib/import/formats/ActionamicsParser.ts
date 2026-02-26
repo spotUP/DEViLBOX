@@ -216,7 +216,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     return null;
   }
 
-  const positionCount = Math.floor(trackNumberLength / 4); // 4 channels, each byte per position
+  const _positionCount = Math.floor(trackNumberLength / 4); // 4 channels, each byte per position
   // Actually: trackNumberLength is total bytes for all 4 channels for track numbers
   // So count = trackNumberLength / 4 (one byte per channel per position, 4 channels)
   // Wait: per NostalgicPlayer: count = (int)(trackNumberLength / 4) — this is the number of positions per channel
@@ -321,7 +321,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   }
 
   const sampleNumberList = loadList(sampleNumberListOffset, sectionLengths[6]);
-  const arpeggioList = loadList(arpeggioListOffset, sectionLengths[7]);
+  const _arpeggioList = loadList(arpeggioListOffset, sectionLengths[7]);
   // frequencyList loaded but not used for pattern extraction
 
   // ── Sub-songs ─────────────────────────────────────────────────────────
@@ -585,7 +585,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   const startPos = primarySong.startPosition;
   const endPos = primarySong.endPosition;
   // endPosition is inclusive (NostalgicPlayer: position == endPosition → advance and loop)
-  const numSongPositions = endPos >= startPos ? (endPos - startPos + 1) : 0;
+  const _numSongPositions = endPos >= startPos ? (endPos - startPos + 1) : 0;
 
   const ROWS_PER_PATTERN = 64;
   const trackerPatterns: Pattern[] = [];
