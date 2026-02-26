@@ -646,6 +646,123 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADE_ftm(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── Sawteeth (.st — magic "SWTD" required to disambiguate) ───────────────
+  if (/\.st$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.sawteeth === 'native') {
+      try {
+        const { isSawteethFormat, parseSawteethFile } = await import('@lib/import/formats/SawteethParser');
+        const bytes = new Uint8Array(buffer);
+        if (isSawteethFormat(bytes)) {
+          const result = parseSawteethFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[SawteethParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_st } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_st(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Sound Control (.sc, .sct) ─────────────────────────────────────────────
+  if (/\.(sc|sct)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.soundControl === 'native') {
+      try {
+        const { isSoundControlFormat, parseSoundControlFile } = await import('@lib/import/formats/SoundControlParser');
+        const bytes = new Uint8Array(buffer);
+        if (isSoundControlFormat(bytes)) {
+          const result = parseSoundControlFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[SoundControlParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_sc } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_sc(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Sound Factory (.psf) ──────────────────────────────────────────────────
+  if (/\.psf$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.soundFactory === 'native') {
+      try {
+        const { isSoundFactoryFormat, parseSoundFactoryFile } = await import('@lib/import/formats/SoundFactoryParser');
+        const bytes = new Uint8Array(buffer);
+        if (isSoundFactoryFormat(bytes)) {
+          const result = parseSoundFactoryFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[SoundFactoryParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_psf } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_psf(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Actionamics (.act) ────────────────────────────────────────────────────
+  // Identified by "ACTIONAMICS SOUND TOOL" signature at offset 62.
+  if (/\.act$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.actionamics === 'native') {
+      try {
+        const { isActionamicsFormat, parseActionamicsFile } = await import('@lib/import/formats/ActionamicsParser');
+        const bytes = new Uint8Array(buffer);
+        if (isActionamicsFormat(bytes)) {
+          const result = parseActionamicsFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[ActionamicsParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_act } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_act(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Activision Pro / Martin Walker (.avp, .mw) ────────────────────────────
+  // Identified by scanning first 4096 bytes for M68k init pattern (0x48 0xe7 0xfc 0xfe).
+  if (/\.(avp|mw)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.activisionPro === 'native') {
+      try {
+        const { isActivisionProFormat, parseActivisionProFile } = await import('@lib/import/formats/ActivisionProParser');
+        const bytes = new Uint8Array(buffer);
+        if (isActivisionProFormat(bytes)) {
+          const result = parseActivisionProFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[ActivisionProParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_avp } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_avp(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Ron Klaren (.rk, .rkb) ────────────────────────────────────────────────
+  // Identified by Amiga HUNK magic (0x3F3) at offset 0 and "RON_KLAREN_SOUNDMODULE!" at offset 40.
+  if (/\.(rk|rkb)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.ronKlaren === 'native') {
+      try {
+        const { isRonKlarenFormat, parseRonKlarenFile } = await import('@lib/import/formats/RonKlarenParser');
+        const bytes = new Uint8Array(buffer);
+        if (isRonKlarenFormat(bytes)) {
+          const result = parseRonKlarenFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[RonKlarenParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_rk } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_rk(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)

@@ -46,6 +46,12 @@ export interface FormatEnginePreferences {
   pumaTracker: FormatEngineChoice;    // .puma → PumaTrackerParser vs UADE
   gameMusicCreator: FormatEngineChoice; // .gmc → GameMusicCreatorParser vs UADE
   faceTheMusic: FormatEngineChoice;     // .ftm → FaceTheMusicParser vs UADE
+  sawteeth: FormatEngineChoice;         // .st (SWTD magic) → SawteethParser vs UADE
+  soundControl: FormatEngineChoice;     // .sc/.sct → SoundControlParser vs UADE
+  soundFactory: FormatEngineChoice;     // .psf → SoundFactoryParser vs UADE
+  actionamics: FormatEngineChoice;      // .act → ActionamicsParser vs UADE
+  activisionPro: FormatEngineChoice;    // .avp/.mw → ActivisionProParser vs UADE
+  ronKlaren: FormatEngineChoice;        // .rk/.rkb → RonKlarenParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -124,6 +130,12 @@ export const useSettingsStore = create<SettingsStore>()(
         pumaTracker: 'native',  // PumaTrackerParser — dedicated PumaTracker support
         gameMusicCreator: 'native', // GameMusicCreatorParser — dedicated Game Music Creator support
         faceTheMusic: 'native',     // FaceTheMusicParser — dedicated Face The Music support
+        sawteeth: 'native',         // SawteethParser — dedicated Sawteeth support
+        soundControl: 'native',     // SoundControlParser — dedicated Sound Control support
+        soundFactory: 'native',     // SoundFactoryParser — dedicated Sound Factory support
+        actionamics: 'native',      // ActionamicsParser — dedicated Actionamics support
+        activisionPro: 'native',    // ActivisionProParser — dedicated Activision Pro support
+        ronKlaren: 'native',        // RonKlarenParser — dedicated Ron Klaren support
         uade: 'enhanced',       // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',

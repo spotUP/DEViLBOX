@@ -45,8 +45,14 @@ Track which formats have native parsers vs UADE-only.
 | `.dm2` | Delta Music 2.0 | DeltaMusic2Parser.ts | NostalgicPlayer + spec | .dm/.dm1 → UADE |
 | `.gmc` | Game Music Creator | GameMusicCreatorParser.ts | **OpenMPT** Load_gmc.cpp | UADE fallback |
 | `.ftm` | Face The Music | FaceTheMusicParser.ts | **OpenMPT** Load_ftm.cpp | embedded samples only; external → UADE |
+| `.st` | Sawteeth | SawteethParser.ts | NostalgicPlayer | SWTD magic required; UADE fallback |
+| `.sc`, `.sct` | Sound Control | SoundControlParser.ts | NostalgicPlayer | v3.x/4.0/5.0 sub-formats; UADE fallback |
+| `.psf` | Sound Factory | SoundFactoryParser.ts | NostalgicPlayer | opcode stream; 16 subsongs; UADE fallback |
 | `.is`, `.is10` | InStereo! 1.0 | InStereo1Parser.ts | NostalgicPlayer | UADE fallback |
 | `.is`, `.is20` | InStereo! 2.0 | InStereo2Parser.ts | NostalgicPlayer | IS20 magic tried first |
+| `.act` | Actionamics | ActionamicsParser.ts | NostalgicPlayer | UADE fallback |
+| `.avp`, `.mw` | Activision Pro | ActivisionProParser.ts | NostalgicPlayer | M68k heuristic; UADE fallback |
+| `.rk`, `.rkb` | Ron Klaren | RonKlarenParser.ts | NostalgicPlayer | HUNK magic + sig; UADE fallback |
 | `.ay` | AY / ZX Spectrum | AYParser.ts | — | native only |
 | `.sap` | SAP (Atari POKEY) | SAPParser.ts | — | native only |
 | `.sid` | SID (C64) | SIDParser.ts | — | native only |
@@ -61,12 +67,6 @@ Track which formats have native parsers vs UADE-only.
 
 | Format | Parser File | Reference | Extensions |
 |---|---|---|---|
-| Actionamics | ActionamicsParser.ts | NostalgicPlayer | `.act` |
-| Activision Pro | ActivisionProParser.ts | NostalgicPlayer | `.sng` |
-| Ron Klaren | RonKlarenParser.ts | NostalgicPlayer | `.rk`, `.rkb` |
-| Sawteeth | SawteethParser.ts | NostalgicPlayer | `.sdt` |
-| Sound Control | SoundControlParser.ts | NostalgicPlayer | `.sc`, `.sct` |
-| Sound Factory | SoundFactoryParser.ts | NostalgicPlayer | `.sf` |
 
 ---
 
@@ -138,3 +138,9 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | TCB Tracker | TCBTrackerParser.ts | **OpenMPT** Load_tcb.cpp |
 | 2026-02-26 | Game Music Creator | GameMusicCreatorParser.ts | **OpenMPT** Load_gmc.cpp |
 | 2026-02-26 | Face The Music | FaceTheMusicParser.ts | **OpenMPT** Load_ftm.cpp |
+| 2026-02-26 | Actionamics | ActionamicsParser.ts | NostalgicPlayer |
+| 2026-02-26 | Activision Pro | ActivisionProParser.ts | NostalgicPlayer |
+| 2026-02-26 | Ron Klaren | RonKlarenParser.ts | NostalgicPlayer |
+| 2026-02-26 | Sawteeth | SawteethParser.ts | NostalgicPlayer |
+| 2026-02-26 | Sound Control | SoundControlParser.ts | NostalgicPlayer |
+| 2026-02-26 | Sound Factory | SoundFactoryParser.ts | NostalgicPlayer |
