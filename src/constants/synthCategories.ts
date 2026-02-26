@@ -1640,6 +1640,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Disc',
     color: 'text-amber-500',
   },
+  SidMon1Synth: {
+    type: 'SidMon1Synth',
+    name: 'SidMon 1.0',
+    shortName: 'SidMon1',
+    description: 'SidMon 1.0 wavetable synthesizer with ADSR envelope, 16-step arpeggio and phase LFO',
+    bestFor: ['Amiga chiptune', 'Wavetable', 'SID-like'],
+    icon: 'Disc',
+    color: 'text-amber-300',
+  },
 };
 
 // Organized categories
