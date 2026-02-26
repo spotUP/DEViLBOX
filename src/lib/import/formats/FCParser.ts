@@ -16,6 +16,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { FCConfig } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Utility functions ─────────────────────────────────────────────────────
@@ -255,6 +256,9 @@ interface FCVoiceState {
 
   // Waveform tracking
   currentWaveform: number; // Current waveform/sample index (-1 = none)
+
+  // Instrument tracking
+  instrIdx: number;         // Current vol macro index (= instrument in FC)
 }
 
 function createVoice(): FCVoiceState {
@@ -268,6 +272,7 @@ function createVoice(): FCVoiceState {
     pitchBendFlag: 0, pitchBendSpeed: 0, pitchBendTime: 0,
     portamentoFlag: 0, portamento: 0,
     currentWaveform: -1,
+    instrIdx: 0,
   };
 }
 
@@ -672,9 +677,114 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
 
   // ── On-demand instrument creation ─────────────────────────────────────────
   const instruments: InstrumentConfig[] = [];
-  const waveToInstrument = new Map<number, number>();
+  const waveToInstrument = new Map<number, number>();    // PCM samples (waveIdx 0-9)
+  const macroToInstrument = new Map<number, number>();   // FC synth instruments (by instrIdx)
   let nextInstrumentId = 1;
 
+  /** Build an FCConfig from a vol macro + its referenced freq macro. */
+  function buildFCConfig(instrIdx: number): FCConfig {
+    const vm = instrIdx < volMacros.length ? volMacros[instrIdx] : null;
+    if (!vm) {
+      return {
+        waveNumber: 0, synthTable: [], synthSpeed: 1,
+        atkLength: 4, atkVolume: 64, decLength: 8, decVolume: 32,
+        sustVolume: 32, relLength: 8, vibDelay: 0, vibSpeed: 0, vibDepth: 0,
+        arpTable: new Array(16).fill(0),
+      };
+    }
+
+    const volSpeed     = vm[0] > 0 ? vm[0] : 1;
+    const freqMacroIdx = vm[1] || 0;
+    const vibSpeed     = vm[2] || 0;
+    const vibDepth     = vm[3] || 0;
+    const vibDelay     = vm[4] || 0;
+
+    // Extract waveform sequence from freq macro
+    const synthTable: FCConfig['synthTable'] = [];
+    let initialWaveNum = 0;
+
+    const fm = freqMacroIdx < freqMacros.length ? freqMacros[freqMacroIdx] : null;
+    if (fm) {
+      let i = 0;
+      while (i < 64 && synthTable.length < 16) {
+        const b = fm[i];
+        if (b === 0xE1) break;
+        if (b === 0xE0) { i += 2; continue; }  // loop — skip
+        if (b === 0xE2 || b === 0xE4) {
+          if (i + 1 < 64) {
+            const waveRef = fm[i + 1];
+            // FC13: waveRef 10-56 → FC wave index 0-46
+            // FC14: waveRef 10-89 → custom wavetable index 0-79 (capped at 46 for now)
+            const maxRef = isFC14 ? 90 : 57;
+            if (waveRef >= 10 && waveRef < maxRef) {
+              const fcWaveIdx = Math.min(46, waveRef - 10);
+              if (synthTable.length === 0) initialWaveNum = fcWaveIdx;
+              synthTable.push({ waveNum: fcWaveIdx, transposition: 0, effect: b === 0xE2 ? 1 : 0 });
+            }
+            i += 2;
+            continue;
+          }
+        }
+        if (b === 0xE3 || b === 0xEA || b === 0xE8) { i += 3; continue; }
+        if (b === 0xE9) { i += 4; continue; }
+        if (b === 0xE7) { i += 2; continue; }
+        i++;
+      }
+    }
+
+    // Approximate ADSR from vol macro data (bytes 5+)
+    let atkVolume = 32, atkLength = 4;
+    let decVolume = 16, decLength = 8;
+    let sustVolume = 16, relLength = 8;
+
+    let maxVol = 0, maxVolPos = 0;
+    for (let i = 5; i < 64; i++) {
+      const v = vm[i];
+      if (v === 0xE1) break;
+      if (v < 0xE0 && v > maxVol) { maxVol = v; maxVolPos = i - 5; }
+    }
+    if (maxVol > 0) {
+      atkVolume  = Math.min(64, maxVol);
+      atkLength  = Math.min(255, Math.max(1, maxVolPos) * volSpeed);
+      decVolume  = Math.min(64, Math.round(atkVolume * 0.5));
+      decLength  = Math.min(255, 8 * volSpeed);
+      sustVolume = Math.min(64, Math.max(8, Math.round(atkVolume * 0.4)));
+      relLength  = Math.min(255, 8 * volSpeed);
+    }
+
+    return {
+      waveNumber: initialWaveNum,
+      synthTable,
+      synthSpeed: Math.max(1, Math.min(15, volSpeed)),
+      atkLength, atkVolume, decLength, decVolume, sustVolume, relLength,
+      vibDelay, vibSpeed, vibDepth,
+      arpTable: new Array(16).fill(0),
+    };
+  }
+
+  /** Create (or retrieve) an FCSynth instrument keyed by vol macro index. */
+  function getOrCreateFCInstrument(instrIdx: number): number {
+    if (macroToInstrument.has(instrIdx)) return macroToInstrument.get(instrIdx)!;
+
+    const id = nextInstrumentId++;
+    macroToInstrument.set(instrIdx, id);
+    const config = buildFCConfig(instrIdx);
+
+    instruments.push({
+      id,
+      name: `FC Inst ${instrIdx + 1}`,
+      type: 'synth' as const,
+      synthType: 'FCSynth' as const,
+      fc: config,
+      effects: [],
+      volume: -6,
+      pan: 0,
+    } as unknown as InstrumentConfig);
+
+    return id;
+  }
+
+  /** Create (or retrieve) a PCM sampler instrument keyed by waveform index (0-9). */
   function getOrCreateInstrument(waveIdx: number): number {
     if (waveToInstrument.has(waveIdx)) return waveToInstrument.get(waveIdx)!;
 
@@ -696,29 +806,8 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
       } else {
         instruments.push(makePlaceholder(id, `Sample ${waveIdx}`));
       }
-    } else if (!isFC14 && waveIdx >= 10 && waveIdx < 57) {
-      // FC13 built-in waveform (indices 10-56 → wave table 0-46)
-      const pcm = extractFC13Wave(waveIdx - 10);
-      if (pcm.length > 0) {
-        instruments.push(createSamplerInstrument(
-          id, `Wave ${waveIdx - 10}`, pcm, 64, 8287, 0, pcm.length
-        ));
-      } else {
-        instruments.push(makePlaceholder(id, `Wave ${waveIdx - 10}`));
-      }
-    } else if (isFC14 && waveIdx >= 10 && waveIdx < 90) {
-      // FC14 custom wavetable (indices 10-89 → wavetable 0-79)
-      const wtIdx = waveIdx - 10;
-      const pcm = wtIdx < waveTablePCMs.length ? waveTablePCMs[wtIdx] : new Uint8Array(0);
-      if (pcm.length > 0) {
-        instruments.push(createSamplerInstrument(
-          id, `WaveTable ${wtIdx}`, pcm, 64, 8287, 0, pcm.length
-        ));
-      } else {
-        instruments.push(makePlaceholder(id, `WaveTable ${wtIdx}`));
-      }
     } else if (waveIdx >= 100) {
-      // SSMP pack sample — create placeholder (pack data not extracted yet)
+      // SSMP pack sample — placeholder
       instruments.push(makePlaceholder(id, `Pack ${Math.floor((waveIdx - 100) / 10)}:${(waveIdx - 100) % 10}`));
     } else {
       instruments.push(makePlaceholder(id, `Unknown ${waveIdx}`));
@@ -773,6 +862,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
 
           // Initialize vol/freq macros from instrument
           const instrIdx = Math.max(0, (fcVal & 0x3F) + seq.offsetIns[ch]);
+          voice.instrIdx = instrIdx;  // Track for FCSynth instrument creation
           if (instrIdx < volMacros.length) {
             const vm = volMacros[instrIdx];
             voice.volMacroIdx = instrIdx;
@@ -843,7 +933,13 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
         let instrument = 0;
         if (voice.currentWaveform >= 0) {
           if (triggered[ch] || voice.currentWaveform !== waveformBefore[ch]) {
-            instrument = getOrCreateInstrument(voice.currentWaveform);
+            if (voice.currentWaveform < 10) {
+              // PCM sample slot (0-9): use waveform-based sampler
+              instrument = getOrCreateInstrument(voice.currentWaveform);
+            } else {
+              // FC built-in or custom wavetable: use vol-macro-based FCSynth
+              instrument = getOrCreateFCInstrument(voice.instrIdx);
+            }
           }
         }
 

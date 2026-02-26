@@ -33,6 +33,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { TFMXConfig } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants (from HippelDecoder.h) ─────────────────────────────────────────
@@ -180,61 +181,106 @@ export function parseTFMXFile(
   const lastStep    = u16BE(buf, ssOff + 2);
   const startSpeed  = u16BE(buf, ssOff + 4);
 
-  // 5. Build VolSeq → first sample index lookup
+  // 5. Extract raw section blobs needed for TFMXSynth
+  // SndModSeqs: sndSeqsCount × 64 bytes
+  const sndModSeqData = buf.slice(sndSeqsOff, sndSeqsOff + TFMX_SEQ_SIZE * sndSeqsCount);
+  // Sample headers: sampleCount × 30 bytes
+  const sampleHeaders = sampleCount > 0
+    ? buf.slice(sampleHdrsOff, sampleHdrsOff + TFMX_SAMPLE_STRUCT_SIZE * sampleCount)
+    : new Uint8Array(0);
+  // Sample data: from sampleDataOff to end of file
+  const sampleDataBlob = sampleDataOff < buf.length
+    ? buf.slice(sampleDataOff)
+    : new Uint8Array(0);
+
+  // 6. Build VolSeq → first sample index lookup (for Sampler fallback naming)
   const volSeqToSampleIdx = new Map<number, number>();
   for (let vsIdx = 0; vsIdx < volSeqsCount; vsIdx++) {
-    const vsOff      = volSeqsOff + vsIdx * TFMX_SEQ_SIZE;
+    const vsOff       = volSeqsOff + vsIdx * TFMX_SEQ_SIZE;
     const soundSeqNum = buf[vsOff + 1]; // byte 1 of VolSeq = SndSeq number
-    const sampleIdx  = findFirstSampleInSndSeq(buf, sndSeqsOff, sndSeqsCount, soundSeqNum);
+    const sampleIdx   = findFirstSampleInSndSeq(buf, sndSeqsOff, sndSeqsCount, soundSeqNum);
     if (sampleIdx >= 0 && sampleIdx < sampleCount) {
       volSeqToSampleIdx.set(vsIdx, sampleIdx);
     }
   }
 
-  // 6. Parse sample headers → one InstrumentConfig per sample slot
-  const instruments: InstrumentConfig[] = [];
+  // 7. Parse sample headers for name extraction (used in fallback Sampler + TFMXSynth naming)
+  const sampleNames: string[] = [];
   const sampleIdxToInstrId = new Map<number, number>();
 
   for (let sIdx = 0; sIdx < sampleCount; sIdx++) {
     const sh = sampleHdrsOff + sIdx * TFMX_SAMPLE_STRUCT_SIZE;
-
-    // Name: 18-byte null-terminated ASCII string
     let name = '';
     for (let i = 0; i < 18 && sh + i < buf.length && buf[sh + i] !== 0; i++) {
       name += String.fromCharCode(buf[sh + i]);
     }
-    name = name.trim() || `Sample ${sIdx + 1}`;
+    sampleNames.push(name.trim() || `Sample ${sIdx + 1}`);
+    sampleIdxToInstrId.set(sIdx, sIdx + 1);
+  }
 
-    // After the 18-byte name (C++ pointer 'sh' starts here at offset +0x12):
-    //   sh+0x00 (+18): startOffs u32BE — byte offset from sampleDataOff
-    //   sh+0x04 (+22): len       u16BE — length in WORDS (×2 = bytes)
-    //   sh+0x06 (+24): repOffs hi u16  — upper word of repOffs, ignored
-    //   sh+0x08 (+26): repOffs lo u16BE — loop start in BYTES
-    //   sh+0x0A (+28): repLen    u16BE — loop length in WORDS (×2 = bytes)
-    const startOffs    = u32BE(buf, sh + 18);
-    const lenWords     = u16BE(buf, sh + 22);
-    // sh+24: repOffs upper word (ignored)
-    const repOffsBytes  = u16BE(buf, sh + 26);
-    const repLenWords   = u16BE(buf, sh + 28);
+  // 8. Build instruments: one TFMXSynth per VolModSeq
+  const instruments: InstrumentConfig[] = [];
+  const volSeqToInstrId = new Map<number, number>();
 
-    const instrId = sIdx + 1;
-    sampleIdxToInstrId.set(sIdx, instrId);
+  for (let vsIdx = 0; vsIdx < volSeqsCount; vsIdx++) {
+    const instrId = vsIdx + 1;
+    volSeqToInstrId.set(vsIdx, instrId);
 
-    const byteLen   = lenWords * 2;
-    const dataStart = sampleDataOff + startOffs;
+    // Name: use the first-referenced sample's name, or a generic fallback
+    const sampleIdx = volSeqToSampleIdx.get(vsIdx);
+    const name = sampleIdx !== undefined
+      ? sampleNames[sampleIdx] ?? `Instrument ${instrId}`
+      : `Instrument ${instrId}`;
 
-    if (byteLen < 2 || dataStart + byteLen > buf.length) {
-      // Out-of-range or empty slot — create a silent placeholder
-      instruments.push(createSamplerInstrument(instrId, name, new Uint8Array(2), 64, 8287, 0, 0));
-      continue;
+    // Extract this VolModSeq's raw 64 bytes
+    const vsOff = volSeqsOff + vsIdx * TFMX_SEQ_SIZE;
+    const volModSeqData = buf.slice(vsOff, vsOff + TFMX_SEQ_SIZE);
+
+    const tfmxConfig: TFMXConfig = {
+      sndSeqsCount,
+      sndModSeqData,
+      volModSeqData,
+      sampleCount,
+      sampleHeaders,
+      sampleData: sampleDataBlob,
+    };
+
+    instruments.push({
+      id:        instrId,
+      name,
+      type:      'synth',
+      synthType: 'TFMXSynth',
+      tfmx:      tfmxConfig,
+      effects:   [],
+      volume:    -6,
+      pan:       0,
+    } as unknown as InstrumentConfig);
+  }
+
+  // Ensure at least one instrument entry even if no VolModSeqs
+  if (instruments.length === 0 && sampleCount > 0) {
+    // Fall back to one Sampler per sample slot
+    for (let sIdx = 0; sIdx < sampleCount; sIdx++) {
+      const sh         = sampleHdrsOff + sIdx * TFMX_SAMPLE_STRUCT_SIZE;
+      const name       = sampleNames[sIdx] ?? `Sample ${sIdx + 1}`;
+      const startOffs  = u32BE(buf, sh + 18);
+      const lenWords   = u16BE(buf, sh + 22);
+      const repOffsBytes = u16BE(buf, sh + 26);
+      const repLenWords  = u16BE(buf, sh + 28);
+      const instrId    = sIdx + 1;
+      const byteLen    = lenWords * 2;
+      const dataStart  = sampleDataOff + startOffs;
+
+      if (byteLen < 2 || dataStart + byteLen > buf.length) {
+        instruments.push(createSamplerInstrument(instrId, name, new Uint8Array(2), 64, 8287, 0, 0));
+        continue;
+      }
+      const pcm       = buf.slice(dataStart, dataStart + byteLen);
+      const hasLoop   = repLenWords > 1 && repOffsBytes < byteLen;
+      const loopStart = hasLoop ? repOffsBytes : 0;
+      const loopEnd   = hasLoop ? Math.min(repOffsBytes + repLenWords * 2, byteLen) : 0;
+      instruments.push(createSamplerInstrument(instrId, name, pcm, 64, 8287, loopStart, loopEnd));
     }
-
-    const pcm       = buf.slice(dataStart, dataStart + byteLen);
-    const hasLoop   = repLenWords > 1 && repOffsBytes < byteLen;
-    const loopStart = hasLoop ? repOffsBytes : 0;
-    const loopEnd   = hasLoop ? Math.min(repOffsBytes + repLenWords * 2, byteLen) : 0;
-
-    instruments.push(createSamplerInstrument(instrId, name, pcm, 64, 8287, loopStart, loopEnd));
   }
 
   // 7. Build TrackerSong patterns from the track table
@@ -303,9 +349,8 @@ export function parseTFMXFile(
           xmNote = tfmxNoteToXM(transposedNote);
 
           // Effective VolSeq = (byte1 & 0x1F) + soundTranspose, clamped
-          const vsIdx     = Math.max(0, Math.min(volSeqsCount - 1, (byte1 & 0x1F) + voice.soundTranspose));
-          const sampleIdx = volSeqToSampleIdx.get(vsIdx);
-          instrId = sampleIdx !== undefined ? (sampleIdxToInstrId.get(sampleIdx) ?? 0) : 0;
+          const vsIdx = Math.max(0, Math.min(volSeqsCount - 1, (byte1 & 0x1F) + voice.soundTranspose));
+          instrId = volSeqToInstrId.get(vsIdx) ?? 0;
         }
 
         channelRows[ch].push({ note: xmNote, instrument: instrId, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
