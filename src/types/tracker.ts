@@ -306,7 +306,21 @@ export interface ParsedInstrument {
  * Preserves original module data for editing and re-export
  */
 export interface ImportMetadata {
-  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'HVL' | 'AHX' | 'OKT' | 'MED' | 'DIGI' | 'FC' | 'SFX' | 'SMON' | 'SIDMON2' | 'FRED' | 'DMUG' | 'UADE' | 'TFMX';
+  sourceFormat:
+    | 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'HVL' | 'AHX' | 'OKT' | 'MED' | 'DIGI' | 'DBM' | 'FC'
+    | 'SFX' | 'SMON' | 'SIDMON2' | 'FRED' | 'DMUG' | 'UADE' | 'TFMX'
+    // Amiga native formats (Phase 2+)
+    | '667' | '669' | 'AMOSMusicBank' | 'AON' | 'AST' | 'AVP' | 'BD' | 'C67' | 'CBA'
+    | 'DigitalSymphony' | 'DM1' | 'DM2' | 'DSM' | 'DSS' | 'DTM' | 'ETX'
+    | 'FaceTheMusic' | 'FMT' | 'GameMusicCreator' | 'GDM' | 'GMC'
+    | 'GraoumfTracker' | 'GraoumfTracker2' | 'ICE' | 'IMF' | 'IMS' | 'IS10' | 'IS20'
+    | 'JamCracker' | 'KRIS' | 'MFP' | 'MTM' | 'MUS' | 'NRU' | 'PLM' | 'PSF' | 'PTM'
+    | 'PumaTracker' | 'QuadraComposer' | 'RK' | 'RTM' | 'SAW' | 'SC'
+    | 'SonicArranger' | 'STK' | 'STM' | 'STP' | 'Symphonie' | 'TCBTracker' | 'ULT' | 'UNIC'
+    // PC tracker formats
+    | 'AMS' | 'DMF' | 'MadTracker2' | 'fmt' | 'xmf' | 'uax' | 'NATIVE'
+    // Generic fallback
+    | string;
   sourceFile: string;
   importedAt: string;
   originalChannelCount: number;
