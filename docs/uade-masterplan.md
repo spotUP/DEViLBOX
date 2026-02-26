@@ -234,11 +234,20 @@ Format DSP Source → thin WASM wrapper → TypeScript engine → TypeScript syn
 - [x] `FredEditorParser.ts` emits `FredConfig`
 - [x] Registered in ToneEngine + InstrumentFactory
 
-### Phase 6 — PCM Format Instrument Naming ❌ NOT STARTED
+### Phase 6 — PCM Format Instrument Naming ⚠️ PARTIAL
 
-- [ ] Add format-specific header parsers in `UADEParser.ts` for major PCM formats (Richard Joseph `.rj`/`.rjp`, Dave Lowe `.dl`, Mark Cooksey `.mc`, Delta Music `.dm`, SonicArranger `.sa`, etc.)
-- [ ] Extract `instrumentNames: string[]` per format
-- [ ] `buildEnhancedSong()` labels Sampler instruments with real names
+- [x] SonicArranger, SoundFX, JamCracker, TCB, EMOD/Quadra Composer, AMOS Music Bank — name extractors in `UADEParser.ts::tryExtractInstrumentNames()`
+- [x] `buildEnhancedSong()` already uses extracted names to label Sampler instruments
+- [ ] Delta Music 2 (`.dm2`) — `DM2!` magic case present but dead code (real `.dm2` are binaries)
+- [ ] Richard Joseph, Dave Lowe, Mark Cooksey, Delta Music 1 — compiled Amiga binaries; not parseable
+
+### Phase B — Native Full Parsers (post-Phase 6 extension)
+
+- [x] **B1 JamCracker** (`.jam`, `.jc`) — `src/lib/import/formats/JamCrackerParser.ts` ✅ 2026-02-26
+  - 4-channel, PCM+AM instruments, Fxx/arpeggio/vibrato/portamento effects
+- [ ] **B2 Quadra Composer** (`.emod`, `.qc`) — FORM/EMOD/EMIC IFF; 4-channel MOD-like
+- [ ] **B3 AMOS Music Bank** (`.abk`) — `AmBk` magic; multi-instrument sample bank
+- [ ] **B4 TCB Tracker** (`.tcb`) — Atari ST tracker; `AN COOL.` magic
 
 ### Phase 7 — Instrument Editor UI ✅ COMPLETE
 
@@ -255,7 +264,9 @@ Format DSP Source → thin WASM wrapper → TypeScript engine → TypeScript syn
 ## Remaining Work
 
 ### High value
-- **Phase 6** — PCM format instrument naming (polish; low risk, mostly string parsing)
+- **Phase B2** — Quadra Composer native parser (IFF-based, well-documented)
+- **Phase B3** — AMOS Music Bank native parser
+- **Phase B4** — TCB Tracker native parser (Atari ST)
 
 ### Low priority / future
 - **OctaMED real-time synthesis** — Add `OctaMEDConfig` type, 10-waveform oscillator + 32-step ADSR table; would require an `octamed-wasm/` build
