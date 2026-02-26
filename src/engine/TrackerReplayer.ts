@@ -3740,32 +3740,63 @@ export class TrackerReplayer {
     // or from multiSampleBufferCache (multi-sample XM instruments)
     let decodedBuffer = engine.getDecodedBuffer(ch.instrument.id);
 
-    // For multi-sample instruments: if the sample config has an audioBuffer
-    // but getDecodedBuffer returned a different one (or none), decode from the sample's ArrayBuffer.
-    // This handles when sampleMap resolved to a non-primary sample.
+    // Resolve the per-sample decoded buffer for MOD/XM playback.
+    // For XM multi-sample instruments the sampleMap lookup (above) has already
+    // replaced ch.instrument.sample with the resolved sample; we need the buffer
+    // for THAT specific sample, not the primary instrument buffer.
+    //
+    // Three paths:
+    //   1. Cache hit   — per-sample buffer already decoded; use it.
+    //   2. ArrayBuffer — fresh load; decode from embedded PCM data (async, skip tick).
+    //   3. URL only    — post-reload (audioBuffer was stripped on save); decode from
+    //                    data URL (async); fall through with primary as approximation.
     const sample = ch.instrument.sample;
-    // Guard: after JSON round-trip, audioBuffer is {} (empty object), not a real ArrayBuffer.
-    // Only treat it as valid if it's actually an ArrayBuffer instance.
+    // Guard: after JSON round-trip, audioBuffer can be {} (empty object), not ArrayBuffer.
     const hasValidAudioBuffer = sample?.audioBuffer instanceof ArrayBuffer;
-    if (!decodedBuffer && hasValidAudioBuffer) {
-      // Check multi-sample cache first
+    const isMultiSample = !!(ch.instrument?.metadata?.sampleMap && ch.instrument.metadata.multiSamples);
+
+    if (sample?.url) {
       const cacheKey = `${ch.instrument.id}:${sample.url}`;
-      decodedBuffer = this.multiSampleBufferCache.get(cacheKey) ?? undefined;
-      if (!decodedBuffer) {
-        // Synchronous fallback: create AudioBuffer from raw PCM data
-        // The audioBuffer is already an ArrayBuffer of 16-bit PCM data
-        // We need to decode it through the AudioContext
-        try {
+      const cachedMulti = this.multiSampleBufferCache.get(cacheKey);
+      if (cachedMulti) {
+        // Cache hit: use the per-sample decoded buffer (overrides primary decodedBuffer)
+        decodedBuffer = cachedMulti;
+      } else if (!decodedBuffer || hasValidAudioBuffer) {
+        // No primary buffer yet, or ArrayBuffer is available for a better decode
+        if (hasValidAudioBuffer) {
+          // Decode from embedded ArrayBuffer (fresh load path)
+          try {
+            const ctx = Tone.getContext().rawContext;
+            if (ctx instanceof AudioContext) {
+              ctx.decodeAudioData((sample.audioBuffer as ArrayBuffer).slice(0)).then(ab => {
+                this.multiSampleBufferCache.set(cacheKey, ab);
+              }).catch(() => { /* ignored */ });
+            }
+          } catch { /* ignored */ }
+        } else {
+          // Decode from data URL (post-reload path — audioBuffer was stripped on save)
+          const urlToLoad = sample.url;
           const ctx = Tone.getContext().rawContext;
           if (ctx instanceof AudioContext) {
-            // Decode asynchronously — for this tick, skip playback
-            // Buffer will be ready for next trigger
-            ctx.decodeAudioData((sample.audioBuffer as ArrayBuffer).slice(0)).then(ab => {
-              this.multiSampleBufferCache.set(cacheKey, ab);
-            }).catch(() => { /* ignored */ });
+            fetch(urlToLoad).then(r => r.arrayBuffer())
+              .then(ab => ctx.decodeAudioData(ab))
+              .then(decoded => { this.multiSampleBufferCache.set(cacheKey, decoded); })
+              .catch(() => { /* ignored */ });
           }
-        } catch { /* ignored */ }
-        return; // Skip this trigger — buffer will be ready next time
+        }
+        if (!decodedBuffer) return; // Skip this trigger — buffer will be ready next time
+      } else if (isMultiSample) {
+        // Primary buffer is set but this multi-sample hasn't been decoded yet.
+        // Queue URL decode so future triggers use the correct per-note sample.
+        const urlToLoad = sample.url;
+        const ctx = Tone.getContext().rawContext;
+        if (ctx instanceof AudioContext) {
+          fetch(urlToLoad).then(r => r.arrayBuffer())
+            .then(ab => ctx.decodeAudioData(ab))
+            .then(decoded => { this.multiSampleBufferCache.set(cacheKey, decoded); })
+            .catch(() => { /* ignored */ });
+        }
+        // Fall through: use primary buffer as rough approximation for this tick
       }
     }
 
@@ -3773,7 +3804,7 @@ export class TrackerReplayer {
       // URL-based sample (e.g. from samplepack or post-reload data URL) — trigger engine to load it.
       // getInstrument() creates a Tone.Sampler/Player which loads the URL,
       // and stores the decoded buffer in decodedAudioBuffers when ready.
-      if (sample?.url && !hasValidAudioBuffer) {
+      if (sample?.url) {
         engine.getInstrument(ch.instrument.id, ch.instrument);
       }
       console.warn('[TrackerReplayer] No decoded buffer for instrument:', ch.instrument.id, ch.instrument.name);
