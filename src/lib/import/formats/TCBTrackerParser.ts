@@ -2,9 +2,9 @@
  * TCBTrackerParser.ts -- TCB Tracker (.tcb) Atari ST format parser
  *
  * TCB Tracker is an Atari ST tracker by Anders Nilsson (AN Cool), 1990-1991.
- * Two format variants share the same layout:
- *   "AN COOL." — old format
- *   "AN COOL!" — new format
+ * Two format variants (per OpenMPT Load_tcb.cpp IsNewFormat() = magic[7] == '.'):
+ *   "AN COOL." — new format (has amigaFreqs + specialValues fields)
+ *   "AN COOL!" — old format / beta (names start directly at +0x90)
  *
  * Always 4 channels, 16 instrument slots, 64 rows per pattern.
  * Samples are 8-bit unsigned PCM (converted to signed on import).
@@ -81,21 +81,24 @@ export async function parseTCBTrackerFile(
   }
 
   // ── Header ────────────────────────────────────────────────────────────────
-  // +0x00  char[8]    magic
-  // +0x08  uint16BE   unknown
-  // +0x0A  uint16BE   numPatterns
-  // +0x0C  uint16BE   unknown
-  // +0x0E  uint8[128] order table
-  // +0x8E  uint8      songLength
-  // +0x8F  uint8      unknown
-  // +0x90  uint16BE   unknown
-  // +0x92  char[8][16] instrument names
-  // +0x112 byte[32]   unknown
+  // +0x00  char[8]     magic ("AN COOL." = new, "AN COOL!" = old/beta)
+  // +0x08  uint32BE    numPatterns
+  // +0x0C  uint8       tempo  (initialSpeed = 16 − tempo, per OpenMPT)
+  // +0x0D  uint8       unknown
+  // +0x0E  uint8[128]  order table
+  // +0x8E  uint8       songLength
+  // +0x8F  uint8       unknown
+  // New format only:
+  //   +0x90  uint16BE    amigaFreqs
+  //   +0x92  char[8][16] instrument names
+  //   +0x112 int16BE[16] specialValues (pitch-bend macros, not parsed)
+  // Old format:
+  //   +0x90  char[8][16] instrument names
+  //   +0x110 byte[34]    unknown
   // +0x132 pattern data
 
-  /* u16(view, 0x08) */  // unknown
-  const numPatterns = u16(view, 0x0A);
-  /* u16(view, 0x0C) */  // unknown
+  const numPatterns = u32(view, 0x08);
+  const tempoVal    = u8(view, 0x0C);
 
   const orderTable: number[] = [];
   for (let i = 0; i < 128; i++) {
@@ -105,13 +108,16 @@ export async function parseTCBTrackerFile(
   const songLength = u8(view, 0x8E);
   // 0x8F: unknown, 0x90-0x91: unknown
 
+  // New format ("AN COOL."): amigaFreqs at +0x90, names at +0x92
+  // Old format ("AN COOL!"): names start directly at +0x90
+  const isNewFormat = magic[7] === '.';
+  const namesOffset = isNewFormat ? 0x92 : 0x90;
   const instrumentNames: string[] = [];
   for (let i = 0; i < 16; i++) {
-    instrumentNames.push(readString(view, 0x92 + i * 8, 8).trim() || `Sample ${i + 1}`);
+    instrumentNames.push(readString(view, namesOffset + i * 8, 8).trim() || `Sample ${i + 1}`);
   }
 
-  // +0x112: 32 unknown bytes (skip)
-  // Pattern data starts at 0x132
+  // Pattern data starts at 0x132 for both variants
 
   // ── Pattern data ──────────────────────────────────────────────────────────
   // Each pattern: 64 rows × 4 channels × 2 bytes = 512 bytes
@@ -151,9 +157,9 @@ export async function parseTCBTrackerFile(
         const effNibble = b1 & 0x0F;
 
         // Note: octave(high) + semitone(low); 0 = no note
+        // Valid range: 0x10 (C-1) to 0x3B (B-3). Bytes outside this range → empty.
         // TCB → DEViLBOX: 12 * oct + semi + 37
-        // (mirrors libxmp xmpNote = 12*oct + semi + 36, then +1 for DEViLBOX XM offset)
-        const note = (noteByte !== 0)
+        const note = (noteByte >= 0x10 && noteByte <= 0x3B)
           ? 12 * (noteByte >> 4) + (noteByte & 0x0F) + 37
           : 0;
 
@@ -178,8 +184,10 @@ export async function parseTCBTrackerFile(
   // ── Instrument data ───────────────────────────────────────────────────────
   // Immediately after pattern data:
   //   +0:   uint32BE  total sample data size (informational, skip)
-  //   +4:   16 × { uint8 vol, uint8 unk1, uint8 unk2, uint8 unk3 }   (64 bytes)
-  //   +68:  16 × { uint32BE sampleOffset, uint32BE sampleLen }       (128 bytes)
+  //   +4:   16 × { uint8 vol, uint8 unk, uint16BE loopFromEnd }  (64 bytes)
+  //         loopFromEnd: distance from sample end → loopStart = sampleLen - loopFromEnd
+  //                      0 means no loop
+  //   +68:  16 × { uint32BE sampleOffset, uint32BE sampleLen }   (128 bytes)
   //   +196: 4 × uint32BE unknown
   //   +212: sample data (accessed via sampleOffset[i] relative to instrBase)
 
@@ -192,12 +200,15 @@ export async function parseTCBTrackerFile(
   /* u32(view, instrBase) */  // total sample data size (skip)
 
   const volumes:       number[] = [];
+  const loopFromEnds:  number[] = [];  // distance from sample end (0 = no loop)
   const sampleOffsets: number[] = [];
   const sampleLengths: number[] = [];
 
   for (let i = 0; i < 16; i++) {
-    const rawVol = u8(view, instrBase + 4 + i * 4);
+    const rawVol    = u8(view,  instrBase + 4 + i * 4);
+    const loopFromE = u16(view, instrBase + 4 + i * 4 + 2);
     volumes.push(Math.min(rawVol >> 1, 64));  // 0-127 → 0-63, cap at 64
+    loopFromEnds.push(loopFromE);
   }
 
   for (let i = 0; i < 16; i++) {
@@ -234,6 +245,13 @@ export async function parseTCBTrackerFile(
     const name = instrumentNames[i];
     const pcm  = sampleBuffers[i];
     const vol  = volumes[i];
+    const len  = sampleLengths[i];
+    const lfe  = loopFromEnds[i];
+
+    // TCB stores loop as distance from end of sample (per OpenMPT Load_tcb.cpp)
+    // if lfe > 0 && lfe < len: loopEnd = len, loopStart = len - lfe
+    const loopEnd   = (lfe > 0 && lfe < len) ? len       : 0;
+    const loopStart = (lfe > 0 && lfe < len) ? len - lfe : 0;
 
     if (!pcm || pcm.length === 0) {
       instruments.push({
@@ -250,7 +268,7 @@ export async function parseTCBTrackerFile(
         createSamplerInstrument(
           i + 1, name, pcm, vol,
           8287,   // Atari ST / ProTracker-compatible sample rate
-          0, 0,   // no loop
+          loopStart, loopEnd,
         ),
       );
     }
@@ -356,7 +374,7 @@ export async function parseTCBTrackerFile(
     songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 4,
-    initialSpeed: 6,
+    initialSpeed: Math.max(1, 16 - tempoVal),  // OpenMPT: SetDefaultSpeed(16 - tempo)
     initialBPM: 125,
     linearPeriods: false,
   };
