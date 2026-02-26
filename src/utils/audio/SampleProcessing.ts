@@ -442,3 +442,87 @@ export async function applyAmigaPal8Bit(
   const dataUrl = await bufferToDataUrl(processedBuffer);
   return { buffer: processedBuffer, dataUrl };
 }
+
+export interface AmigaPalPipelineOptions {
+  trimStart: number;      // seconds
+  trimEnd: number;        // seconds
+  loCutHz: number;        // highpass cutoff (40–500 Hz)
+  hiCutHz: number;        // lowpass cutoff (1000–20000 Hz)
+  limiterEnabled: boolean;
+  limiterThreshDb: number; // 0 = 0 dBFS, negative = reduce peaks
+  limiterMakeupGain: number; // 0–100, applied post-clamp
+}
+
+/**
+ * Apply the full AmigaPal processing pipeline to an AudioBuffer:
+ * trim → hi-pass → lo-pass → optional limiter → 8-bit quantisation
+ */
+export async function applyAmigaPalPipeline(
+  buffer: AudioBuffer,
+  opts: AmigaPalPipelineOptions
+): Promise<ProcessedResult> {
+  const sr = buffer.sampleRate;
+
+  // Clamp trim range
+  const trimS = Math.max(0, Math.min(opts.trimStart, buffer.duration));
+  const trimE = Math.max(trimS, Math.min(opts.trimEnd, buffer.duration));
+  const trimmedLength = Math.max(1, Math.round((trimE - trimS) * sr));
+  const trimOffset = Math.round(trimS * sr);
+
+  // Offline context for DSP
+  const ctx = new OfflineAudioContext(1, trimmedLength, sr);
+
+  // Source — mono mix of input
+  const src = ctx.createBufferSource();
+  // Build a mono buffer from the first channel (AmigaPal works mono)
+  const monoBuffer = new AudioBuffer({ numberOfChannels: 1, length: buffer.length, sampleRate: sr });
+  const monoData = monoBuffer.getChannelData(0);
+  if (buffer.numberOfChannels === 1) {
+    monoData.set(buffer.getChannelData(0));
+  } else {
+    const left = buffer.getChannelData(0);
+    const right = buffer.getChannelData(1);
+    for (let i = 0; i < monoData.length; i++) {
+      monoData[i] = (left[i] + right[i]) * 0.5;
+    }
+  }
+  src.buffer = monoBuffer;
+  src.start(0, trimOffset / sr, trimmedLength / sr);
+
+  // Hi-pass (lo-cut) filter
+  const hiPass = ctx.createBiquadFilter();
+  hiPass.type = 'highpass';
+  hiPass.frequency.value = Math.max(20, opts.loCutHz);
+  hiPass.Q.value = 0.707;
+
+  // Lo-pass (hi-cut) filter
+  const loPass = ctx.createBiquadFilter();
+  loPass.type = 'lowpass';
+  loPass.frequency.value = Math.min(sr / 2 - 1, opts.hiCutHz);
+  loPass.Q.value = 0.707;
+
+  // Optional limiter (DynamicsCompressor used as peak limiter)
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = opts.limiterEnabled ? opts.limiterThreshDb : 0;
+  limiter.knee.value = 0;
+  limiter.ratio.value = opts.limiterEnabled ? 20 : 1;
+  limiter.attack.value = 0.001;
+  limiter.release.value = 0.01;
+
+  const makeupGain = ctx.createGain();
+  makeupGain.gain.value = opts.limiterEnabled
+    ? Math.pow(10, (opts.limiterMakeupGain / 100) * 20 / 20)
+    : 1;
+
+  // Chain: src → hiPass → loPass → limiter → makeupGain → destination
+  src.connect(hiPass);
+  hiPass.connect(loPass);
+  loPass.connect(limiter);
+  limiter.connect(makeupGain);
+  makeupGain.connect(ctx.destination);
+
+  const rendered = await ctx.startRendering();
+
+  // Convert to 8-bit quantization (matching AmigaPal behaviour)
+  return applyAmigaPal8Bit(rendered);
+}

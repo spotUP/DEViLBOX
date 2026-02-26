@@ -28,25 +28,50 @@ export const LFODescriptor: ModuleDescriptor = {
 
   create: (ctx: AudioContext): ModuleInstance => {
     const lfo = ctx.createOscillator();
-    const depth = ctx.createGain();
+    const amplitudeGain = ctx.createGain();  // Controls oscillator amplitude
+    const dcSource = ctx.createConstantSource();  // DC bias for unipolar mode
+    const dcGain = ctx.createGain();              // DC bias amount (0=bipolar, depth*0.5=unipolar)
+    const outputNode = ctx.createGain();          // Mixed output node (the output port)
 
     // Initialize
     lfo.type = 'sine';
     lfo.frequency.value = 1;
-    depth.gain.value = 0.5;
+    amplitudeGain.gain.value = 0.5;  // Initial depth
+    dcSource.offset.value = 1;       // Constant 1, scaled by dcGain
+    dcGain.gain.value = 0;           // Bipolar by default (no DC)
+    outputNode.gain.value = 1;
+    dcSource.start();
     lfo.start();
 
-    // Route: LFO → depth
-    lfo.connect(depth);
+    // Route: lfo → amplitudeGain → outputNode
+    lfo.connect(amplitudeGain);
+    amplitudeGain.connect(outputNode);
+
+    // Route: dcSource → dcGain → outputNode (adds DC offset when unipolar)
+    dcSource.connect(dcGain);
+    dcGain.connect(outputNode);
 
     const ports = new Map<string, ModulePort>([
       ['rate', { id: 'rate', name: 'Rate', direction: 'input', signal: 'cv', param: lfo.frequency }],
       ['sync', { id: 'sync', name: 'Sync', direction: 'input', signal: 'trigger' }],
-      ['output', { id: 'output', name: 'Output', direction: 'output', signal: 'cv', node: depth }],
+      ['output', { id: 'output', name: 'Output', direction: 'output', signal: 'cv', node: outputNode }],
     ]);
 
     let currentWaveform = 0;
     let currentBipolar = 1;
+    let currentDepth = 0.5;
+
+    function updateBipolarState() {
+      if (currentBipolar) {
+        // Bipolar: full depth, no DC offset
+        amplitudeGain.gain.value = currentDepth;
+        dcGain.gain.value = 0;
+      } else {
+        // Unipolar: half amplitude + half DC = range [0, depth]
+        amplitudeGain.gain.value = currentDepth * 0.5;
+        dcGain.gain.value = currentDepth * 0.5;
+      }
+    }
 
     return {
       descriptorId: 'LFO',
@@ -63,11 +88,12 @@ export const LFODescriptor: ModuleDescriptor = {
             lfo.frequency.value = value;
             break;
           case 'depth':
-            depth.gain.value = value;
+            currentDepth = value;
+            updateBipolarState();
             break;
           case 'bipolar':
-            currentBipolar = value;
-            // TODO: Add DC offset for unipolar mode
+            currentBipolar = value >= 0.5 ? 1 : 0;
+            updateBipolarState();
             break;
         }
       },
@@ -79,7 +105,7 @@ export const LFODescriptor: ModuleDescriptor = {
           case 'rate':
             return lfo.frequency.value;
           case 'depth':
-            return depth.gain.value;
+            return currentDepth;
           case 'bipolar':
             return currentBipolar;
           default:
@@ -90,7 +116,11 @@ export const LFODescriptor: ModuleDescriptor = {
       dispose: () => {
         lfo.stop();
         lfo.disconnect();
-        depth.disconnect();
+        amplitudeGain.disconnect();
+        dcSource.stop();
+        dcSource.disconnect();
+        dcGain.disconnect();
+        outputNode.disconnect();
       },
     };
   },

@@ -14,6 +14,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { X, FolderOpen, Folder, Trash2, Shuffle } from 'lucide-react';
 import { CopyLimiterIcon, CopyLoCutIcon, CopyHiCutIcon, CopyPTNoteIcon, LimiterIcon } from '@components/icons/AmigaPalIcons';
 import { useUIStore } from '@stores';
+import { applyAmigaPalPipeline } from '@utils/audio/SampleProcessing';
 import type { ProcessedResult } from '@utils/audio/SampleProcessing';
 
 // ProTracker notes (C-1 to B-3, 36 notes total)
@@ -358,14 +359,16 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
 
     setStatusMessage(`Converting ${samples.length} sample${samples.length > 1 ? 's' : ''}...`, false, 0);
 
-    // For now, just process the first sample and apply it
     const sample = samples[0];
-
-    // TODO: Implement full processing pipeline matching renderer.js lines 750-900
-    const result: ProcessedResult = {
-      buffer: sample.buffer,
-      dataUrl: '', // Will be generated during processing
-    };
+    const result = await applyAmigaPalPipeline(sample.buffer, {
+      trimStart: sample.trimStart,
+      trimEnd: sample.trimEnd,
+      loCutHz: sample.loCutHz,
+      hiCutHz: sample.hiCutHz,
+      limiterEnabled: sample.limiterEnabled,
+      limiterThreshDb: sample.limiterThresh,
+      limiterMakeupGain: sample.limiterMakeup,
+    });
 
     onApply(result);
     setStatusMessage('Conversion complete!', false, 2000);
