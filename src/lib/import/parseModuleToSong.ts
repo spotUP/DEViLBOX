@@ -1351,8 +1351,10 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADE_smus(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
-  // ── Magnetic Fields Packer (.mfp) ─────────────────────────────────────────
-  if (/\.mfp$/i.test(filename)) {
+  // ── Magnetic Fields Packer (.mfp / mfp.*) ────────────────────────────────
+  // Amiga 4-channel format (Shaun Southern). Files use either 'mfp.songname'
+  // prefix naming or conventional 'songname.mfp' extension naming.
+  if (/\.mfp$/i.test(filename) || /^mfp\./i.test((filename.split('/').pop() ?? filename).split('\\').pop() ?? filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.mfp === 'native') {
       try {
@@ -1369,8 +1371,8 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADE_mfp(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
-  // ── Delta Music 1.0 (.dm, .dlm1) — identified by "ALL " magic ─────────────
-  if (/\.(dm|dlm1)$/i.test(filename)) {
+  // ── Delta Music 1.0 (.dm, .dm1) — identified by "ALL " magic ──────────────
+  if (/\.dm1?$/i.test(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.deltaMusic1 === 'native') {
       try {
@@ -1385,52 +1387,6 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
     const { parseUADEFile: parseUADE_dm1 } = await import('@lib/import/formats/UADEParser');
     return parseUADE_dm1(buffer, file.name, uadeMode, subsong, preScannedMeta);
-  }
-
-  // ── Delta Music 1.0 (.dm/.dm1) ────────────────────────────────────────────
-  // Amiga 4-channel wavetable tracker (Karsten Hartmann). UADE also handles it.
-  if (/\.dm1?$/i.test(filename)) {
-    if (prefs.deltaMusic1 === 'native') {
-      try {
-        const { isDeltaMusic1Format, parseDeltaMusic1File } = await import('@lib/import/formats/DeltaMusic1Parser');
-        if (isDeltaMusic1Format(buffer)) return await parseDeltaMusic1File(buffer, file.name);
-      } catch (err) {
-        console.warn(`[DeltaMusic1Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_dm1 } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_dm1(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
-  }
-
-  // ── IFF SMUS / Sonix Music Driver (.smus/.snx/.tiny) ──────────────────────
-  // IFF-chunked Amiga scored-music format (Electronic Arts). UADE also handles it.
-  if (/\.(smus|snx|tiny)$/i.test(filename)) {
-    if (prefs.iffSmus === 'native') {
-      try {
-        const { isIffSmusFormat, parseIffSmusFile } = await import('@lib/import/formats/IffSmusParser');
-        if (isIffSmusFormat(buffer)) return await parseIffSmusFile(buffer, file.name);
-      } catch (err) {
-        console.warn(`[IffSmusParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_smus } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_smus(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
-  }
-
-  // ── Magnetic Fields Packer (mfp.*) ────────────────────────────────────────
-  // Amiga 4-channel module format (Shaun Southern). Files use prefix naming
-  // 'mfp.songname'; also handles 'songname.mfp'. Companion smp.* file for samples.
-  if (/\.mfp$/i.test(filename) || /^mfp\./i.test((filename.split('/').pop() ?? filename).split('\\').pop() ?? filename)) {
-    if (prefs.mfp === 'native') {
-      try {
-        const { isMFPFormat, parseMFPFile } = await import('@lib/import/formats/MFPParser');
-        if (isMFPFormat(buffer, filename)) return await parseMFPFile(buffer, file.name);
-      } catch (err) {
-        console.warn(`[MFPParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_mfp } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_mfp(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── ProTracker 3.6 IFF wrapper (FORM/MODL magic) ──────────────────────────

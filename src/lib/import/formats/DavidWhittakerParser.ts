@@ -23,7 +23,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/types';
 import type { DavidWhittakerConfig } from '@/types/instrument';
 import { DEFAULT_DAVID_WHITTAKER } from '@/types/instrument';
 
@@ -71,7 +71,7 @@ const AMIGA_PERIODS: number[] = [
  * Map an Amiga period value to an XM note number (1-96).
  * AMIGA_PERIODS[24] = 214 = C-3, which maps to MIDI 60 (C-4) = XM note 49.
  */
-function amigaPeriodToXM(period: number): number {
+function _amigaPeriodToXM(period: number): number {
   if (period <= 0) return 0;
   let bestIdx = 0;
   let bestDist = Infinity;
@@ -427,33 +427,37 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string): 
       };
 
       instruments.push({
+        id: i + 1,
         name: `DW Inst ${i + 1}`,
-        type: 'DavidWhittakerSynth',
+        type: 'synth' as const,
+        synthType: 'DavidWhittakerSynth' as const,
         davidWhittaker: dwConfig,
         effects: [],
         volume: 0,
         pan: 0,
-      });
+      } as InstrumentConfig);
     }
   }
 
   // If no instruments were extracted, emit one default instrument
   if (instruments.length === 0) {
     instruments.push({
+      id: 1,
       name: 'DW Instrument',
-      type: 'DavidWhittakerSynth',
+      type: 'synth' as const,
+      synthType: 'DavidWhittakerSynth' as const,
       davidWhittaker: { ...DEFAULT_DAVID_WHITTAKER },
       effects: [],
       volume: 0,
       pan: 0,
-    });
+    } as InstrumentConfig);
   }
 
   // ── Build minimal pattern ─────────────────────────────────────────────────
   // Emit a single-row pattern for each instrument as a preview
   const CHANNELS = 4;
   const ROWS = 64;
-  const channels: TrackerCell[][] = [];
+  const channelData: ChannelData[] = [];
 
   for (let ch = 0; ch < CHANNELS; ch++) {
     const rows: TrackerCell[] = [];
@@ -463,23 +467,43 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string): 
           note: 49,  // MIDI 60 / C-4 / Amiga index 24 (C-3)
           instrument: ch + 1,
           volume: 0,
-          effectType: 0,
-          effectParam: 0,
+          effTyp: 0,
+          eff: 0,
+          effTyp2: 0,
+          eff2: 0,
         });
       } else {
         rows.push({
           note: 0,
           instrument: 0,
           volume: 0,
-          effectType: 0,
-          effectParam: 0,
+          effTyp: 0,
+          eff: 0,
+          effTyp2: 0,
+          eff2: 0,
         });
       }
     }
-    channels.push(rows);
+    channelData.push({
+      id:           `channel-${ch}`,
+      name:         `Channel ${ch + 1}`,
+      muted:        false,
+      solo:         false,
+      collapsed:    false,
+      volume:       100,
+      pan:          0,
+      instrumentId: null,
+      color:        null,
+      rows,
+    });
   }
 
-  const pattern: Pattern = { channels };
+  const pattern: Pattern = {
+    id:       'pattern-0',
+    name:     'Pattern 1',
+    length:   ROWS,
+    channels: channelData,
+  };
   const songPositions = [0];
 
   return {

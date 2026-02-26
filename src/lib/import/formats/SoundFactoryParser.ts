@@ -74,38 +74,39 @@ import { createSamplerInstrument } from './AmigaUtils';
 const HEADER_SIZE = 276;       // 4 + 16 + 256
 const PAL_CLOCK = 3546895;
 
-// Opcode enum (matches SoundFactory/Containers/Opcode.cs)
-const enum Op {
-  Pause        = 0x80,
-  SetVolume    = 0x81,
-  SetFineTune  = 0x82,
-  UseInstrument = 0x83,
-  DefineInstrument = 0x84,
-  Return       = 0x85,
-  GoSub        = 0x86,
-  Goto         = 0x87,
-  For          = 0x88,
-  Next         = 0x89,
-  FadeOut      = 0x8A,
-  Nop          = 0x8B,
-  Request      = 0x8C,
-  Loop         = 0x8D,
-  End          = 0x8E,
-  FadeIn       = 0x8F,
-  SetAdsr      = 0x90,
-  OneShot      = 0x91,
-  Looping      = 0x92,
-  Vibrato      = 0x93,
-  Arpeggio     = 0x94,
-  Phasing      = 0x95,
-  Portamento   = 0x96,
-  Tremolo      = 0x97,
-  Filter       = 0x98,
-  StopAndPause = 0x99,
-  Led          = 0x9A,
-  WaitForRequest = 0x9B,
-  SetTranspose = 0x9C,
-}
+// Opcode constants (matches SoundFactory/Containers/Opcode.cs)
+const Op = {
+  Pause        : 0x80,
+  SetVolume    : 0x81,
+  SetFineTune  : 0x82,
+  UseInstrument: 0x83,
+  DefineInstrument: 0x84,
+  Return       : 0x85,
+  GoSub        : 0x86,
+  Goto         : 0x87,
+  For          : 0x88,
+  Next         : 0x89,
+  FadeOut      : 0x8A,
+  Nop          : 0x8B,
+  Request      : 0x8C,
+  Loop         : 0x8D,
+  End          : 0x8E,
+  FadeIn       : 0x8F,
+  SetAdsr      : 0x90,
+  OneShot      : 0x91,
+  Looping      : 0x92,
+  Vibrato      : 0x93,
+  Arpeggio     : 0x94,
+  Phasing      : 0x95,
+  Portamento   : 0x96,
+  Tremolo      : 0x97,
+  Filter       : 0x98,
+  StopAndPause : 0x99,
+  Led          : 0x9A,
+  WaitForRequest: 0x9B,
+  SetTranspose : 0x9C,
+} as const;
+type Op = typeof Op[keyof typeof Op];
 
 // Period table for note-to-XM mapping (12 notes × 8 octaves, PAL Amiga)
 // SampleTable from Tables.cs: used with MultiplyTable for period calculation

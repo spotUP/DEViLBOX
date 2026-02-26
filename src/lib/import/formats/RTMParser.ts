@@ -346,7 +346,7 @@ function convertRTMEffect(cmd: number, param: number): { effTyp: number; eff: nu
  * Algorithm: running sum; each byte is interpreted as a signed delta.
  * Output is an unsigned byte stream where 0x80 = silence (signed 0).
  */
-function decodeDelta8(src: Uint8Array): Uint8Array {
+function decodeDelta8(src: Uint8Array): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(src.length);
   let acc = 0;
   for (let i = 0; i < src.length; i++) {
@@ -362,7 +362,7 @@ function decodeDelta8(src: Uint8Array): Uint8Array {
  * Each pair of bytes is a signed 16-bit LE delta; accumulate into running sum.
  * Output buffer has the same byte length as the input (pairs of LE int16).
  */
-function decodeDelta16(src: Uint8Array): Uint8Array {
+function decodeDelta16(src: Uint8Array): Uint8Array<ArrayBuffer> {
   const out     = new Uint8Array(src.length);
   const outView = new DataView(out.buffer);
   let acc = 0;

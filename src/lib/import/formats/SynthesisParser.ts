@@ -523,6 +523,14 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
         color:        null,
         rows:         cells.map(row => row[chIdx]),
       })),
+      importMetadata: {
+        sourceFormat:            'Synthesis' as const,
+        sourceFile:              filename,
+        importedAt:              new Date().toISOString(),
+        originalChannelCount:    4,
+        originalPatternCount:    NOP,
+        originalInstrumentCount: NOI,
+      },
     });
   }
 
@@ -548,13 +556,5 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
     numChannels:     4,
     initialSpeed:    song.startSpeed || 6,
     initialBPM:      125,
-    importMetadata: {
-      sourceFormat:            'Synthesis',
-      sourceFile:              filename,
-      importedAt:              new Date().toISOString(),
-      originalChannelCount:    4,
-      originalPatternCount:    NOP,
-      originalInstrumentCount: NOI,
-    },
   };
 }
