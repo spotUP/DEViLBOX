@@ -1377,6 +1377,31 @@ export async function parseSymphonieForPlayback(
     });
   }
 
+  // ── Extract initial cycle (speed) from first played position ─────────────
+  //
+  // Mirror the same first-pass scan used by buildSymPhonieTrackerSong() so
+  // the worklet starts with the correct ticks-per-row instead of always 6.
+  let initialCycle = 6;
+  outerCycle:
+  for (const seq of symSequences) {
+    if (seq.info === 1) continue;
+    if (seq.info === -1) break;
+    if (
+      seq.start >= symPositions.length ||
+      seq.length === 0 ||
+      seq.length > symPositions.length ||
+      symPositions.length - seq.length < seq.start
+    ) continue;
+    for (let pi = seq.start; pi < seq.start + seq.length; pi++) {
+      const pos = symPositions[pi];
+      if (!pos) continue;
+      if (pos.speed > 0) {
+        initialCycle = pos.speed;
+        break outerCycle;
+      }
+    }
+  }
+
   // ── Build patterns + order list ───────────────────────────────────────────
   //
   // Mirror the logic in _parseSymphonieProFile but emit SymphoniePattern
@@ -1500,7 +1525,7 @@ export async function parseSymphonieForPlayback(
   return {
     title,
     bpm:              initialBPM,
-    cycle:            6,     // default rows-per-tick; speed commands in events override per-row
+    cycle:            initialCycle,
     numChannels,
     orderList,
     patterns,
