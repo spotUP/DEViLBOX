@@ -445,6 +445,12 @@ export function getSupportedExtensions(): string[] {
     '.mod3',
     // ── Compressed/Packed formats ───────────────────────────────────────────
     '.zip', '.lha', '.rar', '.gz', '.mmcmp', '.xpk', '.pp', '.pack',
+    // ── Chip-dump / CPU-code formats ────────────────────────────────────────
+    '.vgm', '.vgz',    // Video Game Music (OPN2/OPL/SN register dumps)
+    '.nsf', '.nsfe',   // NES Sound Format (2A03 + expansion chips)
+    '.sap',            // Atari 8-bit POKEY
+    '.ay',             // ZX Spectrum AY (ZXAYEMUL)
+    // Note: .ym and .sid already listed above (previously UADE, now native)
   ];
 }
 

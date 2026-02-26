@@ -215,6 +215,42 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── VGM/VGZ — Video Game Music chip-dump ─────────────────────────────────
+  if (/\.(vgm|vgz)$/.test(filename)) {
+    const { parseVGMFile } = await import('@lib/import/formats/VGMParser');
+    return parseVGMFile(buffer, file.name);
+  }
+
+  // ── YM — Atari ST AY/YM2149 register dumps ────────────────────────────────
+  if (/\.ym$/.test(filename)) {
+    const { parseYMFile } = await import('@lib/import/formats/YMParser');
+    return parseYMFile(buffer, file.name);
+  }
+
+  // ── NSF/NSFE — NES Sound Format ───────────────────────────────────────────
+  if (/\.nsfe?$/.test(filename)) {
+    const { parseNSFFile } = await import('@lib/import/formats/NSFParser');
+    return parseNSFFile(buffer, file.name);
+  }
+
+  // ── SID — Commodore 64 PSID/RSID (.sid and .sid1 only — .sid2/.smn = SidMon II above)
+  if (/\.sid1?$/.test(filename)) {
+    const { parseSIDFile } = await import('@lib/import/formats/SIDParser');
+    return parseSIDFile(buffer, file.name);
+  }
+
+  // ── SAP — Atari 8-bit POKEY ───────────────────────────────────────────────
+  if (/\.sap$/.test(filename)) {
+    const { parseSAPFile } = await import('@lib/import/formats/SAPParser');
+    return parseSAPFile(buffer, file.name);
+  }
+
+  // ── AY — ZX Spectrum AY (ZXAYEMUL) ───────────────────────────────────────
+  if (/\.ay$/.test(filename)) {
+    const { parseAYFile } = await import('@lib/import/formats/AYParser');
+    return parseAYFile(buffer, file.name);
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
