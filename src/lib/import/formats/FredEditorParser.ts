@@ -729,16 +729,22 @@ function decodePatternStream(
         }
       }
 
-      // Portamento effect if active
+      // Portamento effect if active.
+      // In MOD mode, TrackerReplayer sets ch.portaTarget from row.note when effTyp === 0x03.
+      // So we must: (a) put the TARGET in the note field, and (b) use the primary effect slot.
+      let noteToUse = xmNote;
       if (portaDelay === 0 && portaSpeed > 0) {
         const pNote = feNoteToXM(portaNote);
         if (pNote > 0 && pNote !== xmNote) {
-          effTyp2 = 0x03; // Tone portamento
-          eff2 = Math.min(portaSpeed, 0xFF);
+          effTyp = 0x03; // Tone portamento (primary slot — TrackerReplayer checks effTyp only)
+          eff = Math.min(portaSpeed, 0xFF);
+          effTyp2 = 0;
+          eff2 = 0;
+          noteToUse = pNote; // portamento TARGET so ch.portaTarget = period(pNote)
         }
       }
 
-      // Vibrato from sample definition
+      // Vibrato from sample definition (only if portamento not already using primary slot)
       if (smp && smp.vibratoSpeed > 0 && smp.vibratoDepth > 0 && effTyp === 0) {
         effTyp = 0x04; // Vibrato
         const vSpeed = Math.min(smp.vibratoSpeed, 15);
@@ -747,7 +753,7 @@ function decodePatternStream(
       }
 
       rows.push({
-        note: xmNote, instrument, volume: xmVolume,
+        note: noteToUse, instrument, volume: xmVolume,
         effTyp, eff, effTyp2, eff2,
       });
     } else if (value < 0) {
