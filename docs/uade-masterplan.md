@@ -245,9 +245,12 @@ Format DSP Source → thin WASM wrapper → TypeScript engine → TypeScript syn
 
 - [x] **B1 JamCracker** (`.jam`, `.jc`) — `src/lib/import/formats/JamCrackerParser.ts` ✅ 2026-02-26
   - 4-channel, PCM+AM instruments, Fxx/arpeggio/vibrato/portamento effects
-- [ ] **B2 Quadra Composer** (`.emod`, `.qc`) — FORM/EMOD/EMIC IFF; 4-channel MOD-like
-- [ ] **B3 AMOS Music Bank** (`.abk`) — `AmBk` magic; multi-instrument sample bank
-- [ ] **B4 TCB Tracker** (`.tcb`) — Atari ST tracker; `AN COOL.` magic
+- [x] **B2 Quadra Composer** (`.emod`, `.qc`) — `src/lib/import/formats/QuadraComposerParser.ts` ✅ 2026-02-26
+  - IFF FORM/EMOD; EMIC chunk for instruments+patterns+song order; PATT chunk; 8SMP chunk
+- [x] **B3 AMOS Music Bank** (`.abk`) — `src/lib/import/formats/AMOSMusicBankParser.ts` ✅ 2026-02-26
+  - `AmBk` magic; command-based per-channel patterns decoded to TrackerCell rows
+- [x] **B4 TCB Tracker** (`.tcb`) — `src/lib/import/formats/TCBTrackerParser.ts` ✅ 2026-02-26
+  - "AN COOL." / "AN COOL!" magic; 4ch / 16 instruments / 64 rows; unsigned PCM converted to signed
 
 ### Phase 7 — Instrument Editor UI ✅ COMPLETE
 
