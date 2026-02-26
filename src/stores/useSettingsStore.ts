@@ -73,6 +73,8 @@ export interface FormatEnginePreferences {
   actionamics: FormatEngineChoice;        // .act → ActionamicsParser vs UADE
   activisionPro: FormatEngineChoice;      // .avp/.mw → ActivisionProParser vs UADE
   ronKlaren: FormatEngineChoice;          // .rk/.rkb → RonKlarenParser vs UADE
+  madTracker2: FormatEngineChoice;        // .mt2 → MadTracker2Parser vs OpenMPT
+  psm: FormatEngineChoice;                // .psm → PSMParser vs OpenMPT
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -177,6 +179,8 @@ export const useSettingsStore = create<SettingsStore>()(
         actionamics: 'native',      // ActionamicsParser — native parser available
         activisionPro: 'native',    // ActivisionProParser — native parser available
         ronKlaren: 'native',        // RonKlarenParser — native parser available
+        madTracker2: 'native',      // MadTracker2Parser — dedicated MadTracker 2 (.mt2) support
+        psm: 'native',              // PSMParser — dedicated PSM / PSM16 (Epic MegaGames MASI) support
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
