@@ -422,7 +422,7 @@ static inline void SDL_LockAudioDevice(SDL_AudioDeviceID dev)     { (void)dev; }
 static inline void SDL_UnlockAudioDevice(SDL_AudioDeviceID dev)   { (void)dev; }
 
 /* ── Sync primitives no-ops ──────────────────────────────────────────── */
-static inline SDL_mutex *SDL_CreateMutex(void)                    { return (SDL_mutex*)malloc(1); }
+static inline SDL_mutex *SDL_CreateMutex(void)                    { return (SDL_mutex*)malloc(sizeof(void*)); }
 static inline void SDL_DestroyMutex(SDL_mutex *m)                 { free(m); }
 static inline int  SDL_LockMutex(SDL_mutex *m)                    { (void)m; return 0; }
 static inline int  SDL_UnlockMutex(SDL_mutex *m)                  { (void)m; return 0; }
