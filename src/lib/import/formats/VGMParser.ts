@@ -60,10 +60,14 @@ function sn76489CounterToNote(counter: number, clock: number): number {
   return Math.max(1, Math.min(96, note));
 }
 
+// YM2151 KC nibble → semitone offset from C (note that C is at nibble 11, C# at 0)
+const KC_TO_SEMITONE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0] as const;
+
 /** Convert YM2151 key code to MIDI note (1–96). */
 function opmKeyCodeToNote(kc: number): number {
-  const octave = (kc >> 4) & 0x07;
-  const semi = Math.min(kc & 0x0F, 11);
+  const octave  = (kc >> 4) & 0x07;
+  const kcNote  = Math.min(kc & 0x0F, 11);
+  const semi    = KC_TO_SEMITONE[kcNote];
   const midiNote = octave * 12 + semi + 12;
   return Math.max(1, Math.min(96, midiNote));
 }
@@ -278,7 +282,7 @@ function walkCommands(buf: Uint8Array, dataStart: number, chips: VGMChips, opts:
           const prevVol = snVolume[snLatchCh];
           snVolume[snLatchCh] = lo;
 
-          if (chips.sn76489 && opts.snChStart >= 0 && snLatchCh < 3) {
+          if (opts.snChStart >= 0 && snLatchCh < 3) {
             const outCh = opts.snChStart + snLatchCh;
             if (lo === 15 && snPlaying[snLatchCh]) {
               // Silence → note-off
@@ -296,7 +300,7 @@ function walkCommands(buf: Uint8Array, dataStart: number, chips: VGMChips, opts:
         } else {
           // Tone latch: lower nibble = bits[3:0] of counter
           snCounter[snLatchCh] = (snCounter[snLatchCh] & 0x3F0) | lo;
-          // Note emission happens after data byte arrives (or immediately for single-nibble writes)
+          // Note emission happens after data byte arrives
         }
       } else {
         // Data byte: bits[5:0] = upper 6 bits of frequency counter for latched tone channel
@@ -304,7 +308,7 @@ function walkCommands(buf: Uint8Array, dataStart: number, chips: VGMChips, opts:
           // Update upper 6 bits of counter
           snCounter[snLatchCh] = ((data & 0x3F) << 4) | (snCounter[snLatchCh] & 0x0F);
 
-          if (chips.sn76489 && opts.snChStart >= 0) {
+          if (opts.snChStart >= 0) {
             const outCh = opts.snChStart + snLatchCh;
             // If channel is audible, emit note-on with new frequency
             if (snVolume[snLatchCh] < 15 && snCounter[snLatchCh] > 0) {
@@ -360,7 +364,7 @@ function walkCommands(buf: Uint8Array, dataStart: number, chips: VGMChips, opts:
       const reg = buf[pos++];
       const val = buf[pos++];
 
-      if (chips.ym2151 && opts.opmChStart >= 0) {
+      if (opts.opmChStart >= 0) {
         if (reg >= 0x28 && reg <= 0x2F) {
           // Key code register for channel (reg - 0x28)
           const ch = reg - 0x28;
