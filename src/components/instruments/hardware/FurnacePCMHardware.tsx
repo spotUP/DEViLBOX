@@ -9,13 +9,14 @@
  * OKI, YMZ280B, MULTIPCM, AMIGA
  */
 
-import React, { useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 import { SDLHardwareWrapper, type SDLModule } from './SDLHardwareWrapper';
-import type { FurnaceConfig, SynthType } from '@typedefs/instrument';
+import type { FurnaceConfig, SynthType, InstrumentConfig } from '@typedefs/instrument';
 
 interface FurnacePCMHardwareProps {
   config: FurnaceConfig;
   onChange: (config: FurnaceConfig) => void;
+  instrument?: InstrumentConfig;
 }
 
 /* ── SynthType string → chip subtype number (must match furnace_pcm.h PCM_CHIP_*) ── */
@@ -126,23 +127,139 @@ function getChipSuffix(chipType: number): string {
   return map[chipType] ?? 'SEGAPCM';
 }
 
+/* ── PCM decode: audio file → Int8Array for WASM ───────────────────────── */
+
+async function decodePCM(instrument: InstrumentConfig): Promise<Int8Array | null> {
+  const sample = instrument.sample;
+  if (!sample) return null;
+
+  let audioBuffer: AudioBuffer | null = null;
+
+  try {
+    if (sample.audioBuffer && sample.audioBuffer.byteLength > 0) {
+      const ctx = new OfflineAudioContext(1, 1, 44100);
+      audioBuffer = await ctx.decodeAudioData(sample.audioBuffer.slice(0));
+    } else if (sample.url) {
+      const resp = await fetch(sample.url);
+      const arrayBuf = await resp.arrayBuffer();
+      const ctx = new OfflineAudioContext(1, 1, 44100);
+      audioBuffer = await ctx.decodeAudioData(arrayBuf);
+    }
+  } catch {
+    return null;
+  }
+
+  if (!audioBuffer) return null;
+
+  const float32 = audioBuffer.getChannelData(0);
+  const int8 = new Int8Array(float32.length);
+  for (let i = 0; i < float32.length; i++) {
+    let v = Math.round(float32[i] * 127);
+    if (v > 127) v = 127;
+    if (v < -128) v = -128;
+    int8[i] = v;
+  }
+
+  return int8;
+}
+
 /* ── Component ─────────────────────────────────────────────────────────── */
 
-export const FurnacePCMHardware: React.FC<FurnacePCMHardwareProps> = ({ config, onChange }) => {
+export const FurnacePCMHardware: React.FC<FurnacePCMHardwareProps> = ({ config, onChange, instrument }) => {
   const configRef = useRef(config);
   const onChangeRef = useRef(onChange);
+  const sampleRateRef = useRef(config.pcm?.sampleRate ?? 22050);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const [pcmData, setPcmData] = useState<Int8Array | null>(null);
 
   useEffect(() => { configRef.current = config; }, [config]);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
+  /* Keep sample rate ref in sync when config changes */
+  useEffect(() => {
+    sampleRateRef.current = config.pcm?.sampleRate ?? 22050;
+  }, [config.pcm?.sampleRate]);
+
+  /* Decode PCM when instrument changes */
+  useEffect(() => {
+    if (!instrument) { setPcmData(null); return; }
+    let cancelled = false;
+    decodePCM(instrument).then(result => {
+      if (!cancelled) setPcmData(result);
+    });
+    return () => { cancelled = true; };
+  }, [instrument]);
+
+  /* Audio cleanup on unmount */
+  useEffect(() => {
+    return () => {
+      if (currentSourceRef.current) {
+        try { currentSourceRef.current.stop(); } catch { /* ignore */ }
+        currentSourceRef.current = null;
+      }
+      if (audioCtxRef.current) {
+        try { audioCtxRef.current.close(); } catch { /* ignore */ }
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
+
   const configBuffer = useMemo(() => configToBuffer(config), [config]);
 
   const handleModuleReady = useCallback((mod: SDLModule) => {
+    /* Audio playback callbacks */
+    mod.onPlaySample = (ptr: number, len: number, loopStart: number, loopLength: number, loopType: number, is16bit: number) => {
+      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+      const ctx = audioCtxRef.current;
+
+      if (currentSourceRef.current) {
+        try { currentSourceRef.current.stop(); } catch { /* ignore */ }
+        currentSourceRef.current = null;
+      }
+
+      const sr = sampleRateRef.current;
+      const audioBuffer = ctx.createBuffer(1, len, sr);
+      const channel = audioBuffer.getChannelData(0);
+
+      if (is16bit) {
+        const heap16 = (mod as Record<string, unknown>)['HEAP16'] as Int16Array | undefined;
+        if (heap16) {
+          const raw = heap16.subarray(ptr >> 1, (ptr >> 1) + len);
+          for (let i = 0; i < len; i++) channel[i] = raw[i] / 32768.0;
+        }
+      } else {
+        const raw = mod.HEAP8.subarray(ptr, ptr + len);
+        for (let i = 0; i < len; i++) channel[i] = raw[i] / 128.0;
+      }
+
+      const src = ctx.createBufferSource();
+      src.buffer = audioBuffer;
+
+      if (loopType > 0 && loopLength > 0) {
+        src.loop = true;
+        src.loopStart = loopStart / sr;
+        src.loopEnd = (loopStart + loopLength) / sr;
+      }
+
+      src.connect(ctx.destination);
+      src.start();
+      currentSourceRef.current = src;
+    };
+
+    mod.onStopSample = () => {
+      if (currentSourceRef.current) {
+        try { currentSourceRef.current.stop(); } catch { /* ignore */ }
+        currentSourceRef.current = null;
+      }
+    };
+
     mod.onParamChange = (paramId: number, value: number) => {
       const c = { ...configRef.current };
 
       switch (paramId) {
         case PARAM.SAMPLE_RATE:
+          sampleRateRef.current = value;
           c.pcm = { ...c.pcm!, sampleRate: value };
           break;
 
@@ -206,6 +323,8 @@ export const FurnacePCMHardware: React.FC<FurnacePCMHardwareProps> = ({ config, 
       loadConfigFn="_furnace_pcm_load_config"
       configBuffer={configBuffer}
       onModuleReady={handleModuleReady}
+      pcmData={pcmData}
+      loadPcmFn="_furnace_pcm_load_pcm"
     />
   );
 };
