@@ -147,7 +147,6 @@ export class ProTrackerReplayer {
   // Tick timer
   private tickLoop: Tone.Loop | null = null;
   private tickInterval = 0.02;   // 20ms default (125 BPM, 2.5/125)
-  private _ledFilterOn = false;
   private patternDelay = 0;
 
   // Master output
@@ -187,8 +186,6 @@ export class ProTrackerReplayer {
     this.pBreakFlag = false;
     this.posJumpFlag = false;
     this.patternDelay = 0;
-    this._ledFilterOn = false;
-
     console.log(`[PTReplayer] Loaded module: ${module.name}, ${module.numChannels} channels, ${module.songLength} positions`);
   }
 
@@ -520,8 +517,7 @@ export class ProTrackerReplayer {
    */
   private processExtendedEffect(_chIndex: number, ch: ChannelState, x: number, y: number, time: number): void {
     switch (x) {
-      case 0x0: // Set filter (Amiga LED filter)
-        this._ledFilterOn = y > 0;
+      case 0x0: // Set filter (Amiga LED filter) — hardware-only, no-op in software
         break;
 
       case 0x1: // Fine portamento up
