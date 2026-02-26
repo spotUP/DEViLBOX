@@ -13,3 +13,11 @@ void pbWavRender(void)                          {}
 void pbWavExit(void)                            {}
 void pbWavFreqUp(void)                          {}
 void pbWavFreqDown(void)                        {}
+void pbWavAmpUp(void)                           {}
+void pbWavAmpDown(void)                         {}
+void pbWavSongStartUp(void)                     {}
+void pbWavSongStartDown(void)                   {}
+void pbWavSongEndUp(void)                       {}
+void pbWavSongEndDown(void)                     {}
+void rbWavRenderBitDepth16(void)                {}
+void rbWavRenderBitDepth32(void)                {}

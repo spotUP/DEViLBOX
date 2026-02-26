@@ -13,3 +13,5 @@ void rbHelpFeatures(void)            {}
 void rbHelpEffects(void)             {}
 void rbHelpKeybindings(void)         {}
 void rbHelpHowToUseFT2(void)         {}
+void rbHelpFAQ(void)                 {}
+void rbHelpKnownBugs(void)          {}

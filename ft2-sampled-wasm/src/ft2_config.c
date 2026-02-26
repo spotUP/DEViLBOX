@@ -90,3 +90,35 @@ void cbStretchImage(void)                    {}
 void sbAmp(uint32_t pos)                     { (void)pos; }
 void sbMasterVol(uint32_t pos)               { (void)pos; }
 void sbMIDISens(uint32_t pos)                { (void)pos; }
+void configMasterVolDown(void)               {}
+void configMasterVolUp(void)                 {}
+void configQuantizeUp(void)                  {}
+void configQuantizeDown(void)                {}
+void configMIDIChnUp(void)                   {}
+void configMIDIChnDown(void)                 {}
+void configMIDITransUp(void)                 {}
+void configMIDITransDown(void)               {}
+void configMIDISensDown(void)                {}
+void configMIDISensUp(void)                  {}
+void rbConfigAudio(void)                     {}
+void rbConfigLayout(void)                    {}
+void rbConfigMiscellaneous(void)             {}
+void rbConfigAudioBuffSmall(void)            {}
+void rbConfigAudioBuffMedium(void)           {}
+void rbConfigAudioBuffLarge(void)            {}
+void rbConfigAudio16Bit(void)                {}
+void rbConfigAudio32BitFloat(void)           {}
+void rbConfigAudio44kHz(void)                {}
+void rbConfigAudio48kHz(void)                {}
+void rbConfigAudio96kHz(void)                {}
+void rbConfigAudioInput44kHz(void)           {}
+void rbConfigAudioInput48kHz(void)           {}
+void rbConfigAudioInput96kHz(void)           {}
+void rbConfigAudioIntrpDisabled(void)        {}
+void rbConfigAudioIntrpLinear(void)          {}
+void rbConfigAudioIntrpCubic(void)           {}
+void rbConfigAudioIntrpQuadratic(void)       {}
+void rbConfigAudioIntrpSinc8(void)           {}
+void rbConfigAudioIntrpSinc16(void)          {}
+void rbConfigFreqSlidesAmiga(void)           {}
+void rbConfigFreqSlidesLinear(void)          {}
