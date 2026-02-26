@@ -119,6 +119,21 @@ Track which formats have native parsers vs UADE-only.
 | `qpa.*`, `sqt.*`, `qts.*` | Quartet / Quartet PSG / Quartet ST | QuartetParser.ts | UADE eagleplayer | 3 sub-variants; BRA-pattern detection; UADE fallback |
 | `sm.*`, `sm1.*`, `sm2.*`, `sm3.*`, `smpro.*` | Sound Master | SoundMasterParser.ts | UADE eagleplayer asm | 3×BRA + LEA/RTS + 0x00BFE001 sentinel; UADE fallback |
 | `sng.*` | ZoundMonitor | ZoundMonitorParser.ts | UADE eagleplayer asm | computed offset + "df?:"/"?amp" tag; sng.* prefix only; UADE fallback |
+| `.psa`, `PSA.*` | Professional Sound Artists | PSAParser.ts | UADE eagleplayer asm | "PSA\0" magic; subsong/instrument counts; UADE fallback |
+| `.mmdc`, `MMDC.*` | MMDC (MED Packer) | MMDCParser.ts | UADE eagleplayer asm | "MMDC" magic + structural check; UADE fallback |
+| `.jpo`, `.jpold`, `JPO.*` | Steve Turner | SteveTurnerParser.ts | UADE eagleplayer asm | 4×0x2B7C + 68k instruction pattern; UADE fallback |
+| `.tme`, `TME.*` | The Musical Enlightenment | TMEParser.ts | UADE eagleplayer asm | buf[0]==0 + size>=7000 + longword checks; UADE fallback |
+| `.dum` | Infogrames (DUM) | InfogramesParser.ts | UADE eagleplayer asm | header-offset + rel-offset + null+0x0F tag; UADE fallback |
+| `TMK.*` | TimeTracker | TimeTrackerParser.ts | UADE eagleplayer asm | 'TMK' magic + non-zero 4th byte; UADE fallback |
+| `SG.*` | TomyTracker | TomyTrackerParser.ts | UADE eagleplayer asm | size>1728 + structural offset checks; UADE fallback |
+| `EX.*` | Fashion Tracker | FashionTrackerParser.ts | UADE eagleplayer asm | 5 specific 68k instruction patterns at fixed offsets; UADE fallback |
+| `MMS.*`, `SFX20.*` | MultiMedia Sound | MultiMediaSoundParser.ts | UADE eagleplayer asm | 31 even longs <= 0x20000 + 'SO31' magic; UADE fallback |
+| `KRIS.*` | ChipTracker (KRIS prefix) | ChipTrackerParser.ts | UADE eagleplayer asm | 'KRIS' magic at offset 952; UADE fallback |
+| `CIN.*` | Cinemaware | CinemawareParser.ts | UADE eagleplayer asm | 'IBLK'+'ASEQ' magic; UADE fallback |
+| `NTP.*` | NovoTrade Packer | NovoTradePackerParser.ts | UADE eagleplayer asm | 'MODU'+'BODY'+'SAMP' chunks; UADE fallback |
+| `ALP.*` | Alcatraz Packer | AlcatrazPackerParser.ts | UADE eagleplayer asm | 'PAn\x10' magic + size check; UADE fallback |
+| `UDS.*` | Blade Packer | BladePackerParser.ts | UADE eagleplayer asm | 0x538F4E47 magic; 8-channel; UADE fallback |
+| `IMS.*` | Images Music System (prefix) | ImagesMusicSystemParser.ts | UADE eagleplayer asm | offset-arithmetic detection; UADE fallback |
 
 ---
 
@@ -149,7 +164,6 @@ Track which formats have native parsers vs UADE-only.
 | `.hip`, `.hip7`, `.hst`, `.sog` | Jochen Hippel variants (other than CoSo) |
 | `.ash` | Ashley Hogg |
 | `.gray` | Fred Gray |
-| `.cin` | Cinemaware |
 | `.dlm1`, `.dlm2` | Delta Music Loader variants (compiled 68k loader binary) |
 
 ---
@@ -235,3 +249,18 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | Quartet / Quartet PSG / ST | QuartetParser.ts | UADE eagleplayer |
 | 2026-02-26 | Sound Master | SoundMasterParser.ts | UADE eagleplayer asm |
 | 2026-02-26 | ZoundMonitor | ZoundMonitorParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Professional Sound Artists | PSAParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | MMDC (MED Packer) | MMDCParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Steve Turner | SteveTurnerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | The Musical Enlightenment | TMEParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Infogrames DUM | InfogramesParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | TimeTracker | TimeTrackerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | TomyTracker | TomyTrackerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Fashion Tracker | FashionTrackerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | MultiMedia Sound | MultiMediaSoundParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | ChipTracker (KRIS prefix) | ChipTrackerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Cinemaware | CinemawareParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | NovoTrade Packer | NovoTradePackerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Alcatraz Packer | AlcatrazPackerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Blade Packer | BladePackerParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Images Music System (prefix) | ImagesMusicSystemParser.ts | UADE eagleplayer asm |

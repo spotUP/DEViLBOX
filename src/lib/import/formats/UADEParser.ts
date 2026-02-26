@@ -288,6 +288,18 @@ const UADE_EXTENSIONS: Set<string> = new Set([
   'qpa', 'qts', 'sqt',
   // ZoundMonitor
   'sng',
+  // Formats with native parsers — also registering extension for UADE fallback
+  'symmod',  // Symphonie Pro (SymphonieProParser)
+  'dbm',     // DigiBooster Pro (DigiBoosterProParser)
+  'ams',     // AMS / Velvet Studio (AMSParser) — also in libopenmpt, native takes priority
+  'ftm',     // Face the Music (FaceTheMusicParser) — also in libopenmpt, native takes priority
+  'gt2', 'gtk',   // Graoumf Tracker 2 (GraoumfTracker2Parser)
+  'dsym',    // Digital Symphony (DigitalSymphonyParser)
+  'cba',     // Chuck Biscuits Atari ST (ChuckBiscuitsParser)
+  'act',     // Actionamics (ActionamicsParser)
+  'fmt',     // FM Tracker (FMTrackerParser)
+  'c67',     // CDFM Composer 670 (CDFM67Parser)
+  '667',     // Composer 667 (Composer667Parser)
   // PTK-Prowiz packed formats
   'mod_doc', 'mod15', 'mod15_mst', 'mod_ntk', 'mod_ntk1', 'mod_ntk2',
   'mod_ntkamp', 'mod_flt4', 'mod_comp', 'mod15_ust', 'mod15_st-iv',
