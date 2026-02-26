@@ -6,6 +6,9 @@
  */
 
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { View } from '@react-three/drei';
+import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine, disposeDJEngine } from '@/engine/dj/DJEngine';
 import { clearSongCache } from '@/engine/dj/DJSongCache';
@@ -39,6 +42,7 @@ interface DJViewProps {
 }
 
 export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
+  const djViewRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<DJEngine | null>(null);
   const setDJModeActive = useDJStore((s) => s.setDJModeActive);
   const deckViewMode = useDJStore((s) => s.deckViewMode);
@@ -236,7 +240,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
   }, []);
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden select-none bg-dark-bg font-mono">
+    <div ref={djViewRef} className="relative flex flex-col h-full w-full overflow-hidden select-none bg-dark-bg font-mono">
       {/* ================================================================== */}
       {/* TOP BAR                                                            */}
       {/* ================================================================== */}
@@ -472,6 +476,28 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads }) => {
 
       {/* Master Effects Modal */}
       <MasterEffectsModal isOpen={showMasterFX} onClose={() => setShowMasterFX(false)} />
+
+      {/* ================================================================== */}
+      {/* SHARED WEBGL CANVAS — one context for all turntable 3D views       */}
+      {/* Only mounted in 3D mode. Views inside DeckVinyl3DView register via  */}
+      {/* View.Port (drei scissor rendering). pointer-events:none so HTML     */}
+      {/* controls in DJDeck still receive events normally.                  */}
+      {/* ================================================================== */}
+      {deckViewMode === '3d' && (
+        <Canvas
+          style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+          eventSource={djViewRef}
+          eventPrefix="client"
+          gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
+          onCreated={({ gl }) => {
+            gl.toneMapping = THREE.ACESFilmicToneMapping;
+            gl.toneMappingExposure = 1.2;
+            gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault(), false);
+          }}
+        >
+          <View.Port />
+        </Canvas>
+      )}
     </div>
   );
 };
