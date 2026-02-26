@@ -1139,17 +1139,6 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     // Fall through to libopenmpt
   }
 
-  // ── DigiBooster Pro (.dbm) ────────────────────────────────────────────────
-  if (/\.dbm$/.test(filename)) {
-    try {
-      const { isDBMFormat, parseDBMFile } = await import('@lib/import/formats/DigiBoosterProParser');
-      if (isDBMFormat(buffer)) return parseDBMFile(buffer, file.name);
-    } catch (err) {
-      console.warn(`[DigiBoosterProParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
-    }
-    // Fall through to libopenmpt
-  }
-
   // ── Imago Orpheus (.imf, .imff) ───────────────────────────────────────────
   if (/\.imff?$/.test(filename)) {
     try {
