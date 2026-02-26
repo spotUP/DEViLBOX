@@ -168,6 +168,7 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
         name: `${label} Voice ${v}`,
         type: 'synth', synthType: st,
         furnace: { ...DEFAULT_FURNACE, chipType: 3, ops: 2 },
+        effects: [], volume: 0, pan: 0,
       });
     }
   }

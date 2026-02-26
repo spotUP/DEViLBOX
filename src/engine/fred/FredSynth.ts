@@ -41,7 +41,6 @@ export class FredSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _disposed = false;
   private _playerHandle = -1;
-  private _config: FredConfig | null = null;
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
@@ -60,8 +59,6 @@ export class FredSynth implements DevilboxSynth {
   }
 
   async setInstrument(config: FredConfig): Promise<void> {
-    this._config = config;
-
     await this.engine.ready();
 
     if (this._playerHandle >= 0) {

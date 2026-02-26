@@ -45,7 +45,6 @@ export class SidMonSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _disposed = false;
   private _playerHandle = -1;
-  private _config: SidMonConfig | null = null;
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
@@ -64,8 +63,6 @@ export class SidMonSynth implements DevilboxSynth {
   }
 
   async setInstrument(config: SidMonConfig): Promise<void> {
-    this._config = config;
-
     await this.engine.ready();
 
     if (this._playerHandle >= 0) {

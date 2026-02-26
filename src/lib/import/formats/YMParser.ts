@@ -364,6 +364,7 @@ export async function parseYMFile(buffer: ArrayBuffer, filename: string): Promis
   const ayInst: InstrumentConfig = {
     id: 1, name: 'AY Channel', type: 'synth', synthType: 'FurnaceAY',
     furnace: { ...DEFAULT_FURNACE, chipType: 6, ops: 2 },
+    effects: [], volume: 0, pan: 0,
   };
 
   return {

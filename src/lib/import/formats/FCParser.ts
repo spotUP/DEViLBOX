@@ -194,7 +194,7 @@ const FC13_WAVES = [
  * Extract a single FC13 built-in waveform as an unsigned Uint8Array.
  * @param waveIndex 0-46 — index into FC13_WAVES length table
  */
-function extractFC13Wave(waveIndex: number): Uint8Array {
+export function extractFC13Wave(waveIndex: number): Uint8Array {
   if (waveIndex < 0 || waveIndex >= 47) return new Uint8Array(0);
   let dataOffset = 47; // PCM data starts after 47 length values
   for (let i = 0; i < waveIndex; i++) {

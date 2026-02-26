@@ -42,7 +42,6 @@ export class FCSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _disposed = false;
   private _playerHandle = -1;
-  private _config: FCConfig | null = null;
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
@@ -61,8 +60,6 @@ export class FCSynth implements DevilboxSynth {
   }
 
   async setInstrument(config: FCConfig): Promise<void> {
-    this._config = config;
-
     await this.engine.ready();
 
     // Destroy old player if we have one
