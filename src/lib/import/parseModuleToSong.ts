@@ -534,6 +534,26 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── Digital Symphony ──────────────────────────────────────────────────────
+  // .dsym files — identified by 8-byte magic \x02\x01\x13\x13\x14\x12\x01\x0B at offset 0.
+  if (/\.dsym$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.digitalSymphony === 'native') {
+      try {
+        const { isDigitalSymphonyFormat, parseDigitalSymphonyFile } = await import('@lib/import/formats/DigitalSymphonyParser');
+        const bytes = new Uint8Array(buffer);
+        if (isDigitalSymphonyFormat(bytes)) {
+          const result = parseDigitalSymphonyFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[DigitalSymphonyParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── PumaTracker ───────────────────────────────────────────────────────────
   // .puma files — no magic bytes; heuristic header validation (mirrors OpenMPT).
   if (/\.puma$/.test(filename)) {
@@ -929,6 +949,39 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       if (isSTMFormat(buffer)) return parseSTMFile(buffer, file.name);
     } catch (err) {
       console.warn(`[STMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── NoiseRunner (.nru) ────────────────────────────────────────────────────
+  if (/\.nru$/.test(filename)) {
+    try {
+      const { isNRUFormat, parseNRUFile } = await import('@lib/import/formats/NRUParser');
+      if (isNRUFormat(buffer)) return parseNRUFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[NRUParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── PolyTracker (.ptm) ────────────────────────────────────────────────────
+  if (/\.ptm$/.test(filename)) {
+    try {
+      const { isPTMFormat, parsePTMFile } = await import('@lib/import/formats/PTMParser');
+      if (isPTMFormat(buffer)) return parsePTMFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[PTMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── General DigiMusic (.gdm) ──────────────────────────────────────────────
+  if (/\.gdm$/.test(filename)) {
+    try {
+      const { isGDMFormat, parseGDMFile } = await import('@lib/import/formats/GDMParser');
+      if (isGDMFormat(buffer)) return parseGDMFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[GDMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
     // Fall through to libopenmpt
   }
