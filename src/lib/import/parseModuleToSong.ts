@@ -1603,6 +1603,57 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
   }
 
+  // ── Sound Master (sm.* / sm1.* / sm2.* / sm3.* / smpro.* prefix) ───────────
+  // Amiga compiled 68k music format by Michiel J. Soede (v1.0–3.0).
+  // Detection: three 0x6000 BRA.W words + LEA/RTS scan + 0x00BFE001 sentinel.
+  {
+    const _smBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    const _mightBeSM =
+      _smBase.startsWith('sm.') || _smBase.startsWith('sm1.') ||
+      _smBase.startsWith('sm2.') || _smBase.startsWith('sm3.') ||
+      _smBase.startsWith('smpro.');
+    if (_mightBeSM) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.soundMaster === 'native') {
+        try {
+          const { isSoundMasterFormat, parseSoundMasterFile } = await import('@lib/import/formats/SoundMasterParser');
+          if (isSoundMasterFormat(buffer)) {
+            const result = await parseSoundMasterFile(buffer, file.name);
+            if (result) return result;
+          }
+        } catch (err) {
+          console.warn(`[SoundMasterParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_sm } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_sm(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── ZoundMonitor (sng.* prefix) ──────────────────────────────────────────────
+  // Amiga compiled 68k music format (UADE eagleplayer prefix "sng").
+  // Note: .sng extension is Richard Joseph; this block only matches sng.* prefix.
+  // Detection: computed offset from bytes[0..1], then "df?:" or "?amp" tag check.
+  {
+    const _zBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_zBase.startsWith('sng.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.zoundMonitor === 'native') {
+        try {
+          const { isZoundMonitorFormat, parseZoundMonitorFile } = await import('@lib/import/formats/ZoundMonitorParser');
+          if (isZoundMonitorFormat(buffer)) {
+            const result = await parseZoundMonitorFile(buffer, file.name);
+            if (result) return result;
+          }
+        } catch (err) {
+          console.warn(`[ZoundMonitorParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_sng } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_sng(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
   // ── Future Player (.fp / FP.*) ───────────────────────────────────────────────
   // Amiga 4-channel format (Future Player). Magic: 0x000003F3 + "F.PLAYER" at offsets 32-39.
   if (

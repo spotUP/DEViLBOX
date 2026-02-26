@@ -117,6 +117,8 @@ Track which formats have native parsers vs UADE-only.
 | `jt.*`, `mon_old.*` | Jeroen Tel | JeroenTelParser.ts | UADE eagleplayer asm | ANDI.B 68k scan; 3-file variant; UADE fallback |
 | `mc.*`, `mcr.*`, `mco.*` | Mark Cooksey | MarkCookseyParser.ts | UADE eagleplayer asm | 3 sub-variants (Old/New/Rare); binary sig; UADE fallback |
 | `qpa.*`, `sqt.*`, `qts.*` | Quartet / Quartet PSG / Quartet ST | QuartetParser.ts | UADE eagleplayer | 3 sub-variants; BRA-pattern detection; UADE fallback |
+| `sm.*`, `sm1.*`, `sm2.*`, `sm3.*`, `smpro.*` | Sound Master | SoundMasterParser.ts | UADE eagleplayer asm | 3×BRA + LEA/RTS + 0x00BFE001 sentinel; UADE fallback |
+| `sng.*` | ZoundMonitor | ZoundMonitorParser.ts | UADE eagleplayer asm | computed offset + "df?:"/"?amp" tag; sng.* prefix only; UADE fallback |
 
 ---
 
@@ -231,3 +233,5 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | Jeroen Tel | JeroenTelParser.ts | UADE eagleplayer asm |
 | 2026-02-26 | Mark Cooksey | MarkCookseyParser.ts | UADE eagleplayer asm |
 | 2026-02-26 | Quartet / Quartet PSG / ST | QuartetParser.ts | UADE eagleplayer |
+| 2026-02-26 | Sound Master | SoundMasterParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | ZoundMonitor | ZoundMonitorParser.ts | UADE eagleplayer asm |
