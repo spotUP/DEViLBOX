@@ -688,11 +688,13 @@ export function MixerVestax3DView() {
           near: 0.01,
           far: 10,
         }}
-        gl={{ alpha: true, antialias: true }}
+        gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
         style={{ background: 'transparent' }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.2;
+          // Prevent browser default on context loss (which would permanently halt rendering).
+          gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault(), false);
         }}
       >
         <ambientLight intensity={0.4} />
