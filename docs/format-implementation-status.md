@@ -80,6 +80,15 @@ Track which formats have native parsers vs UADE-only.
 | `.ims` | Images Music System | IMSParser.ts | **OpenMPT** Load_ims.cpp | heuristic; UADE fallback |
 | `.ice` | Ice Tracker / SoundTracker 2.6 | ICEParser.ts | **OpenMPT** Load_ice.cpp | MTN/IT10 magic; UADE fallback |
 | `.kris` | ChipTracker / KRIS | KRISParser.ts | **OpenMPT** Load_kris.cpp | KRIS magic at +952; UADE fallback |
+| `.pt36` | ProTracker 3.6 | PT36Parser.ts | **OpenMPT** Load_pt36.cpp | FORM/MODL IFF; OpenMPT fallback |
+| `.ss` | SpeedySystem / SoundSmith | SpeedySystemParser.ts | **OpenMPT** Load_ss.cpp | DOC RAM samples → UADE |
+| `.stk` | Ultimate SoundTracker | SoundTrackerParser.ts | **OpenMPT** Load_stk.cpp | structural heuristic; UADE fallback |
+| `.imf`, `.imff` | Imago Orpheus | ImagoOrpheusParser.ts | **OpenMPT** Load_imf.cpp | IM10/IM20 magic at +60; OpenMPT fallback |
+| `.stp` | Sampler Tracker Plus | SamplerTrackerPlusParser.ts | **OpenMPT** Load_stp.cpp | STP3 magic; OpenMPT fallback |
+| `.dbm` | DigiBooster Pro | DigiBoosterProParser.ts | **OpenMPT** Load_dbm.cpp | DBM0 IFF; OpenMPT fallback |
+| `.amf` | ASYLUM/DSMI AMF | AMFParser.ts | **OpenMPT** Load_amf.cpp | ASYLUM sig or AMF+version; OpenMPT fallback |
+| `.mdl` | Digitrakker / Madness | MadnessParser.ts | **OpenMPT** Load_mdl.cpp | DMDL magic + version; OpenMPT fallback |
+| `.trc`, `.dp`, `.tro` | Tronic | TronicParser.ts | UADE eagleplayer | no magic; extension-only; UADE |
 
 ---
 
@@ -104,7 +113,6 @@ Track which formats have native parsers vs UADE-only.
 | `.gt2` | Graoumf Tracker 2 | Load_gt2.cpp (1566 ln) | 🔄 in progress |
 | `.symmod` | Symphonie Pro | Load_symmod.cpp (1947 ln) | 🔄 in progress |
 | `.rjp`, `.sng` | Richard Joseph | NP source available | Two-file format (.sng+.ins) |
-| `.trc` | Tronic | — | Same author as PumaTracker |
 
 ## 🚧 Claimed — In Progress (this session, 2026-02-26)
 
@@ -169,3 +177,12 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | Images Music System | IMSParser.ts | **OpenMPT** Load_ims.cpp |
 | 2026-02-26 | Ice Tracker / SoundTracker 2.6 | ICEParser.ts | **OpenMPT** Load_ice.cpp |
 | 2026-02-26 | ChipTracker / KRIS | KRISParser.ts | **OpenMPT** Load_kris.cpp |
+| 2026-02-26 | ProTracker 3.6 | PT36Parser.ts | **OpenMPT** Load_pt36.cpp |
+| 2026-02-26 | SpeedySystem / SoundSmith | SpeedySystemParser.ts | **OpenMPT** Load_ss.cpp |
+| 2026-02-26 | Ultimate SoundTracker | SoundTrackerParser.ts | **OpenMPT** Load_stk.cpp |
+| 2026-02-26 | Imago Orpheus | ImagoOrpheusParser.ts | **OpenMPT** Load_imf.cpp |
+| 2026-02-26 | Sampler Tracker Plus | SamplerTrackerPlusParser.ts | **OpenMPT** Load_stp.cpp |
+| 2026-02-26 | DigiBooster Pro | DigiBoosterProParser.ts | **OpenMPT** Load_dbm.cpp |
+| 2026-02-26 | ASYLUM/DSMI AMF | AMFParser.ts | **OpenMPT** Load_amf.cpp |
+| 2026-02-26 | Digitrakker / Madness | MadnessParser.ts | **OpenMPT** Load_mdl.cpp |
+| 2026-02-26 | Tronic | TronicParser.ts | UADE eagleplayer |
