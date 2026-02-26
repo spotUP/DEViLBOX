@@ -85,7 +85,9 @@ function configToBuffer(config: FurnaceConfig, synthType: string): Uint8Array {
   if (subtype === 2 && config.fds) { // FDS chip
     const modTable = config.fds.modTable ?? [];
     for (let i = 0; i < 32; i++) {
-      buf[260 + i] = (modTable[i] ?? 0) & 0xFF; // signed stored as uint8
+      // Values are signed (-4 to +3); store as two's complement uint8
+      const v = modTable[i] ?? 0;
+      buf[260 + i] = (v < 0 ? v + 256 : v) & 0xFF;
     }
     const modSpeed = config.fds.modSpeed ?? 0;
     buf[292] = modSpeed & 0xFF;
