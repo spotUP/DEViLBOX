@@ -508,7 +508,7 @@ export async function parseSymphonieProFile(
     // Attach playback data to the first instrument so InstrumentFactory
     // can instantiate SymphonieSynth for native playback.
     try {
-      const playbackData = await parseSymphonieForPlayback(bytes.buffer, filename);
+      const playbackData = await parseSymphonieForPlayback(bytes.buffer as ArrayBuffer, filename);
       if (song.instruments.length > 0) {
         (song.instruments[0] as unknown as Record<string, unknown>)['synthType'] = 'SymphonieSynth';
         (song.instruments[0] as unknown as Record<string, unknown>)['symphonie'] = playbackData;
