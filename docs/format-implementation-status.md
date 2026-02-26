@@ -72,6 +72,10 @@ Track which formats have native parsers vs UADE-only.
 | `.dsm` | DSIK Sound Module | DSMParser.ts | **OpenMPT** Load_dsm.cpp | OpenMPT fallback |
 | `.dtm` | Digital Tracker | DTMParser.ts | **OpenMPT** Load_dtm.cpp | OpenMPT fallback |
 | `.stm` | ScreamTracker 2 | STMParser.ts | **OpenMPT** Load_stm.cpp | OpenMPT fallback |
+| `.nru` | NoiseRunner | NRUParser.ts | **OpenMPT** Load_nru.cpp | OpenMPT fallback |
+| `.ptm` | PolyTracker | PTMParser.ts | **OpenMPT** Load_ptm.cpp | OpenMPT fallback |
+| `.gdm` | General DigiMusic | GDMParser.ts | **OpenMPT** Load_gdm.cpp | OpenMPT fallback |
+| `.dss` | Digital Sound Studio | DigitalSoundStudioParser.ts | NostalgicPlayer + DSS.txt spec | UADE fallback |
 
 ---
 
@@ -86,7 +90,6 @@ Track which formats have native parsers vs UADE-only.
 
 | Format | Parser File (planned) | Reference | Notes |
 |---|---|---|---|
-| Digital Sound Studio | DigitalSoundStudioParser.ts | NostalgicPlayer + DSS.txt spec | `.dss` |
 
 ---
 
@@ -156,3 +159,8 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | DSIK Sound Module | DSMParser.ts | **OpenMPT** Load_dsm.cpp |
 | 2026-02-26 | Digital Tracker | DTMParser.ts | **OpenMPT** Load_dtm.cpp |
 | 2026-02-26 | ScreamTracker 2 | STMParser.ts | **OpenMPT** Load_stm.cpp |
+| 2026-02-26 | NoiseRunner | NRUParser.ts | **OpenMPT** Load_nru.cpp |
+| 2026-02-26 | PolyTracker | PTMParser.ts | **OpenMPT** Load_ptm.cpp |
+| 2026-02-26 | General DigiMusic | GDMParser.ts | **OpenMPT** Load_gdm.cpp |
+| 2026-02-26 | Digital Sound Studio | DigitalSoundStudioParser.ts | NostalgicPlayer + DSS.txt spec |
+| 2026-02-26 | Digital Symphony | DigitalSymphonyParser.ts | **OpenMPT** Load_dsym.cpp |
