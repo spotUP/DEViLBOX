@@ -1398,21 +1398,25 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── Quartet / Quartet PSG / Quartet ST (qpa.* / sqt.* / qts.* prefix) ──────
-  // Amiga/ST 4-channel format family. QPA uses tempo+0x50 detection;
-  // SQT uses four BRA.W instructions + LEA pattern; QTS uses speed word + 0x0056.
   {
     const _qBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     const _mightBeQuartet = _qBase.startsWith('qpa.') || _qBase.startsWith('sqt.') || _qBase.startsWith('qts.');
     if (_mightBeQuartet) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.quartet === 'native') {
+        try {
+          const { isQuartetFormat, parseQuartetFile } = await import('@lib/import/formats/QuartetParser');
+          if (isQuartetFormat(buffer, file.name)) return await parseQuartetFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[QuartetParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_quartet } = await import('@lib/import/formats/UADEParser');
       return parseUADE_quartet(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
   }
 
   // ── Sound Master (sm.* / sm1.* / sm2.* / sm3.* / smpro.* prefix) ───────────
-  // Amiga compiled 68k music format by Michiel J. Soede (v1.0–3.0).
-  // Detection: three 0x6000 BRA.W words + LEA/RTS scan + 0x00BFE001 sentinel.
   {
     const _smBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     const _mightBeSM =
@@ -1421,6 +1425,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       _smBase.startsWith('smpro.');
     if (_mightBeSM) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.soundMaster === 'native') {
+        try {
+          const { isSoundMasterFormat, parseSoundMasterFile } = await import('@lib/import/formats/SoundMasterParser');
+          if (isSoundMasterFormat(buffer, file.name)) return await parseSoundMasterFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[SoundMasterParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_sm } = await import('@lib/import/formats/UADEParser');
       return parseUADE_sm(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -2526,6 +2538,68 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       const uadeMode = prefs.uade ?? 'enhanced';
       const { parseUADEFile: parseUADE_osp } = await import('@lib/import/formats/UADEParser');
       return parseUADE_osp(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Remaining UADE prefix formats (no native parsers) ─────────────────────
+  // All eagleplayer.conf prefix= entries not covered above route directly to UADE.
+  // Covers: ManiacsOfNoise (mon.*), FredGray (gray.*), JochenHippel-base (hip.*,
+  //   mcmd.*,sog.*), AHX/thx prefix (thx.*), TFMX variants (tfhd1.5.*, tfmxpro.*,
+  //   tfmx1.5.*, tfmx7V.*, tfhd7V.*, tfhdpro.*), FutureComposer-BSI (bfc.*,bsi.*,
+  //   fc-bsi.*), SeanConnolly (s-c.*,scn.*), SpecialFX_ST (doda.*), many more.
+  // NOTE: files without matching routing reach UADE as a last-resort fallback anyway;
+  //   this block provides explicit routing for performance and clarity.
+  {
+    const _uadeBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    // Prefixes that require explicit string matching (hyphens/dots need startsWith not extension-check)
+    const UADE_ONLY_PREFIXES = [
+      // ArtAndMagic, AMOS, Sierra-AGI
+      'aam.', 'abk.', 'agi.',
+      // ActionAmics (prefix form), BeathovenSynthesizer
+      'ast.', 'bss.',
+      // FutureComposer-BSI, custom
+      'bfc.', 'bsi.', 'fc-bsi.', 'cus.', 'cust.', 'custom.',
+      // DavidHanney, DynamicSynthesizer, DariusZendeh, Special-FX_ST (doda.*)
+      'dh.', 'dns.', 'dz.', 'mkiio.', 'doda.',
+      // EarAche, EMS
+      'ea.', 'mg.', 'ems.', 'emsv6.',
+      // ForgottenWorlds, GlueMon, FredGray
+      'fw.', 'glue.', 'gm.', 'gray.',
+      // HowieDavies, MajorTom variants
+      'hd.', 'hn.', 'thn.', 'mtp2.', 'arp.',
+      // JochenHippel base (hip.*, mcmd.*, sog.*) — different from CoSo and 7V
+      'hip.', 'mcmd.', 'sog.',
+      // JasonBrooke
+      'jb.', 'jcb.', 'jcbo.',
+      // MikeDavies, MarkII, MusiclineEditor, MusicMaker
+      'md.', 'mk2.', 'mkii.', 'ml.', 'mm4.', 'sdata.', 'mm8.',
+      // Silmarils, ManiacsOfNoise, Medley
+      'mok.', 'mon.', 'mso.',
+      // Pokeynoise, Laxity
+      'pn.', 'powt.', 'pt.',
+      // RiffRaff, SeanConnolly
+      'riff.', 's-c.', 'scn.',
+      // SonicArranger variants, SpeedyA1System
+      'sa-p.', 'lion.', 'sa_old.', 'sas.',
+      // SCUMM, SynthDream
+      'scumm.', 'sdr.',
+      // SoundProgrammingLanguage, SoundImages
+      'spl.', 'tw.',
+      // SUN-Tronic, SynTracker
+      'sun.', 'synmod.', 'st.',
+      // TimFollin
+      'tf.',
+      // AHX thx prefix (AbyssHighestExperience — thx.* prefix form of AHX)
+      'thx.',
+      // TFMX variant prefixes (all handled by UADE)
+      'tfhd1.5.', 'tfhd7v.', 'tfhdpro.', 'tfmx1.5.', 'tfmx7v.', 'tfmxpro.',
+      // VoodooSupremeSynthesizer
+      'vss.',
+    ] as const;
+    if (UADE_ONLY_PREFIXES.some(p => _uadeBase.startsWith(p))) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      const { parseUADEFile: parseUADE_bulk } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_bulk(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
   }
 
