@@ -5,7 +5,7 @@
  * S3M uses different effect letters than MOD/XM (e.g., A=Speed, T=Tempo, D=VolSlide)
  */
 
-import { type ChannelState, type TickResult, type FormatConfig, type ModuleFormat } from './types';
+import { type ChannelState, type TickResult, type FormatConfig, type ModuleFormat, type WaveformType } from './types';
 import { BaseFormatHandler } from './FormatHandler';
 import {
   periodToFrequency,
@@ -415,6 +415,12 @@ export class S3MHandler extends BaseFormatHandler {
           result.setPan = state.pan;
         }
         break;
+
+      case 'Y': // Panbrello
+        if (x > 0) state.panbrelloSpeed = x;
+        if (y > 0) state.panbrelloDepth = y;
+        this.activeEffects.set(channel, { type: 'panbrello', param, x, y });
+        break;
     }
 
     return result;
@@ -433,7 +439,7 @@ export class S3MHandler extends BaseFormatHandler {
   ): void {
     switch (x) {
       case S3M_S_COMMANDS.GLISSANDO:
-        // Not implemented
+        state.glissando = y > 0;
         break;
 
       case S3M_S_COMMANDS.FINETUNE:
@@ -448,9 +454,12 @@ export class S3MHandler extends BaseFormatHandler {
         this.setTremoloWaveform(state, y);
         break;
 
-      case S3M_S_COMMANDS.PANBRELLO_WAVEFORM:
-        // Not implemented
+      case S3M_S_COMMANDS.PANBRELLO_WAVEFORM: {
+        const waveforms: WaveformType[] = ['sine', 'rampDown', 'rampUp', 'square'];
+        state.panbrelloWaveform = waveforms[y & 0x03] ?? 'sine';
+        state.panbrelloRetrigger = (y & 0x04) === 0;
         break;
+      }
 
       case S3M_S_COMMANDS.PANNING:
         state.pan = y * 17;
@@ -558,6 +567,10 @@ export class S3MHandler extends BaseFormatHandler {
         this.processTremolo(state, result);
         break;
 
+      case 'panbrello':
+        this.processPanbrello(state, result);
+        break;
+
       case 'tremor':
         this.processTremor(state, result);
         break;
@@ -656,5 +669,15 @@ export class S3MHandler extends BaseFormatHandler {
       case 0xF: return volume * 2;
       default: return volume;
     }
+  }
+
+  private processPanbrello(state: ChannelState, result: TickResult): void {
+    const speed = state.panbrelloSpeed ?? 1;
+    const depth = state.panbrelloDepth ?? 0;
+    const waveValue = this.getWaveformValue(state.panbrelloWaveform ?? 'sine', state.panbrelloPos ?? 0);
+    const delta = Math.floor(waveValue * depth) >> 3;
+    const newPan = Math.max(0, Math.min(255, state.pan + delta));
+    result.setPan = newPan;
+    state.panbrelloPos = ((state.panbrelloPos ?? 0) + speed) & 63;
   }
 }

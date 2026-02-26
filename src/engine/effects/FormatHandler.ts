@@ -14,7 +14,7 @@ import {
   type TickResult,
   type WaveformType,
 } from './types';
-import { VIBRATO_TABLE, periodToFrequency, noteStringToPeriod, periodToNoteString } from './PeriodTables';
+import { VIBRATO_TABLE, periodToFrequency, noteStringToPeriod, periodToNoteString, PERIOD_TABLE } from './PeriodTables';
 
 /**
  * Abstract base class for effect handlers
@@ -333,6 +333,21 @@ export abstract class BaseFormatHandler implements FormatHandler {
     if (this.config.amigaLimits) {
       if (state.period < 113) state.period = 113;
       if (state.period > 856) state.period = 856;
+    }
+
+    // Glissando: snap to nearest semitone in period table
+    if (state.glissando) {
+      const flatTable = PERIOD_TABLE[0];
+      let nearest = flatTable[0];
+      let minDist = Math.abs(state.period - nearest);
+      for (const p of flatTable) {
+        const dist = Math.abs(state.period - p);
+        if (dist < minDist) {
+          minDist = dist;
+          nearest = p;
+        }
+      }
+      state.period = nearest;
     }
 
     state.frequency = this.periodToHz(state.period);

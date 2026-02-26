@@ -212,7 +212,7 @@ export const useTrackerInput = () => {
 
   // Preview note with attack (called on keydown)
   const previewNote = useCallback(
-    async (note: string, octave: number, key: string) => {
+    async (note: string, octave: number, key: string, shiftKey = false) => {
       if (currentInstrumentId === null) return;
 
       const engine = getToneEngine();
@@ -239,7 +239,7 @@ export const useTrackerInput = () => {
 
       // For accent, we could use velocity threshold but keyboard doesn't have velocity
       // In the future, we could use a modifier key (e.g., Shift+key = accent)
-      const accent = false; // TODO: Add Shift+key for accent
+      const accent = shiftKey;
 
       // FT2: Get target channel for multi-channel recording
       const targetChannel = getTargetChannel();
@@ -1133,7 +1133,7 @@ export const useTrackerInput = () => {
 
         // Preview note (pass key for tracking held notes)
         // This also sets up the target channel for multi-channel recording
-        previewNote(note, octave, keyLower);
+        previewNote(note, octave, keyLower, e.shiftKey);
 
         // FT2: Only enter notes when in edit/record mode
         if (recordMode) {

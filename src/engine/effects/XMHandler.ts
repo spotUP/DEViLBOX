@@ -522,7 +522,7 @@ export class XMHandler extends BaseFormatHandler {
         break;
 
       case XM_E_COMMANDS.GLISSANDO:
-        // Not implemented
+        state.glissando = y > 0;
         break;
 
       case XM_E_COMMANDS.VIBRATO_WAVEFORM:

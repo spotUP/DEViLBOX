@@ -6,6 +6,7 @@
  */
 
 import type { ModuleDescriptor, ModuleInstance, ModulePort } from '../../../types/modular';
+import { useTransportStore } from '../../../stores/useTransportStore';
 
 export const ArpeggiatorDescriptor: ModuleDescriptor = {
   id: 'Arpeggiator',
@@ -122,7 +123,8 @@ export const ArpeggiatorDescriptor: ModuleDescriptor = {
       gateOut.offset.value = 1;
 
       // Schedule gate off
-      const gateTime = (60 / 120) * currentGateLength * 1000; // Based on BPM
+      const gateBpm = useTransportStore.getState().bpm ?? 120;
+      const gateTime = (60 / gateBpm) * currentGateLength * 1000;
       setTimeout(() => {
         gateOut.offset.value = 0;
       }, gateTime);
@@ -138,7 +140,7 @@ export const ArpeggiatorDescriptor: ModuleDescriptor = {
       if (intervalId) stop();
 
       // Calculate interval based on rate (maps to note divisions)
-      const bpm = 120; // TODO: Get from global tempo
+      const bpm = useTransportStore.getState().bpm ?? 120;
       const quarterNoteMs = (60 / bpm) * 1000;
       const divisions = [4, 2, 1, 0.5, 0.25, 0.125]; // Whole to 32nd notes
       const divisionIndex = Math.floor(currentRate * (divisions.length - 1));

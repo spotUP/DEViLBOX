@@ -47,7 +47,7 @@ export const VCODescriptor: ModuleDescriptor = {
 
     const ports = new Map<string, ModulePort>([
       ['pitch', { id: 'pitch', name: 'Pitch', direction: 'input', signal: 'cv', param: pitchCV.offset }],
-      ['pwm', { id: 'pwm', name: 'PWM', direction: 'input', signal: 'cv' }], // TODO: PWM implementation
+      ['pwm', { id: 'pwm', name: 'PWM', direction: 'input', signal: 'cv' }],
       ['fm', { id: 'fm', name: 'FM', direction: 'input', signal: 'cv', param: osc.frequency }],
       ['output', { id: 'output', name: 'Output', direction: 'output', signal: 'audio', node: gain }],
     ]);
@@ -55,6 +55,20 @@ export const VCODescriptor: ModuleDescriptor = {
     let currentWaveform = 0;
     let currentDetune = 0;
     let currentOctave = 0;
+    let currentPulseWidth = 0.5;
+    let currentPeriodicWave: PeriodicWave | null = null;
+
+    /** Build and apply a PeriodicWave for PWM square wave */
+    function applyPWM(pw: number): void {
+      const N = 128;
+      const real = new Float32Array(N);
+      const imag = new Float32Array(N);
+      for (let n = 1; n < N; n++) {
+        imag[n] = (2 / (n * Math.PI)) * Math.sin(n * Math.PI * pw);
+      }
+      currentPeriodicWave = ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+      osc.setPeriodicWave(currentPeriodicWave);
+    }
 
     return {
       descriptorId: 'VCO',
@@ -64,8 +78,13 @@ export const VCODescriptor: ModuleDescriptor = {
         switch (paramId) {
           case 'waveform':
             currentWaveform = Math.floor(value);
-            const types: OscillatorType[] = ['sine', 'sawtooth', 'square', 'triangle'];
-            osc.type = types[currentWaveform] || 'sawtooth';
+            if (currentWaveform === 2) {
+              // Square with PWM via PeriodicWave
+              applyPWM(currentPulseWidth);
+            } else {
+              const types: OscillatorType[] = ['sine', 'sawtooth', 'square', 'triangle'];
+              osc.type = types[currentWaveform] || 'sawtooth';
+            }
             break;
           case 'detune':
             currentDetune = value;
@@ -75,9 +94,14 @@ export const VCODescriptor: ModuleDescriptor = {
             currentOctave = Math.floor(value);
             // Octave shifts are applied via pitch CV multiplication
             break;
-          case 'pulseWidth':
-            // TODO: Implement PWM via PeriodicWave
+          case 'pulseWidth': {
+            currentPulseWidth = Math.max(0.01, Math.min(0.99, value));
+            // Only apply PWM when waveform is square (index 2)
+            if (currentWaveform === 2) {
+              applyPWM(currentPulseWidth);
+            }
             break;
+          }
           case 'frequency':
             // Direct frequency set (used during noteOn)
             const freq = value * Math.pow(2, currentOctave);
@@ -94,6 +118,8 @@ export const VCODescriptor: ModuleDescriptor = {
             return currentDetune;
           case 'octave':
             return currentOctave;
+          case 'pulseWidth':
+            return currentPulseWidth;
           default:
             return 0;
         }
