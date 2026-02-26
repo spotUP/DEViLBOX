@@ -1223,6 +1223,26 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     // Fall through to libopenmpt
   }
 
+  // ── UFO / MicroProse (.ufo, .mus with DDAT magic) ─────────────────────────
+  // IFF-based 4-channel Amiga format from UFO: Enemy Unknown (1994).
+  // Two-file format: song (.mus) + samples (SMP.set); UADE handles audio.
+  if (/\.(ufo|mus)$/i.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.ufo === 'native') {
+      try {
+        const { isUFOFormat, parseUFOFile } = await import('@lib/import/formats/UFOParser');
+        if (isUFOFormat(new Uint8Array(buffer))) {
+          const result = await parseUFOFile(buffer, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[UFOParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_ufo } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_ufo(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── FM Tracker (.fmt) ─────────────────────────────────────────────────────
   if (/\.fmt$/i.test(filename)) {
     if (prefs.fmTracker === 'native') {
