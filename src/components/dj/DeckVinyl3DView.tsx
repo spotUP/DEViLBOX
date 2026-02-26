@@ -2,17 +2,24 @@
 /**
  * DeckVinyl3DView — 3D WebGL turntable for DJ mode.
  *
- * Loads a Technics SL-1200 .glb model and renders it with Three.js via React Three Fiber.
+ * Loads a Technics SL-1200GR .glb model (12 named mesh nodes, PBR textures, Y-up, cm units).
  * Supports: spinning platter, vinyl scratch via pointer drag, tonearm position tracking,
- * interactive power button, pitch slider drag, and orbit camera controls.
+ * and orbit camera controls.
  *
- * The GLB model has a FLAT hierarchy: all 41 meshes are siblings under one parent node,
- * identified by their **material name** (French-authored model). All node transforms are
- * identity — geometry vertex positions are in world space.
+ * Model node structure (all identity transforms — geometry is in world/cm space):
+ *   Platter_2          — spinning platter disc
+ *   Vinyl              — vinyl record (spins with platter)
+ *   Tonearm_2          — tonearm arm
+ *   Swivle             — tonearm bearing/swivel (pivot point for tonearm rotation)
+ *   Cartridge          — stylus cartridge (part of tonearm assembly)
+ *   Main_Body_2        — deck chassis
+ *   Miscellaneous      — buttons, knobs, labels
+ *   Antiskating_Dial_Cap — antiskating control
+ *   Glass_Cover_2      — dust cover (hidden for DJ use)
+ *   Hinges / Glass_Caps / Feet_Plus — structural parts
  *
- * Instead of reparenting meshes into groups (which was fragile), we apply per-mesh
- * rotation matrices directly each frame: platter meshes rotate around the platter center,
- * tonearm meshes rotate around the tonearm pivot.
+ * MODEL_SCALE = 0.01 converts cm → metres. Platter and tonearm meshes are animated
+ * via direct matrix writes (makeRotationY). Tonearm pivot is derived from Swivle bbox.
  *
  * Lazy-loaded in DJDeck to avoid bloating the initial bundle.
  */
@@ -31,48 +38,27 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 const MODEL_PATH = '/models/turntable.glb';
 
+/** Scale: model is in cm, Three.js world is in metres. */
+const MODEL_SCALE = 0.01;
+
 const DECK_ACCENT: Record<string, string> = {
   A: '#60a5fa',
   B: '#f87171',
   C: '#34d399',
 };
 
-/**
- * Mesh classification by MATERIAL name (French-authored GLB, mesh.name is just "Object_N").
- *
- * IMPORTANT: "plateau" (0.41×0.31) is the turntable BODY/CHASSIS, NOT the spinning platter!
- * The actual platter parts are the rubber mat, record, label, center spindle, and rim rings.
- * "mesure_vitesse" / "mesure_vitesse_milieu" are speed indicators on the body (off-center).
- */
-const PLATTER_MATERIALS = new Set([
-  'caoutchouc',               // rubber mat on platter (0.247)
-  'surface_disque',           // vinyl record surface (0.236)
-  'milieu_disque',            // center record label (0.070)
-  'bitoniau',                 // center spindle/nub (0.008)
-  'tour_plateau',             // platter chrome rim ring (0.275)
-  'tour_plateau_et_ronds',    // outer strobe ring (0.280)
-]);
-
-const TONEARM_MATERIALS = new Set([
-  'bras', 'tete', 'tetemetal', 'poids', 'mesure_tete',
-]);
-
-const POWER_LED_MATERIALS = new Set(['voyant']);
-const POWER_BUTTON_MATERIALS = new Set(['bouton_marche_arret']);
-const PITCH_SLIDER_MATERIALS = new Set(['bouton_vit', 'dessus_bouton_vit']);
-const RPM_BUTTON_MATERIALS = new Set(['bouton_vitesse']);
-
-// RPM speed constants: 33⅓ = 0.5556 rps, 45 = 0.75 rps
+// RPM speed constants
 const RPM_33 = 33;
 const RPM_45 = 45;
-const RPS_33 = 33.333 / 60; // 0.5556 revolutions per second
-const RPS_45 = 45 / 60;     // 0.75 revolutions per second
+const RPS_33 = 33.333 / 60;
+const RPS_45 = 45 / 60;
 
-// Tonearm rotation range (radians around Z axis, from rest to inner groove)
-// Negative Z rotation = clockwise from above = tonearm sweeps inward toward center
-const TONEARM_ANGLE_REST = 0.05;    // Slightly off-record (outward)
-const TONEARM_ANGLE_START = 0.0;    // Outer groove (start of track)
-const TONEARM_ANGLE_END = -0.45;    // Inner groove (end of track)
+// Tonearm rotation range (radians around Y axis at the Swivle bearing).
+// Rest = tonearm lifted/parked (slightly clockwise of start).
+// The tonearm in the model is at the outer-groove position (TONEARM_ANGLE_START = 0).
+const TONEARM_ANGLE_REST = 0.30;    // lifted/parked, off the record
+const TONEARM_ANGLE_START = 0.0;    // outer groove (model's default position)
+const TONEARM_ANGLE_END = -0.35;    // inner groove
 
 // Pre-allocated matrices for per-frame rotation (avoids GC pressure)
 const _rotMat = new THREE.Matrix4();
@@ -80,11 +66,11 @@ const _transMat = new THREE.Matrix4();
 const _invTransMat = new THREE.Matrix4();
 const _compositeMat = new THREE.Matrix4();
 
-/** Compute rotation matrix around a Z-axis pivot point (model is Z-up) */
+/** Compute rotation matrix around a Y-axis pivot point (model is Y-up). */
 function makeRotationAroundPivot(angle: number, pivot: THREE.Vector3, out: THREE.Matrix4): void {
-  // M = T(pivot) * Rz(angle) * T(-pivot)
+  // M = T(pivot) * Ry(angle) * T(-pivot)
   _transMat.makeTranslation(pivot.x, pivot.y, pivot.z);
-  _rotMat.makeRotationZ(angle);
+  _rotMat.makeRotationY(angle);
   _invTransMat.makeTranslation(-pivot.x, -pivot.y, -pivot.z);
   out.copy(_transMat).multiply(_rotMat).multiply(_invTransMat);
 }
@@ -110,7 +96,7 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
   const pitchDragRef = useRef(false);
   const pitchDragStartYRef = useRef(0);
   const pitchDragStartValueRef = useRef(0);
-  const rpmRef = useRef(RPM_33);  // Active RPM: 33 or 45
+  const rpmRef = useRef(RPM_33);
 
   // Store subscriptions
   const isPlaying = useDJStore((s) => s.decks[deckId].isPlaying);
@@ -122,59 +108,45 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
   const pitchOffset = useDJStore((s) => s.decks[deckId].pitchOffset);
   const trackName = useDJStore((s) => s.decks[deckId].trackName);
 
-  // Keep latest values in refs for useFrame
   const playStateRef = useRef({ isPlaying, songPos, totalPositions, audioPosition, durationMs, playbackMode, pitchOffset });
   playStateRef.current = { isPlaying, songPos, totalPositions, audioPosition, durationMs, playbackMode, pitchOffset };
 
   const accentColor = DECK_ACCENT[deckId] ?? '#60a5fa';
 
-  // ── Clone scene and classify meshes (NO reparenting) ──────────────────────
+  // ── Clone scene and classify meshes ───────────────────────────────────────
 
-  const { clonedScene, platterMeshes, tonearmMeshes, platterCenter, tonearmPivot, powerLedMesh, powerButtonMesh: _powerButtonMesh, rpmButtonMesh, pitchSliderMesh: _pitchSliderMesh } = useMemo(() => {
+  const { clonedScene, platterMeshes, tonearmMeshes, platterCenter, tonearmPivot } = useMemo(() => {
     const cloned = gltfScene.clone(true);
     cloned.updateMatrixWorld(true);
 
-    const getMaterialName = (mesh: THREE.Mesh): string => {
-      const mat = mesh.material as THREE.Material;
-      return mat && mat.name ? mat.name.toLowerCase() : '';
-    };
-
-    // Classify meshes by material name
     const platters: THREE.Mesh[] = [];
     const tonearms: THREE.Mesh[] = [];
-    let led: THREE.Mesh | null = null;
-    let powerBtn: THREE.Mesh | null = null;
-    let slider: THREE.Mesh | null = null;
-    let rpmBtn: THREE.Mesh | null = null;
-    let counterweight: THREE.Mesh | null = null as THREE.Mesh | null;  // 'poids' — near the actual pivot bearing
+    let swivleMesh: THREE.Mesh | null = null;
 
     cloned.traverse((child) => {
       if (!('isMesh' in child && child.isMesh)) return;
       const mesh = child as THREE.Mesh;
-      const matName = getMaterialName(mesh);
+      const name = mesh.name;
 
-      if (PLATTER_MATERIALS.has(matName)) {
+      // Three.js GLTF loader appends _1 to mesh nodes when both the transform node
+      // and mesh node share the same name in the GLB file.
+      if (name === 'Platter_2_1' || name === 'Vinyl_1') {
         platters.push(mesh);
-      } else if (TONEARM_MATERIALS.has(matName)) {
+      } else if (name === 'Tonearm_2_1' || name === 'Swivle_1' || name === 'Cartridge_1') {
         tonearms.push(mesh);
-        if (matName === 'poids') counterweight = mesh;
-      } else if (POWER_LED_MATERIALS.has(matName)) {
-        led = mesh;
-      } else if (POWER_BUTTON_MATERIALS.has(matName)) {
-        powerBtn = mesh;
-      } else if (PITCH_SLIDER_MATERIALS.has(matName)) {
-        slider = mesh;
-      } else if (RPM_BUTTON_MATERIALS.has(matName)) {
-        rpmBtn = mesh;
+        if (name === 'Swivle_1') swivleMesh = mesh;
+      } else if (name === 'Glass_Cover_2_1' || name === 'Hinges_1' || name === 'Glass_Caps_1') {
+        mesh.visible = false;
       }
     });
 
-    // Compute platter center from GEOMETRY bounding boxes (local/model space, Z-up).
-    // IMPORTANT: Must NOT use expandByObject() which returns world-space coords (Y-up)
-    // because the rotation matrix is applied as a local transform before the root node's
-    // Z→Y conversion. Using world coords would shift the pivot point incorrectly.
+    // Platter pivot: center of the Vinyl disc (thinnest, most accurate circle)
     const pCenter = new THREE.Vector3();
-    if (platters.length > 0) {
+    const vinylMesh = platters.find((m) => m.name === 'Vinyl_1');
+    if (vinylMesh) {
+      vinylMesh.geometry.computeBoundingBox();
+      vinylMesh.geometry.boundingBox!.getCenter(pCenter);
+    } else if (platters.length > 0) {
       const box = new THREE.Box3();
       for (const m of platters) {
         m.geometry.computeBoundingBox();
@@ -183,91 +155,22 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
       box.getCenter(pCenter);
     }
 
-    // Compute tonearm pivot from geometry bounding boxes (local/model space, Z-up).
-    // The pivot bearing is between the counterweight ('poids') and the arm ('bras').
-    // Use the counterweight's center X as the pivot X (it sits right behind the bearing),
-    // and overall tonearm center Y and max Z for the vertical axis of rotation.
+    // Tonearm pivot: center of the Swivle (bearing) mesh
     const tPivot = new THREE.Vector3();
-    if (tonearms.length > 0) {
-      const armBox = new THREE.Box3();
-      for (const m of tonearms) {
-        m.geometry.computeBoundingBox();
-        if (m.geometry.boundingBox) armBox.union(m.geometry.boundingBox);
-      }
-
-      if (counterweight) {
-        // Pivot is at the counterweight's inner edge (the side closest to the arm)
-        counterweight.geometry.computeBoundingBox();
-        const cwBox = counterweight.geometry.boundingBox!;
-        // The bearing is between the counterweight center and the arm —
-        // use the counterweight's edge closest to the platter center as pivot X
-        const cwCenterX = (cwBox.min.x + cwBox.max.x) / 2;
-        const armCenterX = (armBox.min.x + armBox.max.x) / 2;
-        // Pick the counterweight edge facing the arm
-        const pivotX = cwCenterX < armCenterX ? cwBox.max.x : cwBox.min.x;
-        tPivot.set(pivotX, (armBox.min.y + armBox.max.y) / 2, armBox.max.z);
-      } else {
-        // Fallback: use bounding box extremes (less accurate)
-        tPivot.set(armBox.max.x, (armBox.min.y + armBox.max.y) / 2, armBox.max.z);
-      }
+    if (swivleMesh) {
+      (swivleMesh as THREE.Mesh).geometry.computeBoundingBox();
+      (swivleMesh as THREE.Mesh).geometry.boundingBox!.getCenter(tPivot);
     }
 
-    // Disable auto-update on platter/tonearm meshes — we'll set .matrix directly
+    // Disable auto-update on animated meshes — we set .matrix directly each frame
     for (const m of platters) m.matrixAutoUpdate = false;
     for (const m of tonearms) m.matrixAutoUpdate = false;
 
-    // Log positions for debugging interactive mesh placement
-    const logMeshPos = (label: string, mesh: THREE.Mesh | null) => {
-      if (!mesh) return;
-      const b = new THREE.Box3();
-      mesh.geometry.computeBoundingBox();
-      if (mesh.geometry.boundingBox) b.copy(mesh.geometry.boundingBox);
-      const c = new THREE.Vector3();
-      b.getCenter(c);
-      console.log(`[3DTurntable] ${label}: center=(${c.x.toFixed(4)}, ${c.y.toFixed(4)}, ${c.z.toFixed(4)}), size=(${(b.max.x-b.min.x).toFixed(4)}, ${(b.max.y-b.min.y).toFixed(4)}, ${(b.max.z-b.min.z).toFixed(4)})`);
-    };
-    console.log(`[3DTurntable] Platter: ${platters.length} meshes, center=(${pCenter.x.toFixed(3)}, ${pCenter.y.toFixed(3)}, ${pCenter.z.toFixed(3)})`);
-    console.log(`[3DTurntable] Tonearm: ${tonearms.length} meshes, pivot=(${tPivot.x.toFixed(3)}, ${tPivot.y.toFixed(3)}, ${tPivot.z.toFixed(3)})${counterweight ? ' (from counterweight)' : ' (fallback)'}`);
-    logMeshPos('Counterweight', counterweight);
-    logMeshPos('PowerBtn', powerBtn);
-    logMeshPos('PitchSlider', slider);
-    logMeshPos('RPMButton', rpmBtn);
+    console.log(`[3DTurntable] Platter: ${platters.length} meshes, pivot=(${pCenter.x.toFixed(2)}, ${pCenter.y.toFixed(2)}, ${pCenter.z.toFixed(2)}) cm`);
+    console.log(`[3DTurntable] Tonearm: ${tonearms.length} meshes, pivot=(${tPivot.x.toFixed(2)}, ${tPivot.y.toFixed(2)}, ${tPivot.z.toFixed(2)}) cm`);
 
-    return {
-      clonedScene: cloned,
-      platterMeshes: platters,
-      tonearmMeshes: tonearms,
-      platterCenter: pCenter,
-      tonearmPivot: tPivot,
-      powerLedMesh: led as THREE.Mesh | null,
-      powerButtonMesh: powerBtn as THREE.Mesh | null,
-      pitchSliderMesh: slider as THREE.Mesh | null,
-      rpmButtonMesh: rpmBtn as THREE.Mesh | null,
-    };
+    return { clonedScene: cloned, platterMeshes: platters, tonearmMeshes: tonearms, platterCenter: pCenter, tonearmPivot: tPivot };
   }, [gltfScene]);
-
-  // Update LED on play state change
-  useEffect(() => {
-    if (!powerLedMesh) return;
-    const mat = powerLedMesh.material;
-    if (mat && 'emissive' in mat) {
-      const stdMat = mat as THREE.MeshStandardMaterial;
-      if (isPlaying) {
-        stdMat.emissive = new THREE.Color('#ff2020');
-        stdMat.emissiveIntensity = 2;
-      } else {
-        stdMat.emissive = new THREE.Color('#200000');
-        stdMat.emissiveIntensity = 0.3;
-      }
-      stdMat.needsUpdate = true;
-    }
-  }, [isPlaying, powerLedMesh]);
-
-  // Update RPM button visual feedback (highlight active speed)
-  useEffect(() => {
-    if (!rpmButtonMesh) return;
-    // We'll update RPM visuals in useFrame since rpmRef changes don't trigger re-render
-  }, [rpmButtonMesh]);
 
   // ── Animation: platter rotation + tonearm position ───────────────────────
 
@@ -277,8 +180,6 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
     const physics = physicsRef.current;
 
     // ── Platter rotation ──
-    // Real turntable: constant RPM regardless of music tempo.
-    // Pitch offset scales platter speed (like a real pitch fader).
     if (platterMeshes.length > 0) {
       const baseRps = rpmRef.current === RPM_45 ? RPS_45 : RPS_33;
       const pitchMultiplier = Math.pow(2, playStateRef.current.pitchOffset / 12);
@@ -292,13 +193,11 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
 
         platterAngleRef.current -= rps * rate * 2 * Math.PI * delta;
 
-        // Forward rate to DeckEngine scratch API
         if (isScratchActiveRef.current && Math.abs(rate - prevRateRef.current) > 0.01) {
           try { getDJEngine().getDeck(deckId).setScratchVelocity(rate); } catch { /* not ready */ }
           prevRateRef.current = rate;
         }
 
-        // Check if physics settled — exit scratch
         if (isScratchActiveRef.current && !physics.touching && !physics.spinbackActive && !physics.powerCutActive) {
           if (Math.abs(rate - 1.0) < 0.02) {
             isScratchActiveRef.current = false;
@@ -308,9 +207,7 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
           }
         }
       }
-      // When not playing (and not scratching), platter is stationary
 
-      // Apply rotation matrix to each platter mesh (rotates vertices around platter center)
       makeRotationAroundPivot(platterAngleRef.current, platterCenter, _compositeMat);
       for (const mesh of platterMeshes) {
         mesh.matrix.copy(_compositeMat);
@@ -331,7 +228,6 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
         ? TONEARM_ANGLE_START + progress * (TONEARM_ANGLE_END - TONEARM_ANGLE_START)
         : TONEARM_ANGLE_REST;
 
-      // Smooth interpolation
       tonearmAngleRef.current += (targetAngle - tonearmAngleRef.current) * Math.min(1, delta * 5);
 
       makeRotationAroundPivot(tonearmAngleRef.current, tonearmPivot, _compositeMat);
@@ -341,7 +237,7 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
     }
   });
 
-  // ── Scratch interaction (pointer on platter) ──────────────────────────────
+  // ── Scratch interaction ───────────────────────────────────────────────────
 
   const enterScratch = useCallback(() => {
     if (isScratchActiveRef.current) return;
@@ -353,29 +249,23 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
   const handlePlatterPointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     (e.nativeEvent.target as HTMLElement)?.setPointerCapture?.(e.nativeEvent.pointerId);
-
     if (!playStateRef.current.isPlaying) return;
-
     enterScratch();
     lastPointerRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
     lastPointerTimeRef.current = performance.now();
-
     physicsRef.current.setTouching(true);
     physicsRef.current.setHandVelocity(0);
   }, [enterScratch]);
 
   const handlePlatterPointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (!lastPointerRef.current) return;
-
     const dx = e.nativeEvent.clientX - lastPointerRef.current.x;
     const now = performance.now();
     const dt = Math.max(0.001, (now - lastPointerTimeRef.current) / 1000);
     lastPointerTimeRef.current = now;
-
     const pixelVelocity = -dx / dt;
     const omega = (pixelVelocity / 400) * OMEGA_NORMAL;
     physicsRef.current.setHandVelocity(omega);
-
     lastPointerRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
   }, []);
 
@@ -384,7 +274,7 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
     physicsRef.current.setTouching(false);
   }, []);
 
-  // ── Power button interaction ──────────────────────────────────────────────
+  // ── Power button ─────────────────────────────────────────────────────────
 
   const handlePowerClick = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
@@ -401,7 +291,7 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
     } catch { /* not ready */ }
   }, [deckId]);
 
-  // ── Pitch slider drag ────────────────────────────────────────────────────
+  // ── Pitch slider ─────────────────────────────────────────────────────────
 
   const handlePitchPointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
@@ -414,7 +304,6 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
   const handlePitchPointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (!pitchDragRef.current) return;
     const dy = e.nativeEvent.clientY - pitchDragStartYRef.current;
-    // Map vertical drag: 200px = ±8 semitones range
     const pitchDelta = (dy / 200) * 8;
     const newPitch = Math.max(-8, Math.min(8, pitchDragStartValueRef.current + pitchDelta));
     useDJStore.getState().setDeckPitch(deckId, newPitch);
@@ -424,61 +313,50 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
     pitchDragRef.current = false;
   }, []);
 
-  // Double-click pitch slider to reset to 0
   const handlePitchDoubleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     useDJStore.getState().setDeckPitch(deckId, 0);
   }, [deckId]);
 
-  // ── 33/45 RPM button interaction ──────────────────────────────────────────
+  // ── 33/45 RPM toggle ─────────────────────────────────────────────────────
 
   const handleRpmClick = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
-    // Toggle between 33 and 45
-    const newRpm = rpmRef.current === RPM_33 ? RPM_45 : RPM_33;
-    rpmRef.current = newRpm;
-    console.log(`[3DTurntable] RPM set to ${newRpm}`);
-    // Visual feedback — update the RPM button material color
-    if (rpmButtonMesh) {
-      const mat = rpmButtonMesh.material;
-      if (mat && 'emissive' in mat) {
-        const stdMat = mat as THREE.MeshStandardMaterial;
-        stdMat.emissive = new THREE.Color(newRpm === RPM_45 ? '#ffaa00' : '#444444');
-        stdMat.emissiveIntensity = newRpm === RPM_45 ? 0.8 : 0.2;
-        stdMat.needsUpdate = true;
-      }
-    }
-  }, [rpmButtonMesh]);
+    rpmRef.current = rpmRef.current === RPM_33 ? RPM_45 : RPM_33;
+    console.log(`[3DTurntable] RPM set to ${rpmRef.current}`);
+  }, []);
 
-  // ── Wheel handler for nudge ──────────────────────────────────────────────
+  // ── Wheel nudge ──────────────────────────────────────────────────────────
 
   const handleWheel = useCallback((e: ThreeEvent<WheelEvent>) => {
     if (!playStateRef.current.isPlaying) return;
     e.stopPropagation();
-
-    if (!isScratchActiveRef.current) {
-      enterScratch();
-    }
-
+    if (!isScratchActiveRef.current) enterScratch();
     const impulse = TurntablePhysics.deltaToImpulse(e.nativeEvent.deltaY, e.nativeEvent.deltaMode);
     physicsRef.current.applyImpulse(impulse);
   }, [enterScratch]);
 
+  // Hitbox positions are in world-space metres (model cm × MODEL_SCALE = 0.01).
+  // Platter:  Vinyl bbox centre (-4.937, 10.669, -1.029) × 0.01 → (-0.049, 0.107, -0.010)
+  //           Vinyl radius 15.948 cm × 0.01 → 0.159 m
+  // Other hitboxes are approximate — needs visual calibration after first render.
+  // useEffect on empty dep array just to silence the lint warning about unused vars
+  useEffect(() => { /* accent light placeholder */ }, [accentColor]);
+
   return (
     <>
       {/* Lighting */}
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[2, 4, 2]} intensity={0.8} castShadow={false} />
-      <directionalLight position={[-1, 2, -1]} intensity={0.3} />
-      <pointLight position={[0, -0.05, 0]} color={accentColor} intensity={0.5} distance={0.5} />
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[2, 5, 3]} intensity={0.9} castShadow={false} />
+      <directionalLight position={[-2, 3, -1]} intensity={0.3} />
+      <pointLight position={[0, 0.05, 0]} color={accentColor} intensity={0.4} distance={0.6} />
 
-      {/* The turntable model (untouched hierarchy) */}
-      <primitive object={clonedScene} />
+      {/* Turntable model — scaled from cm to metres */}
+      <primitive object={clonedScene} scale={MODEL_SCALE} />
 
-      {/* Invisible interaction meshes — must NOT use visible={false} (breaks raycasting) */}
-      {/* Platter — large cylinder for scratch interaction */}
+      {/* Platter interaction (scratch / wheel nudge) */}
       <mesh
-        position={[0, 0.045, 0]}
+        position={[-0.049, 0.108, -0.010]}
         rotation={[-Math.PI / 2, 0, 0]}
         onPointerDown={handlePlatterPointerDown}
         onPointerMove={handlePlatterPointerMove}
@@ -486,42 +364,35 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
         onPointerCancel={handlePlatterPointerUp}
         onWheel={handleWheel}
       >
-        <circleGeometry args={[0.15, 32]} />
+        <circleGeometry args={[0.159, 32]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* Power button — use hitbox only (model-cloned meshes with visible=false can't raycast) */}
-      <mesh
-        position={[0.14, 0.035, 0.12]}
-        onClick={handlePowerClick}
-      >
-        <boxGeometry args={[0.03, 0.025, 0.03]} />
+      {/* Power / Start-Stop button (approximate — right-front area of deck) */}
+      <mesh position={[0.18, 0.100, 0.16]} onClick={handlePowerClick}>
+        <boxGeometry args={[0.04, 0.02, 0.04]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* Pitch slider — draggable, double-click to reset */}
+      {/* Pitch slider (approximate — right side of deck on SL-1200GR) */}
       <mesh
-        position={[-0.16, 0.035, 0.0]}
+        position={[0.21, 0.100, -0.02]}
         onPointerDown={handlePitchPointerDown}
         onPointerMove={handlePitchPointerMove}
         onPointerUp={handlePitchPointerUp}
         onPointerCancel={handlePitchPointerUp}
         onDoubleClick={handlePitchDoubleClick}
       >
-        <boxGeometry args={[0.025, 0.025, 0.12]} />
+        <boxGeometry args={[0.02, 0.02, 0.14]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* 33/45 RPM speed selector — clickable to toggle */}
-      <mesh
-        position={[0.14, 0.035, 0.06]}
-        onClick={handleRpmClick}
-      >
-        <boxGeometry args={[0.04, 0.02, 0.025]} />
+      {/* 33/45 RPM selector (approximate — front-center area) */}
+      <mesh position={[0.04, 0.100, 0.17]} onClick={handleRpmClick}>
+        <boxGeometry args={[0.06, 0.02, 0.03]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* Camera controls — scroll-wheel zoom disabled to avoid scratch conflict */}
       <OrbitControls
         ref={orbitRef}
         enablePan={false}
@@ -556,16 +427,19 @@ function DeckVinyl3DView({ deckId }: DeckVinyl3DViewProps) {
     <div className="relative w-full h-full min-h-[200px]" style={{ touchAction: 'none' }}>
       <Canvas
         camera={{
-          position: [0.15, 0.35, 0.35],
+          position: [0.20, 0.42, 0.50],
           fov: 45,
           near: 0.01,
           far: 10,
         }}
-        gl={{ alpha: true, antialias: true }}
+        gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
         style={{ background: 'transparent' }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.2;
+          // Prevent browser default on context loss (which would permanently halt rendering).
+          // R3F will re-create the renderer if the context is restored.
+          gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault(), false);
         }}
       >
         <TurntableScene deckId={deckId} orbitRef={orbitRef} />
