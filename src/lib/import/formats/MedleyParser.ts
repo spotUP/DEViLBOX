@@ -1,19 +1,30 @@
 /**
- * MedleyParser.ts — Medley Amiga music format (.ml) native parser
+ * MedleyParser.ts — Medley Amiga music format native parser
  *
- * Medley is an Amiga music tracker that produces single-file modules
- * supporting multiple subsongs and standard 4-channel Paula playback.
+ * Medley (also known as "PV Synth") is an Amiga music format by Paul van der Valk.
+ * The UADE replay was adapted by mld (Andreas da Silva / Andi Silva).
+ * Files are named with "MSO." prefix.
  *
- * Detection (from UADE Check2 routine in Medley.s):
- *   bytes[0..3]  = "MSOB"  (0x4D, 0x53, 0x4F, 0x42)
- *   bytes[4..7]  = u32BE offset to end-of-song-header / song data start
- *   At (offset - 2): u16BE = number of subsongs (must be > 0)
+ * Detection (from UADE amifilemagic.c line 83 and Medley.s DTP_Check2 routine):
+ *   1. Bytes 0..3 must equal the ASCII string "MSOB" (4 bytes)
+ *   2. The 68k player additionally follows a relative pointer at offset 4:
+ *      addq.l #4,a0      ; a0 now points to buf+4
+ *      add.l  (a0),a0    ; a0 = (buf+4) + u32BE(buf,4)  → targetOffset = 4 + relPtr
+ *      move.w -2(a0),d0  ; subsong count word at (targetOffset - 2)
+ *
+ * From amifilemagic.c (line 83):
+ *   "MSOB", "MSO",   / * Medley * /
+ *
  * The "MSOB" magic is unique and sufficient for reliable detection.
  *
- * Single-file format: all player code and music data in one .ml file.
- * This parser extracts basic metadata; UADE handles actual audio playback.
+ * File prefix: "MSO."
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/medley/Medley.s
+ * Single-file format: music data binary.
+ * Actual audio playback is delegated to UADE.
+ *
+ * References:
+ *   Reference Code/uade-3.05/src/frontends/common/amifilemagic.c (line 83)
+ *   Reference Code/uade-3.05/amigasrc/players/medley/Medley.s (lines 39-52)
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -34,20 +45,26 @@ function u16BE(buf: Uint8Array, off: number): number {
 // ── Format detection ───────────────────────────────────────────────────────
 
 /**
- * Return true if the buffer is a Medley format module.
+ * Return true if the buffer is a Medley module.
  *
- * Checks for the "MSOB" magic bytes at the start of the file.
- * Detection logic mirrors UADE's Check2 routine in Medley.s.
+ * Detection mirrors the DTP_Check2 routine from Medley.s and the
+ * offset_0000_patterns entry from UADE amifilemagic.c:
+ *   "MSOB" matched at byte offset 0
+ *
+ * The "MSOB" four-byte magic is the primary check. UADE's amifilemagic.c
+ * uses only the four-byte magic; the assembly routine additionally follows
+ * a relative pointer to read the subsong count, but format identification
+ * requires only the magic match.
  */
 export function isMedleyFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   if (buf.length < 8) return false;
 
-  // bytes[0..3] == "MSOB" (0x4D, 0x53, 0x4F, 0x42)
+  // bytes[0..3] == "MSOB" (0x4D 0x53 0x4F 0x42)
   return (
-    buf[0] === 0x4D &&
+    buf[0] === 0x4d &&
     buf[1] === 0x53 &&
-    buf[2] === 0x4F &&
+    buf[2] === 0x4f &&
     buf[3] === 0x42
   );
 }
@@ -57,11 +74,16 @@ export function isMedleyFormat(buffer: ArrayBuffer | Uint8Array): boolean {
 /**
  * Parse a Medley module file into a TrackerSong.
  *
- * Medley uses a proprietary binary format with an "MSOB" header followed
- * by an offset pointing to the song header. The word immediately before
- * that offset position contains the subsong count.
- * This parser creates a metadata-only TrackerSong with no instruments.
- * Actual audio playback is always delegated to UADE.
+ * Medley uses a proprietary binary format with an "MSOB" header followed by
+ * a relative pointer (at offset 4) that the player resolves to locate the
+ * subsong table.  The assembly performs:
+ *   addq.l #4,a0      (advance past magic to offset 4)
+ *   add.l  (a0),a0    (a0 = 4 + u32BE(buf,4) = targetOffset)
+ *   move.w -2(a0),d0  (subsong count at targetOffset - 2)
+ *
+ * This parser extracts the subsong count where possible and creates a
+ * metadata-only TrackerSong.  Actual audio playback is always delegated
+ * to UADE.
  *
  * @param buffer   Raw file bytes (ArrayBuffer)
  * @param filename Original filename (used to derive the module name)
@@ -76,17 +98,19 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
   // ── Module name from filename ─────────────────────────────────────────────
 
   const baseName = filename.split('/').pop() ?? filename;
-  // Strip ".ml" extension
-  const moduleName = baseName.replace(/\.ml$/i, '') || baseName;
+  // Strip "MSO." prefix (case-insensitive) or ".ml" extension
+  const moduleName =
+    baseName.replace(/^mso\./i, '').replace(/\.ml$/i, '') || baseName;
 
   // ── Subsong count extraction ──────────────────────────────────────────────
 
-  // bytes[4..7] = u32BE offset to end-of-song-header / song data start
-  // At (offset - 2) from file start: u16BE = number of subsongs
+  // The assembly routine resolves: targetOffset = 4 + u32BE(buf, 4)
+  // and reads the subsong count word at (targetOffset - 2).
   let subsongCount = 1;
   if (buf.length >= 8) {
-    const dataOffset = u32BE(buf, 4);
-    const subsongWordOffset = dataOffset - 2;
+    const relPtr = u32BE(buf, 4);
+    const targetOffset = 4 + relPtr;
+    const subsongWordOffset = targetOffset - 2;
     if (subsongWordOffset >= 0 && subsongWordOffset + 2 <= buf.length) {
       const raw = u16BE(buf, subsongWordOffset);
       if (raw > 0) {
@@ -134,7 +158,17 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
     },
   };
 
-  const instruments: InstrumentConfig[] = [];
+  const instruments: InstrumentConfig[] = [
+    {
+      id: 1,
+      name: 'Sample 1',
+      type: 'synth' as const,
+      synthType: 'Synth' as const,
+      effects: [],
+      volume: 0,
+      pan: 0,
+    } as InstrumentConfig,
+  ];
 
   return {
     name: `${moduleName} [Medley]${subsongCount > 1 ? ` (${subsongCount} subsongs)` : ''}`,
