@@ -32,6 +32,7 @@ export interface FormatEnginePreferences {
   fred: FormatEngineChoice;     // .fred → FredEditorParser vs UADE
   soundfx: FormatEngineChoice;  // .sfx/.sfx13 → SoundFXParser vs UADE
   mugician: FormatEngineChoice;  // .dmu/.mug → DigitalMugicianParser vs UADE
+  tfmx: FormatEngineChoice;    // .tfmx/.mdat/.tfx → TFMXParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -96,6 +97,7 @@ export const useSettingsStore = create<SettingsStore>()(
         fred: 'native',     // FredEditorParser — dedicated Fred Editor support
         soundfx: 'native',  // SoundFXParser — dedicated Sound-FX support
         mugician: 'native', // DigitalMugicianParser — dedicated Digital Mugician support
+        tfmx: 'native',    // TFMXParser — dedicated Jochen Hippel TFMX support
         uade: 'enhanced',   // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
