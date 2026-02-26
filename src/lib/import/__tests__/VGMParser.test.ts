@@ -48,7 +48,7 @@ describe('VGMParser', () => {
 
     // Data at 0x40
     let off = 0x40;
-    u8[off++] = 0x54; u8[off++] = 0x28; u8[off++] = 0x4A; // KC = 0x4A → octave 4, nibble A (A#4)
+    u8[off++] = 0x54; u8[off++] = 0x28; u8[off++] = 0x4A; // KC = 0x4A → octave 4, nibble A → semi=11 (B4)
     u8[off++] = 0x54; u8[off++] = 0x08; u8[off++] = 0x0F; // key-on ch0 all ops
     u8[off++] = 0x66;                                       // end
 
