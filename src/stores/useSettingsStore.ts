@@ -52,6 +52,7 @@ export interface FormatEnginePreferences {
   cdfm67: FormatEngineChoice;             // .c67 → CDFM67Parser vs OpenMPT
   easyTrax: FormatEngineChoice;           // .etx → EasyTraxParser vs OpenMPT
   karlMorton: FormatEngineChoice;         // .mus → KarlMortonParser vs OpenMPT
+  ams: FormatEngineChoice;                // .ams → AMSParser (Extreme's Tracker / Velvet Studio) vs UADE
   xTracker: FormatEngineChoice;           // .dmf (X-Tracker) → XTrackerParser vs UADE
   fmTracker: FormatEngineChoice;          // .fmt → FMTrackerParser (Davey W Taylor FM Tracker)
   xmf: FormatEngineChoice;               // .xmf → XMFParser (Astroidea/Imperium Galactica)
@@ -159,6 +160,7 @@ export const useSettingsStore = create<SettingsStore>()(
         cdfm67: 'native',           // CDFM67Parser — dedicated CDFM Composer 670 support
         easyTrax: 'native',         // EasyTraxParser — dedicated EasyTrax support
         karlMorton: 'native',       // KarlMortonParser — dedicated Karl Morton Music Format support
+        ams: 'native',              // AMSParser — Extreme's Tracker / Velvet Studio support
         xTracker: 'native',         // XTrackerParser — dedicated X-Tracker DMF support
         fmTracker: 'native',        // FMTrackerParser — dedicated FM Tracker (.fmt) support
         xmf: 'native',              // XMFParser — dedicated Astroidea XMF support
