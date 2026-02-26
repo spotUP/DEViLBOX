@@ -64,7 +64,6 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
-import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -90,73 +89,6 @@ const ULAW_TABLE: Int16Array = (() => {
   }
   return t;
 })();
-
-// ── Binary reader class ────────────────────────────────────────────────────────
-
-class _Reader {
-  public pos: number;
-  private data: Uint8Array;
-  private view: DataView;
-
-  constructor(data: Uint8Array, offset = 0) {
-    this.data = data;
-    this.view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    this.pos = offset;
-  }
-
-  get length(): number { return this.data.length; }
-  get remaining(): number { return this.data.length - this.pos; }
-  canRead(n: number): boolean { return this.pos + n <= this.data.length; }
-
-  u8(): number {
-    if (this.pos >= this.data.length) throw new Error('EOF');
-    return this.data[this.pos++];
-  }
-
-  u16le(): number {
-    if (!this.canRead(2)) throw new Error('EOF');
-    const v = this.view.getUint16(this.pos, true);
-    this.pos += 2;
-    return v;
-  }
-
-  u24le(): number {
-    if (!this.canRead(3)) throw new Error('EOF');
-    const v = this.data[this.pos] | (this.data[this.pos + 1] << 8) | (this.data[this.pos + 2] << 16);
-    this.pos += 3;
-    return v;
-  }
-
-  bytes(n: number): Uint8Array {
-    if (!this.canRead(n)) throw new Error('EOF');
-    const slice = this.data.slice(this.pos, this.pos + n);
-    this.pos += n;
-    return slice;
-  }
-
-  /** Read a Pascal-style length-prefixed string (uint8 length then bytes). */
-  sizePrefixedString(): string {
-    const len = this.u8();
-    const raw = this.bytes(len);
-    return decodeRISCOS(raw);
-  }
-
-  /** Read a possibly null-terminated string of at most `maxLen` bytes. */
-  maybeNullTerminated(maxLen: number): string {
-    if (maxLen === 0) return '';
-    if (!this.canRead(maxLen)) throw new Error('EOF');
-    const raw = this.data.slice(this.pos, this.pos + maxLen);
-    this.pos += maxLen;
-    // Truncate at first null byte
-    let end = raw.indexOf(0);
-    if (end < 0) end = maxLen;
-    return decodeRISCOS(raw.slice(0, end));
-  }
-
-  seek(pos: number): void {
-    this.pos = pos;
-  }
-}
 
 // ── String decoding (RISC OS Latin-1 approximation) ──────────────────────────
 

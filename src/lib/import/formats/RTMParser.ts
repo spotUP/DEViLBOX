@@ -80,7 +80,6 @@ const DEFAULT_C5_SPEED = 8363;
 
 // RTMMHeader flag bits
 const SONG_LINEAR_SLIDES = 0x01;
-const _SONG_TRACK_NAMES   = 0x02;
 
 // RTSMHeader flag bits
 const RTSM_SMP_16BIT = 0x02;

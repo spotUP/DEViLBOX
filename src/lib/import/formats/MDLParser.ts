@@ -47,20 +47,8 @@ import { createSamplerInstrument } from './AmigaUtils';
 // ── Binary helpers ─────────────────────────────────────────────────────────────
 
 function u8(v: DataView, off: number): number    { return v.getUint8(off); }
-function _i8(v: DataView, off: number): number    { return v.getInt8(off); }
 function u16le(v: DataView, off: number): number { return v.getUint16(off, true); }
 function u32le(v: DataView, off: number): number { return v.getUint32(off, true); }
-
-function _readString(v: DataView, off: number, len: number): string {
-  let s = '';
-  for (let i = 0; i < len; i++) {
-    const c = v.getUint8(off + i);
-    if (c === 0) break;
-    // Strip trailing spaces
-    s += String.fromCharCode(c);
-  }
-  return s.trimEnd();
-}
 
 function readStringPadded(v: DataView, off: number, len: number): string {
   let s = '';
@@ -88,7 +76,6 @@ const MDLNOTE_PARAM2  = 1 << 5;
 // G=vol-slide-up(0x10), H=vol-slide-dn(0x11), I=retrig(0x1B), J=tremolo(0x07),
 // K=tremor(0x1D), L=none
 // XM/OpenMPT internal command codes (effTyp field):
-const _MDL_EFF_NONE        = 0x00;
 const MDL_EFF_PORTA_UP    = 0x01;
 const MDL_EFF_PORTA_DN    = 0x02;
 const MDL_EFF_TONE_PORTA  = 0x03;
@@ -96,7 +83,6 @@ const MDL_EFF_VIBRATO     = 0x04;
 const MDL_EFF_ARPEGGIO    = 0x00; // arpeggio is effTyp 0 (same as none, but with param)
 const MDL_EFF_TEMPO       = 0x0F; // Fxx
 const MDL_EFF_PANNING     = 0x08;
-const _MDL_EFF_S3MCMDEX    = 0x53; // marker for S3M extended command (remapped)
 const MDL_EFF_POS_JUMP    = 0x0B;
 const MDL_EFF_GLOBAL_VOL  = 0x10; // Cxx global volume (XM Gxx = 0x10)
 const MDL_EFF_PAT_BREAK   = 0x0D;
@@ -483,14 +469,8 @@ function readChunks(v: DataView, startOff: number): Map<number, MDLChunk> {
 
 // Chunk ID magic values (little-endian 16-bit)
 const CHUNK_IN = 0x4E49; // "IN"
-const _CHUNK_ME = 0x454D; // "ME"
 const CHUNK_PA = 0x4150; // "PA"
-const _CHUNK_PN = 0x4E50; // "PN"
 const CHUNK_TR = 0x5254; // "TR"
-const _CHUNK_II = 0x4949; // "II"
-const _CHUNK_VE = 0x4556; // "VE"
-const _CHUNK_PE = 0x4550; // "PE"
-const _CHUNK_FE = 0x4546; // "FE"
 const CHUNK_IS = 0x5349; // "IS"
 const CHUNK_SA = 0x4153; // "SA"
 

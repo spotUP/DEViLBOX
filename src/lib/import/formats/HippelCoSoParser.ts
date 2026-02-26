@@ -214,14 +214,10 @@ export async function parseHippelCoSoFile(
   const tracksOff   = u32BE(buf, 16);
   const songsOff    = u32BE(buf, 20);
   const headersOff  = u32BE(buf, 24);
-  const samplesOff  = u32BE(buf, 28);
 
   // ── Determine number of songs and samples ──────────────────────────────────
   // lastSong = (headers - songsData) / 6
   const numSongs = Math.max(1, Math.floor((headersOff - songsOff) / 6));
-
-  // numSamples = (samplesData - headers) / 10 - 1
-  const _numSamples = Math.max(0, Math.floor((samplesOff - headersOff) / 10) - 1);
 
   // ── Parse songs ───────────────────────────────────────────────────────────
   interface CoSoSong {

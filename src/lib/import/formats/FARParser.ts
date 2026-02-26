@@ -321,7 +321,6 @@ export async function parseFARFile(
   // ── Patterns ───────────────────────────────────────────────────────────────
 
   const patterns: Pattern[] = new Array(MAX_PATTERNS).fill(null);
-  let _totalPatternsInFile = 0;
 
   for (let pat = 0; pat < MAX_PATTERNS; pat++) {
     const chunkSize = patternSizes[pat];

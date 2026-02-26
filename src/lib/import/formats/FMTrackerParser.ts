@@ -60,7 +60,6 @@ const NUM_CHANNELS        = 8;
 const MAGIC               = 'FMTracker\x01\x01';
 
 const OFFSET_MAGIC        = 0;
-const OFFSET_TRACKER_NAME = 11;
 const OFFSET_SONG_NAME    = 31;
 const OFFSET_CHANNELS     = 63;
 const OFFSET_LAST_ROW     = 215;
@@ -122,7 +121,6 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
 
   const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
-  const _trackerName = readNullTerminated(v, OFFSET_TRACKER_NAME, 20);
   const songName    = readNullTerminated(v, OFFSET_SONG_NAME, 32);
   const numRows     = u8(v, OFFSET_LAST_ROW)     + 1;
   const numOrders   = u8(v, OFFSET_LAST_ORDER)   + 1;

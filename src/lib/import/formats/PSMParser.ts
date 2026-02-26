@@ -115,7 +115,6 @@ import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/type
 // ── Little-endian binary helpers ──────────────────────────────────────────────
 
 function u8(buf: Uint8Array, off: number): number { return buf[off] ?? 0; }
-function _s8(buf: Uint8Array, off: number): number { const v = buf[off] ?? 0; return v < 128 ? v : v - 256; }
 function u16le(buf: Uint8Array, off: number): number {
   return (buf[off] ?? 0) | ((buf[off + 1] ?? 0) << 8);
 }
@@ -780,7 +779,6 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
   const panOffset       = u32le(bytes, 86);
   const patOffset       = u32le(bytes, 90);
   const smpOffset       = u32le(bytes, 94);
-  const _commentsOffset  = u32le(bytes, 98);
 
   if (numChannelsPlay > 32 || numChannelsReal > 32) return null;
   const numChannels = Math.max(numChannelsPlay, numChannelsReal);
