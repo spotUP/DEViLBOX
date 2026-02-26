@@ -1837,6 +1837,9 @@ export interface FurnaceConfig {
   ops?: number;          // Number of operators (2 or 4)
   opllPreset?: number;   // OPLL preset patch 0-15
   fixedDrums?: boolean;  // OPLL fixed drum mode
+  kickFreq?: number;     // OPL drum kick frequency
+  snareHatFreq?: number; // OPL drum snare/hi-hat frequency
+  tomTopFreq?: number;   // OPL drum tom/top frequency
 
   // Operator configurations
   operators: FurnaceOperatorConfig[];
@@ -1864,6 +1867,10 @@ export interface FurnaceConfig {
   esfm?: FurnaceESFMConfig;
   es5506?: FurnaceES5506Config;
 
+  // Simple chip-specific fields (from feature blocks)
+  x1BankSlot?: number;     // X1-010 bank slot
+  powerNoiseOctave?: number; // PowerNoise octave
+
   // Additional chip configs (editor-specific)
   nes?: {
     dutyNoise: number;
@@ -1890,6 +1897,7 @@ export interface FurnaceConfig {
     loopPoint: number;
     bitDepth: number;
     loopEnabled: boolean;
+    loopMode?: number;  // 0=forward, 1=backward, 2=ping-pong
   };
 }
 

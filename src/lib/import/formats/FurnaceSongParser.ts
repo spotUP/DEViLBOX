@@ -548,6 +548,9 @@ export interface FurnaceModule {
 
   // Compatibility flags (parsed from inline bytes)
   compatFlags: Record<string, unknown>;
+
+  // Groove patterns (each entry is an array of speed values, length from groove.len)
+  grooves: Array<{ len: number; val: number[] }>;
 }
 
 /**
@@ -631,6 +634,7 @@ export async function parseFurnaceSong(buffer: ArrayBuffer): Promise<FurnaceModu
     patterns: new Map(),
     comment: '',
     compatFlags: {},
+    grooves: [],
   };
 
   if (version >= 240) {
@@ -719,6 +723,7 @@ async function parseNewFormat(
   const subSongPtr: number[] = [];
   const patPtr: number[] = [];
   let commentPtr = 0;
+  const groovePtrs: number[] = [];
 
   // Read elements
   let hasElement = true;
@@ -786,7 +791,7 @@ async function parseNewFormat(
       }
       case DIV_ELEMENT_GROOVE: {
         const count = reader.readUint32();
-        reader.skip(count * 4); // Skip groove pointers
+        for (let i = 0; i < count; i++) groovePtrs.push(reader.readUint32());
         break;
       }
       default: {
@@ -795,6 +800,19 @@ async function parseNewFormat(
         reader.skip(count * 4);
         break;
       }
+    }
+  }
+
+  // Parse GROV blocks — each block: "GROV" magic, size, 1-byte len, 16×uint16 vals
+  for (const ptr of groovePtrs) {
+    reader.seek(ptr);
+    const magic = reader.readMagic(4);
+    if (magic === 'GROV') {
+      reader.readUint32(); // block size (ignored)
+      const len = reader.readUint8();
+      const val: number[] = [];
+      for (let i = 0; i < 16; i++) val.push(reader.readUint16());
+      module.grooves.push({ len, val });
     }
   }
 
@@ -1235,10 +1253,21 @@ async function parseOldFormat(
   // Speeds and grooves
   // Reference: fur.cpp:1639-1659
   if (version >= 139) {
-    reader.skip(17); // speeds.len (1) + speeds.val (16)
+    // Initial speeds for subsong[0] (1-byte values)
+    const speedsLen = reader.readUint8();
+    const speedVals: number[] = [];
+    for (let i = 0; i < 16; i++) speedVals.push(reader.readUint8());
+    // Override subsong speed with the groove/speed values
+    if (speedsLen >= 1) subsong.speed1 = speedVals[0] || subsong.speed1;
+    if (speedsLen >= 2) subsong.speed2 = speedVals[1] || subsong.speed2;
+
+    // Named groove patterns (1-byte values per entry)
     const grooveCount = reader.readUint8();
     for (let i = 0; i < grooveCount; i++) {
-      reader.skip(17); // groove.len (1) + groove.val (16)
+      const len = reader.readUint8();
+      const val: number[] = [];
+      for (let j = 0; j < 16; j++) val.push(reader.readUint8());
+      module.grooves.push({ len, val });
     }
   }
 
@@ -1651,7 +1680,8 @@ function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           const modDepth = reader.readInt32();
           const initMod = reader.readUint8() !== 0;
           const modTable: number[] = [];
-          for (let i = 0; i < 32; i++) modTable.push(reader.readUint8());
+          // Values are signed bytes (-4 to +3); use readInt8 to preserve sign
+          for (let i = 0; i < 32; i++) modTable.push(reader.readInt8());
           inst.fds = { modSpeed, modDepth, initModTableWithFirstWave: initMod, modTable };
           break;
         }
@@ -1667,60 +1697,19 @@ function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           console.log(`[FurnaceParser] Parsed ${featCode} (operator ${opIndex} macros): ${inst.opMacroArrays[opIndex].length} macros`);
           break;
         }
-        case 'LD':
-          // OPL drums — Reference: instrument.cpp:2806-2807
-          // fixedDrums, kickFreq, snareHatFreq, tomTopFreq
-          console.log('[FurnaceParser] Found LD (OPL drums), preserving in rawBinaryData');
-          break;
-        case 'WS':
-          // WaveSynth — Reference: instrument.cpp:2814-2815
-          // wavesynth chip-specific data
-          console.log('[FurnaceParser] Found WS (WaveSynth), preserving in rawBinaryData');
-          break;
-        case 'MP':
-          // MultiPCM — Reference: instrument.cpp:2824-2825
-          // multipcm chip-specific data
-          console.log('[FurnaceParser] Found MP (MultiPCM), preserving in rawBinaryData');
-          break;
-        case 'SU':
-          // Sound Unit — Reference: instrument.cpp:2826-2827
-          // soundunit chip-specific data
-          console.log('[FurnaceParser] Found SU (Sound Unit), preserving in rawBinaryData');
-          break;
-        case 'ES':
-          // ES5506 — Reference: instrument.cpp:2828-2829
-          // es5506 filter and envelope data
-          console.log('[FurnaceParser] Found ES (ES5506), preserving in rawBinaryData');
-          break;
-        case 'X1':
-          // X1-010 — Reference: instrument.cpp:2830-2831
-          // x1_010 chip-specific data
-          console.log('[FurnaceParser] Found X1 (X1-010), preserving in rawBinaryData');
-          break;
-        case 'NE':
-          // NES DPCM — Reference: instrument.cpp:2832-2833
-          // nes dpcm-specific data
-          console.log('[FurnaceParser] Found NE (NES DPCM), preserving in rawBinaryData');
-          break;
-        case 'EF':
-          // ESFM — Reference: instrument.cpp:2834-2835
-          // esfm chip-specific data
-          console.log('[FurnaceParser] Found EF (ESFM), preserving in rawBinaryData');
-          break;
-        case 'PN':
-          // PowerNoise — Reference: instrument.cpp:2836-2837
-          // powernoise chip-specific data
-          console.log('[FurnaceParser] Found PN (PowerNoise), preserving in rawBinaryData');
-          break;
-        case 'S2':
-          // SID2 — Reference: instrument.cpp:2838-2839
-          // sid2 chip-specific data
-          console.log('[FurnaceParser] Found S2 (SID2), preserving in rawBinaryData');
-          break;
-        case 'S3':
-          // SID3 — Reference: instrument.cpp:2840-2841
-          // sid3 chip-specific data (enhanced C64 SID)
-          console.log('[FurnaceParser] Found S3 (SID3), preserving in rawBinaryData');
+        case 'LD': // OPL drums (fixedDrums, kickFreq, snareHatFreq, tomTopFreq)
+        case 'WS': // WaveSynth
+        case 'MP': // MultiPCM
+        case 'SU': // Sound Unit
+        case 'ES': // ES5506 filter/envelope
+        case 'X1': // X1-010 bank slot
+        case 'NE': // NES DPCM note map
+        case 'EF': // ESFM per-operator extras
+        case 'PN': // PowerNoise octave
+        case 'S2': // SID2
+        case 'S3': // SID3 (enhanced C64 SID)
+          // All chip-specific feature blocks are preserved in rawBinaryData.
+          // The FurnaceInsEdHardware WASM reads them natively; no TS parsing needed.
           break;
         default:
           // Unknown feature, skip (reader.seek(featEnd) handles it)
@@ -2532,7 +2521,7 @@ function parsePattern(
   return pat;
 }
 
-/** Converted pattern cell in XM-compatible format */
+/** Converted pattern cell in XM-compatible format (supports up to 8 Furnace effect slots) */
 interface ConvertedPatternCell {
   note: number;
   instrument: number;
@@ -2541,6 +2530,12 @@ interface ConvertedPatternCell {
   effectParam: number;
   effectType2: number;
   effectParam2: number;
+  effectType3?: number;  effectParam3?: number;
+  effectType4?: number;  effectParam4?: number;
+  effectType5?: number;  effectParam5?: number;
+  effectType6?: number;  effectParam6?: number;
+  effectType7?: number;  effectParam7?: number;
+  effectType8?: number;  effectParam8?: number;
 }
 
 /**
@@ -2635,7 +2630,7 @@ function scanInstrumentChannels(module: FurnaceModule): Map<number, Set<number>>
 /**
  * Convert Furnace module to DEViLBOX format
  */
-export function convertFurnaceToDevilbox(module: FurnaceModule): {
+export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0): {
   instruments: ParsedInstrument[];
   patterns: ConvertedPatternCell[][][]; // [pattern][row][channel]
   metadata: ImportMetadata;
@@ -2867,11 +2862,11 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
     };
   });
 
-  // Convert patterns - flatten subsong 0 patterns
+  // Convert patterns - flatten the selected subsong's patterns
   const patterns: ConvertedPatternCell[][][] = [];
-  const subsong = module.subsongs[0];
+  const subsong = module.subsongs[subsongIndex] || module.subsongs[0];
   if (!subsong) {
-    return { instruments, patterns: [], metadata: createMetadata(module), wavetables: [], samples: [], furnaceNative: { subsongs: [], activeSubsong: 0 } };
+    return { instruments, patterns: [], metadata: createMetadata(module, subsongIndex), wavetables: [], samples: [], furnaceNative: { subsongs: [], activeSubsong: subsongIndex } };
   }
 
   // Debug: Log pattern map keys
@@ -2904,7 +2899,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
       for (let ch = 0; ch < module.chans; ch++) {
         // Look up this channel's pattern index for this order position
         const patIdx = subsong.orders[ch]?.[orderPos] ?? 0;
-        const key = `0_${ch}_${patIdx}`;
+        const key = `${subsongIndex}_${ch}_${patIdx}`;
         const pattern = module.patterns.get(key);
 
         if (pattern && pattern.rows[row]) {
@@ -2916,7 +2911,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
           if (cell.effects.length > 0 && cell.effects.some(e => e.type >= 0)) {
             totalEffects++;
           }
-          const converted = convertFurnaceCell(cell, isChipSynth);
+          const converted = convertFurnaceCell(cell, isChipSynth, module.grooves);
           if (converted.note > 0 && converted.note < 97) {
             totalConvertedNotes++;
           }
@@ -2945,7 +2940,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
             effectParam: 0,
             effectType2: 0,
             effectParam2: 0,
-          });
+          } as ConvertedPatternCell);
         }
       }
 
@@ -2982,7 +2977,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule): {
   return {
     instruments,
     patterns,
-    metadata: createMetadata(module),
+    metadata: createMetadata(module, subsongIndex),
     wavetables: module.wavetables.map(wt => ({
       data: [...wt.data],
       width: wt.width,
@@ -3087,8 +3082,8 @@ function convertFurnaceNoteValue(cell: FurnacePatternCell): number {
 /**
  * Create import metadata
  */
-function createMetadata(module: FurnaceModule): ImportMetadata {
-  const subsong = module.subsongs[0];
+function createMetadata(module: FurnaceModule, subsongIndex = 0): ImportMetadata {
+  const subsong = module.subsongs[subsongIndex] || module.subsongs[0];
 
   // Calculate BPM from Furnace's timing system
   // 
@@ -3153,6 +3148,9 @@ function createMetadata(module: FurnaceModule): ImportMetadata {
       compatFlags: module.compatFlags,
       systems: module.systems,
       systemChans: module.systemChans,
+      grooves: module.grooves.length > 0
+        ? module.grooves.map(g => g.val.slice(0, g.len))
+        : undefined,
     },
   };
 }
@@ -3204,8 +3202,9 @@ function convertFurnaceSample(furSample: FurnaceSample, id: number): ParsedSampl
  * Convert Furnace pattern cell to XM-compatible format
  * @param cell The Furnace pattern cell
  * @param isChipSynth If true, skip the -24 octave offset (chip synths use native Furnace octaves)
+ * @param grooves Optional groove table — used to resolve 0x09 groove-index → speed value
  */
-function convertFurnaceCell(cell: FurnacePatternCell, isChipSynth: boolean = false): ConvertedPatternCell {
+function convertFurnaceCell(cell: FurnacePatternCell, isChipSynth: boolean = false, grooves?: Array<{ len: number; val: number[] }>): ConvertedPatternCell {
   let note = 0;
 
   if (cell.note === NOTE_OFF || cell.note === NOTE_RELEASE || cell.note === MACRO_RELEASE) {
@@ -3217,69 +3216,69 @@ function convertFurnaceCell(cell: FurnacePatternCell, isChipSynth: boolean = fal
     const semitone = cell.note === 12 ? 0 : cell.note;
     // Adjust octave for C (note 12) - Furnace stores it one lower
     const adjustedOctave = cell.note === 12 ? cell.octave + 1 : cell.octave;
-    const finalOctave = adjustedOctave < 0 ? 0 : adjustedOctave;
-    
+
     // For chip synths (SID, NES, GB, etc.), use native Furnace octave numbering
     // For Amiga/sample-based, apply -24 offset (Furnace C-4 = MOD C-2)
     const octaveOffset = isChipSynth ? 0 : -24;
-    note = (finalOctave * 12) + semitone + 1 + octaveOffset;
-    
-    // Clamp to valid range (1-96 playable, 97 = note off)
+    note = (adjustedOctave * 12) + semitone + 1 + octaveOffset;
+
+    // Clamp to valid XM range (1-96 playable, 97 = note off)
+    // Notes out of range are silenced (0 = empty) rather than transposed
     if (note > 96) note = 96;
-    if (note < 1) note = 1;
+    if (note < 1) note = 0;
   }
 
   // Convert volume
   let volume = 0;
   if (cell.volume >= 0) {
-    volume = 0x10 + Math.min(64, Math.floor(cell.volume / 2));
+    volume = 0x10 + Math.min(64, Math.round(cell.volume * 64 / 127));
   }
 
-  // Convert effects (up to 2 — our internal format supports 2 per cell)
-  // Furnace supports up to 8 effects per cell; effects 3-8 are silently dropped
-  if (cell.effects.length > 2) {
-    const dropped = cell.effects.slice(2).filter(fx => fx.type !== 0 || fx.value !== 0);
-    if (dropped.length > 0) {
-      console.warn(`[FurnaceParser] Cell has ${cell.effects.length} effects, dropping ${dropped.length} non-empty effects (only 2 slots supported)`);
+  // Convert up to 8 Furnace effect slots
+  const convertedEffects: Array<{ type: number; param: number }> = [];
+  for (let i = 0; i < Math.min(8, cell.effects.length); i++) {
+    const fx = cell.effects[i];
+    let t = mapFurnaceEffect(fx.type);
+    if (t < 0) continue; // -1 = no XM equivalent; drop to avoid false arpeggio
+    let p = fx.value & 0xFF;
+    // Groove effect 0x09: param is groove index — resolve to first speed value
+    // mapFurnaceEffect maps 0x09 → 0x0F (set speed), so the param should be the speed
+    if (fx.type === 0x09 && grooves && grooves.length > 0) {
+      const groove = grooves[p];
+      if (groove && groove.len > 0) {
+        p = groove.val[0]; // Use first speed value of the groove pattern
+      }
+      // If groove index not found, p stays as-is (treated as direct speed)
     }
-  }
-  let effectType = 0;
-  let effectParam = 0;
-  let effectType2 = 0;
-  let effectParam2 = 0;
-  if (cell.effects.length > 0) {
-    const fx = cell.effects[0];
-    effectType = mapFurnaceEffect(fx.type);
-    effectParam = fx.value & 0xFF;
-    // Split composite XM extended effects (E1x, E2x, E9x, EAx, EBx, ECx, EDx, EEx)
-    // The mapping returns e.g. 0xE9 for retrigger, but the replayer expects
+    // Split composite XM extended effects (E1x-EFx)
+    // mapFurnaceEffect returns e.g. 0xE9 for retrigger; replayer expects
     // effectType=0x0E with sub-command in param high nibble: param = 0x9y
-    if (effectType >= 0xE0 && effectType <= 0xEF) {
-      const subCmd = effectType & 0x0F;
-      effectType = 0x0E;
-      effectParam = (subCmd << 4) | (effectParam & 0x0F);
+    if (t >= 0xE0 && t <= 0xEF) {
+      const subCmd = t & 0x0F;
+      t = 0x0E;
+      p = (subCmd << 4) | (p & 0x0F);
     }
-  }
-  if (cell.effects.length > 1) {
-    const fx = cell.effects[1];
-    effectType2 = mapFurnaceEffect(fx.type);
-    effectParam2 = fx.value & 0xFF;
-    if (effectType2 >= 0xE0 && effectType2 <= 0xEF) {
-      const subCmd = effectType2 & 0x0F;
-      effectType2 = 0x0E;
-      effectParam2 = (subCmd << 4) | (effectParam2 & 0x0F);
-    }
+    convertedEffects.push({ type: t, param: p });
   }
 
-  return {
+  const e = (i: number) => convertedEffects[i] ?? { type: 0, param: 0 };
+
+  const result: ConvertedPatternCell = {
     note,
     instrument: cell.instrument >= 0 ? cell.instrument + 1 : 0,
     volume,
-    effectType,
-    effectParam,
-    effectType2,
-    effectParam2,
+    effectType:  e(0).type,  effectParam:  e(0).param,
+    effectType2: e(1).type,  effectParam2: e(1).param,
   };
+
+  if (convertedEffects.length > 2) { result.effectType3 = e(2).type; result.effectParam3 = e(2).param; }
+  if (convertedEffects.length > 3) { result.effectType4 = e(3).type; result.effectParam4 = e(3).param; }
+  if (convertedEffects.length > 4) { result.effectType5 = e(4).type; result.effectParam5 = e(4).param; }
+  if (convertedEffects.length > 5) { result.effectType6 = e(5).type; result.effectParam6 = e(5).param; }
+  if (convertedEffects.length > 6) { result.effectType7 = e(6).type; result.effectParam7 = e(6).param; }
+  if (convertedEffects.length > 7) { result.effectType8 = e(7).type; result.effectParam8 = e(7).param; }
+
+  return result;
 }
 
 /**
@@ -3354,21 +3353,21 @@ function mapFurnaceEffect(furEffect: number): number {
     0xDC: 0xEC, // Delayed mute → note cut
 
     // === Extended Effects (0xE0-0xEF) ===
-    0xE0: 0x00, // Arp speed → keep as arpeggio (param changes timing)
+    0xE0: -1,   // Arp speed → no XM equivalent (param is speed, not note offsets)
     0xE1: 0xE1, // Fine porta up → XM fine porta up
     0xE2: 0xE2, // Fine porta down → XM fine porta down
     0xE3: 0xE4, // Vibrato shape → XM vibrato waveform
     0xE4: 0x04, // Vibrato fine → standard vibrato
-    0xE5: 0x00, // Set pitch → custom (no XM equivalent)
+    0xE5: -1,   // Set pitch → no XM equivalent (would misfire as arpeggio)
     0xE6: 0x03, // Delayed legato → portamento
-    0xE7: 0x00, // Delayed macro release → custom
+    0xE7: -1,   // Delayed macro release → no XM equivalent
     0xE8: 0x03, // Delayed legato up → portamento
     0xE9: 0x03, // Delayed legato down → portamento
-    0xEA: 0x00, // Legato mode → custom
-    0xEB: 0x00, // Sample bank → custom
+    0xEA: -1,   // Legato mode → no XM equivalent
+    0xEB: -1,   // Sample bank → no XM equivalent
     0xEC: 0xEC, // Note cut → XM note cut
     0xED: 0xED, // Note delay → XM note delay
-    0xEE: 0x00, // External command → custom
+    0xEE: -1,   // External command → no XM equivalent
 
     // === Fine Control Effects (0xF0-0xFF) ===
     0xF0: 0x0F, // Set Hz by tempo → speed
@@ -3376,16 +3375,16 @@ function mapFurnaceEffect(furEffect: number): number {
     0xF2: 0xE2, // Single pitch down → fine porta down
     0xF3: 0xEA, // Fine vol up → XM fine vol up
     0xF4: 0xEB, // Fine vol down → XM fine vol down
-    0xF5: 0x00, // Disable macro → custom
-    0xF6: 0x00, // Enable macro → custom
-    0xF7: 0x00, // Restart macro → custom
+    0xF5: -1,   // Disable macro → no XM equivalent
+    0xF6: -1,   // Enable macro → no XM equivalent
+    0xF7: -1,   // Restart macro → no XM equivalent
     0xF8: 0xEA, // Single vol up → fine vol up
     0xF9: 0xEB, // Single vol down → fine vol down
     0xFA: 0x0A, // Fast vol slide → vol slide
     0xFC: 0xEC, // Note release → note cut
     0xFD: 0x0F, // Virtual tempo num → speed
     0xFE: 0x0F, // Virtual tempo den → speed
-    0xFF: 0x00, // Stop song → custom
+    0xFF: -1,   // Stop song → no XM equivalent (drop; param is always 0 anyway)
   };
 
   return mapping[furEffect] ?? furEffect; // Pass through unmapped effects
