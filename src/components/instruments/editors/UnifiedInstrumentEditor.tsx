@@ -18,6 +18,7 @@ import {
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
   DEFAULT_HIVELY,
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC, DEFAULT_FRED, DEFAULT_TFMX,
+  DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_DAVID_WHITTAKER,
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
@@ -85,6 +86,11 @@ const DigMugControls = lazy(() => import('../controls/DigMugControls').then(m =>
 const FCControls = lazy(() => import('../controls/FCControls').then(m => ({ default: m.FCControls })));
 const FredControls = lazy(() => import('../controls/FredControls').then(m => ({ default: m.FredControls })));
 const TFMXControls = lazy(() => import('../controls/TFMXControls').then(m => ({ default: m.TFMXControls })));
+const OctaMEDControls = lazy(() => import('../controls/OctaMEDControls').then(m => ({ default: m.OctaMEDControls })));
+const SidMon1Controls = lazy(() => import('../controls/SidMon1Controls').then(m => ({ default: m.SidMon1Controls })));
+const HippelCoSoControls = lazy(() => import('../controls/HippelCoSoControls').then(m => ({ default: m.HippelCoSoControls })));
+const RobHubbardControls = lazy(() => import('../controls/RobHubbardControls').then(m => ({ default: m.RobHubbardControls })));
+const DavidWhittakerControls = lazy(() => import('../controls/DavidWhittakerControls').then(m => ({ default: m.DavidWhittakerControls })));
 
 // Lazy-loaded hardware UI components
 const HivelyHardware = lazy(() => import('../hardware/HivelyHardware').then(m => ({ default: m.HivelyHardware })));
@@ -114,7 +120,7 @@ import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
 import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'fred' | 'tfmx';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -232,6 +238,11 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isFCType(synthType)) return 'fc';
   if (isFredType(synthType)) return 'fred';
   if (isTFMXType(synthType)) return 'tfmx';
+  if (synthType === 'OctaMEDSynth') return 'octamed';
+  if (synthType === 'SidMon1Synth') return 'sidmon1';
+  if (synthType === 'HippelCoSoSynth') return 'hippelcoso';
+  if (synthType === 'RobHubbardSynth') return 'robhubbard';
+  if (synthType === 'DavidWhittakerSynth') return 'davidwhittaker';
   if (synthType === 'HarmonicSynth') return 'harmonicsynth';
   if (synthType === 'ModularSynth') return 'modular';
   if (synthType === 'WAM') return 'wam';
@@ -633,6 +644,36 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     const current = instrument.fred || DEFAULT_FRED;
     handleChange({ fred: { ...current, ...updates } });
   }, [instrument.fred, handleChange]);
+
+  // Handle OctaMED config updates
+  const handleOctaMEDChange = useCallback((updates: Partial<typeof instrument.octamed>) => {
+    const current = instrument.octamed || DEFAULT_OCTAMED;
+    handleChange({ octamed: { ...current, ...updates } });
+  }, [instrument.octamed, handleChange]);
+
+  // Handle SidMon 1.0 config updates
+  const handleSidMon1Change = useCallback((updates: Partial<typeof instrument.sidmon1>) => {
+    const current = instrument.sidmon1 || DEFAULT_SIDMON1;
+    handleChange({ sidmon1: { ...current, ...updates } });
+  }, [instrument.sidmon1, handleChange]);
+
+  // Handle HippelCoSo config updates
+  const handleHippelCoSoChange = useCallback((updates: Partial<typeof instrument.hippelCoso>) => {
+    const current = instrument.hippelCoso || DEFAULT_HIPPEL_COSO;
+    handleChange({ hippelCoso: { ...current, ...updates } });
+  }, [instrument.hippelCoso, handleChange]);
+
+  // Handle Rob Hubbard config updates
+  const handleRobHubbardChange = useCallback((updates: Partial<typeof instrument.robHubbard>) => {
+    const current = instrument.robHubbard || DEFAULT_ROB_HUBBARD;
+    handleChange({ robHubbard: { ...current, ...updates } });
+  }, [instrument.robHubbard, handleChange]);
+
+  // Handle David Whittaker config updates
+  const handleDavidWhittakerChange = useCallback((updates: Partial<typeof instrument.davidWhittaker>) => {
+    const current = instrument.davidWhittaker || DEFAULT_DAVID_WHITTAKER;
+    handleChange({ davidWhittaker: { ...current, ...updates } });
+  }, [instrument.davidWhittaker, handleChange]);
 
   // Handle Space Laser config updates
   const handleSpaceLaserChange = useCallback((updates: Partial<typeof instrument.spaceLaser>) => {
@@ -1212,6 +1253,121 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
         />
         <Suspense fallback={<LoadingControls />}>
           <TFMXControls config={tfmxConfig} />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // OCTAMED SYNTH EDITOR
+  // ============================================================================
+  if (editorMode === 'octamed') {
+    const octaMEDConfig = { ...DEFAULT_OCTAMED, ...(instrument.octamed || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#000a1a] to-[#000408]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <OctaMEDControls
+            config={octaMEDConfig}
+            onChange={handleOctaMEDChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SIDMON 1.0 EDITOR
+  // ============================================================================
+  if (editorMode === 'sidmon1') {
+    const sidMon1Config = { ...DEFAULT_SIDMON1, ...(instrument.sidmon1 || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a0018] to-[#080008]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <SidMon1Controls
+            config={sidMon1Config}
+            onChange={handleSidMon1Change}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // HIPPEL COSO EDITOR
+  // ============================================================================
+  if (editorMode === 'hippelcoso') {
+    const hippelCoSoConfig = { ...DEFAULT_HIPPEL_COSO, ...(instrument.hippelCoso || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#001a0a] to-[#000805]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <HippelCoSoControls
+            config={hippelCoSoConfig}
+            onChange={handleHippelCoSoChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // ROB HUBBARD EDITOR
+  // ============================================================================
+  if (editorMode === 'robhubbard') {
+    const robHubbardConfig = { ...DEFAULT_ROB_HUBBARD, ...(instrument.robHubbard || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a0a00] to-[#080400]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <RobHubbardControls
+            config={robHubbardConfig}
+            onChange={handleRobHubbardChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // DAVID WHITTAKER EDITOR
+  // ============================================================================
+  if (editorMode === 'davidwhittaker') {
+    const davidWhittakerConfig = { ...DEFAULT_DAVID_WHITTAKER, ...(instrument.davidWhittaker || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0a0a1a] to-[#040408]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <DavidWhittakerControls
+            config={davidWhittakerConfig}
+            onChange={handleDavidWhittakerChange}
+          />
         </Suspense>
       </div>
     );
