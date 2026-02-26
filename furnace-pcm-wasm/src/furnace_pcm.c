@@ -27,6 +27,18 @@ EM_JS(void, js_on_param_change, (int param_id, int value), {
     if (Module.onParamChange) Module.onParamChange(param_id, value);
 });
 
+/* ptr   = WASM byte offset of sample data
+ * len   = sample count (NOT byte count)
+ * loopStart/loopLength = in samples, loopType 0=off 1=fwd 2=bidi
+ * is16bit = 1 for 16-bit, 0 for 8-bit */
+EM_JS(void, js_onPlaySample, (int ptr, int len, int loopStart, int loopLength, int loopType, int is16bit), {
+    if (Module.onPlaySample) Module.onPlaySample(ptr, len, loopStart, loopLength, loopType, is16bit);
+});
+
+EM_JS(void, js_onStopSample, (void), {
+    if (Module.onStopSample) Module.onStopSample();
+});
+
 /* ── Param IDs ─────────────────────────────────────────────────────────── */
 
 #define PARAM_SAMPLE_RATE    0
@@ -254,6 +266,29 @@ static void render(void) {
             g_loop_enable = !g_loop_enable;
             js_on_param_change(PARAM_LOOP_ENABLE, g_loop_enable);
             g_dirty = 1;
+        }
+
+        /* PLAY button */
+        if (g_pcm_data && g_pcm_len > 0) {
+            if (hwui_button(g_fb, SCREEN_W, 260, cy + 2, 90, 18,
+                            "PLAY", 0, g_mouse_x, g_mouse_y, g_mouse_down)) {
+                int is16bit = (g_bit_depth == 16) ? 1 : 0;
+                int sample_count = is16bit ? g_pcm_len / 2 : g_pcm_len;
+                int loopLength = (g_loop_enable && g_loop_end > g_loop_start)
+                                 ? (g_loop_end - g_loop_start) : 0;
+                int loopType = (g_loop_enable && loopLength > 0)
+                               ? (g_loop_mode == 1 ? 2 : 1) : 0;
+                js_onPlaySample((int)(uintptr_t)g_pcm_data, sample_count,
+                                g_loop_start, loopLength, loopType, is16bit);
+                g_dirty = 1;
+            }
+
+            /* STOP button */
+            if (hwui_button(g_fb, SCREEN_W, 356, cy + 2, 90, 18,
+                            "STOP", 0, g_mouse_x, g_mouse_y, g_mouse_down)) {
+                js_onStopSample();
+                g_dirty = 1;
+            }
         }
     }
 
