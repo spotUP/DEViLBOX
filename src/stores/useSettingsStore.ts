@@ -53,6 +53,26 @@ export interface FormatEnginePreferences {
   easyTrax: FormatEngineChoice;           // .etx → EasyTraxParser vs OpenMPT
   karlMorton: FormatEngineChoice;         // .mus → KarlMortonParser vs OpenMPT
   xTracker: FormatEngineChoice;           // .dmf (X-Tracker) → XTrackerParser vs UADE
+  fmTracker: FormatEngineChoice;          // .fmt → FMTrackerParser (Davey W Taylor FM Tracker)
+  xmf: FormatEngineChoice;               // .xmf → XMFParser (Astroidea/Imperium Galactica)
+  uax: FormatEngineChoice;               // .uax → UAXParser (Unreal Audio Package ripper)
+  // Additional Amiga formats with native parsers
+  graoumfTracker2: FormatEngineChoice;    // .gt2/.gtk → GraoumfTracker2Parser vs UADE
+  symphoniePro: FormatEngineChoice;       // .symmod → SymphonieProParser vs UADE
+  composer667: FormatEngineChoice;        // .667 → Composer667Parser vs UADE
+  chuckBiscuits: FormatEngineChoice;      // .cba → ChuckBiscuitsParser vs UADE
+  soundTracker: FormatEngineChoice;       // .stk → SoundTrackerParser vs UADE
+  speedySystem: FormatEngineChoice;       // .ss → SpeedySystemParser vs UADE
+  tronic: FormatEngineChoice;             // .trc/.dp/.tro → TronicParser vs UADE
+  digiBoosterPro: FormatEngineChoice;     // .dbm → DigiBoosterProParser vs UADE
+  gameMusicCreator: FormatEngineChoice;   // .gmc → GameMusicCreatorParser vs UADE
+  faceTheMusic: FormatEngineChoice;       // .ftm → FaceTheMusicParser vs UADE
+  sawteeth: FormatEngineChoice;           // .st (SWTD magic) → SawteethParser vs UADE
+  soundControl: FormatEngineChoice;       // .sc/.sct → SoundControlParser vs UADE
+  soundFactory: FormatEngineChoice;       // .psf → SoundFactoryParser vs UADE
+  actionamics: FormatEngineChoice;        // .act → ActionamicsParser vs UADE
+  activisionPro: FormatEngineChoice;      // .avp/.mw → ActivisionProParser vs UADE
+  ronKlaren: FormatEngineChoice;          // .rk/.rkb → RonKlarenParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -138,6 +158,25 @@ export const useSettingsStore = create<SettingsStore>()(
         easyTrax: 'native',         // EasyTraxParser — dedicated EasyTrax support
         karlMorton: 'native',       // KarlMortonParser — dedicated Karl Morton Music Format support
         xTracker: 'native',         // XTrackerParser — dedicated X-Tracker DMF support
+        fmTracker: 'native',        // FMTrackerParser — dedicated FM Tracker (.fmt) support
+        xmf: 'native',              // XMFParser — dedicated Astroidea XMF support
+        uax: 'native',              // UAXParser — Unreal Audio Package sound ripper
+        graoumfTracker2: 'native',  // GraoumfTracker2Parser — dedicated Graoumf Tracker 1/2 support
+        symphoniePro: 'native',     // SymphonieProParser — dedicated Symphonie Pro support
+        composer667: 'native',      // Composer667Parser — dedicated Composer 667 support
+        chuckBiscuits: 'native',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support
+        soundTracker: 'uade',       // SoundTrackerParser — prefer UADE for authentic original STK playback
+        speedySystem: 'uade',       // SpeedySystemParser — prefer UADE (DOC RAM samples required)
+        tronic: 'uade',             // TronicParser — no native parser; always UADE
+        digiBoosterPro: 'native',   // DigiBoosterProParser — dedicated DigiBooster Pro (.dbm) support
+        gameMusicCreator: 'uade',   // GameMusicCreatorParser — prefer UADE (complex synthesis)
+        faceTheMusic: 'native',     // FaceTheMusicParser — native parser available
+        sawteeth: 'native',         // SawteethParser — native parser available
+        soundControl: 'native',     // SoundControlParser — native parser available
+        soundFactory: 'native',     // SoundFactoryParser — native parser available
+        actionamics: 'native',      // ActionamicsParser — native parser available
+        activisionPro: 'native',    // ActivisionProParser — native parser available
+        ronKlaren: 'native',        // RonKlarenParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',

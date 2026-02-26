@@ -1224,6 +1224,57 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     // Fall through to libopenmpt
   }
 
+  // ── FM Tracker (.fmt) ─────────────────────────────────────────────────────
+  if (/\.fmt$/i.test(filename)) {
+    if (prefs.fmTracker === 'native') {
+      try {
+        const { isFMTrackerFormat, parseFMTrackerFile } = await import('@lib/import/formats/FMTrackerParser');
+        const bytes = new Uint8Array(buffer);
+        if (isFMTrackerFormat(bytes)) {
+          const result = parseFMTrackerFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[FMTrackerParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+      }
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── Astroidea XMF / Imperium Galactica (.xmf) ────────────────────────────
+  if (/\.xmf$/i.test(filename)) {
+    if (prefs.xmf === 'native') {
+      try {
+        const { isXMFFormat, parseXMFFile } = await import('@lib/import/formats/XMFParser');
+        const bytes = new Uint8Array(buffer);
+        if (isXMFFormat(bytes)) {
+          const result = parseXMFFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[XMFParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+      }
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── Unreal Audio Package (.uax) ───────────────────────────────────────────
+  if (/\.uax$/i.test(filename)) {
+    if (prefs.uax === 'native') {
+      try {
+        const { isUAXFormat, parseUAXFile } = await import('@lib/import/formats/UAXParser');
+        const bytes = new Uint8Array(buffer);
+        if (isUAXFormat(bytes)) {
+          const result = parseUAXFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[UAXParser] Native parse failed for ${filename}:`, err);
+      }
+    }
+    return null;
+  }
+
   // ── AMS (Extreme's Tracker / Velvet Studio) ───────────────────────────────
   // PC format — no UADE fallback.  Two magic variants:
   //   "Extreme"    → AMS 1.x (Extreme's Tracker)
