@@ -740,24 +740,23 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
-  // ── Ben Daglish ───────────────────────────────────────────────────────────
-  // .bd files — identified by M68k assembler signatures (no magic bytes).
-  if (/\.bd$/.test(filename)) {
-    const uadeMode = prefs.uade ?? 'enhanced';
-    if (prefs.benDaglish === 'native') {
-      try {
-        const { isBenDaglishFormat, parseBenDaglishFile } = await import('@lib/import/formats/BenDaglishParser');
-        const bytes = new Uint8Array(buffer);
-        if (isBenDaglishFormat(bytes)) {
-          const result = parseBenDaglishFile(bytes, file.name);
-          if (result) return result;
+  // ── Ben Daglish (bd.* prefix) ────────────────────────────────────────────
+  // Amiga compiled 68k format. UADE prefix: bd.
+  {
+    const _bdBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_bdBase.startsWith('bd.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.benDaglish === 'native') {
+        try {
+          const { isBenDaglishFormat, parseBenDaglishFile } = await import('@lib/import/formats/BenDaglishParser');
+          if (isBenDaglishFormat(buffer, filename)) return parseBenDaglishFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[BenDaglishParser] Native parse failed for ${filename}, falling back to UADE:`, err);
         }
-      } catch (err) {
-        console.warn(`[BenDaglishParser] Native parse failed for ${filename}, falling back to UADE:`, err);
       }
+      const { parseUADEFile: parseUADE_bd } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_bd(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── Images Music System (.ims) ────────────────────────────────────────────
