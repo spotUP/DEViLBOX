@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-26T06:29:31.300Z
+ * Generated: 2026-02-26T07:30:17.081Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1284';
-export const BUILD_NUMBER = '1284';
-export const BUILD_HASH = '9183030e';
+export const BUILD_VERSION = '1.0.1286';
+export const BUILD_NUMBER = '1286';
+export const BUILD_HASH = '31562c67';
 export const BUILD_DATE = '2026-02-26';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1284',
+    version: '1.0.1286',
     date: '2026-02-26',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore(furnace-insed): bump WASM cache-bust version to 3"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
       {
         type: 'fix',
         "description": "Remove unused fields and dead header reads (TS6133)"
@@ -226,14 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Ft2-sampled compilation patches for Emscripten"
-      },
-      {
-        type: 'fix',
-        "description": "Correct DigitalMugician header bounds check from +20 to +24"
-      },
-      {
-        type: 'fix',
-        "description": "Add UADE fallback try-catch to all native format parsers"
       }
     ]
   }

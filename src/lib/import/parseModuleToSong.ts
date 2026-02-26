@@ -267,7 +267,7 @@ async function parseMIDIFile(file: File, options?: ParseOptions['midiOptions']):
 // ─── Furnace / DefleMask ──────────────────────────────────────────────────────
 
 async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, subsong = 0): Promise<TrackerSong> {
-  const { parseFurnaceSong, convertFurnaceToDevilbox, extractSubsongPatterns, getSubsongTiming } = await import('@lib/import/formats/FurnaceSongParser');
+  const { parseFurnaceSong, convertFurnaceToDevilbox, convertSubsongForPlayback } = await import('@lib/import/formats/FurnaceSongParser');
   const { convertToInstrument } = await import('@lib/import/InstrumentConverter');
 
   const module = await parseFurnaceSong(buffer);
@@ -341,8 +341,11 @@ async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, subsong 
     engine.setModuleSamples(result.samples.length > 0 ? result.samples : null);
   }
 
-  // Pre-convert ALL subsongs so the in-editor subsong selector can switch between them
-  // without re-parsing the file. Instruments/wavetables are shared across all subsongs.
+  // Pre-convert ALL subsongs using the full conversion pipeline so the in-editor
+  // subsong selector can switch between them without re-parsing.
+  // Instruments/wavetables/samples are module-level (shared) — taken from the primary result.
+  // Each subsong gets its own full convertFurnaceToDevilbox() call for correct pattern
+  // conversion (chip context, effect mapping, octave handling, groove resolution).
   type SubCell = { note?: number; instrument?: number; volume?: number;
     effectType?: number; effectParam?: number; effectType2?: number; effectParam2?: number;
     effectType3?: number; effectParam3?: number; effectType4?: number; effectParam4?: number;
@@ -380,23 +383,24 @@ async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, subsong 
 
   type FurnaceSubsongPlaybackLocal = import('@/types').FurnaceSubsongPlayback;
   const furnaceSubsongs: FurnaceSubsongPlaybackLocal[] = module.subsongs.map((_, i) => {
-    const timing = getSubsongTiming(module, i);
-    // For the active subsong, reuse already-converted patterns
-    const rawCells = i === subsong
-      ? (result.patterns as unknown as SubCell[][][])
-      : (extractSubsongPatterns(module, i) as unknown as SubCell[][][]);
+    // Instruments are module-level and shared across all subsongs — never re-convert them.
+    // For the active subsong reuse the already-converted result; for others extract only
+    // patterns + timing via convertSubsongForPlayback().
+    const subResult = i === subsong ? result : convertSubsongForPlayback(module, i);
+    const subMeta = subResult.metadata;
+    const subPatterns = subResult.patterns as unknown as SubCell[][][];
     const subPatLen = module.subsongs[i]?.patLen || patLen;
     return {
-      name: timing.name,
-      patterns: cellsToPatterns(rawCells, subPatLen, numChannels, `sub${i}`),
-      songPositions: Array.from({ length: timing.ordersLen }, (_, j) => j),
-      initialSpeed: timing.initialSpeed,
-      initialBPM: timing.initialBPM,
-      speed2: timing.speed2 || undefined,
-      hz: timing.hz || undefined,
-      virtualTempoN: timing.virtualTempoN || undefined,
-      virtualTempoD: timing.virtualTempoD || undefined,
-      grooves: timing.grooves,
+      name: module.subsongs[i]?.name || `Subsong ${i + 1}`,
+      patterns: cellsToPatterns(subPatterns, subPatLen, numChannels, `sub${i}`),
+      songPositions: subMeta.modData?.patternOrderTable ?? Array.from({ length: subPatterns.length }, (_, j) => j),
+      initialSpeed: subMeta.modData?.initialSpeed ?? 6,
+      initialBPM: subMeta.modData?.initialBPM ?? 125,
+      speed2: subMeta.furnaceData?.speed2 || undefined,
+      hz: subMeta.furnaceData?.hz || undefined,
+      virtualTempoN: subMeta.furnaceData?.virtualTempoN || undefined,
+      virtualTempoD: subMeta.furnaceData?.virtualTempoD || undefined,
+      grooves: subMeta.furnaceData?.grooves,
     };
   });
 
