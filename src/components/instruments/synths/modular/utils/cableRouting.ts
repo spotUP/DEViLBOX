@@ -33,7 +33,6 @@ export function calculateOrthogonalPath(
     horizontalFirst = true,
     laneOffset = 0,
     obstacles = [],
-    // bendRadius = 0, // TODO: Implement curved bends
   } = options;
 
   const waypoints: Point[] = [start];

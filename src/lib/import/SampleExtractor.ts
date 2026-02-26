@@ -392,6 +392,116 @@ function extractS3M(data: Uint8Array): ExtractionResult {
 }
 
 /**
+ * Extract samples from IT (Impulse Tracker) file
+ * IT format: 8 or 16-bit PCM, signed or unsigned, optional delta encoding
+ */
+function extractIT(data: Uint8Array): ExtractionResult {
+  const title = readString(data, 4, 26);
+  const samples: ExtractedSample[] = [];
+
+  const numOrders = readWord(data, 0x20);
+  const numInstruments = readWord(data, 0x22);
+  const numSamples = readWord(data, 0x24);
+  const numPatterns = readWord(data, 0x26);
+
+  // Pointer tables start at 0xC0 after orders
+  const ordersStart = 0xC0;
+  const instPtrsStart = ordersStart + numOrders;
+  const smpPtrsStart = instPtrsStart + numInstruments * 4;
+
+  for (let i = 0; i < numSamples; i++) {
+    const smpOffset = readDword(data, smpPtrsStart + i * 4);
+    if (smpOffset === 0 || smpOffset + 80 > data.length) continue;
+
+    // Verify IMPS signature
+    const sig = String.fromCharCode(data[smpOffset], data[smpOffset + 1], data[smpOffset + 2], data[smpOffset + 3]);
+    if (sig !== 'IMPS') continue;
+
+    const flags = data[smpOffset + 0x12];
+    const convertFlags = data[smpOffset + 0x2E];
+    const name = readString(data, smpOffset + 0x14, 26);
+    const globalVol = data[smpOffset + 0x11];
+    const defaultVol = data[smpOffset + 0x13];
+    const length = readDword(data, smpOffset + 0x30);
+    const loopBegin = readDword(data, smpOffset + 0x34);
+    const loopEnd = readDword(data, smpOffset + 0x38);
+    const c5Speed = readDword(data, smpOffset + 0x3C);
+    const samplePtr = readDword(data, smpOffset + 0x48);
+
+    const hasSampleData = (flags & 0x01) !== 0;
+    const is16Bit = (flags & 0x02) !== 0;
+    const isStereo = (flags & 0x04) !== 0;
+    const isCompressed = (flags & 0x08) !== 0;
+    const isLooped = (flags & 0x10) !== 0;
+    const isPingPong = (flags & 0x20) !== 0;
+
+    const isSigned = (convertFlags & 0x01) !== 0;
+    const isDeltaEncoded = (convertFlags & 0x04) !== 0;
+
+    if (!hasSampleData || length === 0 || samplePtr === 0) continue;
+    if (isCompressed) {
+      // IT 2.14+ compression — skip (complex algorithm, out of scope for basic extraction)
+      continue;
+    }
+
+    const bytesPerSample = is16Bit ? 2 : 1;
+    const numChannels = isStereo ? 2 : 1;
+    const byteLength = length * bytesPerSample * numChannels;
+
+    if (samplePtr + byteLength > data.length) continue;
+
+    const pcmData = new Float32Array(length);
+
+    if (is16Bit) {
+      let prev = 0;
+      for (let j = 0; j < length; j++) {
+        let val = readWord(data, samplePtr + j * 2);
+        if (isDeltaEncoded) {
+          // Delta: val is a delta, accumulate
+          const signedDelta = val > 32767 ? val - 65536 : val;
+          prev = (prev + signedDelta) & 0xFFFF;
+          val = prev;
+        }
+        pcmData[j] = isSigned
+          ? (val > 32767 ? val - 65536 : val) / 32768
+          : (val - 32768) / 32768;
+      }
+    } else {
+      let prev = 0;
+      for (let j = 0; j < length; j++) {
+        let val = data[samplePtr + j];
+        if (isDeltaEncoded) {
+          const signedDelta = val > 127 ? val - 256 : val;
+          prev = (prev + signedDelta) & 0xFF;
+          val = prev;
+        }
+        pcmData[j] = isSigned
+          ? (val > 127 ? val - 256 : val) / 128
+          : (val - 128) / 128;
+      }
+    }
+
+    let loopType: 'none' | 'forward' | 'pingpong' = 'none';
+    if (isLooped) loopType = isPingPong ? 'pingpong' : 'forward';
+
+    samples.push({
+      name: name || `Sample ${i + 1}`,
+      sampleRate: c5Speed || 8363,
+      channels: 1, // Only mono extraction supported
+      bitDepth: is16Bit ? 16 : 8,
+      pcmData,
+      loopStart: isLooped ? loopBegin : undefined,
+      loopEnd: isLooped ? loopEnd : undefined,
+      loopType,
+      baseNote: 'C-5',
+      volume: defaultVol,
+    });
+  }
+
+  return { samples, format: 'IT', title };
+}
+
+/**
  * Main extraction function - detects format and extracts samples
  */
 export async function extractSamples(file: File): Promise<ExtractionResult> {
@@ -412,8 +522,7 @@ export async function extractSamples(file: File): Promise<ExtractionResult> {
     case 'S3M':
       return extractS3M(data);
     case 'IT':
-      console.warn('[SampleExtractor] IT format sample extraction not yet implemented');
-      return { samples: [], format: 'IT', title: readString(data, 4, 26) };
+      return extractIT(data);
     default:
       throw new Error(`Unsupported format: ${format}`);
   }
@@ -424,5 +533,5 @@ export async function extractSamples(file: File): Promise<ExtractionResult> {
  */
 export function canExtractSamples(filename: string): boolean {
   const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
-  return ['.mod', '.xm', '.s3m'].includes(ext);
+  return ['.mod', '.xm', '.s3m', '.it'].includes(ext);
 }

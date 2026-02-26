@@ -13,7 +13,7 @@ export type ModuleFormat =
   | 'FUR' | 'NATIVE'
   | 'HVL' | 'AHX'
   | 'FC' | 'SMON' | 'SIDMON2' | 'FRED' | 'DMUG'
-  | 'UADE';
+  | 'UADE' | 'TFMX';
 
 // Format-specific configuration
 export interface FormatConfig {
@@ -134,6 +134,13 @@ export interface ChannelState {
   sampleId: number | null;
   noteOn: boolean;            // Is note currently playing?
   funkRepeatPos?: number;     // For EFx Invert Loop
+
+  // Panbrello state (S3M/IT Yxy effect)
+  panbrelloWaveform?: WaveformType;
+  panbrelloPos?: number;
+  panbrelloSpeed?: number;
+  panbrelloDepth?: number;
+  panbrelloRetrigger?: boolean;
 }
 
 // Re-export tracker envelope types

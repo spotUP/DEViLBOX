@@ -147,6 +147,8 @@ export class ProTrackerReplayer {
   // Tick timer
   private tickLoop: Tone.Loop | null = null;
   private tickInterval = 0.02;   // 20ms default (125 BPM, 2.5/125)
+  private ledFilterOn = false;
+  private patternDelay = 0;
 
   // Master output
   private masterGain: Tone.Gain | null = null;
@@ -184,6 +186,8 @@ export class ProTrackerReplayer {
     this.bpm = 125;
     this.pBreakFlag = false;
     this.posJumpFlag = false;
+    this.patternDelay = 0;
+    this.ledFilterOn = false;
 
     console.log(`[PTReplayer] Loaded module: ${module.name}, ${module.numChannels} channels, ${module.songLength} positions`);
   }
@@ -276,6 +280,7 @@ export class ProTrackerReplayer {
     this.songPos = 0;
     this.pattPos = 0;
     this.currentTick = 0;
+    this.patternDelay = 0;
 
     console.log('[PTReplayer] Stopped playback');
   }
@@ -338,8 +343,14 @@ export class ProTrackerReplayer {
     // Advance tick counter
     this.currentTick++;
     if (this.currentTick >= this.speed) {
-      this.currentTick = 0;
-      this.advanceRow();
+      if (this.patternDelay > 0) {
+        // EEx: repeat current row for patternDelay extra speed-lengths
+        this.patternDelay--;
+        this.currentTick = 1; // Skip tick 0 (don't re-trigger notes), keep effects running
+      } else {
+        this.currentTick = 0;
+        this.advanceRow();
+      }
     }
   }
 
@@ -510,7 +521,7 @@ export class ProTrackerReplayer {
   private processExtendedEffect(_chIndex: number, ch: ChannelState, x: number, y: number, time: number): void {
     switch (x) {
       case 0x0: // Set filter (Amiga LED filter)
-        // Not implemented - no hardware filter
+        this.ledFilterOn = y > 0;
         break;
 
       case 0x1: // Fine portamento up
@@ -585,7 +596,7 @@ export class ProTrackerReplayer {
         break;
 
       case 0xE: // Pattern delay
-        // TODO: Implement pattern delay
+        if (y > 0) this.patternDelay = y;
         break;
 
       case 0xF: // Invert loop (Funk repeat)

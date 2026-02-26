@@ -511,8 +511,12 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
                       onChange={(e) => handleNoteChange(parseInt(e.target.value))}
                       className="flex-1 bg-dark-bg border border-dark-border rounded px-3 py-2 text-text-primary"
                     />
-                    <span className="text-xs text-text-muted w-8">
-                      {/* TODO: Note name helper */}
+                    <span className="text-xs text-text-muted w-8" title="MIDI note name">
+                      {(() => {
+                        const n = currentPadMapping?.targetNote ?? 60;
+                        const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+                        return `${names[n % 12]}${Math.floor(n / 12) - 1}`;
+                      })()}
                     </span>
                   </div>
                   <p className="text-xs text-text-muted">
