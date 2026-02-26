@@ -1587,6 +1587,25 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
   }
 
+  // ── Future Player (.fp / FP.*) ───────────────────────────────────────────────
+  // Amiga 4-channel format (Future Player). Magic: 0x000003F3 + "F.PLAYER" at offsets 32-39.
+  if (
+    /\.fp$/i.test(filename) ||
+    /^fp\./i.test((filename.split('/').pop() ?? filename).split('\\').pop() ?? filename)
+  ) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.futurePlayer === 'native') {
+      try {
+        const { isFuturePlayerFormat, parseFuturePlayerFile } = await import('@lib/import/formats/FuturePlayerParser');
+        if (isFuturePlayerFormat(buffer)) return parseFuturePlayerFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[FuturePlayerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_fp } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_fp(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
