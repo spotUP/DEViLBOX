@@ -73,44 +73,9 @@ export interface FormatEnginePreferences {
   deltaMusic1: FormatEngineChoice;    // .dm/.dm1 → DeltaMusic1Parser vs UADE
   pt36: FormatEngineChoice;           // FORM+MODL → PT36Parser vs libopenmpt
   // Newly wired parsers (2026-02-26 batch)
-  fashionTracker: FormatEngineChoice;          // ex.* → FashionTrackerParser vs UADE
-  multiMediaSound: FormatEngineChoice;         // mms.*/sfx20.* → MultiMediaSoundParser vs UADE
-  timeTracker: FormatEngineChoice;             // tmk.* → TimeTrackerParser vs UADE
-  chipTracker: FormatEngineChoice;             // kris.* → ChipTrackerParser vs UADE
-  cinemaware: FormatEngineChoice;              // cin.* → CinemawareParser vs UADE
-  novoTradePacker: FormatEngineChoice;         // ntp.* → NovoTradePackerParser vs UADE
-  alcatrazPacker: FormatEngineChoice;          // alp.* → AlcatrazPackerParser vs UADE
-  bladePacker: FormatEngineChoice;             // uds.* → BladePackerParser vs UADE
-  tomyTracker: FormatEngineChoice;             // sg.* → TomyTrackerParser vs UADE
-  imagesMusicSystem: FormatEngineChoice;       // ims.* → ImagesMusicSystemParser vs UADE
-  seanConran: FormatEngineChoice;              // scr.* → SeanConranParser vs UADE
-  thomasHermann: FormatEngineChoice;           // thm.* → ThomasHermannParser vs UADE
-  titanicsPacker: FormatEngineChoice;          // tits.* → TitanicsPackerParser vs UADE
-  krisHatlelid: FormatEngineChoice;            // kh.* → KrisHatlelidParser vs UADE
-  ntspSystem: FormatEngineChoice;              // two.* → NTSPParser vs UADE
   ufoFormat: FormatEngineChoice;               // mus.*/ufo.* → UFOParser vs UADE
-  moshPacker: FormatEngineChoice;              // mosh.* → MoshPackerParser vs UADE
   daveLowe: FormatEngineChoice;                // dl.* → DaveLoweParser vs UADE
-  coreDesign: FormatEngineChoice;              // core.* → CoreDesignParser vs UADE
-  jankoMrsicFlogel: FormatEngineChoice;        // jmf.* → JankoMrsicFlogelParser vs UADE
-  specialFX: FormatEngineChoice;               // jd.* → SpecialFXParser vs UADE
-  soundPlayer: FormatEngineChoice;             // sjs.* → SoundPlayerParser vs UADE
-  nickPellingPacker: FormatEngineChoice;       // npp.* → NickPellingPackerParser vs UADE
-  peterVerswyvelenPacker: FormatEngineChoice;  // pvp.* → PeterVerswyvelenPackerParser vs UADE
-  wallyBeben: FormatEngineChoice;              // wb.* → WallyBebenParser vs UADE
-  steveBarrett: FormatEngineChoice;            // sb.* → SteveBarrettParser vs UADE
-  paulSummers: FormatEngineChoice;             // snk.* → PaulSummersParser vs UADE
-  desire: FormatEngineChoice;                  // dsr.* → DesireParser vs UADE
-  digitalSonixChrome: FormatEngineChoice;      // dsc.* → DigitalSonixChromeParser vs UADE
-  sonixMusicDriver: FormatEngineChoice;        // smus.*/snx.*/tiny.* → SonixMusicDriverParser vs UADE
-  jesperOlsen: FormatEngineChoice;             // jo.* → JesperOlsenParser vs UADE
-  kimChristensen: FormatEngineChoice;          // kim.* → KimChristensenParser vs UADE
-  amComposer: FormatEngineChoice;              // amc.* → AMComposerParser vs UADE
   tcbTracker: FormatEngineChoice;              // tcb.* → TCBTrackerParser vs UADE
-  mmdc: FormatEngineChoice;                    // mmdc.* → MMDCParser vs UADE
-  psa: FormatEngineChoice;                     // psa.* → PSAParser vs UADE
-  tme: FormatEngineChoice;                     // tme.*/.tme → TMEParser vs UADE
-  specialFXST: FormatEngineChoice;             // doda.* → SpecialFXSTParser vs UADE
   tfmxST: FormatEngineChoice;                  // mdst.* → TFMXSTParser vs UADE
   quartet: FormatEngineChoice;                 // qpa.*/sqt.*/qts.* → QuartetParser vs UADE
   soundMaster: FormatEngineChoice;             // sm.*/sm1.*/sm2.*/sm3.*/smpro.* → SoundMasterParser vs UADE
@@ -217,44 +182,9 @@ export const useSettingsStore = create<SettingsStore>()(
         ronKlaren: 'native',        // RonKlarenParser — native parser available
         deltaMusic1: 'native',  // DeltaMusic1Parser — native parser available
         pt36: 'native',         // PT36Parser — native parser available
-        fashionTracker: 'native',            // FashionTrackerParser — native parser available
-        multiMediaSound: 'native',           // MultiMediaSoundParser — native parser available
-        timeTracker: 'native',               // TimeTrackerParser — native parser available
-        chipTracker: 'native',               // ChipTrackerParser — native parser available
-        cinemaware: 'native',                // CinemawareParser — native parser available
-        novoTradePacker: 'native',           // NovoTradePackerParser — native parser available
-        alcatrazPacker: 'native',            // AlcatrazPackerParser — native parser available
-        bladePacker: 'native',               // BladePackerParser — native parser available
-        tomyTracker: 'native',               // TomyTrackerParser — native parser available
-        imagesMusicSystem: 'native',         // ImagesMusicSystemParser — native parser available
-        seanConran: 'native',                // SeanConranParser — native parser available
-        thomasHermann: 'native',             // ThomasHermannParser — native parser available
-        titanicsPacker: 'native',            // TitanicsPackerParser — native parser available
-        krisHatlelid: 'native',              // KrisHatlelidParser — native parser available
-        ntspSystem: 'native',                // NTSPParser — native parser available
         ufoFormat: 'native',                 // UFOParser — native parser available
-        moshPacker: 'native',                // MoshPackerParser — native parser available
         daveLowe: 'native',                  // DaveLoweParser — native parser available
-        coreDesign: 'native',                // CoreDesignParser — native parser available
-        jankoMrsicFlogel: 'native',          // JankoMrsicFlogelParser — native parser available
-        specialFX: 'native',                 // SpecialFXParser — native parser available
-        soundPlayer: 'native',               // SoundPlayerParser — native parser available
-        nickPellingPacker: 'native',         // NickPellingPackerParser — native parser available
-        peterVerswyvelenPacker: 'native',    // PeterVerswyvelenPackerParser — native parser available
-        wallyBeben: 'native',                // WallyBebenParser — native parser available
-        steveBarrett: 'native',              // SteveBarrettParser — native parser available
-        paulSummers: 'native',               // PaulSummersParser — native parser available
-        desire: 'native',                    // DesireParser — native parser available
-        digitalSonixChrome: 'native',        // DigitalSonixChromeParser — native parser available
-        sonixMusicDriver: 'native',          // SonixMusicDriverParser — native parser available
-        jesperOlsen: 'native',               // JesperOlsenParser — native parser available
-        kimChristensen: 'native',            // KimChristensenParser — native parser available
-        amComposer: 'native',                // AMComposerParser — native parser available
         tcbTracker: 'native',                // TCBTrackerParser — native parser available
-        mmdc: 'native',                      // MMDCParser — native parser available
-        psa: 'native',                       // PSAParser — native parser available
-        tme: 'native',                       // TMEParser — native parser available
-        specialFXST: 'native',               // SpecialFXSTParser — native parser available
         tfmxST: 'native',                    // TFMXSTParser — native parser available
         quartet: 'native',                   // QuartetParser — native parser available
         soundMaster: 'native',               // SoundMasterParser — native parser available
