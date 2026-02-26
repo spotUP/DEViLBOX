@@ -504,6 +504,20 @@ export interface FurnaceRow {
   effects: Array<{ cmd: number; val: number }>;  // Up to 8 effect pairs
 }
 
+// ── Furnace subsong playback data (pre-converted for in-editor switching) ──
+export interface FurnaceSubsongPlayback {
+  name: string;
+  patterns: Pattern[];
+  songPositions: number[];
+  initialSpeed: number;
+  initialBPM: number;
+  speed2?: number;
+  hz?: number;
+  virtualTempoN?: number;
+  virtualTempoD?: number;
+  grooves?: number[][];
+}
+
 // ── HivelyTracker Native Data ───────────────────
 export interface HivelyNativeData {
   channels: number;              // 4 (AHX) or 4-16 (HVL)

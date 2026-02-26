@@ -267,7 +267,7 @@ async function parseMIDIFile(file: File, options?: ParseOptions['midiOptions']):
 // ─── Furnace / DefleMask ──────────────────────────────────────────────────────
 
 async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, subsong = 0): Promise<TrackerSong> {
-  const { parseFurnaceSong, convertFurnaceToDevilbox } = await import('@lib/import/formats/FurnaceSongParser');
+  const { parseFurnaceSong, convertFurnaceToDevilbox, extractSubsongPatterns, getSubsongTiming } = await import('@lib/import/formats/FurnaceSongParser');
   const { convertToInstrument } = await import('@lib/import/InstrumentConverter');
 
   const module = await parseFurnaceSong(buffer);
@@ -341,6 +341,65 @@ async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, subsong 
     engine.setModuleSamples(result.samples.length > 0 ? result.samples : null);
   }
 
+  // Pre-convert ALL subsongs so the in-editor subsong selector can switch between them
+  // without re-parsing the file. Instruments/wavetables are shared across all subsongs.
+  type SubCell = { note?: number; instrument?: number; volume?: number;
+    effectType?: number; effectParam?: number; effectType2?: number; effectParam2?: number;
+    effectType3?: number; effectParam3?: number; effectType4?: number; effectParam4?: number;
+    effectType5?: number; effectParam5?: number; effectType6?: number; effectParam6?: number;
+    effectType7?: number; effectParam7?: number; effectType8?: number; effectParam8?: number; };
+  function cellsToPatterns(rawPats: SubCell[][][], rowLen: number, numCh: number, prefix: string): Pattern[] {
+    return rawPats.map((pat, idx) => ({
+      id: `${prefix}-${idx}`,
+      name: `Pattern ${idx}`,
+      length: rowLen,
+      channels: Array.from({ length: numCh }, (_, ch) => ({
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false, solo: false, collapsed: false, volume: 100, pan: 0,
+        instrumentId: null, color: null,
+        rows: pat.map((row: SubCell[]) => {
+          const cell = row[ch] || {};
+          const tc: import('@/types/tracker').TrackerCell = {
+            note: cell.note || 0, instrument: cell.instrument || 0,
+            volume: cell.volume || 0, effTyp: cell.effectType || 0,
+            eff: cell.effectParam || 0, effTyp2: cell.effectType2 || 0,
+            eff2: cell.effectParam2 || 0,
+          };
+          if (cell.effectType3 || cell.effectParam3) { tc.effTyp3 = cell.effectType3 || 0; tc.eff3 = cell.effectParam3 || 0; }
+          if (cell.effectType4 || cell.effectParam4) { tc.effTyp4 = cell.effectType4 || 0; tc.eff4 = cell.effectParam4 || 0; }
+          if (cell.effectType5 || cell.effectParam5) { tc.effTyp5 = cell.effectType5 || 0; tc.eff5 = cell.effectParam5 || 0; }
+          if (cell.effectType6 || cell.effectParam6) { tc.effTyp6 = cell.effectType6 || 0; tc.eff6 = cell.effectParam6 || 0; }
+          if (cell.effectType7 || cell.effectParam7) { tc.effTyp7 = cell.effectType7 || 0; tc.eff7 = cell.effectParam7 || 0; }
+          if (cell.effectType8 || cell.effectParam8) { tc.effTyp8 = cell.effectType8 || 0; tc.eff8 = cell.effectParam8 || 0; }
+          return tc;
+        }),
+      })),
+    }));
+  }
+
+  type FurnaceSubsongPlaybackLocal = import('@/types').FurnaceSubsongPlayback;
+  const furnaceSubsongs: FurnaceSubsongPlaybackLocal[] = module.subsongs.map((_, i) => {
+    const timing = getSubsongTiming(module, i);
+    // For the active subsong, reuse already-converted patterns
+    const rawCells = i === subsong
+      ? (result.patterns as unknown as SubCell[][][])
+      : (extractSubsongPatterns(module, i) as unknown as SubCell[][][]);
+    const subPatLen = module.subsongs[i]?.patLen || patLen;
+    return {
+      name: timing.name,
+      patterns: cellsToPatterns(rawCells, subPatLen, numChannels, `sub${i}`),
+      songPositions: Array.from({ length: timing.ordersLen }, (_, j) => j),
+      initialSpeed: timing.initialSpeed,
+      initialBPM: timing.initialBPM,
+      speed2: timing.speed2 || undefined,
+      hz: timing.hz || undefined,
+      virtualTempoN: timing.virtualTempoN || undefined,
+      virtualTempoD: timing.virtualTempoD || undefined,
+      grooves: timing.grooves,
+    };
+  });
+
   const furnaceData = result.metadata.furnaceData;
   return {
     name: result.metadata.sourceFile.replace(/\.[^/.]+$/, ''),
@@ -362,6 +421,8 @@ async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, subsong 
     furnaceWavetables: result.wavetables.length > 0 ? result.wavetables : undefined,
     furnaceSamples: result.samples.length > 0 ? result.samples : undefined,
     furnaceNative: result.furnaceNative,
+    furnaceSubsongs: module.subsongs.length > 1 ? furnaceSubsongs : undefined,
+    furnaceActiveSubsong: subsong,
   };
 }
 

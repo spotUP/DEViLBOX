@@ -14,7 +14,7 @@
  */
 
 import * as Tone from 'tone';
-import type { Pattern, TrackerCell, FurnaceNativeData, HivelyNativeData } from '@/types';
+import type { Pattern, TrackerCell, FurnaceNativeData, HivelyNativeData, FurnaceSubsongPlayback } from '@/types';
 import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
 import { PatternAccessor } from './PatternAccessor';
@@ -381,6 +381,9 @@ export interface TrackerSong {
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;
+  // Pre-converted subsong data for in-editor subsong switching
+  furnaceSubsongs?: FurnaceSubsongPlayback[];
+  furnaceActiveSubsong?: number;
 }
 
 // ============================================================================

@@ -821,7 +821,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       setOriginalModuleData(null);
       setBPM(song.initialBPM);
       setSpeed(song.initialSpeed);
-      setMetadata({ name: song.name, author: '', description: `Imported via UADE` });
+      setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
+      useTrackerStore.getState().applyEditorMode(song);
       const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
       if (samplerCount > 0) {
         await getToneEngine().preloadInstruments(song.instruments);

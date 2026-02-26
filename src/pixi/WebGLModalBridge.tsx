@@ -399,6 +399,7 @@ export const WebGLModalBridge: React.FC = () => {
         loadPatterns(song.patterns);
         setCurrentPattern(0);
         if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
+        useTrackerStore.getState().applyEditorMode(song);
 
         notify.success(`Imported ${filename}: ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
       }
