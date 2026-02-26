@@ -112,6 +112,8 @@ export interface FormatEnginePreferences {
   tme: FormatEngineChoice;                     // tme.*/.tme → TMEParser vs UADE
   specialFXST: FormatEngineChoice;             // doda.* → SpecialFXSTParser vs UADE
   tfmxST: FormatEngineChoice;                  // mdst.* → TFMXSTParser vs UADE
+  quartet: FormatEngineChoice;                 // qpa.*/sqt.*/qts.* → QuartetParser vs UADE
+  soundMaster: FormatEngineChoice;             // sm.*/sm1.*/sm2.*/sm3.*/smpro.* → SoundMasterParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -254,6 +256,8 @@ export const useSettingsStore = create<SettingsStore>()(
         tme: 'native',                       // TMEParser — native parser available
         specialFXST: 'native',               // SpecialFXSTParser — native parser available
         tfmxST: 'native',                    // TFMXSTParser — native parser available
+        quartet: 'native',                   // QuartetParser — native parser available
+        soundMaster: 'native',               // SoundMasterParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
