@@ -82,6 +82,7 @@ export interface FormatEnginePreferences {
   mfp: FormatEngineChoice;            // mfp.* → MFPParser vs UADE
   richardJoseph: FormatEngineChoice;  // .rjp/RJP.*/.sng → RichardJosephParser vs UADE
   pt36: FormatEngineChoice;           // FORM+MODL → PT36Parser vs libopenmpt
+  lme: FormatEngineChoice;            // .lme/LME.* → LMEParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -195,6 +196,7 @@ export const useSettingsStore = create<SettingsStore>()(
         mfp: 'native',          // MFPParser — native parser available
         richardJoseph: 'native', // RichardJosephParser — native parser available
         pt36: 'native',         // PT36Parser — native parser available
+        lme: 'native',          // LMEParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',

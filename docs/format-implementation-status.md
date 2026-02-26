@@ -109,6 +109,7 @@ Track which formats have native parsers vs UADE-only.
 | `.rjp`, `.sng`, `RJP.*` | Richard Joseph Player | RichardJosephParser.ts | UADE eagleplayer asm | Two-file (song+SMP); UADE fallback |
 | `.ufo`, `.mus` | UFO / MicroProse | UFOParser.ts | UADE eagleplayer asm | IFF FORM+DDAT magic; two-file; UADE fallback |
 | `.dl`, `.dl_deli`, `DL.*` | Dave Lowe | DaveLoweParser.ts | UADE eagleplayer asm | Three 68k opcode magic bytes; UADE fallback |
+| `.lme`, `LME.*` | Leggless Music Editor | LMEParser.ts | UADE eagleplayer | "LME" magic + zero check; UADE fallback |
 
 ---
 
@@ -215,3 +216,4 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | EasyTrax | EasyTraxParser.ts | NostalgicPlayer |
 | 2026-02-26 | Karl Morton Music | KarlMortonParser.ts | NostalgicPlayer |
 | 2026-02-26 | Richard Joseph Player | RichardJosephParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Leggless Music Editor | LMEParser.ts | UADE eagleplayer |
