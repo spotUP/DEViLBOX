@@ -1268,10 +1268,10 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
           if (result) return result;
         }
       } catch (err) {
-        console.warn(`[UAXParser] Native parse failed for ${filename}:`, err);
+        throw new Error(`[UAXParser] Failed to parse ${filename}: ${err}`);
       }
     }
-    return null;
+    throw new Error(`[UAXParser] ${filename}: no native parser available or format not recognised`);
   }
 
   // ── MadTracker 2 (.mt2) ───────────────────────────────────────────────────
@@ -1331,6 +1331,137 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     // PC format — fall back to UADE
     const { parseUADEFile: parseUADE_ams } = await import('@lib/import/formats/UADEParser');
     return parseUADE_ams(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── IFF SMUS / Sonix Music Driver (.smus, .snx, .tiny) ───────────────────
+  if (/\.(smus|snx|tiny)$/i.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.iffSmus === 'native') {
+      try {
+        const { isIffSmusFormat, parseIffSmusFile } = await import('@lib/import/formats/IffSmusParser');
+        if (isIffSmusFormat(buffer)) {
+          const result = await parseIffSmusFile(buffer, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[IffSmusParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_smus } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_smus(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Magnetic Fields Packer (.mfp) ─────────────────────────────────────────
+  if (/\.mfp$/i.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.mfp === 'native') {
+      try {
+        const { isMFPFormat, parseMFPFile } = await import('@lib/import/formats/MFPParser');
+        if (isMFPFormat(buffer, file.name)) {
+          const result = await parseMFPFile(buffer, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[MFPParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_mfp } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_mfp(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Delta Music 1.0 (.dm, .dlm1) — identified by "ALL " magic ─────────────
+  if (/\.(dm|dlm1)$/i.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.deltaMusic1 === 'native') {
+      try {
+        const { isDeltaMusic1Format, parseDeltaMusic1File } = await import('@lib/import/formats/DeltaMusic1Parser');
+        if (isDeltaMusic1Format(buffer)) {
+          const result = await parseDeltaMusic1File(buffer, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[DeltaMusic1Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_dm1 } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_dm1(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Delta Music 1.0 (.dm/.dm1) ────────────────────────────────────────────
+  // Amiga 4-channel wavetable tracker (Karsten Hartmann). UADE also handles it.
+  if (/\.dm1?$/i.test(filename)) {
+    if (prefs.deltaMusic1 === 'native') {
+      try {
+        const { isDeltaMusic1Format, parseDeltaMusic1File } = await import('@lib/import/formats/DeltaMusic1Parser');
+        if (isDeltaMusic1Format(buffer)) return await parseDeltaMusic1File(buffer, file.name);
+      } catch (err) {
+        console.warn(`[DeltaMusic1Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_dm1 } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_dm1(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── IFF SMUS / Sonix Music Driver (.smus/.snx/.tiny) ──────────────────────
+  // IFF-chunked Amiga scored-music format (Electronic Arts). UADE also handles it.
+  if (/\.(smus|snx|tiny)$/i.test(filename)) {
+    if (prefs.iffSmus === 'native') {
+      try {
+        const { isIffSmusFormat, parseIffSmusFile } = await import('@lib/import/formats/IffSmusParser');
+        if (isIffSmusFormat(buffer)) return await parseIffSmusFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[IffSmusParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_smus } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_smus(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── Magnetic Fields Packer (mfp.*) ────────────────────────────────────────
+  // Amiga 4-channel module format (Shaun Southern). Files use prefix naming
+  // 'mfp.songname'; also handles 'songname.mfp'. Companion smp.* file for samples.
+  if (/\.mfp$/i.test(filename) || /^mfp\./i.test((filename.split('/').pop() ?? filename).split('\\').pop() ?? filename)) {
+    if (prefs.mfp === 'native') {
+      try {
+        const { isMFPFormat, parseMFPFile } = await import('@lib/import/formats/MFPParser');
+        if (isMFPFormat(buffer, filename)) return await parseMFPFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[MFPParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_mfp } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_mfp(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── ProTracker 3.6 IFF wrapper (FORM/MODL magic) ──────────────────────────
+  // No dedicated extension — detected by FORM+MODL IFF magic bytes at offsets 0 and 8.
+  // PT36Parser unwraps the PTDT chunk and parses it as a standard 31-sample MOD.
+  if (prefs.pt36 === 'native' && buffer.byteLength >= 12) {
+    const _pt36 = new Uint8Array(buffer);
+    if (_pt36[0] === 0x46 && _pt36[1] === 0x4F && _pt36[2] === 0x52 && _pt36[3] === 0x4D &&
+        _pt36[8] === 0x4D && _pt36[9] === 0x4F && _pt36[10] === 0x44 && _pt36[11] === 0x4C) {
+      try {
+        const { parsePT36File } = await import('@lib/import/formats/PT36Parser');
+        return await parsePT36File(buffer, file.name);
+      } catch (err) {
+        console.warn(`[PT36Parser] Native parse failed for ${filename}, falling through to OpenMPT:`, err);
+      }
+    }
+  }
+
+  // ── SpeedySystem / SoundSmith (.ss) ───────────────────────────────────────
+  // Apple IIgs SoundSmith/MegaTracker. External DOC RAM samples required;
+  // always delegates to UADE (which bundles samples in module archives).
+  if (/\.ss$/i.test(filename)) {
+    const { parseUADEFile: parseUADE_ss } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_ss(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── Tronic (.trc/.dp/.tro/.tronic) ───────────────────────────────────────
+  // Amiga tracker by Stefan Hartmann. No native parser; always delegates to UADE.
+  if (/\.(trc|dp|tro|tronic)$/i.test(filename)) {
+    const { parseUADEFile: parseUADE_trc } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_trc(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────

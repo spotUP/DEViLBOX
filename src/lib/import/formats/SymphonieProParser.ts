@@ -601,7 +601,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
 
       case CHUNK_POSITION_LIST:
         if (positionsData.length === 0) {
-          positionsData = decodeSymArray(r);
+          positionsData = new Uint8Array(decodeSymArray(r));
         } else {
           // Skip
           if (r.canRead(4)) { const l = r.u32be(); r.skip(l); }
@@ -621,7 +621,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
 
       case CHUNK_PATTERN_EVENTS:
         if (patternData.length === 0) {
-          patternData = decodeSymArray(r);
+          patternData = new Uint8Array(decodeSymArray(r));
         } else {
           if (r.canRead(4)) { const l = r.u32be(); r.skip(l); }
         }
@@ -629,7 +629,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
 
       case CHUNK_INSTRUMENT_LIST:
         if (instrumentData.length === 0) {
-          instrumentData = decodeSymArray(r);
+          instrumentData = new Uint8Array(decodeSymArray(r));
         } else {
           if (r.canRead(4)) { const l = r.u32be(); r.skip(l); }
         }
@@ -637,7 +637,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
 
       case CHUNK_SEQUENCES:
         if (sequencesData.length === 0) {
-          sequencesData = decodeSymArray(r);
+          sequencesData = new Uint8Array(decodeSymArray(r));
         } else {
           if (r.canRead(4)) { const l = r.u32be(); r.skip(l); }
         }

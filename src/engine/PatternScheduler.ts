@@ -424,7 +424,7 @@ export class PatternScheduler {
     this.nextPatternScheduled = false;
 
     // Detect format and maintain persistent handler
-    const format = pattern.importMetadata?.sourceFormat || 'NATIVE';
+    const format = (pattern.importMetadata?.sourceFormat ?? 'NATIVE') as ModuleFormat;
     
     if (!this.activeHandler || this.activeFormat !== format || startOffset === 0) {
       this.activeHandler = createFormatHandler(format);

@@ -44,7 +44,7 @@ function u32le(v: DataView, off: number): number { return v.getUint32(off, true)
 
 function readString(raw: Uint8Array, off: number, maxLen: number): string {
   let end = off;
-  while (end < off + maxLen && raw[end] \!== 0) end++;
+  while (end < off + maxLen && raw[end] !== 0) end++;
   return String.fromCharCode(...Array.from(raw.subarray(off, end))).trim();
 }
 
@@ -67,7 +67,7 @@ const SAMPLE_RATE           = 8363;
 export function isMTMFormat(buffer: ArrayBuffer): boolean {
   if (buffer.byteLength < FILE_HEADER_SIZE) return false;
   const raw = new Uint8Array(buffer);
-  if (raw[0] \!== 0x4D || raw[1] \!== 0x54 || raw[2] \!== 0x4D) return false;
+  if (raw[0] !== 0x4D || raw[1] !== 0x54 || raw[2] !== 0x4D) return false;
   if (raw[3] >= 0x20) return false;
   if (raw[27] > 127) return false;
   if (raw[32] > 64)  return false;
