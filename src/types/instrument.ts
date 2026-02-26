@@ -874,32 +874,94 @@ export const DEFAULT_FC: FCConfig = {
 };
 
 /**
- * Fred Editor instrument configuration.
- * Waveform oscillator + per-tick macro sequence + LFO.
+ * Fred Editor instrument configuration (real format — PWM synthesis).
+ *
+ * Fred Editor has three instrument types:
+ *   0 = Regular PCM sample  → handled by Sampler (no FredConfig needed)
+ *   1 = PWM (pulse-width-modulation square wave) → FredSynth
+ *   2 = Wavetable blend     → Sampler approximation for now
+ *
+ * This config covers type 1. The WASM synth generates a square wave with
+ * oscillating pulse width driven by the pulse parameters below.
+ *
+ * Binary blob layout for fred_load_instrument():
+ *   [0]       envelopeVol   (0-64)
+ *   [1]       attackSpeed   (ticks per volume step)
+ *   [2]       attackVol     (0-64 peak attack volume)
+ *   [3]       decaySpeed    (ticks per volume step)
+ *   [4]       decayVol      (0-64 sustain level)
+ *   [5]       sustainTime   (ticks to hold)
+ *   [6]       releaseSpeed  (ticks per volume step)
+ *   [7]       releaseVol    (0-64 floor)
+ *   [8]       vibratoDelay  (ticks)
+ *   [9]       vibratoSpeed  (ticks per LFO step)
+ *   [10]      vibratoDepth  (1/64th semitone units)
+ *   [11]      arpeggioLimit (active entries in table)
+ *   [12]      arpeggioSpeed (ticks per arp step)
+ *   [13]      pulseRateNeg  (signed int8 — decrease rate per step)
+ *   [14]      pulseRatePos  (unsigned — increase rate per step)
+ *   [15]      pulseSpeed    (ticks per PWM modulation step)
+ *   [16]      pulsePosL     (lower bound of pulse width, 0-64)
+ *   [17]      pulsePosH     (upper bound of pulse width, 0-64)
+ *   [18]      pulseDelay    (ticks before modulation starts)
+ *   [19..34]  arpeggio[16]  (signed bytes: semitone offsets)
+ *   [35..36]  relative      (uint16 LE — period multiplier / 1024)
  */
 export interface FredConfig {
-  waveType: number;          // 0=sine, 1=square, 2=triangle, 3=saw, 4=noise, 5=PWM
-  speed: number;             // 0-63: ticks per macro step
-  macroTable: Array<{        // per-tick macro entries
-    pitchMod: number;        // semitone pitch modulation
-    volume: number;          // 0-64
-    effectCode: number;      // effect identifier
-    effectParam: number;     // effect parameter
-  }>;
-  vibSpeed: number;          // 0-63
-  vibDepth: number;          // 0-63
-  vibDelay: number;          // 0-255 ticks
-  portamentoType: 0 | 1 | 2; // 0=none, 1=linear, 2=exponential
+  // ADSR envelope
+  envelopeVol:   number;   // initial volume (0-64)
+  attackSpeed:   number;   // ticks per volume step
+  attackVol:     number;   // peak attack volume (0-64)
+  decaySpeed:    number;   // ticks per step
+  decayVol:      number;   // sustain level (0-64)
+  sustainTime:   number;   // ticks to hold at decayVol
+  releaseSpeed:  number;   // ticks per step
+  releaseVol:    number;   // floor (0-64)
+
+  // Vibrato
+  vibratoDelay: number;    // ticks before starting
+  vibratoSpeed: number;    // ticks per LFO step
+  vibratoDepth: number;    // amplitude in 1/64th semitone units
+
+  // Arpeggio
+  arpeggio:      number[]; // 16 signed semitone offsets
+  arpeggioLimit: number;   // active entries
+  arpeggioSpeed: number;   // ticks per step
+
+  // PWM parameters
+  pulseRateNeg:  number;   // decrease per step (signed)
+  pulseRatePos:  number;   // increase per step
+  pulseSpeed:    number;   // ticks per PWM step
+  pulsePosL:     number;   // lower bound (0-64)
+  pulsePosH:     number;   // upper bound (0-64)
+  pulseDelay:    number;   // ticks before modulation starts
+
+  // Relative tuning
+  relative:      number;   // period multiplier / 1024 (1024 = no shift)
 }
 
 export const DEFAULT_FRED: FredConfig = {
-  waveType: 0,
-  speed: 1,
-  macroTable: [{ pitchMod: 0, volume: 64, effectCode: 0, effectParam: 0 }],
-  vibSpeed: 0,
-  vibDepth: 0,
-  vibDelay: 0,
-  portamentoType: 0,
+  envelopeVol:   64,
+  attackSpeed:   1,
+  attackVol:     64,
+  decaySpeed:    1,
+  decayVol:      32,
+  sustainTime:   16,
+  releaseSpeed:  1,
+  releaseVol:    0,
+  vibratoDelay:  0,
+  vibratoSpeed:  0,
+  vibratoDepth:  0,
+  arpeggio:      new Array(16).fill(0),
+  arpeggioLimit: 0,
+  arpeggioSpeed: 1,
+  pulseRateNeg:  -1,
+  pulseRatePos:  1,
+  pulseSpeed:    4,
+  pulsePosL:     16,
+  pulsePosH:     48,
+  pulseDelay:    0,
+  relative:      1024,
 };
 
 /**
