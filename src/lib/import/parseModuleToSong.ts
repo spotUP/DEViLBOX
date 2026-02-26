@@ -303,21 +303,6 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
-  // ── TCB Tracker ───────────────────────────────────────────────────────────
-  if (/\.tcb$/.test(filename)) {
-    try {
-      const { isTCBTrackerFormat, parseTCBTrackerFile } = await import('@lib/import/formats/TCBTrackerParser');
-      if (isTCBTrackerFormat(buffer)) {
-        return parseTCBTrackerFile(buffer, file.name);
-      }
-    } catch (err) {
-      console.warn(`[TCBTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-    }
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const uadeMode = prefs.uade ?? 'enhanced';
-    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
-  }
-
   // ── Sonic Arranger ────────────────────────────────────────────────────────
   // Magic "SOARV1.0" at offset 0. "@OARV1.0" is LH-compressed — falls to UADE.
   if (/\.(sa|sonic)$/.test(filename)) {
@@ -1671,6 +1656,25 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
     const { parseUADEFile: parseUADE_fp } = await import('@lib/import/formats/UADEParser');
     return parseUADE_fp(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── TCB Tracker (tcb.*) ──────────────────────────────────────────────────────
+  // Amiga 4-channel format ("AN COOL!" tracker). "AN C" + "OOL!"/"OOL." header.
+  {
+    const _tcbBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_tcbBase.startsWith('tcb.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.tcbTracker === 'native') {
+        try {
+          const { isTCBTrackerFormat, parseTCBTrackerFile } = await import('@lib/import/formats/TCBTrackerParser');
+          if (isTCBTrackerFormat(buffer, filename)) return parseTCBTrackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[TCBTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_tcb } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_tcb(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
   }
 
   // ── Jason Page (jpn.* / jpnd.* / jp.*) ──────────────────────────────────────

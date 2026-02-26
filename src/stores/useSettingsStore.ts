@@ -90,6 +90,7 @@ export interface FormatEnginePreferences {
   quartet: FormatEngineChoice;        // qpa.*/sqt.*/qts.* → QuartetParser vs UADE
   soundMaster: FormatEngineChoice;    // sm.*/sm1.*/sm2.*/sm3.*/smpro.* → SoundMasterParser vs UADE
   zoundMonitor: FormatEngineChoice;   // sng.* → ZoundMonitorParser vs UADE
+  tcbTracker: FormatEngineChoice;     // tcb.* → TCBTrackerParser vs UADE
   jasonPage: FormatEngineChoice;      // jpn.*/jpnd.*/jp.* → JasonPageParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
@@ -212,6 +213,7 @@ export const useSettingsStore = create<SettingsStore>()(
         quartet: 'native',      // QuartetParser — native parser available
         soundMaster: 'native',  // SoundMasterParser — native parser available
         zoundMonitor: 'native', // ZoundMonitorParser — native parser available
+        tcbTracker: 'native',   // TCBTrackerParser — native parser available
         jasonPage: 'native',    // JasonPageParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
