@@ -52,11 +52,8 @@ export interface FormatEnginePreferences {
   cdfm67: FormatEngineChoice;             // .c67 → CDFM67Parser vs OpenMPT
   easyTrax: FormatEngineChoice;           // .etx → EasyTraxParser vs OpenMPT
   karlMorton: FormatEngineChoice;         // .mus → KarlMortonParser vs OpenMPT
-  ufo: FormatEngineChoice;               // .ufo/.mus → UFOParser vs UADE
-  daveLowe: FormatEngineChoice;           // .dl/DL.* → DaveLoweParser vs UADE
   ams: FormatEngineChoice;                // .ams → AMSParser (Extreme's Tracker / Velvet Studio) vs UADE
   xTracker: FormatEngineChoice;           // .dmf (X-Tracker) → XTrackerParser vs UADE
-  fmTracker: FormatEngineChoice;          // .fmt → FMTrackerParser (Davey W Taylor FM Tracker)
   xmf: FormatEngineChoice;               // .xmf → XMFParser (Astroidea/Imperium Galactica)
   uax: FormatEngineChoice;               // .uax → UAXParser (Unreal Audio Package ripper)
   // Additional Amiga formats with native parsers
@@ -80,33 +77,7 @@ export interface FormatEnginePreferences {
   deltaMusic1: FormatEngineChoice;    // .dm/.dm1 → DeltaMusic1Parser vs UADE
   iffSmus: FormatEngineChoice;        // .smus/.snx/.tiny → IffSmusParser vs UADE
   mfp: FormatEngineChoice;            // mfp.* → MFPParser vs UADE
-  richardJoseph: FormatEngineChoice;  // .rjp/RJP.*/.sng → RichardJosephParser vs UADE
   pt36: FormatEngineChoice;           // FORM+MODL → PT36Parser vs libopenmpt
-  lme: FormatEngineChoice;            // .lme/LME.* → LMEParser vs UADE
-  medley: FormatEngineChoice;         // .ml → MedleyParser vs UADE
-  futurePlayer: FormatEngineChoice;   // .fp/FP.* → FuturePlayerParser vs UADE
-  markCooksey: FormatEngineChoice;    // mc.*/mcr.*/mco.* → MarkCookseyParser vs UADE
-  jeroenTel: FormatEngineChoice;      // jt.*/mon_old.* → JeroenTelParser vs UADE
-  quartet: FormatEngineChoice;        // qpa.*/sqt.*/qts.* → QuartetParser vs UADE
-  soundMaster: FormatEngineChoice;    // sm.*/sm1.*/sm2.*/sm3.*/smpro.* → SoundMasterParser vs UADE
-  zoundMonitor: FormatEngineChoice;   // sng.* → ZoundMonitorParser vs UADE
-  tcbTracker: FormatEngineChoice;     // tcb.* → TCBTrackerParser vs UADE
-  jasonPage: FormatEngineChoice;      // jpn.*/jpnd.*/jp.* → JasonPageParser vs UADE
-  mmdc: FormatEngineChoice;           // mmdc.* → MMDCParser vs UADE
-  psa: FormatEngineChoice;            // psa.* → PSAParser vs UADE
-  steveTurner: FormatEngineChoice;    // jpo.*/jpold.* → SteveTurnerParser vs UADE
-  tme: FormatEngineChoice;            // .tme/TME.* → TMEParser vs UADE
-  infogrames: FormatEngineChoice;     // .dum → InfogramesParser vs UADE
-  timeTracker: FormatEngineChoice;    // TMK.* → TimeTrackerParser vs UADE
-  chipTracker: FormatEngineChoice;    // KRIS.* → ChipTrackerParser vs UADE
-  cinemaware: FormatEngineChoice;     // CIN.* → CinemawareParser vs UADE
-  novoTradePacker: FormatEngineChoice; // NTP.* → NovoTradePackerParser vs UADE
-  alcatrazPacker: FormatEngineChoice; // ALP.* → AlcatrazPackerParser vs UADE
-  bladePacker: FormatEngineChoice;    // UDS.* → BladePackerParser vs UADE
-  tomyTracker: FormatEngineChoice;    // SG.* → TomyTrackerParser vs UADE
-  imagesMusicSystem: FormatEngineChoice; // IMS.* (prefix) → ImagesMusicSystemParser vs UADE
-  fashionTracker: FormatEngineChoice;    // EX.* → FashionTrackerParser vs UADE
-  multiMediaSound: FormatEngineChoice;   // MMS.*/SFX20.* → MultiMediaSoundParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -191,11 +162,8 @@ export const useSettingsStore = create<SettingsStore>()(
         cdfm67: 'native',           // CDFM67Parser — dedicated CDFM Composer 670 support
         easyTrax: 'native',         // EasyTraxParser — dedicated EasyTrax support
         karlMorton: 'native',       // KarlMortonParser — dedicated Karl Morton Music Format support
-        ufo: 'native',              // UFOParser — native parser available
-        daveLowe: 'native',         // DaveLoweParser — native parser available
         ams: 'native',              // AMSParser — Extreme's Tracker / Velvet Studio support
         xTracker: 'native',         // XTrackerParser — dedicated X-Tracker DMF support
-        fmTracker: 'native',        // FMTrackerParser — dedicated FM Tracker (.fmt) support
         xmf: 'native',              // XMFParser — dedicated Astroidea XMF support
         uax: 'native',              // UAXParser — Unreal Audio Package sound ripper
         graoumfTracker2: 'native',  // GraoumfTracker2Parser — dedicated Graoumf Tracker 1/2 support
@@ -218,33 +186,7 @@ export const useSettingsStore = create<SettingsStore>()(
         deltaMusic1: 'native',  // DeltaMusic1Parser — native parser available
         iffSmus: 'native',      // IffSmusParser — native parser available
         mfp: 'native',          // MFPParser — native parser available
-        richardJoseph: 'native', // RichardJosephParser — native parser available
         pt36: 'native',         // PT36Parser — native parser available
-        lme: 'native',          // LMEParser — native parser available
-        medley: 'native',       // MedleyParser — native parser available
-        futurePlayer: 'native', // FuturePlayerParser — native parser available
-        markCooksey: 'native',  // MarkCookseyParser — native parser available
-        jeroenTel: 'native',    // JeroenTelParser — native parser available
-        quartet: 'native',      // QuartetParser — native parser available
-        soundMaster: 'native',  // SoundMasterParser — native parser available
-        zoundMonitor: 'native', // ZoundMonitorParser — native parser available
-        tcbTracker: 'native',   // TCBTrackerParser — native parser available
-        jasonPage: 'native',    // JasonPageParser — native parser available
-        mmdc: 'native',         // MMDCParser — native parser available
-        psa: 'native',          // PSAParser — native parser available
-        steveTurner: 'native',  // SteveTurnerParser — native parser available
-        tme: 'native',          // TMEParser — native parser available
-        infogrames: 'native',   // InfogramesParser — native parser available
-        timeTracker: 'native',  // TimeTrackerParser — native parser available
-        chipTracker: 'native',  // ChipTrackerParser — native parser available
-        cinemaware: 'native',   // CinemawareParser — native parser available
-        novoTradePacker: 'native', // NovoTradePackerParser — native parser available
-        alcatrazPacker: 'native', // AlcatrazPackerParser — native parser available
-        bladePacker: 'native',  // BladePackerParser — native parser available
-        tomyTracker: 'native',  // TomyTrackerParser — native parser available
-        imagesMusicSystem: 'native', // ImagesMusicSystemParser (IMS.* prefix) — native parser available
-        fashionTracker: 'native',   // FashionTrackerParser — native parser available
-        multiMediaSound: 'native',  // MultiMediaSoundParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
