@@ -493,10 +493,31 @@ const VOL_SETPITCH  = 248;
 /**
  * Parse a Symphonie Pro (.symmod) file into a TrackerSong.
  * Returns null on any validation failure (never throws).
+ *
+ * Also calls parseSymphonieForPlayback() to attach SymphoniePlaybackData to
+ * the first instrument so InstrumentFactory can instantiate SymphonieSynth.
  */
-export function parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSong | null {
+export async function parseSymphonieProFile(
+  bytes: Uint8Array,
+  filename: string,
+): Promise<TrackerSong | null> {
   try {
-    return _parseSymphonieProFile(bytes, filename);
+    const song = _parseSymphonieProFile(bytes, filename);
+    if (!song) return null;
+
+    // Attach playback data to the first instrument so InstrumentFactory
+    // can instantiate SymphonieSynth for native playback.
+    try {
+      const playbackData = await parseSymphonieForPlayback(bytes.buffer, filename);
+      if (song.instruments.length > 0) {
+        (song.instruments[0] as unknown as Record<string, unknown>)['synthType'] = 'SymphonieSynth';
+        (song.instruments[0] as unknown as Record<string, unknown>)['symphonie'] = playbackData;
+      }
+    } catch (err) {
+      console.warn('[SymphonieProParser] parseSymphonieForPlayback failed; playback will be silent:', err);
+    }
+
+    return song;
   } catch {
     return null;
   }
