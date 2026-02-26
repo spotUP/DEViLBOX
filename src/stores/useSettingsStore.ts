@@ -62,7 +62,6 @@ export interface FormatEnginePreferences {
   symphoniePro: FormatEngineChoice;       // .symmod → SymphonieProParser vs UADE
   composer667: FormatEngineChoice;        // .667 → Composer667Parser vs UADE
   chuckBiscuits: FormatEngineChoice;      // .cba → ChuckBiscuitsParser vs UADE
-  soundTracker: FormatEngineChoice;       // .stk → SoundTrackerParser vs UADE
   speedySystem: FormatEngineChoice;       // .ss → SpeedySystemParser vs UADE
   tronic: FormatEngineChoice;             // .trc/.dp/.tro → TronicParser vs UADE
   digiBoosterPro: FormatEngineChoice;     // .dbm → DigiBoosterProParser vs UADE
@@ -76,6 +75,10 @@ export interface FormatEnginePreferences {
   ronKlaren: FormatEngineChoice;          // .rk/.rkb → RonKlarenParser vs UADE
   madTracker2: FormatEngineChoice;        // .mt2 → MadTracker2Parser vs OpenMPT
   psm: FormatEngineChoice;                // .psm → PSMParser vs OpenMPT
+  deltaMusic1: FormatEngineChoice;    // .dm/.dm1 → DeltaMusic1Parser vs UADE
+  iffSmus: FormatEngineChoice;        // .smus/.snx/.tiny → IffSmusParser vs UADE
+  mfp: FormatEngineChoice;            // mfp.* → MFPParser vs UADE
+  pt36: FormatEngineChoice;           // FORM+MODL → PT36Parser vs libopenmpt
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -169,7 +172,6 @@ export const useSettingsStore = create<SettingsStore>()(
         symphoniePro: 'native',     // SymphonieProParser — dedicated Symphonie Pro support
         composer667: 'native',      // Composer667Parser — dedicated Composer 667 support
         chuckBiscuits: 'native',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support
-        soundTracker: 'uade',       // SoundTrackerParser — prefer UADE for authentic original STK playback
         speedySystem: 'uade',       // SpeedySystemParser — prefer UADE (DOC RAM samples required)
         tronic: 'uade',             // TronicParser — no native parser; always UADE
         digiBoosterPro: 'native',   // DigiBoosterProParser — dedicated DigiBooster Pro (.dbm) support
@@ -183,6 +185,10 @@ export const useSettingsStore = create<SettingsStore>()(
         ronKlaren: 'native',        // RonKlarenParser — native parser available
         madTracker2: 'native',      // MadTracker2Parser — dedicated MadTracker 2 (.mt2) support
         psm: 'native',              // PSMParser — dedicated PSM / PSM16 (Epic MegaGames MASI) support
+        deltaMusic1: 'native',  // DeltaMusic1Parser — native parser available
+        iffSmus: 'native',      // IffSmusParser — native parser available
+        mfp: 'native',          // MFPParser — native parser available
+        pt36: 'native',         // PT36Parser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',

@@ -225,6 +225,7 @@ export type TrackerFormat =
   | 'OKT'   // Oktalyzer
   | 'MED'   // OctaMED / MED
   | 'DIGI'  // DigiBooster
+  | 'DBM'   // DigiBooster Pro (.dbm)
   | 'FC'    // Future Composer 1.3/1.4
   // FlodJS-enhanced native parsers
   | 'SFX'   // Sound-FX

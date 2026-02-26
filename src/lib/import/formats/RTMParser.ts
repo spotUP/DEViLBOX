@@ -685,7 +685,7 @@ export async function parseRTMFile(
 
       if (is16bit) {
         // 16-bit PCM (optionally delta-encoded) → downsample to 8-bit for createSamplerInstrument
-        let raw16 = raw.subarray(cursor, cursor + rawByteLen);
+        let raw16: Uint8Array<ArrayBuffer> = new Uint8Array(raw.buffer, raw.byteOffset + cursor, rawByteLen);
         if (isDelta) raw16 = decodeDelta16(raw16);
 
         // Convert signed 16-bit LE → signed 8-bit (take high byte of each sample)
@@ -707,7 +707,7 @@ export async function parseRTMFile(
         loopEndFrames   = Math.floor(smpHdr.loopEnd   / 2);
       } else {
         // 8-bit PCM (optionally delta-encoded)
-        let rawSmp = raw.subarray(cursor, cursor + rawByteLen);
+        let rawSmp: Uint8Array<ArrayBuffer> = new Uint8Array(raw.buffer, raw.byteOffset + cursor, rawByteLen);
         if (isDelta) rawSmp = decodeDelta8(rawSmp);
         pcm8 = rawSmp;
 
