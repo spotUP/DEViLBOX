@@ -65,4 +65,52 @@ describe('Cpu6502', () => {
     cpu.callSubroutine(0x8000);
     expect(mem.ram[0x4000]).toBe(0x77);
   });
+
+  it('LDA (zp),Y indirect indexed reads correct address', () => {
+    // Zero page $10 = $00, $11 = $20 (pointer to $2000)
+    // Y = $05 → effective address = $2005
+    // mem[$2005] = $AB
+    const mem = makeRAM({
+      0x0010: 0x00, 0x0011: 0x20, // pointer at zp $10 → $2000
+      0x2005: 0xAB,               // value at $2000 + Y(5)
+      0x0200: 0xA0, 0x0201: 0x05, // LDY #5
+      0x0202: 0xB1, 0x0203: 0x10, // LDA ($10),Y
+      0x0204: 0xEA,               // NOP
+    });
+    const cpu = new Cpu6502(mem);
+    cpu.reset(0x0200);
+    cpu.runSteps(3);
+    expect(cpu.getA()).toBe(0xAB);
+  });
+
+  it('DEX + BNE loop counts down correctly', () => {
+    // LDX #3
+    // loop: DEX
+    //        BNE loop   (backward branch)
+    // NOP
+    const mem = makeRAM({
+      0x0200: 0xA2, 0x0201: 0x03, // LDX #3
+      0x0202: 0xCA,               // DEX
+      0x0203: 0xD0, 0x0204: 0xFD, // BNE -3 (back to $0202)
+      0x0205: 0xEA,               // NOP
+    });
+    const cpu = new Cpu6502(mem);
+    cpu.reset(0x0200);
+    cpu.runSteps(1 + 3*2 + 1); // LDX + 3x(DEX+BNE) + final NOP
+    expect(cpu.getX()).toBe(0x00);
+    expect(cpu.getPC()).toBe(0x0206);
+  });
+
+  it('ADC carry and overflow flags', () => {
+    // $7F + $01 = $80: overflow (V=1), no carry (C=0)
+    const mem = makeRAM({
+      0x0200: 0xA9, 0x0201: 0x7F, // LDA #$7F
+      0x0202: 0x69, 0x0203: 0x01, // ADC #$01
+      0x0204: 0xEA,
+    });
+    const cpu = new Cpu6502(mem);
+    cpu.reset(0x0200);
+    cpu.runSteps(3);
+    expect(cpu.getA()).toBe(0x80);
+  });
 });
