@@ -24,6 +24,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { SoundMonConfig } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Utility functions ─────────────────────────────────────────────────────
@@ -394,96 +395,66 @@ export async function parseSoundMonFile(
     const id = i + 1; // 1-indexed
 
     if (inst.synth) {
-      // Synth instrument: generate a waveform from the synth table data
+      // Synth instrument: create a SoundMonConfig for real-time WASM synthesis
       const synthInst = inst as BPSynthInstrument;
-      const waveLen = Math.max(synthInst.length, 32);
 
-      // Extract waveform from table data (table index << 6 = offset into synthTableData)
+      // Extract waveform from synth table data for the WASM module
       const tableOffset = synthInst.table << 6;
-      const pcm = new Uint8Array(waveLen);
+      const waveLen = 64; // SoundMon uses 64-sample waveforms
+      let waveData: Uint8Array | undefined;
 
       if (tableOffset + waveLen <= synthTableData.length) {
-        for (let j = 0; j < waveLen; j++) {
-          pcm[j] = synthTableData[tableOffset + j];
-        }
+        waveData = synthTableData.slice(tableOffset, tableOffset + waveLen);
       } else if (tableOffset < synthTableData.length) {
-        // Partial data available: copy what we have, rest stays zero
-        const available = synthTableData.length - tableOffset;
-        for (let j = 0; j < available; j++) {
-          pcm[j] = synthTableData[tableOffset + j];
-        }
-      } else {
-        // No table data: generate a simple square wave as fallback
-        const half = waveLen >> 1;
-        for (let j = 0; j < half; j++) pcm[j] = 0x7F; // +127
-        for (let j = half; j < waveLen; j++) pcm[j] = 0x80; // -128 unsigned
+        waveData = new Uint8Array(waveLen);
+        waveData.set(synthTableData.subarray(tableOffset));
       }
+      // If no waveData, the C synth falls back to built-in waveType waveform
 
-      // Simulate the ADSR envelope to build a longer, more interesting waveform.
-      // We tile the base waveform and apply ADSR volume modulation tick-by-tick.
-      const tickCount = 128;
-      const samplesPerTick = waveLen; // each tick covers one full cycle
-      const totalSamples = tickCount * samplesPerTick;
-      const rendered = new Uint8Array(totalSamples);
+      // Map SoundMon ADSR parameters to SoundMonConfig fields.
+      // SoundMon ADSR tables are sequences of signed volume values; we extract
+      // the first entry of each phase table as the target volume level.
+      const adsrTableOff = synthInst.adsrTable;
+      const attackVol = adsrTableOff < synthTableData.length
+        ? Math.abs(synthTableData[adsrTableOff] < 128
+            ? synthTableData[adsrTableOff]
+            : synthTableData[adsrTableOff] - 256)
+        : synthInst.volume;
+      const sustainVol = Math.max(0, Math.min(64, synthInst.volume));
 
-      let adsrPtr = 0;
-      let adsrCtr = 1;
-      let currentVol = synthInst.volume;
+      // LFO table provides vibrato parameters
+      const hasLfo = synthInst.lfoControl > 0 && synthInst.lfoDepth > 0;
 
-      for (let tick = 0; tick < tickCount; tick++) {
-        // ADSR envelope processing (simplified from FlodJS)
-        if (synthInst.adsrControl > 0 && synthInst.adsrLen > 0 && synthInst.adsrSpeed > 0) {
-          adsrCtr--;
-          if (adsrCtr === 0) {
-            adsrCtr = synthInst.adsrSpeed;
-            const tableOff = synthInst.adsrTable;
-            if (tableOff + adsrPtr < synthTableData.length) {
-              const adsrVal = (128 + (synthTableData[tableOff + adsrPtr] < 128
-                ? synthTableData[tableOff + adsrPtr]
-                : synthTableData[tableOff + adsrPtr] - 256)) >> 2;
-              currentVol = (adsrVal * synthInst.volume) >> 6;
-            }
-            adsrPtr++;
-            if (adsrPtr >= synthInst.adsrLen) {
-              adsrPtr = 0;
-              if (synthInst.adsrControl === 1) {
-                // One-shot: stop ADSR processing
-                break;
-              }
-            }
-          }
-        }
+      const smConfig: SoundMonConfig = {
+        type: 'synth',
+        waveType: synthInst.table & 0x0F, // lower nibble as wave type index
+        waveSpeed: 0,
+        arpTable: new Array(16).fill(0), // SoundMon MOD table could populate this
+        arpSpeed: 0,
+        attackVolume: Math.min(64, Math.max(0, attackVol)),
+        decayVolume: Math.min(64, sustainVol),
+        sustainVolume: sustainVol,
+        releaseVolume: 0,
+        attackSpeed: Math.min(63, synthInst.adsrSpeed > 0 ? synthInst.adsrSpeed : 4),
+        decaySpeed: 4,
+        sustainLength: 0, // hold until note-off
+        releaseSpeed: 4,
+        vibratoDelay: hasLfo ? synthInst.lfoDelay : 0,
+        vibratoSpeed: hasLfo ? Math.min(63, synthInst.lfoSpeed) : 0,
+        vibratoDepth: hasLfo ? Math.min(63, synthInst.lfoDepth) : 0,
+        portamentoSpeed: 0,
+      };
 
-        // Render one cycle of the waveform at the current volume
-        const vol = Math.max(0, Math.min(64, currentVol));
-        const base = tick * samplesPerTick;
-        for (let j = 0; j < samplesPerTick; j++) {
-          // Convert unsigned byte to signed, apply volume, convert back to unsigned
-          const s = pcm[j % waveLen] < 128 ? pcm[j % waveLen] : pcm[j % waveLen] - 256;
-          const scaled = (s * vol) >> 6;
-          rendered[base + j] = (scaled + 128) & 0xFF;
-        }
-      }
-
-      // The rendered PCM is already in unsigned format; createSamplerInstrument
-      // expects unsigned bytes (it converts internally via pcm8ToWAV which treats
-      // <128 as positive, >=128 as negative). We need signed representation,
-      // so convert back: subtract 128 and mask.
-      const signedPCM = new Uint8Array(totalSamples);
-      for (let j = 0; j < totalSamples; j++) {
-        signedPCM[j] = rendered[j]; // pcm8ToWAV handles unsigned→signed internally
-      }
-
-      const loopLen = totalSamples; // Loop entire ADSR-expanded waveform, not just the base cycle
-      instrConfigs.push(createSamplerInstrument(
+      instrConfigs.push({
         id,
-        `Synth ${i + 1}`,
-        signedPCM,
-        synthInst.volume,
-        8287,
-        0,
-        loopLen,
-      ));
+        name: `Synth ${i + 1}`,
+        type: 'synth' as const,
+        synthType: 'SoundMonSynth' as const,
+        soundMon: smConfig,
+        effects: [],
+        volume: -6,
+        pan: 0,
+      } as InstrumentConfig);
     } else {
       // Regular PCM sample
       const sampleInst = inst as BPSampleInstrument;

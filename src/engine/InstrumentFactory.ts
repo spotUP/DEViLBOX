@@ -29,6 +29,7 @@ import {
 } from '@/types/instrument';
 import { TapeSaturation } from './effects/TapeSaturation';
 import { HivelySynth } from './hively/HivelySynth';
+import { SoundMonSynth } from './soundmon/SoundMonSynth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -838,6 +839,17 @@ export class InstrumentFactory {
       case 'HivelySynth':
         instrument = new HivelySynth();
         break;
+
+      case 'SoundMonSynth': {
+        const smSynth = new SoundMonSynth();
+        if (config.soundMon) {
+          smSynth.setInstrument(config.soundMon).catch(err =>
+            console.error('[InstrumentFactory] SoundMon load failed:', err)
+          );
+        }
+        instrument = smSynth;
+        break;
+      }
 
       case 'UADESynth': {
         const uadeSynth = new UADESynth();

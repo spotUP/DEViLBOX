@@ -870,7 +870,7 @@ export class ToneEngine {
    */
   public async ensureWASMSynthsReady(configs: InstrumentConfig[]): Promise<void> {
     const wasmConfigs = configs.filter((c) => 
-      ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth'].includes(c.synthType || '') ||
+      ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth', 'SoundMonSynth'].includes(c.synthType || '') ||
       c.synthType?.startsWith('Furnace')
     );
     if (wasmConfigs.length === 0) return;
@@ -1836,7 +1836,14 @@ export class ToneEngine {
       case 'Buzzmachine':
       // WASM song players (full-module playback via AudioWorklet)
       case 'HivelySynth':
-      case 'UADESynth': {
+      case 'UADESynth':
+      // UADE format-specific synths (per-note WASM synthesis)
+      case 'SoundMonSynth':
+      case 'SidMonSynth':
+      case 'DigMugSynth':
+      case 'FCSynth':
+      case 'FredSynth':
+      case 'TFMXSynth': {
         instrument = InstrumentFactory.createInstrument(config);
         break;
       }
