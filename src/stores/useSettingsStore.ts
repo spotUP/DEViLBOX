@@ -90,6 +90,16 @@ export interface FormatEnginePreferences {
   musicMaker4V: FormatEngineChoice;   // mm4.*/sdata.* → MusicMaker4V vs UADE
   musicMaker8V: FormatEngineChoice;   // mm8.* → MusicMaker8V vs UADE
   maniacsOfNoise: FormatEngineChoice; // mon.* → ManiacsOfNoiseParser vs UADE
+  // Newly wired parsers (2026-02-27 batch)
+  ufo: FormatEngineChoice;            // .ufo/.mus → UFOParser vs UADE
+  iffSmus: FormatEngineChoice;        // .smus/.snx/.tiny → IffSmusParser vs UADE
+  magneticFieldsPacker: FormatEngineChoice; // .mfp/mfp.* → MagneticFieldsPackerParser vs UADE
+  richardJoseph: FormatEngineChoice;  // .rjp/rjp.* → RichardJosephParser vs UADE
+  daveLowe: FormatEngineChoice;       // .dl/dl.*/dl_deli → DaveLoweParser vs UADE
+  lme: FormatEngineChoice;            // .lme/lme.* → LMEParser vs UADE
+  jochenHippelST: FormatEngineChoice; // mdst.* → JochenHippelSTParser vs UADE
+  specialFX: FormatEngineChoice;      // doda.* → SpecialFXParser vs UADE
+  benDaglish: FormatEngineChoice;     // bd.* → BenDaglishParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -210,6 +220,15 @@ export const useSettingsStore = create<SettingsStore>()(
         musicMaker4V: 'native',   // MusicMakerParser — dedicated Music Maker 4V support
         musicMaker8V: 'native',   // MusicMakerParser — dedicated Music Maker 8V support
         maniacsOfNoise: 'native', // ManiacsOfNoiseParser — dedicated Maniacs of Noise support
+        ufo: 'native',            // UFOParser — dedicated UFO/MicroProse support
+        iffSmus: 'native',        // IffSmusParser — dedicated IFF SMUS support
+        magneticFieldsPacker: 'native', // MagneticFieldsPackerParser — dedicated MFP support
+        richardJoseph: 'native',  // RichardJosephParser — dedicated Richard Joseph support
+        daveLowe: 'native',       // DaveLoweParser — dedicated Dave Lowe support
+        lme: 'native',            // LMEParser — dedicated Leggless Music Editor support
+        jochenHippelST: 'native', // JochenHippelSTParser — dedicated Jochen Hippel ST support
+        specialFX: 'native',      // SpecialFXParser — dedicated Special FX ST support
+        benDaglish: 'native',     // BenDaglishParser — dedicated Ben Daglish support
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',

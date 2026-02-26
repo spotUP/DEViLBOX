@@ -719,11 +719,18 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── Ben Daglish (bd.* prefix) ────────────────────────────────────────────
-  // BenDaglishParser is metadata-only (compiled 68k executable, no parseable
-  // instrument data). UADE always handles audio; native parse is not used.
+  // Compiled 68k Amiga music format. Magic: Amiga HUNK header at offset 0.
   {
     const _bdBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_bdBase.startsWith('bd.')) {
+      if (prefs.benDaglish === 'native') {
+        try {
+          const { isBenDaglishFormat, parseBenDaglishFile } = await import('@lib/import/formats/BenDaglishParser');
+          if (isBenDaglishFormat(buffer, file.name)) return await parseBenDaglishFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[BenDaglishParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_bd } = await import('@lib/import/formats/UADEParser');
       return parseUADE_bd(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
     }
@@ -1169,9 +1176,17 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
 
   // ── UFO / MicroProse (.ufo, .mus with DDAT magic) ─────────────────────────
   // IFF-based 4-channel Amiga format from UFO: Enemy Unknown (1994).
-  // Two-file format: song (.mus) + samples (SMP.set); UADE handles audio.
+  // Magic: "DDAT" at offset 0 (IFF-like chunk marker).
   if (/\.(ufo|mus)$/i.test(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.ufo === 'native') {
+      try {
+        const { isUFOFormat, parseUFOFile } = await import('@lib/import/formats/UFOParser');
+        if (isUFOFormat(buffer)) return parseUFOFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[UFOParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
     const { parseUADEFile: parseUADE_ufo } = await import('@lib/import/formats/UADEParser');
     return parseUADE_ufo(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
@@ -1246,17 +1261,34 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── IFF SMUS / Sonix Music Driver (.smus, .snx, .tiny) ───────────────────
+  // IFF SMUS format: "FORM" + "SMUS" IFF structure. Sonix .snx shares layout.
   if (/\.(smus|snx|tiny)$/i.test(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.iffSmus === 'native') {
+      try {
+        const { isIffSmusFormat, parseIffSmusFile } = await import('@lib/import/formats/IffSmusParser');
+        if (isIffSmusFormat(buffer)) return await parseIffSmusFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[IffSmusParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
     const { parseUADEFile: parseUADE_smus } = await import('@lib/import/formats/UADEParser');
     return parseUADE_smus(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
   // ── Magnetic Fields Packer (.mfp / mfp.*) ────────────────────────────────
   // Two-file format: song data in .mfp, PCM samples in companion smp.* file.
-  // Native parser produces placeholder instruments (no PCM). Delegates to UADE.
+  // Native parser extracts structure; UADE provides full audio with samples.
   if (/\.mfp$/i.test(filename) || /^mfp\./i.test((filename.split('/').pop() ?? filename).split('\\').pop() ?? filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.magneticFieldsPacker === 'native') {
+      try {
+        const { isMagneticFieldsPackerFormat, parseMagneticFieldsPackerFile } = await import('@lib/import/formats/MagneticFieldsPackerParser');
+        if (isMagneticFieldsPackerFormat(buffer, file.name)) return await parseMagneticFieldsPackerFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[MagneticFieldsPackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
     const { parseUADEFile: parseUADE_mfp } = await import('@lib/import/formats/UADEParser');
     return parseUADE_mfp(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
@@ -1282,8 +1314,6 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   // ── Richard Joseph Player (.rjp, RJP.*, .sng with RJP magic) ─────────────
   // Two-file format: song data (RJP.* / *.SNG) + samples (SMP.* / *.INS).
   // Magic: bytes[0..2]="RJP", bytes[4..7]="SMOD", bytes[12..15]=0.
-  // .rjp and .sng are already in the UADE extension list; this block intercepts
-  // them early to optionally extract richer metadata before delegating to UADE.
   {
     const _rjpBase = (filename.split('/').pop() ?? filename).toLowerCase();
     const _mightBeRJP =
@@ -1295,6 +1325,15 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
         new Uint8Array(buffer)[2] === 0x50);    // 'P'
     if (_mightBeRJP) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.richardJoseph === 'native') {
+        try {
+          const { isRJPFormat, parseRJPFile } = await import('@lib/import/formats/RichardJosephParser');
+          const _rjpBuf = new Uint8Array(buffer);
+          if (isRJPFormat(_rjpBuf)) return await parseRJPFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[RichardJosephParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_rjp } = await import('@lib/import/formats/UADEParser');
       return parseUADE_rjp(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -1332,24 +1371,48 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── Dave Lowe (.dl / DL.* prefix) ─────────────────────────────────────────
-  // Compiled 68k Amiga music format. Magic: three specific opcodes at offsets 0,4,8.
+  // Compiled 68k Amiga music format. Two variants: old and new. Both detected
+  // by opcode patterns at offsets 0/4/8.
   {
     const _dlBase = (filename.split('/').pop() ?? filename).toLowerCase();
     const _mightBeDL = /\.dl$/i.test(filename) || /\.dl_deli$/i.test(filename) || _dlBase.startsWith('dl.');
     if (_mightBeDL) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.daveLowe === 'native') {
+        try {
+          const { isDaveLoweFormat, parseDaveLoweFile } = await import('@lib/import/formats/DaveLoweParser');
+          const _dlBuf = new Uint8Array(buffer);
+          if (isDaveLoweFormat(_dlBuf)) return await parseDaveLoweFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[DaveLoweParser] Native parse failed for ${filename}, trying DaveLoweNew:`, err);
+        }
+        try {
+          const { isDaveLoweNewFormat, parseDaveLoweNewFile } = await import('@lib/import/formats/DaveLoweNewParser');
+          if (isDaveLoweNewFormat(buffer)) return parseDaveLoweNewFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[DaveLoweNewParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_dl } = await import('@lib/import/formats/UADEParser');
       return parseUADE_dl(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
   }
 
   // ── Leggless Music Editor (.lme / LME.*) ────────────────────────────────────
-  // Amiga 4-channel format (Leggless Music Editor). Magic: "LME" bytes + zero at offset 36.
+  // Amiga 4-channel format (Leggless Music Editor). Magic: "LME" at offset 0.
   {
     const _lmeBase = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
     const _mightBeLME = /\.lme$/i.test(filename) || _lmeBase.toLowerCase().startsWith('lme.');
     if (_mightBeLME) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.lme === 'native') {
+        try {
+          const { isLMEFormat, parseLMEFile } = await import('@lib/import/formats/LMEParser');
+          if (isLMEFormat(buffer)) return parseLMEFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[LMEParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_lme } = await import('@lib/import/formats/UADEParser');
       return parseUADE_lme(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -2261,21 +2324,40 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
   }
 
-  // ── TFMX-ST (MDST.* prefix) ──────────────────────────────────────────────
+  // ── Jochen Hippel ST (MDST.* prefix) ─────────────────────────────────────
+  // Amiga compiled music format by Jochen Hippel (ST version, not 7V or CoSo).
+  // Magic: scan first 256 bytes for Hippel-ST opcode signature.
   {
     const _mdstBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_mdstBase.startsWith('mdst.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.jochenHippelST === 'native') {
+        try {
+          const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
+          if (isJochenHippelSTFormat(buffer)) return parseJochenHippelSTFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[JochenHippelSTParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_mdst } = await import('@lib/import/formats/UADEParser');
       return parseUADE_mdst(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
   }
 
   // ── Special FX ST (DODA.* prefix) ────────────────────────────────────────
+  // Amiga compiled music format ("Special FX" by Special FX). Magic: "SWTD" tag.
   {
     const _dodaBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_dodaBase.startsWith('doda.')) {
       const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.specialFX === 'native') {
+        try {
+          const { isSpecialFXFormat, parseSpecialFXFile } = await import('@lib/import/formats/SpecialFXParser');
+          if (isSpecialFXFormat(buffer)) return parseSpecialFXFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[SpecialFXParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
       const { parseUADEFile: parseUADE_doda } = await import('@lib/import/formats/UADEParser');
       return parseUADE_doda(buffer, file.name, uadeMode, subsong, preScannedMeta);
     }
@@ -2439,8 +2521,8 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       'ast.', 'bss.',
       // FutureComposer-BSI, custom
       'bfc.', 'bsi.', 'fc-bsi.', 'cus.', 'cust.', 'custom.',
-      // DavidHanney, DynamicSynthesizer, DariusZendeh, Special-FX_ST (doda.*)
-      'dh.', 'dns.', 'dz.', 'mkiio.', 'doda.',
+      // DavidHanney, DynamicSynthesizer, DariusZendeh
+      'dh.', 'dns.', 'dz.', 'mkiio.',
       // EarAche, EMS
       'ea.', 'mg.', 'ems.', 'emsv6.',
       // ForgottenWorlds, GlueMon
