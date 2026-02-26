@@ -33,6 +33,20 @@
 #include "../engine/safeReader.h"
 
 // ---------------------------------------------------------------------------
+// JS audio callbacks
+// ---------------------------------------------------------------------------
+
+/* ptr = WASM byte offset, len = sample count (NOT byte count),
+ * loopType 0=off 1=fwd 2=bidi, is16bit = 1 for 16-bit */
+EM_JS(void, js_onPlaySample, (int ptr, int len, int loopStart, int loopLength, int loopType, int is16bit), {
+    if (Module.onPlaySample) Module.onPlaySample(ptr, len, loopStart, loopLength, loopType, is16bit);
+});
+
+EM_JS(void, js_onStopSample, (void), {
+    if (Module.onStopSample) Module.onStopSample();
+});
+
+// ---------------------------------------------------------------------------
 // Module-level state
 // ---------------------------------------------------------------------------
 
@@ -41,6 +55,10 @@ static SDL_GLContext  g_glCtx    = nullptr;
 static DivEngine*    g_engine   = nullptr;
 static FurnaceGUI*   g_gui      = nullptr;
 static bool          g_running  = false;
+
+/* PCM sample data for JS-side playback */
+static int8_t* g_pcm_data = nullptr;
+static int     g_pcm_len  = 0;
 
 // Default canvas dimensions — resizable at runtime via CSS / JS
 static constexpr int INIT_WIDTH  = 1280;
@@ -328,6 +346,13 @@ void furnace_insed_shutdown(void) {
     delete g_engine;
     g_engine = nullptr;
   }
+
+  // Free PCM data
+  if (g_pcm_data) {
+    free(g_pcm_data);
+    g_pcm_data = nullptr;
+  }
+  g_pcm_len = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -664,6 +689,34 @@ void furnace_insed_tick(void) {
   // relying on emscripten_set_main_loop. Useful for integration with
   // an external rAF loop managed by the host application.
   mainLoopIteration();
+}
+
+EMSCRIPTEN_KEEPALIVE
+void furnace_insed_load_pcm(const uint8_t* data, int len) {
+  if (g_pcm_data) {
+    free(g_pcm_data);
+    g_pcm_data = nullptr;
+  }
+  g_pcm_len = 0;
+  if (data && len > 0) {
+    g_pcm_data = (int8_t*)malloc(len);
+    if (g_pcm_data) {
+      memcpy(g_pcm_data, data, len);
+      g_pcm_len = len;
+    }
+  }
+}
+
+EMSCRIPTEN_KEEPALIVE
+void furnace_insed_play_sample(int loopStart, int loopLength, int loopType) {
+  if (!g_pcm_data || g_pcm_len == 0) return;
+  js_onPlaySample((int)(uintptr_t)g_pcm_data, g_pcm_len,
+                  loopStart, loopLength, loopType, 0 /* 8-bit */);
+}
+
+EMSCRIPTEN_KEEPALIVE
+void furnace_insed_stop_sample(void) {
+  js_onStopSample();
 }
 
 } // extern "C"
