@@ -1667,6 +1667,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Disc',
     color: 'text-green-400',
   },
+  SymphonieSynth: {
+    type: 'SymphonieSynth',
+    name: 'Symphonie Pro',
+    shortName: 'SYM',
+    description: 'Symphonie Pro Amiga tracker engine with DSP echo/delay ring buffer effects',
+    bestFor: ['Amiga tracker', 'DSP effects', 'Symphonie Pro'],
+    icon: 'Music',
+    color: 'text-purple-400',
+  },
 };
 
 // Organized categories
