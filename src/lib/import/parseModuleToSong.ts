@@ -1700,6 +1700,121 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
   }
 
+  // ── MMDC / MED Packer (mmdc.*) ───────────────────────────────────────────────
+  // Amiga format. Magic: "MMDC" at bytes[0..3].
+  {
+    const _mmdcBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_mmdcBase.startsWith('mmdc.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.mmdc === 'native') {
+        try {
+          const { isMMDCFormat, parseMMDCFile } = await import('@lib/import/formats/MMDCParser');
+          if (isMMDCFormat(buffer, filename)) return parseMMDCFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[MMDCParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_mmdc } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_mmdc(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Professional Sound Artists (psa.*) ───────────────────────────────────────
+  // Amiga format. Magic: "PSA\0" at bytes[0..3].
+  {
+    const _psaBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_psaBase.startsWith('psa.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.psa === 'native') {
+        try {
+          const { isPSAFormat, parsePSAFile } = await import('@lib/import/formats/PSAParser');
+          if (isPSAFormat(buffer, filename)) return parsePSAFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[PSAParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_psa } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_psa(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── Steve Turner (jpo.* / jpold.*) ───────────────────────────────────────────
+  // Amiga compiled 68k format. Detection via 4× 0x2B7C pattern + specific opcodes.
+  {
+    const _jpoBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_jpoBase.startsWith('jpo.') || _jpoBase.startsWith('jpold.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.steveTurner === 'native') {
+        try {
+          const { isSteveTurnerFormat, parseSteveTurnerFile } = await import('@lib/import/formats/SteveTurnerParser');
+          if (isSteveTurnerFormat(buffer, filename)) return parseSteveTurnerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[SteveTurnerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_jpo } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_jpo(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── PSA (.psa / PSA.*) ───────────────────────────────────────────────────────
+  // Professional Sound Artists format. Magic: bytes[0..3] == 0x50534100 ("PSA\0").
+  if (
+    /\.psa$/i.test(filename) ||
+    /^psa\./i.test((filename.split('/').pop() ?? filename).split('\\').pop() ?? filename)
+  ) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.psa === 'native') {
+      try {
+        const { isPSAFormat, parsePSAFile } = await import('@lib/import/formats/PSAParser');
+        if (isPSAFormat(buffer)) return parsePSAFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[PSAParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_psa } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_psa(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── MMDC (.mmdc / MMDC.*) ────────────────────────────────────────────────────
+  // MED Packer format by Antony "Ratt" Crowther. Magic: bytes[0..3] == 'MMDC'.
+  if (
+    /\.mmdc$/i.test(filename) ||
+    /^mmdc\./i.test((filename.split('/').pop() ?? filename).split('\\').pop() ?? filename)
+  ) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.mmdc === 'native') {
+      try {
+        const { isMMDCFormat, parseMMDCFile } = await import('@lib/import/formats/MMDCParser');
+        if (isMMDCFormat(buffer)) return parseMMDCFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[MMDCParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_mmdc } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_mmdc(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── Steve Turner (.jpo / .jpold / JPO.*) ────────────────────────────────────
+  // Amiga compiled 68k format (JPO. prefix). Detection: 4x 0x2B7C at offsets
+  // 0/8/16/24, 0x303C00FF at 0x20, 0x32004EB9 at 0x24, 0x4E75 at 0x2C.
+  if (
+    /\.jpold?$/i.test(filename) ||
+    /^jpo\./i.test((filename.split('/').pop() ?? filename).split('\\').pop() ?? filename)
+  ) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.steveTurner === 'native') {
+      try {
+        const { isSteveTurnerFormat, parseSteveTurnerFile } = await import('@lib/import/formats/SteveTurnerParser');
+        if (isSteveTurnerFormat(buffer)) return parseSteveTurnerFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[SteveTurnerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile: parseUADE_jpo } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_jpo(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
