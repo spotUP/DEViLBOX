@@ -49,41 +49,41 @@ function buildNESInstruments(expansionByte: number): InstrumentConfig[] {
   const nesBase = ['NES Pulse 1', 'NES Pulse 2', 'NES Triangle', 'NES Noise'];
   for (const name of nesBase) {
     insts.push({ id: id++, name, type: 'synth', synthType: 'FurnaceNES',
-      furnace: { ...DEFAULT_FURNACE, chipType: 34, ops: 2 } });
+      furnace: { ...DEFAULT_FURNACE, chipType: 34, ops: 2 }, effects: [], volume: 0, pan: 0 });
   }
 
   if (expansionByte & 0x01) {
     for (const name of ['VRC6 Pulse 1', 'VRC6 Pulse 2', 'VRC6 Sawtooth']) {
       insts.push({ id: id++, name, type: 'synth', synthType: 'FurnaceNES',
-        furnace: { ...DEFAULT_FURNACE, chipType: 34, ops: 2 } });
+        furnace: { ...DEFAULT_FURNACE, chipType: 34, ops: 2 }, effects: [], volume: 0, pan: 0 });
     }
   }
   if (expansionByte & 0x02) {
     for (let i = 0; i < 6; i++) {
       insts.push({ id: id++, name: `VRC7 FM ${i + 1}`, type: 'synth', synthType: 'FurnaceOPLL',
-        furnace: { ...DEFAULT_FURNACE, chipType: 13, ops: 2 } });
+        furnace: { ...DEFAULT_FURNACE, chipType: 13, ops: 2 }, effects: [], volume: 0, pan: 0 });
     }
   }
   if (expansionByte & 0x04) {
     insts.push({ id: id++, name: 'FDS Wave', type: 'synth', synthType: 'FurnaceFDS',
-      furnace: { ...DEFAULT_FURNACE, chipType: 15, ops: 2 } });
+      furnace: { ...DEFAULT_FURNACE, chipType: 15, ops: 2 }, effects: [], volume: 0, pan: 0 });
   }
   if (expansionByte & 0x08) {
     for (const name of ['MMC5 Pulse 1', 'MMC5 Pulse 2']) {
       insts.push({ id: id++, name, type: 'synth', synthType: 'FurnaceMMC5',
-        furnace: { ...DEFAULT_FURNACE, chipType: 34, ops: 2 } });
+        furnace: { ...DEFAULT_FURNACE, chipType: 34, ops: 2 }, effects: [], volume: 0, pan: 0 });
     }
   }
   if (expansionByte & 0x10) {
     for (let i = 0; i < 8; i++) {
       insts.push({ id: id++, name: `N163 Wave ${i + 1}`, type: 'synth', synthType: 'FurnaceN163',
-        furnace: { ...DEFAULT_FURNACE, chipType: 17, ops: 2 } });
+        furnace: { ...DEFAULT_FURNACE, chipType: 17, ops: 2 }, effects: [], volume: 0, pan: 0 });
     }
   }
   if (expansionByte & 0x20) {
     for (let i = 0; i < 3; i++) {
       insts.push({ id: id++, name: `5B AY ${i + 1}`, type: 'synth', synthType: 'FurnaceAY',
-        furnace: { ...DEFAULT_FURNACE, chipType: 6, ops: 2 } });
+        furnace: { ...DEFAULT_FURNACE, chipType: 6, ops: 2 }, effects: [], volume: 0, pan: 0 });
     }
   }
 

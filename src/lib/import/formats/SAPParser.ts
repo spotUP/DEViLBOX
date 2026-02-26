@@ -194,6 +194,9 @@ export async function parseSAPFile(buffer: ArrayBuffer, filename: string): Promi
     type: 'synth' as const,
     synthType: 'FurnacePOKEY' as const,
     furnace: { ...DEFAULT_FURNACE, chipType: 20, ops: 2 },
+    effects: [] as [],
+    volume: 0,
+    pan: 0,
   }));
 
   let pattern: Pattern;

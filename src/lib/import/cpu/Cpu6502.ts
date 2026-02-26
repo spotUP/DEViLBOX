@@ -6,13 +6,14 @@ export interface MemoryMap {
 }
 
 export class Cpu6502 {
+  private mem: MemoryMap;
   private A = 0; private X = 0; private Y = 0;
   private SP = 0xFD; private PC = 0;
   // Status flags as individual bits
   private N = 0; private V = 0; private B = 1;
   private D = 0; private I = 1; private Z = 0; private C = 0;
 
-  constructor(private mem: MemoryMap) {}
+  constructor(mem: MemoryMap) { this.mem = mem; }
 
   reset(pc: number, sp = 0xFD): void {
     this.PC = pc; this.SP = sp;
@@ -32,7 +33,6 @@ export class Cpu6502 {
 
   private rd(a: number): number { return this.mem.read(a & 0xFFFF) & 0xFF; }
   private wr(a: number, v: number): void { this.mem.write(a & 0xFFFF, v & 0xFF); }
-  private rd16(a: number): number { return this.rd(a) | (this.rd(a + 1) << 8); }
   // 6502 page-wrap bug on indirect JMP: high byte wraps within page
   private rd16wrap(a: number): number { return this.rd(a) | (this.rd((a & 0xFF00) | ((a + 1) & 0xFF)) << 8); }
 
