@@ -1389,6 +1389,38 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADE_dm1(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── Richard Joseph Player (.rjp, RJP.*, .sng with RJP magic) ─────────────
+  // Two-file format: song data (RJP.* / *.SNG) + samples (SMP.* / *.INS).
+  // Magic: bytes[0..2]="RJP", bytes[4..7]="SMOD", bytes[12..15]=0.
+  // .rjp and .sng are already in the UADE extension list; this block intercepts
+  // them early to optionally extract richer metadata before delegating to UADE.
+  {
+    const _rjpBase = (filename.split('/').pop() ?? filename).toLowerCase();
+    const _mightBeRJP =
+      /\.rjp$/i.test(filename) ||
+      _rjpBase.startsWith('rjp.') ||
+      (/\.sng$/i.test(filename) && buffer.byteLength >= 16 &&
+        new Uint8Array(buffer)[0] === 0x52 &&   // 'R'
+        new Uint8Array(buffer)[1] === 0x4a &&   // 'J'
+        new Uint8Array(buffer)[2] === 0x50);    // 'P'
+    if (_mightBeRJP) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.richardJoseph === 'native') {
+        try {
+          const { isRJPFormat, parseRJPFile } = await import('@lib/import/formats/RichardJosephParser');
+          if (isRJPFormat(new Uint8Array(buffer))) {
+            const result = await parseRJPFile(buffer, file.name);
+            if (result) return result;
+          }
+        } catch (err) {
+          console.warn(`[RichardJosephParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_rjp } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_rjp(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
   // ── ProTracker 3.6 IFF wrapper (FORM/MODL magic) ──────────────────────────
   // No dedicated extension — detected by FORM+MODL IFF magic bytes at offsets 0 and 8.
   // PT36Parser unwraps the PTDT chunk and parses it as a standard 31-sample MOD.
