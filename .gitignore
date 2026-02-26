@@ -38,6 +38,11 @@ hively-insed-wasm/build/
 spacey-delayer-wasm/build/
 re-tape-echo-wasm/build/
 ami-sampler-wasm/build/
+soundmon-wasm/build/
+sidmon-wasm/build/
+digmug-wasm/build/
+fc-wasm/build/
+tfmx-wasm/build/
 public/rdpiano/roms/
 public/onnx-wasm/
 

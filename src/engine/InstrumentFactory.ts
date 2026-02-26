@@ -33,6 +33,7 @@ import { SoundMonSynth } from './soundmon/SoundMonSynth';
 import { SidMonSynth } from './sidmon/SidMonSynth';
 import { DigMugSynth } from './digmug/DigMugSynth';
 import { FCSynth } from './fc/FCSynth';
+import { TFMXSynth } from './tfmx/TFMXSynth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -884,6 +885,17 @@ export class InstrumentFactory {
           );
         }
         instrument = fcSynth;
+        break;
+      }
+
+      case 'TFMXSynth': {
+        const tfmxSynth = new TFMXSynth();
+        if (config.tfmx) {
+          tfmxSynth.setInstrument(config.tfmx).catch(err =>
+            console.error('[InstrumentFactory] TFMX load failed:', err)
+          );
+        }
+        instrument = tfmxSynth;
         break;
       }
 
