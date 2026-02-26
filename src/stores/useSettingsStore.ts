@@ -287,6 +287,19 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
+      // Deep-merge formatEngine so new keys added after initial save get their
+      // default values rather than being undefined in existing localStorage data.
+      merge: (persisted, current) => {
+        const p = persisted as Partial<typeof current>;
+        return {
+          ...current,
+          ...p,
+          formatEngine: {
+            ...current.formatEngine,
+            ...(p.formatEngine ?? {}),
+          },
+        };
+      },
       partialize: (state) => ({
         amigaLimits: state.amigaLimits,
         linearInterpolation: state.linearInterpolation,
