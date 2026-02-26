@@ -34,6 +34,7 @@ export interface FormatEnginePreferences {
   mugician: FormatEngineChoice;  // .dmu/.mug → DigitalMugicianParser vs UADE
   tfmx: FormatEngineChoice;    // .tfmx/.mdat/.tfx → TFMXParser vs UADE
   hippelCoso: FormatEngineChoice; // .hipc/.soc/.coso → HippelCoSoParser vs UADE
+  robHubbard: FormatEngineChoice; // .rh/.rhp → RobHubbardParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -100,6 +101,7 @@ export const useSettingsStore = create<SettingsStore>()(
         mugician: 'native', // DigitalMugicianParser — dedicated Digital Mugician support
         tfmx: 'native',         // TFMXParser — dedicated Jochen Hippel TFMX support
         hippelCoso: 'native',   // HippelCoSoParser — dedicated Jochen Hippel CoSo support
+        robHubbard: 'native',   // RobHubbardParser — dedicated Rob Hubbard support
         uade: 'enhanced',       // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',

@@ -1631,6 +1631,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Disc',
     color: 'text-amber-400',
   },
+  RobHubbardSynth: {
+    type: 'RobHubbardSynth',
+    name: 'Rob Hubbard',
+    shortName: 'Rob Hubbard',
+    description: 'Rob Hubbard Amiga PCM synthesis with period-based vibrato, wobble oscillator and portamento',
+    bestFor: ['Amiga chiptune', 'Game music', 'Rob Hubbard'],
+    icon: 'Disc',
+    color: 'text-amber-500',
+  },
 };
 
 // Organized categories
@@ -1867,6 +1876,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.FurnacePCSPKR,
       SYNTH_INFO.HivelySynth,
       SYNTH_INFO.HippelCoSoSynth,
+      SYNTH_INFO.RobHubbardSynth,
     ],
   },
   {

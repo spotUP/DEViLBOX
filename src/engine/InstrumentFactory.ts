@@ -36,6 +36,7 @@ import { FCSynth } from './fc/FCSynth';
 import { TFMXSynth } from './tfmx/TFMXSynth';
 import { FredSynth } from './fred/FredSynth';
 import { HippelCoSoSynth } from './hippelcoso/HippelCoSoSynth';
+import { RobHubbardSynth } from './robhubbard/RobHubbardSynth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -920,6 +921,17 @@ export class InstrumentFactory {
           );
         }
         instrument = hcSynth;
+        break;
+      }
+
+      case 'RobHubbardSynth': {
+        const rhSynth = new RobHubbardSynth();
+        if (config.robHubbard) {
+          rhSynth.setInstrument(config.robHubbard).catch(err =>
+            console.error('[InstrumentFactory] RobHubbard load failed:', err)
+          );
+        }
+        instrument = rhSynth;
         break;
       }
 
