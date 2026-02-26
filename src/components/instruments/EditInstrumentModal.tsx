@@ -561,12 +561,10 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                 {/* Tab Content */}
                 <div className="flex-1 overflow-y-auto scrollbar-modern">
                   {activeTab === 'sound' && (
-                    <div className="overflow-y-auto">
-                      <InstrumentEditor
-                        instrument={currentInstrument}
-                        onChange={(updates) => updateInstrument(currentInstrument.id, updates)}
-                      />
-                    </div>
+                    <InstrumentEditor
+                      instrument={currentInstrument}
+                      onChange={(updates) => updateInstrument(currentInstrument.id, updates)}
+                    />
                   )}
 
                   {activeTab === 'effects' && (
@@ -688,12 +686,10 @@ interface InstrumentEditorProps {
  */
 const InstrumentEditor: React.FC<InstrumentEditorProps> = ({ instrument, onChange }) => {
   return (
-    <div className="instrument-editor-wrapper">
-      <UnifiedInstrumentEditor
-        instrument={instrument}
-        onChange={onChange}
-      />
-    </div>
+    <UnifiedInstrumentEditor
+      instrument={instrument}
+      onChange={onChange}
+    />
   );
 };
 

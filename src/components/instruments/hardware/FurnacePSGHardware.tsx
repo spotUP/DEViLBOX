@@ -457,11 +457,13 @@ export const FurnacePSGHardware: React.FC<FurnacePSGHardwareProps> = ({ config, 
 
   return (
     <SDLHardwareWrapper
-      imageRendering="pixelated"
+      imageRendering="auto"
       moduleUrl="/furnace/FurnacePSG.js"
       factoryName="createFurnacePSG"
       canvasWidth={960}
       canvasHeight={720}
+      displayWidth={480}
+      displayHeight={360}
       initFn="_furnace_psg_init"
       startFn="_furnace_psg_start"
       shutdownFn="_furnace_psg_shutdown"

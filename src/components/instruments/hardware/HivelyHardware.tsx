@@ -210,14 +210,18 @@ export const HivelyHardware: React.FC<HivelyHardwareProps> = ({ config, onChange
 
     async function init() {
       try {
-        /* Create canvas for SDL — must have id="canvas" for Emscripten event registration */
+        /* Create canvas for SDL — must have id="canvas" for Emscripten event registration.
+         * CSS size MUST match buffer size (800×480) so that Emscripten's mouse coordinate
+         * calculation (clientX - rect.left) produces buffer-space coords, not scaled CSS
+         * pixels. If canvas.style.width differs from canvas.width, hit detection breaks.
+         * Start hidden; show after init so the loading placeholder is visible first. */
         const canvas = document.createElement('canvas');
         canvas.id = 'canvas';
         canvas.width = 800;
         canvas.height = 480;
-        canvas.style.width = '100%';
-        canvas.style.height = 'auto';
-        canvas.style.imageRendering = 'pixelated';
+        canvas.style.width = '800px';
+        canvas.style.height = '480px';
+        canvas.style.display = 'none';
         canvas.tabIndex = 0; /* allow keyboard focus */
 
         if (containerRef.current && !cancelled) {
@@ -293,7 +297,11 @@ export const HivelyHardware: React.FC<HivelyHardwareProps> = ({ config, onChange
 
         mod._insed_start();
 
-        if (!cancelled) setLoaded(true);
+        if (!cancelled) {
+          /* Reveal canvas now that SDL is fully running */
+          canvas.style.display = 'block';
+          setLoaded(true);
+        }
       } catch (err) {
         if (!cancelled) setError(String(err));
       }
@@ -315,24 +323,26 @@ export const HivelyHardware: React.FC<HivelyHardwareProps> = ({ config, onChange
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="hively-hardware-container flex flex-col items-center">
+    <div className="hively-hardware-container flex flex-col items-start">
+      {/* Canvas is 800×480 fixed — allow horizontal scroll on narrow panels */}
       <div
         ref={containerRef}
-        className="relative bg-black overflow-hidden"
-        style={{
-          maxWidth: 800,
-          width: '100%',
-          aspectRatio: '800 / 480',
-        }}
+        className="relative bg-black overflow-auto"
+        style={{ maxWidth: '100%' }}
         onClick={() => canvasRef.current?.focus()}
-      />
-      {!loaded && !error && (
-        <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-          Loading instrument editor...
-        </div>
-      )}
+        onMouseEnter={() => canvasRef.current?.focus()}
+      >
+        {!loaded && !error && (
+          <div
+            className="flex items-center justify-center text-gray-400"
+            style={{ width: 800, height: 480 }}
+          >
+            Loading instrument editor...
+          </div>
+        )}
+      </div>
       {error && (
-        <div className="text-red-400 text-sm mt-2 text-center">
+        <div className="text-red-400 text-sm mt-2 text-center self-center">
           Failed to load hardware UI: {error}
         </div>
       )}
