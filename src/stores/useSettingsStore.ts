@@ -105,6 +105,8 @@ export interface FormatEnginePreferences {
   bladePacker: FormatEngineChoice;    // UDS.* → BladePackerParser vs UADE
   tomyTracker: FormatEngineChoice;    // SG.* → TomyTrackerParser vs UADE
   imagesMusicSystem: FormatEngineChoice; // IMS.* (prefix) → ImagesMusicSystemParser vs UADE
+  fashionTracker: FormatEngineChoice;    // EX.* → FashionTrackerParser vs UADE
+  multiMediaSound: FormatEngineChoice;   // MMS.*/SFX20.* → MultiMediaSoundParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -241,6 +243,8 @@ export const useSettingsStore = create<SettingsStore>()(
         bladePacker: 'native',  // BladePackerParser — native parser available
         tomyTracker: 'native',  // TomyTrackerParser — native parser available
         imagesMusicSystem: 'native', // ImagesMusicSystemParser (IMS.* prefix) — native parser available
+        fashionTracker: 'native',   // FashionTrackerParser — native parser available
+        multiMediaSound: 'native',  // MultiMediaSoundParser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',

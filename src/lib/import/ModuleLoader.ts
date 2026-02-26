@@ -444,6 +444,15 @@ export function getSupportedExtensions(): string[] {
     '.mod_ntkamp', '.mod_flt4', '.mod_comp', '.mod15_ust', '.mod15_st-iv',
     '.mod3',
     // ── Compressed/Packed formats ───────────────────────────────────────────
+    // ── Additional native-parser formats ────────────────────────────────────
+    '.gt2', '.gtk',    // Graoumf Tracker 2
+    '.dsym',           // Digital Symphony
+    '.cba',            // Chuck Biscuits Atari ST
+    '.act',            // Actionamics
+    '.c67',            // CDFM Composer 670
+    '.667',            // Composer 667
+    '.fmt',            // FM Tracker (Davey W Taylor)
+    // ── Compressed/Packed formats ───────────────────────────────────────────
     '.zip', '.lha', '.rar', '.gz', '.mmcmp', '.xpk', '.pp', '.pack',
     // ── Chip-dump / CPU-code formats ────────────────────────────────────────
     '.vgm', '.vgz',    // Video Game Music (OPN2/OPL/SN register dumps)

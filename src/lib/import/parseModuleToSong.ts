@@ -1981,6 +1981,42 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
   }
 
+  // ── Fashion Tracker (EX.* prefix) ────────────────────────────────────────
+  {
+    const _exBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_exBase.startsWith('ex.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.fashionTracker === 'native') {
+        try {
+          const { isFashionTrackerFormat, parseFashionTrackerFile } = await import('@lib/import/formats/FashionTrackerParser');
+          if (isFashionTrackerFormat(buffer)) return parseFashionTrackerFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[FashionTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_ex } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_ex(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
+  // ── MultiMedia Sound (MMS.* / SFX20.* prefix) ────────────────────────────
+  {
+    const _mmsBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+    if (_mmsBase.startsWith('mms.') || _mmsBase.startsWith('sfx20.')) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.multiMediaSound === 'native') {
+        try {
+          const { isMultiMediaSoundFormat, parseMultiMediaSoundFile } = await import('@lib/import/formats/MultiMediaSoundParser');
+          if (isMultiMediaSoundFormat(buffer)) return parseMultiMediaSoundFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[MultiMediaSoundParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_mms } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_mms(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
