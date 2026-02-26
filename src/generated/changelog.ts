@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-26T00:20:16.297Z
+ * Generated: 2026-02-26T06:29:31.300Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1262';
-export const BUILD_NUMBER = '1262';
-export const BUILD_HASH = 'e3d6e331';
+export const BUILD_VERSION = '1.0.1284';
+export const BUILD_NUMBER = '1284';
+export const BUILD_HASH = '9183030e';
 export const BUILD_DATE = '2026-02-26';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,93 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1262',
+    version: '1.0.1284',
     date: '2026-02-26',
     changes: [
+      {
+        type: 'fix',
+        "description": "Remove unused fields and dead header reads (TS6133)"
+      },
+      {
+        type: 'feature',
+        "description": "Add sample preview playback to FurnaceInsEd hardware UI"
+      },
+      {
+        type: 'feature',
+        "description": "Implement full multi-subsong support with in-editor switching"
+      },
+      {
+        type: 'fix',
+        "description": "SoundMon synth loop covers full ADSR expansion not base cycle"
+      },
+      {
+        type: 'feature',
+        "description": "Add sample playback — PLAY/STOP buttons + Web Audio API"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve all TypeScript TS6133/TS2345/TS18047 errors"
+      },
+      {
+        type: 'feature',
+        "description": "FurnaceInsEd WASM module + import dialogs + TFMX parser"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: changelog update, FT2 WASM patches, FT2Hardware volume/pan edit, cleanup"
+      },
+      {
+        type: 'feature',
+        "description": "FileBrowser previews, Modland API, UIStore imports, Pixi fixes"
+      },
+      {
+        type: 'fix',
+        "description": "WASM config polling, Retina canvas, and Hively layout fixes"
+      },
+      {
+        type: 'feature',
+        "description": "Per-format import dialogs in TrackerView and FT2Toolbar"
+      },
+      {
+        type: 'feature',
+        "description": "TFMX format routing, MIDI options, and multi-effect slots 3-8"
+      },
+      {
+        type: 'fix',
+        "description": "ToneEngine Sampler reload decode and looped Player stop"
+      },
+      {
+        type: 'feature',
+        "description": "Expand FurnaceEffectRouter platform family coverage"
+      },
+      {
+        type: 'feature',
+        "description": "Implement all 5 remaining gap fixes for UADE enhanced imports"
+      },
+      {
+        type: 'fix',
+        "description": "Native parser playback — period-based audio, volume, stereo, portamento"
+      },
+      {
+        type: 'fix',
+        "description": "Remove per-note console.log flood from FurnaceSynth and RegisterMapper"
+      },
+      {
+        type: 'fix',
+        "description": "Close AudioContext on unmount (parity with FT2)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix false arpeggio, clean up feature blocks, add groove parsing"
+      },
+      {
+        type: 'fix',
+        "description": "Implement 15 outstanding stubs from FIXES.md"
+      },
+      {
+        type: 'fix',
+        "description": "Fix SDL_CreateMutex stub allocation size warning"
+      },
       {
         type: 'feature',
         "description": "Button press animation and sample playback in hardware UI"
@@ -150,100 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Add UADE fallback try-catch to all native format parsers"
-      },
-      {
-        type: 'fix',
-        "description": "FC2/unknown FC variants fall back to UADE instead of error toast"
-      },
-      {
-        type: 'fix',
-        "description": "VJView null canvas guard + changelog update"
-      },
-      {
-        type: 'feature',
-        "description": "Ft2-sampled build system overhaul and WASM bridge"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve tracker scratch exit hang and re-entry oscillation"
-      },
-      {
-        type: 'fix',
-        "description": "Route module drops through WebGLModalBridge portal"
-      }
-    ]
-  },
-  {
-    version: '2026-02-24',
-    date: '2026-02-24',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Samplepack samples have no decoded buffer for playback"
-      },
-      {
-        type: 'fix',
-        "description": "Boost 3D visualizer audio reactivity ~3x"
-      },
-      {
-        type: 'feature',
-        "description": "Add fullscreen button to VJ view, move debug meter to bottom-right"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add VJ audio level meter and boost AudioDataBus responsiveness"
-      },
-      {
-        type: 'feature',
-        "description": "Add 13 audio-reactive projectM presets"
-      },
-      {
-        type: 'fix',
-        "description": "VJ audio reactivity and zero-size WebGL textures"
-      },
-      {
-        type: 'fix',
-        "description": "TB-303 view layout — center horizontally, allow vertical scroll"
-      },
-      {
-        type: 'fix',
-        "description": "Click-to-seek works when player is stopped"
-      },
-      {
-        type: 'fix',
-        "description": "Correct 3D mixer fader rest positions"
-      },
-      {
-        type: 'fix',
-        "description": "Dedup concurrent renders of the same file in DJPipeline"
-      },
-      {
-        type: 'feature',
-        "description": "Click-to-seek on scrolling waveform"
-      },
-      {
-        type: 'fix',
-        "description": "Waveform h-full stealing visualizer space — use fixed h-16"
-      },
-      {
-        type: 'fix',
-        "description": "Add @refresh reset to R3F components for HMR stability"
-      },
-      {
-        type: 'fix',
-        "description": "Pattern overlay useMemo stale — add totalPositions to deps"
-      },
-      {
-        type: 'fix',
-        "description": "Show pattern overlay in vinyl and 3D deck view modes"
-      },
-      {
-        type: 'fix',
-        "description": "Preset scratch patterns now use audio stream in DJ mode"
-      },
-      {
-        type: 'fix',
-        "description": "Wire up all 3D mixer controls to DJ engine"
       }
     ]
   }
