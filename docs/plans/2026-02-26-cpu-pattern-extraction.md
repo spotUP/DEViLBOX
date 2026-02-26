@@ -363,11 +363,11 @@ Update `eventsToPattern` and `walkCommands` to use the expanded channel count (O
 // OPM (YM2151) per-channel state (8 channels)
 const opmKeyCode = new Uint8Array(8); // reg 0x28–0x2F: bits[6:4]=octave, bits[3:0]=note
 const opmKeyOn   = new Uint8Array(8); // reg 0x08, bits[6:3] = op enables per ch
-// YM2151 key-code to MIDI: KC bits[6:4]=octave (0-7), bits[3:0]=note (0-13, skipping 4 and 8 that don't exist)
-// YM2151 note index to semitone: [0,1,2,3, 4,5,6, 7,8,9, 10,11, 12,13] → [0,1,2,3,4,5,6,7,8,9,10,11,12,13] skipping 4 and 8
-const OPM_NOTE_MAP = [0,1,2,3, 5,6,7, 9,10,11, 13,14]; // 12 semitones from 14 KC values?
-// Simpler: YM2151 uses note = (kc >> 4)*12 + kc_semitone_lut[kc & 0xF]
-const OPM_KC_TO_SEMI = [0,1,2,3, 4, 5,6,7, 8, 9,10,11, 12, 12]; // approximation
+// YM2151 KC nibble → semitone offset from C (C is at nibble 11, C# at 0)
+// KC nibble: 0=C#  1=D  2=D#  3=E  4=F  5=F#  6=G  7=G#  8=A  9=A#  10=B  11=C
+// KC nibble → semitone: [1,2,3,4,5,6,7,8,9,10,11,0]
+// midi = octave * 12 + KC_TO_SEMITONE[min(kc&0xF, 11)] + 12
+const KC_TO_SEMITONE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0] as const;
 ```
 
 For cmd 0x54 (YM2151 port 0):
