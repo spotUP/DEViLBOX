@@ -52,6 +52,10 @@ export interface FormatEnginePreferences {
   symphoniePro: FormatEngineChoice;       // .symmod → SymphonieProParser vs UADE
   composer667: FormatEngineChoice;        // .667 → Composer667Parser vs UADE
   chuckBiscuits: FormatEngineChoice;      // .cba → ChuckBiscuitsParser vs UADE
+  soundTracker: FormatEngineChoice;       // .stk → SoundTrackerParser vs UADE
+  speedySystem: FormatEngineChoice;       // .ss → SpeedySystemParser vs UADE
+  tronic: FormatEngineChoice;             // .trc/.dp/.tro → TronicParser vs UADE
+  digiBoosterPro: FormatEngineChoice;     // .dbm → DigiBoosterProParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -136,6 +140,10 @@ export const useSettingsStore = create<SettingsStore>()(
         symphoniePro: 'native',     // SymphonieProParser — dedicated Symphonie Pro support
         composer667: 'native',      // Composer667Parser — dedicated Composer 667 support
         chuckBiscuits: 'native',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support
+        soundTracker: 'uade',       // SoundTrackerParser — prefer UADE for authentic original STK playback
+        speedySystem: 'uade',       // SpeedySystemParser — prefer UADE (DOC RAM samples required)
+        tronic: 'uade',             // TronicParser — no native parser; always UADE
+        digiBoosterPro: 'native',   // DigiBoosterProParser — dedicated DigiBooster Pro (.dbm) support
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
