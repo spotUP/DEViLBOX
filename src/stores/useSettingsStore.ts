@@ -35,6 +35,7 @@ export interface FormatEnginePreferences {
   tfmx: FormatEngineChoice;    // .tfmx/.mdat/.tfx → TFMXParser vs UADE
   hippelCoso: FormatEngineChoice; // .hipc/.soc/.coso → HippelCoSoParser vs UADE
   robHubbard: FormatEngineChoice; // .rh/.rhp → RobHubbardParser vs UADE
+  sidmon1: FormatEngineChoice;    // .sid1/.smn (magic) → SidMon1Parser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -102,6 +103,7 @@ export const useSettingsStore = create<SettingsStore>()(
         tfmx: 'native',         // TFMXParser — dedicated Jochen Hippel TFMX support
         hippelCoso: 'native',   // HippelCoSoParser — dedicated Jochen Hippel CoSo support
         robHubbard: 'native',   // RobHubbardParser — dedicated Rob Hubbard support
+        sidmon1: 'native',      // SidMon1Parser — dedicated SidMon 1.0 support
         uade: 'enhanced',       // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',

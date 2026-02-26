@@ -140,8 +140,35 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
-  // ── SidMon II ─────────────────────────────────────────────────────────────
-  if (/\.(sid2|smn)$/.test(filename)) {
+  // ── SidMon 1.0 / SidMon II (.smn can be either) ─────────────────────────
+  if (/\.smn$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    // Try SidMon1 magic first
+    if (prefs.sidmon1 !== 'uade') {
+      try {
+        const { isSidMon1Format, parseSidMon1File } = await import('@lib/import/formats/SidMon1Parser');
+        if (isSidMon1Format(buffer)) {
+          return parseSidMon1File(buffer, file.name);
+        }
+      } catch (err) {
+        console.warn(`[SidMon1Parser] Native parse failed for ${filename}, falling back:`, err);
+      }
+    }
+    // Then try SidMon2
+    if (prefs.sidmon2 === 'native') {
+      try {
+        const { parseSidMon2File } = await import('@lib/import/formats/SidMon2Parser');
+        return parseSidMon2File(buffer, file.name);
+      } catch (err) {
+        console.warn(`[SidMon2Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── SidMon II (.sid2 — unambiguous SidMon 2) ─────────────────────────────
+  if (/\.sid2$/.test(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.sidmon2 === 'native') {
       try {
@@ -182,6 +209,21 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       }
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
+  // ── JamCracker ────────────────────────────────────────────────────────────
+  if (/\.(jam|jc)$/.test(filename)) {
+    try {
+      const { isJamCrackerFormat, parseJamCrackerFile } = await import('@lib/import/formats/JamCrackerParser');
+      if (isJamCrackerFormat(buffer)) {
+        return parseJamCrackerFile(buffer, file.name);
+      }
+    } catch (err) {
+      console.warn(`[JamCrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const uadeMode = prefs.uade ?? 'enhanced';
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
@@ -265,8 +307,26 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseNSFFile(buffer, file.name);
   }
 
-  // ── SID — Commodore 64 PSID/RSID (.sid and .sid1 only — .sid2/.smn = SidMon II above)
-  if (/\.sid1?$/.test(filename)) {
+  // ── SidMon 1.0 (.sid1) ───────────────────────────────────────────────────
+  // .sid1 files may be SidMon 1.0 or Commodore 64 SID — try magic detection first.
+  if (/\.sid1$/.test(filename)) {
+    if (prefs.sidmon1 !== 'uade') {
+      try {
+        const { isSidMon1Format, parseSidMon1File } = await import('@lib/import/formats/SidMon1Parser');
+        if (isSidMon1Format(buffer)) {
+          return parseSidMon1File(buffer, file.name);
+        }
+      } catch (err) {
+        console.warn(`[SidMon1Parser] Native parse failed for ${filename}, falling back to SID:`, err);
+      }
+    }
+    // Fallback: try C64 SID parser
+    const { parseSIDFile } = await import('@lib/import/formats/SIDParser');
+    return parseSIDFile(buffer, file.name);
+  }
+
+  // ── SID — Commodore 64 PSID/RSID (.sid only — .sid1 handled above)
+  if (/\.sid$/.test(filename)) {
     const { parseSIDFile } = await import('@lib/import/formats/SIDParser');
     return parseSIDFile(buffer, file.name);
   }
