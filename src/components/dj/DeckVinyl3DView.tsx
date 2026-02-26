@@ -25,8 +25,8 @@
  */
 
 import { useRef, useEffect, useCallback, useMemo } from 'react';
-import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
-import { useGLTF, OrbitControls } from '@react-three/drei';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
+import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
@@ -425,25 +425,18 @@ function DeckVinyl3DView({ deckId }: DeckVinyl3DViewProps) {
 
   return (
     <div className="relative w-full h-full min-h-[200px]" style={{ touchAction: 'none' }}>
-      <Canvas
-        camera={{
-          position: [0.20, 0.42, 0.50],
-          fov: 45,
-          near: 0.01,
-          far: 10,
-        }}
-        gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
-        style={{ background: 'transparent' }}
-        onCreated={({ gl }) => {
-          gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.2;
-          // Prevent browser default on context loss (which would permanently halt rendering).
-          // R3F will re-create the renderer if the context is restored.
-          gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault(), false);
-        }}
-      >
+      {/* View registers with the shared Canvas in DJView via View.Port (drei scissor rendering).
+          PerspectiveCamera makeDefault sets the per-view virtual camera. */}
+      <View className="absolute inset-0">
+        <PerspectiveCamera
+          makeDefault
+          position={[0.20, 0.42, 0.50]}
+          fov={45}
+          near={0.01}
+          far={10}
+        />
         <TurntableScene deckId={deckId} orbitRef={orbitRef} />
-      </Canvas>
+      </View>
       <CameraControlOverlay orbitRef={orbitRef} />
     </div>
   );
