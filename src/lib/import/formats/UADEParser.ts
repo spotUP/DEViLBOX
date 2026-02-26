@@ -375,6 +375,7 @@ export async function parseUADEFile(
     'bp', 'bp3', 'sm', 'sm2', 'sm3', 'sm4',  // SoundMon / BPSoundMon variants
     'fred',                                    // Fred Editor
     'sid', 'sid2',                             // SidMon variants
+    'dmu', 'dmu2', 'mug', 'mug2',             // Digital Mugician variants
   ]);
   if (mode === 'enhanced' && SYNTHESIS_FORMATS.has(ext)) {
     console.warn(`[UADEParser] ${ext.toUpperCase()} uses synthesis waveforms; using classic mode for accurate playback`);
