@@ -25,6 +25,7 @@
 #include "ft2_structs.h"
 #include "ft2_keyboard.h"
 #include "ft2_tables.h"
+#include "ft2_pushbuttons.h"
 
 /* ── JS callbacks (EM_JS) ──────────────────────────────────────────────── */
 
@@ -123,6 +124,9 @@ EMSCRIPTEN_KEEPALIVE
 void ft2_sampled_tick(void)
 {
     if (!g_initialized) return;
+    /* Drive button auto-repeat and maintain pressed visual state each frame */
+    if (mouse.leftButtonPressed)
+        handlePushButtonsWhileMouseDown();
     handleRedrawing();
 }
 
