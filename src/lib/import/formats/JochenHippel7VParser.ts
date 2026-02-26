@@ -6,11 +6,17 @@
  * Two code paths:
  *
  * Path A — wrapped in a loader stub (starts with $6000):
- *   word[0] == $6000
- *   word[1] == D1  (> 0, even, non-negative)
- *   Scan up to 11 longs at (A0 + D1) for $308141FA
- *   On match, advance 4 bytes, read another D1 (> 0, even, non-negative),
- *   advance by D1 → falls into TFMX-7V song check below
+ *   cmp.w #$6000,(A0)   — no post-increment, just check byte 0
+ *   addq.l #2,A0        — A0 = 2
+ *   move.w (A0),D1      — read dist from offset 2, no post-increment
+ *   D1 must be > 0, even, non-negative
+ *   lea (A0,D1.W),A0    — scanOff = 2 + D1
+ *   Scan up to 11 words (dbf D1=10) at scanOff for $308141FA
+ *   On match (OK_1):
+ *     addq.l #4,A0      — skip the found long
+ *     move.w (A0),D1    — read next dist (no post-increment), validate
+ *     lea (A0,D1.W),A0  — songOff = (matchOff+4) + D1  (no +2)
+ *   Falls into TFMX-7V song check
  *
  * Path B — raw TFMX-7V song (Song label):
  *   'TFMX' at A0+0..3
@@ -147,17 +153,18 @@ export function isJochenHippel7VFormat(buffer: ArrayBuffer | Uint8Array): boolea
   let off = 0;
 
   // Path A: loader stub
+  // ASM: cmp.w #$6000,(A0) — NO post-increment, just compare
   if (u16BE(buf, 0) === 0x6000) {
-    off += 2;
-    if (off + 2 > buf.length) return false;
-    const d1 = u16BE(buf, off);
-    off += 2;
+    // addq.l #2,A0  → A0 = 2
+    // move.w (A0),D1  → read dist at offset 2, NO post-increment
+    if (2 + 2 > buf.length) return false;
+    const d1 = u16BE(buf, 2);
     if (d1 === 0) return false;
     if (d1 & 0x8000) return false; // negative
     if (d1 & 1) return false;      // odd
 
-    // scan 11 longs (0..10) for $308141FA
-    let scanOff = off + d1;
+    // lea (A0,D1.W),A0 → scanOff = 2 + D1  (A0 was at 2, no additional advance)
+    let scanOff = 2 + d1;
     let found = -1;
     for (let i = 0; i <= 10; i++) {
       if (scanOff + 4 > buf.length) break;
@@ -169,14 +176,16 @@ export function isJochenHippel7VFormat(buffer: ArrayBuffer | Uint8Array): boolea
     }
     if (found < 0) return false;
 
-    // advance 4 bytes past the found pattern
+    // OK_1: addq.l #4,A0 → afterFind = found + 4
+    // move.w (A0),D1 → read dist at afterFind, NO post-increment
     const afterFind = found + 4;
     if (afterFind + 2 > buf.length) return false;
     const d1b = u16BE(buf, afterFind);
     if (d1b === 0) return false;
     if (d1b & 0x8000) return false;
     if (d1b & 1) return false;
-    const songOff = afterFind + 2 + d1b;
+    // lea (A0,D1.W),A0 → songOff = afterFind + D1b  (no +2)
+    const songOff = afterFind + d1b;
     return checkTFMX7VSong(buf, songOff);
   }
 

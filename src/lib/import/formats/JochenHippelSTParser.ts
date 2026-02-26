@@ -184,9 +184,40 @@ export function isJochenHippelSTFormat(buffer: ArrayBuffer | Uint8Array): boolea
     if (u32BE(buf, off) !== 0x48E7FFFE) return false;
     off += 4;
   } else {
-    // Short form (byte offset)
+    // Short form (byte offset) — BRA.S / No3 path
+    // Assembly lines 367–381:
+    //   btst #0,D1 → must be even
+    //   add.w D1,A0 → advance by byte displacement
+    //   cmp.l #$48E7FFFE,(A0)+
+    //   cmp.w #$6100,(A0)+  → BSR.W opcode
+    //   add.w (A0),A0
+    //   cmp.l #$2F006100,(A0)+
+    //   add.w (A0),A0
+    //   cmp.w #$41FA,(A0)
+    //   lea 20(A0),A0  → then fall through to Later
     if (shortBranch & 1) return false;
     off = 2 + shortBranch;
+    // cmp.l #$48E7FFFE,(A0)+
+    if (off + 4 > buf.length || u32BE(buf, off) !== 0x48E7FFFE) return false;
+    off += 4;
+    // cmp.w #$6100,(A0)+
+    if (off + 2 > buf.length || u16BE(buf, off) !== 0x6100) return false;
+    off += 2;
+    // add.w (A0),A0
+    if (off + 2 > buf.length) return false;
+    const jmpA = u16BE(buf, off);
+    off = off + jmpA;
+    // cmp.l #$2F006100,(A0)+
+    if (off + 4 > buf.length || u32BE(buf, off) !== 0x2F006100) return false;
+    off += 4;
+    // add.w (A0),A0
+    if (off + 2 > buf.length) return false;
+    const jmpB = u16BE(buf, off);
+    off = off + jmpB;
+    // cmp.w #$41FA,(A0)
+    if (off + 2 > buf.length || u16BE(buf, off) !== 0x41FA) return false;
+    // lea 20(A0),A0
+    off += 20;
   }
 
   // Later: look for $41FA (try two positions)
