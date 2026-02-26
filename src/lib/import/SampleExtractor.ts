@@ -402,8 +402,6 @@ function extractIT(data: Uint8Array): ExtractionResult {
   const numOrders = readWord(data, 0x20);
   const numInstruments = readWord(data, 0x22);
   const numSamples = readWord(data, 0x24);
-  const _numPatterns = readWord(data, 0x26);
-
   // Pointer tables start at 0xC0 after orders
   const ordersStart = 0xC0;
   const instPtrsStart = ordersStart + numOrders;
@@ -420,7 +418,6 @@ function extractIT(data: Uint8Array): ExtractionResult {
     const flags = data[smpOffset + 0x12];
     const convertFlags = data[smpOffset + 0x2E];
     const name = readString(data, smpOffset + 0x14, 26);
-    const _globalVol = data[smpOffset + 0x11];
     const defaultVol = data[smpOffset + 0x13];
     const length = readDword(data, smpOffset + 0x30);
     const loopBegin = readDword(data, smpOffset + 0x34);
