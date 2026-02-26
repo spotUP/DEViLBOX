@@ -52,6 +52,7 @@ export interface FormatEnginePreferences {
   cdfm67: FormatEngineChoice;             // .c67 → CDFM67Parser vs OpenMPT
   easyTrax: FormatEngineChoice;           // .etx → EasyTraxParser vs OpenMPT
   karlMorton: FormatEngineChoice;         // .mus → KarlMortonParser vs OpenMPT
+  ufo: FormatEngineChoice;               // .ufo/.mus → UFOParser vs UADE
   ams: FormatEngineChoice;                // .ams → AMSParser (Extreme's Tracker / Velvet Studio) vs UADE
   xTracker: FormatEngineChoice;           // .dmf (X-Tracker) → XTrackerParser vs UADE
   fmTracker: FormatEngineChoice;          // .fmt → FMTrackerParser (Davey W Taylor FM Tracker)
@@ -164,6 +165,7 @@ export const useSettingsStore = create<SettingsStore>()(
         cdfm67: 'native',           // CDFM67Parser — dedicated CDFM Composer 670 support
         easyTrax: 'native',         // EasyTraxParser — dedicated EasyTrax support
         karlMorton: 'native',       // KarlMortonParser — dedicated Karl Morton Music Format support
+        ufo: 'native',              // UFOParser — native parser available
         ams: 'native',              // AMSParser — Extreme's Tracker / Velvet Studio support
         xTracker: 'native',         // XTrackerParser — dedicated X-Tracker DMF support
         fmTracker: 'native',        // FMTrackerParser — dedicated FM Tracker (.fmt) support
