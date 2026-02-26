@@ -31,6 +31,7 @@
 /* ── JS Callbacks ──────────────────────────────────────────────────────── */
 
 EM_JS(void, js_on_param_change, (int param_id, int value), {
+    console.log('[FurnacePSG] js_on_param_change param=' + param_id + ' value=' + value);
     if (Module.onParamChange) Module.onParamChange(param_id, value);
 });
 
@@ -1103,12 +1104,16 @@ static void handle_event(SDL_Event *e) {
         g_mouse_y = e->button.y / SCALE;
         g_mouse_down = 1;
         g_dirty = 1;
+        EM_ASM({ console.log('[FurnacePSG] MOUSEDOWN raw=' + $0 + ',' + $1 + ' scaled=' + $2 + ',' + $3); },
+               e->button.x, e->button.y, g_mouse_x, g_mouse_y);
         break;
     case SDL_MOUSEBUTTONUP:
         g_mouse_x = e->button.x / SCALE;
         g_mouse_y = e->button.y / SCALE;
         g_mouse_down = 0;
         g_dirty = 1;
+        EM_ASM({ console.log('[FurnacePSG] MOUSEUP raw=' + $0 + ',' + $1 + ' scaled=' + $2 + ',' + $3); },
+               e->button.x, e->button.y, g_mouse_x, g_mouse_y);
         break;
     case SDL_MOUSEMOTION:
         g_mouse_x = e->motion.x / SCALE;
