@@ -146,6 +146,15 @@ function runAYEmulation(desc: SongDescriptor): Uint8Array[] {
     ram.set(block.data.subarray(0, len), block.addr);
   }
 
+  // Guard: verify that initAddr and intrAddr are covered by at least one
+  // loaded memory block so we don't silently burn cycles on uncovered addresses.
+  function isCovered(addr: number): boolean {
+    return desc.memBlocks.some(b => addr >= b.addr && addr < b.addr + b.data.length);
+  }
+  if (!isCovered(desc.initAddr) || !isCovered(desc.intrAddr)) {
+    return [];
+  }
+
   const ayRegs = new Uint8Array(16);
   let selectedReg = 0;
 
