@@ -24,6 +24,17 @@ function isFCFormat(filename: string): boolean {
   return /\.(fc|fc2|fc3|fc4|fc13|fc14|sfc|smod|bfc|bsi)$/.test(filename);
 }
 
+interface ParseOptions {
+  subsong?: number;
+  preScannedMeta?: UADEMetadata;
+  midiOptions?: {
+    quantize?: number;
+    mergeChannels?: boolean;
+    velocityToVolume?: boolean;
+    defaultPatternLength?: number;
+  };
+}
+
 /**
  * Parse a tracker module file and return a TrackerSong.
  * Handles .fur, .dmf, .mod, .xm, .it, .s3m, .mid, .hvl, .ahx, .okt, .med,
@@ -32,7 +43,7 @@ function isFCFormat(filename: string): boolean {
  * Format engine preferences (Settings → Format Engine) control which parser
  * is used for formats supported by multiple engines (MOD, HVL, MED, FC, etc.).
  */
-export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?: UADEMetadata): Promise<TrackerSong> {
+export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?: UADEMetadata, midiOptions?: ParseOptions['midiOptions']): Promise<TrackerSong> {
   const filename = file.name.toLowerCase();
   const buffer = await file.arrayBuffer();
   const prefs = getFormatEngine();
@@ -46,7 +57,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
 
   // ── MIDI ──────────────────────────────────────────────────────────────────
   if (filename.endsWith('.mid') || filename.endsWith('.midi')) {
-    return parseMIDIFile(file);
+    return parseMIDIFile(file, midiOptions);
   }
 
   // ── HivelyTracker / AHX ─────────────────────────────────────────────────
@@ -61,7 +72,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
 
   // ── Furnace / DefleMask ─────────────────────────────────────────────────
   if (filename.endsWith('.fur') || filename.endsWith('.dmf')) {
-    return parseFurnaceFile(buffer, file.name);
+    return parseFurnaceFile(buffer, file.name, subsong);
   }
 
   // ── Oktalyzer ────────────────────────────────────────────────────────────
@@ -174,6 +185,21 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── TFMX (Jochen Hippel) ─────────────────────────────────────────────────
+  if (/\.(tfmx|mdat|tfx)$/.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.tfmx === 'native') {
+      try {
+        const { parseTFMXFile } = await import('@lib/import/formats/TFMXParser');
+        return parseTFMXFile(buffer, file.name, subsong);
+      } catch (err) {
+        console.warn(`[TFMXParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── Digital Mugician ──────────────────────────────────────────────────────
   if (/\.(dmu|dmu2|mug|mug2)$/.test(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
@@ -214,9 +240,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
 
 // ─── MIDI ────────────────────────────────────────────────────────────────────
 
-async function parseMIDIFile(file: File): Promise<TrackerSong> {
+async function parseMIDIFile(file: File, options?: ParseOptions['midiOptions']): Promise<TrackerSong> {
   const { importMIDIFile } = await import('@lib/import/MIDIImporter');
-  const result = await importMIDIFile(file, { quantize: 1, mergeChannels: false, velocityToVolume: true, defaultPatternLength: 64 });
+  const result = await importMIDIFile(file, {
+    quantize: options?.quantize ?? 1,
+    mergeChannels: options?.mergeChannels ?? false,
+    velocityToVolume: options?.velocityToVolume ?? true,
+    defaultPatternLength: options?.defaultPatternLength ?? 64,
+  });
 
   const order = result.patterns.map((_, i) => i);
   return {
@@ -235,12 +266,12 @@ async function parseMIDIFile(file: File): Promise<TrackerSong> {
 
 // ─── Furnace / DefleMask ──────────────────────────────────────────────────────
 
-async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string): Promise<TrackerSong> {
+async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, subsong = 0): Promise<TrackerSong> {
   const { parseFurnaceSong, convertFurnaceToDevilbox } = await import('@lib/import/formats/FurnaceSongParser');
   const { convertToInstrument } = await import('@lib/import/InstrumentConverter');
 
   const module = await parseFurnaceSong(buffer);
-  const result = convertFurnaceToDevilbox(module);
+  const result = convertFurnaceToDevilbox(module, subsong);
 
   const instruments = result.instruments
     .map((inst, idx) => convertToInstrument(inst, idx + 1, 'FUR'))
@@ -252,7 +283,17 @@ async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string): Promise
   const patLen = patterns[0]?.length || 64;
   const numChannels = patterns[0]?.[0]?.length || 4;
 
-  interface FurnaceCell { note?: number; instrument?: number; volume?: number; effectType?: number; effectParam?: number; effectType2?: number; effectParam2?: number }
+  interface FurnaceCell {
+    note?: number; instrument?: number; volume?: number;
+    effectType?: number;  effectParam?: number;
+    effectType2?: number; effectParam2?: number;
+    effectType3?: number; effectParam3?: number;
+    effectType4?: number; effectParam4?: number;
+    effectType5?: number; effectParam5?: number;
+    effectType6?: number; effectParam6?: number;
+    effectType7?: number; effectParam7?: number;
+    effectType8?: number; effectParam8?: number;
+  }
   const convertedPatterns: Pattern[] = patterns.map((pat: FurnaceCell[][], idx: number) => ({
     id: `pattern-${idx}`,
     name: `Pattern ${idx}`,
@@ -269,7 +310,7 @@ async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string): Promise
       color: null,
       rows: pat.map((row: FurnaceCell[]) => {
         const cell = row[ch] || {};
-        return {
+        const trackerCell: import('@/types/tracker').TrackerCell = {
           note: cell.note || 0,
           instrument: cell.instrument || 0,
           volume: cell.volume || 0,
@@ -278,6 +319,13 @@ async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string): Promise
           effTyp2: cell.effectType2 || 0,
           eff2: cell.effectParam2 || 0,
         };
+        if (cell.effectType3 || cell.effectParam3) { trackerCell.effTyp3 = cell.effectType3 || 0; trackerCell.eff3 = cell.effectParam3 || 0; }
+        if (cell.effectType4 || cell.effectParam4) { trackerCell.effTyp4 = cell.effectType4 || 0; trackerCell.eff4 = cell.effectParam4 || 0; }
+        if (cell.effectType5 || cell.effectParam5) { trackerCell.effTyp5 = cell.effectType5 || 0; trackerCell.eff5 = cell.effectParam5 || 0; }
+        if (cell.effectType6 || cell.effectParam6) { trackerCell.effTyp6 = cell.effectType6 || 0; trackerCell.eff6 = cell.effectParam6 || 0; }
+        if (cell.effectType7 || cell.effectParam7) { trackerCell.effTyp7 = cell.effectType7 || 0; trackerCell.eff7 = cell.effectParam7 || 0; }
+        if (cell.effectType8 || cell.effectParam8) { trackerCell.effTyp8 = cell.effectType8 || 0; trackerCell.eff8 = cell.effectParam8 || 0; }
+        return trackerCell;
       }),
     })),
   }));

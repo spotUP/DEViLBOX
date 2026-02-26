@@ -79,6 +79,13 @@ export interface TrackerCell {
   effTyp2: EffectType;          // Second effect type (0-35)
   eff2: EffectParam;            // Second effect parameter (0x00-0xFF)
   effect2?: string;             // Legacy string format (migration only)
+  // Extra effect slots 3-8 (optional; populated from Furnace imports)
+  effTyp3?: EffectType;  eff3?: EffectParam;
+  effTyp4?: EffectType;  eff4?: EffectParam;
+  effTyp5?: EffectType;  eff5?: EffectParam;
+  effTyp6?: EffectType;  eff6?: EffectParam;
+  effTyp7?: EffectType;  eff7?: EffectParam;
+  effTyp8?: EffectType;  eff8?: EffectParam;
 
   // TB-303 specific columns (flexible like effect columns)
   // 0 = empty, 1 = accent, 2 = slide
@@ -299,7 +306,7 @@ export interface ParsedInstrument {
  * Preserves original module data for editing and re-export
  */
 export interface ImportMetadata {
-  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'HVL' | 'AHX' | 'OKT' | 'MED' | 'DIGI' | 'FC' | 'SFX' | 'SMON' | 'SIDMON2' | 'FRED' | 'DMUG' | 'UADE';
+  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'HVL' | 'AHX' | 'OKT' | 'MED' | 'DIGI' | 'FC' | 'SFX' | 'SMON' | 'SIDMON2' | 'FRED' | 'DMUG' | 'UADE' | 'TFMX';
   sourceFile: string;
   importedAt: string;
   originalChannelCount: number;
