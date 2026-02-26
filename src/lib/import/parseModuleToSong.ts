@@ -1048,6 +1048,28 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     // Fall through to libopenmpt
   }
 
+  // ── DigiBooster Pro (.dbm) ────────────────────────────────────────────────
+  if (/\.dbm$/.test(filename)) {
+    try {
+      const { isDBMFormat, parseDBMFile } = await import('@lib/import/formats/DBMParser');
+      if (isDBMFormat(buffer)) return parseDBMFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[DBMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── Imago Orpheus (.imf) ──────────────────────────────────────────────────
+  if (/\.imf$/.test(filename)) {
+    try {
+      const { isIMFFormat, parseIMFFile } = await import('@lib/import/formats/IMFParser');
+      if (isIMFFormat(buffer)) return parseIMFFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[IMFParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
