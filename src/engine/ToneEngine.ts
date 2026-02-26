@@ -1602,6 +1602,23 @@ export class ToneEngine {
               },
             });
             this.instrumentSynthTypes.set(key, 'Sampler');
+            // Tone.Sampler has no onload callback with direct AudioBuffer access.
+            // Fetch+decode the primary URL separately so TrackerReplayer's period-based
+            // playback path can find it in decodedAudioBuffers after .dbx reload.
+            if (sampleUrl) {
+              const primaryUrl = sampleUrl;
+              const loadPromise = (async () => {
+                try {
+                  const response = await fetch(primaryUrl);
+                  const arrayBuffer = await response.arrayBuffer();
+                  const audioBuffer = await this.decodeAudioData(arrayBuffer);
+                  this.decodedAudioBuffers.set(instrumentId, audioBuffer);
+                } catch (err) {
+                  console.error(`[ToneEngine] Sampler ${instrumentId} URL decode failed:`, err);
+                }
+              })();
+              this.instrumentLoadingPromises.set(key, loadPromise);
+            }
           }
         }
 
@@ -2469,6 +2486,19 @@ export class ToneEngine {
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
     if (!instrument || !(instrument as any).triggerRelease) {
+      // Special case: Sampler instruments created as Tone.Player (looped waves/wavetables)
+      // have no triggerRelease but must be explicitly stopped to prevent infinite looping.
+      if (config.synthType === 'Sampler') {
+        const playerKey = this.getInstrumentKey(instrumentId, -1);
+        const playerActualType = this.instrumentSynthTypes.get(playerKey);
+        if (playerActualType === 'Player') {
+          const player = instrument as Tone.Player;
+          if (player.state === 'started') {
+            const stopTime = config.isLive ? this.getImmediateTime() : this.getSafeTime(time);
+            if (stopTime !== null) player.stop(stopTime);
+          }
+        }
+      }
       return;
     }
 
