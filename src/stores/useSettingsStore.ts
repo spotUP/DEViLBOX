@@ -78,6 +78,7 @@ export interface FormatEnginePreferences {
   deltaMusic1: FormatEngineChoice;    // .dm/.dm1 → DeltaMusic1Parser vs UADE
   iffSmus: FormatEngineChoice;        // .smus/.snx/.tiny → IffSmusParser vs UADE
   mfp: FormatEngineChoice;            // mfp.* → MFPParser vs UADE
+  richardJoseph: FormatEngineChoice;  // .rjp/RJP.*/.sng → RichardJosephParser vs UADE
   pt36: FormatEngineChoice;           // FORM+MODL → PT36Parser vs libopenmpt
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
@@ -188,6 +189,7 @@ export const useSettingsStore = create<SettingsStore>()(
         deltaMusic1: 'native',  // DeltaMusic1Parser — native parser available
         iffSmus: 'native',      // IffSmusParser — native parser available
         mfp: 'native',          // MFPParser — native parser available
+        richardJoseph: 'native', // RichardJosephParser — native parser available
         pt36: 'native',         // PT36Parser — native parser available
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
