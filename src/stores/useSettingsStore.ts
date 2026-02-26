@@ -83,6 +83,7 @@ export interface FormatEnginePreferences {
   richardJoseph: FormatEngineChoice;  // .rjp/RJP.*/.sng → RichardJosephParser vs UADE
   pt36: FormatEngineChoice;           // FORM+MODL → PT36Parser vs libopenmpt
   lme: FormatEngineChoice;            // .lme/LME.* → LMEParser vs UADE
+  medley: FormatEngineChoice;         // .ml → MedleyParser vs UADE
   futurePlayer: FormatEngineChoice;   // .fp/FP.* → FuturePlayerParser vs UADE
   markCooksey: FormatEngineChoice;    // mc.*/mcr.*/mco.* → MarkCookseyParser vs UADE
   jeroenTel: FormatEngineChoice;      // jt.*/mon_old.* → JeroenTelParser vs UADE
@@ -202,6 +203,7 @@ export const useSettingsStore = create<SettingsStore>()(
         richardJoseph: 'native', // RichardJosephParser — native parser available
         pt36: 'native',         // PT36Parser — native parser available
         lme: 'native',          // LMEParser — native parser available
+        medley: 'native',       // MedleyParser — native parser available
         futurePlayer: 'native', // FuturePlayerParser — native parser available
         markCooksey: 'native',  // MarkCookseyParser — native parser available
         jeroenTel: 'native',    // JeroenTelParser — native parser available
