@@ -100,6 +100,53 @@ export interface FormatEnginePreferences {
   jochenHippelST: FormatEngineChoice; // mdst.* → JochenHippelSTParser vs UADE
   specialFX: FormatEngineChoice;      // doda.* → SpecialFXParser vs UADE
   benDaglish: FormatEngineChoice;     // bd.* → BenDaglishParser vs UADE
+  // Newly wired parsers (2026-02-27 batch 3)
+  timeTracker: FormatEngineChoice;      // tmk.* → TimeTrackerParser vs UADE
+  kris: FormatEngineChoice;             // kris.* → KRISParser vs UADE
+  cinemaware: FormatEngineChoice;       // cin.* → CinemawareParser vs UADE
+  novoTradePacker: FormatEngineChoice;  // ntp.* → NovoTradePackerParser vs UADE
+  alcatrazPacker: FormatEngineChoice;   // alp.* → AlcatrazPackerParser vs UADE
+  bladePacker: FormatEngineChoice;      // uds.* → BladePackerParser vs UADE
+  tomyTracker: FormatEngineChoice;      // sg.* → TomyTrackerParser vs UADE
+  imagesMusicSystem: FormatEngineChoice; // ims.* (prefix form) → ImagesMusicSystemParser vs UADE
+  fashionTracker: FormatEngineChoice;   // ex.* → FashionTrackerParser vs UADE
+  multiMediaSound: FormatEngineChoice;  // mms.*/sfx20.* → MultiMediaSoundParser vs UADE
+  seanConran: FormatEngineChoice;       // scr.* → SeanConranParser vs UADE
+  thomasHermann: FormatEngineChoice;    // thm.* → ThomasHermannParser vs UADE
+  titanicsPacker: FormatEngineChoice;   // tits.* → TitanicsPackerParser vs UADE
+  krisHatlelid: FormatEngineChoice;     // kh.* → KrisHatlelidParser vs UADE
+  ntsp: FormatEngineChoice;             // two.* → NTSPParser vs UADE
+  moshPacker: FormatEngineChoice;       // mosh.* → MoshPackerParser vs UADE
+  coreDesign: FormatEngineChoice;       // core.* → CoreDesignParser vs UADE
+  jankoMrsicFlogel: FormatEngineChoice; // jmf.* → JankoMrsicFlogelParser vs UADE
+  soundPlayer: FormatEngineChoice;      // sjs.* → SoundPlayerParser vs UADE
+  nickPellingPacker: FormatEngineChoice; // npp.* → NickPellingPackerParser vs UADE
+  peterVerswyvelenPacker: FormatEngineChoice; // pvp.* → PeterVerswyvelenPackerParser vs UADE
+  wallyBeben: FormatEngineChoice;       // wb.* → WallyBebenParser vs UADE
+  steveBarrett: FormatEngineChoice;     // sb.* → SteveBarrettParser vs UADE
+  paulSummers: FormatEngineChoice;      // snk.* → PaulSummersParser vs UADE
+  desire: FormatEngineChoice;           // dsr.* → DesireParser vs UADE
+  martinWalker: FormatEngineChoice;     // avp.*/mw.* (prefix) → MartinWalkerParser vs UADE
+  paulShields: FormatEngineChoice;      // ps.* → PaulShieldsParser vs UADE
+  paulRobotham: FormatEngineChoice;     // dat.* → PaulRobothamParser vs UADE
+  pierreAdane: FormatEngineChoice;      // pap.* → PierreAdaneParser vs UADE
+  anders0land: FormatEngineChoice;      // hot.* → Anders0landParser vs UADE
+  andrewParton: FormatEngineChoice;     // bye.* → AndrewPartonParser vs UADE
+  customMade: FormatEngineChoice;       // cm.*/rk.*/rkb.* → CustomMadeParser vs UADE
+  benDaglishSID: FormatEngineChoice;    // bds.* → BenDaglishSIDParser vs UADE
+  digitalSonixChrome: FormatEngineChoice; // dsc.* → DigitalSonixChromeParser vs UADE
+  jesperOlsen: FormatEngineChoice;      // jo.* → JesperOlsenParser vs UADE
+  kimChristensen: FormatEngineChoice;   // kim.* → KimChristensenParser vs UADE
+  ashleyHogg: FormatEngineChoice;       // ash.* → AshleyHoggParser vs UADE
+  adpcmMono: FormatEngineChoice;        // adpcm.* → ADPCMmonoParser vs UADE
+  janneSalmijarvi: FormatEngineChoice;  // js.* → JanneSalmijarviParser vs UADE
+  jochenHippel7V: FormatEngineChoice;   // hip7.*/s7g.* → JochenHippel7VParser vs UADE
+  maximumEffect: FormatEngineChoice;    // max.* → MaximumEffectParser vs UADE
+  midiLoriciel: FormatEngineChoice;     // midi.* → MIDILoricielParser vs UADE
+  onEscapee: FormatEngineChoice;        // one.* → OnEscapeeParser vs UADE
+  paulTonge: FormatEngineChoice;        // pat.* → PaulTongeParser vs UADE
+  robHubbardST: FormatEngineChoice;     // rho.* → RobHubbardSTParser vs UADE
+  robHubbard: FormatEngineChoice;       // rh.* → RobHubbardParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -229,6 +276,52 @@ export const useSettingsStore = create<SettingsStore>()(
         jochenHippelST: 'native', // JochenHippelSTParser — dedicated Jochen Hippel ST support
         specialFX: 'native',      // SpecialFXParser — dedicated Special FX ST support
         benDaglish: 'native',     // BenDaglishParser — dedicated Ben Daglish support
+        timeTracker: 'native',          // TimeTrackerParser — dedicated TimeTracker support
+        kris: 'native',                 // KRISParser — dedicated ChipTracker/KRIS support
+        cinemaware: 'native',           // CinemawareParser — dedicated Cinemaware support
+        novoTradePacker: 'native',      // NovoTradePackerParser — dedicated NovoPacker support
+        alcatrazPacker: 'native',       // AlcatrazPackerParser — dedicated Alcatraz Packer support
+        bladePacker: 'native',          // BladePackerParser — dedicated Blade Packer support
+        tomyTracker: 'native',          // TomyTrackerParser — dedicated Tomy Tracker support
+        imagesMusicSystem: 'native',    // ImagesMusicSystemParser — dedicated IMS prefix support
+        fashionTracker: 'native',       // FashionTrackerParser — dedicated Fashion Tracker support
+        multiMediaSound: 'native',      // MultiMediaSoundParser — dedicated MultiMedia Sound support
+        seanConran: 'native',           // SeanConranParser — dedicated Sean Conran support
+        thomasHermann: 'native',        // ThomasHermannParser — dedicated Thomas Hermann support
+        titanicsPacker: 'native',       // TitanicsPackerParser — dedicated Titanics Packer support
+        krisHatlelid: 'native',         // KrisHatlelidParser — dedicated Kris Hatlelid support
+        ntsp: 'native',                 // NTSPParser — dedicated NTSP System support
+        moshPacker: 'native',           // MoshPackerParser — dedicated Mosh Packer support
+        coreDesign: 'native',           // CoreDesignParser — dedicated Core Design support
+        jankoMrsicFlogel: 'native',     // JankoMrsicFlogelParser — dedicated JMF support
+        soundPlayer: 'native',          // SoundPlayerParser — dedicated Sound Player support
+        nickPellingPacker: 'native',    // NickPellingPackerParser — dedicated NPP support
+        peterVerswyvelenPacker: 'native', // PeterVerswyvelenPackerParser — dedicated PVP support
+        wallyBeben: 'native',           // WallyBebenParser — dedicated Wally Beben support
+        steveBarrett: 'native',         // SteveBarrettParser — dedicated Steve Barrett support
+        paulSummers: 'native',          // PaulSummersParser — dedicated Paul Summers support
+        desire: 'native',               // DesireParser — dedicated Desire support
+        martinWalker: 'native',         // MartinWalkerParser — dedicated Martin Walker support
+        paulShields: 'native',          // PaulShieldsParser — dedicated Paul Shields support
+        paulRobotham: 'native',         // PaulRobothamParser — dedicated Paul Robotham support
+        pierreAdane: 'native',          // PierreAdaneParser — dedicated Pierre Adane support
+        anders0land: 'native',          // Anders0landParser — dedicated Anders 0land support
+        andrewParton: 'native',         // AndrewPartonParser — dedicated Andrew Parton support
+        customMade: 'native',           // CustomMadeParser — dedicated Custom Made support
+        benDaglishSID: 'native',        // BenDaglishSIDParser — dedicated Ben Daglish SID support
+        digitalSonixChrome: 'native',   // DigitalSonixChromeParser — dedicated DSC support
+        jesperOlsen: 'native',          // JesperOlsenParser — dedicated Jesper Olsen support
+        kimChristensen: 'native',       // KimChristensenParser — dedicated Kim Christensen support
+        ashleyHogg: 'native',           // AshleyHoggParser — dedicated Ashley Hogg support
+        adpcmMono: 'native',            // ADPCMmonoParser — dedicated ADPCM Mono support
+        janneSalmijarvi: 'native',      // JanneSalmijarviParser — dedicated Janne Salmijarvi support
+        jochenHippel7V: 'native',       // JochenHippel7VParser — dedicated Jochen Hippel 7V support
+        maximumEffect: 'native',        // MaximumEffectParser — dedicated Maximum Effect support
+        midiLoriciel: 'native',         // MIDILoricielParser — dedicated MIDI Loriciel support
+        onEscapee: 'native',            // OnEscapeeParser — dedicated onEscapee support
+        paulTonge: 'native',            // PaulTongeParser — dedicated Paul Tonge support
+        robHubbardST: 'native',         // RobHubbardSTParser — dedicated Rob Hubbard ST support
+        robHubbard: 'native',           // RobHubbardParser — dedicated Rob Hubbard support
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
