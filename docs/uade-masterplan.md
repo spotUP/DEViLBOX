@@ -271,14 +271,8 @@ Format DSP Source → thin WASM wrapper → TypeScript engine → TypeScript syn
 
 ## Remaining Work
 
-### High value
-- **Phase B2** — Quadra Composer native parser (IFF-based, well-documented)
-- **Phase B3** — AMOS Music Bank native parser
-- **Phase B4** — TCB Tracker native parser (Atari ST)
-
 ### Low priority / future
-- ~~**OctaMED real-time synthesis**~~ — Complete as of 2026-02-27
-- **TFMX UI** — `TFMXControls.tsx` is currently read-only (VolModSeq/SndModSeq hex viewer); editable controls would require reverse-engineering the macro format further
+- **Phase 6 PCM naming** — remaining formats (Richard Joseph `.rj`, Dave Lowe `.dl`, Mark Cooksey `.mc`, Delta Music 1 `.dm`) are compiled Amiga binaries with no parseable name tables; hard blocker, not a code gap
 
 ---
 

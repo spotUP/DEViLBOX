@@ -349,8 +349,6 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
   //   Start/Stop button: left-front  → X≈-17.5cm, Z≈+12cm
   //   Pitch fader:       right side  → X≈+17cm,   Z≈+2cm (centre), spans ~18cm
   //   33/45 RPM:         left-front  → X≈-12cm,   Z≈+13cm
-  useEffect(() => { /* accent light placeholder */ }, [accentColor]);
-
   return (
     <>
       {/* Lighting */}
