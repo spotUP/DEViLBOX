@@ -1495,6 +1495,26 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
   }
 
+  // ── Leggless Music Editor (.lme / LME.*) ────────────────────────────────────
+  // Amiga 4-channel format (Leggless Music Editor). Magic: "LME" bytes + zero at offset 36.
+  {
+    const _lmeBase = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
+    const _mightBeLME = /\.lme$/i.test(filename) || _lmeBase.toLowerCase().startsWith('lme.');
+    if (_mightBeLME) {
+      const uadeMode = prefs.uade ?? 'enhanced';
+      if (prefs.lme === 'native') {
+        try {
+          const { isLMEFormat, parseLMEFile } = await import('@lib/import/formats/LMEParser');
+          if (isLMEFormat(buffer)) return parseLMEFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[LMEParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+      }
+      const { parseUADEFile: parseUADE_lme } = await import('@lib/import/formats/UADEParser');
+      return parseUADE_lme(buffer, file.name, uadeMode, subsong, preScannedMeta);
+    }
+  }
+
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
   // Check extension list first, then fall back to UADE for unknown formats
   // (UADE also detects many formats by magic bytes, not just extension)
