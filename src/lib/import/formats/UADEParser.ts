@@ -422,6 +422,147 @@ export async function parseUADEFile(
 }
 
 /**
+ * Attempt to extract instrument names from a raw Amiga file buffer.
+ *
+ * Strategy 1 — Format-specific parsers for well-known formats:
+ *   • Delta Music 2 (.dm2): "DM2!" magic, 22-byte names at fixed stride
+ *
+ * Strategy 2 — Generic MOD-style name scan:
+ *   Many Amiga formats store instrument names as blocks of 22-byte null-terminated
+ *   ASCII strings (the ProTracker convention). We scan the first 8 KB for the
+ *   largest run of consecutive 22-byte printable-ASCII slots and return it.
+ *
+ * Returns an ordered array of names (may be shorter than the actual instrument
+ * count), or null if nothing convincing was found.
+ */
+function tryExtractInstrumentNames(buffer: ArrayBuffer, ext: string): string[] | null {
+  if (buffer.byteLength < 64) return null;
+  const bytes = new Uint8Array(buffer);
+  const view  = new DataView(buffer);
+
+  /* ── Delta Music 2 (.dm2) ─────────────────────────────────────────────── */
+  if (ext === 'dm2' || ext === 'dm') {
+    // DM2 header: magic "DM2!" at offset 0, followed by song table, then
+    // instrument table.  Each instrument slot is 32 bytes:
+    //   [0..1]  loop offset (u16BE)
+    //   [2..3]  loop length (u16BE, in words)
+    //   [4..5]  sample length (u16BE, in words)
+    //   [6]     volume (u8)
+    //   [7]     pad
+    //   [8..29] name (22 bytes, null-terminated ASCII)
+    // The instrument table starts at offset 0x3A.
+    const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+    if (magic === 'DM2!') {
+      const INSTR_TABLE = 0x3A;
+      const INSTR_SIZE  = 32;
+      const MAX_INSTR   = 31;
+      const names: string[] = [];
+      for (let i = 0; i < MAX_INSTR; i++) {
+        const off = INSTR_TABLE + i * INSTR_SIZE + 8;
+        if (off + 22 > bytes.length) break;
+        const name = readFixedAscii(bytes, off, 22);
+        if (!name) continue;
+        names.push(name);
+      }
+      if (names.length > 0) return names;
+    }
+  }
+
+  /* ── Generic: scan for MOD-style 22-byte ASCII name blocks ───────────── */
+  // Many Amiga trackers use the same 22-byte fixed-length string convention
+  // for instrument names (ProTracker, NoiseTracker, etc. and derivatives).
+  // We search the first SCAN_LIMIT bytes for the start position of the largest
+  // consecutive run of valid 22-byte ASCII strings.
+  const SCAN_LIMIT = Math.min(8192, buffer.byteLength);
+  const NAME_LEN   = 22;
+
+  let bestStart  = -1;
+  let bestCount  = 0;
+
+  // Try every possible start offset
+  for (let startOff = 0; startOff + NAME_LEN <= SCAN_LIMIT; startOff += 2) {
+    let count = 0;
+    let off   = startOff;
+    while (off + NAME_LEN <= SCAN_LIMIT) {
+      const n = readFixedAscii(bytes, off, NAME_LEN);
+      if (n === null) break;
+      count++;
+      off += NAME_LEN;
+    }
+    if (count > bestCount) {
+      bestCount = count;
+      bestStart = startOff;
+    }
+    // Require at least 3 consecutive valid names to consider the block real
+    if (bestCount >= 3) break; // good enough
+  }
+
+  if (bestCount >= 2 && bestStart >= 0) {
+    const names: string[] = [];
+    let off = bestStart;
+    for (let i = 0; i < bestCount && i < 32; i++) {
+      const n = readFixedAscii(bytes, off, NAME_LEN);
+      if (n !== null) names.push(n);
+      off += NAME_LEN;
+    }
+    return names.length > 0 ? names : null;
+  }
+
+  void view; // suppress unused-var lint for future use
+  return null;
+}
+
+/**
+ * Read a fixed-length null-terminated ASCII string from a Uint8Array.
+ * Returns null if the slice contains non-printable non-null bytes
+ * (indicating it is not a string field).
+ */
+function readFixedAscii(bytes: Uint8Array, off: number, len: number): string | null {
+  let str = '';
+  let foundNull = false;
+  for (let i = 0; i < len; i++) {
+    const c = bytes[off + i];
+    if (c === 0) {
+      foundNull = true;
+      continue;
+    }
+    if (foundNull) {
+      // Non-null byte after null-terminator → not a proper string field
+      return null;
+    }
+    // Allow printable ASCII (0x20-0x7E)
+    if (c < 0x20 || c > 0x7E) return null;
+    str += String.fromCharCode(c);
+  }
+  return str.trim() || null; // Return null for all-whitespace names
+}
+
+/**
+ * Build a contextual instrument label from enhanced scan metadata.
+ * Uses loop state and playback frequency as descriptors.
+ */
+function buildSampleLabel(instrIdx: number, typicalPeriod: number, loopLength: number): string {
+  const num = String(instrIdx).padStart(2, '0');
+
+  // Approximate note name from Amiga period (PAL: freq = 3546895 / period)
+  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  let noteName = '';
+  if (typicalPeriod > 0) {
+    const freq = 3546895 / typicalPeriod;
+    // A4 = 440 Hz = MIDI 69
+    const midi = Math.round(69 + 12 * Math.log2(freq / 440));
+    if (midi >= 0 && midi <= 127) {
+      const octave  = Math.floor(midi / 12) - 1;
+      const semitone = midi % 12;
+      noteName = ` ${noteNames[semitone]}-${octave}`;
+    }
+  }
+
+  const loopSuffix = loopLength > 0 ? ' (loop)' : '';
+  return `Sample ${num}${noteName}${loopSuffix}`;
+}
+
+/**
  * Build fully editable TrackerSong from enhanced scan data.
  * Creates real Sampler instruments with extracted PCM audio.
  */
@@ -435,6 +576,11 @@ function buildEnhancedSong(
   periodToNoteIndex: (period: number, finetune?: number) => number,
 ): TrackerSong {
   const enhanced = metadata.enhancedScan!;
+
+  // Attempt to extract instrument names from the file header.
+  // Names are ordered (index 0 = first instrument in file). We match them
+  // to the scan samples in ascending memory-pointer order.
+  const extractedNames = tryExtractInstrumentNames(buffer, ext);
 
   // Build instrument map: samplePtr → instrumentId, and create real Sampler instruments
   const sampleMap = new Map<number, number>();
@@ -469,9 +615,14 @@ function buildEnhancedSong(
     const rawLoopEnd = sample.loopLength > 0 ? sample.loopStart + sample.loopLength : 0;
     const loopEnd = rawLoopEnd > 0 ? Math.min(rawLoopEnd, pcm.length) : 0;
 
+    // Use extracted name if available; otherwise build contextual label
+    const extractedName = extractedNames?.[instrId - 1];
+    const instrName = extractedName
+      || buildSampleLabel(instrId, sample.typicalPeriod, sample.loopLength);
+
     instruments.push(createSamplerInstrument(
       instrId,
-      `Sample ${String(instrId).padStart(2, '0')}`,
+      instrName,
       pcm,
       64, // Full volume
       sampleRate,
