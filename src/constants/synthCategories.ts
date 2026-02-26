@@ -1649,6 +1649,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Disc',
     color: 'text-amber-300',
   },
+  OctaMEDSynth: {
+    type: 'OctaMEDSynth',
+    name: 'OctaMED SynthInstr',
+    shortName: 'OctaMED',
+    description: 'OctaMED synthesizer instrument: vol/wf command-table oscillator with up to 10 waveforms',
+    bestFor: ['Amiga chiptune', 'Wavetable', 'Tracker synth'],
+    icon: 'Waveform',
+    color: 'text-cyan-300',
+  },
 };
 
 // Organized categories
