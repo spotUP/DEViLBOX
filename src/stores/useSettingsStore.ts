@@ -49,6 +49,7 @@ export interface FormatEnginePreferences {
   digitalSoundStudio: FormatEngineChoice; // .dss → DigitalSoundStudioParser vs UADE
   digitalSymphony: FormatEngineChoice;    // .dsym → DigitalSymphonyParser vs UADE
   graoumfTracker2: FormatEngineChoice;    // .gt2/.gtk → GraoumfTracker2Parser vs UADE
+  symphoniePro: FormatEngineChoice;       // .symmod → SymphonieProParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -130,6 +131,7 @@ export const useSettingsStore = create<SettingsStore>()(
         digitalSoundStudio: 'native', // DigitalSoundStudioParser — dedicated Digital Sound Studio support
         digitalSymphony: 'native',    // DigitalSymphonyParser — dedicated Digital Symphony support
         graoumfTracker2: 'native',  // GraoumfTracker2Parser — dedicated Graoumf Tracker 1/2 support
+        symphoniePro: 'native',     // SymphonieProParser — dedicated Symphonie Pro support
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',

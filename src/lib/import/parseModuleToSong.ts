@@ -574,6 +574,26 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── Symphonie Pro ─────────────────────────────────────────────────────────
+  // .symmod files — identified by "SymM" magic at offset 0.
+  if (/\.symmod$/i.test(filename)) {
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.symphoniePro === 'native') {
+      try {
+        const { isSymphonieProFormat, parseSymphonieProFile } = await import('@lib/import/formats/SymphonieProParser');
+        const bytes = new Uint8Array(buffer);
+        if (isSymphonieProFormat(bytes)) {
+          const result = parseSymphonieProFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[SymphonieProParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
+  }
+
   // ── PumaTracker ───────────────────────────────────────────────────────────
   // .puma files — no magic bytes; heuristic header validation (mirrors OpenMPT).
   if (/\.puma$/.test(filename)) {
