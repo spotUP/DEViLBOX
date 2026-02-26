@@ -172,7 +172,8 @@ export async function parseSoundFXFile(
   // -- Skip 20 bytes after sample size table (FlodJS: stream.position += 20) --
   pos += 20;
 
-  // -- Read sample metadata (30 bytes each: 22-name, 2-length, 2-volume, 2-loop, 2-repeat) --
+  // -- Read sample metadata (30 bytes each per OpenMPT SFXSampleHeader) --
+  // Bytes: name[22] + oneshotLength(2) + finetune(1) + volume(1) + loopStart(2) + loopLength(2)
   const samples: (SFXSample | null)[] = [];
 
   // Reconstruct sample pointers from sizes (cumulative offset)
@@ -205,7 +206,8 @@ export async function parseSoundFXFile(
 
     const name = readString(view, pos, 22);
     const length = readUint16BE(view, pos + 22) << 1;
-    const volume = readUint16BE(view, pos + 24);
+    /* finetune */ readUint8(view, pos + 24);          // not used, but read for correctness
+    const volume = readUint8(view, pos + 25);          // uint8 at +25 (not uint16 at +24)
     const loop = readUint16BE(view, pos + 26);
     const repeat = readUint16BE(view, pos + 28) << 1;
 
@@ -584,11 +586,9 @@ export async function parseSoundFXFile(
   }
 
   // -- Calculate BPM from tempo -----------------------------------------------
-  // FlodJS uses: value = (standard ? 20.44952532 : 20.637767904)
-  // mixerSamplesTick = ((tempo / 122) * value * (sampleRate/1000)) / 120
-  // We approximate BPM. The default SoundFX tempo of 14565 at PAL ~ 125 BPM.
-  // Standard Amiga tracker default is 125 BPM, 6 ticks/row.
-  const initialBPM = tempo > 0 ? Math.round((tempo * 125) / 14565) : 125;
+  // OpenMPT Load_sfx.cpp: BPM = (14565.0 * 122.0) / fileHeader.speed
+  // where speed is the raw timer value (same as our `tempo` variable).
+  const initialBPM = tempo > 0 ? Math.round((14565.0 * 122.0) / tempo) : 125;
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
 
