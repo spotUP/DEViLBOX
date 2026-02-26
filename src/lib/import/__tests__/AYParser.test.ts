@@ -198,5 +198,19 @@ describe('AYParser', () => {
     const chA = pat.channels[0];
     const hasNote = chA.rows.some(cell => cell.note > 0 && cell.note < 97);
     expect(hasNote).toBe(true);
+
+    // Channel A should have at least one note approximately equal to MIDI 72 (C5) ±2
+    // Period 213 → freq ≈ 520.6 Hz → MIDI ≈ 72
+    const hasC5 = chA.rows.some(cell => cell.note >= 70 && cell.note <= 74);
+    expect(hasC5).toBe(true);
+
+    // Channels B (index 1) and C (index 2) should have NO pitched notes,
+    // since only channel A registers are written by the play routine.
+    const chB = pat.channels[1];
+    const chC = pat.channels[2];
+    const chBHasNote = chB.rows.some(cell => cell.note > 0 && cell.note < 97);
+    const chCHasNote = chC.rows.some(cell => cell.note > 0 && cell.note < 97);
+    expect(chBHasNote).toBe(false);
+    expect(chCHasNote).toBe(false);
   });
 });
