@@ -111,7 +111,9 @@ function runSAPEmulation(buf: Uint8Array, meta: SAPMeta, numCh: number): FrameNo
 
   const cpu = new Cpu6502(mem);
   const initAddr = meta.type === 'B' ? meta.initAddr : meta.musicAddr;
-  const playAddr = meta.playerAddr || meta.initAddr;
+  // Do NOT fall back to initAddr when playerAddr is 0: init routines are not
+  // designed to be called repeatedly and produce garbled output as a play routine.
+  const playAddr = meta.playerAddr;
 
   if (initAddr === 0 || playAddr === 0) return [];
 
@@ -195,7 +197,7 @@ export async function parseSAPFile(buffer: ArrayBuffer, filename: string): Promi
   }));
 
   let pattern: Pattern;
-  if (meta.dataOffset > 0 && (meta.initAddr > 0 || meta.playerAddr > 0)) {
+  if (meta.dataOffset > 0 && meta.initAddr > 0 && meta.playerAddr > 0) {
     try {
       const frameStates = runSAPEmulation(buf, meta, numCh);
       pattern = frameStates.length > 0
