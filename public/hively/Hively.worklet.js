@@ -303,34 +303,28 @@ class HivelyProcessor extends AudioWorkletProcessor {
     const outputR = output[1] || output[0];
     const numSamples = outputL.length;
 
-    if (!this.playing || !this.tuneLoaded) {
-      // Silence
-      outputL.fill(0);
-      outputR.fill(0);
-      return true;
-    }
+    // Start silent — song playback and standalone players add into this
+    outputL.fill(0);
+    outputR.fill(0);
 
-    // Refill ring buffer if running low
-    while (this.ringAvailable < numSamples + this.frameSamples) {
-      const prevAvailable = this.ringAvailable;
-      this.decodeAndFillRing();
-      // Break if no progress (song ended or error)
-      if (this.ringAvailable === prevAvailable) break;
-    }
+    // ── Song playback (ring-buffer decode) ──
+    if (this.playing && this.tuneLoaded) {
+      // Refill ring buffer if running low
+      while (this.ringAvailable < numSamples + this.frameSamples) {
+        const prevAvailable = this.ringAvailable;
+        this.decodeAndFillRing();
+        // Break if no progress (song ended or error)
+        if (this.ringAvailable === prevAvailable) break;
+      }
 
-    // Copy from ring buffer to output
-    const available = Math.min(numSamples, this.ringAvailable);
-    for (let i = 0; i < available; i++) {
-      outputL[i] = this.ringL[this.ringReadPos];
-      outputR[i] = this.ringR[this.ringReadPos];
-      this.ringReadPos = (this.ringReadPos + 1) % this.ringSize;
-    }
-    this.ringAvailable -= available;
-
-    // Zero any remaining samples
-    for (let i = available; i < numSamples; i++) {
-      outputL[i] = 0;
-      outputR[i] = 0;
+      // Add ring buffer samples into output
+      const available = Math.min(numSamples, this.ringAvailable);
+      for (let i = 0; i < available; i++) {
+        outputL[i] = this.ringL[this.ringReadPos];
+        outputR[i] = this.ringR[this.ringReadPos];
+        this.ringReadPos = (this.ringReadPos + 1) % this.ringSize;
+      }
+      this.ringAvailable -= available;
     }
 
     // ── Mix in standalone instrument players ──
