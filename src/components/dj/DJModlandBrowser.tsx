@@ -11,6 +11,7 @@ import {
   searchModland,
   getModlandFormats,
   downloadModlandFile,
+  downloadTFMXCompanion,
   getModlandStatus,
   type ModlandFile,
   type ModlandFormat,
@@ -126,7 +127,16 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
       setError(null);
 
       try {
-        const buffer = await downloadModlandFile(file.full_path);
+        const [buffer, companion] = await Promise.all([
+          downloadModlandFile(file.full_path),
+          downloadTFMXCompanion(file.full_path),
+        ]);
+
+        if (companion) {
+          const { UADEEngine } = await import('@engine/uade/UADEEngine');
+          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+        }
+
         const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
         const song = await parseModuleToSong(blob);
         const bpmResult = detectBPM(song);
@@ -182,7 +192,16 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
       setError(null);
 
       try {
-        const buffer = await downloadModlandFile(file.full_path);
+        const [buffer, companion] = await Promise.all([
+          downloadModlandFile(file.full_path),
+          downloadTFMXCompanion(file.full_path),
+        ]);
+
+        if (companion) {
+          const { UADEEngine } = await import('@engine/uade/UADEEngine');
+          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+        }
+
         const blob = new File([buffer], file.filename, { type: 'application/octet-stream' });
         const song = await parseModuleToSong(blob);
         const bpmResult = detectBPM(song);
@@ -255,7 +274,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
       tabIndex={-1}
     >
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex-shrink-0 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Globe size={14} className="text-green-400" />
           <h3 className="text-text-primary text-sm font-mono font-bold tracking-wider uppercase">
@@ -280,7 +299,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
       </div>
 
       {/* Search + Filter */}
-      <div className="flex gap-2">
+      <div className="flex-shrink-0 flex gap-2">
         <div className="flex-1 relative">
           <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
           <input

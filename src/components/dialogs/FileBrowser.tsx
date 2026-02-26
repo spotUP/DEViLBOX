@@ -49,6 +49,7 @@ import {
   searchModland,
   getModlandFormats,
   downloadModlandFile,
+  downloadTFMXCompanion,
   getModlandStatus,
   type ModlandFile,
   type ModlandFormat,
@@ -746,7 +747,18 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       setModlandDownloading((prev) => new Set(prev).add(file.full_path));
       setModlandError(null);
       try {
-        const buffer = await downloadModlandFile(file.full_path);
+        // Download primary file and optional TFMX companion in parallel
+        const [buffer, companion] = await Promise.all([
+          downloadModlandFile(file.full_path),
+          downloadTFMXCompanion(file.full_path),
+        ]);
+
+        // Pre-write companion to UADE WASM filesystem before loading
+        if (companion) {
+          const { UADEEngine } = await import('@engine/uade/UADEEngine');
+          await UADEEngine.getInstance().addCompanionFile(companion.filename, companion.buffer);
+        }
+
         await onLoadTrackerModule(buffer, file.filename);
         onClose();
       } catch (err) {
@@ -771,7 +783,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
+        <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-dark-border">
           <h2 className="text-lg font-bold text-text-primary">
             {mode === 'load' ? 'Load Module' : 'Save Module'}
           </h2>
@@ -785,7 +797,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         </div>
 
         {/* View Mode Tabs */}
-        <div className="flex border-b border-dark-border bg-dark-bgTertiary">
+        <div className="flex-shrink-0 flex border-b border-dark-border bg-dark-bgTertiary">
           {/* Demo Files Tab */}
           <button
             onClick={() => {
@@ -865,7 +877,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
 
         {/* Breadcrumb / Current Path */}
         {currentPath && fileSource === 'demo' && (
-          <div className="px-4 py-2 bg-dark-bgTertiary border-b border-dark-border">
+          <div className="flex-shrink-0 px-4 py-2 bg-dark-bgTertiary border-b border-dark-border">
             <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono truncate">
               <FolderOpen size={14} /> {currentPath}
             </div>
@@ -874,7 +886,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
 
         {/* Cloud Files Info */}
         {fileSource === 'cloud' && user && (
-          <div className="px-4 py-2 bg-accent-primary/10 border-b border-dark-border">
+          <div className="flex-shrink-0 px-4 py-2 bg-accent-primary/10 border-b border-dark-border">
             <div className="flex items-center gap-1.5 text-xs text-accent-primary">
               <Cloud size={14} /> Your saved files ({cloudFiles.length})
             </div>
@@ -883,7 +895,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
 
         {/* Modland search bar */}
         {fileSource === 'modland' && (
-          <div className="px-4 py-2 bg-dark-bgTertiary border-b border-dark-border flex gap-2 items-center">
+          <div className="flex-shrink-0 px-4 py-2 bg-dark-bgTertiary border-b border-dark-border flex gap-2 items-center">
             <div className="flex items-center gap-2 text-xs text-text-muted font-mono">
               {modlandStatus?.status === 'ready' && (
                 <span>{modlandStatus.totalFiles.toLocaleString()} files</span>
@@ -923,7 +935,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         )}
 
         {/* File List */}
-        <div ref={fileListRef} className="flex-1 overflow-auto p-4">
+        <div ref={fileListRef} className="flex-1 min-h-0 overflow-auto p-4">
           {error && (
             <div className="bg-red-900/30 border border-red-500 text-red-300 px-4 py-2 rounded mb-4 select-text">
               {error}
@@ -1013,12 +1025,12 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
               )}
             </div>
           ) : isLoading ? (
-            <div className="flex items-center justify-center h-full text-text-muted">
+            <div className="flex items-center justify-center py-16 text-text-muted">
               Loading...
             </div>
           ) : fileSource === 'cloud' && !user ? (
             // Cloud mode but not logged in
-            <div className="flex flex-col items-center justify-center h-full text-text-muted">
+            <div className="flex flex-col items-center justify-center py-16 text-text-muted">
               <Cloud size={48} className="mb-4 text-text-muted/50" />
               <p className="mb-2 text-lg font-medium">Sign in to save files</p>
               <p className="mb-4 text-sm text-center max-w-md">
@@ -1032,7 +1044,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
               </button>
             </div>
           ) : files.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-text-muted">
+            <div className="flex flex-col items-center justify-center py-16 text-text-muted">
               {fileSource === 'cloud' ? (
                 <>
                   <Cloud size={48} className="mb-4 text-text-muted/50" />
@@ -1187,7 +1199,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-4 px-4 py-3 border-t border-dark-border">
+        <div className="flex-shrink-0 flex items-center gap-4 px-4 py-3 border-t border-dark-border">
           {mode === 'save' && fileSource !== 'modland' && (
             <input
               type="text"
@@ -1224,9 +1236,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       {/* Version History Modal */}
       {showRevisions && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60]">
-          <div className="bg-dark-bgPrimary border border-dark-border rounded-lg w-[400px] max-h-[500px] flex flex-col">
+          <div className="bg-dark-bgPrimary border border-dark-border rounded-lg w-[400px] h-[500px] max-h-[80vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
+            <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-dark-border">
               <div className="flex items-center gap-2">
                 <History size={18} className="text-accent-primary" />
                 <span className="font-semibold text-text-primary">Version History</span>
@@ -1244,13 +1256,13 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             </div>
 
             {/* File info */}
-            <div className="px-4 py-2 bg-dark-bgSecondary border-b border-dark-border">
+            <div className="flex-shrink-0 px-4 py-2 bg-dark-bgSecondary border-b border-dark-border">
               <span className="text-sm text-text-muted">File: </span>
               <span className="text-sm text-text-primary font-medium">{revisionsFilename}</span>
             </div>
 
             {/* Revision list */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4">
               {revisionsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin w-6 h-6 border-2 border-accent-primary border-t-transparent rounded-full" />

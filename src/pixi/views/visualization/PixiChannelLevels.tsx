@@ -110,12 +110,19 @@ export const PixiChannelLevels: React.FC<PixiChannelLevelsProps> = ({ width, hei
     g.clear(); g.rect(0, 0, width, height); g.fill({ color: theme.bg.color });
   };
 
-  return isPlaying ? (
-    <pixiGraphics ref={graphicsRef} draw={() => {}} layout={{ width, height }} />
-  ) : (
+  // Always render the same element tree to avoid Yoga node swap BindingErrors.
+  // Swapping between pixiGraphics and pixiContainer on isPlaying change causes
+  // "Expected null or instance of Node" errors in @pixi/layout's Yoga WASM binding.
+  return (
     <pixiContainer layout={{ width, height, justifyContent: 'center', alignItems: 'center' }}>
-      <pixiGraphics draw={drawStatic} layout={{ position: 'absolute', width, height }} />
-      <pixiBitmapText text="LEVELS" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={theme.textMuted.color} layout={{}} />
+      <pixiGraphics ref={graphicsRef} draw={isPlaying ? () => {} : drawStatic} layout={{ position: 'absolute', width, height }} />
+      <pixiBitmapText
+        text="LEVELS"
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+        tint={theme.textMuted.color}
+        layout={isPlaying ? { width: 0, height: 0 } : {}}
+        visible={!isPlaying}
+      />
     </pixiContainer>
   );
 };
