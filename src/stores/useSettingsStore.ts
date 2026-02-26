@@ -44,14 +44,8 @@ export interface FormatEnginePreferences {
   inStereo1: FormatEngineChoice;      // .is/.is10 → InStereo1Parser vs UADE
   inStereo2: FormatEngineChoice;      // .is/.is20 → InStereo2Parser vs UADE
   pumaTracker: FormatEngineChoice;    // .puma → PumaTrackerParser vs UADE
-  gameMusicCreator: FormatEngineChoice; // .gmc → GameMusicCreatorParser vs UADE
-  faceTheMusic: FormatEngineChoice;     // .ftm → FaceTheMusicParser vs UADE
-  sawteeth: FormatEngineChoice;         // .st (SWTD magic) → SawteethParser vs UADE
-  soundControl: FormatEngineChoice;     // .sc/.sct → SoundControlParser vs UADE
-  soundFactory: FormatEngineChoice;     // .psf → SoundFactoryParser vs UADE
-  actionamics: FormatEngineChoice;      // .act → ActionamicsParser vs UADE
-  activisionPro: FormatEngineChoice;    // .avp/.mw → ActivisionProParser vs UADE
-  ronKlaren: FormatEngineChoice;        // .rk/.rkb → RonKlarenParser vs UADE
+  synthesis: FormatEngineChoice;      // .syn → SynthesisParser vs UADE
+  musicAssembler: FormatEngineChoice; // .ma → MusicAssemblerParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -127,16 +121,10 @@ export const useSettingsStore = create<SettingsStore>()(
         sonicArranger: 'native', // SonicArrangerParser — dedicated Sonic Arranger support
         inStereo1: 'native',    // InStereo1Parser — dedicated InStereo! 1.0 support
         inStereo2: 'native',    // InStereo2Parser — dedicated InStereo! 2.0 support
-        pumaTracker: 'native',  // PumaTrackerParser — dedicated PumaTracker support
-        gameMusicCreator: 'native', // GameMusicCreatorParser — dedicated Game Music Creator support
-        faceTheMusic: 'native',     // FaceTheMusicParser — dedicated Face The Music support
-        sawteeth: 'native',         // SawteethParser — dedicated Sawteeth support
-        soundControl: 'native',     // SoundControlParser — dedicated Sound Control support
-        soundFactory: 'native',     // SoundFactoryParser — dedicated Sound Factory support
-        actionamics: 'native',      // ActionamicsParser — dedicated Actionamics support
-        activisionPro: 'native',    // ActivisionProParser — dedicated Activision Pro support
-        ronKlaren: 'native',        // RonKlarenParser — dedicated Ron Klaren support
-        uade: 'enhanced',       // UADE formats — enhanced (editable) by default
+        pumaTracker: 'native',      // PumaTrackerParser — dedicated PumaTracker support
+        synthesis: 'native',        // SynthesisParser — dedicated Synthesis support
+        musicAssembler: 'native',   // MusicAssemblerParser — dedicated Music Assembler support
+        uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
       useBLEP: false,  // Default: BLEP disabled (enable in Settings for band-limited synthesis)

@@ -60,6 +60,8 @@ Track which formats have native parsers vs UADE-only.
 | `.ym` | YM (Atari ST) | YMParser.ts | — | native only |
 | `.nsf`, `.nsfe` | NSF (NES) | NSFParser.ts | — | native only |
 | `.xm` | XM (FastTracker II) | XMParser.ts | — | native only |
+| `.syn` | Synthesis | SynthesisParser.ts | NostalgicPlayer | Synth4.0/4.2; UADE fallback |
+| `.ma` | Music Assembler | MusicAssemblerParser.ts | NostalgicPlayer | M68k heuristic; UADE fallback |
 
 ---
 
@@ -74,8 +76,6 @@ Track which formats have native parsers vs UADE-only.
 
 | Format | Parser File (planned) | Reference | Notes |
 |---|---|---|---|
-| Synthesis | SynthesisParser.ts | NostalgicPlayer | check Synthesis.cs for extension |
-| Music Assembler | MusicAssemblerParser.ts | NostalgicPlayer | `.amc` |
 | Digital Sound Studio | DigitalSoundStudioParser.ts | NostalgicPlayer + DSS.txt spec | `.dss` |
 
 ---
@@ -124,6 +124,8 @@ Track which formats have native parsers vs UADE-only.
 
 | Date | Format | Parser | Reference used |
 |---|---|---|---|
+| 2026-02-26 | Synthesis | SynthesisParser.ts | NostalgicPlayer |
+| 2026-02-26 | Music Assembler | MusicAssemblerParser.ts | NostalgicPlayer |
 | 2026-02-26 | InStereo! 1.0 & 2.0 | InStereo1Parser.ts, InStereo2Parser.ts | NostalgicPlayer |
 | 2026-02-26 | PumaTracker | PumaTrackerParser.ts | **OpenMPT** Load_puma.cpp |
 | 2026-02-26 | Sonic Arranger | SonicArrangerParser.ts | NostalgicPlayer |
