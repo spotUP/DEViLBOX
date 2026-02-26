@@ -62,6 +62,16 @@ Track which formats have native parsers vs UADE-only.
 | `.xm` | XM (FastTracker II) | XMParser.ts | — | native only |
 | `.syn` | Synthesis | SynthesisParser.ts | NostalgicPlayer | Synth4.0/4.2; UADE fallback |
 | `.ma` | Music Assembler | MusicAssemblerParser.ts | NostalgicPlayer | M68k heuristic; UADE fallback |
+| `.unic` | UNIC Tracker | UNICParser.ts | **OpenMPT** Load_unic.cpp | OpenMPT fallback |
+| `.mtm` | MultiTracker | MTMParser.ts | **OpenMPT** Load_mtm.cpp | OpenMPT fallback |
+| `.669` | Composer 669 | Format669Parser.ts | **OpenMPT** Load_669.cpp | OpenMPT fallback |
+| `.far` | Farandole Composer | FARParser.ts | **OpenMPT** Load_far.cpp | OpenMPT fallback |
+| `.plm` | Disorder Tracker 2 | PLMParser.ts | **OpenMPT** Load_plm.cpp | OpenMPT fallback |
+| `.ult` | Ultra Tracker | ULTParser.ts | **OpenMPT** Load_ult.cpp | OpenMPT fallback |
+| `.rtm` | Reality Tracker | RTMParser.ts | **OpenMPT** Load_rtm.cpp | OpenMPT fallback |
+| `.dsm` | DSIK Sound Module | DSMParser.ts | **OpenMPT** Load_dsm.cpp | OpenMPT fallback |
+| `.dtm` | Digital Tracker | DTMParser.ts | **OpenMPT** Load_dtm.cpp | OpenMPT fallback |
+| `.stm` | ScreamTracker 2 | STMParser.ts | **OpenMPT** Load_stm.cpp | OpenMPT fallback |
 
 ---
 
@@ -95,16 +105,6 @@ Track which formats have native parsers vs UADE-only.
 
 | Extension(s) | Format | OpenMPT Loader | Parser File |
 |---|---|---|---|
-| `.unic` | UNIC Tracker | Load_unic.cpp (251 ln) | UNICParser.ts |
-| `.mtm` | MultiTracker | Load_mtm.cpp (318 ln) | MTMParser.ts |
-| `.669` | Composer 669 | Load_669.cpp (332 ln) | Format669Parser.ts |
-| `.far` | Farandole Composer | Load_far.cpp (336 ln) | FARParser.ts |
-| `.plm` | Disorder Tracker 2 | Load_plm.cpp (409 ln) | PLMParser.ts |
-| `.ult` | Ultra Tracker | Load_ult.cpp (435 ln) | ULTParser.ts |
-| `.rtm` | Reality Tracker | Load_rtm.cpp (443 ln) | RTMParser.ts |
-| `.dsm` | DSIK Sound Module | Load_dsm.cpp (525 ln) | DSMParser.ts |
-| `.dtm` | Digital Tracker | Load_dtm.cpp (596 ln) | DTMParser.ts |
-| `.stm` | ScreamTracker 2 | Load_stm.cpp (615 ln) | STMParser.ts |
 
 ---
 
@@ -146,3 +146,13 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | Sawteeth | SawteethParser.ts | NostalgicPlayer |
 | 2026-02-26 | Sound Control | SoundControlParser.ts | NostalgicPlayer |
 | 2026-02-26 | Sound Factory | SoundFactoryParser.ts | NostalgicPlayer |
+| 2026-02-26 | UNIC Tracker | UNICParser.ts | **OpenMPT** Load_unic.cpp |
+| 2026-02-26 | MultiTracker | MTMParser.ts | **OpenMPT** Load_mtm.cpp |
+| 2026-02-26 | Composer 669 | Format669Parser.ts | **OpenMPT** Load_669.cpp |
+| 2026-02-26 | Farandole Composer | FARParser.ts | **OpenMPT** Load_far.cpp |
+| 2026-02-26 | Disorder Tracker 2 | PLMParser.ts | **OpenMPT** Load_plm.cpp |
+| 2026-02-26 | Ultra Tracker | ULTParser.ts | **OpenMPT** Load_ult.cpp |
+| 2026-02-26 | Reality Tracker | RTMParser.ts | **OpenMPT** Load_rtm.cpp |
+| 2026-02-26 | DSIK Sound Module | DSMParser.ts | **OpenMPT** Load_dsm.cpp |
+| 2026-02-26 | Digital Tracker | DTMParser.ts | **OpenMPT** Load_dtm.cpp |
+| 2026-02-26 | ScreamTracker 2 | STMParser.ts | **OpenMPT** Load_stm.cpp |
