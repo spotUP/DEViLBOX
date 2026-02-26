@@ -11,14 +11,15 @@
  *   WASM→JS: 240-byte 0xDE field format via dump_config, called on-demand
  */
 
-import React, { useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 import { SDLHardwareWrapper, type SDLModule } from './SDLHardwareWrapper';
-import type { FurnaceConfig, SynthType } from '@typedefs/instrument';
+import type { FurnaceConfig, SynthType, InstrumentConfig } from '@typedefs/instrument';
 
 interface FurnaceInsEdHardwareProps {
   config: FurnaceConfig;
   onChange: (config: FurnaceConfig) => void;
   synthType?: SynthType;
+  instrument?: InstrumentConfig;
 }
 
 /* ── DivInstrumentType mapping ─────────────────────────────────────────── *
@@ -430,6 +431,42 @@ function bufferToConfig(data: Uint8Array, existingConfig: FurnaceConfig): Furnac
   };
 }
 
+/* ── PCM decode: audio file → Int8Array for WASM ───────────────────────── */
+
+async function decodePCM(instrument: InstrumentConfig): Promise<Int8Array | null> {
+  const sample = instrument.sample;
+  if (!sample) return null;
+
+  let audioBuffer: AudioBuffer | null = null;
+
+  try {
+    if (sample.audioBuffer && sample.audioBuffer.byteLength > 0) {
+      const ctx = new OfflineAudioContext(1, 1, 44100);
+      audioBuffer = await ctx.decodeAudioData(sample.audioBuffer.slice(0));
+    } else if (sample.url) {
+      const resp = await fetch(sample.url);
+      const arrayBuf = await resp.arrayBuffer();
+      const ctx = new OfflineAudioContext(1, 1, 44100);
+      audioBuffer = await ctx.decodeAudioData(arrayBuf);
+    }
+  } catch {
+    return null;
+  }
+
+  if (!audioBuffer) return null;
+
+  const float32 = audioBuffer.getChannelData(0);
+  const int8 = new Int8Array(float32.length);
+  for (let i = 0; i < float32.length; i++) {
+    let v = Math.round(float32[i] * 127);
+    if (v > 127) v = 127;
+    if (v < -128) v = -128;
+    int8[i] = v;
+  }
+
+  return int8;
+}
+
 /* ── Cache-busting version — bump when rebuilding WASM ────────────────── */
 const WASM_VERSION = 2;
 
@@ -439,13 +476,42 @@ export const FurnaceInsEdHardware: React.FC<FurnaceInsEdHardwareProps> = ({
   config,
   onChange,
   synthType,
+  instrument,
 }) => {
   const configRef = useRef(config);
   const onChangeRef = useRef(onChange);
   const moduleRef = useRef<SDLModule | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const sampleRateRef = useRef(44100);
+  const [pcmData, setPcmData] = useState<Int8Array | null>(null);
 
   useEffect(() => { configRef.current = config; }, [config]);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
+  /* Decode PCM when instrument changes */
+  useEffect(() => {
+    if (!instrument) { setPcmData(null); return; }
+    let cancelled = false;
+    decodePCM(instrument).then(result => {
+      if (!cancelled) setPcmData(result);
+    });
+    return () => { cancelled = true; };
+  }, [instrument]);
+
+  /* Audio cleanup on unmount */
+  useEffect(() => {
+    return () => {
+      if (currentSourceRef.current) {
+        try { currentSourceRef.current.stop(); } catch { /* ignore */ }
+        currentSourceRef.current = null;
+      }
+      if (audioCtxRef.current) {
+        try { audioCtxRef.current.close(); } catch { /* ignore */ }
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
 
   const configBuffer = useMemo(
     () => configToBuffer(config, synthType),
@@ -456,7 +522,53 @@ export const FurnaceInsEdHardware: React.FC<FurnaceInsEdHardwareProps> = ({
   // that need g_engine here. The chip type is set via load_config's buffer.
   const handleModuleReady = useCallback((mod: SDLModule) => {
     moduleRef.current = mod;
-  }, []);
+
+    /* Audio playback callbacks from WASM furnace_insed_play_sample / stop_sample */
+    mod.onPlaySample = (ptr: number, len: number, loopStart: number, loopLength: number, loopType: number, is16bit: number) => {
+      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+      const ctx = audioCtxRef.current;
+
+      if (currentSourceRef.current) {
+        try { currentSourceRef.current.stop(); } catch { /* ignore */ }
+        currentSourceRef.current = null;
+      }
+
+      const sr = sampleRateRef.current;
+      const audioBuffer = ctx.createBuffer(1, len, sr);
+      const channel = audioBuffer.getChannelData(0);
+
+      if (is16bit) {
+        const heap16 = (mod as Record<string, unknown>)['HEAP16'] as Int16Array | undefined;
+        if (heap16) {
+          const raw = heap16.subarray(ptr >> 1, (ptr >> 1) + len);
+          for (let i = 0; i < len; i++) channel[i] = raw[i] / 32768.0;
+        }
+      } else {
+        const raw = mod.HEAP8.subarray(ptr, ptr + len);
+        for (let i = 0; i < len; i++) channel[i] = raw[i] / 128.0;
+      }
+
+      const src = ctx.createBufferSource();
+      src.buffer = audioBuffer;
+
+      if (loopType > 0 && loopLength > 0) {
+        src.loop = true;
+        src.loopStart = loopStart / sr;
+        src.loopEnd = (loopStart + loopLength) / sr;
+      }
+
+      src.connect(ctx.destination);
+      src.start();
+      currentSourceRef.current = src;
+    };
+
+    mod.onStopSample = () => {
+      if (currentSourceRef.current) {
+        try { currentSourceRef.current.stop(); } catch { /* ignore */ }
+        currentSourceRef.current = null;
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Read config out of the WASM module and push to onChange if it changed */
   const dumpConfigFromWasm = useCallback(() => {
@@ -510,6 +622,8 @@ export const FurnaceInsEdHardware: React.FC<FurnaceInsEdHardwareProps> = ({
       loadConfigFn="_furnace_insed_load_config"
       configBuffer={configBuffer}
       onModuleReady={handleModuleReady}
+      pcmData={pcmData}
+      loadPcmFn="_furnace_insed_load_pcm"
       className="w-full"
     />
   );
