@@ -97,7 +97,6 @@ Track which formats have native parsers vs UADE-only.
 | `.psm` | PSM / PSM16 (MASI) | PSMParser.ts | **OpenMPT** Load_psm.cpp | "PSM " or "PSM\xFE" magic; OpenMPT fallback |
 | `.ams` | AMS (Extreme's / Velvet) | AMSParser.ts | **OpenMPT** Load_ams.cpp | "Extreme" or "AMShdr" magic; UADE fallback |
 | `.gt2`, `.gtk` | Graoumf Tracker 2 | GraoumfTracker2Parser.ts | **OpenMPT** Load_gt2.cpp | GT2.0 magic; UADE fallback |
-| `.symmod` | Symphonie Pro | SymphonieProParser.ts | **OpenMPT** Load_symmod.cpp | MODU magic; UADE fallback |
 | `.667` | Composer 667 | Composer667Parser.ts | NostalgicPlayer | 6-channel; UADE fallback |
 | `.cba` | Chuck Biscuits / Black Artist | ChuckBiscuitsParser.ts | NostalgicPlayer | UADE fallback |
 | `.dm`, `.dm1` | Delta Music 1.0 | DeltaMusic1Parser.ts | NostalgicPlayer | "ALL " magic; UADE fallback |
@@ -114,6 +113,10 @@ Track which formats have native parsers vs UADE-only.
 | `.ml` | Medley | MedleyParser.ts | UADE eagleplayer | "MSOB" magic; subsong count at offset word; UADE fallback |
 | `jpn.*`, `jpnd.*`, `jp.*` | Jason Page | JasonPageParser.ts | UADE eagleplayer asm | 3 sub-variants; binary signature heuristic; UADE fallback |
 | `.symmod` | Symphonie Pro | SymphonieProParser.ts | **OpenMPT** Load_symmod.cpp | "SymM" magic; chunk-based; custom AudioWorklet synth; UADE fallback |
+| `.fur`, `.dmf` (non-DDMF) | Furnace Tracker Song | FurnaceSongParser.ts | furnace-master src + format spec | multi-chip synthesis; subsong support; OpenMPT fallback |
+| `jt.*`, `mon_old.*` | Jeroen Tel | JeroenTelParser.ts | UADE eagleplayer asm | ANDI.B 68k scan; 3-file variant; UADE fallback |
+| `mc.*`, `mcr.*`, `mco.*` | Mark Cooksey | MarkCookseyParser.ts | UADE eagleplayer asm | 3 sub-variants (Old/New/Rare); binary sig; UADE fallback |
+| `qpa.*`, `sqt.*`, `qts.*` | Quartet / Quartet PSG / Quartet ST | QuartetParser.ts | UADE eagleplayer | 3 sub-variants; BRA-pattern detection; UADE fallback |
 
 ---
 
@@ -210,7 +213,6 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | PSM / PSM16 (MASI) | PSMParser.ts | **OpenMPT** Load_psm.cpp |
 | 2026-02-26 | AMS (Extreme's / Velvet) | AMSParser.ts | **OpenMPT** Load_ams.cpp |
 | 2026-02-26 | Graoumf Tracker 2 | GraoumfTracker2Parser.ts | **OpenMPT** Load_gt2.cpp |
-| 2026-02-26 | Symphonie Pro | SymphonieProParser.ts | **OpenMPT** Load_symmod.cpp |
 | 2026-02-26 | Composer 667 | Composer667Parser.ts | NostalgicPlayer |
 | 2026-02-26 | Chuck Biscuits / Black Artist | ChuckBiscuitsParser.ts | NostalgicPlayer |
 | 2026-02-26 | Delta Music 1.0 | DeltaMusic1Parser.ts | NostalgicPlayer |
@@ -225,3 +227,7 @@ Track which formats have native parsers vs UADE-only.
 | 2026-02-26 | Medley | MedleyParser.ts | UADE eagleplayer |
 | 2026-02-26 | Jason Page | JasonPageParser.ts | UADE eagleplayer asm |
 | 2026-02-26 | Symphonie Pro | SymphonieProParser.ts | **OpenMPT** Load_symmod.cpp |
+| 2026-02-26 | Furnace Tracker Song | FurnaceSongParser.ts | furnace-master src + format spec |
+| 2026-02-26 | Jeroen Tel | JeroenTelParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Mark Cooksey | MarkCookseyParser.ts | UADE eagleplayer asm |
+| 2026-02-26 | Quartet / Quartet PSG / ST | QuartetParser.ts | UADE eagleplayer |
