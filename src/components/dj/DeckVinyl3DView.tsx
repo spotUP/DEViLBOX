@@ -337,10 +337,18 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
   }, [enterScratch]);
 
   // Hitbox positions are in world-space metres (model cm × MODEL_SCALE = 0.01).
+  // Coordinate system (from tonearm/platter pivot data):
+  //   X+ = right side,  X- = left side
+  //   Y+ = up,          surface ≈ 0.106 m
+  //   Z+ = front,       Z- = back (tonearm pivot at Z=-0.0995 confirms this)
+  //
   // Platter:  Vinyl bbox centre (-4.937, 10.669, -1.029) × 0.01 → (-0.049, 0.107, -0.010)
   //           Vinyl radius 15.948 cm × 0.01 → 0.159 m
-  // Other hitboxes are approximate — needs visual calibration after first render.
-  // useEffect on empty dep array just to silence the lint warning about unused vars
+  //
+  // SL-1200GR layout (estimated from real unit dimensions 453×353mm):
+  //   Start/Stop button: left-front  → X≈-17.5cm, Z≈+12cm
+  //   Pitch fader:       right side  → X≈+17cm,   Z≈+2cm (centre), spans ~18cm
+  //   33/45 RPM:         left-front  → X≈-12cm,   Z≈+13cm
   useEffect(() => { /* accent light placeholder */ }, [accentColor]);
 
   return (
@@ -368,28 +376,28 @@ function TurntableScene({ deckId, orbitRef }: TurntableSceneProps) {
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* Power / Start-Stop button (approximate — right-front area of deck) */}
-      <mesh position={[0.18, 0.100, 0.16]} onClick={handlePowerClick}>
-        <boxGeometry args={[0.04, 0.02, 0.04]} />
+      {/* Start/Stop button — left-front of deck (SL-1200GR) */}
+      <mesh position={[-0.175, 0.105, 0.12]} onClick={handlePowerClick}>
+        <boxGeometry args={[0.05, 0.02, 0.05]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* Pitch slider (approximate — right side of deck on SL-1200GR) */}
+      {/* Pitch fader — right side of deck, vertical slider (SL-1200GR) */}
       <mesh
-        position={[0.21, 0.100, -0.02]}
+        position={[0.175, 0.105, 0.02]}
         onPointerDown={handlePitchPointerDown}
         onPointerMove={handlePitchPointerMove}
         onPointerUp={handlePitchPointerUp}
         onPointerCancel={handlePitchPointerUp}
         onDoubleClick={handlePitchDoubleClick}
       >
-        <boxGeometry args={[0.02, 0.02, 0.14]} />
+        <boxGeometry args={[0.025, 0.02, 0.18]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* 33/45 RPM selector (approximate — front-center area) */}
-      <mesh position={[0.04, 0.100, 0.17]} onClick={handleRpmClick}>
-        <boxGeometry args={[0.06, 0.02, 0.03]} />
+      {/* 33/45 RPM selector — left-front, right of Start/Stop (SL-1200GR) */}
+      <mesh position={[-0.12, 0.105, 0.13]} onClick={handleRpmClick}>
+        <boxGeometry args={[0.06, 0.02, 0.04]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
