@@ -51,12 +51,14 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
+import type { InstrumentConfig } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const ML_FILE_MAGIC = 0x4d4c4544; // 'MLED'
+const ML_FILE_MAGIC  = 0x4d4c4544; // 'MLED'
 const ML_FILE_MAGIC2 = 0x4d4f444c; // 'MODL' (combined "MLEDMODL")
+const ML_INST_MAGIC2 = 0x494e5354; // 'INST' (combined "MLEDINST" for standalone instruments)
 const CHUNK_TUNE = 0x54554e45; // 'TUNE'
 const CHUNK_VERS = 0x56455253; // 'VERS'
 const CHUNK_PART = 0x50415254; // 'PART'
@@ -95,6 +97,89 @@ export function isMusicLineFile(data: Uint8Array): boolean {
   if (data.length < 16) return false;
   const v = new DataView(data.buffer, data.byteOffset, data.byteLength);
   return v.getUint32(0) === ML_FILE_MAGIC && v.getUint32(4) === ML_FILE_MAGIC2;
+}
+
+/**
+ * Returns true if `data` looks like a standalone MusicLine instrument file.
+ * Detection: bytes 0-7 == "MLEDINST"
+ */
+export function isMusicLineInstrumentFile(data: Uint8Array): boolean {
+  if (data.length < 16) return false;
+  const v = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  return v.getUint32(0) === ML_FILE_MAGIC && v.getUint32(4) === ML_INST_MAGIC2;
+}
+
+/**
+ * Parse a standalone MusicLine instrument file (.mli) into an InstrumentConfig.
+ *
+ * File layout (from SaveExternInst @ Mline116.asm):
+ *   "MLED"(4) + "INST"(4) + optional extraHeaderSize(u32BE) + VERS? + INST + SMPL
+ *
+ * The function tolerates both formats:
+ *   - With extraHeaderSize field (written by our exporter): chunks at offset 12+extraSize
+ *   - Without (written by original Amiga software): chunks start immediately after the 8-byte magic
+ *
+ * Returns null on parse error or if the file is not a valid MusicLine instrument.
+ */
+export function parseMusicLineInstrument(data: Uint8Array): InstrumentConfig | null {
+  if (!isMusicLineInstrumentFile(data)) return null;
+
+  const v = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const len = data.byteLength;
+
+  // Determine where chunks start.
+  // If bytes[8..11] form a known chunk ID, chunks start at offset 8 (no extra header field).
+  // Otherwise, interpret bytes[8..11] as extraHeaderSize and skip past it.
+  const KNOWN_CHUNK_IDS = new Set([
+    CHUNK_VERS, CHUNK_TUNE, CHUNK_PART, CHUNK_ARPG, CHUNK_INST, CHUNK_SMPL,
+  ]);
+  let pos: number;
+  if (len >= 12 && KNOWN_CHUNK_IDS.has(v.getUint32(8))) {
+    pos = 8; // No extra header field; chunks start right after the 8-byte magic
+  } else if (len >= 12) {
+    const extraSize = v.getUint32(8);
+    pos = 8 + 4 + extraSize; // Skip sizeField + extra header bytes
+  } else {
+    return null;
+  }
+
+  // Collect the first INST and first SMPL chunk
+  let instData: ReturnType<typeof parseInst> | null = null;
+  let smplData: ReturnType<typeof parseSmpl> | null = null;
+
+  while (pos + 8 <= len) {
+    const chunkId   = v.getUint32(pos);
+    const chunkSize = v.getUint32(pos + 4);
+    const dataStart = pos + 8;
+
+    if (chunkId === CHUNK_VERS) {
+      pos = dataStart + chunkSize;
+
+    } else if (chunkId === CHUNK_INST) {
+      if (chunkSize >= INST_SIZE && dataStart + INST_SIZE <= len) {
+        instData = parseInst(v, data, dataStart);
+      }
+      pos = dataStart + chunkSize;
+
+    } else if (chunkId === CHUNK_SMPL) {
+      const smplEndPos = dataStart + SMPL_EXTRA_HDR + chunkSize;
+      if (chunkSize >= SMPL_META_SIZE && smplEndPos <= len + 16) {
+        smplData = parseSmpl(v, data, dataStart, chunkSize);
+      }
+      pos = smplEndPos;
+
+    } else if (chunkId === CHUNK_ARPG) {
+      pos = dataStart + chunkSize; // skip
+
+    } else {
+      break; // Unknown chunk — stop
+    }
+  }
+
+  if (!instData) return null;
+
+  const instruments = buildInstruments([instData], smplData ? [smplData] : []);
+  return instruments[0] ?? null;
 }
 
 /**
