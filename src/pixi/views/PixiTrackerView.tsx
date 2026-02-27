@@ -29,6 +29,7 @@ import { PixiAcidPatternDialog } from '../dialogs/PixiAcidPatternDialog';
 import { PixiFurnaceView } from './furnace/PixiFurnaceView';
 import { PixiHivelyView } from './hively/PixiHivelyView';
 import { MusicLineTrackTableEditor } from '@components/tracker/MusicLineTrackTableEditor';
+import { MusicLinePatternViewer } from '@components/tracker/MusicLinePatternViewer';
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
 import { PixiGridSequencer } from './tracker/PixiGridSequencer';
 import { PixiTB303View } from './tracker/PixiTB303View';
@@ -427,14 +428,23 @@ const AutoSizeHivelyView: React.FC = () => {
   );
 };
 
+const MUSICLINE_MATRIX_HEIGHT = 220;
+
 const AutoSizeMusicLineView: React.FC = () => (
-  <div style={{ width: '100%', height: '100%', overflowY: 'auto', backgroundColor: 'var(--color-bg-primary, #111)' }}>
-    <MusicLineTrackTableEditor
-      onSeek={(pos) => {
-        useTrackerStore.getState().setCurrentPosition(pos);
-        getTrackerReplayer().jumpToPosition(pos, 0);
-      }}
-    />
+  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-primary, #111)' }}>
+    {/* Per-channel track table matrix (top) */}
+    <div style={{ height: MUSICLINE_MATRIX_HEIGHT, flexShrink: 0, overflowY: 'auto', borderBottom: '2px solid #333' }}>
+      <MusicLineTrackTableEditor
+        onSeek={(pos) => {
+          useTrackerStore.getState().setCurrentPosition(pos);
+          getTrackerReplayer().jumpToPosition(pos, 0);
+        }}
+      />
+    </div>
+    {/* Multi-channel note viewer (bottom, fills remaining space) */}
+    <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <MusicLinePatternViewer />
+    </div>
   </div>
 );
 
