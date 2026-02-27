@@ -59,10 +59,12 @@ const MAX_SAMPLES = 15;
 export function isZoundMonitorFormat(buffer: ArrayBuffer, filename?: string): boolean {
   const buf = new Uint8Array(buffer);
 
-  // ── Prefix check (optional fast-reject) ──────────────────────────────────
+  // ── Extension check (optional fast-reject) ───────────────────────────────
+  // UADE eagleplayer uses the prefix ".SNG" (i.e. the file extension is .sng).
+  // DEViLBOX reference files are named "*.sng", not "sng.*".
   if (filename !== undefined) {
     const base = (filename.split('/').pop() ?? filename).toLowerCase();
-    if (!base.startsWith('sng.')) return false;
+    if (!base.endsWith('.sng')) return false;
   }
 
   if (buf.length < 4) return false;

@@ -69,9 +69,6 @@ export function isRJPFormat(buf: Uint8Array): boolean {
   // bytes 4-7 = 'S', 'M', 'O', 'D'
   if (buf[4] !== 0x53 || buf[5] !== 0x4d || buf[6] !== 0x4f || buf[7] !== 0x44) return false;
 
-  // bytes 12-15 must be 0 (DTP_Check2 identity guard)
-  if (buf[12] !== 0 || buf[13] !== 0 || buf[14] !== 0 || buf[15] !== 0) return false;
-
   return true;
 }
 

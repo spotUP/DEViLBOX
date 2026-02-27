@@ -68,11 +68,13 @@ function u32BE(buf: Uint8Array, off: number): number {
 export function isSoundMasterFormat(buffer: ArrayBuffer, filename?: string): boolean {
   const buf = new Uint8Array(buffer);
 
-  // ── Prefix check (optional fast-reject) ──────────────────────────────────
+  // ── Extension check (optional fast-reject) ───────────────────────────────
+  // UADE eagleplayer.conf declares: prefixes=sm,sm1,sm2,sm3,smpro
+  // In practice the reference files use these as file extensions (.sm, .smpro, .sm3).
   if (filename !== undefined) {
     const base = (filename.split('/').pop() ?? filename).toLowerCase();
-    const validPrefixes = ['sm.', 'sm1.', 'sm2.', 'sm3.', 'smpro.'];
-    if (!validPrefixes.some(p => base.startsWith(p))) return false;
+    const validExtensions = ['.sm', '.sm1', '.sm2', '.sm3', '.smpro'];
+    if (!validExtensions.some(ext => base.endsWith(ext))) return false;
   }
 
   // Minimum bytes: three BRA.W words at offsets 0, 4, 8 → need at least 10;

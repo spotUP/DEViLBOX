@@ -13,7 +13,9 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 
 /**
- * Detect Jason Brooke format by filename prefix.
+ * Detect Jason Brooke format by filename prefix or extension.
+ * Prefix format (UADE): jcbo.songname, jcb.songname, jb.songname
+ * Extension format (common rips): songname.jcbo, songname.jcb, songname.jb
  * Checks jcbo. before jcb. to avoid false matches.
  */
 export function isJasonBrookeFormat(
@@ -22,7 +24,11 @@ export function isJasonBrookeFormat(
 ): boolean {
   if (!filename) return false;
   const base = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
-  return base.startsWith('jcbo.') || base.startsWith('jcb.') || base.startsWith('jb.');
+  // Prefix-based (UADE canonical)
+  if (base.startsWith('jcbo.') || base.startsWith('jcb.') || base.startsWith('jb.')) return true;
+  // Extension-based (common rip naming)
+  if (base.endsWith('.jcbo') || base.endsWith('.jcb') || base.endsWith('.jb')) return true;
+  return false;
 }
 
 export function parseJasonBrookeFile(buffer: ArrayBuffer, filename: string): TrackerSong {

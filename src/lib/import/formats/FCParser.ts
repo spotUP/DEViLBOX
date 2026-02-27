@@ -523,8 +523,41 @@ export interface FCMetadata {
  * Extract module counts from an FC header without running the macro simulation.
  * Returns null if the buffer doesn't start with a recognised FC magic.
  */
+/**
+ * Return true if the buffer starts with the Tim Follin binary signature.
+ * All known Follin Player II (.tf) files begin with 0x601A (BRA.S +26),
+ * which is a 68k short branch instruction used as a relocated-executable header.
+ * The byte at offset 2 may be 0x00 or 0x01 depending on the sub-variant.
+ */
+function isFollinFormat(buf: Uint8Array): boolean {
+  if (buf.length < 32) return false;
+  // High byte 0x60 = BRA opcode; low byte 0x1A = displacement +26
+  return buf[0] === 0x60 && buf[1] === 0x1A;
+}
+
+/**
+ * Return true if the buffer starts with the Future Composer BSI magic "FUCO".
+ * FC BSI is an extended variant of FC 1.3 used by some Amiga productions.
+ */
+function isFUCOFormat(buf: Uint8Array): boolean {
+  if (buf.length < 16) return false;
+  return buf[0] === 0x46 && buf[1] === 0x55 && buf[2] === 0x43 && buf[3] === 0x4F; // 'FUCO'
+}
+
 export function parseFCMetadata(buffer: ArrayBuffer): FCMetadata | null {
   const buf = new Uint8Array(buffer);
+  if (buf.length < 32) return null;
+
+  // Tim Follin / Follin Player II (.tf): compiled 68k binary, BRA header
+  if (isFollinFormat(buf)) {
+    return { channels: 4, patterns: 0, orders: 0, instruments: 0, samples: 0 };
+  }
+
+  // FC BSI variant ("FUCO" magic): treat as FC13/SMOD for metadata purposes
+  if (isFUCOFormat(buf)) {
+    return { channels: 4, patterns: 0, orders: 0, instruments: 0, samples: 0 };
+  }
+
   if (buf.length < 100) return null;
 
   const magic = String.fromCharCode(buf[0], buf[1], buf[2], buf[3]);
@@ -556,8 +589,69 @@ export function parseFCMetadata(buffer: ArrayBuffer): FCMetadata | null {
 
 // ── Main Parser ───────────────────────────────────────────────────────────
 
+/**
+ * Build a minimal stub TrackerSong for formats that cannot be fully parsed
+ * natively (FC BSI / FUCO, Follin Player II / TF).  Returns a 4-channel
+ * empty pattern so the TrackerReplayer can accept the song without crashing.
+ */
+function stubTrackerSong(filename: string, formatLabel: string): TrackerSong {
+  const moduleName = filename.replace(/\.[^/.]+$/, '');
+  const emptyRows = Array.from({ length: 32 }, () => ({
+    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+  }));
+  const pattern = {
+    id: 'pattern-0',
+    name: 'Pattern 0',
+    length: 32,
+    channels: Array.from({ length: 4 }, (_, ch) => ({
+      id: `channel-${ch}`,
+      name: `Channel ${ch + 1}`,
+      muted: false,
+      solo: false,
+      collapsed: false,
+      volume: 100,
+      pan: (ch === 0 || ch === 3) ? -50 : 50,
+      instrumentId: null,
+      color: null,
+      rows: emptyRows,
+    })),
+    importMetadata: {
+      sourceFormat: 'FC' as const,
+      sourceFile: filename,
+      importedAt: new Date().toISOString(),
+      originalChannelCount: 4,
+      originalPatternCount: 0,
+      originalInstrumentCount: 0,
+    },
+  };
+  return {
+    name: `${moduleName} [${formatLabel}]`,
+    format: 'FC' as TrackerFormat,
+    patterns: [pattern],
+    instruments: [],
+    songPositions: [0],
+    songLength: 1,
+    restartPosition: 0,
+    numChannels: 4,
+    initialSpeed: 6,
+    initialBPM: 125,
+    linearPeriods: false,
+  };
+}
+
 export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
+
+  // Tim Follin / Follin Player II (.tf) — compiled 68k binary, BRA header.
+  // These cannot be parsed natively; return a stub so the call doesn't throw.
+  if (isFollinFormat(buf)) {
+    return stubTrackerSong(filename, 'Follin Player II');
+  }
+
+  // FC BSI ("FUCO" magic) — return stub; full parsing not yet implemented.
+  if (isFUCOFormat(buf)) {
+    return stubTrackerSong(filename, 'FC BSI');
+  }
 
   const magic = String.fromCharCode(buf[0], buf[1], buf[2], buf[3]);
   if (magic !== 'FC13' && magic !== 'FC14' && magic !== 'SMOD') {

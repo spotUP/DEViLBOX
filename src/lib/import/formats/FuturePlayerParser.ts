@@ -6,12 +6,14 @@
  * ".fp" extension.
  *
  * Detection (from UADE Future Player_v1.asm Check3 routine):
- *   bytes[0..3]  = 0x000003F3
- *   byte[20]     != 0 (must be non-zero)
- *   bytes[32..35] = "F.PL" (0x46, 0x2E, 0x50, 0x4C)
- *   bytes[36..39] = "AYER" (0x41, 0x59, 0x45, 0x52)
+ *   bytes[0..3]   = 0x000003F3
+ *   byte[20]      != 0 (must be non-zero)
+ *   bytes[32..35] = 0x70FF4E75  (JSR trampoline, constant for all FP files)
+ *   bytes[36..39] = "F.PL" (0x46, 0x2E, 0x50, 0x4C)
+ *   bytes[40..43] = "AYER" (0x41, 0x59, 0x45, 0x52)
+ *   u32BE(bytes, 64) != 0  (song pointer check)
  *
- * Together bytes[32..39] spell "F.PLAYER" embedded in the module.
+ * Together bytes[36..43] spell "F.PLAYER" embedded in the module.
  *
  * Single-file format: all player and music data in one file.
  * 4 channels (standard Amiga Paula).
@@ -36,23 +38,25 @@ function u32BE(buf: Uint8Array, off: number): number {
 /**
  * Return true if the buffer is a Future Player format module.
  *
- * Checks:
- *   1. bytes[0..3] == 0x000003F3
- *   2. byte[20] != 0
- *   3. bytes[32..35] == "F.PL" (0x462E504C)
- *   4. bytes[36..39] == "AYER" (0x41594552)
- *
- * Detection logic mirrors UADE's Future Player_v1.asm Check3 routine.
+ * Checks (mirrors UADE's Future Player_v1.asm Check3 routine):
+ *   1. bytes[0..3]  == 0x000003F3
+ *   2. byte[20]     != 0  (chip-memory loading flag)
+ *   3. bytes[32..35] == 0x70FF4E75  (JSR trampoline constant)
+ *   4. bytes[36..39] == "F.PL" (0x462E504C)
+ *   5. bytes[40..43] == "AYER" (0x41594552)
+ *   6. u32BE(bytes, 64) != 0  (song pointer must be non-zero)
  */
 export function isFuturePlayerFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-  if (buf.length < 40) return false;
+  if (buf.length < 68) return false;
 
   return (
     u32BE(buf, 0)  === 0x000003F3 &&
     buf[20]        !== 0          &&
-    u32BE(buf, 32) === 0x462E504C && // "F.PL"
-    u32BE(buf, 36) === 0x41594552    // "AYER"
+    u32BE(buf, 32) === 0x70FF4E75 && // JSR trampoline
+    u32BE(buf, 36) === 0x462E504C && // "F.PL"
+    u32BE(buf, 40) === 0x41594552 && // "AYER"
+    u32BE(buf, 64) !== 0             // song pointer
   );
 }
 

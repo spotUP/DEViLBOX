@@ -166,12 +166,24 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
 
   for (let patIdx = 0; patIdx < blockPtrs.length; patIdx++) {
     const bptr = blockPtrs[patIdx];
-    const nTracks = u16(buf, bptr);
-    const nLines  = u16(buf, bptr + 2);
+
+    // MMD0 block header: uint8 numtracks, uint8 numlines (2 bytes), data follows at bptr+2
+    // MMD1+ block header: uint16 numtracks, uint16 numlines, uint32 blockinfo_offset (8 bytes)
+    let nTracks: number;
+    let nLines: number;
+    let dataStart: number;
+    if (isMMD1Plus) {
+      nTracks   = u16(buf, bptr);
+      nLines    = u16(buf, bptr + 2);
+      dataStart = bptr + 8; // MMD1 has 4 extra bytes (blockinfo ptr)
+    } else {
+      nTracks   = buf[bptr];
+      nLines    = buf[bptr + 1];
+      dataStart = bptr + 2;
+    }
 
     // For MMD0: 3 bytes/cell; for MMD1+: variable (usually 4 bytes/cell)
     const bytesPerCell = isMMD1Plus ? 4 : 3;
-    const dataStart = isMMD1Plus ? bptr + 8 : bptr + 4; // MMD1 has 4 extra bytes (blockinfo ptr)
 
     const channels: ChannelData[] = Array.from({ length: nTracks }, (_, ch) => {
       const rows: TrackerCell[] = [];

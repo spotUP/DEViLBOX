@@ -1,99 +1,137 @@
 /**
- * SpeedySystemParser.ts — Apple IIgs SoundSmith / MegaTracker (.ss) detector
+ * SpeedySystemParser.ts — Speedy System (.ss) and Speedy A1 System (.sas)
+ * Amiga music format detector/stub loader
  *
- * SoundSmith was an Apple IIgs music editor by Kyle Hammond. MegaTracker is
- * a variant that shares the same binary layout with a different magic string.
- * Both are tracked with 14 channels and up to 15 instruments, using the
- * Ensoniq ES-5503-DOC wavetable chip for sample playback.
+ * Two distinct Amiga formats share this parser:
  *
- * Sample data is stored in an external DOC RAM file (extensions: .D, .W,
- * .DOC, .WB, or the generic "DOC.DATA"). These companion files cannot be
- * loaded in a browser without multi-file upload support, so native parsing
- * always falls through to UADE (which bundles the required sample data in its
- * module archive).
+ * 1. Speedy System (.ss) by Michael Winterberg
+ *    Magic: 'SPEEDY-SYSTEM\x00' (14 ASCII bytes) at offset 0.
+ *    UADE eagleplayer.conf: SpeedySystem  prefixes=ss
  *
- * File header layout (600 bytes, all little-endian):
- *   +0    magic[6]       — "SONGOK" (SoundSmith) / "IAN9OK" / "IAN92a" (MegaTracker)
- *   +6    patBufSize     (uint16LE) — total pattern buffer size in bytes:
- *                          multiple of 14*64 = 896, or exactly 0x8000
- *   +8    speed          (uint16LE, 0–15)
- *   +10   reserved[10]
- *   +20   instruments[15] × SSInstrument (30 bytes each = 450 bytes):
- *           +0  nameLength (uint8)
- *           +1  name[21]
- *           +22 reserved[2]
- *           +24 volume     (uint16LE, 0–255; high byte ignored)
- *           +26 midiProgram  (uint16LE, ignored)
- *           +28 midiVelocity (uint16LE, ignored)
- *   +470  numOrders      (uint16LE, effective count = numOrders & 0xFF, ≤128)
- *   +472  orders[128]    (uint8 each)
- *   +600  pattern notes      buffer (patBufSize bytes)
- *   +600+patBufSize  pattern instrEffect buffer (patBufSize bytes)
- *   +600+2*patBufSize  pattern param buffer (patBufSize bytes)
- *   +600+3*patBufSize  SSFooter (30 bytes): 14 × uint16LE panning + uint16LE flags
+ * 2. Speedy A1 System (.sas) — a variant by the same author
+ *    No ASCII magic. Heuristic detection (empirical from reference files):
+ *      bytes[0..2]  == 0x00, 0x00, 0x00
+ *      bytes[3]     in 1..31  (track/channel count — always small and nonzero)
+ *      bytes[14..15] == 0x02, 0x00
+ *    UADE eagleplayer.conf: SpeedyA1System  prefixes=sas
  *
- * Reference: OpenMPT Load_ss.cpp
+ * Actual audio playback is always delegated to UADE. This parser creates a
+ * metadata-only TrackerSong stub.
+ *
+ * Reference: UADE eagleplayer.conf, empirical analysis of reference files.
  */
 
-import type { TrackerSong } from '@/engine/TrackerReplayer';
-
-// ── Binary helpers ────────────────────────────────────────────────────────────
-
-function u8(v: DataView, off: number): number  { return v.getUint8(off); }
-function u16le(v: DataView, off: number): number { return v.getUint16(off, true); }
+import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
+import type { InstrumentConfig } from '@/types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const VALID_MAGICS = ['SONGOK', 'IAN9OK', 'IAN92a'] as const;
-const HEADER_SIZE  = 600;
+const SS_MAGIC     = 'SPEEDY-SYSTEM\x00'; // 14 bytes
+const NUM_CHANNELS = 4;
+const MIN_SS_SIZE  = 14;
+const MIN_SAS_SIZE = 16;
 
 // ── Format detection ──────────────────────────────────────────────────────────
 
+function checkSSMagic(buf: Uint8Array): boolean {
+  if (buf.length < MIN_SS_SIZE) return false;
+  for (let i = 0; i < SS_MAGIC.length; i++) {
+    if (buf[i] !== SS_MAGIC.charCodeAt(i)) return false;
+  }
+  return true;
+}
+
+function checkSASSignature(buf: Uint8Array): boolean {
+  if (buf.length < MIN_SAS_SIZE) return false;
+  // bytes[0..2] must all be 0x00
+  if (buf[0] !== 0x00 || buf[1] !== 0x00 || buf[2] !== 0x00) return false;
+  // bytes[3] must be a small nonzero value (track/channel count)
+  if (buf[3] === 0x00 || buf[3] > 31) return false;
+  // bytes[14..15] == 0x02, 0x00 (observed in all reference .sas files)
+  if (buf[14] !== 0x02 || buf[15] !== 0x00) return false;
+  return true;
+}
+
 /**
- * Returns true if the buffer is an Apple IIgs SoundSmith or MegaTracker module.
- * Detection checks magic bytes, pattern buffer size alignment, and speed range.
+ * Returns true if the buffer is a Speedy System (.ss) or Speedy A1 System (.sas) module.
  */
 export function isSpeedySystemFormat(buffer: ArrayBuffer): boolean {
-  if (buffer.byteLength < HEADER_SIZE) return false;
-  const v = new DataView(buffer);
-
-  // Check 6-byte magic
-  const magic = String.fromCharCode(
-    u8(v, 0), u8(v, 1), u8(v, 2),
-    u8(v, 3), u8(v, 4), u8(v, 5),
-  );
-  if (!(VALID_MAGICS as readonly string[]).includes(magic)) return false;
-
-  // patBufSize must be a multiple of 14*64 = 896, or exactly 0x8000
-  const patBufSize = u16le(v, 6);
-  if (patBufSize < 14 * 64) return false;
-  if (patBufSize !== 0x8000 && patBufSize % (14 * 64) !== 0) return false;
-
-  // Speed must be in range
-  const speed = u16le(v, 8);
-  if (speed > 15) return false;
-
-  // numOrders (effective) ≤ 128
-  const numOrders = u16le(v, 470) & 0xFF;
-  if (numOrders > 128) return false;
-
-  // File must be large enough to hold all three pattern buffers
-  const minSize = HEADER_SIZE + patBufSize * 3;
-  if (buffer.byteLength < minSize) return false;
-
-  return true;
+  const buf = new Uint8Array(buffer);
+  return checkSSMagic(buf) || checkSASSignature(buf);
 }
 
 // ── Parser ────────────────────────────────────────────────────────────────────
 
 /**
- * SoundSmith requires external DOC RAM sample files that cannot be loaded in
- * a browser context. Parsing is always delegated to UADE, which bundles the
- * required samples in its module archive.
+ * Parse a Speedy System or Speedy A1 System module into a metadata-only
+ * TrackerSong stub. Actual audio playback is delegated to UADE.
+ * Returns a resolved promise (never throws).
  */
 export async function parseSpeedySystemFile(
-  _buffer: ArrayBuffer,
-  _filename: string,
+  buffer: ArrayBuffer,
+  filename: string,
 ): Promise<TrackerSong> {
-  throw new Error('[SpeedySystemParser] External DOC RAM samples required — delegating to UADE');
+  const buf = new Uint8Array(buffer);
+  const isSAS = !checkSSMagic(buf) && checkSASSignature(buf);
+  const label = isSAS ? 'Speedy A1 System' : 'Speedy System';
+
+  const songName = filename.replace(/\.[^/.]+$/, '');
+
+  const instruments: InstrumentConfig[] = Array.from({ length: 16 }, (_, i) => ({
+    id:        i + 1,
+    name:      `Sample ${i + 1}`,
+    type:      'synth' as const,
+    synthType: 'Synth' as const,
+    effects:   [],
+    volume:    0,
+    pan:       0,
+  } as InstrumentConfig));
+
+  const emptyRows = Array.from({ length: 64 }, () => ({
+    note: 0, instrument: 0, volume: 0,
+    effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+  }));
+
+  // Amiga LRRL panning
+  const CHAN_PAN = [-50, 50, 50, -50];
+
+  const pattern = {
+    id:      'pattern-0',
+    name:    'Pattern 0',
+    length:  64,
+    channels: Array.from({ length: NUM_CHANNELS }, (_, ch) => ({
+      id:           `channel-${ch}`,
+      name:         `Channel ${ch + 1}`,
+      muted:        false,
+      solo:         false,
+      collapsed:    false,
+      volume:       100,
+      pan:          CHAN_PAN[ch],
+      instrumentId: null,
+      color:        null,
+      rows:         emptyRows,
+    })),
+    importMetadata: {
+      sourceFormat:            'MOD' as const,
+      sourceFile:              filename,
+      importedAt:              new Date().toISOString(),
+      originalChannelCount:    NUM_CHANNELS,
+      originalPatternCount:    1,
+      originalInstrumentCount: instruments.length,
+    },
+  };
+
+  return {
+    name:            `${songName} [${label}]`,
+    format:          'MOD' as TrackerFormat,
+    patterns:        [pattern],
+    instruments,
+    songPositions:   [0],
+    songLength:      1,
+    restartPosition: 0,
+    numChannels:     NUM_CHANNELS,
+    initialSpeed:    6,
+    initialBPM:      125,
+    linearPeriods:   false,
+  };
 }

@@ -57,8 +57,9 @@ export function isTomyTrackerFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   if (d1 < 1 || d1 > MAX_SIZE_FIELD) return false;
   if (d1 & 1) return false;
 
-  // D2 must equal D1 and be even
-  if (d2 !== d1) return false;
+  // D2 must not exceed D1 (bhi check) and must be even
+  // ASM uses "bhi fault" (branch if higher unsigned), so D2 <= D1 is valid
+  if (d2 > d1) return false;
   if (d2 & 1) return false;
 
   // Pattern data size must be >= 0 and divisible by 1024

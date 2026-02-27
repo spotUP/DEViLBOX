@@ -66,7 +66,7 @@ export function isPaulRobothamFormat(buffer: ArrayBuffer | Uint8Array): boolean 
   // bne.b Fault
   const D1 = safeU16(buf, 0);
   if (D1 === 0 || D1 > 4) return false;
-  if (buf[1] !== 0) return false; // high byte of D1 word (buf[0]) — already checked via D1≤4
+  // buf[0] (high byte of D1) must be 0: already guaranteed by D1 ≤ 4 above.
 
   // move.w (A0)+, D2   → word at 2; A0→4
   // tst.b (A0)         → byte at 4 must be 0 (high byte of D3 word)

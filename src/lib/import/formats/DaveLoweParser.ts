@@ -36,18 +36,34 @@ function u32BE(buf: Uint8Array, off: number): number {
 /**
  * Return true if the buffer is a Dave Lowe format module.
  *
- * Checks the three specific 68k MOVE.L opcodes at offsets 0, 4, and 8
- * that are present at the start of all Dave Lowe (.dl / DL.*) modules.
- * Detection logic mirrors UADE's DaveLoweRipp1 EagleRipper check.
+ * Detection mirrors the UADE Dave Lowe_v3.asm DTP_Check2 routine:
+ *   cmp.l  #$000003F3,(A0)      ; Delitracker custom player magic at offset 0
+ *   cmp.l  #$70FF4E75,32(A0)   ; moveq #-1,d0 + rts sequence at offset 32
+ *   cmp.l  #'UNCL',36(A0)      ; bytes 36-39 = 'UNCL'
+ *   cmp.l  #'EART',40(A0)      ; bytes 40-43 = 'EART'  (together: "UNCLEARТ" = "UNCLEARТ")
+ *
+ * All Dave Lowe modules identified by UADE share this binary signature.
  */
 export function isDaveLoweFormat(buf: Uint8Array): boolean {
-  if (buf.length < 12) return false;
+  if (buf.length < 44) return false;
 
-  return (
-    u32BE(buf, 0) === 0x21590032 &&
-    u32BE(buf, 4) === 0x21590036 &&
-    u32BE(buf, 8) === 0x2159003A
-  );
+  // Delitracker custom player magic at offset 0
+  if (u32BE(buf, 0) !== 0x000003F3) return false;
+
+  // moveq #-1,d0 (0x70FF) + rts (0x4E75) at offset 32
+  if (u32BE(buf, 32) !== 0x70FF4E75) return false;
+
+  // 'UNCL' at bytes 36-39
+  if (
+    buf[36] !== 0x55 || buf[37] !== 0x4E || buf[38] !== 0x43 || buf[39] !== 0x4C
+  ) return false;
+
+  // 'EART' at bytes 40-43
+  if (
+    buf[40] !== 0x45 || buf[41] !== 0x41 || buf[42] !== 0x52 || buf[43] !== 0x54
+  ) return false;
+
+  return true;
 }
 
 // ── Main parser ────────────────────────────────────────────────────────────
