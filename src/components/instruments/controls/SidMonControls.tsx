@@ -16,9 +16,11 @@ import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import {
   EnvelopeVisualization,
+  FilterFrequencyResponse,
   SequenceEditor,
   WaveformThumbnail,
 } from '@components/instruments/shared';
+import type { FilterType } from '@components/instruments/shared';
 import type { SequencePreset } from '@components/instruments/shared';
 
 interface SidMonControlsProps {
@@ -38,6 +40,7 @@ const WAVEFORMS: { name: string; type: 'triangle' | 'saw' | 'square' | 'noise' }
 ];
 
 const FILTER_MODE_NAMES = ['LP', 'HP', 'BP'];
+const FILTER_MODE_TYPES: FilterType[] = ['lowpass', 'highpass', 'bandpass'];
 
 const ARP_PRESETS: SequencePreset[] = [
   { name: 'Major',  data: [0, 4, 7, 0, 4, 7, 12, 12, 0, 4, 7, 0, 4, 7, 12, 12], loop: 0 },
@@ -199,6 +202,16 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
               {name}
             </button>
           ))}
+        </div>
+        <div className="mb-3">
+          <FilterFrequencyResponse
+            filterType={FILTER_MODE_TYPES[config.filterMode] ?? 'lowpass'}
+            cutoff={config.filterCutoff / 255}
+            resonance={config.filterResonance / 15}
+            poles={2}
+            color={accent}
+            width={320} height={64}
+          />
         </div>
         <div className="flex gap-4">
           <Knob value={config.filterCutoff} min={0} max={255} step={1}

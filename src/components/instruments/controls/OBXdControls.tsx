@@ -3,6 +3,16 @@ import { Knob } from '@components/controls/Knob';
 import { Waves, Filter, Zap, Activity, Volume2 } from 'lucide-react';
 import { useThemeStore } from '@stores';
 import type { OBXdConfig } from '@typedefs/instrument';
+import { FilterFrequencyResponse } from '@components/instruments/shared';
+import type { FilterType } from '@components/instruments/shared';
+
+const OBXD_FILTER_TYPE_MAP: Record<string, { type: FilterType; poles: 2 | 4 }> = {
+  lp24:  { type: 'lowpass',   poles: 4 },
+  lp12:  { type: 'lowpass',   poles: 2 },
+  hp:    { type: 'highpass',  poles: 2 },
+  bp:    { type: 'bandpass',  poles: 2 },
+  notch: { type: 'notch',     poles: 2 },
+};
 
 // Waveform options for UI
 const OSC_WAVEFORMS = ['saw', 'pulse', 'triangle', 'noise'] as const;
@@ -228,6 +238,22 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
           <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
             FILTER
           </h3>
+        </div>
+
+        <div className="mb-4">
+          {(() => {
+            const ft = OBXD_FILTER_TYPE_MAP[config.filterType ?? 'lp24'] ?? OBXD_FILTER_TYPE_MAP.lp24;
+            return (
+              <FilterFrequencyResponse
+                filterType={ft.type}
+                cutoff={config.filterCutoff ?? 0.7}
+                resonance={config.filterResonance ?? 0.3}
+                poles={ft.poles}
+                color={knobColor}
+                width={320} height={64}
+              />
+            );
+          })()}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
