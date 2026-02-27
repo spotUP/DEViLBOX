@@ -256,15 +256,21 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
 
     } else if (chunkId === CHUNK_SMPL) {
       // ── SMPL: 6-byte extra header + 50-byte metadata + sample data ────────
-      if (chunkSize < SMPL_EXTRA_HDR + SMPL_META_SIZE || dataStart + chunkSize > len) {
-        pos = dataStart + chunkSize;
+      // IMPORTANT: The SMPL chunk size does NOT include the 6-byte extra header
+      // (rawDataSize[4] + deltaCommand[1] + pad[1]). Those 6 bytes are written
+      // separately before the chunk data, so the actual end of a SMPL chunk is
+      // dataStart + SMPL_EXTRA_HDR + chunkSize (not dataStart + chunkSize).
+      // Verified against SaveModule @ Mline116.asm:7362-7430.
+      const smplEndPos = dataStart + SMPL_EXTRA_HDR + chunkSize;
+      if (chunkSize < SMPL_META_SIZE || smplEndPos > len + 16) {
+        pos = smplEndPos;
         continue;
       }
 
       const smpl = parseSmpl(v, data, dataStart, chunkSize);
       if (smpl) smplList.push(smpl);
 
-      pos = dataStart + chunkSize;
+      pos = smplEndPos;
 
     } else {
       // Unknown chunk ID — stop (loader does same: hits CloseFile on unknown ID)
@@ -592,7 +598,8 @@ function parseSmpl(
   const semiTone    = v.getInt16(metaOffset + 48);
 
   const sampleDataOffset = offset + SMPL_EXTRA_HDR + SMPL_META_SIZE;
-  const storedSize = chunkSize - SMPL_EXTRA_HDR - SMPL_META_SIZE;
+  // chunkSize does NOT include the 6-byte extra header, only smpl_SIZE (50) + sampleData
+  const storedSize = chunkSize - SMPL_META_SIZE;
 
   if (storedSize <= 0) return null;
 
@@ -684,7 +691,7 @@ function deltaDePack(packed: Uint8Array, outputSize: number, deltaCommand: numbe
 
 /**
  * Build DEViLBOX InstrumentConfig array from parsed INST + SMPL data.
- * Each INST references a SMPL by smplNumber (0-based index into smplList).
+ * Each INST references a SMPL by smplNumber (1-based: smplNumber=1 → smplList[0]).
  */
 function buildInstruments(
   instList: Array<{ title: string; smplNumber: number; volume: number; fineTune: number; semiTone: number; smplRepStart: number; smplRepLen: number }>,
@@ -694,7 +701,7 @@ function buildInstruments(
 
   for (let i = 0; i < instList.length; i++) {
     const inst = instList[i];
-    const smpl = smplList[inst.smplNumber]; // smplNumber is 0-based index
+    const smpl = smplList[inst.smplNumber - 1]; // smplNumber is 1-based (Mline116.asm:5500 addq #1,_WsMaxNum)
 
     if (!smpl || smpl.pcm.length === 0) {
       // Instrument has no sample — create a silent placeholder
