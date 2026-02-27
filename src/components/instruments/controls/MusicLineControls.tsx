@@ -20,11 +20,13 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 
 const PAL_C3_RATE = 8287;
 
+// Correct loop lengths from FixWaveLength (smplLength=128 words → shifted by 5-smplType):
+// type 1 → 8 words = 16 bytes; type 2 → 16 = 32; type 3 → 32 = 64; type 4 → 64 = 128; type 5+ → 256
 const LOOP_SIZE_DEFS: Record<number, { samples: number; approxNote: string }> = {
-  1: { samples: 32,  approxNote: 'C-3' },
-  2: { samples: 64,  approxNote: 'C-2' },
-  3: { samples: 128, approxNote: 'C-1' },
-  4: { samples: 256, approxNote: 'C-0' },
+  1: { samples: 16,  approxNote: 'C-4' },
+  2: { samples: 32,  approxNote: 'C-3' },
+  3: { samples: 64,  approxNote: 'C-2' },
+  4: { samples: 128, approxNote: 'C-1' },
   5: { samples: 256, approxNote: 'C-0' },
 };
 
