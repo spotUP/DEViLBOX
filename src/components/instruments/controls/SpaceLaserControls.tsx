@@ -3,6 +3,7 @@ import type { SpaceLaserConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Zap, Activity, Filter, Repeat, Waves, Wind } from 'lucide-react';
 import { useThemeStore } from '@stores';
+import { FilterFrequencyResponse } from '@components/instruments/shared';
 
 interface SpaceLaserControlsProps {
   config: SpaceLaserConfig;
@@ -222,6 +223,13 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
               </button>
             ))}
           </div>
+
+          <FilterFrequencyResponse
+            filterType={config.filter.type}
+            cutoff={Math.log10(Math.max(config.filter.cutoff, 20) / 20) / 3}
+            resonance={config.filter.resonance / 100}
+            poles={2} color={accentColor} width={300} height={56}
+          />
 
           <div className="flex gap-6 w-full">
             <Knob
