@@ -50,6 +50,7 @@ describe('parseSoundFXFile — acid housemix.sfx', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
+
 });
 
 describe('parseSoundFXFile — heavy-metal.sfx', () => {
@@ -69,5 +70,14 @@ describe('parseSoundFXFile — heavy-metal.sfx', () => {
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
+  });
+
+  it('extracts PCM Sampler instruments', async () => {
+    const song = await parseSoundFXFile(loadBuf(FILE2), 'heavy-metal.sfx');
+    if (!song) return;
+    expect(song.instruments.length).toBeGreaterThan(0);
+    const samplerInsts = song.instruments.filter(i => i.synthType === 'Sampler');
+    expect(samplerInsts.length).toBeGreaterThan(0);
+    expect(samplerInsts[0].sample?.audioBuffer?.byteLength ?? 0).toBeGreaterThan(0);
   });
 });
