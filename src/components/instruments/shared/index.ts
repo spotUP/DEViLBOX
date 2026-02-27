@@ -15,3 +15,5 @@ export { SequenceEditor } from './SequenceEditor';
 export type { SequenceEditorProps, SequencePreset } from './SequenceEditor';
 export { WaveformThumbnail } from './WaveformThumbnail';
 export type { WaveformThumbnailProps } from './WaveformThumbnail';
+export { FMAlgorithmDiagram } from './FMAlgorithmDiagram';
+export type { FMAlgorithmDiagramProps } from './FMAlgorithmDiagram';
