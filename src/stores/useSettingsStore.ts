@@ -155,6 +155,7 @@ export interface FormatEnginePreferences {
   fmTracker: FormatEngineChoice;        // .fmt → FMTrackerParser vs libopenmpt
   madTracker2: FormatEngineChoice;      // .mt2 → MadTracker2Parser vs libopenmpt
   psm: FormatEngineChoice;              // .psm → PSMParser vs libopenmpt
+  composer667: FormatEngineChoice;      // .667 → Composer667Parser vs libopenmpt
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -337,6 +338,7 @@ export const useSettingsStore = create<SettingsStore>()(
         fmTracker: 'native',          // FMTrackerParser — dedicated FM Tracker support
         madTracker2: 'native',        // MadTracker2Parser — dedicated MadTracker 2 support
         psm: 'native',                // PSMParser — dedicated PSM/PSM16 support
+        composer667: 'native',        // Composer667Parser — dedicated Composer 667 support
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
