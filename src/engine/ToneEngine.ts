@@ -3163,8 +3163,10 @@ export class ToneEngine {
             const finalRate = playbackRate * this.globalPlaybackRate;
             (player as unknown as { playbackRate: number }).playbackRate = finalRate;
           } else if (config.metadata?.modPlayback?.usePeriodPlayback && !period) {
-            // Warn if period-based playback is enabled but no period provided
-            console.warn('[ToneEngine] MOD/XM sample expects period but none provided');
+            // No period provided for period-based instrument — play at natural rate (1.0x).
+            // This resets any stale playbackRate from previous playback, so the sample
+            // always sounds at its recorded pitch during instrument preview.
+            (player as unknown as { playbackRate: number }).playbackRate = this.globalPlaybackRate;
           } else {
             // Normal (non-period) playback - calculate pitch from note
             const baseNote = cachedFrequency('C4');
