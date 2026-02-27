@@ -795,10 +795,8 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const bytes = new Uint8Array(buffer);
     try {
       const { isMusicLineFile, parseMusicLineFile } = await import('@lib/import/formats/MusicLineParser');
-      console.log(`[parseModuleToSong] MusicLine: isMusicLineFile=${isMusicLineFile(bytes)}`);
       if (isMusicLineFile(bytes)) {
         const result = parseMusicLineFile(bytes);
-        console.log(`[parseModuleToSong] MusicLine result:`, result ? { numChannels: result.numChannels, channelTrackTables: !!result.channelTrackTables, tables: result.channelTrackTables?.length } : null);
         if (result) return result;
       }
     } catch (err) {
