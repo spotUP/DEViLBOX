@@ -113,7 +113,12 @@ export class HivelyEngine {
           code = code
             .replace(/import\.meta\.url/g, "'.'")
             .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];');
+            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+            // HEAPU8 is a closure-local var in the Emscripten factory — it is never
+            // added to the Module object, so this.wasm.HEAPU8 is always undefined.
+            // Patch updateMemoryViews() to mirror HEAPU8 onto Module each time it
+            // is (re)created, including after WASM memory grows.
+            .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;');
           code += '\nvar createHively = createHively || ' + code.match(/var\s+(\w+)\s*=\s*\(\s*\)\s*=>/)?.[1] + ';';
           // Simpler approach: just make sure the factory is accessible
           if (!code.includes('var createHively =')) {
