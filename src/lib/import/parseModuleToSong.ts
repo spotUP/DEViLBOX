@@ -2982,6 +2982,28 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return await parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
+  // ── S3M (ScreamTracker 3) ─────────────────────────────────────────────────
+  if (/\.s3m$/i.test(filename)) {
+    try {
+      const { isS3MFormat, parseS3MFile } = await import('@lib/import/formats/S3MParser');
+      if (isS3MFormat(buffer)) return parseS3MFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[S3MParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── IT / MPTM (Impulse Tracker / OpenMPT) ─────────────────────────────────
+  if (/\.(it|mptm)$/i.test(filename)) {
+    try {
+      const { isITFormat, parseITFile } = await import('@lib/import/formats/ITParser');
+      if (isITFormat(buffer)) return parseITFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[ITParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
   // ── MOD, XM, IT, S3M, and other tracker formats ────────────────────────
   // MOD files can be routed to UADE for authentic Amiga playback
   if (filename.endsWith('.mod') && prefs.mod === 'uade') {
