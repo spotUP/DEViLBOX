@@ -17,7 +17,7 @@ import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { MacroListEditor } from './MacroEditor';
 import { WavetableListEditor, type WavetableData } from './WavetableEditor';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
-import { EnvelopeVisualization, WaveformThumbnail } from '@components/instruments/shared';
+import { EnvelopeVisualization, WaveformThumbnail, FMAlgorithmDiagram } from '@components/instruments/shared';
 
 // ============================================================================
 // CHIP-SPECIFIC PARAMETER RANGES (from Furnace insEdit.cpp)
@@ -172,117 +172,6 @@ function getChipParameterRanges(chipType: number): ChipParameterRanges {
 // FM ALGORITHM DIAGRAM (from Furnace drawAlgorithm)
 // ============================================================================
 
-interface AlgorithmDiagramProps {
-  algorithm: number;
-  feedback: number;
-  opCount?: number;
-}
-
-const AlgorithmDiagram: React.FC<AlgorithmDiagramProps> = ({ algorithm, feedback }) => {
-  // Algorithm connections for 4-op FM (OPN/OPM style)
-  // Based on Furnace's algorithm visualizations
-  const algorithms = [
-    // Alg 0: 4→3→2→1→out (serial)
-    { ops: [[4,3], [3,2], [2,1]], carriers: [1] },
-    // Alg 1: (4+3)→2→1→out
-    { ops: [[4,2], [3,2], [2,1]], carriers: [1] },
-    // Alg 2: 4→3→1, 2→1→out
-    { ops: [[4,3], [3,1], [2,1]], carriers: [1] },
-    // Alg 3: 4→3, (3+2)→1→out
-    { ops: [[4,3], [3,1], [2,1]], carriers: [1] },
-    // Alg 4: (4→3)+(2→1)→out
-    { ops: [[4,3], [2,1]], carriers: [3, 1] },
-    // Alg 5: 4→(3+2+1)→out
-    { ops: [[4,3], [4,2], [4,1]], carriers: [3, 2, 1] },
-    // Alg 6: (4→3)+2+1→out
-    { ops: [[4,3]], carriers: [3, 2, 1] },
-    // Alg 7: 4+3+2+1→out (parallel)
-    { ops: [], carriers: [4, 3, 2, 1] },
-  ];
-
-  const alg = algorithms[algorithm] || algorithms[0];
-
-  return (
-    <div className="bg-dark-bg rounded border border-dark-border p-2">
-      <svg viewBox="0 0 120 50" className="w-full h-12">
-        {/* Operator boxes */}
-        {[4, 3, 2, 1].map((op, i) => {
-          const x = 10 + i * 28;
-          const y = 15;
-          const isCarrier = alg.carriers.includes(op);
-          return (
-            <g key={op}>
-              <rect
-                x={x}
-                y={y}
-                width={20}
-                height={20}
-                rx={2}
-                fill={isCarrier ? '#f59e0b' : '#3b82f6'}
-                stroke={isCarrier ? '#fbbf24' : '#60a5fa'}
-                strokeWidth={1}
-              />
-              <text
-                x={x + 10}
-                y={y + 14}
-                textAnchor="middle"
-                fontSize="10"
-                fill="white"
-                fontWeight="bold"
-              >
-                {op}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Feedback arrow on OP4 */}
-        {feedback > 0 && (
-          <path
-            d="M 20 15 Q 20 5 30 5 Q 40 5 40 15"
-            fill="none"
-            stroke="#f472b6"
-            strokeWidth={1}
-            strokeDasharray="2,1"
-          />
-        )}
-
-        {/* Output arrow */}
-        <path
-          d="M 110 25 L 118 25"
-          fill="none"
-          stroke="#22c55e"
-          strokeWidth={2}
-        />
-        <polygon
-          points="118,25 114,22 114,28"
-          fill="#22c55e"
-        />
-
-        {/* Connection lines */}
-        {alg.ops.map(([from, to], i) => {
-          const fromX = 10 + (4 - from) * 28 + 20;
-          const toX = 10 + (4 - to) * 28;
-          return (
-            <line
-              key={i}
-              x1={fromX}
-              y1={25}
-              x2={toX}
-              y2={25}
-              stroke="#64748b"
-              strokeWidth={1}
-            />
-          );
-        })}
-      </svg>
-      <div className="text-[9px] text-center text-text-muted font-mono">
-        ALG {algorithm} • FB {feedback}
-      </div>
-    </div>
-  );
-};
-
 // ============================================================================
 // MAIN FURNACE EDITOR COMPONENT
 // ============================================================================
@@ -296,7 +185,19 @@ interface FurnaceEditorProps {
 export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrumentId, onChange }) => {
   const [activeTab, setActiveTab] = useState<'fm' | 'macros' | 'chip'>('fm');
   const [expandedOps, setExpandedOps] = useState<Set<number>>(new Set([0, 1, 2, 3]));
+  // selectedOp: 1-indexed op number matching FMAlgorithmDiagram convention (null = none)
+  const [selectedOp, setSelectedOp] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Click an operator in the diagram → highlight its card and ensure it's expanded
+  const handleDiagramSelect = useCallback((opNum: number) => {
+    setSelectedOp(prev => prev === opNum ? null : opNum);
+    setExpandedOps(prev => {
+      const next = new Set(prev);
+      next.add(opNum - 1); // opNum is 1-indexed; array is 0-indexed
+      return next;
+    });
+  }, []);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -466,10 +367,12 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Algorithm Diagram */}
             <div className="md:col-span-2">
-              <AlgorithmDiagram
+              <FMAlgorithmDiagram
                 algorithm={config.algorithm}
                 feedback={config.feedback}
-                opCount={paramRanges.opCount}
+                opCount={paramRanges.opCount as 2 | 4}
+                selectedOp={selectedOp}
+                onSelectOp={handleDiagramSelect}
               />
             </div>
 
@@ -515,6 +418,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
                 isExpanded={expandedOps.has(opIdx)}
                 onToggleExpand={() => toggleOpExpanded(opIdx)}
                 isCarrier={isOperatorCarrier(config.algorithm, opIdx)}
+                isSelected={selectedOp === opIdx + 1}
               />
               );
             })}
@@ -674,16 +578,22 @@ interface OperatorCardProps {
   isExpanded: boolean;
   onToggleExpand: () => void;
   isCarrier: boolean;
+  /** Highlighted by clicking in the FMAlgorithmDiagram */
+  isSelected?: boolean;
 }
 
 const OperatorCard: React.FC<OperatorCardProps> = ({
-  index, op, onUpdate, ranges, isExpanded, onToggleExpand, isCarrier
+  index, op, onUpdate, ranges, isExpanded, onToggleExpand, isCarrier, isSelected
 }) => {
-  const borderColor = isCarrier ? 'border-amber-500/30' : 'border-blue-500/30';
+  const borderColor = isSelected
+    ? 'border-emerald-500/60'
+    : isCarrier ? 'border-amber-500/30' : 'border-blue-500/30';
   const accentColor = isCarrier ? '#f59e0b' : '#3b82f6';
-  const bgGradient = isCarrier
-    ? 'from-amber-950/20 to-transparent'
-    : 'from-blue-950/20 to-transparent';
+  const bgGradient = isSelected
+    ? 'from-emerald-950/25 to-transparent'
+    : isCarrier
+      ? 'from-amber-950/20 to-transparent'
+      : 'from-blue-950/20 to-transparent';
 
   return (
     <div className={`bg-gradient-to-br ${bgGradient} bg-dark-bgSecondary p-3 rounded-lg border ${borderColor} transition-colors`}>
