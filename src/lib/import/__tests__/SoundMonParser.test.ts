@@ -57,13 +57,14 @@ describe('parseSoundMonFile — acid mix.bp (SoundMon 2)', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
-  it('extracts SoundMon synth instruments', async () => {
+  it('extracts PCM Sampler instruments (acid mix is a PCM-mode SoundMon file)', async () => {
     const song = await parseSoundMonFile(loadBuf(FILE1), 'acid mix.bp');
     if (!song) return;
     expect(song.instruments.length).toBeGreaterThan(0);
-    const synthInsts = song.instruments.filter(i => i.synthType === 'SoundMonSynth');
-    expect(synthInsts.length).toBeGreaterThan(0);
-    expect(synthInsts[0].soundMon).toBeTruthy();
+    // acid mix.bp contains PCM samples (type=pcm), extracted as Sampler instruments
+    const samplerInsts = song.instruments.filter(i => i.synthType === 'Sampler');
+    expect(samplerInsts.length).toBeGreaterThan(0);
+    expect(samplerInsts[0].sample?.audioBuffer?.byteLength ?? 0).toBeGreaterThan(0);
   });
 });
 
