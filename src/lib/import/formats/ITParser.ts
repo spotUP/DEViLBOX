@@ -344,9 +344,9 @@ function readEnvelope(v: DataView, off: number): EnvelopePoints | undefined {
   return {
     enabled:        true,
     points,
-    sustainPoint:   (flags & 0x04) ? slb : -1,
-    loopStartPoint: (flags & 0x02) ? lpb : -1,
-    loopEndPoint:   (flags & 0x02) ? lpe : -1,
+    sustainPoint:   (flags & 0x04) ? slb : null,
+    loopStartPoint: (flags & 0x02) ? lpb : null,
+    loopEndPoint:   (flags & 0x02) ? lpe : null,
   };
 }
 
