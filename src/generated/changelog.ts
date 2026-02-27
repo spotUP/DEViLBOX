@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-27T01:28:35.038Z
+ * Generated: 2026-02-27T08:01:44.905Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1450';
-export const BUILD_NUMBER = '1450';
-export const BUILD_HASH = '97274adb';
+export const BUILD_VERSION = '1.0.1462';
+export const BUILD_NUMBER = '1462';
+export const BUILD_HASH = 'e4791087';
 export const BUILD_DATE = '2026-02-27';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,49 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1450',
+    version: '1.0.1462',
     date: '2026-02-27',
     changes: [
+      {
+        type: 'feature',
+        "description": "Upgrade MusicMaker 4V/8V from stub to real IFF parser"
+      },
+      {
+        type: 'feature',
+        "description": "Extract instrument names from INAM chunk"
+      },
+      {
+        type: 'fix',
+        "description": "Auto-open pattern order modal on load; fix DigiBoosterParser test escapes"
+      },
+      {
+        type: 'fix',
+        "description": "Restore getTrackerReplayer import, suppress unused patIdx warning"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: regenerate changelog"
+      },
+      {
+        type: 'feature',
+        "description": "Test(import): add integration tests for 13 more native parsers"
+      },
+      {
+        type: 'fix',
+        "description": "Thread channelTrackTables through store so UI switches to track table editor"
+      },
+      {
+        type: 'fix',
+        "description": "Restore numChannels from TUNE header + fix channels[0] lookup in replayer"
+      },
+      {
+        type: 'feature',
+        "description": "Real MusicMaker 4V/8V parser — IFF chunk → Sampler instruments"
+      },
+      {
+        type: 'feature',
+        "description": "1:1 ASM port - single-voice PARTs, metadata extraction, correct channel matrix"
+      },
       {
         type: 'fix',
         "description": "Skip correct 20-byte file header (was 16 — broke all parsing)"
@@ -190,54 +230,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Metadata-only parsers always delegate to UADE; fix XM multiSample persistence"
-      },
-      {
-        type: 'feature',
-        "description": "TME, Infogrames (DUM) native parsers + routing"
-      },
-      {
-        type: 'fix',
-        "description": "Halve playback speed - checkSongEvent was firing twice per sample"
-      },
-      {
-        type: 'fix',
-        "description": "Use bd.* prefix routing for Ben Daglish instead of .bd extension"
-      },
-      {
-        type: 'feature',
-        "description": "MMDC, PSA, Steve Turner parsers + routing"
-      },
-      {
-        type: 'feature',
-        "description": "SoundMaster, ZoundMonitor, TCB Tracker, Medley, RobHubbard parsers"
-      },
-      {
-        type: 'improvement',
-        "description": "Rewrite TCBTracker/RobHubbard/BenDaglish as metadata-only; add tcb.* routing"
-      },
-      {
-        type: 'feature',
-        "description": "Wire SoundMaster + ZoundMonitor parsers; update status doc"
-      },
-      {
-        type: 'improvement',
-        "description": "Add Furnace, Jeroen Tel, Mark Cooksey, Quartet to status; fix Symphonie duplicate"
-      },
-      {
-        type: 'improvement',
-        "description": "Add Symphonie Pro (.symmod) to format-implementation-status.md"
-      },
-      {
-        type: 'improvement',
-        "description": "Add Jason Page (jpn.*/jp.*) to format-implementation-status.md"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
-      },
-      {
-        type: 'improvement',
-        "description": "Add Medley (.ml) to format-implementation-status.md"
       }
     ]
   }
