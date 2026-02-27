@@ -530,6 +530,24 @@ export class ToneEngine {
   }
 
   /**
+   * Await all pending Sampler/Player decode operations (with timeout).
+   * Called from TrackerReplayer.play() so the scheduler doesn't fire notes
+   * before sample buffers are ready — which would cause dropped first notes.
+   */
+  public async awaitPendingLoads(timeoutMs = 5000): Promise<void> {
+    const pending = Array.from(this.instrumentLoadingPromises.values());
+    if (pending.length === 0) return;
+    try {
+      await Promise.race([
+        Promise.all(pending),
+        new Promise<void>(resolve => setTimeout(resolve, timeoutMs)),
+      ]);
+    } catch {
+      // Individual decode failures are already logged inside each promise; ignore here
+    }
+  }
+
+  /**
    * Get the global high-performance WASM instance
    */
   public getWasmInstance(): WebAssembly.Exports | null {
