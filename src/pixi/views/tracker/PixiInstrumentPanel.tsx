@@ -4,9 +4,10 @@
  * for pixel-perfect parity with the DOM tracker view.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
 import { useUIStore } from '@stores';
+import { useTrackerStore } from '@stores/useTrackerStore';
 
 interface PixiInstrumentPanelProps {
   width: number;
@@ -20,6 +21,7 @@ interface PixiInstrumentPanelProps {
  */
 const InstrumentListOverlay: React.FC = () => {
   const [Comp, setComp] = useState<React.ComponentType<any> | null>(null);
+  const editorMode = useTrackerStore(state => state.editorMode);
 
   useEffect(() => {
     import('@components/instruments/InstrumentList').then(m => {
@@ -41,6 +43,7 @@ const InstrumentListOverlay: React.FC = () => {
       showSamplePackButton={true}
       showEditButton={true}
       onEditInstrument={handleEdit}
+      showHivelyImport={editorMode === 'hively'}
     />
   );
 };

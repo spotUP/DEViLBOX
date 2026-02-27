@@ -597,6 +597,12 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       {showLoadModal && (
         <LoadPresetModal onClose={() => setShowLoadModal(false)} />
       )}
+      {showHivelyImportDialog && (
+        <HivelyImportDialog
+          onClose={() => setShowHivelyImportDialog(false)}
+          onImport={handleHivelyImport}
+        />
+      )}
     </div>
   );
 });

@@ -1434,6 +1434,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               showSamplePackButton={true}
               showEditButton={true}
               onEditInstrument={onShowInstruments}
+              showHivelyImport={editorMode === 'hively'}
             />
           </div>
         )}
