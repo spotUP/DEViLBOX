@@ -60,6 +60,12 @@ describe('parseFCFile — commando.smod', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
+  it('extracts FC synth instruments', () => {
+    const song = parseFCFile(loadBuf(FILE_SMOD), 'commando.smod');
+    expect(song.instruments.length).toBeGreaterThan(0);
+    expect(song.instruments[0].synthType).toBe('FCSynth');
+    expect(song.instruments[0].fc).toBeTruthy();
+  });
 });
 
 // ── Parse FC14 — starglide1.fc ────────────────────────────────────────────────

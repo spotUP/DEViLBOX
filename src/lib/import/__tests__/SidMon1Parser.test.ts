@@ -29,6 +29,13 @@ describe('parseSidMon1File — anarchy.sid', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
+  it('extracts SidMon1 synth instruments', () => {
+    const song = parseSidMon1File(loadBuf(FILE_ANARCHY), 'anarchy.sid');
+    if (!song) return;
+    expect(song.instruments.length).toBeGreaterThan(0);
+    expect(song.instruments[0].synthType).toBe('SidMon1Synth');
+    expect(song.instruments[0].sidmon1).toBeTruthy();
+  });
 });
 
 describe('parseSidMon1File — brainwave.sid', () => {
@@ -40,5 +47,12 @@ describe('parseSidMon1File — brainwave.sid', () => {
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
+  });
+  it('extracts SidMon1 synth instruments', () => {
+    const song = parseSidMon1File(loadBuf(FILE_BRAINWAVE), 'brainwave.sid');
+    if (!song) return;
+    expect(song.instruments.length).toBeGreaterThan(0);
+    expect(song.instruments[0].synthType).toBe('SidMon1Synth');
+    expect(song.instruments[0].sidmon1).toBeTruthy();
   });
 });

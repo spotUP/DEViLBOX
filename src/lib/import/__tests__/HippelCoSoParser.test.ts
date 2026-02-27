@@ -42,6 +42,12 @@ describe('parseHippelCoSoFile — a prehistoric tale (intro).hipc', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
+  it('extracts HippelCoSo synth instruments', async () => {
+    const song = await parseHippelCoSoFile(loadBuf(FILE1), 'a prehistoric tale (intro).hipc');
+    expect(song.instruments.length).toBeGreaterThan(0);
+    expect(song.instruments[0].synthType).toBe('HippelCoSoSynth');
+    expect(song.instruments[0].hippelCoso).toBeTruthy();
+  });
 });
 
 describe('parseHippelCoSoFile — amberstar (01).hipc', () => {
@@ -56,5 +62,11 @@ describe('parseHippelCoSoFile — amberstar (01).hipc', () => {
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
+  });
+  it('extracts HippelCoSo synth instruments', async () => {
+    const song = await parseHippelCoSoFile(loadBuf(FILE2), 'amberstar (01).hipc');
+    expect(song.instruments.length).toBeGreaterThan(0);
+    expect(song.instruments[0].synthType).toBe('HippelCoSoSynth');
+    expect(song.instruments[0].hippelCoso).toBeTruthy();
   });
 });
