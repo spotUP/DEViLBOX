@@ -5,13 +5,16 @@
 
 import React, { useState } from 'react';
 import { useTrackerStore } from '@stores';
+import { useTransportStore } from '@stores/useTransportStore';
 import { notify } from '@stores/useNotificationStore';
 import { Plus, Trash2, List, ChevronDown, ChevronUp } from 'lucide-react';
 
 export const PatternOrderList: React.FC = React.memo(() => {
   // Optimize: Use selectors to prevent unnecessary re-renders
   const patternOrder = useTrackerStore((state) => state.patternOrder);
+  const patterns = useTrackerStore((state) => state.patterns);
   const currentPositionIndex = useTrackerStore((state) => state.currentPositionIndex);
+  const initialSpeed = useTransportStore((state) => state.speed);
   const currentPatternIndex = useTrackerStore((state) => state.currentPatternIndex);
   const addToOrder = useTrackerStore((state) => state.addToOrder);
   const removeFromOrder = useTrackerStore((state) => state.removeFromOrder);
@@ -86,6 +89,15 @@ export const PatternOrderList: React.FC = React.memo(() => {
     notify.success('Position duplicated', 2000);
   };
 
+  // Extract per-position speed from row 0 Fxx effect (Symphonie Pro and similar formats)
+  const getPositionSpeed = (patternIndex: number): number | null => {
+    const row = patterns[patternIndex]?.channels[0]?.rows[0];
+    if (row?.effTyp === 0x0F && row.eff > 0 && row.eff !== initialSpeed) {
+      return row.eff;
+    }
+    return null;
+  };
+
   // Handle clear all
   const handleClearAll = () => {
     if (confirm('Clear all positions? This will reset to just the first pattern.')) {
@@ -151,44 +163,52 @@ export const PatternOrderList: React.FC = React.memo(() => {
       {/* Pattern Order List - Scrollable with responsive grid */}
       <div className="max-h-32 overflow-y-auto overflow-x-auto scrollbar-ft2">
         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 xl:grid-cols-16 gap-1 p-2 min-w-min bg-ft2-bg">
-          {patternOrder.map((patternIndex, positionIndex) => (
-            <div
-              key={`pos-${positionIndex}`}
-              draggable
-              onDragStart={(e) => handleDragStart(e, positionIndex)}
-              onDragOver={(e) => handleDragOver(e, positionIndex)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, positionIndex)}
-              onDragEnd={handleDragEnd}
-              onClick={() => setCurrentPosition(positionIndex)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                // Context menu actions
-                if (e.shiftKey) {
-                  handleDuplicate(positionIndex);
-                } else if (e.ctrlKey || e.metaKey) {
-                  handleRemove(positionIndex);
-                }
-              }}
-              className={`
-                relative px-2 py-1.5 rounded border cursor-pointer transition-all
-                ${
-                  positionIndex === currentPositionIndex
-                    ? 'bg-dark-bgActive border-accent-primary text-accent-primary font-bold'
-                    : 'bg-dark-bgTertiary border-dark-border text-text-secondary hover:bg-dark-bgHover hover:border-dark-borderLight'
-                }
-                ${draggedIndex === positionIndex ? 'opacity-50' : ''}
-              `}
-              title={`Position ${positionIndex}: Pattern ${patternIndex}\nClick to select\nShift+Click to duplicate\nCtrl+Click to remove\nDrag to reorder`}
-            >
-              <div className="text-[10px] text-center leading-none">
-                {positionIndex}
+          {patternOrder.map((patternIndex, positionIndex) => {
+            const posSpeed = getPositionSpeed(patternIndex);
+            return (
+              <div
+                key={`pos-${positionIndex}`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, positionIndex)}
+                onDragOver={(e) => handleDragOver(e, positionIndex)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, positionIndex)}
+                onDragEnd={handleDragEnd}
+                onClick={() => setCurrentPosition(positionIndex)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  // Context menu actions
+                  if (e.shiftKey) {
+                    handleDuplicate(positionIndex);
+                  } else if (e.ctrlKey || e.metaKey) {
+                    handleRemove(positionIndex);
+                  }
+                }}
+                className={`
+                  relative px-2 py-1.5 rounded border cursor-pointer transition-all
+                  ${
+                    positionIndex === currentPositionIndex
+                      ? 'bg-dark-bgActive border-accent-primary text-accent-primary font-bold'
+                      : 'bg-dark-bgTertiary border-dark-border text-text-secondary hover:bg-dark-bgHover hover:border-dark-borderLight'
+                  }
+                  ${draggedIndex === positionIndex ? 'opacity-50' : ''}
+                `}
+                title={`Position ${positionIndex}: Pattern ${patternIndex}${posSpeed !== null ? `\nSpeed: ${posSpeed}` : ''}\nClick to select\nShift+Click to duplicate\nCtrl+Click to remove\nDrag to reorder`}
+              >
+                <div className="text-[10px] text-center leading-none">
+                  {positionIndex}
+                </div>
+                <div className="text-xs text-center font-mono leading-none mt-0.5">
+                  {patternIndex}
+                </div>
+                {posSpeed !== null && (
+                  <div className="text-[8px] text-center leading-none mt-0.5 text-amber-400 font-mono">
+                    S:{posSpeed}
+                  </div>
+                )}
               </div>
-              <div className="text-xs text-center font-mono leading-none mt-0.5">
-                {patternIndex}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
