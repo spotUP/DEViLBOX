@@ -460,3 +460,87 @@ export function exportAsHively(
 
   return { data: blob, warnings, filename };
 }
+
+// ── Standalone Instrument (.ahi) Exporter ──────────────────────────────────
+
+/**
+ * Export a single HivelyTracker instrument as a binary .ahi file.
+ *
+ * Format: "THXI" (AHX-compatible, 4-byte plist entries) when all FX codes fit
+ * in AHX range {0-5, 12, 15}. Otherwise "HVLI" (HVL format, 5-byte entries).
+ *
+ * Layout: 4-byte magic + 22-byte header + N plist entries + null-terminated name.
+ */
+export function exportAsAhi(config: HivelyConfig, name: string): Uint8Array {
+  const plist = config.performanceList ?? { speed: 1, entries: [] };
+
+  const isAHX = plist.entries.every(e =>
+    e.fx.every(fx => fx <= 5 || fx === 12 || fx === 15)
+  );
+
+  const plistEntrySize = isAHX ? 4 : 5;
+  const nameBytes = textEncoder.encode(name);
+  const totalSize = 4 + 22 + plist.entries.length * plistEntrySize + nameBytes.length + 1;
+  const buf = new Uint8Array(totalSize);
+  let off = 0;
+
+  // Magic
+  const magic = isAHX ? 'THXI' : 'HVLI';
+  for (let i = 0; i < 4; i++) buf[off++] = magic.charCodeAt(i);
+
+  // 22-byte instrument header
+  const filterSpeed = config.filterSpeed ?? 0;
+  const env = config.envelope ?? { aFrames: 1, aVolume: 64, dFrames: 1, dVolume: 64, sFrames: 1, rFrames: 1, rVolume: 0 };
+
+  buf[off++] = (config.volume ?? 64) & 0xff;
+  buf[off++] = ((filterSpeed & 0x1f) << 3) | ((config.waveLength ?? 3) & 0x07);
+  buf[off++] = env.aFrames & 0xff;
+  buf[off++] = env.aVolume & 0xff;
+  buf[off++] = env.dFrames & 0xff;
+  buf[off++] = env.dVolume & 0xff;
+  buf[off++] = env.sFrames & 0xff;
+  buf[off++] = env.rFrames & 0xff;
+  buf[off++] = env.rVolume & 0xff;
+  buf[off++] = 0; buf[off++] = 0; buf[off++] = 0; // reserved
+  buf[off++] = ((config.filterLowerLimit ?? 0) & 0x7f) | (((filterSpeed >> 5) & 1) << 7);
+  buf[off++] = (config.vibratoDelay ?? 0) & 0xff;
+  buf[off++] = ((config.hardCutRelease ? 1 : 0) << 7)
+    | (((config.hardCutReleaseFrames ?? 0) & 0x07) << 4)
+    | ((config.vibratoDepth ?? 0) & 0x0f);
+  buf[off++] = (config.vibratoSpeed ?? 0) & 0xff;
+  buf[off++] = (config.squareLowerLimit ?? 0) & 0xff;
+  buf[off++] = (config.squareUpperLimit ?? 0) & 0xff;
+  buf[off++] = (config.squareSpeed ?? 0) & 0xff;
+  buf[off++] = (config.filterUpperLimit ?? 0) & 0x3f;
+  buf[off++] = plist.speed & 0xff;
+  buf[off++] = plist.entries.length & 0xff;
+
+  // Plist entries
+  for (const entry of plist.entries) {
+    if (isAHX) {
+      let fx1Packed = entry.fx[1] & 0x07;
+      if (entry.fx[1] === 12) fx1Packed = 6;
+      if (entry.fx[1] === 15) fx1Packed = 7;
+      let fx0Packed = entry.fx[0] & 0x07;
+      if (entry.fx[0] === 12) fx0Packed = 6;
+      if (entry.fx[0] === 15) fx0Packed = 7;
+      const waveHi = (entry.waveform >> 1) & 3;
+      buf[off++] = (fx1Packed << 5) | (fx0Packed << 2) | waveHi;
+      buf[off++] = ((entry.waveform & 1) << 7) | ((entry.fixed ? 1 : 0) << 6) | (entry.note & 0x3f);
+      buf[off++] = entry.fxParam[0] & 0xff;
+      buf[off++] = entry.fxParam[1] & 0xff;
+    } else {
+      buf[off++] = entry.fx[0] & 0x0f;
+      buf[off++] = ((entry.fx[1] & 0x0f) << 3) | (entry.waveform & 0x07);
+      buf[off++] = ((entry.fixed ? 1 : 0) << 6) | (entry.note & 0x3f);
+      buf[off++] = entry.fxParam[0] & 0xff;
+      buf[off++] = entry.fxParam[1] & 0xff;
+    }
+  }
+
+  // Null-terminated name
+  buf.set(nameBytes, off);
+  buf[off + nameBytes.length] = 0;
+
+  return buf;
+}
