@@ -816,3 +816,42 @@ export function parseAhiFile(buffer: ArrayBuffer): { config: HivelyConfig; name:
     },
   };
 }
+
+/**
+ * Extract all instruments from a .hvl or .ahx file as HivelyConfig objects.
+ * Useful for the "import instruments from another song" dialog.
+ */
+export function extractInstrumentsFromHvl(
+  buffer: ArrayBuffer
+): Array<{ name: string; config: HivelyConfig }> {
+  const mod = parseHivelyBinary(buffer);
+  return mod.instruments.map(ins => ({
+    name: ins.name,
+    config: {
+      volume: ins.volume,
+      waveLength: ins.waveLength,
+      filterLowerLimit: ins.filterLowerLimit,
+      filterUpperLimit: ins.filterUpperLimit,
+      filterSpeed: ins.filterSpeed,
+      squareLowerLimit: ins.squareLowerLimit,
+      squareUpperLimit: ins.squareUpperLimit,
+      squareSpeed: ins.squareSpeed,
+      vibratoDelay: ins.vibratoDelay,
+      vibratoSpeed: ins.vibratoSpeed,
+      vibratoDepth: ins.vibratoDepth,
+      hardCutRelease: ins.hardCutRelease,
+      hardCutReleaseFrames: ins.hardCutReleaseFrames,
+      envelope: { ...ins.envelope },
+      performanceList: {
+        speed: ins.performanceList.speed,
+        entries: ins.performanceList.entries.map(e => ({
+          note: e.note,
+          waveform: e.waveform,
+          fixed: e.fixed,
+          fx: [...e.fx] as [number, number],
+          fxParam: [...e.fxParam] as [number, number],
+        })),
+      },
+    },
+  }));
+}
