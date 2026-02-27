@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-27T08:01:44.905Z
+ * Generated: 2026-02-27T08:43:40.191Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1462';
-export const BUILD_NUMBER = '1462';
-export const BUILD_HASH = 'e4791087';
+export const BUILD_VERSION = '1.0.1465';
+export const BUILD_NUMBER = '1465';
+export const BUILD_HASH = '2d167a9e';
 export const BUILD_DATE = '2026-02-27';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,21 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1462',
+    version: '1.0.1465',
     date: '2026-02-27',
     changes: [
+      {
+        type: 'fix',
+        "description": "Thread linearPeriods through store → replayer"
+      },
+      {
+        type: 'fix',
+        "description": "Thread hivelyFileData/hivelyMeta through store → replayer"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: regenerate changelog"
+      },
       {
         type: 'feature',
         "description": "Upgrade MusicMaker 4V/8V from stub to real IFF parser"
@@ -48,10 +60,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Restore getTrackerReplayer import, suppress unused patIdx warning"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: regenerate changelog"
       },
       {
         type: 'feature',
@@ -218,18 +226,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Remove metadata-only native parse calls for 28 UADE formats"
-      },
-      {
-        type: 'feature',
-        "description": "Fashion Tracker, MultiMedia Sound parsers + dialog + UADE ext updates"
-      },
-      {
-        type: 'feature',
-        "description": "Add 9 UADE format parsers (TimeTracker, ChipTracker, Cinemaware, NTP, Alcatraz, Blade, TomyTracker, IMS, TME)"
-      },
-      {
-        type: 'fix',
-        "description": "Metadata-only parsers always delegate to UADE; fix XM multiSample persistence"
       }
     ]
   }
