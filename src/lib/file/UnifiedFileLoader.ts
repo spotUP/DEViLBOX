@@ -289,7 +289,6 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     });
 
     // Set editor mode based on native data availability
-    console.log('[UnifiedFileLoader] applyEditorMode:', { hasFurnace: !!song.furnaceNative, hasHively: !!(song as any).hivelyNative, hasChannelTables: !!song.channelTrackTables, channelTableCount: song.channelTrackTables?.length, numChannels: song.numChannels });
     applyEditorMode(song);
 
     return {

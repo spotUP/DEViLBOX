@@ -331,15 +331,6 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
     channelGrooves,
   };
 
-  console.log('[MusicLineParser] parseMusicLineFile result:', {
-    numChannels,
-    patterns: patterns.length,
-    instruments: instruments.length,
-    channelTrackTables: mappedTrackTables.map((t, i) => `ch${i}:[${t.slice(0, 8).join(',')}${t.length > 8 ? '...' : ''}](len=${t.length})`),
-    channelSpeeds,
-    channelGrooves,
-    songPositions: songPositions.slice(0, 8),
-  });
 
   return song;
 }

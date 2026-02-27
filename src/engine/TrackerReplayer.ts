@@ -457,6 +457,13 @@ export class TrackerReplayer {
   private speed2: number | null = null;  // null = no alternation (XM/MOD mode)
   private speedAB = false;               // false = use speed1 next, true = use speed2 next
 
+  // Per-channel independent sequencing (MusicLine Editor and similar formats)
+  // Each channel has its own tick counter and position, advancing at its own speed.
+  private channelTickCounters: number[] = [];   // Per-channel tick counter (0 .. effectiveSpeed-1)
+  private channelPattPos: number[] = [];         // Per-channel row within current pattern
+  private channelSongPos: number[] = [];         // Per-channel index into its track table
+  private channelGrooveToggle: boolean[] = [];   // Per-channel groove phase (alternates each row)
+
   // Pattern break/jump
   private pBreakPos = 0;
   private pBreakFlag = false;
@@ -865,7 +872,6 @@ export class TrackerReplayer {
 
     this.song = song;
 
-    console.log('[TrackerReplayer] loadSong:', { numChannels: song.numChannels, hasChannelTables: !!song.channelTrackTables, tableLen: song.channelTrackTables?.length, patterns: song.patterns.length, positions: song.songPositions.length });
 
     // Configure format-dispatching pattern accessor
     if (song.furnaceNative) {
@@ -975,6 +981,20 @@ export class TrackerReplayer {
     } else {
       this.speed2 = null;
       this.speedAB = false;
+    }
+
+    // Per-channel sequencing state (MusicLine Editor and similar formats)
+    if (song.channelTrackTables) {
+      const n = song.numChannels;
+      this.channelTickCounters  = Array.from({ length: n }, () => 0);
+      this.channelPattPos       = Array.from({ length: n }, () => 0);
+      this.channelSongPos       = Array.from({ length: n }, () => 0);
+      this.channelGrooveToggle  = Array.from({ length: n }, () => false);
+    } else {
+      this.channelTickCounters  = [];
+      this.channelPattPos       = [];
+      this.channelSongPos       = [];
+      this.channelGrooveToggle  = [];
     }
 
   }
@@ -1388,6 +1408,12 @@ export class TrackerReplayer {
 
     this.totalTicksProcessed++;
 
+    // Per-channel path: each channel advances at its own speed (MusicLine Editor)
+    if (this.song.channelTrackTables && this.accessor.getMode() === 'classic') {
+      this.processTickPerChannel(time);
+      return;
+    }
+
     // Handle pattern delay (legacy MOD behavior — skips entire tick)
     if (!this.useXMPeriods && this.patternDelay > 0) {
       this.patternDelay--;
@@ -1427,17 +1453,9 @@ export class TrackerReplayer {
 
     // Get current pattern (classic path) or use accessor for native formats
     const useNativeAccessor = this.accessor.getMode() !== 'classic';
-    // MusicLine per-channel track tables: each channel looks up its own pattern independently.
-    // When present, pattern lookup is deferred into the per-channel loop below.
-    const usePerChannelTables = !useNativeAccessor && !!this.song.channelTrackTables;
-    if (usePerChannelTables && this.songPos === 0 && this.pattPos === 0 && this.currentTick === 0) {
-      console.log('[TrackerReplayer] processTick: usePerChannelTables=true channels=', this.channels.length, 'tables=', this.song.channelTrackTables!.length);
-    }
-    const patternNum = usePerChannelTables
-      ? (this.song.channelTrackTables![0]?.[this.songPos] ?? 0)
-      : this.song.songPositions[this.songPos];
-    const pattern = (useNativeAccessor || usePerChannelTables) ? null : this.song.patterns[patternNum];
-    if (!useNativeAccessor && !usePerChannelTables && !pattern) return;
+    const patternNum = this.song.songPositions[this.songPos];
+    const pattern = useNativeAccessor ? null : this.song.patterns[patternNum];
+    if (!useNativeAccessor && !pattern) return;
 
     // Queue display state for audio-synced UI (tick 0 = start of row)
     // Use swung time (safeTime) so visual follows the same timing as audio
@@ -1467,13 +1485,6 @@ export class TrackerReplayer {
         let row: TrackerCell | undefined;
         if (useNativeAccessor) {
           row = this.accessor.getRow(this.songPos, this.pattPos, ch);
-        } else if (usePerChannelTables) {
-          // MusicLine: each channel reads from its own independently-sequenced pattern.
-          // PARTs are single-voice (channels[0] only) — always read from channels[0],
-          // regardless of which song channel (ch) is being processed.
-          const chTable: number[] | undefined = this.song.channelTrackTables![ch];
-          const chPatIdx = chTable?.[this.songPos] ?? 0;
-          row = this.song.patterns[chPatIdx]?.channels[0]?.rows[this.pattPos];
         } else {
           row = pattern!.channels[ch]?.rows[this.pattPos];
         }
@@ -4223,6 +4234,107 @@ export class TrackerReplayer {
   }
 
   // ==========================================================================
+  // PER-CHANNEL TICK (MusicLine Editor and similar formats)
+  // ==========================================================================
+
+  /**
+   * Tick handler for formats with per-channel independent track tables.
+   * Each channel maintains its own tick counter, row position, and song position.
+   * Channels with different speeds advance their rows at different rates.
+   * Groove per channel: effectiveSpeed alternates between channelSpeeds[ch] and
+   * channelGrooves[ch] each row when groove > 0.
+   */
+  private processTickPerChannel(time: number): void {
+    if (!this.song) return;
+
+    const tables    = this.song.channelTrackTables!;
+    const speeds    = this.song.channelSpeeds;
+    const grooves   = this.song.channelGrooves;
+    const fallback  = this.song.initialSpeed;
+    const tickInterval = 2.5 / this.bpm;
+
+    // Queue display state and notify row change for channel 0 at row start
+    if (this.channelTickCounters[0] === 0) {
+      const ch0Song = this.channelSongPos[0];
+      const ch0Patt = this.channelPattPos[0];
+      const ch0Pat  = tables[0]?.[ch0Song] ?? 0;
+      this.queueDisplayState(time, ch0Patt, ch0Pat, ch0Song, 0);
+      if (this.onRowChange) this.onRowChange(ch0Patt, ch0Pat, ch0Song);
+    }
+
+    // Sync mute state
+    if (!this.isDJDeck) {
+      const muteEngine = getToneEngine();
+      for (let m = 0; m < this.channels.length; m++) {
+        const muted = muteEngine.isChannelMuted(m);
+        if (this.channels[m]._muteState !== muted) {
+          this.channels[m]._muteState = muted;
+          this.channels[m].muteGain.gain.setValueAtTime(muted ? 0 : 1, time);
+        }
+      }
+    }
+
+    if (!this._suppressNotes) {
+      for (let ch = 0; ch < this.channels.length; ch++) {
+        const channel  = this.channels[ch];
+        const chTick   = this.channelTickCounters[ch];
+        const chSong   = this.channelSongPos[ch];
+        const chPatt   = this.channelPattPos[ch];
+
+        // Effective speed alternates between base speed and groove each row
+        const baseSpeed     = speeds?.[ch]  ?? fallback;
+        const groove        = grooves?.[ch] ?? 0;
+        const effectiveSpeed = (groove > 0 && this.channelGrooveToggle[ch]) ? groove : baseSpeed;
+
+        // Look up row from this channel's current pattern
+        const chPatIdx = tables[ch]?.[chSong] ?? 0;
+        const row = this.song.patterns[chPatIdx]?.channels[0]?.rows[chPatt];
+
+        if (row) {
+          if (chTick === 0) {
+            this.processRow(ch, channel, row, time);
+          } else {
+            this.processEffectTick(ch, channel, row, time + (chTick * tickInterval));
+          }
+          this.processMacros(channel, time + (chTick * tickInterval));
+          this.processEnvelopesAndVibrato(channel, time + (chTick * tickInterval));
+        }
+
+        // Advance this channel's counter; when it overflows, advance its position
+        this.channelTickCounters[ch]++;
+        if (this.channelTickCounters[ch] >= effectiveSpeed) {
+          this.channelTickCounters[ch] = 0;
+          if (groove > 0) this.channelGrooveToggle[ch] = !this.channelGrooveToggle[ch];
+
+          // Advance row within pattern
+          this.channelPattPos[ch]++;
+          const chPattern = this.song.patterns[chPatIdx];
+          const patLen    = chPattern?.channels[0]?.rows.length ?? 128;
+          if (this.channelPattPos[ch] >= patLen) {
+            this.channelPattPos[ch] = 0;
+            // Advance to next track table entry
+            this.channelSongPos[ch]++;
+            const chTable = tables[ch]!;
+            if (this.channelSongPos[ch] >= chTable.length) {
+              this.channelSongPos[ch] = 0;
+              // Channel 0 looping = song end
+              if (ch === 0 && !this._songEndFiredThisBatch) {
+                this._songEndFiredThisBatch = true;
+                this.onSongEnd?.();
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (this.onTickProcess) {
+      this.onTickProcess(this.channelTickCounters[0], this.channelPattPos[0]);
+    }
+    this.totalRowsProcessed++;
+  }
+
+  // ==========================================================================
   // ROW ADVANCEMENT
   // ==========================================================================
 
@@ -4358,6 +4470,17 @@ export class TrackerReplayer {
       this.pattPos = Math.max(0, pattPos);
       this.currentTick = 0;
 
+      // Per-channel seek: all channels jump to the requested position
+      if (this.song.channelTrackTables) {
+        for (let ch = 0; ch < this.channelTickCounters.length; ch++) {
+          const tbl = this.song.channelTrackTables[ch];
+          this.channelSongPos[ch]    = Math.max(0, Math.min(songPos, tbl.length - 1));
+          this.channelPattPos[ch]    = pattPos;
+          this.channelTickCounters[ch] = 0;
+          this.channelGrooveToggle[ch] = false;
+        }
+      }
+
       // Clamp pattern position
       const patternNum = this.song.songPositions[this.songPos];
       const pattern = this.song.patterns[patternNum];
@@ -4416,6 +4539,17 @@ export class TrackerReplayer {
     this.songPos = Math.max(0, Math.min(songPos, this.song.songLength - 1));
     this.pattPos = Math.max(0, pattPos);
     this.currentTick = 0;
+
+    // Per-channel seek: all channels jump to the requested position
+    if (this.song.channelTrackTables) {
+      for (let ch = 0; ch < this.channelTickCounters.length; ch++) {
+        const tbl = this.song.channelTrackTables[ch];
+        this.channelSongPos[ch]    = Math.max(0, Math.min(songPos, tbl.length - 1));
+        this.channelPattPos[ch]    = pattPos;
+        this.channelTickCounters[ch] = 0;
+        this.channelGrooveToggle[ch] = false;
+      }
+    }
 
     // Re-sync speed alternation for stopped seek too
     if (this.speed2 !== null) {
