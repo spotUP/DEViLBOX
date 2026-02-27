@@ -17,3 +17,5 @@ export { WaveformThumbnail } from './WaveformThumbnail';
 export type { WaveformThumbnailProps } from './WaveformThumbnail';
 export { FMAlgorithmDiagram } from './FMAlgorithmDiagram';
 export type { FMAlgorithmDiagramProps } from './FMAlgorithmDiagram';
+export { FilterFrequencyResponse } from './FilterFrequencyResponse';
+export type { FilterFrequencyResponseProps, FilterType } from './FilterFrequencyResponse';
