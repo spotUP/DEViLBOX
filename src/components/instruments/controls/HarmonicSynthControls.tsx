@@ -11,7 +11,7 @@ import type { HarmonicSynthConfig } from '@/types/instrument';
 import { DEFAULT_HARMONIC_SYNTH } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { FilterFrequencyResponse } from '@components/instruments/shared';
+import { FilterFrequencyResponse, EnvelopeVisualization } from '@components/instruments/shared';
 
 interface HarmonicSynthControlsProps {
   config: HarmonicSynthConfig;
@@ -261,6 +261,17 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
         {/* Envelope */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
           <div className="font-mono text-[10px] font-bold text-text-muted mb-2 tracking-wider">ENVELOPE</div>
+          <div className="mb-2">
+            <EnvelopeVisualization
+              mode="linear"
+              attack={config.envelope.attack / 2000}
+              decay={config.envelope.decay / 2000}
+              sustain={config.envelope.sustain / 100}
+              release={config.envelope.release / 5000}
+              color={knobColor}
+              width={300} height={48}
+            />
+          </div>
           <div className="flex gap-3 justify-center">
             <Knob
               value={config.envelope.attack} min={0} max={2000} onChange={(v) => updateEnvelope({ attack: v })}
