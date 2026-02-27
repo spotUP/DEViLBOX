@@ -3157,6 +3157,28 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     // Fall through to libopenmpt
   }
 
+  // ── XM (FastTracker II) ───────────────────────────────────────────────────
+  if (/\.xm$/i.test(filename)) {
+    try {
+      const { isXMFormat, parseXMFile } = await import('@lib/import/formats/XMParser');
+      if (isXMFormat(buffer)) return await parseXMFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[XMParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
+  // ── MOD (ProTracker / compatible) ────────────────────────────────────────
+  if (/\.mod$/i.test(filename)) {
+    try {
+      const { isMODFormat, parseMODFile } = await import('@lib/import/formats/MODParser');
+      if (isMODFormat(buffer)) return await parseMODFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[MODParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
+    }
+    // Fall through to UADE/libopenmpt
+  }
+
   // ── MOD, XM, IT, S3M, and other tracker formats ────────────────────────
   // MOD files can be routed to UADE for authentic Amiga playback
   if (filename.endsWith('.mod') && prefs.mod === 'uade') {
