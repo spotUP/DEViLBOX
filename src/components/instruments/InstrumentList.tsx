@@ -18,9 +18,10 @@ import { focusPopout } from '@components/ui/PopOutWindow';
 import { BASS_PRESETS } from '@constants/factoryPresets';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as Tone from 'tone';
-import type { InstrumentConfig } from '@typedefs/instrument';
+import type { InstrumentConfig, HivelyConfig } from '@typedefs/instrument';
 import { exportAsAhi } from '@lib/export/HivelyExporter';
 import { parseAhiFile } from '@lib/import/formats/HivelyParser';
+import { HivelyImportDialog } from './HivelyImportDialog';
 
 interface InstrumentListProps {
   /** Optional: Compact mode for sidebar */
@@ -45,6 +46,8 @@ interface InstrumentListProps {
   variant?: 'default' | 'ft2';
   /** Optional: Callback when create new is clicked */
   onCreateNew?: () => void;
+  /** Optional: Show HVL/AHX import button */
+  showHivelyImport?: boolean;
 }
 
 // PERFORMANCE: Memoize to prevent expensive re-renders on every scroll step
@@ -59,6 +62,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   showEditButton = false,
   onEditInstrument,
   variant = 'default',
+  showHivelyImport = false,
 }) => {
   const {
     instruments,
@@ -90,6 +94,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   const editInputRef = useRef<HTMLInputElement>(null);
 
   const [showLoadModal, setShowLoadModal] = useState(false);
+  const [showHivelyImportDialog, setShowHivelyImportDialog] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
 
@@ -267,6 +272,15 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     input.click();
   }, [updateInstrument]);
 
+  const handleHivelyImport = useCallback(
+    (toImport: Array<{ name: string; config: HivelyConfig }>) => {
+      for (const { name, config: hively } of toImport) {
+        createInstrument({ name, synthType: 'HivelySynth', hively });
+      }
+    },
+    [createInstrument]
+  );
+
     const handleDragStart = (e: React.DragEvent, id: number) => {
     e.dataTransfer.setData('application/x-devilbox-instrument', JSON.stringify({ id }));
     e.dataTransfer.effectAllowed = 'copy';
@@ -291,7 +305,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   };
 
   // Show action bar if any action buttons are enabled
-  const showActionBar = isFT2 && (showPresetButton || showSamplePackButton || showEditButton);
+  const showActionBar = isFT2 && (showPresetButton || showSamplePackButton || showEditButton || showHivelyImport);
 
   return (
     <div className={`flex flex-col h-full ${isFT2 ? 'bg-ft2-bg border-l border-ft2-border' : ''}`}>
@@ -335,6 +349,16 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
               >
                 <Pencil size={14} />
                 <span className="text-[8px] font-bold">EDIT</span>
+              </button>
+            )}
+            {showHivelyImport && (
+              <button
+                onClick={() => setShowHivelyImportDialog(true)}
+                className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors text-ft2-text"
+                title="Import instruments from HVL/AHX file"
+              >
+                <Upload size={14} />
+                <span className="text-[8px] font-bold">HVL</span>
               </button>
             )}
           </div>
