@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-27T09:52:45.235Z
+ * Generated: 2026-02-27T10:18:44.292Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1469';
-export const BUILD_NUMBER = '1469';
-export const BUILD_HASH = '736b563e';
+export const BUILD_VERSION = '1.0.1473';
+export const BUILD_NUMBER = '1473';
+export const BUILD_HASH = '8ef4bd52';
 export const BUILD_DATE = '2026-02-27';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,25 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1469',
+    version: '1.0.1473',
     date: '2026-02-27',
     changes: [
+      {
+        type: 'fix',
+        "description": "Expose HEAPU8 on Module so worklet loadTune doesn't crash"
+      },
+      {
+        type: 'feature',
+        "description": "Test(parsers): add instrument assertions to SoundMon, SoundFX, JamCracker tests"
+      },
+      {
+        type: 'feature',
+        "description": "Show per-position speed badge in PatternOrderList for Symphonie Pro"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: commit leftover test assertions and changelog updates from parser work"
+      },
       {
         type: 'fix',
         "description": "Use track table count and MOD periods for per-channel format playback"
@@ -206,22 +222,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Remove 23 silent stub native parsers — route to UADE/libopenmpt"
-      },
-      {
-        type: 'feature',
-        "description": "Add instrument editor panels for OctaMED, SidMon1, HippelCoSo, RobHubbard, DavidWhittaker"
-      },
-      {
-        type: 'fix',
-        "description": "Correct 68k ASM bugs in AshleyHogg, JochenHippel7V, JochenHippelST parsers"
-      },
-      {
-        type: 'fix',
-        "description": "Route Magnetic Fields Packer directly to UADE"
-      },
-      {
-        type: 'feature',
-        "description": "40 new UADE format parsers + prefix routing"
       }
     ]
   }
