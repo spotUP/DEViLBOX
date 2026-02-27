@@ -11,7 +11,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { SidMon1Config } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
-import { SequenceEditor } from '@components/instruments/shared';
+import { SequenceEditor, EnvelopeVisualization } from '@components/instruments/shared';
 import type { SequencePreset } from '@components/instruments/shared';
 
 interface SidMon1ControlsProps {
@@ -85,6 +85,18 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
       {/* ADSR Envelope */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="ADSR Envelope" />
+        <div className="mb-3">
+          <EnvelopeVisualization
+            mode="steps"
+            attackVol={config.attackMax ?? 0}    attackSpeed={config.attackSpeed ?? 0}
+            decayVol={config.decayMin ?? 0}      decaySpeed={config.decaySpeed ?? 0}
+            sustainVol={config.decayMin ?? 0}    sustainLen={config.sustain ?? 0}
+            releaseVol={config.releaseMin ?? 0}  releaseSpeed={config.releaseSpeed ?? 0}
+            maxVol={64}
+            color={knob}
+            width={300} height={56}
+          />
+        </div>
         <div className="grid grid-cols-4 gap-3">
           <Knob value={config.attackSpeed ?? 0} min={0} max={255} step={1}
             onChange={(v) => upd('attackSpeed', Math.round(v))}
