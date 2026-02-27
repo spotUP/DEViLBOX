@@ -4,7 +4,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseXM } from '../formats/XMParser';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { parseXM, isXMFormat, parseXMFile } from '../formats/XMParser';
 
 describe('XMParser', () => {
   describe('Header Parsing', () => {
@@ -623,3 +625,98 @@ function createXMWithDeltaEncodedSample(): ArrayBuffer {
     samples: [{ length: 10, bitDepth: 8 }],
   });
 }
+
+// ── Integration tests against real XM files ───────────────────────────────────
+
+const MODLAND = resolve(import.meta.dirname, '../../../../server/data/modland-cache/files');
+const BIOHAZARD = resolve(MODLAND, 'pub__modules__Fasttracker 2__Loonie__biohazard.xm');
+const CLOUDBERRY = resolve(MODLAND, 'pub__modules__Fasttracker 2__Boo__coop-Loonie__cloudberry fields.xm');
+
+function loadXMFile(path: string): ArrayBuffer {
+  const buf = readFileSync(path);
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+}
+
+describe('isXMFormat', () => {
+  it('detects valid XM by Extended Module magic', () => {
+    const ab = loadXMFile(BIOHAZARD);
+    expect(isXMFormat(ab)).toBe(true);
+  });
+
+  it('rejects non-XM data', () => {
+    const buf = new Uint8Array(64).fill(0);
+    expect(isXMFormat(buf.buffer)).toBe(false);
+  });
+
+  it('rejects buffer shorter than 17 bytes', () => {
+    const buf = new Uint8Array(10).fill(0x45);
+    expect(isXMFormat(buf.buffer)).toBe(false);
+  });
+});
+
+describe('parseXMFile — biohazard.xm (Loonie)', () => {
+  it('parses without throwing', async () => {
+    const ab = loadXMFile(BIOHAZARD);
+    await expect(parseXMFile(ab, 'biohazard.xm')).resolves.toBeDefined();
+  });
+
+  it('returns correct format and metadata', async () => {
+    const ab = loadXMFile(BIOHAZARD);
+    const song = await parseXMFile(ab, 'biohazard.xm');
+    expect(song.format).toBe('XM');
+    expect(song.name.length).toBeGreaterThan(0);
+    expect(song.initialBPM).toBeGreaterThan(0);
+    expect(song.initialSpeed).toBeGreaterThan(0);
+    expect(song.numChannels).toBeGreaterThan(0);
+    expect(typeof song.linearPeriods).toBe('boolean');
+  });
+
+  it('has a valid song order list', async () => {
+    const ab = loadXMFile(BIOHAZARD);
+    const song = await parseXMFile(ab, 'biohazard.xm');
+    expect(song.songPositions.length).toBeGreaterThan(0);
+    expect(song.songLength).toBe(song.songPositions.length);
+  });
+
+  it('has instruments with PCM sample data', async () => {
+    const ab = loadXMFile(BIOHAZARD);
+    const song = await parseXMFile(ab, 'biohazard.xm');
+    const withPcm = song.instruments.filter(
+      i => i.type === 'sample' && (i.sample?.audioBuffer?.byteLength ?? 0) > 0
+    );
+    expect(withPcm.length).toBeGreaterThan(0);
+    let totalPcm = 0;
+    for (const inst of withPcm) totalPcm += inst.sample!.audioBuffer!.byteLength;
+    console.log(`biohazard: ${withPcm.length} sampled, ${(totalPcm / 1024).toFixed(0)} KB PCM`);
+  });
+
+  it('has patterns with note data', async () => {
+    const ab = loadXMFile(BIOHAZARD);
+    const song = await parseXMFile(ab, 'biohazard.xm');
+    expect(song.patterns.length).toBeGreaterThan(0);
+    const nonEmpty = song.patterns.some(p =>
+      p.channels.some(ch => ch.rows.some(r => r.note > 0))
+    );
+    expect(nonEmpty).toBe(true);
+  });
+});
+
+describe('parseXMFile — cloudberry fields.xm (Boo/Loonie)', () => {
+  it('parses without throwing', async () => {
+    const ab = loadXMFile(CLOUDBERRY);
+    await expect(parseXMFile(ab, 'cloudberry fields.xm')).resolves.toBeDefined();
+  });
+
+  it('has instruments with PCM sample data', async () => {
+    const ab = loadXMFile(CLOUDBERRY);
+    const song = await parseXMFile(ab, 'cloudberry fields.xm');
+    const withPcm = song.instruments.filter(
+      i => i.type === 'sample' && (i.sample?.audioBuffer?.byteLength ?? 0) > 0
+    );
+    expect(withPcm.length).toBeGreaterThan(0);
+    let totalPcm = 0;
+    for (const inst of withPcm) totalPcm += inst.sample!.audioBuffer!.byteLength;
+    expect(totalPcm).toBeGreaterThan(0);
+    console.log(`cloudberry: ${withPcm.length} sampled, ${(totalPcm / 1024).toFixed(0)} KB PCM`);
+  });
+});

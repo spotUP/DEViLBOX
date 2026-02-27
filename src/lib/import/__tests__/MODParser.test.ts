@@ -4,7 +4,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseMOD, periodToNote } from '../formats/MODParser';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { parseMOD, periodToNote, isMODFormat, parseMODFile } from '../formats/MODParser';
 
 describe('MODParser', () => {
   describe('Header Parsing', () => {
@@ -549,3 +551,98 @@ function createMODWithPatternOrder(order: number[]): ArrayBuffer {
 
   return buffer;
 }
+
+// ── Integration tests against real MOD files ──────────────────────────────────
+
+const MODLAND = resolve(import.meta.dirname, '../../../../server/data/modland-cache/files');
+const AXEL_MOD = resolve(MODLAND, 'pub__modules__Protracker__Axel__axel goes funkey!.mod');
+const SUPERNOVA = resolve(MODLAND, 'pub__modules__Fasttracker__Radix__supernova.mod');
+
+function loadMODFile(path: string): ArrayBuffer {
+  const buf = readFileSync(path);
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+}
+
+describe('isMODFormat', () => {
+  it('detects valid MOD by format tag at offset 1080', () => {
+    const ab = loadMODFile(AXEL_MOD);
+    expect(isMODFormat(ab)).toBe(true);
+  });
+
+  it('rejects non-MOD data (all zeros)', () => {
+    const buf = new Uint8Array(2000).fill(0);
+    expect(isMODFormat(buf.buffer)).toBe(false);
+  });
+
+  it('rejects buffer shorter than 1084 bytes', () => {
+    const buf = new Uint8Array(500).fill(0);
+    expect(isMODFormat(buf.buffer)).toBe(false);
+  });
+});
+
+describe('parseMODFile — axel goes funkey!.mod (Axel)', () => {
+  it('parses without throwing', async () => {
+    const ab = loadMODFile(AXEL_MOD);
+    await expect(parseMODFile(ab, 'axel goes funkey!.mod')).resolves.toBeDefined();
+  });
+
+  it('returns correct format and metadata', async () => {
+    const ab = loadMODFile(AXEL_MOD);
+    const song = await parseMODFile(ab, 'axel goes funkey!.mod');
+    expect(song.format).toBe('MOD');
+    expect(song.name.length).toBeGreaterThan(0);
+    expect(song.initialBPM).toBeGreaterThan(0);
+    expect(song.initialSpeed).toBeGreaterThan(0);
+    expect(song.numChannels).toBeGreaterThan(0);
+    expect(song.linearPeriods).toBe(false);
+  });
+
+  it('has a valid song order list', async () => {
+    const ab = loadMODFile(AXEL_MOD);
+    const song = await parseMODFile(ab, 'axel goes funkey!.mod');
+    expect(song.songPositions.length).toBeGreaterThan(0);
+    expect(song.songLength).toBe(song.songPositions.length);
+  });
+
+  it('has instruments with PCM sample data', async () => {
+    const ab = loadMODFile(AXEL_MOD);
+    const song = await parseMODFile(ab, 'axel goes funkey!.mod');
+    const withPcm = song.instruments.filter(
+      i => i.type === 'sample' && (i.sample?.audioBuffer?.byteLength ?? 0) > 0
+    );
+    expect(withPcm.length).toBeGreaterThan(0);
+    let totalPcm = 0;
+    for (const inst of withPcm) totalPcm += inst.sample!.audioBuffer!.byteLength;
+    console.log(`axel: ${withPcm.length} sampled, ${(totalPcm / 1024).toFixed(0)} KB PCM`);
+  });
+
+  it('has patterns with note data', async () => {
+    const ab = loadMODFile(AXEL_MOD);
+    const song = await parseMODFile(ab, 'axel goes funkey!.mod');
+    expect(song.patterns.length).toBeGreaterThan(0);
+    const nonEmpty = song.patterns.some(p =>
+      p.channels.some(ch => ch.rows.some(r => r.note > 0))
+    );
+    expect(nonEmpty).toBe(true);
+  });
+});
+
+describe('parseMODFile — supernova.mod (Radix)', () => {
+  it('parses without throwing', async () => {
+    const ab = loadMODFile(SUPERNOVA);
+    await expect(parseMODFile(ab, 'supernova.mod')).resolves.toBeDefined();
+  });
+
+  it('has instruments with PCM sample data', async () => {
+    const ab = loadMODFile(SUPERNOVA);
+    const song = await parseMODFile(ab, 'supernova.mod');
+    const withPcm = song.instruments.filter(
+      i => i.type === 'sample' && (i.sample?.audioBuffer?.byteLength ?? 0) > 0
+    );
+    expect(withPcm.length).toBeGreaterThan(0);
+    let totalPcm = 0;
+    for (const inst of withPcm) totalPcm += inst.sample!.audioBuffer!.byteLength;
+    expect(totalPcm).toBeGreaterThan(0);
+    console.log(`supernova: ${withPcm.length} sampled, ${(totalPcm / 1024).toFixed(0)} KB PCM`);
+  });
+});
