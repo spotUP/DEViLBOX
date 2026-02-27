@@ -1,32 +1,52 @@
 /**
  * MusicLineParser.ts — Native parser for MusicLine Editor (.ml) files
  *
- * Binary format verified against:
- *   - Reference Code/musicline-vasm/Mline116.asm (save/load routines, structure defs)
- *   - Reference Code/uade-3.05/amigasrc/players/musicline_editor/mlineplayer102.asm
- *   - Hex analysis of Reference Music/Musicline Editor/- unknown/pink2.ml
+ * Binary format verified 1:1 against Reference Code/musicline-vasm/Mline116.asm.
  *
- * KEY FACTS (verified, do not change without re-verifying in ASM):
- *   - File prefix: "MLEDMODL"(8) + size(4) + magic(4) = 16 bytes
- *   - Chunks: VERS(optional), TUNE, PART×N, ARPG×M, INST×I, SMPL×S
- *   - TUNE chunk size is stored INCORRECTLY in the file (loader ignores it, reads sequentially)
- *   - TUNE header = 40 bytes (title[32] + tempo[2] + speed[1] + groove[1] + volume[2] + playMode[1] + numChannels[1])
- *   - TUNE channel size table = numChannels × 4 bytes (u32BE each = trimmed chnl_Data size)
- *   - chnl_Data buffer is 512 bytes; file stores only trimmed prefix (no trailing defaults)
- *   - chnl_Data entry (2 bytes): bit5 of byte1 distinguishes play-part from command
- *     - Play-part: byte0=partIdx, byte1[4:0]=transpose(−0x10=range−16..+15)
- *     - Command: byte0=param, byte1[7:6]=type(01=end,10=jump,11=wait)
- *   - PART chunk: 2-byte partNumber + RLE compressed rows (see decompressPart)
- *   - PART decompressed size = 128 rows × 6 columns × 2 bytes = 1536 bytes
- *   - inst_SIZE = 206 bytes (verified by counting struct fields)
- *   - smpl_SIZE = 50 bytes = title[32]+padByte[1]+type[1]+pointer[4]+length[2]+repPointer[4]+repLength[2]+fineTune[2]+semiTone[2]
- *   - SMPL extra header: rawDataSize[4]+deltaCommand[1]+pad[1] = 6 bytes BEFORE smpl_SIZE metadata
- *   - SMPL decompression: if storedSize != rawDataSize → delta-depack (nibble pairs)
+ * KEY FACTS (from ASM source, do not change without re-verifying):
  *
- * PART column-to-channel mapping:
- *   Each channel has its own track table (chnl_Data). When a channel is at position P
- *   in its track table, it plays column N of the referenced PART (where N = channel index).
- *   This gives each channel independent sequencing with shared pattern data.
+ *  File header (before first chunk):
+ *    "MLEDMODL"(8) + sizeField(u32BE, 4) + sizeField_bytes_of_extra_header
+ *    First chunk starts at offset 8 + 4 + sizeField = 12 + sizeField.
+ *    sizeField varies by ML version (e.g. 4, 8, 12 bytes of extra header).
+ *
+ *  Chunks: VERS(opt) → TUNE → PART×N → ARPG×M → INST×I → SMPL×S → INFO(opt)
+ *  Each chunk header: chunkId(4) + size(u32BE, 4)
+ *
+ *  TUNE chunk (sequential read, LoadTune @ line 5230):
+ *    40 bytes: title[32]+tempo(u16BE)+speed(u8)+groove(u8)+volume(u16BE)+playMode(u8)+numChannels(u8)
+ *    numChannels × u32BE: per-channel trimmed chnl_Data byte counts (0 = empty channel)
+ *    For each non-zero count: that many bytes of chnl_Data (up to 512 = 256 entries × 2 bytes)
+ *
+ *  chnl_Data entry (2 bytes, big-endian u16, PlayVoice @ line 9690):
+ *    byte0 (HIGH_BYTE) = low 8 bits of part number
+ *    byte1 (LOW_BYTE):
+ *      bit5 = 0 → play-part entry
+ *        bits 7:6 = high 2 bits of part number  (partNum = (bits7:6 << 8) | byte0)
+ *        bits 4:0 = transpose (0x10 = no transpose, range -16..+15 semitones)
+ *      bit5 = 1 → control command
+ *        bits 7:6 = 01 → STOP (voice silenced)
+ *        bits 7:6 = 10 → JUMP (byte0 = target position)
+ *        bits 7:6 = 11 → WAIT (byte0 = wait count; bits4:0 = new speed if non-zero)
+ *    Default fill: 0x0010 (play PART 0, no transpose)
+ *    TunePos advances when PartPos wraps 127→0 (= after 128 rows of current PART).
+ *
+ *  PART chunk (LoadPart @ line 5312, single-voice data):
+ *    2-byte part number (u16BE) + RLE-compressed rows
+ *    Decompressed: 128 rows × 12 bytes/row = 1536 bytes for ONE VOICE:
+ *      byte 0: note (0=rest, 1-60=musical, 61=end-of-part sentinel)
+ *      byte 1: instrument (1-based; 0=no change; 0xFF=no change sentinel)
+ *      bytes 2-11: effect data (effectNum, effectPar, 4×effectWord)
+ *    The 6 RLE columns per row correspond to 6×2 bytes of one voice row.
+ *    PARTs are shared across all channels; each channel picks PARTs via its chnl_Data.
+ *
+ *  INST chunk (LoadInst @ line 5371): 206 bytes (inst_SIZEOF - inst_Title)
+ *  SMPL chunk (LoadSmpl @ line 5403):
+ *    6-byte extra header: rawDataSize(u32BE)+deltaCommand(u8)+pad(u8)
+ *    50-byte smpl metadata (smpl_Title through smpl_SemiTone)
+ *    Sample data: raw if storedSize==rawDataSize, else delta-packed nibbles
+ *
+ *  TUNE chunk size IS reliable (computed correctly in SaveSong @ line 7175-7207).
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -87,14 +107,16 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   const v = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const len = data.byteLength;
 
-  // Skip: "MLEDMODL"(8) + totalSize(4) + magic1(4) + magic2(4) = 20 bytes
-  // File layout (verified against drax.ml hex dump):
+  // Skip: "MLEDMODL"(8) + sizeField(4) + sizeField bytes of extra header
+  // The extra header size varies by MusicLine version (4, 8, 12, ... bytes).
+  // sizeField at offset 8 tells us exactly how many extra bytes follow.
   //   0x00: "MLEDMODL" (8 bytes)
-  //   0x08: u32BE = 8 (size of the two magic fields that follow)
-  //   0x0C: 0x87654321 (magic 1)
-  //   0x10: 0x56766807 (magic 2 / build date)
-  //   0x14: first chunk (e.g. VERS or TUNE)
-  let pos = 20;
+  //   0x08: u32BE — size of extra header that follows
+  //   0x0C: extra header bytes (magic, timestamps, etc.)
+  //   0x0C + sizeField: first chunk (e.g. VERS or TUNE)
+  if (len < 12) return null;
+  const headerExtraSize = v.getUint32(8);
+  let pos = 8 + 4 + headerExtraSize;
 
   // Parsed data accumulators
   let songTitle = '';
@@ -270,12 +292,12 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
     }
   }
 
-  // Build Pattern array
+  // Build Pattern array — each PART = single-voice 1-channel pattern
   const patterns: Pattern[] = [];
   for (const pn of partToPatternIndex.keys()) {
     const patIdx = partToPatternIndex.get(pn)!;
     const rawData = partDataMap.get(pn);
-    patterns[patIdx] = buildPattern(rawData, numChannels);
+    patterns[patIdx] = buildPattern(rawData, patIdx, pn);
   }
 
   // Map channelTrackTables from partNumbers to patternIndices
@@ -289,6 +311,10 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   // Build InstrumentConfig list from INST + SMPL
   const instruments = buildInstruments(instList, smplList);
 
+  // numChannels for the song = actual voice count from TUNE header (4 or 8).
+  // Patterns are 1-channel (single-voice PARTs). The per-channel nature is
+  // expressed through channelTrackTables, not through multi-channel patterns.
+  // The MusicLineTrackTableEditor uses channelTrackTables.length for row count.
   const song: TrackerSong = {
     name: songTitle || 'MusicLine Song',
     format: 'MOD' as const,
@@ -297,7 +323,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
     songPositions,
     songLength: songPositions.length,
     restartPosition: 0,
-    numChannels,
+    numChannels: 1,    // Each PART is a single-voice pattern
     initialSpeed: speed,
     initialBPM: ciaTempoBPM(tempo),
     linearPeriods: false,
@@ -410,20 +436,25 @@ function decompressPart(data: Uint8Array, srcOffset: number, srcLen: number): Ui
 // ── Build Pattern from decompressed PART data ─────────────────────────────
 
 /**
- * Convert a 1536-byte decompressed PART buffer into a DEViLBOX Pattern.
+ * Convert a 1536-byte decompressed PART buffer into a single-voice DEViLBOX Pattern.
  *
- * PART layout: row-major, 6 columns × 2 bytes per row:
- *   byte 0: note (0=rest, 1-60=note, 61=end-of-part sentinel)
- *   byte 1: instrument number (1-based; 0=no instrument)
+ * Each PART in MusicLine is single-voice data (verified in PlayVoice @ Mline116.asm:9673).
+ * The 6 × 2-byte "columns" per row are NOT separate channels — they are the 12 bytes
+ * for ONE voice:
+ *   bytes 0-1  : note (0=rest, 1-60=note, 61=end-of-part sentinel) + instrument (1-based)
+ *   bytes 2-3  : effect number + effect parameter
+ *   bytes 4-11 : 4 × u16 effect words
  *
- * Note mapping: MusicLine note N (1-60) → XM note via amigaNoteToXM (adds 12).
- * Note 61 (end marker) is treated as a rest in the pattern.
+ * Multiple channels each independently select which PART to play via their chnl_Data
+ * track tables. The pattern editor shows ONE PART (one voice) at a time.
+ *
+ * Note mapping: MusicLine note N (1-60) → XM note via amigaNoteToXM (adds 12 octaves).
+ * Note 61 (end sentinel) = reset row counter within PART; treated as rest here.
  */
-function buildPattern(rawData: Uint8Array | undefined, numChannels: number): Pattern {
-  // Initialize empty channels for all numChannels
-  const channels: ChannelData[] = Array.from({ length: numChannels }, (_, ch): ChannelData => ({
-    id:           `channel-${ch}`,
-    name:         `Channel ${ch + 1}`,
+function buildPattern(rawData: Uint8Array | undefined, patIdx: number, partNum: number): Pattern {
+  const channel: ChannelData = {
+    id:           'channel-0',
+    name:         'Voice',
     muted:        false,
     solo:         false,
     collapsed:    false,
@@ -431,46 +462,37 @@ function buildPattern(rawData: Uint8Array | undefined, numChannels: number): Pat
     pan:          0,
     instrumentId: null,
     color:        null,
-    rows:         [],
-  }));
+    rows:         Array.from({ length: PART_ROWS }, (): TrackerCell => {
+      return createEmptyCell();
+    }),
+  };
 
-  if (!rawData) {
-    // Empty pattern: fill with empty cells
-    for (let ch = 0; ch < numChannels; ch++) {
-      channels[ch].rows = Array.from({ length: PART_ROWS }, () => createEmptyCell());
-    }
-    return { id: 'pattern-0', name: 'Pattern', channels, length: PART_ROWS };
-  }
+  if (rawData) {
+    for (let row = 0; row < PART_ROWS; row++) {
+      // Each row is 12 bytes; bytes 0-1 = note + instrument for this voice
+      const rowBase = row * PART_ROW_BYTES;
+      const noteRaw  = rawData[rowBase];
+      const instrRaw = rawData[rowBase + 1];
 
-  for (let row = 0; row < PART_ROWS; row++) {
-    const rowBase = row * PART_ROW_BYTES;
-
-    for (let ch = 0; ch < numChannels; ch++) {
-      const colBase = rowBase + ch * 2;
-      const noteRaw = colBase < rawData.length ? rawData[colBase] : 0;
-      const instrRaw = colBase + 1 < rawData.length ? rawData[colBase + 1] : 0;
-
-      const cell: TrackerCell = createEmptyCell();
+      const cell = channel.rows[row];
 
       if (noteRaw > 0 && noteRaw < ML_NOTE_END) {
-        // Musical note
         cell.note = amigaNoteToXM(noteRaw);
-        // instrRaw 0 or 0xFF = "no instrument change" sentinel; valid range is 1–127
+        // 0x00 and 0xFF are "no instrument change" sentinels; valid range 1–127
         if (instrRaw > 0 && instrRaw !== 0xFF) {
-          cell.instrument = instrRaw; // 1-based instrument index
+          cell.instrument = instrRaw;
         }
-      } else if (noteRaw === ML_NOTE_END) {
-        // End-of-part marker: treat as rest/silence in pattern
-        // (replayer handles the actual stopping via track table end command)
       }
-      // noteRaw === 0 → rest, leave cell empty
-
-      channels[ch].rows.push(cell);
+      // noteRaw === 0 → rest; noteRaw === ML_NOTE_END → end-of-part (reset) → treated as rest
     }
   }
 
-  // Assign collected rows to each channel (already accumulated via push)
-  return { id: `pattern-0`, name: 'Pattern', channels, length: PART_ROWS };
+  return {
+    id:       `part-${partNum}`,
+    name:     `Part ${partNum}`,
+    channels: [channel],
+    length:   PART_ROWS,
+  };
 }
 
 function createEmptyCell(): TrackerCell {
