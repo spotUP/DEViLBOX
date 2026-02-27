@@ -1463,10 +1463,12 @@ export class TrackerReplayer {
         if (useNativeAccessor) {
           row = this.accessor.getRow(this.songPos, this.pattPos, ch);
         } else if (usePerChannelTables) {
-          // MusicLine: each channel reads from its own independently-sequenced pattern
+          // MusicLine: each channel reads from its own independently-sequenced pattern.
+          // PARTs are single-voice (channels[0] only) — always read from channels[0],
+          // regardless of which song channel (ch) is being processed.
           const chTable: number[] | undefined = this.song.channelTrackTables![ch];
           const chPatIdx = chTable?.[this.songPos] ?? 0;
-          row = this.song.patterns[chPatIdx]?.channels[ch]?.rows[this.pattPos];
+          row = this.song.patterns[chPatIdx]?.channels[0]?.rows[this.pattPos];
         } else {
           row = pattern!.channels[ch]?.rows[this.pattPos];
         }
