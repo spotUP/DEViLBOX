@@ -1236,9 +1236,39 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     throw new Error(`[UAXParser] ${filename}: no native parser available or format not recognised`);
   }
 
+  // ── FM Tracker (.fmt) ─────────────────────────────────────────────────────
+  // PC format — OPL-based tracker, magic "FMT" at offset 0. Falls through to libopenmpt.
+  if (/\.fmt$/i.test(filename)) {
+    if (prefs.fmTracker === 'native') {
+      try {
+        const { isFMTrackerFormat, parseFMTrackerFile } = await import('@lib/import/formats/FMTrackerParser');
+        const bytes = new Uint8Array(buffer);
+        if (isFMTrackerFormat(bytes)) {
+          const result = parseFMTrackerFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[FMTrackerParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
+      }
+    }
+    // Fall through to libopenmpt
+  }
+
   // ── MadTracker 2 (.mt2) ───────────────────────────────────────────────────
   // PC format — identified by "MT20" magic at offset 0. Falls through to libopenmpt.
   if (/\.mt2$/i.test(filename)) {
+    if (prefs.madTracker2 === 'native') {
+      try {
+        const { isMadTracker2Format, parseMadTracker2File } = await import('@lib/import/formats/MadTracker2Parser');
+        const bytes = new Uint8Array(buffer);
+        if (isMadTracker2Format(bytes)) {
+          const result = parseMadTracker2File(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[MadTracker2Parser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
+      }
+    }
     // Fall through to libopenmpt
   }
 
@@ -1246,6 +1276,18 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   // Handles both new PSM ("PSM " magic) and PSM16 ("PSM\xFE" magic).
   // Falls through to libopenmpt on failure.
   if (/\.psm$/i.test(filename)) {
+    if (prefs.psm === 'native') {
+      try {
+        const { isPSMFormat, parsePSMFile } = await import('@lib/import/formats/PSMParser');
+        const bytes = new Uint8Array(buffer);
+        if (isPSMFormat(bytes)) {
+          const result = parsePSMFile(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[PSMParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
+      }
+    }
     // Fall through to libopenmpt
   }
 
