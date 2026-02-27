@@ -2910,7 +2910,7 @@ export interface InstrumentMetadata {
   /** Optional display label override shown in the instrument list badge (e.g. "ML Sine", "ML Saw") */
   displayType?: string;
   /** MusicLine Editor waveform synth config (smplType > 0) — triggers synth editor instead of sample editor */
-  mlSynthConfig?: { waveformType: 1 | 2 | 3; volume: number };
+  mlSynthConfig?: { waveformType: number; volume: number };
 }
 
 // Import beat slicer types

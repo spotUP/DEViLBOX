@@ -1,33 +1,32 @@
 /**
- * MusicLineControls — Editor panel for MusicLine Editor waveform instruments
+ * MusicLineControls — Info panel for MusicLine Editor waveform instruments.
  *
- * MusicLine Editor supports three single-cycle waveform types:
- *   1 = Sine
- *   2 = Sawtooth
- *   3 = Square
+ * MusicLine waveform instruments store the SHAPE as actual PCM in the SMPL chunk.
+ * The `inst_SmplType` field (stored as mlSynthConfig.waveformType) is a LOOP SIZE
+ * selector, not a shape selector:
+ *   1 → 32-sample loop  (8287/32  ≈ C3 at PAL C3 period)
+ *   2 → 64-sample loop  (8287/64  ≈ C2)
+ *   3 → 128-sample loop (8287/128 ≈ C1)
+ *   4 → 256-sample loop (8287/256 ≈ C0)
  *
- * Each waveform is a 32-sample loop played at PAL_C3_RATE (8287 Hz), producing
- * a C-3 fundamental when triggered at Amiga period 428.
- *
- * Allows changing the waveform type (regenerates the sample PCM in-place).
+ * Because the waveform shape comes from the SMPL data (parsed at import time),
+ * it cannot be regenerated from the type number alone, so this panel is read-only.
  */
 
-import React, { useCallback, useRef, useEffect } from 'react';
+import React from 'react';
 import type { InstrumentConfig } from '@typedefs/instrument';
-import { WaveformThumbnail } from '../shared/WaveformThumbnail';
-import { createSamplerInstrument } from '@lib/import/formats/AmigaUtils';
-import { generateMusicLineWaveformPcm } from '@lib/import/formats/MusicLineParser';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const PAL_C3_RATE = 8287;
-const ML_WAVE_SAMPLES = 32;
 
-const WAVE_DEFS = [
-  { type: 1 as const, label: 'Sine',   thumbType: 'sine'   as const },
-  { type: 2 as const, label: 'Saw',    thumbType: 'saw'    as const },
-  { type: 3 as const, label: 'Square', thumbType: 'square' as const },
-];
+const LOOP_SIZE_DEFS: Record<number, { samples: number; approxNote: string }> = {
+  1: { samples: 32,  approxNote: 'C-3' },
+  2: { samples: 64,  approxNote: 'C-2' },
+  3: { samples: 128, approxNote: 'C-1' },
+  4: { samples: 256, approxNote: 'C-0' },
+  5: { samples: 256, approxNote: 'C-0' },
+};
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -38,37 +37,13 @@ interface MusicLineControlsProps {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export const MusicLineControls: React.FC<MusicLineControlsProps> = ({ instrument, onChange }) => {
-  const instrumentRef = useRef(instrument);
-  useEffect(() => { instrumentRef.current = instrument; }, [instrument]);
-
+export const MusicLineControls: React.FC<MusicLineControlsProps> = ({ instrument }) => {
   const mlConfig = instrument.metadata?.mlSynthConfig;
-  const waveformType: 1 | 2 | 3 = mlConfig?.waveformType ?? 1;
+  const waveformType: number = mlConfig?.waveformType ?? 3;
   const volume = mlConfig?.volume ?? 64;
 
-  const handleWaveformChange = useCallback((newType: 1 | 2 | 3) => {
-    const cur = instrumentRef.current;
-    const pcm = generateMusicLineWaveformPcm(newType);
-    const rebuilt = createSamplerInstrument(
-      cur.id,
-      cur.name,
-      pcm,
-      volume,
-      PAL_C3_RATE,
-      0,
-      ML_WAVE_SAMPLES,
-    );
-    onChange({
-      sample: rebuilt.sample,
-      metadata: {
-        ...cur.metadata,
-        mlSynthConfig: { waveformType: newType, volume },
-        displayType: WAVE_DEFS.find(w => w.type === newType)?.label
-          ? `ML ${WAVE_DEFS.find(w => w.type === newType)!.label}`
-          : cur.metadata?.displayType,
-      },
-    });
-  }, [onChange, volume]);
+  const loopDef = LOOP_SIZE_DEFS[waveformType] ?? { samples: 256, approxNote: '?' };
+  const freq = Math.round(PAL_C3_RATE / loopDef.samples);
 
   return (
     <div
@@ -81,50 +56,41 @@ export const MusicLineControls: React.FC<MusicLineControlsProps> = ({ instrument
         fontFamily: 'monospace',
       }}
     >
-      {/* Waveform type selector */}
+      {/* Loop size row */}
       <div>
         <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a4a6a', textTransform: 'uppercase', marginBottom: 10 }}>
-          Waveform
+          Waveform Loop
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          {WAVE_DEFS.map(({ type, label, thumbType }) => {
-            const isActive = waveformType === type;
-            return (
-              <button
-                key={type}
-                onClick={() => handleWaveformChange(type)}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '10px 8px',
-                  background: isActive ? '#1a1a2e' : '#0e0e18',
-                  border: `1px solid ${isActive ? '#6060ff' : '#1e1e2e'}`,
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  outline: isActive ? '1px solid #3030a0' : 'none',
-                  transition: 'border-color 0.12s',
-                }}
-              >
-                <WaveformThumbnail
-                  type={thumbType}
-                  width={64}
-                  height={28}
-                  color={isActive ? '#8080ff' : '#404060'}
-                />
-                <span style={{
-                  fontSize: 10,
-                  letterSpacing: 1.5,
-                  textTransform: 'uppercase',
-                  color: isActive ? '#a0a0ff' : '#4a4a6a',
-                }}>
-                  {label}
-                </span>
-              </button>
-            );
-          })}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '12px 16px',
+          background: '#0e0e18',
+          border: '1px solid #2a2a4a',
+          borderRadius: 6,
+        }}>
+          {/* Loop size badge */}
+          <div style={{
+            padding: '6px 14px',
+            background: '#1a1a30',
+            border: '1px solid #6060ff',
+            borderRadius: 4,
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: '#a0a0ff',
+            letterSpacing: 1,
+          }}>
+            {loopDef.samples}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 12, color: '#7a7a9a' }}>
+              {loopDef.samples}-sample single-cycle waveform
+            </span>
+            <span style={{ fontSize: 10, color: '#4a4a6a' }}>
+              Loop type {waveformType} · {freq} Hz fundamental at {loopDef.approxNote}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -138,9 +104,20 @@ export const MusicLineControls: React.FC<MusicLineControlsProps> = ({ instrument
         borderRadius: 6,
       }}>
         <InfoItem label="Volume" value={`${volume} / 64`} />
+        <InfoItem label="Sample rate" value={`${PAL_C3_RATE} Hz`} />
         <InfoItem label="Loop" value="Full cycle" />
-        <InfoItem label="Tuning" value="Amiga period" />
-        <InfoItem label="Base note" value="C-3" />
+        <InfoItem label="Base note" value={loopDef.approxNote} />
+      </div>
+
+      {/* Note */}
+      <div style={{
+        fontSize: 9,
+        color: '#3a3a5a',
+        lineHeight: 1.6,
+        letterSpacing: 0.5,
+      }}>
+        Waveform shape is stored as PCM in the song file and cannot be edited here.
+        The loop type determines the playback pitch at a given note trigger.
       </div>
     </div>
   );
