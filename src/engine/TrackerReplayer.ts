@@ -865,6 +865,8 @@ export class TrackerReplayer {
 
     this.song = song;
 
+    console.log('[TrackerReplayer] loadSong:', { numChannels: song.numChannels, hasChannelTables: !!song.channelTrackTables, tableLen: song.channelTrackTables?.length, patterns: song.patterns.length, positions: song.songPositions.length });
+
     // Configure format-dispatching pattern accessor
     if (song.furnaceNative) {
       this.accessor.setFurnace(song.furnaceNative, song.patterns, song.songPositions);
@@ -1428,6 +1430,9 @@ export class TrackerReplayer {
     // MusicLine per-channel track tables: each channel looks up its own pattern independently.
     // When present, pattern lookup is deferred into the per-channel loop below.
     const usePerChannelTables = !useNativeAccessor && !!this.song.channelTrackTables;
+    if (usePerChannelTables && this.songPos === 0 && this.pattPos === 0 && this.currentTick === 0) {
+      console.log('[TrackerReplayer] processTick: usePerChannelTables=true channels=', this.channels.length, 'tables=', this.song.channelTrackTables!.length);
+    }
     const patternNum = usePerChannelTables
       ? (this.song.channelTrackTables![0]?.[this.songPos] ?? 0)
       : this.song.songPositions[this.songPos];

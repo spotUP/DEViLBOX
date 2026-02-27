@@ -16,6 +16,7 @@ interface PatternOrderModalProps {
 export const PatternOrderModal: React.FC<PatternOrderModalProps> = ({ onClose }) => {
   // Reactive: re-renders when a new song with/without per-channel tables is loaded
   const hasPerChannelTables = useTrackerStore((state) => !!state.channelTrackTables);
+  console.log('[PatternOrderModal] render hasPerChannelTables=', hasPerChannelTables, 'raw=', useTrackerStore.getState().channelTrackTables?.length ?? null);
 
   const patternOrder = useTrackerStore((state) => state.patternOrder);
   const currentPositionIndex = useTrackerStore((state) => state.currentPositionIndex);
