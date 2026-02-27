@@ -694,9 +694,24 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── Composer 667 ─────────────────────────────────────────────────────────
-  // .667 files — OPL FM tracker (PC format). No PCM samples; instruments are
-  // FM patches. Falls through to libopenmpt which natively supports .667.
-  // (UADE is Amiga-only and cannot play OPL FM formats.)
+  // ── Composer 667 (.667) ───────────────────────────────────────────────────
+  // OPL FM tracker (PC format). No PCM samples; instruments are FM patches.
+  // Falls through to libopenmpt on failure. (UADE is Amiga-only, cannot play OPL.)
+  if (/\.667$/.test(filename)) {
+    if (prefs.composer667 === 'native') {
+      try {
+        const { isComposer667Format, parseComposer667File } = await import('@lib/import/formats/Composer667Parser');
+        const bytes = new Uint8Array(buffer);
+        if (isComposer667Format(bytes)) {
+          const result = parseComposer667File(bytes, file.name);
+          if (result) return result;
+        }
+      } catch (err) {
+        console.warn(`[Composer667Parser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
+      }
+    }
+    // Fall through to libopenmpt
+  }
 
   // ── Chuck Biscuits / Black Artist ────────────────────────────────────────
   // .cba files — identified by 'CBA\xF9' magic at offset 0.
@@ -770,6 +785,23 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
     const { parseUADEFile: parseUADE_kris } = await import('@lib/import/formats/UADEParser');
     return parseUADE_kris(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── MusicLine Editor (.ml) ───────────────────────────────────────────────
+  // Magic "MLEDMODL" at offset 0.
+  if (/\.ml$/.test(filename)) {
+    const bytes = new Uint8Array(buffer);
+    try {
+      const { isMusicLineFile, parseMusicLineFile } = await import('@lib/import/formats/MusicLineParser');
+      if (isMusicLineFile(bytes)) {
+        const result = parseMusicLineFile(bytes);
+        if (result) return result;
+      }
+    } catch (err) {
+      console.warn(`[MusicLineParser] Native parse failed for ${filename}:`, err);
+    }
+    // No UADE fallback for .ml (UADE uses prefix-based detection; .ml extension not a UADE prefix)
+    return null;
   }
 
   // ── Game Music Creator (.gmc) ─────────────────────────────────────────────
