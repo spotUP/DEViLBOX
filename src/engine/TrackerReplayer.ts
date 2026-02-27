@@ -1215,6 +1215,12 @@ export class TrackerReplayer {
     this.lastGrooveTemplateId = transportState.grooveTemplateId;
     this.lastSwingAmount = transportState.swing;
     this.lastGrooveSteps = transportState.grooveSteps;
+
+    // Wait for any pending Sampler/Player buffer decodes before starting the tick loop.
+    // Without this, the first note on each sample-based instrument is dropped because
+    // decodeAudioData() hasn't completed by the time the first tick fires.
+    await engine.awaitPendingLoads();
+
     this.startScheduler();
   }
 
