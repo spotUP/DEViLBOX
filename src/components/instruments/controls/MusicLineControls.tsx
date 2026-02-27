@@ -81,16 +81,6 @@ export const MusicLineControls: React.FC<MusicLineControlsProps> = ({ instrument
         fontFamily: 'monospace',
       }}
     >
-      {/* Header */}
-      <div style={{ borderBottom: '1px solid #1e1e2e', paddingBottom: 12 }}>
-        <div style={{ fontSize: 11, letterSpacing: 3, color: '#4a4a6a', textTransform: 'uppercase', marginBottom: 2 }}>
-          MusicLine Editor
-        </div>
-        <div style={{ fontSize: 13, color: '#7a7a9a', fontFamily: 'sans-serif' }}>
-          Single-cycle waveform · 32 samples · {PAL_C3_RATE} Hz
-        </div>
-      </div>
-
       {/* Waveform type selector */}
       <div>
         <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a4a6a', textTransform: 'uppercase', marginBottom: 10 }}>
