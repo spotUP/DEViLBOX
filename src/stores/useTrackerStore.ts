@@ -2666,6 +2666,7 @@ export const useTrackerStore = create<TrackerStore>()(
 
     applyEditorMode: (song) =>
       set((state) => {
+        console.log('[useTrackerStore] applyEditorMode branch:', { hasFurnace: !!song.furnaceNative, hasHively: !!song.hivelyNative, hasChannelTables: !!song.channelTrackTables, tableLen: song.channelTrackTables?.length });
         if (song.furnaceNative) {
           state.editorMode = 'furnace';
           state.furnaceNative = song.furnaceNative;
@@ -2694,6 +2695,7 @@ export const useTrackerStore = create<TrackerStore>()(
           state.channelTrackTables = song.channelTrackTables;
           state.channelSpeeds = song.channelSpeeds ?? null;
           state.channelGrooves = song.channelGrooves ?? null;
+          console.log('[useTrackerStore] applyEditorMode SET channelTrackTables:', state.channelTrackTables?.length, 'speeds:', state.channelSpeeds);
         } else {
           state.editorMode = 'classic';
           state.furnaceNative = null;
