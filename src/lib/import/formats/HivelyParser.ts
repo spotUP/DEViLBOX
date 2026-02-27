@@ -801,7 +801,7 @@ export function parseAhiFile(buffer: ArrayBuffer): { config: HivelyConfig; name:
   // Null-terminated name at end
   let nameEnd = off;
   while (nameEnd < buf.length && buf[nameEnd] !== 0) nameEnd++;
-  const name = new TextDecoder().decode(buf.slice(off, nameEnd));
+  const name = textDecoder.decode(buf.slice(off, nameEnd));
 
   return {
     name,
