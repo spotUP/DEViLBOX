@@ -17,6 +17,7 @@ import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { MacroListEditor } from './MacroEditor';
 import { WavetableListEditor, type WavetableData } from './WavetableEditor';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
+import { EnvelopeVisualization, WaveformThumbnail } from '@components/instruments/shared';
 
 // ============================================================================
 // CHIP-SPECIFIC PARAMETER RANGES (from Furnace insEdit.cpp)
@@ -166,147 +167,6 @@ function getChipParameterRanges(chipType: number): ChipParameterRanges {
     opCount: 4,
   };
 }
-
-// ============================================================================
-// FM ENVELOPE VISUALIZATION (from Furnace drawFMEnv)
-// ============================================================================
-
-interface FMEnvelopeProps {
-  tl: number;
-  ar: number;
-  dr: number;
-  d2r: number;
-  rr: number;
-  sl: number;
-  maxTl: number;
-  maxArDr: number;
-  hasD2R: boolean;
-  width?: number;
-  height?: number;
-  color?: string;
-}
-
-const FMEnvelopeVisualization: React.FC<FMEnvelopeProps> = ({
-  tl, ar, dr, d2r, rr, sl, maxTl, maxArDr, hasD2R,
-  width = 120, height = 48, color = '#f59e0b'
-}) => {
-  const canvasRef = React.useRef<HTMLCanvasElement>(null);
-
-  React.useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx.scale(dpr, dpr);
-
-    const w = width;
-    const h = height;
-    const padding = 2;
-
-    // Clear
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(0, 0, w, h);
-
-    // Grid lines
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 0.5;
-    for (let i = 1; i < 4; i++) {
-      ctx.beginPath();
-      ctx.moveTo(0, (h / 4) * i);
-      ctx.lineTo(w, (h / 4) * i);
-      ctx.stroke();
-    }
-
-    // Calculate envelope points
-    // TL determines starting level (inverted: 0 = max volume, 127 = silent)
-    const startLevel = 1 - (tl / maxTl);
-
-    // AR: Attack time (inverted: 31 = instant, 0 = slow)
-    const attackTime = maxArDr > 0 ? (1 - ar / maxArDr) * 0.3 : 0;
-
-    // DR: Decay time to sustain level
-    const decayTime = maxArDr > 0 ? (1 - dr / maxArDr) * 0.25 : 0;
-
-    // SL: Sustain level (inverted: 0 = full, 15 = silent)
-    const sustainLevel = startLevel * (1 - sl / 15);
-
-    // D2R: Second decay rate (sustain slope)
-    const d2rTime = hasD2R && d2r > 0 ? (1 - d2r / 31) * 0.25 : 0.15;
-    const d2rEndLevel = hasD2R && d2r > 0 ? sustainLevel * 0.5 : sustainLevel;
-
-    // RR: Release time
-    const releaseTime = (1 - rr / 15) * 0.2;
-
-    // Draw envelope path
-    ctx.beginPath();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-
-    const effectiveW = w - padding * 2;
-    const effectiveH = h - padding * 2;
-
-    let x = padding;
-    let y = h - padding;
-
-    // Start at 0
-    ctx.moveTo(x, y);
-
-    // Attack phase
-    x += attackTime * effectiveW;
-    y = padding + effectiveH * (1 - startLevel);
-    ctx.lineTo(x, y);
-
-    // Decay phase (to sustain level)
-    x += decayTime * effectiveW;
-    y = padding + effectiveH * (1 - sustainLevel);
-    ctx.lineTo(x, y);
-
-    // Sustain/D2R phase
-    if (hasD2R && d2r > 0) {
-      x += d2rTime * effectiveW;
-      y = padding + effectiveH * (1 - d2rEndLevel);
-      ctx.lineTo(x, y);
-    } else {
-      x += 0.15 * effectiveW;
-      ctx.lineTo(x, y);
-    }
-
-    // Release phase
-    const releaseStartY = y;
-    void releaseStartY; // Position tracked for future hover info
-    x += releaseTime * effectiveW;
-    y = h - padding;
-    ctx.lineTo(x, y);
-
-    // Continue to end
-    ctx.lineTo(w - padding, y);
-
-    ctx.stroke();
-
-    // Fill under curve
-    ctx.lineTo(w - padding, h - padding);
-    ctx.lineTo(padding, h - padding);
-    ctx.closePath();
-    ctx.fillStyle = `${color}15`;
-    ctx.fill();
-
-  }, [tl, ar, dr, d2r, rr, sl, maxTl, maxArDr, hasD2R, color, width, height]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      className="rounded border border-dark-border w-full"
-      style={{ maxWidth: '100%' }}
-    />
-  );
-};
 
 // ============================================================================
 // FM ALGORITHM DIAGRAM (from Furnace drawAlgorithm)
@@ -871,7 +731,8 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
 
       {/* Envelope Visualization - Full width */}
       <div className="mb-3 w-full">
-        <FMEnvelopeVisualization
+        <EnvelopeVisualization
+          mode="adsr"
           tl={op.tl}
           ar={op.ar}
           dr={op.dr}
@@ -879,8 +740,7 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
           rr={op.rr}
           sl={op.sl}
           maxTl={ranges.tl.max}
-          maxArDr={ranges.ar.max}
-          hasD2R={ranges.hasD2R}
+          maxRate={ranges.ar.max}
           color={accentColor}
           width={280}
           height={48}
@@ -1220,46 +1080,30 @@ const C64Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
         </div>
 
         <div className="flex gap-2">
-          <button
-            onClick={() => updateC64({ triOn: !c64.triOn })}
-            className={`px-4 py-2 text-[10px] font-mono rounded border transition-colors ${
-              c64.triOn
-                ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
-                : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
-            }`}
-          >
-            TRI
-          </button>
-          <button
-            onClick={() => updateC64({ sawOn: !c64.sawOn })}
-            className={`px-4 py-2 text-[10px] font-mono rounded border transition-colors ${
-              c64.sawOn
-                ? 'bg-amber-600/20 border-amber-500/50 text-amber-400'
-                : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
-            }`}
-          >
-            SAW
-          </button>
-          <button
-            onClick={() => updateC64({ pulseOn: !c64.pulseOn })}
-            className={`px-4 py-2 text-[10px] font-mono rounded border transition-colors ${
-              c64.pulseOn
-                ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
-                : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
-            }`}
-          >
-            PULSE
-          </button>
-          <button
-            onClick={() => updateC64({ noiseOn: !c64.noiseOn })}
-            className={`px-4 py-2 text-[10px] font-mono rounded border transition-colors ${
-              c64.noiseOn
-                ? 'bg-rose-600/20 border-rose-500/50 text-rose-400'
-                : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
-            }`}
-          >
-            NOISE
-          </button>
+          {([
+            { key: 'triOn',   label: 'TRI',   wfType: 'triangle', active: c64.triOn,   onColor: '#34d399', borderColor: 'border-emerald-500/50', textColor: 'text-emerald-400', bgColor: 'bg-emerald-600/20' },
+            { key: 'sawOn',   label: 'SAW',   wfType: 'saw',      active: c64.sawOn,   onColor: '#fbbf24', borderColor: 'border-amber-500/50',   textColor: 'text-amber-400',   bgColor: 'bg-amber-600/20' },
+            { key: 'pulseOn', label: 'PULSE', wfType: 'square',   active: c64.pulseOn, onColor: '#22d3ee', borderColor: 'border-cyan-500/50',    textColor: 'text-cyan-400',    bgColor: 'bg-cyan-600/20' },
+            { key: 'noiseOn', label: 'NOISE', wfType: 'noise',    active: c64.noiseOn, onColor: '#fb7185', borderColor: 'border-rose-500/50',    textColor: 'text-rose-400',    bgColor: 'bg-rose-600/20' },
+          ] as const).map(({ key, label, wfType, active, onColor, borderColor, textColor, bgColor }) => (
+            <button
+              key={key}
+              onClick={() => updateC64({ [key]: !active })}
+              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded border transition-colors ${
+                active
+                  ? `${bgColor} ${borderColor} ${textColor}`
+                  : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
+              }`}
+            >
+              <WaveformThumbnail
+                type={wfType}
+                width={40} height={16}
+                color={active ? onColor : '#4b5563'}
+                style="line"
+              />
+              <span className="text-[9px] font-mono">{label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -1268,6 +1112,22 @@ const C64Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
         <div className="flex items-center gap-2 mb-4">
           <Activity size={16} className="text-amber-400" />
           <h3 className="font-mono text-xs font-bold text-text-primary uppercase">ADSR Envelope</h3>
+        </div>
+
+        <div className="mb-3">
+          <EnvelopeVisualization
+            mode="adsr"
+            ar={c64.a}
+            dr={c64.d}
+            rr={c64.r}
+            sl={c64.s}
+            tl={0}
+            maxRate={15}
+            maxTl={1}
+            color="#f59e0b"
+            width={260}
+            height={52}
+          />
         </div>
 
         <div className="flex justify-between gap-4">

@@ -10,6 +10,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { HivelyConfig, HivelyPerfEntryConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+import { EnvelopeVisualization } from '@components/instruments/shared';
 
 interface HivelyControlsProps {
   config: HivelyConfig;
@@ -176,6 +177,23 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
       {/* Envelope ADSR */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Envelope" />
+        <div className="mb-3">
+          <EnvelopeVisualization
+            mode="steps"
+            attackVol={config.envelope.aVolume}
+            attackSpeed={config.envelope.aFrames}
+            decayVol={config.envelope.dVolume}
+            decaySpeed={config.envelope.dFrames}
+            sustainVol={config.envelope.dVolume}
+            sustainLen={config.envelope.sFrames}
+            releaseVol={config.envelope.rVolume}
+            releaseSpeed={config.envelope.rFrames}
+            maxVol={64}
+            color={knobColor}
+            width={320}
+            height={56}
+          />
+        </div>
         <div className="grid grid-cols-4 gap-3">
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.envelope.aFrames} min={1} max={255} step={1}
