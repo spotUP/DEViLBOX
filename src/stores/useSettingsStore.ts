@@ -152,6 +152,9 @@ export interface FormatEnginePreferences {
   jasonPage: FormatEngineChoice;        // jpn.*/jpnd.*/jp.* → JasonPageParser vs UADE
   infogrames: FormatEngineChoice;       // .dum → InfogramesParser vs UADE
   sawteeth: FormatEngineChoice;         // .st → SawteethParser vs UADE
+  fmTracker: FormatEngineChoice;        // .fmt → FMTrackerParser vs libopenmpt
+  madTracker2: FormatEngineChoice;      // .mt2 → MadTracker2Parser vs libopenmpt
+  psm: FormatEngineChoice;              // .psm → PSMParser vs libopenmpt
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -331,6 +334,9 @@ export const useSettingsStore = create<SettingsStore>()(
         jasonPage: 'native',          // JasonPageParser — dedicated Jason Page support
         infogrames: 'native',         // InfogramesParser — dedicated Infogrames support
         sawteeth: 'native',           // SawteethParser — dedicated Sawteeth support
+        fmTracker: 'native',          // FMTrackerParser — dedicated FM Tracker support
+        madTracker2: 'native',        // MadTracker2Parser — dedicated MadTracker 2 support
+        psm: 'native',                // PSMParser — dedicated PSM/PSM16 support
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
