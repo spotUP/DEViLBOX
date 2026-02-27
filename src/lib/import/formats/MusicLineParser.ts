@@ -87,8 +87,14 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   const v = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const len = data.byteLength;
 
-  // Skip: "MLEDMODL"(8) + size(4) + magic(4) = 16 bytes
-  let pos = 16;
+  // Skip: "MLEDMODL"(8) + totalSize(4) + magic1(4) + magic2(4) = 20 bytes
+  // File layout (verified against drax.ml hex dump):
+  //   0x00: "MLEDMODL" (8 bytes)
+  //   0x08: u32BE = 8 (size of the two magic fields that follow)
+  //   0x0C: 0x87654321 (magic 1)
+  //   0x10: 0x56766807 (magic 2 / build date)
+  //   0x14: first chunk (e.g. VERS or TUNE)
+  let pos = 20;
 
   // Parsed data accumulators
   let songTitle = '';
