@@ -1107,6 +1107,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
           totalChannelsWidth={totalChannelsWidth}
           scrollLeft={scrollLeft}
           onScrollChange={(v) => { scrollLeftRef.current = v; setScrollLeft(v); }}
+          channelSpeeds={getTrackerReplayer().getSong()?.channelSpeeds}
+          songInitialSpeed={getTrackerReplayer().getSong()?.initialSpeed}
           onToggleMute={toggleChannelMute}
           onToggleSolo={toggleChannelSolo}
           onToggleCollapse={toggleChannelCollapse}
@@ -1237,6 +1239,9 @@ interface ChannelHeaderDOMProps {
   totalChannelsWidth: number;
   scrollLeft: number;
   onScrollChange: (v: number) => void;
+  /** Per-channel speeds from MusicLine/similar formats (undefined = all use initialSpeed) */
+  channelSpeeds?: number[];
+  songInitialSpeed?: number;
   onToggleMute: (ch: number) => void;
   onToggleSolo: (ch: number) => void;
   onToggleCollapse: (ch: number) => void;
@@ -1271,6 +1276,8 @@ const ChannelHeaderDOM: React.FC<ChannelHeaderDOMProps> = ({
   totalChannelsWidth,
   scrollLeft,
   onScrollChange,
+  channelSpeeds,
+  songInitialSpeed,
   onToggleMute,
   onToggleSolo,
   onToggleCollapse,
@@ -1356,6 +1363,15 @@ const ChannelHeaderDOM: React.FC<ChannelHeaderDOMProps> = ({
                       >
                         {(idx + 1).toString().padStart(2, '0')}
                       </span>
+                      {channelSpeeds && channelSpeeds[idx] !== undefined && channelSpeeds[idx] !== songInitialSpeed && (
+                        <span
+                          className="flex-shrink-0 font-mono text-[9px] font-bold px-0.5 rounded"
+                          style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.35)' }}
+                          title={`Channel speed: ${channelSpeeds[idx]} ticks/row${channelSpeeds[idx] > 0 && channelSpeeds[idx] !== (songInitialSpeed ?? 0) ? ` (song: ${songInitialSpeed})` : ''}`}
+                        >
+                          S:{channelSpeeds[idx]}
+                        </span>
+                      )}
                       <input
                         type="text"
                         className="bg-transparent border-none outline-none font-mono text-[10px] font-bold text-text-primary focus:text-accent-primary transition-colors min-w-0 flex-1 overflow-hidden text-ellipsis uppercase px-0 placeholder:text-text-muted/50"

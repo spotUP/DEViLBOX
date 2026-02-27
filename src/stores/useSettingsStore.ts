@@ -99,7 +99,6 @@ export interface FormatEnginePreferences {
   lme: FormatEngineChoice;            // .lme/lme.* → LMEParser vs UADE
   jochenHippelST: FormatEngineChoice; // mdst.* → JochenHippelSTParser vs UADE
   specialFX: FormatEngineChoice;      // doda.* → SpecialFXParser vs UADE
-  benDaglish: FormatEngineChoice;     // bd.* → BenDaglishParser vs UADE
   // Newly wired parsers (2026-02-27 batch 3)
   timeTracker: FormatEngineChoice;      // tmk.* → TimeTrackerParser vs UADE
   kris: FormatEngineChoice;             // kris.* → KRISParser vs UADE
@@ -284,7 +283,6 @@ export const useSettingsStore = create<SettingsStore>()(
         lme: 'native',            // LMEParser — dedicated Leggless Music Editor support
         jochenHippelST: 'native', // JochenHippelSTParser — dedicated Jochen Hippel ST support
         specialFX: 'native',      // SpecialFXParser — dedicated Special FX ST support
-        benDaglish: 'native',     // BenDaglishParser — dedicated Ben Daglish support
         timeTracker: 'native',          // TimeTrackerParser — dedicated TimeTracker support
         kris: 'native',                 // KRISParser — dedicated ChipTracker/KRIS support
         cinemaware: 'native',           // CinemawareParser — dedicated Cinemaware support

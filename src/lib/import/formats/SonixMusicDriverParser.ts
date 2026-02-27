@@ -26,7 +26,6 @@ import type { InstrumentConfig } from '@/types';
 // ── Constants ─────────────────────────────────────────────────────────────
 
 const MIN_FILE_SIZE_SNX  = 21;  // at minimum: 4 longs (16) + 4-byte skip + 1 byte
-const MIN_FILE_SIZE_TINY = 333; // cmp.l #332, D4 / ble fault → fileSize > 332
 const MIN_FILE_SIZE_SMUS = 28;  // FORM(4)+size(4)+SMUS(4)+SHDR(4)+?(8)+byte23
 
 // ── Binary helpers ─────────────────────────────────────────────────────────

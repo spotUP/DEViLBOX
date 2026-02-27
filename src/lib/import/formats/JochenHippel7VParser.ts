@@ -150,8 +150,6 @@ export function isJochenHippel7VFormat(buffer: ArrayBuffer | Uint8Array): boolea
   const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   if (buf.length < MIN_FILE_SIZE) return false;
 
-  let off = 0;
-
   // Path A: loader stub
   // ASM: cmp.w #$6000,(A0) — NO post-increment, just compare
   if (u16BE(buf, 0) === 0x6000) {

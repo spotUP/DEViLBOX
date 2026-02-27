@@ -53,7 +53,7 @@ type NativeFormatKey =
   | 'symphoniePro' | 'composer667' | 'chuckBiscuits' | 'speedySystem'
   | 'tronic' | 'digiBoosterPro' | 'gameMusicCreator' | 'faceTheMusic'
   | 'soundControl' | 'soundFactory' | 'actionamics' | 'activisionPro'
-  | 'ronKlaren' | 'iffSmus' | 'mfp' | 'richardJoseph' | 'lme' | 'medley'
+  | 'ronKlaren' | 'iffSmus' | 'magneticFieldsPacker' | 'richardJoseph' | 'lme' | 'medley'
   | 'futurePlayer' | 'markCooksey' | 'jeroenTel' | 'quartet'
   | 'soundMaster' | 'zoundMonitor' | 'tcbTracker' | 'jasonPage'
   | 'mmdc' | 'psa' | 'steveTurner' | 'tme' | 'infogrames' | 'ufo'
@@ -142,7 +142,7 @@ const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label
   { key: 'tcbTracker',  regex: /^tcb\.[^.]+$/i,                                  label: 'TCB Tracker',       description: 'TCB Tracker (Atari ST) — native parser or UADE.' },
   { key: 'mmdc',        regex: /^mmdc\.[^.]+$/i,                                 label: 'MMDC',              description: 'MMDC — native parser or UADE.' },
   { key: 'psa',         regex: /^psa\.[^.]+$/i,                                  label: 'PSA',               description: 'Professional Sound Artists — native parser or UADE.' },
-  { key: 'mfp',         regex: /^mfp\.[^.]+$/i,                                  label: 'MFP',               description: 'Magnetic Fields Packer — native parser or UADE.' },
+  { key: 'magneticFieldsPacker',         regex: /^mfp\.[^.]+$/i,                                  label: 'MFP',               description: 'Magnetic Fields Packer — native parser or UADE.' },
 
   // ── Formats with native parsers (fallback: libopenmpt) ───────────────────────
   { key: 'imagoOrpheus', regex: /\.imf$/i,                                        label: 'Imago Orpheus',     description: 'Imago Orpheus — native parser or libopenmpt.' },
