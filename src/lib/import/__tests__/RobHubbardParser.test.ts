@@ -40,6 +40,14 @@ describe('parseRobHubbardFile — budokan.rh', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
+  it('extracts RobHubbard instruments with PCM data', async () => {
+    const song = await parseRobHubbardFile(loadBuf(FILE1), 'budokan.rh');
+    expect(song.instruments.length).toBeGreaterThan(0);
+    expect(song.instruments[0].synthType).toBe('RobHubbardSynth');
+    expect(song.instruments[0].robHubbard).toBeTruthy();
+    const withPCM = song.instruments.filter(i => (i.robHubbard?.sampleData.length ?? 0) > 0);
+    expect(withPCM.length).toBeGreaterThan(0);
+  });
 });
 
 describe('parseRobHubbardFile — flymus.rh', () => {
@@ -52,5 +60,13 @@ describe('parseRobHubbardFile — flymus.rh', () => {
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
+  });
+  it('extracts RobHubbard instruments with PCM data', async () => {
+    const song = await parseRobHubbardFile(loadBuf(FILE2), 'flymus.rh');
+    expect(song.instruments.length).toBeGreaterThan(0);
+    expect(song.instruments[0].synthType).toBe('RobHubbardSynth');
+    expect(song.instruments[0].robHubbard).toBeTruthy();
+    const withPCM = song.instruments.filter(i => (i.robHubbard?.sampleData.length ?? 0) > 0);
+    expect(withPCM.length).toBeGreaterThan(0);
   });
 });

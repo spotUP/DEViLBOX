@@ -57,6 +57,14 @@ describe('parseSoundMonFile — acid mix.bp (SoundMon 2)', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
+  it('extracts SoundMon synth instruments', async () => {
+    const song = await parseSoundMonFile(loadBuf(FILE1), 'acid mix.bp');
+    if (!song) return;
+    expect(song.instruments.length).toBeGreaterThan(0);
+    const synthInsts = song.instruments.filter(i => i.synthType === 'SoundMonSynth');
+    expect(synthInsts.length).toBeGreaterThan(0);
+    expect(synthInsts[0].soundMon).toBeTruthy();
+  });
 });
 
 describe('parseSoundMonFile — alien breed - menu.bp (SoundMon 2)', () => {
@@ -73,6 +81,14 @@ describe('parseSoundMonFile — alien breed - menu.bp (SoundMon 2)', () => {
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
+  });
+  it('extracts SoundMon synth instruments', async () => {
+    const song = await parseSoundMonFile(loadBuf(FILE2), 'alien breed - menu.bp');
+    if (!song) return;
+    expect(song.instruments.length).toBeGreaterThan(0);
+    const synthInsts = song.instruments.filter(i => i.synthType === 'SoundMonSynth');
+    expect(synthInsts.length).toBeGreaterThan(0);
+    expect(synthInsts[0].soundMon).toBeTruthy();
   });
 });
 
