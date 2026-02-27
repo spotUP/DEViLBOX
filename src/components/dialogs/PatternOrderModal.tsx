@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import { useTrackerStore } from '@stores';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { notify } from '@stores/useNotificationStore';
 import { Plus, Trash2, X } from 'lucide-react';
 import { MusicLineTrackTableEditor } from '@components/tracker/MusicLineTrackTableEditor';
