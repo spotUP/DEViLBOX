@@ -332,6 +332,60 @@ function mugicianMeta(buf: Uint8Array): NativeFormatMeta {
   return { channels: 4, patterns, orders, instruments: sampleCount, samples: sampleCount };
 }
 
+/** MusicLine Editor — "MLEDMODL" (8 bytes) + dynamic extra header + IFF-style chunks */
+function musicLineMeta(buf: Uint8Array): NativeFormatMeta {
+  if (buf.length < 12) return UNKNOWN;
+  if (str(buf, 0, 8) !== 'MLEDMODL') return UNKNOWN;
+
+  // Dynamic header: sizeField(u32BE) at offset 8; first chunk at 12 + sizeField
+  const headerExtraSize = u32BE(buf, 8);
+  let pos = 12 + headerExtraSize;
+
+  let channels = -1, patterns = 0, instruments = 0, samples = 0;
+
+  while (pos + 8 <= buf.length) {
+    const id   = str(buf, pos, 4);
+    const size = u32BE(buf, pos + 4);
+    const data = pos + 8;
+
+    if (id === 'TUNE') {
+      // TUNE header: title[32]+tempo[2]+speed[1]+groove[1]+volume[2]+playMode[1]+numChannels[1]
+      // numChannels is at byte 39 within the TUNE data
+      if (data + 40 <= buf.length) {
+        const ch = buf[data + 39];
+        channels = ch >= 1 && ch <= 8 ? ch : -1;
+      }
+      if (size === 0 || data + size > buf.length) break;
+      pos = data + size;
+    } else if (id === 'PART') {
+      patterns++;
+      if (size === 0 || data + size > buf.length) break;
+      pos = data + size;
+    } else if (id === 'ARPG' || id === 'VERS') {
+      if (size === 0 || data + size > buf.length) break;
+      pos = data + size;
+    } else if (id === 'INST') {
+      instruments++;
+      if (size === 0 || data + size > buf.length) break;
+      pos = data + size;
+    } else if (id === 'SMPL') {
+      samples++;
+      if (size === 0 || data + size > buf.length) break;
+      pos = data + size;
+    } else {
+      break; // Unknown chunk — stop
+    }
+  }
+
+  return {
+    channels,
+    patterns:    patterns    > 0 ? patterns    : -1,
+    orders:      -1,  // requires full TUNE channel-data parse; omit
+    instruments: instruments > 0 ? instruments : -1,
+    samples:     samples     > 0 ? samples     : -1,
+  };
+}
+
 /** TFMX by Jochen Hippel — scan for "TFMX\0" header */
 function tfmxMeta(buf: Uint8Array): NativeFormatMeta {
   // Scan the first 0xB80 bytes for the 5-byte magic "TFMX\0"
@@ -374,6 +428,7 @@ export function getNativeFormatMetadata(key: string, buffer: ArrayBuffer): Nativ
     case 'fred':     return fredMeta(buf);
     case 'soundfx':  return soundFXMeta(buf);
     case 'mugician': return mugicianMeta(buf);
+    case 'musicLine': return musicLineMeta(buf);
     case 'tfmx':     return tfmxMeta(buf);
     default:         return { ...UNKNOWN };
   }
