@@ -16,6 +16,8 @@ import { getToneEngine } from '@engine/ToneEngine';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { VSTBridgeSynth } from '@engine/vstbridge/VSTBridgeSynth';
 import { VSTBridgePanel } from './VSTBridgePanel';
+import { FilterFrequencyResponse } from '@components/instruments/shared';
+import type { FilterType } from '@components/instruments/shared';
 
 // ============================================================================
 // Module-scope sub-components (extracted to satisfy react-hooks/static-components)
@@ -153,6 +155,26 @@ const OSC_TYPE_LABELS = [
 const FILTER_TYPE_LABELS = [
   'None', 'LP24', 'LP12', 'BP24', 'BP12', 'HP24', 'HP12',
   'SEM12', 'Korg LP', 'Korg HP', 'Diode', 'Formant', 'Comb', 'Ring',
+];
+
+type Odin2FilterEntry = { type: FilterType; poles: 2 | 4 };
+// Maps FILTER_TYPE_LABELS index → biquad approximation for the frequency response curve.
+// null = filter bypassed (None), so no curve is drawn.
+const ODIN2_FILTER_MAP: Array<Odin2FilterEntry | null> = [
+  null,                               // None
+  { type: 'lowpass',  poles: 4 },    // LP24
+  { type: 'lowpass',  poles: 2 },    // LP12
+  { type: 'bandpass', poles: 4 },    // BP24
+  { type: 'bandpass', poles: 2 },    // BP12
+  { type: 'highpass', poles: 4 },    // HP24
+  { type: 'highpass', poles: 2 },    // HP12
+  { type: 'lowpass',  poles: 2 },    // SEM12 (state-variable, approximate as LP12)
+  { type: 'lowpass',  poles: 4 },    // Korg LP (Moog ladder)
+  { type: 'highpass', poles: 4 },    // Korg HP
+  { type: 'lowpass',  poles: 4 },    // Diode
+  { type: 'lowpass',  poles: 2 },    // Formant (approximate)
+  { type: 'bandpass', poles: 2 },    // Comb (approximate)
+  { type: 'bandpass', poles: 2 },    // Ring (approximate)
 ];
 
 interface Odin2ControlsProps {
@@ -314,6 +336,21 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
           <div className="flex flex-col gap-3">
             <span className="text-xs font-bold" style={{ color: accentColor }}>FILTER 1</span>
             <TypeSelect id={P.FIL1_TYPE} labels={FILTER_TYPE_LABELS} params={params} accentColor={accentColor} setParam={setParam} />
+            {(() => {
+              const entry = ODIN2_FILTER_MAP[Math.round(params[P.FIL1_TYPE])];
+              if (!entry) return null;
+              // FIL1_FREQ is raw Hz (20–20000); normalise to 0–1 on log scale
+              const norm = Math.log10(Math.max(params[P.FIL1_FREQ], 20) / 20) / 3;
+              return (
+                <div className="my-1">
+                  <FilterFrequencyResponse
+                    filterType={entry.type} cutoff={norm}
+                    resonance={params[P.FIL1_RES]} poles={entry.poles}
+                    color={accentColor} width={280} height={56}
+                  />
+                </div>
+              );
+            })()}
             <div className="flex gap-2 justify-center flex-wrap">
               <Knob label="Freq" value={params[P.FIL1_FREQ]} min={20} max={20000} defaultValue={10000}
                 onChange={(v) => setParam(P.FIL1_FREQ, v)} size="sm" color={knobColor} logarithmic
@@ -342,6 +379,20 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
           <div className="flex flex-col gap-3">
             <span className="text-xs font-bold" style={{ color: accentColor }}>FILTER 2</span>
             <TypeSelect id={P.FIL2_TYPE} labels={FILTER_TYPE_LABELS} params={params} accentColor={accentColor} setParam={setParam} />
+            {(() => {
+              const entry = ODIN2_FILTER_MAP[Math.round(params[P.FIL2_TYPE])];
+              if (!entry) return null;
+              const norm = Math.log10(Math.max(params[P.FIL2_FREQ], 20) / 20) / 3;
+              return (
+                <div className="my-1">
+                  <FilterFrequencyResponse
+                    filterType={entry.type} cutoff={norm}
+                    resonance={params[P.FIL2_RES]} poles={entry.poles}
+                    color={accentColor} width={280} height={56}
+                  />
+                </div>
+              );
+            })()}
             <div className="flex gap-2 justify-center flex-wrap">
               <Knob label="Freq" value={params[P.FIL2_FREQ]} min={20} max={20000} defaultValue={10000}
                 onChange={(v) => setParam(P.FIL2_FREQ, v)} size="sm" color={knobColor} logarithmic
