@@ -807,9 +807,17 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
 
   // ── Game Music Creator (.gmc) ─────────────────────────────────────────────
   // No magic bytes — identified by structural heuristics (mirrors OpenMPT).
+  // GMCParser is the OpenMPT-faithful implementation; GameMusicCreatorParser
+  // is the legacy alternative — both extract PCM, try GMC first.
   if (/\.gmc$/.test(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.gameMusicCreator === 'native') {
+      try {
+        const { isGMCFormat, parseGMCFile } = await import('@lib/import/formats/GMCParser');
+        if (isGMCFormat(buffer)) return await parseGMCFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[GMCParser] Native parse failed for ${filename}, trying GameMusicCreatorParser:`, err);
+      }
       try {
         const { isGameMusicCreatorFormat, parseGameMusicCreatorFile } = await import('@lib/import/formats/GameMusicCreatorParser');
         const bytes = new Uint8Array(buffer);
@@ -1347,7 +1355,8 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── IFF SMUS / Sonix Music Driver (.smus, .snx, .tiny) ───────────────────
-  // IFF SMUS format: "FORM" + "SMUS" IFF structure. Sonix .snx shares layout.
+  // IFF SMUS format: "FORM" + "SMUS" IFF structure. Binary SNX/TINY sub-formats
+  // are handled by SonixMusicDriverParser when IffSmusParser does not detect IFF.
   if (/\.(smus|snx|tiny)$/i.test(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.iffSmus === 'native') {
@@ -1356,6 +1365,12 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
         if (isIffSmusFormat(buffer)) return await parseIffSmusFile(buffer, file.name);
       } catch (err) {
         console.warn(`[IffSmusParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+      try {
+        const { isSonixFormat, parseSonixFile } = await import('@lib/import/formats/SonixMusicDriverParser');
+        if (isSonixFormat(buffer)) return parseSonixFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[SonixMusicDriverParser] Native parse failed for ${filename}, falling back to UADE:`, err);
       }
     }
     const { parseUADEFile: parseUADE_smus } = await import('@lib/import/formats/UADEParser');
@@ -2584,6 +2599,8 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
 
   // ── Sonix Music Driver (SMUS.* / SNX.* / TINY.* prefix) ──────────────────
   // IFF SMUS and two binary sub-formats. UADE prefixes: smus, snx, tiny.
+  // IffSmusParser handles IFF SMUS (smus.*); SonixMusicDriverParser handles
+  // the binary SNX and TINY sub-formats which IffSmusParser cannot detect.
   {
     const _sonixBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
     if (_sonixBase.startsWith('smus.') || _sonixBase.startsWith('snx.') || _sonixBase.startsWith('tiny.')) {
@@ -2594,6 +2611,14 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
           if (isIffSmusFormat(buffer)) return await parseIffSmusFile(buffer, file.name);
         } catch (err) {
           console.warn(`[IffSmusParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        }
+        // IffSmusParser only handles the IFF SMUS variant; try SonixMusicDriverParser
+        // for the binary SNX and TINY sub-formats.
+        try {
+          const { isSonixFormat, parseSonixFile } = await import('@lib/import/formats/SonixMusicDriverParser');
+          if (isSonixFormat(buffer)) return parseSonixFile(buffer, file.name);
+        } catch (err) {
+          console.warn(`[SonixMusicDriverParser] Native parse failed for ${filename}, falling back to UADE:`, err);
         }
       }
       const { parseUADEFile: parseUADE_sonix } = await import('@lib/import/formats/UADEParser');
