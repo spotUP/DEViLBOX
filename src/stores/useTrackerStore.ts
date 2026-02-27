@@ -121,6 +121,8 @@ interface TrackerStore {
   editorMode: EditorMode;
   furnaceNative: FurnaceNativeData | null;
   hivelyNative: HivelyNativeData | null;
+  hivelyFileData: ArrayBuffer | null;
+  hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
   furnaceSubsongs: FurnaceSubsongPlayback[] | null;
   furnaceActiveSubsong: number;
   // MusicLine Editor per-channel sequencing data (null for all other formats)
@@ -278,7 +280,7 @@ interface TrackerStore {
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
   setHivelyNative: (data: HivelyNativeData | null) => void;
-  applyEditorMode: (song: { furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[] }) => void;
+  applyEditorMode: (song: { furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[] }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
 
   // Undo/Redo support
@@ -363,6 +365,8 @@ export const useTrackerStore = create<TrackerStore>()(
     editorMode: 'classic' as EditorMode,
     furnaceNative: null,
     hivelyNative: null,
+    hivelyFileData: null,
+    hivelyMeta: null,
     furnaceSubsongs: null,
     furnaceActiveSubsong: 0,
     channelTrackTables: null,
@@ -2671,6 +2675,8 @@ export const useTrackerStore = create<TrackerStore>()(
           state.editorMode = 'furnace';
           state.furnaceNative = song.furnaceNative;
           state.hivelyNative = null;
+          state.hivelyFileData = null;
+          state.hivelyMeta = null;
           state.furnaceSubsongs = song.furnaceSubsongs ?? null;
           state.furnaceActiveSubsong = song.furnaceActiveSubsong ?? 0;
           state.channelTrackTables = null;
@@ -2679,6 +2685,8 @@ export const useTrackerStore = create<TrackerStore>()(
         } else if (song.hivelyNative) {
           state.editorMode = 'hively';
           state.hivelyNative = song.hivelyNative;
+          state.hivelyFileData = song.hivelyFileData ?? null;
+          state.hivelyMeta = song.hivelyMeta ?? null;
           state.furnaceNative = null;
           state.furnaceSubsongs = null;
           state.furnaceActiveSubsong = 0;
@@ -2690,6 +2698,8 @@ export const useTrackerStore = create<TrackerStore>()(
           state.editorMode = 'classic';
           state.furnaceNative = null;
           state.hivelyNative = null;
+          state.hivelyFileData = null;
+          state.hivelyMeta = null;
           state.furnaceSubsongs = null;
           state.furnaceActiveSubsong = 0;
           state.channelTrackTables = song.channelTrackTables;
@@ -2700,6 +2710,8 @@ export const useTrackerStore = create<TrackerStore>()(
           state.editorMode = 'classic';
           state.furnaceNative = null;
           state.hivelyNative = null;
+          state.hivelyFileData = null;
+          state.hivelyMeta = null;
           state.furnaceSubsongs = null;
           state.furnaceActiveSubsong = 0;
           state.channelTrackTables = null;
