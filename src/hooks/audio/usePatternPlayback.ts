@@ -177,7 +177,10 @@ export const usePatternPlayback = () => {
                                    wasReplayerAdvanced;
 
       const needsReload = hasStartedRef.current && !isNaturalAdvancement;
-      const format = (pattern.importMetadata?.sourceFormat as TrackerFormat) || 'XM';
+      // Per-channel formats (MusicLine etc.) have no importMetadata.sourceFormat on their
+      // single-voice PART patterns. Fall back to 'MOD' (Amiga period math) not 'XM'.
+      const format = (pattern.importMetadata?.sourceFormat as TrackerFormat)
+        || (channelTrackTables && channelTrackTables.length > 0 ? 'MOD' : 'XM');
 
       // ── UADE: opaque song player — bypass TrackerReplayer entirely ──────
       if (format === 'UADE') {
@@ -250,7 +253,11 @@ export const usePatternPlayback = () => {
         let effectivePatterns = patterns;
         let effectiveSongPositions: number[];
         let effectiveSongLength: number;
-        let effectiveNumChannels = pattern.channels.length;
+        // For per-channel formats (MusicLine etc.), each PART pattern has only 1 channel,
+        // but the song has N channels (one per track table). Use the track table count.
+        let effectiveNumChannels = (channelTrackTables && channelTrackTables.length > 0)
+          ? channelTrackTables.length
+          : pattern.channels.length;
 
         if (arrangement.isArrangementMode && arrangement.clips.length > 0) {
           // --- Arrangement Mode ---
