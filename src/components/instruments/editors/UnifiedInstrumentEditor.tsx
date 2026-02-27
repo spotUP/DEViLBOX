@@ -1380,6 +1380,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   // MUSICLINE EDITOR WAVEFORM SYNTH EDITOR
   // ============================================================================
   if (editorMode === 'musicline') {
+    const mlDisplayType = instrument.metadata?.displayType ?? 'MusicLine Synth';
     return (
       <div className="synth-editor-container bg-[#060608]">
         <EditorHeader
@@ -1387,6 +1388,19 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           onChange={handleChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
+          customHeader={
+            <div className="synth-editor-header px-4 py-3 bg-[#0a0a12] border-b border-[#1e1e2e]">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-[#1a1a30]">
+                  <Music size={20} className="text-[#8080ff]" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold tracking-wide text-[#a0a0ff]">MusicLine Editor</h2>
+                  <p className="text-[10px] uppercase tracking-widest text-[#4a4a6a]">{mlDisplayType} · Single-cycle waveform</p>
+                </div>
+              </div>
+            </div>
+          }
         />
         <Suspense fallback={<LoadingControls />}>
           <MusicLineControls instrument={instrument} onChange={handleChange} />
