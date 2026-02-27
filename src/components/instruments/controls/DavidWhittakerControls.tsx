@@ -2,84 +2,53 @@
  * DavidWhittakerControls.tsx — David Whittaker instrument editor
  *
  * Exposes all DavidWhittakerConfig parameters: volume, relative tuning,
- * vibrato, and editable volume/frequency sequences with mini SVG visualizations.
+ * vibrato, and editable volume/frequency sequences.
+ *
+ * Enhanced with SequenceEditor (replaces SVG mini-charts + raw grids).
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { DavidWhittakerConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+import { SequenceEditor } from '@components/instruments/shared';
+import type { SequencePreset } from '@components/instruments/shared';
 
 interface DavidWhittakerControlsProps {
   config: DavidWhittakerConfig;
   onChange: (updates: Partial<DavidWhittakerConfig>) => void;
+  volseqPlaybackPosition?: number;
+  frqseqPlaybackPosition?: number;
 }
 
 type DWTab = 'main' | 'sequences';
 
-// ── Mini SVG: bar chart for volseq ─────────────────────────────────────────
-const VolseqBars: React.FC<{ data: number[]; accent: string }> = ({ data, accent }) => {
-  const W = 128;
-  const H = 32;
-  const visible = data.filter((v) => v !== -128);
-  if (visible.length === 0) return <svg width={W} height={H} />;
+// ── Presets ────────────────────────────────────────────────────────────────────
 
-  const barW = W / Math.max(visible.length, 1);
+const VOLSEQ_PRESETS: SequencePreset[] = [
+  { name: 'Attack',  data: [0, 10, 20, 35, 50, 60, 64, 58, 50, 42], loop: 9 },
+  { name: 'Organ',   data: [64, 60, 58, 55, 52, 50, 48, 46], loop: 7 },
+  { name: 'Pluck',   data: [64, 50, 38, 28, 20, 14, 9, 5, 2, 0] },
+  { name: 'Pad',     data: [0, 12, 26, 42, 56, 64], loop: 5 },
+  { name: 'Full',    data: [64], loop: 0 },
+];
 
-  return (
-    <svg width={W} height={H} style={{ display: 'block', marginBottom: 4 }}>
-      <rect width={W} height={H} fill="#060a0f" rx={2} />
-      {visible.map((v, i) => {
-        const vol = Math.max(0, v);
-        const barH = (vol / 64) * (H - 2);
-        return (
-          <rect
-            key={i}
-            x={i * barW + 0.5}
-            y={H - barH - 1}
-            width={Math.max(barW - 1, 1)}
-            height={barH}
-            fill={accent}
-            opacity={0.75}
-          />
-        );
-      })}
-    </svg>
-  );
-};
+const FRQSEQ_PRESETS: SequencePreset[] = [
+  { name: 'Vibrato',    data: [0, 3, 5, 3, 0, -3, -5, -3], loop: 0 },
+  { name: 'Slide Up',   data: [-12, -9, -6, -3, 0], loop: 4 },
+  { name: 'Slide Down', data: [12, 9, 6, 3, 0], loop: 4 },
+  { name: 'Tremolo',    data: [0, 6, 12, 6], loop: 0 },
+  { name: 'Flat',       data: [0] },
+];
 
-// ── Mini SVG: step plot for frqseq (semitone offsets) ──────────────────────
-const FrqseqPlot: React.FC<{ data: number[]; accent: string }> = ({ data, accent }) => {
-  const W = 128;
-  const H = 32;
-  const visible = data.filter((v) => v !== -128);
-  if (visible.length === 0) return <svg width={W} height={H} />;
+// ── Component ──────────────────────────────────────────────────────────────────
 
-  const minV = Math.min(...visible);
-  const maxV = Math.max(...visible);
-  const range = maxV - minV || 1;
-
-  const toY = (v: number) => H - 2 - ((v - minV) / range) * (H - 4);
-  const stepW = W / Math.max(visible.length, 1);
-
-  const segments = visible.map((v, i) => {
-    const x = i * stepW;
-    const y = toY(v);
-    const nextX = (i + 1) * stepW;
-    return `M${x},${y} H${nextX}`;
-  });
-
-  return (
-    <svg width={W} height={H} style={{ display: 'block', marginBottom: 4 }}>
-      <rect width={W} height={H} fill="#060a0f" rx={2} />
-      {segments.map((d, i) => (
-        <path key={i} d={d} stroke={accent} strokeWidth={1.5} fill="none" opacity={0.85} />
-      ))}
-    </svg>
-  );
-};
-
-export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({ config, onChange }) => {
+export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
+  config,
+  onChange,
+  volseqPlaybackPosition,
+  frqseqPlaybackPosition,
+}) => {
   const [activeTab, setActiveTab] = useState<DWTab>('main');
 
   const configRef = useRef(config);
@@ -106,45 +75,6 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({ 
     </div>
   );
 
-  // ── Shared editable sequence grid ─────────────────────────────────────────
-  const renderSeqGrid = (
-    seqKey: 'volseq' | 'frqseq',
-    arr: number[],
-    minVal: number,
-    maxVal: number,
-  ) => (
-    <div className="grid grid-cols-8 gap-1">
-      {arr.map((v, i) => (
-        <div key={i} className="flex flex-col items-center gap-0.5">
-          <span className="text-[9px] font-mono text-gray-600">
-            {i.toString().padStart(2, '0')}
-          </span>
-          <input
-            type="number"
-            value={v}
-            min={minVal}
-            max={maxVal}
-            onChange={(e) => {
-              const val = parseInt(e.target.value);
-              if (!isNaN(val)) {
-                const arr2 = [...(configRef.current[seqKey] ?? [])];
-                arr2[i] = Math.max(minVal, Math.min(maxVal, val));
-                upd(seqKey, arr2);
-              }
-            }}
-            className="text-[10px] font-mono text-center border rounded py-0.5"
-            style={{
-              width: '36px',
-              background: '#060a0f',
-              borderColor: v !== 0 ? dim : '#1a1a1a',
-              color: v === -128 ? '#ff8844' : v !== 0 ? accent : '#444',
-            }}
-          />
-        </div>
-      ))}
-    </div>
-  );
-
   // ── MAIN TAB ──────────────────────────────────────────────────────────────
   const renderMain = () => {
     const relVal = config.relative ?? 8364;
@@ -154,39 +84,30 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({ 
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {/* Volume & Tuning */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Volume &amp; Tuning" />
+          <SectionLabel label="Volume & Tuning" />
           <div className="flex items-start gap-6">
             <Knob
               value={config.defaultVolume ?? 64}
-              min={0}
-              max={64}
-              step={1}
+              min={0} max={64} step={1}
               onChange={(v) => upd('defaultVolume', Math.round(v))}
-              label="Volume"
-              color={knob}
-              size="sm"
+              label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()}
             />
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: accent, opacity: 0.7 }}>
+              <label className="text-[10px] font-bold uppercase tracking-wider"
+                style={{ color: accent, opacity: 0.7 }}>
                 Relative
               </label>
               <input
                 type="number"
                 value={relVal}
-                min={256}
-                max={65535}
+                min={256} max={65535}
                 onChange={(e) => {
                   const val = parseInt(e.target.value);
                   if (!isNaN(val)) upd('relative', Math.max(256, Math.min(65535, val)));
                 }}
                 className="text-[11px] font-mono border rounded px-2 py-1"
-                style={{
-                  width: '80px',
-                  background: '#060a0f',
-                  borderColor: dim,
-                  color: accent,
-                }}
+                style={{ width: '80px', background: '#060a0f', borderColor: dim, color: accent }}
               />
               <span className="text-[10px] text-gray-500">
                 3579545 / value ≈ {approxHz} Hz
@@ -201,24 +122,16 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({ 
           <div className="flex gap-4">
             <Knob
               value={config.vibratoSpeed ?? 0}
-              min={0}
-              max={255}
-              step={1}
+              min={0} max={255} step={1}
               onChange={(v) => upd('vibratoSpeed', Math.round(v))}
-              label="Speed"
-              color={knob}
-              size="sm"
+              label="Speed" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()}
             />
             <Knob
               value={config.vibratoDepth ?? 0}
-              min={0}
-              max={255}
-              step={1}
+              min={0} max={255} step={1}
               onChange={(v) => upd('vibratoDepth', Math.round(v))}
-              label="Depth"
-              color={knob}
-              size="sm"
+              label="Depth" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()}
             />
           </div>
@@ -234,61 +147,42 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({ 
 
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-        {/* Volume Sequence */}
+
+        {/* Volume Sequence — 0-64 volume levels */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Volume Sequence (volseq)" />
-          <VolseqBars data={volseq} accent={accent} />
-          {renderSeqGrid('volseq', volseq, -128, 64)}
-          <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => upd('volseq', [...(configRef.current.volseq ?? []), 0])}
-              className="px-2 py-1 text-[10px] font-mono rounded border transition-colors"
-              style={{ borderColor: dim, color: accent, background: '#060a0f' }}
-            >
-              + Add step
-            </button>
-            <button
-              onClick={() => {
-                const arr = configRef.current.volseq ?? [];
-                if (arr.length > 1) upd('volseq', arr.slice(0, -1));
-              }}
-              className="px-2 py-1 text-[10px] font-mono rounded border transition-colors"
-              style={{ borderColor: '#333', color: '#666', background: '#060a0f' }}
-            >
-              – Remove last
-            </button>
-          </div>
+          <SectionLabel label="Volume Sequence" />
+          <SequenceEditor
+            label="volseq"
+            data={volseq.map(v => Math.max(0, v))}  // clamp -128 loop markers
+            onChange={(d) => upd('volseq', d)}
+            min={0} max={64}
+            presets={VOLSEQ_PRESETS}
+            playbackPosition={volseqPlaybackPosition}
+            color={accent}
+            height={80}
+          />
           <p className="text-[9px] text-gray-600 mt-1">
-            0–64 = volume level; -128 = loop marker (next byte = loop target)
+            Volume level per step (0–64). Sequence loops at the loop point.
           </p>
         </div>
 
-        {/* Frequency Sequence */}
+        {/* Frequency Sequence — semitone offsets */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Frequency Sequence (frqseq)" />
-          <FrqseqPlot data={frqseq} accent={accent} />
-          {renderSeqGrid('frqseq', frqseq, -128, 127)}
-          <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => upd('frqseq', [...(configRef.current.frqseq ?? []), 0])}
-              className="px-2 py-1 text-[10px] font-mono rounded border transition-colors"
-              style={{ borderColor: dim, color: accent, background: '#060a0f' }}
-            >
-              + Add step
-            </button>
-            <button
-              onClick={() => {
-                const arr = configRef.current.frqseq ?? [];
-                if (arr.length > 1) upd('frqseq', arr.slice(0, -1));
-              }}
-              className="px-2 py-1 text-[10px] font-mono rounded border transition-colors"
-              style={{ borderColor: '#333', color: '#666', background: '#060a0f' }}
-            >
-              – Remove last
-            </button>
-          </div>
+          <SectionLabel label="Frequency Sequence" />
+          <SequenceEditor
+            label="frqseq"
+            data={frqseq}
+            onChange={(d) => upd('frqseq', d)}
+            min={-127} max={127}
+            bipolar
+            showNoteNames
+            presets={FRQSEQ_PRESETS}
+            playbackPosition={frqseqPlaybackPosition}
+            color={knob}
+            height={80}
+          />
           <p className="text-[9px] text-gray-600 mt-1">
-            Values = semitone offsets from note; -128 = loop marker
+            Semitone offsets from note pitch per step. Use the loop marker (L) to set loop point.
           </p>
         </div>
       </div>

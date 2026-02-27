@@ -3,28 +3,79 @@
  *
  * Exposes all SoundMonConfig parameters: waveform type, ADSR volumes/speeds,
  * vibrato, arpeggio table, and portamento.
+ *
+ * Enhanced with:
+ *  - EnvelopeVisualization: visual ADSR curve in the Volume Envelope section
+ *  - SequenceEditor: proper step-sequence editor for the arpeggio table
+ *  - WaveformThumbnail: mini previews on each wave-type button
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { SoundMonConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+import {
+  EnvelopeVisualization,
+  SequenceEditor,
+  WaveformThumbnail,
+} from '@components/instruments/shared';
+import type { SequencePreset } from '@components/instruments/shared';
 
 interface SoundMonControlsProps {
   config: SoundMonConfig;
   onChange: (updates: Partial<SoundMonConfig>) => void;
+  /** Optional playback position for arpeggio sequence (undefined = not playing) */
+  arpPlaybackPosition?: number;
 }
 
 type SMTab = 'main' | 'arpeggio';
 
-const WAVE_TYPE_NAMES = [
-  'Square', 'Sawtooth', 'Triangle', 'Noise',
-  'Pulse 1', 'Pulse 2', 'Pulse 3', 'Pulse 4',
-  'Blend 1', 'Blend 2', 'Blend 3', 'Blend 4',
-  'Ring 1', 'Ring 2', 'FM 1', 'FM 2',
+// ── Wave type definitions (16 waveforms) ───────────────────────────────────────
+
+interface WaveDef {
+  name: string;
+  type: 'sine' | 'triangle' | 'saw' | 'square' | 'pulse25' | 'pulse12' | 'noise';
+}
+
+const WAVE_DEFS: WaveDef[] = [
+  { name: 'Square',  type: 'square'  },
+  { name: 'Saw',     type: 'saw'     },
+  { name: 'Triangle',type: 'triangle'},
+  { name: 'Noise',   type: 'noise'   },
+  { name: 'Pulse 1', type: 'pulse25' },
+  { name: 'Pulse 2', type: 'pulse12' },
+  { name: 'Pulse 3', type: 'pulse12' },
+  { name: 'Pulse 4', type: 'pulse25' },
+  { name: 'Blend 1', type: 'sine'    },
+  { name: 'Blend 2', type: 'triangle'},
+  { name: 'Blend 3', type: 'saw'     },
+  { name: 'Blend 4', type: 'square'  },
+  { name: 'Ring 1',  type: 'sine'    },
+  { name: 'Ring 2',  type: 'triangle'},
+  { name: 'FM 1',    type: 'sine'    },
+  { name: 'FM 2',    type: 'triangle'},
 ];
 
-export const SoundMonControls: React.FC<SoundMonControlsProps> = ({ config, onChange }) => {
+// ── Arpeggio presets ────────────────────────────────────────────────────────────
+
+const ARP_PRESETS: SequencePreset[] = [
+  { name: 'Major',      data: [0, 4, 7, 0, 4, 7, 12, 12, 0, 4, 7, 0, 4, 7, 12, 12], loop: 0 },
+  { name: 'Minor',      data: [0, 3, 7, 0, 3, 7, 12, 12, 0, 3, 7, 0, 3, 7, 12, 12], loop: 0 },
+  { name: 'Octave',     data: [0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12], loop: 0 },
+  { name: 'Power',      data: [0, 7, 12, 7, 0, 7, 12, 7, 0, 7, 12, 7, 0, 7, 12, 7], loop: 0 },
+  { name: 'Dom7',       data: [0, 4, 7, 10, 12, 10, 7, 4, 0, 4, 7, 10, 12, 10, 7, 4], loop: 0 },
+  { name: 'Ascend Oct', data: [0, 2, 4, 5, 7, 9, 11, 12, 0, 2, 4, 5, 7, 9, 11, 12], loop: 0 },
+  { name: 'Trill',      data: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1], loop: 0 },
+  { name: 'Clear',      data: new Array(16).fill(0) },
+];
+
+// ── Component ──────────────────────────────────────────────────────────────────
+
+export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
+  config,
+  onChange,
+  arpPlaybackPosition,
+}) => {
   const [activeTab, setActiveTab] = useState<SMTab>('main');
 
   const configRef = useRef(config);
@@ -49,25 +100,38 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({ config, onCh
     </div>
   );
 
-  // ── MAIN TAB ──
+  // ── MAIN TAB ──────────────────────────────────────────────────────────────────
+
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      {/* Waveform selector */}
+
+      {/* Waveform selector — 4×4 grid with mini waveform thumbnails */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Waveform" />
         <div className="grid grid-cols-4 gap-1 mb-2">
-          {WAVE_TYPE_NAMES.map((name, i) => (
-            <button key={i}
-              onClick={() => upd('waveType', i)}
-              className="px-1.5 py-1 text-[10px] font-mono rounded transition-colors truncate"
-              style={{
-                background: config.waveType === i ? accent : '#111',
-                color: config.waveType === i ? '#000' : '#666',
-                border: `1px solid ${config.waveType === i ? accent : '#333'}`,
-              }}>
-              {name}
-            </button>
-          ))}
+          {WAVE_DEFS.map((def, i) => {
+            const active = config.waveType === i;
+            return (
+              <button key={i}
+                onClick={() => upd('waveType', i)}
+                className="flex flex-col items-center gap-0.5 px-1 py-1.5 rounded transition-colors"
+                style={{
+                  background: active ? accent + '28' : '#0a0e14',
+                  border: `1px solid ${active ? accent : '#2a2a2a'}`,
+                }}>
+                <WaveformThumbnail
+                  type={def.type}
+                  width={40} height={18}
+                  color={active ? accent : '#444'}
+                  style="line"
+                />
+                <span className="text-[9px] font-mono leading-tight"
+                  style={{ color: active ? accent : '#555' }}>
+                  {def.name}
+                </span>
+              </button>
+            );
+          })}
         </div>
         <div className="flex items-center gap-4 mt-2">
           <Knob value={config.waveSpeed} min={0} max={15} step={1}
@@ -77,48 +141,68 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({ config, onCh
         </div>
       </div>
 
-      {/* ADSR Volumes */}
+      {/* Volume Envelope — knobs + visual curve */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Volume Envelope" />
+
+        {/* Envelope visualization */}
+        <div className="mb-3">
+          <EnvelopeVisualization
+            mode="steps"
+            attackVol={config.attackVolume}   attackSpeed={config.attackSpeed}
+            decayVol={config.decayVolume}     decaySpeed={config.decaySpeed}
+            sustainVol={config.sustainVolume} sustainLen={config.sustainLength}
+            releaseVol={config.releaseVolume} releaseSpeed={config.releaseSpeed}
+            maxVol={64}
+            width={320} height={72}
+            color={accent}
+          />
+        </div>
+
+        {/* ADSR Knobs — 4 columns (A / D / S / R) */}
         <div className="grid grid-cols-4 gap-3">
           <div className="flex flex-col items-center gap-2">
+            <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Attack</span>
             <Knob value={config.attackVolume} min={0} max={64} step={1}
               onChange={(v) => upd('attackVolume', Math.round(v))}
-              label="Atk Vol" color={knob} size="sm"
+              label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.attackSpeed} min={0} max={63} step={1}
               onChange={(v) => upd('attackSpeed', Math.round(v))}
-              label="Atk Spd" color={knob} size="sm"
+              label="Speed" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
+            <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Decay</span>
             <Knob value={config.decayVolume} min={0} max={64} step={1}
               onChange={(v) => upd('decayVolume', Math.round(v))}
-              label="Dec Vol" color={knob} size="sm"
+              label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.decaySpeed} min={0} max={63} step={1}
               onChange={(v) => upd('decaySpeed', Math.round(v))}
-              label="Dec Spd" color={knob} size="sm"
+              label="Speed" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
+            <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Sustain</span>
             <Knob value={config.sustainVolume} min={0} max={64} step={1}
               onChange={(v) => upd('sustainVolume', Math.round(v))}
-              label="Sus Vol" color={knob} size="sm"
+              label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.sustainLength} min={0} max={255} step={1}
               onChange={(v) => upd('sustainLength', Math.round(v))}
-              label="Sus Len" color={knob} size="sm"
+              label="Length" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
+            <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Release</span>
             <Knob value={config.releaseVolume} min={0} max={64} step={1}
               onChange={(v) => upd('releaseVolume', Math.round(v))}
-              label="Rel Vol" color={knob} size="sm"
+              label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.releaseSpeed} min={0} max={63} step={1}
               onChange={(v) => upd('releaseSpeed', Math.round(v))}
-              label="Rel Spd" color={knob} size="sm"
+              label="Speed" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
           </div>
         </div>
@@ -157,47 +241,32 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({ config, onCh
     </div>
   );
 
-  // ── ARPEGGIO TAB ──
+  // ── ARPEGGIO TAB ──────────────────────────────────────────────────────────────
+
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Arpeggio" />
-        <div className="flex gap-4 mb-3">
+        <div className="flex items-center justify-between mb-3">
+          <SectionLabel label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}
             onChange={(v) => upd('arpSpeed', Math.round(v))}
             label="Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
-        <div className="grid grid-cols-8 gap-1">
-          {config.arpTable.map((v, i) => (
-            <div key={i} className="flex flex-col items-center gap-0.5">
-              <span className="text-[9px] font-mono text-gray-600">
-                {i.toString().padStart(2, '0')}
-              </span>
-              <input
-                type="number"
-                value={v}
-                min={-64}
-                max={63}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  if (!isNaN(val)) {
-                    const arr = [...configRef.current.arpTable];
-                    arr[i] = Math.max(-64, Math.min(63, val));
-                    upd('arpTable', arr);
-                  }
-                }}
-                className="text-[10px] font-mono text-center border rounded py-0.5"
-                style={{
-                  width: '36px',
-                  background: '#060a0f',
-                  borderColor: v !== 0 ? dim : '#1a1a1a',
-                  color: v !== 0 ? accent : '#444',
-                }}
-              />
-            </div>
-          ))}
-        </div>
+
+        <SequenceEditor
+          label="Arpeggio Table"
+          data={config.arpTable}
+          onChange={(d) => upd('arpTable', d)}
+          min={-64} max={63}
+          bipolar
+          fixedLength
+          showNoteNames
+          presets={ARP_PRESETS}
+          playbackPosition={arpPlaybackPosition}
+          color={accent}
+          height={100}
+        />
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { OctaMEDConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+import { SequenceEditor } from '@components/instruments/shared';
 
 interface OctaMEDControlsProps {
   config: OctaMEDConfig;
@@ -263,49 +264,34 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
     </div>
   );
 
-  // ── WAVEFORM TAB ──
+  // ── WAVEFORM TAB ── editable waveform data with SequenceEditor
   const renderWaveform = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      {config.waveforms.map((wf, idx) => {
-        // Build SVG polyline points string from 256 signed bytes
-        const points = Array.from(wf)
-          .map((sample, i) => {
-            const x = (i / 255) * 256;
-            const y = 24 - (sample / 128) * 22;
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-          })
-          .join(' ');
-
-        return (
+      {config.waveforms.map((wf, idx) => (
+        <div key={idx} className={`rounded-lg border p-3 ${panelBg}`}>
           <div
-            key={idx}
-            className={`rounded-lg border p-3 ${panelBg}`}
+            className="text-[10px] font-bold uppercase tracking-widest mb-2"
+            style={{ color: accent, opacity: 0.7 }}
           >
-            <div
-              className="text-[10px] font-bold uppercase tracking-widest mb-2"
-              style={{ color: accent, opacity: 0.7 }}
-            >
-              Wave {idx + 1}
-            </div>
-            <svg
-              width={256}
-              height={48}
-              style={{ background: '#060a0f', display: 'block', borderRadius: '4px' }}
-            >
-              {/* Zero line */}
-              <line x1={0} y1={24} x2={256} y2={24} stroke="#1a1a2a" strokeWidth={1} />
-              {/* Waveform */}
-              <polyline
-                points={points}
-                fill="none"
-                stroke={knob}
-                strokeWidth={1.2}
-                strokeLinejoin="round"
-              />
-            </svg>
+            Wave {idx + 1}
           </div>
-        );
-      })}
+          <SequenceEditor
+            label={`Wave ${idx + 1}`}
+            data={Array.from(wf)}
+            onChange={(d) => {
+              const newWaveforms = configRef.current.waveforms.map((w, i) =>
+                i === idx ? new Int8Array(d) : w
+              );
+              onChange({ waveforms: newWaveforms });
+            }}
+            min={-128} max={127}
+            bipolar
+            fixedLength
+            color={knob}
+            height={72}
+          />
+        </div>
+      ))}
 
       {config.waveforms.length === 0 && (
         <div className="text-xs text-gray-600 p-3">No waveforms defined.</div>

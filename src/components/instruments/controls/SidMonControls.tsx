@@ -3,24 +3,57 @@
  *
  * Exposes all SidMonConfig parameters: waveform selector, ADSR, filter,
  * vibrato, and arpeggio table.
+ *
+ * Enhanced with:
+ *  - WaveformThumbnail: visual previews on waveform selector buttons
+ *  - EnvelopeVisualization mode="adsr": SID-format ADSR curve
+ *  - SequenceEditor: arpeggio table editor
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { SidMonConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+import {
+  EnvelopeVisualization,
+  SequenceEditor,
+  WaveformThumbnail,
+} from '@components/instruments/shared';
+import type { SequencePreset } from '@components/instruments/shared';
 
 interface SidMonControlsProps {
   config: SidMonConfig;
   onChange: (updates: Partial<SidMonConfig>) => void;
+  arpPlaybackPosition?: number;
 }
 
 type SMTab = 'main' | 'filter' | 'arpeggio';
 
-const WAVEFORM_NAMES = ['Triangle', 'Sawtooth', 'Pulse', 'Noise'];
+// SID waveforms with visual shape hints
+const WAVEFORMS: { name: string; type: 'triangle' | 'saw' | 'square' | 'noise' }[] = [
+  { name: 'Triangle', type: 'triangle' },
+  { name: 'Sawtooth', type: 'saw'      },
+  { name: 'Pulse',    type: 'square'   },
+  { name: 'Noise',    type: 'noise'    },
+];
+
 const FILTER_MODE_NAMES = ['LP', 'HP', 'BP'];
 
-export const SidMonControls: React.FC<SidMonControlsProps> = ({ config, onChange }) => {
+const ARP_PRESETS: SequencePreset[] = [
+  { name: 'Major',  data: [0, 4, 7, 0, 4, 7, 12, 12, 0, 4, 7, 0, 4, 7, 12, 12], loop: 0 },
+  { name: 'Minor',  data: [0, 3, 7, 0, 3, 7, 12, 12, 0, 3, 7, 0, 3, 7, 12, 12], loop: 0 },
+  { name: 'Octave', data: [0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12], loop: 0 },
+  { name: 'Power',  data: [0, 7, 12, 7, 0, 7, 12, 7, 0, 7, 12, 7, 0, 7, 12, 7], loop: 0 },
+  { name: 'Clear',  data: new Array(16).fill(0) },
+];
+
+// ── Component ──────────────────────────────────────────────────────────────────
+
+export const SidMonControls: React.FC<SidMonControlsProps> = ({
+  config,
+  onChange,
+  arpPlaybackPosition,
+}) => {
   const [activeTab, setActiveTab] = useState<SMTab>('main');
 
   const configRef = useRef(config);
@@ -45,25 +78,37 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({ config, onChange
     </div>
   );
 
-  // ── MAIN TAB ──
+  // ── MAIN TAB ──────────────────────────────────────────────────────────────
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      {/* Waveform */}
+
+      {/* Waveform — buttons with visual thumbnails */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Waveform" />
-        <div className="flex gap-2 mb-3">
-          {WAVEFORM_NAMES.map((name, i) => (
-            <button key={i}
-              onClick={() => upd('waveform', i as 0 | 1 | 2 | 3)}
-              className="flex-1 py-1.5 text-xs font-mono rounded transition-colors"
-              style={{
-                background: config.waveform === i ? accent : '#111',
-                color: config.waveform === i ? '#000' : '#666',
-                border: `1px solid ${config.waveform === i ? accent : '#333'}`,
-              }}>
-              {name}
-            </button>
-          ))}
+        <div className="grid grid-cols-4 gap-2 mb-3">
+          {WAVEFORMS.map((wf, i) => {
+            const active = config.waveform === i;
+            return (
+              <button key={i}
+                onClick={() => upd('waveform', i as 0 | 1 | 2 | 3)}
+                className="flex flex-col items-center gap-0.5 px-1 py-1.5 rounded transition-colors"
+                style={{
+                  background: active ? accent + '28' : '#0a0012',
+                  border: `1px solid ${active ? accent : '#2a002a'}`,
+                }}>
+                <WaveformThumbnail
+                  type={wf.type}
+                  width={56} height={22}
+                  color={active ? accent : '#555'}
+                  style="line"
+                />
+                <span className="text-[9px] font-mono leading-tight"
+                  style={{ color: active ? accent : '#555' }}>
+                  {wf.name}
+                </span>
+              </button>
+            );
+          })}
         </div>
         {config.waveform === 2 && (
           <div className="flex items-center gap-4">
@@ -75,9 +120,26 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({ config, onChange
         )}
       </div>
 
-      {/* ADSR */}
+      {/* ADSR — knobs + SID-format envelope curve */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="ADSR (SID format, 0–15)" />
+
+        {/* Envelope visualization */}
+        <div className="mb-3">
+          <EnvelopeVisualization
+            mode="adsr"
+            ar={config.attack}
+            dr={config.decay}
+            rr={config.release}
+            sl={config.sustain}
+            tl={0}
+            maxRate={15}
+            maxTl={1}
+            width={320} height={64}
+            color={accent}
+          />
+        </div>
+
         <div className="flex gap-4">
           <Knob value={config.attack} min={0} max={15} step={1}
             onChange={(v) => upd('attack', Math.round(v))}
@@ -119,7 +181,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({ config, onChange
     </div>
   );
 
-  // ── FILTER TAB ──
+  // ── FILTER TAB ──────────────────────────────────────────────────────────
   const renderFilter = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
@@ -152,45 +214,31 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({ config, onChange
     </div>
   );
 
-  // ── ARPEGGIO TAB ──
+  // ── ARPEGGIO TAB ──────────────────────────────────────────────────────────
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Arpeggio" />
-        <div className="flex gap-4 mb-3">
+        <div className="flex items-center justify-between mb-3">
+          <SectionLabel label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}
             onChange={(v) => upd('arpSpeed', Math.round(v))}
             label="Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
-        <div className="grid grid-cols-4 gap-1">
-          {config.arpTable.map((v, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <span className="text-[9px] font-mono text-gray-600 w-4">{i}</span>
-              <input
-                type="number"
-                value={v}
-                min={-64}
-                max={63}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  if (!isNaN(val)) {
-                    const arr = [...configRef.current.arpTable];
-                    arr[i] = Math.max(-64, Math.min(63, val));
-                    upd('arpTable', arr);
-                  }
-                }}
-                className="text-[10px] font-mono text-center border rounded py-0.5"
-                style={{
-                  width: '48px',
-                  background: '#080006',
-                  borderColor: v !== 0 ? dim : '#1a1a1a',
-                  color: v !== 0 ? accent : '#444',
-                }}
-              />
-            </div>
-          ))}
-        </div>
+
+        <SequenceEditor
+          label="Arpeggio Table"
+          data={config.arpTable}
+          onChange={(d) => upd('arpTable', d)}
+          min={-64} max={63}
+          bipolar
+          fixedLength
+          showNoteNames
+          presets={ARP_PRESETS}
+          playbackPosition={arpPlaybackPosition}
+          color={accent}
+          height={100}
+        />
       </div>
     </div>
   );
