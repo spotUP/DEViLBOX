@@ -336,11 +336,12 @@ export function parseS3MFile(buffer: ArrayBuffer, filename: string): TrackerSong
       continue;
     }
 
-    // Three-byte data pointer
-    const dpB0 = u8(v, smpOff + 13);
-    const dpB1 = u8(v, smpOff + 14);
-    const dpB2 = u8(v, smpOff + 15);
-    const dataPointer = (dpB0 | (dpB1 << 8) | (dpB2 << 16)) * 16;
+    // Three-byte paragraph pointer: byte[13]=high, byte[14-15]=low word LE
+    // Format: (lowWordLo | lowWordHi<<8 | high<<16) * 16
+    const dpHigh = u8(v, smpOff + 13);
+    const dpLo   = u8(v, smpOff + 14);
+    const dpHi   = u8(v, smpOff + 15);
+    const dataPointer = (dpLo | (dpHi << 8) | (dpHigh << 16)) * 16;
 
     const length        = u32le(v, smpOff + 16);
     const loopStart     = u32le(v, smpOff + 20);
