@@ -133,21 +133,50 @@ interface SAPosition {
 // -- Format detection ---------------------------------------------------------
 
 /**
- * Returns true if the buffer starts with "SOARV1.0" (uncompressed Sonic Arranger).
- * "@OARV1.0" (lh-compressed) is rejected — UADE handles it natively.
+ * Returns true if the buffer is a Sonic Arranger file. Two sub-formats accepted:
+ *
+ * 1. Uncompressed song data: starts with "SOARV1.0" magic followed by "STBL" chunk.
+ *    "@OARV1.0" (lh-compressed) is rejected — UADE handles it natively.
+ *
+ * 2. Player+data binary: starts with 0x4EFA (JSR PC-relative) instructions.
+ *    Per Sonic Arranger_v1.asm Check2 (NoSong path):
+ *      - word[0] == 0x4EFA
+ *      - displacement D1 = word[2]: > 0, not negative, even
+ *      - word at (6 + D1): == 0x41FA (lea PC-relative to song data)
  */
 export function isSonicArrangerFormat(buffer: ArrayBuffer): boolean {
   if (buffer.byteLength < 8) return false;
   const v = new DataView(buffer);
+
+  // Path 1: "SOARV1.0" magic
   let magic = '';
   for (let i = 0; i < 8; i++) magic += String.fromCharCode(v.getUint8(i));
-  return magic === 'SOARV1.0';
+  if (magic === 'SOARV1.0') return true;
+
+  // Path 2: 4EFA JSR player binary
+  if (buffer.byteLength < 50) return false;
+  const w0 = v.getUint16(0, false);
+  if (w0 !== 0x4EFA) return false;
+
+  const d1 = v.getUint16(2, false);
+  if (d1 === 0) return false;
+  if (d1 & 0x8000) return false; // negative
+  if (d1 & 0x0001) return false; // odd
+
+  // Check 0x41FA at offset (6 + d1)
+  const leaOffset = 6 + d1;
+  if (leaOffset + 2 > buffer.byteLength) return false;
+  return v.getUint16(leaOffset, false) === 0x41FA;
 }
 
 // -- Main parser --------------------------------------------------------------
 
 /**
  * Parse a Sonic Arranger (.sa) file into a TrackerSong.
+ *
+ * Two sub-formats:
+ *   1. SOARV1.0 — fully parsed (patterns, instruments, samples).
+ *   2. 4EFA player binary — metadata stub only (UADE handles audio).
  */
 export async function parseSonicArrangerFile(
   buffer: ArrayBuffer,
@@ -156,11 +185,47 @@ export async function parseSonicArrangerFile(
   const v     = new DataView(buffer);
   const bytes = new Uint8Array(buffer);
 
-  if (buffer.byteLength < 16) throw new Error('SonicArranger: file too small');
+  if (buffer.byteLength < 8) throw new Error('SonicArranger: file too small');
 
   let magic = '';
   for (let i = 0; i < 8; i++) magic += String.fromCharCode(v.getUint8(i));
-  if (magic !== 'SOARV1.0') throw new Error(`SonicArranger: bad magic "${magic}"`);
+
+  // ── 4EFA player binary — return metadata stub ─────────────────────────────
+  if (magic !== 'SOARV1.0') {
+    if (v.getUint16(0, false) !== 0x4EFA) {
+      throw new Error(`SonicArranger: unrecognised format (magic="${magic}")`);
+    }
+    const moduleName = filename.replace(/\.[^/.]+$/, '');
+    const emptyRows = Array.from({ length: 64 }, (): TrackerCell => ({
+      note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+    }));
+    return {
+      name:   moduleName,
+      format: 'MOD' as TrackerFormat,
+      patterns: [{
+        id: 'pattern-0', name: 'Pattern 0', length: 64,
+        channels: Array.from({ length: 4 }, (_, ch) => ({
+          id: `channel-${ch}`, name: `Channel ${ch + 1}`,
+          muted: false, solo: false, collapsed: false,
+          volume: 100, pan: [-50, 50, 50, -50][ch],
+          instrumentId: null, color: null, rows: emptyRows,
+        } as ChannelData)),
+        importMetadata: {
+          sourceFormat: 'SonicArranger', sourceFile: filename,
+          importedAt: new Date().toISOString(),
+          originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 0,
+        },
+      }],
+      instruments: [{
+        id: 1, name: 'Sample 1', type: 'synth' as const,
+        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      } as InstrumentConfig],
+      songPositions: [0], songLength: 1, restartPosition: 0,
+      numChannels: 4, initialSpeed: 6, initialBPM: 125, linearPeriods: false,
+    };
+  }
+
+  if (buffer.byteLength < 16) throw new Error('SonicArranger: file too small');
 
   let pos = 8;  // cursor after magic
 

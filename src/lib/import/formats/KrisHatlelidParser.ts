@@ -41,14 +41,18 @@ export function isKrisHatlelidFormat(buffer: ArrayBuffer | Uint8Array): boolean 
 
   if (u32BE(buf, 40) !== 0x60000016) return false;
 
-  // Two-file variant check at offset 44
-  if (u32BE(buf, 44) === 0x0000ABCD) {
-    // Two-file variant: check offset 60
-    return u32BE(buf, 60) === 0xB07C0000;
-  } else {
-    // Single-file variant: check offsets 60 and 64
-    return u32BE(buf, 60) === 0x41F90000 && u32BE(buf, 64) === 0x00004E75;
-  }
+  // At this point in the ASM, A0=44 after the post-increment read of offset 40.
+  // The next check reads (A0)+ which is offset 44, leaving A0=48.
+  // All subsequent indexed checks use 16(A0)=offset 64 and 20(A0)=offset 68.
+  if (u32BE(buf, 44) !== 0x0000ABCD) return false;
+
+  // After (A0)+ for the ABCD check, A0=48.
+  // Two-file: cmp.l #$B07C0000, 16(A0) → buf[64]
+  if (u32BE(buf, 64) === 0xB07C0000) return true;
+
+  // Dwa: cmp.l #$41F90000,16(A0); cmp.l #$00004E75,20(A0)
+  // 16(A0)=offset 64, 20(A0)=offset 68
+  return u32BE(buf, 64) === 0x41F90000 && u32BE(buf, 68) === 0x00004E75;
 }
 
 export function parseKrisHatlelidFile(buffer: ArrayBuffer, filename: string): TrackerSong {

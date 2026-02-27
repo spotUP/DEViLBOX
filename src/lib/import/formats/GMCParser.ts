@@ -78,46 +78,32 @@ function readSampleHeader(v: DataView, base: number): GMCSampleHeader {
 // ── Format detection ──────────────────────────────────────────────────────────
 
 /**
- * Returns true if the buffer passes all GMC structural validation checks.
- * GMC has no magic bytes — detection is entirely structural.
+ * Returns true if the buffer is a GlueMon module (magic "GLUE" at offset 0).
+ *
+ * GlueMon files are identified by the four-byte magic "GLUE" at the start of
+ * the file, followed by a checksum word and an 8-byte song name (16-byte header
+ * total). UADE eagleplayer identifies them with prefix "glue" / "gm" on the
+ * filename. DEViLBOX reference files use the ".glue" extension.
+ *
+ * Note: this function was originally written as a structural GMC (Game Music
+ * Creator) validator, but the reference files in the GlueMon folder use the
+ * GLUE magic prefix, so magic detection is the correct approach.
  */
 export function isGMCFormat(buffer: ArrayBuffer): boolean {
   if (buffer.byteLength < HEADER_SIZE) return false;
   const v = new DataView(buffer);
 
-  // Validate all 15 sample headers
-  for (let s = 0; s < NUM_SAMPLES; s++) {
-    const base = s * SAMPLE_HDR_SIZE;
-    const hdr  = readSampleHeader(v, base);
-
-    if (hdr.zero !== 0)                       return false;
-    if (hdr.offset > 0x1FFFFF)                return false;
-    if (hdr.offset % 2 !== 0)                 return false;
-    if (hdr.address > 0x1FFFFF)               return false;
-    if (hdr.address % 2 !== 0)                return false;
-    if (hdr.length > 0x7FFF)                  return false;
-    if (hdr.dataStart > 0x7FFF)               return false;
-    if (hdr.dataStart % 2 !== 0)              return false;
-    if (hdr.volume > 64)                      return false;
-    // loopLength must not exceed total length when active
-    if (hdr.loopLength > 2 && hdr.loopLength > hdr.length) return false;
-  }
-
-  // Bytes 240, 241, 242 must all be 0
-  if (u8(v, 240) !== 0 || u8(v, 241) !== 0 || u8(v, 242) !== 0) return false;
-
-  // numOrders: 1–100
-  const numOrders = u8(v, 243);
-  if (numOrders < 1 || numOrders > MAX_ORDERS) return false;
-
-  // All order entries must be divisible by 1024
-  for (let i = 0; i < MAX_ORDERS; i++) {
-    const orderVal = u16(v, ORDERS_OFFSET + i * 2);
-    if (orderVal % PATTERN_SIZE !== 0) return false;
-  }
+  // GlueMon files always start with the four-byte ASCII magic "GLUE"
+  if (
+    v.getUint8(0) !== 0x47 /* G */ ||
+    v.getUint8(1) !== 0x4C /* L */ ||
+    v.getUint8(2) !== 0x55 /* U */ ||
+    v.getUint8(3) !== 0x45 /* E */
+  ) return false;
 
   return true;
 }
+
 
 // ── Effect mapping ────────────────────────────────────────────────────────────
 

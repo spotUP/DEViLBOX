@@ -115,9 +115,11 @@ export function isSidMon1Format(buffer: ArrayBuffer): boolean {
       if (i + 6 < buf.length && u16BE(buf, i + 4) === 0xd1e8) {
         const start = u16BE(buf, i + 6);
         if (start === 0xffd4) {
-          // Calculate position
-          const position = j + i + 2 - 4; // stream.position - 6 equivalent
-          if (position >= 0 && position + 32 < buf.length) {
+          // S1Player computes position = j + stream.position - 6
+          // After reading 4 shorts (8 bytes from i), stream.position = i + 8
+          // position = j + (i + 8) - 6 = j + i + 2
+          const position = j + i + 2;
+          if (position >= 0 && position + 32 <= buf.length) {
             const id = readString(buf, position, 32);
             if (id === ' SID-MON BY R.v.VLIET  (c) 1988 ') {
               return true;

@@ -37,19 +37,47 @@ export function isPaulSummersFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   for (let i = 0; i < SEARCH_COUNT; i++) {
     const pos = SEARCH_START + i * 2;
 
-    // Need at least 8 bytes from pos (4 for magic + 4 for secondary check)
-    if (pos + 8 > buf.length) break;
+    // Need at least 4 bytes from pos for magic
+    if (pos + 4 > buf.length) break;
 
     if (u32BE(buf, pos) !== MAGIC) continue;
 
-    // tst.l (A1)+ — the 4 bytes at pos+4 must be non-zero
-    const tstVal = u32BE(buf, pos + 4);
-    if (tstVal === 0) continue;
+    // Found magic 0x46FC2700 at pos.
+    // Mirroring CheckIt in Paul Summers_v2.asm:
+    //   Loop: tst.l (A1) → must be non-zero, cmp.w #$4E73,(A1)+ → if match,
+    //         then cmp.w #$41FA,(A1)+ → if match, enter FindLea loop.
+    //   A1 starts at pos and advances 2 bytes per CheckIt iteration.
+    //   On each iteration, if the long is zero → Fault.
+    //   If word is 0x4E73 then check next word for 0x41FA.
+    let a1 = pos;
+    let found = false;
 
-    // RTE opcode at pos+4
-    if (u16BE(buf, pos + 4) !== 0x4E73) continue;
+    // Limit scan to a reasonable window (e.g., 256 bytes forward)
+    const scanLimit = Math.min(a1 + 256, buf.length - 4);
 
-    return true;
+    while (a1 < scanLimit) {
+      // tst.l (A1) — long at a1 must be non-zero
+      if (u32BE(buf, a1) === 0) break; // Fault
+
+      // cmp.w #$4E73,(A1)+
+      const w = u16BE(buf, a1);
+      a1 += 2;
+
+      if (w === 0x4E73) {
+        // cmp.w #$41FA,(A1)+
+        if (a1 + 2 > buf.length) break;
+        const w2 = u16BE(buf, a1);
+        a1 += 2;
+        if (w2 === 0x41FA) {
+          found = true;
+          break;
+        }
+        // Not 0x41FA — loop back to CheckIt
+      }
+      // Not 0x4E73 — loop back to CheckIt (tst.l will check from current a1)
+    }
+
+    if (found) return true;
   }
 
   return false;

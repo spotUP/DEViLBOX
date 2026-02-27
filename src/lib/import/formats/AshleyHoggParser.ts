@@ -37,6 +37,12 @@ function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
 }
 
+/** Signed 16-bit big-endian read (two's complement). */
+function s16BE(buf: Uint8Array, off: number): number {
+  const v = u16BE(buf, off);
+  return v >= 0x8000 ? v - 0x10000 : v;
+}
+
 function u32BE(buf: Uint8Array, off: number): number {
   return (((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0);
 }
@@ -95,8 +101,10 @@ export function isAshleyHoggFormat(buffer: ArrayBuffer | Uint8Array): boolean {
               if (codeOff + 10 <= buf.length) {
                 if (u32BE(buf, codeOff) === 0x48E7FFFE &&
                     u16BE(buf, codeOff + 4) === 0x6100) {
-                  // add.w (A0),A0: displacement at codeOff+6 (A0 at codeOff+6 after +4+2)
-                  const bsrOff = u16BE(buf, codeOff + 6);
+                  // BSR displacement is a signed 16-bit word relative to A0 after
+                  // consuming the opcode (A0 at codeOff+6). Use s16BE so that
+                  // backward branches (negative displacement) resolve correctly.
+                  const bsrOff = s16BE(buf, codeOff + 6);
                   // LEA target: A0 = (codeOff+6) + bsrOff = codeOff+6+bsrOff
                   const leaOff = codeOff + 6 + bsrOff;
                   if (leaOff + 6 <= buf.length &&

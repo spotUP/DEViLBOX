@@ -4,7 +4,7 @@
  * Oktalyzer is an 8-channel Amiga tracker that uses IFF (Interchange File Format)
  * for its file structure. It was popular on the Amiga in the early 1990s.
  *
- * File structure: FORM/OKTA IFF container with chunks:
+ * File structure: "OKTASONG" 8-byte magic followed by IFF-style chunks:
  *   CMOD — 4 words: channel pair modes (0=stereo, 1=mono-left, 2=mono-right)
  *   SAMP — Sample headers (32 bytes each): name[20], length[4], loopStart[4], loopEnd[4], pad[2], volume[2]
  *   SPEE — Tempo (word)
@@ -13,6 +13,9 @@
  *   PATT — Song sequence (SLEN bytes)
  *   PBOD — Pattern body (one per pattern): 4 bytes per row-channel: note, sample, cmd, data
  *   SBOD — Sample PCM data (one chunk per sample, 8-bit signed)
+ *
+ * Note: The file starts with "OKTASONG" (8 bytes), NOT an IFF FORM container.
+ * Chunks follow immediately at offset 8.
  *
  * Reference: https://wiki.multimedia.cx/index.php/Oktalyzer
  */
@@ -40,9 +43,10 @@ function readU32BE(buf: Uint8Array, offset: number): number {
 interface OKTSample {
   name: string;
   length: number;
-  loopStart: number;
-  loopEnd: number;
+  loopStart: number;   // byte offset (already doubled from the stored word value)
+  loopLength: number;  // byte length (already doubled from the stored word value)
   volume: number;
+  type: number;        // 0=7-bit paired, 1=8-bit unpaired, 2=7-bit both
   pcm: Uint8Array | null;
 }
 
@@ -55,14 +59,14 @@ interface OKTPattern {
 export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
 
-  // Verify FORM/OKTA header
-  const formId = TEXT_DECODER.decode(buf.subarray(0, 4));
-  const typeId = TEXT_DECODER.decode(buf.subarray(8, 12));
-  if (formId !== 'FORM' || typeId !== 'OKTA') {
-    throw new Error(`Not a valid Oktalyzer file (expected FORM/OKTA, got ${formId}/${typeId})`);
+  // Verify "OKTASONG" magic — Oktalyzer files begin with this 8-byte identifier
+  // followed directly by IFF-style chunks (no surrounding FORM wrapper).
+  const magic = TEXT_DECODER.decode(buf.subarray(0, 8));
+  if (magic !== 'OKTASONG') {
+    throw new Error(`Not a valid Oktalyzer file (expected OKTASONG magic, got ${magic.slice(0, 8)})`);
   }
 
-  let offset = 12;
+  let offset = 8;
   const fileSize = buf.byteLength;
 
   // ── Parse IFF chunks ─────────────────────────────────────────────────────
@@ -92,16 +96,19 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
       }
 
       case 'SAMP': {
-        // 32 bytes per sample
+        // 32 bytes per sample:
+        //   name[20], length[4], loopStart[2], loopLength[2], volume[2], type[2]
+        // loopStart and loopLength are stored as words; multiply by 2 for byte offsets.
         const sampCount = Math.floor(chunkSize / 32);
         for (let i = 0; i < sampCount; i++) {
           const base = dataStart + i * 32;
-          const name = readStr(buf, base, 20);
-          const length = readU32BE(buf, base + 20);
-          const loopStart = readU32BE(buf, base + 24);
-          const loopEnd = readU32BE(buf, base + 28);
-          const volume = readU16BE(buf, base + 30);
-          samples.push({ name, length, loopStart, loopEnd, volume, pcm: null });
+          const name       = readStr(buf, base, 20);
+          const length     = readU32BE(buf, base + 20);
+          const loopStart  = readU16BE(buf, base + 24) * 2;
+          const loopLength = readU16BE(buf, base + 26) * 2;
+          const volume     = readU16BE(buf, base + 28);
+          const type       = readU16BE(buf, base + 30);
+          samples.push({ name, length, loopStart, loopLength, volume, type, pcm: null });
         }
         break;
       }
@@ -171,14 +178,17 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
   // ── Build instruments ────────────────────────────────────────────────────
   const instruments: InstrumentConfig[] = samples.map((samp, i) => {
     const pcm = samp.pcm ?? new Uint8Array(samp.length);
+    // Loop is valid when loopLength > 2 and the loop region fits within the sample
+    const loopEnd = samp.loopStart + samp.loopLength;
+    const hasValidLoop = samp.loopLength > 2 && loopEnd <= samp.length;
     return createSamplerInstrument(
       i + 1,
       samp.name,
       pcm,
       samp.volume,
       8287,          // Amiga C-3 sample rate (Paula standard)
-      samp.loopStart,
-      samp.loopEnd
+      hasValidLoop ? samp.loopStart : 0,
+      hasValidLoop ? loopEnd : 0
     );
   });
 

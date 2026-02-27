@@ -40,6 +40,9 @@ import type { InstrumentConfig } from '@/types';
 
 const MIN_FILE_SIZE = 3001; // file size must be > 3000
 
+// Delitracker Custom magic: dword at offset 0 in all .cus / cust. / custom. files
+const DELITRACKER_CUSTOM_MAGIC = 0x000003f3;
+
 const DEFAULT_INSTRUMENTS = 8;
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
@@ -57,28 +60,46 @@ function u32BE(buf: Uint8Array, off: number): number {
 // ── Format detection ────────────────────────────────────────────────────────
 
 /**
- * Return true if the buffer passes the DTP_Check2 detection algorithm
- * from CustomMade_v1.asm.
+ * Return true if the buffer is a Custom Made or Delitracker Custom format file.
  *
- * When `filename` is supplied the basename is checked for one of the expected
- * UADE prefixes (`cm.`, `rk.`, `rkb.`). The binary scan is always performed.
+ * Two sub-formats are detected:
+ *
+ * 1. Delitracker Custom (.cus / cust. / custom.):
+ *    - dword at offset 0 == 0x000003F3
+ *    - file size > 3000 bytes
+ *
+ * 2. CustomMade (cm.* / rk.* / rkb.*) — 68k executable:
+ *    - Passes the DTP_Check2 detection algorithm from CustomMade_v1.asm
+ *    - First word is 0x4EF9 (JMP), 0x4EB9 (JSR), or 0x6000 (BRA.W)
+ *    - Followed by secondary opcode validation
+ *    - Voice-clear signature in bytes 8..407
+ *
+ * When `filename` is supplied and starts with a known prefix (cm., rk., rkb.)
+ * only the CustomMade binary scan is attempted. For .cus / cust. extensions
+ * only the Delitracker magic is checked. Without a filename both checks run.
  *
  * @param buffer    Raw file bytes
- * @param filename  Original filename (optional; used for prefix check)
+ * @param filename  Original filename (optional; used for prefix/extension check)
  */
 export function isCustomMadeFormat(buffer: ArrayBuffer, filename?: string): boolean {
   const buf = new Uint8Array(buffer);
 
-  // ── Prefix check (optional fast-reject) ──────────────────────────────────
+  if (buf.length <= MIN_FILE_SIZE - 1) return false;
+
+  // ── Delitracker Custom check ──────────────────────────────────────────────
+  // Files with .cus / .cust / custom. prefix use the Delitracker custom player.
+  // They all share the magic value 0x000003F3 at offset 0.
+  if (buf.length >= 4 && u32BE(buf, 0) === DELITRACKER_CUSTOM_MAGIC) {
+    return true;
+  }
+
+  // ── CustomMade (cm./rk./rkb.) binary scan ────────────────────────────────
   if (filename !== undefined) {
     const base = (filename.split('/').pop() ?? filename).toLowerCase();
     if (!base.startsWith('cm.') && !base.startsWith('rk.') && !base.startsWith('rkb.')) {
       return false;
     }
   }
-
-  // File size > 3000
-  if (buf.length <= MIN_FILE_SIZE - 1) return false;
 
   // Need at least 8 bytes for the header checks
   if (buf.length < 8) return false;
@@ -90,7 +111,6 @@ export function isCustomMadeFormat(buffer: ArrayBuffer, filename?: string): bool
 
   if (word0 === 0x4ef9 || word0 === 0x4eb9) {
     // JMP or JSR: word at offset 6 must be 0x4EF9 (JMP)
-    if (buf.length < 8) return false;
     if (u16BE(buf, 6) !== 0x4ef9) return false;
     // scanStart already set to 8
   } else if (word0 === 0x6000) {

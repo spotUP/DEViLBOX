@@ -54,14 +54,21 @@ function u32BE(buf: Uint8Array, off: number): number {
   return (((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0);
 }
 
+const MAGIC_MXTX = 0x4D585458; // 'MXTX'
+
 /**
- * Detect Maximum Effect format.
+ * Detect Maximum Effect / MaxTrax format.
  *
- * Mirrors Check2 in "Maximum Effect_v1.asm".
+ * Files with 'MXTX' magic are MaxTrax files and are accepted directly.
+ * Files without the magic are checked against the structural Check2 logic
+ * from "Maximum Effect_v1.asm".
  */
 export function isMaximumEffectFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   if (buf.length < MIN_FILE_SIZE) return false;
+
+  // Fast-accept: MaxTrax files start with 'MXTX' magic
+  if (u32BE(buf, 0) === MAGIC_MXTX) return true;
 
   const fileSize = buf.length;
   const d1_0 = u32BE(buf, 0);

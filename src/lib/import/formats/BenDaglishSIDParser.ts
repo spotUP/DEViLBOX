@@ -63,10 +63,12 @@ function u32BE(buf: Uint8Array, off: number): number {
 export function isBenDaglishSIDFormat(buffer: ArrayBuffer, filename?: string): boolean {
   const buf = new Uint8Array(buffer);
 
-  // ── Prefix check (optional fast-reject) ──────────────────────────────────
+  // ── Extension check (optional fast-reject) ───────────────────────────────
+  // UADE eagleplayer.conf lists these with a "BDS" prefix convention, but in
+  // practice the reference files use a ".bds" suffix (e.g. "chubbygristle.bds").
   if (filename !== undefined) {
     const base = (filename.split('/').pop() ?? filename).toLowerCase();
-    if (!base.startsWith('bds.')) return false;
+    if (!base.endsWith('.bds')) return false;
   }
 
   if (buf.length < MIN_FILE_SIZE) return false;
@@ -125,8 +127,8 @@ export async function parseBenDaglishSIDFile(
   // ── Module name from filename ─────────────────────────────────────────────
 
   const baseName = filename.split('/').pop() ?? filename;
-  // Strip "BDS." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^bds\./i, '') || baseName;
+  // Strip ".bds" suffix (case-insensitive)
+  const moduleName = baseName.replace(/\.bds$/i, '') || baseName;
 
   // ── Instrument placeholders ───────────────────────────────────────────────
 

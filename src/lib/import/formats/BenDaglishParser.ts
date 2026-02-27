@@ -72,10 +72,12 @@ function u32BE(buf: Uint8Array, off: number): number {
 export function isBenDaglishFormat(buffer: ArrayBuffer, filename?: string): boolean {
   const buf = new Uint8Array(buffer);
 
-  // ── Prefix check (optional fast-reject) ──────────────────────────────────
+  // ── Extension check (optional fast-reject) ───────────────────────────────
+  // UADE eagleplayer.conf lists these with a "bd" prefix convention, but in
+  // practice the reference files use a ".bd" suffix (e.g. "corporation.bd").
   if (filename !== undefined) {
     const base = (filename.split('/').pop() ?? filename).toLowerCase();
-    if (!base.startsWith('bd.')) return false;
+    if (!base.endsWith('.bd')) return false;
   }
 
   // Need at least 14 bytes for the header checks (through offset 12 + 2).
@@ -143,8 +145,8 @@ export async function parseBenDaglishFile(
   // ── Module name from filename ─────────────────────────────────────────────
 
   const baseName = filename.split('/').pop() ?? filename;
-  // Strip "bd." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^bd\./i, '') || baseName;
+  // Strip ".bd" suffix (case-insensitive)
+  const moduleName = baseName.replace(/\.bd$/i, '') || baseName;
 
   // ── Instrument placeholders ───────────────────────────────────────────────
   //

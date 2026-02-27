@@ -116,10 +116,13 @@ function periodToNote(period: number): number {
 // ── Format detection ──────────────────────────────────────────────────────────
 
 /**
- * Heuristic STK format detection.
- * Mirrors OpenMPT ValidateHeader() from Load_stk.cpp.
+ * Format detection for STK (Ultimate SoundTracker) and SPS (Stonetracker) files.
  *
- * The STK format has no magic bytes; detection relies on:
+ * Stonetracker files use the magic "SPS" at offset 0 (followed by a version
+ * byte, typically 0x02). These are accepted directly without structural checks.
+ *
+ * The heuristic UST/STK path (no magic bytes) mirrors OpenMPT ValidateHeader()
+ * from Load_stk.cpp:
  * 1. Reasonable character counts in the title and sample names
  * 2. Valid sample volumes (0-64) and lengths (≤ 37000 words)
  * 3. Valid song header: numOrders ≤ 128, restartPos ≤ 220
@@ -129,6 +132,13 @@ function periodToNote(period: number): number {
 export function isSTKFormat(buffer: ArrayBuffer): boolean {
   if (buffer.byteLength < HEADER_BLOCK_SIZE + PATTERN_BYTES) return false;
   const v = new DataView(buffer);
+
+  // Stonetracker files begin with the ASCII magic "SPS"
+  if (
+    v.getUint8(0) === 0x53 /* S */ &&
+    v.getUint8(1) === 0x50 /* P */ &&
+    v.getUint8(2) === 0x53 /* S */
+  ) return true;
 
   // Count invalid chars in song title
   let invalidCharsInTitle = countInvalidChars(v, 0, SONG_NAME_SIZE);

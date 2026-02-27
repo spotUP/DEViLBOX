@@ -12,8 +12,9 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 
 /**
- * Detect Maniacs of Noise format by filename prefix.
- * Accepts: mon.*
+ * Detect Maniacs of Noise format by filename prefix or extension.
+ * Prefix format (UADE): mon.songname
+ * Extension format (common rips): songname.mon
  * Rejects: mon_old.* (JeroenTel / Jeroen Tel format)
  */
 export function isManiacsOfNoiseFormat(
@@ -24,7 +25,11 @@ export function isManiacsOfNoiseFormat(
   const base = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
   // mon_old.* belongs to JeroenTel
   if (base.startsWith('mon_old.')) return false;
-  return base.startsWith('mon.');
+  // Prefix-based (UADE canonical)
+  if (base.startsWith('mon.')) return true;
+  // Extension-based (common rip naming)
+  if (base.endsWith('.mon')) return true;
+  return false;
 }
 
 export function parseManiacsOfNoiseFile(buffer: ArrayBuffer, filename: string): TrackerSong {
