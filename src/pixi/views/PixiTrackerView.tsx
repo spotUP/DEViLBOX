@@ -28,6 +28,7 @@ import { PixiRandomizeDialog } from '../dialogs/PixiRandomizeDialog';
 import { PixiAcidPatternDialog } from '../dialogs/PixiAcidPatternDialog';
 import { PixiFurnaceView } from './furnace/PixiFurnaceView';
 import { PixiHivelyView } from './hively/PixiHivelyView';
+import { MusicLineTrackTableEditor } from '@components/tracker/MusicLineTrackTableEditor';
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
 import { PixiGridSequencer } from './tracker/PixiGridSequencer';
 import { PixiTB303View } from './tracker/PixiTB303View';
@@ -36,6 +37,7 @@ import { useTrackerInput } from '@/hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useTrackerStore, useTransportStore, useUIStore } from '@stores';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useFPSMonitor } from '@/hooks/useFPSMonitor';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
@@ -231,12 +233,12 @@ export const PixiTrackerView: React.FC = () => {
             <PixiTB303View channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
           </pixiContainer>
 
-          {/* Furnace / Hively — still DOM-based, via PixiDOMOverlay */}
+          {/* Furnace / Hively / MusicLine — still DOM-based, via PixiDOMOverlay */}
           <PixiDOMOverlay
             layout={{
-              flex: viewMode === 'tracker' && (editorMode === 'furnace' || editorMode === 'hively') ? 1 : 0,
-              height: viewMode === 'tracker' && (editorMode === 'furnace' || editorMode === 'hively') ? '100%' : 0,
-              width: viewMode === 'tracker' && (editorMode === 'furnace' || editorMode === 'hively') ? '100%' : 0,
+              flex: viewMode === 'tracker' && (editorMode === 'furnace' || editorMode === 'hively' || editorMode === 'musicline') ? 1 : 0,
+              height: viewMode === 'tracker' && (editorMode === 'furnace' || editorMode === 'hively' || editorMode === 'musicline') ? '100%' : 0,
+              width: viewMode === 'tracker' && (editorMode === 'furnace' || editorMode === 'hively' || editorMode === 'musicline') ? '100%' : 0,
             }}
             style={{ overflow: 'hidden' }}
           >
@@ -244,6 +246,8 @@ export const PixiTrackerView: React.FC = () => {
               <AutoSizeFurnaceView />
             ) : viewMode === 'tracker' && editorMode === 'hively' ? (
               <AutoSizeHivelyView />
+            ) : viewMode === 'tracker' && editorMode === 'musicline' ? (
+              <AutoSizeMusicLineView />
             ) : null}
           </PixiDOMOverlay>
 
@@ -422,6 +426,17 @@ const AutoSizeHivelyView: React.FC = () => {
     </div>
   );
 };
+
+const AutoSizeMusicLineView: React.FC = () => (
+  <div style={{ width: '100%', height: '100%', overflowY: 'auto', backgroundColor: 'var(--color-bg-primary, #111)' }}>
+    <MusicLineTrackTableEditor
+      onSeek={(pos) => {
+        useTrackerStore.getState().setCurrentPosition(pos);
+        getTrackerReplayer().jumpToPosition(pos, 0);
+      }}
+    />
+  </div>
+);
 
 // ─── Editor Controls Bar (DOM Overlay) ──────────────────────────────────────
 

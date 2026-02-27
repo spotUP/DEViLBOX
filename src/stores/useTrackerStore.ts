@@ -2698,7 +2698,7 @@ export const useTrackerStore = create<TrackerStore>()(
           state.channelGrooves = null;
         } else if (song.channelTrackTables) {
           // MusicLine Editor and similar per-channel formats
-          state.editorMode = 'classic';
+          state.editorMode = 'musicline';
           state.furnaceNative = null;
           state.hivelyNative = null;
           state.hivelyFileData = null;
