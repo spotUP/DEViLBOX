@@ -16,6 +16,8 @@ interface AudioStore {
   contextState: 'suspended' | 'running' | 'closed';
   masterVolume: number; // -60 to 0 dB
   masterMuted: boolean;
+  sampleBusGain: number; // dB offset on tracker/sample path (masterInput); 0 = unity
+  synthBusGain: number;  // dB offset on synth/chip path (synthBus); 0 = unity
   analyserNode: Tone.Analyser | null;
   fftNode: Tone.FFT | null;
   toneEngineInstance: ToneEngine | null;
@@ -29,6 +31,8 @@ interface AudioStore {
   setMasterVolume: (volume: number) => void;
   setMasterMuted: (muted: boolean) => void;
   toggleMasterMute: () => void;
+  setSampleBusGain: (db: number) => void;
+  setSynthBusGain: (db: number) => void;
   setAnalyserNode: (node: Tone.Analyser | null) => void;
   setFFTNode: (node: Tone.FFT | null) => void;
   setToneEngineInstance: (instance: ToneEngine) => void;
@@ -49,6 +53,8 @@ export const useAudioStore = create<AudioStore>()(
     contextState: 'suspended',
     masterVolume: 0,
     masterMuted: false,
+    sampleBusGain: 0,
+    synthBusGain: 0,
     analyserNode: null,
     fftNode: null,
     toneEngineInstance: null,
@@ -112,6 +118,20 @@ export const useAudioStore = create<AudioStore>()(
     setToneEngineInstance: (instance) =>
       set((state) => {
         state.toneEngineInstance = instance;
+      }),
+
+    setSampleBusGain: (db) =>
+      set((state) => {
+        state.sampleBusGain = db;
+        const engine = get().toneEngineInstance;
+        if (engine) engine.setSampleBusGain(db);
+      }),
+
+    setSynthBusGain: (db) =>
+      set((state) => {
+        state.synthBusGain = db;
+        const engine = get().toneEngineInstance;
+        if (engine) engine.setSynthBusGain(db);
       }),
 
     // Master Effects Actions
