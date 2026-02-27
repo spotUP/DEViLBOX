@@ -3,28 +3,61 @@
  *
  * Exposes all DigMugConfig parameters: 4-wave selector, blend position,
  * morph speed, volume, vibrato, and arpeggio table.
+ *
+ * Enhanced with:
+ *  - WaveformThumbnail: mini visual previews on each of the 4 wave slots
+ *  - SequenceEditor: proper step-sequence editor for the arpeggio table
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { DigMugConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+import { SequenceEditor, WaveformThumbnail } from '@components/instruments/shared';
+import type { SequencePreset } from '@components/instruments/shared';
 
 interface DigMugControlsProps {
   config: DigMugConfig;
   onChange: (updates: Partial<DigMugConfig>) => void;
+  arpPlaybackPosition?: number;
 }
 
 type DMTab = 'main' | 'arpeggio';
 
-// Built-in Digital Mugician waveform names (0-14)
-const DM_WAVE_NAMES = [
-  'Sine', 'Triangle', 'Sawtooth', 'Square', 'Pulse 25%',
-  'Pulse 12%', 'Noise', 'Organ 1', 'Organ 2', 'Brass',
-  'String', 'Bell', 'Piano', 'Flute', 'Reed',
+// Built-in Digital Mugician waveform names + shape hints
+const DM_WAVES: { name: string; type: 'sine' | 'triangle' | 'saw' | 'square' | 'pulse25' | 'pulse12' | 'noise' }[] = [
+  { name: 'Sine',      type: 'sine'     },
+  { name: 'Triangle',  type: 'triangle' },
+  { name: 'Sawtooth',  type: 'saw'      },
+  { name: 'Square',    type: 'square'   },
+  { name: 'Pulse 25%', type: 'pulse25'  },
+  { name: 'Pulse 12%', type: 'pulse12'  },
+  { name: 'Noise',     type: 'noise'    },
+  { name: 'Organ 1',   type: 'sine'     },
+  { name: 'Organ 2',   type: 'sine'     },
+  { name: 'Brass',     type: 'saw'      },
+  { name: 'String',    type: 'saw'      },
+  { name: 'Bell',      type: 'sine'     },
+  { name: 'Piano',     type: 'triangle' },
+  { name: 'Flute',     type: 'sine'     },
+  { name: 'Reed',      type: 'square'   },
 ];
 
-export const DigMugControls: React.FC<DigMugControlsProps> = ({ config, onChange }) => {
+const ARP_PRESETS: SequencePreset[] = [
+  { name: 'Major',  data: [0, 4, 7, 0, 4, 7, 12, 12, 0, 4, 7, 0, 4, 7, 12, 12], loop: 0 },
+  { name: 'Minor',  data: [0, 3, 7, 0, 3, 7, 12, 12, 0, 3, 7, 0, 3, 7, 12, 12], loop: 0 },
+  { name: 'Octave', data: [0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12], loop: 0 },
+  { name: 'Power',  data: [0, 7, 12, 7, 0, 7, 12, 7, 0, 7, 12, 7, 0, 7, 12, 7], loop: 0 },
+  { name: 'Clear',  data: new Array(16).fill(0) },
+];
+
+// ── Component ──────────────────────────────────────────────────────────────────
+
+export const DigMugControls: React.FC<DigMugControlsProps> = ({
+  config,
+  onChange,
+  arpPlaybackPosition,
+}) => {
   const [activeTab, setActiveTab] = useState<DMTab>('main');
 
   const configRef = useRef(config);
@@ -50,36 +83,55 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({ config, onChange
   );
 
   const updateWavetable = useCallback((slot: 0 | 1 | 2 | 3, value: number) => {
-    const wt: [number, number, number, number] = [...configRef.current.wavetable];
+    const wt: [number, number, number, number] = [...configRef.current.wavetable] as [number, number, number, number];
     wt[slot] = value;
     onChange({ wavetable: wt });
   }, [onChange]);
 
-  // ── MAIN TAB ──
+  // ── MAIN TAB ──────────────────────────────────────────────────────────────
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      {/* 4-wave slot selectors */}
+
+      {/* 4-wave slot selectors with thumbnails */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Wavetable Slots (4 waves)" />
+
+        {/* Slot buttons — each shows a thumbnail of the selected wave */}
         <div className="grid grid-cols-4 gap-2 mb-3">
-          {([0, 1, 2, 3] as const).map((slot) => (
-            <div key={slot} className="flex flex-col gap-1">
-              <span className="text-[10px] text-gray-500 text-center">Wave {slot + 1}</span>
-              <select
-                value={config.wavetable[slot]}
-                onChange={(e) => updateWavetable(slot, parseInt(e.target.value))}
-                className="text-xs font-mono border rounded px-1 py-1"
-                style={{ background: '#0a0f00', borderColor: dim, color: accent }}>
-                {DM_WAVE_NAMES.map((name, i) => (
-                  <option key={i} value={i} style={{ background: '#111', color: '#ccc' }}>
-                    {i}: {name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ))}
+          {([0, 1, 2, 3] as const).map((slot) => {
+            const waveIdx = config.wavetable[slot];
+            const waveDef = DM_WAVES[waveIdx] ?? DM_WAVES[0];
+            return (
+              <div key={slot} className="flex flex-col gap-1">
+                <span className="text-[10px] text-gray-500 text-center">Wave {slot + 1}</span>
+                {/* Waveform preview */}
+                <div className="rounded overflow-hidden border"
+                  style={{ borderColor: dim }}>
+                  <WaveformThumbnail
+                    type={waveDef.type}
+                    width={72} height={28}
+                    color={accent}
+                    style="line"
+                  />
+                </div>
+                {/* Select dropdown below preview */}
+                <select
+                  value={waveIdx}
+                  onChange={(e) => updateWavetable(slot, parseInt(e.target.value))}
+                  className="text-[9px] font-mono border rounded px-1 py-0.5"
+                  style={{ background: '#0a0f00', borderColor: dim, color: accent }}>
+                  {DM_WAVES.map((w, i) => (
+                    <option key={i} value={i} style={{ background: '#111', color: '#ccc' }}>
+                      {i}: {w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
         </div>
 
+        {/* Blend + Morph controls */}
         <div className="flex gap-4">
           <Knob value={config.waveBlend} min={0} max={63} step={1}
             onChange={(v) => upd('waveBlend', Math.round(v))}
@@ -124,45 +176,31 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({ config, onChange
     </div>
   );
 
-  // ── ARPEGGIO TAB ──
+  // ── ARPEGGIO TAB ──────────────────────────────────────────────────────────
   const renderArpeggio = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
-        <SectionLabel label="Arpeggio" />
-        <div className="flex gap-4 mb-3">
+        <div className="flex items-center justify-between mb-3">
+          <SectionLabel label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}
             onChange={(v) => upd('arpSpeed', Math.round(v))}
             label="Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
-        <div className="grid grid-cols-4 gap-1">
-          {config.arpTable.map((v, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <span className="text-[9px] font-mono text-gray-600 w-4">{i}</span>
-              <input
-                type="number"
-                value={v}
-                min={-64}
-                max={63}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  if (!isNaN(val)) {
-                    const arr = [...configRef.current.arpTable];
-                    arr[i] = Math.max(-64, Math.min(63, val));
-                    upd('arpTable', arr);
-                  }
-                }}
-                className="text-[10px] font-mono text-center border rounded py-0.5"
-                style={{
-                  width: '48px',
-                  background: '#060a00',
-                  borderColor: v !== 0 ? dim : '#1a1a1a',
-                  color: v !== 0 ? accent : '#444',
-                }}
-              />
-            </div>
-          ))}
-        </div>
+
+        <SequenceEditor
+          label="Arpeggio Table"
+          data={config.arpTable}
+          onChange={(d) => upd('arpTable', d)}
+          min={-64} max={63}
+          bipolar
+          fixedLength
+          showNoteNames
+          presets={ARP_PRESETS}
+          playbackPosition={arpPlaybackPosition}
+          color={accent}
+          height={100}
+        />
       </div>
     </div>
   );

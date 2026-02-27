@@ -9,6 +9,8 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { FredConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+import { EnvelopeVisualization, SequenceEditor } from '@components/instruments/shared';
+import type { SequencePreset } from '@components/instruments/shared';
 
 interface FredControlsProps {
   config: FredConfig;
@@ -16,6 +18,13 @@ interface FredControlsProps {
 }
 
 type FredTab = 'envelope' | 'pwm' | 'arpeggio' | 'vibrato';
+
+const ARP_PRESETS: SequencePreset[] = [
+  { name: 'Major',  data: [0, 4, 7, 0, 4, 7, 12, 12, 0, 4, 7, 0, 4, 7, 12, 12], loop: 0 },
+  { name: 'Minor',  data: [0, 3, 7, 0, 3, 7, 12, 12, 0, 3, 7, 0, 3, 7, 12, 12], loop: 0 },
+  { name: 'Octave', data: [0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12], loop: 0 },
+  { name: 'Clear',  data: new Array(16).fill(0) },
+];
 
 export const FredControls: React.FC<FredControlsProps> = ({ config, onChange }) => {
   const [activeTab, setActiveTab] = useState<FredTab>('envelope');
@@ -68,6 +77,21 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange }) 
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Envelope" />
+
+        {/* Envelope curve visualization */}
+        <div className="mb-3">
+          <EnvelopeVisualization
+            mode="steps"
+            attackVol={config.attackVol}    attackSpeed={config.attackSpeed}
+            decayVol={config.decayVol}      decaySpeed={config.decaySpeed}
+            sustainVol={config.envelopeVol} sustainLen={config.sustainTime}
+            releaseVol={config.releaseVol}  releaseSpeed={config.releaseSpeed}
+            maxVol={64}
+            width={320} height={72}
+            color={accent}
+          />
+        </div>
+
         <div className="grid grid-cols-4 gap-3 mb-3">
           {/* Attack */}
           <div className="flex flex-col items-center gap-2">
@@ -198,36 +222,21 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange }) 
 
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Arpeggio Table (semitone offsets)" />
-        <div className="grid grid-cols-8 gap-1">
-          {config.arpeggio.map((v, i) => (
-            <div key={i} className="flex flex-col items-center gap-0.5">
-              <span className="text-[9px] font-mono" style={{ color: i < config.arpeggioLimit ? accent : '#444' }}>
-                {i.toString().padStart(2, '0')}
-              </span>
-              <input
-                type="number"
-                value={v}
-                min={-64}
-                max={63}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  if (!isNaN(val)) {
-                    const arr = [...configRef.current.arpeggio];
-                    arr[i] = Math.max(-64, Math.min(63, val));
-                    upd('arpeggio', arr);
-                  }
-                }}
-                className="text-[10px] font-mono text-center border rounded py-0.5"
-                style={{
-                  width: '36px',
-                  background: i < config.arpeggioLimit ? '#0a0800' : '#060606',
-                  borderColor: i < config.arpeggioLimit ? dim : '#1a1a1a',
-                  color: i < config.arpeggioLimit ? accent : '#444',
-                }}
-              />
-            </div>
-          ))}
-        </div>
+        <SequenceEditor
+          label="Arpeggio"
+          data={config.arpeggio}
+          onChange={(d) => upd('arpeggio', d)}
+          min={-64} max={63}
+          bipolar
+          fixedLength
+          showNoteNames
+          presets={ARP_PRESETS}
+          color={accent}
+          height={100}
+        />
+        <p className="text-[9px] text-gray-600 mt-1">
+          Steps 0–{config.arpeggioLimit - 1} active (set by Active Steps limit above)
+        </p>
       </div>
     </div>
   );

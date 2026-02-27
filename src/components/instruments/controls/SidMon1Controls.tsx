@@ -3,12 +3,16 @@
  *
  * Exposes all SidMon1Config parameters: ADSR envelope speeds/levels,
  * phase oscillator, tuning, arpeggio table, and waveform data.
+ *
+ * Enhanced with SequenceEditor for arpeggio and waveform tables.
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { SidMon1Config } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+import { SequenceEditor } from '@components/instruments/shared';
+import type { SequencePreset } from '@components/instruments/shared';
 
 interface SidMon1ControlsProps {
   config: SidMon1Config;
@@ -16,6 +20,38 @@ interface SidMon1ControlsProps {
 }
 
 type SM1Tab = 'main' | 'arpeggio' | 'waveform';
+
+// ── Presets ────────────────────────────────────────────────────────────────────
+
+const ARP_PRESETS: SequencePreset[] = [
+  { name: 'Major',  data: [0, 4, 7, 0, 4, 7, 12, 12, 0, 4, 7, 0, 4, 7, 12, 12], loop: 0 },
+  { name: 'Minor',  data: [0, 3, 7, 0, 3, 7, 12, 12, 0, 3, 7, 0, 3, 7, 12, 12], loop: 0 },
+  { name: 'Octave', data: [0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12], loop: 0 },
+  { name: 'Clear',  data: new Array(16).fill(0) },
+];
+
+const WAVE_PRESETS: SequencePreset[] = [
+  {
+    name: 'Sine',
+    data: Array.from({ length: 32 }, (_, i) => Math.round(Math.sin((i / 32) * Math.PI * 2) * 100)),
+  },
+  {
+    name: 'Saw',
+    data: Array.from({ length: 32 }, (_, i) => Math.round(((i / 31) * 2 - 1) * 100)),
+  },
+  {
+    name: 'Square',
+    data: Array.from({ length: 32 }, (_, i) => (i < 16 ? 100 : -100)),
+  },
+  {
+    name: 'Triangle',
+    data: Array.from({ length: 32 }, (_, i) =>
+      i < 16 ? Math.round((i / 15) * 2 - 1) * 100 : Math.round((1 - ((i - 16) / 15)) * 2 - 1) * 100
+    ),
+  },
+];
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChange }) => {
   const [activeTab, setActiveTab] = useState<SM1Tab>('main');
@@ -42,7 +78,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
     </div>
   );
 
-  // ── MAIN TAB ──
+  // ── MAIN TAB ──────────────────────────────────────────────────────────────
   const renderMain = () => (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
 
@@ -117,59 +153,34 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
     </div>
   );
 
-  // ── ARPEGGIO TAB ──
+  // ── ARPEGGIO TAB ──────────────────────────────────────────────────────────
   const renderArpeggio = () => {
     const arp = config.arpeggio ?? new Array(16).fill(0);
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         <div className={`rounded-lg border p-3 ${panelBg}`}>
           <SectionLabel label="Arpeggio (16 steps)" />
-          <div className="grid grid-cols-4 gap-2">
-            {arp.map((v: number, i: number) => (
-              <div key={i} className="flex flex-col items-center gap-0.5">
-                <span className="text-[9px] font-mono text-gray-600">
-                  {i.toString(16).toUpperCase().padStart(2, '0')}
-                </span>
-                <input
-                  type="number"
-                  value={v}
-                  min={0}
-                  max={255}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (!isNaN(val)) {
-                      const arr = [...(configRef.current.arpeggio ?? new Array(16).fill(0))];
-                      arr[i] = Math.max(0, Math.min(255, val));
-                      onChange({ arpeggio: arr });
-                    }
-                  }}
-                  className="text-[10px] font-mono text-center border rounded py-0.5"
-                  style={{
-                    width: '48px',
-                    background: '#060a0f',
-                    borderColor: v !== 0 ? dim : '#1a1a1a',
-                    color: v !== 0 ? accent : '#444',
-                  }}
-                />
-              </div>
-            ))}
-          </div>
+          <SequenceEditor
+            label="Arpeggio"
+            data={arp}
+            onChange={(d) => upd('arpeggio', d)}
+            min={0} max={255}
+            fixedLength
+            presets={ARP_PRESETS}
+            color={accent}
+            height={80}
+            cellFormat="hex"
+            showCells
+          />
         </div>
       </div>
     );
   };
 
-  // ── WAVEFORM TAB ──
+  // ── WAVEFORM TAB ──────────────────────────────────────────────────────────
   const renderWaveform = () => {
     const mainWave  = config.mainWave  ?? new Array(32).fill(0);
     const phaseWave = config.phaseWave ?? new Array(32).fill(0);
-
-    const makePoints = (wave: number[]) =>
-      wave.map((v, i) => {
-        const x = (i / 31) * 250 + 3;
-        const y = 32 - (v / 128) * 28;
-        return `${x},${y}`;
-      }).join(' ');
 
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
@@ -177,85 +188,33 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
         {/* Main Wave */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
           <SectionLabel label="Main Wave (32 bytes)" />
-          <svg width={256} height={64} className="mb-2 rounded"
-            style={{ background: '#060a0f', border: `1px solid ${dim}` }}>
-            <polyline
-              points={makePoints(mainWave)}
-              fill="none"
-              stroke={accent}
-              strokeWidth={1.5}
-            />
-          </svg>
-          <div className="grid grid-cols-8 gap-1">
-            {mainWave.map((v: number, i: number) => (
-              <div key={i} className="flex flex-col items-center gap-0.5">
-                <span className="text-[8px] font-mono text-gray-600">{i}</span>
-                <input
-                  type="number"
-                  value={v}
-                  min={-128}
-                  max={127}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (!isNaN(val)) {
-                      const arr = [...(configRef.current.mainWave ?? new Array(32).fill(0))];
-                      arr[i] = Math.max(-128, Math.min(127, val));
-                      onChange({ mainWave: arr });
-                    }
-                  }}
-                  className="text-[10px] font-mono text-center border rounded py-0.5"
-                  style={{
-                    width: '34px',
-                    background: '#060a0f',
-                    borderColor: v !== 0 ? dim : '#1a1a1a',
-                    color: v !== 0 ? accent : '#444',
-                  }}
-                />
-              </div>
-            ))}
-          </div>
+          <SequenceEditor
+            label="Main Wave"
+            data={mainWave}
+            onChange={(d) => upd('mainWave', d)}
+            min={-128} max={127}
+            bipolar
+            fixedLength
+            presets={WAVE_PRESETS}
+            color={accent}
+            height={80}
+          />
         </div>
 
         {/* Phase Wave */}
         <div className={`rounded-lg border p-3 ${panelBg}`}>
           <SectionLabel label="Phase Wave (32 bytes)" />
-          <svg width={256} height={64} className="mb-2 rounded"
-            style={{ background: '#060a0f', border: `1px solid ${dim}` }}>
-            <polyline
-              points={makePoints(phaseWave)}
-              fill="none"
-              stroke={knob}
-              strokeWidth={1.5}
-            />
-          </svg>
-          <div className="grid grid-cols-8 gap-1">
-            {phaseWave.map((v: number, i: number) => (
-              <div key={i} className="flex flex-col items-center gap-0.5">
-                <span className="text-[8px] font-mono text-gray-600">{i}</span>
-                <input
-                  type="number"
-                  value={v}
-                  min={-128}
-                  max={127}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (!isNaN(val)) {
-                      const arr = [...(configRef.current.phaseWave ?? new Array(32).fill(0))];
-                      arr[i] = Math.max(-128, Math.min(127, val));
-                      onChange({ phaseWave: arr });
-                    }
-                  }}
-                  className="text-[10px] font-mono text-center border rounded py-0.5"
-                  style={{
-                    width: '34px',
-                    background: '#060a0f',
-                    borderColor: v !== 0 ? dim : '#1a1a1a',
-                    color: v !== 0 ? accent : '#444',
-                  }}
-                />
-              </div>
-            ))}
-          </div>
+          <SequenceEditor
+            label="Phase Wave"
+            data={phaseWave}
+            onChange={(d) => upd('phaseWave', d)}
+            min={-128} max={127}
+            bipolar
+            fixedLength
+            presets={WAVE_PRESETS}
+            color={knob}
+            height={80}
+          />
         </div>
       </div>
     );
