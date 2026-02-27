@@ -790,8 +790,8 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── MusicLine Editor (.ml) ───────────────────────────────────────────────
-  // Magic "MLEDMODL" at offset 0.
-  if (/\.ml$/.test(filename)) {
+  // Magic "MLEDMODL" at offset 0. Falls through to Medley handler if magic doesn't match.
+  if (/\.ml$/i.test(filename)) {
     const bytes = new Uint8Array(buffer);
     try {
       const { isMusicLineFile, parseMusicLineFile } = await import('@lib/import/formats/MusicLineParser');
@@ -802,8 +802,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     } catch (err) {
       console.warn(`[MusicLineParser] Native parse failed for ${filename}:`, err);
     }
-    // No UADE fallback for .ml (UADE uses prefix-based detection; .ml extension not a UADE prefix)
-    throw new Error(`[MusicLineParser] Failed to parse ${filename}: not a valid MusicLine Editor file`);
+    // Not a MusicLine file — fall through to Medley handler below
   }
 
   // ── Game Music Creator (.gmc) ─────────────────────────────────────────────
