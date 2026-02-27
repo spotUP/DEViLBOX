@@ -691,22 +691,28 @@ function deltaDePack(packed: Uint8Array, outputSize: number, deltaCommand: numbe
 // ── Waveform synthesis ─────────────────────────────────────────────────────
 
 /**
- * MusicLine smplType → waveform loop length (in samples):
- *   1 → 32 samples   (8287/32  ≈ 259 Hz ≈ C3 at PAL_C3_RATE)
- *   2 → 64 samples   (8287/64  ≈ 129 Hz ≈ C2)
- *   3 → 128 samples  (8287/128 ≈  65 Hz ≈ C1)
- *   4 → 256 samples  (8287/256 ≈  32 Hz ≈ C0)
- *   5 → 256 samples  (same as 4; type 5 uses original 256-byte waveform)
+ * MusicLine smplType → waveform loop length (in BYTES).
  *
- * The WAVEFORM SHAPE is stored in the SMPL chunk as 256 bytes of signed PCM;
- * smplType only selects which downsampled sub-loop length to use for playback.
- * Reference: FixWaveLength @ Mline116.asm (offsets 480/448/384/256/0).
+ * Source: FixWaveLength @ Mline116.asm.
+ * The routine reads inst_SmplLength (in words, =128 for a 256-byte SMPL),
+ * then right-shifts by (5 - smplType) bits to get the loop length in words,
+ * converting to bytes by × 2:
+ *
+ *   smplType 1 → 128 >> 4 = 8 words = 16 bytes   (8287/16 ≈ 518 Hz ≈ C4-ish)
+ *   smplType 2 → 128 >> 3 = 16 words = 32 bytes  (8287/32 ≈ 259 Hz ≈ C3-ish)
+ *   smplType 3 → 128 >> 2 = 32 words = 64 bytes  (8287/64 ≈ 129 Hz ≈ C2-ish)
+ *   smplType 4 → 128 >> 1 = 64 words = 128 bytes (8287/128 ≈ 65 Hz ≈ C1-ish)
+ *   smplType 5+ → 128 >> 0 = 128 words = 256 bytes (full waveform, C0-ish)
+ *
+ * The waveform SHAPE is stored as PCM in the SMPL chunk (256 bytes).
+ * smplType only selects the downsampled sub-loop length. Different types
+ * play at different octaves by design — composers tune their note values
+ * accordingly.
  */
-export function mlSmplTypeToLoopLen(smplType: number): number {
-  if (smplType <= 0) return 256;
-  if (smplType >= 4) return 256;
-  // 1→32, 2→64, 3→128
-  return 32 * (1 << (smplType - 1));
+export function mlSmplTypeToLoopLen(smplType: number, smplLengthWords: number = 128): number {
+  const shift = Math.max(0, 5 - Math.min(smplType, 5));
+  const loopWords = smplLengthWords >> shift;
+  return Math.max(loopWords * 2, 2); // convert words → bytes; minimum 2 bytes
 }
 
 /**
@@ -732,7 +738,7 @@ function downsampleWaveform(pcm: Uint8Array, targetLen: number): Uint8Array {
  *   type 1 = Sine, type 2 = Sawtooth, type 3 = Square
  */
 export function generateMusicLineWaveformPcm(type: number): Uint8Array {
-  const len = mlSmplTypeToLoopLen(type) || 32;
+  const len = mlSmplTypeToLoopLen(type) || 16;
   const pcm = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
     const phase = i / len;
@@ -778,11 +784,14 @@ function buildInstruments(
     // Reference: FixWaveLength @ Mline116.asm — uses sub-loops from 256-byte waveform buffer.
     if (inst.smplType > 0) {
       const smpl = smplList[inst.smplNumber - 1]; // smplNumber is 1-based
-      const loopLen = mlSmplTypeToLoopLen(inst.smplType);
+      // Use actual SMPL smplLength (in words) if available; default to 128 (= 256 byte waveform)
+      const smplLengthWords = smpl?.smplLength ?? 128;
+      const loopLen = mlSmplTypeToLoopLen(inst.smplType, smplLengthWords);
       let wavePcm: Uint8Array;
 
       if (smpl && smpl.pcm.length > 0) {
-        // Downsample the 256-byte SMPL waveform to the sub-loop length for this smplType
+        // Downsample the 256-byte SMPL waveform to the sub-loop length for this smplType.
+        // This mirrors the Amiga makewaves cascade: 256→128→64→32→16 bytes.
         wavePcm = downsampleWaveform(smpl.pcm, loopLen);
       } else {
         // No SMPL data — produce silence (will be inaudible, not a click)
