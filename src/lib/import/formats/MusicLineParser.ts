@@ -281,31 +281,26 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
 
   // ── Build TrackerSong ─────────────────────────────────────────────────────
 
-  // Collect all used part numbers and build a sorted partNumber→patternIndex map
-  const usedPartNumbers = new Set<number>();
+  // Build a sorted partNumber→patternIndex map — ONLY for parts that have actual data.
+  // Parts referenced in chnl_Data but missing from PART chunks ("phantom" parts) are
+  // excluded here; the track table mapping below falls back to pattern 0 for them.
+  const allPartNumbers = new Set<number>();
+  for (const pn of partDataMap.keys()) allPartNumbers.add(pn);
+  // Also include referenced parts that exist in partDataMap (skip phantom refs)
   for (const table of channelTrackTables) {
-    for (const p of table) usedPartNumbers.add(p);
-  }
-
-  // Sort part numbers so pattern indices are deterministic
-  const sortedPartNumbers = Array.from(usedPartNumbers).sort((a, b) => a - b);
-  const partToPatternIndex = new Map<number, number>();
-  sortedPartNumbers.forEach((pn, idx) => partToPatternIndex.set(pn, idx));
-
-  // Also include parts not referenced (in case they exist in the file)
-  for (const pn of partDataMap.keys()) {
-    if (!partToPatternIndex.has(pn)) {
-      partToPatternIndex.set(pn, partToPatternIndex.size);
+    for (const p of table) {
+      if (partDataMap.has(p)) allPartNumbers.add(p);
     }
   }
 
-  // Build Pattern array — each PART = single-voice 1-channel pattern
-  const patterns: Pattern[] = [];
-  for (const pn of partToPatternIndex.keys()) {
-    const patIdx = partToPatternIndex.get(pn)!;
-    const rawData = partDataMap.get(pn);
-    patterns[patIdx] = buildPattern(rawData, patIdx, pn);
-  }
+  const sortedPartNumbers = Array.from(allPartNumbers).sort((a, b) => a - b);
+  const partToPatternIndex = new Map<number, number>();
+  sortedPartNumbers.forEach((pn, idx) => partToPatternIndex.set(pn, idx));
+
+  // Build Pattern array — each PART = single-voice 1-channel pattern (no phantom gaps)
+  const patterns: Pattern[] = sortedPartNumbers.map((pn, idx) =>
+    buildPattern(partDataMap.get(pn)!, idx, pn)
+  );
 
   // Map channelTrackTables from partNumbers to patternIndices
   const mappedTrackTables: number[][] = channelTrackTables.map(table =>
