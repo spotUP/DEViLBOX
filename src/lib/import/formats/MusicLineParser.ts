@@ -450,7 +450,7 @@ function decompressPart(data: Uint8Array, srcOffset: number, srcLen: number): Ui
  * Note mapping: MusicLine note N (1-60) → XM note via amigaNoteToXM (adds 12 octaves).
  * Note 61 (end sentinel) = reset row counter within PART; treated as rest here.
  */
-function buildPattern(rawData: Uint8Array | undefined, patIdx: number, partNum: number): Pattern {
+function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum: number): Pattern {
   const channel: ChannelData = {
     id:           'channel-0',
     name:         'Voice',
