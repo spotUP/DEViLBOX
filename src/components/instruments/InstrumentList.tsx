@@ -21,6 +21,8 @@ import * as Tone from 'tone';
 import type { InstrumentConfig, HivelyConfig } from '@typedefs/instrument';
 import { exportAsAhi } from '@lib/export/HivelyExporter';
 import { parseAhiFile } from '@lib/import/formats/HivelyParser';
+import { exportMusicLineInstrument } from '@lib/export/MusicLineExporter';
+import { parseMusicLineInstrument } from '@lib/import/formats/MusicLineParser';
 import { HivelyImportDialog } from './HivelyImportDialog';
 
 interface InstrumentListProps {
@@ -281,6 +283,41 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     [createInstrument]
   );
 
+  const handleSaveMli = useCallback((e: React.MouseEvent, inst: InstrumentConfig) => {
+    e.stopPropagation();
+    const bytes = exportMusicLineInstrument(inst);
+    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${inst.name.replace(/[^a-zA-Z0-9_\-]/g, '_') || 'instrument'}.mli`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleLoadMli = useCallback((e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.mli';
+    input.onchange = async (ev: Event) => {
+      const file = (ev.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const buffer = await file.arrayBuffer();
+        const result = parseMusicLineInstrument(new Uint8Array(buffer));
+        if (result) {
+          updateInstrument(id, { ...result, id });
+        }
+      } catch (err) {
+        console.error('[MliLoad] Failed to parse .mli:', err);
+      }
+    };
+    input.click();
+  }, [updateInstrument]);
+
     const handleDragStart = (e: React.DragEvent, id: number) => {
     e.dataTransfer.setData('application/x-devilbox-instrument', JSON.stringify({ id }));
     e.dataTransfer.effectAllowed = 'copy';
@@ -466,6 +503,24 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                           onClick={(e) => handleLoadAhi(e, instrument.id)}
                           className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-yellow-400`}
                           title="Load .ahi instrument file"
+                        >
+                          <Upload size={10} />
+                        </button>
+                      </>
+                    )}
+                    {instrument.synthType === 'Sampler' && (
+                      <>
+                        <button
+                          onClick={(e) => handleSaveMli(e, instrument)}
+                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-orange-400`}
+                          title="Save as .mli instrument file"
+                        >
+                          <Download size={10} />
+                        </button>
+                        <button
+                          onClick={(e) => handleLoadMli(e, instrument.id)}
+                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-orange-400`}
+                          title="Load .mli instrument file"
                         >
                           <Upload size={10} />
                         </button>
