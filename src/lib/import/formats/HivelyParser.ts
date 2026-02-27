@@ -15,6 +15,7 @@ import type {
   HivelyNativeData,
   HivelyNativeTrack,
   HivelyNativePosition,
+  HivelyConfig,
 } from '@/types';
 
 // ── HVL Internal Types ──────────────────────────────────────────────────────
@@ -726,4 +727,92 @@ export function parseHivelyFile(buffer: ArrayBuffer, fileName: string): TrackerS
   // Preserve raw binary so HivelyEngine WASM can load the full tune for playback
   song.hivelyFileData = buffer.slice(0);
   return song;
+}
+
+/**
+ * Parse a .ahi standalone instrument file (THXI = AHX format, HVLI = HVL format).
+ * Returns the HivelyConfig and instrument name.
+ */
+export function parseAhiFile(buffer: ArrayBuffer): { config: HivelyConfig; name: string } {
+  const buf = new Uint8Array(buffer);
+  if (buf.length < 26) throw new Error('Invalid .ahi file: too short');
+
+  const magic = String.fromCharCode(buf[0], buf[1], buf[2], buf[3]);
+  if (magic !== 'THXI' && magic !== 'HVLI') {
+    throw new Error(`Invalid .ahi magic: "${magic}"`);
+  }
+  const isAHX = magic === 'THXI';
+
+  // Instrument header at bytes 4–25 (same bit layout as in HVL/AHX song files)
+  const b = 4; // base offset
+  const volume           = buf[b + 0];
+  const filterSpeed      = ((buf[b + 1] >> 3) & 0x1f) | ((buf[b + 12] >> 2) & 0x20);
+  const waveLength       = buf[b + 1] & 0x07;
+  const envelope = {
+    aFrames: buf[b + 2], aVolume: buf[b + 3],
+    dFrames: buf[b + 4], dVolume: buf[b + 5],
+    sFrames: buf[b + 6], rFrames: buf[b + 7], rVolume: buf[b + 8],
+  };
+  const filterLowerLimit      = buf[b + 12] & 0x7f;
+  const vibratoDelay          = buf[b + 13];
+  const hardCutRelease        = (buf[b + 14] & 0x80) !== 0;
+  const hardCutReleaseFrames  = (buf[b + 14] >> 4) & 0x07;
+  const vibratoDepth          = buf[b + 14] & 0x0f;
+  const vibratoSpeed          = buf[b + 15];
+  const squareLowerLimit      = buf[b + 16];
+  const squareUpperLimit      = buf[b + 17];
+  const squareSpeed           = buf[b + 18];
+  const filterUpperLimit      = buf[b + 19] & 0x3f;
+  const plistSpeed            = buf[b + 20];
+  const plistLength           = buf[b + 21];
+
+  let off = 26; // after 4-byte magic + 22-byte header
+  const plistEntrySize = isAHX ? 4 : 5;
+
+  if (buf.length < off + plistLength * plistEntrySize) {
+    throw new Error('Invalid .ahi file: truncated plist data');
+  }
+
+  const entries: HivelyConfig['performanceList']['entries'] = [];
+  for (let j = 0; j < plistLength; j++) {
+    if (isAHX) {
+      let fx1 = (buf[off] >> 5) & 7;
+      if (fx1 === 6) fx1 = 12;
+      if (fx1 === 7) fx1 = 15;
+      let fx0 = (buf[off] >> 2) & 7;
+      if (fx0 === 6) fx0 = 12;
+      if (fx0 === 7) fx0 = 15;
+      const waveform = ((buf[off] << 1) & 6) | (buf[off + 1] >> 7);
+      const fixed = ((buf[off + 1] >> 6) & 1) !== 0;
+      const note = buf[off + 1] & 0x3f;
+      entries.push({ note, waveform, fixed, fx: [fx0, fx1], fxParam: [buf[off + 2], buf[off + 3]] });
+      off += 4;
+    } else {
+      const fx0 = buf[off] & 0x0f;
+      const fx1 = (buf[off + 1] >> 3) & 0x0f;
+      const waveform = buf[off + 1] & 0x07;
+      const fixed = ((buf[off + 2] >> 6) & 1) !== 0;
+      const note = buf[off + 2] & 0x3f;
+      entries.push({ note, waveform, fixed, fx: [fx0, fx1], fxParam: [buf[off + 3], buf[off + 4]] });
+      off += 5;
+    }
+  }
+
+  // Null-terminated name at end
+  let nameEnd = off;
+  while (nameEnd < buf.length && buf[nameEnd] !== 0) nameEnd++;
+  const name = new TextDecoder().decode(buf.slice(off, nameEnd));
+
+  return {
+    name,
+    config: {
+      volume, waveLength, filterSpeed,
+      filterLowerLimit, filterUpperLimit,
+      squareLowerLimit, squareUpperLimit, squareSpeed,
+      vibratoDelay, vibratoSpeed, vibratoDepth,
+      hardCutRelease, hardCutReleaseFrames,
+      envelope,
+      performanceList: { speed: plistSpeed, entries },
+    },
+  };
 }
