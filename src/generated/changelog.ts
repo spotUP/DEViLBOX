@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-27T08:51:56.139Z
+ * Generated: 2026-02-27T08:58:19.221Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1466';
-export const BUILD_NUMBER = '1466';
-export const BUILD_HASH = '47f002bd';
+export const BUILD_VERSION = '1.0.1467';
+export const BUILD_NUMBER = '1467';
+export const BUILD_HASH = '6cc798ff';
 export const BUILD_DATE = '2026-02-27';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1466',
+    version: '1.0.1467',
     date: '2026-02-27',
     changes: [
+      {
+        type: 'feature',
+        "description": "Implement per-channel speed/groove in replayer"
+      },
       {
         type: 'improvement',
         "description": "Chore: regenerate changelog"
@@ -218,10 +222,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add prefix routing for 18 UADE formats + wire native parser prefs"
-      },
-      {
-        type: 'fix',
-        "description": "Read initial cycle from position data instead of hardcoding 6"
       }
     ]
   }
