@@ -12,6 +12,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Waves, Plus, RotateCcw, Trash2, Copy, Wand2, FileUp } from 'lucide-react';
+import { WaveformThumbnail } from '@components/instruments/shared';
 
 // ============================================================================
 // TYPES
@@ -522,21 +523,31 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
     <div className="space-y-3">
       {/* Wavetable selector */}
       <div className="flex items-center gap-2 flex-wrap">
-        {wavetables.map((wave, index) => (
-          <button
-            key={wave.id}
-            onClick={() => setSelectedWave(index)}
-            className={`
-              px-3 py-1.5 rounded font-mono text-[10px] border transition-colors
-              ${selectedWave === index
-                ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400'
-                : 'bg-dark-bg border-dark-border text-text-muted hover:text-text-primary hover:border-dark-border/80'
-              }
-            `}
-          >
-            Wave {wave.id}
-          </button>
-        ))}
+        {wavetables.map((wave, index) => {
+          const isSelected = selectedWave === index;
+          return (
+            <button
+              key={wave.id}
+              onClick={() => setSelectedWave(index)}
+              className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded border transition-colors
+                ${isSelected
+                  ? 'bg-cyan-500/20 border-cyan-500'
+                  : 'bg-dark-bg border-dark-border hover:border-dark-border/80'
+                }`}
+            >
+              <WaveformThumbnail
+                data={wave.data}
+                maxValue={wave.max ?? 15}
+                width={52} height={18}
+                color={isSelected ? '#22d3ee' : '#4b5563'}
+                style="bar"
+              />
+              <span className={`font-mono text-[9px] ${isSelected ? 'text-cyan-400' : 'text-text-muted'}`}>
+                Wave {wave.id}
+              </span>
+            </button>
+          );
+        })}
 
         {wavetables.length < maxWavetables && (
           <>
