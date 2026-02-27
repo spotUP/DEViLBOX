@@ -46,7 +46,8 @@ import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
 import { notify } from '@stores/useNotificationStore';
-import type { TrackerSong } from '@engine/TrackerReplayer';
+import { getTrackerReplayer, type TrackerSong } from '@engine/TrackerReplayer';
+import { MusicLineTrackTableEditor } from './MusicLineTrackTableEditor';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
 import type { XMNote } from '@lib/import/formats/XMParser';
@@ -426,10 +427,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Pattern order modal
   const [showPatternOrder, setShowPatternOrder] = useState(false);
   const channelTrackTables = useTrackerStore((state) => state.channelTrackTables);
-  // Auto-open the pattern order modal when a per-channel format (MusicLine, etc.) is loaded
-  useEffect(() => {
-    if (channelTrackTables) setShowPatternOrder(true);
-  }, [channelTrackTables]);
 
   // Mobile swipe handlers for cursor navigation
   const handleSwipeLeft = useCallback(() => {
@@ -1352,6 +1349,26 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   <p className="text-xs text-text-muted mt-4">
                     You can change this anytime in Settings → Display → Render Mode
                   </p>
+                </div>
+              </div>
+            ) : channelTrackTables ? (
+              <div className="flex-1 overflow-auto bg-dark-bgPrimary">
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-ft2-text">MusicLine Editor</span>
+                    <span className="text-xs text-accent-primary bg-accent-primary/10 px-1.5 py-0.5 rounded border border-accent-primary/30">
+                      per-channel
+                    </span>
+                    <span className="text-xs text-ft2-textDim ml-auto">
+                      {channelTrackTables.length} channels · {patterns.length} parts
+                    </span>
+                  </div>
+                  <MusicLineTrackTableEditor
+                    onSeek={(pos) => {
+                      useTrackerStore.getState().setCurrentPosition(pos);
+                      getTrackerReplayer().jumpToPosition(pos, 0);
+                    }}
+                  />
                 </div>
               </div>
             ) : (
