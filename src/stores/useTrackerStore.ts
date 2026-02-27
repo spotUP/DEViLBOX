@@ -119,6 +119,7 @@ interface TrackerStore {
 
   // Multi-format editor support
   editorMode: EditorMode;
+  linearPeriods: boolean; // true = XM/IT/FTM linear frequency table; false = Amiga periods
   furnaceNative: FurnaceNativeData | null;
   hivelyNative: HivelyNativeData | null;
   hivelyFileData: ArrayBuffer | null;
@@ -280,7 +281,7 @@ interface TrackerStore {
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
   setHivelyNative: (data: HivelyNativeData | null) => void;
-  applyEditorMode: (song: { furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[] }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[] }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
 
   // Undo/Redo support
@@ -363,6 +364,7 @@ export const useTrackerStore = create<TrackerStore>()(
 
     // Multi-format editor support
     editorMode: 'classic' as EditorMode,
+    linearPeriods: false,
     furnaceNative: null,
     hivelyNative: null,
     hivelyFileData: null,
@@ -2671,6 +2673,8 @@ export const useTrackerStore = create<TrackerStore>()(
     applyEditorMode: (song) =>
       set((state) => {
         console.log('[useTrackerStore] applyEditorMode branch:', { hasFurnace: !!song.furnaceNative, hasHively: !!song.hivelyNative, hasChannelTables: !!song.channelTrackTables, tableLen: song.channelTrackTables?.length });
+        // Always store linearPeriods — affects period→Hz math for XM, IT, FTM, XTracker etc.
+        state.linearPeriods = song.linearPeriods ?? false;
         if (song.furnaceNative) {
           state.editorMode = 'furnace';
           state.furnaceNative = song.furnaceNative;
