@@ -51,6 +51,14 @@ describe('parseDigitalMugicianFile — editorsong.dmu', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
+
+  it('extracts DigMug synth instruments', async () => {
+    const song = await parseDigitalMugicianFile(loadBuf(FILE1), 'editorsong.dmu');
+    if (!song) return;
+    expect(song.instruments.length).toBeGreaterThan(0);
+    expect(song.instruments[0].synthType).toBe('DigMugSynth');
+    expect(song.instruments[0].digMug).toBeTruthy();
+  });
 });
 
 describe('parseDigitalMugicianFile — flight.dmu', () => {

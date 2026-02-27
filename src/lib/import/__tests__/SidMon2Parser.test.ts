@@ -29,6 +29,13 @@ describe('parseSidMon2File — bruno time.sid2', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
+  it('extracts SidMon2 synth instruments', async () => {
+    const song = await parseSidMon2File(loadBuf(FILE_BRUNOTIME), 'bruno time.sid2');
+    if (!song) return;
+    expect(song.instruments.length).toBeGreaterThan(0);
+    expect(song.instruments[0].synthType).toBe('SidMonSynth');
+    expect(song.instruments[0].sidMon).toBeTruthy();
+  });
 });
 
 describe('parseSidMon2File — carcass-demonintro.sid2', () => {
@@ -40,5 +47,12 @@ describe('parseSidMon2File — carcass-demonintro.sid2', () => {
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
+  });
+  it('extracts SidMon2 synth instruments', async () => {
+    const song = await parseSidMon2File(loadBuf(FILE_CARCASS), 'carcass-demonintro.sid2');
+    if (!song) return;
+    expect(song.instruments.length).toBeGreaterThan(0);
+    expect(song.instruments[0].synthType).toBe('SidMonSynth');
+    expect(song.instruments[0].sidMon).toBeTruthy();
   });
 });
