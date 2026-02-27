@@ -1746,7 +1746,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     id: 'samples',
     name: 'Samples',
     description: 'Sample-based instruments',
-    synths: [SYNTH_INFO.Sampler, SYNTH_INFO.Player],
+    synths: [SYNTH_INFO.Sampler, SYNTH_INFO.Player, SYNTH_INFO.ChiptuneModule],
   },
   {
     id: 'plugins',
@@ -1914,6 +1914,16 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.HippelCoSoSynth,
       SYNTH_INFO.RobHubbardSynth,
       SYNTH_INFO.DavidWhittakerSynth,
+      SYNTH_INFO.UADESynth,
+      SYNTH_INFO.SoundMonSynth,
+      SYNTH_INFO.SidMonSynth,
+      SYNTH_INFO.SidMon1Synth,
+      SYNTH_INFO.DigMugSynth,
+      SYNTH_INFO.FCSynth,
+      SYNTH_INFO.FredSynth,
+      SYNTH_INFO.TFMXSynth,
+      SYNTH_INFO.OctaMEDSynth,
+      SYNTH_INFO.SymphonieSynth,
     ],
   },
   {
@@ -1962,6 +1972,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     name: 'Buzzmachines',
     description: 'Jeskola Buzz machines - classic tracker synths and drums',
     synths: [
+      SYNTH_INFO.Buzzmachine,     // Generic Buzz fallback
       SYNTH_INFO.Buzz3o3,         // TB-303 clone
       SYNTH_INFO.Buzz3o3DF,       // Devil Fish enhanced 303
       SYNTH_INFO.BuzzM3,          // Dual-osc synth
@@ -1982,6 +1993,8 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     description: 'Hardware-accurate synth and keyboard chip emulations',
     synths: [
       SYNTH_INFO.MAMEVFX,
+      SYNTH_INFO.VFX,
+      SYNTH_INFO.D50,
       SYNTH_INFO.MAMEDOC,
       SYNTH_INFO.MAMEES5503,
       SYNTH_INFO.MAMERSA,
