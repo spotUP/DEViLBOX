@@ -12,6 +12,7 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { Toggle } from '@components/controls/Toggle';
 import { KeyboardShortcutSheet } from '@components/tracker/KeyboardShortcutSheet';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { useAudioStore } from '@stores/useAudioStore';
 import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
 
@@ -65,6 +66,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     renderMode,
     setRenderMode,
   } = useSettingsStore();
+
+  const { sampleBusGain, setSampleBusGain, synthBusGain, setSynthBusGain } = useAudioStore();
 
   const {
     editStep, setEditStep,
@@ -570,6 +573,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Bus Gain Balance */}
+              <div className="flex flex-col gap-2">
+                <label className="text-ft2-text text-xs font-mono">Bus Gain Balance:</label>
+                <span className="text-[9px] text-ft2-textDim font-mono">Balance sample vs synth/chip engine levels</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] text-ft2-textDim font-mono w-16">Samples</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={-12}
+                      max={12}
+                      step={1}
+                      value={sampleBusGain}
+                      onChange={(e) => setSampleBusGain(Number(e.target.value))}
+                      className="w-20 accent-ft2-cursor"
+                    />
+                    <span className="text-ft2-text text-[10px] font-mono w-10 text-right">
+                      {sampleBusGain > 0 ? `+${sampleBusGain}` : sampleBusGain} dB
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] text-ft2-textDim font-mono w-16">Synths</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={-12}
+                      max={12}
+                      step={1}
+                      value={synthBusGain}
+                      onChange={(e) => setSynthBusGain(Number(e.target.value))}
+                      className="w-20 accent-ft2-cursor"
+                    />
+                    <span className="text-ft2-text text-[10px] font-mono w-10 text-right">
+                      {synthBusGain > 0 ? `+${synthBusGain}` : synthBusGain} dB
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
