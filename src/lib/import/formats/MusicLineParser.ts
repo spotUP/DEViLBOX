@@ -135,7 +135,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   interface InstData {
     title: string;
     smplNumber: number;
-    smplType: number;     // 0=PCM, 1=Sine, 2=Sawtooth, 3=Square
+    smplType: number;     // 0=raw PCM; >0=waveform loop-size type (1=32s,2=64s,3=128s,4=256s)
     volume: number;       // 0–64
     fineTune: number;     // signed, may be used for finetune
     semiTone: number;     // signed, semitone transposition
@@ -550,7 +550,7 @@ function parseInst(v: DataView, data: Uint8Array, offset: number): {
   return {
     title:       readCString(data, o, 32),
     smplNumber:  data[o + 32],           // 0-based
-    smplType:    data[o + 33],           // 0=PCM, 1=Sine, 2=Sawtooth, 3=Square
+    smplType:    data[o + 33],           // 0=raw PCM; >0=waveform loop-size (1=32s,2=64s,3=128s,4=256s)
     // smplPtr   = v.getUint32(o + 34),   // ignore (Amiga RAM)
     // smplLen   = v.getUint16(o + 38),   // in words
     // smplRepPtr= v.getUint32(o + 40),   // ignore
@@ -690,47 +690,70 @@ function deltaDePack(packed: Uint8Array, outputSize: number, deltaCommand: numbe
 
 // ── Waveform synthesis ─────────────────────────────────────────────────────
 
-// For a 32-sample waveform at PAL_C3_RATE=8287 Hz:
-//   playbackRate at C3 period (428) = 8287/8287 = 1.0
-//   output frequency = 8287/32 ≈ 259 Hz ≈ C3 ✓
-const ML_WAVE_SAMPLES = 32;
+/**
+ * MusicLine smplType → waveform loop length (in samples):
+ *   1 → 32 samples   (8287/32  ≈ 259 Hz ≈ C3 at PAL_C3_RATE)
+ *   2 → 64 samples   (8287/64  ≈ 129 Hz ≈ C2)
+ *   3 → 128 samples  (8287/128 ≈  65 Hz ≈ C1)
+ *   4 → 256 samples  (8287/256 ≈  32 Hz ≈ C0)
+ *   5 → 256 samples  (same as 4; type 5 uses original 256-byte waveform)
+ *
+ * The WAVEFORM SHAPE is stored in the SMPL chunk as 256 bytes of signed PCM;
+ * smplType only selects which downsampled sub-loop length to use for playback.
+ * Reference: FixWaveLength @ Mline116.asm (offsets 480/448/384/256/0).
+ */
+export function mlSmplTypeToLoopLen(smplType: number): number {
+  if (smplType <= 0) return 256;
+  if (smplType >= 4) return 256;
+  // 1→32, 2→64, 3→128
+  return 32 * (1 << (smplType - 1));
+}
 
 /**
- * Generate a single-cycle waveform as unsigned 8-bit PCM (two's complement).
- *   type 1 = Sine
- *   type 2 = Sawtooth (ramp up)
- *   type 3 = Square
+ * Downsample a waveform PCM buffer to targetLen samples by evenly spacing sample points.
+ * Used to extract the correct sub-loop from a 256-byte MusicLine waveform.
+ */
+function downsampleWaveform(pcm: Uint8Array, targetLen: number): Uint8Array {
+  if (pcm.length === 0) return new Uint8Array(targetLen);
+  const out = new Uint8Array(targetLen);
+  const step = pcm.length / targetLen;
+  for (let i = 0; i < targetLen; i++) {
+    out[i] = pcm[Math.min(Math.floor(i * step), pcm.length - 1)];
+  }
+  return out;
+}
+
+/**
+ * @deprecated — only kept for MusicLineControls waveform preview.
+ * The parser now reads actual PCM from the SMPL chunk; this function is no longer
+ * used during import.
  *
- * 32 samples at PAL_C3_RATE (8287 Hz) gives ~C3 fundamental at Amiga C3 period (428).
+ * Generate a placeholder single-cycle waveform as unsigned 8-bit PCM:
+ *   type 1 = Sine, type 2 = Sawtooth, type 3 = Square
  */
 export function generateMusicLineWaveformPcm(type: number): Uint8Array {
-  const pcm = new Uint8Array(ML_WAVE_SAMPLES);
-  for (let i = 0; i < ML_WAVE_SAMPLES; i++) {
-    const phase = i / ML_WAVE_SAMPLES;
+  const len = mlSmplTypeToLoopLen(type) || 32;
+  const pcm = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    const phase = i / len;
     let val: number;
     switch (type) {
-      case 1: // Sine
-        val = Math.round(Math.sin(phase * 2 * Math.PI) * 127);
-        break;
-      case 2: // Sawtooth (ramp up: -127 → +127)
-        val = Math.round(phase * 254 - 127);
-        break;
-      case 3: // Square
-        val = phase < 0.5 ? 127 : -128;
-        break;
-      default:
-        val = 0;
+      case 1: val = Math.round(Math.sin(phase * 2 * Math.PI) * 127); break;
+      case 2: val = Math.round(phase * 254 - 127); break;
+      case 3: val = phase < 0.5 ? 127 : -128; break;
+      default: val = 0;
     }
-    // Signed 8-bit → unsigned (two's complement)
     pcm[i] = (val + 256) & 0xff;
   }
   return pcm;
 }
 
 const ML_WAVE_DISPLAY_NAMES: Record<number, string> = {
-  1: 'ML Sine',
-  2: 'ML Saw',
-  3: 'ML Square',
+  1: 'ML Wave 32',
+  2: 'ML Wave 64',
+  3: 'ML Wave 128',
+  4: 'ML Wave 256',
+  5: 'ML Wave 256',
 };
 
 // ── Instrument building ────────────────────────────────────────────────────
@@ -748,9 +771,24 @@ function buildInstruments(
   for (let i = 0; i < instList.length; i++) {
     const inst = instList[i];
 
-    // smplType > 0 = waveform synth (1=Sine, 2=Sawtooth, 3=Square)
+    // smplType > 0 = waveform synth.
+    // smplType is a LOOP SIZE selector (NOT a waveform shape):
+    //   1 → 32-sample loop, 2 → 64, 3 → 128, 4 → 256, 5 → 256 (full)
+    // The actual PCM waveform shape is stored in the SMPL chunk.
+    // Reference: FixWaveLength @ Mline116.asm — uses sub-loops from 256-byte waveform buffer.
     if (inst.smplType > 0) {
-      const wavePcm = generateMusicLineWaveformPcm(inst.smplType);
+      const smpl = smplList[inst.smplNumber - 1]; // smplNumber is 1-based
+      const loopLen = mlSmplTypeToLoopLen(inst.smplType);
+      let wavePcm: Uint8Array;
+
+      if (smpl && smpl.pcm.length > 0) {
+        // Downsample the 256-byte SMPL waveform to the sub-loop length for this smplType
+        wavePcm = downsampleWaveform(smpl.pcm, loopLen);
+      } else {
+        // No SMPL data — produce silence (will be inaudible, not a click)
+        wavePcm = new Uint8Array(loopLen);
+      }
+
       const displayType = ML_WAVE_DISPLAY_NAMES[inst.smplType] ?? `ML Wave ${inst.smplType}`;
       const base = createSamplerInstrument(
         i + 1,
@@ -758,15 +796,15 @@ function buildInstruments(
         wavePcm,
         inst.volume > 0 ? inst.volume : 64,
         PAL_C3_RATE,
-        0,               // loopStart — loop the full waveform
-        ML_WAVE_SAMPLES  // loopEnd
+        0,        // loopStart — loop the full extracted waveform
+        loopLen   // loopEnd
       );
       instruments.push({
         ...base,
         metadata: {
           ...base.metadata!,
           displayType,
-          mlSynthConfig: { waveformType: inst.smplType as 1 | 2 | 3, volume: inst.volume },
+          mlSynthConfig: { waveformType: inst.smplType, volume: inst.volume },
         },
       });
       continue;
