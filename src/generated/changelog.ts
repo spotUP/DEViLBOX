@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-27T10:18:44.292Z
+ * Generated: 2026-02-27T11:07:40.826Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1473';
-export const BUILD_NUMBER = '1473';
-export const BUILD_HASH = '8ef4bd52';
+export const BUILD_VERSION = '1.0.1478';
+export const BUILD_NUMBER = '1478';
+export const BUILD_HASH = '8fc90e81';
 export const BUILD_DATE = '2026-02-27';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,29 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1473',
+    version: '1.0.1478',
     date: '2026-02-27',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix SMPL parsing so all instruments have audio"
+      },
+      {
+        type: 'feature',
+        "description": "Apply shared component library to all UADE synth editors"
+      },
+      {
+        type: 'feature',
+        "description": "Embed track table editor inline in TrackerView"
+      },
+      {
+        type: 'fix',
+        "description": "Emit one InstrumentConfig per instrument slot"
+      },
+      {
+        type: 'fix',
+        "description": "Also expose HEAPF32 on Module for audio decode"
+      },
       {
         type: 'fix',
         "description": "Expose HEAPU8 on Module so worklet loadTune doesn't crash"
@@ -196,32 +216,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Remove 22 final silent stub native parsers — route to UADE"
-      }
-    ]
-  },
-  {
-    version: '2026-02-26',
-    date: '2026-02-26',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Correct Medley subsong pointer arithmetic and add placeholder instrument"
-      },
-      {
-        type: 'fix',
-        "description": "Remove 35 more silent stub native parsers — route to UADE"
-      },
-      {
-        type: 'feature',
-        "description": "Complete UADE prefix routing coverage + native parser prefs"
-      },
-      {
-        type: 'improvement',
-        "description": "Swap stale format prefs for new parser wiring"
-      },
-      {
-        type: 'fix',
-        "description": "Remove 23 silent stub native parsers — route to UADE/libopenmpt"
       }
     ]
   }
