@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-27T17:04:13.835Z
+ * Generated: 2026-02-27T20:24:51.417Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1495';
-export const BUILD_NUMBER = '1495';
-export const BUILD_HASH = 'ef78d455';
+export const BUILD_VERSION = '1.0.1497';
+export const BUILD_NUMBER = '1497';
+export const BUILD_HASH = '7179363d';
 export const BUILD_DATE = '2026-02-27';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1495',
+    version: '1.0.1497',
     date: '2026-02-27',
     changes: [
+      {
+        type: 'fix',
+        "description": "Add 14 missing synth types to SYNTH_CATEGORIES dropdown"
+      },
+      {
+        type: 'feature',
+        "description": "Add multi-channel pattern viewer below track matrix"
+      },
       {
         type: 'fix',
         "description": "Use actual SMPL PCM for waveform instruments instead of fake generators"
@@ -200,14 +208,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Correct .ml format detection, instrument sentinel, and Vite dedupe"
-      },
-      {
-        type: 'feature',
-        "description": "Native MusicLine Editor parser + per-channel replayer support"
-      },
-      {
-        type: 'feature',
-        "description": "Add native XM/MOD parsers — isXMFormat+parseXMFile, isMODFormat+parseMODFile"
       }
     ]
   }
