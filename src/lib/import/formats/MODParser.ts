@@ -10,6 +10,10 @@ import type {
   ParsedSample,
   ImportMetadata,
 } from '../../../types/tracker';
+import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
+import type { Pattern, ChannelData, TrackerCell } from '@/types';
+import type { InstrumentConfig } from '@/types/instrument';
+import { convertToInstrument } from '../InstrumentConverter';
 
 /**
  * MOD File Header
@@ -465,4 +469,108 @@ export function convertMODEffect(effect: number, param: number): string {
   const effectChar = effect.toString(16).toUpperCase();
   const paramHex = param.toString(16).padStart(2, '0').toUpperCase();
   return `${effectChar}${paramHex}`;
+}
+
+// ── TrackerSong wrapper ───────────────────────────────────────────────────────
+
+const MOD_FORMAT_TAGS = new Set([
+  'M.K.', 'M!K!', 'FLT4', 'FLT8', '4CHN', '6CHN', '8CHN',
+  'OCTA', 'CD81', '2CHN', 'TDZ1', 'TDZ2', 'TDZ3',
+]);
+
+/** Detect MOD by format tag at byte offset 1080 (4 bytes). */
+export function isMODFormat(buffer: ArrayBuffer): boolean {
+  if (buffer.byteLength < 1084) return false;
+  const bytes = new Uint8Array(buffer, 1080, 4);
+  const tag = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+  return MOD_FORMAT_TAGS.has(tag);
+}
+
+const NOTE_SEMITONES: Record<string, number> = {
+  'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
+  'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11,
+};
+
+function noteNameToIndex(name: string): number {
+  // Matches "C-3", "C#3", "A#2", etc.
+  const match = name.match(/^([A-G]#?)[-]?(\d)$/);
+  if (!match) return 0;
+  const semitone = NOTE_SEMITONES[match[1]] ?? 0;
+  const octave = parseInt(match[2]);
+  return octave * 12 + semitone + 1; // 1-based, C-0 = 1
+}
+
+/** Parse a MOD file and return a TrackerSong with real PCM instruments. */
+export async function parseMODFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
+  const { header, patterns: modPatterns, instruments: parsedInstruments, metadata } = await parseMOD(buffer);
+
+  const emptyInst = (id: number, name: string): InstrumentConfig => ({
+    id,
+    name: name || `Sample ${id}`,
+    type:      'sample' as const,
+    synthType: 'Sampler' as const,
+    effects:   [],
+    volume:    -60,
+    pan:       0,
+  } as InstrumentConfig);
+
+  const instruments: InstrumentConfig[] = parsedInstruments.map((inst) => {
+    const id = inst.id;
+    const converted = convertToInstrument(inst, id, 'S3M'); // MOD has no envelopes
+    return converted.length > 0 ? { ...converted[0], id } : emptyInst(id, inst.name);
+  });
+
+  const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+
+  const patterns: Pattern[] = modPatterns.map((modPat, patIdx) => ({
+    id:     `pattern-${patIdx}`,
+    name:   `Pattern ${patIdx}`,
+    length: modPat.length, // 64 rows
+    channels: Array.from({ length: header.channelCount }, (_, ch): ChannelData => ({
+      id:           `channel-${ch}`,
+      name:         `Channel ${ch + 1}`,
+      muted:        false,
+      solo:         false,
+      collapsed:    false,
+      volume:       100,
+      pan:          0,
+      instrumentId: null,
+      color:        null,
+      rows: modPat.map((row): TrackerCell => {
+        const n = row[ch];
+        if (!n || (n.period === 0 && n.instrument === 0 && n.effect === 0 && n.effectParam === 0)) {
+          return emptyCell();
+        }
+        const noteName = periodToNote(n.period);
+        const noteIdx  = noteName ? noteNameToIndex(noteName) : 0;
+        return {
+          note:       noteIdx,
+          instrument: n.instrument,
+          volume:     0, // MOD has no per-note volume column
+          effTyp:     n.effect,
+          eff:        n.effectParam,
+          effTyp2:    0,
+          eff2:       0,
+        };
+      }),
+    })),
+  }));
+
+  const songPositions = header.patternOrderTable.slice(0, header.songLength);
+  const initialSpeed  = metadata.modData?.initialSpeed ?? 6;
+  const initialBPM    = metadata.modData?.initialBPM ?? 125;
+
+  return {
+    name:            header.title.replace(/\0/g, '').trim() || filename.replace(/\.[^/.]+$/, ''),
+    format:          'MOD' as TrackerFormat,
+    patterns,
+    instruments,
+    songPositions,
+    songLength:      header.songLength,
+    restartPosition: header.restartPosition,
+    numChannels:     header.channelCount,
+    initialSpeed,
+    initialBPM,
+    linearPeriods:   false, // MOD always uses Amiga periods
+  };
 }
