@@ -17,7 +17,7 @@ import { resolveArrangement } from '@lib/arrangement/resolveArrangement';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 
 export const usePatternPlayback = () => {
-  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta } = useTrackerStore(useShallow((s) => ({
+  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, channelTrackTables, channelSpeeds, channelGrooves, linearPeriods, hivelyNative, hivelyFileData, hivelyMeta } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
     setCurrentPattern: s.setCurrentPattern,
@@ -27,6 +27,7 @@ export const usePatternPlayback = () => {
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
+    linearPeriods: s.linearPeriods,
     hivelyNative: s.hivelyNative,
     hivelyFileData: s.hivelyFileData,
     hivelyMeta: s.hivelyMeta,
@@ -292,6 +293,8 @@ export const usePatternPlayback = () => {
           numChannels: effectiveNumChannels,
           initialSpeed: modData?.initialSpeed ?? 6,
           initialBPM: modData?.initialBPM ?? bpmRef.current,
+          // Period frequency mode (set by XM, IT, FTM, XTracker, etc. parsers)
+          linearPeriods,
           // Per-channel track tables (MusicLine Editor and similar formats)
           channelTrackTables: channelTrackTables ?? undefined,
           channelSpeeds: channelSpeeds ?? undefined,
