@@ -4,6 +4,8 @@ import { Knob } from '@components/controls/Knob';
 import { Waves, Activity, Filter, Repeat, Speaker, Wind } from 'lucide-react';
 import { useThemeStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
+import { FilterFrequencyResponse } from '@components/instruments/shared';
+import type { FilterType } from '@components/instruments/shared';
 
 interface DubSirenControlsProps {
   config: DubSirenConfig;
@@ -281,6 +283,15 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
               </button>
             ))}
           </div>
+
+          <FilterFrequencyResponse
+            filterType={config.filter.type as FilterType}
+            cutoff={Math.log10(Math.max(config.filter.frequency, 20) / 20) / 3}
+            resonance={0}
+            poles={2}
+            color={knobColor}
+            width={300} height={56}
+          />
 
           <Knob
             value={config.filter.frequency}

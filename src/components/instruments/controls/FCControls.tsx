@@ -9,6 +9,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { FCConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+import { EnvelopeVisualization } from '@components/instruments/shared';
 
 interface FCControlsProps {
   config: FCConfig;
@@ -78,6 +79,18 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange }) => {
       {/* ADSR */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Volume Envelope" />
+        <div className="mb-3">
+          <EnvelopeVisualization
+            mode="steps"
+            attackVol={config.atkVolume}   attackSpeed={config.atkLength}
+            decayVol={config.decVolume}    decaySpeed={config.decLength}
+            sustainVol={config.sustVolume} sustainLen={32}
+            releaseVol={0}                 releaseSpeed={config.relLength}
+            maxVol={64}
+            color={knob}
+            width={300} height={56}
+          />
+        </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.atkLength} min={0} max={255} step={1}
