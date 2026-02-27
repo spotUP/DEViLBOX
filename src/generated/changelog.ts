@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-27T00:59:06.044Z
+ * Generated: 2026-02-27T01:28:35.038Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1446';
-export const BUILD_NUMBER = '1446';
-export const BUILD_HASH = '386f1f96';
+export const BUILD_VERSION = '1.0.1450';
+export const BUILD_NUMBER = '1450';
+export const BUILD_HASH = '97274adb';
 export const BUILD_DATE = '2026-02-27';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,25 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1446',
+    version: '1.0.1450',
     date: '2026-02-27',
     changes: [
+      {
+        type: 'fix',
+        "description": "Skip correct 20-byte file header (was 16 — broke all parsing)"
+      },
+      {
+        type: 'fix',
+        "description": "Add musicLine key to FormatEnginePreferences"
+      },
+      {
+        type: 'fix',
+        "description": "Correct .ml format detection, instrument sentinel, and Vite dedupe"
+      },
+      {
+        type: 'feature',
+        "description": "Native MusicLine Editor parser + per-channel replayer support"
+      },
       {
         type: 'feature',
         "description": "Add native XM/MOD parsers — isXMFormat+parseXMFile, isMODFormat+parseMODFile"
@@ -222,22 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Add Medley (.ml) to format-implementation-status.md"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused _version in LMEParser; fix RobHubbard v3 pos logic"
-      },
-      {
-        type: 'feature',
-        "description": "Medley native parser (.ml) + routing + settings key"
-      },
-      {
-        type: 'fix',
-        "description": "Register SymphonieSynth in ToneEngine; single instrument"
-      },
-      {
-        type: 'fix',
-        "description": "Deep-merge formatEngine on persist hydration"
       }
     ]
   }
