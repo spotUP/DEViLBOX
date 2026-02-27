@@ -9,7 +9,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getSynthInfo } from '@constants/synthCategories';
-import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package, ExternalLink, Download, Upload } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 import { InstrumentContextMenu } from './InstrumentContextMenu';
@@ -19,6 +19,8 @@ import { BASS_PRESETS } from '@constants/factoryPresets';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as Tone from 'tone';
 import type { InstrumentConfig } from '@typedefs/instrument';
+import { exportAsAhi } from '@lib/export/HivelyExporter';
+import { parseAhiFile } from '@lib/import/formats/HivelyParser';
 
 interface InstrumentListProps {
   /** Optional: Compact mode for sidebar */
@@ -231,7 +233,41 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     }
   };
 
-  const handleDragStart = (e: React.DragEvent, id: number) => {
+  const handleSaveAhi = useCallback((e: React.MouseEvent, inst: InstrumentConfig) => {
+    e.stopPropagation();
+    if (!inst.hively) return;
+    const bytes = exportAsAhi(inst.hively, inst.name);
+    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${inst.name.replace(/[^a-zA-Z0-9_\-]/g, '_') || 'instrument'}.ahi`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleLoadAhi = useCallback((e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.ahi';
+    input.onchange = async (ev: Event) => {
+      const file = (ev.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const buffer = await file.arrayBuffer();
+        const { config, name } = parseAhiFile(buffer);
+        updateInstrument(id, { hively: config, name });
+      } catch (err) {
+        console.error('[AhiLoad] Failed to parse .ahi:', err);
+      }
+    };
+    input.click();
+  }, [updateInstrument]);
+
+    const handleDragStart = (e: React.DragEvent, id: number) => {
     e.dataTransfer.setData('application/x-devilbox-instrument', JSON.stringify({ id }));
     e.dataTransfer.effectAllowed = 'copy';
     
@@ -393,6 +429,24 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                     >
                       <Copy size={10} />
                     </button>
+                    {instrument.synthType === 'HivelySynth' && (
+                      <>
+                        <button
+                          onClick={(e) => handleSaveAhi(e, instrument)}
+                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-yellow-400`}
+                          title="Save as .ahi instrument file"
+                        >
+                          <Download size={10} />
+                        </button>
+                        <button
+                          onClick={(e) => handleLoadAhi(e, instrument.id)}
+                          className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-yellow-400`}
+                          title="Load .ahi instrument file"
+                        >
+                          <Upload size={10} />
+                        </button>
+                      </>
+                    )}
                     {instruments.length > 1 && (
                       <button
                         onClick={(e) => handleDelete(e, instrument.id)}
