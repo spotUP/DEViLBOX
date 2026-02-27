@@ -107,12 +107,15 @@ function calculateDecayAndSustain(
   }
 
   // Find sustain point or steady state
-  let sustainIdx = sustainPointIdx ?? peakIdx;
+  // Guard: treat negative sustainPointIdx (e.g. -1 from IT when disabled) as absent
+  const validSustainIdx = (sustainPointIdx !== null && sustainPointIdx >= 0 && sustainPointIdx < points.length)
+    ? sustainPointIdx : null;
+  let sustainIdx = validSustainIdx ?? peakIdx;
   let sustainValue = points[sustainIdx]?.value ?? peakValue;
 
   // If sustain point is specified, use it
-  if (sustainPointIdx !== null && sustainPointIdx < points.length) {
-    sustainValue = points[sustainPointIdx].value;
+  if (validSustainIdx !== null) {
+    sustainValue = points[validSustainIdx].value;
   } else {
     // Find where envelope stabilizes (change < 10%)
     for (let i = peakIdx + 1; i < points.length; i++) {
@@ -127,7 +130,7 @@ function calculateDecayAndSustain(
   }
 
   // Calculate decay time
-  const decayTicks = points[sustainIdx].tick - points[peakIdx].tick;
+  const decayTicks = (sustainIdx < points.length ? points[sustainIdx].tick : points[peakIdx].tick) - points[peakIdx].tick;
   const tickToMs = 192 / 6;
   const decay = Math.max(0, decayTicks * tickToMs);
 
