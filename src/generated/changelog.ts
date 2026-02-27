@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-27T11:07:40.826Z
+ * Generated: 2026-02-27T17:04:13.835Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1478';
-export const BUILD_NUMBER = '1478';
-export const BUILD_HASH = '8fc90e81';
+export const BUILD_VERSION = '1.0.1495';
+export const BUILD_NUMBER = '1495';
+export const BUILD_HASH = 'ef78d455';
 export const BUILD_DATE = '2026-02-27';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,16 +30,76 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1478',
+    version: '1.0.1495',
     date: '2026-02-27',
     changes: [
       {
         type: 'fix',
-        "description": "Fix SMPL parsing so all instruments have audio"
+        "description": "Use actual SMPL PCM for waveform instruments instead of fake generators"
+      },
+      {
+        type: 'fix',
+        "description": "Replace Sampler dropdown with MusicLine branded header"
+      },
+      {
+        type: 'fix',
+        "description": "Add ChipTrackerParser + SamplerTrackerPlusParser stubs, fix test"
       },
       {
         type: 'feature',
-        "description": "Apply shared component library to all UADE synth editors"
+        "description": "Synth editor for waveform instruments"
+      },
+      {
+        type: 'fix',
+        "description": "Wire MFPParser, delete two dead stub parsers"
+      },
+      {
+        type: 'fix',
+        "description": "Hively-style track matrix + fix instrument preview pitch"
+      },
+      {
+        type: 'fix',
+        "description": "Wire GMCParser + SonixMusicDriverParser into routing"
+      },
+      {
+        type: 'feature',
+        "description": "Add steps-mode EnvelopeVisualization to SidMon1Controls"
+      },
+      {
+        type: 'feature',
+        "description": "Wire FilterFrequencyResponse into DubSiren + EnvelopeVisualization into FCControls"
+      },
+      {
+        type: 'feature',
+        "description": "Add EnvelopeVisualization mode=linear + wire into OBXd/V2/HarmonicSynth editors"
+      },
+      {
+        type: 'feature',
+        "description": "Add FilterFrequencyResponse shared component"
+      },
+      {
+        type: 'feature',
+        "description": "Add 'musicline' editor mode for WebGL DOM overlay"
+      },
+      {
+        type: 'feature',
+        "description": "Add FMAlgorithmDiagram shared component"
+      },
+      {
+        type: 'fix',
+        "description": "Await pending sample decodes before starting scheduler"
+      },
+      {
+        type: 'feature',
+        "description": "Enhance MacroEditor with line-draw, presets, playback cursor, hover tooltips"
+      },
+      {
+        type: 'feature',
+        "description": "Apply shared component library to WavetableEditor, FurnaceEditor, HivelyControls"
+      },
+      {
+        type: 'fix',
+        "description": "Fix SMPL parsing so all instruments have audio"
       },
       {
         type: 'feature',
@@ -148,74 +208,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add native XM/MOD parsers — isXMFormat+parseXMFile, isMODFormat+parseMODFile"
-      },
-      {
-        type: 'fix',
-        "description": "Hook pumaTracker pref key into PumaTracker stub"
-      },
-      {
-        type: 'feature',
-        "description": "Wire Composer667 native parser (batch 6)"
-      },
-      {
-        type: 'feature',
-        "description": "Test(import): add ITParser vitest suite for orbiter.it and sunchild.it"
-      },
-      {
-        type: 'fix',
-        "description": "Guard EnvelopeConverter against negative sustainPointIdx"
-      },
-      {
-        type: 'fix',
-        "description": "Correct S3M 3-byte paragraph pointer byte order"
-      },
-      {
-        type: 'feature',
-        "description": "Wire FMTracker, MadTracker2, PSM native parsers (batch 5)"
-      },
-      {
-        type: 'feature',
-        "description": "Wire 9 more native parser guards + add 4 new format keys"
-      },
-      {
-        type: 'feature',
-        "description": "Native S3M and IT parsers with real PCM extraction"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: clean up stale masterplan todos and dead useEffect"
-      },
-      {
-        type: 'feature',
-        "description": "Rewrite TFMXControls with editable VolModSeq/SndModSeq macro viewer"
-      },
-      {
-        type: 'feature',
-        "description": "Wire 51 more UADE stubs with native parser guards (batch 3)"
-      },
-      {
-        type: 'feature',
-        "description": "Extract Rob Hubbard PCM samples + wire 4 more native parsers"
-      },
-      {
-        type: 'feature',
-        "description": "Wire 9 more native parsers — UFO, IffSmus, MagneticFieldsPacker, RichardJoseph, DaveLowe, LME, JochenHippelST, SpecialFX, BenDaglish"
-      },
-      {
-        type: 'feature',
-        "description": "Wire OctaMED, SidMon1, HippelCoSo, DavidWhittaker synths into ToneEngine"
-      },
-      {
-        type: 'feature',
-        "description": "Wire 18 native parsers — Medley, MarkCooksey, JeroenTel, Quartet, SoundMaster, ZoundMonitor, SynthPack, TCBTracker, MMDC, PSA, SteveTurner, TME, JasonBrooke, Laxity, FredGray, MusicMaker4V/8V, ManiacsOfNoise"
-      },
-      {
-        type: 'improvement',
-        "description": "Sync format-implementation-status with batch-3/4 parsers and routing audit"
-      },
-      {
-        type: 'fix',
-        "description": "Remove 22 final silent stub native parsers — route to UADE"
       }
     ]
   }

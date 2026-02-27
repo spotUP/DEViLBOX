@@ -48,6 +48,7 @@ import { AutomationPanel } from '@components/automation/AutomationPanel';
 import { notify } from '@stores/useNotificationStore';
 import { getTrackerReplayer, type TrackerSong } from '@engine/TrackerReplayer';
 import { MusicLineTrackTableEditor } from './MusicLineTrackTableEditor';
+import { MusicLinePatternViewer } from './MusicLinePatternViewer';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
 import type { XMNote } from '@lib/import/formats/XMParser';
@@ -1352,9 +1353,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 </div>
               </div>
             ) : editorMode === 'musicline' ? (
-              <div className="flex-1 overflow-auto bg-dark-bgPrimary">
-                <div className="p-4 space-y-3">
-                  <div className="flex items-center gap-2">
+              <div className="flex-1 flex flex-col min-h-0 bg-dark-bgPrimary">
+                {/* Per-channel track table matrix */}
+                <div className="flex-shrink-0 border-b border-dark-border" style={{ maxHeight: 220, overflowY: 'auto' }}>
+                  <div className="px-3 pt-3 pb-1 flex items-center gap-2">
                     <span className="text-sm font-bold text-ft2-text">MusicLine Editor</span>
                     <span className="text-xs text-accent-primary bg-accent-primary/10 px-1.5 py-0.5 rounded border border-accent-primary/30">
                       per-channel
@@ -1363,12 +1365,18 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                       {channelTrackTables?.length ?? 0} channels · {patterns.length} parts
                     </span>
                   </div>
-                  <MusicLineTrackTableEditor
-                    onSeek={(pos) => {
-                      useTrackerStore.getState().setCurrentPosition(pos);
-                      getTrackerReplayer().jumpToPosition(pos, 0);
-                    }}
-                  />
+                  <div className="px-3 pb-3">
+                    <MusicLineTrackTableEditor
+                      onSeek={(pos) => {
+                        useTrackerStore.getState().setCurrentPosition(pos);
+                        getTrackerReplayer().jumpToPosition(pos, 0);
+                      }}
+                    />
+                  </div>
+                </div>
+                {/* Multi-channel note viewer */}
+                <div className="flex-1 min-h-0">
+                  <MusicLinePatternViewer />
                 </div>
               </div>
             ) : (

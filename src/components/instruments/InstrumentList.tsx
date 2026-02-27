@@ -373,7 +373,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
                 {/* Synth Type Badge */}
                 <span className={`text-[9px] px-1 rounded ${isSelected ? 'bg-ft2-bg/20 text-ft2-bg' : 'bg-ft2-header text-ft2-textDim'}`}>
-                  {synthInfo?.shortName || instrument.synthType}
+                  {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
                 </span>
 
                 {/* Actions (visible on hover, always visible when selected) */}
@@ -469,7 +469,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                 {/* Synth type badge (non-compact only) */}
                 {!compact && (
                   <span className="text-[10px] text-text-muted font-mono">
-                    {synthInfo?.shortName || instrument.synthType}
+                    {instrument.metadata?.displayType || synthInfo?.shortName || instrument.synthType}
                   </span>
                 )}
 
