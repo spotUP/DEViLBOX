@@ -3,7 +3,7 @@ import type { V2Config } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Activity, Filter, Zap } from 'lucide-react';
 import { useThemeStore } from '@stores';
-import { FilterFrequencyResponse } from '@components/instruments/shared';
+import { FilterFrequencyResponse, EnvelopeVisualization } from '@components/instruments/shared';
 
 // Maps FILTER_MODES index ('Off','Low','Band','High','Notch','All','MoogL','MoogH')
 // to a biquad approximation. null = filter bypassed (Off), no curve drawn.
@@ -427,7 +427,19 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <Zap size={16} className="text-amber-500" />
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">AMP ENVELOPE (EG 1)</h3>
         </div>
-        
+
+        <div className="mb-3">
+          <EnvelopeVisualization
+            mode="linear"
+            attack={config.envelope.attack / 127}
+            decay={config.envelope.decay / 127}
+            sustain={config.envelope.sustain / 127}
+            release={config.envelope.release / 127}
+            color={knobColor}
+            width={300} height={56}
+          />
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
           <Knob
             value={config.envelope.attack}
@@ -470,7 +482,19 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <Zap size={16} className="text-amber-500" />
           <h3 className="font-bold text-amber-400 uppercase tracking-tight">MOD ENVELOPE (EG 2)</h3>
         </div>
-        
+
+        <div className="mb-3">
+          <EnvelopeVisualization
+            mode="linear"
+            attack={config.envelope2.attack / 127}
+            decay={config.envelope2.decay / 127}
+            sustain={config.envelope2.sustain / 127}
+            release={config.envelope2.release / 127}
+            color={knobColor}
+            width={300} height={56}
+          />
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
           <Knob
             value={config.envelope2.attack}
