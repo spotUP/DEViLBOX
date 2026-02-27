@@ -72,3 +72,31 @@ describe("parseMusicLineFile — rush.ml", () => {
     expect(report.numChannels).toBeGreaterThan(0);
   });
 });
+
+// ── Channel track table structure ─────────────────────────────────────────────
+
+describe("channelTrackTables structure", () => {
+  it("pink2.ml: channelTrackTables has 4 channels", () => {
+    const song = parseMusicLineFile(loadBytes(FILE1))!;
+    expect(song.channelTrackTables).toBeDefined();
+    expect(song.channelTrackTables!.length).toBe(4);
+    // Each channel should have at least one position
+    for (const table of song.channelTrackTables!) {
+      expect(table.length).toBeGreaterThan(0);
+    }
+    console.log("pink2.ml channelTrackTables lengths:", song.channelTrackTables!.map(t => t.length));
+    console.log("pink2.ml channelSpeeds:", song.channelSpeeds);
+  });
+
+  it("rush.ml: channelTrackTables has 8 channels", () => {
+    const song = parseMusicLineFile(loadBytes(FILE2))!;
+    expect(song.channelTrackTables).toBeDefined();
+    expect(song.channelTrackTables!.length).toBe(8);
+    // Each channel should have at least one position
+    for (const table of song.channelTrackTables!) {
+      expect(table.length).toBeGreaterThan(0);
+    }
+    console.log("rush.ml channelTrackTables lengths:", song.channelTrackTables!.map(t => t.length));
+    console.log("rush.ml channelSpeeds:", song.channelSpeeds);
+  });
+});
