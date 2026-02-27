@@ -74,10 +74,14 @@ function findJeroenTelScanPos(buf: Uint8Array): number {
 export function isJeroenTelFormat(buffer: ArrayBuffer, filename?: string): boolean {
   const buf = new Uint8Array(buffer);
 
-  // ── Prefix check (optional fast-reject) ──────────────────────────────────
+  // ── Prefix / extension check (optional fast-reject) ─────────────────────
+  // UADE canonical names use prefix: jt.songname or mon_old.songname
+  // Common rip naming uses extension: songname.jt
   if (filename !== undefined) {
     const baseName = (filename.split('/').pop() ?? filename).toLowerCase();
-    if (!baseName.startsWith('jt.') && !baseName.startsWith('mon_old.')) {
+    const hasPrefix = baseName.startsWith('jt.') || baseName.startsWith('mon_old.');
+    const hasExtension = baseName.endsWith('.jt');
+    if (!hasPrefix && !hasExtension) {
       return false;
     }
   }
@@ -106,9 +110,17 @@ export function isJeroenTelFormat(buffer: ArrayBuffer, filename?: string): boole
   if (buf[scanPos + 10] !== 0x4e || buf[scanPos + 11] !== 0x75) return false;
 
   // ── Post-RTS structural check ─────────────────────────────────────────────
-  // ext.w D1; add.w D1, A0  →  advance from (scanPos + 12) by D1 bytes
-  // A0 now points to scanPos + 12 + D1
-  const checkOff = scanPos + 12 + d1;
+  // The ASM reads: ext.w D1; add.w D1, A0 — but A0 here is the pointer *past*
+  // the RTS (at scanPos+12), and D1 is the sign-extended byte from scanPos+9.
+  // For real files D1 is 0x02, making the "skip" 2 bytes — landing at offset 14.
+  // However, the reference files have 0x78001839 at scanPos+12 (offset 12), NOT
+  // at scanPos+14.  Tracing the actual ASM more carefully: the ANDI.B sequence
+  // is 8 bytes (02 39 00 01 xx xx xx xx), then BNE+D1+RTS at +8..+11.  The label
+  // "Good" / "NoOne" check happens at (A0) where A0 = scanPos+12 before the
+  // ext.w/add.w step.  D1 is a byte used as an offset INTO the data, not an
+  // additional skip past the RTS.  Empirically, 0x78001839 sits at scanPos+12
+  // in every real Jeroen Tel file tested.
+  const checkOff = scanPos + 12;
   if (checkOff + 3 >= buf.length) return false;
 
   const word0 = (buf[checkOff] << 8) | buf[checkOff + 1];

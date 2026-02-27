@@ -71,9 +71,19 @@ function u32BE(buf: Uint8Array, off: number): number {
 // ── Sub-variant detection ───────────────────────────────────────────────────
 
 /**
- * Jason Page format variant. 1 = old, 2 = new, 3 = raw binary.
+ * Jason Page format variant.
+ *  1 = old (Format 1)
+ *  2 = new (Format 2)
+ *  3 = raw binary (Format 3)
+ *  4 = Steve Turner / JPO (UADE prefix "JPO.", file extension ".jpo")
+ *
+ * Steve Turner modules (UADE eagleplayer.conf: SteveTurner prefixes=jpo,jpold)
+ * are historically distributed alongside Jason Page files and share the same
+ * UADE "Jason Page Old" category in many music archives.  We include them here
+ * so that ".jpo" files detected by the Steve Turner binary signature are also
+ * handled by this parser without throwing.
  */
-type JasonPageVariant = 1 | 2 | 3;
+type JasonPageVariant = 1 | 2 | 3 | 4;
 
 /**
  * Check for Format 3 (raw binary).
@@ -183,13 +193,42 @@ function detectFormat12(buf: Uint8Array): 1 | 2 | null {
 }
 
 /**
+ * Check for Steve Turner / JPO format (Variant 4).
+ *
+ * Mirrors the DTP_Check2 in Steve Turner_v4.asm:
+ *   1. u16BE(0x00) == 0x2B7C   (MOVE.L #...,D(An) — channel 0 init)
+ *   2. u16BE(0x08) == 0x2B7C   (channel 1 init)
+ *   3. u16BE(0x10) == 0x2B7C   (channel 2 init)
+ *   4. u16BE(0x18) == 0x2B7C   (channel 3 init)
+ *   5. u32BE(0x20) == 0x303C00FF  (MOVE.W #$00FF,D0)
+ *   6. u32BE(0x24) == 0x32004EB9  (MOVE.W D0,D1; JSR abs.l)
+ *   7. u16BE(0x2C) == 0x4E75   (RTS)
+ *
+ * UADE eagleplayer.conf: SteveTurner  prefixes=jpo,jpold
+ * File extension: .jpo, .jpold
+ */
+function isFormat4SteveTurner(buf: Uint8Array): boolean {
+  if (buf.length < 0x2e) return false;
+  if (u16BE(buf, 0x00) !== 0x2b7c) return false;
+  if (u16BE(buf, 0x08) !== 0x2b7c) return false;
+  if (u16BE(buf, 0x10) !== 0x2b7c) return false;
+  if (u16BE(buf, 0x18) !== 0x2b7c) return false;
+  if (u32BE(buf, 0x20) !== 0x303c00ff) return false;
+  if (u32BE(buf, 0x24) !== 0x32004eb9) return false;
+  if (u16BE(buf, 0x2c) !== 0x4e75) return false;
+  return true;
+}
+
+/**
  * Detect the Jason Page sub-variant of the given buffer.
  *
  * Format 3 is tried first because its signature constants are highly specific
- * and unambiguous. Formats 1/2 are tried next.
+ * and unambiguous. Steve Turner (Variant 4) is tried next because it uses a
+ * very different 68k instruction pattern.  Formats 1/2 are tried last.
  */
 function detectVariant(buf: Uint8Array): JasonPageVariant | null {
   if (isFormat3(buf)) return 3;
+  if (isFormat4SteveTurner(buf)) return 4;
   const f12 = detectFormat12(buf);
   if (f12 !== null) return f12;
   return null;
@@ -205,12 +244,24 @@ function basename(path: string): string {
 }
 
 /**
- * Return true if `name` starts with a known Jason Page UADE prefix
- * (case-insensitive):  jpn.  jpnd.  jp.
+ * Return true if `name` has a known Jason Page / Steve Turner UADE prefix or
+ * extension (case-insensitive):
+ *
+ *   Prefixes (UADE JasonPage): jpn.  jpnd.  jp.
+ *   Prefixes (UADE SteveTurner): jpo.  jpold.
+ *   Extensions (common in archives): .jpo  .jpold
  */
 function hasJasonPagePrefix(name: string): boolean {
   const lower = name.toLowerCase();
-  return lower.startsWith('jpn.') || lower.startsWith('jpnd.') || lower.startsWith('jp.');
+  return (
+    lower.startsWith('jpn.')  ||
+    lower.startsWith('jpnd.') ||
+    lower.startsWith('jp.')   ||
+    lower.startsWith('jpo.')  ||
+    lower.startsWith('jpold.') ||
+    lower.endsWith('.jpo')    ||
+    lower.endsWith('.jpold')
+  );
 }
 
 /**
@@ -284,7 +335,8 @@ export async function parseJasonPageFile(
   const variantLabel =
     variant === 1 ? 'Old (Format 1)' :
     variant === 2 ? 'New (Format 2)' :
-                    'Raw (Format 3)';
+    variant === 3 ? 'Raw (Format 3)' :
+                    'Steve Turner (JPO)';
 
   // ── Instrument placeholders ───────────────────────────────────────────────
   //

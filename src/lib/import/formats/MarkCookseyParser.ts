@@ -186,14 +186,43 @@ function isRareFormat(buf: Uint8Array): boolean {
   return true;
 }
 
+/**
+ * Check for the MarkCookseyOld player format (mco.* prefix / UADE: Mark_Cooksey_Old).
+ *
+ * This is a SEPARATE UADE player from the main MarkCooksey variants above.
+ * Detection mirrors UADE's MarkCookseyOld_mod.asm DTP_Check2 routine:
+ *   cmp.b  #$60,(A0)              ; BRA opcode at byte 0
+ *   move.l 2(A0),D0               ; u32 at offset 2
+ *   and.l  #$FFFFFF00,D0
+ *   and.l  #$FFFFFF00,D1          ; D1 = file size
+ *   cmp.l  D1,D0                  ; (u32_at_2 & 0xFFFFFF00) == (fileSize & 0xFFFFFF00)
+ *   tst.b  32(A0)                 ; byte at offset 32 must be 0
+ */
+function isMarkCookseyOldPlayerFormat(buf: Uint8Array): boolean {
+  if (buf.length < 36) return false;
+
+  // byte[0] must be 0x60 (BRA opcode)
+  if (buf[0] !== 0x60) return false;
+
+  // (u32 at offset 2) & 0xFFFFFF00 must equal (fileSize) & 0xFFFFFF00
+  const u32at2 = ((buf[2] << 24) | (buf[3] << 16) | (buf[4] << 8) | buf[5]) >>> 0;
+  if ((u32at2 & 0xFFFFFF00) !== (buf.length & 0xFFFFFF00)) return false;
+
+  // byte at offset 32 must be 0
+  if (buf[32] !== 0) return false;
+
+  return true;
+}
+
 // ── Format variant labels ──────────────────────────────────────────────────
 
-type MarkCookseyVariant = 'old' | 'new' | 'rare';
+type MarkCookseyVariant = 'old' | 'new' | 'rare' | 'old-player';
 
 function detectVariant(buf: Uint8Array): MarkCookseyVariant | null {
   if (isOldFormat(buf)) return 'old';
   if (isNewFormat(buf)) return 'new';
   if (isRareFormat(buf)) return 'rare';
+  if (isMarkCookseyOldPlayerFormat(buf)) return 'old-player';
   return null;
 }
 
@@ -217,10 +246,13 @@ export function isMarkCookseyFormat(buffer: ArrayBuffer, filename?: string): boo
   const buf = new Uint8Array(buffer);
   if (buf.length < 24) return false;
 
-  // Prefix check (optional but strongly recommended guard against false positives)
+  // Prefix/extension check (optional but strongly recommended guard against false positives)
+  // Accept both UADE-style prefixes (mc., mcr., mco.) and extension-style (.mc, .mcr, .mco)
   if (filename !== undefined) {
     const baseName = filename.split('/').pop()?.split('\\').pop() ?? filename;
-    if (!/^mc[ro]?\./i.test(baseName) && !/^mco\./i.test(baseName)) {
+    const hasPrefix = /^mc[ro]?\./i.test(baseName) || /^mco\./i.test(baseName);
+    const hasExt   = /\.(mc|mcr|mco)$/i.test(baseName);
+    if (!hasPrefix && !hasExt) {
       return false;
     }
   }
@@ -264,9 +296,10 @@ export async function parseMarkCookseyFile(
   // ── Variant label ─────────────────────────────────────────────────────────
 
   const variantLabel =
-    variant === 'old'  ? 'Old (mco)'   :
-    variant === 'rare' ? 'Rare (mcr)'  :
-                         'New (mc)';
+    variant === 'old'        ? 'Old (mco)'        :
+    variant === 'rare'       ? 'Rare (mcr)'       :
+    variant === 'old-player' ? 'Old Player (mco)' :
+                               'New (mc)';
 
   // ── Instrument placeholders ──────────────────────────────────────────────
   //

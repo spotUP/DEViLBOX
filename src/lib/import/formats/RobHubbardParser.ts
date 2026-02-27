@@ -108,7 +108,7 @@ export function isRobHubbardFormat(buffer: ArrayBuffer, filename?: string): bool
   // ── Prefix check (optional fast-reject) ──────────────────────────────────
   if (filename !== undefined) {
     const base = (filename.split('/').pop() ?? filename).toLowerCase();
-    if (!base.startsWith('rh.')) return false;
+    if (!base.startsWith('rh.') && !base.endsWith('.rh')) return false;
   }
 
   // ── Minimum size ─────────────────────────────────────────────────────────

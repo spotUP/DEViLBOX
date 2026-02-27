@@ -115,17 +115,25 @@ interface RawCell {
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 /**
- * Returns true if the buffer starts with the PT36 IFF FORM/MODL header.
- * "FORM" at offset 0 and "MODL" at offset 8 uniquely identify PT36 files.
+ * Returns true if the buffer starts with either:
+ *   - ProTracker 3.6 IFF FORM/MODL header ("FORM" at +0, "MODL" at +8), or
+ *   - PreTracker format magic: "PRT" at +0 followed by a version byte (0x1B for v1.x).
+ *
+ * Both are handled by parsePT36File.
  */
 export function isPT36Format(buffer: ArrayBuffer): boolean {
   if (buffer.byteLength < 12) return false;
   const buf = new Uint8Array(buffer);
-  return readFourCC(buf, 0) === 'FORM' && readFourCC(buf, 8) === 'MODL';
+  // ProTracker 3.6 IFF
+  if (readFourCC(buf, 0) === 'FORM' && readFourCC(buf, 8) === 'MODL') return true;
+  // PreTracker: magic is 'PRT' + version byte (non-zero, e.g. 0x1B for v1.x)
+  if (buf[0] === 0x50 && buf[1] === 0x52 && buf[2] === 0x54 && buf[3] !== 0) return true;
+  return false;
 }
 
 /**
- * Parse a ProTracker 3.6 IFF-wrapped MOD file into a TrackerSong.
+ * Parse a ProTracker 3.6 IFF-wrapped MOD file or a PreTracker (.prt) file
+ * into a TrackerSong.
  */
 export async function parsePT36File(
   buffer: ArrayBuffer,
@@ -134,7 +142,12 @@ export async function parsePT36File(
   const buf = new Uint8Array(buffer);
 
   if (!isPT36Format(buffer)) {
-    throw new Error('PT36Parser: not a valid ProTracker 3.6 IFF file');
+    throw new Error('PT36Parser: not a valid ProTracker 3.6 / PreTracker file');
+  }
+
+  // ── PreTracker format (PRT\xNN magic) ─────────────────────────────────────
+  if (buf[0] === 0x50 && buf[1] === 0x52 && buf[2] === 0x54 && buf[3] !== 0) {
+    return parsePreTrackerBuffer(buf, filename);
   }
 
   // ── Walk IFF chunks ───────────────────────────────────────────────────────
@@ -248,6 +261,76 @@ export async function parsePT36File(
   );
 
   return song;
+}
+
+// ── PreTracker binary parser ───────────────────────────────────────────────────
+
+/**
+ * Parse a PreTracker (.prt) file into a TrackerSong stub.
+ *
+ * PreTracker header layout (inferred from reference files and pretracker.s):
+ *   +0   'PRT' + version byte (e.g. 0x1B for v1.x)
+ *   +4   uint32BE: offset to sub-song table
+ *   +8   uint32BE: offset to instruments
+ *   +12  uint32BE: offset to patterns
+ *   +16  uint32BE: offset to sample data
+ *   +20  char[16]: song title (null-terminated)
+ *   +36  char[16]: author (null-terminated)
+ *   +90  uint8: sub-song count (0 = 1 sub-song)
+ *
+ * Actual audio playback is handled by UADE; this returns a metadata stub.
+ */
+function parsePreTrackerBuffer(buf: Uint8Array, filename: string): TrackerSong {
+  const songTitle = readStr(buf, 20, 16) || filename.replace(/\.[^/.]+$/, '');
+
+  const instruments: InstrumentConfig[] = [{
+    id: 1, name: 'Sample 1', type: 'sample' as const,
+    synthType: 'Sampler' as const, effects: [], volume: -60, pan: 0,
+  } as InstrumentConfig];
+
+  const emptyRows = Array.from({ length: 64 }, () => ({
+    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+  }));
+
+  const pattern: Pattern = {
+    id: 'pattern-0',
+    name: 'Pattern 0',
+    length: 64,
+    channels: Array.from({ length: 4 }, (_, ch) => ({
+      id: `channel-${ch}`,
+      name: `Channel ${ch + 1}`,
+      muted: false,
+      solo: false,
+      collapsed: false,
+      volume: 100,
+      pan: CHANNEL_PANNING[ch],
+      instrumentId: null,
+      color: null,
+      rows: emptyRows,
+    } as ChannelData)),
+    importMetadata: {
+      sourceFormat: 'MOD' as const,
+      sourceFile:   filename,
+      importedAt:   new Date().toISOString(),
+      originalChannelCount:    4,
+      originalPatternCount:    1,
+      originalInstrumentCount: 0,
+    },
+  };
+
+  return {
+    name:            `${songTitle} [PreTracker]`,
+    format:          'MOD' as TrackerFormat,
+    patterns:        [pattern],
+    instruments,
+    songPositions:   [0],
+    songLength:      1,
+    restartPosition: 0,
+    numChannels:     4,
+    initialSpeed:    6,
+    initialBPM:      125,
+    linearPeriods:   false,
+  };
 }
 
 // ── MOD binary parser ──────────────────────────────────────────────────────────

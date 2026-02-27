@@ -133,23 +133,39 @@ function sc40NoteToXm(noteIndex: number): number {
 
 /**
  * Returns true if `bytes` is a Sound Control module.
- * Checks:
- *   - file length >= 64
- *   - tracksLen field (at 0x0A) > 0 and < fileLen
- *   - samplesLen field (at 0x0E) >= 0
- *   - positionListLen (at 0x12) > 0
- *   - total 64+TL+SL+PLL does not exceed file length
+ *
+ * Detection mirrors SoundControlIdentifier.cs (NostalgicPlayer):
+ *   1. File length >= 576 (minimum useful size)
+ *   2. tracksLen at offset 16 must be < 0x8000 and even
+ *   3. At position (tracksLen + 64 - 2): uint16 must be 0xFFFF
+ *   4. At position (tracksLen + 64):     uint32 must be 0x00000400
+ *
+ * Header layout (big-endian):
+ *   0x00  16 bytes  Song name
+ *   0x10   4 bytes  tracksLen
+ *   0x14   4 bytes  samplesLen
+ *   0x18   4 bytes  posListLen
+ *   0x1C   4 bytes  sampleCommandsLen (instruments section, 4.0+ only)
+ *   0x20   2 bytes  skip
+ *   0x22   2 bytes  version: 2 = 3.x, 3 = 4.0/5.0
+ *   0x24   2 bytes  speed (4.0+ only)
  */
 export function isSoundControlFormat(bytes: Uint8Array): boolean {
-  if (bytes.length < 64) return false;
-  const tracksLen = u32BE(bytes, 0x0A);
-  const samplesLen = u32BE(bytes, 0x0E);
-  const posListLen = u32BE(bytes, 0x12);
-  if (tracksLen < 512) return false; // Must have at least the 256-entry offset table (512 bytes)
-  if (posListLen < 12) return false;  // At least one position (12 bytes)
-  if (posListLen % 12 !== 0) return false; // Must be multiple of 12 bytes
-  const totalLen = 64 + tracksLen + samplesLen + posListLen;
-  if (totalLen > bytes.length + 65536) return false; // Allow some slack for instruments
+  if (bytes.length < 576) return false;
+
+  // tracksLen at offset 16 (after 16-byte song name)
+  const tracksLen = u32BE(bytes, 16);
+  if (tracksLen === 0 || tracksLen >= 0x8000) return false;
+  if ((tracksLen & 1) !== 0) return false;  // must be even
+
+  // At (tracksLen + 64 - 2): must be 0xFFFF
+  const checkPos = tracksLen + 64 - 2;
+  if (checkPos + 6 > bytes.length) return false;
+  if (u16BE(bytes, checkPos) !== 0xFFFF) return false;
+
+  // At (tracksLen + 64): must be 0x00000400
+  if (u32BE(bytes, checkPos + 2) !== 0x00000400) return false;
+
   return true;
 }
 
@@ -184,22 +200,30 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
   if (!isSoundControlFormat(bytes)) return null;
 
   // ── Header ────────────────────────────────────────────────────────────
+  // Song name: 16 bytes at 0x00
+  // tracksLen:         uint32 BE at 0x10
+  // samplesLen:        uint32 BE at 0x14
+  // posListLen:        uint32 BE at 0x18
+  // sampleCommandsLen: uint32 BE at 0x1C
+  // skip 2 bytes at 0x20
+  // version:           uint16 BE at 0x22  (2 = SC3.x, 3 = SC4.x/5.x)
+  // speed:             uint16 BE at 0x24  (SC4.0+)
   const songName   = readString(bytes, 0x00, 16).trim() || filename.replace(/\.[^/.]+$/, '');
-  const tracksLen  = u32BE(bytes, 0x0A);
-  const samplesLen = u32BE(bytes, 0x0E);
-  const posListLen = u32BE(bytes, 0x12);
-  const instrLen   = u32BE(bytes, 0x16);
+  const tracksLen  = u32BE(bytes, 0x10);
+  const samplesLen = u32BE(bytes, 0x14);
+  const posListLen = u32BE(bytes, 0x18);
+  const instrLen   = u32BE(bytes, 0x1C);
 
-  // version byte at 0x1C (after 2 skip bytes at 0x1A)
-  // 0x0500 → SC5.0, 0x0400 → SC4.0, else SC3.x
-  const versionWord = u16BE(bytes, 0x1C);
+  // version at 0x22 (after 2 skip bytes at 0x20)
+  // 3 = SC4.0/5.0; 2 = SC3.x
+  const versionWord = u16BE(bytes, 0x22);
   let speed = 6;
-  if (versionWord >= 0x0400) {
-    speed = u16BE(bytes, 0x1E) || 6;
+  if (versionWord >= 3) {
+    speed = u16BE(bytes, 0x24) || 6;
     if (speed < 1 || speed > 31) speed = 6;
   }
 
-  const is40orHigher = versionWord >= 0x0400;
+  const is40orHigher = versionWord >= 3;
 
   // Section offsets
   const tracksBase   = 64;

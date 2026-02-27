@@ -140,10 +140,6 @@ export function isPTMFormat(buffer: ArrayBuffer): boolean {
   if (numSamples  < 1 || numSamples  > 255) return false;
   if (numPatterns < 1 || numPatterns > 128) return false;
 
-  // 9. Buffer must contain header + all sample headers
-  const minSize = HEADER_SIZE + numSamples * SAMPLE_HEADER_SIZE;
-  if (buffer.byteLength < minSize) return false;
-
   return true;
 }
 

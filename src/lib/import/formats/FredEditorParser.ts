@@ -188,7 +188,7 @@ export async function parseFredEditorFile(
   }
 
   let dataPtr = 0;
-  let basePtr = 0;
+  let basePtr = -1;
   let pos = 16;
 
   while (pos < 1024 && pos + 6 <= byteLength) {
@@ -261,7 +261,7 @@ export async function parseFredEditorFile(
     pos += 2;
   }
 
-  if (basePtr === 0) {
+  if (basePtr === -1) {
     throw new Error('Not a Fred Editor file: could not locate basePtr');
   }
 

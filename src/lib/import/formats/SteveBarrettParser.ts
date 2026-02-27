@@ -30,9 +30,22 @@ export function isSteveBarrettFormat(buffer: ArrayBuffer | Uint8Array): boolean 
   const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   if (buf.length < MIN_FILE_SIZE) return false;
 
-  // Scan 4 consecutive BRA instructions at the start, each 4 bytes wide
+  // Scan 4 consecutive BRA instructions at the start, each 4 bytes wide.
+  // Per Steve Barrett_v2.asm Check2:
+  //   NextBranch loop (D1=3, so 4 iterations):
+  //     cmp.w #$6000,(A0)+  — BRA opcode, A0 advances by 2
+  //     move.w (A0)+, D2    — read displacement, A0 advances by 2
+  //     btst #0, D2         — must be even
+  //     dbf D1, NextBranch
+  //   After loop: A0 = 16 (start), D2 = last displacement read (from offset 14)
+  //   lea (A0,D2.W),A0      — jump forward by D2 from current A0 (=16)
+  //   cmp.w #$2A7C,(A0)+    — MOVE.L opcode
+  //   cmp.l #$00DFF0A8,(A0) — Amiga DMA register address
+
   let pos = 0;
+  let lastD2 = 0;
   for (let i = 0; i < 4; i++) {
+    if (pos + 4 > buf.length) return false;
     // BRA opcode
     if (u16BE(buf, pos) !== 0x6000) return false;
 
@@ -42,14 +55,20 @@ export function isSteveBarrettFormat(buffer: ArrayBuffer | Uint8Array): boolean 
     if (d2 & 0x8000) return false;
     if (d2 & 0x0001) return false;
 
+    lastD2 = d2;
     pos += 4;
   }
+  // pos == 16, lastD2 == displacement of 4th BRA (at bytes 14-15)
 
-  // At offset 8: MOVE.L opcode
-  if (u16BE(buf, 8) !== 0x2A7C) return false;
+  // lea (A0,D2.W),A0 — jump to pos + lastD2
+  const targetPos = pos + lastD2;
+  if (targetPos + 6 > buf.length) return false;
 
-  // At offset 10: Amiga DMA register address
-  if (u32BE(buf, 10) !== 0x00DFF0A8) return false;
+  // cmp.w #$2A7C,(A0)+ — MOVE.L opcode at targetPos
+  if (u16BE(buf, targetPos) !== 0x2A7C) return false;
+
+  // cmp.l #$00DFF0A8,(A0) — Amiga DMA register at targetPos+2
+  if (u32BE(buf, targetPos + 2) !== 0x00DFF0A8) return false;
 
   return true;
 }

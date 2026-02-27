@@ -125,15 +125,21 @@ function checkTFMXSTSong(buf: Uint8Array, songOff: number): boolean {
 /**
  * Detect Jochen Hippel ST format.
  *
- * Mirrors Check2 in "Jochen Hippel_v1.asm":
- *   - MCMD path: movem push + bsr + $2F006100 + lea chains → 'MCMD' magic
- *   - SOG path: $60 branch → $48E7FFFE → lea chains → 'TFMX' song validation
+ * Three detection paths:
+ *   1. Raw TFMX-ST song data: starts with 'TFMX' magic directly (common rip format, *.sog).
+ *   2. MCMD wrapper: starts with $48E7FFFE (movem push) + player code → 'MCMD' song.
+ *   3. SOG wrapper: starts with $60xx (BRA) + player code → 'TFMX' song validation.
+ *
+ * Mirrors Check2 in "Jochen Hippel_v1.asm".
  */
 export function isJochenHippelSTFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   if (buf.length < MIN_FILE_SIZE) return false;
 
   const first4 = u32BE(buf, 0);
+
+  // Fast-accept: raw TFMX-ST song data starting with 'TFMX' magic
+  if (first4 === MAGIC_TFMX) return true;
 
   // MCMD format: starts with $48E7FFFE
   if (first4 === 0x48E7FFFE) {
