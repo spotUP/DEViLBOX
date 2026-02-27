@@ -9,6 +9,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { RobHubbardConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+import { SequenceEditor, WaveformThumbnail } from '@components/instruments/shared';
 
 interface RobHubbardControlsProps {
   config: RobHubbardConfig;
@@ -150,17 +151,6 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
   const renderVibwave = () => {
     const vib = config.vibTable ?? [];
     const hasData = vib.length > 0;
-    const preview16 = vib.slice(0, 16);
-
-    const makePoints = () => {
-      if (vib.length === 0) return '';
-      if (vib.length === 1) return `3,32 253,32`;
-      return vib.map((v, i) => {
-        const x = (i / (vib.length - 1)) * 250 + 3;
-        const y = 32 - (v / 128) * 28;
-        return `${x},${y}`;
-      }).join(' ');
-    };
 
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
@@ -168,35 +158,18 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
           <SectionLabel label="Vibrato Wave Table" />
           {hasData ? (
             <>
-              <svg width={256} height={64} className="mb-2 rounded"
-                style={{ background: '#060a0f', border: `1px solid ${dim}` }}>
-                <polyline
-                  points={makePoints()}
-                  fill="none"
-                  stroke={accent}
-                  strokeWidth={1.5}
-                />
-              </svg>
-              <div className="text-[10px] font-mono mb-2" style={{ color: accent, opacity: 0.6 }}>
-                {vib.length} entries
-              </div>
-              <div className="grid grid-cols-8 gap-1">
-                {preview16.map((v: number, i: number) => (
-                  <div key={i} className="flex flex-col items-center gap-0.5">
-                    <span className="text-[8px] font-mono text-gray-600">{i}</span>
-                    <span
-                      className="text-[10px] font-mono text-center border rounded py-0.5 px-1"
-                      style={{
-                        background: '#060a0f',
-                        borderColor: v !== 0 ? dim : '#1a1a1a',
-                        color: v !== 0 ? accent : '#444',
-                        minWidth: '34px',
-                        display: 'inline-block',
-                      }}>
-                      {v}
-                    </span>
-                  </div>
-                ))}
+              <SequenceEditor
+                label="Vibrato Wave"
+                data={vib}
+                onChange={(d) => upd('vibTable', d)}
+                min={-128} max={127}
+                bipolar
+                fixedLength
+                color={accent}
+                height={72}
+              />
+              <div className="text-[10px] font-mono mt-1" style={{ color: accent, opacity: 0.5 }}>
+                {vib.length} entries · starting index: {config.vibratoIdx}
               </div>
             </>
           ) : (
@@ -214,23 +187,14 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
     const raw = config.sampleData ?? [];
     const hasData = raw.length > 0;
 
-    // Subsample to max 512 points for performance
+    // Subsample to max 512 points for WaveformThumbnail display
     const MAX_POINTS = 512;
-    const step = Math.max(1, Math.ceil(raw.length / MAX_POINTS));
+    const stride = Math.max(1, Math.ceil(raw.length / MAX_POINTS));
     const samples: number[] = [];
-    for (let i = 0; i < raw.length; i += step) {
-      samples.push(raw[i]);
+    for (let i = 0; i < raw.length; i += stride) {
+      // Convert signed byte (-128..127) to 0..255 for WaveformThumbnail
+      samples.push((raw[i] & 0xff));
     }
-
-    const makePoints = () => {
-      if (samples.length === 0) return '';
-      if (samples.length === 1) return `3,32 253,32`;
-      return samples.map((v, i) => {
-        const x = (i / (samples.length - 1)) * 250 + 3;
-        const y = 32 - (v / 128) * 28;
-        return `${x},${y}`;
-      }).join(' ');
-    };
 
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
@@ -238,15 +202,15 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
           <SectionLabel label="Sample Waveform" />
           {hasData ? (
             <>
-              <svg width={256} height={64} className="mb-2 rounded"
-                style={{ background: '#060a0f', border: `1px solid ${dim}` }}>
-                <polyline
-                  points={makePoints()}
-                  fill="none"
-                  stroke={knob}
-                  strokeWidth={1}
+              <div className="mb-2 rounded overflow-hidden">
+                <WaveformThumbnail
+                  data={samples}
+                  maxValue={255}
+                  width={320} height={64}
+                  color={knob}
+                  style="line"
                 />
-              </svg>
+              </div>
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-mono" style={{ color: accent, opacity: 0.6 }}>
                   {config.sampleLen} bytes total
