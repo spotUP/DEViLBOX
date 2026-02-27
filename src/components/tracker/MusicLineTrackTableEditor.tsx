@@ -47,12 +47,12 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
     };
   }, []);
 
-  if (!song?.channelTrackTables) return null;
+  if (!song?.channelTrackTables || song.channelTrackTables.length === 0) return null;
 
   const { channelTrackTables, channelSpeeds, initialSpeed, numChannels, patterns } = song;
 
-  // Find the max positions across all channels
-  const maxPositions = Math.max(...channelTrackTables.map(t => t.length));
+  // Find the max positions across all channels (guard against empty tables)
+  const maxPositions = Math.max(0, ...channelTrackTables.map(t => t.length));
   const positions = Array.from({ length: maxPositions }, (_, i) => i);
 
   // Build channel labels — use pattern channel names if available
