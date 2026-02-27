@@ -16,6 +16,11 @@
  *       [6..7] loop_length_words    uint16  loop size in Amiga 16-bit words
  *     4 bytes: defsnd block (skip)
  *     Concatenated signed 8-bit PCM (one block per non-empty instrument)
+ *   INAM — instrument names (library paths):
+ *     4-byte header: entry_size (uint16) + name_off (uint16)
+ *     Typically: entry_size=60, name_off=36 → 24-byte name field per entry
+ *     First DEFAULT_INSTNUM entries map 1:1 to INST instrument slots
+ *     Names are Amiga library paths, e.g. "System:Instruments/egit2" (24-char max)
  *
  * References:
  *   UADE MusicMaker4.asm / MusicMaker8.asm (Thomas Winischhofer, BSD)
@@ -93,6 +98,47 @@ function readChunks(buf: Uint8Array): Map<string, IFFChunk> {
   return chunks;
 }
 
+// ── INAM name reader ───────────────────────────────────────────────────────────
+
+/**
+ * Parse INAM chunk into a map of slot index → instrument name.
+ *
+ * INAM header (4 bytes): entry_size (u16) + name_off (u16)
+ * Typically entry_size=60, name_off=36, giving a 24-byte name field.
+ * Names are null-terminated Amiga library paths: "System:Instruments/egit2".
+ * We strip the path prefix and return just the basename ("egit2").
+ */
+function readInamNames(buf: Uint8Array, chunk: IFFChunk): Map<number, string> {
+  const names = new Map<number, string>();
+  if (chunk.size < 4) return names;
+
+  const entry_size = u16be(buf, chunk.offset);
+  const name_off   = u16be(buf, chunk.offset + 2);
+  if (entry_size === 0 || name_off >= entry_size) return names;
+
+  const nameFieldLen = entry_size - name_off;
+  const dataStart = chunk.offset + 4;
+  const numEntries = Math.floor((chunk.size - 4) / entry_size);
+
+  for (let i = 0; i < numEntries && i < DEFAULT_INSTNUM; i++) {
+    const eoff = dataStart + i * entry_size;
+    if (eoff + entry_size > chunk.offset + chunk.size) break;
+
+    const nameStart = eoff + name_off;
+    const raw = readStr(buf, nameStart, nameFieldLen);
+    if (!raw) continue;
+
+    // Strip Amiga volume/path prefix: "System:Instruments/egit2" → "egit2".
+    // If the path was truncated mid-component (e.g. "System:A1000Backup/dh0/I")
+    // the last slash gives a single char — skip those, the fallback name is better.
+    const slash = raw.lastIndexOf('/');
+    const name = slash >= 0 ? raw.slice(slash + 1) : raw;
+    if (name.length >= 2) names.set(i, name);
+  }
+
+  return names;
+}
+
 // ── Core parser ────────────────────────────────────────────────────────────────
 
 function parseMusicMakerFile(
@@ -120,6 +166,10 @@ function parseMusicMakerFile(
       if (songName.length > 0) moduleName = songName;
     }
   }
+
+  // ── Instrument names from INAM ───────────────────────────────────────────────
+  const inam = chunks.get('INAM');
+  const inamNames = inam ? readInamNames(buf, inam) : new Map<number, string>();
 
   // ── Instruments from INST ────────────────────────────────────────────────────
   // INST layout:
@@ -181,7 +231,7 @@ function parseMusicMakerFile(
 
         instruments.push(createSamplerInstrument(
           i + 1,
-          `Sample ${i + 1}`,
+          inamNames.get(i) ?? `Sample ${i + 1}`,
           pcm,
           64,               // default volume (max)
           AMIGA_SAMPLE_RATE,
@@ -240,25 +290,43 @@ function parseMusicMakerFile(
   };
 }
 
+// ── Filename helpers ───────────────────────────────────────────────────────────
+
+/** Return the bare filename (no directory), lowercased. */
+function baseLower(filename: string): string {
+  return ((filename.split('/').pop() ?? filename).split('\\').pop() ?? filename).toLowerCase();
+}
+
 // ── Music Maker 4V ─────────────────────────────────────────────────────────────
 
 /**
  * Detect Music Maker 4V format.
- * IFF check: FORM + MMV4 at bytes[8..11].
- * Prefix check: mm4.* or sdata.*
+ *
+ * Important: real IFF files (.mm4 extension) use FORM+MMV8 as the format tag,
+ * NOT FORM+MMV4 — both 4V and 8V IFF files share the MMV8 tag and are
+ * differentiated by filename extension only (matching UADE's eagleplayer logic).
+ *
+ * Detection order:
+ *   1. IFF: FORM + MMV4 tag (theoretical; not seen in the wild)
+ *   2. IFF: FORM + MMV8 tag + .mm4 extension
+ *   3. Legacy prefix: mm4.* or sdata.*
  */
 export function isMusicMaker4VFormat(
   buffer: ArrayBuffer | Uint8Array,
   filename?: string,
 ): boolean {
   const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const base = filename ? baseLower(filename) : '';
 
   if (buf.length >= MIN_IFF_SIZE && readTag4(buf, 0) === 'FORM') {
-    if (readTag4(buf, 8) === 'MMV4') return true;
+    const tag = readTag4(buf, 8);
+    if (tag === 'MMV4') return true;
+    // MMV8 tag is used for both 4V and 8V IFF — use extension to distinguish
+    if (tag === 'MMV8' && base.endsWith('.mm4')) return true;
   }
 
   if (!filename) return false;
-  const base = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+  // Legacy split-file format: songname stored as mm4.name or sdata.name
   return base.startsWith('mm4.') || base.startsWith('sdata.');
 }
 
@@ -271,21 +339,31 @@ export function parseMusicMaker4VFile(buffer: ArrayBuffer, filename: string): Tr
 
 /**
  * Detect Music Maker 8V format.
- * IFF check: FORM + MMV8 at bytes[8..11].
- * Prefix check: mm8.*
+ *
+ * IFF files use FORM+MMV8 tag. When a filename is available, .mm8 extension
+ * confirms 8V. Without a filename (buffer-only check), any FORM+MMV8 that
+ * didn't match 4V is treated as 8V.
+ *
+ * Detection order:
+ *   1. IFF: FORM + MMV8 tag + .mm8 extension (or no contrary extension)
+ *   2. Legacy prefix: mm8.*
  */
 export function isMusicMaker8VFormat(
   buffer: ArrayBuffer | Uint8Array,
   filename?: string,
 ): boolean {
   const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const base = filename ? baseLower(filename) : '';
 
   if (buf.length >= MIN_IFF_SIZE && readTag4(buf, 0) === 'FORM') {
-    if (readTag4(buf, 8) === 'MMV8') return true;
+    if (readTag4(buf, 8) === 'MMV8') {
+      // Exclude .mm4 files — those are 4V files that share the MMV8 tag
+      if (base.endsWith('.mm4')) return false;
+      return true;
+    }
   }
 
   if (!filename) return false;
-  const base = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
   return base.startsWith('mm8.');
 }
 
