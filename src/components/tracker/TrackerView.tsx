@@ -425,6 +425,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [randomizeChannel, setRandomizeChannel] = useState(0);
   // Pattern order modal
   const [showPatternOrder, setShowPatternOrder] = useState(false);
+  const channelTrackTables = useTrackerStore((state) => state.channelTrackTables);
+  // Auto-open the pattern order modal when a per-channel format (MusicLine, etc.) is loaded
+  useEffect(() => {
+    if (channelTrackTables) setShowPatternOrder(true);
+  }, [channelTrackTables]);
 
   // Mobile swipe handlers for cursor navigation
   const handleSwipeLeft = useCallback(() => {
