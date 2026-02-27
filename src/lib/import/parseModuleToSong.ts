@@ -1384,6 +1384,12 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.magneticFieldsPacker === 'native') {
       try {
+        const { isMFPFormat, parseMFPFile } = await import('@lib/import/formats/MFPParser');
+        if (isMFPFormat(buffer, file.name)) return await parseMFPFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[MFPParser] Native parse failed for ${filename}, falling back to MagneticFieldsPackerParser:`, err);
+      }
+      try {
         const { isMagneticFieldsPackerFormat, parseMagneticFieldsPackerFile } = await import('@lib/import/formats/MagneticFieldsPackerParser');
         if (isMagneticFieldsPackerFormat(buffer, file.name)) return await parseMagneticFieldsPackerFile(buffer, file.name);
       } catch (err) {
