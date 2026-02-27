@@ -147,6 +147,11 @@ export interface FormatEnginePreferences {
   paulTonge: FormatEngineChoice;        // pat.* → PaulTongeParser vs UADE
   robHubbardST: FormatEngineChoice;     // rho.* → RobHubbardSTParser vs UADE
   robHubbard: FormatEngineChoice;       // rh.* → RobHubbardParser vs UADE
+  // Newly wired parsers (2026-02-27 batch 4)
+  futurePlayer: FormatEngineChoice;     // .fp/fp.* → FuturePlayerParser vs UADE
+  jasonPage: FormatEngineChoice;        // jpn.*/jpnd.*/jp.* → JasonPageParser vs UADE
+  infogrames: FormatEngineChoice;       // .dum → InfogramesParser vs UADE
+  sawteeth: FormatEngineChoice;         // .st → SawteethParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -322,6 +327,10 @@ export const useSettingsStore = create<SettingsStore>()(
         paulTonge: 'native',            // PaulTongeParser — dedicated Paul Tonge support
         robHubbardST: 'native',         // RobHubbardSTParser — dedicated Rob Hubbard ST support
         robHubbard: 'native',           // RobHubbardParser — dedicated Rob Hubbard support
+        futurePlayer: 'native',       // FuturePlayerParser — dedicated Future Player support
+        jasonPage: 'native',          // JasonPageParser — dedicated Jason Page support
+        infogrames: 'native',         // InfogramesParser — dedicated Infogrames support
+        sawteeth: 'native',           // SawteethParser — dedicated Sawteeth support
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
