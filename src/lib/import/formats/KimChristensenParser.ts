@@ -27,9 +27,6 @@ function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
 }
 
-function u32BE(buf: Uint8Array, off: number): number {
-  return (((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0);
-}
 
 /**
  * Detect a Kim Christensen module.

@@ -803,7 +803,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       console.warn(`[MusicLineParser] Native parse failed for ${filename}:`, err);
     }
     // No UADE fallback for .ml (UADE uses prefix-based detection; .ml extension not a UADE prefix)
-    return null;
+    throw new Error(`[MusicLineParser] Failed to parse ${filename}: not a valid MusicLine Editor file`);
   }
 
   // ── Game Music Creator (.gmc) ─────────────────────────────────────────────

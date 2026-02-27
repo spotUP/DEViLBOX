@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-26T22:51:24.303Z
+ * Generated: 2026-02-27T00:59:06.044Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1424';
-export const BUILD_NUMBER = '1424';
-export const BUILD_HASH = '7b2ae20f';
-export const BUILD_DATE = '2026-02-26';
+export const BUILD_VERSION = '1.0.1446';
+export const BUILD_NUMBER = '1446';
+export const BUILD_HASH = '386f1f96';
+export const BUILD_DATE = '2026-02-27';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,103 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1424',
+    version: '1.0.1446',
+    date: '2026-02-27',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Add native XM/MOD parsers — isXMFormat+parseXMFile, isMODFormat+parseMODFile"
+      },
+      {
+        type: 'fix',
+        "description": "Hook pumaTracker pref key into PumaTracker stub"
+      },
+      {
+        type: 'feature',
+        "description": "Wire Composer667 native parser (batch 6)"
+      },
+      {
+        type: 'feature',
+        "description": "Test(import): add ITParser vitest suite for orbiter.it and sunchild.it"
+      },
+      {
+        type: 'fix',
+        "description": "Guard EnvelopeConverter against negative sustainPointIdx"
+      },
+      {
+        type: 'fix',
+        "description": "Correct S3M 3-byte paragraph pointer byte order"
+      },
+      {
+        type: 'feature',
+        "description": "Wire FMTracker, MadTracker2, PSM native parsers (batch 5)"
+      },
+      {
+        type: 'feature',
+        "description": "Wire 9 more native parser guards + add 4 new format keys"
+      },
+      {
+        type: 'feature',
+        "description": "Native S3M and IT parsers with real PCM extraction"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: clean up stale masterplan todos and dead useEffect"
+      },
+      {
+        type: 'feature',
+        "description": "Rewrite TFMXControls with editable VolModSeq/SndModSeq macro viewer"
+      },
+      {
+        type: 'feature',
+        "description": "Wire 51 more UADE stubs with native parser guards (batch 3)"
+      },
+      {
+        type: 'feature',
+        "description": "Extract Rob Hubbard PCM samples + wire 4 more native parsers"
+      },
+      {
+        type: 'feature',
+        "description": "Wire 9 more native parsers — UFO, IffSmus, MagneticFieldsPacker, RichardJoseph, DaveLowe, LME, JochenHippelST, SpecialFX, BenDaglish"
+      },
+      {
+        type: 'feature',
+        "description": "Wire OctaMED, SidMon1, HippelCoSo, DavidWhittaker synths into ToneEngine"
+      },
+      {
+        type: 'feature',
+        "description": "Wire 18 native parsers — Medley, MarkCooksey, JeroenTel, Quartet, SoundMaster, ZoundMonitor, SynthPack, TCBTracker, MMDC, PSA, SteveTurner, TME, JasonBrooke, Laxity, FredGray, MusicMaker4V/8V, ManiacsOfNoise"
+      },
+      {
+        type: 'improvement',
+        "description": "Sync format-implementation-status with batch-3/4 parsers and routing audit"
+      },
+      {
+        type: 'fix',
+        "description": "Remove 22 final silent stub native parsers — route to UADE"
+      }
+    ]
+  },
+  {
+    version: '2026-02-26',
     date: '2026-02-26',
     changes: [
+      {
+        type: 'fix',
+        "description": "Correct Medley subsong pointer arithmetic and add placeholder instrument"
+      },
+      {
+        type: 'fix',
+        "description": "Remove 35 more silent stub native parsers — route to UADE"
+      },
+      {
+        type: 'feature',
+        "description": "Complete UADE prefix routing coverage + native parser prefs"
+      },
+      {
+        type: 'improvement',
+        "description": "Swap stale format prefs for new parser wiring"
+      },
       {
         type: 'fix',
         "description": "Remove 23 silent stub native parsers — route to UADE/libopenmpt"
@@ -144,94 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Deep-merge formatEngine on persist hydration"
-      },
-      {
-        type: 'fix',
-        "description": "Add SymphonieSynth to SYNTH_INFO; fix ArrayBufferLike cast"
-      },
-      {
-        type: 'feature',
-        "description": "Wire SymphonieSynth into InstrumentFactory, types, and parser"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove unused _engineConnectedToSynth dead state"
-      },
-      {
-        type: 'feature',
-        "description": "SymphonieEngine singleton + SymphonieSynth wrapper"
-      },
-      {
-        type: 'feature',
-        "description": "Symphonie.worklet.js — VoiceExpander AudioWorklet processor"
-      },
-      {
-        type: 'feature',
-        "description": "Jason Page parser + routing"
-      },
-      {
-        type: 'feature',
-        "description": "Future Player native parser (.fp/FP.*)"
-      },
-      {
-        type: 'fix',
-        "description": "Correct _decodeDelta16 block-interleaved algorithm; fix loop comment"
-      },
-      {
-        type: 'fix',
-        "description": "Remove dead code and unused variables from parser files"
-      },
-      {
-        type: 'feature',
-        "description": "Mark Cooksey, Jeroen Tel, Quartet native parsers"
-      },
-      {
-        type: 'feature',
-        "description": "Leggless Music Editor (LME) native parser"
-      },
-      {
-        type: 'feature',
-        "description": "ParseSymphonieForPlayback() with PCM extraction and DSP events"
-      },
-      {
-        type: 'feature',
-        "description": "GDM, MDL, NRU, PTM native parsers + parser bug fixes"
-      },
-      {
-        type: 'feature',
-        "description": "SymphoniePlaybackData interfaces"
-      },
-      {
-        type: 'feature',
-        "description": "Dave Lowe (.dl) native parser with UADE fallback"
-      },
-      {
-        type: 'feature',
-        "description": "UFO/MicroProse (.ufo/.mus) native parser with UADE fallback"
-      },
-      {
-        type: 'feature',
-        "description": "Richard Joseph Player (.rjp/.sng) native parser"
-      },
-      {
-        type: 'fix',
-        "description": "Routing fixes + parser bug fixes"
-      },
-      {
-        type: 'feature',
-        "description": "Wire IFF SMUS, MFP, Delta Music 1.0 parsers; cleanup duplicates"
-      },
-      {
-        type: 'feature',
-        "description": "AMS (Extreme Tracker / Velvet Studio) native parser (OpenMPT)"
-      },
-      {
-        type: 'feature',
-        "description": "MadTracker 2 and PSM native parsers (OpenMPT)"
-      },
-      {
-        type: 'feature',
-        "description": "FM Tracker, XMF, UAX native parsers"
       }
     ]
   }
