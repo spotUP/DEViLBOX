@@ -311,10 +311,9 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   // Build InstrumentConfig list from INST + SMPL
   const instruments = buildInstruments(instList, smplList);
 
-  // numChannels for the song = actual voice count from TUNE header (4 or 8).
-  // Patterns are 1-channel (single-voice PARTs). The per-channel nature is
-  // expressed through channelTrackTables, not through multi-channel patterns.
-  // The MusicLineTrackTableEditor uses channelTrackTables.length for row count.
+  // numChannels = actual voice count from TUNE header (1-8).
+  // Patterns are 1-channel (single-voice PARTs); the replayer reads channels[0]
+  // of whichever PART each channel's track table points to.
   const song: TrackerSong = {
     name: songTitle || 'MusicLine Song',
     format: 'MOD' as const,
@@ -323,7 +322,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
     songPositions,
     songLength: songPositions.length,
     restartPosition: 0,
-    numChannels: 1,    // Each PART is a single-voice pattern
+    numChannels,       // TUNE header channel count (4 or 8)
     initialSpeed: speed,
     initialBPM: ciaTempoBPM(tempo),
     linearPeriods: false,
