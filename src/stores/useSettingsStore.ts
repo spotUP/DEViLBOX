@@ -72,6 +72,7 @@ export interface FormatEnginePreferences {
   deltaMusic1: FormatEngineChoice;    // .dm/.dm1 → DeltaMusic1Parser vs UADE
   pt36: FormatEngineChoice;           // FORM+MODL → PT36Parser vs libopenmpt
   // Newly wired parsers (2026-02-26 batch)
+  musicLine: FormatEngineChoice;      // .ml → MusicLineParser (native only; falls through to medley if magic mismatch)
   medley: FormatEngineChoice;         // .ml → MedleyParser vs UADE
   markCooksey: FormatEngineChoice;    // mc.*/mcr.*/mco.* → MarkCookseyParser vs UADE
   jeroenTel: FormatEngineChoice;      // jt.*/mon_old.* → JeroenTelParser vs UADE
@@ -257,6 +258,7 @@ export const useSettingsStore = create<SettingsStore>()(
         ronKlaren: 'native',        // RonKlarenParser — native parser available
         deltaMusic1: 'native',  // DeltaMusic1Parser — native parser available
         pt36: 'native',         // PT36Parser — native parser available
+        musicLine: 'native',      // MusicLineParser — native parser (magic-byte gated)
         medley: 'native',         // MedleyParser — dedicated Medley support
         markCooksey: 'native',    // MarkCookseyParser — dedicated Mark Cooksey support
         jeroenTel: 'native',      // JeroenTelParser — dedicated Jeroen Tel support
