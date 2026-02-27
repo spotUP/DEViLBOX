@@ -17,13 +17,16 @@ import { resolveArrangement } from '@lib/arrangement/resolveArrangement';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 
 export const usePatternPlayback = () => {
-  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition } = useTrackerStore(useShallow((s) => ({
+  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, channelTrackTables, channelSpeeds, channelGrooves } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
     setCurrentPattern: s.setCurrentPattern,
     patternOrder: s.patternOrder,
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
+    channelTrackTables: s.channelTrackTables,
+    channelSpeeds: s.channelSpeeds,
+    channelGrooves: s.channelGrooves,
   })));
   const { isPlaying, isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
     isPlaying: s.isPlaying,
@@ -285,6 +288,10 @@ export const usePatternPlayback = () => {
           numChannels: effectiveNumChannels,
           initialSpeed: modData?.initialSpeed ?? 6,
           initialBPM: modData?.initialBPM ?? bpmRef.current,
+          // Per-channel track tables (MusicLine Editor and similar formats)
+          channelTrackTables: channelTrackTables ?? undefined,
+          channelSpeeds: channelSpeeds ?? undefined,
+          channelGrooves: channelGrooves ?? undefined,
           // Furnace-specific timing data (only set for .fur imports)
           speed2: furnaceData?.speed2,
           hz: furnaceData?.hz,

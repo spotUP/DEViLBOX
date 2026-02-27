@@ -6,7 +6,6 @@ import React, { useState } from 'react';
 import { useTrackerStore } from '@stores';
 import { notify } from '@stores/useNotificationStore';
 import { Plus, Trash2, X } from 'lucide-react';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { MusicLineTrackTableEditor } from '@components/tracker/MusicLineTrackTableEditor';
 
 interface PatternOrderModalProps {
@@ -14,8 +13,8 @@ interface PatternOrderModalProps {
 }
 
 export const PatternOrderModal: React.FC<PatternOrderModalProps> = ({ onClose }) => {
-  // Check if loaded song uses per-channel track tables (MusicLine Editor etc.)
-  const hasPerChannelTables = !!getTrackerReplayer().getSong()?.channelTrackTables;
+  // Reactive: re-renders when a new song with/without per-channel tables is loaded
+  const hasPerChannelTables = useTrackerStore((state) => !!state.channelTrackTables);
 
   const patternOrder = useTrackerStore((state) => state.patternOrder);
   const currentPositionIndex = useTrackerStore((state) => state.currentPositionIndex);

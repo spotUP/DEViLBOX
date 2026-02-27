@@ -123,6 +123,10 @@ interface TrackerStore {
   hivelyNative: HivelyNativeData | null;
   furnaceSubsongs: FurnaceSubsongPlayback[] | null;
   furnaceActiveSubsong: number;
+  // MusicLine Editor per-channel sequencing data (null for all other formats)
+  channelTrackTables: number[][] | null;
+  channelSpeeds: number[] | null;
+  channelGrooves: number[] | null;
 
   // Actions
   setCurrentPattern: (index: number, fromReplayer?: boolean) => void;
@@ -274,7 +278,7 @@ interface TrackerStore {
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
   setHivelyNative: (data: HivelyNativeData | null) => void;
-  applyEditorMode: (song: { furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number }) => void;
+  applyEditorMode: (song: { furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[] }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
 
   // Undo/Redo support
@@ -361,6 +365,9 @@ export const useTrackerStore = create<TrackerStore>()(
     hivelyNative: null,
     furnaceSubsongs: null,
     furnaceActiveSubsong: 0,
+    channelTrackTables: null,
+    channelSpeeds: null,
+    channelGrooves: null,
 
     // Actions
     setCurrentPattern: (index, fromReplayer) =>
@@ -2665,18 +2672,37 @@ export const useTrackerStore = create<TrackerStore>()(
           state.hivelyNative = null;
           state.furnaceSubsongs = song.furnaceSubsongs ?? null;
           state.furnaceActiveSubsong = song.furnaceActiveSubsong ?? 0;
+          state.channelTrackTables = null;
+          state.channelSpeeds = null;
+          state.channelGrooves = null;
         } else if (song.hivelyNative) {
           state.editorMode = 'hively';
           state.hivelyNative = song.hivelyNative;
           state.furnaceNative = null;
           state.furnaceSubsongs = null;
           state.furnaceActiveSubsong = 0;
+          state.channelTrackTables = null;
+          state.channelSpeeds = null;
+          state.channelGrooves = null;
+        } else if (song.channelTrackTables) {
+          // MusicLine Editor and similar per-channel formats
+          state.editorMode = 'classic';
+          state.furnaceNative = null;
+          state.hivelyNative = null;
+          state.furnaceSubsongs = null;
+          state.furnaceActiveSubsong = 0;
+          state.channelTrackTables = song.channelTrackTables;
+          state.channelSpeeds = song.channelSpeeds ?? null;
+          state.channelGrooves = song.channelGrooves ?? null;
         } else {
           state.editorMode = 'classic';
           state.furnaceNative = null;
           state.hivelyNative = null;
           state.furnaceSubsongs = null;
           state.furnaceActiveSubsong = 0;
+          state.channelTrackTables = null;
+          state.channelSpeeds = null;
+          state.channelGrooves = null;
         }
       }),
 
