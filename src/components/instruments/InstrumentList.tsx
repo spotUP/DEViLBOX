@@ -137,9 +137,13 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       // Ensure WASM synths are initialized before triggering
       await engine.ensureInstrumentReady(inst);
 
-      // Use C4 as default preview note, or C3 for bass instruments
+      // For period-based Amiga/MOD instruments, preview at the baseNote to get
+      // playbackRate=1.0 (natural pitch). Otherwise use C4, or C3 for bass.
+      const isModSample = inst.metadata?.modPlayback?.usePeriodPlayback;
       const isBass = inst.synthType === 'TB303' || inst.name.toLowerCase().includes('bass');
-      const previewNote = isBass ? 'C3' : 'C4';
+      const previewNote = isModSample
+        ? (inst.sample?.baseNote || 'C3')   // Natural pitch: playbackRate = 1.0
+        : (isBass ? 'C3' : 'C4');
 
       const now = Tone.now();
       engine.triggerNoteAttack(inst.id, previewNote, now, 0.8, inst);
