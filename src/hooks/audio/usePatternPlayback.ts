@@ -280,7 +280,6 @@ export const usePatternPlayback = () => {
         // engine.ensureWASMSynthsReady(). No need for a duplicate fire-and-forget call here.
 
         // Load song into TrackerReplayer
-        console.log('[usePatternPlayback] loadSong:', { channelTrackTables: channelTrackTables?.length ?? null, numChannels: effectiveNumChannels, positions: effectiveSongPositions.length });
         const furnaceData = pattern.importMetadata?.furnaceData;
         replayer.loadSong({
           name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-27T08:43:40.191Z
+ * Generated: 2026-02-27T08:51:56.139Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1465';
-export const BUILD_NUMBER = '1465';
-export const BUILD_HASH = '2d167a9e';
+export const BUILD_VERSION = '1.0.1466';
+export const BUILD_NUMBER = '1466';
+export const BUILD_HASH = '47f002bd';
 export const BUILD_DATE = '2026-02-27';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1465',
+    version: '1.0.1466',
     date: '2026-02-27',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: regenerate changelog"
+      },
       {
         type: 'fix',
         "description": "Thread linearPeriods through store → replayer"
@@ -40,10 +44,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Thread hivelyFileData/hivelyMeta through store → replayer"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: regenerate changelog"
       },
       {
         type: 'feature',
@@ -222,10 +222,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Read initial cycle from position data instead of hardcoding 6"
-      },
-      {
-        type: 'fix',
-        "description": "Remove metadata-only native parse calls for 28 UADE formats"
       }
     ]
   }

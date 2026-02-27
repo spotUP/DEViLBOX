@@ -2672,7 +2672,6 @@ export const useTrackerStore = create<TrackerStore>()(
 
     applyEditorMode: (song) =>
       set((state) => {
-        console.log('[useTrackerStore] applyEditorMode branch:', { hasFurnace: !!song.furnaceNative, hasHively: !!song.hivelyNative, hasChannelTables: !!song.channelTrackTables, tableLen: song.channelTrackTables?.length });
         // Always store linearPeriods — affects period→Hz math for XM, IT, FTM, XTracker etc.
         state.linearPeriods = song.linearPeriods ?? false;
         if (song.furnaceNative) {
@@ -2709,7 +2708,6 @@ export const useTrackerStore = create<TrackerStore>()(
           state.channelTrackTables = song.channelTrackTables;
           state.channelSpeeds = song.channelSpeeds ?? null;
           state.channelGrooves = song.channelGrooves ?? null;
-          console.log('[useTrackerStore] applyEditorMode SET channelTrackTables:', state.channelTrackTables?.length, 'speeds:', state.channelSpeeds);
         } else {
           state.editorMode = 'classic';
           state.furnaceNative = null;
