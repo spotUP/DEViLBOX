@@ -24,14 +24,16 @@ function makeSTPBuffer(): ArrayBuffer {
   const buf = new Uint8Array(300).fill(0);
   // 'STP3' magic
   buf[0] = 0x53; buf[1] = 0x54; buf[2] = 0x50; buf[3] = 0x33;
-  // version = 1
+  // version = 1 (u16be at offset 4)
   buf[4] = 0x00; buf[5] = 0x01;
-  // numOrders = 4 (1-128)
+  // numOrders = 4 (u8 at offset 6, must be ≤ 128)
   buf[6] = 0x04;
-  // patternLength = 64
+  // patternLength = 64 (u8 at offset 7)
   buf[7] = 0x40;
-  // numSamples at offset 200 = 1 (1-31)
-  buf[200] = 0x00; buf[201] = 0x01;
+  // timerCount = 125 (u16be at offset 140, must be ≠ 0)
+  buf[140] = 0x00; buf[141] = 0x7D;
+  // midiCount = 50 (u16be at offset 148, must equal 50)
+  buf[148] = 0x00; buf[149] = 0x32;
   return buf.buffer;
 }
 
@@ -46,21 +48,21 @@ describe('isSTPFormat — crafted buffer', () => {
     expect(isSTPFormat(buf.buffer)).toBe(false);
   });
 
-  it('rejects version > 3', () => {
+  it('rejects version > 2', () => {
     const buf = new Uint8Array(makeSTPBuffer());
-    buf[5] = 0x04;
+    buf[5] = 0x03; // version = 3
     expect(isSTPFormat(buf.buffer)).toBe(false);
   });
 
-  it('rejects numOrders = 0', () => {
+  it('rejects numOrders > 128', () => {
     const buf = new Uint8Array(makeSTPBuffer());
-    buf[6] = 0x00;
+    buf[6] = 0xFF; // numOrders = 255
     expect(isSTPFormat(buf.buffer)).toBe(false);
   });
 
-  it('rejects numSamples = 0', () => {
+  it('rejects timerCount = 0', () => {
     const buf = new Uint8Array(makeSTPBuffer());
-    buf[200] = 0x00; buf[201] = 0x00;
+    buf[140] = 0x00; buf[141] = 0x00; // timerCount = 0
     expect(isSTPFormat(buf.buffer)).toBe(false);
   });
 
