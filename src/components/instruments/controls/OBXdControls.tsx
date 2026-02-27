@@ -3,7 +3,7 @@ import { Knob } from '@components/controls/Knob';
 import { Waves, Filter, Zap, Activity, Volume2 } from 'lucide-react';
 import { useThemeStore } from '@stores';
 import type { OBXdConfig } from '@typedefs/instrument';
-import { FilterFrequencyResponse } from '@components/instruments/shared';
+import { FilterFrequencyResponse, EnvelopeVisualization } from '@components/instruments/shared';
 import type { FilterType } from '@components/instruments/shared';
 
 const OBXD_FILTER_TYPE_MAP: Record<string, { type: FilterType; poles: 2 | 4 }> = {
@@ -318,6 +318,18 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
           FILTER ENVELOPE
         </h3>
 
+        <div className="mb-3">
+          <EnvelopeVisualization
+            mode="linear"
+            attack={config.filterAttack ?? 0.01}
+            decay={config.filterDecay ?? 0.3}
+            sustain={config.filterSustain ?? 0.3}
+            release={config.filterRelease ?? 0.3}
+            color={knobColor}
+            width={300} height={56}
+          />
+        </div>
+
         <div className="grid grid-cols-4 gap-6">
           <Knob
             value={config.filterAttack ?? 0.01}
@@ -369,6 +381,18 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
           <h3 className="font-bold uppercase tracking-tight" style={{ color: accentColor }}>
             AMP ENVELOPE
           </h3>
+        </div>
+
+        <div className="mb-3">
+          <EnvelopeVisualization
+            mode="linear"
+            attack={config.ampAttack ?? 0.01}
+            decay={config.ampDecay ?? 0.2}
+            sustain={config.ampSustain ?? 0.7}
+            release={config.ampRelease ?? 0.3}
+            color={knobColor}
+            width={300} height={56}
+          />
         </div>
 
         <div className="grid grid-cols-4 gap-6">
