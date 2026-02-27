@@ -11,6 +11,7 @@ import type { HarmonicSynthConfig } from '@/types/instrument';
 import { DEFAULT_HARMONIC_SYNTH } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
+import { FilterFrequencyResponse } from '@components/instruments/shared';
 
 interface HarmonicSynthControlsProps {
   config: HarmonicSynthConfig;
@@ -236,6 +237,14 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
               <option value="highpass">HP</option>
               <option value="bandpass">BP</option>
             </select>
+          </div>
+          <div className="mb-2">
+            <FilterFrequencyResponse
+              filterType={config.filter.type}
+              cutoff={Math.log10(Math.max(config.filter.cutoff, 20) / 20) / 3}
+              resonance={config.filter.resonance / 30}
+              poles={2} color={knobColor} width={300} height={56}
+            />
           </div>
           <div className="flex gap-4 justify-center">
             <Knob

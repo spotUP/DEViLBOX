@@ -3,6 +3,7 @@ import type { SynareConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Drum, Activity, Waves, MoveDown, Speaker, Wind } from 'lucide-react';
 import { useThemeStore } from '@stores';
+import { FilterFrequencyResponse } from '@components/instruments/shared';
 import { getToneEngine } from '@engine/ToneEngine';
 
 interface SynareControlsProps {
@@ -175,6 +176,14 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
           <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-yellow-400'}`}>FILTER</h3>
         </div>
         
+        <div className="mb-3">
+          <FilterFrequencyResponse
+            filterType="lowpass"
+            cutoff={Math.log10(Math.max(config.filter.cutoff, 20) / 20) / 3}
+            resonance={config.filter.resonance / 100}
+            poles={2} color={knobColor} width={300} height={56}
+          />
+        </div>
         <div className="flex flex-wrap gap-6 items-end">
           <Knob
             value={config.filter.cutoff}
