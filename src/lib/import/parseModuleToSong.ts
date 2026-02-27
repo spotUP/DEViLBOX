@@ -620,16 +620,18 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   // ── PumaTracker ───────────────────────────────────────────────────────────
   // .puma files — no magic bytes; heuristic header validation (mirrors OpenMPT).
   if (/\.puma$/.test(filename)) {
-    try {
-      const { isPumaTrackerFormat, parsePumaTrackerFile } = await import('@lib/import/formats/PumaTrackerParser');
-      if (isPumaTrackerFormat(buffer)) {
-        return parsePumaTrackerFile(buffer, file.name);
+    const uadeMode = prefs.uade ?? 'enhanced';
+    if (prefs.pumaTracker === 'native') {
+      try {
+        const { isPumaTrackerFormat, parsePumaTrackerFile } = await import('@lib/import/formats/PumaTrackerParser');
+        if (isPumaTrackerFormat(buffer)) {
+          return parsePumaTrackerFile(buffer, file.name);
+        }
+      } catch (err) {
+        console.warn(`[PumaTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
       }
-    } catch (err) {
-      console.warn(`[PumaTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
     }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const uadeMode = prefs.uade ?? 'enhanced';
     return parseUADEFile(buffer, file.name, uadeMode, subsong, preScannedMeta);
   }
 
