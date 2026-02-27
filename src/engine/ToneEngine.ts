@@ -945,6 +945,22 @@ export class ToneEngine {
   }
 
   /**
+   * Set sample bus gain (tracker/MOD/XM sample path: masterInput → amigaFilter)
+   * Use to balance samples vs synths. 0 = unity gain (default).
+   */
+  public setSampleBusGain(db: number): void {
+    this.masterInput.gain.value = db === 0 ? 1 : Math.pow(10, db / 20);
+  }
+
+  /**
+   * Set synth bus gain (native chip/UADE/DB303 path: synthBus → masterEffectsInput)
+   * Use to balance synths vs samples. 0 = unity gain (default).
+   */
+  public setSynthBusGain(db: number): void {
+    this.synthBus.gain.value = db === 0 ? 1 : Math.pow(10, db / 20);
+  }
+
+  /**
    * Set master mute
    */
   public setMasterMute(muted: boolean): void {
