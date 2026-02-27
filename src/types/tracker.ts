@@ -480,7 +480,7 @@ export const NOTE_OFF: TrackerCell = {
 };
 
 // ── Editor Mode ─────────────────────────────────
-export type EditorMode = 'classic' | 'furnace' | 'hively';
+export type EditorMode = 'classic' | 'furnace' | 'hively' | 'musicline';
 
 // ── Furnace Native Data ─────────────────────────
 export interface FurnaceNativeData {

@@ -1351,7 +1351,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   </p>
                 </div>
               </div>
-            ) : channelTrackTables ? (
+            ) : editorMode === 'musicline' ? (
               <div className="flex-1 overflow-auto bg-dark-bgPrimary">
                 <div className="p-4 space-y-3">
                   <div className="flex items-center gap-2">
@@ -1360,7 +1360,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                       per-channel
                     </span>
                     <span className="text-xs text-ft2-textDim ml-auto">
-                      {channelTrackTables.length} channels · {patterns.length} parts
+                      {channelTrackTables?.length ?? 0} channels · {patterns.length} parts
                     </span>
                   </div>
                   <MusicLineTrackTableEditor
