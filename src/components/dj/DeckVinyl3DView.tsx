@@ -24,7 +24,7 @@
  * Lazy-loaded in DJDeck to avoid bloating the initial bundle.
  */
 
-import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';

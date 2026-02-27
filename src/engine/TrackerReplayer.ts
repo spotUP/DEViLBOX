@@ -392,6 +392,15 @@ export interface TrackerSong {
   // Pre-converted subsong data for in-editor subsong switching
   furnaceSubsongs?: FurnaceSubsongPlayback[];
   furnaceActiveSubsong?: number;
+
+  // Per-channel independent sequencing (MusicLine Editor and similar formats)
+  // When present, each channel uses its own pattern sequence instead of the global songPositions.
+  // channelTrackTables[chIdx][posIdx] = patternIndex  (analogous to Furnace orders matrix)
+  channelTrackTables?: number[][];
+  // Per-channel ticks-per-row (overrides initialSpeed for each channel independently)
+  channelSpeeds?: number[];
+  // Per-channel groove speed (alternates with channelSpeeds each row; 0 = no groove)
+  channelGrooves?: number[];
 }
 
 // ============================================================================
@@ -1416,9 +1425,14 @@ export class TrackerReplayer {
 
     // Get current pattern (classic path) or use accessor for native formats
     const useNativeAccessor = this.accessor.getMode() !== 'classic';
-    const patternNum = this.song.songPositions[this.songPos];
-    const pattern = useNativeAccessor ? null : this.song.patterns[patternNum];
-    if (!useNativeAccessor && !pattern) return;
+    // MusicLine per-channel track tables: each channel looks up its own pattern independently.
+    // When present, pattern lookup is deferred into the per-channel loop below.
+    const usePerChannelTables = !useNativeAccessor && !!this.song.channelTrackTables;
+    const patternNum = usePerChannelTables
+      ? (this.song.channelTrackTables![0]?.[this.songPos] ?? 0)
+      : this.song.songPositions[this.songPos];
+    const pattern = (useNativeAccessor || usePerChannelTables) ? null : this.song.patterns[patternNum];
+    if (!useNativeAccessor && !usePerChannelTables && !pattern) return;
 
     // Queue display state for audio-synced UI (tick 0 = start of row)
     // Use swung time (safeTime) so visual follows the same timing as audio
@@ -1445,9 +1459,17 @@ export class TrackerReplayer {
 
       for (let ch = 0; ch < this.channels.length; ch++) {
         const channel = this.channels[ch];
-        const row = useNativeAccessor
-          ? this.accessor.getRow(this.songPos, this.pattPos, ch)
-          : pattern!.channels[ch]?.rows[this.pattPos];
+        let row: TrackerCell | undefined;
+        if (useNativeAccessor) {
+          row = this.accessor.getRow(this.songPos, this.pattPos, ch);
+        } else if (usePerChannelTables) {
+          // MusicLine: each channel reads from its own independently-sequenced pattern
+          const chTable: number[] | undefined = this.song.channelTrackTables![ch];
+          const chPatIdx = chTable?.[this.songPos] ?? 0;
+          row = this.song.patterns[chPatIdx]?.channels[ch]?.rows[this.pattPos];
+        } else {
+          row = pattern!.channels[ch]?.rows[this.pattPos];
+        }
         if (!row) continue;
 
         if (readNewNote) {

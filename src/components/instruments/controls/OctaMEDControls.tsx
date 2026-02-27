@@ -5,7 +5,7 @@
  * vibrato), vol command table, wf command table, and waveform preview.
  */
 
-import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { OctaMEDConfig } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';

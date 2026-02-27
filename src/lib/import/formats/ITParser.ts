@@ -329,7 +329,6 @@ function readEnvelope(v: DataView, off: number): EnvelopePoints | undefined {
   const lpb   = u8(v, off + 2);
   const lpe   = u8(v, off + 3);
   const slb   = u8(v, off + 4);
-  const sle   = u8(v, off + 5);
 
   if (!(flags & 0x01) || num === 0) return undefined;
 

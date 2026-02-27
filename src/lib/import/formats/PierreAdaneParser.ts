@@ -45,9 +45,6 @@ function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
 }
 
-function u32BE(buf: Uint8Array, off: number): number {
-  return (((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0);
-}
 
 function safeU16(buf: Uint8Array, off: number): number {
   if (off < 0 || off + 1 >= buf.length) return 0x8001; // negative+odd sentinel
@@ -115,7 +112,6 @@ export function isPierreAdaneFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   //   D2 = D2_orig - D1_orig - 2  (gap21-2, but already checked == gap43)
   //   add.w D4, D5  → D5 = D4_orig + gap43
   const D4_orig = safeU16(buf, 6);
-  const D3_orig = safeU16(buf, 4);
   const D5_final = D4_orig + gap43;
 
   // lea (A0, D1.W), A2  → A2 = base + D1_orig
