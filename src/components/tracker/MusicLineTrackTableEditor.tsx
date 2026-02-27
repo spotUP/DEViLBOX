@@ -8,11 +8,14 @@
  *   Columns = song positions (0..N)
  *   Rows    = channels (Ch 1..numChannels)
  *   Cells   = pattern index at that channel × position
+ *
+ * Reads data from the tracker store so the matrix is visible even before
+ * playback starts (the replayer only loads the song on first play).
  */
 
-import React, { useEffect, useRef, useState } from 'react';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
-import type { TrackerSong } from '@engine/TrackerReplayer';
+import React from 'react';
+import { useTrackerStore } from '@stores';
+import { useTransportStore } from '@stores/useTransportStore';
 
 interface MusicLineTrackTableEditorProps {
   /** Called when user clicks a position cell to navigate */
@@ -20,43 +23,19 @@ interface MusicLineTrackTableEditorProps {
 }
 
 export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps> = ({ onSeek }) => {
-  const [song, setSong] = useState<TrackerSong | null>(() => getTrackerReplayer().getSong());
-  const [currentPos, setCurrentPos] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const channelTrackTables = useTrackerStore((state) => state.channelTrackTables);
+  const channelSpeeds = useTrackerStore((state) => state.channelSpeeds);
+  const patterns = useTrackerStore((state) => state.patterns);
+  const currentPos = useTrackerStore((state) => state.currentPositionIndex);
+  const initialSpeed = useTransportStore((state) => state.speed);
 
-  // Sync song reference when replayer loads a new song
-  useEffect(() => {
-    const replayer = getTrackerReplayer();
-    // Poll for song changes — there's no subscription API for song loads,
-    // but the component re-mounts when the modal opens so initial state is fine.
-    setSong(replayer.getSong());
-
-    // Subscribe to position changes for highlighting
-    const origOnRowChange = replayer.onRowChange;
-    const handler = (_row: number, _pattern: number, position: number) => {
-      setCurrentPos(position);
-      origOnRowChange?.(_row, _pattern, position);
-    };
-    replayer.onRowChange = handler;
-
-    return () => {
-      // Restore previous handler on unmount
-      if (replayer.onRowChange === handler) {
-        replayer.onRowChange = origOnRowChange;
-      }
-    };
-  }, []);
-
-  if (!song?.channelTrackTables || song.channelTrackTables.length === 0) return null;
-
-  const { channelTrackTables, channelSpeeds, initialSpeed, patterns } = song;
+  if (!channelTrackTables || channelTrackTables.length === 0) return null;
 
   // Find the max positions across all channels (guard against empty tables)
   const maxPositions = Math.max(0, ...channelTrackTables.map(t => t.length));
   const positions = Array.from({ length: maxPositions }, (_, i) => i);
 
-  // Build channel labels — one row per entry in channelTrackTables (not numChannels,
-  // which is 1 since each PART is a single-voice pattern in MusicLine)
+  // Build channel labels
   const channelLabels = Array.from({ length: channelTrackTables.length }, (_, i) => `Ch ${i + 1}`);
 
   return (
@@ -66,7 +45,7 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
       </div>
 
       {/* Scrollable matrix */}
-      <div ref={containerRef} className="overflow-x-auto overflow-y-auto max-h-80 scrollbar-ft2">
+      <div className="overflow-x-auto overflow-y-auto max-h-80 scrollbar-ft2">
         <table className="text-[11px] font-mono border-collapse" style={{ minWidth: maxPositions * 42 + 64 }}>
           <thead>
             <tr className="sticky top-0 bg-dark-bgTertiary z-10">
