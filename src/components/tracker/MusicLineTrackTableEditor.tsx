@@ -49,14 +49,15 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
 
   if (!song?.channelTrackTables || song.channelTrackTables.length === 0) return null;
 
-  const { channelTrackTables, channelSpeeds, initialSpeed, numChannels, patterns } = song;
+  const { channelTrackTables, channelSpeeds, initialSpeed, patterns } = song;
 
   // Find the max positions across all channels (guard against empty tables)
   const maxPositions = Math.max(0, ...channelTrackTables.map(t => t.length));
   const positions = Array.from({ length: maxPositions }, (_, i) => i);
 
-  // Build channel labels — use pattern channel names if available
-  const channelLabels = Array.from({ length: numChannels }, (_, i) => `Ch ${i + 1}`);
+  // Build channel labels — one row per entry in channelTrackTables (not numChannels,
+  // which is 1 since each PART is a single-voice pattern in MusicLine)
+  const channelLabels = Array.from({ length: channelTrackTables.length }, (_, i) => `Ch ${i + 1}`);
 
   return (
     <div className="flex flex-col gap-2 min-w-0">
