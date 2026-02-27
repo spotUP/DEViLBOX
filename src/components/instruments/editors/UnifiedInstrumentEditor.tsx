@@ -91,6 +91,7 @@ const SidMon1Controls = lazy(() => import('../controls/SidMon1Controls').then(m 
 const HippelCoSoControls = lazy(() => import('../controls/HippelCoSoControls').then(m => ({ default: m.HippelCoSoControls })));
 const RobHubbardControls = lazy(() => import('../controls/RobHubbardControls').then(m => ({ default: m.RobHubbardControls })));
 const DavidWhittakerControls = lazy(() => import('../controls/DavidWhittakerControls').then(m => ({ default: m.DavidWhittakerControls })));
+const MusicLineControls = lazy(() => import('../controls/MusicLineControls').then(m => ({ default: m.MusicLineControls })));
 
 // Lazy-loaded hardware UI components
 const HivelyHardware = lazy(() => import('../hardware/HivelyHardware').then(m => ({ default: m.HivelyHardware })));
@@ -120,7 +121,7 @@ import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
 import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'musicline';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -307,7 +308,9 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     unbakeInstrument(instrument.id);
   };
 
-  const editorMode = getEditorMode(instrument.synthType);
+  const editorMode = instrument.metadata?.mlSynthConfig
+    ? 'musicline'
+    : getEditorMode(instrument.synthType);
 
   // Auto-switch tabs when synth type changes
   useEffect(() => {
@@ -1368,6 +1371,25 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             config={davidWhittakerConfig}
             onChange={handleDavidWhittakerChange}
           />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // MUSICLINE EDITOR WAVEFORM SYNTH EDITOR
+  // ============================================================================
+  if (editorMode === 'musicline') {
+    return (
+      <div className="synth-editor-container bg-[#060608]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <MusicLineControls instrument={instrument} onChange={handleChange} />
         </Suspense>
       </div>
     );

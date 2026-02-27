@@ -135,6 +135,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   interface InstData {
     title: string;
     smplNumber: number;
+    smplType: number;     // 0=PCM, 1=Sine, 2=Sawtooth, 3=Square
     volume: number;       // 0–64
     fineTune: number;     // signed, may be used for finetune
     semiTone: number;     // signed, semitone transposition
@@ -542,14 +543,14 @@ function createEmptyCell(): TrackerCell {
  *   Total = 206 bytes ✓
  */
 function parseInst(v: DataView, data: Uint8Array, offset: number): {
-  title: string; smplNumber: number; volume: number;
+  title: string; smplNumber: number; smplType: number; volume: number;
   fineTune: number; semiTone: number; smplRepStart: number; smplRepLen: number;
 } {
   const o = offset;
   return {
     title:       readCString(data, o, 32),
     smplNumber:  data[o + 32],           // 0-based
-    // smplType  = data[o + 33],          // ignore
+    smplType:    data[o + 33],           // 0=PCM, 1=Sine, 2=Sawtooth, 3=Square
     // smplPtr   = v.getUint32(o + 34),   // ignore (Amiga RAM)
     // smplLen   = v.getUint16(o + 38),   // in words
     // smplRepPtr= v.getUint32(o + 40),   // ignore
@@ -687,6 +688,51 @@ function deltaDePack(packed: Uint8Array, outputSize: number, deltaCommand: numbe
   return out;
 }
 
+// ── Waveform synthesis ─────────────────────────────────────────────────────
+
+// For a 32-sample waveform at PAL_C3_RATE=8287 Hz:
+//   playbackRate at C3 period (428) = 8287/8287 = 1.0
+//   output frequency = 8287/32 ≈ 259 Hz ≈ C3 ✓
+const ML_WAVE_SAMPLES = 32;
+
+/**
+ * Generate a single-cycle waveform as unsigned 8-bit PCM (two's complement).
+ *   type 1 = Sine
+ *   type 2 = Sawtooth (ramp up)
+ *   type 3 = Square
+ *
+ * 32 samples at PAL_C3_RATE (8287 Hz) gives ~C3 fundamental at Amiga C3 period (428).
+ */
+export function generateMusicLineWaveformPcm(type: number): Uint8Array {
+  const pcm = new Uint8Array(ML_WAVE_SAMPLES);
+  for (let i = 0; i < ML_WAVE_SAMPLES; i++) {
+    const phase = i / ML_WAVE_SAMPLES;
+    let val: number;
+    switch (type) {
+      case 1: // Sine
+        val = Math.round(Math.sin(phase * 2 * Math.PI) * 127);
+        break;
+      case 2: // Sawtooth (ramp up: -127 → +127)
+        val = Math.round(phase * 254 - 127);
+        break;
+      case 3: // Square
+        val = phase < 0.5 ? 127 : -128;
+        break;
+      default:
+        val = 0;
+    }
+    // Signed 8-bit → unsigned (two's complement)
+    pcm[i] = (val + 256) & 0xff;
+  }
+  return pcm;
+}
+
+const ML_WAVE_DISPLAY_NAMES: Record<number, string> = {
+  1: 'ML Sine',
+  2: 'ML Saw',
+  3: 'ML Square',
+};
+
 // ── Instrument building ────────────────────────────────────────────────────
 
 /**
@@ -694,13 +740,38 @@ function deltaDePack(packed: Uint8Array, outputSize: number, deltaCommand: numbe
  * Each INST references a SMPL by smplNumber (1-based: smplNumber=1 → smplList[0]).
  */
 function buildInstruments(
-  instList: Array<{ title: string; smplNumber: number; volume: number; fineTune: number; semiTone: number; smplRepStart: number; smplRepLen: number }>,
+  instList: Array<{ title: string; smplNumber: number; smplType: number; volume: number; fineTune: number; semiTone: number; smplRepStart: number; smplRepLen: number }>,
   smplList: Array<{ title: string; pcm: Uint8Array; smplLength: number; repLength: number; fineTune: number; semiTone: number }>
 ) {
   const instruments = [];
 
   for (let i = 0; i < instList.length; i++) {
     const inst = instList[i];
+
+    // smplType > 0 = waveform synth (1=Sine, 2=Sawtooth, 3=Square)
+    if (inst.smplType > 0) {
+      const wavePcm = generateMusicLineWaveformPcm(inst.smplType);
+      const displayType = ML_WAVE_DISPLAY_NAMES[inst.smplType] ?? `ML Wave ${inst.smplType}`;
+      const base = createSamplerInstrument(
+        i + 1,
+        inst.title || displayType,
+        wavePcm,
+        inst.volume > 0 ? inst.volume : 64,
+        PAL_C3_RATE,
+        0,               // loopStart — loop the full waveform
+        ML_WAVE_SAMPLES  // loopEnd
+      );
+      instruments.push({
+        ...base,
+        metadata: {
+          ...base.metadata!,
+          displayType,
+          mlSynthConfig: { waveformType: inst.smplType as 1 | 2 | 3, volume: inst.volume },
+        },
+      });
+      continue;
+    }
+
     const smpl = smplList[inst.smplNumber - 1]; // smplNumber is 1-based (Mline116.asm:5500 addq #1,_WsMaxNum)
 
     if (!smpl || smpl.pcm.length === 0) {
