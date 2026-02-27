@@ -699,21 +699,29 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
   const numRawPatterns = patternSize > 0 ? Math.floor(symEvents.length / patternSize) : 0;
 
   // ── Build InstrumentConfig list ───────────────────────────────────────────
-  // Symphonie Pro is a full-song replayer (like UADESynth/HivelySynth).
-  // Emit a single placeholder instrument; parseSymphonieProFile will attach
-  // the SymphoniePlaybackData and set synthType to 'SymphonieSynth'.
+  // Emit one entry per Symphonie instrument so TrackerReplayer can find each
+  // instrument by its 1-based ID. parseSymphonieProFile will attach the full
+  // SymphoniePlaybackData (and set synthType = 'SymphonieSynth') to index 0.
   const songTitle = infoText || filename.replace(/\.symmod$/i, '');
-  const instruments: InstrumentConfig[] = [
-    {
-      id:        1,
-      name:      songTitle,
-      type:      'sample' as const,
-      synthType: 'Sampler' as const,
-      effects:   [],
-      volume:    0,
-      pan:       0,
-    } as unknown as InstrumentConfig,
-  ];
+  const instruments: InstrumentConfig[] = symInstruments.length > 0
+    ? symInstruments.map((si, i) => ({
+        id:        i + 1,
+        name:      si.name || songTitle,
+        type:      'sample' as const,
+        synthType: 'Sampler' as const,
+        effects:   [],
+        volume:    si.volume ?? 0,
+        pan:       0,
+      } as unknown as InstrumentConfig))
+    : [{
+        id:        1,
+        name:      songTitle,
+        type:      'sample' as const,
+        synthType: 'Sampler' as const,
+        effects:   [],
+        volume:    0,
+        pan:       0,
+      } as unknown as InstrumentConfig];
 
   // ── Build patterns ────────────────────────────────────────────────────────
   // Mirrors OpenMPT's sequence/position → pattern conversion.
