@@ -53,7 +53,7 @@ type NativeFormatKey =
   | 'symphoniePro' | 'composer667' | 'chuckBiscuits' | 'speedySystem'
   | 'tronic' | 'digiBoosterPro' | 'gameMusicCreator' | 'faceTheMusic'
   | 'soundControl' | 'soundFactory' | 'actionamics' | 'activisionPro'
-  | 'ronKlaren' | 'iffSmus' | 'magneticFieldsPacker' | 'richardJoseph' | 'lme' | 'medley'
+  | 'ronKlaren' | 'iffSmus' | 'magneticFieldsPacker' | 'richardJoseph' | 'lme' | 'musicLine' | 'medley'
   | 'futurePlayer' | 'markCooksey' | 'jeroenTel' | 'quartet'
   | 'soundMaster' | 'zoundMonitor' | 'tcbTracker' | 'jasonPage'
   | 'mmdc' | 'psa' | 'steveTurner' | 'tme' | 'infogrames' | 'ufo'
@@ -129,6 +129,7 @@ const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label
   { key: 'activisionPro',     regex: /\.(avp|mw)$/i,                              label: 'Activision Pro',    description: 'Activision Pro — native parser or UADE.' },
   { key: 'iffSmus',           regex: /\.(smus|snx|tiny)$/i,                       label: 'IFF SMUS',          description: 'IFF SMUS Sonix — native parser or UADE.' },
   { key: 'lme',               regex: /\.lme$/i,                                   label: 'LME',               description: 'Leggless Music Editor — native parser or UADE.' },
+  { key: 'musicLine',         regex: /\.ml$/i,                                    label: 'MusicLine Editor',  description: 'MusicLine Editor — native parser.' },
   { key: 'medley',            regex: /\.ml$/i,                                    label: 'Medley',            description: 'Medley — native parser or UADE.' },
   { key: 'futurePlayer',      regex: /\.fp$/i,                                    label: 'Future Player',     description: 'Future Player — native parser or UADE.' },
   { key: 'ufo',               regex: /\.ufo$/i,                                   label: 'UFO',               description: 'UFO format — native parser or UADE.' },

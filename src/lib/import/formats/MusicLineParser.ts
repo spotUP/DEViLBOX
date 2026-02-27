@@ -449,7 +449,8 @@ function buildPattern(rawData: Uint8Array | undefined, numChannels: number): Pat
       if (noteRaw > 0 && noteRaw < ML_NOTE_END) {
         // Musical note
         cell.note = amigaNoteToXM(noteRaw);
-        if (instrRaw > 0) {
+        // instrRaw 0 or 0xFF = "no instrument change" sentinel; valid range is 1–127
+        if (instrRaw > 0 && instrRaw !== 0xFF) {
           cell.instrument = instrRaw; // 1-based instrument index
         }
       } else if (noteRaw === ML_NOTE_END) {
