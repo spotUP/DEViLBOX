@@ -356,6 +356,7 @@ static int16 *g_playerMixL[MAX_PLAYERS] = {NULL};
 static int16 *g_playerMixR[MAX_PLAYERS] = {NULL};
 static uint32 g_playerMixSize[MAX_PLAYERS] = {0};
 static uint8 g_playerActive[MAX_PLAYERS] = {0};
+static uint32 g_playerSamplesLeft[MAX_PLAYERS] = {0};
 
 static void ensure_player_mix_buffer(int32 handle, uint32 samples) {
     if (samples > g_playerMixSize[handle]) {
@@ -473,6 +474,7 @@ void hively_destroy_player(int32 handle) {
     g_playerMixR[handle] = NULL;
     g_playerMixSize[handle] = 0;
     g_playerActive[handle] = 0;
+    g_playerSamplesLeft[handle] = 0;
 }
 
 /*
@@ -622,6 +624,7 @@ void hively_player_note_on(int32 handle, int32 note, int32 velocity) {
     voice->vc_PlantPeriod = 1;
 
     g_playerActive[handle] = 1;
+    g_playerSamplesLeft[handle] = 0; /* fire hvl_process_frame immediately on first render */
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -652,30 +655,40 @@ uint32 hively_player_render(int32 handle, float *outL, float *outR, uint32 numSa
     struct hvl_voice *voice = &ht->ht_Voices[0];
     ensure_player_mix_buffer(handle, numSamples);
 
-    /* Process frames and render */
     uint32 written = 0;
-    while (written < numSamples) {
-        /* Process one frame of voice state (ADSR, vibrato, filter sweep, plist) */
-        hvl_process_frame(ht, voice);
-        hvl_set_audio(voice, ht->ht_FreqF);
+    const uint32 samplesPerFrame = ht->ht_Frequency / 50;
+    if (samplesPerFrame == 0) {
+        memset(outL, 0, numSamples * sizeof(float));
+        memset(outR, 0, numSamples * sizeof(float));
+        return numSamples;
+    }
+    const float scale = 1.0f / 32768.0f;
 
-        /* Render a chunk of audio */
-        uint32 samplesPerFrame = ht->ht_Frequency / 50;
+    while (written < numSamples) {
+        /* Fire voice state update at 50 Hz */
+        if (g_playerSamplesLeft[handle] == 0) {
+            hvl_process_frame(ht, voice);
+            hvl_set_audio(voice, ht->ht_FreqF);
+            g_playerSamplesLeft[handle] = samplesPerFrame;
+        }
+
+        /* Render up to the end of the current 50Hz frame */
         uint32 toRender = numSamples - written;
-        if (toRender > samplesPerFrame) toRender = samplesPerFrame;
+        if (toRender > g_playerSamplesLeft[handle])
+            toRender = g_playerSamplesLeft[handle];
 
         memset(&g_playerMixL[handle][0], 0, toRender * sizeof(int16));
         memset(&g_playerMixR[handle][0], 0, toRender * sizeof(int16));
 
         hvl_mixchunk(ht, toRender, (int8 *)g_playerMixL[handle], (int8 *)g_playerMixR[handle], 2);
 
-        /* Convert int16 → float32 */
-        const float scale = 1.0f / 32768.0f;
         for (uint32 i = 0; i < toRender; i++) {
             outL[written + i] = (float)g_playerMixL[handle][i] * scale;
             outR[written + i] = (float)g_playerMixR[handle][i] * scale;
         }
+
         written += toRender;
+        g_playerSamplesLeft[handle] -= toRender;
     }
 
     return written;
