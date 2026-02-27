@@ -51,7 +51,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
-import { createSamplerInstrument, amigaNoteToXM } from './AmigaUtils';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -455,7 +455,7 @@ function decompressPart(data: Uint8Array, srcOffset: number, srcLen: number): Ui
  * Multiple channels each independently select which PART to play via their chnl_Data
  * track tables. The pattern editor shows ONE PART (one voice) at a time.
  *
- * Note mapping: MusicLine note N (1-60) → XM note via amigaNoteToXM (adds 12 octaves).
+ * Note mapping: MusicLine note N (25=C-1, 37=C-2, 49=C-3) → XM note via (mlNote - 12).
  * Note 61 (end sentinel) = reset row counter within PART; treated as rest here.
  */
 function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum: number): Pattern {
@@ -484,13 +484,37 @@ function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum:
       const cell = channel.rows[row];
 
       if (noteRaw > 0 && noteRaw < ML_NOTE_END) {
-        cell.note = amigaNoteToXM(noteRaw);
+        // MusicLine note numbers: 25=C-1, 37=C-2, 49=C-3.
+        // XM note numbers:         1=C-0, 13=C-1, 25=C-2.
+        // ML note 25 → XM note 13 (C-1): mlNote - 12.
+        // amigaNoteToXM() is designed for ProTracker 1-based notes (1=C-1) and adds 12 — wrong here.
+        cell.note = Math.max(1, noteRaw - 12);
         // 0x00 and 0xFF are "no instrument change" sentinels; valid range 1–127
         if (instrRaw > 0 && instrRaw !== 0xFF) {
           cell.instrument = instrRaw;
         }
       }
       // noteRaw === 0 → rest; noteRaw === ML_NOTE_END → end-of-part (reset) → treated as rest
+
+      // Effects: 5 slots × 2 bytes at bytes 2-11.
+      // Slot 0 (bytes 2-3) → cell.effTyp / cell.eff  (XM effect columns)
+      // Slot 1 (bytes 4-5) → cell.effTyp2 / cell.eff2
+      // Slots 2-4 are stored but TrackerCell only has 2 effect columns; ignore remainder.
+      const eff0Num = rawData[rowBase + 2];
+      const eff0Par = rawData[rowBase + 3];
+      const eff1Num = rawData[rowBase + 4];
+      const eff1Par = rawData[rowBase + 5];
+
+      if (eff0Num) {
+        const { effTyp, eff } = mapMLEffect(eff0Num, eff0Par);
+        cell.effTyp = effTyp;
+        cell.eff    = eff;
+      }
+      if (eff1Num) {
+        const { effTyp, eff } = mapMLEffect(eff1Num, eff1Par);
+        cell.effTyp2 = effTyp;
+        cell.eff2    = eff;
+      }
     }
   }
 
@@ -504,6 +528,29 @@ function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum:
 
 function createEmptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+}
+
+/**
+ * Map a MusicLine effect number + parameter to XM-compatible effTyp/eff.
+ *
+ * From Mline116.asm line 3494 help text and FX_JumpTable:
+ *   1 = SlideUp          → XM 0x01 Portamento up
+ *   2 = SlideDown        → XM 0x02 Portamento down
+ *   3 = SetVolume        → XM 0x0C Set volume (parameter 0x00–0x40)
+ *   4 = VolumeSlideUp    → XM 0x0A Volume slide (hi nibble = up)
+ *   5 = VolumeSlideDown  → XM 0x0A Volume slide (lo nibble = down)
+ *   6 = Restart          → XM 0x0B Pattern jump (to position 0 = restart)
+ */
+function mapMLEffect(effectNum: number, effectPar: number): { effTyp: number; eff: number } {
+  switch (effectNum) {
+    case 1: return { effTyp: 0x01, eff: effectPar };                       // Slide up
+    case 2: return { effTyp: 0x02, eff: effectPar };                       // Slide down
+    case 3: return { effTyp: 0x0C, eff: effectPar };                       // Set volume (0x00–0x40)
+    case 4: return { effTyp: 0x0A, eff: (effectPar & 0x0F) << 4 };        // Volume slide up
+    case 5: return { effTyp: 0x0A, eff: effectPar & 0x0F };               // Volume slide down
+    case 6: return { effTyp: 0x0B, eff: 0 };                              // Restart = jump to pos 0
+    default: return { effTyp: 0, eff: 0 };
+  }
 }
 
 // ── INST parsing ───────────────────────────────────────────────────────────
@@ -755,11 +802,11 @@ export function generateMusicLineWaveformPcm(type: number): Uint8Array {
 }
 
 const ML_WAVE_DISPLAY_NAMES: Record<number, string> = {
-  1: 'ML Wave 32',
-  2: 'ML Wave 64',
-  3: 'ML Wave 128',
-  4: 'ML Wave 256',
-  5: 'ML Wave 256',
+  1: 'ML Wave 16',   // 16-byte loop (8287/16 ≈ C4)
+  2: 'ML Wave 32',   // 32-byte loop (8287/32 ≈ C3)
+  3: 'ML Wave 64',   // 64-byte loop (8287/64 ≈ C2)
+  4: 'ML Wave 128',  // 128-byte loop (8287/128 ≈ C1)
+  5: 'ML Wave 256',  // 256-byte loop (8287/256 ≈ C0)
 };
 
 // ── Instrument building ────────────────────────────────────────────────────
