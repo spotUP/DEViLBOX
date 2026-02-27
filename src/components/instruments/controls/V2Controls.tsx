@@ -3,6 +3,20 @@ import type { V2Config } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Activity, Filter, Zap } from 'lucide-react';
 import { useThemeStore } from '@stores';
+import { FilterFrequencyResponse } from '@components/instruments/shared';
+
+// Maps FILTER_MODES index ('Off','Low','Band','High','Notch','All','MoogL','MoogH')
+// to a biquad approximation. null = filter bypassed (Off), no curve drawn.
+const V2_FILTER_MAP: Array<{ type: 'lowpass' | 'highpass' | 'bandpass' | 'notch'; poles: 2 | 4 } | null> = [
+  null,                              // Off
+  { type: 'lowpass',  poles: 2 },   // Low
+  { type: 'bandpass', poles: 2 },   // Band
+  { type: 'highpass', poles: 2 },   // High
+  { type: 'notch',    poles: 2 },   // Notch
+  { type: 'lowpass',  poles: 2 },   // All (all-pass, approximate)
+  { type: 'lowpass',  poles: 4 },   // MoogL
+  { type: 'highpass', poles: 4 },   // MoogH
+];
 
 interface V2ControlsProps {
   config: V2Config;
@@ -289,7 +303,19 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             ))}
           </select>
         </div>
-        
+        {(() => {
+          const entry = V2_FILTER_MAP[config.filter1.mode];
+          if (!entry) return null;
+          return (
+            <div className="mb-3">
+              <FilterFrequencyResponse
+                filterType={entry.type} cutoff={config.filter1.cutoff / 127}
+                resonance={config.filter1.resonance / 127} poles={entry.poles}
+                color={knobColor} width={280} height={56}
+              />
+            </div>
+          );
+        })()}
         <div className="grid grid-cols-2 gap-6 items-center gap-6">
           <Knob
             value={config.filter1.cutoff}
@@ -327,7 +353,19 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
             ))}
           </select>
         </div>
-        
+        {(() => {
+          const entry = V2_FILTER_MAP[config.filter2.mode];
+          if (!entry) return null;
+          return (
+            <div className="mb-3">
+              <FilterFrequencyResponse
+                filterType={entry.type} cutoff={config.filter2.cutoff / 127}
+                resonance={config.filter2.resonance / 127} poles={entry.poles}
+                color={knobColor} width={280} height={56}
+              />
+            </div>
+          );
+        })()}
         <div className="grid grid-cols-2 gap-6 items-center gap-6">
           <Knob
             value={config.filter2.cutoff}
