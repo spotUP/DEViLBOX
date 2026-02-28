@@ -2,10 +2,12 @@
  * DEViLBOX Server - Auth and File Management API
  */
 
+// Load environment variables FIRST — before any route modules read process.env constants
+import 'dotenv/config';
+
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import filesRoutes from './routes/files';
 import modlandRoutes from './routes/modland';
@@ -13,9 +15,6 @@ import scRoutes from './routes/sc';
 import { initDatabase } from './db/database';
 import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
