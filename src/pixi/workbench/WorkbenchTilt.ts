@@ -33,26 +33,28 @@ import {
 
 // Clip-space vertex shader: no projection matrix needed.
 // aPosition is pre-computed in clip space (x ∈ [-1,1], y ∈ [-1,1]).
-const VERT = /* glsl */ `
-  in vec2 aPosition;
-  in vec2 aUV;
-  out vec2 vUV;
-  void main() {
-    gl_Position = vec4(aPosition, 0.0, 1.0);
-    vUV = aUV;
-  }
+// #version 300 es must be the very first characters — no leading whitespace.
+const VERT = /* glsl */`#version 300 es
+in vec2 aPosition;
+in vec2 aUV;
+out vec2 vUV;
+void main() {
+  gl_Position = vec4(aPosition, 0.0, 1.0);
+  vUV = aUV;
+}
 `;
 
 // Samples the render texture.
 // Y is not flipped here — Pixi's RenderTexture already handles orientation
 // via framebuffer.invertY so UV (0,0) = top-left of rendered image.
-const FRAG = /* glsl */ `
-  in vec2 vUV;
-  out vec4 outColor;
-  uniform sampler2D uTexture;
-  void main() {
-    outColor = texture(uTexture, vUV);
-  }
+const FRAG = /* glsl */`#version 300 es
+precision highp float;
+in vec2 vUV;
+out vec4 outColor;
+uniform sampler2D uTexture;
+void main() {
+  outColor = texture(uTexture, vUV);
+}
 `;
 
 // ─── WorkbenchTiltRenderer ────────────────────────────────────────────────────
