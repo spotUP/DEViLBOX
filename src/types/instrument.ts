@@ -1216,7 +1216,7 @@ export const DEFAULT_DAVID_WHITTAKER: DavidWhittakerConfig = {
  */
 export interface SunVoxConfig {
   /**
-   * Raw .sunsynth binary as loaded from disk.
+   * Raw .sunsynth / .sunvox binary as loaded from disk.
    * Persisted via IndexedDB structured clone (ArrayBuffer survives round-trips).
    * NOTE: Not preserved in JSON file export — patches must be re-imported after
    * loading a project from a .json export file.
@@ -1224,6 +1224,12 @@ export interface SunVoxConfig {
   patchData: ArrayBuffer | null;
   /** Display name of the loaded patch (from module name in WASM) */
   patchName: string;
+  /**
+   * True when patchData is a full .sunvox song (loaded via setSong).
+   * False / absent when it is a .sunsynth patch (loaded via setModule).
+   * triggerAttack starts/stops the song rather than sending per-note MIDI.
+   */
+  isSong?: boolean;
   /**
    * Runtime cache of the most recently set control values, keyed by ctlId string.
    * Populated by SunVoxControls UI; not guaranteed to reflect the WASM engine state.
