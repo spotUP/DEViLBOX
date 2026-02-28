@@ -9,7 +9,8 @@
 import type { UADEEngine } from './UADEEngine';
 
 export class UADEChipEditor {
-  constructor(private readonly engine: UADEEngine) {}
+  private readonly engine: UADEEngine;
+  constructor(engine: UADEEngine) { this.engine = engine; }
 
   /** Read `length` raw bytes from chip RAM at `addr`. */
   readBytes(addr: number, length: number): Promise<Uint8Array> {
@@ -76,7 +77,7 @@ export class UADEChipEditor {
    */
   async exportModule(moduleBase: number, moduleSize: number, filename: string): Promise<void> {
     const bytes = await this.readModule(moduleBase, moduleSize);
-    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+    const blob = new Blob([bytes as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
