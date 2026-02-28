@@ -110,6 +110,11 @@ export default defineConfig({
     entries: ['src/**/*.{ts,tsx,js,jsx}'],
   },
   server: {
+    // Cross-Origin Isolation headers required for SharedArrayBuffer (scsynth WASM pthreads)
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+    },
     // Reduce resource usage for better performance when running multiple servers
     watch: {
       usePolling: false, // Disable polling to reduce CPU usage
