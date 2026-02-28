@@ -20,6 +20,36 @@ export type FormatEngineChoice = 'native' | 'uade';
  */
 export type UADEImportMode = 'enhanced' | 'classic';
 
+export interface CRTParams {
+  scanlineIntensity: number;  // 0–1
+  scanlineCount:     number;  // 50–1200
+  adaptiveIntensity: number;  // 0–1
+  brightness:        number;  // 0.6–1.8
+  contrast:          number;  // 0.6–1.8
+  saturation:        number;  // 0–2
+  bloomIntensity:    number;  // 0–1.5
+  bloomThreshold:    number;  // 0–1
+  rgbShift:          number;  // 0–1
+  vignetteStrength:  number;  // 0–2
+  curvature:         number;  // 0–0.5
+  flickerStrength:   number;  // 0–0.15
+}
+
+export const CRT_DEFAULT_PARAMS: CRTParams = {
+  scanlineIntensity: 0.15,
+  scanlineCount:     400,
+  adaptiveIntensity: 0.5,
+  brightness:        1.1,
+  contrast:          1.05,
+  saturation:        1.1,
+  bloomIntensity:    0.2,
+  bloomThreshold:    0.5,
+  rgbShift:          0.0,
+  vignetteStrength:  0.3,
+  curvature:         0.15,
+  flickerStrength:   0.01,
+};
+
 export interface FormatEnginePreferences {
   mod: FormatEngineChoice;     // .mod → libopenmpt/MODParser vs UADE
   hvl: FormatEngineChoice;     // .hvl/.ahx → HivelyParser vs UADE
@@ -184,6 +214,10 @@ interface SettingsStore {
   trackerVisualBg: boolean;  // Enable WebGL visual background behind tracker pattern
   trackerVisualMode: number; // Current visualizer mode index (0-5)
 
+  // CRT Shader
+  crtEnabled: boolean;
+  crtParams:  CRTParams;
+
   // Render Mode
   renderMode: 'dom' | 'webgl';  // UI rendering: 'dom' = React/Tailwind, 'webgl' = PixiJS
 
@@ -201,6 +235,9 @@ interface SettingsStore {
   setTrackerVisualBg: (enabled: boolean) => void;
   setTrackerVisualMode: (mode: number) => void;
   setRenderMode: (mode: 'dom' | 'webgl') => void;
+  setCrtEnabled:  (enabled: boolean) => void;
+  setCrtParam:    (param: keyof CRTParams, value: number) => void;
+  resetCrtParams: () => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -353,6 +390,8 @@ export const useSettingsStore = create<SettingsStore>()(
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
       trackerVisualBg: false,  // Default: off
       trackerVisualMode: 0,    // Default: spectrum bars
+      crtEnabled: false,
+      crtParams:  { ...CRT_DEFAULT_PARAMS },
       renderMode: 'webgl' as const,  // Default: WebGL/workbench rendering
 
     // Actions
@@ -420,6 +459,15 @@ export const useSettingsStore = create<SettingsStore>()(
         set((state) => {
           state.renderMode = renderMode;
         }),
+
+    setCrtEnabled: (crtEnabled) =>
+      set((state) => { state.crtEnabled = crtEnabled; }),
+
+    setCrtParam: (param, value) =>
+      set((state) => { state.crtParams[param] = value; }),
+
+    resetCrtParams: () =>
+      set((state) => { state.crtParams = { ...CRT_DEFAULT_PARAMS }; }),
     })),
     {
       name: 'devilbox-settings',
@@ -460,6 +508,8 @@ export const useSettingsStore = create<SettingsStore>()(
         midiPolyphonic: state.midiPolyphonic,
         trackerVisualBg: state.trackerVisualBg,
         trackerVisualMode: state.trackerVisualMode,
+        crtEnabled: state.crtEnabled,
+        crtParams:  state.crtParams,
         // renderMode intentionally not persisted — always start in webgl/workbench mode
       }),
     }
