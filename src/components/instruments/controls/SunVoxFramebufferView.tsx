@@ -216,12 +216,14 @@ export const SunVoxFramebufferView: React.FC<SunVoxFramebufferViewProps> = ({
   const moduleRef = useRef<SunVoxUIModule | null>(null);
   const handleRef = useRef<number>(-1);
   const controlsRef = useRef<SunVoxControl[]>([]);
+  // Track last propagated interaction to prevent 60fps synth.set spam (clicked_ctl in C does not auto-clear)
+  const lastPropagatedRef = useRef<{ ctl: number; value: number } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Keep refs in sync with props — CLAUDE.md configRef pattern
-  useEffect(() => { configRef.current = config; }, [config]);
-  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+  // Keep refs in sync with props — CLAUDE.md configRef pattern (no dependency array)
+  useEffect(() => { configRef.current = config; });
+  useEffect(() => { onChangeRef.current = onChange; });
 
   // When config.controlValues changes externally, push updated values to WASM
   useEffect(() => {
@@ -244,27 +246,50 @@ export const SunVoxFramebufferView: React.FC<SunVoxFramebufferViewProps> = ({
 
     async function init() {
       try {
-        // Load SunVoxUI Emscripten module via script injection (same as PT2Hardware)
+        // Load SunVoxUI Emscripten module.
+        // We fetch the JS source as text, apply the HEAPU8/HEAP32 mirror patch
+        // (same technique as SunVoxEngine.ts uses for SunVox.js), then inject via
+        // blob URL.  Without the patch, m.HEAPU8 / m.HEAP32 become stale views
+        // after WASM memory grows because Emscripten's updateMemoryViews() only
+        // updates the closure-local variable, not Module["HEAPU8"].
         const factory = await new Promise<
           (opts: Record<string, unknown>) => Promise<SunVoxUIModule>
-        >((resolve, reject) => {
+        >(async (resolve, reject) => {
           const win = window as unknown as Record<string, unknown>;
           if (typeof win['createSunVoxUI'] === 'function') {
             resolve(win['createSunVoxUI'] as (opts: Record<string, unknown>) => Promise<SunVoxUIModule>);
             return;
           }
-          const script = document.createElement('script');
-          script.src = '/sunvox/SunVoxUI.js';
-          script.onload = () => {
-            const fn = (window as unknown as Record<string, unknown>)['createSunVoxUI'];
-            if (typeof fn === 'function') {
-              resolve(fn as (opts: Record<string, unknown>) => Promise<SunVoxUIModule>);
-            } else {
-              reject(new Error('createSunVoxUI not found after script load'));
-            }
-          };
-          script.onerror = () => reject(new Error('Failed to load SunVoxUI.js'));
-          document.head.appendChild(script);
+          try {
+            const baseUrl = (import.meta as unknown as Record<string, Record<string, string>>).env?.BASE_URL ?? '/';
+            const response = await fetch(`${baseUrl}sunvox/SunVoxUI.js`);
+            if (!response.ok) throw new Error(`Failed to fetch SunVoxUI.js: ${response.status}`);
+            let code = await response.text();
+            // Mirror heap views onto Module so they stay valid after memory growth
+            code = code
+              .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
+              .replace(/HEAP32=new Int32Array\(b\);/, 'HEAP32=new Int32Array(b);Module["HEAP32"]=HEAP32;');
+            const blob = new Blob([code], { type: 'text/javascript' });
+            const blobUrl = URL.createObjectURL(blob);
+            const script = document.createElement('script');
+            script.src = blobUrl;
+            script.onload = () => {
+              URL.revokeObjectURL(blobUrl);
+              const fn = (window as unknown as Record<string, unknown>)['createSunVoxUI'];
+              if (typeof fn === 'function') {
+                resolve(fn as (opts: Record<string, unknown>) => Promise<SunVoxUIModule>);
+              } else {
+                reject(new Error('createSunVoxUI not found after script load'));
+              }
+            };
+            script.onerror = () => {
+              URL.revokeObjectURL(blobUrl);
+              reject(new Error('Failed to inject SunVoxUI.js blob'));
+            };
+            document.head.appendChild(script);
+          } catch (fetchErr) {
+            reject(fetchErr);
+          }
         });
 
         if (cancelled) return;
@@ -349,32 +374,43 @@ export const SunVoxFramebufferView: React.FC<SunVoxFramebufferViewProps> = ({
           () => canvas.removeEventListener('wheel', onWheel),
         );
 
+        // Capture m in a local const so TypeScript can narrow the type in the rAF closure
+        const capturedM = m;
+        lastPropagatedRef.current = null; // reset on each init cycle
+
         // rAF render loop
         const renderLoop = () => {
           if (cancelled) return;
 
-          if (m!._sunvox_ui_tick) m!._sunvox_ui_tick(uiHandle);
-          blitFramebuffer(m!, uiHandle, ctx, imgData, pixelCount);
+          if (capturedM._sunvox_ui_tick) capturedM._sunvox_ui_tick(uiHandle);
+          blitFramebuffer(capturedM, uiHandle, ctx, imgData, pixelCount);
 
-          // Check for user interactions with controls
-          const clickedCtl = m!._sunvox_ui_get_clicked_ctl(uiHandle);
+          // Check for user interactions with controls.
+          // clicked_ctl in C is NOT auto-cleared after reading — it persists until
+          // sunvox_ui_set_module() is called.  Guard with lastPropagatedRef so we
+          // only forward new interactions, not every frame after the first click.
+          const clickedCtl = capturedM._sunvox_ui_get_clicked_ctl(uiHandle);
           if (clickedCtl >= 0) {
-            const clickedValue = m!._sunvox_ui_get_clicked_value(uiHandle);
+            const clickedValue = capturedM._sunvox_ui_get_clicked_value(uiHandle);
+            const last = lastPropagatedRef.current;
+            if (!last || last.ctl !== clickedCtl || last.value !== clickedValue) {
+              lastPropagatedRef.current = { ctl: clickedCtl, value: clickedValue };
 
-            // Forward to synth engine (fire-and-forget)
-            synth.set(clickedCtl.toString(), clickedValue);
+              // Forward to synth engine (fire-and-forget)
+              synth.set(clickedCtl.toString(), clickedValue);
 
-            // Merge into config and propagate up
-            const current = configRef.current;
-            const updated: SunVoxConfig = {
-              ...current,
-              controlValues: {
-                ...current.controlValues,
-                [clickedCtl.toString()]: clickedValue,
-              },
-            };
-            configRef.current = updated;
-            onChangeRef.current(updated);
+              // Merge into config and propagate up
+              const current = configRef.current;
+              const updated: SunVoxConfig = {
+                ...current,
+                controlValues: {
+                  ...current.controlValues,
+                  [clickedCtl.toString()]: clickedValue,
+                },
+              };
+              configRef.current = updated;
+              onChangeRef.current(updated);
+            }
           }
 
           rafId = requestAnimationFrame(renderLoop);
