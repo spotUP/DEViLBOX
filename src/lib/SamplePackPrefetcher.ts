@@ -8,24 +8,22 @@
 
 import { SAMPLE_PACKS } from '@/constants/samplePacks';
 
-const CACHE_NAME = 'sample-packs-v1';
-const STORAGE_KEY = 'samplePacksCached';
+export const CACHE_NAME = 'sample-packs-v1';
+export const STORAGE_KEY = 'samplePacksCached';
 const CACHE_VERSION = 'v1';
 const BATCH_SIZE = 4;
 
 /** Collect all unique sample URLs from the factory pack registry. */
 function getAllSampleUrls(): string[] {
-  const urls: string[] = [];
+  const seen = new Set<string>();
   for (const pack of SAMPLE_PACKS) {
     for (const samples of Object.values(pack.samples)) {
       for (const sample of samples) {
-        if (sample.url && !urls.includes(sample.url)) {
-          urls.push(sample.url);
-        }
+        if (sample.url) seen.add(sample.url);
       }
     }
   }
-  return urls;
+  return Array.from(seen);
 }
 
 /**
@@ -64,6 +62,8 @@ export async function runPrefetchIfNeeded(
 
   onProgress(completed, total);
 
+  let errorCount = 0;
+
   // Fetch in batches
   for (let i = 0; i < pending.length; i += BATCH_SIZE) {
     const batch = pending.slice(i, i + BATCH_SIZE);
@@ -75,7 +75,7 @@ export async function runPrefetchIfNeeded(
             await cache.put(url, response);
           }
         } catch (err) {
-          // Individual failures are non-fatal — skip silently
+          errorCount++;
           console.warn('[SamplePackPrefetcher] Failed to cache:', url, err);
         }
         completed++;
@@ -84,7 +84,9 @@ export async function runPrefetchIfNeeded(
     );
   }
 
-  localStorage.setItem(STORAGE_KEY, CACHE_VERSION);
+  if (errorCount === 0) {
+    localStorage.setItem(STORAGE_KEY, CACHE_VERSION);
+  }
 }
 
 /** Clear the sample pack cache and flag (forces re-download on next boot). */
