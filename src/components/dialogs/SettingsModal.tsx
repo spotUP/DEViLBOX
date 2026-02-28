@@ -16,6 +16,33 @@ import { useAudioStore } from '@stores/useAudioStore';
 import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
 
+interface CRTSliderProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}
+
+const CRTSlider: React.FC<CRTSliderProps> = ({ label, value, min, max, step, onChange }) => (
+  <div className="flex items-center justify-between gap-2">
+    <label className="text-ft2-text text-[10px] font-mono w-28 shrink-0">{label}</label>
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(e) => onChange(parseFloat(e.target.value))}
+      className="flex-1 h-1 accent-ft2-highlight cursor-pointer"
+    />
+    <span className="text-ft2-textDim text-[10px] font-mono w-10 text-right tabular-nums">
+      {value.toFixed(step < 0.01 ? 3 : step < 0.1 ? 2 : 1)}
+    </span>
+  </div>
+);
+
 const KEYBOARD_SCHEMES = [
   { id: 'fasttracker2', name: 'FastTracker 2', description: 'Classic FT2 layout (DOS/PC) - from ft2-clone source' },
   { id: 'impulse-tracker', name: 'Impulse Tracker', description: 'IT/Schism Tracker style - from schismtracker source' },
@@ -65,6 +92,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setTrackerVisualMode,
     renderMode,
     setRenderMode,
+    crtEnabled,
+    crtParams,
+    setCrtEnabled,
+    setCrtParam,
+    resetCrtParams,
   } = useSettingsStore();
 
   const { sampleBusGain, setSampleBusGain, synthBusGain, setSynthBusGain, autoGain, setAutoGain } = useAudioStore();
@@ -230,6 +262,55 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       </option>
                     ))}
                   </select>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* CRT Shader Section */}
+          <section>
+            <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">CRT SHADER</h3>
+            <div className="space-y-3">
+
+              {/* Enable toggle */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">CRT Effect:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">WebGL post-processing — scanlines, curvature, bloom</span>
+                </div>
+                <Toggle label="" value={crtEnabled} onChange={setCrtEnabled} size="sm" />
+              </div>
+
+              {/* Param sliders — only shown when enabled */}
+              {crtEnabled && (
+                <div className="space-y-2 border-t border-ft2-border pt-3">
+
+                  <div className="text-[9px] text-ft2-highlight font-mono font-bold tracking-wide">SCANLINES</div>
+                  <CRTSlider label="Intensity"  value={crtParams.scanlineIntensity} min={0}   max={1}    step={0.01}  onChange={(v) => setCrtParam('scanlineIntensity', v)} />
+                  <CRTSlider label="Count"      value={crtParams.scanlineCount}     min={50}  max={1200} step={1}     onChange={(v) => setCrtParam('scanlineCount', v)} />
+                  <CRTSlider label="Adaptive"   value={crtParams.adaptiveIntensity} min={0}   max={1}    step={0.01}  onChange={(v) => setCrtParam('adaptiveIntensity', v)} />
+
+                  <div className="text-[9px] text-ft2-highlight font-mono font-bold tracking-wide pt-1">COLOR</div>
+                  <CRTSlider label="Brightness" value={crtParams.brightness}        min={0.6} max={1.8}  step={0.01}  onChange={(v) => setCrtParam('brightness', v)} />
+                  <CRTSlider label="Contrast"   value={crtParams.contrast}          min={0.6} max={1.8}  step={0.01}  onChange={(v) => setCrtParam('contrast', v)} />
+                  <CRTSlider label="Saturation" value={crtParams.saturation}        min={0}   max={2}    step={0.01}  onChange={(v) => setCrtParam('saturation', v)} />
+
+                  <div className="text-[9px] text-ft2-highlight font-mono font-bold tracking-wide pt-1">EFFECTS</div>
+                  <CRTSlider label="Bloom Intensity" value={crtParams.bloomIntensity}  min={0} max={1.5} step={0.01}  onChange={(v) => setCrtParam('bloomIntensity', v)} />
+                  <CRTSlider label="Bloom Threshold" value={crtParams.bloomThreshold}  min={0} max={1}   step={0.01}  onChange={(v) => setCrtParam('bloomThreshold', v)} />
+                  <CRTSlider label="RGB Shift"       value={crtParams.rgbShift}        min={0} max={1}   step={0.01}  onChange={(v) => setCrtParam('rgbShift', v)} />
+
+                  <div className="text-[9px] text-ft2-highlight font-mono font-bold tracking-wide pt-1">FRAMING</div>
+                  <CRTSlider label="Vignette"   value={crtParams.vignetteStrength}  min={0}   max={2}   step={0.01}  onChange={(v) => setCrtParam('vignetteStrength', v)} />
+                  <CRTSlider label="Curvature"  value={crtParams.curvature}         min={0}   max={0.5} step={0.005} onChange={(v) => setCrtParam('curvature', v)} />
+                  <CRTSlider label="Flicker"    value={crtParams.flickerStrength}   min={0}   max={0.15} step={0.001} onChange={(v) => setCrtParam('flickerStrength', v)} />
+
+                  <button
+                    onClick={resetCrtParams}
+                    className="w-full text-[10px] font-mono text-ft2-textDim border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight px-2 py-1 transition-colors mt-1"
+                  >
+                    Reset to defaults
+                  </button>
                 </div>
               )}
             </div>
