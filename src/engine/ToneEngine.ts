@@ -2392,19 +2392,6 @@ export class ToneEngine {
     channelIndex?: number,
     hammer?: boolean
   ): void {
-    // MusicLine instruments: route preview through the WASM engine which applies
-    // the correct synthesis (envelope, pitch, sub-loop) instead of raw Tone.js Sampler.
-    if (config.metadata?.isMusicLine) {
-      import('./musicline/MusicLineEngine').then(({ MusicLineEngine }) => {
-        if (MusicLineEngine.hasInstance()) {
-          const instIdx = (config.metadata?.mlInstIdx as number | undefined) ?? 0;
-          const midiNote = Math.round(Tone.Frequency(note as Tone.Unit.Frequency).toMidi());
-          MusicLineEngine.getInstance().previewNoteOn(instIdx, midiNote, Math.round(velocity * 100));
-        }
-      }).catch(() => { /* WASM not ready */ });
-      return;
-    }
-
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
     if (!instrument) {
@@ -2679,17 +2666,6 @@ export class ToneEngine {
     config: InstrumentConfig,
     channelIndex?: number
   ): void {
-    // MusicLine instruments: route release through WASM preview engine
-    if (config.metadata?.isMusicLine) {
-      import('./musicline/MusicLineEngine').then(({ MusicLineEngine }) => {
-        if (MusicLineEngine.hasInstance()) {
-          const instIdx = (config.metadata?.mlInstIdx as number | undefined) ?? 0;
-          MusicLineEngine.getInstance().previewNoteOff(instIdx);
-        }
-      }).catch(() => { /* WASM not ready */ });
-      return;
-    }
-
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
     if (!instrument || !(instrument as any).triggerRelease) {
