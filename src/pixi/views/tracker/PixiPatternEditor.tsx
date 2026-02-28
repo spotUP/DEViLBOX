@@ -1149,14 +1149,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         onPointerUpOutside={handlePointerUp}
       >
         {/* TrackerVisualBackground behind the grid */}
-        {trackerVisualBg && (
-          <PixiDOMOverlay
-            layout={{ position: 'absolute', width, height: gridHeight, left: 0, top: 0 }}
-            style={{ pointerEvents: 'none', zIndex: 0 }}
-          >
-            <TrackerVisualBackground width={width} height={gridHeight} />
-          </PixiDOMOverlay>
-        )}
+        <PixiDOMOverlay
+          layout={{ position: 'absolute', width, height: gridHeight, left: 0, top: 0 }}
+          style={{ pointerEvents: 'none', zIndex: 0 }}
+          visible={trackerVisualBg}
+        >
+          <TrackerVisualBackground width={width} height={gridHeight} />
+        </PixiDOMOverlay>
 
         <pixiGraphics draw={drawGrid} layout={{ position: 'absolute', width, height: gridHeight }} />
 
@@ -1172,19 +1171,18 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         ))}
 
         {/* Drag-and-drop overlay for instruments — only visible during drag */}
-        {isDragActive && (
-          <PixiDOMOverlay
-            layout={{ position: 'absolute', width, height: gridHeight, left: 0, top: 0 }}
-            style={{ pointerEvents: 'auto', zIndex: 10, background: dragOverCell ? 'rgba(99,102,241,0.08)' : 'transparent', transition: 'background 0.15s' }}
-          >
-            <div
-              style={{ width: '100%', height: '100%' }}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            />
-          </PixiDOMOverlay>
-        )}
+        <PixiDOMOverlay
+          layout={{ position: 'absolute', width, height: gridHeight, left: 0, top: 0 }}
+          style={{ pointerEvents: isDragActive ? 'auto' : 'none', zIndex: 10, background: isDragActive && dragOverCell ? 'rgba(99,102,241,0.08)' : 'transparent', transition: 'background 0.15s' }}
+          visible={isDragActive}
+        >
+          <div
+            style={{ width: '100%', height: '100%' }}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          />
+        </PixiDOMOverlay>
       </pixiContainer>
 
       {/* ─── DOM overlays for context menus + parameter editor ────────── */}

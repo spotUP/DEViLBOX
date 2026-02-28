@@ -459,6 +459,12 @@ function App() {
       return;
     }
 
+    // .sunvox project files — replace project directly
+    if (/\.sunvox$/i.test(file.name)) {
+      await loadSongFile(file);
+      return;
+    }
+
     // .dbx project files get a preview dialog showing song info before replacing
     if (/\.dbx$/i.test(file.name)) {
       setPendingSongFile(file);
