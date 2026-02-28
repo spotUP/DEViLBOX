@@ -1,12 +1,11 @@
 /**
  * SuperCollider scripted synth registration
- *
- * Registers the SuperCollider descriptor for UI routing.
- * Actual instance construction is handled by InstrumentFactory (needs AudioContext).
  */
 
+import * as Tone from 'tone';
 import { SynthRegistry } from '../SynthRegistry';
 import { DEFAULT_SUPERCOLLIDER } from '@typedefs/instrument';
+import { SuperColliderSynth } from '../../sc/SuperColliderSynth';
 
 SynthRegistry.register({
   id: 'SuperCollider',
@@ -16,12 +15,9 @@ SynthRegistry.register({
   useSynthBus: true,
   volumeOffsetDb: 0,
   controlsComponent: 'SuperColliderEditor',
-  // create is never invoked for SuperCollider — InstrumentFactory constructs instances
-  // directly because they require an AudioContext parameter.
-  create: (_config) => {
-    void DEFAULT_SUPERCOLLIDER;
-    throw new Error(
-      '[SuperColliderRegistry] Use InstrumentFactory to create SuperCollider instances.',
-    );
+  create: (config) => {
+    const sc = config.superCollider ?? DEFAULT_SUPERCOLLIDER;
+    const audioCtx = Tone.getContext().rawContext as AudioContext;
+    return new SuperColliderSynth(sc, audioCtx);
   },
 });
