@@ -249,7 +249,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     e.stopPropagation();
     if (!inst.hively) return;
     const bytes = exportAsAhi(inst.hively, inst.name);
-    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+    const blob = new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -298,7 +298,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   const handleSaveMli = useCallback((e: React.MouseEvent, inst: InstrumentConfig) => {
     e.stopPropagation();
     const bytes = exportMusicLineInstrument(inst);
-    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+    const blob = new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

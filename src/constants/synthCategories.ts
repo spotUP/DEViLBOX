@@ -1676,6 +1676,33 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Music',
     color: 'text-purple-400',
   },
+  MusicLineSynth: {
+    type: 'MusicLineSynth',
+    name: 'MusicLine',
+    shortName: 'MLN',
+    description: 'MusicLine Amiga tracker engine with wavetable synthesis',
+    bestFor: ['Amiga wavetable', 'Chiptune', 'MusicLine'],
+    icon: 'Waves',
+    color: 'text-teal-400',
+  },
+  SunVoxSynth: {
+    type: 'SunVoxSynth',
+    name: 'SunVox',
+    shortName: 'SVX',
+    description: 'SunVox WASM modular synth patch player (.sunsynth / .sunvox)',
+    bestFor: ['Modular synth', 'SunVox patches', 'Complex synthesis'],
+    icon: 'Sun',
+    color: 'text-yellow-400',
+  },
+  SuperCollider: {
+    type: 'SuperCollider',
+    name: 'SuperCollider',
+    shortName: 'SC',
+    description: 'SuperCollider SynthDef scripted synthesis via scsynth WASM',
+    bestFor: ['Algorithmic composition', 'Live coding', 'Experimental'],
+    icon: 'Code2',
+    color: 'text-lime-400',
+  },
 };
 
 // Organized categories
