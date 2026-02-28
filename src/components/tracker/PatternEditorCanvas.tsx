@@ -169,6 +169,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const trackerZoom = useUIStore(s => s.trackerZoom);
   const rowHighlightInterval = useUIStore(s => s.rowHighlightInterval);
   const showBeatLabels = useUIStore(s => s.showBeatLabels);
+  const showChannelNames = useUIStore(s => s.showChannelNames);
   const rowHeight = Math.round(24 * (trackerZoom / 100));
 
   // Keep rowHeightRef in sync so the RAF loop always sees the current value
@@ -1680,19 +1681,21 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                         >
                           {(idx + 1).toString().padStart(2, '0')}
                         </span>
-                        <input
-                          type="text"
-                          className="bg-transparent border-none outline-none font-mono text-[10px] font-bold text-text-primary focus:text-accent-primary transition-colors min-w-0 flex-1 overflow-hidden text-ellipsis uppercase px-0 placeholder:text-text-muted/50"
-                          value={channel.name || ''}
-                          placeholder={`CH${idx + 1}`}
-                          onChange={(e) => updateChannelName(idx, e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              (e.target as HTMLInputElement).blur();
-                            }
-                          }}
-                          title={`Click to rename channel (Short: ${channel.shortName || (idx + 1)})`}
-                        />
+                        {showChannelNames && (
+                          <input
+                            type="text"
+                            className="bg-transparent border-none outline-none font-mono text-[10px] font-bold text-text-primary focus:text-accent-primary transition-colors min-w-0 flex-1 overflow-hidden text-ellipsis uppercase px-0 placeholder:text-text-muted/50"
+                            value={channel.name || ''}
+                            placeholder={`CH${idx + 1}`}
+                            onChange={(e) => updateChannelName(idx, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }}
+                            title={`Click to rename channel (Short: ${channel.shortName || (idx + 1)})`}
+                          />
+                        )}
                         <div className="flex-shrink-0">
                           <ChannelVUMeter level={trigger.level} isActive={trigger.triggered} />
                         </div>
