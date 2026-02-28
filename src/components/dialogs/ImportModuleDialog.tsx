@@ -57,10 +57,25 @@ type NativeFormatKey =
   | 'futurePlayer' | 'markCooksey' | 'jeroenTel' | 'quartet'
   | 'soundMaster' | 'zoundMonitor' | 'tcbTracker' | 'jasonPage'
   | 'mmdc' | 'psa' | 'steveTurner' | 'tme' | 'infogrames' | 'ufo'
+  // ── Batch 3/4: prefix-based composer/packer formats ──────────────────────────
+  | 'synthPack' | 'jasonBrooke' | 'laxity' | 'fredGray' | 'musicMaker4V' | 'musicMaker8V'
+  | 'jochenHippelST' | 'specialFX' | 'timeTracker' | 'kris' | 'cinemaware'
+  | 'novoTradePacker' | 'alcatrazPacker' | 'bladePacker' | 'tomyTracker'
+  | 'fashionTracker' | 'multiMediaSound' | 'seanConran' | 'thomasHermann'
+  | 'titanicsPacker' | 'krisHatlelid' | 'ntsp' | 'moshPacker' | 'coreDesign'
+  | 'jankoMrsicFlogel' | 'soundPlayer' | 'nickPellingPacker' | 'peterVerswyvelenPacker'
+  | 'wallyBeben' | 'steveBarrett' | 'paulSummers' | 'desire' | 'martinWalker'
+  | 'paulShields' | 'paulRobotham' | 'pierreAdane' | 'anders0land' | 'andrewParton'
+  | 'customMade' | 'benDaglishSID' | 'digitalSonixChrome' | 'jesperOlsen'
+  | 'kimChristensen' | 'ashleyHogg' | 'adpcmMono' | 'janneSalmijarvi'
+  | 'jochenHippel7V' | 'midiLoriciel' | 'onEscapee' | 'paulTonge' | 'robHubbardST'
+  | 'maniacsOfNoise'
   // ── Auto-detect native (no user toggle; native tried first, UADE fallback) ──
   | 'amosMusicBank' | 'iceTracker'
   // ── User-selectable native vs UADE (recently added) ─────────────────────────
   | 'imagesMusicSystem' | 'sawteeth' | 'maximumEffect'
+  // ── Extension-based formats missing from earlier audit ────────────────────────
+  | 'karlMorton' | 'xmf' | 'uax'
   // ── Formats with native parsers (vs libopenmpt as fallback) ─────────────────
   | 'imagoOrpheus' | 'cdfm67' | 'easyTrax' | 'madTracker2' | 'psm' | 'pt36';
 
@@ -82,7 +97,7 @@ const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label
   { key: 'hippelCoso', regex: /\.(hipc|soc|coso)$/i,                             label: 'Hippel-CoSo',       description: 'Jochen Hippel CoSo — native parser or UADE.' },
 
   // ── Classic Amiga composers ──────────────────────────────────────────────────
-  { key: 'robHubbard',     regex: /\.rh[op]?$/i,                                 label: 'Rob Hubbard',       description: 'Rob Hubbard Amiga format — native parser or UADE.' },
+  { key: 'robHubbard',     regex: /^rh\.[^.]+$/i,                                label: 'Rob Hubbard',       description: 'Rob Hubbard Amiga prefix format (rh.*) — native parser or UADE.' },
   { key: 'davidWhittaker', regex: /\.(dw|dwold)$/i,                              label: 'David Whittaker',   description: 'David Whittaker format — native parser or UADE.' },
   { key: 'benDaglish',     regex: /^bd\.[^.]+$/i,                                label: 'Ben Daglish',       description: 'Ben Daglish format — native parser or UADE.' },
   { key: 'jeroenTel',      regex: /^(jt|mon_old)\.[^.]+$/i,                      label: 'Jeroen Tel',        description: 'Jeroen Tel format — native parser or UADE.' },
@@ -148,6 +163,65 @@ const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label
   { key: 'mmdc',        regex: /^mmdc\.[^.]+$/i,                                 label: 'MMDC',              description: 'MMDC — native parser or UADE.' },
   { key: 'psa',         regex: /^psa\.[^.]+$/i,                                  label: 'PSA',               description: 'Professional Sound Artists — native parser or UADE.' },
   { key: 'magneticFieldsPacker',         regex: /^mfp\.[^.]+$/i,                                  label: 'MFP',               description: 'Magnetic Fields Packer — native parser or UADE.' },
+
+  // ── Batch 3/4: prefix-based composer/packer formats (2026-02-27) ─────────────
+  { key: 'maniacsOfNoise',         regex: /^mon\.[^.]+$/i,            label: 'Maniacs of Noise',         description: 'Maniacs of Noise (mon.*) — native parser or UADE.' },
+  { key: 'synthPack',              regex: /^osp\.[^.]+$/i,            label: 'Synth Pack',               description: 'Synth Pack (osp.*) — native parser or UADE.' },
+  { key: 'jasonBrooke',            regex: /^(jcbo|jcb|jb)\.[^.]+$/i, label: 'Jason Brooke',             description: 'Jason Brooke (jcbo/jcb/jb.*) — native parser or UADE.' },
+  { key: 'laxity',                 regex: /^(powt|pt)\.[^.]+$/i,      label: 'Laxity',                   description: 'Laxity (powt/pt.*) — native parser or UADE.' },
+  { key: 'fredGray',               regex: /^gray\.[^.]+$/i,           label: 'Fred Gray',                description: 'Fred Gray (gray.*) — native parser or UADE.' },
+  { key: 'musicMaker4V',           regex: /^(mm4|sdata)\.[^.]+$/i,    label: 'Music Maker 4V',           description: 'Music Maker 4-Voice (mm4/sdata.*) — native parser or UADE.' },
+  { key: 'musicMaker8V',           regex: /^mm8\.[^.]+$/i,            label: 'Music Maker 8V',           description: 'Music Maker 8-Voice (mm8.*) — native parser or UADE.' },
+  { key: 'jochenHippelST',         regex: /^(hst|mdst)\.[^.]+$/i,    label: 'Jochen Hippel ST',         description: 'Jochen Hippel Atari ST (hst/mdst.*) — native parser or UADE.' },
+  { key: 'specialFX',              regex: /^(jd|doda)\.[^.]+$/i,      label: 'Special FX',               description: 'Special FX (jd/doda.*) — native parser or UADE.' },
+  { key: 'timeTracker',            regex: /^tmk\.[^.]+$/i,            label: 'Time Tracker',             description: 'Time Tracker (tmk.*) — native parser or UADE.' },
+  { key: 'kris',                   regex: /^kris\.[^.]+$/i,           label: 'KRIS',                     description: 'KRIS format (kris.*) — native parser or UADE.' },
+  { key: 'cinemaware',             regex: /^cin\.[^.]+$/i,            label: 'Cinemaware',               description: 'Cinemaware (cin.*) — native parser or UADE.' },
+  { key: 'novoTradePacker',        regex: /^ntp\.[^.]+$/i,            label: 'Novo Trade Packer',        description: 'Novo Trade Packer (ntp.*) — native parser or UADE.' },
+  { key: 'alcatrazPacker',         regex: /^alp\.[^.]+$/i,            label: 'Alcatraz Packer',          description: 'Alcatraz Packer (alp.*) — native parser or UADE.' },
+  { key: 'bladePacker',            regex: /^uds\.[^.]+$/i,            label: 'Blade Packer',             description: 'Blade Packer (uds.*) — native parser or UADE.' },
+  { key: 'tomyTracker',            regex: /^sg\.[^.]+$/i,             label: 'Tomy Tracker',             description: 'Tomy Tracker (sg.*) — native parser or UADE.' },
+  { key: 'fashionTracker',         regex: /^ex\.[^.]+$/i,             label: 'Fashion Tracker',          description: 'Fashion Tracker (ex.*) — native parser or UADE.' },
+  { key: 'multiMediaSound',        regex: /^(mms|sfx20)\.[^.]+$/i,    label: 'Multi Media Sound',        description: 'Multi Media Sound (mms/sfx20.*) — native parser or UADE.' },
+  { key: 'seanConran',             regex: /^scr\.[^.]+$/i,            label: 'Sean Conran',              description: 'Sean Conran (scr.*) — native parser or UADE.' },
+  { key: 'thomasHermann',          regex: /^thm\.[^.]+$/i,            label: 'Thomas Hermann',           description: 'Thomas Hermann (thm.*) — native parser or UADE.' },
+  { key: 'titanicsPacker',         regex: /^tits\.[^.]+$/i,           label: 'Titanics Packer',          description: 'Titanics Packer (tits.*) — native parser or UADE.' },
+  { key: 'krisHatlelid',           regex: /^kh\.[^.]+$/i,             label: 'Kris Hatlelid',            description: 'Kris Hatlelid (kh.*) — native parser or UADE.' },
+  { key: 'ntsp',                   regex: /^two\.[^.]+$/i,            label: 'NTSP',                     description: 'NTSP (two.*) — native parser or UADE.' },
+  { key: 'moshPacker',             regex: /^mosh\.[^.]+$/i,           label: 'Mosh Packer',              description: 'Mosh Packer (mosh.*) — native parser or UADE.' },
+  { key: 'coreDesign',             regex: /^core\.[^.]+$/i,           label: 'Core Design',              description: 'Core Design (core.*) — native parser or UADE.' },
+  { key: 'jankoMrsicFlogel',       regex: /^jmf\.[^.]+$/i,            label: 'Janko Mrsic-Flogel',       description: 'Janko Mrsic-Flogel (jmf.*) — native parser or UADE.' },
+  { key: 'soundPlayer',            regex: /^sjs\.[^.]+$/i,            label: 'Sound Player',             description: 'Sound Player (sjs.*) — native parser or UADE.' },
+  { key: 'nickPellingPacker',      regex: /^npp\.[^.]+$/i,            label: 'Nick Pelling Packer',      description: 'Nick Pelling Packer (npp.*) — native parser or UADE.' },
+  { key: 'peterVerswyvelenPacker', regex: /^pvp\.[^.]+$/i,            label: 'Peter Verswyvelen Packer', description: 'Peter Verswyvelen Packer (pvp.*) — native parser or UADE.' },
+  { key: 'wallyBeben',             regex: /^wb\.[^.]+$/i,             label: 'Wally Beben',              description: 'Wally Beben (wb.*) — native parser or UADE.' },
+  { key: 'steveBarrett',           regex: /^sb\.[^.]+$/i,             label: 'Steve Barrett',            description: 'Steve Barrett (sb.*) — native parser or UADE.' },
+  { key: 'paulSummers',            regex: /^snk\.[^.]+$/i,            label: 'Paul Summers',             description: 'Paul Summers (snk.*) — native parser or UADE.' },
+  { key: 'desire',                 regex: /^dsr\.[^.]+$/i,            label: 'Desire',                   description: 'Desire (dsr.*) — native parser or UADE.' },
+  { key: 'martinWalker',           regex: /^(avp|mw)\.[^.]+$/i,       label: 'Martin Walker',            description: 'Martin Walker prefix form (avp/mw.*) — native parser or UADE.' },
+  { key: 'paulShields',            regex: /^ps\.[^.]+$/i,             label: 'Paul Shields',             description: 'Paul Shields (ps.*) — native parser or UADE.' },
+  { key: 'paulRobotham',           regex: /^dat\.[^.]+$/i,            label: 'Paul Robotham',            description: 'Paul Robotham (dat.*) — native parser or UADE.' },
+  { key: 'pierreAdane',            regex: /^pap\.[^.]+$/i,            label: 'Pierre Adane',             description: 'Pierre Adane Packer (pap.*) — native parser or UADE.' },
+  { key: 'anders0land',            regex: /^hot\.[^.]+$/i,            label: 'Anders Øland',             description: 'Anders Øland (hot.*) — native parser or UADE.' },
+  { key: 'andrewParton',           regex: /^bye\.[^.]+$/i,            label: 'Andrew Parton',            description: 'Andrew Parton (bye.*) — native parser or UADE.' },
+  { key: 'customMade',             regex: /^(cm|rk|rkb)\.[^.]+$/i,    label: 'Custom Made',              description: 'Custom Made prefix form (cm/rk/rkb.*) — native parser or UADE.' },
+  { key: 'benDaglishSID',          regex: /^bds\.[^.]+$/i,            label: 'Ben Daglish SID',          description: 'Ben Daglish SID (bds.*) — native parser or UADE.' },
+  { key: 'digitalSonixChrome',     regex: /^dsc\.[^.]+$/i,            label: 'Digital Sonix Chrome',     description: 'Digital Sonix Chrome (dsc.*) — native parser or UADE.' },
+  { key: 'jesperOlsen',            regex: /^jo\.[^.]+$/i,             label: 'Jesper Olsen',             description: 'Jesper Olsen (jo.*) — native parser or UADE.' },
+  { key: 'kimChristensen',         regex: /^kim\.[^.]+$/i,            label: 'Kim Christensen',          description: 'Kim Christensen (kim.*) — native parser or UADE.' },
+  { key: 'ashleyHogg',             regex: /^ash\.[^.]+$/i,            label: 'Ashley Hogg',              description: 'Ashley Hogg (ash.*) — native parser or UADE.' },
+  { key: 'adpcmMono',              regex: /^adpcm\.[^.]+$/i,          label: 'ADPCM Mono',               description: 'ADPCM Mono (adpcm.*) — native parser or UADE.' },
+  { key: 'janneSalmijarvi',        regex: /^js\.[^.]+$/i,             label: 'Janne Salmijärvi',         description: 'Janne Salmijärvi (js.*) — native parser or UADE.' },
+  { key: 'jochenHippel7V',         regex: /^(hip7|s7g)\.[^.]+$/i,    label: 'Jochen Hippel 7V',         description: 'Jochen Hippel 7-Voice (hip7/s7g.*) — native parser or UADE.' },
+  { key: 'midiLoriciel',           regex: /^midi\.[^.]+$/i,           label: 'MIDI Loriciel',            description: 'MIDI Loriciel Atari ST (midi.*) — native parser or UADE.' },
+  { key: 'onEscapee',              regex: /^one\.[^.]+$/i,            label: 'On Escapee',               description: 'On Escapee (one.*) — native parser or UADE.' },
+  { key: 'paulTonge',              regex: /^pat\.[^.]+$/i,            label: 'Paul Tonge',               description: 'Paul Tonge (pat.*) — native parser or UADE.' },
+  { key: 'robHubbardST',           regex: /^rho\.[^.]+$/i,            label: 'Rob Hubbard ST',           description: 'Rob Hubbard Atari ST (rho.*) — native parser or UADE.' },
+
+  // ── Extension-based formats missing from earlier audit ────────────────────────
+  { key: 'karlMorton',             regex: /\.mus$/i,                   label: 'Karl Morton',              description: 'Karl Morton (.mus) — native parser or libopenmpt.' },
+  { key: 'xmf',                    regex: /\.xmf$/i,                   label: 'XMF',                      description: 'XMF format (Astroidea/Imperium Galactica) — native parser or UADE.' },
+  { key: 'uax',                    regex: /\.uax$/i, nativeOnly: true,  label: 'UAX',                      description: 'Unreal Audio Package (.uax) — native parser only (no UADE fallback).' },
 
   // ── Auto-detect native (magic-based; no user engine toggle) ─────────────────
   { key: 'amosMusicBank', regex: /\.abk$/i,              nativeOnly: true,        label: 'AMOS Music Bank',   description: 'AMOS Music Bank — native parser (magic-detected), UADE fallback.' },
