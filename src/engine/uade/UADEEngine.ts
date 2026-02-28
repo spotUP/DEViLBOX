@@ -94,6 +94,8 @@ export class UADEEngine {
   private _subsongScanPromise: Promise<{ subsong: number; scanResult: UADEEnhancedScanData & { rows: unknown[][] } }> | null = null;
   private _resolveSubsongScan: ((result: { subsong: number; scanResult: UADEEnhancedScanData & { rows: unknown[][] } }) => void) | null = null;
   private _rejectSubsongScan: ((err: Error) => void) | null = null;
+  // Queued isolated channel renders: Map<channelIndex, {resolve, reject}>
+  private _isolateChannelPending: Map<number, { resolve: (result: { channelIndex: number; pcm: ArrayBuffer; sampleRate: number; framesWritten: number }) => void; reject: (err: Error) => void }> = new Map();
   private _positionCallbacks: Set<PositionCallback> = new Set();
   private _channelCallbacks: Set<ChannelCallback> = new Set();
   private _songEndCallbacks: Set<() => void> = new Set();
@@ -290,6 +292,24 @@ export class UADEEngine {
             this._rejectSubsongScan = null;
           }
           break;
+
+        case 'instrumentIsolated': {
+          const pending = this._isolateChannelPending.get(data.channelIndex);
+          if (pending) {
+            pending.resolve({ channelIndex: data.channelIndex, pcm: data.pcm, sampleRate: data.sampleRate, framesWritten: data.framesWritten });
+            this._isolateChannelPending.delete(data.channelIndex);
+          }
+          break;
+        }
+
+        case 'instrumentIsolatedError': {
+          const pending = this._isolateChannelPending.get(data.channelIndex);
+          if (pending) {
+            pending.reject(new Error(data.message));
+            this._isolateChannelPending.delete(data.channelIndex);
+          }
+          break;
+        }
       }
     };
 
@@ -436,6 +456,40 @@ export class UADEEngine {
 
     this.workletNode.port.postMessage({ type: 'scanSubsong', subsong });
     return this._subsongScanPromise;
+  }
+
+  /**
+   * Render a single Paula channel in isolation.
+   * Mutes all other channels, renders durationMs of audio, resets mute mask.
+   * @param channelIndex - Paula channel 0-3 to isolate
+   * @param durationMs   - Duration in milliseconds to render (default 2000)
+   */
+  async isolateChannel(channelIndex: number, durationMs = 2000): Promise<{ channelIndex: number; pcm: ArrayBuffer; sampleRate: number; framesWritten: number }> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('UADEEngine not initialized');
+
+    const promise = new Promise<{ channelIndex: number; pcm: ArrayBuffer; sampleRate: number; framesWritten: number }>((resolve, reject) => {
+      this._isolateChannelPending.set(channelIndex, { resolve, reject });
+    });
+
+    this.workletNode.port.postMessage({ type: 'isolateChannel', channelIndex, durationMs });
+    return promise;
+  }
+
+  /**
+   * Write new PCM data directly into Amiga chip RAM at the given address.
+   * Used to apply edits from the Sampler instrument editor back to the running WASM.
+   * @param samplePtr - Amiga chip RAM address (samplePtr from UADEExtractedSample)
+   * @param pcmData   - New 8-bit signed PCM bytes to write
+   */
+  setInstrumentSample(samplePtr: number, pcmData: Uint8Array): void {
+    if (!this.workletNode) return;
+    // Transfer the buffer for zero-copy delivery to the worklet
+    const copy = pcmData.slice();
+    this.workletNode.port.postMessage(
+      { type: 'setInstrumentSample', samplePtr, pcmData: copy.buffer },
+      [copy.buffer],
+    );
   }
 
   dispose(): void {

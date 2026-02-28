@@ -577,9 +577,41 @@ int uade_wasm_read_memory(uint32_t addr, uint8_t *out, uint32_t len) {
     return 0;
 }
 
+/*
+ * Write `length` bytes from `data` into Amiga address space.
+ * Uses put_byte() which goes through UAE memory banking (chip RAM, etc.).
+ * Returns 0 on success.
+ * Used to write back edited PCM sample data to chip RAM.
+ */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_write_memory(uint32_t addr, const uint8_t *data, uint32_t length) {
+    for (uint32_t i = 0; i < length; i++) {
+        put_byte(addr + i, data[i]);
+    }
+    return 0;
+}
+
 EMSCRIPTEN_KEEPALIVE
 int uade_wasm_get_total_frames(void) {
     return s_total_frames;
+}
+
+/* ── Per-channel mute mask ──────────────────────────────────────────────── */
+
+/*
+ * Global mute mask referenced by audio.c sample handlers.
+ * Bits 0-3 = channels 0-3; 1=active, 0=muted. Default 0x0F (all active).
+ */
+unsigned char uade_wasm_channel_mute_mask = 0x0F;
+
+/*
+ * Set per-channel mute mask.
+ * channel_mask: bits 0-3 = channels 0-3; 1=active, 0=muted.
+ * E.g. 0x01 = only channel 0 active (channels 1,2,3 muted).
+ */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_mute_channels(uint8_t channel_mask) {
+    uade_wasm_channel_mute_mask = channel_mask;
 }
 
 EMSCRIPTEN_KEEPALIVE

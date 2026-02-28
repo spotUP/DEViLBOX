@@ -84,6 +84,17 @@ export class UADESynth implements DevilboxSynth {
     return undefined;
   }
 
+  /**
+   * Write edited PCM data back into Amiga chip RAM.
+   * Called by the instrument editor when the user modifies a sample extracted
+   * from an enhanced-mode UADE scan (e.g. changes loop points or trims the sample).
+   * @param samplePtr - Amiga chip RAM address stored in UADEConfig.samplePtr
+   * @param pcmData   - New 8-bit signed PCM bytes
+   */
+  setInstrumentSample(samplePtr: number, pcmData: Uint8Array): void {
+    this.engine.setInstrumentSample(samplePtr, pcmData);
+  }
+
   getEngine(): UADEEngine {
     return this.engine;
   }

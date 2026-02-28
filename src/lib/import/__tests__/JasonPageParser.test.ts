@@ -41,6 +41,23 @@ describe('parseJasonPageFile — jpn.fire and ice-1', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
+
+  it('creates 32 placeholder instruments (MAX_SAMPLES)', async () => {
+    const song = await parseJasonPageFile(loadBuf(FILE1), 'jpn.fire and ice-1');
+    // MI_MaxSamples = 32 per InfoBuffer in Jason Page_v5.s
+    expect(song.instruments).toHaveLength(32);
+  });
+
+  it('names instruments Sample 1..N (no names in format)', async () => {
+    const song = await parseJasonPageFile(loadBuf(FILE1), 'jpn.fire and ice-1');
+    expect(song.instruments[0].name).toBe('Sample 1');
+    expect(song.instruments[31].name).toBe('Sample 32');
+  });
+
+  it('has 4 channels', async () => {
+    const song = await parseJasonPageFile(loadBuf(FILE1), 'jpn.fire and ice-1');
+    expect(song.numChannels).toBe(4);
+  });
 });
 
 describe('parseJasonPageFile — offroad.jpo', () => {

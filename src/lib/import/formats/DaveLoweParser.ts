@@ -90,12 +90,31 @@ export async function parseDaveLoweFile(
     throw new Error('Not a Dave Lowe module');
   }
 
-  // ── Module name from filename ─────────────────────────────────────────────
+  // ── Module name ───────────────────────────────────────────────────────────
+  //
+  // All Dave Lowe modules carry a null-terminated ASCII title string at a
+  // fixed offset of 0x70 in the binary (confirmed across the full reference
+  // file set).  Read it first; fall back to the filename if the field is empty
+  // or contains non-printable characters.
+
+  let embeddedTitle = '';
+  const TITLE_OFFSET = 0x70;
+  const TITLE_MAX_LEN = 32;
+  if (buf.length > TITLE_OFFSET) {
+    for (let i = TITLE_OFFSET; i < Math.min(TITLE_OFFSET + TITLE_MAX_LEN, buf.length); i++) {
+      const c = buf[i];
+      if (c === 0) break;
+      // Accept printable ASCII only (0x20–0x7E)
+      if (c < 0x20 || c > 0x7e) { embeddedTitle = ''; break; }
+      embeddedTitle += String.fromCharCode(c);
+    }
+  }
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "DL." prefix (case-insensitive) or ".dl" / ".dl_deli" suffix
-  const moduleName =
+  const filenameDerived =
     baseName.replace(/^dl\./i, '').replace(/\.(dl|dl_deli)$/i, '') || baseName;
+  const moduleName = embeddedTitle.trim() || filenameDerived;
 
   // ── Instrument placeholders ──────────────────────────────────────────────
 
