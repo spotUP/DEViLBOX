@@ -19,7 +19,7 @@
  *   INAM — instrument names (library paths):
  *     4-byte header: entry_size (uint16) + name_off (uint16)
  *     Typically: entry_size=60, name_off=36 → 24-byte name field per entry
- *     First DEFAULT_INSTNUM entries map 1:1 to INST instrument slots
+ *     First instCount entries map 1:1 to PINS/INST instrument slots
  *     Names are Amiga library paths, e.g. "System:Instruments/egit2" (24-char max)
  *
  * References:
@@ -42,6 +42,8 @@ const MMV8_SONGID = 0x5345;
 
 /** Default instrument count when no SEI1 extended header is present */
 const DEFAULT_INSTNUM = 26;
+/** Safety cap to prevent runaway loops on malformed files (SEI1-specified counts are trusted up to this) */
+const MAX_INSTNUM = 64;
 
 /** Amiga standard sample rate: C-3 at period 214 (PAL) */
 const AMIGA_SAMPLE_RATE = 8363;
@@ -120,7 +122,7 @@ function readInamNames(buf: Uint8Array, chunk: IFFChunk): Map<number, string> {
   const dataStart = chunk.offset + 4;
   const numEntries = Math.floor((chunk.size - 4) / entry_size);
 
-  for (let i = 0; i < numEntries && i < DEFAULT_INSTNUM; i++) {
+  for (let i = 0; i < numEntries && i < MAX_INSTNUM; i++) {
     const eoff = dataStart + i * entry_size;
     if (eoff + entry_size > chunk.offset + chunk.size) break;
 
@@ -178,7 +180,9 @@ function parseMusicMakerFile(
   //   4 bytes defsnd block
   //   Concatenated PCM data (signed 8-bit)
   const instruments: InstrumentConfig[] = [];
-  const inst = chunks.get('INST');
+  // Real files use either 'PINS' or 'INST' for the PCM/instrument chunk.
+  // Try PINS first (most common in practice), fall back to INST.
+  const inst = chunks.get('PINS') ?? chunks.get('INST');
 
   if (inst && inst.size >= 8) {
     const chunkEnd = inst.offset + inst.size;
@@ -195,8 +199,10 @@ function parseMusicMakerFile(
       hdrPos += 8;
     }
 
-    // Clamp to prevent runaway loops on malformed files
-    instCount = Math.min(instCount, DEFAULT_INSTNUM);
+    // Clamp to prevent runaway loops on malformed files.
+    // When SEI1 is present it specifies the real count; allow up to MAX_INSTNUM.
+    // When absent, instCount is already DEFAULT_INSTNUM (26).
+    instCount = Math.min(instCount, MAX_INSTNUM);
 
     // Sample PCM data starts after: N × 8-byte headers + 4-byte defsnd
     const sampleDataStart = hdrPos + instCount * 8 + 4;

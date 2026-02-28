@@ -57,6 +57,19 @@ describe("parseMusicMaker4VFile — axelf.mm4", () => {
       parseMusicMaker4VFile(loadBuf(FILE_4V), "axelf.mm4")
     ).not.toThrow();
   });
+  it("extracts Sampler instruments with real PCM data", () => {
+    const song = parseMusicMaker4VFile(loadBuf(FILE_4V), "axelf.mm4");
+    expect(song.instruments.length).toBeGreaterThan(0);
+    const sampler = song.instruments.find((i) => i.synthType === "Sampler");
+    expect(sampler).toBeDefined();
+    expect(sampler!.sample?.audioBuffer).toBeDefined();
+    // Ensure at least one instrument has actual PCM bytes
+    expect((sampler!.sample!.audioBuffer as ArrayBuffer).byteLength).toBeGreaterThan(0);
+  });
+  it("uses 4 channels", () => {
+    const song = parseMusicMaker4VFile(loadBuf(FILE_4V), "axelf.mm4");
+    expect(song.numChannels).toBe(4);
+  });
   it("reports format capabilities", () => {
     const song = parseMusicMaker4VFile(loadBuf(FILE_4V), "axelf.mm4");
     const report = analyzeFormat(song, "axelf.mm4");
@@ -73,6 +86,18 @@ describe("parseMusicMaker8VFile — crockett8.mm8", () => {
     expect(() =>
       parseMusicMaker8VFile(loadBuf(FILE_8V), "crockett8.mm8")
     ).not.toThrow();
+  });
+  it("extracts Sampler instruments with real PCM data", () => {
+    const song = parseMusicMaker8VFile(loadBuf(FILE_8V), "crockett8.mm8");
+    expect(song.instruments.length).toBeGreaterThan(0);
+    const sampler = song.instruments.find((i) => i.synthType === "Sampler");
+    expect(sampler).toBeDefined();
+    expect(sampler!.sample?.audioBuffer).toBeDefined();
+    expect((sampler!.sample!.audioBuffer as ArrayBuffer).byteLength).toBeGreaterThan(0);
+  });
+  it("uses 8 channels", () => {
+    const song = parseMusicMaker8VFile(loadBuf(FILE_8V), "crockett8.mm8");
+    expect(song.numChannels).toBe(8);
   });
   it("reports format capabilities", () => {
     const song = parseMusicMaker8VFile(loadBuf(FILE_8V), "crockett8.mm8");
