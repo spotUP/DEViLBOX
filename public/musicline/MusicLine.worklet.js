@@ -22,6 +22,7 @@ class MusicLineProcessor extends AudioWorkletProcessor {
     this._srcRate = 28150;        // WASM native output rate (INTERNAL_RATE)
     this._dstRate = sampleRate;   // AudioContext rate (48000 Hz typically)
     this._resampPos = 0.0;        // fractional read position into source buffer
+    this._previewResampPos = 0.0; // fractional read position for preview resampler
 
     // Position reporting (~250ms intervals)
     this._reportCounter = 0;
@@ -287,8 +288,7 @@ class MusicLineProcessor extends AudioWorkletProcessor {
       // How many source frames we need to produce `numOut` destination frames
       // given the fractional position already consumed.
       const srcNeeded = Math.min(
-        Math.ceil((numOut - this._resampPos / (this._srcRate / this._dstRate))
-          * this._srcRate / this._dstRate) + 2,
+        Math.ceil(numOut * this._srcRate / this._dstRate) + 2,
         this._renderFrames
       );
 
@@ -296,11 +296,12 @@ class MusicLineProcessor extends AudioWorkletProcessor {
       const framesWritten = this.wasm._ml_render(this._renderPtr, srcNeeded);
 
       if (framesWritten === 0 || this.wasm._ml_is_finished()) {
-        // Song ended
+        // Song ended — emit event, stop playing, then fall through so the
+        // rest of process() can still output silence and report position.
+        this.port.postMessage({ type: 'ended' });
         this.playing = false;
         this._resampPos = 0.0;
-        this.port.postMessage({ type: 'ended' });
-        return true;
+        // (no early return — fall through to preview mixing and position report)
       }
 
       if (framesWritten > 0) {
@@ -330,7 +331,6 @@ class MusicLineProcessor extends AudioWorkletProcessor {
         const srcBuf = heapF32.subarray(off, off + framesWritten * 2);
 
         // Preview resampler has its own independent position
-        if (this._previewResampPos === undefined) this._previewResampPos = 0.0;
         const posRef = { pos: this._previewResampPos };
 
         // Mix preview into output (additive)
