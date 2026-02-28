@@ -64,7 +64,7 @@ export const PixiTabBar: React.FC<PixiTabBarProps> = ({
       <pixiContainer
         layout={{ width: viewportW, height, overflow: 'hidden', flexDirection: 'row' }}
       >
-        {tabs.map((tab) => (
+        {tabs.map((tab, i) => (
           <PixiTab
             key={tab.id}
             tab={tab}
@@ -73,38 +73,24 @@ export const PixiTabBar: React.FC<PixiTabBarProps> = ({
             height={height}
             onSelect={() => onSelect(tab.id)}
             onClose={() => onClose(tab.id)}
+            tabIndex={i}
             scrollOffset={scrollOffset}
           />
         ))}
-        {tabs.map((tab, i) => (
-          tab.id === activeTabId ? (
-            <pixiGraphics
-              key={`underline-${tab.id}`}
-              draw={(g: GraphicsType) => {
-                g.clear();
-                g.rect(i * tabW - scrollOffset, height - 2, tabW, 2);
-                g.fill({ color: theme.accent.color });
-              }}
-              layout={{ position: 'absolute', width, height }}
-            />
-          ) : null
-        ))}
       </pixiContainer>
 
-      {canScrollLeft && (
-        <PixiTabScrollBtn
-          label="◂"
-          height={height}
-          onClick={() => setScrollOffset(s => Math.max(0, s - tabW))}
-        />
-      )}
-      {canScrollRight && (
-        <PixiTabScrollBtn
-          label="▸"
-          height={height}
-          onClick={() => setScrollOffset(s => s + tabW)}
-        />
-      )}
+      <PixiTabScrollBtn
+        label="◂"
+        height={height}
+        visible={canScrollLeft}
+        onClick={() => setScrollOffset(s => Math.max(0, s - tabW))}
+      />
+      <PixiTabScrollBtn
+        label="▸"
+        height={height}
+        visible={canScrollRight}
+        onClick={() => setScrollOffset(s => s + tabW)}
+      />
 
       <PixiTabNewBtn height={height} onClick={onNew} />
     </pixiContainer>
@@ -118,11 +104,12 @@ interface PixiTabProps {
   height: number;
   onSelect: () => void;
   onClose: () => void;
+  tabIndex: number;
   scrollOffset: number;
 }
 
 const PixiTab: React.FC<PixiTabProps> = ({
-  tab, isActive, width, height, onSelect, onClose,
+  tab, isActive, width, height, onSelect, onClose, tabIndex, scrollOffset,
 }) => {
   const theme = usePixiTheme();
   const [hovered, setHovered] = useState(false);
@@ -130,6 +117,7 @@ const PixiTab: React.FC<PixiTabProps> = ({
   const maxLabelW = width - PADDING_H * 2 - CLOSE_BTN_SIZE - 4;
   const rawLabel = tab.label.length > 16 ? tab.label.slice(0, 14) + '…' : tab.label;
   const displayLabel = tab.dirty ? `${rawLabel} •` : rawLabel;
+  const showClose = isActive || hovered;
 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -144,6 +132,13 @@ const PixiTab: React.FC<PixiTabProps> = ({
     g.fill({ color: theme.border.color, alpha: 0.4 });
   }, [isActive, hovered, width, height, theme]);
 
+  const drawUnderline = useCallback((g: GraphicsType) => {
+    g.clear();
+    if (!isActive) return;
+    g.rect(tabIndex * width - scrollOffset, height - 2, width, 2);
+    g.fill({ color: theme.accent.color });
+  }, [isActive, tabIndex, width, scrollOffset, height, theme]);
+
   return (
     <pixiContainer
       eventMode="static"
@@ -154,39 +149,40 @@ const PixiTab: React.FC<PixiTabProps> = ({
       layout={{ width, height, flexDirection: 'row', alignItems: 'center', paddingLeft: PADDING_H }}
     >
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
+      {/* Active underline — always rendered, only visible when active */}
+      <pixiGraphics draw={drawUnderline} layout={{ position: 'absolute', width, height }} />
       <pixiBitmapText
         text={displayLabel}
         style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 11, fill: 0xffffff }}
         tint={isActive ? theme.text.color : theme.textSecondary.color}
         layout={{ flex: 1, maxWidth: maxLabelW }}
       />
-      {(isActive || hovered) && (
-        <pixiContainer
-          eventMode="static"
-          cursor="pointer"
-          onPointerUp={(e: { stopPropagation: () => void }) => { e.stopPropagation(); onClose(); }}
-          layout={{ width: CLOSE_BTN_SIZE, height: CLOSE_BTN_SIZE, justifyContent: 'center', alignItems: 'center', marginRight: 4 }}
-        >
-          <pixiBitmapText
-            text="×"
-            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 13, fill: 0xffffff }}
-            tint={hovered ? theme.error.color : theme.textMuted.color}
-            layout={{}}
-          />
-        </pixiContainer>
-      )}
+      {/* Close button — always in layout tree, hidden via display:'none' when inactive */}
+      <pixiContainer
+        eventMode={showClose ? 'static' : 'none'}
+        cursor="pointer"
+        onPointerUp={(e: { stopPropagation: () => void }) => { e.stopPropagation(); onClose(); }}
+        layout={{ display: showClose ? 'flex' : 'none', width: CLOSE_BTN_SIZE, height: CLOSE_BTN_SIZE, justifyContent: 'center', alignItems: 'center', marginRight: 4 }}
+      >
+        <pixiBitmapText
+          text="×"
+          style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 13, fill: 0xffffff }}
+          tint={hovered ? theme.error.color : theme.textMuted.color}
+          layout={{}}
+        />
+      </pixiContainer>
     </pixiContainer>
   );
 };
 
-const PixiTabScrollBtn: React.FC<{ label: string; height: number; onClick: () => void }> = ({ label, height, onClick }) => {
+const PixiTabScrollBtn: React.FC<{ label: string; height: number; visible: boolean; onClick: () => void }> = ({ label, height, visible, onClick }) => {
   const theme = usePixiTheme();
   return (
     <pixiContainer
-      eventMode="static"
+      eventMode={visible ? 'static' : 'none'}
       cursor="pointer"
       onPointerUp={onClick}
-      layout={{ width: 20, height, justifyContent: 'center', alignItems: 'center' }}
+      layout={{ display: visible ? 'flex' : 'none', width: 20, height, justifyContent: 'center', alignItems: 'center' }}
     >
       <pixiBitmapText
         text={label}
