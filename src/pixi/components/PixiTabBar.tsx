@@ -164,7 +164,7 @@ const PixiTab: React.FC<PixiTabProps> = ({
         <pixiContainer
           eventMode="static"
           cursor="pointer"
-          onPointerUp={(e) => { e.stopPropagation(); onClose(); }}
+          onPointerUp={(e: { stopPropagation: () => void }) => { e.stopPropagation(); onClose(); }}
           layout={{ width: CLOSE_BTN_SIZE, height: CLOSE_BTN_SIZE, justifyContent: 'center', alignItems: 'center', marginRight: 4 }}
         >
           <pixiBitmapText
