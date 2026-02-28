@@ -1,33 +1,34 @@
 /**
- * PixiHivelyView - Top-level HivelyTracker Editor View
- *
- * Combines the position editor (top) with the track editor (bottom),
- * matching the original HivelyTracker two-panel paradigm.
+ * PixiHivelyView - Top-level HivelyTracker Editor View (pure Pixi)
  *
  * Layout:
  * ┌──────────────────────────────────────────────────┐
- * │ Toolbar (tempo, speed, octave, instrument)       │
+ * │ Toolbar (format, tempo, speed, tracks, positions)│
  * ├──────────────────────────────────────────────────┤
- * │ Position Editor (compact, ~140px tall)           │
- * │ Shows track assignments per channel per position │
+ * │ Position Editor (~160px tall)                    │
  * ├──────────────────────────────────────────────────┤
  * │ Track Editor (fills remaining space)             │
- * │ Shows pattern data for tracks at current pos     │
  * └──────────────────────────────────────────────────┘
- *
- * Enter key toggles focus between position editor and track editor.
  */
 
-import React, { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useState } from 'react';
+import type { Graphics as GraphicsType } from 'pixi.js';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { exportAsHively } from '@lib/export/HivelyExporter';
+import { usePixiTheme } from '@/pixi/theme';
+import { PIXI_FONTS } from '@/pixi/fonts';
+import { PixiButton } from '@/pixi/components/PixiButton';
 import { PixiHivelyPositionEditor } from './PixiHivelyPositionEditor';
 import { PixiHivelyTrackEditor } from './PixiHivelyTrackEditor';
 
 const TOOLBAR_HEIGHT = 32;
 const POSITION_EDITOR_HEIGHT = 160;
+
+// HivelyTracker palette
+const HVL_ACCENT = 0xffff88;
+const HVL_SEP    = 0x555555;
 
 interface HivelyViewProps {
   width: number;
@@ -35,10 +36,17 @@ interface HivelyViewProps {
 }
 
 export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => {
+  const theme = usePixiTheme();
   const nativeData = useTrackerStore(s => s.hivelyNative);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const isPlaying = useTransportStore(s => s.isPlaying);
+
+  const [editPosition, setEditPosition] = useState(0);
+  const [focusTarget, setFocusTarget] = useState<'position' | 'track'>('track');
+
+  // Use playback position when playing, edit position otherwise
+  const activePosition = isPlaying ? currentPositionIndex : editPosition;
 
   const handleExport = useCallback((format: 'hvl' | 'ahx') => {
     const song = getTrackerReplayer().getSong();
@@ -57,157 +65,161 @@ export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => 
     }
   }, []);
 
-  const [editPosition, setEditPosition] = useState(0);
-  const [focusTarget, setFocusTarget] = useState<'position' | 'track'>('track');
-
-  const posEditorRef = useRef<HTMLDivElement>(null);
-  const trackEditorRef = useRef<HTMLDivElement>(null);
-
-  // Use playback position when playing, edit position otherwise
-  const activePosition = isPlaying ? currentPositionIndex : editPosition;
-
   const handlePositionChange = useCallback((pos: number) => {
     setEditPosition(pos);
-    if (!isPlaying) {
-      setCurrentPosition(pos);
-    }
+    if (!isPlaying) setCurrentPosition(pos);
   }, [isPlaying, setCurrentPosition]);
 
   const handleFocusTrackEditor = useCallback(() => {
     setFocusTarget('track');
-    // Focus the track editor's container div
-    trackEditorRef.current?.querySelector<HTMLDivElement>('[tabindex]')?.focus();
   }, []);
 
   const handleFocusPositionEditor = useCallback(() => {
     setFocusTarget('position');
-    posEditorRef.current?.querySelector<HTMLDivElement>('[tabindex]')?.focus();
   }, []);
+
+  // ─── Draw callbacks ────────────────────────────────────────────────────────
+
+  const drawBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, width, height);
+    g.fill({ color: 0x000000 });
+  }, [width, height]);
+
+  const drawToolbarBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, width, TOOLBAR_HEIGHT);
+    g.fill({ color: 0x111111 });
+    g.rect(0, TOOLBAR_HEIGHT - 1, width, 1);
+    g.fill({ color: 0x333333 });
+  }, [width]);
+
+  const drawPosBorder = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, POSITION_EDITOR_HEIGHT - 2, width, 2);
+    g.fill({ color: focusTarget === 'position' ? HVL_ACCENT : 0x333333 });
+  }, [width, focusTarget]);
+
+  // ── No module loaded ───────────────────────────────────────────────────────
 
   if (!nativeData) {
     return (
-      <div style={{
-        width,
-        height,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#808080',
-        fontFamily: 'JetBrains Mono, monospace',
-        fontSize: 13,
-        backgroundColor: '#000000',
-      }}>
-        No HivelyTracker module loaded
-      </div>
+      <pixiContainer layout={{ width, height, alignItems: 'center', justifyContent: 'center' }}>
+        <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
+        <pixiBitmapText
+          text="No HivelyTracker module loaded"
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+        />
+      </pixiContainer>
     );
   }
 
+  const formatLabel = nativeData.channels <= 4 ? 'AHX' : 'HVL';
   const trackEditorHeight = height - TOOLBAR_HEIGHT - POSITION_EDITOR_HEIGHT;
 
-  return (
-    <div style={{
-      width,
-      height,
-      display: 'flex',
-      flexDirection: 'column',
-      backgroundColor: '#000000',
-    }}>
-      {/* Toolbar */}
-      <div style={{
-        height: TOOLBAR_HEIGHT,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '0 8px',
-        backgroundColor: '#111111',
-        borderBottom: '1px solid #333',
-        fontFamily: 'JetBrains Mono, monospace',
-        fontSize: 11,
-        color: '#ffffff',
-      }}>
-        <span style={{ color: '#ffff88', fontWeight: 'bold' }}>
-          {nativeData.channels <= 4 ? 'AHX' : 'HVL'}
-        </span>
-        <span style={{ color: '#555' }}>|</span>
-        <span>
-          Tempo: {nativeData.tempo}
-        </span>
-        <span style={{ color: '#555' }}>|</span>
-        <span>
-          Speed: {nativeData.speedMultiplier}x
-        </span>
-        <span style={{ color: '#555' }}>|</span>
-        <span>
-          Tracks: {nativeData.tracks.length}
-        </span>
-        <span style={{ color: '#555' }}>|</span>
-        <span>
-          Positions: {nativeData.positions.length}
-        </span>
-        <span style={{ color: '#555' }}>|</span>
-        <span>
-          CH: {nativeData.channels}
-        </span>
-        <span style={{ color: '#555' }}>|</span>
-        <span>
-          Pos: {activePosition.toString().padStart(3, '0')}/{nativeData.positions.length.toString().padStart(3, '0')}
-        </span>
-        <span style={{ flex: 1 }} />
-        <span style={{ color: '#555' }}>|</span>
-        <button
-          onClick={() => handleExport('hvl')}
-          disabled={!nativeData}
-          style={{
-            background: 'none',
-            border: '1px solid #444',
-            color: '#88ff88',
-            fontFamily: 'JetBrains Mono, monospace',
-            fontSize: 11,
-            padding: '1px 6px',
-            cursor: nativeData ? 'pointer' : 'default',
-            opacity: nativeData ? 1 : 0.4,
-          }}
-          title="Export as HVL"
-        >
-          HVL↓
-        </button>
-        <button
-          onClick={() => handleExport('ahx')}
-          disabled={!nativeData}
-          style={{
-            background: 'none',
-            border: '1px solid #444',
-            color: '#88ff88',
-            fontFamily: 'JetBrains Mono, monospace',
-            fontSize: 11,
-            padding: '1px 6px',
-            cursor: nativeData ? 'pointer' : 'default',
-            opacity: nativeData ? 1 : 0.4,
-          }}
-          title="Export as AHX (4 channels max)"
-        >
-          AHX↓
-        </button>
-        <span style={{ color: '#555' }}>|</span>
-        <span style={{
-          color: focusTarget === 'position' ? '#ffff88' : '#808080',
-          cursor: 'pointer',
-        }} onClick={handleFocusPositionEditor}>
-          [POS]
-        </span>
-        <span style={{
-          color: focusTarget === 'track' ? '#ffff88' : '#808080',
-          cursor: 'pointer',
-        }} onClick={handleFocusTrackEditor}>
-          [TRK]
-        </span>
-      </div>
+  const toolbarInfo = [
+    `Tempo: ${nativeData.tempo}`,
+    `Speed: ${nativeData.speedMultiplier}x`,
+    `Tracks: ${nativeData.tracks.length}`,
+    `Positions: ${nativeData.positions.length}`,
+    `CH: ${nativeData.channels}`,
+    `Pos: ${activePosition.toString().padStart(3, '0')}/${nativeData.positions.length.toString().padStart(3, '0')}`,
+  ].join('  |  ');
 
-      {/* Position Editor (top panel) */}
-      <div ref={posEditorRef} style={{
-        height: POSITION_EDITOR_HEIGHT,
-        borderBottom: `2px solid ${focusTarget === 'position' ? '#ffff88' : '#333'}`,
-      }}>
+  return (
+    <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
+      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
+
+      {/* Toolbar */}
+      <pixiContainer
+        layout={{
+          width,
+          height: TOOLBAR_HEIGHT,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingLeft: 8,
+          paddingRight: 8,
+          gap: 6,
+        }}
+      >
+        <pixiGraphics draw={drawToolbarBg} layout={{ position: 'absolute', width, height: TOOLBAR_HEIGHT }} />
+
+        {/* Format label */}
+        <pixiBitmapText
+          text={formatLabel}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+          tint={HVL_ACCENT}
+        />
+
+        <pixiBitmapText
+          text="|"
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+          tint={HVL_SEP}
+        />
+
+        {/* Info string */}
+        <pixiBitmapText
+          text={toolbarInfo}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+          tint={theme.textSecondary.color}
+        />
+
+        {/* Flex spacer */}
+        <pixiContainer layout={{ flex: 1, height: TOOLBAR_HEIGHT }} />
+
+        {/* Export buttons */}
+        <PixiButton
+          label="HVL↓"
+          variant="ft2"
+          size="sm"
+          color="green"
+          onClick={() => handleExport('hvl')}
+        />
+        <PixiButton
+          label="AHX↓"
+          variant="ft2"
+          size="sm"
+          color="green"
+          onClick={() => handleExport('ahx')}
+        />
+
+        <pixiBitmapText
+          text="|"
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+          tint={HVL_SEP}
+        />
+
+        {/* Focus selectors */}
+        <pixiContainer
+          eventMode="static"
+          cursor="pointer"
+          onPointerUp={handleFocusPositionEditor}
+          layout={{ height: TOOLBAR_HEIGHT, alignItems: 'center' }}
+        >
+          <pixiBitmapText
+            text="[POS]"
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+            tint={focusTarget === 'position' ? HVL_ACCENT : theme.textMuted.color}
+          />
+        </pixiContainer>
+
+        <pixiContainer
+          eventMode="static"
+          cursor="pointer"
+          onPointerUp={handleFocusTrackEditor}
+          layout={{ height: TOOLBAR_HEIGHT, alignItems: 'center' }}
+        >
+          <pixiBitmapText
+            text="[TRK]"
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+            tint={focusTarget === 'track' ? HVL_ACCENT : theme.textMuted.color}
+          />
+        </pixiContainer>
+      </pixiContainer>
+
+      {/* Position Editor */}
+      <pixiContainer layout={{ width, height: POSITION_EDITOR_HEIGHT }}>
         <PixiHivelyPositionEditor
           width={width}
           height={POSITION_EDITOR_HEIGHT}
@@ -216,10 +228,14 @@ export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => 
           onPositionChange={handlePositionChange}
           onFocusTrackEditor={handleFocusTrackEditor}
         />
-      </div>
+        <pixiGraphics
+          draw={drawPosBorder}
+          layout={{ position: 'absolute', width, height: POSITION_EDITOR_HEIGHT }}
+        />
+      </pixiContainer>
 
-      {/* Track Editor (bottom panel, fills remaining space) */}
-      <div ref={trackEditorRef} style={{ flex: 1 }}>
+      {/* Track Editor */}
+      <pixiContainer layout={{ flex: 1, width, height: trackEditorHeight }}>
         <PixiHivelyTrackEditor
           width={width}
           height={trackEditorHeight}
@@ -227,7 +243,7 @@ export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => 
           currentPosition={activePosition}
           onFocusPositionEditor={handleFocusPositionEditor}
         />
-      </div>
-    </div>
+      </pixiContainer>
+    </pixiContainer>
   );
 };
