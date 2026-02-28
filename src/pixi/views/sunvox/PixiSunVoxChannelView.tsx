@@ -331,7 +331,8 @@ export const PixiSunVoxChannelView: React.FC<PixiSunVoxChannelViewProps> = ({
               text={hl.text}
               style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
               tint={hl.color}
-              layout={{ position: 'absolute', left: hl.x, top: hl.y }}
+              x={hl.x}
+              y={hl.y}
             />
           ))}
         </pixiContainer>
@@ -346,7 +347,8 @@ export const PixiSunVoxChannelView: React.FC<PixiSunVoxChannelViewProps> = ({
               text={label.text}
               style={{ fontFamily: PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }}
               tint={label.color}
-              layout={{ position: 'absolute', left: label.x, top: label.y }}
+              x={label.x}
+              y={label.y}
             />
           ))}
         </pixiContainer>

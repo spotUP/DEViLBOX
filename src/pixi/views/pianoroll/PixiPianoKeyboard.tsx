@@ -102,7 +102,8 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
           text={text}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
           tint={0x333338}
-          layout={{ position: 'absolute', left: width * 0.68, top: y }}
+          x={width * 0.68}
+          y={y}
         />
       ))}
     </pixiContainer>
