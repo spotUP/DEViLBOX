@@ -341,6 +341,8 @@ async function loadWithLibopenmpt(
  */
 export function getSupportedExtensions(): string[] {
   return [
+    // ── MIDI ────────────────────────────────────────────────────────────────
+    '.mid', '.midi',
     // ── libopenmpt formats ──────────────────────────────────────────────────
     '.mod', '.xm', '.it', '.s3m', '.mptm',
     '.669', '.amf', '.ams', '.dbm', '.dmf',
