@@ -13,3 +13,7 @@ export { PixiScrollView } from './PixiScrollView';
 export { PixiList } from './PixiList';
 export { PixiNumericInput } from './PixiNumericInput';
 export { PixiToast } from './PixiToast';
+export { PixiCheckbox } from './PixiCheckbox';
+export { SelectOption, PixiSelect, PixiDropdownPanel } from './PixiSelect';
+export { MenuSeparator, MenuAction, MenuCheckbox, MenuItem, Menu, PixiMenuBar } from './PixiMenuBar';
+export { Tab, PixiTabBar } from './PixiTabBar';
