@@ -425,15 +425,18 @@ export async function parseUADEFile(
     const fmt = metadata.formatName;
     type NativeRoute = () => Promise<TrackerSong | null>;
     const NATIVE_ROUTES: Record<string, NativeRoute> = {
-      'ProTracker':       async () => { const { parseMODFile } = await import('./MODParser'); return parseMODFile(buffer, filename); },
-      'Noisetracker':     async () => { const { parseMODFile } = await import('./MODParser'); return parseMODFile(buffer, filename); },
-      'Soundtracker':     async () => { const { parseMODFile } = await import('./MODParser'); return parseMODFile(buffer, filename); },
-      'Oktalyzer':        async () => { const { parseOktalyzerFile } = await import('./OktalyzerParser'); return parseOktalyzerFile(buffer, filename); },
-      'MED':              async () => { const { parseMEDFile } = await import('./MEDParser'); return parseMEDFile(buffer, filename); },
-      'SoundFX':          async () => { const { parseSoundFXFile } = await import('./SoundFXParser'); return parseSoundFXFile(buffer, filename); },
-      'SoundMon':         async () => { const { parseSoundMonFile } = await import('./SoundMonParser'); return parseSoundMonFile(buffer, filename); },
-      'JamCracker':       async () => { const { parseJamCrackerFile } = await import('./JamCrackerParser'); return parseJamCrackerFile(buffer, filename); },
-      'Quadra Composer':  async () => { const { parseQuadraComposerFile } = await import('./QuadraComposerParser'); return parseQuadraComposerFile(buffer, filename); },
+      'ProTracker':         async () => { const { parseMODFile } = await import('./MODParser'); return parseMODFile(buffer, filename); },
+      'Noisetracker':       async () => { const { parseMODFile } = await import('./MODParser'); return parseMODFile(buffer, filename); },
+      'Soundtracker':       async () => { const { parseMODFile } = await import('./MODParser'); return parseMODFile(buffer, filename); },
+      'Oktalyzer':          async () => { const { parseOktalyzerFile } = await import('./OktalyzerParser'); return parseOktalyzerFile(buffer, filename); },
+      'MED':                async () => { const { parseMEDFile } = await import('./MEDParser'); return parseMEDFile(buffer, filename); },
+      'SoundFX':            async () => { const { parseSoundFXFile } = await import('./SoundFXParser'); return parseSoundFXFile(buffer, filename); },
+      'SoundMon':           async () => { const { parseSoundMonFile } = await import('./SoundMonParser'); return parseSoundMonFile(buffer, filename); },
+      'JamCracker':         async () => { const { parseJamCrackerFile } = await import('./JamCrackerParser'); return parseJamCrackerFile(buffer, filename); },
+      'Quadra Composer':    async () => { const { parseQuadraComposerFile } = await import('./QuadraComposerParser'); return parseQuadraComposerFile(buffer, filename); },
+      'FutureComposer1.3':  async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
+      'FutureComposer1.4':  async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
+      'FutureComposer-BSI': async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
     };
     const route = NATIVE_ROUTES[fmt];
     if (route) {
@@ -472,7 +475,6 @@ export async function parseUADEFile(
   // NOTE: bare 'fc' is excluded here because .fc covers both FC 1.x (synthesis) and FC 2.0
   // (real PCM samples). FC 2.0 should get enhanced treatment; only FC 1.x is synthesis.
   const SYNTHESIS_FORMATS = new Set([
-    'fc3', 'sfc', 'bfc', 'bsi',              // Future Composer 1.x variants (synthesis only)
     'bp', 'bp3', 'sm', 'sm2', 'sm3', 'sm4',  // SoundMon / BPSoundMon variants
     'fred',                                    // Fred Editor
     'sid', 'sid2',                             // SidMon variants
@@ -530,15 +532,8 @@ export async function parseUADEFile(
 
     return classicSong;
   }
-  // For .fc files, distinguish FC 1.x (synthesis: FC13/FC14/SMOD magic) from FC 2.0 (real PCM).
-  if (mode === 'enhanced' && ext === 'fc') {
-    const fcBytes = new Uint8Array(buffer, 0, 4);
-    const fcMagic = String.fromCharCode(fcBytes[0], fcBytes[1], fcBytes[2], fcBytes[3]);
-    if (fcMagic === 'FC13' || fcMagic === 'FC14' || fcMagic === 'SMOD') {
-      console.warn('[UADEParser] FC 1.x synthesis format (wavetable-only); using classic mode for accurate playback');
-      return buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
-    }
-  }
+  // Note: .fc files with FC13/FC14/SMOD magic are routed to parseFCFile via NATIVE_ROUTES above.
+  // FC 2.0 (real PCM samples) does not carry those magic bytes and falls through to enhanced scan.
 
   // If enhanced scan data is available AND mode is 'enhanced', build editable song
   if (mode === 'enhanced' && activeEnhancedScan) {

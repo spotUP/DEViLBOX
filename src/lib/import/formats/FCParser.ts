@@ -16,7 +16,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
-import type { FCConfig } from '@/types/instrument';
+import type { FCConfig, UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Utility functions ─────────────────────────────────────────────────────
@@ -639,7 +639,7 @@ function stubTrackerSong(filename: string, formatLabel: string): TrackerSong {
   };
 }
 
-export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong {
+export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 0): TrackerSong {
   const buf = new Uint8Array(buffer);
 
   // Tim Follin / Follin Player II (.tf) — compiled 68k binary, BRA header.
@@ -672,6 +672,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
   const wavePtr      = u32BE(buf, off);  off += 4;
 
   // ── 10 sample definitions (6 bytes each: len, loopStart, loopLen — u16 BE) ──
+  const sampleDefsFileOffset = off; // = 0x28 for FC13/SMOD, same for FC14 before wavetable lengths
   const sampleDefs: Array<{ len: number; loopStart: number; loopLen: number }> = [];
   for (let i = 0; i < 10; i++) {
     sampleDefs.push({
@@ -864,6 +865,20 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
     macroToInstrument.set(instrIdx, id);
     const config = buildFCConfig(instrIdx);
 
+    const chipRam: UADEChipRamInfo = {
+      moduleBase,
+      moduleSize: buffer.byteLength,
+      instrBase: moduleBase + volMacroPtr + instrIdx * 64,
+      instrSize: 64,
+      sections: {
+        freqMacros: moduleBase + freqMacroPtr,
+        volMacros:  moduleBase + volMacroPtr,
+        waveData:   moduleBase + wavePtr,
+        sampleData: moduleBase + samplePtr,
+        sampleDefs: moduleBase + sampleDefsFileOffset,
+      },
+    };
+
     instruments.push({
       id,
       name: `FC Inst ${instrIdx + 1}`,
@@ -873,6 +888,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
       effects: [],
       volume: -6,
       pan: 0,
+      uadeChipRam: chipRam,
     } as unknown as InstrumentConfig);
 
     return id;
@@ -885,6 +901,20 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
     const id = nextInstrumentId++;
     waveToInstrument.set(waveIdx, id);
 
+    const chipRam: UADEChipRamInfo = {
+      moduleBase,
+      moduleSize: buffer.byteLength,
+      instrBase: moduleBase + sampleDefsFileOffset + waveIdx * 6,
+      instrSize: 6,
+      sections: {
+        freqMacros: moduleBase + freqMacroPtr,
+        volMacros:  moduleBase + volMacroPtr,
+        waveData:   moduleBase + wavePtr,
+        sampleData: moduleBase + samplePtr,
+        sampleDefs: moduleBase + sampleDefsFileOffset,
+      },
+    };
+
     if (waveIdx < 10) {
       // PCM sample (indices 0-9)
       if (sampleDefs[waveIdx].len > 0) {
@@ -894,11 +924,15 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string): TrackerSong 
         //   repLen  (loopLen)   is stored in WORDS — multiply by 2 for bytes.
         const loopStart = def.loopLen > 1 ? def.loopStart : 0;
         const loopEnd   = def.loopLen > 1 ? def.loopStart + def.loopLen * 2 : 0;
-        instruments.push(createSamplerInstrument(
+        const instr = createSamplerInstrument(
           id, `Sample ${waveIdx}`, samplePCMs[waveIdx], 64, 8287, loopStart, loopEnd
-        ));
+        );
+        instr.uadeChipRam = chipRam;
+        instruments.push(instr);
       } else {
-        instruments.push(makePlaceholder(id, `Sample ${waveIdx}`));
+        const instr = makePlaceholder(id, `Sample ${waveIdx}`);
+        instr.uadeChipRam = chipRam;
+        instruments.push(instr);
       }
     } else if (waveIdx >= 100) {
       // SSMP pack sample — placeholder
