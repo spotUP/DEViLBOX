@@ -1333,6 +1333,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <HippelCoSoControls
             config={hippelCoSoConfig}
             onChange={handleHippelCoSoChange}
+            uadeChipRam={instrument.uadeChipRam}
           />
         </Suspense>
       </div>
@@ -1356,6 +1357,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <RobHubbardControls
             config={robHubbardConfig}
             onChange={handleRobHubbardChange}
+            uadeChipRam={instrument.uadeChipRam}
           />
         </Suspense>
       </div>
