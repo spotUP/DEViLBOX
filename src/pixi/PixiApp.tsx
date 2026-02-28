@@ -36,6 +36,8 @@ declare global {
   interface Window {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     __pixiYogaInstance?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    __pixiYogaConfig?: any;
   }
 }
 
@@ -51,7 +53,14 @@ function initPixiLayout(): Promise<void> {
       }
       // Always re-set so @pixi/layout uses the instance even after HMR
       setYoga(yoga);
-      setYogaConfig(yoga.Config.create());
+      // Reuse the same Config object across HMR reloads. Creating a new Config
+      // each time causes BindingErrors: existing layout nodes were built with
+      // the old Config instance, so the next layout update (e.g. pressing play)
+      // triggers "Expected null or instance of Node, got an instance of Node".
+      if (!window.__pixiYogaConfig) {
+        window.__pixiYogaConfig = yoga.Config.create();
+      }
+      setYogaConfig(window.__pixiYogaConfig);
       await loadPixiFonts();
     })();
   }
