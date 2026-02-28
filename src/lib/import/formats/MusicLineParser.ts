@@ -398,6 +398,19 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   // Build InstrumentConfig list from INST + SMPL
   const instruments = buildInstruments(instList, smplList);
 
+  // Stamp importMetadata on all patterns now that totals are known
+  const importedAt = new Date().toISOString();
+  for (const p of patterns) {
+    p.importMetadata = {
+      sourceFormat:           'ML' as const,
+      sourceFile:             '',
+      importedAt,
+      originalChannelCount:   numChannels,
+      originalPatternCount:   patterns.length,
+      originalInstrumentCount: instruments.length,
+    };
+  }
+
   // numChannels = actual voice count from TUNE header (1-8).
   // Patterns are 1-channel (single-voice PARTs); the replayer reads channels[0]
   // of whichever PART each channel's track table points to.
@@ -604,7 +617,6 @@ function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum:
     name:     `Part ${partNum}`,
     channels: [channel],
     length:   PART_ROWS,
-    importMetadata: { sourceFormat: 'ML' as const },
   };
 }
 
