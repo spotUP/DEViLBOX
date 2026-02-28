@@ -133,6 +133,35 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
 
   // === Modular Synthesis ===
   'ModularSynth': { synthType: 'ModularSynth', volume: -12 },
+
+  // === MAME Standalone WASM Chips ===
+  // ROM/sample-dependent (definitively silent without ROM):
+  // 'MAMEAICA': { synthType: 'MAMEAICA', volume: -12 },     // needs wavetable ROM
+  // 'MAMERF5C400': { synthType: 'MAMERF5C400', volume: -12 }, // needs sample ROM
+  'MAMEASC': { synthType: 'MAMEASC', volume: -12 },
+  'MAMEAstrocade': { synthType: 'MAMEAstrocade', volume: -12 },
+  'MAMEC352': { synthType: 'MAMEC352', volume: -12 },
+  'MAMEES5503': { synthType: 'MAMEES5503', volume: -12 },
+  'MAMEICS2115': { synthType: 'MAMEICS2115', volume: -12 },
+  'MAMEK054539': { synthType: 'MAMEK054539', volume: -12 },
+  'MAMEMEA8000': { synthType: 'MAMEMEA8000', volume: -12 },
+  'MAMESN76477': { synthType: 'MAMESN76477', volume: -12 },
+  'MAMESNKWave': { synthType: 'MAMESNKWave', volume: -12 },
+  'MAMESP0250': { synthType: 'MAMESP0250', volume: -12 },
+  'MAMETMS36XX': { synthType: 'MAMETMS36XX', volume: -12 },
+  'MAMETMS5220': { synthType: 'MAMETMS5220', volume: -12 },
+  'MAMETR707': { synthType: 'MAMETR707', volume: -12 },
+  'MAMEUPD931': { synthType: 'MAMEUPD931', volume: -12 },
+  'MAMEUPD933': { synthType: 'MAMEUPD933', volume: -12 },
+  'MAMEVotrax': { synthType: 'MAMEVotrax', volume: -12 },
+  'MAMEYMF271': { synthType: 'MAMEYMF271', volume: -12 },
+  'MAMEYMOPQ': { synthType: 'MAMEYMOPQ', volume: -12 },
+  'MAMEVASynth': { synthType: 'MAMEVASynth', volume: -12 },
+  'MAMERSA': { synthType: 'MAMERSA', volume: -12 },
+
+  // === Hardware WASM Chips ===
+  'CEM3394': { synthType: 'CEM3394', volume: -12 },
+  'SCSP': { synthType: 'SCSP', volume: -12 },
 };
 
 /* ALL FURNACE SYNTHS - FULL TEST CONFIG (for reference)
@@ -437,37 +466,37 @@ const SYNTH_CONFIGS_FULL: Record<string, any> = {
   // 'BuzzM4': { synthType: 'BuzzM4', volume: -12 },
   // 'Buzzmachine': { synthType: 'Buzzmachine', volume: -12 },
 
-  // === MAME Synths === (TESTING: only MAMEDOC/ES5503 enabled for faster testing)
-  // 'MAMEVFX': { synthType: 'MAMEVFX', volume: -12 },  // needs ROM
+  // === MAME Synths (standalone WASM chips) ===
+  // 'MAMEVFX': { synthType: 'MAMEVFX', volume: -12 },   // needs ROM
+  // 'MAMESWP30': { synthType: 'MAMESWP30', volume: -12 }, // needs ROM
+  // 'MAMEAICA': { synthType: 'MAMEAICA', volume: -12 },  // silent: sample-playback, needs ROM
+  // 'MAMERF5C400': { synthType: 'MAMERF5C400', volume: -12 }, // silent: sample-playback, needs ROM
   'MAMEDOC': { synthType: 'MAMEDOC', volume: -12 },
-  // 'MAMERSA': { synthType: 'MAMERSA', volume: -12 },
-  // 'MAMESWP30': { synthType: 'MAMESWP30', volume: -12 },  // needs ROM
-  // 'MAMEAICA': { synthType: 'MAMEAICA', volume: -12 },
-  // 'MAMEASC': { synthType: 'MAMEASC', volume: -12 },
-  // 'MAMEAstrocade': { synthType: 'MAMEAstrocade', volume: -12 },
-  // 'MAMEC352': { synthType: 'MAMEC352', volume: -12 },
-  // 'MAMEES5503': { synthType: 'MAMEES5503', volume: -12 },
-  // 'MAMEICS2115': { synthType: 'MAMEICS2115', volume: -12 },
-  // 'MAMEK054539': { synthType: 'MAMEK054539', volume: -12 },
-  // 'MAMEMEA8000': { synthType: 'MAMEMEA8000', volume: -12 },
-  // 'MAMERF5C400': { synthType: 'MAMERF5C400', volume: -12 },
-  // 'MAMESN76477': { synthType: 'MAMESN76477', volume: -12 },
-  // 'MAMESNKWave': { synthType: 'MAMESNKWave', volume: -12 },
-  // 'MAMESP0250': { synthType: 'MAMESP0250', volume: -12 },
-  // 'MAMETMS36XX': { synthType: 'MAMETMS36XX', volume: -12 },
-  // 'MAMETMS5220': { synthType: 'MAMETMS5220', volume: -12 },
-  // 'MAMETR707': { synthType: 'MAMETR707', volume: -12 },
-  // 'MAMEUPD931': { synthType: 'MAMEUPD931', volume: -12 },
-  // 'MAMEUPD933': { synthType: 'MAMEUPD933', volume: -12 },
-  // 'MAMEVotrax': { synthType: 'MAMEVotrax', volume: -12 },
-  // 'MAMEYMF271': { synthType: 'MAMEYMF271', volume: -12 },
-  // 'MAMEYMOPQ': { synthType: 'MAMEYMOPQ', volume: -12 },
-  // 'MAMEVASynth': { synthType: 'MAMEVASynth', volume: -12 },
+  'MAMERSA': { synthType: 'MAMERSA', volume: -12 },
+  'MAMEASC': { synthType: 'MAMEASC', volume: -12 },
+  'MAMEAstrocade': { synthType: 'MAMEAstrocade', volume: -12 },
+  'MAMEC352': { synthType: 'MAMEC352', volume: -12 },
+  'MAMEES5503': { synthType: 'MAMEES5503', volume: -12 },
+  'MAMEICS2115': { synthType: 'MAMEICS2115', volume: -12 },
+  'MAMEK054539': { synthType: 'MAMEK054539', volume: -12 },
+  'MAMEMEA8000': { synthType: 'MAMEMEA8000', volume: -12 },
+  'MAMESN76477': { synthType: 'MAMESN76477', volume: -12 },
+  'MAMESNKWave': { synthType: 'MAMESNKWave', volume: -12 },
+  'MAMESP0250': { synthType: 'MAMESP0250', volume: -12 },
+  'MAMETMS36XX': { synthType: 'MAMETMS36XX', volume: -12 },
+  'MAMETMS5220': { synthType: 'MAMETMS5220', volume: -12 },
+  'MAMETR707': { synthType: 'MAMETR707', volume: -12 },
+  'MAMEUPD931': { synthType: 'MAMEUPD931', volume: -12 },
+  'MAMEUPD933': { synthType: 'MAMEUPD933', volume: -12 },
+  'MAMEVotrax': { synthType: 'MAMEVotrax', volume: -12 },
+  'MAMEYMF271': { synthType: 'MAMEYMF271', volume: -12 },
+  'MAMEYMOPQ': { synthType: 'MAMEYMOPQ', volume: -12 },
+  'MAMEVASynth': { synthType: 'MAMEVASynth', volume: -12 },
 
-  // === Hardware WASM Synths === (TESTING: only CEM3394 enabled for faster testing)
+  // === Hardware WASM Synths ===
   // 'CZ101': { synthType: 'CZ101', volume: -12 },
   'CEM3394': { synthType: 'CEM3394', volume: -12 },
-  // 'SCSP': { synthType: 'SCSP', volume: -12 },
+  'SCSP': { synthType: 'SCSP', volume: -12 },
 
   // === JUCE/WASM Synths === (DISABLED for faster testing)
   // 'Dexed': { synthType: 'Dexed', volume: -12 },
@@ -1157,15 +1186,35 @@ async function testVolumeLevels() {
       }
 
       // For dispatch synths, create native AnalyserNode tapped from their _nativeGain.
-      // Audio routes through native nodes (worklet → nativeGain → destination), so
-      // Tone.Meter doesn't see it. Must be done after ensureInitialized().
+      // _nativeGain is not connected to destination by default (ToneEngine does that).
+      // Connect it to destination here so audio is audible during the test.
+      let dispatchNativeGain: GainNode | null = null;
       if (isDispatchSynth && !furnaceNativeMeter) {
         const nativeGain = synthObj._nativeGain as GainNode | undefined;
         if (nativeGain && nativeGain.context) {
           furnaceNativeMeter = nativeGain.context.createAnalyser();
           furnaceNativeMeter.fftSize = 256;
           nativeGain.connect(furnaceNativeMeter);
+          // Connect to destination so audio is audible during test
+          nativeGain.connect(nativeGain.context.destination);
+          dispatchNativeGain = nativeGain;
           console.log(`[VolumeTest] ${name}: Created native AnalyserNode for dispatch metering`);
+        }
+      }
+
+      // For MAME/HW chips (DevilboxSynth with native output, no connect() method),
+      // create a native AnalyserNode tapped from their output GainNode.
+      // This is the same pattern as FM synths: output → analyser → destination.
+      let mameOutputNode: AudioNode | null = null;
+      const isMAMESynth = name.startsWith('MAME') || name === 'CEM3394' || name === 'SCSP';
+      if (isMAMESynth && !furnaceNativeMeter) {
+        const output = synthObj.output as AudioNode | undefined;
+        if (output && output.context) {
+          furnaceNativeMeter = output.context.createAnalyser();
+          furnaceNativeMeter.fftSize = 256;
+          output.connect(furnaceNativeMeter);
+          furnaceNativeMeter.connect(output.context.destination);
+          mameOutputNode = output;
         }
       }
 
@@ -1207,60 +1256,134 @@ async function testVolumeLevels() {
           const tMsg = triggerError instanceof Error ? triggerError.message : String(triggerError);
           console.warn(`[Test] ${name} start/stop error:`, tMsg);
         }
-      } else if (typeof synthObj.triggerAttack === 'function') {
+      } else if (typeof synthObj.triggerAttack === 'function' || typeof synthObj.triggerAttackRelease === 'function') {
         try {
-          if (NO_NOTE_SYNTHS.includes(name)) {
-            // Use triggerAttackRelease for percussion synths to ensure audible output
-            if (typeof synthObj.triggerAttackRelease === 'function') {
-              // DrumMachine wrapper: (note, duration) - note is ignored, duration required
-              // Standard Tone.js: (duration) - duration as first argument
-              if (name === 'DrumMachine') {
-                (synthObj.triggerAttackRelease as (note: string, dur: number) => void)('C4', 0.5);
-              } else {
-                (synthObj.triggerAttackRelease as (dur: string) => void)('8n');
-              }
-            } else {
-              (synthObj.triggerAttack as () => void)();
-            }
-          } else {
-            // TR707 uses GM drum mapping (MIDI 35-56), trigger C2 (36 = Bass Drum 1)
-            const testNote = name === 'MAMETR707' ? 'C2' : 'C4';
-            (synthObj.triggerAttack as (note: string) => void)(testNote);
-          }
+          // ── Build a phrase that shows the synth's character ───────────────────
+          // Each step: note (null = silence/gap), ms = duration of note or gap
+          type PhraseStep = { note: string | null; ms: number };
+          const phrase: PhraseStep[] = (() => {
+            // TR707 drum machine — MIDI GM drum mapping
+            if (name === 'MAMETR707') return [
+              { note: 'C2',  ms: 120 }, // Bass Drum
+              { note: null,  ms:  60 },
+              { note: 'D2',  ms: 120 }, // Snare
+              { note: null,  ms:  60 },
+              { note: 'C2',  ms: 120 }, // Bass Drum
+              { note: 'F#2', ms: 100 }, // Hi-hat
+              { note: 'D2',  ms: 120 }, // Snare
+              { note: null,  ms:  80 },
+            ];
+            // Simple arcade tone generators
+            if (['MAMETMS36XX', 'MAMEAstrocade', 'MAMESN76477'].includes(name)) return [
+              { note: 'C3', ms: 280 },
+              { note: 'G3', ms: 280 },
+              { note: 'C4', ms: 400 },
+            ];
+            // Speech / phoneme chips — single long note triggers phoneme output
+            if (['MAMEVotrax', 'MAMETMS5220', 'MAMEMEA8000', 'MAMESP0250'].includes(name)) return [
+              { note: 'A3', ms: 1000 },
+            ];
+            // Percussion synths (MembraneSynth, MetalSynth, NoiseSynth, DrumMachine)
+            if (NO_NOTE_SYNTHS.includes(name)) return [
+              { note: 'C1', ms: 200 }, { note: null, ms:  80 },
+              { note: 'C1', ms: 200 }, { note: null, ms:  80 },
+              { note: 'C1', ms: 200 },
+            ];
+            // FM chips — slower arpeggio to let attack transients and modulation breathe
+            if (/OPN|OPM|OPL|OPZ|ESFM|VRC7|Y8950|YMF|YMOPQ|VASynth|CEM3394|UPD93/.test(name)) return [
+              { note: 'C3',  ms: 380 },
+              { note: 'E3',  ms: 380 },
+              { note: 'G3',  ms: 380 },
+              { note: 'C4',  ms: 550 },
+            ];
+            // Wavetable / wave-channel chips — C major arp in mid range
+            if (/SCC|NAMCO|BUBBLE|X1_010|SNKWave|ASC|ICS2115|ES5503/.test(name)) return [
+              { note: 'C4', ms: 250 },
+              { note: 'E4', ms: 250 },
+              { note: 'G4', ms: 250 },
+              { note: 'C5', ms: 380 },
+            ];
+            // PCM / sample-playback chips — three hits across the range
+            if (/SEGAPCM|QSOUND|ES5506|MULTIPCM|K007232|K053260|GA20|OKI|YMZ280|MSM|K054539|C352|SCSP|RF5C|AMIGA/.test(name)) return [
+              { note: 'C4', ms: 320 }, { note: null, ms: 80 },
+              { note: 'G4', ms: 320 }, { note: null, ms: 80 },
+              { note: 'C5', ms: 450 },
+            ];
+            // SID chips — show the characteristic buzz and filter sweep
+            if (/C64|SID/.test(name)) return [
+              { note: 'C3', ms: 300 },
+              { note: 'G3', ms: 300 },
+              { note: 'C4', ms: 300 },
+              { note: 'G4', ms: 450 },
+            ];
+            // AY/PSG chips — clean square-wave arp
+            if (/AY|PSG|SAA|TED|VIC|POKEY|T6W28|TIA|SUPERVISION|PCSPEAKER|ZXBEEPER/.test(name)) return [
+              { note: 'C4', ms: 200 },
+              { note: 'E4', ms: 200 },
+              { note: 'G4', ms: 200 },
+              { note: 'C5', ms: 320 },
+            ];
+            // Default — single-octave C major arpeggio
+            return [
+              { note: 'C4', ms: 220 },
+              { note: 'E4', ms: 220 },
+              { note: 'G4', ms: 220 },
+              { note: 'C5', ms: 380 },
+            ];
+          })();
 
-          // Sample at 5ms intervals initially, then slower at 30ms.
-          // 5ms captures audio render quanta; 50ms settle time before trigger
-          // ensures multi-node chains (e.g. DrumMachine: Synth→Distortion→Filter)
-          // have propagated audio to the meter.
-          for (let i = 0; i < 30; i++) {
-            await new Promise(r => setTimeout(r, i < 15 ? 5 : 30));
-
-            // For Furnace synths, use native AnalyserNode (audio bypasses Tone.Meter)
+          // ── Sample level from whichever path carries audio ─────────────────────
+          const sampleLevel = () => {
             if (furnaceNativeMeter) {
-              const dataArray = new Float32Array(furnaceNativeMeter.fftSize);
-              furnaceNativeMeter.getFloatTimeDomainData(dataArray);
-              // Find peak amplitude in the time domain data
+              const data = new Float32Array(furnaceNativeMeter.fftSize);
+              furnaceNativeMeter.getFloatTimeDomainData(data);
               let maxSample = 0;
-              for (const sample of dataArray) {
-                const abs = Math.abs(sample);
-                if (abs > maxSample) maxSample = abs;
-              }
-              // Convert to dB
-              const nativeLevel = maxSample > 0 ? 20 * Math.log10(maxSample) : -Infinity;
-              if (nativeLevel > peakDb) {
-                peakDb = nativeLevel;
-                if (i < 5) console.log(`[VolumeTest] ${name}: Native meter sample ${i}: peak=${maxSample.toFixed(4)}, dB=${nativeLevel.toFixed(1)}`);
-              }
+              for (const s of data) { const a = Math.abs(s); if (a > maxSample) maxSample = a; }
+              const db = maxSample > 0 ? 20 * Math.log10(maxSample) : -Infinity;
+              if (db > peakDb) peakDb = db;
             } else {
               const level = meter.getValue();
-              // meter.getValue() can return null before audio propagates through chain
               if (typeof level === 'number' && level > peakDb) peakDb = level;
+            }
+          };
+
+          const hasAR     = typeof synthObj.triggerAttackRelease === 'function';
+          const hasAttack = typeof synthObj.triggerAttack === 'function';
+
+          // ── Play each step in the phrase ───────────────────────────────────────
+          for (const step of phrase) {
+            if (step.note !== null) {
+              if (NO_NOTE_SYNTHS.includes(name)) {
+                // Percussion: no note argument
+                if (hasAR) {
+                  if (name === 'DrumMachine') {
+                    (synthObj.triggerAttackRelease as (n: string, d: number) => void)('C4', step.ms / 1000);
+                  } else {
+                    (synthObj.triggerAttackRelease as (d: string) => void)('8n');
+                  }
+                } else if (hasAttack) {
+                  (synthObj.triggerAttack as () => void)();
+                }
+              } else if (hasAR) {
+                (synthObj.triggerAttackRelease as (n: string, d: number) => void)(step.note, step.ms / 1000);
+              } else if (hasAttack) {
+                (synthObj.triggerAttack as (n: string) => void)(step.note);
+              }
+            }
+
+            // Sample throughout this step's duration
+            const deadline = Date.now() + step.ms;
+            while (Date.now() < deadline) {
+              await new Promise(r => setTimeout(r, 8));
+              sampleLevel();
+            }
+
+            // Release if using attack/release mode (not attackRelease)
+            if (!hasAR && hasAttack && step.note !== null && !NO_NOTE_SYNTHS.includes(name)) {
+              try { (synthObj.triggerRelease as () => void)(); } catch { /* ignored */ }
             }
           }
 
-          if (typeof synthObj.triggerRelease === 'function') {
-            try { (synthObj.triggerRelease as () => void)(); } catch { /* ignored */ }
-          }
         } catch (triggerError: unknown) {
           const tMsg = triggerError instanceof Error ? triggerError.message : String(triggerError);
           console.warn(`[Test] ${name} trigger error:`, tMsg);
@@ -1313,7 +1436,7 @@ async function testVolumeLevels() {
         try { (synthObj.dispose as () => void)(); } catch { /* ignored */ }
       }
 
-      // Cleanup native meter for FM and dispatch Furnace synths
+      // Cleanup native meter for FM, dispatch Furnace, and MAME/HW synths
       if (furnaceNativeMeter) {
         if (isFMSynth) {
           const furnaceEngine = FurnaceChipEngine.getInstance();
@@ -1323,11 +1446,19 @@ async function testVolumeLevels() {
             try { nativeOutput.disconnect(furnaceNativeMeter); } catch { /* ignored */ }
             try { furnaceNativeMeter.disconnect(nativeOutput.context.destination); } catch { /* ignored */ }
           }
+        } else if (isMAMESynth && mameOutputNode) {
+          // MAME/HW: output → analyser → destination
+          try { mameOutputNode.disconnect(furnaceNativeMeter); } catch { /* ignored */ }
+          try { furnaceNativeMeter.disconnect(mameOutputNode.context.destination); } catch { /* ignored */ }
         } else {
-          // Dispatch synth — just disconnect the analyser
+          // Dispatch synth — disconnect analyser and destination connection
+          if (dispatchNativeGain) {
+            try { dispatchNativeGain.disconnect(dispatchNativeGain.context.destination); } catch { /* ignored */ }
+          }
           try { furnaceNativeMeter.disconnect(); } catch { /* ignored */ }
         }
         furnaceNativeMeter = null;
+        mameOutputNode = null;
         console.log(`[VolumeTest] ${name}: Cleaned up native meter, final peakDb=${peakDb.toFixed(2)}`);
       }
 
