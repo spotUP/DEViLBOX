@@ -1,0 +1,20 @@
+
+Archive name                     Size     Date   Version  Format name
+
+EP_AMComposer.lha                3611  17-06-1999  v1.1  A.M. Composer v1.2
+EP_BennDaglish.lha               5012  29-03-1999  v1.1  Benn Daglish
+EP_DaveLowe.lha                  3066  20-08-1999  v1.0  Dave Lowe
+EP_JasonBrooke.lha               ----  07-01-2000  v1.0  Jason Brooke
+EP_JasonPageN.lha                8142  20-02-1999  v1.2  Jason Page New
+EP_JasonPageO.lha                4435  11-07-1999  v1.1  Jason Page Old
+EP_LME.lha                       3674  10-06-1999  v1.0  Leggless Music Editor
+EP_MWalker.lha	                 ----  30-12-1999  v1.0  Martin Walker
+EP_Mugician.lha                  6732  09-08-1999  v1.0  Mugician
+EP_Mugician2.lha                 8526  22-07-1999  v1.0  Mugician II
+EP_PaulShields.lha               3594  30-09-1999  v1.0  Paul Shields
+EP_RJosephPlay.lha               5316  28-12-1999  v1.0  Richard Joseph Player V1.7A
+EP_RobHubbard.lha                4628  10-09-1999  v1.3  Rob Hubbard
+EP_RobHubbardO.lha               2801  20-09-1999  v1.0  Rob Hubbard Old
+EP_SConnolly.lha                 4601  29-10-1999  v1.1  Sean Connolly (EMS 3.01/3.18/5.xx)
+EPSoundcontrol.lha               7278  08-06-1999  v1.0  Soundcontrol 3.0/3.2/4.0/5.0
+EP_TFMX.lha                      6827  07-09-1999  v1.1  TFMX V1.0-1.6

@@ -1,0 +1,1351 @@
+* USE: - Set filename of tune to convert (see bottom of source-code)
+*      - Assemble
+*      - J PACK
+*      - J Save_Final
+*      - J Do_Play	(if wished)
+*      - J Free
+
+*AUTO USE: - Assemble
+*          - J
+*
+;----------------------------------------
+* WARNING: THIS IS CRAP + SHIT !
+;----------------------------------------
+AUTO:	JSR	PACK
+	JSR	Save_Final
+	JSR	Do_PLAY
+	JSR	FREE
+	move.l	MaxRastime,d0
+	RTS
+;----------------------------------------
+Init = 0
+Play = 4
+Stop = 8
+Fade = 12
+
+Do_PLAY:
+	move.l	#0,d0
+	move.l	FinalAdr,a0
+	jsr	Init(a0)
+wait:	
+	cmp.b	#$7e,$dff006
+	bne	wait
+	move.w	#$0fff,$dff180	
+	move.l	FinalAdr,a0
+	move.b	$dff006,EnterVPos
+	jsr	4(a0)
+	move.b	$dff006,ExitVPos
+	move.w	#$0000,$dff180
+
+	clr.l	d0
+	move.b	EnterVPos,d0
+	clr.l	d1
+	move.b	ExitVPos,d1
+	sub.w	d0,d1
+	move.l	MaxRastime,d0
+	cmp.l	d1,d0
+	bhi	nomore
+	move.l	d1,MaxRastime
+nomore:
+	btst	#2,$dff016
+	bne	next
+	move.l	#10,d0
+	move.l	FinalAdr,a0
+	jsr	Fade(a0)
+next:
+	btst	#6,$bfe001
+	bne	wait
+fin:
+	move.l	FinalAdr,a0
+	jsr	Stop(a0)
+	rts
+EnterVPos:	dc.b	0
+ExitVPos:	dc.b	0
+MaxRastime:	dc.l	0
+;----------------------------------------
+;MISCELLANEOUS
+Chip = 2
+Fast = 4
+Clear =	$10000
+Mode_Old = 1005
+Mode_New = 1006
+
+FinalSize = 100000
+WorkSize  = 100000
+
+***************************** START *****************************
+PACK:
+	JSR	Do_INIT
+	JSR	READ_TABLE
+	JSR	READ_PATTERN
+	JSR	READ_INSTR
+	JSR	PASS1
+	JSR	PASS2
+	JSR	PASS3
+	JSR	TRANS_ROUTINE
+	JSR	FINISH
+	rts
+;---------------------
+READ_TABLE:
+	move.l	WorkAdr,d2
+	move.l	#[[4*3]+2]+2,d3
+	bsr	Read		;Read ID + version + tune nbr
+
+	move.l	WorkAdr,a0
+	moveq	#0,d0
+	move.w	14(a0),d0	;Read number of tables
+	move.b	d0,Lab2_MaxPart
+	sub.b	#1,Lab2_MaxPart
+	move.w	d0,(a0)
+		move.l	d0,d3
+		lea	Lab2_Tempo,a0
+		move.l	a0,d2
+		bsr	Read
+
+	moveq	#0,d0
+	move.l	WorkAdr,a0
+	move.w	(a0),d0
+	mulu	#[4*256],d0
+	move.l	d0,d3
+	move.l	WorkAdr,d2
+	add.l	#2,d2
+
+	move.l	d2,BackupAdr
+	add.l	d3,BackupAdr
+	bsr	Read
+	rts
+;---------------------
+READ_PATTERN:
+	lea	PattLen,a5
+	move.l	#127,d7
+READ_PATTERN_loop:
+	move.l	#LongWord,d2
+	move.l	#4,d3
+	bsr	Read		;Read pattern length = length to read
+
+	move.w	LongWord+2,(a5)+	;Save it !
+
+	move.l	BackupAdr,d2
+	moveq	#0,d3
+	move.w	LongWord+2,d3
+	bsr	Read		;Read pattern-data
+
+	moveq	#0,d5
+	move.w	LongWord+2,d5
+	add.l	d5,BackupAdr
+
+	dbf	d7,READ_PATTERN_loop
+	rts
+;---------------------
+READ_INSTR:
+	move.l	BackupAdr,d2
+	move.l	#2,d3
+	bsr	Read		;Read number of instr
+
+	move.l	BackupAdr,a0
+	move.b	(a0)+,LongWord
+	move.b	(a0)+,LongWord+1
+	moveq	#0,d0
+	move.w	LongWord,d0
+
+	mulu	#96,d0
+	move.l	d0,d3
+	add.l	#2,BackupAdr
+	move.l	BackupAdr,d2
+	add.l	d3,BackupAdr
+	bsr	Read
+*READ SAMPLES*
+	move.l	BackupAdr,d2
+	add.l	#2,BackupAdr
+	move.w	#2,d3
+	bsr	Read		;Read number of samples
+
+	move.l	BackupAdr,a0
+	sub.l	#2,a0			;Point on number of samples
+	clr.l	d7
+	move.b	(a0)+,d7
+	lsl.l	#8,d7
+	move.b	(a0)+,d7		;Read this !
+	sub.w	#1,d7			;And prepare for loop
+
+READ_SAMPLES_loop:
+	move.l	BackupAdr,d2
+	add.l	#2,BackupAdr
+	move.l	#2,d3
+	bsr	Read		;Read sample number
+
+	move.l	BackupAdr,d2
+	add.l	#2,BackupAdr
+	move.l	#2,d3
+	bsr	Read		;Read sample size
+
+	move.l	BackupAdr,a0
+	sub.l	#2,a0
+	clr.l	d3
+	move.b	(a0)+,d3
+	lsl.l	#8,d3
+	move.b	(a0)+,d3
+
+	move.l	BackupAdr,d2
+	add.l	d3,BackupAdr
+	bsr	Read
+
+
+	dbf	d7,READ_SAMPLES_loop
+	rts
+;---------------------
+Save_Final:
+	move.l	#FinalName,d1
+	move.l	#Mode_New,d2
+	bsr	Open
+	tst.l	d0
+	beq	Error
+
+	move.l	FinalAdr,d2
+	move.l	EndAddress,d3
+	sub.l	d2,d3
+	bsr	Write
+
+	bsr	Close
+	bsr	CLOSE_THE_DOS
+	rts
+;---------------------
+TRANS_ROUTINE:
+	move.l	#Lab2_BlockTrk-Lab2_Base-1,d7
+	lea	Lab2_Base,a0
+	move.l	FinalAdr,a1
+	TRANS_ROUTINE_loop:
+	move.b	(a0)+,(a1)+
+	dbf	d7,TRANS_ROUTINE_loop
+	rts
+;---------------------
+PASS1:
+	moveq	#0,d0
+	move.l	WorkAdr,a0
+	move.w	(a0)+,d0
+	lea	Lab2_BlockTrk,a1
+	sub.l	#Lab2_Base,a1
+	add.l	FinalAdr,a1
+	move.l	d0,d1
+	mulu	#8,d1
+	lea	(a1,d1.w),a2
+	move.l	a2,a5
+	move.l	a0,a3
+	sub.w	#1,d0
+PASS1_NextTune:
+	moveq	#3,d7
+PASS1_NextTrack:
+	move.w	d1,(a1)+
+PASS1_NextValue:
+	move.b	(a0)+,d2
+	move.b	d2,1(a2)
+	add.l	#2,a2
+	add.l	#2,d1
+	cmp.b	#0,d2
+	bmi	PASS1_EndTable
+	bra	PASS1_NextValue
+PASS1_EndTable:
+	add.l	#256,a3
+	move.l	a3,a0
+	dbf	d7,PASS1_NextTrack
+	dbf	d0,PASS1_NextTune
+	rts
+;---------------------
+PASS2:
+	move.l	a2,StartPatternAdr
+	moveq	#0,d0
+PASS2_NextPattern:
+	move.l	d0,d1
+	mulu	#2,d1
+	lea	PattLen,a1
+	lea	(a1,d1.w),a1
+	move.w	(a1),d2
+	sub.w	#1,d2
+Pass2_NextByte:
+	move.b	(a0)+,(a2)+
+	dbf	d2,Pass2_NextByte
+	add.l	#1,d0
+
+	cmp.b	#128,d0
+	bne	PASS2_NextPattern
+
+	move.l	a2,d0
+	btst	#0,d0
+	beq	PASS21
+
+	add.l	#1,a2
+PASS21:
+	move.l	a2,StartStructAdr
+	move.l	a5,a3
+	move.l	StartPatternAdr,a1
+PASS21NextOne:
+		cmp.l	a1,a3
+		bge	PASS21End
+		move.w	(a3),d0
+		cmp.b	#0,d0
+		bmi	PASS21Command
+		lea	PattLen,a4
+		moveq	#0,d1
+		move.l	a4,a5
+		andi.l	#$0000ffff,d0
+		mulu	#2,d0
+		lea	(a5,d0.w),a5
+PASS211:
+		cmpa.l	a4,a5
+		ble	PASS212
+		add.w	-2(a5),d1
+		sub.l	#2,a5
+		bra	PASS211
+PASS212:
+		move.w	d1,(a3)+
+		bra	PASS21NextOne
+PASS21Command:
+		cmp.w	#$00FF,d0
+		beq	PASS21CommStop
+PASS21CommJmp:
+		bclr	#7,d0
+		mulu	#2,d0
+		bset	#15,d0
+		move.w	d0,(a3)+
+		bra	PASS21NextOne
+PASS21CommStop:
+		move.w	#$FFFF,(a3)+
+		bra	PASS21NextOne
+PASS21End:
+	rts
+;---------------------
+PASS3:
+	clr.l	d0
+	move.b	(a0)+,d0
+	lsl.l	#8,d0
+	move.b	(a0)+,d0	;Lis nbr de struct ins
+	move.l	d0,d7
+	sub.w	#1,d0
+PASS3_NextStr:
+	add.l	#32,a0		;Saute par dessus (oh ouuii!!!) les
+				;crottes de merdes de noms.
+	move.w	#63,d1		;Copie les struct
+PASS31:
+	move.b	(a0)+,(a2)+
+	dbf	d1,PASS31	;DBF struct (recopie)
+	dbf	d0,PASS3_NextStr	;Main DBF (boucle)
+PASS32:
+	clr.l	d0
+	move.b	(a0)+,d0	;Lis nombre de samples
+	lsl.l	#8,d0
+	move.b	(a0)+,d0
+	sub.w	#1,d0
+PASS321:
+		move.l	a2,a5
+		sub.l	FinalAdr,a5	;A5=offset des samples
+		clr.l	d1
+		move.b	(a0)+,d1
+		lsl.l	#8,d1
+		move.b	(a0)+,d1	;Lis numero du sample
+		lea	SamOff,a4
+		mulu	#4,d1
+		move.l	a5,(a4,d1.l)
+		clr.l	d2
+		move.b	(a0)+,d2
+		lsl.l	#8,d2		;Lis taille du sample
+		move.b	(a0)+,d2	;en octets
+		sub.w	#1,d2
+PASS322:
+		move.b	(a0)+,(a2)+
+		dbf	d2,PASS322	;Copie le sample
+		dbf	d0,PASS321	;Passe au sample suivant !
+		move.l	a2,EndAddress	;Et on sauve l'adr finale...
+
+* Maintenant, attribution des offsets aux struct ins
+
+		move.l	StartStructAdr,a0
+		move.l	d7,d0
+		sub.w	#1,d0
+PASS323:
+		lea	SamOff,a4
+		move.l	Lab2_InsAdr-Lab2_InsStr(a0),d4
+		tst.l	d4
+		beq	PASS324
+		mulu	#4,d4
+		move.l	(a4,d4.l),Lab2_InsAdr-Lab2_InsStr(a0)
+PASS324:
+		add.l	#$40,a0
+		dbf	d0,PASS323	
+
+	move.l	StartStructAdr,a0
+	sub.l	FinalAdr,a0
+	move.l	a0,Lab2_OffsetStruct
+
+	move.l	StartPatternAdr,a0
+	sub.l	FinalAdr,a0
+	move.l	a0,Lab2_OffsetPattern
+
+	rts
+;---------------------
+Do_INIT:
+* ALLOC MEMORY *
+	move.l	#FinalSize,d0
+	move.l	#Chip+Clear,d1
+	bsr	AllocMem
+	tst.l	d0
+	beq	Error
+	move.l	d0,FinalAdr
+
+	move.l	#WorkSize,d0
+	move.l	#Chip+Clear,d1
+	bsr	AllocMem
+	tst.l	d0
+	beq	Error
+	move.l	d0,WorkAdr
+
+* OPEN DOS *
+	lea	DosName,a1
+	bsr	OpenLibrary
+	tst.l	d0
+	beq	Error
+	move.l	d0,DosBase
+
+* OPEN FILE *
+	move.l	#FileName,d1
+	move.l	#Mode_Old,d2
+	bsr	Open
+	tst.l	d0
+	beq	Error
+	rts
+;---------------------
+FINISH:
+* CLOSE FILE *
+	bsr	Close
+	rts
+
+CLOSE_THE_DOS:
+* CLOSE DOS *
+	move.l	DosBase,a1
+	bsr	CloseLibrary
+	rts
+
+FREE:
+	move.l	FinalAdr,a1
+	move.l	#FinalSize,d0
+	bsr	FreeMem
+
+	move.l	WorkAdr,a1
+	move.l	#WorkSize,d0
+	bsr	FreeMem
+	rts
+;------------------------------ Labels
+PattLen:	blk.w	128,0
+SamOff:		blk.l	65,0
+FinalAdr:	dc.l	0
+EndAddress:	dc.l	0
+WorkAdr:	dc.l	0
+DosName:	dc.b	"dos.library",0
+LongWord:	dc.l	0
+DosBase:	dc.l	0
+FileHD:		dc.l	0
+BackupAdr:	dc.l	0
+StartPatternAdr:dc.l	0
+StartStructAdr:dc.l	0
+;============================== ROUTINES
+OpenLibrary:
+	move.l	4,a6
+	moveq	#0,d0
+	jsr	-408(a6)
+	rts
+CloseLibrary:
+	move.l	4,a6
+	jsr	-414(a6)
+	rts
+AllocMem:
+	add.l	#8,d0
+	move.l	4,a6
+	jsr	-198(a6)
+	tst.l	d0
+	beq	AllocMen_Exit
+	add.l	#8,d0
+	AllocMen_Exit:
+	rts
+FreeMem:
+	add.l	#8,d0
+	subq	#8,a1
+	move.l	4,a6
+	jsr	-210(a6)
+	rts
+Open:
+	move.l	DosBase,a6
+	jsr	-30(a6)
+	move.l	d0,FileHD
+	rts
+Close:
+	move.l	FileHD,d1
+	move.l	DosBase,a6
+	jsr	-36(a6)
+	rts
+Read:
+	move.l	FileHD,d1
+	move.l	DosBase,a6
+	jsr	-42(a6)
+	rts
+Write:
+	move.l	FileHD,d1
+	move.l	DosBase,a6
+	jsr	-48(a6)
+	rts
+OpenDos:
+	lea	DosName,a1
+	bsr	OpenLibrary
+	move.l	d0,DosBase
+	rts
+CloseDos:
+	move.l	DosBase,a1
+	bsr	CloseLibrary
+	rts
+
+Error:	move.l	#$FFFF,d0
+	ErrorLoop:
+	move	d0,$DFF180
+	dbf	d0,ErrorLoop
+	illegal
+	rts
+
+;=============================== FINAL REPLAY ROUTINE
+;
+;  C R A P - P L A Y E R   !!     Sorry for the lame...
+;
+
+Lab2_Base:
+	jmp	Lab2_InitReplay(PC)
+	jmp	Lab2_StartReplay(PC)
+	jmp	Lab2_StopReplay(PC)
+	jmp	Lab2_FadeOut(PC)
+DmaVoicesOnOff:
+	dc.b	%1111
+	even
+
+AUD0LCH = $A0
+AUD0LEN = $A4
+AUD0PER = $A6
+AUD0VOL = $A8
+
+EndCode = $80
+PrtCode = $81
+TmpCode = $82
+InsCode = $83
+PseCode = $84
+MaxCode = $A0
+
+Lab2_InitReplay:
+	move.b	Lab2_MaxPart(PC),d1
+	cmp.b	d1,d0
+	bhi	Lab2_StopReplay
+
+	lea	Lab2_MusicPart(PC),a3
+	move.b	d0,(a3)
+
+	lea	Lab2_Tempo(PC),a2
+	lea	Lab2_TempoCur(PC),a4
+	add.l	d0,a2
+	move.b	(a2),(a4)
+
+	lsl.l	#3,d0
+	moveq	#3,d7
+	moveq	#0,d6
+	lea	Lab2_TrkStr(PC),a0
+Lab2_InitReplay1:
+	move.w	#1,Lab2_TrkDur-Lab2_TrkStr(a0)
+	clr.w	Lab2_TrkTabOff-Lab2_TrkStr(a0)
+
+	lea	Lab2_BlockTrk(PC),a1
+	move.l	a1,a2
+	lea	(a1,d0.w),a1
+	add.w	(a1,d6.w),a2
+
+	move.l	a2,Lab2_TrkTab-Lab2_TrkStr(a0)
+
+	lea	Lab2_Base(PC),a3
+	add.l	Lab2_OffsetPattern(PC),a3
+	add.w	(a2),a3
+	move.l	a3,Lab2_TrkPos-Lab2_TrkStr(a0)
+	st	Lab2_TrkDMA-Lab2_TrkStr(a0)
+	add.l	#$80,a0
+	add.b	#2,d6
+	dbf	d7,Lab2_InitReplay1
+	lea	Flag_Stop_Music(PC),a3
+	clr.b	(a3)
+	lea	Lab2_FadeVolume(PC),a3
+	move	#$1000,(a3)
+	lea	Flag_FadeOut(PC),a3
+	sf	(a3)
+	rts
+Lab2_FadeOut:
+	lea	Lab2_FadeSpeed(PC),a3
+	move.b	d0,(a3)
+	lea	Flag_FadeOut(PC),a3
+	st	(a3)
+	rts
+Lab2_StopReplay:
+	lea	Flag_Stop_Music(PC),a3
+	move.b	#$FF,(a3)
+	move.w	#$F,$DFF096
+	rts
+;-------------------------------
+Lab2_StartReplay:
+	lea	Flag_Stop_Music(PC),a3
+	tst.b	(a3)
+	beq	Lab2_StartReplay2
+	rts
+Lab2_StartReplay2:
+	moveq	#3,d5
+	moveq	#0,d4
+Lab2_NextVoice:
+	moveq	#0,d7
+	move	d5,d0
+	lsl.w	#4,d0
+	lea	$DFF000,a6
+	add	d0,a6
+	move	d5,d0
+	lsl.w	#7,d0
+	lea	Lab2_TrkStr(PC),a0
+	add	d0,a0
+	move.l	Lab2_TrkPos-Lab2_TrkStr(a0),a1
+	move.l	Lab2_TrkInsA-Lab2_TrkStr(a0),a5
+	tst.b	Lab2_TrkDMA-Lab2_TrkStr(a0)
+	bne	Lab2_ChangeTimer
+	st	Lab2_TrkDMA-Lab2_TrkStr(a0)
+	moveq	#0,d0
+	move	Lab2_InsRepLen-Lab2_InsStr(a5),d0
+	beq	Lab2_OneShotSound
+	bmi	Lab2_ChangeTimer
+
+Lab2_LoopedSound:
+	lea	Lab2_Base(PC),a2
+	add.l	Lab2_InsAdr-Lab2_InsStr(a5),a2
+	add.l	d0,a2
+	move	Lab2_InsLen-Lab2_InsStr(a5),d1
+	sub	d0,d1
+	tst.b	Lab2_InsType-Lab2_InsStr(a5)
+	beq	Lab2_LoopedSoundTrack
+	lea	$40(a0),a2			;Voice Buffer ADR
+Lab2_LoopedSoundTrack:
+	move.l	a2,AUD0LCH(a6)
+	move	d1,AUD0LEN(a6)
+	bra	Lab2_ChangeTimer
+Lab2_OneShotSound:
+	lea	Lab2_BlankSamSt(PC),a2
+	move.l	a2,AUD0LCH(a6)
+	move	#[Lab2_BlankSamEd-Lab2_BlankSamSt]/2,AUD0LEN(a6)
+
+Lab2_ChangeTimer:
+	subq.w	#1,Lab2_TrkDur-Lab2_TrkStr(a0)
+	tst	Lab2_TrkDur-Lab2_TrkStr(a0)
+	beq	Lab2_NewLine
+	cmp	#1,Lab2_TrkDur-Lab2_TrkStr(a0)
+	bne	Lab2_ModifySound
+	cmp.b	#MaxCode,(a1)
+	bpl	Lab2_ModifySound
+	moveq	#0,d1
+	bset	d5,d1
+	move	d1,$DFF096
+	bra	Lab2_ModifySound
+
+Lab2_NewLine:
+	move.l	Lab2_TrkInsA-Lab2_TrkStr(a0),a5
+	moveq	#0,d0
+	move.b	(a1)+,d0
+	bpl	Lab2_NewNote
+	cmp.b	#InsCode,d0
+	beq	Lab2_ChangeIns
+	cmp.b	#TmpCode,d0
+	beq	Lab2_CheckTempo
+	cmp.b	#PrtCode,d0
+	beq	Lab2_CheckPort
+	cmp.b	#PseCode,d0
+	beq	Lab2_ExecutePause
+	cmp.b	#EndCode,d0
+	beq	Lab2_NextPattern
+
+Lab2_NoteDelay:
+	neg.b	d0
+	moveq	#0,d1
+	move.b	Lab2_TempoCur(PC),d1
+	mulu	d1,d0
+	move	d0,Lab2_TrkDur-Lab2_TrkStr(a0)
+	move.l	a1,Lab2_TrkPos-Lab2_TrkStr(a0)
+	bra	Lab2_ModifySound		
+
+Lab2_ChangeIns:
+	move.b	(a1)+,d0	
+	lea	Lab2_Base(PC),a5
+	add.l	Lab2_OffsetStruct(PC),a5
+;	lea	Lab2_InsStr(PC),a5
+	lsl	#6,d0
+	add.l	d0,a5
+	move.l	a5,Lab2_TrkInsA-Lab2_TrkStr(a0)
+	moveq	#-1,d7
+	move.l	a1,Lab2_TrkPos-Lab2_TrkStr(a0)
+	bra	Lab2_NewLine
+
+Lab2_CheckTempo:
+	move.b	(a1)+,d0
+	lea	Lab2_TempoCur(PC),a4
+	move.b	d0,(a4)
+	move.l	a1,Lab2_TrkPos-Lab2_TrkStr(a0)
+	bra	Lab2_NewLine
+
+Lab2_CheckPort:
+	move.b	(a1)+,d0
+	move.l	d0,d2
+	moveq	#0,d1
+	move.b	Lab2_TempoCur(PC),d1
+	mulu	d2,d1
+	move	d1,Lab2_TrkSpd-Lab2_TrkStr(a0)
+	lea	Lab2_PeriodTable(PC),a2
+	move	Lab2_InsPer-Lab2_InsStr(a5),d1
+	moveq	#10,d2
+	move.b	(a1)+,d0
+	move.b	d0,Lab2_TrkDesNo-Lab2_TrkStr(a0)
+	lsl	#1,d0
+	move	(a2,d0.w),d0
+	mulu	d1,d0
+	lsr.l	d2,d0
+	move	d0,Lab2_TrkPerL-Lab2_TrkStr(a0)
+	move	#0,Lab2_TrkStPer-Lab2_TrkStr(a0)
+	moveq	#0,d0	
+	moveq	#0,d1
+	move.b	(a1)+,d0
+	move.b	Lab2_TempoCur(PC),d1
+	mulu	d1,d0
+	move	d0,Lab2_TrkPrtD-Lab2_TrkStr(a0)
+	st	Lab2_TrkPort-Lab2_TrkStr(a0)
+	move.l	a1,Lab2_TrkPos-Lab2_TrkStr(a0)
+	bra	Lab2_NewLine
+
+Lab2_ExecutePause:
+	moveq	#0,d1
+	bset	d5,d1
+	move	d1,$dff096
+	moveq	#0,d1
+	move.b	Lab2_TempoCur(PC),d1
+	move	d1,Lab2_TrkDur-Lab2_TrkStr(a0)
+	st	Lab2_TrkDMA-Lab2_TrkStr(a0)
+	move.l	a1,Lab2_TrkPos-Lab2_TrkStr(a0)
+	bra	Lab2_GoToNextVoice
+
+Lab2_NextPattern:
+	moveq	#0,d0
+	moveq	#0,d1
+	moveq	#0,d2
+	moveq	#0,d3
+	move.w	Lab2_TrkTabOff-Lab2_TrkStr(a0),d0
+;	addq.b	#2,d0
+	addq.w	#2,d0
+
+Lab2_JumpReturn:
+	move.l	Lab2_TrkTab-Lab2_TrkStr(a0),a3
+	add.l	d0,a3
+	move.w	(a3),d2
+	cmp.w	#$ffff,d2
+	beq	Lab2_StopMusic
+	cmp.w	#0,d2
+	bmi	Lab2_JumpTable
+	move.w	d0,Lab2_TrkTabOff-Lab2_TrkStr(a0)
+	lea	Lab2_Base(PC),a3
+	add.l	Lab2_OffsetPattern(PC),a3
+	add.l	d2,a3
+	move.l	a3,Lab2_TrkPos-Lab2_TrkStr(a0)
+	move.w	#1,Lab2_TrkDur-Lab2_TrkStr(a0)
+	bra	Lab2_NextVoice
+Lab2_JumpTable:
+	bclr	#15,d2
+;	move.b	d2,d0	
+	move.w	d2,d0
+	and.l	#$0000ffff,d0
+	bra	Lab2_JumpReturn
+Lab2_StopMusic:
+	lea	Flag_Stop_Music(PC),a2
+	move.b	#-1,(a2)
+	move.w	#0,$DFF0A8
+	move.w	#0,$DFF0B8
+	move.w	#0,$DFF0C8
+	move.w	#0,$DFF0D8
+	move.w	#$F,$DFF096
+	rts
+
+Lab2_NewNote:
+	move.l	a1,Lab2_TrkPos-Lab2_TrkStr(a0)
+	move.b	d0,Lab2_TrkNote-Lab2_TrkStr(a0)
+	sf	Lab2_TrkArpP-Lab2_TrkStr(a0)
+	move.b	Lab2_InsArpD-Lab2_InsStr(a5),Lab2_TrkArpS-Lab2_TrkStr(a0)
+	move.b	Lab2_InsVibD-Lab2_InsStr(a5),Lab2_TrkVibD-Lab2_TrkStr(a0)
+	move.b	Lab2_InsVibI-Lab2_InsStr(a5),Lab2_TrkVibI-Lab2_TrkStr(a0)
+	move.b	Lab2_InsVibA-Lab2_InsStr(a5),Lab2_TrkVibA-Lab2_TrkStr(a0)
+	st	Lab2_TrkVibDa-Lab2_TrkStr(a0)
+	move.b	#0,Lab2_TrkVibC-Lab2_TrkStr(a0)
+
+Lab2_SyncManagement:
+	cmp.b	#1,Lab2_InsType-Lab2_InsStr(a5)
+	beq	Lab2_Type1Sync
+	cmp.b	#2,Lab2_InsType-Lab2_InsStr(a5)
+	beq	Lab2_Type2Sync
+	bra	Lab2_NoteManagement
+
+Lab2_Type1Sync:
+	tst.b	d7
+	bne	Lab2_Type1Sync2
+	btst	#1,Lab2_InsSync-Lab2_InsStr(a5)
+	beq	Lab2_NoteManagement
+	Lab2_Type1Sync2:
+	bsr	Lab2_RemakeInsType1
+	bra	Lab2_NoteManagement
+
+Lab2_Type2Sync:
+	tst.b	d7
+	bne	Lab2_Type2Sync2
+	btst	#3,Lab2_InsSync-Lab2_InsStr(a5)
+	beq	Lab2_NoteManagement
+	Lab2_Type2Sync2:
+	bsr	Lab2_RemakeInsType2
+	bra	Lab2_NoteManagement
+
+Lab2_NoteManagement:
+	moveq	#0,d1
+	move.b	Lab2_TempoCur(PC),d1
+	move	d1,Lab2_TrkDur-Lab2_TrkStr(a0)
+	lea	Lab2_Base(PC),a2
+	add.l	Lab2_InsAdr-Lab2_InsStr(a5),a2
+;	move.l	Lab2_InsAdr-Lab2_InsStr(a5),a2
+	tst.b	Lab2_InsType-Lab2_InsStr(a5)
+	beq	Lab2_NoteTrack
+	lea	$40(a0),a2
+Lab2_NoteTrack:
+	move.l	a2,AUD0LCH(a6)
+	move	Lab2_InsLen-Lab2_InsStr(a5),AUD0LEN(a6)
+	moveq	#0,d1
+	move.b	d1,Lab2_TrkVol-Lab2_TrkStr(a0)
+	move	d1,AUD0VOL(a6)
+	move.b	#0,Lab2_TrkADSR-Lab2_TrkStr(a0)
+	move.b	Lab2_InsSusT-Lab2_InsStr(a5),Lab2_TrkSuLf-Lab2_TrkStr(a0)
+
+	move	#0,d0
+	lea	Lab2_PeriodTable(PC),a2
+	move	Lab2_InsPer-Lab2_InsStr(a5),d1
+	moveq	#10,d2
+	move.b	Lab2_TrkNote-Lab2_TrkStr(a0),d0
+	lsl	#1,d0
+	move	(a2,d0.w),d0
+	mulu	d1,d0
+	lsr.l	d2,d0
+	move	d0,AUD0PER(a6)
+	move	d0,Lab2_TrkPer-Lab2_TrkStr(a0)
+
+	tst.b	Lab2_TrkPort-Lab2_TrkStr(a0)
+	beq	Lab2_DMAOn
+	tst	Lab2_TrkStPer-Lab2_TrkStr(a0)
+	bne	Lab2_DMAOn
+	move	Lab2_TrkPerL-Lab2_TrkStr(a0),d0
+	sub	Lab2_TrkPer-Lab2_TrkStr(a0),d0
+	move	d0,Lab2_TrkPerDi-Lab2_TrkStr(a0)
+	move	#1,Lab2_TrkPrtCn-Lab2_TrkStr(a0)
+	move	Lab2_TrkPer-Lab2_TrkStr(a0),Lab2_TrkStPer-Lab2_TrkStr(a0)
+
+Lab2_DMAOn:
+	move.b	DmaVoicesOnOff(PC),d1
+	btst	d5,d1
+	beq	Lab2_GoToNextVoice
+	move	#$8200,d1
+	bset	d5,d1
+	move	d1,$dff096
+	sf	Lab2_TrkDMA-Lab2_TrkStr(a0)
+	bra	Lab2_ModifySound
+Lab2_GoToNextVoice:
+	dbf	d5,Lab2_NextVoice
+	rts
+
+Lab2_ModifySound:
+	btst	d5,$dff003
+	beq	Lab2_GoToNextVoice
+Lab2_Arpeggio:
+	moveq	#0,d0
+	move.b	Lab2_TrkNote-Lab2_TrkStr(a0),d0
+	moveq	#0,d1
+	move.b	Lab2_TrkArpP-Lab2_TrkStr(a0),d1
+	move.b	Lab2_InsArpV-Lab2_InsStr(a5,d1.w),d2
+	add.b	d2,d0
+
+	subq.b	#1,Lab2_TrkArpS-Lab2_TrkStr(a0)
+	bne	Lab2_CalcPeriod
+	move.b	Lab2_InsArpD-Lab2_InsStr(a5),Lab2_TrkArpS-Lab2_TrkStr(a0)
+	addq.b	#1,Lab2_TrkArpP-Lab2_TrkStr(a0)
+	move.b	Lab2_InsArpMax-Lab2_InsStr(a5),d3
+	cmp.b	Lab2_TrkArpP-Lab2_TrkStr(a0),d3
+	bne	Lab2_CalcPeriod
+	move.b	#$00,Lab2_TrkArpP-Lab2_TrkStr(a0)
+Lab2_CalcPeriod:
+	lea	Lab2_PeriodTable(PC),a2
+	move	Lab2_InsPer-Lab2_InsStr(a5),d1
+	moveq	#10,d2
+	lsl	#1,d0
+	move	(a2,d0.w),d0
+	mulu	d1,d0
+	lsr.l	d2,d0
+	move	d0,Lab2_TrkPer-Lab2_TrkStr(a0)
+
+Lab2_Portamento:
+	tst.b	Lab2_TrkPort-Lab2_TrkStr(a0)
+	beq	Lab2_Vibrato
+	tst	Lab2_TrkPrtD-Lab2_TrkStr(a0)
+	beq	Lab2_ModifyPort
+	subq	#1,Lab2_TrkPrtD-Lab2_TrkStr(a0)
+	bra	Lab2_Vibrato
+
+Lab2_ModifyPort:
+	moveq	#0,d1
+	move	Lab2_TrkPrtCn-Lab2_TrkStr(a0),d1
+	muls	Lab2_TrkPerDi-Lab2_TrkStr(a0),d1
+	divs	Lab2_TrkSpd-Lab2_TrkStr(a0),d1
+	add	d1,Lab2_TrkPer-Lab2_TrkStr(a0)
+
+Lab2_StopPort:
+	addi	#1,Lab2_TrkPrtCn-Lab2_TrkStr(a0)
+	move	Lab2_TrkPrtCn-Lab2_TrkStr(a0),d2
+	cmp	Lab2_TrkSpd-Lab2_TrkStr(a0),d2
+	ble	Lab2_Vibrato
+	move.b	Lab2_TrkDesNo-Lab2_TrkStr(a0),Lab2_TrkNote-Lab2_TrkStr(a0)
+	sf	Lab2_TrkPort-Lab2_TrkStr(a0)
+
+Lab2_Vibrato:
+	move	Lab2_TrkPer-Lab2_TrkStr(a0),d0
+	tst.b	Lab2_TrkVibD-Lab2_TrkStr(a0)
+	beq	Lab2_ModifyVib
+	subq.b	#1,Lab2_TrkVibD-Lab2_TrkStr(a0)
+	bra	Lab2_SetPeriod
+
+Lab2_ModifyVib:
+	tst.b	Lab2_TrkVibDa-Lab2_TrkStr(a0)
+	beq	Lab2_SetPeriod
+	bpl	Lab2_ModifyVib5
+
+	moveq	#0,d1
+	move.b	Lab2_TrkVibC-Lab2_TrkStr(a0),d1
+	add.b	Lab2_TrkVibI-Lab2_TrkStr(a0),d1
+	move.b	d1,Lab2_TrkVibC-Lab2_TrkStr(a0)
+	cmp.b	Lab2_TrkVibA-Lab2_TrkStr(a0),d1
+	bne	Lab2_ModifyVib2
+	bchg	#7,Lab2_TrkVibDa-Lab2_TrkStr(a0)
+	bra	Lab2_ModifyVib2
+
+Lab2_ModifyVib5:
+	move.b	Lab2_TrkVibC-Lab2_TrkStr(a0),d1
+	sub.b	Lab2_TrkVibI-Lab2_TrkStr(a0),d1
+	move.b	d1,Lab2_TrkVibC-Lab2_TrkStr(a0)
+	bne	Lab2_ModifyVib2
+	bchg	#7,Lab2_TrkVibDa-Lab2_TrkStr(a0)
+
+Lab2_ModifyVib2:
+	tst.b	Lab2_TrkVibC-Lab2_TrkStr(a0)
+	bne	Lab2_ModifyVib3
+	bchg	#0,Lab2_TrkVibDa-Lab2_TrkStr(a0)
+
+Lab2_ModifyVib3:
+	ext	d1
+	btst	#0,Lab2_TrkVibDa-Lab2_TrkStr(a0)
+	beq	Lab2_ModifyVib4
+	add	d1,d0
+	bra	Lab2_SetPeriod
+
+Lab2_ModifyVib4:
+	sub	d1,d0
+
+Lab2_SetPeriod:
+	move	d0,AUD0PER(a6)
+	cmp.b	#0,Lab2_TrkADSR-Lab2_TrkStr(a0)
+	beq	Lab2_VolumeAttack
+	cmp.b	#1,Lab2_TrkADSR-Lab2_TrkStr(a0)
+	beq	Lab2_VolumeDecay
+	cmp.b	#2,Lab2_TrkADSR-Lab2_TrkStr(a0)
+	beq	Lab2_VolumeSustain
+	cmp.b	#3,Lab2_TrkADSR-Lab2_TrkStr(a0)
+	beq	Lab2_VolumeRelease
+	bra	Lab2_SetVolume
+
+Lab2_VolumeAttack:
+	moveq	#0,d0
+	moveq	#0,d1
+	moveq	#0,d2
+	move.b	Lab2_InsAttI-Lab2_InsStr(a5),d2
+	move.b	Lab2_InsAttA-Lab2_InsStr(a5),d1
+	move.b	Lab2_TrkVol-Lab2_TrkStr(a0),d0
+	addi	d2,d0
+	move.b	d0,Lab2_TrkVol-Lab2_TrkStr(a0)
+	cmp	d1,d0
+	blt	Lab2_SetVolume
+	move.b	d1,Lab2_TrkVol-Lab2_TrkStr(a0)
+	move.b	#1,Lab2_TrkADSR-Lab2_TrkStr(a0)
+	bra	Lab2_SetVolume
+
+Lab2_VolumeDecay:
+	moveq	#0,d0
+	moveq	#0,d1
+	moveq	#0,d2
+	move.b	Lab2_InsDecI-Lab2_InsStr(a5),d2
+	move.b	Lab2_InsDecA-Lab2_InsStr(a5),d1
+	move.b	Lab2_TrkVol-Lab2_TrkStr(a0),d0
+	subi	d2,d0
+	move.b	d0,Lab2_TrkVol-Lab2_TrkStr(a0)
+	cmp	d1,d0
+	bgt	Lab2_SetVolume
+	move.b	d1,Lab2_TrkVol-Lab2_TrkStr(a0)
+	move.b	#2,Lab2_TrkADSR-Lab2_TrkStr(a0)
+	bra	Lab2_SetVolume
+
+Lab2_VolumeSustain:
+	tst.b	Lab2_TrkSuLf-Lab2_TrkStr(a0)
+	bne	Lab2_VolumeSustain2
+	move.b	#3,Lab2_TrkADSR-Lab2_TrkStr(a0)
+	bra	Lab2_SetVolume
+	Lab2_VolumeSustain2:
+	subq.b	#1,Lab2_TrkSuLf-Lab2_TrkStr(a0)
+	bra	Lab2_SetVolume
+
+Lab2_VolumeRelease:
+	moveq	#0,d0
+	moveq	#0,d1
+	moveq	#0,d2
+	move.b	Lab2_InsRelI-Lab2_InsStr(a5),d2
+	move.b	Lab2_InsRelA-Lab2_InsStr(a5),d1
+	move.b	Lab2_TrkVol-Lab2_TrkStr(a0),d0
+	subi	d2,d0
+	move.b	d0,Lab2_TrkVol-Lab2_TrkStr(a0)
+	cmp	d1,d0
+	bgt	Lab2_SetVolume
+	move.b	d1,Lab2_TrkVol-Lab2_TrkStr(a0)
+	move.b	#4,Lab2_TrkADSR-Lab2_TrkStr(a0)
+	bra	Lab2_SetVolume
+
+Lab2_SetVolume:
+	moveq	#0,d0
+	moveq	#0,d1
+	moveq	#0,d2
+	moveq	#0,d4
+	move.b	Lab2_TrkVol-Lab2_TrkStr(a0),d0
+	move.b	Lab2_InsMvol-Lab2_InsStr(a5),d1	;Mastervolume
+	lea	Lab2_FadeVolume(PC),a3
+	move.w	(a3),d2
+	move.b	Flag_FadeOut(PC),d3
+	tst.b	d3
+	beq	Lab2_EndFade
+	move.b	Lab2_FadeSpeed(PC),d4
+	sub.w	d4,d2
+	tst.w	d2
+	bmi	Lab2_Fadeto0
+	move.w	d2,(a3)
+	bra	Lab2_EndFade
+Lab2_Fadeto0:
+	clr.w	(a3)
+	clr.l	d2
+	lea	Flag_Stop_Music(PC),a3
+	move.b	#$FF,(a3)
+	rts
+Lab2_EndFade:
+	mulu	d2,d1
+	lsr.l	#8,d1
+	lsr.l	#4,d1
+	mulu	d1,d0
+	lsr.l	#8,d0
+	lsr.l	#1,d0
+	move	d0,AUD0VOL(a6)
+
+Lab2_Instrument:
+	tst.b	Lab2_InsType-Lab2_InsStr(a5)
+	bne	Lab2_ModifyIns
+	bra	Lab2_GoToNextVoice
+
+Lab2_ModifyIns:
+	cmpi.b	#2,Lab2_InsType-Lab2_InsStr(a5)
+	beq	Lab2_ModifyInsType2
+
+Lab2_ModifyInsType1:
+	tst.b	Lab2_TrkPulD-Lab2_TrkStr(a0)
+	beq	Lab2_ModifyInsType1_2
+	subq.b	#1,Lab2_TrkPulD-Lab2_TrkStr(a0)
+	bra	Lab2_GoToNextVoice
+	Lab2_ModifyInsType1_2:
+	tst.b	Lab2_TrkPulS-Lab2_TrkStr(a0)
+	beq	Lab2_ModifyInsType1_3
+	subq.b	#1,Lab2_TrkPulS-Lab2_TrkStr(a0)
+	bra	Lab2_GoToNextVoice
+	Lab2_ModifyInsType1_3:
+	btst	#0,Lab2_InsSync-Lab2_InsStr(a5)
+	beq	Lab2_ModifyInsType1_30
+	tst.b	Lab2_TrkPShtC-Lab2_TrkStr(a0)
+	beq	Lab2_ModifyInsType2_End
+Lab2_ModifyInsType1_30:	
+	move.b	Lab2_InsPulS-Lab2_InsStr(a5),Lab2_TrkPulS-Lab2_TrkStr(a0)
+	moveq	#0,d0
+	moveq	#0,d1
+	moveq	#0,d2
+	move.b	Lab2_TrkPulP-Lab2_TrkStr(a0),d0
+	move.b	Lab2_InsPulSt-Lab2_InsStr(a5),d1
+	move.b	Lab2_InsPulEd-Lab2_InsStr(a5),d2
+	lea	$40(a0),a2
+	btst	#2,Lab2_TrkPulW-Lab2_TrkStr(a0)
+	bne	Lab2_ModifyInsType1_32
+	Lab2_ModifyInsType1_31:
+	cmp.b	d2,d0
+	ble	Lab2_ModifyInsType1_NegVal
+	bset	#2,Lab2_TrkPulW-Lab2_TrkStr(a0)
+	subq.b	#1,Lab2_TrkPShtC-Lab2_TrkStr(a0)
+	subq.b	#1,d0
+	Lab2_ModifyInsType1_32:
+;	btst	#0,Lab2_InsSync-Lab2_InsStr(a5)
+;	bne	Lab2_ModifyInsType1_End
+	cmp.b	d1,d0
+	bge	Lab2_ModifyInsType1_PosVal
+	bclr	#2,Lab2_TrkPulW-Lab2_TrkStr(a0)
+	subq.b	#1,Lab2_TrkPShtC-Lab2_TrkStr(a0)
+	addq.b	#1,d0
+	bra	Lab2_ModifyInsType1_31
+
+Lab2_ModifyInsType1_NegVal:
+	move.b	Lab2_InsPulN-Lab2_InsStr(a5),(a2,d0.w)
+	addq.b	#1,d0
+	move.b	d0,Lab2_TrkPulP-Lab2_TrkStr(a0)
+	bra	Lab2_GoToNextVoice
+
+Lab2_ModifyInsType1_PosVal:
+	move.b	Lab2_InsPulP-Lab2_InsStr(a5),(a2,d0.w)
+	subq.b	#1,d0
+	move.b	d0,Lab2_TrkPulP-Lab2_TrkStr(a0)
+Lab2_ModifyInsType1_End:
+	bra	Lab2_GoToNextVoice
+
+Lab2_ModifyInsType2:
+	tst.b	Lab2_TrkBlenD-Lab2_TrkStr(a0)
+	beq	Lab2_ModifyInsType2_2
+	subq.b	#1,Lab2_TrkBlenD-Lab2_TrkStr(a0)
+	bra	Lab2_GoToNextVoice
+	Lab2_ModifyInsType2_2:
+	btst	#2,Lab2_InsSync-Lab2_InsStr(a5)
+	beq	Lab2_ModifyInsType2_20
+	tst.b	Lab2_TrkBShtC-Lab2_TrkStr(a0)
+	beq	Lab2_ModifyInsType2_End
+Lab2_ModifyInsType2_20:
+	tst.b	Lab2_TrkBlenW-Lab2_TrkStr(a0)
+	bne	Lab2_ModifyInsType2_4
+	Lab2_ModifyInsType2_3:
+	moveq	#0,d1
+	move.b	Lab2_InsBlenS-Lab2_InsStr(a5),d1
+	moveq	#1,d0
+	lsl.l	d1,d0
+	cmp	Lab2_TrkBlenP-Lab2_TrkStr(a0),d0
+	beq	Lab2_ModifyInsType2_ChgWay
+	moveq	#0,d3
+	addi	#1,Lab2_TrkBlenP-Lab2_TrkStr(a0)
+	move	Lab2_TrkBlenP-Lab2_TrkStr(a0),d3
+	lea	$40(a0),a4
+	lea	Lab2_Base(PC),a3
+	add.l	Lab2_InsAdr-Lab2_InsStr(a5),a3
+;	move.l	Lab2_InsAdr-Lab2_InsStr(a5),a3
+	lea	32(a3),a2
+	moveq	#$1F,d2
+	bra	Lab2_ModifyInsType2_ChgSnd
+
+	Lab2_ModifyInsType2_4:
+	moveq	#0,d0
+	move	Lab2_TrkBlenP-Lab2_TrkStr(a0),d0
+	cmpi	#1,d0
+	beq	Lab2_ModifyInsType2_ChgWay
+	moveq	#0,d3
+	subi	#1,Lab2_TrkBlenP-Lab2_TrkStr(a0)
+	move	Lab2_TrkBlenP-Lab2_TrkStr(a0),d3
+	lea	$40(a0),a4
+	lea	Lab2_Base(PC),a3
+	add.l	Lab2_InsAdr-Lab2_InsStr(a5),a3
+;	move.l	Lab2_InsAdr-Lab2_InsStr(a5),a3
+	lea	32(a3),a2
+	moveq	#$1F,d2
+	bra	Lab2_ModifyInsType2_ChgSnd
+
+Lab2_ModifyInsType2_ChgSnd:
+	moveq	#0,d6
+	move.b	Lab2_InsBlenS-Lab2_InsStr(a5),d6
+	Lab2_ModifyInsType2_ChgSnd2:
+	move.l	d3,d1
+	muls	(a2)+,d1
+	lsr.l	d6,d1
+	addi.b	(a3)+,d1
+	move.b	d1,(a4)+
+	dbf	d2,Lab2_ModifyInsType2_ChgSnd2
+Lab2_ModifyInsType2_End:
+	bra	Lab2_GoToNextVoice
+
+Lab2_ModifyInsType2_ChgWay:
+	eori.b	#1,Lab2_TrkBlenW-Lab2_TrkStr(a0)
+	subq.b	#1,Lab2_TrkBShtC-Lab2_TrkStr(a0)
+	bra	Lab2_ModifyInsType2_2
+
+Lab2_RemakeInsType1:
+	moveq	#0,d1
+	moveq	#0,d2
+	moveq	#0,d3
+	move.b	Lab2_InsPShtC-Lab2_InsStr(a5),Lab2_TrkPShtC-Lab2_TrkStr(a0)
+	move.b	Lab2_InsPulD-Lab2_InsStr(a5),Lab2_TrkPulD-Lab2_TrkStr(a0)
+	move.b	Lab2_InsPulS-Lab2_InsStr(a5),Lab2_TrkPulS-Lab2_TrkStr(a0)
+	move.b	#0,Lab2_TrkPulW-Lab2_TrkStr(a0)
+	move.b	Lab2_InsPulSt-Lab2_InsStr(a5),Lab2_TrkPulP-Lab2_TrkStr(a0)
+	lea	$40(a0),a4
+	move	Lab2_InsLen-Lab2_InsStr(a5),d1
+	add.b	d1,d1
+	move.b	d1,d2
+	move.b	Lab2_InsPulSt-Lab2_InsStr(a5),d3
+	subq.b	#1,d3
+Lab2_RemakeInsType1_2:
+	move.b	Lab2_InsPulN-Lab2_InsStr(a5),(a4)+
+	dbf	d3,Lab2_RemakeInsType1_2
+	sub.b	Lab2_InsPulSt-Lab2_InsStr(a5),d1
+	subq.b	#1,d1
+Lab2_RemakeInsType1_3:
+	move.b	Lab2_InsPulP-Lab2_InsStr(a5),(a4)+
+	dbf	d1,Lab2_RemakeInsType1_3
+	rts
+
+Lab2_RemakeInsType2:
+	move.b	#0,Lab2_TrkBlenW-Lab2_TrkStr(a0)
+	move	#1,Lab2_TrkBlenP-Lab2_TrkStr(a0)
+	move.b	Lab2_InsBShtC-Lab2_InsStr(a5),Lab2_TrkBShtC-Lab2_TrkStr(a0)
+	move.b	Lab2_InsBlenD-Lab2_InsStr(a5),Lab2_TrkBlenD-Lab2_TrkStr(a0)
+	lea	Lab2_Base(PC),a3
+	add.l	Lab2_InsAdr-Lab2_InsStr(a5),a3
+;	move.l	Lab2_InsAdr-Lab2_InsStr(a5),a3
+	lea	$40(a0),a4
+	moveq	#$1F,d1
+	Lab2_RemakeInsType2_2:
+	move.b	(a3)+,(a4)+
+	dbf	d1,Lab2_RemakeInsType2_2
+	rts
+;--------------------------------------------------------------
+Flag_Stop_Music:	dc.b	$FF
+Flag_FadeOut:		dc.b	0
+Lab2_FadeVolume:	dc.w	$0000
+Lab2_FadeSpeed:		dc.b	0
+			even
+;--------------------------------------------------------------
+Lab2_PeriodTable:
+	dc.w $2000,$1E30,$1C80,$1AE8,$1968,$17F8,$16A0,$1558
+	dc.w $1428,$1308,$11F8,$10F0
+
+	dc.w $1000,$0F18,$0E40,$0D74,$0CB4,$0BFC,$0B50,$0AAC
+	dc.w $0A14,$0984,$08FC,$0878
+
+	dc.w $0800,$078C,$0720,$06BA,$065A,$05FE,$05A8,$0556
+	dc.w $050A,$04C2,$047E,$043C
+
+	dc.w $0400,$03C6,$0390,$035D,$032D,$02FF,$02D4,$02AB
+	dc.w $0285,$0261,$023F,$021E
+
+	dc.w $0200,$01E3,$01C8,$01AE,$0196,$017F,$016A,$0155
+	dc.w $0142,$0130,$011F,$010F
+
+	dc.w $0100,$00F1,$00E4,$00D7,$00CB,$00BF,$00B5,$00AA
+	dc.w $00A1,$0098,$008F,$0087
+Lab2_MusicPart:		dc.b	0
+Lab2_MaxPart:		dc.b	0
+Lab2_TempoCur:		dc.b	0
+Lab2_Tempo:		blk.b	10,2
+			even
+Lab2_OffsetStruct:	dc.l	0
+Lab2_OffsetPattern:	dc.l	0
+Lab2_BlankSamSt:	blk.b	100,0
+Lab2_BlankSamEd:
+
+Lab2_TrkStr:
+Lab2_TrkTab:	dc.l 	0	;Pattern table start adr
+Lab2_TrkAdr:	dc.l	0	;Pattern start addr
+Lab2_TrkPos:	dc.l	0	;Pattern pos pointer
+Lab2_TrkInsA:	dc.l	0	;Current ins structure addr
+Lab2_TrkVibD:	dc.b	0,0	;Vibrato -delay
+Lab2_TrkVibI:	dc.b	0	;Vibrato -increment (speed)
+Lab2_TrkVibA:	dc.b	0	;Vibrato -amplitude
+Lab2_TrkVibC:	dc.b	0	;Vibrato -current value
+Lab2_TrkPort:	dc.b	0	;Portamento -indicator
+Lab2_TrkPrtD:	dc.w	0	;Portamento -delay
+Lab2_TrkPrtI:	dc.b	0	;Portamento -increment (speed)
+Lab2_TrkNote:	dc.b	0	;Current played note
+Lab2_TrkPerL:	dc.w	0	;Portamento -period limit
+Lab2_TrkPer:	dc.w	0	;Current period
+Lab2_TrkDMA:	dc.b	0	;DMA state
+Lab2_TrkInsN:	dc.b	0	;Current ins number
+Lab2_TrkDur:	dc.w	0	;Note duration
+Lab2_TrkVibDa:	dc.b	0	;Vinbrato -data
+Lab2_TrkDesNo:	dc.b	0	;Portamento -destination note
+Lab2_TrkStPer:	dc.w	0	;Portamento -start period
+Lab2_TrkPerDi:	dc.w	0	;Portamento -difference between notes
+Lab2_TrkPrtCn:	dc.w	0	;Portamento -counter
+Lab2_TrkSpd:	dc.w	0	;Speed (Nbr lines * tempo)
+Lab2_TrkVol:	dc.b	0	;Current volume
+Lab2_TrkADSR:	dc.b	0	;ADRS indicator (0=A 1=D 2=S 3=R)
+Lab2_TrkSuLf:	dc.b	0	;Sustain time left
+Lab2_TrkArpP:	dc.b	0	;Arpeggio -table pos
+Lab2_TrkArpS:	dc.b	0	;Arpeggio -speed (0=max +=slower)
+Lab2_TrkPulP:	dc.b	0	;Pulse -position
+Lab2_TrkPulD:	dc.b	0	;Pulse -delay
+Lab2_TrkPulW:	dc.b	0	;Pulse -way
+Lab2_TrkPulS:	dc.b	0,0	;Pulse -speed (0=max +=slower)
+Lab2_TrkBlenP:	dc.w	0	;Blend -position
+Lab2_TrkBlenW:	dc.b	0	;Blend -way
+Lab2_TrkBlenD:	dc.b	0	;Blend -delay
+Lab2_TrkTabOff:	dc.w	0	;Pos of Pattern in Table
+Lab2_TrkPShtC:	dc.b	0	;Pulse -shot counter
+Lab2_TrkBShtC:	dc.b	0	;Blend -shot counter
+	blk.b 2,0
+
+	blk.b	$40,0
+	blk.b	$40,0
+	blk.b	$40,0
+	blk.b	$40,0
+	blk.b	$40,0
+	blk.b	$40,0
+	blk.b	$40,0
+
+Lab2_BlockTrk:
+Lab2_InsStr:
+Lab2_InsAdr:	dc.l	0	;Sample -addr
+Lab2_InsRepLen:	dc.w	-1	;Sample -repeat length (-1=all 0=zero)
+Lab2_InsLen:	dc.w	32/2	;Sample -length
+Lab2_InsPer:	dc.w	428	;Sample -period (default tuning)
+Lab2_InsVibD:	dc.b	0,0	;Vibrato -delay
+Lab2_InsVibI:	dc.b	0	;Vibrato -increment
+Lab2_InsVibA:	dc.b	0	;Vibrato -amplitude
+Lab2_InsMvol:	dc.b	$A0	;Master Volume
+Lab2_InsAttI:	dc.b	$FE/2	;Attack -speed
+Lab2_InsAttA:	dc.b	$FE	;Attack -amplitude
+Lab2_InsDecI:	dc.b	$C0/2	;Decay -speed
+Lab2_InsDecA:	dc.b	$C0	;Decay -amplitude
+Lab2_InsSusT:	dc.b	$10	;Sustain time
+Lab2_InsRelI:	dc.b	$60	;Release -speed
+Lab2_InsRelA:	dc.b	$10	;Release -amplitude
+Lab2_InsArpV:	blk.b	16,0	;Arpeggio values
+Lab2_InsArpD:	dc.b	2	;Arpeggio speed (0=max +=slower)
+Lab2_InsType:	dc.b	-1	;Lab2_Ins type (0=sample 1=pulse 2=blend)
+Lab2_InsPulN:	dc.b	128	;Pulse -negative value
+Lab2_InsPulP:	dc.b	127	;Pulse -positive value
+Lab2_InsPulS:	dc.b	2	;Pulse -speed
+Lab2_InsPulSt:	dc.b	16	;Pulse -start byte
+Lab2_InsPulEd:	dc.b	30	;Pulse -end byte
+Lab2_InsPulD:	dc.b	0	;Pulse -delay
+Lab2_InsSync:	dc.b	%1010	;Sync bits: bset 0 = X shots pulse
+				;	    bset 1 = Synchro pulse
+				;	    bset 2 = X shots blend
+				;	    bset 3 = Synchro blend
+Lab2_InsBlenS:	dc.b	4	;Blend -speed
+Lab2_InsBlenD:	dc.b	0	;Blend -delay
+Lab2_InsPShtC:	dc.b	0	;Pulse -shot counter
+Lab2_InsBShtC:	dc.b	0	;Blend -shot counter
+Lab2_InsArpMax:	dc.b	1	;Nb of Arp Value	
+	blk.b	12,0
+
+FileName:	dc.b	"df1:Furbie3",0
+		even
+FinalName:	dc.b	"df1:mod.Furbie",0
+		even
+

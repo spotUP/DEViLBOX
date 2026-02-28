@@ -1,0 +1,55 @@
+Short:    EaglePlayer "SOPROL" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  1
+Type:     mus/play
+
+This is a new external "SOPROL" module replay for EaglePlayer 1.54/2.00+.
+It's a player for all (?) SOPROL (Amiga) modules.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- Volume
+- Balance
+- SongEnd
+- ModuleInfo
+- SubSong
+- as a bonus, an EagleRipper (finder only) for SOPROL modules is included
+
+Notes:
+
+1. SOPROL (full name: Sound Programming Language) was created by Holger
+   Gehrmann and worked like an interpreter. The song patterns and
+   instruments were typed like a basic program. It was first used on the
+   C-64 and on PCs based on the Tandy chipset and then on the Atari ST and
+   Amiga.
+
+2. To play SOPROL music every module must first be adapted to a special
+   format which is very similar to EaglePlayer's "Dave Lowe" format.
+   For more information please contact Wanted Team.
+
+3. An example SOPROL module (non-commerical) can be found on Aminet:
+
+   mods/misc/SPL_Sanxion.lha
+
+4. Included is a list of all available SOPROL modules that I know of
+   (see SOPROL.txt). If you have, or know of, unsupported "SOPROL"
+   modules please contact Wanted Team.
+
+5. The latest version of EP players released by Wanted Team are available
+   on Wanted Team's FTP:
+
+address    ftp.union.org.pl (temporarily offline)
+login      krzak
+password   Rozany1
+catalog    /Players/
+
+6. The email address wt@jho.pol.pl might not be valid after March 2000.
+
+Our special thanks go to:
+
+- Holger Gehrmann

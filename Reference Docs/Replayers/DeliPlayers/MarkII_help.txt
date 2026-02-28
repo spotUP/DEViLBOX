@@ -1,0 +1,43 @@
+
+
+  The Mark I/II Systems
+  ---------------------
+
+OLD1
+----
+
+detect:
+	$48e7 $00f0 $41fa $.... <-offset to module !!
+	$4cd8 $0600
+	$4a00
+sys:
+
+IF d0=-1 THEN GOSUB initmainsong
+IF d0=0 OR d0>2 THEN
+  IF d4<>0 THEN
+    d0=d4.b : d4=d4>>8
+    IF d0=-1 THEN
+      initsubsong(d4)
+     ELSE
+      ?
+    END IF
+   ELSE
+    workwith(d1,d2)
+  END IF
+ ELSEIF d0=1 THEN GOSUB playfadeout
+ ELSEIF d0=2 THEN GOSUB play
+END IF
+
+
+OLD2
+----
+
+detect:
+	$48e7 $00f0 $41fa $....
+	$4cd8 $0600
+	$4a44
+sys:
+
+ ...ist mir zu blöd...
+
+

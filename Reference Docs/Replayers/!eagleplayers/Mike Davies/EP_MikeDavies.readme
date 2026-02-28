@@ -1,0 +1,41 @@
+Short:    EaglePlayer "Mike Davies" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  1
+Type:     mus/play
+
+This is a new external "Mike Davies" module replay for EaglePlayer 1.54/2.00+.
+It's a player for all (?) known Mike Davies Amiga modules.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- Volume
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- Balance
+- SongEnd
+- ModuleInfo
+- SubSong
+
+Notes:
+
+1. This player plays/recognizes only onefiled Mike Davies mods, mods
+   with separated samples must be converted to onefiled format.
+
+2. This player can also be named "Tiertex Player" because Mike Davies'
+   songs were used mostly (or only) in Tiertex games ("Strider", "Strider II",
+   "Dynasty Wars").  Also, in only one Tiertex Amiga game ("Italy 1990")
+   Mike Davies was credited.
+
+3. The latest version of EP players released by Wanted Team are available
+   on Wanted Team's FTP:
+
+address    ftp.union.org.pl (temporarily offline)
+login      krzak
+password   Rozany1
+catalog    /Players/
+
+4. The email address wt@jho.pol.pl might not be valid after March 2000.

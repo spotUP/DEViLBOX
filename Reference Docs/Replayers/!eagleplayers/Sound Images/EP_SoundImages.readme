@@ -1,0 +1,51 @@
+Short:    EaglePlayer "Sound Images" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  2
+Type:     mus/play
+Replaces: mus/play/EP_SoundImages.lha
+
+This is a new version of external module replayer for EaglePlayer 1.54/2.00+.
+It's a replayer for all known (PC relative) modules which Tony Williams
+has released used Sound Images (1) music player (Amiga version) and all (?)
+Sound Images (2) music player.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- Volume
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- Balance
+- SongEnd
+- ModuleInfo with Position Counter (a few virtual)
+- SubSong
+- as bonus attached is EagleRipper for Sound Images modules
+- normal (more power) volume output for "Never Mind" music
+- all hidden subsong(s) are enabled (for example "MoonFall" second tune)
+
+Version 2
+
+- added support for Sound Images Generation 2 modules
+- updated ripper for Sound Images Generation 2 modules
+
+Notes:
+
+1. If you have unsupported Sound Images Generation 2 songs, please contact
+   with Wanted Team.
+
+2. ModuleInfo works/looks better for EaglePlayer 1.54.
+
+3. "PlaySpeed" option sometimes doesn't work correctly.
+
+4. The latest version of EP players released by Wanted Team are available
+   on Wanted Team's FTP:
+
+address    ftp.union.org.pl (temporary offline)
+login      krzak
+password   Rozany1
+catalog    /Players/
+
+5. Email wt@jho.pol.pl might not be valid after March 2000.

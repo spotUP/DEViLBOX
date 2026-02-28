@@ -1,0 +1,58 @@
+Short:    EaglePlayer "Speedy System" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  1
+Type:     mus/play
+
+This is a new external "Speedy System" module player for EaglePlayer 1.54/2.00+.
+It's a player for all (?) known "Speedy System" (the first Michael
+Winterberg Amiga music format) modules.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- Volume
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- Balance
+- SongEnd
+- ModuleInfo with Position Counter
+- PatternJump
+- Save
+- as a bonus, an EagleRipper for Speedy System modules is included
+
+Notes:
+
+1. Warning!!! Don't use the "PlayFaster" button, because this player
+   doesn't like it and it may crash your Amiga. For "speediest" playing
+   use the "PatternJump" option.
+
+2. This player correctly plays (hopefully) all "Speedy System" songs and
+   was tested with mods created with versions 2.0, 2.1, 2.2, 3.0, and "A".
+
+3. Sometimes it's best to disable the Eureka-Packer player in the EP
+   Manager menu because the Eureka-Packer recognition code isn't perfect
+   and may incorrectly identify "Speedy System" songs. If Eureka-Packer
+   is not disabled some "Speedy System" songs can crash EaglePlayer.
+
+4. "Speedy System" songs must always have a standard 13 bytes header
+   (SPEEDY-SYSTEM) plus an optional zero byte at the beginning of the file.
+   Modules without a correct header will not be recognized. A song without
+   a header was used in the game "Down at the Trolls".
+
+5. The latest version of EP players released by Wanted Team are available
+   on Wanted Team's FTP:
+
+address    ftp.union.org.pl (temporarily offline)
+login      krzak
+password   Rozany1
+catalog    /Players/
+
+6. The email address wt@jho.pol.pl might not be valid after March 2000.
+
+Our special thanks go to the following people:
+
+- Bernd Gmeineder
+- Gaelan Griffin

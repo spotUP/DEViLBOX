@@ -1,0 +1,168 @@
+;
+; Example Program: Usage of "non-system-player.o"
+; SKELETON
+; ******************************************************************
+; FOR ADVANCED ASSEMBLER PROGRAMMERS WHO ARE TAKING OVER THE MACHINE
+; ******************************************************************
+; Written in 1989 by DIRE CRACKS Inc.
+
+; xrefs
+
+; THE SOUND DATA:
+;  These Labels are contained in MusicMaker-created object files
+
+  xref _PINSDAT ; when crunched          -> (  created  )
+; xref _INSTDAT ; when not crunched      -> (    by     )
+  xref _MELODAT ;                        -> ( using "O" )
+
+; PLAYER ROUTINES
+  xref _generalsndinit,_generalsndreset,_soundon,_soundoff,_decrunchinstrs
+  xref _setvolume,_setspeed
+
+; FLAGS
+  xref _fadeflag,_fadefinished,_channelsfinished
+
+; THE INTERRUPT PROGRAM
+  xref _generalplay
+
+; CODE START
+
+; EXAMPLE for calling the fibonacci-decruncher
+  lea.l _PINSDAT,a0
+  lea.l $50000,a1      ; this is nuts
+  jsr _decrunchinstrs
+
+; EXAMPLE for calling sound initialization
+  moveq.l #-1,d0       ; play 0=loop, <>0=oneshot
+  lea.l $50000,a1      ; if instrs are not crunched: lea.l _INSTDAT,a1
+  lea.l _MELODAT,a2
+  lea.l myprivateroutine,a3
+  jsr _generalsndinit
+
+; THIS SETS UP MY OWN LEVEL 6 INTERRUPT HANDLER
+  move.l $78,oldint6
+  move.w $dff01c,oldints
+  move.w #$3fff,$dff09a
+  lea.l level_6_int(PC),a0
+  move.l a0,$78
+  move.w #$2000,$dff09c
+  move.w #$a000,$dff09a
+
+; SWITCHING sound ON
+  jsr _soundon
+
+  move.w #300,d7
+waitmouse:
+
+; IN CASE OF ONESHOT: WAIT FOR CHANNELS TO FINISH
+    cmpi.b #$0f,_channelsfinished
+    beq.s soundfinished
+
+    btst.b #7,$bfe001
+    bne.s nosetspeed300
+      move.w d7,d0
+      jsr _setspeed
+      move.w d0,d7
+nosetspeed300:
+    btst.b #7,$bfe001
+    beq.s nosetspeed300
+
+
+    btst.b #6,$bfe001
+  bne.s waitmouse
+
+
+;  IN CASE YOU WANT TO SET A NEW VOLUME-LEVEL:
+; moveq.l #63,d0
+; jsr _setvolume
+;  THIS SETS THE GENERAL VOLUME TO THE HALF OF THE ORIGINAL.
+;  TO SET IT TO MAXIMUM, SET IT TO 127.
+;  THE GIVEN VALUE'S RANGE GOES FROM 0 TO 127.
+;  !! YOU SHOULD CALL THIS ROUTINE O-N-L-Y WHEN PLAYER IS RUNNING !!
+
+; FADE SOUND OUT
+  move.b #120,_fadeflag   ; fadespeed 50(=very fast) - 120 (slow)
+
+; WAIT FOR FADE TO FINISH
+waitforfade:
+    tst.b _fadefinished
+  beq.s waitforfade
+
+; SWITCHING SOUND OFF IMMEDIATLY
+soundfinished:
+  jsr _soundoff
+
+; SWITCHING LOW PASS FILTER TO ORIG STATE
+  bclr.b #1,$bfe001
+
+; IF YOU WANT YOUR SOUND START AGAIN
+; DO THE FOLLOWING:
+; moveq.l #0,d0  OR  moveq.l #1,d0   FOR LOOP/ONESHOT
+; jsr _generalsndreset
+; jsr _soundon
+; AND THEN AS DONE BEFORE.
+
+; IF YOU WANT TO PLAY ANOTHER SOUND, YOU MUST CALL
+; jsr _generalsndinit  INSTEAD OF _generalsndreset
+; WITH THE REGISTERS SET AS FAR ABOVE.
+; SINCE THERE'S NO _generalsndremove LIKE IN THE sysplayer IT'S NOT
+; REQUIRED IN THIS VERSION THOUGH ...
+
+; THIS IS MY EXIT-STUFF
+  move.w #$3fff,$dff09a
+  move.l oldint6(PC),$78
+  move.w oldints(PC),d0
+  ori.w #$8000,d0
+  move.w d0,$dff09a
+  moveq.l #0,d0
+  rts
+
+; ---------------
+; MYPRIVATEROUTINE, called, when "$" is in a macro.
+; gets pointer to itself in a0, and called-count.w in d0
+; SHOULD NOT TAKE THAT LONG (called from level 6 interrupt !!!)
+myprivateroutine:
+ move.w #$0f00,$dff180
+ rts ; always ends up by this !
+
+; ---------------
+
+; LEVEL 6 CONTROL ROUTINE
+; READY TO USE IN YOUR OWN PROGRAM
+level_6_int:
+ movem.l d0-d7/a0-a6,-(a7)
+ lea.l $dff000,a6
+ move.w #$2000,$09c(a6)
+ lea.l $bfd000,a0
+ move.b $d00(a0),d0
+ btst.b #7,d0
+ beq.s nointerrupt
+ lea.l level6ints(PC),a1
+ moveq.l #0,d1
+testforints:
+ btst.b d1,d0
+ beq.s notrequested
+  movem.l a1/d0-d1,-(a7)
+   lsl.w #2,d1
+   move.l 0(a1,d1.w),a2
+    jsr (a2)
+  movem.l (a7)+,a1/d0-d1
+notrequested:
+ addq.w #1,d1
+ cmpi.w #5,d1
+ bne.s testforints
+nointerrupt:
+ movem.l (a7)+,d0-d7/a0-a6
+ rte
+
+; CUSTOM INTERRUPT POINTERS for level 6: SET YOUR POINTERS HERE
+; order:          timera, timerb(=snd),alarm,  serial, flag
+level6ints:  dc.l default,_generalplay,default,default,default
+
+default: rts
+
+oldint6: dc.l 0
+oldints: dc.w 0
+
+ END
+

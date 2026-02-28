@@ -1,0 +1,184 @@
+
+; This is a DEMO for handling multiple songs over "mmv8.library"
+; Written in 1992 by Thomas Winischhofer
+; This is PD.
+
+; For MORE comment, see c example!
+
+ include "MMV8:Developer/ASM/mmv8.i"   ; MM include
+
+ move.l $4,a6             ; standard open library startup
+ lea.l dosname(PC),a1
+ jsr -408(a6)
+ move.l d0,dosbase
+ lea.l mmv8name(PC),a1
+ moveq.l #16,d0           ; multisong from v15 supported yet!
+ jsr -552(a6)             ; open mmv8.library
+ move.l d0,mmv8base       ; i suppose it opens...
+
+ move.l dosbase(PC),a6
+ jsr -60(a6)
+ move.l d0,outhandle
+
+ move.l mmv8base(PC),a6   ; LockAudio() to lock audio.device. THIS IS
+ jsr -186(a6)             ; IMPORTANT to avoid possible lethal disturbance!
+ move.b d0,audopen        ; Returns FALSE, if could NOT get locked. YOU
+                          ; SHOULD CARE ABOUT THIS!!!!!
+
+; The routines start counting from 0. Song #1 to be handled as #0, etc.
+
+ lea.l songloading1(PC),a0
+ bsr print                ; print "Loading Song #1..."
+ move.l mmv8base(PC),a6
+ lea.l songname1(PC),a0   ; songname
+ moveq.l #ONESHOT,d0      ; oneshot!
+ lea.l routine1(PC),a1    ; song's private routine
+ moveq.l #0,d1            ; songnum=0
+ jsr -138(a6)             ; ->NewLoadAndInit()
+
+ lea.l songloading2(PC),a0
+ bsr print
+ move.l mmv8base(PC),a6   ; The same for song #1
+ lea.l songname2(PC),a0
+ moveq.l #ONESHOT,d0
+ lea.l routine2(PC),a1
+ moveq.l #1,d1
+ jsr -138(a6)
+
+ lea.l songloading3(PC),a0
+ bsr print
+ move.l mmv8base(PC),a6   ; ... and #2
+ lea.l songname3(PC),a0
+ moveq.l #ONESHOT,d0
+ lea.l routine3(PC),a1
+ moveq.l #2,d1
+ jsr -138(a6)
+
+; When using multisongs, each single song must be notified to the player
+; by calling either NewLoadAndInit or NewSndInit. NewSndInit will mostly
+; apply, when eg. you load the song directly via trackdisk.device...!
+
+; NOTE: The player requires a correctly working ciab.resource !
+
+ moveq.l #0,d0            ; Song #0
+ jsr -156(a6)             ; -> NewSndReset() sets up a song to play
+ lea.l songplay1(PC),a0   ;    (Original oneshot-value used, given to
+ bsr print                ;    NewLoadAndInit!)
+ jsr -30(a6)              ; -> SoundOn()
+1$: jsr -84(a6)           ; -> WaitOneShotFin()
+ tst.l d0
+ beq.s 1$
+ jsr -36(a6)              ; -> SoundOff()
+
+ moveq.l #1,d0
+ jsr -156(a6)
+ lea.l songplay2(PC),a0   ; same...
+ bsr print
+ jsr -30(a6)
+2$: jsr -84(a6)
+ tst.l d0
+ beq.s 2$
+ jsr -36(a6)
+
+ moveq.l #2,d0
+ jsr -156(a6)
+ lea.l songplay3(PC),a0   ; same...
+ bsr print
+ jsr -30(a6)
+3$: jsr -84(a6)
+ tst.l d0
+ beq.s 3$
+ jsr -36(a6)
+
+ moveq.l #LOOP,d0         ; oneshot
+ moveq.l #1,d1            ; song #2
+ jsr -162(a6)             ; -> NewSndResetOneshot (overrule oneshot
+ lea.l songplay2A(PC),a0  ;                        for THIS time ONLY!)
+ bsr print
+ jsr -30(a6)              ; -> SoundOn()
+   move.l dosbase(PC),a6
+   moveq.l #100,d1
+   jsr -198(a6)
+ move.l mmv8base(PC),a6
+ moveq.l #115,d0
+ jsr -60(a6)              ; -> FadeSnd()
+4$: jsr -66(a6)           ; -> WaitFade()  - fading ready ???
+ tst.l d0
+ beq.s 4$
+ jsr -36(a6)              ; -> SoundOff()
+
+ jsr -168(a6)             ; -> RemoveAllSongs(): frees memory of all songs
+ jsr -48(a6)              ; -> GeneralSndRemove(): removes player interrupt
+ tst.b audopen
+ beq.s 5$
+   jsr -192(a6)           ; -> UnlockAudio() to unlock audio.device.
+5$:
+
+ move.l $4,a6
+ move.l mmv8base(PC),a1   ; close libs and exit
+ jsr -414(a6)
+ move.l dosbase(PC),a1
+ jsr -414(a6)
+ moveq.l #0,d0
+ rts                      ; quit away...
+
+print:
+ movem.l d0-d3/a0-a2/a6,-(a7)
+ move.l dosbase(PC),a6
+ move.l outhandle(PC),d1
+ moveq.l #0,d3
+ move.w (a0)+,d3
+ move.l a0,d2
+ jsr -48(a6)
+ movem.l (a7)+,d0-d3/a0-a2/a6
+ rts
+
+routine1:
+ move.w #$0f00,$dff180    ; sub's for $
+ rts
+routine2:
+ move.w #$00f0,$dff180
+ rts
+routine3:
+ move.w #$000f,$dff180
+ rts
+
+dosbase:   dc.l 0
+mmv8base:  dc.l 0
+outhandle: dc.l 0
+audopen:   dc.b 0
+ cnop 0,2
+
+dosname:   dc.b 'dos.library',0
+mmv8name:  dc.b 'mmv8.library',0
+
+songname1: dc.b 'sd:song-01',0
+songname2: dc.b 'sd:song-02',0
+songname3: dc.b 'sd:song-03',0
+
+
+songloading1: dc.w (slend1-songloading1)-2
+ dc.b 'Loading song #1...',10
+slend1: cnop 0,2
+songloading2: dc.w (slend2-songloading2)-2
+ dc.b 'Loading song #2...',10
+slend2: cnop 0,2
+songloading3: dc.w (slend3-songloading3)-2
+ dc.b 'Loading song #3...',10
+slend3: cnop 0,2
+
+songplay1:    dc.w (spend1-songplay1)-2
+ dc.b 'Playing song #1...',10
+spend1: cnop 0,2
+songplay2:    dc.w (spend2-songplay2)-2
+ dc.b 'Playing song #2...',10
+spend2: cnop 0,2
+songplay3:    dc.w (spend3-songplay3)-2
+ dc.b 'Playing song #3...',10
+spend3: cnop 0,2
+songplay2A:    dc.w (spend2A-songplay2A)-2
+ dc.b 'Playing song #2 in loop mode for 2 seconds ...',10
+spend2A: cnop 0,2
+
+
+ END

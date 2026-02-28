@@ -1,0 +1,104 @@
+; medplrlib_stub.a:	stub routines for calling medplayer.library from
+;			C-compilers which don't support direct library
+;			calling
+
+	XREF	_MEDPlayerBase
+	XDEF	_GetPlayer
+	XDEF	_FreePlayer
+	XDEF	_PlayModule
+	XDEF	_ContModule
+	XDEF	_StopPlayer
+	XDEF	_DimOffPlayer
+	XDEF	_SetTempo
+	XDEF	_LoadModule
+	XDEF	_UnLoadModule
+	XDEF	_GetCurrentModule
+	XDEF	_ResetMIDI
+
+	CODE
+
+_GetPlayer:
+	MOVE.L	4(SP),D0
+	MOVE.L	A6,-(SP)
+	MOVEA.L	_MEDPlayerBase,A6
+	JSR	-$1E(A6)
+	MOVEA.L	(SP)+,A6
+	RTS
+
+_FreePlayer:
+	MOVE.L	A6,-(SP)
+	MOVEA.L	_MEDPlayerBase,A6
+	JSR	-$24(A6)
+	MOVEA.L	(SP)+,A6
+	RTS
+
+_PlayModule:
+	MOVEA.L	4(SP),A0
+	MOVE.L	A6,-(SP)
+	MOVEA.L	_MEDPlayerBase,A6
+	JSR	-$2A(A6)
+	MOVEA.L	(SP)+,A6
+	RTS
+
+_ContModule:
+	MOVEA.L	4(SP),A0
+	MOVE.L	A6,-(SP)
+	MOVEA.L	_MEDPlayerBase,A6
+	JSR	-$30(A6)
+	MOVEA.L	(SP)+,A6
+	RTS
+
+_StopPlayer:
+	MOVE.L	A6,-(SP)
+	MOVEA.L	_MEDPlayerBase,A6
+	JSR	-$36(A6)
+	MOVEA.L	(SP)+,A6
+	RTS
+
+_DimOffPlayer:
+	MOVE.L	4(SP),D0
+	MOVE.L	A6,-(SP)
+	MOVEA.L	_MEDPlayerBase,A6
+	JSR	-$3C(A6)
+	MOVEA.L	(SP)+,A6
+	RTS
+
+_SetTempo:
+	MOVE.L	4(SP),D0
+	MOVE.L	A6,-(SP)
+	MOVEA.L _MEDPlayerBase,A6
+	JSR	-$42(A6)
+	MOVEA.L	(SP)+,A6
+	RTS
+
+_LoadModule:
+	MOVEA.L	4(SP),A0
+	MOVE.L	A6,-(SP)
+	MOVEA.L	_MEDPlayerBase,A6
+	JSR	-$48(A6)
+	MOVEA.L	(SP)+,A6
+	RTS
+
+_UnLoadModule:
+	MOVEA.L	4(SP),A0
+	MOVE.L	A6,-(SP)
+	MOVEA.L _MEDPlayerBase,A6
+	JSR	-$4E(A6)
+	MOVEA.L	(SP)+,A6
+	RTS
+
+_GetCurrentModule:
+	MOVE.L	A6,-(SP)
+	MOVEA.L _MEDPlayerBase,A6
+	JSR	-$54(A6)
+	MOVEA.L	(SP)+,A6
+	RTS
+
+_ResetMIDI:
+	MOVE.L	A6,-(SP)
+	MOVEA.L _MEDPlayerBase,A6
+	JSR	-$5A(A6)
+	MOVEA.L	(SP)+,A6
+	RTS
+
+	END
