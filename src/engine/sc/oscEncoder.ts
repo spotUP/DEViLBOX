@@ -3,12 +3,14 @@
 // All multi-byte values are big-endian per the OSC spec.
 // Strings and type tags are null-terminated and zero-padded to 4-byte boundaries.
 
+const _encoder = new TextEncoder();
+
 function pad4(n: number): number {
   return Math.ceil(n / 4) * 4;
 }
 
 function encodeString(str: string): Uint8Array {
-  const bytes = new TextEncoder().encode(str);
+  const bytes = _encoder.encode(str);
   const size = pad4(bytes.length + 1); // +1 for null terminator
   const buf = new Uint8Array(size);
   buf.set(bytes);
@@ -55,6 +57,10 @@ export function encodeOSCMessage(address: string, args: OSCArg[]): Uint8Array {
       case 'f': return encodeFloat32BE(arg.value);
       case 's': return encodeString(arg.value);
       case 'b': return encodeBlob(arg.value);
+      default: {
+        const _exhaustiveCheck: never = arg;
+        throw new Error(`Unhandled OSC arg type: ${(_exhaustiveCheck as { type: string }).type}`);
+      }
     }
   });
 
