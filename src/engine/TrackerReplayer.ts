@@ -1197,6 +1197,8 @@ export class TrackerReplayer {
 
     // MusicLine Editor: load raw binary into MusicLineEngine WASM before playback.
     if (this.song.musiclineFileData) {
+      // WASM handles all audio for ML songs — suppress Sampler note triggers to avoid double audio.
+      this._suppressNotes = true;
       try {
         const mlEngine = MusicLineEngine.getInstance();
         await mlEngine.ready();
