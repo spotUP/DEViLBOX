@@ -17,6 +17,7 @@ import {
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { encodeFurnaceInstrument } from '@lib/export/FurnaceInstrumentEncoder';
 import type { FurnaceConfig } from '@typedefs/instrument';
+import { FurnaceChipType } from '@engine/chips/FurnaceChipEngine';
 import { getToneEngine } from '@engine/ToneEngine';
 
 /** Channel names for each platform */
@@ -426,6 +427,16 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
         if (!hasModuleSamples) { this.loadTestSampleBRR(); this.engine.renderSamples(pt); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
+
+      // === Atari Lynx Mikey: needs non-zero FEEDBACK (duty) to oscillate ===
+      // The Mikey LFSR audio engine uses FEEDBACK register to select XOR tap.
+      // With duty=0 → feedback=0 → mTapSelector=0 → shift register fills with 1s →
+      // constant DC output → silence. Uploading a DIV_INS_MIKEY instrument with a
+      // duty macro of 1 causes the FEEDBACK register to be written on the first tick,
+      // giving mTapSelector=1 → alternating ±output → audible square wave.
+      case P.LYNX:
+        this.setupDefaultLynxInstrument();
+        break;
     }
 
     // For non-sample chips, set instrument and volume normally
@@ -511,6 +522,45 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     for (let ch = 0; ch < numCh; ch++) {
       this.engine.setInstrument(ch, 0, pt);
       this.engine.setVolume(ch, 15, pt);
+    }
+  }
+
+  /**
+   * Set up a default Atari Lynx Mikey instrument with duty=1.
+   *
+   * The Mikey LFSR generates audio via an LFSR shift register. The FEEDBACK register
+   * (set by DivInstrumentMikey::duty) controls which bit is XOR'd back as input.
+   * With duty=0 (the default): feedback=0 → mTapSelector=0 → xorGate always 0 →
+   * shift register fills with 1s → constant positive DC → silence.
+   * With duty=1: feedback=1 → mTapSelector=1 → alternating parity → ±output → square wave.
+   *
+   * The FEEDBACK register is only written when std.duty.had=true (macro change).
+   * We upload a DIV_INS_MIKEY instrument with a one-shot duty macro (value=1) so
+   * FEEDBACK is written on the first tick after note-on, enabling LFSR oscillation.
+   */
+  private setupDefaultLynxInstrument(): void {
+    const pt = this.platformType;
+    const numCh = this.engine.getChannelCount(pt) || 4;
+
+    const config: FurnaceConfig = {
+      chipType: FurnaceChipType.LYNX, // 25 — falls through to type=25 in binary; getIns() ignores type
+      algorithm: 0, feedback: 0, fms: 0, ams: 0, fms2: 0, ams2: 0,
+      ops: 0, opllPreset: 0, fixedDrums: false,
+      operators: [],
+      macros: [
+        // code=2 → dutyMacro slot → MikeyDuty(1).feedback=1 → mTapSelector=1 → LFSR oscillates
+        { code: 2, type: 0, data: [1], loop: -1, release: -1, mode: 0 },
+      ],
+      opMacros: [],
+      wavetables: [],
+    };
+
+    const binaryData = encodeFurnaceInstrument(config, 'Default Lynx');
+    this.engine.uploadFurnaceInstrument(0, binaryData, pt);
+
+    for (let ch = 0; ch < numCh; ch++) {
+      this.engine.setInstrument(ch, 0, pt);
+      this.engine.setVolume(ch, getMaxVolume(pt), pt);
     }
   }
 
