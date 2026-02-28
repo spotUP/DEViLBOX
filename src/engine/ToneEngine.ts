@@ -97,6 +97,16 @@ export class ToneEngine {
   public fft: Tone.FFT;
   private analysersConnected: boolean = false;
 
+  // Auto-gain: proportional controller that balances sample bus vs synth bus levels
+  private autoGainEnabled: boolean = false;
+  private autoGainLoopId: ReturnType<typeof setInterval> | null = null;
+  private sampleLevelAnalyser: AnalyserNode | null = null;
+  private synthLevelAnalyser: AnalyserNode | null = null;
+  private autoGainSampleCorr: number = 0; // dB correction applied on top of manual gain
+  private autoGainSynthCorr: number = 0;
+  private _manualSampleGainDb: number = 0; // tracks last setSampleBusGain arg
+  private _manualSynthGainDb: number = 0;
+
   // Native AudioContext — owned by DEViLBOX, shared with Tone.js via Tone.setContext()
   // This allows WASM/WAM synths to use the real BaseAudioContext directly.
   private _nativeContext: AudioContext | null = null;
@@ -895,7 +905,8 @@ export class ToneEngine {
     const wasmConfigs = configs.filter((c) => 
       ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth', 'SymphonieSynth',
        'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth', 'TFMXSynth',
-       'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'DavidWhittakerSynth'].includes(c.synthType || '') ||
+       'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'DavidWhittakerSynth',
+       'SunVoxSynth'].includes(c.synthType || '') ||
       c.synthType?.startsWith('Furnace')
     );
     if (wasmConfigs.length === 0) return;
@@ -949,7 +960,8 @@ export class ToneEngine {
    * Use to balance samples vs synths. 0 = unity gain (default).
    */
   public setSampleBusGain(db: number): void {
-    this.masterInput.gain.value = db === 0 ? 1 : Math.pow(10, db / 20);
+    this._manualSampleGainDb = db;
+    this._applyBusGains();
   }
 
   /**
@@ -957,7 +969,108 @@ export class ToneEngine {
    * Use to balance synths vs samples. 0 = unity gain (default).
    */
   public setSynthBusGain(db: number): void {
-    this.synthBus.gain.value = db === 0 ? 1 : Math.pow(10, db / 20);
+    this._manualSynthGainDb = db;
+    this._applyBusGains();
+  }
+
+  /** Apply bus gains: manual setting + auto-gain correction combined */
+  private _applyBusGains(): void {
+    const sampleDb = this._manualSampleGainDb + this.autoGainSampleCorr;
+    const synthDb = this._manualSynthGainDb + this.autoGainSynthCorr;
+    this.masterInput.gain.value = Math.pow(10, sampleDb / 20);
+    this.synthBus.gain.value = Math.pow(10, synthDb / 20);
+  }
+
+  /**
+   * Enable/disable automatic bus gain balancing.
+   * When enabled, a proportional controller continuously adjusts sample and synth
+   * bus gains to equalize their RMS levels. Corrections reset to 0 when disabled.
+   */
+  public setAutoGain(enabled: boolean): void {
+    this.autoGainEnabled = enabled;
+    if (enabled) {
+      this._ensureAutoGainAnalysers();
+      this._startAutoGainLoop();
+    } else {
+      this._stopAutoGainLoop();
+      this.autoGainSampleCorr = 0;
+      this.autoGainSynthCorr = 0;
+      this._applyBusGains();
+    }
+  }
+
+  public getAutoGain(): boolean {
+    return this.autoGainEnabled;
+  }
+
+  /** Returns current auto-gain corrections in dB (informational, for UI display) */
+  public getAutoGainCorrections(): { sample: number; synth: number } {
+    return { sample: this.autoGainSampleCorr, synth: this.autoGainSynthCorr };
+  }
+
+  private _ensureAutoGainAnalysers(): void {
+    if (this.sampleLevelAnalyser && this.synthLevelAnalyser) return;
+    const ctx = Tone.getContext().rawContext as AudioContext;
+
+    if (!this.sampleLevelAnalyser) {
+      const a = ctx.createAnalyser();
+      a.fftSize = 2048;
+      a.smoothingTimeConstant = 0;
+      (getNativeAudioNode(this.masterInput as any) as GainNode).connect(a);
+      this.sampleLevelAnalyser = a;
+    }
+
+    if (!this.synthLevelAnalyser) {
+      const a = ctx.createAnalyser();
+      a.fftSize = 2048;
+      a.smoothingTimeConstant = 0;
+      (getNativeAudioNode(this.synthBus as any) as GainNode).connect(a);
+      this.synthLevelAnalyser = a;
+    }
+  }
+
+  private _computeRmsDb(data: Float32Array): number {
+    let sumSq = 0;
+    for (let i = 0; i < data.length; i++) sumSq += data[i] * data[i];
+    const rms = Math.sqrt(sumSq / data.length);
+    return rms < 1e-10 ? -120 : 20 * Math.log10(rms);
+  }
+
+  private _startAutoGainLoop(): void {
+    if (this.autoGainLoopId !== null) return;
+    const buf = new Float32Array(2048);
+    const RATE = 0.2;
+    const SILENCE = -50;
+    const MAX_CORR = 12;
+
+    this.autoGainLoopId = setInterval(() => {
+      if (!this.sampleLevelAnalyser || !this.synthLevelAnalyser) return;
+
+      this.sampleLevelAnalyser.getFloatTimeDomainData(buf);
+      const sampleDb = this._computeRmsDb(buf);
+      this.synthLevelAnalyser.getFloatTimeDomainData(buf);
+      const synthDb = this._computeRmsDb(buf);
+
+      // Only balance when both buses have signal
+      if (sampleDb < SILENCE || synthDb < SILENCE) return;
+
+      // error > 0 → samples louder; apply symmetric correction
+      const error = sampleDb - synthDb;
+      this.autoGainSampleCorr -= error * RATE * 0.5;
+      this.autoGainSynthCorr += error * RATE * 0.5;
+
+      this.autoGainSampleCorr = Math.max(-MAX_CORR, Math.min(MAX_CORR, this.autoGainSampleCorr));
+      this.autoGainSynthCorr = Math.max(-MAX_CORR, Math.min(MAX_CORR, this.autoGainSynthCorr));
+
+      this._applyBusGains();
+    }, 100) as unknown as ReturnType<typeof setInterval>;
+  }
+
+  private _stopAutoGainLoop(): void {
+    if (this.autoGainLoopId !== null) {
+      clearInterval(this.autoGainLoopId as unknown as number);
+      this.autoGainLoopId = null;
+    }
   }
 
   /**
@@ -1890,7 +2003,9 @@ export class ToneEngine {
       case 'SidMon1Synth':
       case 'HippelCoSoSynth':
       case 'RobHubbardSynth':
-      case 'DavidWhittakerSynth': {
+      case 'DavidWhittakerSynth':
+      // SunVox WASM patch player
+      case 'SunVoxSynth': {
         instrument = InstrumentFactory.createInstrument(config);
         break;
       }
