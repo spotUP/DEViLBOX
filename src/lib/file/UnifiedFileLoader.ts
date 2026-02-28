@@ -350,12 +350,16 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     const name = file.name.replace(/\.sunvox$/i, '');
     const PATTERN_LEN = 256;
     const emptyRow = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    // TypeScript can't track mutations of let-bindings inside async closures,
+    // so it infers preSunVoxModules as null here. The cast restores the real type.
+    type SvoxModule = { name: string; id: number; synthData: ArrayBuffer };
+    const extractedModules = preSunVoxModules as SvoxModule[] | null;
 
-    if (preSunVoxModules && preSunVoxModules.length > 0) {
+    if (extractedModules && extractedModules.length > 0) {
       // Module decomposition mode: one SunVoxSynth (synth mode) per module,
       // one tracker channel per module, each with a trigger note at row 0.
       const now = Date.now();
-      const channels = preSunVoxModules.map((mod, idx) => {
+      const channels = extractedModules.map((mod, idx) => {
         useInstrumentStore.getState().createInstrument({
           name: mod.name,
           synthType: 'SunVoxSynth' as const,
@@ -397,9 +401,9 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       loadPatterns([pattern]);
       setCurrentPattern(0);
       setPatternOrder([0]);
-      setMetadata({ name, author: '', description: `Imported from ${file.name} (${preSunVoxModules.length} modules)` });
+      setMetadata({ name, author: '', description: `Imported from ${file.name} (${extractedModules.length} modules)` });
       applyEditorMode({});
-      return { success: true, message: `Loaded SunVox project: ${name} — ${preSunVoxModules.length} module(s)` };
+      return { success: true, message: `Loaded SunVox project: ${name} — ${extractedModules.length} module(s)` };
     }
 
     // Fallback: song mode — load the whole project as a single instrument.
