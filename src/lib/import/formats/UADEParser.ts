@@ -525,6 +525,12 @@ export async function parseUADEFile(
         const { parseDeltaMusic1File } = await import('./DeltaMusic1Parser');
         return parseDeltaMusic1File(buffer, filename);
       },
+      // NOTE: UADE format name for Delta Music 2.0 is 'Delta Music 2' (from uade_wasm_get_format_name()).
+      // DeltaMusic 2.0 loads at chip RAM address 0x000000, so no scanMemoryForMagic is needed.
+      'Delta Music 2': async () => {
+        const { parseDeltaMusic2File } = await import('./DeltaMusic2Parser');
+        return parseDeltaMusic2File(buffer, filename);
+      },
       'JochenHippel-CoSo': async () => {
         const { parseHippelCoSoFile } = await import('./HippelCoSoParser');
         // HippelCoSo is a compiled Amiga binary with a "COSO" magic at byte 0.

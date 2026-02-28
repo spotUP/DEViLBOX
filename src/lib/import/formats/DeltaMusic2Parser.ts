@@ -46,6 +46,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { DeltaMusic2Config, DeltaMusic2VolEntry, DeltaMusic2VibEntry, UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -127,6 +128,10 @@ interface DM2Instrument {
   sampleNumber: number;  // which PCM sample slot (0-7)
   table: Uint8Array;     // 48-byte waveform sequence table
   sampleData?: Int8Array; // PCM data if isSample
+  /** DeltaMusic2Config built from instrument header at parse time */
+  dm2Config: DeltaMusic2Config;
+  /** Chip RAM address of this instrument's header (= instrumentDataBase + instrumentOffsets[i]) */
+  instrBase: number;
 }
 
 // ── Main Parser ────────────────────────────────────────────────────────────
@@ -248,9 +253,26 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       rLen = sLen > rStart ? sLen - rStart : 0;
     }
 
-    // Volume table: 5 × 3 bytes (speed, level, sustain) — skip for now
+    // Volume table: 5 × 3 bytes (speed, level, sustain) at base+6
+    const volTable: DeltaMusic2VolEntry[] = [];
+    for (let v = 0; v < 5; v++) {
+      volTable.push({
+        speed:   bytes[base + 6 + v * 3],
+        level:   bytes[base + 7 + v * 3],
+        sustain: bytes[base + 8 + v * 3],
+      });
+    }
     iOff += 15;
-    // Vibrato table: 5 × 3 bytes (speed, delay, sustain) — skip for now
+
+    // Vibrato table: 5 × 3 bytes (speed, delay, sustain) at base+21
+    const vibTable: DeltaMusic2VibEntry[] = [];
+    for (let v = 0; v < 5; v++) {
+      vibTable.push({
+        speed:   bytes[base + 21 + v * 3],
+        delay:   bytes[base + 22 + v * 3],
+        sustain: bytes[base + 23 + v * 3],
+      });
+    }
     iOff += 15;
 
     const pitchBend   = u16BE(bytes, iOff); iOff += 2;
@@ -266,6 +288,14 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       isSample:      isSampleByte === 0xff,
       sampleNumber:  sampleNum,
       table,
+      dm2Config: {
+        volTable,
+        vibTable,
+        pitchBend,
+        table: new Uint8Array(table),
+        isSample: isSampleByte === 0xff,
+      },
+      instrBase: base,
     });
   }
 
@@ -327,6 +357,19 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
     const inst = dm2Instruments[i];
     const id = i + 1; // 1-based
 
+    // Build UADEChipRamInfo — common to all three instrument branches.
+    // DeltaMusic2 loads at chip RAM address 0x000000 (moduleBase=0),
+    // so file offsets equal chip RAM addresses directly.
+    const chipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: bytes.length,
+      instrBase: inst.instrBase,
+      instrSize: 88,
+      sections: { instrumentTable: instrumentDataBase },
+    };
+
+    let builtInstrument: InstrumentConfig;
+
     if (inst.isSample && inst.sampleData && inst.sampleLength > 0) {
       // ── PCM sample instrument ──────────────────────────────────────────
       // Amiga PCM samples are 8-bit signed at PAL C-3 rate (8287 Hz).
@@ -340,9 +383,7 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       const loopStart = hasLoop ? inst.repeatStart : 0;
       const loopEnd   = hasLoop ? inst.repeatStart + inst.repeatLength : 0;
 
-      instruments.push(
-        createSamplerInstrument(id, `Sample ${i}`, pcmUint8, 64, PCM_BASE_RATE, loopStart, loopEnd)
-      );
+      builtInstrument = createSamplerInstrument(id, `Sample ${i}`, pcmUint8, 64, PCM_BASE_RATE, loopStart, loopEnd);
     } else if (!inst.isSample && inst.sampleLength > 0 && waveforms.length > 0) {
       // ── Synth (waveform) instrument ───────────────────────────────────
       // The first entry in inst.table gives the initial waveform index.
@@ -367,21 +408,25 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       //   playbackRate = SYNTH_BASE_RATE × 2^((N − 37)/12)
       //   = (PAL_CLOCK/2/856) × 2^((N−37)/12)
       //   = PAL_CLOCK / (2 × periods[N])   [because periods[N] = 856 / 2^((N−37)/12)]
-      instruments.push(
-        createSamplerInstrument(id, `Synth ${i}`, pcmUint8, 64, SYNTH_BASE_RATE, 0, playLen)
-      );
+      builtInstrument = createSamplerInstrument(id, `Synth ${i}`, pcmUint8, 64, SYNTH_BASE_RATE, 0, playLen);
     } else {
       // Placeholder (no sample data / no waveforms)
-      instruments.push({
+      builtInstrument = {
         id,
         name: `Instrument ${i}`,
         type: 'synth' as const,
-        synthType: 'Synth' as const,
+        synthType: 'DeltaMusic2Synth' as const,
         effects: [],
         volume: -6,
         pan: 0,
-      } as InstrumentConfig);
+      } as InstrumentConfig;
     }
+
+    // Attach DeltaMusic2Config and chip RAM metadata to every instrument
+    builtInstrument.deltaMusic2 = inst.dm2Config;
+    builtInstrument.uadeChipRam = chipRam;
+
+    instruments.push(builtInstrument);
   }
 
   // ── Build patterns ─────────────────────────────────────────────────────
