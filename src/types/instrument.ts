@@ -208,6 +208,8 @@ export type SynthType =
   | 'OctaMEDSynth'   // OctaMED SynthInstr (vol/wf command table oscillator)
   | 'DavidWhittakerSynth' // David Whittaker (Amiga period-based frq/vol sequence synthesis)
   | 'SymphonieSynth'  // Symphonie / Symphonie Pro (native AudioWorklet replayer)
+  // SunVox modular synthesizer
+  | 'SunVoxSynth'     // SunVox WASM patch player (.sunsynth / .sunvox)
   // Modular Synthesis
   | 'ModularSynth';   // Modular synthesizer with patch editor
 
@@ -1184,6 +1186,27 @@ export const DEFAULT_DAVID_WHITTAKER: DavidWhittakerConfig = {
   vibratoDepth: 0,
   volseq: [64, -128, 0],   // constant volume, loop at 0
   frqseq: [-128, 0],        // static pitch, loop at 0
+};
+
+/**
+ * SunVox WASM patch configuration.
+ * Stores a raw .sunsynth (or .sunvox) binary and the user-visible display name.
+ * controlValues caches the most recently read per-control values so the UI can
+ * render knobs without repeatedly querying the WASM layer.
+ */
+export interface SunVoxConfig {
+  /** Raw .sunsynth patch binary — null until a patch is loaded */
+  patchData: ArrayBuffer | null;
+  /** Display name of the loaded patch (from module name in WASM) */
+  patchName: string;
+  /** Most recently read control values, keyed by ctlId string */
+  controlValues: Record<string, number>;
+}
+
+export const DEFAULT_SUNVOX: SunVoxConfig = {
+  patchData: null,
+  patchName: '',
+  controlValues: {},
 };
 
 /**
@@ -3531,6 +3554,8 @@ export interface InstrumentConfig {
   octamed?: OctaMEDConfig;
   davidWhittaker?: DavidWhittakerConfig;
   symphonie?: import('@/engine/symphonie/SymphoniePlaybackData').SymphoniePlaybackData;
+  // SunVox WASM patch
+  sunvox?: SunVoxConfig;
   // Modular Synthesis
   modularSynth?: import('./modular').ModularPatchConfig;
   // Sampler config
