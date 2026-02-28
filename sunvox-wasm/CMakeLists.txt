@@ -27,6 +27,8 @@ set(SOURCES
     ${SUNDOG_SRC}/core/code/debug.cpp
     ${SUNDOG_SRC}/memory/code/memory.cpp
     ${SUNDOG_SRC}/time/code/timemanager.cpp
+    ${SUNDOG_SRC}/utils/code/utils.cpp
+    ${SUNDOG_SRC}/filesystem/code/v3nus_fs.cpp
 )
 
 set(OUTPUT_NAME "SunVox")
@@ -43,6 +45,11 @@ target_include_directories(${OUTPUT_NAME} PRIVATE
 )
 
 target_compile_definitions(${OUTPUT_NAME} PRIVATE STYPE_FLOAT)
+
+# psynths_vocal_filter.cpp uses cos/sin without including <math.h> (the include
+# in psynth.h is guarded by STYPE_FLOATINGPOINT && ARCH_X86, which we don't set).
+# Force-include <cmath> so all TUs have it available.
+target_compile_options(${OUTPUT_NAME} PRIVATE "-include" "cmath")
 
 if(EMSCRIPTEN)
     set(EXPORTED_FUNCTIONS
