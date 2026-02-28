@@ -16,7 +16,7 @@ import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { PixiButton, PixiNumericInput } from '../components';
 import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
-import { PixiFT2Toolbar } from './tracker/PixiFT2Toolbar';
+import { PixiFT2Toolbar, FT2_TOOLBAR_HEIGHT, FT2_TOOLBAR_HEIGHT_COMPACT } from './tracker/PixiFT2Toolbar';
 import { PixiInstrumentPanel } from './tracker/PixiInstrumentPanel';
 import { PixiChannelVUMeters } from './tracker/PixiChannelVUMeters';
 import { PixiPatternMinimap } from './tracker/PixiPatternMinimap';
@@ -89,8 +89,6 @@ type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrange
 
 const PATTERN_PANEL_HEIGHT = 180;
 
-const FT2_TOOLBAR_HEIGHT = 160; // DOM FT2Toolbar via PixiDOMOverlay: ~120px content + ~28px menu + padding
-
 export const PixiTrackerView: React.FC = () => {
   // Enable FT2-style keyboard input (window event listeners — no DOM needed)
   useTrackerInput();
@@ -104,6 +102,7 @@ export const PixiTrackerView: React.FC = () => {
   const editorMode = useTrackerStore(s => s.editorMode);
   const { width: windowWidth, height: windowHeight } = usePixiResponsive();
   const showMacroSlots = useUIStore(s => s.showMacroSlots);
+  const compactToolbar = useUIStore(s => s.compactToolbar);
   const [showInstrumentPanel, setShowInstrumentPanel] = useState(true);
 
   // Hide instrument panel on narrow windows (matches DOM TrackerView)
@@ -133,12 +132,13 @@ export const PixiTrackerView: React.FC = () => {
   const nextPatternId = nextPositionIdx >= 0 ? patterns[patternOrder[nextPositionIdx]]?.id : undefined;
   const nextPatternLength = nextPositionIdx >= 0 ? patterns[patternOrder[nextPositionIdx]]?.length : undefined;
 
-  // Compute instrument panel height: window minus navbar(76) + toolbar(160) + controls(32) + statusbar(32) + optional pattern panel
+  // Compute instrument panel height: window minus navbar + toolbar + controls + statusbar + optional pattern panel
   const NAVBAR_H = 98; // NavBar(45px) + TabBar(41px) + borders+padding — must match PixiNavBar height
   const STATUSBAR_H = 32; // must match PixiStatusBar STATUS_BAR_HEIGHT
   const CONTROLS_BAR_H = 32;
   const MACRO_SLOTS_H = showMacroSlots ? 32 : 0;
-  const instrumentPanelHeight = windowHeight - NAVBAR_H - FT2_TOOLBAR_HEIGHT - CONTROLS_BAR_H - STATUSBAR_H - MACRO_SLOTS_H - (showPatterns ? PATTERN_PANEL_HEIGHT : 0);
+  const toolbarH = compactToolbar ? FT2_TOOLBAR_HEIGHT_COMPACT : FT2_TOOLBAR_HEIGHT;
+  const instrumentPanelHeight = windowHeight - NAVBAR_H - toolbarH - CONTROLS_BAR_H - STATUSBAR_H - MACRO_SLOTS_H - (showPatterns ? PATTERN_PANEL_HEIGHT : 0);
   const editorWidth = windowWidth - (instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0) - 16; // minus instrument panel and minimap
 
   return (
