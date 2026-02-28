@@ -75,7 +75,7 @@ self.addEventListener('fetch', (event) => {
       if (cachedResponse) {
         // Return cached version and update in background
         fetch(event.request).then((response) => {
-          if (response.ok) {
+          if (response.ok && response.status === 200) {
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, response);
             });
@@ -86,7 +86,7 @@ self.addEventListener('fetch', (event) => {
 
       // Fetch and cache new resources
       return fetch(event.request).then((response) => {
-        if (response.ok && event.request.method === 'GET') {
+        if (response.ok && response.status === 200 && event.request.method === 'GET') {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
