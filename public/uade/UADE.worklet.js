@@ -221,8 +221,16 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       case 'readMemory': {
         const { requestId, addr, length } = data;
+        if (!this._wasm || !this._ready) {
+          this.port.postMessage({ type: 'readMemoryError', requestId, error: 'WASM not ready' });
+          break;
+        }
         try {
           const ptr = this._wasm._malloc(length);
+          if (!ptr) {
+            this.port.postMessage({ type: 'readMemoryError', requestId, error: 'malloc failed' });
+            break;
+          }
           this._wasm._uade_wasm_read_memory(addr, ptr, length);
           const result = new Uint8Array(this._wasm.HEAPU8.buffer, ptr, length).slice();
           this._wasm._free(ptr);
@@ -234,9 +242,17 @@ class UADEProcessor extends AudioWorkletProcessor {
       }
       case 'writeMemory': {
         const { requestId, addr, data: writeData } = data;
+        if (!this._wasm || !this._ready) {
+          this.port.postMessage({ type: 'writeMemoryError', requestId, error: 'WASM not ready' });
+          break;
+        }
         try {
           const bytes = new Uint8Array(writeData);
           const ptr = this._wasm._malloc(bytes.length);
+          if (!ptr) {
+            this.port.postMessage({ type: 'writeMemoryError', requestId, error: 'malloc failed' });
+            break;
+          }
           this._wasm.HEAPU8.set(bytes, ptr);
           this._wasm._uade_wasm_write_memory(addr, ptr, bytes.length);
           this._wasm._free(ptr);
