@@ -45,7 +45,7 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
     this._waDriver = null;  // Embind audio_driver() object — provides WaRun()
     this._oscEndpoint = null;  // Module.oscDriver[SC_PORT] — provides receive()
     this._floatBufOut = null;  // Float32Array views into WASM heap (per channel)
-    this._blockSize = 128;
+    this._blockSize = 128;  // Struct default; replaced during _init() from message blockSize, then overwritten again from adFinal.bufSize after callMain
 
     this.port.onmessage = (evt) => this._handleMessage(evt.data);
   }
