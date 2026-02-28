@@ -261,7 +261,7 @@ export class CRTRenderer {
    */
   renderFrame(time: number, params: CRTParams): void {
     // 1. Restore scene for RT capture; exclude CRT mesh from RT.
-    this.sceneContainer.renderable = true;
+    this.sceneContainer.alpha = 1;
     this.mesh.renderable = false;
     this.app.renderer.render({ container: this.sceneContainer, target: this.rt, clear: true });
 
@@ -281,15 +281,17 @@ export class CRTRenderer {
     u.uCurvature.value         = params.curvature;
     u.uFlickerStrength.value   = params.flickerStrength;
 
-    // 3. Show CRT mesh. Scene stays renderable so PixiJS EventSystem still
-    //    delivers pointer events (hitTestRecursive checks renderable in v8).
-    //    The scene renders to screen behind the mesh but is fully covered by it.
+    // 3. Hide scene from screen render via alpha=0 (not renderable=false — that
+    //    kills pointer events in PixiJS v8 hitTestRecursive). alpha=0 is
+    //    invisible on screen but EventSystem still delivers clicks normally.
+    this.sceneContainer.alpha = 0;
     this.mesh.renderable = true;
   }
 
   /** Restore normal rendering (no CRT). */
   setEnabled(enabled: boolean): void {
     if (!enabled) {
+      this.sceneContainer.alpha = 1;
       this.mesh.renderable = false;
     }
   }
