@@ -71,9 +71,11 @@ export async function loadFile(
       return await loadInstrumentFile(file);
     }
 
-    // .sunsynth / .sunvox - SunVox patch or project → add as SunVoxSynth instrument
+    // .sunsynth / .sunvox - SunVox patch or project → show import dialog
     if (filename.endsWith('.sunsynth') || filename.endsWith('.sunvox')) {
-      return await loadSunVoxInstrument(file);
+      const { useUIStore } = await import('@stores/useUIStore');
+      useUIStore.getState().setPendingSunVoxFile(file);
+      return { success: true, message: '' };
     }
 
     // .xml - DB303 preset or pattern
