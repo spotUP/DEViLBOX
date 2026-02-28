@@ -439,6 +439,8 @@ export const useSettingsStore = create<SettingsStore>()(
         return {
           ...current,
           ...p,
+          // Always use the hardcoded default for renderMode — never restore from storage
+          renderMode: current.renderMode,
           formatEngine: {
             ...current.formatEngine,
             ...(p.formatEngine ?? {}),
@@ -458,7 +460,7 @@ export const useSettingsStore = create<SettingsStore>()(
         midiPolyphonic: state.midiPolyphonic,
         trackerVisualBg: state.trackerVisualBg,
         trackerVisualMode: state.trackerVisualMode,
-        renderMode: state.renderMode,
+        // renderMode intentionally not persisted — always start in webgl/workbench mode
       }),
     }
   )
