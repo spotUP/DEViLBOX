@@ -1,0 +1,33 @@
+
+>EXTERN "MOD.ILYAD",SONG
+SONG=$40000
+WHICHSONG=4
+	bset	#1,$bfe001
+	MOVEQ	#WHICHSONG,D0
+	move.l $4,a6		;This little routine
+	jsr -132(a6)		;is only for test purposes
+	LEA	SONG,A0
+	JSR	0(A0)		;(Raster time measuring)
+	ploop:			;and is not needed by the
+	move.w #0,$dff180	;replay routine!
+	cmpi.b #$7E,$dff006
+	bne.s ploop		;The results i got from the
+	move.w #8,$dff180	;test, is a use of approximatly
+	LEA	SONG,A0
+	JSR	4(A0)		;15-20 raster lines
+	BTST	#2,$DFF016
+	BEQ	END
+	btst #6,$bfe001		;which means that you need to
+	bne.s ploop		;allocate 20 RASTER LINES
+	BEQ	END		;------------------------
+	move.l $4,a6
+	jmp -138(a6)
+
+END:
+	LEA	SONG,A0
+	JSR	8(A0)
+	MOVEQ	#0,D2
+	move.w #$000f,$dff096
+	RTS
+	bclr	#1,$bfe001
+

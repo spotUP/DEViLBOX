@@ -1,0 +1,285 @@
+;
+; RADIO  - plays a 4 channel song using mmv8.library
+;          Very easy 4-channel song handling demonstration
+;
+; Written by The Dire Cracks, Inc.
+;
+; >> This is public domain <<
+;
+;
+
+ SECTION Pseudo,CODE          ; Prg runs stand-alone from CLI
+
+start:
+ bra.s realstart
+ dc.b '$VER: MM_V8-4Player V3.0 (7 Feb 1993)',$0d,$0a
+ cnop 0,2
+realstart:
+ lea.l argvBuffer,a2          ; CLI - Parameters
+ lea.l argvArray,a3
+ moveq.l #0,d2
+3$: move.b (a0)+,d1
+    subq.l #1,d0
+    bls.s parmExit
+    cmpi.b #' ',d1
+     bls.s 3$
+    addq.l #1,d2
+    move.l a2,(a3)+
+    bra.s 5$
+4$: move.b (a0)+,d1
+    subq.l #1,d0
+    cmpi.b #' ',d1
+     bls.s 6$
+5$: move.b d1,(a2)+
+    bra.s 4$
+6$: clr.b (a2)+
+    bra.s 3$
+parmExit:
+ clr.b (a2)+
+ clr.l (a3)+
+ move.l d2,argc
+
+ lea.l start-4(PC),a0
+ clr.l (a0)
+ move.l $4,a6
+ lea.l dosname,a1
+ jsr -408(a6)
+ move.l d0,a6
+ move.l #procname,d1
+ moveq.l #0,d2
+ move.l #procstart-4,d3
+ lsr.l #2,d3
+ move.l #4096,d4
+ jsr -138(a6)              ; Create Radio-Process, and
+ moveq.l #0,d0             ; ... quit this process
+ rts
+
+
+
+ SECTION Radio,CODE
+
+procstart:
+ move.l 4,a6               ; OpenLib stuff
+ lea.l dosname(PC),a1      ;
+ jsr -408(a6)
+ move.l d0,dosbase         ;    dos.library
+  beq errorexit
+ lea.l intname(PC),a1
+ jsr -408(a6)
+ move.l d0,intbase         ;    intuition.library
+  beq errorexit
+ lea.l mmv8name(PC),a1
+ moveq.l #16,d0
+ jsr -552(a6)
+ move.l d0,mmv8base        ;    mmv8.library
+  beq errorexit
+
+ moveq.l #1,d0             ; # of args ok?
+ cmp.l argc(PC),d0
+ beq.s ok_inp1
+errorexit:
+   bsr FLASH
+   bsr closelibs
+   bra EXIT
+
+ok_inp1:                   ; but we're right here now: parameters are correct
+ move.l argvArray,a0
+ lea.l macrosname(PC),a1
+namecopyloop:
+    move.b (a0)+,(a1)+
+ bne.s namecopyloop
+
+ move.l intbase(PC),a6     ; open the RADIO-Window
+ lea.l mywindow(PC),a0
+ cmpi.w #37,20(a6)
+ bcs.s 1$
+   lea.l windowtags(PC),a1
+   jsr -606(a6)
+   bra.s 2$
+1$:
+ jsr -204(a6)
+2$:
+ move.l d0,window
+  beq cantopenwindow
+ move.l d0,a0
+ move.l 86(a0),userport
+
+
+
+ move.l mmv8base(PC),a6
+ jsr -186(a6)               ; LockAudio() - locks audio.device
+ move.b d0,audopen          ; returns FALSE if not locked; you'd better
+                            ; care about this!
+
+
+
+ lea.l macrosname(PC),a0    ; NOW THE BIG ONE:
+ moveq.l #0,d0
+ jsr -72(a6)   ; loadandinit: Let the mmv8.lib MANAGE ALL THAT SOUND STUFF
+ tst.l d0
+ bne cantload
+
+
+; ***** IMPORTANT:
+; Here we need no call to SetupCacheControl() due we're playing
+; 4 channel songs only. Caches are no problem here.
+; The mmv8.library DOES feature this function, but it is a stub only.
+
+
+
+ bset.b #1,$bfe001          ; switch low pass filter off
+ jsr -30(a6)   ; soundon    : switch sound on
+
+
+nogoodmsg:                  ; The intuition-message stuff
+  move.l $4,a6
+  move.l userport(PC),a0
+  jsr -384(a6)
+  move.l userport(PC),a0
+  jsr -372(a6)
+  move.l d0,a1
+  move.l 20(a1),d2
+  jsr -378(a6)
+  move.l d2,d3
+  andi.l #$00000200,d2      ; close-gadget ???  -> QUIT
+   bne.s endofplay
+  andi.l #$00000040,d3      ; gadgup ??? -> Volume Button !
+   bne.s recalcvolume
+ bra.s nogoodmsg
+
+recalcvolume:               ; user set a new volume !
+ lea.l prop1(PC),a0
+ moveq.l #0,d0
+ move.w 2(a0),d0
+ divu 6(a0),d0
+ move.l mmv8base(PC),a6
+ jsr -96(a6)                ; setvolume: Sets general volume
+ bra.s nogoodmsg
+
+
+endofplay:                  ; end of program
+ move.l mmv8base(PC),a6
+ moveq.l #120,d0
+ jsr -60(a6)   ; fadesnd    : Make Sound fade away ..........
+
+
+waitfade:
+  jsr -66(a6)  ; waitfade   : Ain't that fade finished yet ?!
+  tst.l d0
+ beq.s waitfade
+
+
+ jsr -36(a6)   ; soundoff   : Switching sound OFF
+
+
+ jsr -78(a6)   ; removeloaded : LET mmv8.lib MANAGE ALL THAT GETAWAY STUFF
+
+
+ move.l intbase(PC),a6     ; Finish up with my window
+ move.l window(PC),a0
+ jsr -72(a6)
+
+ tst.b audopen
+ beq.s 1$
+   move.l mmv8base(PC),a6
+   jsr -192(a6)            ; UnlockAudio() - unlocks audio.device
+1$:
+
+ bsr.s closelibs           ; close the libs
+EXIT:
+ move.l $4,a6
+ jsr -132(a6)              ; FORBID
+ move.l dosbase(PC),a6
+ move.l #procstart-4,d1
+ lsr.l #2,d1
+ jsr -156(a6)              ; UnLoad our Segment
+ moveq.l #0,d0
+ rts                       ; AND: So far - So long - See ya ...
+
+; -------------------
+cantload:                  ; ERROR: mmv8.lib plays hide'n'seek with the
+ move.l intbase(PC),a6     ;        sound-files or/and could not get
+ move.l window(PC),a0      ;        enough memory for sound-data
+ jsr -72(a6)
+ tst.b audopen
+ beq.s 1$
+   move.l mmv8base(PC),a6
+   jsr -192(a6)            ; UnlockAudio() - unlocks audio.device
+1$:
+cantopenwindow:            ; ERROR: intuition did'nt let us open our
+ bsr FLASH
+ bsr.s closelibs           ;        nice little window
+ bra.s EXIT
+
+closelibs:                 ; close-the-libs-sub
+ move.l $4,a6
+ move.l mmv8base(PC),d0
+ beq.s noopenmmv8
+ move.l d0,a1
+ jsr -414(a6)
+noopenmmv8:
+ move.l intbase(PC),d0
+ beq.s noopenint
+ move.l d0,a1
+ jsr -414(a6)
+noopenint:
+ rts
+
+FLASH:                     ; NO TEXT PRINTING SINCE WE'RE RUNNING
+ move.l intbase(PC),a6     ; STAND-ALONE FROM CLI !!!
+ suba.l a0,a0              ; instead, just FLASH the screen(s).
+ jmp -96(a6)
+
+; now for the data:
+
+dosname:   dc.b 'dos.library',0
+intname:   dc.b 'intuition.library',0
+mmv8name:  dc.b 'mmv8.library',0
+ cnop 0,2
+dosbase:   dc.l 0
+intbase:   dc.l 0
+mmv8base:  dc.l 0
+window:    dc.l 0
+userport:  dc.l 0
+mywindow:
+ dc.w 387,0,200,21,$0201
+ dc.l $00000240,$0003000e,firstgadget,0,mytitle,0,0
+ dc.w 0,0,0,0,$0001
+windowtags: dc.l $80000077,21-10,0,0
+ cnop 0,4
+procname: 
+mytitle: dc.b 'Radio',0
+ cnop 0,2
+firstgadget:
+ dc.l 0
+ dc.w (8*7)+8,12-21,132,$0006,$000b,$0001,$0003
+ dc.l gadgetrender1,0,text1,0,prop1
+ dc.w $0001,0,0
+prop1:
+ dc.w $0013,$ffff,0,$0204,0,0,0,0,0,0,0,$0204,0,0
+gadgetrender1:
+ dc.w -2,-1,$0300,$0005
+ dc.l xytable,0
+xytable:
+ dc.l $00000000,$00a700a7,$00070007,$00000007,$00000000
+ cnop 0,2
+text1:
+ dc.w $0100,$0100,-((8*7)+4),-1
+ dc.l textattr,text11,0
+textattr:
+ dc.l fontname
+ dc.w 8,0
+fontname: dc.b 'topaz.font',0
+text11: dc.b 'Volume:'
+ cnop 0,2
+argc:       dc.l 0
+macrosname: ds.b 256
+audopen:    dc.b 0
+ cnop 0,4
+
+ SECTION myBSS,BSS
+
+argvArray:  ds.l 4
+argvBuffer: ds.b 128
+
+ END

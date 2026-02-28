@@ -1,0 +1,20 @@
+;	example4.a -- calling modplayer from assembler program
+
+	xref	_song	;the name of the object file should be "song"
+	xref	_InitPlayer
+	xref	_PlayModule
+	xref	_RemPlayer
+
+	code
+	movem.l a0-a6/d0-d7,-(sp)
+	jsr	_InitPlayer(pc)	;no error checking needed here!!
+	lea	_song,a0
+	jsr	_PlayModule(pc)
+	movea.l 4,a6
+	moveq	#$40,d0
+	lsl.l	#6,d0
+	jsr	-$13e(a6)	;wait for Ctrl-C
+	jsr	_RemPlayer(pc)
+	movem.l (sp)+,a0-a6/d0-d7
+	rts
+	end

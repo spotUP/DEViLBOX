@@ -1,0 +1,60 @@
+Short:    EaglePlayer "Sean Connolly" external replayer
+Author:   Czeslaw Maron (Mr.Larmer/Wanted Team)
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  2
+Type:     mus/play
+
+This is a new version of external "Sean Connolly" module replayer
+for EaglePlayer 1.54/2.0x.
+It's a replayer for all known modules which Sean Connolly has released
+used EMS V3.01, V3.18 and V5.xx (4 voices) music format.
+
+Version 1
+
+- initial release
+
+Version 2
+
+New features:
+
+- added support for EMS V3.01 modules
+- added Analyzer
+- added Voices
+- added SampleInfo with SampleSaver (EP 2.0x only)
+- added Balance
+- updated ModuleInfo (still without synth samples support :-( )
+- added Volume
+- added Position Counter (a few virtual :-) )
+- added SongEnd
+- as bonus attached is EagleRipper for Sean Connolly's modules
+
+Notes:
+
+1. ModuleInfo works/looks better for EaglePlayer 1.54.
+
+2. Player was tested only with not initialized (ripped directly from disk)
+   modules.
+
+3. Player/ripper was tested with EMS V3.01, V3.18 and V5.xx modules only !!!
+
+4. If you have unsupported Sean Connolly's Amiga (4 voices only) modules,
+   please contact with Wanted Team.
+
+5. Latest version of EP players released by Wanted Team are available on
+   Wanted Team's FTP:
+
+address    ftp.union.org.pl (temporary offline, maybe run again from Jan 2000)
+login      krzak
+password   Rozany1
+catalog    /Players/
+
+6. Example Sean Connolly's module is available on WT's FTP:
+
+catalog    /Modules/
+file       SCN_SurfNinjas.lha
+
+7. Email wt@jho.pol.pl might not be valid after March 2000.
+
+Our special thanks go to following people:
+
+- Sean 'Odie' Connolly for help

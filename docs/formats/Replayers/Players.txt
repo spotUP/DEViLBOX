@@ -1,0 +1,126 @@
+
+All known Musicplayers on AMIGA (1.1.93)
+----------------------------------------
+
+List made by The Vampire / PseudoDOS Group
+For contacts call: germany 08142/58859
+...Thanx to ZEG for discovering and exploring.
+
+
+Player Name	Birth	Playtp.	Filetp.	Chn VX	Identificatin of Musicdata
+------------------------------------------------------------------------------
+
+UnicTracker		sa	
+KRIS			sa	m1	4	31	"KRIS">$3b8
+Soundtracker		sa	m1	4	15	
+Soundtracker2.6		sa	m1	4	31	"MTN",0 at $5b8
+Noisetracker		sa	m1	4	31	"M.K."|"NORI">$43c
+Startrekker		sasy	m1/m2	4	31	"FLT4"|"EXO4">$438
+Startrekker8		sa	m1	8	31	"FLT8"|"EXO8">$438
+Protracker		sa	m1	4	31	"M.K."|"M!K!">$438
+Protracker		sa	m1	4	 ?	?
+SoundFX1.3		sa	m1	4	15  	"SONG" at $3c
+SoundFX2.0		sa	m1	4	31	"SO31" at 124
+MED			sa	m1	4	63	"MMD0" at $0
+OctaMED			sa	m1	8   	63	"MMD1" at $0
+Oktalyzer						"OKTA">0
+FutureComp1.3		sy1+	m1	4		"SMOD" at $0
+FutureComp1.4	6.4.90	sy1+	m1	4		"FC14" at $0
+TFMX_old		sa	m3	4		"TFMX" at $0
+TFMX_1.5		sa	m3	4		"TFMX-SONG" at $0
+TFMX_pro		sa	m3	4		"TFMX (EMPTY)" at $0
+TFMX_7V			sa	m3	7		
+HIPPEL	(FC10?)		sasy1	m1	4		"TFMX" at $0
+HIPPEL-COSO		sasy1	m1	4		"COSO" at $0
+PV Synth 1.0		sasy+	m1	4		"MSOB">$0
+Synthesis4.0						"Synth4.0">0
+ActionamicsSoundTool					"ACTIONAMICS SOUND TOOL V
+SonicArranger						"SOAR"
+ManiacsOfNoise			m
+Fred				m
+Sidmon1.0			m
+SidmonII			m1	4		"DMON">$3c
+SoundMon_old			m1	4	15	"V. " at $1a
+SoundMon1.2			m1	4	15	"V.2" at $1a
+SoundMon1.3			m1	4		"V.3" at $1a
+MusicAssembler			m	4		"dynamite89"
+JamCrackerPro1.0a		m1	4		"BeEp" at $0
+DeltaMusic1.0			m	4		"DELT">$16c
+DeltaMusic2.0			m	4		"DELT">$16c
+Mark_old
+MarkII
+MarkII Soundsystem					".ZAD">$348
+EarAche
+Custommade		sasy1	m!
+Suntronic			m!
+HQC Player_old		sy1	m!
+HQC Player		 sy1	m!
+FuturePlayer			m!			"FuturePlayer"
+Whitacker_old		sasy1	m
+Whitacker		sasy1	m
+Digital Mugician		m1			" MUG">0
+G.M.C.
+GMOD (nix)
+PumaTracker0.99						"inst"/"patt"
+FaceTheMusic						"FTMN">0
+EMS
+DSS							"MMU2">0
+The Music Enligh.
+Legless MusicEd
+8SVX			sa	m1	2	1	"8SVX" at 8
+SMUS							"SMUS" at 8
+SoProL				m3	4
+Beathoven		sa
+Gremlin Player		sa	m	4		..."Nu$k"..."NuSk"
+
+
+JasonPage (Fire&Ice, Paradroid)
+Richard Joseph (JamesPond II, Cadaver)
+Ocean (NewZealandStory, MidnightResistance)
+Hamplot			?
+PCDemo			?
+GlueMaster (Kaktusdemo)	sy2
+...
+
+Psygnosis(special)
+
+
+Crunched/Modified Trackermodules (the ones without an editor):
+
+Wanton			sa	m1	4	31	"WN"
+NoisePacker2		sa	m1+	4	31
+NoisePacker3		sa	m1+	4	31
+MEXX
+CRB-CrunchedReplay	sa	m1+	4	31
+NHP-Packer		sa	m1+	4	31
+PinballDreams		sa	m1+	4	31
+Complex_old		sa	m1+	4	31
+P40A-P41B		sa	m1+	4	31
+Promizer1.0c		sa	m1+	4	31
+NoiseTrackerPacker1.3	sa	m1+	4	31	"PATT" at Patterns
+ProPacker2.1		sa	m1+	4	31
+Prorunner1.0		sa	m1	4	31	"SNT.">$438
+Prorunner2.0		sa	m1+	4	31	"SNT!">0
+GrapeTracker		sa	m1+	4	31	
+
+------------------------------------------------------------------------------
+
+Playertype:
+
+	!	= not PC-relative
+	sa	= digisamples
+	sy	= normal synth
+	sy+	= shord digidrums possible
+	sy1	= sy/sy+ & ringmodulation
+	sy2	= sy1 & calculated drums
+	md	= midi, number of channels
+
+
+Filetype:
+
+	+	= packed
+	!	= not PC-relative
+	m	= all data and playercode
+	m1	= all data
+	m2	= songdata & extern datablock(syndat)
+	m3	= songdata & extern samples

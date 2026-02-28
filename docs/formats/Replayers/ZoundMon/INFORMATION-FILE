@@ -1,0 +1,64 @@
+04-01-1989 02:30:and some seconds  The Web Inc. (TKR) 
+Welcomes you to this infofile, (it's just a little note 
+to get you started with this proggie.) 
+It is about the zoundmonitor from Activas Washing Corp.
+
+You can find the zoundmonitor program in the main menu,
+ and a soundtracker to zoundmonitor converter as well. 
+ (this proggie converts soundtracker songs to zoundmonitor format) 
+
+
+in this directory you can find some replay sources and other utilities
+that may be of any use to you. here some info about the files.
+ 
+*  Zound.o      : The linkable Aztec object file
+
+*  Zound.c      : The source from Zound.o
+
+*  LetsHearIt   : A 4K program which plays a song for you
+
+*  LetsHearIt.c : The C-source from LetsHearIt
+                   including a (clear ?) discription how to use
+                   my soundroutines in your own (Aztec!) C-Programs
+*  ZBurster     : Like LetsHearIt, it plays a song
+                   But after pressing LMB it will give you some
+                   usefull information about how fast your song
+                   will be played when you use it in your own programs
+                   ( Mean time is Approx 1.7 rasterlines per frame)
+*  GuruGoodBye.o : This Linkable object file is to be found is directory
+                    CFiles on this disk. It saves you from GuruMeditations
+                    No: 3,4,5,6,7,9,10 and 11. See CFiles/Guru.c for how
+                    it should be used.
+
+
+GETTING STARTED WITH THE ZOUNDMON PROGGIE;
+
+INPUT THE NAME OF THE SONG TO BE LOADED AT THE LEFT UPPER SCREEN
+AT THE PLACE 'SONGTITLE'  e.g.  zoundmonsongs/trossport
+
+AT THE RIGHT UPPER SCREEN YOU SEE 'SAMPLEPATH' PUT HERE THE PATH WHERE TO
+FIND THE INSTRUMENTS e.g. df1: OR st-01:
+
+
+
+*** IMPORTANT ***
+
+YOU CAN USE THE WEB INC. SOUNDTRACKER DATA DISKS FOR THIS PROGRAM!
+
+
+                 SIGNED; 
+                        THE WEB INC.
+
+
+P.S. IF YOU HAVE SOME PROBLEMS USING THIS PROGGIE OR YOU HAVE SOME
+     QUESTIONS CONTACT THE WEB INC. 
+
+
+BYE FOR NOW........
+
+
+
+
+
+THE SAMPLES HAVE BEEN CHANGED TO PROTECT THE INNOCENT!
+

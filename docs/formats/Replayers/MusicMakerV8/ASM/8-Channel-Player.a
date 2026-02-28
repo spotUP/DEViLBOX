@@ -1,0 +1,188 @@
+;
+; Example Program: Usage of "mplayer.o"
+; Written by DIRE CRACKS Inc.
+;
+
+; xrefs ----------------------------------------------------------------
+
+; THE SOUND DATA:
+; These Labels are contained in MusicMaker-created object files
+
+  xref _PINSDAT ; when crunched          -> (           )
+; xref _INSTDAT ; when not crunched      -> ( created by)
+  xref _MELODAT ;                        -> ( using "O" )
+
+
+; AVAILABLE PLAYER ROUTINES:
+  xref _soundon,_soundoff,_generalsndinit,_generealsndremove
+  xref _generalsndreset,_fadesnd,_waitfade,_loadandinit,_removeloaded
+  xref _waitoneshotfin,_decrunchinstrs,setvolume,getunpackedinstlen
+  xref _isstdsong,_setalertreaction,_obtainmixbuflen,_setmixbuffers
+  xref _newmaketables,_lockaudio,_unlockaudio,_setupcachecontrol
+
+
+; CODE START -----------------------------------------------------------
+
+; 1.STEP: Calling the fibonacci-decruncher (when using packed instrs ONLY)
+
+  lea.l _PINSDAT,a0
+  jsr _getunpackedinstlen ; calc length of UNPACKED instrs from PACKED file
+  move.l d0,mymemlen
+  move.l 4,a6
+  move.l #$10001,d1       ; need no chipmem in 8-channel-player
+  jsr -198(a6)
+  move.l d0,mymem
+  move.l d0,a1            ;
+  lea.l _PINSDAT,a0       ;
+  jsr _decrunchinstrs     ; do the decrunching
+
+
+
+; 2.STEP: We need 8 buffers in CHIP-RAM
+
+  lea.l _MELODAT,a0
+  jsr _obtainmixbuflen   ; calc required buffer length for this song (size=d0)
+  lea.l $60000,a0        ;  ($60000 is nuts; you should call AllocMem!)
+  moveq.l #8-1,d1        ; we need 8 buffers
+mixfieldbuildloop:       ; build up vectorfield needed for _setmixbuffers
+   move.l a0,-(a7)
+   adda.w d0,a0
+  dbra d1,mixfieldbuildloop
+  move.l a7,a0
+  jsr _setmixbuffers     ; setup vectorfield for player
+  lea.l 8*4(a7),a7
+
+
+
+; 3.STEP: We need another table, which is filled up by _newmaketables
+;         (Please, call AllocMEM!!!)
+  lea.l $70000,a0    ;           need free memory of 4544+(64*d1) bytes
+  moveq.l #-1,d1     ;     -in this case: table unpacked:     /\
+  jsr _newmaketables ;      memory requirement is: packed  128, 256 unpacked
+
+
+; The following only applies to programs using the player
+; in a running multi tasking environment:
+; audio.device should be locked to avoid eventual lethal disturbance!!!
+  jsr _lockaudio
+  move.b d0,audopen  ; returns FALSE, if could NOT get locked.
+;                      !!!! YOU SHOULD CARE ABOUT THIS !!!!
+
+
+; 4.STEP: Call final init-routine:  (sets up int-vector, etc)
+
+  moveq.l #0,d0              ; play 0=loop, <>0=oneshot
+  move.l mymem(PC),a1        ; or: lea.l _INSTDAT,a1 when instrs are unpacked
+  lea.l _MELODAT,a2
+  lea.l myprivateroutine,a3  ; routine to be called when $ is in a macro
+  jsr _generalsndinit
+
+
+
+;*************************************************************************
+; The following is REALLY important:
+; Starting version 3, the mplayer features SetupCacheControl() to handle
+; 68020,30,40 caches and 68040 CachePreDMA(). By default, the caches are
+; ignored. On machines equipped with 68040, especially, this can be
+; troubleful in case COPYBACK mode is ON. Arguments to this functions
+; are: d0: Kickstart version, because ClearCache() and CachePreDMA() are
+;          supported from 37, yet.
+;      d1: System-Attn Flags from Execbase for sensing the CPU type.
+;
+; This function MUST be called AFTER a song has been initialized.
+;
+; NOTE: The mplayer module requires a CORRECTLY INITIALIZED
+; ¯¯¯¯¯ ExecBase area due to VBR handling routines inside  !!!!
+
+ move.l $4,a0
+ move.w 20(a0),d0    ; execbase->Version
+ move.w 296(a0),d1   ; execbase-> AttnFlags
+ jsr _setupcachecontrol      ; SetupCacheControl()
+
+;*************************************************************************
+
+
+
+; FINAL STEP: SWITCHING sound ON
+  jsr _soundon
+
+
+waitmouse:
+
+; IN CASE OF ONESHOT: WAIT FOR SONG TO FINISH
+;   jsr _waitoneshotfin
+;   tst.l d0             ; d0=true, when sound has finished
+;   bne soundfinished
+
+    btst.b #7,$bfe001   ; well, in fact it's the joystick
+  bne.s waitmouse
+
+
+; --- TO SET A NEW VOLUME-LEVEL:
+; moveq.l #63,d0     ; set volume to half
+; jsr _setvolume     ; set it to 127 for full volume
+;                       !! YOU SHOULD CALL THIS ROUTINE
+;                       O-N-L-Y WHEN PLAYER IS RUNNING !!
+
+; --- to FADE SOUND OUT
+; moveq.l #120,d0    ; fadespeed 50(=very fast) - 126 (slow)
+; jsr _fadesnd
+; WAIT FOR FADE TO FINISH
+;waitforfade:
+;    jsr _waitfade
+;    tst.l d0        ; d0=true, when fading is ready
+;  beq.s waitforfade ; you MUST use soundoff after fading!
+
+
+; SWITCHING SOUND OFF IMMEDIATLY
+soundfinished:
+  jsr _soundoff
+
+
+; SWITCHING LOW PASS FILTER TO ORIG STATE
+  bclr.b #1,$bfe001
+
+
+; IF YOU WANT YOUR SOUND START AGAIN:
+; moveq.l #0,d0  OR  moveq.l #1,d0   FOR LOOP/ONESHOT
+; jsr _generalsndreset
+; jsr _soundon
+; ...
+
+
+; IF YOU WANT TO PLAY ANOTHER SOUND, YOU MUST CALL
+; jsr _generalsndinit  INSTEAD OF _generalsndreset
+; WITH THE REGISTERS SET AS FAR ABOVE.
+
+
+; THIS IS MY EXIT-STUFF
+  jsr _generalsndremove ; restore int vector (was set up by GeneralSndInit)
+  tst.b audopen
+  beq.s 1$
+   jsr unlockaudio      ; unlock audio.device for other tasks
+1$:
+
+  move.l $4,a6
+  move.l mymemlen(PC),d0
+  move.l mymem(PC),a1
+  jsr -210(a6)
+  moveq.l #0,d0
+  rts
+
+; ---------------
+; MYPRIVATEROUTINE, called, when "$" is in a macro.
+; gets pointer to itself in a0, and called-count.w in d0
+; SHOULD NOT TAKE THAT LONG (called from a VERY time critical level4 int!!!)
+myprivateroutine:
+ move.w #$0f00,$dff180
+ rts                    ; always ends up by this !
+
+; ---------------
+
+mymem:    dc.l 0
+mymemlen: dc.l 0
+audopen:  dc.b 0
+ cnop 0,2
+
+ END
+

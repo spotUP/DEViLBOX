@@ -1,0 +1,44 @@
+Short:        EaglePlayer "G&T Game Systems" external replayer
+Author:       Wanted Team
+Uploader:     Don Adan <DonAdan@wp.pl>
+Version:      1
+Type:         mus/play
+Architecture: m68k-amigaos
+
+This is a new external "G&T Game Systems" replay for EaglePlayer
+1.54/2.00+. It's a player for all known "G&T Game Systems" modules.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- Balance
+- ModuleInfo with Position Counter
+- Volume
+- SongEnd
+- Save
+- Duration (+/- 1sec)
+
+Notes:
+
+1. "G(erald) & T(homas) Game Systems" soundformat was used in "Carver"
+   game only (?).
+
+2. This player uses the audio device and so wont work on DeliPlayer
+   for the PC.
+
+3. If you have, or know of, unsupported "G&T Game Systems" modules
+   please contact the Wanted Team.
+
+4. You can get the latest versions of Wanted Team products from:
+
+   http://amiga.emucamp.com/wt/wt.html
+
+Special greetings go to
+
+- the perfect Gaelan G. for help
+- Maik Ringlepp for inspiration
+- Jan Krolzig for betatesting

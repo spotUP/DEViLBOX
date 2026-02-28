@@ -1,0 +1,45 @@
+	SECTION	FredGray,Code_C
+
+Start
+	moveq	#-1,D0			; security
+	rts
+
+	dc.b	'FREDGRAY'		; ID string
+
+	dc.l	Play			; pointer to Interrupt routine
+					; (must exist)
+	dc.l	InitSong		; pointer to InitSong routine
+					; (must exist)
+	dc.l	4			; number of subsongs (must exist)
+	dc.l	ModuleName		; pointer to module name label
+					; (must exist or 0)
+	dc.l	AuthorName		; pointer to module author label
+					; (must exist or 0)
+	dc.l	SpecialInfo		; pointer to special text label
+					; (must exist or 0)
+	dc.l	ModuleEnd-Start		; size of loaded file
+	dc.l	ModuleEnd-ModuleStart	; size of loaded module
+	dc.l	0			; private
+
+ModuleName
+	dc.b	'Black Lamp',0
+AuthorName
+	dc.b	'Fred Gray',0
+SpecialInfo
+	dc.b	'(c) 1988 by FireBird',10,10
+	dc.b	'Ripped and adapted by Don Adan/Wanted Team !',0
+	even
+ModuleStart
+
+SongTable
+	dc.b	1
+	dc.b	12
+	dc.b	14
+	dc.b	$13
+	even
+InitSong
+	move.b	SongTable(PC,D0.W),StartPosition
+
+	<put here the disassembled module>
+
+ModuleEnd

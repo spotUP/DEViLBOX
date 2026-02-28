@@ -1,0 +1,267 @@
+* SELECTOR SOURCE FOR FredEditor
+ 
+>extern 'MOD.TEST',MT_DATA	;sett inn filenavn her
+LENGDE=12126	;Lengde på filenavn (sett inn lengden på filen)
+WHICHSONG=	0		; WHICH SONG TO PLAY
+
+main:
+	jmp	a
+version:	equ	33
+ok1:		equ	0
+error1:		equ	10
+
+
+detach:	move.l	4,a6
+	suba.l	a1,a1
+	jsr	-294(a6)
+	move.l	d0,a0
+	move.b	(a0),d7
+	moveq	#version,d0
+	lea	dosname1(pc),a1
+	jsr	-408(a6)
+	move.l	d0,dosbase1
+	beq.B	error12
+	
+	move.l	d0,a6
+	lea	detach(pc),a0
+	move.l	-(a0),d3
+	clr.l	(a0)
+	move.l	#name,d1
+	moveq	#0,d2
+	move.b	d7,d2
+;	move.l	#B-A,d4	;lengde på program :b-a
+	jsr	-138(a6)	
+error12:	moveq	#error1,d2
+		bra.B	cleanup
+
+ready:		moveq	#ok1,d2
+cleanup:	move.l	dosbase1,d0
+		beq.B	exit
+	
+	move.l	d0,a1
+	move.l	4,a6
+	jsr	-414(a6)
+	
+exit:	move.l	d2,d0
+	rts
+	
+dosbase1:	dc.l	0
+dosname1:	dc.b	'dos.library',0
+
+NAME:	DC.B	'MULTITASKING',0
+	SECTION SELECTOR,CODE	
+A:
+	bset	#1,$bfe001	;Slår av led og filter
+	move.l	4,a6		;Åpning av libraries osv..
+	lea	dosname,a1
+	jsr	-408(a6)
+	move.l	d0,dosbase
+
+	move.l	dosbase,a6
+	move.l	#window,d1
+	move.l	#1005,d2
+	jsr	-30(a6)
+	tst.l	d0		;Hvis noe går galt, hopp til
+	beq	error		;error.
+	move.l	d0,hd
+
+	move.l	dosbase,a6
+	move.l	hd,d1
+	move.l	#text,d2
+	move.l	#textend-text,d3
+	jsr	-48(a6)
+	
+	MOVEM.L	D0-D7/A0-A6,-(A7)
+	MOVEQ	#WHICHSONG,D0
+	LEA	MT_DATA,A0
+	JSR	(A0)
+	MOVEM.L	(A7)+,D0-D7/A0-A6
+	jsr	0(A0)		;initialize music 
+
+loop:
+	cmp.b	#$ff,$dff006		;wait for raster $ff
+	bne	loop
+
+
+EVER:	MOVE.L	$DFF004,D0
+	AND.L	#$1FF00,D0
+	CMP.L	#$08000,D0
+	BNE.S	EVER
+
+EV2:	
+	move.w	$dff006,d0
+	move.l	d0,ti
+	MOVEM.L	D0-D7/A0-A6,-(A7)
+	LEA	MT_DATA,A0
+	JSR	4(A0)
+	MOVEM.L	(A7)+,D0-D7/A0-A6
+	move.l	ti,d0
+	moveq	#0,d1
+	move.w	$dff006,d1
+	sub.w	d0,d1
+	cmp.l	TIME,D1
+	BLE.S	NONEW
+	MOVE.L	D1,TIME
+NONEW:
+	
+	BTST	#2,$DFF016		;Test høyre musknapp 
+	BEQ.S	EV2			;Hvis trykket, hopp til ev2 = spoling
+
+	beq	next1			; 
+	cmp.b	#$5f,$bfec01		; Test tast F 1
+	bne	next1
+	jsr	s1			; F 1 trykt, gå til S1
+next1:	beq	next2
+	cmp.b	#$5d,$bfec01		; F 2
+	bne	next2
+	jsr	s2
+next2: 	beq	next3
+	cmp.b	#$5b,$bfec01		; F 3
+	bne	next3
+	jsr	s3
+next3: 	beq	next4
+	cmp.b	#$59,$bfec01		; F 4
+	bne	next4
+	jsr	s4
+next4: 	beq	next5
+	cmp.b	#$57,$bfec01		; F 5
+	bne	next5
+	jsr	s5
+next5: 	beq	next6
+	cmp.b	#$55,$bfec01		; F 6
+	bne	next6
+	jsr	s6
+next6:
+ 	beq	next7
+	cmp.b	#$53,$bfec01		; F 7
+	bne	next7
+	jsr	s7
+next7: 	beq	next8
+	cmp.b	#$51,$bfec01		; F 8
+	bne	next8
+	jsr	s8
+next8:  beq	next9
+	cmp.b	#$4f,$bfec01		; F 9
+	bne	next9
+	jsr	s9
+next9:  beq	next0
+	cmp.b	#$4d,$bfec01		; F 10
+	bne	next0
+	jsr	s0
+next0:  
+	BTST#6,$bfe001		;mouse button??
+	bne	loop			;Hvis ja, fortsett til stopp
+
+stopp:
+	move.l	dosbase,a6
+	move.l	hd,d1
+	jsr	-36(a6)
+
+	move.l	4,a6
+	move.l	dosbase,a1
+	jsr	-414(a6)
+	MOVEM.L	D0-D7/A0-A6,-(A7)
+	LEA	MT_DATA,A0
+	JSR	8(A0)
+	MOVEM.L	(A7)+,D0-D7/A0-A6
+	RTS
+
+error:
+	move.l	4,a6
+	move.l	dosbase,a1
+	jsr	-414(a6)
+
+	move.l	#$ffffffff,d1
+dd:	move.w	d1,$dff180
+	dbf	d1,dd
+	rts
+	
+s1:	MOVEM.L	D0-D7/A0-A6,-(A7)
+	MOVEQ	#1,D0
+	JSR	0(A0)	
+	MOVEM.L	(A7)+,D0-D7/A0-A6
+	rts			
+s2:	move.b	#1,D0
+	jsr	0(A0)
+	rts
+s3:	move.L	#2,D0	
+	JSR	0(A0)	
+	rts
+s4:	move.L	#3,D0	
+	JSR	0(A0)		
+	rts
+s5:	move.L	#4,D0	
+	JSR	0(A0)	
+	rts
+s6:	move.L	#5,D0	
+	JSR	0(A0)	
+	rts
+s7:	move.L	#6,D0	
+	JSR	0(A0)	
+	rts
+s8:	move.L	#7,D0	
+	JSR	0(A0)	  
+	rts
+s9:	move.L	#8,D0	; Flytt ny songpos inn i mt_counter1
+	JSR	0(A0)		; Initialiser sangen
+	rts
+s0:	move.L	#9,D0	; Flytt ny songpos inn i mt_counter1
+	JSR	0(A0)		; Initialiser sangen
+	rts
+
+window:	dc.b 'CON:0/0/640/256/TIMEWALKER',0 ;256 = full sjerm
+	; Disse linjene er navnet
+	; på vinduet.
+
+	even
+
+hd:	dc.l	0,0
+dosname:dc.b	'dos.library',0
+dosbase:dc.l	0
+ti:	dc.l	0
+TIME:	DC.L	0
+
+text:
+
+	dc.b	$9b,'0 p'	; Gjemmer Cursor 
+	dc.b	$9b,'33m'	; Setter ny farge
+	dc.b	$0a,$0a	 	; TO linjer ned
+	dc.b	$9b,'4m'	; Understrek
+	dc.b	$9B,'19H','ILYAD BY FREDERICK HAHN',$0a
+	dc.b	$9b,'0;33m'
+	dc.b	$9B,'18H','Press : ',$0a
+	dc.b	$0a
+	dc.b	'                                  F1 - Song # 1 ',$0a
+	dc.b	'                                  F2 - Song # 2 ',$0a
+	dc.b	'                                  F3 - Song # 3 ',$0a
+	dc.b	'                                  F4 - Song # 4 ',$0a
+	dc.b	'                                  F5 - Song # 5 ',$0a
+	dc.b	'                                  F6 - Song # 6 ',$0a
+	dc.b	'                                  F7 - Song # 7 ',$0a
+	dc.b	'                                  F8 - Song # 8 ',$0a
+	dc.b	'                                  F9 - Song # 9 ',$0a
+	dc.b	'                                  F0 - Song #10 ',$0a
+	dc.b	$0a
+;	dc.b	$0a,$0a,$0a,$0a
+	dc.b	'                       Tune title - "ILYAD" ',$0a
+	dc.b    '                          This tune is approx - 12kb ',$0a 
+	dc.b	'                          LMB to exit - RMB to forwind ',$0a
+	dc.b	"                            (C) '91 Maniacs of Noise ",$0a
+	dc.b	$0a
+	dc.b	$9b,'3m'	; Kursivskrift på
+	dc.b	'                                Maniacs of Noise ',$0a
+	dc.b	'                               Øistein Johan Eide ',$0a
+	dc.b	'                                Skytterveien #14 ',$0a
+	dc.b	'                                 5035 Sandviken ',$0a
+	dc.b	'                                     Norway ',$0a
+	dc.b    $9b,'0m'	; Alle effekter av
+	dc.b	$9b,'8m'	; Fjerner mulighet til å skrive i vinduet
+
+textend:	dc.b	0,0
+
+	even
+;	SECTION DATA,DATA_C
+	Mt_Data:	blk.b	lengde,0
+
+B:	
+;/* End of File */

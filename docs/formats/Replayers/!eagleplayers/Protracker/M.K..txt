@@ -1,0 +1,13 @@
+> BTW. I have last question. One of my german friend told me that Protracker
+> ID "M.K." is from your name "Michael Kleps", this is right or not ?
+
+That's correct. There were four unused bytes in the ProTracker format and I
+changed it to "M.K." to distinguish between the 15 and the 31 instrument
+format.
+
+For some reason it stayed for some years, even when the pattern limit was
+raised from 64 to 100 they simply changed it to "M!K!". Nice :)
+
+Mike
+
+
