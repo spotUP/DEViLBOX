@@ -17,6 +17,7 @@ import {
   Eye,
   Play,
   Square,
+  ExternalLink,
 } from 'lucide-react';
 import { useArrangementStore } from '@stores/useArrangementStore';
 import { useUIStore, useTransportStore } from '@stores';
@@ -192,6 +193,15 @@ export const ArrangementToolbar: React.FC = () => {
       >
         <Plus size={14} />
         <span>Track</span>
+      </button>
+
+      {/* Pop-out */}
+      <button
+        className="p-1.5 rounded bg-dark-bgTertiary text-text-secondary hover:bg-dark-border hover:text-text-primary"
+        onClick={() => useUIStore.getState().setArrangementPoppedOut(true)}
+        title="Pop out Arrangement"
+      >
+        <ExternalLink size={14} />
       </button>
     </div>
   );
