@@ -95,6 +95,9 @@ export interface UIStateSnapshot {
   columnVisibility: ColumnVisibility;
   trackerVisualBg: boolean;
   recordMode: boolean;
+  rowHeight: number;           // Derived from trackerZoom (80-200%)
+  rowHighlightInterval: number; // Every N rows gets a highlight color
+  showBeatLabels: boolean;     // Show beat.tick format in line number gutter
 }
 
 // ─── Channel layout ───────────────────────────────────────────────────────────
