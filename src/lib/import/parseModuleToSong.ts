@@ -1081,6 +1081,17 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     // Fall through to libopenmpt
   }
 
+  // ── ScreamTracker STMIK (.stx) ────────────────────────────────────────────
+  if (/\.stx$/i.test(filename)) {
+    try {
+      const { isSTXFormat, parseSTXFile } = await import('@lib/import/formats/STXParser');
+      if (isSTXFormat(buffer)) return parseSTXFile(buffer, file.name);
+    } catch (err) {
+      console.warn(`[STXParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
+    // Fall through to libopenmpt
+  }
+
   // ── NoiseRunner (.nru) ────────────────────────────────────────────────────
   if (/\.nru$/.test(filename)) {
     try {
