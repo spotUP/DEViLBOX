@@ -555,7 +555,16 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           if (hasElectronFS() && window.electron?.fs && selectedFile.path) {
             buffer = await window.electron.fs.readFile(selectedFile.path);
           } else if (hasServerFS && selectedFile.path) {
-            buffer = await readServerFile(selectedFile.path);
+            try {
+              buffer = await readServerFile(selectedFile.path);
+            } catch {
+              // Server file missing (404) — fall back to static/manifest
+              if (selectedFile.path && isManifestAvailable()) {
+                buffer = await readStaticFile(selectedFile.path);
+              } else {
+                throw new Error('Cannot read tracker module');
+              }
+            }
           } else if (selectedFile.handle) {
             const file = await (selectedFile.handle as FileSystemFileHandle).getFile();
             buffer = await file.arrayBuffer();
@@ -583,7 +592,17 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         const text = new TextDecoder().decode(buffer);
         data = isXmlFile ? text : JSON.parse(text);
       } else if (hasServerFS && selectedFile.path) {
-        const buffer = await readServerFile(selectedFile.path);
+        let buffer: ArrayBuffer;
+        try {
+          buffer = await readServerFile(selectedFile.path);
+        } catch {
+          // Server file missing (404) — fall back to static/manifest
+          if (selectedFile.path && isManifestAvailable()) {
+            buffer = await readStaticFile(selectedFile.path);
+          } else {
+            throw new Error('Cannot read file');
+          }
+        }
         const text = new TextDecoder().decode(buffer);
         data = isXmlFile ? text : JSON.parse(text);
       } else if (selectedFile.handle) {
