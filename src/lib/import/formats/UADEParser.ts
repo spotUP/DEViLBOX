@@ -451,6 +451,18 @@ export async function parseUADEFile(
         } catch { /* older WASM without scanMemoryForMagic, moduleBase stays 0 */ }
         return parseSidMon1File(buffer, filename, moduleBase);
       },
+      'Fred': async () => {
+        const { parseFredEditorFile } = await import('./FredEditorParser');
+        // Fred is a compiled Amiga binary; try to locate it in chip RAM via a
+        // common Fred header pattern — a BRA.W opcode (0x4EFA) near the start.
+        let moduleBase = 0;
+        try {
+          const fredMagic = new Uint8Array([0x4E, 0xFA, 0x00]);
+          const found = await engine.scanMemoryForMagic(fredMagic, 256 * 1024);
+          if (found >= 0) moduleBase = found;
+        } catch { /* older WASM without scanMemoryForMagic, moduleBase stays 0 */ }
+        return parseFredEditorFile(buffer, filename, moduleBase);
+      },
       'SIDMon2.0': async () => {
         const { parseSidMon2File } = await import('./SidMon2Parser');
         return parseSidMon2File(buffer, filename, 0);
@@ -493,7 +505,6 @@ export async function parseUADEFile(
   // NOTE: bare 'fc' is excluded here because .fc covers both FC 1.x (synthesis) and FC 2.0
   // (real PCM samples). FC 2.0 should get enhanced treatment; only FC 1.x is synthesis.
   const SYNTHESIS_FORMATS = new Set([
-    'fred',                                    // Fred Editor
     'dmu', 'dmu2', 'mug', 'mug2',             // Digital Mugician variants
   ]);
   if (mode === 'enhanced' && SYNTHESIS_FORMATS.has(ext)) {

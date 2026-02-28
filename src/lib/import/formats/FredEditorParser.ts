@@ -13,7 +13,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
-import type { InstrumentConfig, FredConfig } from '@/types/instrument';
+import type { InstrumentConfig, FredConfig, UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Fred Editor period table (from FEPlayer.js) ─────────────────────────────
@@ -172,7 +172,8 @@ export function isFredEditorFormat(buffer: ArrayBuffer): boolean {
  */
 export async function parseFredEditorFile(
   buffer: ArrayBuffer,
-  filename: string
+  filename: string,
+  moduleBase = 0
 ): Promise<TrackerSong> {
   const view = new DataView(buffer);
   const byteLength = buffer.byteLength;
@@ -276,7 +277,8 @@ export async function parseFredEditorFile(
   }
 
   const sampleDataOffset = readUint32(view, sampleTableOffset);
-  let readPos = basePtr + sampleDataOffset;
+  const sampleDefsStart = basePtr + sampleDataOffset; // file offset of first sample def
+  let readPos = sampleDefsStart;
 
   if (readPos >= byteLength) {
     throw new Error('Fred Editor: sample data position out of bounds');
@@ -486,6 +488,22 @@ export async function parseFredEditorFile(
     const instId = i + 1;
     const name = `Sample ${i + 1}`;
 
+    // Chip RAM location for this instrument's 64-byte sample definition entry
+    const instrFileOffset = sampleDefsStart + i * 64;
+    const chipRam: UADEChipRamInfo = {
+      moduleBase,
+      moduleSize: buffer.byteLength,
+      instrBase: moduleBase + instrFileOffset,
+      instrSize: 64,
+      sections: {
+        dataBase:    moduleBase + dataPtr,
+        fileBase:    moduleBase + basePtr,
+        sampleDefs:  moduleBase + sampleDefsStart,
+        patternData: moduleBase + patternStart,
+        trackData:   moduleBase + tracksBase,
+      },
+    };
+
     if (sample.length > 0 && sample.pointer >= 0 && sample.type === 0) {
       // Regular PCM sample
       const start = sample.pointer;
@@ -502,7 +520,7 @@ export async function parseFredEditorFile(
           loopEnd = sample.length;
         }
 
-        instruments.push(createSamplerInstrument(
+        const instr = createSamplerInstrument(
           instId,
           name,
           pcm,
@@ -510,9 +528,13 @@ export async function parseFredEditorFile(
           8287,
           loopStart,
           loopEnd
-        ));
+        );
+        instr.uadeChipRam = chipRam;
+        instruments.push(instr);
       } else {
-        instruments.push(makePlaceholderInstrument(instId, name));
+        const instr = makePlaceholderInstrument(instId, name);
+        instr.uadeChipRam = chipRam;
+        instruments.push(instr);
       }
     } else if (sample.type === 1) {
       // PWM synth instrument — use FredSynth
@@ -540,14 +562,15 @@ export async function parseFredEditorFile(
         relative:      sample.relative,
       };
       instruments.push({
-        id:        instId,
-        name:      `${name} (PWM)`,
-        type:      'synth' as const,
-        synthType: 'FredSynth' as const,
-        fred:      fredCfg,
-        effects:   [],
-        volume:    -6,
-        pan:       0,
+        id:           instId,
+        name:         `${name} (PWM)`,
+        type:         'synth' as const,
+        synthType:    'FredSynth' as const,
+        fred:         fredCfg,
+        effects:      [],
+        volume:       -6,
+        pan:          0,
+        uadeChipRam:  chipRam,
       } as unknown as InstrumentConfig);
     } else if (sample.type === 2) {
       // Wavetable blend — use Sampler approximation with the PCM data if available
@@ -555,7 +578,7 @@ export async function parseFredEditorFile(
       const end   = start + sample.length;
       if (sample.length > 0 && start >= 0 && end <= pcmData.length) {
         const pcm = pcmData.slice(start, end);
-        instruments.push(createSamplerInstrument(
+        const instr = createSamplerInstrument(
           instId,
           `${name} (Blend)`,
           pcm,
@@ -563,12 +586,18 @@ export async function parseFredEditorFile(
           8287,
           0,
           0
-        ));
+        );
+        instr.uadeChipRam = chipRam;
+        instruments.push(instr);
       } else {
-        instruments.push(makePlaceholderInstrument(instId, `${name} (Blend)`));
+        const instr = makePlaceholderInstrument(instId, `${name} (Blend)`);
+        instr.uadeChipRam = chipRam;
+        instruments.push(instr);
       }
     } else {
-      instruments.push(makePlaceholderInstrument(instId, name));
+      const instr = makePlaceholderInstrument(instId, name);
+      instr.uadeChipRam = chipRam;
+      instruments.push(instr);
     }
   }
 
