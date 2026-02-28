@@ -24,6 +24,7 @@ const StatusBarOverlay: React.FC = () => {
   const [Comp, setComp] = useState<React.ComponentType<any> | null>(null);
   const [OscComp, setOscComp] = useState<React.ComponentType<any> | null>(null);
   const isAudioActive = useAudioStore(s => s.contextState === 'running');
+  const oscilloscopeVisible = useUIStore(s => s.oscilloscopeVisible);
 
   useEffect(() => {
     import('@components/layout/StatusBar').then(m => setComp(() => m.StatusBar));
@@ -45,7 +46,7 @@ const StatusBarOverlay: React.FC = () => {
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Comp onShowTips={handleShowTips} />
       {/* GL enhancement: compact oscilloscope in the status bar */}
-      {isAudioActive && OscComp && (
+      {oscilloscopeVisible && isAudioActive && OscComp && (
         <div
           style={{
             position: 'absolute',

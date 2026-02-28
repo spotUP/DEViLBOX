@@ -245,10 +245,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const { masterEffects } = useAudioStore(useShallow((s) => ({
     masterEffects: s.masterEffects,
   })));
-  const { oscilloscopeVisible } = useUIStore(useShallow((s) => ({
+  const { oscilloscopeVisible, compactToolbar } = useUIStore(useShallow((s) => ({
     oscilloscopeVisible: s.oscilloscopeVisible,
+    compactToolbar: s.compactToolbar,
   })));
-  const compactToolbar = false;
   const { curves, reset: resetAutomation } = useAutomationStore(useShallow((s) => ({
     curves: s.curves,
     reset: s.reset,
