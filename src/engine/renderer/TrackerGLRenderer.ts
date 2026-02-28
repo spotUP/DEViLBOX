@@ -370,12 +370,13 @@ export class TrackerGLRenderer {
     const contentWidth = noteWidth + 4 + paramWidth;
 
     // Visible rows
-    const visibleLines = Math.ceil(height / ROW_HEIGHT) + 2;
+    const rowH = ui.rowHeight ?? 24;
+    const visibleLines = Math.ceil(height / rowH) + 2;
     const topLines = Math.floor(visibleLines / 2);
     const vStart = currentRow - topLines;
     const visibleEnd = vStart + visibleLines;
-    const centerLineTop = Math.floor(height / 2) - ROW_HEIGHT / 2;
-    const baseY = centerLineTop - topLines * ROW_HEIGHT - smoothOffset;
+    const centerLineTop = Math.floor(height / 2) - rowH / 2;
+    const baseY = centerLineTop - topLines * rowH - smoothOffset;
 
     // ── Clear ─────────────────────────────────────────────────────────────────
     if (ui.trackerVisualBg) {
@@ -449,14 +450,15 @@ export class TrackerGLRenderer {
         rowIndex = i;
       }
 
-      const y = baseY + (i - vStart) * ROW_HEIGHT;
-      if (y + ROW_HEIGHT < 0 || y > height) continue;
+      const y = baseY + (i - vStart) * rowH;
+      if (y + rowH < 0 || y > height) continue;
 
       if (!ui.trackerVisualBg) {
-        const isHL = rowIndex % 4 === 0;
+        const hlInterval = ui.rowHighlightInterval ?? 4;
+        const isHL = rowIndex % hlInterval === 0;
         const bgColor = isHL ? colors.rowHighlight : colors.rowNormal;
         const alpha = isGhostRow ? bgColor[3] * 0.35 : bgColor[3];
-        this.addRect(0, y, width, ROW_HEIGHT, [bgColor[0], bgColor[1], bgColor[2], alpha]);
+        this.addRect(0, y, width, rowH, [bgColor[0], bgColor[1], bgColor[2], alpha]);
       }
     }
 
@@ -464,7 +466,7 @@ export class TrackerGLRenderer {
     {
       const [r, g, b, a] = colors.centerLine;
       const alpha = ui.trackerVisualBg ? a * 0.5 : a;
-      this.addRect(0, centerLineTop, width, ROW_HEIGHT, [r, g, b, alpha]);
+      this.addRect(0, centerLineTop, width, rowH, [r, g, b, alpha]);
     }
 
     // Channel separators and left stripes (full height)
@@ -518,18 +520,26 @@ export class TrackerGLRenderer {
         rowIndex = i;
       }
 
-      const y = baseY + (i - vStart) * ROW_HEIGHT;
-      if (y + ROW_HEIGHT < 0 || y > height) continue;
+      const y = baseY + (i - vStart) * rowH;
+      if (y + rowH < 0 || y > height) continue;
 
       const ghostAlpha = isGhostRow ? 0.35 : 1.0;
-      const isHL = rowIndex % 4 === 0;
+      const hlInterval = ui.rowHighlightInterval ?? 4;
+      const isHL = rowIndex % hlInterval === 0;
 
       // Line number
-      const lineNumStr = ui.useHex
-        ? rowIndex.toString(16).toUpperCase().padStart(2, '0')
-        : rowIndex.toString(10).padStart(2, '0');
+      let lineNumStr: string;
+      if (ui.showBeatLabels) {
+        const beat = Math.floor(rowIndex / hlInterval) + 1;
+        const tick = (rowIndex % hlInterval) + 1;
+        lineNumStr = `${beat}.${tick}`;
+      } else {
+        lineNumStr = ui.useHex
+          ? rowIndex.toString(16).toUpperCase().padStart(2, '0')
+          : rowIndex.toString(10).padStart(2, '0');
+      }
       const lnColor = isHL ? colors.lineNumberHighlight : colors.lineNumber;
-      this.addGlyphString(lineNumStr, 4, y + (ROW_HEIGHT - atlas.glyphLogicalHeight) / 2,
+      this.addGlyphString(lineNumStr, 4, y + (rowH - atlas.glyphLogicalHeight) / 2,
         atlas, [lnColor[0], lnColor[1], lnColor[2], lnColor[3] * ghostAlpha]);
 
       // Each channel
@@ -545,7 +555,7 @@ export class TrackerGLRenderer {
 
         const isCollapsed = chData.collapsed;
         const x = colX + Math.floor((chW - (isCollapsed ? noteWidth : contentWidth)) / 2);
-        const gy = y + (ROW_HEIGHT - atlas.glyphLogicalHeight) / 2;
+        const gy = y + (rowH - atlas.glyphLogicalHeight) / 2;
 
         if (isCollapsed) {
           // Just note column
@@ -649,14 +659,14 @@ export class TrackerGLRenderer {
         if (sel && !isGhostRow && ch >= minSelCh && ch <= maxSelCh
             && rowIndex >= minSelRow && rowIndex <= maxSelRow) {
           const [sr, sg, sb, sa] = colors.selection;
-          this.addRect(colX, y, chW, ROW_HEIGHT, [sr, sg, sb, sa]);
+          this.addRect(colX, y, chW, rowH, [sr, sg, sb, sa]);
         }
 
         // Drag-over highlight
         if (dragOver && !isGhostRow
             && ch === dragOver.channelIndex && rowIndex === dragOver.rowIndex) {
           const ac = colors.accent;
-          this.addRect(colX, y, chW, ROW_HEIGHT, [ac[0], ac[1], ac[2], 0.4]);
+          this.addRect(colX, y, chW, rowH, [ac[0], ac[1], ac[2], 0.4]);
         }
       }
     }
@@ -702,7 +712,7 @@ export class TrackerGLRenderer {
       if (isPlaying) caretColor = colors.cursorSecondary;
 
       // Draw caret background
-      this.addRect(caretX, caretY, caretW, ROW_HEIGHT, caretColor);
+      this.addRect(caretX, caretY, caretW, rowH, caretColor);
     }
 
     this.flushRects();
@@ -776,7 +786,7 @@ export class TrackerGLRenderer {
 
         const caretX = cursorX + caretOffX;
         const caretY = centerLineTop;
-        const gy = caretY + (ROW_HEIGHT - atlas.glyphLogicalHeight) / 2;
+        const gy = caretY + (rowH - atlas.glyphLogicalHeight) / 2;
         this.addGlyphString(charStr, caretX, gy, atlas, [1, 1, 1, 1]);
       }
     }

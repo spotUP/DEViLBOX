@@ -114,6 +114,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const bridgeRef = useRef<TrackerOffscreenBridge | null>(null);
   // Ref-tracked scroll for immediate worker updates (avoids React re-renders on scroll)
   const scrollLeftRef = useRef(0);
+  // Ref-tracked row height for RAF loop (avoids restarting effect on zoom change)
+  const rowHeightRef = useRef(24);
 
   // Get pattern and actions (moved BEFORE callbacks that use them)
   const {
@@ -163,6 +165,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   })));
 
   const trackerVisualBg = useSettingsStore((s) => s.trackerVisualBg);
+
+  const trackerZoom = useUIStore(s => s.trackerZoom);
+  const rowHighlightInterval = useUIStore(s => s.rowHighlightInterval);
+  const showBeatLabels = useUIStore(s => s.showBeatLabels);
+  const rowHeight = Math.round(24 * (trackerZoom / 100));
+
+  // Keep rowHeightRef in sync so the RAF loop always sees the current value
+  useEffect(() => { rowHeightRef.current = rowHeight; }, [rowHeight]);
 
   // Keep peerCursorRef, peerMouseRef, and peerSelectionRef in sync with collaboration store (no React re-renders)
   useEffect(() => {
@@ -302,8 +312,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       return;
     }
 
-    // Convert pixels to rows (ROW_HEIGHT = 24px)
-    const rowDelta = Math.round(deltaY / ROW_HEIGHT);
+    // Convert pixels to rows
+    const rowDelta = Math.round(deltaY / rowHeightRef.current);
 
     if (Math.abs(rowDelta) > 0) {
       const newRow = Math.max(0, Math.min(pattern.length + 31, cursor.rowIndex + rowDelta));
@@ -343,11 +353,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const relativeY = clientY - rect.top;
 
     // Adjust for scrollY (which is baseY in render)
-    // baseY = centerLineTop - (topLines * ROW_HEIGHT) - smoothOffset;
-    // We want to know which row is at relativeY.
-    // The currentRow is at centerLineTop.
-    const centerLineTop = Math.floor(dimensions.height / 2) - ROW_HEIGHT / 2;
-    const rowOffset = Math.floor((relativeY - centerLineTop) / ROW_HEIGHT);
+    // We want to know which row is at relativeY. The currentRow is at centerLineTop.
+    const centerLineTop = Math.floor(dimensions.height / 2) - rowHeightRef.current / 2;
+    const rowOffset = Math.floor((relativeY - centerLineTop) / rowHeightRef.current);
     
     const transportState = useTransportStore.getState();
     const currentRow = transportState.isPlaying ? transportState.currentRow : cursor.rowIndex;
@@ -558,7 +566,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const relativeY = tapY - rect.top + containerRef.current.scrollTop;
 
     // On mobile, there's no channel header, so no offset needed
-    const rowIndex = Math.floor(relativeY / ROW_HEIGHT);
+    const rowIndex = Math.floor(relativeY / rowHeightRef.current);
 
     // Calculate channel width - must match render() layout
     const noteWidth = CHAR_WIDTH * 3 + 4;
@@ -850,6 +858,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       columnVisibility:   tracker.columnVisibility,
       trackerVisualBg:    settings.trackerVisualBg,
       recordMode:         tracker.recordMode,
+      rowHeight:          Math.round(24 * (ui.trackerZoom / 100)),
+      rowHighlightInterval: ui.rowHighlightInterval,
+      showBeatLabels:     ui.showBeatLabels,
     };
   }, []);
 
@@ -1195,7 +1206,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Subscribe to UI store
     const unsubUI = useUIStore.subscribe((s, prev) => {
-      if (s.useHexNumbers !== prev.useHexNumbers || s.blankEmptyCells !== prev.blankEmptyCells) {
+      if (s.useHexNumbers !== prev.useHexNumbers || s.blankEmptyCells !== prev.blankEmptyCells
+          || s.trackerZoom !== prev.trackerZoom || s.rowHighlightInterval !== prev.rowHighlightInterval
+          || s.showBeatLabels !== prev.showBeatLabels) {
         bridgeRef.current?.post({ type: 'uiState', uiState: snapshotUI() });
       }
     });
@@ -1266,7 +1279,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               ? nextState.time - audioState.time
               : (2.5 / audioBpm) * audioSpeed;
             const progress = Math.min(Math.max((audioTime - audioState.time) / effectiveDuration, 0), 1);
-            smoothOffset = progress * ROW_HEIGHT;
+            smoothOffset = progress * rowHeightRef.current;
           }
         } else {
           // UADE / opaque playback: replayer has no state, use transport store row
@@ -1293,11 +1306,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       // Update overlay positions (macroLanes) — same math as the old render loop
       const h = dimensions.height;
-      const visibleLines = Math.ceil(h / ROW_HEIGHT) + 2;
+      const rh = rowHeightRef.current;
+      const visibleLines = Math.ceil(h / rh) + 2;
       const topLines     = Math.floor(visibleLines / 2);
       const vStart       = currentRow - topLines;
-      const centerLineTop = Math.floor(h / 2) - ROW_HEIGHT / 2;
-      const baseY        = centerLineTop - topLines * ROW_HEIGHT - smoothOffset;
+      const centerLineTop = Math.floor(h / 2) - rh / 2;
+      const baseY        = centerLineTop - topLines * rh - smoothOffset;
 
       scrollYRef.current       = baseY;
       visibleStartRef.current  = vStart;
@@ -1311,7 +1325,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const curPatIdx = useTrackerStore.getState().currentPatternIndex;
         const offsets = channelOffsetsRef.current;
         if (pc.active && pc.patternIndex === curPatIdx && offsets.length > pc.channel) {
-          const py = baseY + (pc.row - vStart) * ROW_HEIGHT;
+          const py = baseY + (pc.row - vStart) * rh;
           // +8 accounts for the internal channel padding before the note column starts
           const px = offsets[pc.channel] - scrollLeftRef.current + 8;
           peerCursorDivRef.current.style.display = 'block';
@@ -1335,8 +1349,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           if (offsets.length > endCh) {
             const left   = offsets[startCh] + LINE_NUMBER_WIDTH - scrollLeftRef.current;
             const width  = offsets[endCh] + widths[endCh] - offsets[startCh];
-            const top    = baseY + (startRow - vStart) * ROW_HEIGHT;
-            const height = (endRow - startRow + 1) * ROW_HEIGHT;
+            const top    = baseY + (startRow - vStart) * rh;
+            const height = (endRow - startRow + 1) * rh;
             peerSelectionDivRef.current.style.display = 'block';
             peerSelectionDivRef.current.style.left = `${left}px`;
             peerSelectionDivRef.current.style.top = `${top}px`;
@@ -1821,7 +1835,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               key={`automation-${pattern.id}`}
               patternId={pattern.id}
               patternLength={pattern.length}
-              rowHeight={ROW_HEIGHT}
+              rowHeight={rowHeight}
               channelCount={pattern.channels.length}
               channelOffsets={channelOffsets}
               channelWidths={channelWidths}
@@ -1842,14 +1856,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 top: scrollYRef.current,
                 left: 0,
                 right: 0,
-                height: pattern.length * ROW_HEIGHT,
+                height: pattern.length * rowHeight,
                 pointerEvents: 'none',
                 transform: `translateX(${-scrollLeft}px)`
               }}
             >
               <MacroLanes
                 pattern={pattern}
-                rowHeight={ROW_HEIGHT}
+                rowHeight={rowHeight}
                 channelCount={pattern.channels.length}
                 channelOffsets={channelOffsets}
                 channelWidths={channelWidths}
@@ -1867,7 +1881,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             top: 0,
             left: 0,
             width: CHAR_WIDTH * 3 + 4,
-            height: ROW_HEIGHT,
+            height: rowHeight,
             display: 'none',
             pointerEvents: 'none',
             backgroundColor: 'rgba(168, 85, 247, 0.55)',
@@ -1889,7 +1903,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         {/* VU Meters overlay - moved AFTER canvas and added z-30 */}
         <div
           className="absolute right-0 pointer-events-none z-30 overflow-hidden"
-          style={{ top: 0, left: LINE_NUMBER_WIDTH, height: `calc(50% - ${ROW_HEIGHT / 2}px)` }}
+          style={{ top: 0, left: LINE_NUMBER_WIDTH, height: `calc(50% - ${rowHeight / 2}px)` }}
         >
           <ChannelVUMeters 
             channelOffsets={channelOffsets} 
