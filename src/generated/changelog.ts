@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-28T12:57:41.899Z
+ * Generated: 2026-02-28T13:09:11.670Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1638';
-export const BUILD_NUMBER = '1638';
-export const BUILD_HASH = '3499767f';
+export const BUILD_VERSION = '1.0.1641';
+export const BUILD_NUMBER = '1641';
+export const BUILD_HASH = '863057c3';
 export const BUILD_DATE = '2026-02-28';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,21 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1638',
+    version: '1.0.1641',
     date: '2026-02-28',
     changes: [
+      {
+        type: 'fix',
+        "description": "Defer OffscreenCanvas init to rAF so flex layout is computed first"
+      },
+      {
+        type: 'fix',
+        "description": "Guard prefetcher cache.put against HTTP 206 partial responses"
+      },
+      {
+        type: 'fix',
+        "description": "Address code review issues — 206 guard, Set dedup, error tracking, export CACHE_NAME"
+      },
       {
         type: 'feature',
         "description": "Show toast when previewing uncached sample during download"
@@ -216,18 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Complete UADE modal audit — add 55 missing format engine toggles"
-      },
-      {
-        type: 'fix',
-        "description": "Add SuperCollider to Scripted category in synth browser"
-      },
-      {
-        type: 'fix',
-        "description": "Audit UADE import modal — fix gaps, add missing formats, fix STX ts error"
-      },
-      {
-        type: 'fix',
-        "description": "AllocateUTF8 → stringToNewUTF8, prevent detached ArrayBuffer, add missing audio exts to drop handler"
       }
     ]
   }
