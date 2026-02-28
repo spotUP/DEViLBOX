@@ -4,6 +4,10 @@
  */
 
 import { useMemo } from 'react';
+
+// Stable empty layout object — prevents new object creation on every render,
+// which causes Yoga WASM "Expected null or instance of Node" BindingErrors.
+const EMPTY_LAYOUT: Record<string, unknown> = {};
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme, type PixiColor } from '../theme';
 
@@ -85,7 +89,7 @@ export const PixiLabel: React.FC<PixiLabelProps> = ({
       style={{ fontFamily, fontSize, fill: 0xffffff }}
       tint={tint}
       alpha={alpha}
-      layout={layout ?? {}}
+      layout={layout ?? EMPTY_LAYOUT}
     />
   );
 };

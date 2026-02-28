@@ -11,6 +11,11 @@ import { getToneEngine } from '@engine/ToneEngine';
 
 const PEAK_DECAY = 0.015;
 
+// Stable layout objects — inline object literals create new references every render,
+// which causes Yoga WASM "Expected null or instance of Node" BindingErrors.
+const LABEL_LAYOUT_VISIBLE: Record<string, unknown> = {};
+const LABEL_LAYOUT_COLLAPSED: Record<string, unknown> = { width: 0, height: 0 };
+
 interface PixiChannelLevelsProps {
   width: number;
   height: number;
@@ -120,7 +125,7 @@ export const PixiChannelLevels: React.FC<PixiChannelLevelsProps> = ({ width, hei
         text="LEVELS"
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={isPlaying ? { width: 0, height: 0 } : {}}
+        layout={isPlaying ? LABEL_LAYOUT_COLLAPSED : LABEL_LAYOUT_VISIBLE}
         visible={!isPlaying}
       />
     </pixiContainer>
