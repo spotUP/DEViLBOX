@@ -316,13 +316,15 @@ export const useUIStore = create<UIStore>()(
           }
           state.statusMessage = msg;
 
-          // Clear after timeout if specified
-          if (timeout > 0) {
-            const win = window as unknown as Record<string, unknown>;
-            if (win._statusTimeout) {
-              clearTimeout(win._statusTimeout as ReturnType<typeof setTimeout>);
-            }
+          // Always cancel any pending auto-revert timer when a new message is set,
+          // so a previous timed message can't silently overwrite live progress updates.
+          const win = window as unknown as Record<string, unknown>;
+          if (win._statusTimeout) {
+            clearTimeout(win._statusTimeout as ReturnType<typeof setTimeout>);
+            win._statusTimeout = null;
+          }
 
+          if (timeout > 0) {
             win._statusTimeout = setTimeout(() => {
               // We need to use the store's set method directly here as we're in a timeout
               const prevMsg = useUIStore.getState().prevStatusMessage;
