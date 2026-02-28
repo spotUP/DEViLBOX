@@ -1194,6 +1194,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <DigMugControls
             config={digMugConfig}
             onChange={handleDigMugChange}
+            uadeChipRam={instrument.uadeChipRam}
           />
         </Suspense>
       </div>

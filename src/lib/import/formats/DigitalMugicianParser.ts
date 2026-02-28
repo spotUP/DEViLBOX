@@ -18,7 +18,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
-import type { DigMugConfig } from '@/types/instrument';
+import type { DigMugConfig, UADEChipRamInfo } from '@/types/instrument';
 
 // -- Binary reading helpers (Big Endian) ------------------------------------
 
@@ -326,6 +326,7 @@ export async function parseDigitalMugicianFile(
   // -- Instrument definitions (16 bytes each, 1-based) ----------------------
   const samples: DMSample[] = [];
   const numInstruments = sampleCount + 1; // 0 is alias for 1
+  const sampleTableBase = pos; // chip RAM base address of the 16-byte instrument definitions
 
   for (let i = 1; i < numInstruments; i++) {
     if (pos + 16 > buf.length) break;
@@ -521,6 +522,17 @@ export async function parseDigitalMugicianFile(
 
     const vol = Math.min(64, sample.volume);
 
+    // Chip RAM info: instrument defs are 1-based; sampleIdx 1 → offset 0
+    const chipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: buf.byteLength,
+      instrBase: sampleTableBase + (sampleIdx - 1) * 16,
+      instrSize: 16,
+      sections: {
+        sampleTable: sampleTableBase,
+      },
+    };
+
     if (sample.wave >= 32 && sample.sampleLength > 0) {
       // PCM instrument (type=1)
       const pcmStart = sample.pointer;
@@ -552,6 +564,7 @@ export async function parseDigitalMugicianFile(
         effects: [],
         volume: -6,
         pan: 0,
+        uadeChipRam: chipRam,
       } as InstrumentConfig);
 
     } else if (sample.wave < 32) {
@@ -583,6 +596,7 @@ export async function parseDigitalMugicianFile(
         effects: [],
         volume: -6,
         pan: 0,
+        uadeChipRam: chipRam,
       } as InstrumentConfig);
 
     } else {
