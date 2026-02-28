@@ -820,13 +820,13 @@ function getSnapshotFromState(state: {
   groups: TrackGroup[];
   automationLanes: TimelineAutomationLane[];
 }): ArrangementSnapshot {
-  return JSON.parse(JSON.stringify({
+  return structuredClone({
     tracks: state.tracks,
     clips: state.clips,
     markers: state.markers,
     groups: state.groups,
     automationLanes: state.automationLanes,
-  }));
+  });
 }
 
 function applySnapshot(
