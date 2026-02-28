@@ -116,7 +116,7 @@ export const PixiTrackerView: React.FC = () => {
       <PixiFT2Toolbar />
 
       {/* TB-303 Knob Panel — shown when a TB-303 instrument is active and not in TB-303/SunVox view */}
-      <pixiContainer layout={{ width: '100%', height: tb303PanelH }} visible={tb303PanelH > 0}>
+      <pixiContainer layout={{ width: '100%', height: tb303PanelH }} alpha={tb303PanelH > 0 ? 1 : 0} renderable={tb303PanelH > 0}>
         <PixiTB303KnobPanel width={windowWidth} />
       </pixiContainer>
 
@@ -124,7 +124,7 @@ export const PixiTrackerView: React.FC = () => {
       <PixiEditorControlsBar viewMode={viewMode} onViewModeChange={setViewMode} gridChannelIndex={gridChannelIndex} onGridChannelChange={setGridChannelIndex} />
 
       {/* Pattern management panel — always mounted, height:0 when hidden */}
-      <pixiContainer layout={{ width: '100%', height: showPatterns ? PATTERN_PANEL_HEIGHT : 0 }} visible={showPatterns}>
+      <pixiContainer layout={{ width: '100%', height: showPatterns ? PATTERN_PANEL_HEIGHT : 0 }} alpha={showPatterns ? 1 : 0} renderable={showPatterns}>
         <PixiPatternManagement width={windowWidth} height={PATTERN_PANEL_HEIGHT} />
       </pixiContainer>
 
@@ -217,7 +217,9 @@ export const PixiTrackerView: React.FC = () => {
 
           {/* Furnace editor — pure Pixi */}
           <pixiContainer
-            visible={viewMode === 'tracker' && editorMode === 'furnace'}
+            alpha={viewMode === 'tracker' && editorMode === 'furnace' ? 1 : 0}
+            renderable={viewMode === 'tracker' && editorMode === 'furnace'}
+            eventMode={viewMode === 'tracker' && editorMode === 'furnace' ? 'static' : 'none'}
             layout={{
               flex: viewMode === 'tracker' && editorMode === 'furnace' ? 1 : 0,
               height: viewMode === 'tracker' && editorMode === 'furnace' ? '100%' : 0,
@@ -229,7 +231,9 @@ export const PixiTrackerView: React.FC = () => {
 
           {/* HivelyTracker editor — pure Pixi */}
           <pixiContainer
-            visible={viewMode === 'tracker' && editorMode === 'hively'}
+            alpha={viewMode === 'tracker' && editorMode === 'hively' ? 1 : 0}
+            renderable={viewMode === 'tracker' && editorMode === 'hively'}
+            eventMode={viewMode === 'tracker' && editorMode === 'hively' ? 'static' : 'none'}
             layout={{
               flex: viewMode === 'tracker' && editorMode === 'hively' ? 1 : 0,
               height: viewMode === 'tracker' && editorMode === 'hively' ? '100%' : 0,
@@ -241,7 +245,9 @@ export const PixiTrackerView: React.FC = () => {
 
           {/* MusicLine — pure Pixi */}
           <pixiContainer
-            visible={viewMode === 'tracker' && editorMode === 'musicline'}
+            alpha={viewMode === 'tracker' && editorMode === 'musicline' ? 1 : 0}
+            renderable={viewMode === 'tracker' && editorMode === 'musicline'}
+            eventMode={viewMode === 'tracker' && editorMode === 'musicline' ? 'static' : 'none'}
             layout={{
               flex: viewMode === 'tracker' && editorMode === 'musicline' ? 1 : 0,
               height: viewMode === 'tracker' && editorMode === 'musicline' ? '100%' : 0,
