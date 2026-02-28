@@ -901,6 +901,20 @@ export class TrackerReplayer {
       }
     }
 
+    // Pre-initialize MusicLine WASM when an ML song is loaded so instrument preview
+    // works immediately (before the user presses play).
+    if (song.musiclineFileData) {
+      void (async () => {
+        try {
+          const mlEngine = MusicLineEngine.getInstance();
+          await mlEngine.ready();
+          await mlEngine.loadSong(song.musiclineFileData!.slice(0));
+        } catch (err) {
+          console.warn('[TrackerReplayer] ML WASM pre-init failed:', err);
+        }
+      })();
+    }
+
     // Dispose old channels before creating new ones (prevent Web Audio node leaks)
     for (const ch of this.channels) {
       for (const p of ch.playerPool) {

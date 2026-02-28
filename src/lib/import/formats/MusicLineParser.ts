@@ -1034,6 +1034,8 @@ function buildInstruments(
           ...base.metadata!,
           displayType,
           mlSynthConfig: { waveformType: inst.smplType, volume: inst.volume },
+          isMusicLine: true,
+          mlInstIdx: i,
         },
       });
       continue;
@@ -1044,9 +1046,8 @@ function buildInstruments(
     if (!smpl || smpl.pcm.length === 0) {
       // Instrument has no sample — create a silent placeholder
       const silentPcm = new Uint8Array(2);
-      instruments.push(
-        createSamplerInstrument(i + 1, inst.title || `Instrument ${i + 1}`, silentPcm, inst.volume || 64, PAL_C3_RATE, 0, 0)
-      );
+      const placeholder = createSamplerInstrument(i + 1, inst.title || `Instrument ${i + 1}`, silentPcm, inst.volume || 64, PAL_C3_RATE, 0, 0);
+      instruments.push({ ...placeholder, metadata: { ...placeholder.metadata!, isMusicLine: true, mlInstIdx: i } });
       continue;
     }
 
@@ -1055,17 +1056,16 @@ function buildInstruments(
     const loopLen   = inst.smplRepLen * 2;
     const loopEnd   = loopStart + loopLen;
 
-    instruments.push(
-      createSamplerInstrument(
-        i + 1,
-        inst.title || smpl.title || `Instrument ${i + 1}`,
-        smpl.pcm,
-        inst.volume > 0 ? inst.volume : 64,
-        PAL_C3_RATE,
-        loopStart,
-        loopEnd > loopStart + 2 ? loopEnd : 0
-      )
+    const base2 = createSamplerInstrument(
+      i + 1,
+      inst.title || smpl.title || `Instrument ${i + 1}`,
+      smpl.pcm,
+      inst.volume > 0 ? inst.volume : 64,
+      PAL_C3_RATE,
+      loopStart,
+      loopEnd > loopStart + 2 ? loopEnd : 0
     );
+    instruments.push({ ...base2, metadata: { ...base2.metadata!, isMusicLine: true, mlInstIdx: i } });
   }
 
   // If no instruments were parsed, add a placeholder
