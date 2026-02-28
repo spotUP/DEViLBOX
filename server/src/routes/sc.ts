@@ -40,6 +40,8 @@ interface CompileFailure {
   success: false;
   error: string;
   line?: number;
+  /** Full sclang output after the class-library preamble, for display in the editor. */
+  rawOutput?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,6 +188,22 @@ function parseSclangError(output: string): { error: string; line?: number } {
   return { error, line };
 }
 
+/**
+ * Strip the class-library compilation preamble from sclang output so only the
+ * part relevant to the user's code is returned. Keeps everything from the last
+ * "compile done" marker onward, or the full output if that marker is missing.
+ * Truncated to 8 000 chars so the response stays reasonable.
+ */
+function cleanSclangOutput(output: string): string {
+  // sclang prints "compile done" after the class library loads.
+  // Everything after that is interpreter output for the user's script.
+  const marker = 'compile done';
+  const idx = output.lastIndexOf(marker);
+  const relevant = idx >= 0 ? output.slice(idx + marker.length).trimStart() : output.trimStart();
+  const MAX = 8_000;
+  return relevant.length > MAX ? relevant.slice(0, MAX) + '\n… (truncated)' : relevant;
+}
+
 // ---------------------------------------------------------------------------
 // POST /compile
 // ---------------------------------------------------------------------------
@@ -233,7 +251,7 @@ router.post('/compile', (req: Request, res: Response) => {
         }
         const output = err instanceof SclangCompileError ? err.sclangOutput : '';
         const { error, line } = parseSclangError(output);
-        res.json({ success: false, error, line } satisfies CompileFailure);
+        res.json({ success: false, error, line, rawOutput: cleanSclangOutput(output) } satisfies CompileFailure);
         return;
       }
 
@@ -246,7 +264,7 @@ router.post('/compile', (req: Request, res: Response) => {
       } catch {
         // File not created despite exit 0 — probably a runtime error
         const { error, line } = parseSclangError(sclangOutput);
-        res.json({ success: false, error, line } satisfies CompileFailure);
+        res.json({ success: false, error, line, rawOutput: cleanSclangOutput(sclangOutput) } satisfies CompileFailure);
         return;
       }
 
