@@ -502,6 +502,8 @@ export const useUIStore = create<UIStore>()(
     })),
     {
       name: 'devilbox-ui-settings',
+      version: 1,
+      migrate: (persistedState) => persistedState ?? {},
       partialize: (state) => ({
         // Only persist layout preferences, not transient UI state
         showPatterns: state.showPatterns,

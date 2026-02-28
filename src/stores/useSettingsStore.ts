@@ -423,6 +423,8 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
+      version: 1,
+      migrate: (persistedState) => persistedState ?? {},
       // Deep-merge formatEngine so new keys added after initial save get their
       // default values rather than being undefined in existing localStorage data.
       merge: (persisted, current) => {
