@@ -12,16 +12,22 @@ export const GLScrollList: React.FC<ScrollListProps> = ({
   onDoubleClick,
   height,
   itemHeight = 28,
-  width = 200,
+  /** width is required when rendered in GL context — see ScrollListProps */
+  width,
   layout,
 }) => {
+  if (process.env.NODE_ENV !== 'production' && width === undefined) {
+    console.warn('[ScrollList] width prop is required in GL renderer. Falling back to 200px.');
+  }
+  const resolvedWidth = width ?? 200;
+
   return (
     <PixiList
       items={items}
       selectedId={selectedId ?? null}
       onSelect={onSelect}
       onDoubleClick={onDoubleClick}
-      width={width}
+      width={resolvedWidth}
       height={height}
       itemHeight={itemHeight}
       layout={layout}
