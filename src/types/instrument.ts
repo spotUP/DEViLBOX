@@ -211,7 +211,9 @@ export type SynthType =
   // SunVox modular synthesizer
   | 'SunVoxSynth'     // SunVox WASM patch player (.sunsynth / .sunvox)
   // Modular Synthesis
-  | 'ModularSynth';   // Modular synthesizer with patch editor
+  | 'ModularSynth'    // Modular synthesizer with patch editor
+  // SuperCollider scripted synthesis
+  | 'SuperCollider';  // SuperCollider SynthDef (scsynth WASM)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 
@@ -332,6 +334,23 @@ export interface DevilFishConfig {
 
   // Output processing
   muffler: 'off' | 'soft' | 'hard' | 'dark' | 'mid' | 'bright'; // TB303: soft/hard clipping, Buzz3o3: dark/mid/bright lowpass
+}
+
+// SuperCollider synthesis types
+
+export interface SCParam {
+  name: string;
+  value: number;
+  default: number;
+  min: number;
+  max: number;
+}
+
+export interface SuperColliderConfig {
+  synthDefName: string;   // Name declared in SynthDef(\name, ...)
+  source: string;         // SC source code (for display/editing)
+  binary: string;         // base64-encoded compiled .scsyndef
+  params: SCParam[];      // Tweakable parameters (excl. freq/amp/gate)
 }
 
 export interface TB303Config {
@@ -3567,6 +3586,8 @@ export interface InstrumentConfig {
   sunvox?: SunVoxConfig;
   // Modular Synthesis
   modularSynth?: import('./modular').ModularPatchConfig;
+  // SuperCollider scripted synthesis
+  superCollider?: SuperColliderConfig;
   // Sampler config
   sample?: SampleConfig;
   effects: EffectConfig[];
@@ -3705,4 +3726,15 @@ export const DEFAULT_TB303: TB303Config = {
     mix: 0,
     stereo: 0.5,        // default-preset.xml: 0.5 (spread)
   },
+};
+
+export const DEFAULT_SUPERCOLLIDER: SuperColliderConfig = {
+  synthDefName: '',
+  source: `SynthDef(\\\\mySynth, { |freq=440, amp=0.5, gate=1|
+  var sig = SinOsc.ar(freq) * amp;
+  var env = EnvGen.kr(Env.adsr(0.01, 0.1, 0.7, 0.5), gate, doneAction: 2);
+  Out.ar(0, (sig * env).dup);
+}).add`,
+  binary: '',
+  params: [],
 };
