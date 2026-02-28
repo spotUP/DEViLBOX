@@ -211,11 +211,15 @@ router.post('/compile', (req: Request, res: Response) => {
     try {
       await fs.mkdir(tmpDir, { recursive: true });
 
+      // Strip trailing .add/.store/.load/.play — these are interactive-mode idioms that
+      // try to communicate with a running server. For compilation we only need the
+      // SynthDef object; chaining .writeDefFile on it requires it to be the return value.
+      const compilableSource = source.trimEnd().replace(/\.(add|store|load|play)\s*;?\s*$/, '');
+
       // Wrap the user's SynthDef expression so it writes the .scsyndef binary.
       // Wrap in (...) so multi-line SynthDef is treated as one expression.
-      // .add is allowed — it schedules to the local interpreter without needing a server.
       const outDirEscaped = tmpDir.replace(/\\/g, '/'); // SC uses forward slashes
-      const script = `(\n${source}\n).writeDefFile("${outDirEscaped}");\n0.exit;\n`;
+      const script = `(\n${compilableSource}\n).writeDefFile("${outDirEscaped}");\n0.exit;\n`;
 
       // Write script to a file and execute — stdin REPL mode breaks multi-line expressions.
       const scriptPath = path.join(tmpDir, 'compile.sc');

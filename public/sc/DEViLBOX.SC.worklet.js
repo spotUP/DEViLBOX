@@ -157,24 +157,23 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
 
       // ---- setTimeout/clearTimeout polyfill ----
       // AudioWorkletGlobalScope does not expose setTimeout/clearTimeout.
-      // SC.js (Emscripten) uses them internally, so we must polyfill using MessageChannel.
+      // SC.js (Emscripten) uses them internally, so we polyfill via Promise microtasks.
       if (typeof globalThis.setTimeout === 'undefined') {
+        // AudioWorkletGlobalScope has no setTimeout, MessageChannel, or XHR.
+        // Use Promise microtasks as a zero-delay shim — sufficient for Emscripten's
+        // internal setTimeout(fn, 0) deferred-run calls. Actual delay is ignored.
         let _nextId = 1;
-        const _timers = new Map();
+        const _timers = new Set();
         globalThis.setTimeout = (fn, _delay) => {
           const id = _nextId++;
-          const ch = new MessageChannel();
-          ch.port2.onmessage = () => {
+          _timers.add(id);
+          Promise.resolve().then(() => {
             if (_timers.has(id)) { _timers.delete(id); fn(); }
-          };
-          _timers.set(id, ch);
-          ch.port1.postMessage(null);
+          });
           return id;
         };
-        globalThis.clearTimeout = (id) => {
-          if (_timers.has(id)) { _timers.get(id).port2.onmessage = null; _timers.delete(id); }
-        };
-        globalThis.setInterval = (fn, delay) => globalThis.setTimeout(fn, delay);
+        globalThis.clearTimeout = (id) => { _timers.delete(id); };
+        globalThis.setInterval = (fn, _delay) => globalThis.setTimeout(fn, _delay);
         globalThis.clearInterval = (id) => globalThis.clearTimeout(id);
       }
 
@@ -216,21 +215,25 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
       const execFn = new Function('Module', wrappedCode);
       execFn(M);
 
-      // Wait for Module runtime to be ready
+      // Wait for Module runtime to be ready.
+      // When wasmBinary is provided, Emscripten typically initializes synchronously
+      // inside execFn(M) above — check calledRun FIRST before touching setTimeout.
       await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('SC.js onRuntimeInitialized timeout')), 30000);
         if (M.calledRun || M.asm) {
-          // Already initialized
-          clearTimeout(timeout);
+          // Already initialized synchronously — no timeout needed.
           resolve();
-        } else {
-          const prevInit = M.onRuntimeInitialized;
-          M.onRuntimeInitialized = () => {
-            clearTimeout(timeout);
-            if (prevInit) prevInit();
-            resolve();
-          };
+          return;
         }
+        // Async path: install onRuntimeInitialized hook.
+        // setTimeout polyfill fires as a microtask so the 30s value is nominal,
+        // but it still lets us detect a hung init on the next tick.
+        const timeout = setTimeout(() => reject(new Error('SC.js onRuntimeInitialized timeout')), 30000);
+        const prevInit = M.onRuntimeInitialized;
+        M.onRuntimeInitialized = () => {
+          clearTimeout(timeout);
+          if (prevInit) prevInit();
+          resolve();
+        };
       });
 
       console.log('[SC.worklet] SC.js runtime ready. Setting up audio driver...');
@@ -425,27 +428,38 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
   /**
    * AudioWorklet process() — called every audio block (128 frames by default).
    *
-   * The output buffer layout in Module.audioDriver.floatBufOut is PLANAR:
-   *   floatBufOut[0] = left channel (blockSize Float32 samples)
-   *   floatBufOut[1] = right channel (blockSize Float32 samples)
+   * scsynth writes audio into WASM heap memory at Module.audioDriver.bufOutPtr
+   * (planar layout: all frames for ch0, then ch1, ...).
    *
-   * We call WaRun() which renders one block into these WASM heap buffers,
-   * then copy each channel to the Web Audio output arrays.
+   * We read from Module.HEAPF32 directly rather than using cached Float32Array
+   * views because Emscripten replaces HEAPF32 with a new TypedArray whenever
+   * the WASM heap grows (e.g. after /d_recv loads a SynthDef binary). Cached
+   * views would silently read zeros from the old detached buffer — causing
+   * silence even though WaRun() is producing audio in the new heap region.
    */
   process(_inputs, outputs, _params) {
     if (!this._ready || !this._waDriver) return true;
 
     try {
-      // Render one audio block
+      // Render one audio block into WASM heap
       this._waDriver.WaRun();
 
-      // Copy WASM output buffers to Web Audio output
+      // Copy from WASM heap to Web Audio output.
+      // Always dereference Module.HEAPF32 fresh — it may have been replaced by
+      // Emscripten's updateGlobalBufferAndViews() since last call.
       const output = outputs[0];
-      if (output && this._floatBufOut) {
-        const numCh = Math.min(output.length, this._floatBufOut.length);
-        for (let ch = 0; ch < numCh; ch++) {
-          if (output[ch] && this._floatBufOut[ch]) {
-            output[ch].set(this._floatBufOut[ch]);
+      if (output) {
+        const M = globalThis.Module;
+        const bufOutPtr = M && M.audioDriver && M.audioDriver.bufOutPtr;
+        if (bufOutPtr) {
+          const heapF32 = M.HEAPF32;         // always current after heap growth
+          const bs = this._blockSize;
+          const base = bufOutPtr >>> 2;       // byte offset → float32 index
+          const numCh = Math.min(output.length, NUM_OUT_CHANNELS);
+          for (let ch = 0; ch < numCh; ch++) {
+            if (output[ch]) {
+              output[ch].set(heapF32.subarray(base + ch * bs, base + (ch + 1) * bs));
+            }
           }
         }
       }
