@@ -1206,6 +1206,19 @@ export class TrackerReplayer {
         if (!this._muted) {
           mlEngine.play();
           console.log('[TrackerReplayer] MusicLineEngine loaded & playing');
+
+          // Route ML engine audio through the stereo separation chain.
+          // ML songs don't have a 'MusicLineSynth' instrument in their instrument list
+          // (parser uses Sampler instruments for display), so we route directly here
+          // instead of relying on the instrument-iteration block below.
+          if (!this.isDJDeck && !this.routedNativeEngines.has('MusicLineSynth')) {
+            engine.routeNativeEngineOutput({ name: 'MusicLineSynth', output: mlEngine.output } as any);
+            const nativeInput = getNativeAudioNode(this.separationNode.inputTone as any);
+            if (nativeInput) {
+              engine.rerouteNativeEngine('MusicLineSynth', nativeInput);
+              this.routedNativeEngines.add('MusicLineSynth');
+            }
+          }
         }
       } catch (err) {
         console.error('[TrackerReplayer] Failed to load ML tune into WASM:', err);
@@ -4307,54 +4320,54 @@ export class TrackerReplayer {
       }
     }
 
-    if (!this._suppressNotes) {
-      for (let ch = 0; ch < this.channels.length; ch++) {
-        const channel  = this.channels[ch];
-        const chTick   = this.channelTickCounters[ch];
-        const chSong   = this.channelSongPos[ch];
-        const chPatt   = this.channelPattPos[ch];
+    for (let ch = 0; ch < this.channels.length; ch++) {
+      const channel  = this.channels[ch];
+      const chTick   = this.channelTickCounters[ch];
+      const chSong   = this.channelSongPos[ch];
+      const chPatt   = this.channelPattPos[ch];
 
-        // Effective speed alternates between base speed and groove each row
-        const baseSpeed     = speeds?.[ch]  ?? fallback;
-        const groove        = grooves?.[ch] ?? 0;
-        const effectiveSpeed = (groove > 0 && this.channelGrooveToggle[ch]) ? groove : baseSpeed;
+      // Effective speed alternates between base speed and groove each row
+      const baseSpeed     = speeds?.[ch]  ?? fallback;
+      const groove        = grooves?.[ch] ?? 0;
+      const effectiveSpeed = (groove > 0 && this.channelGrooveToggle[ch]) ? groove : baseSpeed;
 
-        // Look up row from this channel's current pattern
-        const chPatIdx = tables[ch]?.[chSong] ?? 0;
-        const row = this.song.patterns[chPatIdx]?.channels[0]?.rows[chPatt];
+      // Look up row from this channel's current pattern
+      const chPatIdx = tables[ch]?.[chSong] ?? 0;
+      const row = this.song.patterns[chPatIdx]?.channels[0]?.rows[chPatt];
 
-        if (row) {
-          if (chTick === 0) {
-            this.processRow(ch, channel, row, time);
-          } else {
-            this.processEffectTick(ch, channel, row, time + (chTick * tickInterval));
-          }
-          this.processMacros(channel, time + (chTick * tickInterval));
-          this.processEnvelopesAndVibrato(channel, time + (chTick * tickInterval));
+      // Trigger audio only when notes are not suppressed (ML WASM handles its own audio)
+      if (!this._suppressNotes && row) {
+        if (chTick === 0) {
+          this.processRow(ch, channel, row, time);
+        } else {
+          this.processEffectTick(ch, channel, row, time + (chTick * tickInterval));
         }
+        this.processMacros(channel, time + (chTick * tickInterval));
+        this.processEnvelopesAndVibrato(channel, time + (chTick * tickInterval));
+      }
 
-        // Advance this channel's counter; when it overflows, advance its position
-        this.channelTickCounters[ch]++;
-        if (this.channelTickCounters[ch] >= effectiveSpeed) {
-          this.channelTickCounters[ch] = 0;
-          if (groove > 0) this.channelGrooveToggle[ch] = !this.channelGrooveToggle[ch];
+      // Advance this channel's counter; when it overflows, advance its position.
+      // Always runs regardless of _suppressNotes so the display position tracks correctly.
+      this.channelTickCounters[ch]++;
+      if (this.channelTickCounters[ch] >= effectiveSpeed) {
+        this.channelTickCounters[ch] = 0;
+        if (groove > 0) this.channelGrooveToggle[ch] = !this.channelGrooveToggle[ch];
 
-          // Advance row within pattern
-          this.channelPattPos[ch]++;
-          const chPattern = this.song.patterns[chPatIdx];
-          const patLen    = chPattern?.channels[0]?.rows.length ?? 128;
-          if (this.channelPattPos[ch] >= patLen) {
-            this.channelPattPos[ch] = 0;
-            // Advance to next track table entry
-            this.channelSongPos[ch]++;
-            const chTable = tables[ch]!;
-            if (this.channelSongPos[ch] >= chTable.length) {
-              this.channelSongPos[ch] = 0;
-              // Channel 0 looping = song end
-              if (ch === 0 && !this._songEndFiredThisBatch) {
-                this._songEndFiredThisBatch = true;
-                this.onSongEnd?.();
-              }
+        // Advance row within pattern
+        this.channelPattPos[ch]++;
+        const chPattern = this.song.patterns[chPatIdx];
+        const patLen    = chPattern?.channels[0]?.rows.length ?? 128;
+        if (this.channelPattPos[ch] >= patLen) {
+          this.channelPattPos[ch] = 0;
+          // Advance to next track table entry
+          this.channelSongPos[ch]++;
+          const chTable = tables[ch]!;
+          if (this.channelSongPos[ch] >= chTable.length) {
+            this.channelSongPos[ch] = 0;
+            // Channel 0 looping = song end
+            if (ch === 0 && !this._songEndFiredThisBatch) {
+              this._songEndFiredThisBatch = true;
+              this.onSongEnd?.();
             }
           }
         }
