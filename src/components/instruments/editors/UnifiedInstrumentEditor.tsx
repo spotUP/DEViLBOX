@@ -17,7 +17,7 @@ import {
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
   DEFAULT_HIVELY,
-  DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC, DEFAULT_FRED, DEFAULT_TFMX,
+  DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC, DEFAULT_DELTAMUSIC1, DEFAULT_FRED, DEFAULT_TFMX,
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_DAVID_WHITTAKER,
   DEFAULT_SUPERCOLLIDER,
 } from '@typedefs/instrument';
@@ -93,6 +93,7 @@ const HippelCoSoControls = lazy(() => import('../controls/HippelCoSoControls').t
 const RobHubbardControls = lazy(() => import('../controls/RobHubbardControls').then(m => ({ default: m.RobHubbardControls })));
 const DavidWhittakerControls = lazy(() => import('../controls/DavidWhittakerControls').then(m => ({ default: m.DavidWhittakerControls })));
 const MusicLineControls = lazy(() => import('../controls/MusicLineControls').then(m => ({ default: m.MusicLineControls })));
+const DeltaMusic1Controls = lazy(() => import('../controls/DeltaMusic1Controls').then(m => ({ default: m.DeltaMusic1Controls })));
 const SuperColliderEditor = lazy(() => import('../SuperColliderEditor').then(m => ({ default: m.SuperColliderEditor })));
 
 // Lazy-loaded hardware UI components
@@ -123,7 +124,7 @@ import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
 import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'musicline' | 'supercollider';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'musicline' | 'supercollider';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -209,6 +210,11 @@ function isFCType(synthType: SynthType): boolean {
   return synthType === 'FCSynth';
 }
 
+/** Check if synth type is Delta Music 1.0 */
+function isDeltaMusic1Type(synthType: SynthType): boolean {
+  return synthType === 'DeltaMusic1Synth';
+}
+
 /** Check if synth type is Fred Editor */
 function isFredType(synthType: SynthType): boolean {
   return synthType === 'FredSynth';
@@ -239,6 +245,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isSidMonType(synthType)) return 'sidmon';
   if (isDigMugType(synthType)) return 'digmug';
   if (isFCType(synthType)) return 'fc';
+  if (isDeltaMusic1Type(synthType)) return 'deltamusic1';
   if (isFredType(synthType)) return 'fred';
   if (isTFMXType(synthType)) return 'tfmx';
   if (synthType === 'OctaMEDSynth') return 'octamed';
@@ -644,6 +651,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     const current = instrument.fc || DEFAULT_FC;
     handleChange({ fc: { ...current, ...updates } });
   }, [instrument.fc, handleChange]);
+
+  // Handle DeltaMusic1 config updates
+  const handleDeltaMusic1Change = useCallback((updates: Partial<typeof instrument.deltaMusic1>) => {
+    const current = instrument.deltaMusic1 || DEFAULT_DELTAMUSIC1;
+    handleChange({ deltaMusic1: { ...current, ...updates } });
+  }, [instrument.deltaMusic1, handleChange]);
 
   // Handle Fred config updates
   const handleFredChange = useCallback((updates: Partial<typeof instrument.fred>) => {
@@ -1226,6 +1239,30 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   }
 
   // ============================================================================
+  // DELTA MUSIC 1.0 EDITOR
+  // ============================================================================
+  if (editorMode === 'deltamusic1') {
+    const dm1Config = deepMerge(DEFAULT_DELTAMUSIC1, instrument.deltaMusic1 || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a0e00] to-[#080400]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <DeltaMusic1Controls
+            config={dm1Config}
+            onChange={handleDeltaMusic1Change}
+            uadeChipRam={instrument.uadeChipRam}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
   // FRED EDITOR
   // ============================================================================
   if (editorMode === 'fred') {
@@ -1286,6 +1323,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <OctaMEDControls
             config={octaMEDConfig}
             onChange={handleOctaMEDChange}
+            uadeChipRam={instrument.uadeChipRam}
           />
         </Suspense>
       </div>
