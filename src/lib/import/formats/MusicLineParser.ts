@@ -65,6 +65,8 @@ const CHUNK_PART = 0x50415254; // 'PART'
 const CHUNK_ARPG = 0x41525047; // 'ARPG'
 const CHUNK_INST = 0x494e5354; // 'INST'
 const CHUNK_SMPL = 0x534d504c; // 'SMPL'
+const CHUNK_MODL = 0x4d4f444c; // 'MODL' (also ML_FILE_MAGIC2, used in isValidChunkId)
+const CHUNK_INFO = 0x494e464f; // 'INFO'
 
 const TUNE_HEADER_SIZE = 40;   // bytes from tune_Title to end of tune_Channels (incl. numChannels)
 const PART_ROWS = 128;
@@ -86,6 +88,15 @@ const CHNL_CMD_FLAG = 0x20;     // bit5 = 1: command entry
 const CHNL_CMD_TYPE_MASK = 0xC0; // bits 7:6 = command type
 const CHNL_CMD_END = 0x40;      // type 01: end channel
 const CHNL_CMD_JUMP = 0x80;     // type 10: jump (loop)
+
+// Valid chunk IDs — used for forward scan (mirrors module.cpp isValidChunkId)
+const VALID_CHUNK_IDS = new Set([
+  CHUNK_MODL, CHUNK_VERS, CHUNK_TUNE, CHUNK_PART, CHUNK_ARPG, CHUNK_INST, CHUNK_SMPL, CHUNK_INFO,
+]);
+
+function isValidChunkId(id: number): boolean {
+  return VALID_CHUNK_IDS.has(id);
+}
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -192,16 +203,28 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   const v = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const len = data.byteLength;
 
-  // Skip: "MLEDMODL"(8) + sizeField(4) + sizeField bytes of extra header
-  // The extra header size varies by MusicLine version (4, 8, 12, ... bytes).
-  // sizeField at offset 8 tells us exactly how many extra bytes follow.
-  //   0x00: "MLEDMODL" (8 bytes)
-  //   0x08: u32BE — size of extra header that follows
-  //   0x0C: extra header bytes (magic, timestamps, etc.)
-  //   0x0C + sizeField: first chunk (e.g. VERS or TUNE)
-  if (len < 12) return null;
-  const headerExtraSize = v.getUint32(8);
-  let pos = 8 + 4 + headerExtraSize;
+  // Skip "MLED"(0-3) + "MODL"(4-7), then handle MODL's optional extra data.
+  //
+  // module.cpp LoadMod logic (after consuming "MLED"):
+  //   - Reads chunk ID → MODL
+  //   - Peeks next 4 bytes:
+  //     - If valid chunk ID (e.g. "VERS"): MODL has no data; leave bytes for next iteration
+  //     - Otherwise: treat as MODL data size (u32BE); consume size + that many bytes
+  //
+  // This handles both:
+  //   "MLEDMODLVERS..."       → pos=8 (no MODL extra data, VERS follows immediately)
+  //   "MLEDMODL\x00\x00\x00\x04[4 bytes]VERS..." → pos=16 (4-byte MODL extra header)
+  if (len < 8) return null;
+  let pos = 8; // default: start right after "MLEDMODL"
+  if (pos + 4 <= len) {
+    const next4 = v.getUint32(pos);
+    if (!isValidChunkId(next4)) {
+      // It's a MODL data-size field, not a chunk ID — skip size + extra bytes
+      const modlExtraSize = next4;
+      pos += 4 + modlExtraSize;
+    }
+    // else: valid chunk ID follows immediately; MODL had no extra data
+  }
 
   // Parsed data accumulators
   let songTitle = '';
@@ -241,15 +264,23 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   const smplList: SmplData[] = [];
 
   // ── Chunk parsing loop ────────────────────────────────────────────────────
-  while (pos + 8 <= len) {
+  while (pos + 4 <= len) {
+    // Forward scan: if current position doesn't have a valid chunk ID, advance
+    // byte by byte until we find one. Mirrors module.cpp LoadMod:
+    //   while (len >= 4 && !isValidChunkId(mod)) { mod++; len--; }
+    while (pos + 4 <= len && !isValidChunkId(v.getUint32(pos))) {
+      pos++;
+    }
+    if (pos + 8 > len) break;
+
     const chunkId = v.getUint32(pos);
     const chunkSize = v.getUint32(pos + 4);
     const dataStart = pos + 8;
 
-    // Guard against corrupt chunk sizes
-    if (dataStart + chunkSize > len + 16) {
-      // Allow small over-reads (TUNE stores wrong size); stop on large mismatch
-      if (chunkId !== CHUNK_TUNE) break;
+    // Guard against corrupt chunk sizes for non-TUNE chunks
+    // (TUNE size is known-buggy in some old ML files — handled by sequential read)
+    if (chunkId !== CHUNK_TUNE && dataStart + chunkSize > len + 16) {
+      break;
     }
 
     if (chunkId === CHUNK_VERS) {
@@ -361,9 +392,24 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
 
       pos = smplEndPos;
 
+    } else if (chunkId === CHUNK_INFO) {
+      // INFO chunk: 9 null-terminated strings (title, author, date, duration, text[0..4])
+      // Not needed for playback — skip with declared size.
+      pos = dataStart + chunkSize;
+
+    } else if (chunkId === CHUNK_MODL || chunkId === CHUNK_VERS) {
+      // MODL/VERS encountered inside the loop (shouldn't happen after header handling,
+      // but handle gracefully by skipping — mirrors module.cpp default case behaviour).
+      pos = dataStart + chunkSize;
+
     } else {
-      // Unknown chunk ID — stop (loader does same: hits CloseFile on unknown ID)
-      break;
+      // Unknown chunk — skip with declared size (mirrors module.cpp default case).
+      // Do NOT break: remaining chunks (INST, SMPL, etc.) may still be valid.
+      if (dataStart + chunkSize <= len) {
+        pos = dataStart + chunkSize;
+      } else {
+        break; // Corrupt/truncated chunk size — stop
+      }
     }
   }
 
