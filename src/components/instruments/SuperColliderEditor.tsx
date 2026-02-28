@@ -89,12 +89,18 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const configRef = useRef(config);
+  const onChangeRef = useRef(onChange);
   const [status, setStatus] = React.useState<CompileStatus>({ state: 'idle' });
 
   // Keep configRef in sync so callbacks don't capture stale config
   useEffect(() => {
     configRef.current = config;
   }, [config]);
+
+  // Keep onChangeRef in sync so the mount-once update listener uses current onChange
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   // -------------------------------------------------------------------------
   // Build & mount the CodeMirror editor
@@ -113,7 +119,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
             const newSource = update.state.doc.toString();
             // Only call onChange if source actually changed to avoid loops
             if (newSource !== configRef.current.source) {
-              onChange({ ...configRef.current, source: newSource });
+              onChangeRef.current({ ...configRef.current, source: newSource });
             }
           }
         }),
