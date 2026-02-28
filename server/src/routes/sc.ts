@@ -10,7 +10,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { execFile } from 'child_process';
+import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
@@ -112,36 +112,63 @@ class SclangCompileError extends Error {
   }
 }
 
-/** Run a .scd file through sclang, resolving with combined stdout+stderr. */
-function runSclang(scdFile: string): Promise<string> {
+/**
+ * Run SC source code through sclang via stdin, resolving with combined stdout+stderr.
+ * Piping via stdin works reliably for non-root users; the -D file-arg approach hangs.
+ */
+function runSclang(script: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(
-      SCLANG_PATH,
-      // -D = daemon mode (no stdin/interactive prompt, runs file then exits on 0.exit)
-      ['-D', scdFile],
-      {
-        timeout: COMPILE_TIMEOUT_MS,
+    let proc: ReturnType<typeof spawn>;
+    try {
+      proc = spawn(SCLANG_PATH, [], {
         env: {
           ...process.env,
           // Required for headless server: use Qt's offscreen platform instead of X11
           QT_QPA_PLATFORM: 'offscreen',
-          // Allow Chromium (QtWebEngine bundled in SC) to run as root
+          // Allow Chromium (QtWebEngine bundled in SC) to run as root or in containers
           QTWEBENGINE_CHROMIUM_FLAGS: '--no-sandbox',
         },
-      },
-      (err, stdout, stderr) => {
-        const output = [stdout, stderr].filter(Boolean).join('\n');
-        if (err?.code === 'ENOENT' || err?.message?.includes('not found')) {
-          reject(new SclangNotFoundError(`sclang not found at "${SCLANG_PATH}"`));
-          return;
-        }
-        if (err) {
-          reject(new SclangCompileError(output));
-          return;
-        }
+      });
+    } catch (err: unknown) {
+      const e = err as NodeJS.ErrnoException;
+      if (e.code === 'ENOENT') {
+        reject(new SclangNotFoundError(`sclang not found at "${SCLANG_PATH}"`));
+      } else {
+        reject(err);
+      }
+      return;
+    }
+
+    const chunks: Buffer[] = [];
+    proc.stdout?.on('data', (d: Buffer) => chunks.push(d));
+    proc.stderr?.on('data', (d: Buffer) => chunks.push(d));
+
+    proc.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'ENOENT') {
+        reject(new SclangNotFoundError(`sclang not found at "${SCLANG_PATH}"`));
+      } else {
+        reject(err);
+      }
+    });
+
+    proc.on('close', (code) => {
+      const output = Buffer.concat(chunks).toString();
+      if (code !== 0 && code !== null) {
+        reject(new SclangCompileError(output));
+      } else {
         resolve(output);
       }
-    );
+    });
+
+    const timer = setTimeout(() => {
+      proc.kill();
+      reject(new SclangCompileError('sclang timed out'));
+    }, COMPILE_TIMEOUT_MS);
+    proc.on('close', () => clearTimeout(timer));
+
+    // Write script to stdin and close so sclang sees EOF and exits
+    proc.stdin?.write(script);
+    proc.stdin?.end();
   });
 }
 
@@ -177,7 +204,6 @@ router.post('/compile', (req: Request, res: Response) => {
 
     const id = randomBytes(8).toString('hex');
     const tmpDir = path.join(os.tmpdir(), `sc_compile_${id}`);
-    const scdFile = path.join(tmpDir, 'synth.scd');
 
     try {
       await fs.mkdir(tmpDir, { recursive: true });
@@ -186,12 +212,11 @@ router.post('/compile', (req: Request, res: Response) => {
       // The source must evaluate to a SynthDef object as its final expression.
       const outDirEscaped = tmpDir.replace(/\\/g, '/'); // SC uses forward slashes
       const script = `(\n${source}\n).writeDefFile("${outDirEscaped}");\n0.exit;\n`;
-      await fs.writeFile(scdFile, script, 'utf8');
 
-      // Run sclang
+      // Run sclang — pipe via stdin (file-arg approach hangs for non-root users)
       let sclangOutput: string;
       try {
-        sclangOutput = await runSclang(scdFile);
+        sclangOutput = await runSclang(script);
       } catch (err) {
         if (err instanceof SclangNotFoundError) {
           res.status(503).json({ success: false, error: 'SuperCollider (sclang) is not installed on the server. Set SCLANG_PATH to the sclang binary.' } satisfies CompileFailure);
