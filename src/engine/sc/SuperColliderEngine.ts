@@ -39,6 +39,8 @@ export class SuperColliderEngine {
     if (cached) return cached;
 
     const promise = SuperColliderEngine._boot(audioContext);
+    // Evict on failure so callers can retry (e.g. on transient network error)
+    promise.catch(() => instanceCache.delete(audioContext));
     instanceCache.set(audioContext, promise);
     return promise;
   }
