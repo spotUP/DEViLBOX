@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import filesRoutes from './routes/files';
 import modlandRoutes from './routes/modland';
+import scRoutes from './routes/sc';
 import { initDatabase } from './db/database';
 import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
@@ -61,6 +62,7 @@ app.use('/api/modland/', modlandLimiter as unknown as express.RequestHandler);
 app.use('/api/auth', authRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/modland', modlandRoutes);
+app.use('/api/sc', scRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
