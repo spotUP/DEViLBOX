@@ -2064,6 +2064,14 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     ],
   },
   {
+    id: 'scripted',
+    name: '📝 Scripted',
+    description: 'Live-coded and algorithmically scripted synthesis',
+    synths: [
+      SYNTH_INFO.SuperCollider,
+    ],
+  },
+  {
     id: 'vstbridge',
     name: '🔌 VST Bridge',
     description: 'Open-source synths ported via the generic VSTBridge framework',
