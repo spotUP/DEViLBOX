@@ -362,7 +362,7 @@ export function getSupportedExtensions(): string[] {
     // ── UADE exotic Amiga formats (130+ via 68k emulation) ──────────────────
     '.fc2', '.fc3', '.fc4', '.smod',
     '.hip', '.hip7', '.sog', '.s7g', '.hipc', '.hst', '.soc', '.coso',
-    '.tfmx', '.mdat', '.tfmxpro', '.tfhd1.5', '.tfhd7v', '.tfhdpro',
+    '.tfmx', '.mdat', '.tfmxpro', '.tfmx1.5', '.tfmx7v', '.tfhd1.5', '.tfhd7v', '.tfhdpro',
     '.fred', '.gray',
     '.sm', '.sm1', '.sm2', '.sm3', '.smpro',
     '.bd', '.bds',
@@ -372,7 +372,7 @@ export function getSupportedExtensions(): string[] {
     '.rj', '.rjp',
     '.dm', '.dm1', '.dm2', '.dlm1', '.dlm2',
     '.sa', '.sa-p', '.sa_old', '.sonic', '.lion',
-    '.abk', '.aam', '.aon', '.aon4', '.aon8', '.adpcm',
+    '.abk', '.aam', '.aon', '.aon4', '.aon8', '.adpcm', '.adsc', '.mod_adsc4',
     '.bss', '.bfc', '.bsi',
     '.core', '.cin',
     '.dl', '.dl_deli', '.dln',
