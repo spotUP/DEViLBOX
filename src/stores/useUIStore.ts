@@ -81,9 +81,10 @@ interface UIStore {
   // Transient UI state (not persisted)
   statusMessage: string;
   prevStatusMessage: string;
-  pendingModuleFile: File | null; // Module file pending import (set by drag-drop, consumed by TrackerView)
-  pendingAudioFile: File | null;  // Audio sample file pending import (adds sampler instrument)
-  pendingTD3File: File | null;    // TD-3 pattern file pending import (.sqs/.seq)
+  pendingModuleFile: File | null;  // Module file pending import (set by drag-drop, consumed by TrackerView)
+  pendingAudioFile: File | null;   // Audio sample file pending import (adds sampler instrument)
+  pendingTD3File: File | null;     // TD-3 pattern file pending import (.sqs/.seq)
+  pendingSunVoxFile: File | null;  // SunVox file pending import (.sunsynth / .sunvox)
 
   // Actions
   togglePanel: (panel: PanelType) => void;
@@ -140,6 +141,7 @@ interface UIStore {
   setPendingModuleFile: (file: File | null) => void;
   setPendingAudioFile: (file: File | null) => void;
   setPendingTD3File: (file: File | null) => void;
+  setPendingSunVoxFile: (file: File | null) => void;
 
   // Dialog command (keyboard → dialog bridge)
   dialogOpen: DialogCommand | null;
@@ -208,6 +210,7 @@ export const useUIStore = create<UIStore>()(
       pendingModuleFile: null,
       pendingAudioFile: null,
       pendingTD3File: null,
+      pendingSunVoxFile: null,
 
       // Dialog bridge (keyboard → dialog)
       dialogOpen: null,
@@ -476,6 +479,10 @@ export const useUIStore = create<UIStore>()(
       setPendingTD3File: (file) =>
         set((state) => {
           state.pendingTD3File = file;
+        }),
+      setPendingSunVoxFile: (file) =>
+        set((state) => {
+          state.pendingSunVoxFile = file;
         }),
 
       // Dialog bridge actions
