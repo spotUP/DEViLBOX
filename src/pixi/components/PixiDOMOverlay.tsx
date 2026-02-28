@@ -13,6 +13,7 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { Container as ContainerType } from 'pixi.js';
+import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 
 interface PixiDOMOverlayProps {
   layout: Record<string, unknown>;   // @pixi/layout flex props
@@ -46,6 +47,10 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
   autoHeightRef.current = autoHeight;
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
+  // Hide DOM overlays during WebGL tilt — they can't participate in the GL transform
+  const isTilted = useWorkbenchStore((s) => s.isTilted);
+  const isTiltedRef = useRef(isTilted);
+  isTiltedRef.current = isTilted;
   // Persist the last measured autoHeight value so parent re-renders
   // don't overwrite it with the caller's static height prop.
   const measuredHeightRef = useRef<number | null>(null);
@@ -140,12 +145,12 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
               if (!autoHeightRef.current) {
                 div.style.height = `${h}px`;
               }
-              if (visibleRef.current) {
+              if (visibleRef.current && !isTiltedRef.current) {
                 div.style.display = '';
               }
             }
-            // Hide/show when visible changes without bounds change
-            div.style.display = visibleRef.current ? (prevW > 0 ? '' : 'none') : 'none';
+            // Hide/show when visible or isTilted changes without bounds change
+            div.style.display = (visibleRef.current && !isTiltedRef.current) ? (prevW > 0 ? '' : 'none') : 'none';
           }
         }
       }

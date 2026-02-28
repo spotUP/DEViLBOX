@@ -16,7 +16,7 @@ import { useTabsStore } from '@stores/useTabsStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
-import { BUILTIN_WORKSPACES, springCameraTo } from '../workbench/WorkbenchExpose';
+import { BUILTIN_WORKSPACES, springCameraTo, fitAllWindows } from '../workbench/WorkbenchExpose';
 
 /** View window toggle buttons shown in the NavBar */
 const VIEW_WINDOWS = [
@@ -168,7 +168,7 @@ const NAV_H = NAV_ROW1_H + NAV_ROW2_H;
 
 export const PixiNavBar: React.FC = () => {
   const theme = usePixiTheme();
-  const { width } = usePixiResponsive();
+  const { width, height } = usePixiResponsive();
 
   // Tabs store
   const storeTabs = useTabsStore((s) => s.tabs);
@@ -184,9 +184,11 @@ export const PixiNavBar: React.FC = () => {
   // Settings store
   const setRenderMode = useSettingsStore((s) => s.setRenderMode);
 
-  // Workbench store — window visibility
+  // Workbench store — window visibility + 3D tilt
   const windows      = useWorkbenchStore((s) => s.windows);
   const toggleWindow = useWorkbenchStore((s) => s.toggleWindow);
+  const isTilted     = useWorkbenchStore((s) => s.isTilted);
+  const setTilted    = useWorkbenchStore((s) => s.setTilted);
 
   // Workspace picker popup state
   const [wsPickerOpen, setWsPickerOpen] = useState(false);
@@ -208,6 +210,29 @@ export const PixiNavBar: React.FC = () => {
   const handleSwitchToDom = useCallback(() => {
     setRenderMode('dom');
   }, [setRenderMode]);
+
+  // Fit all visible windows into view
+  const handleFitAll = useCallback(() => {
+    const ws = useWorkbenchStore.getState().windows;
+    springCameraTo(fitAllWindows(ws, width, height));
+  }, [width, height]);
+
+  // Camera zoom presets — spring-animate to a fixed scale centred on screen
+  const zoomToScale = useCallback((targetScale: number) => {
+    const cam = useWorkbenchStore.getState().camera;
+    const ratio = targetScale / cam.scale;
+    const x = width  / 2 - (width  / 2 - cam.x) * ratio;
+    const y = height / 2 - (height / 2 - cam.y) * ratio;
+    springCameraTo({ x, y, scale: targetScale });
+  }, [width, height]);
+
+  // Bird's-eye: zoom way out so the whole layout is visible
+  const handleBird = useCallback(() => {
+    const ws = useWorkbenchStore.getState().windows;
+    const cam = fitAllWindows(ws, width, height, 0.08);
+    // Cap scale at 0.3 so it's always a wide-angle view
+    springCameraTo({ ...cam, scale: Math.min(cam.scale, 0.3) });
+  }, [width, height]);
 
   // Row 1 background
   const drawRow1Bg = useCallback((g: GraphicsType) => {
@@ -286,6 +311,39 @@ export const PixiNavBar: React.FC = () => {
 
         {/* Spacer */}
         <pixiContainer layout={{ flex: 1 }} />
+
+        {/* Camera presets: bird's-eye, fit-all, 1:1 */}
+        <PixiButton
+          label="BIRD"
+          variant="ghost"
+          size="sm"
+          onClick={handleBird}
+          layout={{ marginRight: 2 }}
+        />
+        <PixiButton
+          label="FIT"
+          variant="ghost"
+          size="sm"
+          onClick={handleFitAll}
+          layout={{ marginRight: 2 }}
+        />
+        <PixiButton
+          label="1:1"
+          variant="ghost"
+          size="sm"
+          onClick={() => zoomToScale(1)}
+          layout={{ marginRight: 4 }}
+        />
+
+        {/* WebGL 3D tilt toggle */}
+        <PixiButton
+          label="3D"
+          variant="ft2"
+          size="sm"
+          active={isTilted}
+          onClick={() => setTilted(!isTilted)}
+          layout={{ marginRight: 8 }}
+        />
 
         {/* Workspace snapshot picker */}
         <pixiContainer layout={{ position: 'relative', marginRight: 8 }}>
