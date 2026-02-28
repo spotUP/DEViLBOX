@@ -24,7 +24,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
-import type { SoundMonConfig } from '@/types/instrument';
+import type { SoundMonConfig, UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Utility functions ─────────────────────────────────────────────────────
@@ -197,6 +197,7 @@ export function isSoundMonFormat(buffer: ArrayBuffer): boolean {
 export async function parseSoundMonFile(
   buffer: ArrayBuffer,
   filename: string,
+  moduleBase = 0,
 ): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
   if (buf.length < 32) throw new Error('File too small to be a SoundMon module');
@@ -225,8 +226,12 @@ export async function parseSoundMonFile(
   // ── 15 Instruments ─────────────────────────────────────────────────────
   // Instruments are 1-indexed in the player (samples[1..15])
   const instruments: BPInstrument[] = [];
+  const instrTableOffset = pos; // = 32 (start of instrument table in file)
+  // Track per-instrument file offsets for chip RAM info
+  const instrFileOffsets: Array<{ base: number; size: number }> = [];
 
   for (let i = 0; i < 15; i++) {
+    const instrStartPos = pos;
     const firstByte = u8(buf, pos);
 
     if (firstByte === 0xff) {
@@ -307,6 +312,7 @@ export async function parseSoundMonFile(
         fxControl, fxSpeed, fxDelay,
         modControl, modTable, modLen, modDelay, modSpeed,
       });
+      instrFileOffsets.push({ base: instrStartPos, size: pos - instrStartPos });
     } else {
       // Regular sample instrument
       const name = readString(buf, pos, 24); pos += 24;
@@ -338,6 +344,7 @@ export async function parseSoundMonFile(
         volume,
         pointer: -1,
       });
+      instrFileOffsets.push({ base: instrStartPos, size: pos - instrStartPos });
     }
   }
 
@@ -346,6 +353,7 @@ export async function parseSoundMonFile(
   const trackLen = songLength * 4;
   const tracks: BPStep[] = [];
   let higherPattern = 0;
+  const trackDataOffset = pos; // file offset of track/sequence data
 
   for (let i = 0; i < trackLen; i++) {
     const pattern = u16BE(buf, pos); pos += 2;
@@ -359,6 +367,7 @@ export async function parseSoundMonFile(
   // higherPattern patterns, each 16 rows, 3 bytes per row
   const patternDataLen = higherPattern * 16;
   const patternRows: BPRow[] = [];
+  const patternDataOffset = pos; // file offset of pattern data
 
   for (let i = 0; i < patternDataLen; i++) {
     const note = s8(buf, pos); pos++;
@@ -372,6 +381,7 @@ export async function parseSoundMonFile(
   // ── Synth table data (V2/V3 only) ──────────────────────────────────────
   // `tables` entries of 64 bytes each — raw waveform data for synth instruments
   const synthTableData = new Uint8Array(tables * 64);
+  const synthTablesOffset = pos; // file offset of synth table data
   if (tables > 0) {
     const end = Math.min(pos + tables * 64, buf.length);
     synthTableData.set(buf.subarray(pos, end));
@@ -379,6 +389,7 @@ export async function parseSoundMonFile(
   }
 
   // ── Sample PCM data ─────────────────────────────────────────────────────
+  const sampleDataOffset = pos; // file offset of sample PCM data
   for (let i = 0; i < 15; i++) {
     const inst = instruments[i];
     if (inst.synth || inst.length === 0) continue;
@@ -393,6 +404,21 @@ export async function parseSoundMonFile(
   for (let i = 0; i < 15; i++) {
     const inst = instruments[i];
     const id = i + 1; // 1-indexed
+
+    const instrOff = instrFileOffsets[i] ?? { base: instrTableOffset, size: 0 };
+    const chipRam: UADEChipRamInfo = {
+      moduleBase,
+      moduleSize: buffer.byteLength,
+      instrBase: moduleBase + instrOff.base,
+      instrSize: instrOff.size,
+      sections: {
+        instrTable: moduleBase + instrTableOffset,
+        trackData: moduleBase + trackDataOffset,
+        patternData: moduleBase + patternDataOffset,
+        synthTables: moduleBase + synthTablesOffset,
+        sampleData: moduleBase + sampleDataOffset,
+      },
+    };
 
     if (inst.synth) {
       // Synth instrument: create a SoundMonConfig for real-time WASM synthesis
@@ -454,6 +480,7 @@ export async function parseSoundMonFile(
         effects: [],
         volume: -6,
         pan: 0,
+        uadeChipRam: chipRam,
       } as InstrumentConfig);
     } else {
       // Regular PCM sample
@@ -464,7 +491,7 @@ export async function parseSoundMonFile(
         const loopStart = hasLoop ? sampleInst.loop : 0;
         const loopEnd = hasLoop ? sampleInst.loop + sampleInst.repeat : 0;
 
-        instrConfigs.push(createSamplerInstrument(
+        const instr = createSamplerInstrument(
           id,
           sampleInst.name || `Sample ${i + 1}`,
           pcm,
@@ -472,10 +499,14 @@ export async function parseSoundMonFile(
           8287,
           loopStart,
           loopEnd,
-        ));
+        );
+        instr.uadeChipRam = chipRam;
+        instrConfigs.push(instr);
       } else {
         // Empty sample placeholder
-        instrConfigs.push(makePlaceholder(id, sampleInst.name || `Sample ${i + 1}`));
+        const placeholder = makePlaceholder(id, sampleInst.name || `Sample ${i + 1}`);
+        placeholder.uadeChipRam = chipRam;
+        instrConfigs.push(placeholder);
       }
     }
   }
