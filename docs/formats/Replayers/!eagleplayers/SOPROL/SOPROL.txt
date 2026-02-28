@@ -1,0 +1,8 @@
+SPL.BoulderDash                 71584  
+SPL.Clever&Smart                73060  
+SPL.Extensor                    91832  
+SPL.GraffitiMan                 69992  
+SPL.HollywoodPoker              69868  
+SPL.Sanxion                     66712  
+SPL.SpacePort                  127820  
+SPL.WesternGames                38104  

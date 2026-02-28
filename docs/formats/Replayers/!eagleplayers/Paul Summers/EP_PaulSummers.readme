@@ -1,0 +1,41 @@
+Short:    EaglePlayer "Paul Summers" external replayer
+Author:   Wanted Team
+Uploader: Don Adan <DonAdan@wp.pl>
+Version:  3
+Type:     mus/play
+Replaces: mus/play/EP_PaulSummers.lha
+
+This is a new version of the external "Paul Summers" module replay for
+EaglePlayer 1.54/2.00+. It's a player for all (?) known Paul Summers (?)
+Amiga modules.
+
+Version 1
+
+Features:
+
+- Analyzer
+- SubSong
+- Balance
+- ModuleInfo
+- Volume
+
+Version 2
+
+- added SongEnd (only for non looping songs)
+- added an Amplifier version (EP 2.00+ only)
+
+Version 3
+
+- added support for second version of "Paul Summers" mods
+
+Notes:
+
+1. If you have, or know of, unsupported "Paul Summers" modules please
+   contact the Wanted Team.
+
+2. Now you can choose your preferred player version for use with EP 2.00+.
+
+3. You can get the latest versions of Wanted Team products from:
+
+   http://amiga.emucamp.com/wt/wt.html
+

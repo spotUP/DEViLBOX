@@ -1,0 +1,193 @@
+
+* EXAMPLE SOURCE FOR MUGICIAN PLAYROUTINE
+
+* RI MUSICFILE on Music
+
+* FOR Å KJØRE EN MUSIKKFIL, GJØR DETTE:
+* A <2 * RETURN>
+* Y <RETURN>
+***************************************
+* RI <RET>			      *	
+* FILENAME PÅ MUSICFILEN <RET>        *
+* MUSIC <RET>			      *
+***************************************
+* J <START>			      *
+***************************************
+* HVIS DU BARE TRENGER F.EKS.4 SANGER *
+* SÅ SKRIV ';' PÅ ALLE F-TASTENE SOM  *
+* DU IKKE TRENGER. HER ER ET EKSEMPEL *
+* DU HAR LAGET 7 SANGER, DA GJØR DU : *
+* CMP.B #$53,$BFEC01		; F 8 *
+* DEN SKAL VÆRE SLIK :                *
+* ;CMP.B #$53,$BFEC01		; F 8 *
+* DETTE VAR DA IKKE SÅ VANSKELIG ?    *
+*				      *
+*				      *
+*     MENUSCREEN V1.01 CODED BY:      *
+*				      *
+*	      Rune Langøen    	      *
+*	       Rugdev. 40	      *
+*             5030  LANDÅS	      *
+*				      *
+*  Eventuelle sjekker eller gaver kan *
+*  sendes til ovenstående adresse.    *
+***************************************
+
+       
+>EXTERN "MOD.ILYAD",SONG
+LENGDE=19722
+
+	bset	#1,$bfe001
+main:
+	move.l	$4,a6
+	lea	dosname,a1
+	jsr	-408(a6)
+	move.l	d0,dosbase
+
+	move.l	dosbase,a6
+	move.l	#window,d1
+	move.l	#1005,d2
+	jsr	-30(a6)
+	move.l	d0,hd
+
+	move.l	dosbase,a6
+	move.l	hd,d1
+	move.l	#text,d2
+	move.l	#textend-text,d3
+	jsr	-48(a6)
+	
+
+	moveq	#0,d0
+	lea	song,a0
+	jsr	0(a0)		;initialize music #0
+
+
+loop:
+	cmp.b	#$ff,$dff006		;wait for raster $ff
+	bne	loop
+	jsr	4(a0)
+
+	cmp.w	#0,d4
+	beq	next1
+	cmp.b	#$5f,$bfec01		; F 1
+	bne	next1
+	jsr	s1
+next1:	cmp.w	#1,d4
+	beq	next2
+	cmp.b	#$5d,$bfec01		; F 2
+	bne	next2
+	jsr	s2
+next2: 	cmp.w	#2,d4
+	beq	next3
+	cmp.b	#$5b,$bfec01		; F 3
+	bne	next3
+	jsr	s3
+next3: 	cmp.w	#3,d4
+	beq	next4
+	cmp.b	#$59,$bfec01		; F 4
+	bne	next4
+	jsr	s4
+next4: 	cmp.w	#4,d4
+	beq	next5
+	cmp.b	#$57,$bfec01		; F 5
+	bne	next5
+	jsr	s5
+next5: 	cmp.w	#5,d4
+	beq	next6
+	cmp.b	#$55,$bfec01		; F 6
+	bne	next6
+	jsr	s6
+next6:
+ 	cmp.w	#6,d4
+	beq	next7
+	cmp.b	#$53,$bfec01		; F 7
+	bne	next7
+	jsr	s7
+next7: 	cmp.w	#7,d4
+	beq	next8
+	cmp.b	#$51,$bfec01		; F 8
+	bne	next8
+	jsr	s8
+next8:
+
+
+
+	btst	#6,$bfe001		;mouse button??
+	bne	loop
+stopp:
+	move.l	dosbase,a6
+	move.l	hd,d1
+	jsr	-36(a6)
+
+
+	jsr	8(a0)
+	rts
+
+	
+s1:	moveq	#0,d0
+	jsr	0(A0)
+	jmp	loop
+s2:	moveq	#1,d0
+	jsr	0(A0)
+	jmp	loop
+s3:	moveq	#2,d0
+	jsr	0(A0)
+	jmp	loop
+s4:	moveq	#3,d0
+	jsr	0(A0)
+	jmp	loop
+s5:	moveq	#4,d0
+	jsr	0(A0)
+	jmp	loop
+s6:	moveq	#5,d0
+	jsr	0(A0)
+	jmp	loop
+s7:	moveq	#6,d0
+	jsr	0(A0)
+	jmp	loop
+s8:	moveq	#7,d0
+	jsr	0(A0)
+	jmp	loop
+
+
+window:dc.b	'CON:0/0/640/255/** Music examples by Øisten Eide'
+	dc.b	'/Maniacs of Noise **',0
+	even
+hd:dc.l	0
+
+dosname:dc.b	'dos.library',0
+dosbase:dc.l	0
+
+text:
+	dc.b	$0a,$0a,$0a
+	dc.b	'                 '
+	dc.b	$9b,'4m'
+	dc.b	'Game music number xx - Ola softwarehouse',$0a
+	dc.b	$0a
+	dc.b	$9b,'0m'
+	dc.b	'                                   Press :'
+	dc.b	$0a,$0a,$0a
+	dc.b	$9b,'33m'
+	dc.b	'                                F1 - Song #1 ',$0a
+	dc.b	'                                F2 - Song #2 ',$0a
+	dc.b	'                                F3 - Song #3 ',$0a
+	dc.b	'                                F4 - Song #4 ',$0a
+	dc.b	'                                F5 - Song #5 ',$0a
+	dc.b	'                                F6 - Song #6 ',$0a
+	dc.b	'                                F7 - Song #7 ',$0a
+	dc.b	'                                F8 - Song #8 ',$0a
+	dc.b	$9b,'0m'
+	dc.b	$0a,$0a
+	dc.b	'                        Press left mousebutton to exit ',$0a
+	dc.b	$0a,$0a,$0a,$0a,$0a,$0a
+	dc.b	$9b,'3;33m'
+	dc.b	'                               Øistein Eide ',$0a
+	dc.b	'                              Skytterveien 14 ',$0a
+	dc.b	'                         N-5035  BERGEN/SANDVIKEN ',$0a
+	dc.b	$9b,'0m'
+	dc.b	$0A
+
+textend:dc.b	0,0
+SONG:
+	BLK.B	LENGDE,0
+

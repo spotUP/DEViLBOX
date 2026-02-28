@@ -1,0 +1,23 @@
+
+xplay.readme
+11-mar-98
+
+This is sourcecode of the 'future player' audio routine as used by
+Imploder 4.0. This material is copyright by Paul van der Valk. Using
+this code is not possible without my permission. Enquiries to:
+falcon@casema.net.
+
+This version compiles with GenIm2 and has the A4000 audio bug fixed.
+
+This sourcecode is older than the binary variant that appears in
+the Medley Sound Editor. It seems pretty complete though. This code
+has not been tested. Use it on your own risk anyway (my standard
+disclaimer ;)).
+
+
+
+Enjoy!
+
+Paul van der Valk
+
+(Correction: it is the sourcecode for his Medley player routine / BuZz)

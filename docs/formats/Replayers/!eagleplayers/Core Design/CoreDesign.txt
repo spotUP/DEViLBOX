@@ -1,0 +1,6 @@
+CORE.ActionFighter              68052  
+CORE.Axel'sMagicHammer FX       43032  
+CORE.DynamiteDux               156532  
+CORE.MontyPythons              128592  
+CORE.RickDangerous             103240  
+CORE.Saint&Greavsie             67820  
