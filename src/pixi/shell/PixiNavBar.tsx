@@ -5,8 +5,8 @@
  * Row 2 (53px): PixiTabBar with project tabs
  */
 
-import React, { useCallback } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
+import React, { useCallback, useState, useRef } from 'react';
+import type { FederatedPointerEvent, Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiButton } from '../components/PixiButton';
@@ -15,6 +15,154 @@ import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useTabsStore } from '@stores/useTabsStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { BUILTIN_WORKSPACES, springCameraTo } from '../workbench/WorkbenchExpose';
+import { startTilt, stopTilt } from '../workbench/WorkbenchTilt';
+import { openCoverFlow } from '../workbench/CoverFlowOverlay';
+
+/** View window toggle buttons shown in the NavBar */
+const VIEW_WINDOWS = [
+  { id: 'tracker',     label: 'TRK' },
+  { id: 'pianoroll',  label: 'PNO' },
+  { id: 'arrangement',label: 'ARR' },
+  { id: 'dj',         label: 'DJ'  },
+  { id: 'vj',         label: 'VJ'  },
+  { id: 'instrument', label: 'INS' },
+] as const;
+
+// ─── Workspace Picker Popup ───────────────────────────────────────────────────
+
+const POPUP_W = 160;
+const POPUP_ITEM_H = 24;
+
+interface WorkspacePopupProps {
+  /** Y offset below the button */
+  offsetY: number;
+  onClose: () => void;
+}
+
+const WorkspacePopup: React.FC<WorkspacePopupProps> = ({ offsetY, onClose }) => {
+  const theme = usePixiTheme();
+  const userWorkspaces = useWorkbenchStore((s) => s.workspaces);
+  const saveWorkspace   = useWorkbenchStore((s) => s.saveWorkspace);
+  const loadWorkspace   = useWorkbenchStore((s) => s.loadWorkspace);
+
+  const allBuiltins = Object.keys(BUILTIN_WORKSPACES);
+  const allUser     = Object.keys(userWorkspaces);
+  const items = [
+    ...allBuiltins.map((n) => ({ name: n, builtin: true })),
+    ...allUser.map((n) => ({ name: n, builtin: false })),
+    { name: '+ Save Current', builtin: false, isSave: true },
+  ] as const;
+
+  const itemCount = items.length;
+  const popupH = itemCount * POPUP_ITEM_H + 8;
+
+  const drawBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.roundRect(0, 0, POPUP_W, popupH, 6);
+    g.fill({ color: 0x0c0c18, alpha: 0.97 });
+    g.roundRect(0, 0, POPUP_W, popupH, 6);
+    g.stroke({ color: theme.border.color, alpha: 0.6, width: 1 });
+  }, [popupH, theme]);
+
+  const handleItem = useCallback((name: string, isSave: boolean, builtin: boolean) => {
+    if (isSave) {
+      const label = `Layout ${new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })}`;
+      saveWorkspace(label);
+    } else {
+      if (builtin) {
+        // Load built-in: apply windows directly then spring camera
+        const ws = BUILTIN_WORKSPACES[name];
+        const store = useWorkbenchStore.getState();
+        for (const [id, w] of Object.entries(ws.windows)) {
+          if (store.windows[id]) {
+            store.moveWindow(id, w.x, w.y);
+            store.resizeWindow(id, w.width, w.height);
+            if (w.visible) store.showWindow(id);
+            else store.hideWindow(id);
+          }
+        }
+        springCameraTo(ws.camera);
+      } else {
+        loadWorkspace(name);
+        springCameraTo(useWorkbenchStore.getState().camera);
+      }
+    }
+    onClose();
+  }, [saveWorkspace, loadWorkspace, onClose]);
+
+  return (
+    <pixiContainer y={offsetY} layout={{ position: 'absolute', width: POPUP_W }}>
+      <pixiGraphics
+        draw={drawBg}
+        layout={{ position: 'absolute', width: POPUP_W, height: popupH }}
+      />
+      <pixiContainer layout={{ width: POPUP_W, flexDirection: 'column', paddingTop: 4 }}>
+        {items.map((item, i) => (
+          <WorkspaceItem
+            key={item.name}
+            label={item.name}
+            isBuiltin={'builtin' in item ? item.builtin : false}
+            isSave={'isSave' in item ? item.isSave : false}
+            onPress={() => handleItem(item.name, 'isSave' in item ? !!item.isSave : false, 'builtin' in item ? item.builtin : false)}
+          />
+        ))}
+      </pixiContainer>
+    </pixiContainer>
+  );
+};
+
+interface WorkspaceItemProps {
+  label: string;
+  isBuiltin: boolean;
+  isSave: boolean;
+  onPress: () => void;
+}
+
+const WorkspaceItem: React.FC<WorkspaceItemProps> = ({ label, isBuiltin, isSave, onPress }) => {
+  const theme = usePixiTheme();
+  const [hovered, setHovered] = useState(false);
+
+  const drawBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    if (hovered) {
+      g.rect(2, 0, POPUP_W - 4, POPUP_ITEM_H);
+      g.fill({ color: theme.bgHover.color });
+    }
+  }, [hovered, theme]);
+
+  const textColor = isSave
+    ? theme.accent.color
+    : isBuiltin ? theme.textSecondary.color : theme.text.color;
+
+  return (
+    <pixiContainer
+      eventMode="static"
+      cursor="pointer"
+      onPointerOver={() => setHovered(true)}
+      onPointerOut={() => setHovered(false)}
+      onPointerUp={onPress}
+      layout={{ width: POPUP_W, height: POPUP_ITEM_H, paddingLeft: 12, alignItems: 'center' }}
+    >
+      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: POPUP_W, height: POPUP_ITEM_H }} />
+      <pixiBitmapText
+        text={label}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+        tint={textColor}
+        layout={{ alignSelf: 'center' }}
+      />
+      {isBuiltin && (
+        <pixiBitmapText
+          text=" ★"
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={{ alignSelf: 'center', marginLeft: 4 }}
+        />
+      )}
+    </pixiContainer>
+  );
+};
 
 const NAV_ROW1_H = 45;
 const NAV_ROW2_H = 53;
@@ -38,6 +186,15 @@ export const PixiNavBar: React.FC = () => {
   // Settings store
   const setRenderMode = useSettingsStore((s) => s.setRenderMode);
 
+  // Workbench store — window visibility + tilt
+  const windows      = useWorkbenchStore((s) => s.windows);
+  const toggleWindow = useWorkbenchStore((s) => s.toggleWindow);
+  const isTilted     = useWorkbenchStore((s) => s.isTilted);
+  const setTilted    = useWorkbenchStore((s) => s.setTilted);
+
+  // Workspace picker popup state
+  const [wsPickerOpen, setWsPickerOpen] = useState(false);
+
   // Map ProjectTab[] → Tab[] (ProjectTab uses `name`, Tab expects `label`)
   const tabs: Tab[] = storeTabs.map((t) => ({
     id: t.id,
@@ -55,6 +212,16 @@ export const PixiNavBar: React.FC = () => {
   const handleSwitchToDom = useCallback(() => {
     setRenderMode('dom');
   }, [setRenderMode]);
+
+  // 3D tilt toggle
+  const handle3DToggle = useCallback(() => {
+    if (isTilted) {
+      stopTilt(() => setTilted(false));
+    } else {
+      setTilted(true);
+      startTilt();
+    }
+  }, [isTilted, setTilted]);
 
   // Row 1 background
   const drawRow1Bg = useCallback((g: GraphicsType) => {
@@ -111,7 +278,60 @@ export const PixiNavBar: React.FC = () => {
           text="DEViLBOX"
           style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 16, fill: 0xffffff }}
           tint={theme.accent.color}
-          layout={{ flex: 1 }}
+          layout={{ marginRight: 16 }}
+        />
+
+        {/* View window toggle buttons */}
+        {VIEW_WINDOWS.map(({ id, label }) => {
+          const win = windows[id];
+          const isOpen = win?.visible && !win?.minimized;
+          return (
+            <PixiButton
+              key={id}
+              label={label}
+              variant="ft2"
+              size="sm"
+              active={isOpen}
+              onClick={() => toggleWindow(id)}
+              layout={{ marginRight: 4 }}
+            />
+          );
+        })}
+
+        {/* Spacer */}
+        <pixiContainer layout={{ flex: 1 }} />
+
+        {/* Workspace snapshot picker */}
+        <pixiContainer layout={{ position: 'relative', marginRight: 8 }}>
+          <PixiButton
+            label="LAYOUT"
+            variant="ghost"
+            size="sm"
+            active={wsPickerOpen}
+            onClick={() => setWsPickerOpen((v) => !v)}
+          />
+          {wsPickerOpen && (
+            <WorkspacePopup offsetY={NAV_ROW1_H} onClose={() => setWsPickerOpen(false)} />
+          )}
+        </pixiContainer>
+
+        {/* CoverFlow view switcher */}
+        <PixiButton
+          label="FLOW"
+          variant="ghost"
+          size="sm"
+          onClick={openCoverFlow}
+          layout={{ marginRight: 4 }}
+        />
+
+        {/* 3D tilt toggle */}
+        <PixiButton
+          label="3D"
+          variant="ghost"
+          size="sm"
+          active={isTilted}
+          onClick={handle3DToggle}
+          layout={{ marginRight: 8 }}
         />
 
         {/* Theme cycler */}
