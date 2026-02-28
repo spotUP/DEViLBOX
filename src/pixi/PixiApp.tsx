@@ -24,13 +24,32 @@ extend({ Container, Graphics, BitmapText, Sprite, Text });
  * Ensures React Strict Mode double-invocation waits for the same operation
  * instead of loading Yoga twice (which would mix WASM Node instances and
  * cause "Expected null or instance of Node" BindingErrors).
+ *
+ * Yoga is stored on `window` so the reference survives Vite HMR module
+ * reloads — if the PixiApp module is hot-replaced, `initPromise` resets to
+ * null but `window.__pixiYogaInstance` still holds the original WASM module.
+ * We re-call setYoga with the SAME instance rather than creating a new one,
+ * preventing the "old tree nodes (instance A) + new child node (instance B)"
+ * mismatch that triggers the Emscripten BindingError.
  */
+declare global {
+  interface Window {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    __pixiYogaInstance?: any;
+  }
+}
+
 let initPromise: Promise<void> | null = null;
 
 function initPixiLayout(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
-      const yoga = await loadYoga();
+      let yoga = window.__pixiYogaInstance;
+      if (!yoga) {
+        yoga = await loadYoga();
+        window.__pixiYogaInstance = yoga;
+      }
+      // Always re-set so @pixi/layout uses the instance even after HMR
       setYoga(yoga);
       setYogaConfig(yoga.Config.create());
       await loadPixiFonts();
