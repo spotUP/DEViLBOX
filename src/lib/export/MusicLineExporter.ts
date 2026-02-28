@@ -18,7 +18,8 @@
  *   "MLED"(4) + "INST"(4) + extraHeaderSize(u32BE = 0) + chunks(VERS→INST→SMPL)
  */
 
-import type { TrackerSong, Pattern } from '@/engine/TrackerReplayer';
+import type { TrackerSong } from '@/engine/TrackerReplayer';
+import type { Pattern } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
 
 // ── Sequential binary writer ───────────────────────────────────────────────
