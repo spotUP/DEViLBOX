@@ -167,6 +167,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   const trackerZoom = useUIStore(s => s.trackerZoom);
   const showChannelNames = useUIStore(s => s.showChannelNames);
+  const showAutomationLanes = useUIStore(s => s.showAutomationLanes);
+  const showMacroLanes = useUIStore(s => s.showMacroLanes);
   const rowHeight = Math.round(24 * (trackerZoom / 100));
 
   // Keep rowHeightRef in sync so the RAF loop always sees the current value
@@ -1206,7 +1208,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const unsubUI = useUIStore.subscribe((s, prev) => {
       if (s.useHexNumbers !== prev.useHexNumbers || s.blankEmptyCells !== prev.blankEmptyCells
           || s.trackerZoom !== prev.trackerZoom || s.rowHighlightInterval !== prev.rowHighlightInterval
-          || s.showBeatLabels !== prev.showBeatLabels) {
+          || s.showBeatLabels !== prev.showBeatLabels
+          || s.showAutomationLanes !== prev.showAutomationLanes || s.showMacroLanes !== prev.showMacroLanes) {
         bridgeRef.current?.post({ type: 'uiState', uiState: snapshotUI() });
       }
     });
@@ -1831,45 +1834,49 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         {/* Automation Lanes Overlay */}
         {pattern && (
           <>
-            <AutomationLanes
-              key={`automation-${pattern.id}`}
-              patternId={pattern.id}
-              patternLength={pattern.length}
-              rowHeight={rowHeight}
-              channelCount={pattern.channels.length}
-              channelOffsets={channelOffsets}
-              channelWidths={channelWidths}
-              rowNumWidth={LINE_NUMBER_WIDTH}
-              scrollOffset={scrollYRef.current}
-              visibleStart={visibleStartRef.current}
-              /* parameter is resolved per-channel from useAutomationStore.channelLanes */
-              prevPatternId={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.id : (patterns.length > 1 ? patterns[patterns.length - 1]?.id : undefined)) : undefined}
-              prevPatternLength={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length > 1 ? patterns[patterns.length - 1]?.length : undefined)) : undefined}
-              nextPatternId={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.id : (patterns.length > 1 ? patterns[0]?.id : undefined)) : undefined}
-              nextPatternLength={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : undefined)) : undefined}
-            />
-            {/* Internal Macro Columns Overlay (only when visible) */}
-            <div
-              ref={macroOverlayRef}
-              style={{
-                position: 'absolute',
-                top: scrollYRef.current,
-                left: 0,
-                right: 0,
-                height: pattern.length * rowHeight,
-                pointerEvents: 'none',
-                transform: `translateX(${-scrollLeft}px)`
-              }}
-            >
-              <MacroLanes
-                pattern={pattern}
+            {showAutomationLanes && (
+              <AutomationLanes
+                key={`automation-${pattern.id}`}
+                patternId={pattern.id}
+                patternLength={pattern.length}
                 rowHeight={rowHeight}
                 channelCount={pattern.channels.length}
                 channelOffsets={channelOffsets}
                 channelWidths={channelWidths}
                 rowNumWidth={LINE_NUMBER_WIDTH}
+                scrollOffset={scrollYRef.current}
+                visibleStart={visibleStartRef.current}
+                /* parameter is resolved per-channel from useAutomationStore.channelLanes */
+                prevPatternId={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.id : (patterns.length > 1 ? patterns[patterns.length - 1]?.id : undefined)) : undefined}
+                prevPatternLength={showGhostPatterns ? (currentPatternIndex > 0 ? patterns[currentPatternIndex - 1]?.length : (patterns.length > 1 ? patterns[patterns.length - 1]?.length : undefined)) : undefined}
+                nextPatternId={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.id : (patterns.length > 1 ? patterns[0]?.id : undefined)) : undefined}
+                nextPatternLength={showGhostPatterns ? (currentPatternIndex < patterns.length - 1 ? patterns[currentPatternIndex + 1]?.length : (patterns.length > 1 ? patterns[0]?.length : undefined)) : undefined}
               />
-            </div>
+            )}
+            {/* Internal Macro Columns Overlay (only when visible) */}
+            {showMacroLanes && (
+              <div
+                ref={macroOverlayRef}
+                style={{
+                  position: 'absolute',
+                  top: scrollYRef.current,
+                  left: 0,
+                  right: 0,
+                  height: pattern.length * rowHeight,
+                  pointerEvents: 'none',
+                  transform: `translateX(${-scrollLeft}px)`
+                }}
+              >
+                <MacroLanes
+                  pattern={pattern}
+                  rowHeight={rowHeight}
+                  channelCount={pattern.channels.length}
+                  channelOffsets={channelOffsets}
+                  channelWidths={channelWidths}
+                  rowNumWidth={LINE_NUMBER_WIDTH}
+                />
+              </div>
+            )}
           </>
         )}
 
