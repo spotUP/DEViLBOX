@@ -79,6 +79,12 @@ soundmon-wasm/build/
 sidmon-wasm/build/
 digmug-wasm/build/
 fc-wasm/build/
+sunvox-wasm/build/
+sunvox-wasm-ui/build/
+musicline-wasm/build/
+octamed-wasm/build/
+sidmon1-wasm/build/
+davidwhittaker-wasm/build/
 
 # Stray audio files
 *.wav
@@ -87,6 +93,9 @@ uade-wasm/generated/
 # Turntable source models (GLB already in public/models/)
 Turntable/
 turntable.glb
+
+# Session context (never commit — personal/team working notes)
+thoughts/
 
 # Backup files
 *.bak
