@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-28T14:16:43.420Z
+ * Generated: 2026-02-28T14:24:30.940Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1655';
-export const BUILD_NUMBER = '1655';
-export const BUILD_HASH = 'df7297f1';
+export const BUILD_VERSION = '1.0.1657';
+export const BUILD_NUMBER = '1657';
+export const BUILD_HASH = '4c4929e7';
 export const BUILD_DATE = '2026-02-28';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1655',
+    version: '1.0.1657',
     date: '2026-02-28',
     changes: [
+      {
+        type: 'fix',
+        "description": "Remove unused ROW_HEIGHT/rowHighlightInterval/showBeatLabels vars, add missing UIStateSnapshot fields to workers"
+      },
+      {
+        type: 'feature',
+        "description": "Implement showChannelNames in channel headers (DOM + Pixi)"
+      },
       {
         type: 'fix',
         "description": "Restore missing fetch call in authFetch body"
@@ -220,14 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Show import dialog on drag-drop instead of silently adding instrument"
-      },
-      {
-        type: 'fix',
-        "description": "Make error messages selectable/copyable across all synth editors"
-      },
-      {
-        type: 'fix',
-        "description": "Raise toast z-index above modals and overlays"
       }
     ]
   }
