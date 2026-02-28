@@ -1,0 +1,16 @@
+* prototypes for MEDPlayer.library V1.00
+##base _MEDPlayerBase
+##bias 30
+##public
+GetPlayer(initser)(D0)
+FreePlayer()()
+PlayModule(module)(A0)
+ContModule(module)(A0)
+StopPlayer()()
+DimOffPlayer(dimlength)(D0)
+SetTempo(tempo)(D0)
+LoadModule(filename)(A0)
+UnLoadModule(module)(A0)
+GetCurrentModule()()
+ResetMIDI()()
+##end

@@ -1,0 +1,50 @@
+Short:    EaglePlayer "Speedy A1 System" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  1
+Type:     mus/play
+
+This is a new external "Speedy A1 System" module player for EaglePlayer
+1.54/2.00+. It's a player for all (?) known "Speedy A1 System"
+(the second Michael Winterberg Amiga music format) modules.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- Volume
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- Balance
+- SongEnd
+- ModuleInfo with Position Counter
+- Save
+- as a bonus, an EagleRipper for "Speedy A1 System" modules is included
+
+Notes:
+
+1. Warning!!! Don't use the "PlayFaster" button, because this player
+   doesn't like it and it may crash your Amiga.
+
+2. This player/ripper was only tested with three "Speedy A1 System" songs.
+   If you have, or know of, unsupported "Speedy A1 System" modules please
+   contact Wanted Team.
+
+3. The latest version of EP players released by Wanted Team are available
+   on Wanted Team's FTP:
+
+address    ftp.union.org.pl (temporarily offline)
+login      krzak
+password   Rozany1
+catalog    /Players/
+
+4. The email address wt@jho.pol.pl might not be valid after March 2000.
+
+Our special thanks go to the following people:
+
+- Bernd Gmeineder
+- Gaelan Griffin
+
+
+

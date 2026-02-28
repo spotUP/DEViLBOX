@@ -1,0 +1,4 @@
+RIFF.BombFusion                 45012  
+RIFF.Protector                  36800  
+RIFF.SideWinder2                20976  
+RIFF.T'Bird                     54044  

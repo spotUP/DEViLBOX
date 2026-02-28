@@ -1,0 +1,72 @@
+
+>EXTERN "MOD.ILYAD",SONG
+SONG=$40000
+WHICHSONG=3
+INIT=0
+PLAY=4
+STOP=8
+FADE=12
+
+
+	MOVEQ	#WHICHSONG,D0
+S:	LEA	SONG,A0
+	JSR	0(A0)
+	
+
+wait:	
+	cmp.b	#$7e,$dff006
+	bne	wait
+	move.w	#$0fff,$dff180	
+	move.l	SONG,a0
+	move.b	$dff006,EnterVPos
+	jsr	4(a0)
+	move.b	$dff006,ExitVPos
+	move.w	#$0000,$dff180
+
+	clr.l	d0
+	move.b	EnterVPos,d0
+	clr.l	d1
+	move.b	ExitVPos,d1
+	sub.w	d0,d1
+	move.l	MaxRastime,d0
+	cmp.l	d1,d0
+	bhi	nomore
+	move.l	d1,MaxRastime
+
+;EVER:	MOVE.L	$DFF004,D2
+;	AND.L	#$1FF00,D2
+;	CMP.L	#$08000,D2
+;	BNE.S	EVER
+
+;EV2:	MOVE.W	#0,$DFF180
+;	move.w	$dff006,D2
+;	move.l	D2,ti
+;	LEA	SONG,A0
+;	JSR	4(A0)
+;	move.l	ti,D2
+;	moveq	#0,d1
+;	move.w	$dff006,d1
+;	sub.w	D2,d1
+;	cmp.l	TIME,D1
+;	BLE.S	NONEW
+;	MOVE.L	D1,TIME
+;NONEW:
+;	MOVE.W	#$444,$DFF180
+;	BTST	#2,$DFF016
+;	BEQ.S	EV2
+
+	BTST	#6,$BFE001
+	BNE.S	WAIT
+NOMORE:
+	LEA	SONG,A0
+	JSR	8(A0)
+	MOVEQ	#0,D2
+	RTS
+
+;ti:	dc.l	0
+;TIME:	DC.L	0
+
+EnterVPos:	dc.b	0
+ExitVPos:	dc.b	0
+MaxRastime:	dc.l	0
+

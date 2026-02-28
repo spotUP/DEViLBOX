@@ -1,0 +1,391 @@
+; MMV8-lib file for SAS C compiler.
+; requires V21 mmv8.library
+
+ xdef _SoundOn,_SoundOff,_GeneralSndInit,_GeneralSndRemove,_GeneralSndReset
+ xdef _FadeSnd,_WaitFade,_LoadAndInit,_RemoveLoaded,_WaitOneShotFin
+ xdef _DecrunchInstrs,_SetVolume,_SetSpeed,_GetUnPackedInstLen,_IsStdSong
+ xdef _SetAlertReaction,_NewLoadAndInit,_NewSndInit,_NewRemoveSong
+ xdef _NewSndReset,_NewSndResetOneshot,_RemoveAllSongs,_NewMakeTables
+ xdef _LockAudio,_UnlockAudio,_MuteChannels,_GetMutedChannels
+ xdef _InitUMod,_InitPMod,_GetUnPackLenMod,_DecrunchMod,_IsStdMod,_ObtainMixBufLenMod
+
+ xref _MMV8Base
+
+_soundon            equ -30
+_soundoff           equ -36
+_generalsndinit     equ -42
+_generalsndremove   equ -48
+_generalsndreset    equ -54
+_fadesnd            equ -60
+_waitfade           equ -66
+_loadandinit        equ -72
+_removeloaded       equ -78
+_waitoneshotfin     equ -84
+_decrunchinstrs     equ -90
+_setvolume          equ -96
+_setspeed           equ -102
+_getunpackedinstlen equ -108
+_isstdsong          equ -114
+_setalertreaction   equ -120
+_obtainmixbuflen    equ -126
+_setmixbuffers      equ -132
+_newloadandinit     equ -138
+_newsndinit         equ -144
+_newremovesong      equ -150
+_newsndreset        equ -156
+_newsndresetoneshot equ -162
+_removeallsongs     equ -168
+_newmaketables      equ -174
+_lockaudio          equ -186
+_unlockaudio        equ -192
+_setupcachecontrol  equ -198
+_mutechannels       equ -204
+_getmutedchannels   equ -210
+_initumod           equ -216
+_initpmod           equ -222
+_getunpacklenmod    equ -228
+_decrunchmod        equ -234
+_isstdmod           equ -240
+_obtainmixbuflenmod equ -246
+
+
+ SECTION _SoundOn
+_SoundOn:            ; SoundOn();
+ move.l a6,-(a7)
+ move.l _MMV8Base,a6
+ jsr _soundon(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _SoundOff
+_SoundOff:           ; SoundOff();
+ move.l a6,-(a7)
+ move.l _MMV8Base,a6
+ jsr _soundoff(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _GeneralSndInit
+_GeneralSndInit:     ; GeneralSndInit(oneshot,instrs,sdata,routine);
+ movem.l a2-a3/a6,-(a7)
+ move.l 16+0(a7),d0
+ move.l 16+4(a7),a1
+ move.l 16+8(a7),a2
+ move.l 16+12(a7),a3
+ move.l _MMV8Base,a6
+ jsr _generalsndinit(a6)
+ movem.l (a7)+,a2-a3
+ rts
+
+ SECTION _GeneralSndRemove
+_GeneralSndRemove:   ; GeneralSndEdRemove();
+ move.l a6,-(a7)
+ move.l _MMV8Base,a6
+ jsr _generalsndremove(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _GeneralSndReset
+_GeneralSndReset:    ; GeneralSndReset(oneshot);
+ move.l a6,-(a7)
+ move.l 8(a7),d0
+ move.l _MMV8Base,a6
+ jsr _generalsndreset(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _FadeSnd
+_FadeSnd:            ; FadeSnd(fadespeed);
+ move.l a6,-(a7)
+ move.l 8(a7),d0
+ move.l _MMV8Base,a6
+ jsr _fadesnd(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _WaitFade
+_WaitFade:           ; finished = WaitFade();
+ move.l a6,-(a7)
+ move.l _MMV8Base,a6
+ jsr _waitfade(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _SetVolume
+_SetVolume:          ; SetVolume(level);
+ move.l a6,-(a7)
+ move.l 8(a7),d0
+ move.l _MMV8Base,a6
+ jsr _setvolume(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _SetSpeed
+_SetSpeed:           ; oldspeed = SetSpeed(speed);
+ move.l a6,-(a7)
+ move.l 8(a7),d0
+ move.l _MMV8Base,a6
+ jsr _setspeed(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _LoadAndInit
+_LoadAndInit:        ; error = LoadAndInit(filename,oneshot);
+ move.l a6,-(a7)
+ move.l 8(a7),a0
+ move.l 12(a7),d0
+ move.l _MMV8Base,a6
+ jsr _loadandinit(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _RemoveLoaded
+_RemoveLoaded:       ; RemoveLoaded();
+ move.l a6,-(a7)
+ move.l _MMV8Base,a6
+ jsr _removeloaded(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _WaitOneShotFin
+_WaitOneShotFin:     ; finished = WaitOneShotFin();
+ move.l a6,-(a7)
+ move.l _MMV8Base,a6
+ jsr _waitoneshotfin(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _DecrunchInstrs
+_DecrunchInstrs:     ; DecrunchInstrs(source,dest);
+ move.l a6,-(a7)
+ move.l 8(a7),a0
+ move.l 12(a7),a1
+ move.l _MMV8Base,a6
+ jsr _decrunchinstrs(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _GetUnPackedInstLen
+_GetUnPackedInstLen:  ; instlen = GetUnPackedInstLen(ipdata);
+ move.l a6,-(a7)
+ move.l 8(a7),a0
+ move.l _MMV8Base,a6
+ jsr _getunpackedinstlen(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _IsStdSong
+_IsStdSong:           ; isstdsong = IsStdSong(sdata);
+ move.l a6,-(a7)
+ move.l 8(a7),a0
+ move.l _MMV8Base,a6
+ jsr _isstdsong(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _SetAlertReaction
+_SetAlertReaction:    ; SetAlertReaction(reaction);
+ move.l a6,-(a7)
+ move.l 8(a7),d0
+ move.l _MMV8Base,a6
+ jsr _setalertreaction(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _ObtainMixBufLen
+_ObtainMixBufLen:     ; mixbuflen = ObtainMixBufLen(&MELODAT);
+ move.l a6,-(a7)
+ move.l 8(a7),a0
+ move.l _MMV8Base,a6
+ jsr _obtainmixbuflen(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _SetMixBuffers
+_SetMixBuffers:       ; SetMixBuffers(vectorfield);
+ move.l a6,-(a7)
+ move.l 8(a7),a0
+ move.l _MMV8Base,a6
+ jsr _setmixbuffers(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _NewLoadAndInit
+_NewLoadAndInit:
+ move.l a6,-(a7)
+ move.l 8(a7),a0
+ move.l 12(a7),d0
+ move.l 16(a7),a1
+ move.l 20(a7),d1
+ move.l _MMV8Base,a6
+ jsr _newloadandinit(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _NewSndInit
+_NewSndInit:
+ movem.l a2-a3/a6,-(a7)
+ move.l 16+0(a7),d0
+ move.l 16+4(a7),d1
+ move.l 16+8(a7),a1
+ move.l 16+12(a7),a2
+ move.l 16+16(a7),a3
+ move.l _MMV8Base,a6
+ jsr _newsndinit(a6)
+ movem.l (a7)+,a2-a3/a6
+ rts
+
+ SECTION _NewRemoveSong
+_NewRemoveSong:
+ move.l a6,-(a7)
+ move.l 8(a7),d0
+ move.l _MMV8Base,a6
+ jsr _newremovesong(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _NewSndReset
+_NewSndReset:
+ move.l a6,-(a7)
+ move.l 8(a7),d0
+ move.l _MMV8Base,a6
+ jsr _newsndreset(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _NewSndResetOneshot
+_NewSndResetOneshot:
+ move.l a6,-(a7)
+ move.l 8(a7),d0
+ move.l 12(a7),d1
+ move.l _MMV8Base,a6
+ jsr _newsndresetoneshot(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _RemoveAllSongs
+_RemoveAllSongs:
+ move.l a6,-(a7)
+ move.l _MMV8Base,a6
+ jsr _removeallsongs(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _NewMakeTables
+_NewMakeTables:
+ move.l a6,-(a7)
+ move.l 8(a7),a0
+ move.l 12(a7),d1
+ move.l _MMV8Base,a6
+ jsr _newmaketables(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _LockAudio
+_LockAudio:     ; success = LockAudio()
+ move.l a6,-(a7)
+ move.l _MMV8Base,a6
+ jsr _lockaudio(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _UnlockAudio
+_UnlockAudio:     ; UnlockAudio()
+ move.l a6,-(a7)
+ move.l _MMV8Base,a6
+ jsr _unlockaudio(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _SetupCacheControl
+_SetupCacheControl:
+ move.l a6,-(a7)
+ move.l 8(a7),d0
+ move.l 12(a7),d1
+ move.l _MMV8Base,a6
+ jsr _setupcachecontrol(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _MuteChannels
+_MuteChannels:     ; MuteChannels(channels)
+ move.l a6,-(a7)
+ move.l _MMV8Base,a6
+ jsr _mutechannels(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _GetMutedChannels
+_GetMutedChannels:
+ move.l a6,-(a7)
+ move.l 8(a7),d0
+ move.l _MMV8Base,a6
+ jsr _getmutedchannels(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _InitUMod  ; InitUMod(oneshot, song#, module,subroutine)
+_InitUMod:
+ movem.l a2/a6,-(a7)
+ move.l 12(a7),d0
+ move.l 16(a7),d1
+ move.l 20(a7),a1
+ move.l 24(a7),a2
+ move.l _MMV8Base,a6
+ jsr _initumod(a6)
+ movem.l (a7)+,a2/a6
+ rts
+
+ SECTION _InitPMod  ; InitPMod(oneshot,song#, pmodule, instrs, subroutine)
+_InitPMod:
+ movem.l a2-a3/a6,-(a7)
+ move.l 16(a7),d0
+ move.l 20(a7),d1
+ move.l 24(a7),a1
+ move.l 28(a7),a2
+ move.l 32(a7),a3
+ move.l _MMV8Base,a6
+ jsr _initpmod(a6)
+ movem.l (a7)+,a2-a3/a6
+ rts
+
+ SECTION _GetUnPackLenMod ; length = GetUnPackLenMod(pmodule)
+_GetUnPackLenMod:
+ move.l a6,-(a7)
+ move.l 8(a7),a0
+ move.l _MMV8Base,a6
+ jsr _getunpacklenmod(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _DecrunchMod   ; DecrunchMod(pmodule, instrmem)
+_DecrunchMod:
+ move.l a6,-(a7)
+ move.l 8(a7),a0
+ move.l 12(a7),a1
+ move.l _MMV8Base,a6
+ jsr _decrunchmod(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _IsStdMod      ; TRUE|FALSE = IsStdMod(module)
+_IsStdMod:
+ move.l a6,-(a7)
+ move.l 8(a7),a0
+ move.l _MMV8Base,a6
+ jsr _isstdmod(a6)
+ movem.l (a7)+,a6
+ rts
+
+ SECTION _ObtainMixBufLenMod  ; mixbufferlen = Obtain...(module)
+_ObtainMixBufLenMod:
+ move.l a6,-(a7)
+ move.l 8(a7),a0
+ move.l _MMV8Base,a6
+ jsr _obtainmixbuflenmod(a6)
+ movem.l (a7)+,a6
+ rts
+
+ END
+
+

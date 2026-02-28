@@ -1,0 +1,47 @@
+;
+; EXAMPLE for calling the Linker for a C program to play MusicMaker-Music
+;
+; c-player.o is the compiled "C-Player.c" from this disk,
+;
+; c-interface.o contains the stack-to-register conversion routines required
+;               for c-programs. (Same file for sysplayer as well as mplayer!)
+; sysplayer.o   contains the MusicMaker 4-channel player code,
+; mplayer.o     contains the MusicMaker 8-channel player code.
+;
+; tw#?song#? are the files containing the sound data; they are created by
+;          MusicMaker's "O"-command from CM.
+;
+; mmv8.lib, mmv88.lib, mmvx.lib are required for using the libraries
+;
+;
+blink lib:c.o
+      MMV8:Developer/C/C-Player.o              ; 4-channels
+      MMV8:Developer/C/C-Interface.o
+      MMV8:Developer/linkmodules/sysplayer.o
+      obj:twsong.s.o       ; any 4-channel song
+      obj:twsong.i.o
+   TO MMV8:Developer/C/C-Player
+  LIB lib:lc.lib+lib:amiga.lib+lib:mmv8.lib
+
+blink lib:c.o
+      MMV8:Developer/C/C-8Player.o             ; 8-channels
+      MMV8:Developer/C/C-Interface.o
+      MMV8:Developer/linkmodules/mplayer.o
+      obj:tw1song.s.o      ; any 8-channel song
+      obj:tw1song.i.o
+   TO MMV8:Developer/C/C-8Player
+  LIB lib:lc.lib+lib:amiga.lib+lib:mmv88.lib
+
+
+; If you are using the mmv8.library instead (without) linking the player code
+; to your program, that's what it says:
+blink lib:c.o
+      MMV8:Developer/C/C-player.o
+      obj:twsong.s.o
+      obj:twsong.i.o
+   TO MMV8:Developer/C/C-player
+  LIB lib:lc.lib+lib:amiga.lib+MMV8:Developer/C/MMV8.lib
+
+; Note: THESE C-Player examples both use the library (LIB-File required)
+; AND need the sys|mplayer.o !
+

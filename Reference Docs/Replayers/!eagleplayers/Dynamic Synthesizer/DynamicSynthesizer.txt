@@ -1,0 +1,10 @@
+DNS.HollywoodPokerPro ingame    17288  
+DNS.HollywoodPokerPro title     10184  
+DNS.PTC                         14096  
+DNS.Starball ingame             11930  
+DNS.Starball title               8086  
+SMP.HollywoodPokerPro ingame    67706  
+SMP.HollywoodPokerPro title     89492  
+SMP.PTC                         69632  
+SMP.Starball ingame             92246  
+SMP.Starball title              54476  

@@ -1,0 +1,36 @@
+Short:    EaglePlayer "Fred Gray" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  1
+Type:     mus/play
+
+This is a new external "Fred Gray" module replay for EaglePlayer 1.54/2.00+.
+It's a player for all (?) known Fred Gray Amiga modules.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- ModuleInfo (with Position Counter)
+- Volume
+- Balance
+- SongEnd (only for non-looping songs)
+- SubSong
+- as a bonus, an EagleRipper (finder only) for Fred Gray (Amiga and Atari ST)
+  modules is included
+
+Notes:
+
+1. All Fred Gray modules must be converted to a special format before they
+   can be played. This format is very similar to EaglePlayer's "Dave Lowe"
+   format. For more information please contact Wanted Team.
+
+2. Included is a list of all available Fred Gray modules that I am aware of
+   (see FredGray.txt). If you have, or know of, unsupported Fred Gray
+   modules please contact Wanted Team. Although it is not included in the
+   attached list, this sound format was also used in the game "HellRaider",
+   but only for playing sound effects.
+
+3. The email address wt@jho.pol.pl might not be valid after March 2000.

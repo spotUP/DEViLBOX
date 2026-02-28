@@ -1,0 +1,45 @@
+Short:    EaglePlayer "Unique Development" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  1
+Type:     mus/play
+
+This is a new external module replayer for EaglePlayer 1.54/2.00+.
+It's a replayer for all known Unique Development modules created
+by Per Almered.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- Volume
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- Balance
+- SongEnd
+- ModuleInfo with Position Counter
+- SubSong
+
+Notes:
+
+1. This player plays mods from Amiga game called "Obsession" and perhaps
+   can works with songs from Atari STE (and Falcon) version of this game.
+
+   BTW. If you have Atari STE/Falcon version of "Obsession" game, please
+   contact with Wanted Team.
+
+2. Default file prefixes:
+
+   for songdata file - UDS. (for example: UDS.Obsession Menu)
+   for samples file  - SMP. (for example: SMP.Obsession Menu)
+
+3. The latest version of EP players released by Wanted Team are available
+   on Wanted Team's FTP:
+
+address    ftp.union.org.pl (temporary offline)
+login      krzak
+password   Rozany1
+catalog    /Players/
+
+4. Email wt@jho.pol.pl might not be valid after March 2000.

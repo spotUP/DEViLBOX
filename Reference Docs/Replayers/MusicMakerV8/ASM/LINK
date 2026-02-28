@@ -1,0 +1,37 @@
+;
+; This file is a skeleton batch for linking the asm-player examples.
+;
+
+; The files
+; "obj:twsong.#?.o" do not exist on this disk, but you can create them by
+; using the "O" command from MusicMaker.
+
+; 1. The Non-System-Player
+blink MMV8:Developer/ASM/Non-System-Player.o          ; Main
+      MMV8:Developer/LinkModules/Player.o             ; Player-Module
+      obj:twsong.s.o,obj:twsong.i.o                ; Sound data
+    TO MMV8:Developer/ASM/Non-System-Player
+
+; 2. The System-Player
+blink MMV8:Developer/ASM/System-Player.o              ; The Main Prg.
+      MMV8:Developer/LinkModules/SYSPlayer.o          ; The Player-Module
+      obj:twsong.s.o,obj:twsong.i.o                ; The Sound-Data
+    TO MMV8:Developer/ASM/Non-System-Player
+
+; 3. The 8-Channel-Player
+blink MMV8:Developer/ASM/8-Channel-Player.o           ; The Main Program
+      MMV8:Developer/Linkmoduls/MPlayer.o             ; The Player-Module
+      obj:twsong.s.o,obj:twsong.i.o                ; The Song-Data
+    TO MMV8:Developer/ASM/8-Channel-Player
+
+; 4. The 8Player-Example
+blink MMV8:Developer/ASM/8Player.o                    ; Main
+      MMV8:Developer/LinkModules/MPlayer.o            ; Player-Module
+    TO MMV8:Developer/ASM/8Player
+(Sounddata will be loaded in this example - so no linking necessary !)
+
+; FOR Library-Player and Multiplayer
+; is no special linking-info necessary, because these are using the
+; mmv8.library and do not need any linked data.
+
+

@@ -1,0 +1,78 @@
+Short:    EaglePlayer "David Whittaker" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  1
+Type:     mus/play
+
+This is a different version of the external "David Whittaker" player
+for EaglePlayer 1.54/2.00+. It's a replayer for all (?) known modules
+which David Whittaker has released using Rob Hubbard's and his own Amiga
+replay routine.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- SubSong
+- Balance
+- ModuleInfo with Position Counter (although they don't have true patterns)
+- Volume
+- SongEnd
+
+Notes:
+
+1. This player plays David Whittaker (old and new) modules and also plays
+   old Rob Hubbard modules (for example: "Leviathan" and "QBall").
+
+2. Note that the "Rob Hubbard Old" format is different from, and older
+   than, the old Rob Hubbard modules that can be played by this player.
+   "Rob Hubbard Old" might be better named "Rob Hubbard ST."
+
+3. This player plays/recognizes only onefiled Rob Hubbard mods; mods
+   with separated samples (for example: "Leviathan") must be converted
+   to the onefile format.
+
+4. If you have, or know of, unsupported Dave Whittaker or Rob Hubbard
+   modules please contact Wanted Team.
+
+5. If you have the beta version of the "Aquaventura" game with David
+   Whittaker music please contact Wanted Team.
+
+6. This player also plays initialized Whittaker mods but it is probably
+   better to use the uninitialized versions.
+
+7. This player also plays non-standard Whittaker mods (for example:
+   "Aquaventura", "Dan Dare 3").
+
+8. Many (?) damaged Whittaker mods exist. Damaged mods are unplayable or
+   will play badly; you can check for error messages with EaglePlayer.
+   You should rip these songs again with Exotic Ripper which will
+   correctly calculate the length of most Whittaker songs, except
+   some old mods (for example: the "Bubble Bobble" module and the
+   "Grimblood" module) and some non-standard mods (for example: the
+   "Obliterator" title music).
+
+9. This player doesn't play very short Whittaker modules because they
+   can crash your Amiga.
+
+   BTW, all standard Whittaker modules (old & new) must always have
+   64 zero bytes at the end of module.
+
+10. All (?) Whittaker songs with random subsong switching (for example:
+    "Sentinel", "Loopz") are playable now with normal subsong switching.
+
+11. A full list of all the old Whittaker mods that are known to me is
+    attached (OldWhittaker.txt).
+
+12. The latest versions of EP players released by Wanted Team are available
+    on Wanted Team's FTP site:
+
+address    ftp.union.org.pl (temporarily offline)
+login      krzak
+password   Rozany1
+catalog    /Players/
+
+13. The email address wt@jho.pol.pl might not be valid after March 2000.

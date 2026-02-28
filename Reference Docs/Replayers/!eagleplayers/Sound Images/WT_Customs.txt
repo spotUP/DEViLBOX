@@ -1,0 +1,8 @@
+
+Archive name        Size  Ver. Module name
+
+BlueAngel69.lha    46257   2   Blue Angel 69 (c) 1989 by Magic Bytes
+DoubleDragon2.lha   4534   2   Double Dragon II (c) 1989 by Binary Design/Virgin
+Gluecksrad.lha     44217   1   Gluecksrad (c) 1991 (?) by GameTEK
+PinkPanther.lha    39274   1   Pink Panther (c) 1988 by reLINE/Magic Bytes
+TetraQuest.lha      6237   1   Tetra Quest (c) 1988 by Microdeal

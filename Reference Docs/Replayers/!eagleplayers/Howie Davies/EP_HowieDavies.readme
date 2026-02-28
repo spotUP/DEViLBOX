@@ -1,0 +1,44 @@
+Short:    EaglePlayer "Howie Davies" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  1
+Type:     mus/play
+
+This is a new external "Howie Davies" module replay for EaglePlayer 1.54/2.00+.
+It's a player for all (?) modules which were composed by Howie Davies
+for the Amiga using Gary Antcliffe's replay routine, which is based on
+the "Riff Raff" replay routine.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- Volume
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- Balance
+- SongEnd (only for looping songs)
+- ModuleInfo
+- SubSong
+- as a bonus, an EagleRipper (finder only) for Howie Davies modules is included
+
+Notes:
+
+1. This soundformat was used only (or mostly) in PAL Developments games
+   from the years 1990-91 (example: "Blazing Thunder"). The music for the
+   C64 versions of all these games was made by Julian Potts (Japmaster).
+
+2. To play Howie Davies music every module must first be converted to a
+   special format which is very similar to EaglePlayer's "Dave Lowe"
+   format. For more information please contact Wanted Team.
+
+3. Included is a list of all available Howie Davies modules that I know of
+   (see HowieDavies.txt). If you have, or know of, unsupported Howie Davies
+   modules please contact Wanted Team.
+
+4. You can get the latest versions of Wanted Team products from:
+
+   http://www.emucamp.com/amiga/wt/wt.html
+
+5. The email address wt@jho.pol.pl might not be valid after March 2000.
