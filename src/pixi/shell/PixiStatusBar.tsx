@@ -20,6 +20,8 @@ import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { KNOB_BANKS, type KnobAssignment } from '@/midi/knobBanks';
 import type { KnobBankMode } from '@/midi/types';
+import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { WorkbenchMinimap } from '../workbench/WorkbenchMinimap';
 
 /** Main status bar height (matches DOM py-1.5 + text) */
 const STATUS_BAR_HEIGHT = 32;
@@ -484,6 +486,7 @@ interface MainRowProps {
   isAudioRunning: boolean;
   collabConnected: boolean;
   collabRoomCode: string | null;
+  minimapVisible: boolean;
 }
 
 const MainStatusRow: React.FC<MainRowProps> = ({
@@ -496,6 +499,7 @@ const MainStatusRow: React.FC<MainRowProps> = ({
   isAudioRunning,
   collabConnected,
   collabRoomCode,
+  minimapVisible,
 }) => {
   const theme = usePixiTheme();
 
@@ -537,6 +541,13 @@ const MainStatusRow: React.FC<MainRowProps> = ({
         collabRoomCode={collabRoomCode}
         activeView={activeView}
       />
+
+      {/* Workbench minimap — sits flush to right edge of status bar */}
+      {minimapVisible && (
+        <pixiContainer layout={{ position: 'absolute', right: 0, bottom: 0 }}>
+          <WorkbenchMinimap screenW={width} screenH={window.innerHeight} />
+        </pixiContainer>
+      )}
     </pixiContainer>
   );
 };
@@ -548,6 +559,7 @@ export const PixiStatusBar: React.FC = () => {
 
   const activeView = useUIStore((s) => s.activeView);
   const isAudioRunning = useAudioStore((s) => s.contextState === 'running');
+  const minimapVisible = useWorkbenchStore((s) => s.minimapVisible);
   const collabStatus = useCollaborationStore((s) => s.status);
   const collabRoomCode = useCollaborationStore((s) => s.roomCode);
 
@@ -616,6 +628,7 @@ export const PixiStatusBar: React.FC = () => {
         isAudioRunning={isAudioRunning}
         collabConnected={collabConnected}
         collabRoomCode={collabRoomCode}
+        minimapVisible={minimapVisible}
       />
     </pixiContainer>
   );

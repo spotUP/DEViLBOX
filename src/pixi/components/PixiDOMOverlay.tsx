@@ -13,6 +13,7 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { Container as ContainerType } from 'pixi.js';
+import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 
 interface PixiDOMOverlayProps {
   layout: Record<string, unknown>;   // @pixi/layout flex props
@@ -46,6 +47,9 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
   autoHeightRef.current = autoHeight;
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
+  const isTilted    = useWorkbenchStore((s) => s.isTilted);
+  const isTiltedRef = useRef(isTilted);
+  isTiltedRef.current = isTilted;
   // Persist the last measured autoHeight value so parent re-renders
   // don't overwrite it with the caller's static height prop.
   const measuredHeightRef = useRef<number | null>(null);
@@ -121,11 +125,13 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
             | { width: number; height: number } | undefined;
 
           if (computed && computed.width > 0 && computed.height > 0) {
-            const globalPos = el.toGlobal({ x: 0, y: 0 });
-            const x = Math.round(globalPos.x);
-            const y = Math.round(globalPos.y);
-            const w = Math.round(computed.width);
-            const h = Math.round(computed.height);
+            const globalTL = el.toGlobal({ x: 0, y: 0 });
+            const globalBR = el.toGlobal({ x: computed.width, y: computed.height });
+            const x = Math.round(globalTL.x);
+            const y = Math.round(globalTL.y);
+            // Use BR-TL so width/height correctly reflect camera scale transforms
+            const w = Math.round(Math.abs(globalBR.x - globalTL.x));
+            const h = Math.round(Math.abs(globalBR.y - globalTL.y));
 
             if (x !== prevX || y !== prevY || w !== prevW || h !== prevH) {
               prevX = x; prevY = y; prevW = w; prevH = h;
@@ -138,12 +144,12 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
               if (!autoHeightRef.current) {
                 div.style.height = `${h}px`;
               }
-              if (visibleRef.current) {
+              if (visibleRef.current && !isTiltedRef.current) {
                 div.style.display = '';
               }
             }
-            // Hide/show when visible changes without bounds change
-            div.style.display = visibleRef.current ? (prevW > 0 ? '' : 'none') : 'none';
+            // Hide/show when visible or isTilted changes without bounds change
+            div.style.display = (visibleRef.current && !isTiltedRef.current) ? (prevW > 0 ? '' : 'none') : 'none';
           }
         }
       }
