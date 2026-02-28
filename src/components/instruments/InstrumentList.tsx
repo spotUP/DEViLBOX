@@ -162,10 +162,14 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       const now = Tone.now();
       engine.triggerNoteAttack(inst.id, previewNote, now, 0.8, inst);
 
-      // Release after 300ms
+      // Samples play through immediately — 300ms is plenty.
+      // Synth instruments need more time to let the envelope breathe.
+      const isSampler = ['Sampler', 'Sam', 'Player', 'DrumKit'].includes(inst.synthType ?? '');
+      const holdMs = isSampler ? 300 : 800;
+
       previewTimeoutRef.current = window.setTimeout(() => {
         engine.triggerNoteRelease(inst.id, previewNote, Tone.now(), inst);
-      }, 300);
+      }, holdMs);
     } catch (error) {
       console.warn('[InstrumentList] Preview failed:', error);
     }
