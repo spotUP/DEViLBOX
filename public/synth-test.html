@@ -64,6 +64,50 @@
     }
     th { background: #0d1117; color: #888; }
     .synth-count { color: #00ff88; font-size: 24px; margin: 10px 0; }
+
+    /* Interactive judgment area */
+    .judgment-area {
+      background: #0d2040;
+      border: 1px solid #00ff88;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin: 8px 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .judge-ok    { background: #00cc66; color: #000; }
+    .judge-notok { background: #cc2222; color: #fff; }
+    .judge-replay { background: #0066cc; color: #fff; }
+    .reason-input { display: flex; gap: 8px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+    .reason-input input, .reason-text {
+      background: #1a1a2e; border: 1px solid #555; color: #eee;
+      padding: 6px 10px; border-radius: 4px; flex: 1; font-size: 14px;
+    }
+    .judge-confirm { background: #cc2222; color: #fff; }
+
+    /* Fixed judgment overlay panel — always visible at bottom of viewport */
+    #judgment-panel {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #0d1117;
+      border-top: 2px solid #00ff88;
+      padding: 16px 24px;
+      z-index: 9999;
+      box-shadow: 0 -4px 24px rgba(0, 255, 136, 0.25);
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    #judgment-panel.visible { display: flex; }
+    #judgment-panel .reason-text {
+      background: #1a1a2e; border: 1px solid #555; color: #eee;
+      padding: 6px 10px; border-radius: 4px; flex: 1; font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -74,10 +118,12 @@
   <button id="runTests">Run All Tests</button>
   <button id="runFallbackTests">Run Fallback Detection Only</button>
   <button id="runVolumeTests">Run Volume Level Tests</button>
+  <button id="runInteractiveTest">🎧 Interactive Volume Test</button>
   <button id="runBehaviorTests">Run Sustain/Release Tests</button>
   <button id="runSamplePackTests">Run Sample Pack Tests</button>
 
   <div id="results"></div>
+  <div id="judgment-panel"></div>
 
   <!-- Load test-runner.ts via Vite -->
   <script type="module" src="/src/test-runner.ts"></script>
