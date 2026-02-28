@@ -64,6 +64,7 @@ class MusicLineProcessor extends AudioWorkletProcessor {
         this._resampPos = 0.0;
         if (this.wasm && this.songLoaded) {
           this.wasm._ml_stop();
+          this.songLoaded = false;
         }
         break;
 
