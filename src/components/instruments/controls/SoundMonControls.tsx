@@ -8,10 +8,55 @@
  *  - EnvelopeVisualization: visual ADSR curve in the Volume Envelope section
  *  - SequenceEditor: proper step-sequence editor for the arpeggio table
  *  - WaveformThumbnail: mini previews on each wave-type button
+ *
+ * When loaded via UADE (uadeChipRam present), scalar params that have a direct
+ * 1-byte equivalent in the synth instrument header are written to chip RAM so
+ * UADE picks them up on the next note trigger.
+ *
+ * SoundMon synth instrument byte layout (offset from instrBase = moduleBase +
+ * file offset of the 0xFF marker byte):
+ *
+ *   +0   : 0xFF marker
+ *   +1   : table index (waveType source — not written; would corrupt table ptr)
+ *   +2-3 : waveform length word (BE)
+ *   +4   : adsrControl
+ *   +5   : adsrTable byte
+ *   +6-7 : adsrLen word (BE)
+ *   +8   : adsrSpeed  → attackSpeed  ✓ written
+ *   +9   : lfoControl
+ *   +10  : lfoTable byte
+ *   +11  : lfoDepth   → vibratoDepth ✓ written
+ *   +12-13: lfoLen word (BE)
+ *
+ *   V1/V2 (instrSize == 29):
+ *     +14  : skip byte
+ *     +15  : lfoDelay  → vibratoDelay ✓ written
+ *     +16  : lfoSpeed  → vibratoSpeed ✓ written
+ *     ... ADSR/EG/volume (skipped)
+ *
+ *   V3 (instrSize == 32):
+ *     +14  : lfoDelay  → vibratoDelay ✓ written
+ *     +15  : lfoSpeed  → vibratoSpeed ✓ written
+ *     ... ADSR/EG/FX/mod/volume (skipped)
+ *
+ * Fields NOT written to chip RAM (with reason):
+ *   waveType       — +1 is the table index pointer; partial overwrite would
+ *                    corrupt the waveform table reference
+ *   waveSpeed      — purely a SoundMonConfig concept; no chip RAM equivalent
+ *   attackVolume   — stored in ADSR table data (variable-length sequence), not
+ *   decayVolume      in the fixed instrument header; requires table re-encoding
+ *   sustainVolume
+ *   releaseVolume
+ *   decaySpeed     — no dedicated byte in the instrument header
+ *   sustainLength  — no dedicated byte in the instrument header
+ *   releaseSpeed   — no dedicated byte in the instrument header
+ *   portamentoSpeed — no dedicated byte in the instrument header
+ *   arpTable       — stored in separate synth table region; not in instr header
+ *   arpSpeed       — no dedicated byte in the instrument header
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import type { SoundMonConfig } from '@/types/instrument';
+import type { SoundMonConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import {
@@ -20,12 +65,16 @@ import {
   WaveformThumbnail,
 } from '@components/instruments/shared';
 import type { SequencePreset } from '@components/instruments/shared';
+import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
+import { UADEEngine } from '@/engine/uade/UADEEngine';
 
 interface SoundMonControlsProps {
   config: SoundMonConfig;
   onChange: (updates: Partial<SoundMonConfig>) => void;
   /** Optional playback position for arpeggio sequence (undefined = not playing) */
   arpPlaybackPosition?: number;
+  /** Present when this instrument was loaded via UADE's native SoundMon parser. */
+  uadeChipRam?: UADEChipRamInfo;
 }
 
 type SMTab = 'main' | 'arpeggio';
@@ -69,17 +118,41 @@ const ARP_PRESETS: SequencePreset[] = [
   { name: 'Clear',      data: new Array(16).fill(0) },
 ];
 
+// ── SoundMon instrument size constants ─────────────────────────────────────────
+// V1/V2 synth instrument block = 29 bytes; V3 = 32 bytes.
+// Used to determine which lfoDelay/lfoSpeed offset applies.
+const SM_V1V2_INSTR_SIZE = 29;
+
+/** Byte offset of lfoDelay (vibratoDelay) relative to instrBase. */
+function lfoDelayOffset(instrSize: number): number {
+  return instrSize === SM_V1V2_INSTR_SIZE ? 15 : 14;
+}
+
+/** Byte offset of lfoSpeed (vibratoSpeed) relative to instrBase. */
+function lfoSpeedOffset(instrSize: number): number {
+  return instrSize === SM_V1V2_INSTR_SIZE ? 16 : 15;
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
   config,
   onChange,
   arpPlaybackPosition,
+  uadeChipRam,
 }) => {
   const [activeTab, setActiveTab] = useState<SMTab>('main');
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
+
+  const chipEditorRef = useRef<UADEChipEditor | null>(null);
+  const getEditor = useCallback(() => {
+    if (!chipEditorRef.current) {
+      chipEditorRef.current = new UADEChipEditor(UADEEngine.getInstance());
+    }
+    return chipEditorRef.current;
+  }, []);
 
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyan = currentThemeId === 'cyan-lineart';
@@ -92,6 +165,20 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
   const upd = useCallback(<K extends keyof SoundMonConfig>(key: K, value: SoundMonConfig[K]) => {
     onChange({ [key]: value } as Partial<SoundMonConfig>);
   }, [onChange]);
+
+  /**
+   * Like `upd`, but also writes a single byte to chip RAM when a UADE context
+   * is active. byteOffset is relative to instrBase.
+   */
+  const updWithChipRam = useCallback(
+    (key: keyof SoundMonConfig, value: SoundMonConfig[keyof SoundMonConfig], byteOffset: number) => {
+      upd(key as Parameters<typeof upd>[0], value as Parameters<typeof upd>[1]);
+      if (uadeChipRam && typeof value === 'number') {
+        void getEditor().writeU8(uadeChipRam.instrBase + byteOffset, value & 0xFF);
+      }
+    },
+    [upd, uadeChipRam, getEditor],
+  );
 
   const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
     <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
@@ -133,11 +220,17 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
             );
           })}
         </div>
+        {/* TODO chip RAM: waveType maps to table index (+1) which is a pointer
+            into the synth table region — overwriting it alone would corrupt
+            the waveform table reference and is not safe without re-encoding
+            the full waveform table. Skipped. */}
         <div className="flex items-center gap-4 mt-2">
           <Knob value={config.waveSpeed} min={0} max={15} step={1}
             onChange={(v) => upd('waveSpeed', Math.round(v))}
             label="Morph Rate" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
+          {/* TODO chip RAM: waveSpeed has no direct byte in the SoundMon
+              instrument header. Skipped. */}
         </div>
       </div>
 
@@ -167,8 +260,11 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
               onChange={(v) => upd('attackVolume', Math.round(v))}
               label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
+            {/* TODO chip RAM: attackVolume is stored in the ADSR table sequence
+                (variable-length opcode data), not in the fixed instrument header.
+                Re-encoding the ADSR table is non-trivial. Skipped. */}
             <Knob value={config.attackSpeed} min={0} max={63} step={1}
-              onChange={(v) => upd('attackSpeed', Math.round(v))}
+              onChange={(v) => updWithChipRam('attackSpeed', Math.round(v), 8)}
               label="Speed" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
           </div>
@@ -178,10 +274,13 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
               onChange={(v) => upd('decayVolume', Math.round(v))}
               label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
+            {/* TODO chip RAM: decayVolume stored in ADSR table. Skipped. */}
             <Knob value={config.decaySpeed} min={0} max={63} step={1}
               onChange={(v) => upd('decaySpeed', Math.round(v))}
               label="Speed" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
+            {/* TODO chip RAM: decaySpeed has no dedicated byte in the instrument
+                header (adsrSpeed at +8 covers only attackSpeed). Skipped. */}
           </div>
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Sustain</span>
@@ -189,10 +288,12 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
               onChange={(v) => upd('sustainVolume', Math.round(v))}
               label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
+            {/* TODO chip RAM: sustainVolume stored in ADSR table. Skipped. */}
             <Knob value={config.sustainLength} min={0} max={255} step={1}
               onChange={(v) => upd('sustainLength', Math.round(v))}
               label="Length" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
+            {/* TODO chip RAM: sustainLength has no dedicated byte. Skipped. */}
           </div>
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Release</span>
@@ -200,10 +301,12 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
               onChange={(v) => upd('releaseVolume', Math.round(v))}
               label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
+            {/* TODO chip RAM: releaseVolume stored in ADSR table. Skipped. */}
             <Knob value={config.releaseSpeed} min={0} max={63} step={1}
               onChange={(v) => upd('releaseSpeed', Math.round(v))}
               label="Speed" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
+            {/* TODO chip RAM: releaseSpeed has no dedicated byte. Skipped. */}
           </div>
         </div>
       </div>
@@ -213,15 +316,27 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
         <SectionLabel label="Vibrato" />
         <div className="flex gap-4">
           <Knob value={config.vibratoDelay} min={0} max={255} step={1}
-            onChange={(v) => upd('vibratoDelay', Math.round(v))}
+            onChange={(v) => {
+              const val = Math.round(v);
+              updWithChipRam(
+                'vibratoDelay', val,
+                lfoDelayOffset(uadeChipRam?.instrSize ?? SM_V1V2_INSTR_SIZE),
+              );
+            }}
             label="Delay" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibratoSpeed} min={0} max={63} step={1}
-            onChange={(v) => upd('vibratoSpeed', Math.round(v))}
+            onChange={(v) => {
+              const val = Math.round(v);
+              updWithChipRam(
+                'vibratoSpeed', val,
+                lfoSpeedOffset(uadeChipRam?.instrSize ?? SM_V1V2_INSTR_SIZE),
+              );
+            }}
             label="Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibratoDepth} min={0} max={63} step={1}
-            onChange={(v) => upd('vibratoDepth', Math.round(v))}
+            onChange={(v) => updWithChipRam('vibratoDepth', Math.round(v), 11)}
             label="Depth" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
@@ -235,6 +350,8 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
             onChange={(v) => upd('portamentoSpeed', Math.round(v))}
             label="Speed" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()} />
+          {/* TODO chip RAM: portamentoSpeed has no dedicated byte in the
+              SoundMon instrument header. Skipped. */}
           <span className="text-[10px] text-gray-600">0 = disabled</span>
         </div>
       </div>
@@ -252,6 +369,8 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
             onChange={(v) => upd('arpSpeed', Math.round(v))}
             label="Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
+          {/* TODO chip RAM: arpSpeed has no dedicated byte in the instrument
+              header; arpeggio data lives in the synth table region. Skipped. */}
         </div>
 
         <SequenceEditor
@@ -267,6 +386,10 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
           color={accent}
           height={100}
         />
+        {/* TODO chip RAM: arpTable entries live in the synth table region
+            (sections.synthTables + table_index * 64), not in the instrument
+            header. Writing them requires knowing the correct table index and
+            re-encoding all 64 bytes. Skipped. */}
       </div>
     </div>
   );
@@ -289,6 +412,22 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
       </div>
       {activeTab === 'main'     && renderMain()}
       {activeTab === 'arpeggio' && renderArpeggio()}
+      {uadeChipRam && (
+        <div className="flex justify-end px-3 py-2 border-t border-opacity-30"
+          style={{ borderColor: dim }}>
+          <button
+            className="text-[10px] px-2 py-1 rounded opacity-70 hover:opacity-100 transition-colors"
+            style={{ background: 'rgba(80,120,40,0.3)', color: '#88cc44' }}
+            onClick={() => void getEditor().exportModule(
+              uadeChipRam.moduleBase,
+              uadeChipRam.moduleSize,
+              'song.bp'
+            )}
+          >
+            Export .bp (Amiga)
+          </button>
+        </div>
+      )}
     </div>
   );
 };
