@@ -57,6 +57,10 @@ type NativeFormatKey =
   | 'futurePlayer' | 'markCooksey' | 'jeroenTel' | 'quartet'
   | 'soundMaster' | 'zoundMonitor' | 'tcbTracker' | 'jasonPage'
   | 'mmdc' | 'psa' | 'steveTurner' | 'tme' | 'infogrames' | 'ufo'
+  // ── Auto-detect native (no user toggle; native tried first, UADE fallback) ──
+  | 'amosMusicBank' | 'iceTracker'
+  // ── User-selectable native vs UADE (recently added) ─────────────────────────
+  | 'imagesMusicSystem' | 'sawteeth' | 'maximumEffect'
   // ── Formats with native parsers (vs libopenmpt as fallback) ─────────────────
   | 'imagoOrpheus' | 'cdfm67' | 'easyTrax' | 'madTracker2' | 'psm' | 'pt36';
 
@@ -70,7 +74,7 @@ const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label
   { key: 'soundmon', regex: /\.(bp|bp3|sndmon)$/i,                               label: 'SoundMon',          description: 'Brian Postma\'s SoundMon V1/V2/V3.' },
   { key: 'sidmon2',  regex: /\.(sid2|smn)$/i,                                    label: 'SidMon II',         description: 'SidMon II — native parser or UADE.' },
   { key: 'fred',     regex: /\.fred$/i,                                           label: 'Fred Editor',       description: 'Fred Editor by Software of Sweden.' },
-  { key: 'soundfx',  regex: /\.(sfx|sfx13)$/i,                                   label: 'Sound-FX',          description: 'Sound-FX v1.0 and v2.0.' },
+  { key: 'soundfx',  regex: /\.(sfx|sfx2|sfx13)$/i,                               label: 'Sound-FX',          description: 'Sound-FX v1.0 and v2.0.' },
   { key: 'mugician', regex: /\.(dmu|dmu2|mug|mug2)$/i,                           label: 'Digital Mugician',  description: 'Digital Mugician V1/V2 by Rob Hubbard.' },
   { key: 'tfmx',     regex: /\.(tfmx|mdat|tfx)$/i,                               label: 'TFMX',              description: 'Jochen Hippel TFMX — native parser or UADE.' },
 
@@ -144,6 +148,15 @@ const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label
   { key: 'mmdc',        regex: /^mmdc\.[^.]+$/i,                                 label: 'MMDC',              description: 'MMDC — native parser or UADE.' },
   { key: 'psa',         regex: /^psa\.[^.]+$/i,                                  label: 'PSA',               description: 'Professional Sound Artists — native parser or UADE.' },
   { key: 'magneticFieldsPacker',         regex: /^mfp\.[^.]+$/i,                                  label: 'MFP',               description: 'Magnetic Fields Packer — native parser or UADE.' },
+
+  // ── Auto-detect native (magic-based; no user engine toggle) ─────────────────
+  { key: 'amosMusicBank', regex: /\.abk$/i,              nativeOnly: true,        label: 'AMOS Music Bank',   description: 'AMOS Music Bank — native parser (magic-detected), UADE fallback.' },
+  { key: 'iceTracker',    regex: /\.ice$/i,              nativeOnly: true,        label: 'ICE Tracker',       description: 'ICE Tracker / SoundTracker 2.6 — native parser (magic-detected), UADE fallback.' },
+
+  // ── User-selectable: native parser or UADE ────────────────────────────────────
+  { key: 'imagesMusicSystem', regex: /\.ims$/i,                                   label: 'Images Music System', description: 'Images Music System — native parser or UADE.' },
+  { key: 'sawteeth',          regex: /\.st$/i,                                    label: 'Sawteeth',          description: 'Sawteeth (SWTD magic) — native parser or UADE.' },
+  { key: 'maximumEffect',     regex: /\.(mxtx|max)$/i,                            label: 'Maximum Effect / MaxTrax', description: 'Maximum Effect (max.*) and MaxTrax (.mxtx) — native parser or UADE.' },
 
   // ── Formats with native parsers (fallback: libopenmpt) ───────────────────────
   { key: 'imagoOrpheus', regex: /\.imf$/i,                                        label: 'Imago Orpheus',     description: 'Imago Orpheus — native parser or libopenmpt.' },
