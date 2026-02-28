@@ -185,7 +185,6 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
         e.preventDefault();
         navigator.clipboard.readText().then(pasted => {
           const cv = valueRef.current;
-          const cp = cursorPosRef.current;
           const css = selStartRef.current;
           const cse = selEndRef.current;
           const lo = Math.min(css, cse), hi = Math.max(css, cse);
@@ -285,7 +284,7 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
         style={{ fontFamily, fontSize, fill: 0xffffff }}
         tint={isPlaceholder ? theme.textMuted.color : theme.text.color}
         alpha={isPlaceholder ? 0.5 : 1}
-        layout={{ position: 'absolute', x: PADDING_H, y: (height - fontSize) / 2 }}
+        layout={{ position: 'absolute', left: PADDING_H, top: (height - fontSize) / 2 }}
       />
       <pixiGraphics draw={drawCursor} layout={{ position: 'absolute', width, height }} />
     </pixiContainer>
