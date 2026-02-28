@@ -1,0 +1,82 @@
+Short:    EaglePlayer "Silmarils" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  1
+Type:     mus/play
+
+This is a new external "Silmarils" module replay for EaglePlayer 1.54/2.00+.
+It's a replayer for all (?) modules which were used in (Amiga) Silmarils
+games from the years 1989-92.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- SubSong
+- Balance
+- ModuleInfo with Position Counter
+- Volume
+- SongEnd
+- fixes for bugs in some songdata files
+
+Notes:
+
+1. This soundformat was used only (?) in Silmarils games from "Targhan" to
+   "Ishar I" (ECS). The newer Silmarils games (from 1993-94) use a modified
+   (split) tracker format.
+
+2. This player uses the WaitAudioDMA function so you can change the wait
+   method in the EP Timing submenu and set the correct values for your
+   particular Amiga CPU and/or screen mode. EP's "Automatic Wait" option
+   does not work correctly for Amigas with some of the more advanced screen
+   modes (DblPAL, Productivity, etc) and some graphics card screen modes.
+   Therefore, it is best to use the "Raster Wait" mode and set the raster
+   value to at least 16 and save this wait mode as the default. Without
+   these changes the player can "miss" some notes in some Silmarils mods
+   depending on the active screen mode. The "DBF Loops" method can also be
+   used, but the correct value depends on your Amiga CPU speed and it is
+   therefore not recommended.
+
+3. Silmarils' soundformat is a 3 voice MIDI clone with a built-in sample
+   depacking routine. It was one of the hardest players to make. Aside from
+   ripping and adapting the player routine it was also necessary to rip
+   and adapt part of Silmarils' interpreter code.
+
+4. Some Silmarils modules may use an external "main file" but only modules
+   from the game "Boston Bomb Club" are known to use this feature at the
+   present time. In order to play/load these files an underscore
+   character "_" must be in the correct place in the songdata file name.
+
+   For example, if the main file is named:
+
+   MOK.BostonBombClub
+
+   then any songdata files must be named in the following style:
+
+   MOK.BostonBombClub_??? (for example, MOK.BostonBombClub_title)
+
+5. If you have (or know of) unsupported Silmarils modules please
+   contact Wanted Team.
+
+6. If you have the (unpublished?) Silmarils game called "Xyphoes Fantasy"
+   (either the full version or a demo) please contact Wanted Team.
+
+7. This player works only with uninitialized Silmarils mods ripped
+   directly from disks. You can easily rip Silmarils mods from all their
+   games. All you have to do is decrunch the files with the Silmarils
+   decruncher slave for the xfdmaster library.
+
+8. You can get the latest versions of Wanted Team products from:
+
+   http://amiga.emucamp.com/wt/wt.html
+
+Special greetings go to
+
+- Mok
+- Gaelan Griffin for support
+
+Merry Christmas and Happy New Year 2002 for all Amiga users!!!
+

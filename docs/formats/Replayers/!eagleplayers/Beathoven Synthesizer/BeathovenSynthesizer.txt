@@ -1,0 +1,22 @@
+BSS.Denaris loading            262512  
+BSS.DerPreisIstHeiss            51008  
+BSS.Detonator hiscore           27232  
+BSS.Detonator title             22264  
+BSS.Funny Funk                  81628  
+BSS.Gluecksrad                  57840  
+BSS.GreatGianaSisters ingame    76416  
+BSS.GreatGianaSisters title     93132  
+BSS.In80DaysAroundTheWorld      65292  
+BSS.Journey                     28352  
+BSS.Katakis loading            260468  
+BSS.RainbowArtsSlideshow        65292  
+BSS.Riskant!                    31964  
+BSS.Smash Intro                 32212  
+BSS.Stars                      121872  
+BSS.StreetGang                  52040  
+BSS.TheChamps cracktro          60420  
+BSS.Third Intro                 79508  
+BSS.Tristar cracktro            37580  
+BSS.VirusKillerV2.0Pro          38608  
+BSS.Zoom!                       46144  
+BSS.Zoom! (US)                  45516  

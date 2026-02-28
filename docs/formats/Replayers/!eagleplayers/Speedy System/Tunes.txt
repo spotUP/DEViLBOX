@@ -1,0 +1,132 @@
+
+*   * *   *  **** ***** *   * ***** *   *
+** ** *   * *       *   *  *  *     **  *
+* * * *   *  ***    *   ***   ****  * * *
+*   * *   *     *   *   *  *  *     *  **
+*   *  ***  ****  ***** *   * ***** *   *
+
+
+
+Bisher erstellte Musiken
+------------------------
+Datum    Name                     Zeit (zirka)
+----------------------------------------------
+05.03.88 Chaconne                 4´05 
+17.03.88 Pauker-Rap               4´20 
+29.03.88 Phantasy-Flight          5´00 
+27.05.88 Crazy-Wolfs              4´55 
+19.06.88 Pauker-Rap II            4´20 
+19.06.88 Phantasy-Flight II       5´00 
+10.07.88 Team-Remix               4´00 
+17.07.88 Friendship-Music         3´02 
+
+Auf den folgenen Seiten gibt es noch eine kleine
+Beschreibung zu den Musiken.
+
+
+
+Chaconne
+--------
+
+Die Idee zu Chaconne gab mir Christine Weiß im 
+September 1987. Die Musik konnte jedoch erst
+im März von mir programmiert werden, denn zuerst
+mußte natürlich der Musikeditor vollständig
+funktionieren. Eine neue Version von Chaconne ist 
+für zirka September geplant. 
+
+Eine vergleichbare Musik ist "Friendship-Music".
+
+
+
+Pauker-Rap
+----------
+
+Diese Musik entstand als Team-Arbeit an nur einem
+Nachmittag. Das lag daran, daß Robert und Jens-Uwe
+schon eine enorme Vorarbeit mit den 
+digitalisieren der einzelnen Stimmen geleistet
+hatten. Es war wirklich kein Problem, diese Stimmen
+in den Musik-Code einzubauen. Die Musik ist voll-
+ständig in Stereo programmiert !
+
+
+
+
+Phantasy-Flight
+---------------
+
+Für die Programmierung des "Fantasie-Flugs" habe
+ich fast eine Woche benötigt. Na, ich gebe ja zu,
+ein bisschen mehr Melodie hätte nicht geschadet.
+Aber das Hauptmerkmal dieses Musikstücks sollten
+schließlich die Sound-Effekte sein.
+
+
+
+
+Crazy-Wolfs
+-----------
+
+Crazy-Wolfs ist eigentlich ein Zufallsprodukt. 
+Robert und ich hatten mit Jens-Uwe´s Digitizer
+herumexperimentiert. Auf einmal hatten wir so 
+ein Gehäule im Rechner. Tja, und darauf habe ich
+dann später die Crazy-Wolfs-Musik aufgebaut.
+
+
+
+Pauker-Rap II
+-------------
+
+Pauker-Rap II ist ein Remix von seinem "Vorgänger".
+Ich habe dabei fast alle Sprüche vom ersten Rap
+übernommen. An wenigen Stellen kommt es zu kleinen
+"Rythmus-Durchhängern". Ich bitte dies zu ent-
+schuldigen.
+
+Sämtliche Sprüche wurden übrigens von Jens-Uwe in
+einem Dortmunder Gymnasium aufgenommen.
+
+
+
+Phantasy-Flight II
+------------------
+
+Phantasy-Flight II ist eine total neue Version und
+Nachfolger vom ersten Phantasy-Flight. Ich habe dafür
+250 K-Byte an Sound "verbraten".
+
+Das hämische Lachen stammt übrigens von Jens-Uwe
+der es mal wieder nicht lassen konnte, mit einem
+Vocoder herumzuspielen.
+
+Ich habe - ausnahmsweise - auch ein paar Sounds von
+Crazy-Wolfs übernommen.
+
+
+
+Team-Remix
+----------
+
+Nun, der Team-Remix ist nicht gerade die beste Musik 
+von denen, die ich bisher erstellt habe.
+
+Also, sprechen wir nicht weiter darüber.
+
+
+
+Friendship-Music (Musik einer Freundschaft)
+----------------
+
+Eine richtige Freundschaft ist normalerweise
+harmonisch und beinhaltet romantische Phasen.Unter
+diesem Eindruck entstand die Musik einer Freundschaft.
+Die Musik soll ein bisschen Romantik wiedergeben.
+Ich habe deshalb extra nur "weiche" Instrumente
+benutzt.
+
+Viel Spass beim anhören !
+
+
+Michael.

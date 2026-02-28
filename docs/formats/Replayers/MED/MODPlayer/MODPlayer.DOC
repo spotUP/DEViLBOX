@@ -1,0 +1,230 @@
+****** Instructions for using "modplayer", the stand-alone playroutine
+****** of MED V2.10
+
+"modplayer" is a piece of code (about 3 - 5 KBytes, depending on your needs)
+which is linked with your program and plays modules made with MED.
+
+"modplayer" contains the following routines:
+	InitPlayer
+	RemPlayer
+	PlayModule
+	ContModule
+	StopPlayer
+	DimOffPlayer (optional)
+	SetTempo
+	ResetMIDI (optional, too)
+
+The arguments are passed in registers, and return values are returned in d0.
+
+And now the descriptions of each one:
+--------------------------------------------------------------------------
+InitPlayer -- initialize everything
+
+Before you can call the other functions, you must call this function.
+It allocates the audio channels, timer, serial port (if MIDI) etc...
+
+ARGUMENTS:	none
+
+RETURNS:		0 if everything is ok, otherwise something failed.
+		If something failed, you can still call the other
+		routines - they just don't do anything.
+--------------------------------------------------------------------------
+RemPlayer -- return everything back
+
+Call this when your program exits. It frees the audio channels etc. etc.
+
+ARGUMENTS:	none
+
+RETURNS:		nothing
+--------------------------------------------------------------------------
+PlayModule -- start playing a module
+
+When you want to start playing call this.
+
+ARGUMENTS:	a0 = pointer to the module. Where to get that pointer?
+		Don't panic, it's explained later....
+
+RETURNS:		nothing
+--------------------------------------------------------------------------
+ContModule -- continue playing after stop from the point it was stopped
+
+As is.
+
+ARGUMENTS:	a0 = ptr to the module
+
+RETURNS:		exactly nothing
+--------------------------------------------------------------------------
+StopPlayer -- stop playing
+
+ARGUMENTS:	no arguments
+
+RETURNS:		nothing
+--------------------------------------------------------------------------
+DimOffPlayer -- fade out and stop player
+
+Returns immediately and starts fading the sound.
+
+ARGUMENTS:	d0 = how many lines do you want the fade to take??
+
+RETURNS:		nothing
+--------------------------------------------------------------------------
+SetTempo -- set the playback tempo
+
+ARGUMENTS:	d0 = new tempo (1 - 240)
+
+RETURNS:		nothing
+--------------------------------------------------------------------------
+ResetMIDI -- reset pitchbenders/modulation wheels/presets
+
+ARGUMENTS:	nothing
+
+RETURNS:		nothing
+--------------------------------------------------------------------------
+
+"modplayer.a" is the source code of the music routine. It contains all
+theses routines. You may have noticed that you may not need all these
+routines. At the beginning of the source are two "switches":
+
+DIM	EQU	1
+MIDI	EQU	1
+
+If you don't need DimOffPlayer, the first line should read:
+
+DIM	EQU	0
+
+If you don't need MIDI output, the second line should be:
+
+MIDI	EQU	0
+
+With these switches you can make the player shorter, a bit faster and
+avoid allocating resources that are not needed (like serial port).
+
+Now you must assemble this file. It works well with A68k-assembler,
+which is MetaComco-compatible, so any MetaComco-compatible should work.
+If you don't have A68k, you can get it from Fish #186, at least (although
+there are probably newer version(s) available now). It shouldn't be too
+difficult to convert it to non-MetaComco-assemblers too.
+
+The result is an object file. Link this file with your program.
+
+Now you have the player, but there's still something missing...guess??...
+that's right: the music.
+
+You have two ways to get the music:
+1. Include the module in your final executable.
+2. Save the module as a separate disk file and load it when needed
+   (this is probably the best way if you have more than one song).
+
+First I cover the first method:
+--------------------------------------------------------------------------
+Including the module in your final executable:
+
+There are two ways to do this:
+1. Save the module as an object file which you can directly link with your
+   program.
+2. In some assemblers it is possible to include binary files into the code.
+   While I have not tried it (I haven't got such an assembler, maybe I
+   should buy), it should work.
+
+Again I cover the first method first:
+
+You must load MED V2.10 and load the song you want to include. Now select
+"Save song". You should see the save format requester. There are two
+gadgets which save object files: "Obj 1" and "Obj 2". Another problem,
+which one to select??
+
+Well, the reason why there are two gadgets is that Lattice's Blink 5.04,
+which I use, handles the chip bits of the object files in a nonstandard
+way. While the the standard way would be
+        000003EA    40001234,
+        hunk_data   |   hunk size
+                   chip
+
+Lattice uses a format like this:
+        400003EA    00001234
+        | hunk_data     hunk size
+     chip
+
+The "Obj 1" gadget saves the file in Blink format, "Obj 2" saves it in
+the standard format (described in AmigaDOS manual).
+
+I suggest that you first try "Obj 1". If you get an error message when
+linking, then select "Obj 2".
+
+Now you know how to save the object file. The object file has exactly
+one symbol defined: the module (struct MMD0). The name of the symbol
+depends on the file name (so you can have more than one song). If the
+file name you entered was "song", the object file would be "song.o" and
+the module would be defined as "_song" (in C just plain "song").
+
+In C, you would define it this way:
+
+	extern struct MMD0 far song; /* remember to include "med.h" */
+
+and to start playing, you'd call:
+
+	PlayModule(&song);
+
+With assembler, it would look like this:
+
+	xref	_PlayModule
+	xref	_song
+	....
+	lea	_song,a0
+	jsr	_PlayModule(pc)
+
+Then the another way...
+
+When you have included the module (not an object file!!) as a binary
+module, it must be relocated before it can be used. The easiest way to
+do this is to use _RelocModule, which is in "loadmod.a". After it's
+relocated, send the pointer of the module to PlayModule (NOTE: Remember
+to xdef the _RelocModule-function or strip the function).
+By the way, never relocate the same module twice. It is 100 % guaranteed
+that it won't work then.
+
+And the second method:
+--------------------------------------------------------------------------
+File "loadmod.a" contains three routines:
+	LoadModule
+	UnLoadModule
+	RelocModule (see above)
+
+You need only the first two of them. RelocModule is used by LoadModule.
+
+--------------------------------------------------------------------------
+LoadModule -- load module from disk
+
+Loads and relocates module.
+
+ARGUMENTS:	a0 = pointer to the file name
+
+RETURNS:		d0 = pointer to the module, if something failed: 0
+--------------------------------------------------------------------------
+UnLoadModule -- free the module from memory
+
+Frees the module. Remember to StopPlayer() before you unload the module
+that is currently playing. Also remember to free all modules you've loaded
+before you exit the program.
+
+ARGUMENTS:	a0 = pointer to the module
+
+RETURNS:		nothing, nothing and nothing
+--------------------------------------------------------------------------
+
+Just call LoadModule to load the module and send the returned pointer to
+PlayModule. Easy??
+
+==========================================================================
+
+REMEMBER:	All functions expect the arguments in registers. This is
+		automatically (??) handled by you when you program in
+		assembler, but it is not automatically handled when you
+		program in C.
+
+If you have Lattice C V5.04, this is done automatically if you include
+"modplayer.h" in all your code modules which call modplayer. If you
+have a compiler which doesn't support argument passing in registers,
+then you have to write the stub routines in assembler.
+
+That was it. See also the small example sources.

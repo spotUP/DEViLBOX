@@ -1,0 +1,157 @@
+
+; FOR C PROGRAMS:
+  xdef _SoundOnC,_SoundOffC,_GeneralSndInitC,_GeneralSndRemoveC
+  xdef _GeneralSndResetC,_FadeSndC,_WaitFadeC,_LoadAndInitC,_RemoveLoadedC
+  xdef _WaitOneShotFinC,_DecrunchInstrsC,_SetVolumeC,_SetSpeedC
+  xdef _ObtainMixBufLenC,_SetMixBuffersC
+  xdef _GetUnPackedInstLenC,_IsStdSongC  ; new v12
+  xdef _SetAlertReactionC                ; new v14
+  xdef _NewLoadAndInitC,_NewSndInitC,_NewRemoveSongC,_NewSndResetC  ; new v15
+  xdef _NewSndResetOneshotC,_RemoveAllSongsC,_NewMakeTablesC        ;
+  xdef _LockAudioC,_UnlockAudioC                                    ; new v16
+  xdef _SetupCacheControlC                                          ; new v17
+
+
+  xref _soundon,_soundoff,_generalsndinit,_generalsndremove,_fadesnd
+  xref _setvolume,_setspeed,_waitfade,_loadandinit,_removeloaded,_waitoneshotfin
+  xref _decrunchinstrs,_isstdsong,_getunpackedinstlen,_setalertreaction
+  xref _generalsndreset
+  xref _obtainmixbuflen,_setmixbuffers
+  xref _newloadandinit,_newsndinit,_newremovesong,_newsndreset
+  xref _newsndresetoneshot,_removeallsongs,_newmaketables
+  xref _lockaudio,_unlockaudio,_setupcachecontrol
+
+; *** SOUND ROUTINES START FOR C PROGRAMS
+
+_SoundOnC:            ; SoundOnC();
+ jmp _soundon
+
+_SoundOffC:           ; SoundOffC();
+ jmp _soundoff
+
+_GeneralSndInitC:     ; GeneralSndInitC(oneshot,instrs,sdata,routine);
+ movem.l a2-a3,-(a7)
+ move.l 12+0(a7),d0
+ move.l 12+4(a7),a1
+ move.l 12+8(a7),a2
+ move.l 12+12(a7),a3
+ jsr _generalsndinit
+ movem.l (a7)+,a2-a3
+ rts
+
+_GeneralSndRemoveC:   ; GeneralSndRemoveC();
+ jmp _generalsndremove
+
+_GeneralSndResetC:    ; GeneralSndResetC(oneshot);
+ move.l 4(a7),d0
+ jmp _generalsndreset
+
+_FadeSndC:            ; FadeSndC(Fadespeed);
+ move.l 4(a7),d0
+ jmp _fadesnd
+
+_WaitFadeC:           ; finished = WaitFadeC();
+ jmp _waitfade
+
+_SetVolumeC:          ; SetVolumeC(State);
+ move.l 4(a7),d0
+ jmp _setvolume
+
+_SetSpeedC:           ; oldspeed = SetSpeedC(speed);
+ move.l 4(a7),d0
+ jmp _setspeed
+
+_LoadAndInitC:        ; error = LoadAndInitC(name,oneshot);
+ move.l 4(a7),a0
+ move.l 8(a7),d0
+ jmp _loadandinit
+
+_RemoveLoadedC:       ; RemoveLoadedC();
+ jmp _removeloaded
+
+_WaitOneShotFinC:     ; finished = WaitOneShotFinC();
+ jmp _waitoneshotfin
+
+_DecrunchInstrsC:     ; DecrunchInstrsC(source,dest);
+ move.l 4(a7),a0
+ move.l 8(a7),a1
+ jmp _decrunchinstrs
+
+_GetUnPackedInstLenC: ; instlen = GetUnPackedInstLenC(ipfilestart);
+ move.l 4(a7),a0
+ jmp _getunpackedinstlen
+
+_IsStdSongC:          ; isstdsong = IsStdSongC(sdata);
+ move.l 4(a7),a0
+ jmp _isstdsong
+
+_SetAlertReactionC:   ; SetAlertReactionC(reaction)
+ move.l 4(a7),d0
+ jmp _setalertreaction
+
+_ObtainMixBufLenC:    ; mixbuflen = ObtainMixBufLenC(sdata);
+ move.l 4(a7),a0
+ jmp _obtainmixbuflen
+
+_SetMixBuffersC:      ; SetMixBuffersC(vectorfield);
+ move.l 4(a7),a0
+ jmp _setmixbuffers
+
+; The following do ONLY (really) exist in sysplayer; no-op in mplayer:
+
+_NewLoadAndInitC:     ; error = NewLoadAndInitC(filename,oneshot,routine,song#);
+ move.l 4(a7),a0
+ move.l 8(a7),d0
+ move.l 12(a7),a1
+ move.l 16(a7),d1
+ jmp _newloadandinit
+
+_NewSndInitC:         ; NewSndInit(oneshot,song#,instrs,sdata,routine);
+ movem.l a2-a3,-(a7)
+ move.l 12+0(a7),d0
+ move.l 12+4(a7),d1
+ move.l 12+8(a7),a1
+ move.l 12+12(a7),a2
+ move.l 12+16(a7),a3
+ jsr _newsndinit
+ movem.l (a7)+,a2-a3
+ rts
+
+_NewRemoveSongC:      ; NewRemoveSongC(song#);
+ move.l 4(a7),d0
+ jmp _newremovesong
+
+_NewSndResetC:        ; NewSndResetC(song#);
+ move.l 4(a7),d0
+ jmp _newsndreset
+
+_NewSndResetOneshotC: ; NewSndResetOneshotC(oneshot,song#);
+ move.l 4(a7),d0
+ move.l 8(a7),d1
+ jmp _newsndresetoneshot
+
+_RemoveAllSongsC:     ; RemoveAllSongsC();
+ jmp _removeallsongs
+
+; This only (really) exists in mplayer, and makes NOTHING in sysplayer:
+_NewMakeTablesC:      ; NewMakeTablesC(memory,packed);
+ move.l 4(a7),a0
+ move.l 8(a7),d1
+ jmp _newmaketables
+
+
+_LockAudioC:          ; success = LockAudioC()
+ jmp _lockaudio
+
+_UnlockAudioC:        ; UnlockAudioC()
+ jmp _unlockaudio
+
+
+; This only (really) exists in mplayer, and makes NOTHING in sysplayer:
+_SetupCacheControlC:  ; SetupCacheControlC(systemversion,attnflags);
+ move.l 4(a7),a0
+ move.l 8(a7),d1
+ jmp _setupcachecontrol
+
+
+ END

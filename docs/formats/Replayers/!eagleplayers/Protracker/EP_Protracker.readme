@@ -1,0 +1,115 @@
+Short:    EaglePlayer "Protracker" external replayer
+Author:   Wanted Team
+Uploader: Don Adan <DonAdan@wp.pl>
+Version:  5
+Type:     mus/play
+Replaces: mus/play/EP_Protracker.lha
+
+This is a new version of an alternate external "Protracker" replay for
+EaglePlayer 1.54/2.00+.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- PatternJump
+- Balance
+- ModuleInfo with Position Counter
+- Volume
+- SongEnd
+- SubSong
+- Save
+- capable of finding the author's name with the EP FindAuthor routine
+- PatternScroll
+
+Version 2
+
+- added support for Soundtracker (15 samples) modules
+
+Version 3
+
+- some fixes
+- added Config (requires Kickstart V37+)
+- added an Amplifier version (EP 2.00+ only)
+
+Version 4
+
+- fixed a bug in the recognition routine, it now works for Soundtracker
+  (15 samples) modules which use all 128 song positions
+- changed (pseudo) subsongs detection routine
+- as a bonus, attached is a FUCK decoder for xfdmaster library
+- as a second bonus, attached is an Imagitec depacker for xfdmaster library
+
+Version 5
+
+- some changes
+- extended Config
+- added real support for The Ultimate Soundtracker modules, now replay
+  can handle both the arpeggio and portamento commands correctly (?)
+
+Notes:
+
+1. In order to use this Protracker player you must first disable the
+   internal Protracker player in the EaglePlayer manager menu (and
+   sometimes the StarTracker player also, for example for modules from
+   the game "Lotus III"). For playing Soundtracker (15 samples) modules,
+   you must also disable EaglePlayer's internal OLDSoundtracker player.
+
+2. This player doesn't play all tracker mods correctly. It plays some mods
+   correctly, some incorrectly (mostly lame converted Soundtracker songs),
+   some better, some worse, and some differently than the internal 
+   EaglePlayer Protracker and OLDSoundtracker player.
+   At present there is no single Protracker player which correctly plays
+   all Protracker mods because there are too many different versions
+   of the Protracker/Soundtracker editor/replay with different wait modes
+   and sometimes even with different commands.
+
+3. This player uses the WaitAudioDMA function so you can change the wait
+   mode in the EP Timing submenu and set the correct values for your
+   particular Amiga CPU and/or screen mode.
+
+4. This version of the Protracker player is configurable via the EP player
+   manager. You can set how the D command is handled for Soundtracker
+   (15 samples) songs or choose how the replay handles 1 (arpeggio)
+   and 2 (portamento) commands for the The Ultimate Soundtracker mods.
+   The first (default) mode is "Pattern Break" which  works correctly
+   with songs created in later versions of Soundtracker. The second mode
+   is "Volume Slide", which works correctly with older Soundtracker songs,
+   e.g the "Blood Money" title song. The third mode "Ultimate ST" is
+   recommended to hear Soundtracker modules created with "The Ultimate 
+   Soundtracker" (the first Soundtracker editor) by Karsten Obarski, 
+   e.g. "Oil Imperium", "Future Tank", "Detector", etc. The configuration 
+   will be saved to the "EnvArc:EaglePlayer/" and/or "Configs/" directories.
+   If none of these directories exist then the configuration can not be saved.
+
+5. This Protracker player was based on the Dens Design version of the
+   Protracker replay routine used in the game "Aladdin". It was mostly
+   used by famous tracker musicians like Andrew Barnabas, Volker Tripp and
+   Bjørn Lynne. The main reason for this player is to allow you to play
+   Protracker mods with (pseudo) subsongs like the ingame modules from
+   "Aladdin" and "Cool Spot".
+
+6. If a module uses the normal PatternJump command sometimes subsongs
+   that don't really exist are detected.
+
+7. The loaded module must always be at least as many bytes long as the
+   calculated size. This is why some modules will give you an error with 
+   this player.
+
+8. If you want you can try to make a better Protracker player, the source
+   is available on the WT page.
+
+9. Now you can choose your preferred player version for use with EP 2.00+.
+
+10. You can get the latest versions of Wanted Team products from:
+
+   http://amiga.emucamp.com/wt/wt.html
+
+Special greetings go to
+
+- Gaelan Griffin for support with the PatternScroll routine
+
+

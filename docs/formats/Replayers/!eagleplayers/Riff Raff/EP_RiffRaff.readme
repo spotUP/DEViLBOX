@@ -1,0 +1,40 @@
+Short:    EaglePlayer "Riff Raff" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  1
+Type:     mus/play
+
+This is a new external "Riff Raff" module replay for EaglePlayer 1.54/2.00+.
+It's a player for all (?) modules which were composed by a musician
+who usually used the nickname "Riff Raff" (possibly Howie Davies) for
+the Amiga.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- Volume
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- Balance
+- SongEnd
+- ModuleInfo
+- SubSong
+- as a bonus, an EagleRipper (finder only) for Riff Raff modules is included
+
+Notes:
+
+1. This soundformat was used only (or mostly) in PAL Developments games
+   from the year 1989 (example: "Protector", "T'Bird"). The music for the
+   C64 versions of all these games was made by Julian Potts (Japmaster).
+
+2. To play Riff Raff music every module must first be converted to a
+   special format which is very similar to EaglePlayer's "Dave Lowe"
+   format. For more information please contact Wanted Team.
+
+3. Included is a list of all available Riff Raff modules that I know of
+   (see RiffRaff.txt). If you have, or know of, unsupported "Riff Raff"
+   modules please contact Wanted Team.
+
+4. The email address wt@jho.pol.pl might not be valid after March 2000.

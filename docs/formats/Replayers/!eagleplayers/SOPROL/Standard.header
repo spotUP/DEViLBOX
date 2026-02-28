@@ -1,0 +1,44 @@
+	SECTION	SOPROL,Code_C
+
+Start
+	moveq	#-1,D0			; security
+	rts
+
+	dc.b	'!SOPROL!'		; ID string
+
+	dc.l	Play			; pointer to Interrupt routine
+					; (must exist)
+	dc.l	InitSong		; pointer to InitSong routine
+					; (must exist)
+
+	dc.l	8			; number of subsongs (must exist)
+
+	dc.l	ModuleName		; pointer to module name label
+					; (must exist or 0)
+	dc.l	AuthorName		; pointer to module author label
+					; (must exist or 0)
+	dc.l	SpecialInfo		; pointer to special text label
+					; (must exist or 0)
+
+	dc.l	ModuleEnd-Start		; size of loaded file
+	dc.l	ModuleEnd-ModuleStart	; size of loaded module
+	dc.l	SampleEnd-SampleStart	; size of samples
+	dc.l	(ModuleEnd-ModuleStart)-(SampleEnd-SampleStart)
+					; size of songdata (with replayer)
+	dc.l	(709379+60/2)/60	; timer value (must exist or 0)
+
+ModuleName
+	dc.b	'Graffiti Man',0
+AuthorName
+	dc.b	'Holger Gehrmann',0
+SpecialInfo
+	dc.b	'(c) 1987 by reLINE/Rainbow Arts',10,10
+	dc.b	'Ripped and adapted by Don Adan/Wanted Team !',0
+	even
+
+ModuleStart
+
+	<put here the disassembled and fixed (if necessary) module>
+
+SampleEnd
+ModuleEnd

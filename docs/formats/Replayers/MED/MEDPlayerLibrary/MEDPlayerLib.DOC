@@ -1,0 +1,318 @@
+Instructions for using "medplayer.library" V1.00, by Teijo Kinnunen.
+--------------------------------------------------------------------
+
+"medplayer.library" is a shared library, which can be used to load
+and play MED modules. You can call its functions from any language
+which supports library calls (C, Assembler, Basic...)
+
+There's one advantage of using "medplayer.library" instead of linking
+with modplayer: If "medplayer.library" is upgraded, then the user has
+only change the library and there's no need to make modifications for
+the program itself.
+
+First you must install "medplayer.library" to your LIBS: drawer.
+Click the "Inst"-gadget to do that (provided that you've booted with
+Workbench 1.3 or later). You can also load it with ARP's "loadlib"
+command. AmigaBasic-programmers should also copy "medplayer.bmap" to
+LIBS: or the current directory of AmigaBasic.
+
+How to use the library?
+=======================
+
+AmigaBasic: Study the example program...
+
+C: If you have the Lattice C 5.04, then include "libproto.h", which
+   contains the #pragma's for calling the library. If you have some
+   other compiler, assemble "medplrlib_stub.a", which contains the
+   stub routines for calling the library (like amiga.lib).
+
+Assembler: Just load the registers and call like any other library function.
+
+Other languages: Since these are the only languages I know, I can't
+   help with other languages. Most other languages (Modula-2, other Basics
+   etc..) have probably some way of calling Amiga library functions. See
+   the manual of the compiler/interpreter.
+
+Included are also few examples of using the library in C and Basic.
+
+Here's the complete list of the functions of "medplayer.library" (in
+RKM autodoc-style):
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+
+GetPlayer
+
+NAME
+	GetPlayer -- get and initialize the player routine
+
+SYNOPSIS
+	error = GetPlayer(midi)
+	D0                D0
+
+FUNCTION
+	This routine allocates the audio channels and CIAA timer A
+	and prepares the interrupt. If "midi" is nonzero, serial
+	port is allocated and initialized. You should call this
+	routine when your programs starts up.
+
+INPUTS
+	midi = 0 no midi, 1 set up midi. When you use a song that
+	       has only Amiga samples, there's no reason to allocate
+	       the serial port. Then set midi to 0. Use only values
+	       0 or 1 here. Other values reserved for future expansion.
+
+RESULT
+	If everything is OK, GetPlayer() returns zero. If initialization
+	failed or somebody else is currently using the library, then
+	GetPlayer() returns nonzero value.
+	NOTE: Even if GetPlayer() returned an error, you can still call
+	      the library functions without making harm. They just won't
+	      work (except LoadModule(), UnLoadModule() and GetCurrent-
+	      Module(), which always work).
+
+SEE ALSO
+	FreePlayer
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+
+FreePlayer
+
+NAME
+	FreePlayer -- free the resources allocated by GetPlayer()
+
+SYNOPSIS
+	FreePlayer()
+
+FUNCTION
+	This routine frees all resources allocated by GetPlayer().
+	Remember always call this routine before your program
+	exits. It doesn't harm to call this if GetPlayer() failed.
+	If you don't call this function during exit, audio channels,
+	timer etc. will remain allocated until reboot.
+
+SEE ALSO
+	GetPlayer
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+
+PlayModule
+
+NAME
+	PlayModule -- play module from the beginning
+
+SYNOPSIS
+	PlayModule(module)
+	           A0
+
+FUNCTION
+	This routine starts to play the module from the beginning.
+	The module can be obtained by calling LoadModule() or it can
+	be part of your program (when saved as an object file and
+	linked with it or included with some assemblers "binary
+	include" option).
+
+INPUTS
+	module = pointer to module. If zero, then play the current
+	         module (module which was played last).
+
+SEE ALSO
+	ContModule, StopPlayer, DimOffPlayer
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+
+ContModule
+
+NAME
+	ContModule -- continue playing the module from where it stopped
+
+SYNOPSIS
+	ContModule(module)
+	           A0
+
+FUNCTION
+	ContModule() functions just like PlayModule() except if you
+	have stopped playing with StopPlayer(), the playing will
+	continue where it stopped. When you play the module first
+	time, you should use PlayModule(), because ContModule() doesn't
+	initialize the filter.
+
+INPUTS
+	module = pointer to module. If zero, use the current module.
+
+SEE ALSO
+	PlayModule, StopPlayer, DimOffPlayer
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+
+StopPlayer
+
+NAME
+	StopPlayer -- stops playing immediately
+
+SYNOPSIS
+	StopPlayer()
+
+FUNCTION
+	Stop.
+
+SEE ALSO
+	PlayModule, ContModule, DimOffPlayer
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+
+DimOffPlayer
+
+NAME
+	DimOffPlayer -- fade out the volume and stop playing
+
+SYNOPSIS
+	DimOffPlayer(dimlength)
+
+FUNCTION
+	Fades out the volume and stops the playing. The routine
+	returns immediately after you've called it. Then the
+	sound will start fading. If you want to know when the
+	player has stopped, you can examine the playstate-field
+	of the current module.
+
+INPUTS
+	dimlength = how slowly should the sound fade, in lines
+	            e.g. DimOffPlayer(60) fades the sound in 60
+		     lines
+
+SEE ALSO
+	PlayModule, ContModule, StopPlayer
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+
+SetTempo
+
+NAME
+	SetTempo -- modify the playing speed
+
+SYNOPSIS
+	SetTempo(tempo)
+	         D0
+
+FUNCTION
+	If you want to modify the playback speed, you can call this one.
+	This number should be 1 - 240. Note that tempos 1 - 10 are
+	recognized as SoundTracker tempos.
+
+INPUTS
+	tempo = new tempo
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+
+LoadModule
+
+NAME
+	LoadModule -- load a MED module from disk and relocate it
+
+SYNOPSIS
+	module = LoadModule(name)
+	D0                  A0
+
+FUNCTION
+	When you want to load a module from disk, call this function.
+	The function loads only MED modules (MMD0). It doesn't load
+	Tracker-modules, MED songs or object files. Only MMD0s
+	(MMD0 is the identification word at the beginning of the file).
+	Because the module contains many pointers, they must be
+	relocated. This function relocates the module automatically.
+	If you link songs saved as object files, they will be relocated
+	by the AmigaDOS. Only if you include the module as a binary file,
+	then YOU must relocate it. This is an easy thing to do. You can
+	use the "RelocModule" function from "loadmod.a".
+
+INPUTS
+	name = pointer to file name (null-terminated)
+
+RESULT
+	module = pointer to module. If failed to load for some reason
+	         (disk error, out of memory, not a module), zero will
+		  be returned.
+
+SEE ALSO
+	UnLoadModule
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+
+UnLoadModule
+
+NAME
+	UnLoadModule -- frees the module from memory
+
+SYNOPSIS
+	UnLoadModule(module)
+	             A0
+FUNCTION
+	When you don't need the module anymore, you MUST free the
+	memory it has used. Use this routine for it. Remember to
+	stop the player before unloading the module it is playing.
+
+	NOTE: unload only those modules which are loaded with
+	LoadModule(). If you attempt to free module which is a part
+	of the program, you will cause guru 81000009/81000005.
+
+INPUTS
+	module = pointer to module. If zero, nothing happens.
+
+SEE ALSO
+	LoadModule
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+
+GetCurrentModule
+
+NAME
+	GetCurrentModule -- returns the address of module currently playing
+
+SYNOPSIS
+	module = GetCurrentModule()
+	D0
+
+FUNCTION
+	Simply returns the pointer of the module, which is currently
+	playing (or if player is stopped, which was played last). This
+	works also if some other task is currently playing. In this case,
+	because of multitasking, you should have no use for the value
+	(the module can be already unloaded). You may ask what use this
+	function has. Well, I'm not sure, but because this function
+	takes only 2 machine language instructions (8 bytes of memory)
+	there's not much harm of it.
+
+RESULT
+	module = pointer to current module
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+
+ResetMIDI
+
+NAME
+	ResetMIDI -- reset all pitchbenders and modulation wheels and
+	             ask player to resend the preset values
+
+SYNOPSIS
+	ResetMIDI()
+
+FUNCTION
+	This function resets pitchbenders and modulation wheels on all
+	MIDI channels. It also asks the player to send again the
+	preset change requests for all instruments, so that the presets
+	will be correct if the user has changed them. It performs the
+	same function as MED's Ctrl-Space.
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------

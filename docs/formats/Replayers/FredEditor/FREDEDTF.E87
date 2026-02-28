@@ -1,0 +1,46 @@
+* SELECTOR SOURCE FOR FredEditor
+ 
+>extern "SOUNDTRACKS/ILYAD-FRED",MT_DATA	;sett inn filenavn her
+LENGDE=24820	;Lengde på filenavn (sett inn lengden på filen)
+
+LOOP:
+
+EVER:	MOVE.L	$DFF004,D0
+	AND.L	#$1FF00,D0
+	CMP.L	#$08000,D0
+	BNE.S	EVER
+
+EV2:	
+	move.w	$dff006,d0
+	move.l	d0,ti
+	lea	MT_DATA,A0
+	JSR	4(A0)
+	RTS		;play 1 note
+	move.l	ti,d0
+	moveq	#0,d1
+	move.w	$dff006,d1
+	sub.w	d0,d1
+	cmp.l	TIME,D1
+	BLE.S	NONEW
+	MOVE.L	D1,TIME
+NONEW:
+	
+	BTST	#2,$DFF016		;Test høyre musknapp 
+	BEQ.S	EV2			;Hvis trykket, hopp til ev2 = spoling
+
+	btst	#6,$bfe001		;mouse button??
+	bne	loop			;Hvis ja, fortsett til stopp
+
+stopp:
+	lea	mt_data,a0
+	jsr	8(a0)
+	rts
+	EVEN
+	LEA	MT_DATA,A0
+	
+Mt_Data=$40000	
+TI:	DC.L	0
+TIME:	DC.L	0
+B:	
+
+;/* End of File */
