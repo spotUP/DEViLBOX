@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Upload, Play, Square, Music, FileAudio, AlertCircle, Info } from 'lucide-react';
+import { X, Play, Square, Music, FileAudio, AlertCircle, Info } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import {
   loadModuleFile,
@@ -267,7 +267,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [useLibopenmpt, setUseLibopenmpt] = useState(true);
   const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
   const [selectedSubsong, setSelectedSubsong] = useState(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   // Track whether a UADE scan is in-flight so handleClose can cancel it
   const uadeScanActiveRef = useRef(false);
   // MusicLine preview engine reference (connect/disconnect on preview start/stop)
@@ -403,21 +402,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     }
   }, [initialFile, isOpen, handleFileSelect]);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileSelect(file);
-  }, [handleFileSelect]);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-  }, []);
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFileSelect(file);
-  }, [handleFileSelect]);
-
   // Native format keys where libopenmpt can successfully preview the file.
   // All other native formats either need a dedicated engine or have no preview.
   const LIBOPENMPT_PLAYABLE_NATIVE_KEYS = new Set<NativeFormatKey>([
@@ -550,36 +534,13 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
         {/* Body */}
         <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(80vh-110px)]">
-          {/* Drop zone */}
-          <div
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onClick={() => fileInputRef.current?.click()}
-            className={`
-              border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-              ${isLoading ? 'border-accent-primary/50 bg-accent-primary/5' : 'border-dark-border hover:border-accent-primary/50 hover:bg-dark-bgHover'}
-            `}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={getSupportedExtensions().join(',')}
-              onChange={handleInputChange}
-              className="hidden"
-            />
-            {isLoading ? (
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-text-muted">Loading module...</p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-2">
-                <Upload size={32} className="text-text-muted" />
-                <p className="text-sm text-text-primary">Drop a tracker file here or click to browse</p>
-                <p className="text-xs text-text-muted">Supports MOD, XM, IT, S3M and 20+ other formats</p>
-              </div>
-            )}
-          </div>
+          {/* Loading indicator */}
+          {isLoading && (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs text-text-muted">Loading…</span>
+            </div>
+          )}
 
           {/* Error message */}
           {error && (
