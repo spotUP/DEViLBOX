@@ -555,6 +555,9 @@ export const PixiFT2Toolbar: React.FC = () => {
 
       {/* ── Row 4: File / action buttons ── */}
       <pixiContainer
+        alpha={!compactToolbar ? 1 : 0}
+        renderable={!compactToolbar}
+        eventMode={!compactToolbar ? 'static' : 'none'}
         layout={{
           width: '100%',
           height: FILE_ROW_H,

@@ -141,12 +141,15 @@ export const PixiTrackerView: React.FC = () => {
         <pixiContainer layout={{ flex: 1, width: '100%', height: '100%' }}>
           {/* Editor — native Pixi components for each view mode.
               All editors are ALWAYS mounted to avoid @pixi/layout BindingError
-              when swapping Yoga child nodes. Visibility controlled via visible +
-              zero layout dimensions. */}
+              when swapping Yoga child nodes. Visibility is controlled via
+              alpha/renderable (NOT visible — @pixi/layout calls _onChildRemoved()
+              when visible=false, detaching Yoga nodes and causing BindingErrors). */}
 
           {/* Classic tracker pattern editor — native Pixi */}
           <pixiContainer
-            visible={viewMode === 'tracker' && editorMode === 'classic'}
+            alpha={viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0}
+            renderable={viewMode === 'tracker' && editorMode === 'classic'}
+            eventMode={viewMode === 'tracker' && editorMode === 'classic' ? 'static' : 'none'}
             layout={{
               flex: viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0,
               height: viewMode === 'tracker' && editorMode === 'classic' ? '100%' : 0,
@@ -158,7 +161,9 @@ export const PixiTrackerView: React.FC = () => {
 
           {/* Grid sequencer — native Pixi */}
           <pixiContainer
-            visible={viewMode === 'grid'}
+            alpha={viewMode === 'grid' ? 1 : 0}
+            renderable={viewMode === 'grid'}
+            eventMode={viewMode === 'grid' ? 'static' : 'none'}
             layout={{
               flex: viewMode === 'grid' ? 1 : 0,
               height: viewMode === 'grid' ? '100%' : 0,
@@ -170,7 +175,9 @@ export const PixiTrackerView: React.FC = () => {
 
           {/* Piano Roll — native Pixi (existing PixiPianoRollView) */}
           <pixiContainer
-            visible={viewMode === 'pianoroll'}
+            alpha={viewMode === 'pianoroll' ? 1 : 0}
+            renderable={viewMode === 'pianoroll'}
+            eventMode={viewMode === 'pianoroll' ? 'static' : 'none'}
             layout={{
               flex: viewMode === 'pianoroll' ? 1 : 0,
               height: viewMode === 'pianoroll' ? '100%' : 0,
@@ -182,7 +189,9 @@ export const PixiTrackerView: React.FC = () => {
 
           {/* TB-303 view — native Pixi */}
           <pixiContainer
-            visible={viewMode === 'tb303'}
+            alpha={viewMode === 'tb303' ? 1 : 0}
+            renderable={viewMode === 'tb303'}
+            eventMode={viewMode === 'tb303' ? 'static' : 'none'}
             layout={{
               flex: viewMode === 'tb303' ? 1 : 0,
               height: viewMode === 'tb303' ? '100%' : 0,
@@ -194,7 +203,9 @@ export const PixiTrackerView: React.FC = () => {
 
           {/* SunVox channel view — native Pixi */}
           <pixiContainer
-            visible={viewMode === 'sunvox'}
+            alpha={viewMode === 'sunvox' ? 1 : 0}
+            renderable={viewMode === 'sunvox'}
+            eventMode={viewMode === 'sunvox' ? 'static' : 'none'}
             layout={{
               flex: viewMode === 'sunvox' ? 1 : 0,
               height: viewMode === 'sunvox' ? '100%' : 0,
@@ -252,9 +263,9 @@ export const PixiTrackerView: React.FC = () => {
             />
           </pixiContainer>
 
-          {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga insertChild crash.
-              Conditional mount/unmount of Pixi children triggers BindingError in
-              Emscripten's Yoga WASM binding. Use visible + layout sizing instead. */}
+          {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga BindingErrors.
+              Use alpha/renderable (NOT visible) — @pixi/layout calls _onChildRemoved()
+              on visible=false, detaching Yoga nodes and causing BindingErrors. */}
           {/* VU meters overlay — covers top half of editor down to the edit bar.
               VU segments draw upward from the bottom of this area, so they
               appear to shoot out from the edit cursor row.
@@ -267,12 +278,12 @@ export const PixiTrackerView: React.FC = () => {
             const gridH = instrumentPanelHeight - PE_HEADER - PE_SCROLLBAR;
             const vuHeight = Math.max(50, Math.floor(PE_SCROLLBAR + PE_HEADER + (gridH - PE_ROW) / 2));
             return (
-              <pixiContainer visible={viewMode === 'tracker' && editorMode === 'classic'} layout={{ position: 'absolute', width: Math.max(100, editorWidth), height: vuHeight }}>
+              <pixiContainer alpha={viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0} renderable={viewMode === 'tracker' && editorMode === 'classic'} eventMode={viewMode === 'tracker' && editorMode === 'classic' ? 'static' : 'none'} layout={{ position: 'absolute', width: Math.max(100, editorWidth), height: vuHeight }}>
                 <PixiChannelVUMeters width={Math.max(100, editorWidth)} height={vuHeight} />
               </pixiContainer>
             );
           })()}
-          <pixiContainer visible={viewMode === 'tracker' && showAutomation && !!patternId} layout={{ position: 'absolute' }}>
+          <pixiContainer alpha={viewMode === 'tracker' && showAutomation && !!patternId ? 1 : 0} renderable={viewMode === 'tracker' && showAutomation && !!patternId} eventMode={viewMode === 'tracker' && showAutomation && !!patternId ? 'static' : 'none'} layout={{ position: 'absolute' }}>
             <PixiAutomationLanes
               width={Math.max(100, editorWidth)}
               height={Math.max(100, instrumentPanelHeight)}
@@ -286,7 +297,7 @@ export const PixiTrackerView: React.FC = () => {
               nextPatternLength={nextPatternLength}
             />
           </pixiContainer>
-          <pixiContainer visible={viewMode === 'tracker' && showMacroLanes} layout={{ position: 'absolute' }}>
+          <pixiContainer alpha={viewMode === 'tracker' && showMacroLanes ? 1 : 0} renderable={viewMode === 'tracker' && showMacroLanes} eventMode={viewMode === 'tracker' && showMacroLanes ? 'static' : 'none'} layout={{ position: 'absolute' }}>
             <PixiMacroLanes
               width={Math.max(100, editorWidth)}
               height={Math.max(100, instrumentPanelHeight)}
@@ -298,7 +309,7 @@ export const PixiTrackerView: React.FC = () => {
         </pixiContainer>
 
         {/* Pattern minimap — always mounted, zero-width when hidden */}
-        <pixiContainer visible={viewMode === 'tracker'} layout={{ width: viewMode === 'tracker' ? 16 : 0 }}>
+        <pixiContainer alpha={viewMode === 'tracker' ? 1 : 0} renderable={viewMode === 'tracker'} eventMode={viewMode === 'tracker' ? 'static' : 'none'} layout={{ width: viewMode === 'tracker' ? 16 : 0 }}>
           <PixiPatternMinimap height={Math.max(100, instrumentPanelHeight)} />
         </pixiContainer>
 
@@ -314,13 +325,13 @@ export const PixiTrackerView: React.FC = () => {
         )}
 
         {/* Instrument list — always mounted, zero-width when hidden */}
-        <pixiContainer visible={instrumentPanelVisible} layout={{ width: instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0, height: '100%' }}>
+        <pixiContainer alpha={instrumentPanelVisible ? 1 : 0} renderable={instrumentPanelVisible} eventMode={instrumentPanelVisible ? 'static' : 'none'} layout={{ width: instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0, height: '100%' }}>
           <PixiInstrumentPanel width={INSTRUMENT_PANEL_W} height={Math.max(100, instrumentPanelHeight)} />
         </pixiContainer>
       </pixiContainer>
 
       {/* Macro Slots Panel — always mounted, zero-height when hidden */}
-      <pixiContainer visible={showMacroSlots && viewMode === 'tracker'} layout={{ width: '100%', height: showMacroSlots && viewMode === 'tracker' ? 32 : 0 }}>
+      <pixiContainer alpha={showMacroSlots && viewMode === 'tracker' ? 1 : 0} renderable={showMacroSlots && viewMode === 'tracker'} eventMode={showMacroSlots && viewMode === 'tracker' ? 'static' : 'none'} layout={{ width: '100%', height: showMacroSlots && viewMode === 'tracker' ? 32 : 0 }}>
         <PixiMacroSlotsPanel width={windowWidth} />
       </pixiContainer>
 

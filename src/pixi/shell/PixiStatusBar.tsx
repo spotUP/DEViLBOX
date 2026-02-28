@@ -20,6 +20,8 @@ import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { KNOB_BANKS, type KnobAssignment } from '@/midi/knobBanks';
 import type { KnobBankMode } from '@/midi/types';
+import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { WorkbenchMinimap } from '../workbench/WorkbenchMinimap';
 
 /** Main status bar height (matches DOM py-1.5 + text) */
 const STATUS_BAR_HEIGHT = 32;
@@ -506,6 +508,7 @@ interface MainRowProps {
   collabConnected: boolean;
   collabRoomCode: string | null;
   onShowTips: () => void;
+  minimapVisible: boolean;
 }
 
 const MainStatusRow: React.FC<MainRowProps> = ({
@@ -519,6 +522,7 @@ const MainStatusRow: React.FC<MainRowProps> = ({
   collabConnected,
   collabRoomCode,
   onShowTips,
+  minimapVisible,
 }) => {
   const theme = usePixiTheme();
 
@@ -561,6 +565,13 @@ const MainStatusRow: React.FC<MainRowProps> = ({
         activeView={activeView}
         onShowTips={onShowTips}
       />
+
+      {/* Workbench minimap — sits flush to right edge of status bar */}
+      {minimapVisible && (
+        <pixiContainer layout={{ position: 'absolute', right: 0, bottom: 0 }}>
+          <WorkbenchMinimap screenW={width} screenH={window.innerHeight} />
+        </pixiContainer>
+      )}
     </pixiContainer>
   );
 };
@@ -577,6 +588,7 @@ export const PixiStatusBar: React.FC = () => {
   const onShowTips = useCallback(() => {
     openModal('help', { initialTab: 'tips' });
   }, [openModal]);
+  const minimapVisible = useWorkbenchStore((s) => s.minimapVisible);
   const collabStatus = useCollaborationStore((s) => s.status);
   const collabRoomCode = useCollaborationStore((s) => s.roomCode);
 
@@ -646,6 +658,7 @@ export const PixiStatusBar: React.FC = () => {
         collabConnected={collabConnected}
         collabRoomCode={collabRoomCode}
         onShowTips={onShowTips}
+        minimapVisible={minimapVisible}
       />
     </pixiContainer>
   );
