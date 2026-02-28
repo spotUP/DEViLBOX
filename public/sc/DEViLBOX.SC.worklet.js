@@ -155,6 +155,29 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
         };
       }
 
+      // ---- setTimeout/clearTimeout polyfill ----
+      // AudioWorkletGlobalScope does not expose setTimeout/clearTimeout.
+      // SC.js (Emscripten) uses them internally, so we must polyfill using MessageChannel.
+      if (typeof globalThis.setTimeout === 'undefined') {
+        let _nextId = 1;
+        const _timers = new Map();
+        globalThis.setTimeout = (fn, _delay) => {
+          const id = _nextId++;
+          const ch = new MessageChannel();
+          ch.port2.onmessage = () => {
+            if (_timers.has(id)) { _timers.delete(id); fn(); }
+          };
+          _timers.set(id, ch);
+          ch.port1.postMessage(null);
+          return id;
+        };
+        globalThis.clearTimeout = (id) => {
+          if (_timers.has(id)) { _timers.get(id).port2.onmessage = null; _timers.delete(id); }
+        };
+        globalThis.setInterval = (fn, delay) => globalThis.setTimeout(fn, delay);
+        globalThis.clearInterval = (id) => globalThis.clearTimeout(id);
+      }
+
       // ---- Load SC.js glue via new Function() ----
       // SC.js is NOT modularized — it uses `var Module = ...` at the top level.
       // We execute it in a new Function scope so its globals don't pollute ours.
@@ -185,10 +208,13 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: 'error', message: 'WASM aborted: ' + reason });
       };
 
-      // Execute SC.js. It will install itself on globalThis.Module.
+      // Execute SC.js. Pass M as the 'Module' parameter so SC.js's local
+      // `var Module = typeof Module != "undefined" ? Module : {}` resolves to M.
+      // Without this, SC.js's var declaration creates a local {} that shadows
+      // globalThis.Module, causing it to ignore our wasmBinary and try to XHR-fetch.
       const wrappedCode = jsCode + '\n// end SC.js\n';
-      const execFn = new Function(wrappedCode);
-      execFn();
+      const execFn = new Function('Module', wrappedCode);
+      execFn(M);
 
       // Wait for Module runtime to be ready
       await new Promise((resolve, reject) => {
