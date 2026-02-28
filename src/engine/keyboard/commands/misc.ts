@@ -153,12 +153,16 @@ export function clonePattern(): boolean {
 export function increasePatternSize(): boolean {
   const { currentPatternIndex, expandPattern } = useTrackerStore.getState();
   expandPattern(currentPatternIndex);
+  const newLength = useTrackerStore.getState().patterns[currentPatternIndex]?.length ?? 0;
+  useUIStore.getState().setStatusMessage(`Pattern: ${newLength} rows`, false, 1000);
   return true;
 }
 
 export function decreasePatternSize(): boolean {
   const { currentPatternIndex, shrinkPattern } = useTrackerStore.getState();
   shrinkPattern(currentPatternIndex);
+  const newLength = useTrackerStore.getState().patterns[currentPatternIndex]?.length ?? 0;
+  useUIStore.getState().setStatusMessage(`Pattern: ${newLength} rows`, false, 1000);
   return true;
 }
 
