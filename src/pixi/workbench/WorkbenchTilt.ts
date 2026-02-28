@@ -58,8 +58,9 @@ const FRAG = /* glsl */ `
 // ─── WorkbenchTiltRenderer ────────────────────────────────────────────────────
 
 export class WorkbenchTiltRenderer {
+  private app: Application;
   private rt: RenderTexture;
-  private mesh: Mesh;
+  private mesh: Mesh<Geometry, Shader>;
 
   // Float32Array kept as a persistent view into the posBuffer's data.
   // Modified in-place each frame then buf.update() signals the GPU.
@@ -70,11 +71,12 @@ export class WorkbenchTiltRenderer {
   private h: number;
 
   constructor(
-    private app: Application,
+    app: Application,
     parentContainer: ContainerType,  // mesh is added here imperatively
     width: number,
     height: number,
   ) {
+    this.app = app;
     this.w = width;
     this.h = height;
 
