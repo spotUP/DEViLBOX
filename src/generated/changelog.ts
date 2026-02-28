@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-28T14:04:02.933Z
+ * Generated: 2026-02-28T14:16:43.420Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1650';
-export const BUILD_NUMBER = '1650';
-export const BUILD_HASH = '1724f039';
+export const BUILD_VERSION = '1.0.1655';
+export const BUILD_NUMBER = '1655';
+export const BUILD_HASH = 'df7297f1';
 export const BUILD_DATE = '2026-02-28';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,29 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1650',
+    version: '1.0.1655',
     date: '2026-02-28',
     changes: [
+      {
+        type: 'fix',
+        "description": "Restore missing fetch call in authFetch body"
+      },
+      {
+        type: 'feature',
+        "description": "Wire trackerZoom, rowHighlightInterval, showBeatLabels through DOM canvas pipeline"
+      },
+      {
+        type: 'feature',
+        "description": "Decompose modules into individual synth instruments on import"
+      },
+      {
+        type: 'fix',
+        "description": "Wire compactToolbar, trackerZoom, rowHighlightInterval, showBeatLabels, oscilloscopeVisible from UIStore"
+      },
+      {
+        type: 'fix',
+        "description": "Reset editor mode when loading .sunvox or .dbx files"
+      },
       {
         type: 'fix',
         "description": "Strip .add/.store/.load/.play from SynthDef before compilation"
@@ -208,26 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Raise toast z-index above modals and overlays"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent BindingError black screen on reset by avoiding structural tree swaps"
-      },
-      {
-        type: 'fix',
-        "description": "Use PINS chunk name and raise instrument cap to 64"
-      },
-      {
-        type: 'fix',
-        "description": "Use MusicLineEngine for import dialog preview of .ml files"
-      },
-      {
-        type: 'fix',
-        "description": "Suppress double audio, fix pattern cutting and effect mapping"
-      },
-      {
-        type: 'fix',
-        "description": "Add SunVoxSynth and MusicLineSynth to SYNTH_CATEGORIES so they appear in the synth type dropdown"
       }
     ]
   }

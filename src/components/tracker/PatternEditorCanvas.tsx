@@ -43,7 +43,6 @@ import type {
 } from '@engine/renderer/worker-types';
 import TrackerWorkerFactory from '@/workers/tracker-render.worker.ts?worker';
 
-const ROW_HEIGHT = 24;
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
 // Channel width is computed dynamically in render() based on acid/prob columns
@@ -167,8 +166,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const trackerVisualBg = useSettingsStore((s) => s.trackerVisualBg);
 
   const trackerZoom = useUIStore(s => s.trackerZoom);
-  const rowHighlightInterval = useUIStore(s => s.rowHighlightInterval);
-  const showBeatLabels = useUIStore(s => s.showBeatLabels);
   const showChannelNames = useUIStore(s => s.showChannelNames);
   const rowHeight = Math.round(24 * (trackerZoom / 100));
 

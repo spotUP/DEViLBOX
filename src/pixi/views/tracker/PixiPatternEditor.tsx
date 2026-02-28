@@ -41,7 +41,6 @@ import type { CursorPosition } from '@typedefs';
 const SCROLLBAR_HEIGHT = 12;
 
 // ─── Layout constants (must match worker-types / TrackerGLRenderer) ──────────
-const ROW_HEIGHT = 24;
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
 const FONT_SIZE = 11;

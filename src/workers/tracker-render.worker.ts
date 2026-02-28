@@ -46,6 +46,9 @@ let ui: UIStateSnapshot = {
   columnVisibility: { flag1: false, flag2: false, probability: false },
   trackerVisualBg: false,
   recordMode: false,
+  rowHeight: 24,
+  rowHighlightInterval: 4,
+  showBeatLabels: false,
 };
 let layout: ChannelLayoutSnapshot = { offsets: [], widths: [], totalWidth: 0 };
 let playback = { row: 0, smoothOffset: 0, patternIndex: 0, isPlaying: false };
