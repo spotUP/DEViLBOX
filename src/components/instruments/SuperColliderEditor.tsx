@@ -292,8 +292,8 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
         );
       case 'error':
         return (
-          <span className="flex items-center gap-1.5 text-xs text-accent-error">
-            <AlertCircle size={12} />
+          <span className="flex items-center gap-1.5 text-xs text-accent-error select-text cursor-text">
+            <AlertCircle size={12} className="shrink-0" />
             {status.line !== undefined ? `Error on line ${status.line}: ` : 'Error: '}
             {status.message}
           </span>

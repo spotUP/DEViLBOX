@@ -303,7 +303,7 @@ export const WAMControls: React.FC<WAMControlsProps> = ({
           <AlertCircle size={18} className="text-accent-error flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <h4 className="text-sm font-bold text-accent-error uppercase">Loading Error</h4>
-            <p className="text-xs text-text-secondary mt-1">{error}</p>
+            <p className="text-xs text-text-secondary mt-1 select-text cursor-text">{error}</p>
           </div>
         </div>
       )}
