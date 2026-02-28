@@ -216,21 +216,19 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
       execFn(M);
 
       // Wait for Module runtime to be ready.
-      // When wasmBinary is provided, Emscripten typically initializes synchronously
-      // inside execFn(M) above — check calledRun FIRST before touching setTimeout.
-      await new Promise((resolve, reject) => {
+      // WebAssembly.instantiate() is always async even when wasmBinary is provided,
+      // so M.calledRun is typically false immediately after execFn(M) returns.
+      // We cannot implement a meaningful timeout here because our setTimeout polyfill
+      // fires as a microtask (zero real delay) — a 30-second timeout would fire
+      // immediately and reject the promise before WASM has a chance to init.
+      // Instead, just wait for onRuntimeInitialized with no timeout.
+      await new Promise((resolve) => {
         if (M.calledRun || M.asm) {
-          // Already initialized synchronously — no timeout needed.
           resolve();
           return;
         }
-        // Async path: install onRuntimeInitialized hook.
-        // setTimeout polyfill fires as a microtask so the 30s value is nominal,
-        // but it still lets us detect a hung init on the next tick.
-        const timeout = setTimeout(() => reject(new Error('SC.js onRuntimeInitialized timeout')), 30000);
         const prevInit = M.onRuntimeInitialized;
         M.onRuntimeInitialized = () => {
-          clearTimeout(timeout);
           if (prevInit) prevInit();
           resolve();
         };
