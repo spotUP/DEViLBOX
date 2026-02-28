@@ -116,7 +116,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
 
       case 'isolateChannel':
-        this._scanInstrumentIsolated(data.channelIndex, data.durationMs || 2000);
+        this._scanInstrumentIsolated(data.channelIndex, data.durationMs || 30000);
         break;
 
       case 'setInstrumentSample': {
@@ -627,12 +627,15 @@ class UADEProcessor extends AudioWorkletProcessor {
             if (hasNonZero) {
               // Detect loop: if wlen > 1 and sample re-triggers with same lc
               // Most Amiga formats: loop start is at (lc), loop length is (wlen) words
-              // We'll store wlen for now and refine during post-processing
+              // We'll store wlen for now and refine during post-processing.
+              // Clamp loopLength to byteLen — wlen from DMA can exceed extracted bytes
+              // when the sample was truncated by MEM_READ_BUF_SIZE.
+              const rawLoopLen0 = wlen > 1 ? wlen * 2 : 0;
               sampleCache.set(lc, {
                 pcm,
                 length: byteLen,
                 loopStart: 0,  // Refined later
-                loopLength: wlen > 1 ? wlen * 2 : 0,
+                loopLength: rawLoopLen0 > 0 ? Math.min(rawLoopLen0, byteLen) : 0,
                 typicalPeriod: per > 0 ? per : 428, // Default to C-2 if unknown
               });
             }
@@ -657,7 +660,11 @@ class UADEProcessor extends AudioWorkletProcessor {
             const relLoopStart = lc - prevLc;
             if (relLoopStart < prevSample.length) {
               prevSample.loopStart = relLoopStart;
-              prevSample.loopLength = wlen > 1 ? wlen * 2 : 0;
+              // Clamp loopLength so loopStart + loopLength never exceeds extracted PCM.
+              const rawLoopLen1 = wlen > 1 ? wlen * 2 : 0;
+              prevSample.loopLength = rawLoopLen1 > 0
+                ? Math.min(rawLoopLen1, prevSample.length - relLoopStart)
+                : 0;
             }
           }
         }
@@ -840,7 +847,7 @@ class UADEProcessor extends AudioWorkletProcessor {
 
         // Build fingerprint for the row just pushed
         const _row = rows[rows.length - 1];
-        const _fp = _row.map(ch => `${ch.period | 0},${ch.samplePtr | 0}`).join('|');
+        const _fp = _row.map(ch => `${ch.period | 0},${ch.samplePtr | 0},${ch.volume | 0}`).join('|');
         _fpHistory.push(_fp);
 
         if (_fpHistory.length >= LOOP_WINDOW) {

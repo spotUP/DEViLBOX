@@ -42,6 +42,7 @@ import type { WaveformDrawOptions } from '../../utils/audio/drawSampleWaveform';
 import { useSampleEditorState } from '../../hooks/useSampleEditorState';
 import type { DragTarget } from '../../hooks/useSampleEditorState';
 import { addManualSlice } from '../../lib/audio/BeatSliceAnalyzer';
+import { UADEEngine } from '../../engine/uade/UADEEngine';
 
 // ─── Props & types ─────────────────────────────────────────────────────
 
@@ -152,8 +153,22 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           },
         },
       });
+
+      // Write-back to UADE chip RAM when editing a UADE enhanced-mode sample.
+      const samplePtr = instrument.sample?.uadeSamplePtr;
+      if (samplePtr && UADEEngine.hasInstance()) {
+        // Convert AudioBuffer Float32 → 8-bit signed Amiga PCM stored as unsigned bytes.
+        // Paula is mono — use channel 0.
+        const f32 = buffer.getChannelData(0);
+        const pcm8 = new Uint8Array(f32.length);
+        for (let i = 0; i < f32.length; i++) {
+          const s8 = Math.round(Math.max(-1, Math.min(1, f32[i])) * 127);
+          pcm8[i] = s8 < 0 ? s8 + 256 : s8;
+        }
+        UADEEngine.getInstance().setInstrumentSample(samplePtr, pcm8);
+      }
     },
-    [instrument.id, instrument.parameters, sampleInfo, updateInstrument],
+    [instrument.id, instrument.parameters, instrument.sample, sampleInfo, updateInstrument],
   );
 
   const onUpdateParams = useCallback(
