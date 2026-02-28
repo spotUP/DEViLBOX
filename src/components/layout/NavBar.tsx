@@ -6,8 +6,9 @@ import React, { useState, useEffect } from 'react';
 import { useProjectStore, useAudioStore, useTabsStore, useThemeStore, themes } from '@stores';
 import { useAuthStore } from '@stores/useAuthStore';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Palette, Download, LogIn, LogOut, Cloud, Users } from 'lucide-react';
+import { Plus, X, Palette, Download, LogIn, LogOut, Cloud, Users, Monitor } from 'lucide-react';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
 import { AuthModal } from '@components/dialogs/AuthModal';
@@ -34,6 +35,9 @@ const NavBarComponent: React.FC = () => {
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const setTheme = useThemeStore((state) => state.setTheme);
   const getCurrentTheme = useThemeStore((state) => state.getCurrentTheme);
+
+  const renderMode = useSettingsStore((state) => state.renderMode);
+  const setRenderMode = useSettingsStore((state) => state.setRenderMode);
 
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
@@ -231,6 +235,20 @@ const NavBarComponent: React.FC = () => {
               title="Download Desktop App"
             >
               <span className="hidden sm:inline uppercase whitespace-nowrap">Desktop App</span>
+            </Button>
+          )}
+
+          {/* Switch to DOM mode — only shown when running in GL/WebGL mode */}
+          {renderMode === 'webgl' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setRenderMode('dom')}
+              icon={<Monitor size={14} />}
+              iconPosition="left"
+              title="Switch to DOM rendering mode"
+            >
+              <span className="hidden sm:inline">DOM</span>
             </Button>
           )}
 

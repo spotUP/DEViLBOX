@@ -518,6 +518,14 @@
     border-color: var(--color-bg);
   }
 
+  .bg-ft2-highlight {
+    background-color: var(--color-accent);
+  }
+
+  .bg-ft2-bgSecondary {
+    background-color: var(--color-bg-secondary);
+  }
+
   .bg-ft2-shadow {
     background-color: var(--ft2-shadow);
   }
