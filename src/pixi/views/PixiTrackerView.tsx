@@ -117,6 +117,7 @@ export const PixiTrackerView: React.FC = () => {
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const showAutomation = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
+  const tb303Collapsed = useUIStore(s => s.tb303Collapsed);
   const currentPattern = patterns[currentPatternIndex];
   const patternId = currentPattern?.id || '';
   const patternLength = currentPattern?.length || 64;
@@ -156,7 +157,7 @@ export const PixiTrackerView: React.FC = () => {
         style={{ overflow: 'visible', zIndex: 34 }}
         autoHeight
       >
-        <TB303KnobPanelOverlay visible={viewMode !== 'tb303' && viewMode !== 'sunvox'} />
+        <TB303KnobPanelOverlay visible={!tb303Collapsed && viewMode !== 'tb303' && viewMode !== 'sunvox'} />
       </PixiDOMOverlay>
 
       {/* Editor controls bar — DOM overlay for 1:1 parity */}
