@@ -54,7 +54,7 @@ export class SunVoxEngine {
   private _songLoadedQueue: Map<number, PendingResolvers<void>> = new Map();
   private _songSavedQueue: Map<number, PendingResolvers<ArrayBuffer>> = new Map();
   private _synthLoadedQueue: Map<number, PendingResolvers<number>> = new Map();
-  private _synthSavedQueue: Map<number, PendingResolvers<ArrayBuffer>> = new Map();
+  private _synthSavedQueue: Map<string, PendingResolvers<ArrayBuffer>> = new Map();
   private _modulesQueue: Map<number, PendingResolvers<SunVoxModuleInfo[]>> = new Map();
   private _controlsQueue: Map<string, PendingResolvers<SunVoxControl[]>> = new Map();
 
@@ -116,28 +116,28 @@ export class SunVoxEngine {
           fetch(`${baseUrl}sunvox/SunVox.js`),
         ]);
 
-        if (wasmResponse.ok) {
-          this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          // Transform Emscripten output for Function() execution inside the worklet
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-            // Mirror HEAPU8/HEAPF32 onto Module so the worklet can access them
-            // after memory grows (updateMemoryViews is closure-local in Emscripten)
-            .replace(
-              /HEAPU8=new Uint8Array\(b\);/,
-              'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;',
-            )
-            .replace(
-              /HEAPF32=new Float32Array\(b\);/,
-              'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;',
-            );
-          this.jsCode = code;
-        }
+        if (!wasmResponse.ok) throw new Error(`[SunVoxEngine] Failed to fetch SunVox.wasm: ${wasmResponse.status}`);
+        if (!jsResponse.ok) throw new Error(`[SunVoxEngine] Failed to fetch SunVox.js: ${jsResponse.status}`);
+
+        this.wasmBinary = await wasmResponse.arrayBuffer();
+
+        let code = await jsResponse.text();
+        // Transform Emscripten output for Function() execution inside the worklet
+        code = code
+          .replace(/import\.meta\.url/g, "'.'")
+          .replace(/export\s+default\s+\w+;?/g, '')
+          .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+          // Mirror HEAPU8/HEAPF32 onto Module so the worklet can access them
+          // after memory grows (updateMemoryViews is closure-local in Emscripten)
+          .replace(
+            /HEAPU8=new Uint8Array\(b\);/,
+            'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;',
+          )
+          .replace(
+            /HEAPF32=new Float32Array\(b\);/,
+            'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;',
+          );
+        this.jsCode = code;
       }
 
       this.loadedContexts.add(context);
@@ -225,17 +225,10 @@ export class SunVoxEngine {
 
       case 'synthSaved': {
         const key = `${data.handle}:${data.moduleId}`;
-        const resolver = this._synthSavedQueue.get(data.handle!);
+        const resolver = this._synthSavedQueue.get(key);
         if (resolver) {
-          this._synthSavedQueue.delete(data.handle!);
+          this._synthSavedQueue.delete(key);
           resolver.resolve(data.buffer!);
-        } else {
-          // Try composite key fallback (in case same handle saves multiple synths)
-          const r2 = this._synthSavedQueue.get(parseInt(key));
-          if (r2) {
-            this._synthSavedQueue.delete(parseInt(key));
-            r2.resolve(data.buffer!);
-          }
         }
         break;
       }
@@ -303,6 +296,9 @@ export class SunVoxEngine {
    */
   async createHandle(sampleRate: number): Promise<number> {
     await this._initPromise;
+    if (this._disposed || !this.workletNode) {
+      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
+    }
     return new Promise<number>((resolve, reject) => {
       this._handleQueue.push({ resolve, reject });
       this.workletNode!.port.postMessage({ type: 'create', sampleRate });
@@ -317,6 +313,9 @@ export class SunVoxEngine {
   /** Load a .sunvox song file from an ArrayBuffer. Transfers ownership. */
   async loadSong(handle: number, buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
+    if (this._disposed || !this.workletNode) {
+      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
+    }
     return new Promise<void>((resolve, reject) => {
       this._songLoadedQueue.set(handle, { resolve, reject });
       this.workletNode!.port.postMessage({ type: 'loadSong', handle, buffer }, [buffer]);
@@ -326,6 +325,9 @@ export class SunVoxEngine {
   /** Save the current song to an ArrayBuffer. */
   async saveSong(handle: number): Promise<ArrayBuffer> {
     await this._initPromise;
+    if (this._disposed || !this.workletNode) {
+      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
+    }
     return new Promise<ArrayBuffer>((resolve, reject) => {
       this._songSavedQueue.set(handle, { resolve, reject });
       this.workletNode!.port.postMessage({ type: 'saveSong', handle });
@@ -338,6 +340,9 @@ export class SunVoxEngine {
    */
   async loadSynth(handle: number, buffer: ArrayBuffer): Promise<number> {
     await this._initPromise;
+    if (this._disposed || !this.workletNode) {
+      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
+    }
     return new Promise<number>((resolve, reject) => {
       this._synthLoadedQueue.set(handle, { resolve, reject });
       this.workletNode!.port.postMessage({ type: 'loadSynth', handle, buffer }, [buffer]);
@@ -347,8 +352,12 @@ export class SunVoxEngine {
   /** Save a specific module as a .sunsynth ArrayBuffer. */
   async saveSynth(handle: number, moduleId: number): Promise<ArrayBuffer> {
     await this._initPromise;
+    if (this._disposed || !this.workletNode) {
+      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
+    }
+    const key = `${handle}:${moduleId}`;
     return new Promise<ArrayBuffer>((resolve, reject) => {
-      this._synthSavedQueue.set(handle, { resolve, reject });
+      this._synthSavedQueue.set(key, { resolve, reject });
       this.workletNode!.port.postMessage({ type: 'saveSynth', handle, moduleId });
     });
   }
@@ -356,6 +365,9 @@ export class SunVoxEngine {
   /** Get the list of modules (synthesizers, effects) in a SunVox instance. */
   async getModules(handle: number): Promise<SunVoxModuleInfo[]> {
     await this._initPromise;
+    if (this._disposed || !this.workletNode) {
+      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
+    }
     return new Promise<SunVoxModuleInfo[]>((resolve, reject) => {
       this._modulesQueue.set(handle, { resolve, reject });
       this.workletNode!.port.postMessage({ type: 'getModules', handle });
@@ -365,6 +377,9 @@ export class SunVoxEngine {
   /** Get the controls (parameters) of a specific module. */
   async getControls(handle: number, moduleId: number): Promise<SunVoxControl[]> {
     await this._initPromise;
+    if (this._disposed || !this.workletNode) {
+      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
+    }
     const key = `${handle}:${moduleId}`;
     return new Promise<SunVoxControl[]>((resolve, reject) => {
       this._controlsQueue.set(key, { resolve, reject });

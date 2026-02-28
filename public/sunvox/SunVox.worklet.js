@@ -12,16 +12,16 @@
  * Models the SoundMon + Hively worklet patterns for init and player management.
  */
 
-// Static scratch buffers allocated once at module init time (after WASM loads).
 const MAX_FRAMES = 128;
-let renderBufL = 0;
-let renderBufR = 0;
 
 class SunVoxProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.wasm = null;
     this.initialized = false;
+    // Per-instance scratch buffers — allocated after WASM loads, freed on dispose.
+    this.renderBufL = 0;
+    this.renderBufR = 0;
 
     // Per-handle render state. Keyed by handle (integer).
     // Value: { active: true } — all handles share the static render bufs.
@@ -87,6 +87,8 @@ class SunVoxProcessor extends AudioWorkletProcessor {
             m._sunvox_wasm_destroy(parseInt(h));
           }
           this.handles = {};
+          if (this.renderBufL) { m._free(this.renderBufL); this.renderBufL = 0; }
+          if (this.renderBufR) { m._free(this.renderBufR); this.renderBufR = 0; }
         }
         this.initialized = false;
         break;
@@ -266,9 +268,9 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         wasmBinary,
       });
 
-      // Allocate static scratch buffers once — reused for every render call
-      renderBufL = this.wasm._malloc(MAX_FRAMES * 4);
-      renderBufR = this.wasm._malloc(MAX_FRAMES * 4);
+      // Allocate per-instance scratch buffers — reused for every render call
+      this.renderBufL = this.wasm._malloc(MAX_FRAMES * 4);
+      this.renderBufR = this.wasm._malloc(MAX_FRAMES * 4);
 
       this.initialized = true;
       this.port.postMessage({ type: 'ready' });
@@ -297,12 +299,12 @@ class SunVoxProcessor extends AudioWorkletProcessor {
 
     const m = this.wasm;
     const heapF32 = m.HEAPF32;
-    const offL = renderBufL >> 2; // byte offset → Float32 index
-    const offR = renderBufR >> 2;
+    const offL = this.renderBufL >> 2; // byte offset → Float32 index
+    const offR = this.renderBufR >> 2;
 
     for (const h of Object.keys(this.handles)) {
       const hi = parseInt(h);
-      m._sunvox_wasm_render(hi, renderBufL, renderBufR, numSamples);
+      m._sunvox_wasm_render(hi, this.renderBufL, this.renderBufR, numSamples);
       for (let i = 0; i < numSamples; i++) {
         outputL[i] += heapF32[offL + i];
         outputR[i] += heapF32[offR + i];
