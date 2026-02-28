@@ -195,7 +195,8 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
           text={text}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
           tint={theme.textMuted.color}
-          layout={{ position: 'absolute', left: x + 3, top: 3 }}
+          x={x + 3}
+          y={3}
         />
       ))}
 
@@ -207,7 +208,8 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
           tint={muted ? theme.textMuted.color : color}
           alpha={muted ? 0.5 : 0.9}
-          layout={{ position: 'absolute', left: x, top: y }}
+          x={x}
+          y={y}
         />
       ))}
     </pixiContainer>

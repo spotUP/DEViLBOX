@@ -439,7 +439,8 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
               text={label.text}
               style={{ fontFamily: label.bold ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
               tint={label.color}
-              layout={{ position: 'absolute', left: label.x, top: label.y }}
+              x={label.x}
+              y={label.y}
             />
           ))}
         </pixiContainer>

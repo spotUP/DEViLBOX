@@ -487,7 +487,8 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
             text={label.text}
             style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
             tint={label.highlight ? 0xffffff : theme.textMuted.color}
-            layout={{ position: 'absolute', left: label.x, top: HEADER_HEIGHT / 2 - 5 }}
+            x={label.x}
+            y={HEADER_HEIGHT / 2 - 5}
           />
         ))}
 
@@ -502,7 +503,8 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
               fill: 0xffffff,
             }}
             tint={label.isRoot ? theme.accent.color : label.isSharp ? theme.textMuted.color : theme.textSecondary.color}
-            layout={{ position: 'absolute', left: LABEL_WIDTH - 32, top: label.y }}
+            x={LABEL_WIDTH - 32}
+            y={label.y}
           />
         ))}
       </pixiContainer>
