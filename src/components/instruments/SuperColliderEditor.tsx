@@ -177,7 +177,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
           value: p.default,
         }));
 
-        onChange({
+        onChangeRef.current({
           ...configRef.current,
           source,
           synthDefName: data.synthDefName,
@@ -192,7 +192,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
       const message = err instanceof Error ? err.message : 'Network error';
       setStatus({ state: 'error', message });
     }
-  }, [onChange]);
+  }, []);
 
   // -------------------------------------------------------------------------
   // Param panel — change handler
