@@ -1,7 +1,7 @@
 /**
  * PixiRoot — Root layout container for the WebGL UI.
  * Uses @pixi/layout (Yoga flexbox) for the main app structure:
- *   NavBar (36px) | MainArea (flex:1) | StatusBar (24px)
+ *   NavBar | MainArea (flex:1) | StatusBar
  *
  * NOTE: The root container MUST use explicit pixel dimensions, not percentages.
  * @pixi/layout's Yoga calculateLayout() requires numeric width/height for root nodes
@@ -20,9 +20,9 @@ import { WorkbenchContainer } from './workbench/WorkbenchContainer';
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
   const collabStatus = useCollaborationStore(s => s.status);
+  const activeView = useUIStore(s => s.activeView);
 
   // Keep drumpad modal auto-open behavior
-  const activeView = useUIStore(s => s.activeView);
   useEffect(() => {
     if (activeView === 'drumpad') {
       const s = useUIStore.getState();
@@ -41,13 +41,8 @@ export const PixiRoot: React.FC = () => {
       {/* Navigation bar — pure Pixi */}
       <PixiNavBar />
 
-      {/* Main content area — infinite workbench canvas */}
-      <pixiContainer
-        layout={{
-          flex: 1,
-          width: '100%',
-        }}
-      >
+      {/* Main content area — workbench fills remaining space */}
+      <pixiContainer layout={{ flex: 1, width: '100%' }}>
         <WorkbenchContainer />
       </pixiContainer>
 

@@ -131,7 +131,12 @@ async function loadMSDFFontFromJson(name: string, jsonPath: string): Promise<voi
   if (Cache.has(cacheKey)) Cache.remove(cacheKey);
 
   // Create BitmapFont and register under the cache key BitmapFontManager.getFont() looks up.
+  // NOTE: The BitmapFont constructor auto-registers under `data.fontFamily + '-bitmap'`.
+  // When json.info.face is an empty string, this creates a stray '-bitmap' cache entry.
+  // Remove it immediately to prevent the "[Cache] already has key" warning.
   const bitmapFont = new BitmapFont({ data, textures }, jsonPath);
+  const autoKey = `${(data.fontFamily as string) ?? ''}-bitmap`;
+  if (autoKey !== cacheKey && Cache.has(autoKey)) Cache.remove(autoKey);
   Cache.set(cacheKey, bitmapFont);
 }
 

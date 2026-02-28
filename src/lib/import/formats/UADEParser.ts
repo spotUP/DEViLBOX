@@ -360,6 +360,41 @@ export async function parseUADEFile(
   const metadata = preScannedMeta ?? await engine.load(buffer, filename);
   const scanRows = metadata.scanData ?? [];
 
+  // Phase 3a: Route to native parser when UADE detects a format with native support.
+  // Native parsers deliver more accurate instrument names, effects, and pattern data
+  // than the Paula-register heuristic scan can provide.
+  //
+  // Format name strings come from uade_wasm_get_format_name() at runtime.
+  // NOTE: Verify exact strings by logging metadata.formatName with real test files
+  // before adding new entries — UADE format names may differ from what's expected.
+  if (mode === 'enhanced') {
+    const fmt = metadata.formatName;
+    type NativeRoute = () => Promise<TrackerSong | null>;
+    const NATIVE_ROUTES: Record<string, NativeRoute> = {
+      'ProTracker':       async () => { const { parseMODFile } = await import('./MODParser'); return parseMODFile(buffer, filename); },
+      'Noisetracker':     async () => { const { parseMODFile } = await import('./MODParser'); return parseMODFile(buffer, filename); },
+      'Soundtracker':     async () => { const { parseMODFile } = await import('./MODParser'); return parseMODFile(buffer, filename); },
+      'Oktalyzer':        async () => { const { parseOktalyzerFile } = await import('./OktalyzerParser'); return parseOktalyzerFile(buffer, filename); },
+      'MED':              async () => { const { parseMEDFile } = await import('./MEDParser'); return parseMEDFile(buffer, filename); },
+      'SoundFX':          async () => { const { parseSoundFXFile } = await import('./SoundFXParser'); return parseSoundFXFile(buffer, filename); },
+      'SoundMon':         async () => { const { parseSoundMonFile } = await import('./SoundMonParser'); return parseSoundMonFile(buffer, filename); },
+      'JamCracker':       async () => { const { parseJamCrackerFile } = await import('./JamCrackerParser'); return parseJamCrackerFile(buffer, filename); },
+      'Quadra Composer':  async () => { const { parseQuadraComposerFile } = await import('./QuadraComposerParser'); return parseQuadraComposerFile(buffer, filename); },
+    };
+    const route = NATIVE_ROUTES[fmt];
+    if (route) {
+      try {
+        const nativeSong = await route();
+        if (nativeSong) {
+          console.log(`[UADEParser] '${fmt}' → native parser`);
+          return nativeSong;
+        }
+      } catch (err) {
+        console.warn(`[UADEParser] Native parser for '${fmt}' failed, falling back to UADE scan:`, err);
+      }
+    }
+  }
+
   // Resolve scan data for the requested subsong.
   // subsong=0 reuses the data from the initial load; subsong>0 triggers a worklet re-scan.
   let activeScanRows = scanRows;
@@ -590,6 +625,57 @@ export function tryExtractInstrumentNames(buffer: ArrayBuffer, ext: string): str
   // MaxTrax is a synthesis-only Amiga format with MXTX magic.  No PCM sample
   // name table exists — return null to prevent false positives.
   if (ext === 'mxtx') return null;
+
+  /* ── Jochen Hippel CoSo / TFMX variants (.hipc, .soc, .sog, .s7g, .hst) */
+  // These Jochen Hippel variants are compiled 68k executables (CoSo = "Code Sounds").
+  // No instrument name table exists.
+  if (ext === 'hipc' || ext === 'soc' || ext === 'sog' || ext === 's7g' || ext === 'hst') return null;
+
+  /* ── Maniacs of Noise (.mon) ─────────────────────────────────────────── */
+  // Maniacs of Noise modules are compiled 68k executables with no instrument
+  // name table.  Return null to prevent false positives.
+  if (ext === 'mon') return null;
+
+  /* ── GlueMon (.glue, .gm) ────────────────────────────────────────────── */
+  // GlueMon modules are packed Amiga executables with no instrument name table.
+  if (ext === 'glue' || ext === 'gm') return null;
+
+  /* ── Kim Christensen (.kim) ──────────────────────────────────────────── */
+  // Kim Christensen modules are compiled 68k executables with no instrument
+  // name table.
+  if (ext === 'kim') return null;
+
+  /* ── Kris Hatlelid (.kh) ─────────────────────────────────────────────── */
+  // Kris Hatlelid modules are compiled 68k executables with no instrument name table.
+  if (ext === 'kh') return null;
+
+  /* ── FutureComposer (.fc, .fc13, .fc14, .sfc, .bfc, .bsi, .smod) ────── */
+  // Future Composer formats use a wavetable synthesis approach.  The instrument
+  // table contains waveform and envelope data, but no ASCII name fields.
+  // Return null to prevent the generic scanner from misidentifying data as names.
+  if (ext === 'fc' || ext === 'fc13' || ext === 'fc14' || ext === 'sfc' ||
+      ext === 'bfc' || ext === 'bsi' || ext === 'smod' || ext === 'fc2' ||
+      ext === 'fc3' || ext === 'fc4') return null;
+
+  /* ── Fred Editor (.fred) ─────────────────────────────────────────────── */
+  // Fred Editor is a synthesis-only format with no instrument name table.
+  if (ext === 'fred') return null;
+
+  /* ── SidMon (.sm, .sm2, .sm3, .sm4, .sid2) ──────────────────────────── */
+  // SidMon formats are synthesis-only with no ASCII instrument name fields.
+  if (ext === 'sm' || ext === 'sm2' || ext === 'sm3' || ext === 'sm4' || ext === 'sid2') return null;
+
+  /* ── Digital Mugician (.dmu, .dmu2, .mug, .mug2) ────────────────────── */
+  // Digital Mugician uses wavetable synthesis with no instrument name table.
+  if (ext === 'dmu' || ext === 'dmu2' || ext === 'mug' || ext === 'mug2') return null;
+
+  /* ── Laxity (.powt, .pt) ─────────────────────────────────────────────── */
+  // Laxity modules are compiled 68k executables with no instrument name table.
+  if (ext === 'powt' || ext === 'pt') return null;
+
+  /* ── InStereo (.is, .is20) ───────────────────────────────────────────── */
+  // InStereo modules use a binary format with no ASCII instrument name fields.
+  if (ext === 'is' || ext === 'is20') return null;
 
   /* ── Delta Music 2 (.dm2) ─────────────────────────────────────────────── */
   if (ext === 'dm2' || ext === 'dm') {

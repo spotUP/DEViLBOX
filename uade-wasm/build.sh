@@ -177,7 +177,7 @@ LDFLAGS=(
     "-sMAXIMUM_MEMORY=134217728"    # 128 MB max
     "-sALLOW_MEMORY_GROWTH=1"
     # WASM exports
-    "-sEXPORTED_FUNCTIONS=['_uade_wasm_init','_uade_wasm_load','_uade_wasm_render','_uade_wasm_stop','_uade_wasm_get_subsong_count','_uade_wasm_get_subsong_min','_uade_wasm_get_subsong_max','_uade_wasm_get_player_name','_uade_wasm_get_format_name','_uade_wasm_set_subsong','_uade_wasm_set_looping','_uade_wasm_cleanup','_uade_wasm_get_channel_snapshot','_uade_wasm_get_channel_extended','_uade_wasm_get_cia_state','_uade_wasm_read_memory','_uade_wasm_write_memory','_uade_wasm_get_total_frames','_uade_wasm_add_extra_file','_uade_wasm_mute_channels','_malloc','_free']"
+    "-sEXPORTED_FUNCTIONS=['_uade_wasm_init','_uade_wasm_load','_uade_wasm_render','_uade_wasm_stop','_uade_wasm_get_subsong_count','_uade_wasm_get_subsong_min','_uade_wasm_get_subsong_max','_uade_wasm_get_player_name','_uade_wasm_get_format_name','_uade_wasm_set_subsong','_uade_wasm_set_looping','_uade_wasm_cleanup','_uade_wasm_get_channel_snapshot','_uade_wasm_get_channel_extended','_uade_wasm_get_cia_state','_uade_wasm_read_memory','_uade_wasm_write_memory','_uade_wasm_get_total_frames','_uade_wasm_add_extra_file','_uade_wasm_mute_channels','_uade_wasm_get_tick_count','_uade_wasm_reset_tick_count','_uade_wasm_read_string','_malloc','_free']"
     "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','stringToUTF8','UTF8ToString','HEAPU8','HEAPU32','HEAPF32']"
     # WASM output format (for AudioWorklet — no ES modules)
     "-sMODULARIZE=1"

@@ -100,6 +100,12 @@ export class UADEEngine {
   private _channelCallbacks: Set<ChannelCallback> = new Set();
   private _songEndCallbacks: Set<() => void> = new Set();
   private _disposed = false;
+  // Pending readString requests: Map<requestId, {resolve, reject}>
+  private _readStringPending: Map<number, { resolve: (s: string) => void; reject: (e: Error) => void }> = new Map();
+  private _readStringNextId = 0;
+  // Pending scanMemory requests: Map<requestId, {resolve, reject}>
+  private _scanMemoryPending: Map<number, { resolve: (addr: number) => void; reject: (e: Error) => void }> = new Map();
+  private _scanMemoryNextId = 0;
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -310,6 +316,42 @@ export class UADEEngine {
           }
           break;
         }
+
+        case 'readStringResult': {
+          const pending = this._readStringPending.get(data.requestId);
+          if (pending) {
+            pending.resolve(data.value ?? '');
+            this._readStringPending.delete(data.requestId);
+          }
+          break;
+        }
+
+        case 'readStringError': {
+          const pending = this._readStringPending.get(data.requestId);
+          if (pending) {
+            pending.reject(new Error(data.message));
+            this._readStringPending.delete(data.requestId);
+          }
+          break;
+        }
+
+        case 'scanMemoryResult': {
+          const pending = this._scanMemoryPending.get(data.requestId);
+          if (pending) {
+            pending.resolve(data.addr ?? -1);
+            this._scanMemoryPending.delete(data.requestId);
+          }
+          break;
+        }
+
+        case 'scanMemoryError': {
+          const pending = this._scanMemoryPending.get(data.requestId);
+          if (pending) {
+            pending.reject(new Error(data.message));
+            this._scanMemoryPending.delete(data.requestId);
+          }
+          break;
+        }
       }
     };
 
@@ -490,6 +532,46 @@ export class UADEEngine {
       { type: 'setInstrumentSample', samplePtr, pcmData: copy.buffer },
       [copy.buffer],
     );
+  }
+
+  /**
+   * Read a null-terminated string from Amiga chip RAM at the given address.
+   * Wraps uade_wasm_read_string() via worklet message round-trip.
+   * Useful for reading instrument names from format-specific memory offsets.
+   * @param addr   - Amiga chip RAM address (e.g. 0x000000 = chip RAM base)
+   * @param maxLen - Maximum string length to read (default 22, max 256)
+   */
+  async readStringFromMemory(addr: number, maxLen = 22): Promise<string> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('UADEEngine not initialized');
+    const requestId = this._readStringNextId++;
+    const promise = new Promise<string>((resolve, reject) => {
+      this._readStringPending.set(requestId, { resolve, reject });
+    });
+    this.workletNode.port.postMessage({ type: 'readString', requestId, addr, maxLen });
+    return promise;
+  }
+
+  /**
+   * Scan Amiga chip RAM for a byte sequence (magic bytes) starting from address 0.
+   * Returns the address of the first match, or -1 if not found.
+   * Useful for locating module base address when format uses non-standard load address.
+   * @param magic     - Byte sequence to search for
+   * @param searchLen - How many bytes of chip RAM to search (default 512KB)
+   */
+  async scanMemoryForMagic(magic: Uint8Array, searchLen = 524288): Promise<number> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('UADEEngine not initialized');
+    const requestId = this._scanMemoryNextId++;
+    const promise = new Promise<number>((resolve, reject) => {
+      this._scanMemoryPending.set(requestId, { resolve, reject });
+    });
+    const magicCopy = magic.slice();
+    this.workletNode.port.postMessage(
+      { type: 'scanMemory', requestId, magic: magicCopy.buffer, searchLen },
+      [magicCopy.buffer],
+    );
+    return promise;
   }
 
   dispose(): void {
