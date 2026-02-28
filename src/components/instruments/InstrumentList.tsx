@@ -18,12 +18,13 @@ import { focusPopout } from '@components/ui/PopOutWindow';
 import { BASS_PRESETS } from '@constants/factoryPresets';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as Tone from 'tone';
-import type { InstrumentConfig, HivelyConfig } from '@typedefs/instrument';
+import type { InstrumentConfig, HivelyConfig, SunVoxConfig } from '@typedefs/instrument';
 import { exportAsAhi } from '@lib/export/HivelyExporter';
 import { parseAhiFile } from '@lib/import/formats/HivelyParser';
 import { exportMusicLineInstrument } from '@lib/export/MusicLineExporter';
 import { parseMusicLineInstrument } from '@lib/import/formats/MusicLineParser';
 import { HivelyImportDialog } from './HivelyImportDialog';
+import { SunVoxImportDialog } from './SunVoxImportDialog';
 
 interface InstrumentListProps {
   /** Optional: Compact mode for sidebar */
@@ -50,6 +51,8 @@ interface InstrumentListProps {
   onCreateNew?: () => void;
   /** Optional: Show HVL/AHX import button */
   showHivelyImport?: boolean;
+  /** Optional: Show SunSynth import button */
+  showSunVoxImport?: boolean;
 }
 
 // PERFORMANCE: Memoize to prevent expensive re-renders on every scroll step
@@ -65,6 +68,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   onEditInstrument,
   variant = 'default',
   showHivelyImport = false,
+  showSunVoxImport = false,
 }) => {
   const {
     instruments,
@@ -97,6 +101,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
 
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [showHivelyImportDialog, setShowHivelyImportDialog] = useState(false);
+  const [showSunVoxImportDialog, setShowSunVoxImportDialog] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
 
@@ -283,6 +288,13 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     [createInstrument]
   );
 
+  const handleSunVoxImport = useCallback(
+    (name: string, config: SunVoxConfig) => {
+      createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
+    },
+    [createInstrument]
+  );
+
   const handleSaveMli = useCallback((e: React.MouseEvent, inst: InstrumentConfig) => {
     e.stopPropagation();
     const bytes = exportMusicLineInstrument(inst);
@@ -342,7 +354,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   };
 
   // Show action bar if any action buttons are enabled
-  const showActionBar = isFT2 && (showPresetButton || showSamplePackButton || showEditButton || showHivelyImport);
+  const showActionBar = isFT2 && (showPresetButton || showSamplePackButton || showEditButton || showHivelyImport || showSunVoxImport);
 
   return (
     <div className={`flex flex-col h-full ${isFT2 ? 'bg-ft2-bg border-l border-ft2-border' : ''}`}>
@@ -396,6 +408,16 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
               >
                 <Upload size={14} />
                 <span className="text-[8px] font-bold">HVL</span>
+              </button>
+            )}
+            {showSunVoxImport && (
+              <button
+                onClick={() => setShowSunVoxImportDialog(true)}
+                className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors text-ft2-text"
+                title="Import instrument from .sunsynth file"
+              >
+                <Upload size={14} />
+                <span className="text-[8px] font-bold">SVX</span>
               </button>
             )}
           </div>
@@ -680,6 +702,12 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         <HivelyImportDialog
           onClose={() => setShowHivelyImportDialog(false)}
           onImport={handleHivelyImport}
+        />
+      )}
+      {showSunVoxImportDialog && (
+        <SunVoxImportDialog
+          onClose={() => setShowSunVoxImportDialog(false)}
+          onImport={handleSunVoxImport}
         />
       )}
     </div>
