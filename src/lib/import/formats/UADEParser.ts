@@ -560,6 +560,32 @@ export function tryExtractInstrumentNames(buffer: ArrayBuffer, ext: string): str
   // table.  Return null to prevent false positives from the generic scanner.
   if (ext === 'mc' || ext === 'mcr' || ext === 'mco') return null;
 
+  /* ── Dave Lowe New (.dln, .dl_deli) ─────────────────────────────────── */
+  // Dave Lowe New modules use a binary packed data format.  There is no
+  // instrument name table.  Return null to prevent the generic 22-byte scanner
+  // from misidentifying packed offsets/lengths as ASCII name blocks.
+  if (ext === 'dln' || ext === 'dl_deli') return null;
+
+  /* ── David Whittaker (.dw, .dwold) ──────────────────────────────────── */
+  // David Whittaker modules are compiled 68k executables with no instrument
+  // name table.  Return null to prevent false positives from the generic scanner.
+  if (ext === 'dw' || ext === 'dwold') return null;
+
+  /* ── Jochen Hippel (.hip, .hip7) ─────────────────────────────────────── */
+  // Jochen Hippel modules are compiled 68k executables with no instrument
+  // name table.  Return null to prevent false positives from the generic scanner.
+  if (ext === 'hip' || ext === 'hip7') return null;
+
+  /* ── Rob Hubbard (.rh, .rho) ─────────────────────────────────────────── */
+  // Rob Hubbard modules are compiled 68k executables with no instrument name
+  // table.  Return null to prevent false positives from the generic scanner.
+  if (ext === 'rh' || ext === 'rho') return null;
+
+  /* ── Mark II (.mk2, .mkii, .mkiio) ──────────────────────────────────── */
+  // Mark II modules are compiled 68k executables with no instrument name table.
+  // Return null to prevent false positives from the generic scanner.
+  if (ext === 'mk2' || ext === 'mkii' || ext === 'mkiio') return null;
+
   /* ── Delta Music 2 (.dm2) ─────────────────────────────────────────────── */
   if (ext === 'dm2' || ext === 'dm') {
     // DM2 header: magic "DM2!" at offset 0, followed by song table, then
