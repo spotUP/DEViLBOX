@@ -33,6 +33,8 @@ import { ImportDBXDialog } from '@components/dialogs/ImportDBXDialog';
 import { ImportInstrumentDialog } from '@components/dialogs/ImportInstrumentDialog';
 import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
+import { useDevServerStatus } from '@hooks/useDevServerStatus';
+import { DevServerDownBanner } from '@components/ui/DevServerDownBanner';
 import { usePatternPlayback } from '@hooks/audio/usePatternPlayback';
 import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { notify } from '@stores/useNotificationStore';
@@ -73,6 +75,7 @@ function App() {
   // Check for application updates
   const { updateAvailable, latestVersion, currentVersion, refresh } = useVersionCheck();
   const [updateDismissed, setUpdateDismissed] = useState(false);
+  const isDevServerDown = useDevServerStatus();
   // PERFORMANCE: Use useShallow to prevent re-renders on unrelated audio store changes
   const { initialized, contextState, setInitialized, setContextState, setToneEngineInstance, setAnalyserNode, setFFTNode } = useAudioStore(
     useShallow((state) => ({
@@ -533,6 +536,7 @@ function App() {
           <ToastNotification />
           <SynthErrorDialog />
           <RomUploadDialog />
+          {isDevServerDown && <DevServerDownBanner />}
           {updateAvailable && !updateDismissed && (
             <UpdateNotification
               onRefresh={refresh}
@@ -1117,6 +1121,9 @@ function App() {
 
       {/* ROM Upload Dialog - Shows when ROM-dependent synths can't auto-load ROMs */}
       <RomUploadDialog />
+
+      {/* Dev server down banner */}
+      {isDevServerDown && <DevServerDownBanner />}
 
       {/* Update Notification */}
       {updateAvailable && !updateDismissed && (
