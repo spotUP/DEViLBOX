@@ -275,78 +275,82 @@ export const PixiSunVoxChannelView: React.FC<PixiSunVoxChannelViewProps> = ({
     g.fill({ color: theme.border.color, alpha: theme.border.alpha });
   }, [width, theme]);
 
-  // ── Empty state ─────────────────────────────────────────────────────────────
-
-  if (!channel) {
-    return (
-      <pixiContainer layout={{ width, height }}>
-        <pixiBitmapText
-          text={`No channel at index ${channelIndex}`}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
-          tint={theme.error.color}
-          layout={{ marginTop: 40, marginLeft: 20 }}
-        />
-      </pixiContainer>
-    );
-  }
+  // ── Render ─────────────────────────────────────────────────────────────────
+  // Use visible prop instead of early return to avoid @pixi/layout BindingError.
+  // Conditional mount/unmount of Pixi children triggers Yoga node swap errors;
+  // always render the same tree structure and control visibility instead.
+  const hasChannel = !!channel;
 
   return (
-    <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
+    <pixiContainer layout={{ width, height }}>
+      {/* Error overlay — always mounted; shown only when no channel.
+          position: 'absolute' keeps it out of the flex layout flow. */}
+      <pixiBitmapText
+        visible={!hasChannel}
+        text={hasChannel ? '' : `No channel at index ${channelIndex}`}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+        tint={theme.error.color}
+        layout={{ position: 'absolute', marginTop: 40, marginLeft: 20 }}
+      />
 
-      {/* ── Transport / title bar ─────────────────────────────────────── */}
-      <pixiContainer layout={{ width, height: TRANSPORT_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, gap: 8 }}>
-        <pixiGraphics draw={drawTransport} layout={{ position: 'absolute', width, height: TRANSPORT_H }} />
+      {/* Main content — always mounted; hidden when no channel */}
+      <pixiContainer visible={hasChannel} layout={{ width, height, flexDirection: 'column' }}>
 
-        <PixiLabel text="SUNVOX" size="sm" weight="bold" color="accent" />
+        {/* ── Transport / title bar ─────────────────────────────────────── */}
+        <pixiContainer layout={{ width, height: TRANSPORT_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, gap: 8 }}>
+          <pixiGraphics draw={drawTransport} layout={{ position: 'absolute', width, height: TRANSPORT_H }} />
 
-        {moduleId !== undefined && (
-          <PixiLabel text={`MOD:${moduleId}`} size="xs" color="textMuted" />
-        )}
+          <PixiLabel text="SUNVOX" size="sm" weight="bold" color="accent" />
 
-        <PixiLabel text={`CH ${(channelIndex + 1).toString().padStart(2, '0')}`} size="xs" color="textSecondary" />
+          {moduleId !== undefined && (
+            <PixiLabel text={`MOD:${moduleId}`} size="xs" color="textMuted" />
+          )}
 
-        {isPlaying && (
-          <PixiLabel
-            text={`ROW ${(displayRow).toString(16).toUpperCase().padStart(2, '0')} / ${patternLength.toString(16).toUpperCase().padStart(2, '0')} @ ${bpm} BPM`}
-            size="xs"
-            color="textMuted"
-          />
-        )}
+          <PixiLabel text={`CH ${(channelIndex + 1).toString().padStart(2, '0')}`} size="xs" color="textSecondary" />
 
-        <pixiContainer layout={{ flex: 1 }} />
+          {isPlaying && (
+            <PixiLabel
+              text={`ROW ${(displayRow).toString(16).toUpperCase().padStart(2, '0')} / ${patternLength.toString(16).toUpperCase().padStart(2, '0')} @ ${bpm} BPM`}
+              size="xs"
+              color="textMuted"
+            />
+          )}
 
-        <PixiButton label="CLEAR" variant="ghost" size="sm" color="red" onClick={handleClear} />
+          <pixiContainer layout={{ flex: 1 }} />
+
+          <PixiButton label="CLEAR" variant="ghost" size="sm" color="red" onClick={handleClear} />
+        </pixiContainer>
+
+        {/* ── Column header bar ─────────────────────────────────────────── */}
+        <pixiContainer layout={{ width, height: HEADER_H }}>
+          <pixiGraphics draw={drawHeader} layout={{ position: 'absolute', width, height: HEADER_H }} />
+          {headerLabels.map((hl, i) => (
+            <pixiBitmapText
+              key={`hdr-${i}`}
+              text={hl.text}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+              tint={hl.color}
+              layout={{ position: 'absolute', left: hl.x, top: hl.y }}
+            />
+          ))}
+        </pixiContainer>
+
+        {/* ── Pattern grid ──────────────────────────────────────────────── */}
+        <pixiContainer layout={{ width, height: gridHeight }}>
+          <pixiGraphics draw={drawGrid} layout={{ position: 'absolute', width, height: gridHeight }} />
+
+          {cellLabels.map((label, i) => (
+            <pixiBitmapText
+              key={`cell-${i}`}
+              text={label.text}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }}
+              tint={label.color}
+              layout={{ position: 'absolute', left: label.x, top: label.y }}
+            />
+          ))}
+        </pixiContainer>
+
       </pixiContainer>
-
-      {/* ── Column header bar ─────────────────────────────────────────── */}
-      <pixiContainer layout={{ width, height: HEADER_H }}>
-        <pixiGraphics draw={drawHeader} layout={{ position: 'absolute', width, height: HEADER_H }} />
-        {headerLabels.map((hl, i) => (
-          <pixiBitmapText
-            key={`hdr-${i}`}
-            text={hl.text}
-            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
-            tint={hl.color}
-            layout={{ position: 'absolute', left: hl.x, top: hl.y }}
-          />
-        ))}
-      </pixiContainer>
-
-      {/* ── Pattern grid ──────────────────────────────────────────────── */}
-      <pixiContainer layout={{ width, height: gridHeight }}>
-        <pixiGraphics draw={drawGrid} layout={{ position: 'absolute', width, height: gridHeight }} />
-
-        {cellLabels.map((label, i) => (
-          <pixiBitmapText
-            key={`cell-${i}`}
-            text={label.text}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }}
-            tint={label.color}
-            layout={{ position: 'absolute', left: label.x, top: label.y }}
-          />
-        ))}
-      </pixiContainer>
-
     </pixiContainer>
   );
 };

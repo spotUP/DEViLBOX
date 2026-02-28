@@ -387,67 +387,71 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
     g.fill({ color: theme.border.color, alpha: theme.border.alpha });
   }, [width, theme]);
 
-  // Error states
-  if (!instrument) {
-    return (
-      <pixiContainer layout={{ width, height }}>
-        <pixiBitmapText
-          text={`No instrument on Ch ${channelIndex + 1}`}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
-          tint={theme.error.color}
-          layout={{ marginTop: 40, marginLeft: 20 }}
-        />
-      </pixiContainer>
-    );
-  }
+  // Use visible prop instead of early return to avoid @pixi/layout BindingError.
+  // Conditional mount/unmount of Pixi children triggers Yoga node swap errors;
+  // always render the same tree structure and control visibility instead.
+  const hasInstrument = !!instrument;
 
   return (
-    <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
-      {/* Transport bar */}
-      <pixiContainer layout={{ width, height: TRANSPORT_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, gap: 8 }}>
-        <pixiGraphics draw={drawTransport} layout={{ position: 'absolute', width, height: TRANSPORT_H }} />
+    <pixiContainer layout={{ width, height }}>
+      {/* Error overlay — always mounted; shown only when no instrument.
+          position: 'absolute' keeps it out of the flex layout flow. */}
+      <pixiBitmapText
+        visible={!hasInstrument}
+        text={hasInstrument ? '' : `No instrument on Ch ${channelIndex + 1}`}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+        tint={theme.error.color}
+        layout={{ position: 'absolute', marginTop: 40, marginLeft: 20 }}
+      />
 
-        <PixiLabel text="TB-303" size="sm" weight="bold" color="accent" />
+      {/* Main content — always mounted; hidden when no instrument */}
+      <pixiContainer visible={hasInstrument} layout={{ width, height, flexDirection: 'column' }}>
+        {/* Transport bar */}
+        <pixiContainer layout={{ width, height: TRANSPORT_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, gap: 8 }}>
+          <pixiGraphics draw={drawTransport} layout={{ position: 'absolute', width, height: TRANSPORT_H }} />
 
-        {isPlaying && (
-          <PixiLabel text={`Step ${(currentStep + 1).toString().padStart(2, '0')}/16 @ ${bpm} BPM`} size="xs" color="textMuted" />
-        )}
+          <PixiLabel text="TB-303" size="sm" weight="bold" color="accent" />
 
-        <pixiContainer layout={{ flex: 1 }} />
+          {isPlaying && (
+            <PixiLabel text={`Step ${(currentStep + 1).toString().padStart(2, '0')}/16 @ ${bpm} BPM`} size="xs" color="textMuted" />
+          )}
 
-        <PixiButton label="RANDOM" variant="ghost" size="sm" onClick={handleRandomize} />
-        <PixiButton label="CLEAR" variant="ghost" size="sm" color="red" onClick={handleClear} />
-      </pixiContainer>
+          <pixiContainer layout={{ flex: 1 }} />
 
-      {/* Sequencer grid */}
-      <pixiContainer
-        layout={{ width, height: STEP_H + LED_H + 8 }}
-        eventMode="static"
-        cursor="pointer"
-        onPointerDown={handlePointerDown}
-      >
-        <pixiGraphics draw={drawSequencer} layout={{ position: 'absolute', width, height: STEP_H + LED_H + 8 }} />
+          <PixiButton label="RANDOM" variant="ghost" size="sm" onClick={handleRandomize} />
+          <PixiButton label="CLEAR" variant="ghost" size="sm" color="red" onClick={handleClear} />
+        </pixiContainer>
 
-        {/* Labels */}
-        {stepLabelData.map((label, idx) => (
-          <pixiBitmapText
-            key={idx}
-            text={label.text}
-            style={{ fontFamily: label.bold ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-            tint={label.color}
-            layout={{ position: 'absolute', left: label.x, top: label.y }}
-          />
-        ))}
-      </pixiContainer>
+        {/* Sequencer grid */}
+        <pixiContainer
+          layout={{ width, height: STEP_H + LED_H + 8 }}
+          eventMode="static"
+          cursor="pointer"
+          onPointerDown={handlePointerDown}
+        >
+          <pixiGraphics draw={drawSequencer} layout={{ position: 'absolute', width, height: STEP_H + LED_H + 8 }} />
 
-      {/* Knob section — TB-303 parameters */}
-      <pixiContainer layout={{ width, height: KNOB_SECTION_H, flexDirection: 'row', gap: 12, paddingLeft: 16, paddingTop: 8 }}>
-        <PixiKnob label="Waveform" value={waveform} min={0} max={1} onChange={handleWaveformChange} size="sm" />
-        <PixiKnob label="Cutoff" value={cutoff} min={0} max={1} onChange={handleCutoffChange} size="sm" />
-        <PixiKnob label="Resonance" value={resonance} min={0} max={1} onChange={handleResonanceChange} size="sm" />
-        <PixiKnob label="Env Mod" value={envMod} min={0} max={1} onChange={handleEnvModChange} size="sm" />
-        <PixiKnob label="Decay" value={decay} min={0} max={1} onChange={handleDecayChange} size="sm" />
-        <PixiKnob label="Accent" value={accentAmt} min={0} max={1} onChange={handleAccentChange} size="sm" />
+          {/* Labels */}
+          {stepLabelData.map((label, idx) => (
+            <pixiBitmapText
+              key={idx}
+              text={label.text}
+              style={{ fontFamily: label.bold ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+              tint={label.color}
+              layout={{ position: 'absolute', left: label.x, top: label.y }}
+            />
+          ))}
+        </pixiContainer>
+
+        {/* Knob section — TB-303 parameters */}
+        <pixiContainer layout={{ width, height: KNOB_SECTION_H, flexDirection: 'row', gap: 12, paddingLeft: 16, paddingTop: 8 }}>
+          <PixiKnob label="Waveform" value={waveform} min={0} max={1} onChange={handleWaveformChange} size="sm" />
+          <PixiKnob label="Cutoff" value={cutoff} min={0} max={1} onChange={handleCutoffChange} size="sm" />
+          <PixiKnob label="Resonance" value={resonance} min={0} max={1} onChange={handleResonanceChange} size="sm" />
+          <PixiKnob label="Env Mod" value={envMod} min={0} max={1} onChange={handleEnvModChange} size="sm" />
+          <PixiKnob label="Decay" value={decay} min={0} max={1} onChange={handleDecayChange} size="sm" />
+          <PixiKnob label="Accent" value={accentAmt} min={0} max={1} onChange={handleAccentChange} size="sm" />
+        </pixiContainer>
       </pixiContainer>
     </pixiContainer>
   );
