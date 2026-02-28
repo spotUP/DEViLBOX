@@ -32,8 +32,17 @@ class SunVoxProcessor extends AudioWorkletProcessor {
     this.messageQueue = [];
 
     this.port.onmessage = (event) => {
-      // Enqueue rather than handling synchronously so process() stays audio-thread safe.
-      this.messageQueue.push(event.data);
+      if (event.data.type === 'init') {
+        // Handle init directly — initWasm() is async and posts 'ready' when done.
+        // It must NOT go through the queue because process() only runs when the
+        // worklet node is connected to an active audio graph. During pre-read
+        // extraction the engine exists before any SunVoxSynth, so process() never
+        // fires and a queued init would hang forever.
+        this.initWasm(event.data.sampleRate, event.data.wasmBinary, event.data.jsCode);
+      } else {
+        // All other messages are enqueued and drained at the start of process().
+        this.messageQueue.push(event.data);
+      }
     };
   }
 
@@ -63,11 +72,6 @@ class SunVoxProcessor extends AudioWorkletProcessor {
 
     switch (data.type) {
       // ── Lifecycle ──────────────────────────────────────────────────────────
-
-      case 'init':
-        // Async — runs init, resolves on next drain
-        this.initWasm(data.sampleRate, data.wasmBinary, data.jsCode);
-        break;
 
       case 'create': {
         if (!m) break;
