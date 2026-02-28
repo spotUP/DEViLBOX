@@ -437,11 +437,59 @@ async function loadAudioSample(file: File): Promise<FileLoadResult> {
 
 /**
  * Load a .sunsynth or .sunvox file as a SunVoxSynth instrument.
+ * - .sunsynth → patch/module mode (responds to individual note events)
+ * - .sunvox   → song mode (triggerAttack starts the whole song playing)
+ *   Also auto-creates a minimal 1-row pattern with a C-4 note so the user
+ *   can press Play immediately and hear the song.
  */
 async function loadSunVoxInstrument(file: File): Promise<FileLoadResult> {
   const buffer = await file.arrayBuffer();
   const name = file.name.replace(/\.(sunsynth|sunvox)$/i, '');
-  const config = { patchData: buffer, patchName: name, controlValues: {} };
+  const isSong = file.name.toLowerCase().endsWith('.sunvox');
+  const config = { patchData: buffer, patchName: name, isSong, controlValues: {} };
+
   useInstrumentStore.getState().createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
-  return { success: true, message: `Imported SunVox instrument: ${name}` };
+
+  if (isSong) {
+    // Auto-create a minimal 1-row pattern so the user can press Play immediately.
+    const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
+    const currentInstruments = useInstrumentStore.getState().instruments;
+    const instrumentIndex = currentInstruments.length; // 1-based: just-added is last
+    const patternId = `svox-${Date.now()}`;
+    const pattern = {
+      id: patternId,
+      name,
+      length: 1,
+      channels: [{
+        id: `ch-svox-${Date.now()}`,
+        name: 'SunVox',
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: 0,
+        instrumentId: currentInstruments[currentInstruments.length - 1]?.id ?? '',
+        color: '#facc15',
+        rows: [{
+          note: 'C-4',
+          instrument: instrumentIndex,
+          volume: 64,
+          effTyp: 0,
+          eff: 0,
+        }],
+      }],
+    };
+    const existing = useTrackerStore.getState().patterns;
+    loadPatterns([...existing, pattern]);
+    const newIdx = existing.length;
+    setCurrentPattern(newIdx);
+    setPatternOrder([...useTrackerStore.getState().patterns.map((_, i) => i)]);
+  }
+
+  return {
+    success: true,
+    message: isSong
+      ? `Loaded SunVox song: ${name} — press Play to hear it`
+      : `Imported SunVox patch: ${name}`,
+  };
 }
