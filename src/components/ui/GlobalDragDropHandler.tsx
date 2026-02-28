@@ -33,7 +33,7 @@ const SUPPORTED_EXTENSIONS = new Set([
   // MIDI
   '.mid', '.midi',
   // Audio samples
-  '.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif',
+  '.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif', '.m4a', '.iff', '.8svx',
   // All tracker/module formats (MOD, XM, IT, S3M, Furnace, HVL, UADE exotic, etc.)
   ...getSupportedExtensions(),
 ]);
