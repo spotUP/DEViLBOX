@@ -55,6 +55,66 @@ function extractSynthDefName(source: string): string | null {
   return m ? m[1] : null;
 }
 
+/**
+ * Extract just the SynthDef(…) expression from a source file that may contain
+ * server-boot code, GUI setup, sequencers, etc.
+ *
+ * Tracks balanced parentheses and skips double-quoted string literals so that
+ * parens inside strings don't confuse the counter. Also strips any trailing
+ * interactive-mode chained calls (.add, .send(s), .store, .load, .play).
+ *
+ * Returns null only if no SynthDef is found at all; returns the full source
+ * unchanged if brace matching fails (so the user sees a real sclang error).
+ */
+function extractSynthDefBlock(source: string): string | null {
+  const startMatch = source.match(/\bSynthDef\s*\(/);
+  if (!startMatch || startMatch.index === undefined) return null;
+
+  const blockStart = startMatch.index;
+  // The opening paren is at the end of the regex match.
+  const openParen = blockStart + startMatch[0].length - 1;
+
+  let depth = 0;
+  let i = openParen;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === '"') {
+      // Skip double-quoted string literal
+      i++;
+      while (i < source.length && source[i] !== '"') {
+        if (source[i] === '\\') i++; // escape
+        i++;
+      }
+    } else if (ch === '\'') {
+      // Skip single-quoted symbol literal
+      i++;
+      while (i < source.length && source[i] !== '\'') {
+        if (source[i] === '\\') i++;
+        i++;
+      }
+    } else if (ch === '(') {
+      depth++;
+    } else if (ch === ')') {
+      depth--;
+      if (depth === 0) { i++; break; }
+    }
+    i++;
+  }
+
+  if (depth !== 0) {
+    // Unbalanced — fall back to full source so sclang reports the real error.
+    return source;
+  }
+
+  // Consume any chained interactive-mode calls after the closing paren:
+  //   .add  .add;  .send(s)  .send(s);  .store  .play  etc.
+  const tail = source.slice(i);
+  const chainMatch = tail.match(/^(\s*\.[a-zA-Z_]\w*(?:\s*\([^)]*\))?\s*;?)+/);
+  if (chainMatch) i += chainMatch[0].length;
+
+  return source.slice(blockStart, i).trim();
+}
+
 const STANDARD_PARAMS = new Set(['freq', 'amp', 'gate', 'out', 'buf', 'bufnum', 'sustain', 't_gate']);
 
 /**
@@ -229,15 +289,19 @@ router.post('/compile', (req: Request, res: Response) => {
     try {
       await fs.mkdir(tmpDir, { recursive: true });
 
-      // Strip trailing .add/.store/.load/.play — these are interactive-mode idioms that
-      // try to communicate with a running server. For compilation we only need the
-      // SynthDef object; chaining .writeDefFile on it requires it to be the return value.
-      const compilableSource = source.trimEnd().replace(/\.(add|store|load|play)\s*;?\s*$/, '');
+      // Extract just the SynthDef block so that files containing s.boot, GUI code,
+      // sequencers, etc. don't cause sclang to hang waiting for a server connection.
+      // extractSynthDefBlock also strips trailing .add/.send(s)/.store/.play chains.
+      const synthDefBlock = extractSynthDefBlock(source);
+      if (!synthDefBlock) {
+        res.json({ success: false, error: 'Could not find SynthDef block in source' } satisfies CompileFailure);
+        return;
+      }
 
-      // Wrap the user's SynthDef expression so it writes the .scsyndef binary.
+      // Wrap the SynthDef expression so it writes the .scsyndef binary.
       // Wrap in (...) so multi-line SynthDef is treated as one expression.
       const outDirEscaped = tmpDir.replace(/\\/g, '/'); // SC uses forward slashes
-      const script = `(\n${compilableSource}\n).writeDefFile("${outDirEscaped}");\n0.exit;\n`;
+      const script = `(\n${synthDefBlock}\n).writeDefFile("${outDirEscaped}");\n0.exit;\n`;
 
       // Write script to a file and execute — stdin REPL mode breaks multi-line expressions.
       const scriptPath = path.join(tmpDir, 'compile.sc');

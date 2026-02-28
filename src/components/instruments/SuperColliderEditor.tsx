@@ -131,6 +131,35 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   const importInputRef = useRef<HTMLInputElement>(null);
   const logRef = useRef<HTMLPreElement>(null);
   const [status, setStatus] = React.useState<CompileStatus>({ state: 'idle' });
+  const [progress, setProgress] = React.useState(0);
+  const [showProgress, setShowProgress] = React.useState(false);
+  const progressRef = useRef(0);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startProgress = useCallback(() => {
+    progressRef.current = 0;
+    setProgress(0);
+    setShowProgress(true);
+    progressIntervalRef.current = setInterval(() => {
+      // Ease toward 88% — never quite reaches it, giving a "waiting" feel
+      progressRef.current += (88 - progressRef.current) * 0.04;
+      setProgress(progressRef.current);
+    }, 60);
+  }, []);
+
+  const finishProgress = useCallback((success: boolean) => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    setProgress(success ? 100 : progressRef.current);
+    if (success) {
+      setTimeout(() => setShowProgress(false), 500);
+    } else {
+      // On error leave bar at current position briefly, then hide
+      setTimeout(() => setShowProgress(false), 800);
+    }
+  }, []);
 
   // Keep refs in sync
   useEffect(() => { configRef.current = config; }, [config]);
@@ -202,6 +231,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   // -------------------------------------------------------------------------
   const handleCompile = useCallback(async () => {
     setStatus({ state: 'compiling' });
+    startProgress();
     const source = viewRef.current?.state.doc.toString() ?? configRef.current.source;
 
     try {
@@ -229,15 +259,18 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
           binary: data.binary,
           params: newParams,
         });
+        finishProgress(true);
         setStatus({ state: 'compiled' });
       } else {
+        finishProgress(false);
         setStatus({ state: 'error', message: data.error, line: data.line, rawOutput: data.rawOutput });
       }
     } catch (err) {
+      finishProgress(false);
       const message = err instanceof Error ? err.message : 'Network error';
       setStatus({ state: 'error', message });
     }
-  }, []);
+  }, [startProgress, finishProgress]);
 
   // -------------------------------------------------------------------------
   // Param handlers
@@ -366,14 +399,23 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
             Compiled — \{config.synthDefName}
           </span>
         );
-      case 'error':
+      case 'error': {
+        const errorText = (status.line !== undefined ? `Line ${status.line}: ` : '') + status.message;
+        const copyText = status.rawOutput ? `${errorText}\n\n${status.rawOutput}` : errorText;
         return (
-          <span className="flex items-center gap-1.5 text-xs text-accent-error select-text cursor-text">
+          <span className="flex items-center gap-1.5 text-xs text-accent-error min-w-0">
             <AlertCircle size={12} className="shrink-0" />
-            {status.line !== undefined ? `Line ${status.line}: ` : ''}
-            {status.message}
+            <span className="truncate select-text cursor-text" title={errorText}>{errorText}</span>
+            <button
+              onClick={() => { void navigator.clipboard.writeText(copyText); }}
+              className="shrink-0 ml-0.5 text-accent-error hover:opacity-70 transition-opacity"
+              title="Copy error to clipboard"
+            >
+              <Copy size={11} />
+            </button>
           </span>
         );
+      }
     }
   };
 
@@ -410,6 +452,25 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
             Export
           </button>
         </div>
+      </div>
+
+      {/* Progress bar — appears during compile, fades out on completion */}
+      <div
+        className="shrink-0 overflow-hidden transition-all duration-300"
+        style={{ height: showProgress ? 3 : 0 }}
+      >
+        <div
+          className="h-full transition-all"
+          style={{
+            width: `${progress}%`,
+            background: status.state === 'error'
+              ? 'var(--color-accent-error, #e06c75)'
+              : 'var(--color-accent-primary, #7c3aed)',
+            transitionDuration: progress === 100 ? '200ms' : '600ms',
+            transitionTimingFunction: 'ease-out',
+            boxShadow: `0 0 6px ${status.state === 'error' ? 'rgba(224,108,117,0.6)' : 'rgba(124,58,237,0.6)'}`,
+          }}
+        />
       </div>
 
       {/* Body: editor (left) + param panel (right, always visible) */}
