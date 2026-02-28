@@ -117,8 +117,18 @@ function runSclang(scdFile: string): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       SCLANG_PATH,
-      [scdFile],
-      { timeout: COMPILE_TIMEOUT_MS },
+      // -D = daemon mode (no stdin/interactive prompt, runs file then exits on 0.exit)
+      ['-D', scdFile],
+      {
+        timeout: COMPILE_TIMEOUT_MS,
+        env: {
+          ...process.env,
+          // Required for headless server: use Qt's offscreen platform instead of X11
+          QT_QPA_PLATFORM: 'offscreen',
+          // Allow Chromium (QtWebEngine bundled in SC) to run as root
+          QTWEBENGINE_CHROMIUM_FLAGS: '--no-sandbox',
+        },
+      },
       (err, stdout, stderr) => {
         const output = [stdout, stderr].filter(Boolean).join('\n');
         if (err?.code === 'ENOENT' || err?.message?.includes('not found')) {
