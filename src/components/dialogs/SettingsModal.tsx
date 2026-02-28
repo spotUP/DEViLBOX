@@ -67,7 +67,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setRenderMode,
   } = useSettingsStore();
 
-  const { sampleBusGain, setSampleBusGain, synthBusGain, setSynthBusGain } = useAudioStore();
+  const { sampleBusGain, setSampleBusGain, synthBusGain, setSynthBusGain, autoGain, setAutoGain } = useAudioStore();
 
   const {
     editStep, setEditStep,
@@ -577,10 +577,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
               {/* Bus Gain Balance */}
               <div className="flex flex-col gap-2">
-                <label className="text-ft2-text text-xs font-mono">Bus Gain Balance:</label>
-                <span className="text-[9px] text-ft2-textDim font-mono">Balance sample vs synth/chip engine levels</span>
                 <div className="flex items-center justify-between">
-                  <span className="text-[9px] text-ft2-textDim font-mono w-16">Samples</span>
+                  <label className="text-ft2-text text-xs font-mono">Bus Gain Balance:</label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <span className="text-[9px] text-ft2-textDim font-mono">Auto</span>
+                    <input
+                      type="checkbox"
+                      checked={autoGain}
+                      onChange={(e) => setAutoGain(e.target.checked)}
+                      className="accent-ft2-cursor"
+                    />
+                  </label>
+                </div>
+                <span className="text-[9px] text-ft2-textDim font-mono">
+                  {autoGain ? 'Auto-balancing active — plays at least 1s to calibrate' : 'Balance sample vs synth/chip engine levels'}
+                </span>
+                <div className="flex items-center justify-between">
+                  <span className={`text-[9px] font-mono w-16 ${autoGain ? 'text-ft2-textDim' : 'text-ft2-textDim'}`}>Samples</span>
                   <div className="flex items-center gap-2">
                     <input
                       type="range"
@@ -589,7 +602,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       step={1}
                       value={sampleBusGain}
                       onChange={(e) => setSampleBusGain(Number(e.target.value))}
-                      className="w-20 accent-ft2-cursor"
+                      disabled={autoGain}
+                      className="w-20 accent-ft2-cursor disabled:opacity-40"
                     />
                     <span className="text-ft2-text text-[10px] font-mono w-10 text-right">
                       {sampleBusGain > 0 ? `+${sampleBusGain}` : sampleBusGain} dB
@@ -606,7 +620,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       step={1}
                       value={synthBusGain}
                       onChange={(e) => setSynthBusGain(Number(e.target.value))}
-                      className="w-20 accent-ft2-cursor"
+                      disabled={autoGain}
+                      className="w-20 accent-ft2-cursor disabled:opacity-40"
                     />
                     <span className="text-ft2-text text-[10px] font-mono w-10 text-right">
                       {synthBusGain > 0 ? `+${synthBusGain}` : synthBusGain} dB

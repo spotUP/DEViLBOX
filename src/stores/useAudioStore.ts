@@ -18,6 +18,7 @@ interface AudioStore {
   masterMuted: boolean;
   sampleBusGain: number; // dB offset on tracker/sample path (masterInput); 0 = unity
   synthBusGain: number;  // dB offset on synth/chip path (synthBus); 0 = unity
+  autoGain: boolean;     // Auto-gain: auto-balance sample vs synth bus levels
   analyserNode: Tone.Analyser | null;
   fftNode: Tone.FFT | null;
   toneEngineInstance: ToneEngine | null;
@@ -33,6 +34,7 @@ interface AudioStore {
   toggleMasterMute: () => void;
   setSampleBusGain: (db: number) => void;
   setSynthBusGain: (db: number) => void;
+  setAutoGain: (enabled: boolean) => void;
   setAnalyserNode: (node: Tone.Analyser | null) => void;
   setFFTNode: (node: Tone.FFT | null) => void;
   setToneEngineInstance: (instance: ToneEngine) => void;
@@ -55,6 +57,7 @@ export const useAudioStore = create<AudioStore>()(
     masterMuted: false,
     sampleBusGain: 0,
     synthBusGain: 0,
+    autoGain: false,
     analyserNode: null,
     fftNode: null,
     toneEngineInstance: null,
@@ -132,6 +135,13 @@ export const useAudioStore = create<AudioStore>()(
         state.synthBusGain = db;
         const engine = get().toneEngineInstance;
         if (engine) engine.setSynthBusGain(db);
+      }),
+
+    setAutoGain: (enabled) =>
+      set((state) => {
+        state.autoGain = enabled;
+        const engine = get().toneEngineInstance;
+        if (engine) engine.setAutoGain(enabled);
       }),
 
     // Master Effects Actions

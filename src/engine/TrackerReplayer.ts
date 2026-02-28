@@ -28,7 +28,7 @@ import type { GrooveTemplate } from '@/types/audio';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate, ft2ArpeggioPeriod, ft2Period2NotePeriod, FT2_ARPEGGIO_TAB } from './effects/FT2Tables';
 import { HivelyEngine } from './hively/HivelyEngine';
-
+import { MusicLineEngine } from './musicline/MusicLineEngine';
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -220,7 +220,7 @@ const GROOVE_MAP = new Map<string, GrooveTemplate>(GROOVE_TEMPLATES.map(t => [t.
 // ============================================================================
 
 export type TrackerFormat =
-  | 'MOD' | 'XM' | 'IT' | 'S3M' | 'HVL' | 'AHX'
+  | 'MOD' | 'XM' | 'IT' | 'S3M' | 'HVL' | 'AHX' | 'ML'
   // Exotic Amiga formats (Phase 2 full editing)
   | 'OKT'   // Oktalyzer
   | 'MED'   // OctaMED / MED
@@ -385,7 +385,8 @@ export interface TrackerSong {
   };
   /** Raw HVL/AHX binary for loading into the HivelyEngine WASM */
   hivelyFileData?: ArrayBuffer;
-
+  /** Raw MusicLine binary for loading into the MusicLineEngine WASM */
+  musiclineFileData?: Uint8Array;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;
@@ -1194,13 +1195,30 @@ export class TrackerReplayer {
       }
     }
 
+    // MusicLine Editor: load raw binary into MusicLineEngine WASM before playback.
+    if (this.song.musiclineFileData && this.song.format === 'ML') {
+      try {
+        const mlEngine = MusicLineEngine.getInstance();
+        const ctx = (engine as unknown as { context: AudioContext }).context;
+        await mlEngine.init(ctx);
+        await mlEngine.ready();
+        await mlEngine.loadSong(this.song.musiclineFileData.slice(0));
+        if (!this._muted) {
+          mlEngine.play();
+          console.log('[TrackerReplayer] MusicLineEngine loaded & playing');
+        }
+      } catch (err) {
+        console.error('[TrackerReplayer] Failed to load ML tune into WASM:', err);
+      }
+    }
+
     // Route UADE/Hively native engine output through the stereo separation chain
     // so the Amiga stereo mix (hard-pan LRRL) gets narrowed by stereoSeparation.
     // In DJ mode, DeckEngine.loadSong() handles this; only do it for tracker view.
     if (!this.isDJDeck) {
       for (const inst of this.song.instruments) {
         const st = inst.synthType;
-        if ((st === 'UADESynth' || st === 'HivelySynth') && !this.routedNativeEngines.has(st)) {
+        if ((st === 'UADESynth' || st === 'HivelySynth' || st === 'MusicLineSynth') && !this.routedNativeEngines.has(st)) {
           const nativeInput = getNativeAudioNode(this.separationNode.inputTone as any);
           if (nativeInput) {
             engine.rerouteNativeEngine(st, nativeInput);
@@ -1250,6 +1268,15 @@ export class TrackerReplayer {
           HivelyEngine.getInstance().stop();
         }
       } catch { /* HivelyEngine may not be loaded */ }
+    }
+
+    // Stop MusicLineEngine if this is an ML song
+    if (this.song?.musiclineFileData && this.song.format === 'ML') {
+      try {
+        if (MusicLineEngine.hasInstance()) {
+          MusicLineEngine.getInstance().stop();
+        }
+      } catch { /* MusicLineEngine may not be loaded */ }
     }
 
     // Stop all channels (release synth notes + stop sample players)
