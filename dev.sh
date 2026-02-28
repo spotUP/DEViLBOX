@@ -2,9 +2,12 @@
 # dev.sh — DEViLBOX full-stack dev launcher
 #
 # Kills any existing processes on the dev ports, then starts:
-#   • API server    (Express + SC compile)   → http://localhost:3001
-#   • Collab server (WebSocket signaling)    → ws://localhost:4002
-#   • Frontend      (Vite)                  → http://localhost:5173
+#   • API server    (Express + SC compile)   → http://localhost:3001  [logs/backend.log]
+#   • Collab server (WebSocket signaling)    → ws://localhost:4002    [logs/collab.log]
+#   • Frontend      (Vite)                  → http://localhost:5173  [stdout — always visible]
+#
+# Vite runs in the foreground so TypeScript errors and crashes are immediately visible.
+# Ctrl-C kills Vite and the EXIT trap shuts down the two background servers.
 #
 # Usage: ./dev.sh
 # Stop:  Ctrl-C
@@ -45,15 +48,12 @@ kill_port "$FRONTEND_PORT"
 # ── Cleanup on exit ────────────────────────────────────────────────────────────
 BACKEND_PID=""
 COLLAB_PID=""
-FRONTEND_PID=""
 
 cleanup() {
   echo ""
   log "Shutting down..."
-  [ -n "$BACKEND_PID" ]  && kill "$BACKEND_PID"  2>/dev/null || true
-  [ -n "$COLLAB_PID" ]   && kill "$COLLAB_PID"   2>/dev/null || true
-  [ -n "$FRONTEND_PID" ] && kill "$FRONTEND_PID" 2>/dev/null || true
-  # Belt-and-suspenders: clear the ports in case child processes spawned subchildren
+  [ -n "$BACKEND_PID" ] && kill "$BACKEND_PID" 2>/dev/null || true
+  [ -n "$COLLAB_PID" ]  && kill "$COLLAB_PID"  2>/dev/null || true
   kill_port "$BACKEND_PORT"
   kill_port "$COLLAB_PORT"
   kill_port "$FRONTEND_PORT"
@@ -90,7 +90,7 @@ log "Generating changelog and file manifest..."
 node scripts/generate-changelog.cjs
 node scripts/generate-file-manifest.js
 
-# ── Type-check ─────────────────────────────────────────────────────────────────
+# ── Type-check — output always visible, exits on error ────────────────────────
 log "Running type-check..."
 if ! npm run type-check; then
   err "TypeScript errors — fix them before starting the dev server."
@@ -103,11 +103,10 @@ log "Building AssemblyScript (DevilboxDSP.wasm)..."
 npm run asbuild
 ok "AssemblyScript built."
 
-# ── Logs ───────────────────────────────────────────────────────────────────────
+# ── Logs (backend and collab only — Vite runs in foreground) ─────────────────
 mkdir -p logs
 : > logs/backend.log
 : > logs/collab.log
-: > logs/frontend.log
 
 # ── API server (Express) ───────────────────────────────────────────────────────
 log "Starting API server on port $BACKEND_PORT..."
@@ -145,37 +144,18 @@ for i in $(seq 1 20); do
   sleep 0.5
 done
 
-# ── Frontend (Vite) ────────────────────────────────────────────────────────────
-log "Starting frontend on port $FRONTEND_PORT..."
-npx vite > logs/frontend.log 2>&1 &
-FRONTEND_PID=$!
-
-log "Waiting for frontend to be ready..."
-for i in $(seq 1 60); do
-  if nc -z localhost "$FRONTEND_PORT" 2>/dev/null; then
-    ok "Frontend ready (PID: $FRONTEND_PID)"
-    break
-  fi
-  if (( i % 10 == 0 )); then
-    printf "  %ss elapsed — check logs/frontend.log if this seems stuck\n" "$i"
-  fi
-  if [ "$i" -eq 60 ]; then
-    warn "Frontend didn't come up in 60 s — check logs/frontend.log"
-    tail -5 logs/frontend.log | sed 's/^/  /'
-  fi
-  sleep 1
-done
-
+# ── Status banner (backend up, Vite starting below) ───────────────────────────
 echo ""
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-echo -e "${GREEN}  DEViLBOX is running${RESET}"
-echo -e "  Frontend  → ${CYAN}http://localhost:$FRONTEND_PORT${RESET}"
-echo -e "  API       → ${CYAN}http://localhost:$BACKEND_PORT${RESET}"
-echo -e "  Collab    → ${CYAN}ws://localhost:$COLLAB_PORT${RESET}"
-echo -e "  Logs      → logs/backend.log  logs/collab.log  logs/frontend.log"
+echo -e "${GREEN}  DEViLBOX back-end running${RESET}"
+echo -e "  API    → ${CYAN}http://localhost:$BACKEND_PORT${RESET}   (logs/backend.log)"
+echo -e "  Collab → ${CYAN}ws://localhost:$COLLAB_PORT${RESET}    (logs/collab.log)"
+echo -e "  Vite   → ${CYAN}http://localhost:$FRONTEND_PORT${RESET}  (output below)"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-echo -e "  ${YELLOW}Ctrl-C to stop${RESET}"
+echo -e "  ${YELLOW}Ctrl-C to stop all servers${RESET}"
 echo ""
 
-# Keep alive — exit when any child dies (Ctrl-C triggers cleanup via trap)
-wait "$BACKEND_PID" "$COLLAB_PID" "$FRONTEND_PID"
+# ── Frontend (Vite) — foreground, output always visible ──────────────────────
+# All Vite output (HMR, build warnings, errors) prints directly to this terminal.
+# When Vite exits (Ctrl-C or crash), the EXIT trap above kills backend + collab.
+./node_modules/.bin/vite
