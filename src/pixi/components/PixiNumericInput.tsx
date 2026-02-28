@@ -24,6 +24,8 @@ interface PixiNumericInputProps {
   /** Show +/- buttons */
   showButtons?: boolean;
   layout?: Record<string, unknown>;
+  /** Preset values for quick selection (currently unused by the component) */
+  presets?: Array<{ label: string; value: number }>;
 }
 
 const ARROW_BTN_SIZE = 18;
