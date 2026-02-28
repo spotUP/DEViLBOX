@@ -39,7 +39,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { Pattern, TrackerCell, InstrumentConfig, UADEChipRamInfo, DeltaMusic1Config } from '@/types';
 import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // -- Constants ---------------------------------------------------------------
@@ -158,6 +158,34 @@ interface DM1Instrument {
   sampleData: Int8Array | null;
 }
 
+// -- Config helpers ----------------------------------------------------------
+
+/**
+ * Build a DeltaMusic1Config from a parsed DM1Instrument.
+ * All fields are taken directly from the instrument header; no conversion needed.
+ */
+function buildDM1Config(inst: DM1Instrument): DeltaMusic1Config {
+  return {
+    volume:        inst.volume,
+    attackStep:    inst.attackStep,
+    attackDelay:   inst.attackDelay,
+    decayStep:     inst.decayStep,
+    decayDelay:    inst.decayDelay,
+    sustain:       inst.sustain,
+    releaseStep:   inst.releaseStep,
+    releaseDelay:  inst.releaseDelay,
+    vibratoWait:   inst.vibratoWait,
+    vibratoStep:   inst.vibratoStep,
+    vibratoLength: inst.vibratoLength,
+    bendRate:      inst.bendRate,
+    portamento:    inst.portamento,
+    tableDelay:    inst.tableDelay,
+    arpeggio:      [...inst.arpeggio],
+    isSample:      inst.isSample,
+    table:         inst.table ? [...inst.table] : null,
+  };
+}
+
 // -- Note conversion ---------------------------------------------------------
 
 /**
@@ -264,10 +292,19 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
   //   sampleData[instrumentLength - headerSize]
   //
   // Header size: isSample=true -> 30 bytes, isSample=false -> 78 bytes.
+
+  // File-relative offset at start of instrument data section (for chip RAM sections).
+  const instrumentTableOffset = off;
+
   const instruments: DM1Instrument[] = [];
+  // File-relative offset for each instrument slot (for uadeChipRam.instrBase).
+  // Slots with instLen=0 get offset -1 (no data).
+  const instrumentFileOffsets: number[] = [];
+
   for (let i = 0; i < 20; i++) {
     const instLen = instrumentLengths[i];
     if (instLen === 0) {
+      instrumentFileOffsets.push(-1);
       instruments.push({
         number: i,
         attackStep: 0, attackDelay: 0, decayStep: 0, decayDelay: 0,
@@ -280,6 +317,9 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       });
       continue;
     }
+    // Record this instrument's file offset before advancing.
+    instrumentFileOffsets.push(off);
+
     const base = off;
     const attackStep    = bytes[base + 0];
     const attackDelay   = bytes[base + 1];
@@ -344,11 +384,26 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
   }
   // -- Build InstrumentConfig[] --------------------------------------------
   // DM1 instrument slots are 0-based in pattern data; DEViLBOX uses 1-based IDs.
+  // Delta Music 1.0 loads at chip RAM address 0x000000, so instrBase = file offset.
   const trackerInstruments: InstrumentConfig[] = [];
 
   for (let i = 0; i < 20; i++) {
     const inst = instruments[i];
     const id = i + 1;
+    const instrFileOffset = instrumentFileOffsets[i]; // -1 when slot is empty
+
+    // Build chip RAM info when we have a valid file offset for this slot.
+    const chipRam: UADEChipRamInfo | undefined = instrFileOffset >= 0
+      ? {
+          moduleBase: 0,
+          moduleSize: buffer.byteLength,
+          instrBase: instrFileOffset, // DM1 loads at address 0, so chip addr = file offset
+          instrSize: instrumentLengths[i],
+          sections: {
+            instrumentTable: instrumentTableOffset,
+          },
+        }
+      : undefined;
 
     if (inst.sampleLength === 0 || inst.sampleData === null) {
       // Empty slot: produce a placeholder instrument
@@ -379,9 +434,10 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       const loopStart = hasLoop ? inst.repeatStart * 2 : 0;
       const loopEnd   = hasLoop ? (inst.repeatStart + inst.repeatLength) * 2 : 0;
 
-      trackerInstruments.push(
-        createSamplerInstrument(id, `Sample ${i}`, pcmUint8, inst.volume, PCM_BASE_RATE, loopStart, loopEnd)
-      );
+      const samplerInst = createSamplerInstrument(id, `Sample ${i}`, pcmUint8, inst.volume, PCM_BASE_RATE, loopStart, loopEnd);
+      // PCM slots also carry uadeChipRam so the editor can export the module.
+      if (chipRam) samplerInst.uadeChipRam = chipRam;
+      trackerInstruments.push(samplerInst);
 
     } else if (inst.table !== null) {
       // Synth (wavetable) instrument.
@@ -407,10 +463,12 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
           id,
           name: `Synth ${i}`,
           type: 'synth' as const,
-          synthType: 'Synth' as const,
+          synthType: 'DeltaMusic1Synth' as const,
           effects: [],
           volume: -6,
           pan: 0,
+          deltaMusic1: buildDM1Config(inst),
+          ...(chipRam ? { uadeChipRam: chipRam } : {}),
         } as InstrumentConfig);
         continue;
       }
@@ -423,19 +481,24 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       // Store at SYNTH_BASE_RATE (2072 Hz = PAL C-1) with baseNote "C3" (XM note 37).
       // DM1 note index 37 (period 856) maps to XM note 13 (C-1), so the sampler
       // pitches the waveform correctly for all DM1 note values.
-      trackerInstruments.push(
-        createSamplerInstrument(id, `Synth ${i}`, pcmUint8, inst.volume, SYNTH_BASE_RATE, 0, waveLen)
-      );
+      const synthInst = createSamplerInstrument(id, `Synth ${i}`, pcmUint8, inst.volume, SYNTH_BASE_RATE, 0, waveLen);
+      // Upgrade the synthType and attach the DM1 config + chip RAM info.
+      synthInst.synthType = 'DeltaMusic1Synth';
+      synthInst.deltaMusic1 = buildDM1Config(inst);
+      if (chipRam) synthInst.uadeChipRam = chipRam;
+      trackerInstruments.push(synthInst);
 
     } else {
       trackerInstruments.push({
         id,
         name: `Instrument ${id}`,
         type: 'synth' as const,
-        synthType: 'Synth' as const,
+        synthType: 'DeltaMusic1Synth' as const,
         effects: [],
         volume: -6,
         pan: 0,
+        deltaMusic1: buildDM1Config(inst),
+        ...(chipRam ? { uadeChipRam: chipRam } : {}),
       } as InstrumentConfig);
     }
   }

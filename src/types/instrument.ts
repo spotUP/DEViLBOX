@@ -209,6 +209,7 @@ export type SynthType =
   | 'DavidWhittakerSynth' // David Whittaker (Amiga period-based frq/vol sequence synthesis)
   | 'SymphonieSynth'  // Symphonie / Symphonie Pro (native AudioWorklet replayer)
   | 'MusicLineSynth'  // MusicLine Editor (WASM replayer)
+  | 'DeltaMusic1Synth' // Delta Music 1.0 (4-channel Amiga wavetable + ADSR synthesis)
   // SunVox modular synthesizer
   | 'SunVoxSynth'     // SunVox WASM patch player (.sunsynth / .sunvox)
   // Modular Synthesis
@@ -899,6 +900,86 @@ export const DEFAULT_FC: FCConfig = {
   vibSpeed: 0,
   vibDepth: 0,
   arpTable: new Array(16).fill(0),
+};
+
+/**
+ * Delta Music 1.0 instrument configuration.
+ *
+ * DM1 instruments carry either a PCM sample (isSample=true) or a synth
+ * sound table (isSample=false) with a 48-byte waveform sequence.
+ *
+ * Instrument header layout (byte offsets from instrBase):
+ *   +0   attackStep      +1   attackDelay
+ *   +2   decayStep       +3   decayDelay
+ *   +4-5 sustain (BE)    +6   releaseStep  +7   releaseDelay
+ *   +8   volume (0-64)   +9   vibratoWait  +10  vibratoStep  +11  vibratoLength
+ *   +12  bendRate (int8) +13  portamento
+ *   +14  isSample        +15  tableDelay
+ *   +16-23 arpeggio[8]
+ *   +24-25 sampleLength  +26-27 repeatStart  +28-29 repeatLength
+ *   [+30-77 table[48] — only when !isSample]
+ *   [sampleData follows]
+ */
+export interface DeltaMusic1Config {
+  /** 0-64 Amiga volume (Amiga: 64 = full). */
+  volume: number;
+  /** ADSR envelope — attack step size (higher = faster). */
+  attackStep: number;
+  /** ADSR — ticks per attack step (higher = slower). */
+  attackDelay: number;
+  /** ADSR — decay step size. */
+  decayStep: number;
+  /** ADSR — ticks per decay step. */
+  decayDelay: number;
+  /** Sustain counter (UWORD BE, DM1 ticks). */
+  sustain: number;
+  /** ADSR — release step size. */
+  releaseStep: number;
+  /** ADSR — ticks per release step. */
+  releaseDelay: number;
+  /** Vibrato wait: ticks before vibrato begins. */
+  vibratoWait: number;
+  /** Vibrato step: LFO speed (half-periods per tick). */
+  vibratoStep: number;
+  /** Vibrato length: LFO depth (period delta). */
+  vibratoLength: number;
+  /** Pitch bend rate (signed, –128..+127). */
+  bendRate: number;
+  /** Portamento rate (0 = disabled). */
+  portamento: number;
+  /** Synth table delay between waveform segment advances. */
+  tableDelay: number;
+  /** Arpeggio table — 8 semitone offsets (0 = no arpeggio). */
+  arpeggio: number[];
+  /** True when this slot carries a PCM sample (not a synth table). */
+  isSample: boolean;
+  /**
+   * 48-byte sound table (synth instruments only).
+   * Entries < 0x80: play segment at sampleData[entry*32..+32].
+   * Entries >= 0x80: set tableDelay (entry & 0x7F) and advance.
+   * Entry 0xFF: loop back.
+   */
+  table: number[] | null;
+}
+
+export const DEFAULT_DELTAMUSIC1: DeltaMusic1Config = {
+  volume: 64,
+  attackStep: 4,
+  attackDelay: 1,
+  decayStep: 2,
+  decayDelay: 2,
+  sustain: 0,
+  releaseStep: 2,
+  releaseDelay: 2,
+  vibratoWait: 0,
+  vibratoStep: 0,
+  vibratoLength: 0,
+  bendRate: 0,
+  portamento: 0,
+  tableDelay: 0,
+  arpeggio: new Array(8).fill(0),
+  isSample: false,
+  table: null,
 };
 
 /**
@@ -3611,6 +3692,7 @@ export interface InstrumentConfig {
   sidMon?: SidMonConfig;
   digMug?: DigMugConfig;
   fc?: FCConfig;
+  deltaMusic1?: DeltaMusic1Config;
   fred?: FredConfig;
   tfmx?: TFMXConfig;
   hippelCoso?: HippelCoSoConfig;
