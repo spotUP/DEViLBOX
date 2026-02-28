@@ -676,7 +676,11 @@ void furnace_chip_write(int type, uint32_t port, uint8_t data) {
         case CHIP_K007232: if (k7232_chip) k7232_chip->write(port, data); break;
         case CHIP_K053260: if (k53260_chip) k53260_chip->write(port, data); break;
         case CHIP_X1_010: if (x1_010_chip) x1_010_chip->ram_w(port, data); break;
-        case CHIP_OPL4: if (opl4_chip) opl4_chip->writeReg(port, data); break;
+        // OPL4 FM synthesis is identical to OPL3 FM. The YMF278B contains an OPL3
+        // core plus a separate wavetable (PCM) section. The YMF278 class only handles
+        // the PCM section; FM registers go nowhere via writeReg(). Route FM writes
+        // to the shared OPL3 chip so the FM part actually produces audio.
+        case CHIP_OPL4: OPL3_WriteReg(&opl3_chip_inst, (uint16_t)port, data); break;
         case CHIP_T6W28: 
             if (port == 0) t6w28_chip->write_data_left(0, data);
             else t6w28_chip->write_data_right(0, data);
@@ -989,7 +993,19 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
             case CHIP_K007232: if (k7232_chip) { k7232_chip->tick(1); buffer_l[i] = (float)k7232_chip->output(0)/32768.0f; buffer_r[i] = (float)k7232_chip->output(1)/32768.0f; } break;
             case CHIP_K053260: if (k53260_chip) { k53260_chip->tick(1); buffer_l[i] = (float)k53260_chip->output(0)/32768.0f; buffer_r[i] = (float)k53260_chip->output(1)/32768.0f; } break;
             case CHIP_X1_010: if (x1_010_chip) { x1_010_chip->tick(); buffer_l[i] = (float)x1_010_chip->output(0)/32768.0f; buffer_r[i] = (float)x1_010_chip->output(1)/32768.0f; } break;
-            case CHIP_OPL4: if (opl4_chip) { short buf[2]; opl4_chip->generate(buf[0], buf[1], buf[0], buf[1]); buffer_l[i] = (float)(buf[0] * 8)/32768.0f; buffer_r[i] = (float)(buf[1] * 8)/32768.0f; } break;
+            // OPL4 FM is routed to the shared OPL3 chip (see write handler above).
+            // Render from OPL3 so the FM output is actually heard.
+            case CHIP_OPL4: {
+                int16_t opl4_buf[4] = {0, 0, 0, 0};
+                OPL3_GenerateResampled(&opl3_chip_inst, opl4_buf);
+                int32_t opl4_l = ((int32_t)opl4_buf[0] + opl4_buf[2]) * 64;
+                int32_t opl4_r = ((int32_t)opl4_buf[1] + opl4_buf[3]) * 64;
+                if (opl4_l > 32767) opl4_l = 32767; if (opl4_l < -32768) opl4_l = -32768;
+                if (opl4_r > 32767) opl4_r = 32767; if (opl4_r < -32768) opl4_r = -32768;
+                buffer_l[i] = (float)opl4_l / 32768.0f;
+                buffer_r[i] = (float)opl4_r / 32768.0f;
+                break;
+            }
             case CHIP_BUBBLE:
                 if (bubble_timer) {
                     bubble_timer->tick(1);
