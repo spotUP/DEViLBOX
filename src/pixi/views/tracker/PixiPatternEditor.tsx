@@ -1097,18 +1097,19 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   return (
     <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
       {/* ─── Top Horizontal Scrollbar ─────────────────────────────────── */}
-      {!allChannelsFit && (
-        <PixiDOMOverlay
-          layout={{ width, height: SCROLLBAR_HEIGHT }}
-          style={{ zIndex: 25 }}
-        >
-          <HorizontalScrollbar
-            totalWidth={totalChannelsWidth}
-            scrollLeft={scrollLeft}
-            onScrollChange={(v) => { scrollLeftRef.current = v; setScrollLeft(v); }}
-          />
-        </PixiDOMOverlay>
-      )}
+      {/* Always rendered — use display:'none' to hide rather than conditional rendering,
+          which would free the Yoga node and cause BindingErrors on the next layout pass. */}
+      <PixiDOMOverlay
+        layout={{ display: allChannelsFit ? 'none' : 'flex', width, height: SCROLLBAR_HEIGHT }}
+        style={{ zIndex: 25 }}
+        visible={!allChannelsFit}
+      >
+        <HorizontalScrollbar
+          totalWidth={totalChannelsWidth}
+          scrollLeft={scrollLeft}
+          onScrollChange={(v) => { scrollLeftRef.current = v; setScrollLeft(v); }}
+        />
+      </PixiDOMOverlay>
 
       {/* ─── Channel Header — DOM overlay for interactive controls ─────── */}
       <PixiDOMOverlay
@@ -1173,6 +1174,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
         <pixiGraphics draw={drawGrid} layout={{ position: 'absolute', width, height: gridHeight }} />
 
+        {/* Cell text labels — positioned via x/y (not layout) so that React can freely
+            add/remove them without freeing Yoga nodes. Variable-count layout children
+            trigger Yoga BindingErrors when the array shrinks during scroll. */}
         {cellLabels.map((label, i) => (
           <pixiBitmapText
             key={`cell-${i}`}
@@ -1180,7 +1184,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
             style={{ fontFamily: label.bold ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }}
             tint={label.color}
             alpha={label.alpha ?? 1.0}
-            layout={{ position: 'absolute', left: label.x, top: label.y }}
+            x={label.x}
+            y={label.y}
           />
         ))}
 
