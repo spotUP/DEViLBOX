@@ -976,8 +976,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
 
       {/* ─── Error ───────────────────────────────────────────────── */}
       {error && (
-        <div className="flex items-center gap-2 p-2 bg-accent-error/20 border border-accent-error/40 rounded text-accent-error text-xs">
-          <AlertCircle size={14} />
+        <div className="flex items-center gap-2 p-2 bg-accent-error/20 border border-accent-error/40 rounded text-accent-error text-xs select-text cursor-text">
+          <AlertCircle size={14} className="shrink-0" />
           {error}
         </div>
       )}

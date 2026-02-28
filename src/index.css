@@ -104,6 +104,15 @@
     box-sizing: border-box;
   }
 
+  /* Error messages should always be selectable/copyable regardless of global user-select:none */
+  p.text-accent-error, p.text-red-400, p.text-red-300,
+  div.text-accent-error, div.text-red-400, div.text-red-300,
+  .error-selectable {
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+  }
+
   #root {
     width: 100%;
     height: 100%;
