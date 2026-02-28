@@ -8,7 +8,7 @@
  *   - MIDI knob panel (KNOB_PANEL_HEIGHT): bank tabs + 8-knob grid (conditional)
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useShallow } from 'zustand/react/shallow';
 import { PIXI_FONTS } from '../fonts';
@@ -166,17 +166,17 @@ const TrackerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) =>
 
   return (
     <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', flex: 1, height: barHeight }}>
-      <pixiBitmapText text="Row " style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
+      <pixiBitmapText text="Row" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={{ ...textLayout, marginRight: 4 }} />
       <pixiBitmapText text={rowStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={theme.accent.color} layout={textLayout} />
       <PixiSep height={10} />
       <pixiBitmapText text={channelStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
       <PixiSep height={10} />
       <pixiBitmapText text={columnStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
       <PixiSep height={10} />
-      <pixiBitmapText text="Oct " style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
+      <pixiBitmapText text="Oct" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={{ ...textLayout, marginRight: 4 }} />
       <pixiBitmapText text={octStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={theme.accent.color} layout={textLayout} />
       <PixiSep height={10} />
-      <pixiBitmapText text="Mode: " style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
+      <pixiBitmapText text="Mode:" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={{ ...textLayout, marginRight: 4 }} />
       <pixiBitmapText text={modeStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={modeColor} layout={textLayout} />
       <PixiSep height={10} />
       <pixiBitmapText text={recStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={recColor} layout={textLayout} />
@@ -215,6 +215,7 @@ interface RightSideProps {
   collabConnected: boolean;
   collabRoomCode: string | null;
   activeView: string;
+  onShowTips: () => void;
 }
 
 const RightSide: React.FC<RightSideProps> = ({
@@ -227,8 +228,10 @@ const RightSide: React.FC<RightSideProps> = ({
   collabConnected,
   collabRoomCode,
   activeView,
+  onShowTips,
 }) => {
   const theme = usePixiTheme();
+  const [tipsHovered, setTipsHovered] = useState(false);
   const showMIDI = hasMIDIDevice && activeView !== 'dj' && activeView !== 'vj';
 
   const textLayout = useMemo(() => ({ alignSelf: 'center' as const }), []);
@@ -275,6 +278,24 @@ const RightSide: React.FC<RightSideProps> = ({
           <PixiSep height={10} />
         </>
       ) : null}
+
+      {/* TIPS button */}
+      <pixiContainer
+        eventMode="static"
+        cursor="pointer"
+        onPointerUp={onShowTips}
+        onPointerOver={() => setTipsHovered(true)}
+        onPointerOut={() => setTipsHovered(false)}
+        layout={{ flexDirection: 'row', alignItems: 'center', height: barHeight, marginRight: 8 }}
+      >
+        <pixiBitmapText
+          text="💡 TIPS"
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+          tint={tipsHovered ? theme.warning.color : theme.warning.color}
+          layout={{ alignSelf: 'center' }}
+        />
+      </pixiContainer>
+      <PixiSep height={10} />
 
       {/* Audio state indicator */}
       <PixiDot color={audioDotColor} />
@@ -484,6 +505,7 @@ interface MainRowProps {
   isAudioRunning: boolean;
   collabConnected: boolean;
   collabRoomCode: string | null;
+  onShowTips: () => void;
 }
 
 const MainStatusRow: React.FC<MainRowProps> = ({
@@ -496,6 +518,7 @@ const MainStatusRow: React.FC<MainRowProps> = ({
   isAudioRunning,
   collabConnected,
   collabRoomCode,
+  onShowTips,
 }) => {
   const theme = usePixiTheme();
 
@@ -536,6 +559,7 @@ const MainStatusRow: React.FC<MainRowProps> = ({
         collabConnected={collabConnected}
         collabRoomCode={collabRoomCode}
         activeView={activeView}
+        onShowTips={onShowTips}
       />
     </pixiContainer>
   );
@@ -547,7 +571,12 @@ export const PixiStatusBar: React.FC = () => {
   const { width } = usePixiResponsive();
 
   const activeView = useUIStore((s) => s.activeView);
+  const openModal = useUIStore((s) => s.openModal);
   const isAudioRunning = useAudioStore((s) => s.contextState === 'running');
+
+  const onShowTips = useCallback(() => {
+    openModal('help', { initialTab: 'tips' });
+  }, [openModal]);
   const collabStatus = useCollaborationStore((s) => s.status);
   const collabRoomCode = useCollaborationStore((s) => s.roomCode);
 
@@ -616,6 +645,7 @@ export const PixiStatusBar: React.FC = () => {
         isAudioRunning={isAudioRunning}
         collabConnected={collabConnected}
         collabRoomCode={collabRoomCode}
+        onShowTips={onShowTips}
       />
     </pixiContainer>
   );
