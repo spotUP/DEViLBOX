@@ -314,9 +314,9 @@ export const WebGLModalBridge: React.FC = () => {
             collapsed: false,
             volume: 100,
             pan: 0,
-            instrumentId: currentInstruments[currentInstruments.length - 1]?.id ?? '',
+            instrumentId: instrumentIndex,
             color: '#facc15',
-            rows: [{ note: 'C-4', instrument: instrumentIndex, volume: 64, effTyp: 0, eff: 0 }],
+            rows: [{ note: 49, instrument: instrumentIndex, volume: 64, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }],
           }],
         };
         const existing = useTrackerStore.getState().patterns;
