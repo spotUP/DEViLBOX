@@ -492,6 +492,46 @@ export async function parseUADEFile(
         } catch { /* older WASM without scanMemoryForMagic, moduleBase stays 0 */ }
         return parseDavidWhittakerFile(buffer, filename, moduleBase);
       },
+      'RobHubbard': async () => {
+        const { parseRobHubbardFile } = await import('./RobHubbardParser');
+        // Rob Hubbard is a compiled Amiga binary (relocatable). Scan chip RAM for
+        // the distinctive 4-byte sequence at offset 28 of the module header:
+        // 0x4E75 (RTS) + 0x41FA (LEA pc-relative) — highly specific to this player.
+        // Fallback to 0 if scanMemoryForMagic is not available (older WASM).
+        let moduleBase = 0;
+        try {
+          const rhMagic = new Uint8Array([0x4E, 0x75, 0x41, 0xFA]);
+          const found = await engine.scanMemoryForMagic(rhMagic, 256 * 1024);
+          if (found >= 0) moduleBase = found - 28; // magic is at offset 28 from module start
+        } catch { /* older WASM without scanMemoryForMagic, moduleBase stays 0 */ }
+        return parseRobHubbardFile(buffer, filename, moduleBase < 0 ? 0 : moduleBase);
+      },
+      'RobHubbard_ST': async () => {
+        const { parseRobHubbardSTFile } = await import('./RobHubbardSTParser');
+        // Rob Hubbard ST is a compiled Amiga binary. Scan chip RAM for the
+        // first 4 bytes of the ST module header: 0x00407F40.
+        // Fallback to 0 if scanMemoryForMagic is not available (older WASM).
+        let moduleBase = 0;
+        try {
+          const rhstMagic = new Uint8Array([0x00, 0x40, 0x7F, 0x40]);
+          const found = await engine.scanMemoryForMagic(rhstMagic, 256 * 1024);
+          if (found >= 0) moduleBase = found;
+        } catch { /* older WASM without scanMemoryForMagic, moduleBase stays 0 */ }
+        return parseRobHubbardSTFile(buffer, filename, moduleBase);
+      },
+      'JochenHippel-CoSo': async () => {
+        const { parseHippelCoSoFile } = await import('./HippelCoSoParser');
+        // HippelCoSo is a compiled Amiga binary with a "COSO" magic at byte 0.
+        // Scan chip RAM for those 4 bytes to find where UADE loaded the module.
+        // Fallback to 0 if scanMemoryForMagic is not available (older WASM).
+        let moduleBase = 0;
+        try {
+          const cosoMagic = new Uint8Array([0x43, 0x4F, 0x53, 0x4F]); // "COSO"
+          const found = await engine.scanMemoryForMagic(cosoMagic);
+          if (found >= 0) moduleBase = found;
+        } catch { /* older WASM without scanMemoryForMagic, moduleBase stays 0 */ }
+        return parseHippelCoSoFile(buffer, filename, moduleBase);
+      },
     };
     const route = NATIVE_ROUTES[fmt];
     if (route) {

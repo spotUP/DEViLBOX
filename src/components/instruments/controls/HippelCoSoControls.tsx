@@ -3,20 +3,37 @@
  *
  * Exposes all HippelCoSoConfig parameters: timing, vibrato, and editable
  * frequency/volume sequences using the shared SequenceEditor component.
+ *
+ * When loaded via UADE (uadeChipRam present), scalar params that map directly
+ * to bytes in the volseq header are written back to chip RAM so UADE picks them
+ * up on the next note trigger. An export button is also shown.
+ *
+ * HippelCoSo volseq header byte layout (offset from instrBase):
+ *   +0  : volSpeed  (uint8)      ✓ written
+ *   +1  : fseqIdx   (int8)       — skip (index into fseq table, not a user param)
+ *   +2  : vibSpeed  (int8)       ✓ written via writeS8
+ *   +3  : vibDepth  (int8 mag)   ✓ written (stored as negative depth in hardware)
+ *   +4  : vibDelay  (uint8)      ✓ written
+ *   +5..: vseq data (variable)   — skip (variable-length sequence data)
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import type { HippelCoSoConfig } from '@/types/instrument';
+import type { HippelCoSoConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import { SequenceEditor } from '@components/instruments/shared';
 import type { SequencePreset } from '@components/instruments/shared';
+import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
+import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { Download } from 'lucide-react';
 
 interface HippelCoSoControlsProps {
   config: HippelCoSoConfig;
   onChange: (updates: Partial<HippelCoSoConfig>) => void;
   fseqPlaybackPosition?: number;
   vseqPlaybackPosition?: number;
+  /** Present when this instrument was loaded via UADE's native HippelCoSo parser. */
+  uadeChipRam?: UADEChipRamInfo;
 }
 
 type HCSTab = 'main' | 'sequences';
@@ -46,11 +63,21 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
   onChange,
   fseqPlaybackPosition,
   vseqPlaybackPosition,
+  uadeChipRam,
 }) => {
   const [activeTab, setActiveTab] = useState<HCSTab>('main');
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
+
+  const chipEditorRef = useRef<UADEChipEditor | null>(null);
+  function getEditor(): UADEChipEditor | null {
+    if (!uadeChipRam) return null;
+    if (!chipEditorRef.current) {
+      chipEditorRef.current = new UADEChipEditor(UADEEngine.getInstance());
+    }
+    return chipEditorRef.current;
+  }
 
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyan = currentThemeId === 'cyan-lineart';
@@ -59,6 +86,41 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
   const knob    = isCyan ? '#00ffff' : '#66bbff';
   const dim     = isCyan ? '#004444' : '#001833';
   const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#000e1a] border-blue-900/30';
+
+  /**
+   * Like `upd`, but also writes a single byte to chip RAM when a UADE context is
+   * active. byteOffset is relative to instrBase (the volseq header address).
+   */
+  const updU8WithChipRam = useCallback(
+    (key: keyof HippelCoSoConfig, value: HippelCoSoConfig[keyof HippelCoSoConfig], byteOffset: number) => {
+      onChange({ [key]: value } as Partial<HippelCoSoConfig>);
+      if (uadeChipRam && typeof value === 'number') {
+        const editor = getEditor();
+        if (editor) {
+          void editor.writeU8(uadeChipRam.instrBase + byteOffset, value & 0xFF);
+        }
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onChange, uadeChipRam],
+  );
+
+  /**
+   * Like updU8WithChipRam but writes a signed byte (two's complement).
+   */
+  const updS8WithChipRam = useCallback(
+    (key: keyof HippelCoSoConfig, value: HippelCoSoConfig[keyof HippelCoSoConfig], byteOffset: number) => {
+      onChange({ [key]: value } as Partial<HippelCoSoConfig>);
+      if (uadeChipRam && typeof value === 'number') {
+        const editor = getEditor();
+        if (editor) {
+          void editor.writeU8(uadeChipRam.instrBase + byteOffset, value < 0 ? (256 + value) : value);
+        }
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onChange, uadeChipRam],
+  );
 
   const upd = useCallback(<K extends keyof HippelCoSoConfig>(key: K, value: HippelCoSoConfig[K]) => {
     onChange({ [key]: value } as Partial<HippelCoSoConfig>);
@@ -83,7 +145,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
           <Knob
             value={config.volSpeed}
             min={1} max={16} step={1}
-            onChange={(v) => upd('volSpeed', Math.round(v))}
+            onChange={(v) => updU8WithChipRam('volSpeed', Math.round(v), 0)}
             label="Vol Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()}
           />
@@ -98,21 +160,21 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
           <Knob
             value={config.vibDelay}
             min={0} max={255} step={1}
-            onChange={(v) => upd('vibDelay', Math.round(v))}
+            onChange={(v) => updU8WithChipRam('vibDelay', Math.round(v), 4)}
             label="Delay" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()}
           />
           <Knob
             value={config.vibSpeed}
             min={-128} max={127} step={1}
-            onChange={(v) => upd('vibSpeed', Math.round(v))}
+            onChange={(v) => updS8WithChipRam('vibSpeed', Math.round(v), 2)}
             label="Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()}
           />
           <Knob
             value={config.vibDepth}
             min={0} max={255} step={1}
-            onChange={(v) => upd('vibDepth', Math.round(v))}
+            onChange={(v) => updU8WithChipRam('vibDepth', Math.round(v), 3)}
             label="Depth" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()}
           />
@@ -167,7 +229,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex border-b" style={{ borderColor: dim }}>
+      <div className="flex items-center border-b" style={{ borderColor: dim }}>
         {([['main', 'Parameters'], ['sequences', 'Sequences']] as const).map(([id, label]) => (
           <button
             key={id}
@@ -182,6 +244,23 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
             {label}
           </button>
         ))}
+        {uadeChipRam && (
+          <button
+            onClick={() => {
+              const editor = getEditor();
+              if (editor && uadeChipRam) {
+                editor.exportModule(uadeChipRam.moduleBase, uadeChipRam.moduleSize, 'module.hipc')
+                  .catch(console.error);
+              }
+            }}
+            className="ml-auto flex items-center gap-1 px-2 py-1 mr-2 text-[10px] font-mono bg-dark-bgSecondary hover:bg-dark-bg border border-dark-border rounded transition-colors"
+            title="Export module with current edits"
+            style={{ color: accent }}
+          >
+            <Download size={10} />
+            Export .hipc
+          </button>
+        )}
       </div>
       {activeTab === 'main'      && renderMain()}
       {activeTab === 'sequences' && renderSequences()}

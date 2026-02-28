@@ -52,7 +52,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
-import type { HippelCoSoConfig } from '@/types/instrument';
+import type { HippelCoSoConfig, UADEChipRamInfo } from '@/types/instrument';
 
 // ── Binary read helpers ─────────────────────────────────────────────────────
 
@@ -190,10 +190,15 @@ function extractVseq(buf: Uint8Array, offset: number, maxLen = 128): number[] {
 /**
  * Parse a Jochen Hippel CoSo (.hipc, .soc) file into a TrackerSong.
  * Returns format 'MOD' so it's fully editable in the tracker.
+ *
+ * @param moduleBase - Chip RAM address where the module binary starts (0 if unknown).
+ *                     HippelCoSo is a compiled Amiga binary; pass the address returned by
+ *                     UADEEngine.scanMemoryForMagic so the UADEChipEditor can resolve it.
  */
 export async function parseHippelCoSoFile(
   buffer: ArrayBuffer,
   filename: string,
+  moduleBase = 0,
 ): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
 
@@ -299,12 +304,32 @@ export async function parseHippelCoSoFile(
       vibDelay,
     };
 
+    // vsqOff is a file-relative byte offset to this instrument's volseq header (5 bytes)
+    // followed by variable-length vseq data. We record it as instrBase so the UADEChipEditor
+    // can write scalar params back to chip RAM. instrSize covers the 5-byte fixed header only;
+    // vseq/fseq sequences are variable-length and not written back individually.
+    const chipRam: UADEChipRamInfo = {
+      moduleBase,
+      moduleSize: buffer.byteLength,
+      instrBase: moduleBase + vsqOff,
+      instrSize: 5,
+      sections: {
+        volseqTable: moduleBase + volseqsOff,
+        frqseqTable: moduleBase + frqseqsOff,
+        patternsTable: moduleBase + patternsOff,
+        tracksData: moduleBase + tracksOff,
+        songsData: moduleBase + songsOff,
+        headersData: moduleBase + headersOff,
+      },
+    };
+
     instruments.push({
       id: i + 1,
       name: `CoSo ${i + 1}`,
       type: 'synth' as const,
       synthType: 'HippelCoSoSynth' as const,
       hippelCoso: hcConfig,
+      uadeChipRam: chipRam,
       effects: [],
       volume: -6,
       pan: 0,
