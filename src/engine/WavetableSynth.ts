@@ -47,8 +47,8 @@ export class WavetableSynth implements DevilboxSynth {
     // Create filter
     this.filter = this.audioContext.createBiquadFilter();
     this.filter.type = config.filter.type as BiquadFilterType;
-    this.filter.frequency.value = config.filter.cutoff;
-    this.filter.Q.value = config.filter.resonance / 10; // 0-100 -> 0-10
+    this.filter.frequency.value = isFinite(config.filter.cutoff) ? config.filter.cutoff : 8000;
+    this.filter.Q.value = isFinite(config.filter.resonance) ? config.filter.resonance / 10 : 1;
 
     // Output gain with volume boost (wavetable tends to be quiet)
     this.outputGain = this.audioContext.createGain();

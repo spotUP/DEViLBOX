@@ -17,8 +17,6 @@ import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { BUILTIN_WORKSPACES, springCameraTo } from '../workbench/WorkbenchExpose';
-import { startTilt, stopTilt } from '../workbench/WorkbenchTilt';
-import { openCoverFlow } from '../workbench/CoverFlowOverlay';
 
 /** View window toggle buttons shown in the NavBar */
 const VIEW_WINDOWS = [
@@ -186,11 +184,9 @@ export const PixiNavBar: React.FC = () => {
   // Settings store
   const setRenderMode = useSettingsStore((s) => s.setRenderMode);
 
-  // Workbench store — window visibility + tilt
+  // Workbench store — window visibility
   const windows      = useWorkbenchStore((s) => s.windows);
   const toggleWindow = useWorkbenchStore((s) => s.toggleWindow);
-  const isTilted     = useWorkbenchStore((s) => s.isTilted);
-  const setTilted    = useWorkbenchStore((s) => s.setTilted);
 
   // Workspace picker popup state
   const [wsPickerOpen, setWsPickerOpen] = useState(false);
@@ -212,16 +208,6 @@ export const PixiNavBar: React.FC = () => {
   const handleSwitchToDom = useCallback(() => {
     setRenderMode('dom');
   }, [setRenderMode]);
-
-  // 3D tilt toggle
-  const handle3DToggle = useCallback(() => {
-    if (isTilted) {
-      stopTilt(() => setTilted(false));
-    } else {
-      setTilted(true);
-      startTilt();
-    }
-  }, [isTilted, setTilted]);
 
   // Row 1 background
   const drawRow1Bg = useCallback((g: GraphicsType) => {
@@ -314,25 +300,6 @@ export const PixiNavBar: React.FC = () => {
             <WorkspacePopup offsetY={NAV_ROW1_H} onClose={() => setWsPickerOpen(false)} />
           )}
         </pixiContainer>
-
-        {/* CoverFlow view switcher */}
-        <PixiButton
-          label="FLOW"
-          variant="ghost"
-          size="sm"
-          onClick={openCoverFlow}
-          layout={{ marginRight: 4 }}
-        />
-
-        {/* 3D tilt toggle */}
-        <PixiButton
-          label="3D"
-          variant="ghost"
-          size="sm"
-          active={isTilted}
-          onClick={handle3DToggle}
-          layout={{ marginRight: 8 }}
-        />
 
         {/* Theme cycler */}
         <PixiButton

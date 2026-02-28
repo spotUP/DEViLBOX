@@ -121,7 +121,9 @@ function redrawSnapLines(g: GraphicsType, lines: SnapLine[], alpha: number, came
 
 export const WorkbenchContainer: React.FC = () => {
   const { width, height } = usePixiResponsive();
-  const camera     = useWorkbenchStore((s) => s.camera);
+  // NOTE: camera is NOT in React state — it is applied imperatively via a
+  // Zustand store subscription below.  This prevents WorkbenchContainer (and
+  // all PixiWindow children) from re-rendering on every pan/zoom frame.
   const windows    = useWorkbenchStore((s) => s.windows);
   const panCamera  = useWorkbenchStore((s) => s.panCamera);
   const zoomCamera = useWorkbenchStore((s) => s.zoomCamera);
@@ -134,22 +136,22 @@ export const WorkbenchContainer: React.FC = () => {
   const snapLinesRef = useRef<SnapLine[]>([]);
   const snapAlphaRef = useRef<number>(0);
   const snapFadeRaf  = useRef<number>(0);
-  const cameraRef    = useRef(camera);
-  cameraRef.current = camera;
 
   // Active camera spring
   const springRef = useRef<CameraSpringHandle | null>(null);
 
-  // Apply camera transform whenever camera changes
+  // Apply camera transform imperatively via store subscription — no React re-render.
   useEffect(() => {
-    const el = worldRef.current;
-    if (!el) return;
-    applyTransform(el, camera);
-    // Redraw snap lines at new scale (line width changes)
-    if (snapGfxRef.current && snapLinesRef.current.length > 0) {
-      redrawSnapLines(snapGfxRef.current, snapLinesRef.current, snapAlphaRef.current, camera.scale);
-    }
-  }, [camera]);
+    const apply = (cam: CameraState) => {
+      if (worldRef.current) applyTransform(worldRef.current, cam);
+      if (snapGfxRef.current && snapLinesRef.current.length > 0) {
+        redrawSnapLines(snapGfxRef.current, snapLinesRef.current, snapAlphaRef.current, cam.scale);
+      }
+    };
+    // Apply immediately with current state, then subscribe to future changes.
+    apply(useWorkbenchStore.getState().camera);
+    return useWorkbenchStore.subscribe((s) => s.camera, apply);
+  }, []);
 
   // ─── Snap guide lines ───────────────────────────────────────────────────────
 
@@ -162,7 +164,7 @@ export const WorkbenchContainer: React.FC = () => {
     if (lines.length > 0) {
       // Show immediately at full opacity
       snapAlphaRef.current = 1;
-      redrawSnapLines(g, lines, 1, cameraRef.current.scale);
+      redrawSnapLines(g, lines, 1, useWorkbenchStore.getState().camera.scale);
     } else {
       // Fade out
       const startAlpha = snapAlphaRef.current;
@@ -173,7 +175,7 @@ export const WorkbenchContainer: React.FC = () => {
         const t       = Math.min(1, elapsed / FADE_DURATION_MS);
         const alpha   = startAlpha * (1 - t);
         snapAlphaRef.current = alpha;
-        redrawSnapLines(g, snapLinesRef.current.length > 0 ? snapLinesRef.current : [], alpha, cameraRef.current.scale);
+        redrawSnapLines(g, snapLinesRef.current.length > 0 ? snapLinesRef.current : [], alpha, useWorkbenchStore.getState().camera.scale);
         // Keep old lines visible while fading
         if (t < 1) {
           snapFadeRaf.current = requestAnimationFrame(fade);
@@ -286,13 +288,13 @@ export const WorkbenchContainer: React.FC = () => {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  const contextValue: WorkbenchContextValue = { camera, focusWindow, setSnapLines };
+  const contextValue: WorkbenchContextValue = { focusWindow, setSnapLines };
 
   return (
     <WorkbenchContext.Provider value={contextValue}>
       <pixiContainer layout={{ width, height: '100%' }} eventMode="static">
-        {/* Background */}
-        <WorkbenchBackground width={width} height={height} camera={camera} />
+        {/* Background — subscribes to camera directly; no prop needed */}
+        <WorkbenchBackground width={width} height={height} />
 
         {/* Pan hit area */}
         <pixiContainer
@@ -317,7 +319,6 @@ export const WorkbenchContainer: React.FC = () => {
                 key={id}
                 id={id}
                 title={title}
-                camera={camera}
                 screenW={width}
                 screenH={height}
                 onFocus={focusWindow}
@@ -336,7 +337,7 @@ export const WorkbenchContainer: React.FC = () => {
           })}
 
           {/* Tether: Instrument Editor ↔ Tracker */}
-          <WindowTether fromId="instrument" toId="tracker" cameraScale={camera.scale} />
+          <WindowTether fromId="instrument" toId="tracker" />
 
           {/* Snap guide lines — drawn imperatively, always on top */}
           <pixiGraphics
