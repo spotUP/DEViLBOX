@@ -1703,6 +1703,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Code2',
     color: 'text-lime-400',
   },
+  DeltaMusic1Synth: {
+    type: 'DeltaMusic1Synth',
+    name: 'Delta Music 1.0',
+    shortName: 'DM1',
+    description: 'Amiga Delta Music 1.0 — 4-channel wavetable synth with ADSR envelopes and arpeggios',
+    bestFor: ['Amiga chiptune', 'Wavetable', '4-channel'],
+    icon: 'Disc',
+    color: 'text-gray-400',
+  },
 };
 
 // Organized categories
