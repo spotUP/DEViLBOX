@@ -45,6 +45,7 @@ import {
   DEFAULT_RDPIANO,
   DEFAULT_CHIPTUNE_MODULE,
   DEFAULT_WAM,
+  DEFAULT_SUPERCOLLIDER,
 } from '@typedefs/instrument';
 
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
@@ -189,6 +190,11 @@ function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
       break;
     case 'MAMESWP30':
       base.mame = { ...DEFAULT_MAME_SWP30 };
+      break;
+    case 'SuperCollider':
+      base.superCollider = { ...DEFAULT_SUPERCOLLIDER };
+      // SC ignores the time parameter in triggerAttack, so always use immediate time.
+      base.isLive = true;
       break;
   }
 
@@ -393,7 +399,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.v2 ||
         updates.wam ||
         updates.parameters ||
-        updates.sample
+        updates.sample ||
+        updates.superCollider
       );
 
       set((state) => {
@@ -647,6 +654,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
       if (synthTypeChanging || isPresetLoad || soundParamsChanging) {
         try {
           const engine = getToneEngine();
+          if (updates.superCollider) {
+            console.log('[SC:Store] invalidateInstrument id:', id, 'binary length:', updates.superCollider.binary?.length ?? 0, 'defName:', updates.superCollider.synthDefName);
+          }
           engine.invalidateInstrument(id);
         } catch (error) {
           console.warn('[InstrumentStore] Could not invalidate instrument:', error);

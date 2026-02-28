@@ -134,6 +134,7 @@ export class SuperColliderEngine {
 
   /** Load a compiled SynthDef binary into scsynth (/d_recv). */
   loadSynthDef(binary: Uint8Array): void {
+    console.log('[SC:Engine] /d_recv binary', binary.byteLength, 'bytes');
     this.sendOsc(oscLoadSynthDef(binary));
   }
 
@@ -144,6 +145,7 @@ export class SuperColliderEngine {
    * @param params  - Initial control values (e.g. { freq: 440, gate: 1 })
    */
   noteOn(nodeId: number, defName: string, params: Record<string, number>): void {
+    console.log('[SC:Engine] /s_new nodeId:', nodeId, 'defName:', defName, 'freq:', params.freq?.toFixed(1));
     this.sendOsc(oscNewSynth(defName, nodeId, params));
   }
 
