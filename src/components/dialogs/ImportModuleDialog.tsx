@@ -60,7 +60,7 @@ type NativeFormatKey =
   // ── Formats with native parsers (vs libopenmpt as fallback) ─────────────────
   | 'imagoOrpheus' | 'cdfm67' | 'easyTrax' | 'madTracker2' | 'psm' | 'pt36';
 
-const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label: string; description: string }> = [
+const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label: string; description: string; nativeOnly?: boolean }> = [
   // ── Original entries ─────────────────────────────────────────────────────────
   { key: 'hvl',      regex: /\.(hvl|ahx)$/i,                                    label: 'HivelyTracker',     description: 'HivelyTracker/AHX — native parser or UADE.' },
   { key: 'okt',      regex: /\.okt$/i,                                           label: 'Oktalyzer',         description: 'Oktalyzer 8-channel — native parser or UADE.' },
@@ -129,7 +129,7 @@ const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label
   { key: 'activisionPro',     regex: /\.(avp|mw)$/i,                              label: 'Activision Pro',    description: 'Activision Pro — native parser or UADE.' },
   { key: 'iffSmus',           regex: /\.(smus|snx|tiny)$/i,                       label: 'IFF SMUS',          description: 'IFF SMUS Sonix — native parser or UADE.' },
   { key: 'lme',               regex: /\.lme$/i,                                   label: 'LME',               description: 'Leggless Music Editor — native parser or UADE.' },
-  { key: 'musicLine',         regex: /\.ml$/i,                                    label: 'MusicLine Editor',  description: 'MusicLine Editor — native parser.' },
+  { key: 'musicLine',         regex: /\.ml$/i,                                    label: 'MusicLine Editor',  description: 'MusicLine Editor — native WASM engine (no UADE fallback).', nativeOnly: true },
   { key: 'medley',            regex: /\.ml$/i,                                    label: 'Medley',            description: 'Medley — native parser or UADE.' },
   { key: 'futurePlayer',      regex: /\.fp$/i,                                    label: 'Future Player',     description: 'Future Player — native parser or UADE.' },
   { key: 'ufo',               regex: /\.ufo$/i,                                   label: 'UFO',               description: 'UFO format — native parser or UADE.' },
@@ -191,8 +191,19 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const nativeFmt  = detectNativeFormat(loadedFileName);
   const isChipDump = CHIP_DUMP_FORMAT_RE.test(loadedFileName);
   const isUADE     = !nativeFmt && !isChipDump && isUADEFormat(loadedFileName);
-  const isNativeSelected = nativeFmt ? (formatEngine[nativeFmt.key] as string) !== 'uade' : false;
+  // nativeOnly formats always use native — force pref to 'native' if it was previously set to 'uade'
+  const isNativeOnly = !!(nativeFmt?.nativeOnly);
+  const isNativeSelected = nativeFmt
+    ? isNativeOnly || (formatEngine[nativeFmt.key] as string) !== 'uade'
+    : false;
   const uadeMode   = formatEngine.uade ?? 'enhanced';
+
+  // Auto-correct any stale 'uade' preference for native-only formats when the file loads
+  useEffect(() => {
+    if (nativeFmt && isNativeOnly && (formatEngine[nativeFmt.key] as string) === 'uade') {
+      setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'native');
+    }
+  }, [nativeFmt, isNativeOnly, formatEngine, setFormatEngine]);
 
   const handleFileSelect = useCallback(async (file: File) => {
     if (!isSupportedModule(file.name)) {
@@ -552,38 +563,50 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                 Import Engine — <span className="text-accent-primary">{nativeFmt.label}</span>
               </p>
 
-              {/* Native parser option */}
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="nativeEngine"
-                  checked={isNativeSelected}
-                  onChange={() => setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'native')}
-                  className="mt-0.5 accent-accent-primary"
-                />
-                <div>
-                  <span className="text-sm text-text-primary">Native Parser (Fully Editable)</span>
+              {/* Native-only formats: just show info, no engine toggle */}
+              {isNativeOnly ? (
+                <div className="flex items-start gap-2">
+                  <Info size={12} className="mt-0.5 text-accent-primary shrink-0" />
                   <p className="text-xs text-text-muted">{nativeFmt.description}</p>
                 </div>
-              </label>
+              ) : (
+                <>
+                  {/* Native parser option */}
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="nativeEngine"
+                      checked={isNativeSelected}
+                      onChange={() => setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'native')}
+                      className="mt-0.5 accent-accent-primary"
+                    />
+                    <div>
+                      <span className="text-sm text-text-primary">Native Parser (Fully Editable)</span>
+                      <p className="text-xs text-text-muted">{nativeFmt.description}</p>
+                    </div>
+                  </label>
 
-              {/* UADE option */}
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="nativeEngine"
-                  checked={!isNativeSelected}
-                  onChange={() => setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'uade')}
-                  className="mt-0.5 accent-accent-primary"
-                />
-                <div>
-                  <span className="text-sm text-text-primary">UADE (Amiga Emulation)</span>
-                  <p className="text-xs text-text-muted">Use UADE emulator instead of native parser.</p>
-                </div>
-              </label>
+                  {/* UADE option */}
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="nativeEngine"
+                      checked={!isNativeSelected}
+                      onChange={() => setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'uade')}
+                      className="mt-0.5 accent-accent-primary"
+                    />
+                    <div>
+                      <span className="text-sm text-text-primary">UADE (Amiga Emulation)</span>
+                      <p className="text-xs text-text-muted">Use UADE emulator instead of native parser.</p>
+                    </div>
+                  </label>
+                </>
+              )}
 
-              {/* UADE mode sub-selector — shown when UADE is chosen for this format */}
-              {showUADEModeSelector && (
+              )}
+
+              {/* UADE mode sub-selector — shown when UADE is chosen for this format (non-native-only) */}
+              {!isNativeOnly && showUADEModeSelector && (
                 <div className="mt-2 ml-5 pl-3 border-l border-dark-border space-y-1.5">
                   <p className="text-xs text-text-muted font-medium">UADE Mode</p>
                   <label className="flex items-start gap-2 cursor-pointer">
