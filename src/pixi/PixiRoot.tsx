@@ -8,9 +8,8 @@
  * that have no parent layout to resolve percentages against.
  */
 
-import { useRef, useEffect } from 'react';
-import { useTick } from '@pixi/react';
-import type { Container as ContainerType } from 'pixi.js';
+import { useEffect } from 'react';
+import { useApplication, useTick } from '@pixi/react';
 import { useUIStore, useSettingsStore } from '@stores';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { usePixiResponsive } from './hooks/usePixiResponsive';
@@ -19,16 +18,17 @@ import { PixiStatusBar } from './shell/PixiStatusBar';
 import { PixiPeerCursor } from './views/collaboration/PixiPeerCursor';
 import { WorkbenchContainer } from './workbench/WorkbenchContainer';
 import { CRTRenderer } from './CRTRenderer';
+import { useRef } from 'react';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
   const collabStatus = useCollaborationStore(s => s.status);
   const activeView = useUIStore(s => s.activeView);
 
+  const { app } = useApplication();
   const crtEnabled = useSettingsStore((s) => s.crtEnabled);
   const crtParams  = useSettingsStore((s) => s.crtParams);
 
-  const rootContainerRef = useRef<ContainerType>(null);
   const crtRef = useRef<CRTRenderer | null>(null);
 
   // Keep drumpad modal auto-open behavior
@@ -39,33 +39,35 @@ export const PixiRoot: React.FC = () => {
     }
   }, [activeView]);
 
-  // Create CRTRenderer filter once on mount. PixiJS manages the RT internally.
+  // Create CRTRenderer filter once on mount.
   useEffect(() => {
     const filter = new CRTRenderer();
     crtRef.current = filter;
     return () => {
+      // Remove from stage before destroying
+      if (app?.stage?.filters?.includes(filter)) app.stage.filters = [];
       filter.destroy();
       crtRef.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Apply/remove the filter and update uniforms each frame.
+  // Apply filter to app.stage (not a @pixi/layout container — no Yoga hooks fire).
+  // Removing/adding on crtEnabled avoids per-frame filter array churn.
   useTick(() => {
-    const container = rootContainerRef.current;
     const crt = crtRef.current;
-    if (!container || !crt) return;
+    if (!crt || !app?.stage) return;
 
     if (crtEnabled) {
-      if (!container.filters?.includes(crt)) container.filters = [crt];
+      if (!app.stage.filters?.includes(crt)) app.stage.filters = [crt];
       crt.updateParams(performance.now() / 1000, crtParams);
     } else {
-      if (container.filters?.length) container.filters = [];
+      if (app.stage.filters?.length) app.stage.filters = [];
     }
   });
 
   return (
     <pixiContainer
-      ref={rootContainerRef}
       layout={{
         width,
         height,
