@@ -1287,7 +1287,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   }
 
   // ============================================================================
-  // TFMX EDITOR (read-only viewer)
+  // TFMX EDITOR
   // ============================================================================
   if (editorMode === 'tfmx') {
     const tfmxConfig = instrument.tfmx || DEFAULT_TFMX;
@@ -1300,7 +1300,11 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           onVizModeChange={setVizMode}
         />
         <Suspense fallback={<LoadingControls />}>
-          <TFMXControls config={tfmxConfig} />
+          <TFMXControls
+            config={tfmxConfig}
+            onChange={(cfg) => handleChange({ tfmx: cfg })}
+            uadeChipRam={instrument.uadeChipRam}
+          />
         </Suspense>
       </div>
     );
