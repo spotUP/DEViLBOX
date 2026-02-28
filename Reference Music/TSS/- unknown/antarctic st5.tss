@@ -1,0 +1,37 @@
+#TITLE		<夢大陸アドベンチャー[stage 5]>
+#CHANNEL	3
+
+#A		{ MELODY }
+		o7 l8 t145 %128 v14 q13 s24
+
+		$
+
+		c4>a+4.gg2. g+4g4.d+d+2.
+		g+4g4.d+d+4.f4. d4.f4.ggga4b<
+		cccd4d+c2dc> a+2.bbb<c4d
+		cccd4d+c2dd+ d2.>bbbb4.
+		dr4d+r4<drd+r>dr4d+r4<d+d+dr
+
+#B		{ SUB-MELODY }
+		o6 l8 t145 %128 v13 q13 s24
+		
+		$
+
+		d+4d2r4cdd+c c4>a+4.g+g+4g+a+<c>g+
+		<c4>a+4.g+g+4.<c4. c4.c4.cccd4d
+		d+d+d+f4gd+2fd+ d2.dddd+4f
+		d+d+d+f4gd+2fg f2.dddd4.
+		v11 >ar4ar4<arar>ar4ar4<ffgr v13
+
+#C		{ BASS }
+		o3 l8 t145 %128 v13 q6 s6
+
+		$
+
+		[cfga+ga+] [c+fg+<c+>g+<c+>]
+		fg+<cd+c>g+fg+<cdc>g+ [g<cdgdc>]
+		cga+[3d+ga+] [a+<df>]g<g>ga4b
+		ccgccgg+g+<d+>g+g+<d+> [gg<d>gg<d>]
+		[ccccccffff]
+
+#END

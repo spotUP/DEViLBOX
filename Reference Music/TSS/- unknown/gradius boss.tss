@@ -1,0 +1,27 @@
+#TITLE	<GRADIUS BOSS>
+#CHANNEL 4
+
+#A	t140 o5 v5,15 l16 %0 q6 s16 k0
+	cd-de-efg-ga-ab-b<c>
+	$
+	/:f<fcd>g<fcd>a<fcd>g<fcd>:/
+	< /:4aaga:/ < /:4cc>b-<c:/
+
+#B	o5 v2,12 l16 %0 q6 s16 k-1
+	cd-de-efg-ga-ab-b<c>
+	$
+	/:f<fcd>g<fcd>a<fcd>g<fcd>:/
+	/:f<fcd>g<fcd>:/ o5 s32 /:4ccrc:/
+
+#C	o3 v15,5 l16 %0 q6 s32 k0
+	r2.r
+	$
+	/:16ffrf:/
+
+#D	o3 v14,4 l16 %0 q6 s32 k-1
+	r2.r
+	$
+	/:4ffrf:/ < /:6ccrc:/ ffrf aara
+	ccrc ffrf /:aara:/
+
+#END
