@@ -494,6 +494,15 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
       />
 
+      {/* Edit — advanced pattern operations (tracker view only) */}
+      <PixiButton
+        label="Edit"
+        variant="ghost"
+        size="sm"
+        onClick={() => useUIStore.getState().openModal('advancedEdit')}
+        layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
+      />
+
       {/* REC button */}
       <PixiButton
         label="REC"
