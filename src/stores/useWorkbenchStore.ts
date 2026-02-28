@@ -65,6 +65,9 @@ interface WorkbenchStore {
   snapToGrid: boolean;
   gridSize: number;
 
+  // 3D tilt state (not persisted — resets to flat on page load)
+  isTilted: boolean;
+
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   setCamera: (camera: Partial<CameraState>) => void;
@@ -91,6 +94,7 @@ interface WorkbenchStore {
   setSnapToGrid: (snap: boolean) => void;
   setGridSize: (size: number) => void;
   setUiSoundVolume: (vol: number) => void;
+  setTilted: (tilted: boolean) => void;
 }
 
 export const useWorkbenchStore = create<WorkbenchStore>()(
@@ -104,6 +108,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       uiSoundVolume: 0.3,
       snapToGrid: false,
       gridSize: 40,
+      isTilted: false,
 
       // ─── Camera ────────────────────────────────────────────────────────────
 
@@ -240,6 +245,9 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       setUiSoundVolume: (vol) =>
         set((state) => { state.uiSoundVolume = Math.max(0, Math.min(1, vol)); }),
+
+      setTilted: (tilted) =>
+        set((state) => { state.isTilted = tilted; }),
     })),
     {
       name: 'devilbox-workbench',

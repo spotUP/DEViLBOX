@@ -106,6 +106,12 @@ export class UADEEngine {
   // Pending scanMemory requests: Map<requestId, {resolve, reject}>
   private _scanMemoryPending: Map<number, { resolve: (addr: number) => void; reject: (e: Error) => void }> = new Map();
   private _scanMemoryNextId = 0;
+  // Pending readMemory requests: Map<requestId, {resolve, reject}>
+  private _readMemoryPending = new Map<number, { resolve: (v: Uint8Array) => void; reject: (e: Error) => void }>();
+  private _readMemoryNextId = 0;
+  // Pending writeMemory requests: Map<requestId, {resolve, reject}>
+  private _writeMemoryPending = new Map<number, { resolve: () => void; reject: (e: Error) => void }>();
+  private _writeMemoryNextId = 0;
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -352,6 +358,31 @@ export class UADEEngine {
           }
           break;
         }
+
+        case 'readMemoryResult': {
+          const { requestId, data: buf } = event.data;
+          this._readMemoryPending.get(requestId)?.resolve(new Uint8Array(buf));
+          this._readMemoryPending.delete(requestId);
+          break;
+        }
+        case 'readMemoryError': {
+          const { requestId, error } = event.data;
+          this._readMemoryPending.get(requestId)?.reject(new Error(error));
+          this._readMemoryPending.delete(requestId);
+          break;
+        }
+        case 'writeMemoryResult': {
+          const { requestId } = event.data;
+          this._writeMemoryPending.get(requestId)?.resolve();
+          this._writeMemoryPending.delete(requestId);
+          break;
+        }
+        case 'writeMemoryError': {
+          const { requestId, error } = event.data;
+          this._writeMemoryPending.get(requestId)?.reject(new Error(error));
+          this._writeMemoryPending.delete(requestId);
+          break;
+        }
       }
     };
 
@@ -570,6 +601,34 @@ export class UADEEngine {
     this.workletNode.port.postMessage(
       { type: 'scanMemory', requestId, magic: magicCopy.buffer, searchLen },
       [magicCopy.buffer],
+    );
+    return promise;
+  }
+
+  /** Read `length` bytes from Amiga chip RAM starting at `addr`. */
+  async readMemory(addr: number, length: number): Promise<Uint8Array> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('UADEEngine not initialized');
+    const requestId = this._readMemoryNextId++;
+    const promise = new Promise<Uint8Array>((resolve, reject) => {
+      this._readMemoryPending.set(requestId, { resolve, reject });
+    });
+    this.workletNode.port.postMessage({ type: 'readMemory', requestId, addr, length });
+    return promise;
+  }
+
+  /** Write `data` bytes into Amiga chip RAM at `addr`. Changes take effect on next note trigger. */
+  async writeMemory(addr: number, data: Uint8Array): Promise<void> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('UADEEngine not initialized');
+    const requestId = this._writeMemoryNextId++;
+    const promise = new Promise<void>((resolve, reject) => {
+      this._writeMemoryPending.set(requestId, { resolve, reject });
+    });
+    const copy = data.slice();
+    this.workletNode.port.postMessage(
+      { type: 'writeMemory', requestId, addr, data: copy.buffer },
+      [copy.buffer],
     );
     return promise;
   }

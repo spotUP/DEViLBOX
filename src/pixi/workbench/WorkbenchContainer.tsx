@@ -11,9 +11,12 @@
  */
 
 import React, { createContext, useCallback, useContext, useRef, useEffect } from 'react';
-import type { FederatedPointerEvent, Container as ContainerType, Graphics as GraphicsType } from 'pixi.js';
+import { useApplication, useTick } from '@pixi/react';
+import type { FederatedPointerEvent, Container as ContainerType, Graphics as GraphicsType, BitmapText as BitmapTextType } from 'pixi.js';
 import { useWorkbenchStore, type CameraState } from '@stores/useWorkbenchStore';
 import { applyTransform } from './WorkbenchCamera';
+import { PIXI_FONTS } from '../fonts';
+import { usePixiTheme } from '../theme';
 import { WorkbenchBackground } from './WorkbenchBackground';
 import { PixiWindow, TITLE_H } from './PixiWindow';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
@@ -26,6 +29,7 @@ import {
 import type { SnapLine } from './windowSnap';
 import { WindowTether } from './WindowTether';
 import { playFocusZoom } from './workbenchSounds';
+import { WorkbenchTiltRenderer } from './WorkbenchTilt';
 import { PixiTrackerView } from '../views/PixiTrackerView';
 import { PixiDJView } from '../views/PixiDJView';
 import { PixiArrangementView } from '../views/PixiArrangementView';
@@ -121,15 +125,19 @@ function redrawSnapLines(g: GraphicsType, lines: SnapLine[], alpha: number, came
 
 export const WorkbenchContainer: React.FC = () => {
   const { width, height } = usePixiResponsive();
-  // NOTE: camera is NOT in React state — it is applied imperatively via a
-  // Zustand store subscription below.  This prevents WorkbenchContainer (and
-  // all PixiWindow children) from re-rendering on every pan/zoom frame.
+  const theme = usePixiTheme();
+  // Camera is read reactively here only for passing to props/context; the world
+  // container transform is still applied imperatively via the subscription below.
+  const camera     = useWorkbenchStore((s) => s.camera);
   const windows    = useWorkbenchStore((s) => s.windows);
   const panCamera  = useWorkbenchStore((s) => s.panCamera);
   const zoomCamera = useWorkbenchStore((s) => s.zoomCamera);
+  const isTilted   = useWorkbenchStore((s) => s.isTilted);
 
   // World container ref (camera transform applied here)
   const worldRef = useRef<ContainerType>(null);
+  // Zoom level indicator — updated imperatively alongside camera
+  const zoomTextRef = useRef<BitmapTextType | null>(null);
 
   // Snap guide line Graphics ref
   const snapGfxRef   = useRef<GraphicsType>(null);
@@ -140,6 +148,16 @@ export const WorkbenchContainer: React.FC = () => {
   // Active camera spring
   const springRef = useRef<CameraSpringHandle | null>(null);
 
+  // ─── WebGL tilt ─────────────────────────────────────────────────────────────
+  const { app } = useApplication();
+  const tiltRendererRef = useRef<WorkbenchTiltRenderer | null>(null);
+  // Animated tilt factor 0 (flat) → 1 (full tilt), spring-eased
+  const tiltFactorRef   = useRef(0);
+  // Refs so the useTick callback always reads current values
+  const isTiltedRef     = useRef(isTilted);
+  isTiltedRef.current   = isTilted;
+  const rootContainerRef = useRef<ContainerType>(null);
+
   // Apply camera transform imperatively via store subscription — no React re-render.
   useEffect(() => {
     const apply = (cam: CameraState) => {
@@ -147,10 +165,14 @@ export const WorkbenchContainer: React.FC = () => {
       if (snapGfxRef.current && snapLinesRef.current.length > 0) {
         redrawSnapLines(snapGfxRef.current, snapLinesRef.current, snapAlphaRef.current, cam.scale);
       }
+      // Update zoom level indicator imperatively
+      if (zoomTextRef.current) {
+        zoomTextRef.current.text = `${Math.round(cam.scale * 100)}%`;
+      }
     };
     // Apply immediately with current state, then subscribe to future changes.
     apply(useWorkbenchStore.getState().camera);
-    return useWorkbenchStore.subscribe((s) => s.camera, apply);
+    return useWorkbenchStore.subscribe((s) => apply(s.camera));
   }, []);
 
   // ─── Snap guide lines ───────────────────────────────────────────────────────
@@ -248,6 +270,7 @@ export const WorkbenchContainer: React.FC = () => {
   const handleBgPointerDown = useCallback((e: FederatedPointerEvent) => {
     cancelSpring();
     panDragRef.current = { lastX: e.globalX, lastY: e.globalY };
+    document.body.style.cursor = 'grabbing';
 
     const onMove = (me: PointerEvent) => {
       if (!panDragRef.current) return;
@@ -260,6 +283,7 @@ export const WorkbenchContainer: React.FC = () => {
 
     const onUp = () => {
       panDragRef.current = null;
+      document.body.style.cursor = '';
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
     };
@@ -271,9 +295,24 @@ export const WorkbenchContainer: React.FC = () => {
   // ─── Wheel zoom ────────────────────────────────────────────────────────────
 
   const handleBgWheel = useCallback((e: WheelEvent) => {
+    // Bail if the pointer is over a workbench window — let the view handle scroll.
+    // Convert screen → world coords and check window bounding rects.
+    const cam = useWorkbenchStore.getState().camera;
+    const worldX = (e.clientX - cam.x) / cam.scale;
+    const worldY = (e.clientY - cam.y) / cam.scale;
+    const wins = useWorkbenchStore.getState().windows;
+    const overWindow = Object.values(wins).some(
+      (w) => w.visible && !w.minimized &&
+        worldX >= w.x && worldX <= w.x + w.width &&
+        worldY >= w.y && worldY <= w.y + w.height,
+    );
+    if (overWindow) return;
+
     e.preventDefault();
     cancelSpring();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    // Proportional zoom: smooth on trackpad, one-step-per-tick on mouse wheel.
+    // Clamp to ±40% per event to prevent runaway zoom on fast trackpad flicks.
+    const delta = Math.max(-0.4, Math.min(0.4, -e.deltaY * 0.001));
     zoomCamera(delta, e.clientX, e.clientY);
   }, [zoomCamera, cancelSpring]);
 
@@ -286,22 +325,70 @@ export const WorkbenchContainer: React.FC = () => {
 
   useEffect(() => () => cancelSpring(), [cancelSpring]);
 
+  // ─── Tilt renderer lifecycle ────────────────────────────────────────────────
+  // Created after the root container mounts; destroyed on unmount.
+  useEffect(() => {
+    const root = rootContainerRef.current;
+    if (!root || !app) return;
+    const renderer = new WorkbenchTiltRenderer(app, root, width, height);
+    tiltRendererRef.current = renderer;
+    return () => {
+      renderer.destroy();
+      tiltRendererRef.current = null;
+    };
+  // Re-create if dimensions change (resize)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app, width, height]);
+
+  // ─── Tilt per-frame tick ─────────────────────────────────────────────────────
+  // Spring-animates tiltFactor and triggers the GL render-to-texture pass.
+  // Runs inside the Pixi ticker (UPDATE priority → before main scene render).
+  useTick((ticker) => {
+    const target = isTiltedRef.current ? 1 : 0;
+    const current = tiltFactorRef.current;
+    if (Math.abs(target - current) < 0.001 && Math.abs(target) < 0.001) return;
+
+    // Exponential smoothing: ~300ms settle time
+    const dt = Math.min(ticker.deltaMS / 1000, 0.05);
+    const next = current + (target - current) * (1 - Math.exp(-dt * 6));
+    tiltFactorRef.current = Math.abs(next - target) < 0.001 ? target : next;
+
+    const tiltActive = tiltFactorRef.current > 0.005;
+    const tilt = tiltRendererRef.current;
+    const world = worldRef.current;
+    if (!tilt || !world) return;
+
+    tilt.setActive(tiltActive, world);
+    if (tiltActive) {
+      tilt.renderFrame(world, tiltFactorRef.current);
+    }
+  });
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  const contextValue: WorkbenchContextValue = { focusWindow, setSnapLines };
+  const contextValue: WorkbenchContextValue = { camera, focusWindow, setSnapLines };
 
   return (
     <WorkbenchContext.Provider value={contextValue}>
-      <pixiContainer layout={{ width, height: '100%' }} eventMode="static">
-        {/* Background — subscribes to camera directly; no prop needed */}
-        <WorkbenchBackground width={width} height={height} />
+      <pixiContainer ref={rootContainerRef} layout={{ width, height: '100%' }} eventMode="static" sortableChildren>
+        <WorkbenchBackground width={width} height={height} camera={camera} />
 
-        {/* Pan hit area */}
+        {/* Pan hit area — grab cursor signals this surface is draggable */}
         <pixiContainer
           layout={{ position: 'absolute', width, height }}
           eventMode="static"
-          cursor="default"
+          cursor="grab"
           onPointerDown={handleBgPointerDown}
+        />
+
+        {/* Zoom level indicator — screen space, bottom-left corner */}
+        <pixiBitmapText
+          ref={zoomTextRef}
+          text="100%"
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          alpha={0.5}
+          layout={{ position: 'absolute', bottom: 8, left: 10 }}
         />
 
         {/* World container — camera transform via ref */}
@@ -319,6 +406,7 @@ export const WorkbenchContainer: React.FC = () => {
                 key={id}
                 id={id}
                 title={title}
+                camera={camera}
                 screenW={width}
                 screenH={height}
                 onFocus={focusWindow}
