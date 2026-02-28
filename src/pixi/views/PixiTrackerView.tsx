@@ -24,6 +24,7 @@ import { PixiAutomationLanes } from './tracker/PixiAutomationLanes';
 import { PixiMacroLanes } from './tracker/PixiMacroLanes';
 import { PixiMacroSlotsPanel } from './tracker/PixiMacroSlotsPanel';
 import { PixiMIDIKnobBar } from './tracker/PixiMIDIKnobBar';
+import { PixiEditorControlsBar } from './tracker/PixiEditorControlsBar';
 import { PixiRandomizeDialog } from '../dialogs/PixiRandomizeDialog';
 import { PixiAcidPatternDialog } from '../dialogs/PixiAcidPatternDialog';
 import { PixiFurnaceView } from './furnace/PixiFurnaceView';
@@ -160,8 +161,8 @@ export const PixiTrackerView: React.FC = () => {
         <TB303KnobPanelOverlay visible={!tb303Collapsed && viewMode !== 'tb303' && viewMode !== 'sunvox'} />
       </PixiDOMOverlay>
 
-      {/* Editor controls bar — DOM overlay for 1:1 parity */}
-      <PixiEditorControlsBarOverlay viewMode={viewMode} onViewModeChange={setViewMode} gridChannelIndex={gridChannelIndex} onGridChannelChange={setGridChannelIndex} />
+      {/* Editor controls bar — pure Pixi, no DOM overlay */}
+      <PixiEditorControlsBar viewMode={viewMode} onViewModeChange={setViewMode} gridChannelIndex={gridChannelIndex} onGridChannelChange={setGridChannelIndex} />
 
       {/* Pattern management panel (collapsible) — always mounted, height:0 when hidden
           to avoid Yoga node swap errors in @pixi/layout */}
