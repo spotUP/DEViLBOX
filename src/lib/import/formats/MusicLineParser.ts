@@ -602,20 +602,11 @@ function decompressPart(data: Uint8Array, srcOffset: number, srcLen: number): { 
  * Note 61 (end sentinel) = reset row counter within PART; treated as rest here.
  */
 function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum: number): Pattern {
-  const channel: ChannelData = {
-    id:           'channel-0',
-    name:         'Voice',
-    muted:        false,
-    solo:         false,
-    collapsed:    false,
-    volume:       100,
-    pan:          0,
-    instrumentId: null,
-    color:        null,
-    rows:         Array.from({ length: PART_ROWS }, (): TrackerCell => {
-      return createEmptyCell();
-    }),
-  };
+  const rows: TrackerCell[] = Array.from({ length: PART_ROWS }, (): TrackerCell => createEmptyCell());
+
+  // Effective length: rows up to (not including) the first end-of-part sentinel (note 61).
+  // Trailing empty rows after the sentinel are display noise — trim them.
+  let effectiveLength = PART_ROWS;
 
   if (rawData) {
     for (let row = 0; row < PART_ROWS; row++) {
@@ -624,25 +615,28 @@ function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum:
       const noteRaw  = rawData[rowBase];
       const instrRaw = rawData[rowBase + 1];
 
-      const cell = channel.rows[row];
+      if (noteRaw === ML_NOTE_END) {
+        // End-of-part sentinel: the pattern ends here; rows beyond this are empty padding.
+        effectiveLength = row;
+        break;
+      }
 
-      if (noteRaw > 0 && noteRaw < ML_NOTE_END) {
+      const cell = rows[row];
+
+      if (noteRaw > 0) {
         // MusicLine note numbers: 25=C-1, 37=C-2, 49=C-3.
         // XM note numbers:         1=C-0, 13=C-1, 25=C-2.
         // ML note 25 → XM note 13 (C-1): mlNote - 12.
-        // amigaNoteToXM() is designed for ProTracker 1-based notes (1=C-1) and adds 12 — wrong here.
         cell.note = Math.max(1, noteRaw - 12);
         // 0x00 and 0xFF are "no instrument change" sentinels; valid range 1–127
         if (instrRaw > 0 && instrRaw !== 0xFF) {
           cell.instrument = instrRaw;
         }
       }
-      // noteRaw === 0 → rest; noteRaw === ML_NOTE_END → end-of-part (reset) → treated as rest
 
       // Effects: 5 slots × 2 bytes at bytes 2-11.
       // Slot 0 (bytes 2-3) → cell.effTyp / cell.eff  (XM effect columns)
       // Slot 1 (bytes 4-5) → cell.effTyp2 / cell.eff2
-      // Slots 2-4 are stored but TrackerCell only has 2 effect columns; ignore remainder.
       const eff0Num = rawData[rowBase + 2];
       const eff0Par = rawData[rowBase + 3];
       const eff1Num = rawData[rowBase + 4];
@@ -661,11 +655,37 @@ function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum:
     }
   }
 
+  // If no sentinel found, fall back to trimming trailing all-empty rows.
+  if (effectiveLength === PART_ROWS) {
+    let lastNonEmpty = -1;
+    for (let row = 0; row < PART_ROWS; row++) {
+      const c = rows[row];
+      if (c.note || c.instrument || c.effTyp || c.effTyp2) lastNonEmpty = row;
+    }
+    effectiveLength = lastNonEmpty >= 0 ? lastNonEmpty + 1 : PART_ROWS;
+  }
+
+  // Ensure at least 1 row
+  if (effectiveLength < 1) effectiveLength = 1;
+
+  const channel: ChannelData = {
+    id:           'channel-0',
+    name:         'Voice',
+    muted:        false,
+    solo:         false,
+    collapsed:    false,
+    volume:       100,
+    pan:          0,
+    instrumentId: null,
+    color:        null,
+    rows:         rows.slice(0, effectiveLength),
+  };
+
   return {
     id:       `part-${partNum}`,
     name:     `Part ${partNum}`,
     channels: [channel],
-    length:   PART_ROWS,
+    length:   effectiveLength,
   };
 }
 
