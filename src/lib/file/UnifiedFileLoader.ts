@@ -135,8 +135,43 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   // resetInstruments() and the subsequent loadPatterns/createInstrument calls.
   // Without this, React flushes after the reset and renders an empty (black) scene.
   let preReadBuffer: ArrayBuffer | null = null;
+  let preSunVoxModules: Array<{ name: string; id: number; synthData: ArrayBuffer }> | null = null;
+
   if (filename.endsWith('.sunvox')) {
     preReadBuffer = await file.arrayBuffer();
+
+    // Try to extract individual modules before the reset so we can create
+    // one SunVoxSynth instrument per module (synth mode) instead of loading
+    // the whole project as a single song-mode instrument.
+    try {
+      const { SunVoxEngine } = await import('@/engine/sunvox/SunVoxEngine');
+      const { getDevilboxAudioContext } = await import('@/utils/audio-context');
+      const svEngine = SunVoxEngine.getInstance();
+      await svEngine.ready();
+      const sampleRate = getDevilboxAudioContext().sampleRate;
+      const tempHandle = await svEngine.createHandle(sampleRate);
+      try {
+        // loadSong internally slices the buffer before transfer — preReadBuffer stays intact.
+        await svEngine.loadSong(tempHandle, preReadBuffer);
+        const modules = await svEngine.getModules(tempHandle);
+        // Module id=0 is always the "Output" bus — skip it.
+        const synthModules = modules.filter((m) => m.id > 0);
+        if (synthModules.length > 0) {
+          preSunVoxModules = await Promise.all(
+            synthModules.map(async (mod) => ({
+              name: mod.name,
+              id: mod.id,
+              synthData: await svEngine.saveSynth(tempHandle, mod.id),
+            }))
+          );
+        }
+      } finally {
+        svEngine.destroyHandle(tempHandle);
+      }
+    } catch (err) {
+      console.warn('[UnifiedFileLoader] SunVox module extraction failed, falling back to song mode:', err);
+      preSunVoxModules = null;
+    }
   }
 
   // === FULL STATE RESET (unless preserveInstruments) ===
@@ -294,32 +329,83 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   if (filename.endsWith('.sunvox')) {
     // preReadBuffer was populated before the reset — no await here, preventing
     // React from flushing an empty scene between reset and data load.
-    const buffer = preReadBuffer!;
     const name = file.name.replace(/\.sunvox$/i, '');
-    const sunvoxConfig = {
-      patchData: buffer,
-      patchName: name,
-      isSong: true,
-      controlValues: {} as Record<string, number>,
-    };
+    const PATTERN_LEN = 256;
+    const emptyRow = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+
+    if (preSunVoxModules && preSunVoxModules.length > 0) {
+      // Module decomposition mode: one SunVoxSynth (synth mode) per module,
+      // one tracker channel per module, each with a trigger note at row 0.
+      const now = Date.now();
+      const channels = preSunVoxModules.map((mod, idx) => {
+        useInstrumentStore.getState().createInstrument({
+          name: mod.name,
+          synthType: 'SunVoxSynth' as const,
+          sunvox: {
+            patchData: mod.synthData,
+            patchName: mod.name,
+            isSong: false,
+            controlValues: {} as Record<string, number>,
+          },
+        });
+        const instruments = useInstrumentStore.getState().instruments;
+        const instrumentIndex = instruments.length; // 1-based tracker index
+        const newInstrument = instruments[instruments.length - 1];
+        const rows = Array.from({ length: PATTERN_LEN }, (_, i) =>
+          i === 0
+            ? { note: 49, instrument: instrumentIndex, volume: 64, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }
+            : { ...emptyRow }
+        );
+        return {
+          id: `ch-svox-${now}-${idx}`,
+          name: mod.name,
+          muted: false,
+          solo: false,
+          collapsed: false,
+          volume: 100,
+          pan: 0,
+          instrumentId: newInstrument.id,
+          color: '#facc15',
+          rows,
+        };
+      });
+
+      const pattern = {
+        id: `svox-${Date.now()}`,
+        name,
+        length: PATTERN_LEN,
+        channels,
+      };
+      loadPatterns([pattern]);
+      setCurrentPattern(0);
+      setPatternOrder([0]);
+      setMetadata({ name, author: '', description: `Imported from ${file.name} (${preSunVoxModules.length} modules)` });
+      applyEditorMode({});
+      return { success: true, message: `Loaded SunVox project: ${name} — ${preSunVoxModules.length} module(s)` };
+    }
+
+    // Fallback: song mode — load the whole project as a single instrument.
+    const buffer = preReadBuffer!;
     useInstrumentStore.getState().createInstrument({
       name,
       synthType: 'SunVoxSynth' as const,
-      sunvox: sunvoxConfig,
+      sunvox: {
+        patchData: buffer,
+        patchName: name,
+        isSong: true,
+        controlValues: {} as Record<string, number>,
+      },
     });
     const instruments = useInstrumentStore.getState().instruments;
     const newInstrument = instruments[instruments.length - 1];
     const instrumentIndex = instruments.length; // 1-based tracker index
-    const PATTERN_LEN = 256;
-    const emptyRow = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
     const rows = Array.from({ length: PATTERN_LEN }, (_, i) =>
       i === 0
         ? { note: 49, instrument: instrumentIndex, volume: 64, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }
         : { ...emptyRow }
     );
-    const patternId = `svox-${Date.now()}`;
     const pattern = {
-      id: patternId,
+      id: `svox-${Date.now()}`,
       name,
       length: PATTERN_LEN,
       channels: [{
