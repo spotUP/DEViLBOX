@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { EditorView } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { Play, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { Play, CheckCircle, AlertCircle, Loader, Download, Upload } from 'lucide-react';
 import type { SuperColliderConfig, SCParam } from '@typedefs/instrument';
 import { superColliderLanguage } from '@engine/sc/scLanguage';
 
@@ -90,6 +90,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   const viewRef = useRef<EditorView | null>(null);
   const configRef = useRef(config);
   const onChangeRef = useRef(onChange);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = React.useState<CompileStatus>({ state: 'idle' });
 
   // Keep configRef in sync so callbacks don't capture stale config
@@ -194,6 +195,75 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   }, [onChange]);
 
   // -------------------------------------------------------------------------
+  // Param panel — change handler
+  // -------------------------------------------------------------------------
+  const handleParamChange = useCallback((name: string, value: number) => {
+    onChangeRef.current({
+      ...configRef.current,
+      params: configRef.current.params.map((p) =>
+        p.name === name ? { ...p, value } : p
+      ),
+    });
+  }, []);
+
+  // -------------------------------------------------------------------------
+  // Preset export
+  // -------------------------------------------------------------------------
+  const handleExport = useCallback(() => {
+    const cfg = configRef.current;
+    const preset = {
+      version: 1,
+      name: cfg.synthDefName || 'untitled',
+      synthDefName: cfg.synthDefName,
+      source: cfg.source,
+      binary: cfg.binary,
+      params: cfg.params,
+    };
+    const blob = new Blob([JSON.stringify(preset, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${cfg.synthDefName || 'preset'}.scpreset`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  // -------------------------------------------------------------------------
+  // Preset import
+  // -------------------------------------------------------------------------
+  const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const preset = JSON.parse(evt.target?.result as string) as {
+          version: number;
+          synthDefName?: string;
+          source?: string;
+          binary?: string;
+          params?: SCParam[];
+        };
+        if (preset.version !== 1 || !preset.synthDefName || !preset.source) {
+          alert('Invalid .scpreset file');
+          return;
+        }
+        onChangeRef.current({
+          synthDefName: preset.synthDefName,
+          source: preset.source,
+          binary: preset.binary ?? '',
+          params: preset.params ?? [],
+        });
+      } catch {
+        alert('Failed to parse .scpreset file');
+      }
+    };
+    reader.readAsText(file);
+    // Reset so the same file can be re-imported
+    e.target.value = '';
+  }, []);
+
+  // -------------------------------------------------------------------------
   // Status bar content
   // -------------------------------------------------------------------------
   const renderStatus = () => {
@@ -239,19 +309,80 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
         <span className="text-xs font-semibold text-text-primary font-mono tracking-wide">
           SuperCollider
         </span>
-        {config.synthDefName && (
-          <span className="text-xs text-text-muted font-mono">
-            \{config.synthDefName}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {config.synthDefName && (
+            <span className="text-xs text-text-muted font-mono mr-2">
+              \{config.synthDefName}
+            </span>
+          )}
+          <button
+            onClick={() => { importInputRef.current?.click(); }}
+            title="Import .scpreset"
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text-secondary hover:text-text-primary hover:bg-dark-bgTertiary transition-colors"
+          >
+            <Upload size={11} />
+            Import
+          </button>
+          <button
+            onClick={handleExport}
+            title="Export .scpreset"
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text-secondary hover:text-text-primary hover:bg-dark-bgTertiary transition-colors"
+          >
+            <Download size={11} />
+            Export
+          </button>
+        </div>
       </div>
 
-      {/* CodeMirror editor — grows to fill available space */}
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-auto min-h-0"
-        style={{ minHeight: 0 }}
-      />
+      {/* Body: editor (left) + param panel (right) */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* CodeMirror editor */}
+        <div
+          ref={containerRef}
+          className="flex-1 overflow-auto min-h-0"
+          style={{ minHeight: 0 }}
+        />
+
+        {/* Param panel — only shown when there are params */}
+        {config.params.length > 0 && (
+          <div className="w-56 shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto flex flex-col">
+            <div className="px-3 py-2 border-b border-dark-border shrink-0">
+              <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                Parameters
+              </span>
+            </div>
+            <div className="flex flex-col gap-3 p-3">
+              {config.params.map((param) => {
+                const step = (param.max - param.min) / 200;
+                return (
+                  <div key={param.name} className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-text-secondary font-mono truncate" title={param.name}>
+                        {param.name}
+                      </span>
+                      <span className="text-xs text-text-muted font-mono ml-2 shrink-0">
+                        {Number(param.value.toPrecision(3))}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={param.min}
+                      max={param.max}
+                      step={step}
+                      value={param.value}
+                      onChange={(e) => {
+                        handleParamChange(param.name, Number(e.target.value));
+                      }}
+                      className="w-full h-1.5 appearance-none rounded cursor-pointer"
+                      style={{ accentColor: 'var(--color-accent-primary, #7c3aed)' }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Status bar */}
       <div className="flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-t border-dark-border shrink-0">
@@ -275,6 +406,15 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
           Compile &amp; Load
         </button>
       </div>
+
+      {/* Hidden file input for import */}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".scpreset"
+        style={{ display: 'none' }}
+        onChange={handleImport}
+      />
     </div>
   );
 };
