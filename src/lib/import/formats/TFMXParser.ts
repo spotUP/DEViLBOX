@@ -32,6 +32,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { TFMXConfig, UADEChipRamInfo } from '@/types/instrument';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -310,9 +311,76 @@ export function parseTFMXFile(
     initialSpeed = tempo + 1;
   }
 
-  // 7. No instrument metadata extractable at this level (macros require
-  //    full TFMX engine emulation).  Leave instruments empty.
+  // 7. Extract VolModSeq and SndModSeq instrument data from the mdat file.
   const instruments: InstrumentConfig[] = [];
+
+  // Read section pointers at h+0x1D4 (patternPtr = SndModSeq table)
+  // and h+0x1D8 (macroPtr = VolModSeq table).
+  let macroPtr   = u32BE(buf, h + 0x1D8);  // VolModSeq table
+  let patternPtr = u32BE(buf, h + 0x1D4);  // SndModSeq table
+  if (macroPtr   === 0) macroPtr   = h + 0x400;
+  if (patternPtr === 0) patternPtr = h + 0x200;
+
+  // Cap at 128 instruments; stop at the first VolModSeq that is all-zeros (empty slot).
+  const MAX_INSTRUMENTS = 128;
+  const VOL_MOD_SIZE = 64;
+  const SND_MOD_SIZE = 64;
+
+  for (let i = 0; i < MAX_INSTRUMENTS; i++) {
+    const vsqOff = macroPtr + i * VOL_MOD_SIZE;
+    if (vsqOff + VOL_MOD_SIZE > buf.length) break;
+
+    // Check if this VolModSeq slot is empty (all zeros = unused).
+    let nonZero = false;
+    for (let b = 0; b < VOL_MOD_SIZE; b++) {
+      if (buf[vsqOff + b] !== 0) { nonZero = true; break; }
+    }
+    if (!nonZero) break; // stop at first empty slot
+
+    // Read the 64-byte VolModSeq for this instrument.
+    const volModSeqData = new Uint8Array(VOL_MOD_SIZE);
+    for (let b = 0; b < VOL_MOD_SIZE; b++) volModSeqData[b] = buf[vsqOff + b];
+
+    // Read the SndModSeq referenced by byte 1 (sndSeqNum).
+    const sndSeqNum = volModSeqData[1];
+    const sndOff = patternPtr + sndSeqNum * SND_MOD_SIZE;
+    const sndModSeqData = new Uint8Array(SND_MOD_SIZE);
+    if (sndOff + SND_MOD_SIZE <= buf.length) {
+      for (let b = 0; b < SND_MOD_SIZE; b++) sndModSeqData[b] = buf[sndOff + b];
+    }
+
+    const tfmxConfig: TFMXConfig = {
+      sndSeqsCount: 1,
+      sndModSeqData,
+      volModSeqData,
+      sampleCount: 0,
+      sampleHeaders: new Uint8Array(0),
+      sampleData: new Uint8Array(0),
+    };
+
+    const uadeChipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: buf.length,
+      instrBase: vsqOff,  // file-relative = chip RAM address (TFMX loads at address 0)
+      instrSize: VOL_MOD_SIZE,
+      sections: {
+        volModSeqTable: macroPtr,
+        sndModSeqTable: patternPtr,
+      },
+    };
+
+    instruments.push({
+      id: i + 1,
+      name: `Instrument ${i + 1}`,
+      type: 'synth' as const,
+      synthType: 'TFMXSynth' as const,
+      tfmx: tfmxConfig,
+      uadeChipRam,
+      effects: [],
+      volume: 64,
+      pan: 0,
+    } as InstrumentConfig);
+  }
 
   return {
     name:            filename.replace(/\.[^/.]+$/, ''),

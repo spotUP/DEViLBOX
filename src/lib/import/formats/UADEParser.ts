@@ -538,6 +538,25 @@ export async function parseUADEFile(
         } catch { /* older WASM without scanMemoryForMagic, moduleBase stays 0 */ }
         return parseHippelCoSoFile(buffer, filename, moduleBase);
       },
+      // NOTE: TFMX loads at chip RAM address 0 — no scanMemoryForMagic needed.
+      // UADE may report the format as 'TFMX', 'TFMX-Pro', 'TFMX Pro', or 'TFMX 7-Voices'.
+      // All variants use the same mdat file layout and are handled by parseTFMXFile.
+      'TFMX': async () => {
+        const { parseTFMXFile } = await import('./TFMXParser');
+        return parseTFMXFile(buffer, filename);
+      },
+      'TFMX-Pro': async () => {
+        const { parseTFMXFile } = await import('./TFMXParser');
+        return parseTFMXFile(buffer, filename);
+      },
+      'TFMX Pro': async () => {
+        const { parseTFMXFile } = await import('./TFMXParser');
+        return parseTFMXFile(buffer, filename);
+      },
+      'TFMX 7-Voices': async () => {
+        const { parseTFMXFile } = await import('./TFMXParser');
+        return parseTFMXFile(buffer, filename);
+      },
     };
     const route = NATIVE_ROUTES[fmt];
     if (route) {
