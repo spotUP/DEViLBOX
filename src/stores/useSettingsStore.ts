@@ -78,6 +78,8 @@ export interface FormatEnginePreferences {
   jeroenTel: FormatEngineChoice;      // jt.*/mon_old.* → JeroenTelParser vs UADE
   quartet: FormatEngineChoice;        // qpa.*/sqt.*/qts.* → QuartetParser vs UADE
   soundMaster: FormatEngineChoice;    // sm.*/sm1.*/sm2.*/sm3.*/smpro.* → SoundMasterParser vs UADE
+  amosMusicBank: FormatEngineChoice;  // .abk → AmosMusicBankParser (native only)
+  iceTracker: FormatEngineChoice;     // .ice → IceTrackerParser (native only)
   zoundMonitor: FormatEngineChoice;   // sng.* → ZoundMonitorParser vs UADE
   synthPack: FormatEngineChoice;      // osp.* → SynthPackParser vs UADE
   tcbTracker: FormatEngineChoice;     // tcb.* → TCBTrackerParser vs UADE
@@ -264,6 +266,8 @@ export const useSettingsStore = create<SettingsStore>()(
         jeroenTel: 'native',      // JeroenTelParser — dedicated Jeroen Tel support
         quartet: 'native',        // QuartetParser — dedicated Quartet support
         soundMaster: 'native',    // SoundMasterParser — dedicated SoundMaster support
+        amosMusicBank: 'native',  // AmosMusicBankParser — native only
+        iceTracker: 'native',     // IceTrackerParser — native only
         zoundMonitor: 'native',   // ZoundMonitorParser — dedicated ZoundMonitor support
         synthPack: 'native',      // SynthPackParser — dedicated SynthPack support
         tcbTracker: 'native',     // TCBTrackerParser — dedicated TCB Tracker support
