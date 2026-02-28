@@ -86,12 +86,10 @@ export const PixiFrequencyBars: React.FC<PixiFrequencyBarsProps> = ({ width, hei
     g.clear(); g.rect(0, 0, width, height); g.fill({ color: theme.bg.color });
   };
 
-  return isPlaying ? (
-    <pixiGraphics ref={graphicsRef} draw={() => {}} layout={{ width, height }} />
-  ) : (
+  return (
     <pixiContainer layout={{ width, height, justifyContent: 'center', alignItems: 'center' }}>
-      <pixiGraphics draw={drawStatic} layout={{ position: 'absolute', width, height }} />
-      <pixiBitmapText text="SPECTRUM" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={theme.textMuted.color} layout={{}} />
+      <pixiGraphics ref={graphicsRef} draw={isPlaying ? () => {} : drawStatic} layout={{ position: 'absolute', width, height }} />
+      <pixiBitmapText text="SPECTRUM" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={theme.textMuted.color} layout={{}} visible={!isPlaying} />
     </pixiContainer>
   );
 };
