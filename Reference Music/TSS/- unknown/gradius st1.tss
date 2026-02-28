@@ -1,0 +1,51 @@
+{ sample data for TSS Compiler ver 0.60 }
+#TITLE		<GRADIUS STAGE1>
+#CHANNEL	4
+#A	$
+	{ SEQ. }
+	t130 %0 o7 v8 l16 q14 s32
+	[c>bagfgab<] [c>b-a-gfga-b-<]
+	[c>bagfgab<] c>b-a-gfga-b-<cde-fc>b-a-b-<
+	[c>bagfgab<] [c>b-a-gfga-b-<]
+	[c>bagfga|b<]f< dc>bagab<cdc>bagb<dg
+	{ MELODY (high) }
+	o6 v12 q10 s16
+	e-8.c8.e-4. l16cde-8 d8.>b-8.g2^8
+	<c8.>a8.<cc d8.>b8.<dd e-8.c8.e-f f8.d8.g1^8
+	
+#B	$
+	{ MELODY (echo) }
+	t130 %0 o5 v5 q10 s16 k-2 r16.
+	g4g8.<c16f8e4c8 g8.>b-16b-4. l16 ga-b-<e-fg
+	c8.>a8.<c4f8> ab<cd e-8c>a-8<e-8c f8d>b-8<df8>
+	g4g8.<c16f8e4c8 g8.>b-16b-4. l16 ga-b-<e-fg
+	a8cc8.f8 g8a4f8 d8.gg2^8^32
+	
+	{ MELODY (low) }
+	o6 v9 q10 s16
+	c8.>a-8.<c4. l16>a-b-<c8> b-8.g8.e-2^8
+	a8.f8.aa b8.g8.bb <c8.>a-8.<cc d8.>b-8.<d1^8
+#C	$
+	{ MELODY }
+	t130 %0 o5 v13 q10 s16
+	g4g8.<c16f8e4c8 g8.>b-16b-4. l16 ga-b-<e-fg
+	c8.>a8.<c4f8> ab<cd e-8c>a-8<e-8c f8d>b-8<df8>
+	g4g8.<c16f8e4c8 g8.>b-16b-4. l16 ga-b-<e-fg
+	a8cc8.f8 g8a4f8 d8.gg2.
+	
+	{ SUB-MELODY }
+	v9 q13
+	c8.e-8.a-2^8 >b-8.<d8.e-2^8
+	>ab-<cf^4 >b<cdg^4 cde-a-^4 de-fb-8.<c2^8>b2
+#D	$
+	{ BASS }
+	t130 %0 o3 v11 q8 s32 l16
+	[4c8<cc>] [4e-8<e-e->]
+	[4f8<ff>] [a-8<a-a->][b-8<b-b->]
+	[4c8<cc>] [4e-8<e-e->]
+	[4f8<ff>] [4g8<gg>]
+	
+	{ BASS }
+	[4a-<a-e-a->] [4e-<e->b-<e->]
+	[f<fcf>] [g<gdg>] [a-<a-e-a->] [b-<b-fb->] [4g8<gg>]
+#END
