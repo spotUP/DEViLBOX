@@ -360,25 +360,25 @@ export class UADEEngine {
         }
 
         case 'readMemoryResult': {
-          const { requestId, data: buf } = event.data;
+          const { requestId, data: buf } = data;
           this._readMemoryPending.get(requestId)?.resolve(new Uint8Array(buf));
           this._readMemoryPending.delete(requestId);
           break;
         }
         case 'readMemoryError': {
-          const { requestId, error } = event.data;
+          const { requestId, error } = data;
           this._readMemoryPending.get(requestId)?.reject(new Error(error));
           this._readMemoryPending.delete(requestId);
           break;
         }
         case 'writeMemoryResult': {
-          const { requestId } = event.data;
+          const { requestId } = data;
           this._writeMemoryPending.get(requestId)?.resolve();
           this._writeMemoryPending.delete(requestId);
           break;
         }
         case 'writeMemoryError': {
-          const { requestId, error } = event.data;
+          const { requestId, error } = data;
           this._writeMemoryPending.get(requestId)?.reject(new Error(error));
           this._writeMemoryPending.delete(requestId);
           break;
