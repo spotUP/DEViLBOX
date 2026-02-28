@@ -467,6 +467,18 @@ export async function parseUADEFile(
         const { parseSidMon2File } = await import('./SidMon2Parser');
         return parseSidMon2File(buffer, filename, 0);
       },
+      'Mugician': async () => {
+        const { parseDigitalMugicianFile } = await import('./DigitalMugicianParser');
+        return parseDigitalMugicianFile(buffer, filename);
+      },
+      'MugicianII': async () => {
+        const { parseDigitalMugicianFile } = await import('./DigitalMugicianParser');
+        return parseDigitalMugicianFile(buffer, filename);
+      },
+      'Mugician II': async () => {
+        const { parseDigitalMugicianFile } = await import('./DigitalMugicianParser');
+        return parseDigitalMugicianFile(buffer, filename);
+      },
     };
     const route = NATIVE_ROUTES[fmt];
     if (route) {
@@ -504,8 +516,9 @@ export async function parseUADEFile(
   // enhanced scan cannot reliably extract. Force classic (UADE playback) for these.
   // NOTE: bare 'fc' is excluded here because .fc covers both FC 1.x (synthesis) and FC 2.0
   // (real PCM samples). FC 2.0 should get enhanced treatment; only FC 1.x is synthesis.
-  const SYNTHESIS_FORMATS = new Set([
-    'dmu', 'dmu2', 'mug', 'mug2',             // Digital Mugician variants
+  const SYNTHESIS_FORMATS = new Set<string>([
+    // Digital Mugician variants are now handled by NATIVE_ROUTES (parseDigitalMugicianFile).
+    // No synthesis-only formats remain that can't be natively parsed.
   ]);
   if (mode === 'enhanced' && SYNTHESIS_FORMATS.has(ext)) {
     console.warn(`[UADEParser] ${ext.toUpperCase()} uses synthesis waveforms; running per-channel isolated renders`);

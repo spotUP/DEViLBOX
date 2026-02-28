@@ -17,6 +17,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument, periodToNoteIndex } from './AmigaUtils';
 
 // -- SoundFX period table (from FlodJS FXPlayer.PERIODS) ---------------------
@@ -152,6 +153,11 @@ export async function parseSoundFXFile(
     numSampleSlots = 32;
     sampleTableOffset = 544; // v2.0 header is 544 bytes larger
   }
+
+  // -- Sample table base file offset (for uadeChipRam.instrBase computation) --
+  // v1: 16 slots * 4 bytes + 20-byte skip = 84
+  // v2: 32 slots * 4 bytes + 20-byte skip = 148
+  const sampleTableBase = numSampleSlots * 4 + 20;
 
   // -- Read tempo (2 bytes after magic) ---------------------------------------
   // For v1: tempo at offset 64, for v2: tempo at offset 128
@@ -324,17 +330,29 @@ export async function parseSoundFXFile(
       loopEnd = sample.repeat;
     }
 
-    instruments.push(
-      createSamplerInstrument(
-        i,
-        sample.name || `Sample ${i}`,
-        pcm,
-        sample.volume,
-        8287, // Standard Amiga C-3 sample rate
-        loopStart,
-        loopEnd,
-      ),
+    // Slot i (1-based) metadata sits at sampleTableBase + (i-1)*30 in the file.
+    // moduleBase=0 because UADE loads the SoundFX file at Amiga address 0x000000.
+    const chipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: buffer.byteLength,
+      instrBase: sampleTableBase + (i - 1) * 30,
+      instrSize: 30,
+      sections: {
+        sampleTable: sampleTableBase,
+      },
+    };
+
+    const instr = createSamplerInstrument(
+      i,
+      sample.name || `Sample ${i}`,
+      pcm,
+      sample.volume,
+      8287, // Standard Amiga C-3 sample rate
+      loopStart,
+      loopEnd,
     );
+    instr.uadeChipRam = chipRam;
+    instruments.push(instr);
   }
 
   // -- Build patterns ---------------------------------------------------------
