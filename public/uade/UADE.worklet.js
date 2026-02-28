@@ -218,6 +218,34 @@ class UADEProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: 'scanMemoryResult', requestId, addr: foundAddr });
         break;
       }
+
+      case 'readMemory': {
+        const { requestId, addr, length } = data;
+        try {
+          const ptr = this._wasm._malloc(length);
+          this._wasm._uade_wasm_read_memory(addr, ptr, length);
+          const result = new Uint8Array(this._wasm.HEAPU8.buffer, ptr, length).slice();
+          this._wasm._free(ptr);
+          this.port.postMessage({ type: 'readMemoryResult', requestId, data: result.buffer }, [result.buffer]);
+        } catch (e) {
+          this.port.postMessage({ type: 'readMemoryError', requestId, error: String(e) });
+        }
+        break;
+      }
+      case 'writeMemory': {
+        const { requestId, addr, data: writeData } = data;
+        try {
+          const bytes = new Uint8Array(writeData);
+          const ptr = this._wasm._malloc(bytes.length);
+          this._wasm.HEAPU8.set(bytes, ptr);
+          this._wasm._uade_wasm_write_memory(addr, ptr, bytes.length);
+          this._wasm._free(ptr);
+          this.port.postMessage({ type: 'writeMemoryResult', requestId });
+        } catch (e) {
+          this.port.postMessage({ type: 'writeMemoryError', requestId, error: String(e) });
+        }
+        break;
+      }
     }
   }
 
