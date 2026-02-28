@@ -604,6 +604,7 @@ function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum:
     name:     `Part ${partNum}`,
     channels: [channel],
     length:   PART_ROWS,
+    importMetadata: { sourceFormat: 'ML' as const },
   };
 }
 
