@@ -32,6 +32,7 @@ import type { CursorPosition } from '@typedefs';
 import { useCollaborationStore, getCollabClient } from '@stores/useCollaborationStore';
 // OffscreenCanvas + WebGL2 worker bridge
 import { TrackerOffscreenBridge } from '@engine/renderer/OffscreenBridge';
+import { reportSynthError } from '@stores/useSynthErrorStore';
 import type {
   PatternSnapshot,
   ThemeSnapshot,
@@ -1086,13 +1087,35 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     container.appendChild(canvas);
     canvasRef.current = canvas;
 
+    let readyReceived = false;
+    const readyTimeoutId = setTimeout(() => {
+      if (!readyReceived) {
+        reportSynthError(
+          'Tracker Worker',
+          'Pattern editor failed to start (no ready signal after 10 s). ' +
+          'Try reloading the page. If this persists, your browser may not support OffscreenCanvas WebGL2.',
+          { errorType: 'init', debugData: { offscreenCanvasSupported: true } },
+        );
+      }
+    }, 10_000);
+
     const bridge = new TrackerOffscreenBridge(TrackerWorkerFactory, {
       onReady: () => {
+        readyReceived = true;
+        clearTimeout(readyTimeoutId);
         // Worker is ready — send layout so it can start rendering
         bridge.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
       },
       onMessage: () => {
         // Future: handle click replies from worker (currently hit-tested on main thread)
+      },
+      onError: (err) => {
+        clearTimeout(readyTimeoutId);
+        reportSynthError(
+          'Tracker Worker',
+          err.message || 'Pattern editor worker crashed unexpectedly.',
+          { errorType: 'runtime', debugData: { filename: err.filename, lineno: err.lineno } },
+        );
       },
     });
     bridgeRef.current = bridge;
@@ -1186,6 +1209,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     return () => {
       cancelAnimationFrame(initRafId);
+      clearTimeout(readyTimeoutId);
       unsubTracker();
       unsubUI();
       unsubSettings();
