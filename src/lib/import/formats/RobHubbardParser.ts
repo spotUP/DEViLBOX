@@ -50,7 +50,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
-import type { RobHubbardConfig } from '@/types/instrument';
+import type { RobHubbardConfig, UADEChipRamInfo } from '@/types/instrument';
 import { DEFAULT_ROB_HUBBARD } from '@/types/instrument';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -202,12 +202,20 @@ function findSampleTable(buf: Uint8Array): { tableOffset: number; count: number 
  * because the exact synth parameters are encoded in 68k machine code and cannot
  * be extracted without emulation.
  */
+interface SampleBlobResult {
+  config: RobHubbardConfig;
+  /** File-relative byte offset of the start of this blob (the u32BE pcmLen field). */
+  blobOffset: number;
+  /** Total blob size in bytes: pcmLen + 6 (4-byte length + 2-byte header + PCM). */
+  blobSize: number;
+}
+
 function parseSampleBlobs(
   buf: Uint8Array,
   tableOffset: number,
   count: number,
-): RobHubbardConfig[] {
-  const configs: RobHubbardConfig[] = [];
+): SampleBlobResult[] {
+  const results: SampleBlobResult[] = [];
   let pos = tableOffset;
 
   for (let i = 0; i < count; i++) {
@@ -233,7 +241,7 @@ function parseSampleBlobs(
       sampleData[j] = byte >= 128 ? byte - 256 : byte;
     }
 
-    configs.push({
+    const config: RobHubbardConfig = {
       sampleLen:     pcmLen,
       loopOffset:    -1,    // no loop — loop info is encoded in 68k code
       sampleVolume:  sampleVolume || 64,
@@ -244,12 +252,14 @@ function parseSampleBlobs(
       loPos:         0,
       vibTable:      [],
       sampleData,
-    });
+    };
+
+    results.push({ config, blobOffset: pos, blobSize: pcmLen + 6 });
 
     pos += pcmLen + 6;
   }
 
-  return configs;
+  return results;
 }
 
 // ── Main parser ─────────────────────────────────────────────────────────────
@@ -266,12 +276,15 @@ function parseSampleBlobs(
  * Synth parameters that require 68k emulation (relative, divider, vibTable,
  * hiPos/loPos) are set to safe defaults.
  *
- * @param buffer   Raw file bytes (ArrayBuffer)
- * @param filename Original filename (used to derive module name)
+ * @param buffer     Raw file bytes (ArrayBuffer)
+ * @param filename   Original filename (used to derive module name)
+ * @param moduleBase Chip RAM address where UADE loaded this module (0 if unknown).
+ *                   Use UADEEngine.scanMemoryForMagic to resolve the real address.
  */
 export async function parseRobHubbardFile(
   buffer: ArrayBuffer,
   filename: string,
+  moduleBase = 0,
 ): Promise<TrackerSong> {
   if (!isRobHubbardFormat(buffer, filename)) {
     throw new Error('Not a Rob Hubbard module');
@@ -284,13 +297,13 @@ export async function parseRobHubbardFile(
   const moduleName = baseName.replace(/^rh\./i, '') || baseName;
 
   // ── Extract sample configs ────────────────────────────────────────────────
-  let extractedConfigs: RobHubbardConfig[] = [];
+  let blobResults: SampleBlobResult[] = [];
   const tableResult = findSampleTable(buf);
   if (tableResult !== null) {
-    extractedConfigs = parseSampleBlobs(buf, tableResult.tableOffset, tableResult.count);
+    blobResults = parseSampleBlobs(buf, tableResult.tableOffset, tableResult.count);
   }
 
-  const extractedCount = extractedConfigs.length;
+  const extractedCount = blobResults.length;
 
   // ── Build instrument list ─────────────────────────────────────────────────
   const instruments: InstrumentConfig[] = [];
@@ -298,16 +311,30 @@ export async function parseRobHubbardFile(
   for (let i = 0; i < MAX_INSTRUMENTS; i++) {
     if (i < extractedCount) {
       // Real PCM data extracted from the binary
-      const cfg = extractedConfigs[i];
+      const { config: cfg, blobOffset, blobSize } = blobResults[i];
+
+      // Blob layout: [u32BE pcmLen][u8 vol][u8 unused][pcmLen bytes PCM]
+      // The sampleVolume byte is at blobOffset+4 within the file.
+      const chipRam: UADEChipRamInfo = {
+        moduleBase,
+        moduleSize: buffer.byteLength,
+        instrBase:  moduleBase + blobOffset,
+        instrSize:  blobSize,
+        sections: {
+          sampleTable: moduleBase + (tableResult?.tableOffset ?? 0),
+        },
+      };
+
       instruments.push({
-        id:         i + 1,
-        name:       `Sample ${i + 1}`,
-        type:       'synth' as const,
-        synthType:  'RobHubbardSynth' as const,
-        effects:    [],
-        volume:     0,
-        pan:        0,
-        robHubbard: cfg,
+        id:          i + 1,
+        name:        `Sample ${i + 1}`,
+        type:        'synth' as const,
+        synthType:   'RobHubbardSynth' as const,
+        effects:     [],
+        volume:      0,
+        pan:         0,
+        robHubbard:  cfg,
+        uadeChipRam: chipRam,
       } as InstrumentConfig);
     } else {
       // Placeholder for unextracted slots (silent but correctly typed)

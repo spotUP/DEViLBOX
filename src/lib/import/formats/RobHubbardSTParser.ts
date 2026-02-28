@@ -46,7 +46,7 @@ export function isRobHubbardSTFormat(buffer: ArrayBuffer | Uint8Array): boolean 
   return true;
 }
 
-export function parseRobHubbardSTFile(buffer: ArrayBuffer, filename: string): TrackerSong {
+export function parseRobHubbardSTFile(buffer: ArrayBuffer, filename: string, _moduleBase = 0): TrackerSong {
   const buf = new Uint8Array(buffer);
   if (!isRobHubbardSTFormat(buf)) throw new Error('Not a Rob Hubbard ST module');
 

@@ -6,23 +6,35 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import type { RobHubbardConfig } from '@/types/instrument';
+import type { RobHubbardConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import { SequenceEditor, WaveformThumbnail } from '@components/instruments/shared';
+import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
+import { UADEEngine } from '@/engine/uade/UADEEngine';
 
 interface RobHubbardControlsProps {
   config: RobHubbardConfig;
   onChange: (updates: Partial<RobHubbardConfig>) => void;
+  /** Present when this instrument was loaded via UADE's native RobHubbard parser. */
+  uadeChipRam?: UADEChipRamInfo;
 }
 
 type RHTab = 'main' | 'vibwave' | 'sample';
 
-export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, onChange }) => {
+export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, onChange, uadeChipRam }) => {
   const [activeTab, setActiveTab] = useState<RHTab>('main');
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
+
+  const chipEditorRef = useRef<UADEChipEditor | null>(null);
+  const getEditor = useCallback(() => {
+    if (!chipEditorRef.current) {
+      chipEditorRef.current = new UADEChipEditor(UADEEngine.getInstance());
+    }
+    return chipEditorRef.current;
+  }, []);
 
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyan = currentThemeId === 'cyan-lineart';
@@ -34,7 +46,11 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
 
   const upd = useCallback(<K extends keyof RobHubbardConfig>(key: K, value: RobHubbardConfig[K]) => {
     onChange({ [key]: value } as Partial<RobHubbardConfig>);
-  }, [onChange]);
+    // Write sampleVolume (byte at blob+4) back to chip RAM when loaded via UADE.
+    if (key === 'sampleVolume' && uadeChipRam) {
+      void getEditor().writeBytes(uadeChipRam.instrBase + 4, new Uint8Array([value as number]));
+    }
+  }, [onChange, uadeChipRam, getEditor]);
 
   const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
     <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
@@ -255,6 +271,22 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
       {activeTab === 'main'    && renderMain()}
       {activeTab === 'vibwave' && renderVibwave()}
       {activeTab === 'sample'  && renderSample()}
+      {uadeChipRam && (
+        <div className="flex justify-end px-3 py-2 border-t border-opacity-30"
+          style={{ borderColor: dim }}>
+          <button
+            className="text-[10px] px-2 py-1 rounded opacity-70 hover:opacity-100 transition-colors"
+            style={{ background: 'rgba(60,40,100,0.4)', color: '#cc88ff' }}
+            onClick={() => void getEditor().exportModule(
+              uadeChipRam.moduleBase,
+              uadeChipRam.moduleSize,
+              'module.rh'
+            )}
+          >
+            Export .rh (Amiga)
+          </button>
+        </div>
+      )}
     </div>
   );
 };
