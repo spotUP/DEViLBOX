@@ -480,9 +480,9 @@ function App() {
       return;
     }
 
-    // .sunvox project files — replace project directly
+    // .sunvox project files — show import dialog (same pattern as audio/TD-3 files)
     if (/\.sunvox$/i.test(file.name)) {
-      await loadSongFile(file);
+      useUIStore.getState().setPendingSunVoxFile(file);
       return;
     }
 
