@@ -14,14 +14,12 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { useTrackerStore, useTransportStore, useAudioStore, useUIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useFPSMonitor } from '@/hooks/useFPSMonitor';
-import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
 import { notify } from '@stores/useNotificationStore';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton } from '../../components/PixiButton';
 import { PixiSelect, type SelectOption } from '../../components/PixiSelect';
-import { PixiNumericInput } from '../../components/PixiNumericInput';
 
 const BAR_H = 32;
 
@@ -62,23 +60,6 @@ const Sep: React.FC = () => {
       }}
       layout={{ width: 1, height: BAR_H }}
     />
-  );
-};
-
-// ─── Label+children section ──────────────────────────────────────────────────
-
-const Section: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => {
-  const theme = usePixiTheme();
-  return (
-    <pixiContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-      <pixiBitmapText
-        text={label}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
-        tint={theme.textMuted.color}
-        layout={{}}
-      />
-      {children}
-    </pixiContainer>
   );
 };
 
@@ -232,16 +213,10 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
     recordMode,
     showGhostPatterns,
     channelCount,
-    songLength,
-    patternLength,
-    resizePattern,
   } = useTrackerStore(useShallow(s => ({
     recordMode: s.recordMode,
     showGhostPatterns: s.showGhostPatterns,
     channelCount: s.patterns[s.currentPatternIndex]?.channels?.length || 4,
-    songLength: s.patternOrder.length,
-    patternLength: s.patterns[s.currentPatternIndex]?.length || 64,
-    resizePattern: s.resizePattern,
   })));
 
   // ── Transport store ───────────────────────────────────────────────────────
@@ -264,14 +239,9 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
   // ── UI store ──────────────────────────────────────────────────────────────
   const statusMessage = useUIStore(s => s.statusMessage);
-  const showAutoLanes = useUIStore(s => s.showAutomationLanes);
-  const showMacLanes = useUIStore(s => s.showMacroLanes);
-  const showMacSlots = useUIStore(s => s.showMacroSlots);
 
   // ── Groove ────────────────────────────────────────────────────────────────
   const grooveActive = grooveTemplateId !== 'straight' || swing !== (useMpcScale ? 50 : 100) || jitter > 0;
-  const grooveName = GROOVE_TEMPLATES.find(t => t.id === grooveTemplateId)?.name || 'Straight';
-  const grooveIndex = GROOVE_TEMPLATES.findIndex(t => t.id === grooveTemplateId);
 
   // ── Channel selector options ──────────────────────────────────────────────
   const channelOptions = useMemo<SelectOption[]>(
@@ -293,41 +263,6 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   const handleChannelChange = useCallback((val: string) => {
     setTimeout(() => onGridChannelChange(Number(val)), 0);
   }, [onGridChannelChange]);
-
-  const handleInsertPosition = useCallback(() => {
-    const { patternOrder, currentPositionIndex, setPatternOrder, setCurrentPosition } = useTrackerStore.getState();
-    const patIdx = patternOrder[currentPositionIndex] ?? 0;
-    const newOrder = [...patternOrder];
-    newOrder.splice(currentPositionIndex + 1, 0, patIdx);
-    setPatternOrder(newOrder);
-    setCurrentPosition(currentPositionIndex + 1);
-  }, []);
-
-  const handleDeletePosition = useCallback(() => {
-    const { patternOrder, currentPositionIndex, setPatternOrder, setCurrentPosition } = useTrackerStore.getState();
-    if (patternOrder.length <= 1) return;
-    const newOrder = [...patternOrder];
-    newOrder.splice(currentPositionIndex, 1);
-    setPatternOrder(newOrder);
-    if (currentPositionIndex >= newOrder.length) {
-      setCurrentPosition(newOrder.length - 1);
-    }
-  }, []);
-
-  const handleLengthChange = useCallback((newLength: number) => {
-    if (newLength >= 1 && newLength <= 256) {
-      resizePattern(useTrackerStore.getState().currentPatternIndex, newLength);
-    }
-  }, [resizePattern]);
-
-  const handlePatternLengthPreset = useCallback((preset: number) => {
-    resizePattern(useTrackerStore.getState().currentPatternIndex, preset);
-  }, [resizePattern]);
-
-  const handleCycleGroove = useCallback((delta: number) => {
-    const newIndex = ((grooveIndex + delta) % GROOVE_TEMPLATES.length + GROOVE_TEMPLATES.length) % GROOVE_TEMPLATES.length;
-    useTransportStore.getState().setGrooveTemplate(GROOVE_TEMPLATES[newIndex].id);
-  }, [grooveIndex]);
 
   const handleToggleRecord = useCallback(() => {
     useTrackerStore.getState().toggleRecordMode();
@@ -351,16 +286,8 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
     useUIStore.getState().openModal('grooveSettings');
   }, []);
 
-  const handleToggleAutoLanes = useCallback(() => {
-    useUIStore.getState().toggleAutomationLanes();
-  }, []);
-
-  const handleToggleMacroLanes = useCallback(() => {
-    useUIStore.getState().toggleMacroLanes();
-  }, []);
-
-  const handleToggleMacroSlots = useCallback(() => {
-    useUIStore.getState().toggleMacroSlots();
+  const handleShowAutoEditor = useCallback(() => {
+    useUIStore.getState().openModal('automation');
   }, []);
 
   const handleShowDrumpads = useCallback(() => {
@@ -430,59 +357,6 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
       <Sep />
 
-      {/* Song Length + Insert/Delete */}
-      <Section label="SONG">
-        <pixiBitmapText
-          text={String(songLength)}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
-          tint={theme.textSecondary.color}
-          layout={{}}
-        />
-      </Section>
-      <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
-        <PixiButton label="INS" variant="ghost" size="sm" onClick={handleInsertPosition} />
-        <PixiButton label="DEL" variant="ghost" size="sm" onClick={handleDeletePosition} />
-      </pixiContainer>
-
-      <Sep />
-
-      {/* Pattern Length */}
-      <Section label="LEN">
-        <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
-          <PixiNumericInput
-            value={patternLength}
-            min={1}
-            max={256}
-            onChange={handleLengthChange}
-            width={44}
-          />
-          <PixiButton label="16"  variant="ghost" size="sm" onClick={() => handlePatternLengthPreset(16)} />
-          <PixiButton label="32"  variant="ghost" size="sm" onClick={() => handlePatternLengthPreset(32)} />
-          <PixiButton label="64"  variant="ghost" size="sm" onClick={() => handlePatternLengthPreset(64)} />
-          <PixiButton label="128" variant="ghost" size="sm" onClick={() => handlePatternLengthPreset(128)} />
-        </pixiContainer>
-      </Section>
-
-      <Sep />
-
-      {/* Groove */}
-      <Section label="GRV">
-        <pixiContainer layout={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
-          <PixiButton label="<" variant="ghost" size="sm" onClick={() => handleCycleGroove(-1)} />
-          <PixiButton
-            label={grooveName}
-            variant={grooveActive ? 'ft2' : 'ghost'}
-            color={grooveActive ? 'blue' : undefined}
-            size="sm"
-            active={grooveActive}
-            onClick={handleGrooveSettings}
-          />
-          <PixiButton label=">" variant="ghost" size="sm" onClick={() => handleCycleGroove(1)} />
-        </pixiContainer>
-      </Section>
-
-      <Sep />
-
       {/* Ghost Patterns — only in tracker view */}
       <PixiButton
         label="Ghosts"
@@ -494,13 +368,21 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
       />
 
-      {/* Edit — advanced pattern operations (tracker view only) */}
+      {/* Auto — opens automation editor (tracker view only) */}
       <PixiButton
-        label="Edit"
+        label="Auto"
         variant="ghost"
         size="sm"
-        onClick={() => useUIStore.getState().openModal('advancedEdit')}
+        onClick={handleShowAutoEditor}
         layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
+      />
+
+      {/* Pads */}
+      <PixiButton
+        label="Pads"
+        variant="ghost"
+        size="sm"
+        onClick={handleShowDrumpads}
       />
 
       {/* REC button */}
@@ -520,6 +402,8 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         size="sm"
         onClick={handleRecSettings}
       />
+
+      <Sep />
 
       {/* Master Mute */}
       <PixiButton
@@ -541,38 +425,14 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         onClick={handleToggleSmooth}
       />
 
-      <Sep />
-
-      {/* Overlay toggles */}
+      {/* Groove — single button matching DOM EditorControlsBar */}
       <PixiButton
-        label="Auto"
-        variant={showAutoLanes ? 'ft2' : 'ghost'}
-        color={showAutoLanes ? 'blue' : undefined}
+        label="GROOVE"
+        variant={grooveActive ? 'ft2' : 'ghost'}
+        color={grooveActive ? 'blue' : undefined}
         size="sm"
-        active={showAutoLanes}
-        onClick={handleToggleAutoLanes}
-      />
-      <PixiButton
-        label="Macro"
-        variant={showMacLanes ? 'ft2' : 'ghost'}
-        color={showMacLanes ? 'blue' : undefined}
-        size="sm"
-        active={showMacLanes}
-        onClick={handleToggleMacroLanes}
-      />
-      <PixiButton
-        label="Slots"
-        variant={showMacSlots ? 'ft2' : 'ghost'}
-        color={showMacSlots ? 'blue' : undefined}
-        size="sm"
-        active={showMacSlots}
-        onClick={handleToggleMacroSlots}
-      />
-      <PixiButton
-        label="Pads"
-        variant="ghost"
-        size="sm"
-        onClick={handleShowDrumpads}
+        active={grooveActive}
+        onClick={handleGrooveSettings}
       />
 
       {/* Spacer */}
