@@ -2963,6 +2963,17 @@ export interface InstrumentMetadata {
   displayType?: string;
   /** MusicLine Editor waveform synth config (smplType > 0) — triggers synth editor instead of sample editor */
   mlSynthConfig?: { waveformType: number; volume: number };
+  /** Raw .ml file bytes — set when loading a whole MusicLine song (song mode) */
+  mlSongData?: Uint8Array;
+  /** 0-based instrument index within the loaded .ml file (preview mode) */
+  mlInstIdx?: number;
+  /** Richard Joseph (.rjp / .sng) sample metadata stored by RichardJosephParser */
+  rjpSample?: {
+    loopStart: number;
+    loopSize: number;
+    hasLoop: boolean;
+    lengthBytes: number;
+  };
 }
 
 // Import beat slicer types
