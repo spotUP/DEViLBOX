@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import type { ScrollListProps } from './types';
 
 export const DOMScrollList: React.FC<ScrollListProps> = ({
@@ -11,6 +11,13 @@ export const DOMScrollList: React.FC<ScrollListProps> = ({
 }) => {
   const lastClickRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll selected item into view when selection changes
+  useEffect(() => {
+    if (!selectedId || !containerRef.current) return;
+    const el = containerRef.current.querySelector('[aria-selected="true"]') as HTMLElement | null;
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [selectedId]);
 
   const handleClick = useCallback((id: string) => {
     const now = Date.now();
@@ -43,6 +50,7 @@ export const DOMScrollList: React.FC<ScrollListProps> = ({
     <div
       ref={containerRef}
       role="listbox"
+      tabIndex={0}
       onKeyDown={handleContainerKeyDown}
       style={{
         height,
