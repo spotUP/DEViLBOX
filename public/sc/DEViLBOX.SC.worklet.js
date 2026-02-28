@@ -62,6 +62,9 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
 
       case 'dispose':
         this._ready = false;
+        // Note: globalThis.Module is not torn down — a second 'init' message
+        // after dispose would corrupt the onRuntimeInitialized callback chain.
+        // The worklet is designed to be initialized once per AudioContext lifetime.
         break;
     }
   }
@@ -69,7 +72,7 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
   async _init(jsCode, wasmBinary, initSampleRate, blockSize) {
     try {
       const sr = initSampleRate || sampleRate || 44100;
-      this._blockSize = blockSize;
+      this._blockSize = blockSize; // Temporary default; overwritten below from adFinal.bufSize
 
       // ---- Emscripten environment polyfills ----
       // AudioWorkletGlobalScope has no window/document/importScripts.
@@ -169,7 +172,8 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
       const M = globalThis.Module;
       M.noInitialRun = true;
       M.wasmBinary = wasmBinary;
-      // Provide a locateFile override so SC.js doesn't try to fetch .wasm
+      // Fallback only — wasmBinary above already provides the binary directly,
+      // so Emscripten never calls locateFile in practice. Kept as a safety net.
       M.locateFile = (path) => {
         if (path.endsWith('.wasm')) return '/sc/SC.wasm';
         return path;
@@ -322,6 +326,12 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
 
       this._blockSize = adFinal.bufSize || blockSize;
       this._floatBufOut = adFinal.floatBufOut;
+      if (!this._floatBufOut || this._floatBufOut.length < NUM_OUT_CHANNELS) {
+        throw new Error(
+          'Module.audioDriver.floatBufOut missing or wrong channel count after callMain — ' +
+          'ASM_CONSTS[84155] did not initialize output buffers'
+        );
+      }
 
       // ---- Get the WaDriver embind object ----
       if (typeof M.audio_driver !== 'function') {
@@ -371,7 +381,12 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
    * @param {ArrayBuffer|Uint8Array} oscPacket - Raw OSC bytes
    */
   _sendOsc(oscPacket) {
-    if (!this._ready || !this._oscEndpoint) return;
+    if (!this._ready || !this._oscEndpoint) {
+      if (typeof console !== 'undefined') {
+        console.warn('[DEViLBOX.SC] OSC packet dropped — worklet not ready');
+      }
+      return;
+    }
     try {
       const bytes = oscPacket instanceof Uint8Array ? oscPacket : new Uint8Array(oscPacket);
       // receive(srcAddr, data): srcAddr=0 means localhost/self
