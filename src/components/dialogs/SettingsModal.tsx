@@ -15,6 +15,8 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { useAudioStore } from '@stores/useAudioStore';
 import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
+import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { startTilt, stopTilt } from '@/pixi/workbench/WorkbenchTilt';
 
 const KEYBOARD_SCHEMES = [
   { id: 'fasttracker2', name: 'FastTracker 2', description: 'Classic FT2 layout (DOS/PC) - from ft2-clone source' },
@@ -78,6 +80,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   } = useTrackerStore();
 
   const { activeScheme, setActiveScheme, platformOverride, setPlatformOverride } = useKeyboardStore();
+
+  const isTilted  = useWorkbenchStore((s) => s.isTilted);
+  const setTilted = useWorkbenchStore((s) => s.setTilted);
+
+  const handle3DToggle = (enabled: boolean) => {
+    if (enabled) {
+      setTilted(true);
+      startTilt();
+    } else {
+      stopTilt(() => setTilted(false));
+    }
+  };
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
@@ -232,6 +246,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   </select>
                 </div>
               )}
+            </div>
+          </section>
+
+          {/* Workbench Section */}
+          <section>
+            <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">WORKBENCH</h3>
+            <div className="space-y-3">
+              {/* 3D Tilt */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">3D Tilt:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Perspective tilt with mouse parallax</span>
+                </div>
+                <Toggle
+                  label=""
+                  value={isTilted}
+                  onChange={handle3DToggle}
+                  size="sm"
+                />
+              </div>
+
+              {/* Keyboard hints */}
+              <div className="text-[9px] text-ft2-textDim font-mono leading-tight pt-1 border-t border-ft2-border/30">
+                <span className="text-ft2-highlight">Tab</span> — hold for Exposé (fit all windows) · release to restore
+              </div>
             </div>
           </section>
 

@@ -353,7 +353,7 @@ export const useSettingsStore = create<SettingsStore>()(
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
       trackerVisualBg: false,  // Default: off
       trackerVisualMode: 0,    // Default: spectrum bars
-      renderMode: 'dom' as const,  // Default: DOM rendering
+      renderMode: 'webgl' as const,  // Default: WebGL/workbench rendering
 
     // Actions
     setAmigaLimits: (amigaLimits) =>
@@ -423,8 +423,15 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 1,
-      migrate: (persistedState) => persistedState ?? {},
+      version: 2,
+      migrate: (persistedState: unknown, version: number) => {
+        const s = (persistedState ?? {}) as Record<string, unknown>;
+        if (version < 2) {
+          // v2: workbench becomes the default UI
+          s.renderMode = 'webgl';
+        }
+        return s;
+      },
       // Deep-merge formatEngine so new keys added after initial save get their
       // default values rather than being undefined in existing localStorage data.
       merge: (persisted, current) => {
@@ -432,6 +439,8 @@ export const useSettingsStore = create<SettingsStore>()(
         return {
           ...current,
           ...p,
+          // Always use the hardcoded default for renderMode — never restore from storage
+          renderMode: current.renderMode,
           formatEngine: {
             ...current.formatEngine,
             ...(p.formatEngine ?? {}),
@@ -451,7 +460,7 @@ export const useSettingsStore = create<SettingsStore>()(
         midiPolyphonic: state.midiPolyphonic,
         trackerVisualBg: state.trackerVisualBg,
         trackerVisualMode: state.trackerVisualMode,
-        renderMode: state.renderMode,
+        // renderMode intentionally not persisted — always start in webgl/workbench mode
       }),
     }
   )
