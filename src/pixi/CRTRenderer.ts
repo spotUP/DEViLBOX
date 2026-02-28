@@ -251,6 +251,7 @@ export class CRTRenderer {
     this.mesh = new Mesh({ geometry, shader });
     this.mesh.renderable = false;  // hidden until renderFrame() is called
     this.mesh.zIndex = 10000;      // above WorkbenchTilt (9000) and all other layers
+    this.mesh.eventMode = 'none';  // pass-through: clicks reach the scene behind the mesh
     app.stage.addChild(this.mesh);
   }
 
@@ -280,16 +281,15 @@ export class CRTRenderer {
     u.uCurvature.value         = params.curvature;
     u.uFlickerStrength.value   = params.flickerStrength;
 
-    // 3. Hide scene from screen render; show CRT mesh.
-    //    visible stays true → EventSystem still delivers pointer events.
-    this.sceneContainer.renderable = false;
+    // 3. Show CRT mesh. Scene stays renderable so PixiJS EventSystem still
+    //    delivers pointer events (hitTestRecursive checks renderable in v8).
+    //    The scene renders to screen behind the mesh but is fully covered by it.
     this.mesh.renderable = true;
   }
 
-  /** Restore normal rendering (no CRT). Safe to call every tick when disabled. */
+  /** Restore normal rendering (no CRT). */
   setEnabled(enabled: boolean): void {
     if (!enabled) {
-      this.sceneContainer.renderable = true;
       this.mesh.renderable = false;
     }
   }
