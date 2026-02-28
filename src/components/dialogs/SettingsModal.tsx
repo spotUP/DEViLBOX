@@ -749,10 +749,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
           {/* Info Section */}
           <section className="pt-4 border-t border-ft2-border">
-            <div className="text-ft2-textDim text-[10px] font-mono space-y-1">
+            <div className="text-ft2-textDim text-[10px] font-mono space-y-1 mb-4">
               <div>DEViLBOX v1.0.0</div>
               <div>TB-303 Acid Tracker</div>
               <div className="text-ft2-highlight">Settings are saved automatically</div>
+            </div>
+            <div>
+              <h3 className="text-ft2-highlight text-xs font-bold mb-2 tracking-wide">DANGER ZONE</h3>
+              <p className="text-ft2-textDim text-[9px] font-mono mb-2">
+                If the app fails to load or behaves unexpectedly, clearing all local state will reset it to factory defaults.
+                Your project will be lost if not exported first.
+              </p>
+              <button
+                onClick={() => {
+                  if (!confirm('Clear all app state and reload? This will delete your unsaved project and all settings.')) return;
+                  navigator.serviceWorker.getRegistrations()
+                    .then(regs => Promise.all(regs.map(r => r.unregister())))
+                    .then(() => caches.keys())
+                    .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+                    .then(() => { localStorage.clear(); return indexedDB.databases(); })
+                    .then(dbs => Promise.all(dbs.map(db => indexedDB.deleteDatabase(db.name!))))
+                    .then(() => location.reload());
+                }}
+                className="px-3 py-1.5 bg-transparent border border-red-700 text-red-500 text-[10px] font-mono hover:bg-red-900/30 transition-colors focus:outline-none"
+              >
+                CLEAR ALL STATE &amp; RELOAD
+              </button>
             </div>
           </section>
         </div>
