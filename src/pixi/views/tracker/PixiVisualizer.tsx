@@ -117,11 +117,11 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
 
   // Memoized layout objects for prop-dependent values (width/height change infrequently)
   const layoutContainer = useMemo(
-    () => ({ width, height, justifyContent: 'center', alignItems: 'center' }),
+    () => ({ width, height, justifyContent: 'center' as const, alignItems: 'center' as const }),
     [width, height]
   );
   const layoutFill = useMemo(
-    () => ({ position: 'absolute', width, height }),
+    () => ({ position: 'absolute' as const, width, height }),
     [width, height]
   );
 
