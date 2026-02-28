@@ -208,6 +208,7 @@ export type SynthType =
   | 'OctaMEDSynth'   // OctaMED SynthInstr (vol/wf command table oscillator)
   | 'DavidWhittakerSynth' // David Whittaker (Amiga period-based frq/vol sequence synthesis)
   | 'SymphonieSynth'  // Symphonie / Symphonie Pro (native AudioWorklet replayer)
+  | 'MusicLineSynth'  // MusicLine Editor (WASM replayer)
   // SunVox modular synthesizer
   | 'SunVoxSynth'     // SunVox WASM patch player (.sunsynth / .sunvox)
   // Modular Synthesis

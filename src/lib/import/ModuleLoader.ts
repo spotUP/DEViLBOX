@@ -452,6 +452,17 @@ export function getSupportedExtensions(): string[] {
     '.c67',            // CDFM Composer 670
     '.667',            // Composer 667
     '.fmt',            // FM Tracker (Davey W Taylor)
+    // ── Native parsers with previously missing extension registration ────────
+    '.dtm',            // Digital Tracker
+    '.etx',            // EasyTrax
+    '.is10',           // InStereo! 1.0
+    '.plm',            // Disorder Tracker 2
+    '.qc',             // Quadra Composer
+    '.rk', '.rkb',     // Ron Klaren
+    '.rtm',            // Reality Tracker
+    '.tfx',            // TFMX (alternate extension)
+    '.uax',            // Unreal Audio Package
+    '.xmf',            // Astroidea XMF (Imperium Galactica)
     // ── Compressed/Packed formats ───────────────────────────────────────────
     '.zip', '.lha', '.rar', '.gz', '.mmcmp', '.xpk', '.pp', '.pack',
     // ── Chip-dump / CPU-code formats ────────────────────────────────────────

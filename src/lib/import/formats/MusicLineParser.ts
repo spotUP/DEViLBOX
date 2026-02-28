@@ -403,7 +403,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   // of whichever PART each channel's track table points to.
   const song: TrackerSong = {
     name: songTitle || 'MusicLine Song',
-    format: 'MOD' as const,
+    format: 'ML' as const,
     patterns,
     instruments,
     songPositions,
@@ -419,6 +419,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   };
 
 
+  song.musiclineFileData = data.slice(0);
   return song;
 }
 
