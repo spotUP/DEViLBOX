@@ -321,10 +321,13 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
       const rleStart = dataStart + 2;
       const rleLen = chunkSize - 2;
 
-      const decompressed = decompressPart(data, rleStart, rleLen);
+      const { out: decompressed, consumed: rleConsumed } = decompressPart(data, rleStart, rleLen);
       partDataMap.set(partNumber, decompressed);
 
-      pos = dataStart + chunkSize;
+      // CRITICAL: Some ML files store incorrect chunk sizes in the PART header.
+      // Use actual bytes consumed by the RLE decompressor, not the declared size.
+      // This matches the C++ reference (module.cpp: ptr tracks actual position).
+      pos = rleStart + rleConsumed;
 
     } else if (chunkId === CHUNK_ARPG) {
       // ARPG: 2-byte arpeggio number + arpeggio data — skip for now
@@ -504,7 +507,7 @@ function parseChnlData(data: Uint8Array, offset: number, byteCount: number): Chn
  *
  * Output: 128 rows × 6 cols × 2 bytes = 1536 bytes, zero-initialized.
  */
-function decompressPart(data: Uint8Array, srcOffset: number, srcLen: number): Uint8Array {
+function decompressPart(data: Uint8Array, srcOffset: number, srcLen: number): { out: Uint8Array; consumed: number } {
   const out = new Uint8Array(PART_FULL_SIZE); // zero-initialized
   let src = srcOffset;
   const srcEnd = srcOffset + srcLen;
@@ -531,7 +534,7 @@ function decompressPart(data: Uint8Array, srcOffset: number, srcLen: number): Ui
     }
   }
 
-  return out;
+  return { out, consumed: src - srcOffset };
 }
 
 // ── Build Pattern from decompressed PART data ─────────────────────────────
@@ -627,23 +630,33 @@ function createEmptyCell(): TrackerCell {
 /**
  * Map a MusicLine effect number + parameter to XM-compatible effTyp/eff.
  *
- * From Mline116.asm line 3494 help text and FX_JumpTable:
- *   1 = SlideUp          → XM 0x01 Portamento up
- *   2 = SlideDown        → XM 0x02 Portamento down
- *   3 = SetVolume        → XM 0x0C Set volume (parameter 0x00–0x40)
- *   4 = VolumeSlideUp    → XM 0x0A Volume slide (hi nibble = up)
- *   5 = VolumeSlideDown  → XM 0x0A Volume slide (lo nibble = down)
- *   6 = Restart          → XM 0x0B Pattern jump (to position 0 = restart)
+ * Effect numbers from enums.h (musicline_playback-main reference):
+ *   0x01 = fx_SlideUp          → XM 0x01 Portamento up
+ *   0x02 = fx_SlideDown        → XM 0x02 Portamento down
+ *   0x03 = fx_Portamento       → XM 0x03 Tone portamento
+ *   0x04 = fx_InitInstPortamento (ignore — instrument-level portamento init)
+ *   0x05 = fx_PitchUp          → XM 0x01 Portamento up (pitch step)
+ *   0x06 = fx_PitchDown        → XM 0x02 Portamento down (pitch step)
+ *   0x10 = fx_Volume           → XM 0x0C Set volume (0x00–0x40)
+ *   0x11 = fx_VolumeSlideUp    → XM 0x0A Volume slide (hi nibble = up speed)
+ *   0x12 = fx_VolumeSlideDown  → XM 0x0A Volume slide (lo nibble = down speed)
+ *   0x40 = fx_SpeedPart        → XM 0x0F Speed (ticks per row for this channel)
+ *   0x42 = fx_SpeedAll         → XM 0x0F Tempo (global BPM / speed)
  */
 function mapMLEffect(effectNum: number, effectPar: number): { effTyp: number; eff: number } {
   switch (effectNum) {
-    case 1: return { effTyp: 0x01, eff: effectPar };                       // Slide up
-    case 2: return { effTyp: 0x02, eff: effectPar };                       // Slide down
-    case 3: return { effTyp: 0x0C, eff: effectPar };                       // Set volume (0x00–0x40)
-    case 4: return { effTyp: 0x0A, eff: (effectPar & 0x0F) << 4 };        // Volume slide up
-    case 5: return { effTyp: 0x0A, eff: effectPar & 0x0F };               // Volume slide down
-    case 6: return { effTyp: 0x0B, eff: 0 };                              // Restart = jump to pos 0
-    default: return { effTyp: 0, eff: 0 };
+    case 0x01: return { effTyp: 0x01, eff: effectPar };                    // SlideUp → portamento up
+    case 0x02: return { effTyp: 0x02, eff: effectPar };                    // SlideDown → portamento down
+    case 0x03: return { effTyp: 0x03, eff: effectPar };                    // Portamento → tone portamento
+    case 0x04: return { effTyp: 0, eff: 0 };                              // InitInstPortamento (ignore)
+    case 0x05: return { effTyp: 0x01, eff: effectPar };                    // PitchUp → portamento up
+    case 0x06: return { effTyp: 0x02, eff: effectPar };                    // PitchDown → portamento down
+    case 0x10: return { effTyp: 0x0C, eff: effectPar };                    // Volume → set volume (0x00–0x40)
+    case 0x11: return { effTyp: 0x0A, eff: (effectPar & 0x0F) << 4 };     // VolumeSlideUp
+    case 0x12: return { effTyp: 0x0A, eff: effectPar & 0x0F };            // VolumeSlideDown
+    case 0x40: return { effTyp: 0x0F, eff: effectPar };                    // SpeedPart → speed
+    case 0x42: return { effTyp: 0x0F, eff: effectPar };                    // SpeedAll → speed/tempo
+    default:   return { effTyp: 0, eff: 0 };
   }
 }
 
