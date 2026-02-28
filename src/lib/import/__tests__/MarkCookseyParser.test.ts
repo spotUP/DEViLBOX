@@ -28,6 +28,9 @@ describe('isMarkCookseyFormat', () => {
   it('rejects zeroed buffer', () => {
     expect(isMarkCookseyFormat(new ArrayBuffer(64))).toBe(false);
   });
+  it('rejects a buffer that is too short', () => {
+    expect(isMarkCookseyFormat(new ArrayBuffer(8))).toBe(false);
+  });
 });
 
 describe('parseMarkCookseyFile — commando.mc', () => {
@@ -41,6 +44,28 @@ describe('parseMarkCookseyFile — commando.mc', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
+
+  it('creates 64 placeholder instruments (MAX_SAMPLES per InfoBuffer)', async () => {
+    const song = await parseMarkCookseyFile(loadBuf(FILE1), 'commando.mc');
+    // MI_MaxSamples = 64 per the assembly InfoBuffer declaration
+    expect(song.instruments).toHaveLength(64);
+  });
+
+  it('names instruments Sample 1..N (no names in format)', async () => {
+    const song = await parseMarkCookseyFile(loadBuf(FILE1), 'commando.mc');
+    expect(song.instruments[0].name).toBe('Sample 1');
+    expect(song.instruments[63].name).toBe('Sample 64');
+  });
+
+  it('has 4 channels', async () => {
+    const song = await parseMarkCookseyFile(loadBuf(FILE1), 'commando.mc');
+    expect(song.numChannels).toBe(4);
+  });
+
+  it('derives module name from filename', async () => {
+    const song = await parseMarkCookseyFile(loadBuf(FILE1), 'commando.mc');
+    expect(song.name).toContain('commando');
+  });
 });
 
 describe('parseMarkCookseyFile — mco.a question of sport', () => {
@@ -53,5 +78,10 @@ describe('parseMarkCookseyFile — mco.a question of sport', () => {
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
+  });
+
+  it('creates 64 placeholder instruments', async () => {
+    const song = await parseMarkCookseyFile(loadBuf(FILE2), 'mco.a question of sport');
+    expect(song.instruments).toHaveLength(64);
   });
 });

@@ -11,6 +11,8 @@ const REF = resolve(import.meta.dirname, '../../../../Reference Music');
 const DL_DIR = resolve(REF, 'Dave Lowe/Dave Lowe');
 const FILE1 = resolve(DL_DIR, 'afterburner.dl');
 const FILE2 = resolve(DL_DIR, 'altered beast.dl');
+const FILE_BANGKOK = resolve(DL_DIR, 'bangkok knights.dl');
+const FILE_GHOSTBUSTERS = resolve(DL_DIR, 'ghostbusters2 jingle.dl');
 
 function loadBytes(p: string): Uint8Array {
   return new Uint8Array(readFileSync(p));
@@ -44,6 +46,28 @@ describe('parseDaveLoweFile — afterburner.dl', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
+
+  it('extracts embedded title "After Burner" from offset 0x70', async () => {
+    const song = await parseDaveLoweFile(loadBuf(FILE1), 'afterburner.dl');
+    // Embedded title at 0x70 should override the filename-derived name
+    expect(song.name).toContain('After Burner');
+  });
+
+  it('creates 8 placeholder instruments', async () => {
+    const song = await parseDaveLoweFile(loadBuf(FILE1), 'afterburner.dl');
+    expect(song.instruments).toHaveLength(8);
+  });
+
+  it('names instruments Sample 1..N (no names in format)', async () => {
+    const song = await parseDaveLoweFile(loadBuf(FILE1), 'afterburner.dl');
+    expect(song.instruments[0].name).toBe('Sample 1');
+    expect(song.instruments[7].name).toBe('Sample 8');
+  });
+
+  it('has 4 channels', async () => {
+    const song = await parseDaveLoweFile(loadBuf(FILE1), 'afterburner.dl');
+    expect(song.numChannels).toBe(4);
+  });
 });
 
 describe('parseDaveLoweFile — altered beast.dl', () => {
@@ -56,5 +80,19 @@ describe('parseDaveLoweFile — altered beast.dl', () => {
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
+  });
+});
+
+describe('parseDaveLoweFile — bangkok knights.dl', () => {
+  it('extracts embedded title "Bangkok Knights"', async () => {
+    const song = await parseDaveLoweFile(loadBuf(FILE_BANGKOK), 'bangkok knights.dl');
+    expect(song.name).toContain('Bangkok Knights');
+  });
+});
+
+describe('parseDaveLoweFile — ghostbusters2 jingle.dl', () => {
+  it('extracts embedded title "Ghostbusters II jingle"', async () => {
+    const song = await parseDaveLoweFile(loadBuf(FILE_GHOSTBUSTERS), 'ghostbusters2 jingle.dl');
+    expect(song.name).toContain('Ghostbusters II jingle');
   });
 });
