@@ -4,7 +4,7 @@
  * Feature parity with the DOM InstrumentList (preset/edit/drag) is deferred.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { ScrollList } from '../../../ui/components/ScrollList';
 import type { ScrollListItem } from '../../../ui/components/ScrollList';
@@ -19,11 +19,13 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
   const currentId   = useInstrumentStore((s) => s.currentInstrumentId);
   const select      = useInstrumentStore((s) => s.setCurrentInstrument);
 
-  const items: ScrollListItem[] = instruments.map((inst) => ({
-    id: String(inst.id),
-    label: inst.name || `Instrument ${inst.id}`,
-    sublabel: inst.synthType,
-  }));
+  const items = useMemo<ScrollListItem[]>(() =>
+    instruments.map((inst) => ({
+      id: String(inst.id),
+      label: inst.name || `Instrument ${inst.id}`,
+      sublabel: inst.synthType,
+    })),
+  [instruments]);
 
   const handleSelect = useCallback((id: string) => {
     select(Number(id));
@@ -36,7 +38,6 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
       onSelect={handleSelect}
       height={height}
       width={width}
-      layout={{ width, height }}
     />
   );
 };
