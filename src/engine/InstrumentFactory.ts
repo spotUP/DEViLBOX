@@ -295,18 +295,18 @@ export class InstrumentFactory {
     'Furnace': 0,          // Generic Furnace - WASM dispatcher, no chip-specific output
     // Furnace FM chips - recalibrated 2026-02-13 via browser test runner
     'FurnaceOPN': 7,       // Measured: -10.0dB → on target
-    'FurnaceOPM': 2,       // Measured: -10.1dB → on target
-    'FurnaceOPL': 10,      // Measured: -9.5dB → on target
-    'FurnaceOPLL': 12,     // Measured: variable (-10 to -34dB), using conservative +12
-    'FurnaceESFM': 19,     // Measured: -28.6dB → need +19dB
+    'FurnaceOPM': -6,      // Recalibrated 2026-02-28
+    'FurnaceOPL': 2,       // Recalibrated 2026-02-28
+    'FurnaceOPLL': 1,      // Recalibrated 2026-02-28
+    'FurnaceESFM': 5,      // Recalibrated 2026-02-28
     'FurnaceOPZ': -14,     // Measured: +3.8dB → need -14dB
-    'FurnaceOPNA': 6,      // Measured: -15.7dB → need +6dB
-    'FurnaceOPNB': 7,      // Measured: -17.4dB → need +7dB
-    'FurnaceOPL4': 9,      // Measured: -18.6dB → need +9dB
-    'FurnaceY8950': 9,     // Measured: -18.7dB → need +9dB
-    'FurnaceVRC7': 8,      // Measured: variable (-9 to -26dB), using conservative +8
-    'FurnaceOPN2203': -3,  // Measured: -7.5dB → need -3dB
-    'FurnaceOPNBB': 2,     // Measured: -9.5dB → on target
+    'FurnaceOPNA': -11,    // Recalibrated 2026-02-28
+    'FurnaceOPNB': -10,    // Recalibrated 2026-02-28
+    'FurnaceOPL4': -8,     // Recalibrated 2026-02-28
+    'FurnaceY8950': -5,    // Recalibrated 2026-02-28
+    'FurnaceVRC7': -6,     // Recalibrated 2026-02-28
+    'FurnaceOPN2203': -23, // Recalibrated 2026-02-28
+    'FurnaceOPNBB': -21,   // Recalibrated 2026-02-28
     // Furnace Dispatch chips - recalibrated 2026-02-13 via browser test runner
     'FurnaceNES': 7,       // Measured: -9.8dB → on target
     'FurnaceGB': 4,        // Measured: -9.6dB → on target
@@ -323,9 +323,9 @@ export class InstrumentFactory {
     'FurnaceGBA': -10,     // Measured: -10.0dB → on target
     'FurnaceNDS': 3,       // Measured: -8.6dB → on target
     'FurnacePOKEMINI': -10, // Measured: -10.0dB → on target
-    'FurnaceC64': 6,       // Measured: -11.1dB → on target
-    'FurnaceSID6581': 6,   // Measured: -11.1dB → on target
-    'FurnaceSID8580': 6,   // Measured: -11.1dB → on target
+    'FurnaceC64': 16,      // Recalibrated 2026-02-28
+    'FurnaceSID6581': 16,  // Recalibrated 2026-02-28
+    'FurnaceSID8580': 17,  // Recalibrated 2026-02-28
     'FurnaceAY': 3,        // Measured: -9.0dB → on target
     'FurnaceAY8930': 25,   // Measured: -32.4dB → need +22dB
     'FurnaceVIC': -1,      // Measured: -6.4dB → need -4dB (was +3, overcorrected)
@@ -334,32 +334,32 @@ export class InstrumentFactory {
     'FurnaceVERA': 14,     // Measured: -13.4dB → need +3dB
     'FurnaceSCC': 9,       // Measured: -9.7dB → on target
     'FurnaceTIA': -7,      // Measured: -10.4dB → on target
-    'FurnaceAMIGA': 15,    // Measured: -21.6dB → need +12dB
+    'FurnaceAMIGA': -4,    // Recalibrated 2026-02-28
     'FurnacePET': -10,     // Measured: -10.0dB → on target
     'FurnacePCSPKR': -10,  // Measured: -10.0dB → on target
     'FurnaceZXBEEPER': -4, // Measured: -10.2dB → on target
     'FurnacePOKEY': 7,     // Measured: -9.7dB → on target
     'FurnacePONG': -10,    // Measured: -10.0dB → on target
     'FurnacePV1000': 3,    // Measured: -9.6dB → on target
-    'FurnaceDAVE': 15,     // Measured: -21.6dB → need +12dB
-    'FurnaceSU': 27,       // Measured: -29.4dB → need +19dB
+    'FurnaceDAVE': 2,      // Recalibrated 2026-02-28
+    'FurnaceSU': 8,        // Recalibrated 2026-02-28
     'FurnacePOWERNOISE': -4, // Measured: -10.4dB → on target
     'FurnaceSEGAPCM': -5,  // Measured: -10.4dB → on target
-    'FurnaceQSOUND': 18,   // Measured: -22.9dB → need +13dB
-    'FurnaceES5506': 80,   // Measured: -52.3dB → need +42dB
+    'FurnaceQSOUND': 4,    // Recalibrated 2026-02-28
+    'FurnaceES5506': 38,   // Recalibrated 2026-02-28
     'FurnaceRF5C68': 0,    // Silent - sample format mismatch (needs signed magnitude)
-    'FurnaceC140': 33,     // Measured: -34.7dB → need +25dB
+    'FurnaceC140': 8,      // Recalibrated 2026-02-28
     'FurnaceK007232': -4,  // Measured: -9.9dB → on target
-    'FurnaceK053260': 17,  // Measured: -24.0dB → need +14dB
+    'FurnaceK053260': -1,  // Recalibrated 2026-02-28
     'FurnaceGA20': 3,      // Silent - sample format mismatch (needs unsigned 8-bit)
-    'FurnaceOKI': 44,      // Silent - needs VOX ADPCM encoding
-    'FurnaceYMZ280B': 39,  // Measured: -34.7dB → need +25dB
+    'FurnaceOKI': 2,       // Recalibrated 2026-02-28
+    'FurnaceYMZ280B': 14,  // Recalibrated 2026-02-28
     'FurnaceX1_010': 15,   // Measured: -9.6dB → on target
     'FurnaceMSM6258': -10, // Measured: -10.1dB → on target
     'FurnaceMSM5232': 10,  // Measured: -9.8dB → on target
-    'FurnaceMULTIPCM': 56, // Measured: -51.7dB → need +42dB
-    'FurnaceNAMCO': -5,    // Measured: variable (-7 to +5dB), using conservative -5
-    'FurnacePCMDAC': 8,    // Measured: -23.0dB → need +13dB
+    'FurnaceMULTIPCM': 14, // Recalibrated 2026-02-28
+    'FurnaceNAMCO': 0,     // Recalibrated 2026-02-28
+    'FurnacePCMDAC': -5,   // Recalibrated 2026-02-28
     'FurnaceBUBBLE': 3,    // Measured: -9.5dB → on target
     'FurnaceSM8521': 9,    // Measured: -16.2dB → need +6dB
     'FurnaceT6W28': 3,     // Measured: -8.3dB → on target
@@ -401,28 +401,28 @@ export class InstrumentFactory {
     'CZ101': 0,            // Reset to 0 - was unmeasured guess of 10
     'Dexed': 41,           // VERIFIED: measured -9.9dB with this offset (correct!)
     'OBXd': 9,             // VERIFIED: measured -10.0dB with this offset (correct!)
-    'CEM3394': 19,         // Measured 2026-02-05: peak -29.2dB → need +19dB delta
-    'SCSP': 15,            // Measured 2026-02-05: peak -25.2dB → need +15dB
+    'CEM3394': 14,         // Recalibrated 2026-02-28
+    'SCSP': 1,             // Recalibrated 2026-02-28
     // MAME chip synths - calibrated 2026-02-07 via browser test runner
-    'MAMEAstrocade': 18,   // Measured: -27.6dB → need +18dB
+    'MAMEAstrocade': 10,   // Recalibrated 2026-02-28
     'MAMESN76477': 5,      // Measured: -15.0dB → need +5dB
-    'MAMEASC': 11,         // Measured: -21.4dB → need +11dB
-    'MAMEES5503': 62,      // Measured: -72.1dB (nearly silent) → need +62dB
-    'MAMEMEA8000': 12,     // Measured: -22.2dB → need +12dB
-    'MAMESNKWave': 8,      // Measured: -18.2dB → need +8dB
-    'MAMESP0250': 26,      // Measured: -35.8dB → need +26dB
-    'MAMETMS36XX': 6,      // Measured: -16.5dB → need +6dB
-    'MAMEVotrax': 20,      // Measured: -30.4dB → need +20dB
-    'MAMEYMOPQ': 19,       // Measured 2026-02-07: -29.1dB → need +19dB
-    'MAMEUPD931': 23,      // Measured: -33.2dB → need +23dB
-    'MAMEUPD933': 28,      // Measured: -38.3dB → need +28dB
-    'MAMETMS5220': 37,     // Measured: -47.2dB → need +37dB
-    'MAMEYMF271': 15,      // Measured: -24.9dB → need +15dB
+    'MAMEASC': 2,          // Recalibrated 2026-02-28
+    'MAMEES5503': 48,      // Recalibrated 2026-02-28
+    'MAMEMEA8000': 8,      // Recalibrated 2026-02-28
+    'MAMESNKWave': 2,      // Recalibrated 2026-02-28
+    'MAMESP0250': 7,       // Recalibrated 2026-02-28
+    'MAMETMS36XX': -1,     // Recalibrated 2026-02-28
+    'MAMEVotrax': 12,      // Recalibrated 2026-02-28
+    'MAMEYMOPQ': 9,        // Recalibrated 2026-02-28
+    'MAMEUPD931': 18,      // Recalibrated 2026-02-28
+    'MAMEUPD933': 16,      // Recalibrated 2026-02-28
+    'MAMETMS5220': 4,      // Recalibrated 2026-02-28
+    'MAMEYMF271': 8,       // Recalibrated 2026-02-28
     'MAMETR707': 22,       // Measured 2026-02-07: -31.6dB → need +22dB
-    'MAMEVASynth': 20,     // Measured: -30.0dB → need +20dB
+    'MAMEVASynth': 12,     // Recalibrated 2026-02-28
     'MAMEAICA': 0,         // Silent (sample-playback chip, needs ROM + mapping)
-    'MAMEICS2115': 35,     // Measured 2026-02-07: -44.6dB → need +35dB
-    'MAMEK054539': 22,     // Measured 2026-02-07: -31.8dB → need +22dB
+    'MAMEICS2115': 30,     // Recalibrated 2026-02-28
+    'MAMEK054539': 19,     // Recalibrated 2026-02-28
     'MAMEC352': 17,        // Measured 2026-02-07: -26.7dB → need +17dB
     'MAMERF5C400': 0,      // Silent (sample-playback chip, needs ROM + mapping)
     'ModularSynth': 0,     // Not yet calibrated
