@@ -3520,6 +3520,25 @@ export const DEFAULT_SYNARE: SynareConfig = {
   },
 };
 
+/** Chip RAM location metadata for UADE-based format editing.
+ *  Stored on instruments produced by native parsers when loaded via UADE.
+ *  All addresses are absolute Amiga chip RAM addresses. */
+export interface UADEChipRamInfo {
+  /** Chip RAM address where the module binary starts (file byte 0 maps here). */
+  moduleBase: number;
+  /** Total size of the module binary in bytes (for full export via readMemory). */
+  moduleSize: number;
+  /** Chip RAM address where this instrument's data block starts.
+   *  instrBase = moduleBase + file_offset_of_instrument_entry */
+  instrBase: number;
+  /** Size of this instrument's data block in bytes. */
+  instrSize: number;
+  /** Format-specific named section addresses within the module.
+   *  e.g. { freqMacros: 0x12340, volMacros: 0x15600, waveData: 0x18000 }
+   *  Used by editors to find waveform tables, arpeggio data, etc. */
+  sections: Record<string, number>;
+}
+
 /**
  * DeepPartial Helper
  */
@@ -3617,6 +3636,7 @@ export interface InstrumentConfig {
   parameters?: Record<string, unknown>; // Additional synth-specific parameters (e.g., sample URLs)
   metadata?: InstrumentMetadata; // Import metadata and transformation history
   rawBinaryData?: Uint8Array;   // Raw binary instrument data for WASM upload (e.g. native .fur format)
+  uadeChipRam?: UADEChipRamInfo;  // present when loaded via UADE native parser
 }
 
 export interface InstrumentPreset {
