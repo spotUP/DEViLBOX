@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-28T13:10:44.087Z
+ * Generated: 2026-02-28T13:43:52.301Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1642';
-export const BUILD_NUMBER = '1642';
-export const BUILD_HASH = '779e455c';
+export const BUILD_VERSION = '1.0.1644';
+export const BUILD_NUMBER = '1644';
+export const BUILD_HASH = '23c0d8b4';
 export const BUILD_DATE = '2026-02-28';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1642',
+    version: '1.0.1644',
     date: '2026-02-28',
     changes: [
+      {
+        type: 'fix',
+        "description": "Version Zustand stores and add DANGER ZONE reset button"
+      },
+      {
+        type: 'fix',
+        "description": "Add setTimeout polyfill and fix Module scoping in SC worklet"
+      },
       {
         type: 'fix',
         "description": "Surface worker errors and silent hangs via SynthErrorDialog"
@@ -220,14 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Register missing UADE extensions in file picker"
-      },
-      {
-        type: 'fix',
-        "description": "Trim last pattern to actual row count, not hardcoded 64"
-      },
-      {
-        type: 'fix',
-        "description": "Replace missing Emscripten string helpers with portable _malloc+HEAPU8 approach"
       }
     ]
   }

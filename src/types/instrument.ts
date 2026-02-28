@@ -3752,7 +3752,7 @@ export const DEFAULT_SUPERCOLLIDER: SuperColliderConfig = {
   var sig = SinOsc.ar(freq) * amp;
   var env = EnvGen.kr(Env.adsr(0.01, 0.1, 0.7, 0.5), gate, doneAction: 2);
   Out.ar(0, (sig * env).dup);
-}).add`,
+})`,
   binary: '',
   params: [],
 };
