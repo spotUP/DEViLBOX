@@ -201,20 +201,17 @@ const SubsongSelector: React.FC = () => {
     }
   }, [furnaceData, subsongNames, allSubsongs, pattern, loadPatterns, setPatternOrder, setBPM, setSpeed]);
 
-  // Only show if there are multiple subsongs
-  if (!furnaceData || !furnaceData.subsongCount || furnaceData.subsongCount <= 1) {
-    return null;
-  }
-
-  const currentSubsong = String(furnaceData.currentSubsong ?? 0);
+    const isVisible = !!(furnaceData && furnaceData.subsongCount && furnaceData.subsongCount > 1);
+  const currentSubsong = String(furnaceData?.currentSubsong ?? 0);
 
   return (
     <PixiSelect
-      options={options}
+      options={isVisible ? options : [{ value: '0', label: '' }]}
       value={currentSubsong}
       onChange={handleChange}
       width={140}
       height={24}
+      layout={{ display: isVisible ? 'flex' : 'none' }}
     />
   );
 };
@@ -414,15 +411,14 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
       />
 
       {/* Channel selector — only in non-tracker modes */}
-      {viewMode !== 'tracker' && (
-        <PixiSelect
-          options={channelOptions}
-          value={String(gridChannelIndex)}
-          onChange={handleChannelChange}
-          width={64}
-          height={24}
-        />
-      )}
+      <PixiSelect
+        options={channelOptions}
+        value={String(gridChannelIndex)}
+        onChange={handleChannelChange}
+        width={64}
+        height={24}
+        layout={{ display: viewMode !== 'tracker' ? 'flex' : 'none' }}
+      />
 
       <Sep />
 
@@ -488,16 +484,15 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
       <Sep />
 
       {/* Ghost Patterns — only in tracker view */}
-      {viewMode === 'tracker' && (
-        <PixiButton
-          label="Ghosts"
-          variant={showGhostPatterns ? 'ft2' : 'ghost'}
-          color={showGhostPatterns ? 'blue' : undefined}
-          size="sm"
-          active={showGhostPatterns}
-          onClick={handleToggleGhosts}
-        />
-      )}
+      <PixiButton
+        label="Ghosts"
+        variant={showGhostPatterns ? 'ft2' : 'ghost'}
+        color={showGhostPatterns ? 'blue' : undefined}
+        size="sm"
+        active={showGhostPatterns}
+        onClick={handleToggleGhosts}
+        layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
+      />
 
       {/* REC button */}
       <PixiButton
@@ -575,14 +570,12 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
       <pixiContainer layout={{ flex: 1 }} />
 
       {/* Status message */}
-      {statusMessage && (
-        <pixiBitmapText
-          text={statusMessage.toUpperCase()}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-          tint={theme.accent.color}
-          layout={{ marginRight: 8 }}
-        />
-      )}
+      <pixiBitmapText
+        text={statusMessage?.toUpperCase() ?? ''}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+        tint={theme.accent.color}
+        layout={{ display: statusMessage ? 'flex' : 'none', marginRight: 8 }}
+      />
 
       {/* FPS pill */}
       <pixiBitmapText
