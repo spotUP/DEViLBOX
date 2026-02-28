@@ -3,17 +3,32 @@
  *
  * Exposes all FCConfig parameters: waveform selector, synth macro table,
  * ADSR envelope, vibrato, and arpeggio table.
+ *
+ * When loaded via UADE (uadeChipRam present), scalar params are also written
+ * directly to chip RAM so UADE picks them up on the next note trigger.
+ *
+ * FC vol macro byte layout (instrBase = moduleBase + volMacroPtr + instrIdx*64):
+ *   byte[0] = volSpeed  (synthSpeed)
+ *   byte[1] = freqMacroIdx  (not exposed — do not overwrite)
+ *   byte[2] = vibSpeed
+ *   byte[3] = vibDepth
+ *   byte[4] = vibDelay
+ *   byte[5..63] = vol envelope opcodes (ADSR — complex, no chip RAM write yet)
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import type { FCConfig } from '@/types/instrument';
+import type { FCConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import { EnvelopeVisualization } from '@components/instruments/shared';
+import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
+import { UADEEngine } from '@/engine/uade/UADEEngine';
 
 interface FCControlsProps {
   config: FCConfig;
   onChange: (updates: Partial<FCConfig>) => void;
+  /** Present when this instrument was loaded via UADE's native FC parser. */
+  uadeChipRam?: UADEChipRamInfo;
 }
 
 type FCTab = 'envelope' | 'synth' | 'arpeggio';
@@ -29,11 +44,19 @@ function waveLabel(n: number): string {
   return FC_WAVE_NAMES[n] ?? `Wave ${n}`;
 }
 
-export const FCControls: React.FC<FCControlsProps> = ({ config, onChange }) => {
+export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeChipRam }) => {
   const [activeTab, setActiveTab] = useState<FCTab>('envelope');
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
+
+  const chipEditorRef = useRef<UADEChipEditor | null>(null);
+  const getEditor = useCallback(() => {
+    if (!chipEditorRef.current) {
+      chipEditorRef.current = new UADEChipEditor(UADEEngine.getInstance());
+    }
+    return chipEditorRef.current;
+  }, []);
 
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyan = currentThemeId === 'cyan-lineart';
@@ -46,6 +69,34 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange }) => {
   const upd = useCallback(<K extends keyof FCConfig>(key: K, value: FCConfig[K]) => {
     onChange({ [key]: value } as Partial<FCConfig>);
   }, [onChange]);
+
+  /**
+   * Like `upd`, but also writes a single byte to chip RAM when a UADE context
+   * is active. byteOffset is relative to instrBase (start of the 64-byte vol
+   * macro for this instrument).
+   *
+   * Byte map:
+   *   0 = synthSpeed
+   *   2 = vibSpeed
+   *   3 = vibDepth
+   *   4 = vibDelay
+   *
+   * TODO: atkLength/atkVolume/decLength/decVolume/sustVolume/relLength require
+   * encoding as FC vol-envelope opcodes (variable-length ADSR sequences) and
+   * writing byte[5..63]. The opcode format is non-trivial; skipped for now.
+   *
+   * TODO: arpTable / synthTable changes require writing the separate arp/synth
+   * macro regions (not part of the 64-byte vol macro). Skipped for now.
+   */
+  const updWithChipRam = useCallback(
+    (key: keyof FCConfig, value: FCConfig[keyof FCConfig], byteOffset: number) => {
+      upd(key as Parameters<typeof upd>[0], value as Parameters<typeof upd>[1]);
+      if (uadeChipRam && typeof value === 'number') {
+        void getEditor().writeU8(uadeChipRam.instrBase + byteOffset, value & 0xFF);
+      }
+    },
+    [upd, uadeChipRam, getEditor],
+  );
 
   const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
     <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
@@ -130,15 +181,15 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange }) => {
         <SectionLabel label="Vibrato" />
         <div className="flex gap-4">
           <Knob value={config.vibDelay} min={0} max={255} step={1}
-            onChange={(v) => upd('vibDelay', Math.round(v))}
+            onChange={(v) => updWithChipRam('vibDelay', Math.round(v), 4)}
             label="Delay" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibSpeed} min={0} max={63} step={1}
-            onChange={(v) => upd('vibSpeed', Math.round(v))}
+            onChange={(v) => updWithChipRam('vibSpeed', Math.round(v), 2)}
             label="Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibDepth} min={0} max={63} step={1}
-            onChange={(v) => upd('vibDepth', Math.round(v))}
+            onChange={(v) => updWithChipRam('vibDepth', Math.round(v), 3)}
             label="Depth" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
@@ -161,7 +212,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange }) => {
           <SectionLabel label="Synth Macro Sequencer" />
           <div className="flex items-center gap-4 mb-3">
             <Knob value={config.synthSpeed} min={0} max={15} step={1}
-              onChange={(v) => upd('synthSpeed', Math.round(v))}
+              onChange={(v) => updWithChipRam('synthSpeed', Math.round(v), 0)}
               label="Speed" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
             <span className="text-[10px] text-gray-500">Ticks per macro step (0 = disabled)</span>
@@ -283,6 +334,20 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange }) => {
       {activeTab === 'envelope' && renderEnvelope()}
       {activeTab === 'synth'    && renderSynth()}
       {activeTab === 'arpeggio' && renderArpeggio()}
+      {uadeChipRam && (
+        <div className="flex justify-end px-3 py-2 border-t border-yellow-900/30">
+          <button
+            className="text-[10px] px-2 py-1 rounded bg-yellow-900/40 text-yellow-400 hover:bg-yellow-900/60 transition-colors"
+            onClick={() => void getEditor().exportModule(
+              uadeChipRam.moduleBase,
+              uadeChipRam.moduleSize,
+              'song.fc'
+            )}
+          >
+            Export .fc (Amiga)
+          </button>
+        </div>
+      )}
     </div>
   );
 };
