@@ -71,7 +71,7 @@ export async function runPrefetchIfNeeded(
       batch.map(async (url) => {
         try {
           const response = await fetch(url);
-          if (response.ok) {
+          if (response.ok && response.status === 200) {
             await cache.put(url, response);
           }
         } catch (err) {
