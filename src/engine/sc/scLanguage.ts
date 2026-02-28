@@ -8,12 +8,31 @@ const SC_KEYWORDS = new Set([
   'inf', 'pi', 'and', 'or', 'not',
 ]);
 
+// State type for tracking nested block-comment depth across lines
+interface SCState { blockDepth: number; }
+
 // Minimal SuperCollider stream language for CodeMirror 6
 // Highlights: keywords, UGen names (PascalCase), strings, numbers, comments
-const scStreamLanguage = StreamLanguage.define<Record<string, never>>({
+const scStreamLanguage = StreamLanguage.define<SCState>({
   name: 'supercollider',
-  startState: () => ({}),
-  token(stream) {
+  startState: (): SCState => ({ blockDepth: 0 }),
+  copyState: (state: SCState): SCState => ({ ...state }),
+  token(stream, state) {
+    // If we are inside a block comment carried over from a previous line,
+    // consume this line tracking nested /* and */ to update depth.
+    if (state.blockDepth > 0) {
+      while (!stream.eol()) {
+        if (stream.match('/*')) { state.blockDepth++; }
+        else if (stream.match('*/')) {
+          state.blockDepth--;
+          if (state.blockDepth === 0) break;
+        } else {
+          stream.next();
+        }
+      }
+      return 'comment';
+    }
+
     if (stream.eatSpace()) return null;
 
     // Single-line comment
@@ -22,13 +41,17 @@ const scStreamLanguage = StreamLanguage.define<Record<string, never>>({
       return 'comment';
     }
 
-    // Block comment
+    // Block comment — may span multiple lines; track depth in state
     if (stream.match('/*')) {
-      let depth = 1;
+      state.blockDepth = 1;
       while (!stream.eol()) {
-        if (stream.match('/*')) { depth++; }
-        else if (stream.match('*/')) { depth--; if (depth === 0) break; }
-        else stream.next();
+        if (stream.match('/*')) { state.blockDepth++; }
+        else if (stream.match('*/')) {
+          state.blockDepth--;
+          if (state.blockDepth === 0) break;
+        } else {
+          stream.next();
+        }
       }
       return 'comment';
     }
