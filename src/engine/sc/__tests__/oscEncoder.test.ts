@@ -8,6 +8,28 @@ import {
   oscFreeNode,
 } from '../oscEncoder';
 
+// ---------------------------------------------------------------------------
+// Binary parsing helpers for high-level function tests
+// ---------------------------------------------------------------------------
+
+function readString(buf: Uint8Array, offset: number): { value: string; next: number } {
+  let end = offset;
+  while (buf[end] !== 0) end++;
+  const value = new TextDecoder().decode(buf.slice(offset, end));
+  const next = offset + Math.ceil((end - offset + 1) / 4) * 4;
+  return { value, next };
+}
+
+function readInt32(buf: Uint8Array, offset: number): number {
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  return view.getInt32(offset, false); // big-endian
+}
+
+function readFloat32(buf: Uint8Array, offset: number): number {
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  return view.getFloat32(offset, false); // big-endian
+}
+
 describe('encodeOSCMessage', () => {
   it('encodes address string padded to 4 bytes', () => {
     const msg = encodeOSCMessage('/a', []);
@@ -58,39 +80,133 @@ describe('encodeOSCMessage', () => {
 
 describe('oscNewSynth', () => {
   it('creates /s_new with defName, nodeId, addAction=0, group=0, then key-value pairs', () => {
-    const msg = oscNewSynth('mySynth', 1000, { cutoff: 800, resonance: 0.3 });
-    const decoder = new TextDecoder();
-    // Address should start with /s_new (padded to 8 bytes)
-    const addr = decoder.decode(msg.slice(0, 8)).replace(/\0/g, '');
-    expect(addr).toBe('/s_new');
-    expect(msg.byteLength).toBeGreaterThan(0);
+    const msg = oscNewSynth('mySynth', 1001, { cutoff: 800, resonance: 0.3 });
+
+    // --- Address ---
+    const addr = readString(msg, 0);
+    expect(addr.value).toBe('/s_new');
+
+    // --- Type tag string ---
+    // Args: s(defName) i(nodeId) i(addAction) i(targetId) s(key) f(val) s(key) f(val)
+    // Expected tag: ",siiisfsf"
+    const typeTag = readString(msg, addr.next);
+    expect(typeTag.value).toBe(',siiisfsf');
+
+    // --- Arguments ---
+    let offset = typeTag.next;
+
+    // defName: string 'mySynth'
+    const defNameArg = readString(msg, offset);
+    expect(defNameArg.value).toBe('mySynth');
+    offset = defNameArg.next;
+
+    // nodeId: int32 = 1001
+    expect(readInt32(msg, offset)).toBe(1001);
+    offset += 4;
+
+    // addAction: int32 = 0
+    expect(readInt32(msg, offset)).toBe(0);
+    offset += 4;
+
+    // targetId (root group): int32 = 0
+    expect(readInt32(msg, offset)).toBe(0);
+    offset += 4;
+
+    // key 'cutoff': string
+    const cutoffKey = readString(msg, offset);
+    expect(cutoffKey.value).toBe('cutoff');
+    offset = cutoffKey.next;
+
+    // value 800.0: float32
+    expect(readFloat32(msg, offset)).toBeCloseTo(800.0, 1);
+    offset += 4;
+
+    // key 'resonance': string
+    const resonanceKey = readString(msg, offset);
+    expect(resonanceKey.value).toBe('resonance');
+    offset = resonanceKey.next;
+
+    // value 0.3: float32
+    expect(readFloat32(msg, offset)).toBeCloseTo(0.3, 5);
   });
 });
 
 describe('oscSetParams', () => {
   it('creates /n_set with nodeId and key-value pairs', () => {
-    const msg = oscSetParams(1000, { gate: 0 });
-    const decoder = new TextDecoder();
-    const addr = decoder.decode(msg.slice(0, 8)).replace(/\0/g, '');
-    expect(addr).toBe('/n_set');
+    const msg = oscSetParams(42, { freq: 440.0 });
+
+    // --- Address ---
+    const addr = readString(msg, 0);
+    expect(addr.value).toBe('/n_set');
+
+    // --- Type tag string ---
+    // Args: i(nodeId) s(key) f(val) → ",isf"
+    const typeTag = readString(msg, addr.next);
+    expect(typeTag.value).toBe(',isf');
+
+    // --- Arguments ---
+    let offset = typeTag.next;
+
+    // nodeId: int32 = 42
+    expect(readInt32(msg, offset)).toBe(42);
+    offset += 4;
+
+    // key 'freq': string
+    const freqKey = readString(msg, offset);
+    expect(freqKey.value).toBe('freq');
+    offset = freqKey.next;
+
+    // value 440.0: float32
+    expect(readFloat32(msg, offset)).toBeCloseTo(440.0, 1);
   });
 });
 
 describe('oscFreeNode', () => {
-  it('creates /n_free with nodeId', () => {
-    const msg = oscFreeNode(1000);
-    const decoder = new TextDecoder();
-    const addr = decoder.decode(msg.slice(0, 8)).replace(/\0/g, '');
-    expect(addr).toBe('/n_free');
+  it('creates /n_free with nodeId as int32', () => {
+    const msg = oscFreeNode(99);
+
+    // --- Address ---
+    const addr = readString(msg, 0);
+    expect(addr.value).toBe('/n_free');
+
+    // --- Type tag string ---
+    // Args: i(nodeId) → ",i"
+    const typeTag = readString(msg, addr.next);
+    expect(typeTag.value).toBe(',i');
+
+    // --- Arguments ---
+    const offset = typeTag.next;
+
+    // nodeId: int32 = 99
+    expect(readInt32(msg, offset)).toBe(99);
   });
 });
 
 describe('oscLoadSynthDef', () => {
-  it('creates /d_recv with binary blob', () => {
-    const binary = new Uint8Array([0xDE, 0xAD]);
+  it('creates /d_recv with binary blob including 4-byte big-endian length prefix', () => {
+    const binary = new Uint8Array([0x53, 0x43, 0x67, 0x66]); // "SCgf"
     const msg = oscLoadSynthDef(binary);
-    const decoder = new TextDecoder();
-    const addr = decoder.decode(msg.slice(0, 8)).replace(/\0/g, '');
-    expect(addr).toBe('/d_recv');
+
+    // --- Address ---
+    const addr = readString(msg, 0);
+    expect(addr.value).toBe('/d_recv');
+
+    // --- Type tag string ---
+    // Args: b(blob) → ",b"
+    const typeTag = readString(msg, addr.next);
+    expect(typeTag.value).toBe(',b');
+
+    // --- Blob argument ---
+    let offset = typeTag.next;
+
+    // 4-byte big-endian length prefix = 4 (the blob is 4 bytes)
+    expect(readInt32(msg, offset)).toBe(4);
+    offset += 4;
+
+    // Blob data: "SCgf"
+    expect(msg[offset]).toBe(0x53); // 'S'
+    expect(msg[offset + 1]).toBe(0x43); // 'C'
+    expect(msg[offset + 2]).toBe(0x67); // 'g'
+    expect(msg[offset + 3]).toBe(0x66); // 'f'
   });
 });
