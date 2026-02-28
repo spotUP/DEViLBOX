@@ -19,7 +19,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
-import type { SidMonConfig } from '@/types/instrument';
+import type { SidMonConfig, UADEChipRamInfo } from '@/types/instrument';
 
 // -- SidMon II period table (from S2Player.js) --------------------------------
 // Index 0 is unused (0). Indices 1-72 cover 6 octaves (C-1 to B-6).
@@ -180,10 +180,13 @@ export function isSidMon2Format(buffer: ArrayBuffer): boolean {
 /**
  * Parse a SidMon II module file into a TrackerSong.
  * Follows the S2Player.js loader logic exactly.
+ *
+ * @param moduleBase - Chip RAM address where the module binary starts (0 for plain file load).
  */
 export async function parseSidMon2File(
   buffer: ArrayBuffer,
-  filename: string
+  filename: string,
+  moduleBase = 0
 ): Promise<TrackerSong> {
   const data = new Uint8Array(buffer);
 
@@ -508,12 +511,27 @@ export async function parseSidMon2File(
       loopLength,
     };
 
+    const uadeChipRam: UADEChipRamInfo = {
+      moduleBase,
+      moduleSize: buffer.byteLength,
+      instrBase: moduleBase + instrPosition + (i - 1) * 32,
+      instrSize: 32,
+      sections: {
+        instrTable:    moduleBase + instrPosition,
+        waveTable:     moduleBase + wavePosition,
+        arpeggioTable: moduleBase + arpeggioPosition,
+        vibratoTable:  moduleBase + vibratoPosition,
+        sampleData:    moduleBase + sampleDataStart,
+      },
+    };
+
     trackerInstruments.push({
       id: i,
       name: smp?.name || `Instrument ${i}`,
       type: 'synth' as const,
       synthType: 'SidMonSynth' as const,
       sidMon: config,
+      uadeChipRam,
       effects: [],
       volume: -6,
       pan: 0,
