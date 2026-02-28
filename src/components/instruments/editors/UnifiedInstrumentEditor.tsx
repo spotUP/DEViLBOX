@@ -1379,6 +1379,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <DavidWhittakerControls
             config={davidWhittakerConfig}
             onChange={handleDavidWhittakerChange}
+            uadeChipRam={instrument.uadeChipRam}
           />
         </Suspense>
       </div>

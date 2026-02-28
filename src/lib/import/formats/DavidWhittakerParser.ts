@@ -24,7 +24,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/types';
-import type { DavidWhittakerConfig } from '@/types/instrument';
+import type { DavidWhittakerConfig, UADEChipRamInfo } from '@/types/instrument';
 import { DEFAULT_DAVID_WHITTAKER } from '@/types/instrument';
 
 // ── Binary read helpers ───────────────────────────────────────────────────────
@@ -328,8 +328,12 @@ function scanDWStructures(buf: Uint8Array): DWParseResult | null {
  *
  * Extracts instrument configs using heuristic binary scanning.
  * Returns a minimal song if full extraction is not possible.
+ *
+ * @param moduleBase - Chip RAM address where the module binary starts (0 if unknown).
+ *                     DavidWhittaker is a compiled Amiga binary; use UADEEngine.scanMemoryForMagic
+ *                     with the 0x47fa (lea x,a3) opcode to find the actual base address.
  */
-export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string): TrackerSong {
+export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, moduleBase = 0): TrackerSong {
   const buf = new Uint8Array(buffer);
   const baseName = filename.replace(/\.[^.]+$/, '');
 
@@ -385,12 +389,31 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string): 
         frqseq,
       };
 
+      // File-relative offset of this instrument's sample header record.
+      // instrBase = moduleBase + fileOffset; when moduleBase=0 (parse time),
+      // instrBase equals the file offset and the UADEParser's NATIVE_ROUTES
+      // wrapper resolves the real chip RAM address via scanMemoryForMagic.
+      const instrFileOffset = scanResult.sampleInfoBase + i * scanResult.sampleInfoSize;
+      const chipRam: UADEChipRamInfo = {
+        moduleBase,
+        moduleSize: buffer.byteLength,
+        instrBase: moduleBase + instrFileOffset,
+        instrSize: scanResult.sampleInfoSize,
+        sections: {
+          sampleInfoBase: moduleBase + scanResult.sampleInfoBase,
+          base:           moduleBase + scanResult.base,
+          frqseqs:        scanResult.frqseqsOffset > 0 ? moduleBase + scanResult.frqseqsOffset : 0,
+          volseqs:        scanResult.volseqsOffset  > 0 ? moduleBase + scanResult.volseqsOffset  : 0,
+        },
+      };
+
       instruments.push({
         id: i + 1,
         name: `DW Inst ${i + 1}`,
         type: 'synth' as const,
         synthType: 'DavidWhittakerSynth' as const,
         davidWhittaker: dwConfig,
+        uadeChipRam: chipRam,
         effects: [],
         volume: 0,
         pan: 0,

@@ -479,6 +479,19 @@ export async function parseUADEFile(
         const { parseDigitalMugicianFile } = await import('./DigitalMugicianParser');
         return parseDigitalMugicianFile(buffer, filename);
       },
+      'DavidWhittaker': async () => {
+        const { parseDavidWhittakerFile } = await import('./DavidWhittakerParser');
+        // DavidWhittaker is a compiled Amiga binary; scan chip RAM for the
+        // 0x47fa (lea x,a3) opcode to find where UADE loaded the module.
+        // Fallback to 0 if scanMemoryForMagic is not available (older WASM).
+        let moduleBase = 0;
+        try {
+          const dwMagic = new Uint8Array([0x47, 0xFA]);
+          const found = await engine.scanMemoryForMagic(dwMagic, 256 * 1024);
+          if (found >= 0) moduleBase = found;
+        } catch { /* older WASM without scanMemoryForMagic, moduleBase stays 0 */ }
+        return parseDavidWhittakerFile(buffer, filename, moduleBase);
+      },
     };
     const route = NATIVE_ROUTES[fmt];
     if (route) {
