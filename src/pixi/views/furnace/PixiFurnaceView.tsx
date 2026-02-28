@@ -1,8 +1,5 @@
 /**
- * PixiFurnaceView - Top-level Furnace Editor View
- *
- * Combines the 2D order matrix (left panel) with the per-channel
- * pattern editor (main area), matching the Furnace tracker layout.
+ * PixiFurnaceView - Top-level Furnace Editor View (pure Pixi)
  *
  * Layout:
  * ┌──────────────────────────────────────────────────┐
@@ -16,9 +13,11 @@
  */
 
 import React, { useCallback, useState } from 'react';
+import type { Graphics as GraphicsType } from 'pixi.js';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { usePixiTheme } from '@/pixi/theme';
+import { PIXI_FONTS } from '@/pixi/fonts';
 import { PixiFurnaceOrderMatrix } from './PixiFurnaceOrderMatrix';
 import { PixiFurnacePatternEditor } from './PixiFurnacePatternEditor';
 
@@ -41,35 +40,46 @@ export const PixiFurnaceView: React.FC<FurnaceViewProps> = ({ width, height }) =
 
   const [editPosition, setEditPosition] = useState(0);
 
-  // Use playback position when playing, edit position otherwise
   const activePosition = isPlaying ? currentPositionIndex : editPosition;
 
   const handlePositionChange = useCallback((pos: number) => {
     setEditPosition(pos);
-    if (!isPlaying) {
-      setCurrentPosition(pos);
-    }
+    if (!isPlaying) setCurrentPosition(pos);
   }, [isPlaying, setCurrentPosition]);
 
   const handleOrderChange = useCallback((channel: number, position: number, patternIndex: number) => {
     setFurnaceOrderEntry(channel, position, patternIndex);
   }, [setFurnaceOrderEntry]);
 
+  const drawBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, width, height);
+    g.fill({ color: theme.bg.color });
+  }, [width, height, theme]);
+
+  const drawToolbarBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, width, TOOLBAR_HEIGHT);
+    g.fill({ color: theme.bgSecondary.color });
+    g.rect(0, TOOLBAR_HEIGHT - 1, width, 1);
+    g.fill({ color: theme.border.color, alpha: 0.5 });
+  }, [width, theme]);
+
+  // ── No module loaded ────────────────────────────────────────────────────────
+
   if (!nativeData) {
     return (
-      <div style={{
-        width,
-        height,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: `#${(theme.textMuted.color).toString(16).padStart(6, '0')}`,
-        fontFamily: 'JetBrains Mono, monospace',
-        fontSize: 13,
-        backgroundColor: `#${(theme.bg.color).toString(16).padStart(6, '0')}`,
-      }}>
-        No Furnace module loaded
-      </div>
+      <pixiContainer layout={{ width, height, alignItems: 'center', justifyContent: 'center' }}>
+        <pixiGraphics
+          draw={drawBg}
+          layout={{ position: 'absolute', width, height }}
+        />
+        <pixiBitmapText
+          text="No Furnace module loaded"
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+        />
+      </pixiContainer>
     );
   }
 
@@ -77,67 +87,50 @@ export const PixiFurnaceView: React.FC<FurnaceViewProps> = ({ width, height }) =
   const editorWidth = width - ORDER_MATRIX_WIDTH;
   const editorHeight = height - TOOLBAR_HEIGHT;
 
-  return (
-    <div style={{
-      width,
-      height,
-      display: 'flex',
-      flexDirection: 'column',
-      backgroundColor: `#${(theme.bg.color).toString(16).padStart(6, '0')}`,
-    }}>
-      {/* Toolbar */}
-      <div style={{
-        height: TOOLBAR_HEIGHT,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '0 8px',
-        backgroundColor: `#${(theme.bgSecondary.color).toString(16).padStart(6, '0')}`,
-        borderBottom: `1px solid #${(theme.border.color).toString(16).padStart(6, '0')}`,
-        fontFamily: 'JetBrains Mono, monospace',
-        fontSize: 11,
-        color: `#${(theme.text.color).toString(16).padStart(6, '0')}`,
-      }}>
-        <span style={{ color: `#${(theme.accent.color).toString(16).padStart(6, '0')}`, fontWeight: 'bold' }}>
-          FURNACE
-        </span>
-        <span style={{ color: `#${(theme.textMuted.color).toString(16).padStart(6, '0')}` }}>|</span>
-        <span>
-          Subsong: {sub?.name || '0'}
-        </span>
-        <span style={{ color: `#${(theme.textMuted.color).toString(16).padStart(6, '0')}` }}>|</span>
-        <span>
-          Spd: {sub?.speed1}/{sub?.speed2}
-        </span>
-        <span style={{ color: `#${(theme.textMuted.color).toString(16).padStart(6, '0')}` }}>|</span>
-        <span>
-          Hz: {sub?.hz?.toFixed(1)}
-        </span>
-        <span style={{ color: `#${(theme.textMuted.color).toString(16).padStart(6, '0')}` }}>|</span>
-        <span>
-          Len: {sub?.patLen}
-        </span>
-        <span style={{ color: `#${(theme.textMuted.color).toString(16).padStart(6, '0')}` }}>|</span>
-        <span>
-          Pos: {activePosition.toString(16).toUpperCase().padStart(2, '0')}/{(sub?.ordersLen ?? 0).toString(16).toUpperCase().padStart(2, '0')}
-        </span>
-        <span style={{ color: `#${(theme.textMuted.color).toString(16).padStart(6, '0')}` }}>|</span>
-        <span>
-          CH: {sub?.channels.length ?? 0}
-        </span>
-      </div>
+  // Build toolbar info string
+  const toolbarLeft = `FURNACE`;
+  const toolbarInfo = [
+    `Subsong: ${sub?.name || '0'}`,
+    `Spd: ${sub?.speed1}/${sub?.speed2}`,
+    `Hz: ${sub?.hz?.toFixed(1)}`,
+    `Len: ${sub?.patLen}`,
+    `Pos: ${activePosition.toString(16).toUpperCase().padStart(2, '0')}/${(sub?.ordersLen ?? 0).toString(16).toUpperCase().padStart(2, '0')}`,
+    `CH: ${sub?.channels.length ?? 0}`,
+  ].join('  |  ');
 
-      {/* Main content: Order Matrix + Pattern Editor */}
-      <div style={{
-        display: 'flex',
-        flex: 1,
-        overflow: 'hidden',
-      }}>
-        {/* Order Matrix (left panel) */}
-        <div style={{
-          width: ORDER_MATRIX_WIDTH,
-          borderRight: `1px solid #${(theme.border.color).toString(16).padStart(6, '0')}`,
-        }}>
+  return (
+    <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
+      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
+
+      {/* Toolbar */}
+      <pixiContainer
+        layout={{
+          width,
+          height: TOOLBAR_HEIGHT,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingLeft: 8,
+          paddingRight: 8,
+          gap: 12,
+        }}
+      >
+        <pixiGraphics draw={drawToolbarBg} layout={{ position: 'absolute', width, height: TOOLBAR_HEIGHT }} />
+        <pixiBitmapText
+          text={toolbarLeft}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+          tint={theme.accent.color}
+        />
+        <pixiBitmapText
+          text={toolbarInfo}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+          tint={theme.textSecondary.color}
+        />
+      </pixiContainer>
+
+      {/* Main content: Order Matrix (left) + Pattern Editor (right) */}
+      <pixiContainer layout={{ flex: 1, width, height: editorHeight, flexDirection: 'row' }}>
+        {/* Order Matrix */}
+        <pixiContainer layout={{ width: ORDER_MATRIX_WIDTH, height: editorHeight }}>
           <PixiFurnaceOrderMatrix
             width={ORDER_MATRIX_WIDTH}
             height={editorHeight}
@@ -146,9 +139,9 @@ export const PixiFurnaceView: React.FC<FurnaceViewProps> = ({ width, height }) =
             onPositionChange={handlePositionChange}
             onOrderChange={handleOrderChange}
           />
-        </div>
+        </pixiContainer>
 
-        {/* Pattern Editor (main area) */}
+        {/* Pattern Editor */}
         <PixiFurnacePatternEditor
           width={editorWidth}
           height={editorHeight}
@@ -156,7 +149,7 @@ export const PixiFurnaceView: React.FC<FurnaceViewProps> = ({ width, height }) =
           currentPosition={activePosition}
           playbackRow={displayRow}
         />
-      </div>
-    </div>
+      </pixiContainer>
+    </pixiContainer>
   );
 };
