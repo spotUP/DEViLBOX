@@ -2755,7 +2755,8 @@ export class ToneEngine {
         config.synthType === 'CEM3394' ||
         config.synthType === 'SCSP' ||
         // MAME worklet synths (all use triggerRelease with no note)
-        config.synthType.startsWith('MAME')
+        config.synthType.startsWith('MAME') ||
+        config.synthType === 'SunVoxSynth'
       ) {
         // These synths use triggerRelease(time) - no note parameter
         (instrument as any).triggerRelease(safeTime);
