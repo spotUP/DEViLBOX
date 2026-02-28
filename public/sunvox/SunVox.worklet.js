@@ -50,6 +50,14 @@ class SunVoxProcessor extends AudioWorkletProcessor {
 
   handleMessage(data) {
     const m = this.wasm;
+    // Portable string→pointer helper. Works across all Emscripten versions:
+    // newer builds removed allocateUTF8/stringToNewUTF8 in favour of _malloc + stringToUTF8.
+    const strToPtr = (s) => {
+      const bytes = new TextEncoder().encode(s + '\0');
+      const ptr = m._malloc(bytes.length);
+      m.HEAPU8.set(bytes, ptr);
+      return ptr;
+    };
 
     switch (data.type) {
       // ── Lifecycle ──────────────────────────────────────────────────────────
@@ -100,7 +108,7 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         const buf = new Uint8Array(data.buffer);
         try {
           m.FS.writeFile('/tmp/input.sunvox', buf);
-          const pathPtr = m.stringToNewUTF8('/tmp/input.sunvox');
+          const pathPtr = strToPtr('/tmp/input.sunvox');
           m._sunvox_wasm_load_song(data.handle, pathPtr);
           m._free(pathPtr);
           m.FS.unlink('/tmp/input.sunvox');
@@ -114,7 +122,7 @@ class SunVoxProcessor extends AudioWorkletProcessor {
       case 'saveSong': {
         if (!m) break;
         try {
-          const pathPtr = m.stringToNewUTF8('/tmp/output.sunvox');
+          const pathPtr = strToPtr('/tmp/output.sunvox');
           m._sunvox_wasm_save_song(data.handle, pathPtr);
           m._free(pathPtr);
           const saved = m.FS.readFile('/tmp/output.sunvox');
@@ -135,7 +143,7 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         const buf = new Uint8Array(data.buffer);
         try {
           m.FS.writeFile('/tmp/input.sunsynth', buf);
-          const pathPtr = m.stringToNewUTF8('/tmp/input.sunsynth');
+          const pathPtr = strToPtr('/tmp/input.sunsynth');
           const moduleId = m._sunvox_wasm_load_synth(data.handle, pathPtr);
           m._free(pathPtr);
           m.FS.unlink('/tmp/input.sunsynth');
@@ -149,7 +157,7 @@ class SunVoxProcessor extends AudioWorkletProcessor {
       case 'saveSynth': {
         if (!m) break;
         try {
-          const pathPtr = m.stringToNewUTF8('/tmp/output.sunsynth');
+          const pathPtr = strToPtr('/tmp/output.sunsynth');
           m._sunvox_wasm_save_synth(data.handle, data.moduleId, pathPtr);
           m._free(pathPtr);
           const saved = m.FS.readFile('/tmp/output.sunsynth');
