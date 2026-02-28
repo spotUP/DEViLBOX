@@ -4,7 +4,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import * as Tone from 'tone';
-import { useInstrumentStore, useSamplePackStore, useAllSamplePacks } from '@stores';
+import { useInstrumentStore, useSamplePackStore, useAllSamplePacks, notify } from '@stores';
 import { SAMPLE_CATEGORY_LABELS } from '@typedefs/samplePack';
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
 import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square, Upload, Folder, Trash2, Zap, FileAudio } from 'lucide-react';
@@ -13,6 +13,20 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { getAudioContext } from '../../audio/AudioContextSingleton';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { SampleData } from '@typedefs/drumpad';
+
+/** Returns true if the sample URL is cached in sample-packs-v1, or if the
+ *  Cache API is unavailable (assume cached to avoid false positives). */
+// Keep in sync with CACHE_NAME in SamplePackPrefetcher.ts and SAMPLE_CACHE_NAME in public/sw.js
+async function isSampleCached(url: string): Promise<boolean> {
+  if (!('caches' in window)) return true;
+  try {
+    const cache = await caches.open('sample-packs-v1');
+    const match = await cache.match(url);
+    return !!match;
+  } catch {
+    return true; // fail open
+  }
+}
 
 interface SamplePackBrowserProps {
   onClose: () => void;
@@ -241,6 +255,17 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
 
   // Preview a sample
   const previewSample = async (sample: SampleInfo) => {
+    // Guard: only check factory pack URLs (not blob: or user-uploaded URLs)
+    if (sample.url.startsWith('/data/samples/packs/')) {
+      if (localStorage.getItem('samplePacksCached') !== 'v1') {
+        const cached = await isSampleCached(sample.url);
+        if (!cached) {
+          notify.warning('Sample packs are still downloading — try again in a moment');
+          return;
+        }
+      }
+    }
+
     // Increment version to invalidate any pending callbacks
     const currentVersion = ++previewVersionRef.current;
 
@@ -299,8 +324,20 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
   };
 
   // Load selected samples into current instrument(s)
-  const handleLoadSamples = () => {
+  const handleLoadSamples = async () => {
     if (selectedSamples.size === 0 || !selectedPack) return;
+
+    // Guard: if any selected URL is a factory pack URL, check cache before loading
+    const firstUrl = Array.from(selectedSamples)[0];
+    if (firstUrl.startsWith('/data/samples/packs/')) {
+      if (localStorage.getItem('samplePacksCached') !== 'v1') {
+        const cached = await isSampleCached(firstUrl);
+        if (!cached) {
+          notify.warning('Sample packs are still downloading — try again in a moment');
+          return;
+        }
+      }
+    }
 
     const urls = Array.from(selectedSamples);
 
@@ -423,6 +460,17 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
     if (selectedSamples.size === 0 || !selectedPack || !onSelectSample) return;
 
     const url = Array.from(selectedSamples)[0];
+
+    // Guard: only check factory pack URLs (not blob: or user-uploaded URLs)
+    if (url.startsWith('/data/samples/packs/')) {
+      if (localStorage.getItem('samplePacksCached') !== 'v1') {
+        const cached = await isSampleCached(url);
+        if (!cached) {
+          notify.warning('Sample packs are still downloading — try again in a moment');
+          return;
+        }
+      }
+    }
     // Find sample info
     let sampleInfo: SampleInfo | undefined;
     for (const cat of selectedPack.categories) {
