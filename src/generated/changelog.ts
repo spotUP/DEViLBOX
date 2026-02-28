@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-28T11:01:50.331Z
+ * Generated: 2026-02-28T12:57:41.899Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1619';
-export const BUILD_NUMBER = '1619';
-export const BUILD_HASH = '94b05eff';
+export const BUILD_VERSION = '1.0.1638';
+export const BUILD_NUMBER = '1638';
+export const BUILD_HASH = '3499767f';
 export const BUILD_DATE = '2026-02-28';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,81 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1619',
+    version: '1.0.1638',
     date: '2026-02-28',
     changes: [
+      {
+        type: 'feature',
+        "description": "Show toast when previewing uncached sample during download"
+      },
+      {
+        type: 'improvement',
+        "description": "Replace JSON.parse/stringify with structuredClone"
+      },
+      {
+        type: 'fix',
+        "description": "Guard cache.put against HTTP 206 partial responses"
+      },
+      {
+        type: 'fix',
+        "description": "Hold synth instrument preview for 800ms instead of 300ms"
+      },
+      {
+        type: 'feature',
+        "description": "Run background sample pack prefetch on first boot"
+      },
+      {
+        type: 'feature',
+        "description": "Add SamplePackPrefetcher for background cache population"
+      },
+      {
+        type: 'feature',
+        "description": "Register service worker on app startup"
+      },
+      {
+        type: 'feature',
+        "description": "Add sample-packs-v1 cache with cache-first strategy"
+      },
+      {
+        type: 'improvement',
+        "description": "Add sample packs on-demand implementation plan"
+      },
+      {
+        type: 'improvement',
+        "description": "Add sample packs on-demand download design"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: ignore wasm build dirs and thoughts/ in .gitignore"
+      },
+      {
+        type: 'feature',
+        "description": "Chore(refs): add reference music files for parser testing"
+      },
+      {
+        type: 'feature',
+        "description": "Chore(refs): add EaglePlayers replayer documentation tree"
+      },
+      {
+        type: 'improvement',
+        "description": "Add format documentation and format popularity CSVs"
+      },
+      {
+        type: 'feature',
+        "description": "Add MusicLineEngine.ts + audit/inspection utility scripts"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: regenerate changelog to build 1619"
+      },
+      {
+        type: 'fix',
+        "description": "Route MusicLine audio through separation chain, fix channel tracking when suppressed"
+      },
+      {
+        type: 'fix',
+        "description": "Load dotenv before route modules, switch sclang to file-based execution"
+      },
       {
         type: 'fix',
         "description": "Narrow layout string literals with as const in PixiVisualizer"
@@ -156,82 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "AllocateUTF8 → stringToNewUTF8, prevent detached ArrayBuffer, add missing audio exts to drop handler"
-      },
-      {
-        type: 'fix',
-        "description": "Persist Yoga instance on window to survive Vite HMR reloads"
-      },
-      {
-        type: 'fix',
-        "description": "STX parser, .sfx2/.m15 routing, sunvox drag-drop"
-      },
-      {
-        type: 'feature',
-        "description": "Register .mxtx extension + route to MaximumEffectParser"
-      },
-      {
-        type: 'fix',
-        "description": "Stamp full ImportMetadata on patterns after totals are known"
-      },
-      {
-        type: 'fix',
-        "description": "Add -D flag and headless env vars to sclang invocation"
-      },
-      {
-        type: 'fix',
-        "description": "Remove stray closing brace in ImportModuleDialog ternary"
-      },
-      {
-        type: 'fix',
-        "description": "Register .mid/.midi in getSupportedExtensions()"
-      },
-      {
-        type: 'fix',
-        "description": "Set sourceFormat 'ML' on patterns and fix TrackerReplayer guard"
-      },
-      {
-        type: 'fix',
-        "description": "Mark MusicLine as native-only in ImportModuleDialog"
-      },
-      {
-        type: 'fix',
-        "description": "Handle .sunvox/.sunsynth drop — create SunVoxSynth instrument"
-      },
-      {
-        type: 'fix',
-        "description": "Fix three TypeScript errors — canvas null, Uint8Array BlobPart, missing SynthInfo entries"
-      },
-      {
-        type: 'fix',
-        "description": "Widen parseAhiFile parameter to ArrayBufferLike"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Pattern import in MusicLineExporter"
-      },
-      {
-        type: 'feature',
-        "description": "Add POST /api/sc/compile endpoint and wire frontend to API_URL"
-      },
-      {
-        type: 'fix',
-        "description": "Remove nonexistent init() call and fix unused param TS errors"
-      },
-      {
-        type: 'fix',
-        "description": "Add rjpSample to InstrumentMetadata; add Mark II null guard tests"
-      },
-      {
-        type: 'feature',
-        "description": "Wire SunVoxImportDialog into InstrumentList + TrackerView"
-      },
-      {
-        type: 'feature',
-        "description": "Wire musiclineFileData through store and usePatternPlayback"
-      },
-      {
-        type: 'feature',
-        "description": "Add SunVoxImportDialog for .sunsynth file import"
       }
     ]
   }
