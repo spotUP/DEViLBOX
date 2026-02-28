@@ -14,7 +14,7 @@ import {
 
 function readString(buf: Uint8Array, offset: number): { value: string; next: number } {
   let end = offset;
-  while (buf[end] !== 0) end++;
+  while (end < buf.length && buf[end] !== 0) end++;
   const value = new TextDecoder().decode(buf.slice(offset, end));
   const next = offset + Math.ceil((end - offset + 1) / 4) * 4;
   return { value, next };
@@ -132,17 +132,17 @@ describe('oscNewSynth', () => {
 });
 
 describe('oscSetParams', () => {
-  it('creates /n_set with nodeId and key-value pairs', () => {
-    const msg = oscSetParams(42, { freq: 440.0 });
+  it('creates /n_set with nodeId and key-value pairs for two params', () => {
+    const msg = oscSetParams(42, { freq: 440.0, amp: 0.75 });
 
     // --- Address ---
     const addr = readString(msg, 0);
     expect(addr.value).toBe('/n_set');
 
     // --- Type tag string ---
-    // Args: i(nodeId) s(key) f(val) → ",isf"
+    // Args: i(nodeId) s(key) f(val) s(key) f(val) → ",isfsf"
     const typeTag = readString(msg, addr.next);
-    expect(typeTag.value).toBe(',isf');
+    expect(typeTag.value).toBe(',isfsf');
 
     // --- Arguments ---
     let offset = typeTag.next;
@@ -158,6 +158,15 @@ describe('oscSetParams', () => {
 
     // value 440.0: float32
     expect(readFloat32(msg, offset)).toBeCloseTo(440.0, 1);
+    offset += 4;
+
+    // key 'amp': string
+    const ampKey = readString(msg, offset);
+    expect(ampKey.value).toBe('amp');
+    offset = ampKey.next;
+
+    // value 0.75: float32
+    expect(readFloat32(msg, offset)).toBeCloseTo(0.75, 5);
   });
 });
 
