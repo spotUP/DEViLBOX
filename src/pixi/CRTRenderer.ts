@@ -1,51 +1,56 @@
 /**
- * CRTRenderer — Full-screen CRT post-processing shader.
+ * CRTRenderer — Full-screen CRT post-processing as a PixiJS v8 Filter.
  *
- * Pattern: identical to WorkbenchTiltRenderer.
- *   1. Render the scene container to a RenderTexture (CRT mesh excluded via renderable=false).
- *   2. Show the CRT mesh with uniforms updated from CRTParams.
- *   3. Pixi's normal render draws the CRT mesh to screen.
- *   4. Scene container uses renderable=false (not visible=false) so pointer events still work.
+ * Extends Filter so PixiJS handles the RenderTexture internally:
+ *   1. PixiJS renders the target container to a temp RT.
+ *   2. Our fragment shader samples that RT and applies CRT effects.
+ *   3. PixiJS composites the result to screen.
  *
- * Call renderFrame() each tick (BEFORE Pixi's screen render — useTick runs at NORMAL priority,
- * Pixi renders at LOW priority).
- * Call setEnabled(false) to restore normal rendering without CRT.
+ * No extra renderer.render() call — avoids Yoga layout conflicts
+ * that occurred when manually rendering the scene container mid-frame.
+ *
+ * Usage:
+ *   const crt = new CRTRenderer();
+ *   container.filters = [crt];          // enable
+ *   crt.updateParams(time, crtParams);  // call each tick
+ *   container.filters = [];             // disable
  */
 
-import type { Application, Container as ContainerType } from 'pixi.js';
-import {
-  RenderTexture,
-  Geometry,
-  Buffer,
-  BufferUsage,
-  Mesh,
-  Shader,
-  GlProgram,
-} from 'pixi.js';
+import { Filter, GlProgram } from 'pixi.js';
 import type { CRTParams } from '@stores/useSettingsStore';
 
 // ─── GLSL ─────────────────────────────────────────────────────────────────────
 
-// Clip-space quad vertex shader (identical to WorkbenchTilt).
-const VERT = /* glsl */ `#version 300 es
-  precision highp float;
+// Standard PixiJS v8 filter vertex shader.
+// Provides vTextureCoord to the fragment shader via the filter system's
+// uInputSize / uOutputFrame / uOutputTexture uniforms.
+const VERT = /* glsl */ `
   in vec2 aPosition;
-  in vec2 aUV;
-  out vec2 vUV;
-  void main() {
-    gl_Position = vec4(aPosition, 0.0, 1.0);
-    vUV = aUV;
+  out vec2 vTextureCoord;
+
+  uniform vec4 uInputSize;
+  uniform vec4 uOutputFrame;
+  uniform vec4 uOutputTexture;
+
+  vec4 filterVertexPosition(void) {
+    vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
+    position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
+    position.y = position.y * (2.0 * uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
+    return vec4(position, 0.0, 1.0);
+  }
+
+  vec2 filterTextureCoord(void) {
+    return aPosition * (uOutputFrame.zw * uInputSize.zw);
+  }
+
+  void main(void) {
+    gl_Position = filterVertexPosition();
+    vTextureCoord = filterTextureCoord();
   }
 `;
 
 // CRT fragment shader — adapted from Reference Code/webgl-crt-shader-main/CRTShader.js.
-// Changes from the original:
-//   - #version 300 es header
-//   - varying vec2 vUv  →  in vec2 vUV
-//   - uniform tDiffuse  →  uniform uTexture
-//   - texture2D(...)    →  texture(...)
-//   - gl_FragColor      →  out vec4 fragColor
-//   - uniform names prefixed with 'u'
+// Uses vTextureCoord (from PixiJS filter system) instead of vUV.
 const FRAG = /* glsl */ `#version 300 es
   #ifdef GL_FRAGMENT_PRECISION_HIGH
     precision highp float;
@@ -68,7 +73,7 @@ const FRAG = /* glsl */ `#version 300 es
   uniform float uCurvature;
   uniform float uFlickerStrength;
 
-  in vec2 vUV;
+  in vec2 vTextureCoord;
   out vec4 fragColor;
 
   const float PI = 3.14159265;
@@ -104,7 +109,7 @@ const FRAG = /* glsl */ `#version 300 es
   }
 
   void main() {
-    vec2 uv = vUV;
+    vec2 uv = vTextureCoord;
 
     if (uCurvature > 0.001) {
       uv = curveRemapUV(uv, uCurvature);
@@ -169,59 +174,11 @@ const FRAG = /* glsl */ `#version 300 es
 
 type UniformEntry = { value: number; type: 'f32' };
 
-export class CRTRenderer {
-  private readonly app: Application;
-  private readonly sceneContainer: ContainerType;
-  private readonly rt: RenderTexture;
-  private readonly mesh: Mesh<Geometry, Shader>;
+export class CRTRenderer extends Filter {
   private readonly _u: Record<string, UniformEntry>;
 
-  constructor(
-    app: Application,
-    sceneContainer: ContainerType,
-    width: number,
-    height: number,
-  ) {
-    this.app = app;
-    this.sceneContainer = sceneContainer;
-
-    // ── RenderTexture ─────────────────────────────────────────────────────────
-    this.rt = RenderTexture.create({ width, height });
-
-    // ── Quad geometry (full-screen, clip space) ───────────────────────────────
-    // Same layout as WorkbenchTilt: 4 vertices, positions + UVs separate buffers.
-    const posBuffer = new Buffer({
-      data: new Float32Array([
-        -1,  1,  // TL
-         1,  1,  // TR
-         1, -1,  // BR
-        -1, -1,  // BL
-      ]),
-      usage: BufferUsage.VERTEX,
-    });
-
-    const uvBuffer = new Buffer({
-      data: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
-      usage: BufferUsage.VERTEX,
-    });
-
-    const indexBuffer = new Buffer({
-      data: new Uint32Array([0, 1, 2, 0, 2, 3]),
-      usage: BufferUsage.INDEX,
-    });
-
-    const geometry = new Geometry({
-      attributes: {
-        aPosition: { buffer: posBuffer, format: 'float32x2', stride: 8, offset: 0 },
-        aUV:       { buffer: uvBuffer,  format: 'float32x2', stride: 8, offset: 0 },
-      },
-      indexBuffer,
-    });
-
-    // ── Uniform data ──────────────────────────────────────────────────────────
-    // PixiJS v8 wraps a plain object into a UniformGroup.
-    // Mutating .value in place causes PixiJS to re-upload on next render.
-    this._u = {
+  constructor() {
+    const _u: Record<string, UniformEntry> = {
       uTime:              { value: 0.0,  type: 'f32' },
       uScanlineIntensity: { value: 0.15, type: 'f32' },
       uScanlineCount:     { value: 400,  type: 'f32' },
@@ -237,35 +194,14 @@ export class CRTRenderer {
       uFlickerStrength:   { value: 0.01, type: 'f32' },
     };
 
-    // ── Shader ────────────────────────────────────────────────────────────────
     const glProgram = new GlProgram({ vertex: VERT, fragment: FRAG });
-    const shader = new Shader({
-      glProgram,
-      resources: {
-        uTexture: this.rt.source,
-        uniforms:  this._u as any,
-      },
-    });
+    super({ glProgram, resources: { uniforms: _u as any } });
 
-    // ── Mesh ──────────────────────────────────────────────────────────────────
-    this.mesh = new Mesh({ geometry, shader });
-    this.mesh.renderable = false;  // hidden until renderFrame() is called
-    this.mesh.zIndex = 10000;      // above WorkbenchTilt (9000) and all other layers
-    this.mesh.eventMode = 'none';  // pass-through: clicks reach the scene behind the mesh
-    app.stage.addChild(this.mesh);
+    this._u = _u;
   }
 
-  /**
-   * Capture scene → RT, update uniforms, expose mesh.
-   * Call inside useTick (NORMAL priority) — Pixi renders to screen at LOW priority afterward.
-   */
-  renderFrame(time: number, params: CRTParams): void {
-    // 1. Restore scene for RT capture; exclude CRT mesh from RT.
-    this.sceneContainer.alpha = 1;
-    this.mesh.renderable = false;
-    this.app.renderer.render({ container: this.sceneContainer, target: this.rt, clear: true });
-
-    // 2. Update uniforms.
+  /** Update all CRT uniforms. Call each tick while enabled. */
+  updateParams(time: number, params: CRTParams): void {
     const u = this._u;
     u.uTime.value              = time;
     u.uScanlineIntensity.value = params.scanlineIntensity;
@@ -280,30 +216,5 @@ export class CRTRenderer {
     u.uVignetteStrength.value  = params.vignetteStrength;
     u.uCurvature.value         = params.curvature;
     u.uFlickerStrength.value   = params.flickerStrength;
-
-    // 3. Hide scene from screen render via alpha=0 (not renderable=false — that
-    //    kills pointer events in PixiJS v8 hitTestRecursive). alpha=0 is
-    //    invisible on screen but EventSystem still delivers clicks normally.
-    this.sceneContainer.alpha = 0;
-    this.mesh.renderable = true;
-  }
-
-  /** Restore normal rendering (no CRT). */
-  setEnabled(enabled: boolean): void {
-    if (!enabled) {
-      this.sceneContainer.alpha = 1;
-      this.mesh.renderable = false;
-    }
-  }
-
-  /** Call on canvas resize. */
-  resize(width: number, height: number): void {
-    this.rt.resize(width, height);
-  }
-
-  destroy(): void {
-    this.app.stage.removeChild(this.mesh);
-    this.mesh.destroy();
-    this.rt.destroy(true);
   }
 }

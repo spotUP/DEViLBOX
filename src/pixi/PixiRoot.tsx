@@ -9,7 +9,7 @@
  */
 
 import { useRef, useEffect } from 'react';
-import { useApplication, useTick } from '@pixi/react';
+import { useTick } from '@pixi/react';
 import type { Container as ContainerType } from 'pixi.js';
 import { useUIStore, useSettingsStore } from '@stores';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
@@ -25,7 +25,6 @@ export const PixiRoot: React.FC = () => {
   const collabStatus = useCollaborationStore(s => s.status);
   const activeView = useUIStore(s => s.activeView);
 
-  const { app } = useApplication();
   const crtEnabled = useSettingsStore((s) => s.crtEnabled);
   const crtParams  = useSettingsStore((s) => s.crtParams);
 
@@ -40,31 +39,27 @@ export const PixiRoot: React.FC = () => {
     }
   }, [activeView]);
 
-  // Create/destroy CRTRenderer when app is ready
+  // Create CRTRenderer filter once on mount. PixiJS manages the RT internally.
   useEffect(() => {
-    if (!app || !rootContainerRef.current) return;
-    const renderer = new CRTRenderer(app, rootContainerRef.current, width, height);
-    crtRef.current = renderer;
+    const filter = new CRTRenderer();
+    crtRef.current = filter;
     return () => {
-      renderer.destroy();
+      filter.destroy();
       crtRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [app]);
+  }, []);
 
-  // Resize CRT render texture when canvas dimensions change
-  useEffect(() => {
-    crtRef.current?.resize(width, height);
-  }, [width, height]);
-
-  // Drive CRT renderer each frame (NORMAL priority — before Pixi's LOW-priority screen render)
+  // Apply/remove the filter and update uniforms each frame.
   useTick(() => {
+    const container = rootContainerRef.current;
     const crt = crtRef.current;
-    if (!crt) return;
+    if (!container || !crt) return;
+
     if (crtEnabled) {
-      crt.renderFrame(performance.now() / 1000, crtParams);
+      if (!container.filters?.includes(crt)) container.filters = [crt];
+      crt.updateParams(performance.now() / 1000, crtParams);
     } else {
-      crt.setEnabled(false);
+      if (container.filters?.length) container.filters = [];
     }
   });
 
