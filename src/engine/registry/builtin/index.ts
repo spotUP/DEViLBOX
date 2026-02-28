@@ -8,3 +8,4 @@ import './tone';
 import './sampler';
 import './tb303';
 import './furnace';
+import './supercollider';

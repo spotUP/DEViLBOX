@@ -34,6 +34,9 @@ function midiToHz(note: number | string): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
+// Module-level counter so node IDs are unique across all SuperColliderSynth instances.
+let _nextGlobalNodeId = 1000;
+
 // ---------------------------------------------------------------------------
 // SuperColliderSynth
 // ---------------------------------------------------------------------------
@@ -49,7 +52,6 @@ export class SuperColliderSynth implements DevilboxSynth {
   private _engine: SuperColliderEngine | null = null;
   private _enginePromise: Promise<SuperColliderEngine> | null = null;
   private _currentNodeId: number | null = null;
-  private _nextNodeId = 1000; // scsynth node IDs; start well above reserved range
   private _disposed = false;
   private _gainNode: GainNode; // Placeholder output while engine loads
 
@@ -108,7 +110,7 @@ export class SuperColliderSynth implements DevilboxSynth {
       this._currentNodeId = null;
     }
 
-    const nodeId = this._nextNodeId++;
+    const nodeId = _nextGlobalNodeId++;
     this._currentNodeId = nodeId;
 
     const freq = midiToHz(note);
