@@ -6,6 +6,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { Application, extend, useApplication } from '@pixi/react';
+import { GLRenderer } from '../ui/renderer-context';
 import { Container, Graphics, BitmapText, Sprite, Text } from 'pixi.js';
 import '@pixi/layout'; // Side-effect: registers layout mixin on Container
 import { setYoga, setYogaConfig } from '@pixi/layout';
@@ -99,22 +100,24 @@ export const PixiApp: React.FC = () => {
   }
 
   return (
-    <div ref={containerRef} className="h-screen w-screen" style={{ overflow: 'hidden' }}>
-      <Application
-        preference="webgl"
-        backgroundAlpha={1}
-        backgroundColor={0x0a0a0b}
-        antialias
-        autoDensity
-        resolution={window.devicePixelRatio || 1}
-        resizeTo={window}
-        roundPixels
-        preserveDrawingBuffer
-        className="pixi-canvas"
-      >
-        <PixiAppContent />
-      </Application>
-    </div>
+    <GLRenderer>
+      <div ref={containerRef} className="h-screen w-screen" style={{ overflow: 'hidden' }}>
+        <Application
+          preference="webgl"
+          backgroundAlpha={1}
+          backgroundColor={0x0a0a0b}
+          antialias
+          autoDensity
+          resolution={window.devicePixelRatio || 1}
+          resizeTo={window}
+          roundPixels
+          preserveDrawingBuffer
+          className="pixi-canvas"
+        >
+          <PixiAppContent />
+        </Application>
+      </div>
+    </GLRenderer>
   );
 };
 
