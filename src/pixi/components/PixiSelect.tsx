@@ -19,6 +19,7 @@ interface PixiDropdownPanelProps {
   onSelect: (value: string) => void;
   onClose: () => void;
   width: number;
+  visible?: boolean;
   maxItems?: number;
   itemHeight?: number;
   layout?: Record<string, unknown>;
@@ -32,6 +33,7 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
   onSelect,
   onClose,
   width,
+  visible = true,
   maxItems = 12,
   itemHeight = ITEM_H,
   layout: layoutProp,
@@ -59,6 +61,7 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
 
   return (
     <pixiContainer
+      visible={visible}
       zIndex={200}
       layout={{
         position: 'absolute',
@@ -69,7 +72,7 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
         gap: 0,
         ...layoutProp,
       }}
-      eventMode="static"
+      eventMode={visible ? 'static' : 'none'}
       onPointerDown={(e: FederatedPointerEvent) => e.stopPropagation()}
     >
       <pixiGraphics
@@ -169,15 +172,14 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
         tint={theme.textMuted.color}
         layout={{ position: 'absolute', left: width - 14, top: (height - 10) / 2 }}
       />
-      {open && (
-        <PixiDropdownPanel
-          options={options}
-          onSelect={onChange}
-          onClose={() => setOpen(false)}
-          width={Math.max(width, 160)}
-          layout={{ position: 'absolute', top: height + 2 }}
-        />
-      )}
+      <PixiDropdownPanel
+        visible={open}
+        options={options}
+        onSelect={onChange}
+        onClose={() => setOpen(false)}
+        width={Math.max(width, 160)}
+        layout={{ position: 'absolute', top: height + 2 }}
+      />
     </pixiContainer>
   );
 };
