@@ -9,6 +9,7 @@ import { SAMPLE_CATEGORY_LABELS } from '@typedefs/samplePack';
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
 import { Package, Search, Play, Check, Music, Disc3, Sparkles, X, Square, Upload, Folder, Trash2, Zap, FileAudio } from 'lucide-react';
 import { normalizeUrl } from '@utils/urlUtils';
+import { CACHE_NAME as SAMPLE_PACK_CACHE_NAME, STORAGE_KEY as SAMPLE_PACK_STORAGE_KEY } from '@/lib/SamplePackPrefetcher';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getAudioContext } from '../../audio/AudioContextSingleton';
 import type { InstrumentConfig } from '@typedefs/instrument';
@@ -16,11 +17,10 @@ import type { SampleData } from '@typedefs/drumpad';
 
 /** Returns true if the sample URL is cached in sample-packs-v1, or if the
  *  Cache API is unavailable (assume cached to avoid false positives). */
-// Keep in sync with CACHE_NAME in SamplePackPrefetcher.ts and SAMPLE_CACHE_NAME in public/sw.js
 async function isSampleCached(url: string): Promise<boolean> {
   if (!('caches' in window)) return true;
   try {
-    const cache = await caches.open('sample-packs-v1');
+    const cache = await caches.open(SAMPLE_PACK_CACHE_NAME);
     const match = await cache.match(url);
     return !!match;
   } catch {
@@ -32,7 +32,7 @@ async function isSampleCached(url: string): Promise<boolean> {
  *  show a warning toast and return true (caller should bail out). */
 async function warnIfNotCached(url: string): Promise<boolean> {
   // Fast path: flag is set means everything is cached
-  if (localStorage.getItem('samplePacksCached') === 'v1') return false;
+  if (localStorage.getItem(SAMPLE_PACK_STORAGE_KEY) === 'v1') return false;
   // Only check factory pack URLs (blob: URLs are always local)
   if (!url.startsWith('/data/samples/packs/')) return false;
   const cached = await isSampleCached(url);
