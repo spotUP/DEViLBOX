@@ -33,6 +33,7 @@ import { MusicLinePatternViewer } from '@components/tracker/MusicLinePatternView
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
 import { PixiGridSequencer } from './tracker/PixiGridSequencer';
 import { PixiTB303View } from './tracker/PixiTB303View';
+import { PixiSunVoxChannelView } from './sunvox/PixiSunVoxChannelView';
 import { PixiPianoRollView } from './PixiPianoRollView';
 import { useTrackerInput } from '@/hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
@@ -83,7 +84,7 @@ const useSelectStyle = (variant: 'default' | 'accent' = 'default'): React.CSSPro
   };
 };
 
-type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'arrangement' | 'dj' | 'drumpad';
+type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad';
 
 const PATTERN_PANEL_HEIGHT = 180;
 
@@ -106,7 +107,7 @@ export const PixiTrackerView: React.FC = () => {
 
   // Hide instrument panel on narrow windows (matches DOM TrackerView)
   const canShowInstrumentPanel = windowWidth >= 900;
-  const instrumentPanelVisible = viewMode !== 'tb303' && canShowInstrumentPanel && showInstrumentPanel;
+  const instrumentPanelVisible = viewMode !== 'tb303' && viewMode !== 'sunvox' && canShowInstrumentPanel && showInstrumentPanel;
   const INSTRUMENT_PANEL_W = 200;
 
   // Pattern data for automation/macro lanes overlay
@@ -155,7 +156,7 @@ export const PixiTrackerView: React.FC = () => {
         style={{ overflow: 'visible', zIndex: 34 }}
         autoHeight
       >
-        <TB303KnobPanelOverlay visible={viewMode !== 'tb303'} />
+        <TB303KnobPanelOverlay visible={viewMode !== 'tb303' && viewMode !== 'sunvox'} />
       </PixiDOMOverlay>
 
       {/* Editor controls bar — DOM overlay for 1:1 parity */}
@@ -232,6 +233,18 @@ export const PixiTrackerView: React.FC = () => {
             }}
           >
             <PixiTB303View channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+          </pixiContainer>
+
+          {/* SunVox channel view — native Pixi */}
+          <pixiContainer
+            visible={viewMode === 'sunvox'}
+            layout={{
+              flex: viewMode === 'sunvox' ? 1 : 0,
+              height: viewMode === 'sunvox' ? '100%' : 0,
+              width: viewMode === 'sunvox' ? '100%' : 0,
+            }}
+          >
+            <PixiSunVoxChannelView channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
           </pixiContainer>
 
           {/* Furnace / Hively / MusicLine — still DOM-based, via PixiDOMOverlay */}
@@ -312,10 +325,10 @@ export const PixiTrackerView: React.FC = () => {
 
         {/* Instrument panel toggle button — always mounted, zero-width when hidden */}
         <PixiDOMOverlay
-          layout={{ width: canShowInstrumentPanel && viewMode !== 'tb303' ? 24 : 0, height: '100%' }}
+          layout={{ width: canShowInstrumentPanel && viewMode !== 'tb303' && viewMode !== 'sunvox' ? 24 : 0, height: '100%' }}
           style={{ borderLeft: '1px solid rgba(255,255,255,0.1)' }}
         >
-          {canShowInstrumentPanel && viewMode !== 'tb303' && (
+          {canShowInstrumentPanel && viewMode !== 'tb303' && viewMode !== 'sunvox' && (
             <button
               onClick={() => setShowInstrumentPanel(p => !p)}
               style={{
