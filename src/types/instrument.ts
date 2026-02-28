@@ -1195,11 +1195,20 @@ export const DEFAULT_DAVID_WHITTAKER: DavidWhittakerConfig = {
  * render knobs without repeatedly querying the WASM layer.
  */
 export interface SunVoxConfig {
-  /** Raw .sunsynth patch binary — null until a patch is loaded */
+  /**
+   * Raw .sunsynth binary as loaded from disk.
+   * Persisted via IndexedDB structured clone (ArrayBuffer survives round-trips).
+   * NOTE: Not preserved in JSON file export — patches must be re-imported after
+   * loading a project from a .json export file.
+   */
   patchData: ArrayBuffer | null;
   /** Display name of the loaded patch (from module name in WASM) */
   patchName: string;
-  /** Most recently read control values, keyed by ctlId string */
+  /**
+   * Runtime cache of the most recently set control values, keyed by ctlId string.
+   * Populated by SunVoxControls UI; not guaranteed to reflect the WASM engine state.
+   * Stale values on project load are harmless — WASM re-initializes from patchData.
+   */
   controlValues: Record<string, number>;
 }
 
