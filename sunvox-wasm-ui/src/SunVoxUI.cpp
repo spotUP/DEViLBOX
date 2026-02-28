@@ -65,9 +65,9 @@
 #define HEADER_H          28   /* module name header height                 */
 #define FOOTER_H          0
 
-/* Palette (BGRA bytes: [B,G,R,A]) encoded as uint32 little-endian         */
-/* uint32 layout on a little-endian machine: byte0=B, byte1=G, byte2=R, byte3=A */
-static inline uint32_t bgra( uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255 )
+/* Packs R, G, B (0-255 each) and A=255 into a little-endian BGRA uint32
+   as stored in the framebuffer: memory order [B, G, R, A].                  */
+static inline uint32_t rgba_pixel( uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255 )
 {
     return ( (uint32_t)a << 24 ) | ( (uint32_t)r << 16 ) | ( (uint32_t)g << 8 ) | b;
 }
@@ -462,9 +462,9 @@ int sunvox_ui_create( int width, int height )
             memset( ui, 0, sizeof( UiInstance ) );
             ui->width  = width;
             ui->height = height;
-            ui->fb     = (uint32_t *)malloc( (size_t)( width * height ) * 4 );
+            ui->fb     = (uint32_t *)malloc( (size_t)width * (size_t)height * 4 );
             if ( !ui->fb ) return -1;
-            memset( ui->fb, 0x1A, (size_t)( width * height ) * 4 );
+            memset( ui->fb, 0x1A, (size_t)width * (size_t)height * 4 );
             ui->used        = true;
             ui->hover_row   = -1;
             ui->active_row  = -1;
@@ -521,6 +521,7 @@ void sunvox_ui_set_module( int handle,
              sizeof( ui->mod_name ) - 1 );
     ui->mod_name[ sizeof( ui->mod_name ) - 1 ] = '\0';
 
+    if ( ctls_count < 0 ) ctls_count = 0;
     ui->ctl_count = ctls_count > MAX_CTLS ? MAX_CTLS : ctls_count;
 
     for ( int i = 0; i < ui->ctl_count; i++ )
@@ -598,6 +599,8 @@ void sunvox_ui_mouse_event( int handle, int type, int x, int y, int btn )
                             ui->ctls[ ui->active_row ].val_min;
                 if ( range > 0 && bar_w_max > 0 )
                 {
+                    if ( dx < -bar_w_max ) dx = -bar_w_max;
+                    if ( dx >  bar_w_max ) dx =  bar_w_max;
                     int delta_val = ( dx * range ) / bar_w_max;
                     int new_val   = ui->drag_val_start + delta_val;
                     int v_min = ui->ctls[ ui->active_row ].val_min;
