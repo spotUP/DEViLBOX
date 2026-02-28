@@ -72,7 +72,7 @@ export const PixiTrackerView: React.FC = () => {
   // Pattern data for automation/macro lanes overlay.
   // Use stable primitive selectors — avoids re-rendering the whole tracker view on every cell edit.
   // Cell edits change s.patterns reference but never change id/length/channelCount/patternOrder.
-  const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
+  // currentPositionIndex reserved for future automation lane scroll sync
   const showAutomation = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
   const tb303Collapsed = useUIStore(s => s.tb303Collapsed);
