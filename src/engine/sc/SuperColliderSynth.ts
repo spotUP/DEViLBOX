@@ -59,7 +59,7 @@ export class SuperColliderSynth implements DevilboxSynth {
     this._gainNode = audioContext.createGain();
     // Expose the gain node as output immediately so callers can connect to the
     // effect chain before the engine finishes booting.
-    (this as { output: AudioNode }).output = this._gainNode;
+    this.output = this._gainNode;
     this._initEngine();
   }
 
@@ -100,6 +100,12 @@ export class SuperColliderSynth implements DevilboxSynth {
 
     // time parameter is not used — scsynth scheduling is handled internally
     void time;
+
+    // Release any still-playing node before starting a new one (monophonic behaviour)
+    if (this._currentNodeId != null) {
+      this._engine?.noteOff(this._currentNodeId);
+      this._currentNodeId = null;
+    }
 
     const nodeId = this._nextNodeId++;
     this._currentNodeId = nodeId;

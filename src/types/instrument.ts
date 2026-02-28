@@ -3730,7 +3730,7 @@ export const DEFAULT_TB303: TB303Config = {
 
 export const DEFAULT_SUPERCOLLIDER: SuperColliderConfig = {
   synthDefName: '',
-  source: `SynthDef(\\\\mySynth, { |freq=440, amp=0.5, gate=1|
+  source: `SynthDef(\\mySynth, { |freq=440, amp=0.5, gate=1|
   var sig = SinOsc.ar(freq) * amp;
   var env = EnvGen.kr(Env.adsr(0.01, 0.1, 0.7, 0.5), gate, doneAction: 2);
   Out.ar(0, (sig * env).dup);
