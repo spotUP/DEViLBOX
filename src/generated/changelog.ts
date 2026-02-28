@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-28T14:24:30.940Z
+ * Generated: 2026-02-28T15:19:33.059Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1657';
-export const BUILD_NUMBER = '1657';
-export const BUILD_HASH = '4c4929e7';
+export const BUILD_VERSION = '1.0.1670';
+export const BUILD_NUMBER = '1670';
+export const BUILD_HASH = '3157e525';
 export const BUILD_DATE = '2026-02-28';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,57 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1657',
+    version: '1.0.1670',
     date: '2026-02-28',
     changes: [
+      {
+        type: 'fix',
+        "description": "SunVox worklet cleanup + keyboard handler improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Error line highlighting, raw output display, param management"
+      },
+      {
+        type: 'feature',
+        "description": "Add MAME chips + phrase-based test sounds to synth test runner"
+      },
+      {
+        type: 'fix',
+        "description": "Init WASM directly in onmessage, add _rejectInit"
+      },
+      {
+        type: 'feature',
+        "description": "Show banner when Vite dev server is unreachable"
+      },
+      {
+        type: 'fix',
+        "description": "Cast preSunVoxModules to fix tsc -b type errors"
+      },
+      {
+        type: 'fix',
+        "description": "Add status message feedback to keyboard commands missing user feedback"
+      },
+      {
+        type: 'fix',
+        "description": "Add pop-out button to ArrangementToolbar"
+      },
+      {
+        type: 'fix',
+        "description": "Gate AutomationLanes/MacroLanes on UIStore flags in DOM; respect tb303Collapsed in GL"
+      },
+      {
+        type: 'fix',
+        "description": "Add status messages to panel focus commands and wire useHexNumbers in DrumPad"
+      },
+      {
+        type: 'fix',
+        "description": "Add 6s timeout to module extraction to prevent load hang"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused vars, add missing UIStateSnapshot fields to workers"
+      },
       {
         type: 'fix',
         "description": "Remove unused ROW_HEIGHT/rowHighlightInterval/showBeatLabels vars, add missing UIStateSnapshot fields to workers"
@@ -176,58 +224,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Route MusicLine audio through separation chain, fix channel tracking when suppressed"
-      },
-      {
-        type: 'fix',
-        "description": "Load dotenv before route modules, switch sclang to file-based execution"
-      },
-      {
-        type: 'fix',
-        "description": "Narrow layout string literals with as const in PixiVisualizer"
-      },
-      {
-        type: 'fix',
-        "description": "Fix WASM crash on stop/load and trim pattern length to sentinel"
-      },
-      {
-        type: 'fix',
-        "description": "Import .sunvox as project, fix BindingErrors and black screen"
-      },
-      {
-        type: 'feature',
-        "description": "Add Oktalyzer SAMP chunk name extraction + pin null guards with tests"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate Yoga BindingError on playback start"
-      },
-      {
-        type: 'feature',
-        "description": "Remove dropzone and browse-files button from import dialog"
-      },
-      {
-        type: 'fix',
-        "description": "Add Cross-Origin Isolation headers for SharedArrayBuffer"
-      },
-      {
-        type: 'fix',
-        "description": "Rewrite chunk parser to match module.cpp reference 1:1"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript errors and fix SuperCollider registry create()"
-      },
-      {
-        type: 'feature',
-        "description": "Extract real PCM samples from TCB Tracker modules"
-      },
-      {
-        type: 'fix',
-        "description": "Wire HivelyEngine for HVL/AHX preview; hide button for unsupported formats"
-      },
-      {
-        type: 'feature',
-        "description": "Show import dialog on drag-drop instead of silently adding instrument"
       }
     ]
   }
