@@ -53,10 +53,13 @@ async function doLoadFonts(): Promise<void> {
   }
 
   try {
-    // Uninstall dynamic fallbacks before MSDF load — both register under the same
-    // "${name}-bitmap" cache key, and Pixi warns if the key is set twice.
+    // Evict the fallback cache entries before MSDF load so Pixi doesn't warn
+    // "already has key" when both register under "${name}-bitmap".
+    // We use Cache.remove() (not BitmapFontManager.uninstall()) to avoid
+    // destroying the DynamicBitmapFont textures while BitmapText nodes are
+    // actively using them — that would cause a red-rectangle flash.
     for (const def of fontDefs) {
-      BitmapFontManager.uninstall(def.name);
+      if (Cache.has(`${def.name}-bitmap`)) Cache.remove(`${def.name}-bitmap`);
     }
     await Assets.load(fontDefs.map(d => d.name));
   } catch {
