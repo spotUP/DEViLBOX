@@ -18,7 +18,10 @@ import { randomBytes } from 'crypto';
 
 const router = Router();
 
-const SCLANG_PATH = process.env.SCLANG_PATH || 'sclang';
+// Read lazily so dotenv is guaranteed to have run before first use.
+function getSclangPath(): string {
+  return process.env.SCLANG_PATH ?? 'sclang';
+}
 const COMPILE_TIMEOUT_MS = 30_000;
 const MAX_SOURCE_LENGTH = 100_000;
 
@@ -43,9 +46,10 @@ interface CompileFailure {
 // Source parsing helpers
 // ---------------------------------------------------------------------------
 
-/** Extract SynthDef name from SC source, e.g. SynthDef(\mySynth, ...) or SynthDef('mySynth', ...) */
+/** Extract SynthDef name from SC source.
+ * Handles: SynthDef(\mySynth, ...), SynthDef('mySynth', ...), SynthDef("mySynth", ...) */
 function extractSynthDefName(source: string): string | null {
-  const m = source.match(/SynthDef\s*\(\s*[\\']?(\w+)/);
+  const m = source.match(/SynthDef\s*\(\s*(?:\\|'|")?(\w+)/);
   return m ? m[1] : null;
 }
 
@@ -113,26 +117,29 @@ class SclangCompileError extends Error {
 }
 
 /**
- * Run SC source code through sclang via stdin, resolving with combined stdout+stderr.
- * Piping via stdin works reliably for non-root users; the -D file-arg approach hangs.
+ * Write script to a temp file and run it with sclang <file>.
+ * File-based execution handles multi-line SynthDefs correctly; stdin REPL mode
+ * processes input line-by-line which breaks multi-line expressions.
  */
-function runSclang(script: string): Promise<string> {
+async function runSclang(script: string, scriptPath: string): Promise<string> {
+  await fs.writeFile(scriptPath, script, 'utf8');
+
+  const sclangPath = getSclangPath();
   return new Promise((resolve, reject) => {
     let proc: ReturnType<typeof spawn>;
     try {
-      proc = spawn(SCLANG_PATH, [], {
-        env: {
-          ...process.env,
-          // Required for headless server: use Qt's offscreen platform instead of X11
-          QT_QPA_PLATFORM: 'offscreen',
-          // Allow Chromium (QtWebEngine bundled in SC) to run as root or in containers
-          QTWEBENGINE_CHROMIUM_FLAGS: '--no-sandbox',
-        },
+      // macOS uses 'cocoa' (the default) — don't override QT_QPA_PLATFORM.
+      // Linux headless servers need 'offscreen' to avoid X11 errors.
+      const qtEnv = process.platform === 'linux'
+        ? { QT_QPA_PLATFORM: 'offscreen', QTWEBENGINE_CHROMIUM_FLAGS: '--no-sandbox' }
+        : {};
+      proc = spawn(sclangPath, [scriptPath], {
+        env: { ...process.env, ...qtEnv },
       });
     } catch (err: unknown) {
       const e = err as NodeJS.ErrnoException;
       if (e.code === 'ENOENT') {
-        reject(new SclangNotFoundError(`sclang not found at "${SCLANG_PATH}"`));
+        reject(new SclangNotFoundError(`sclang not found at "${sclangPath}"`));
       } else {
         reject(err);
       }
@@ -145,7 +152,7 @@ function runSclang(script: string): Promise<string> {
 
     proc.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'ENOENT') {
-        reject(new SclangNotFoundError(`sclang not found at "${SCLANG_PATH}"`));
+        reject(new SclangNotFoundError(`sclang not found at "${sclangPath}"`));
       } else {
         reject(err);
       }
@@ -165,10 +172,6 @@ function runSclang(script: string): Promise<string> {
       reject(new SclangCompileError('sclang timed out'));
     }, COMPILE_TIMEOUT_MS);
     proc.on('close', () => clearTimeout(timer));
-
-    // Write script to stdin and close so sclang sees EOF and exits
-    proc.stdin?.write(script);
-    proc.stdin?.end();
   });
 }
 
@@ -209,14 +212,16 @@ router.post('/compile', (req: Request, res: Response) => {
       await fs.mkdir(tmpDir, { recursive: true });
 
       // Wrap the user's SynthDef expression so it writes the .scsyndef binary.
-      // The source must evaluate to a SynthDef object as its final expression.
+      // Wrap in (...) so multi-line SynthDef is treated as one expression.
+      // .add is allowed — it schedules to the local interpreter without needing a server.
       const outDirEscaped = tmpDir.replace(/\\/g, '/'); // SC uses forward slashes
       const script = `(\n${source}\n).writeDefFile("${outDirEscaped}");\n0.exit;\n`;
 
-      // Run sclang — pipe via stdin (file-arg approach hangs for non-root users)
+      // Write script to a file and execute — stdin REPL mode breaks multi-line expressions.
+      const scriptPath = path.join(tmpDir, 'compile.sc');
       let sclangOutput: string;
       try {
-        sclangOutput = await runSclang(script);
+        sclangOutput = await runSclang(script, scriptPath);
       } catch (err) {
         if (err instanceof SclangNotFoundError) {
           res.status(503).json({ success: false, error: 'SuperCollider (sclang) is not installed on the server. Set SCLANG_PATH to the sclang binary.' } satisfies CompileFailure);
