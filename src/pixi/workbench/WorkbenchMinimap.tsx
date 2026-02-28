@@ -11,6 +11,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import type { FederatedPointerEvent, Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
+import { PIXI_FONTS } from '../fonts';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { springCameraTo, type CameraSpringHandle } from './WorkbenchExpose';
 import { playMinimapClick } from './workbenchSounds';
@@ -194,7 +195,7 @@ export const WorkbenchMinimap: React.FC<Props> = ({ screenW, screenH }) => {
       {/* Zoom label */}
       <pixiBitmapText
         text={`${Math.round(camera.scale * 100)}%`}
-        style={{ fontFamily: 'monospace', fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
         tint={0x8080a0}
         x={PADDING + 2}
         y={MAP_H - 12}

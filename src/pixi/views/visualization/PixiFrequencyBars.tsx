@@ -89,7 +89,7 @@ export const PixiFrequencyBars: React.FC<PixiFrequencyBarsProps> = ({ width, hei
   return (
     <pixiContainer layout={{ width, height, justifyContent: 'center', alignItems: 'center' }}>
       <pixiGraphics ref={graphicsRef} draw={isPlaying ? () => {} : drawStatic} layout={{ position: 'absolute', width, height }} />
-      <pixiBitmapText text="SPECTRUM" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={theme.textMuted.color} layout={{}} visible={!isPlaying} />
+      <pixiBitmapText text="SPECTRUM" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={theme.textMuted.color} layout={{}} alpha={!isPlaying ? 1 : 0} />
     </pixiContainer>
   );
 };
