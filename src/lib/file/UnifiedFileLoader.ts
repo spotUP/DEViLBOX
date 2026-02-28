@@ -71,6 +71,11 @@ export async function loadFile(
       return await loadInstrumentFile(file);
     }
 
+    // .sunsynth / .sunvox - SunVox patch or project → add as SunVoxSynth instrument
+    if (filename.endsWith('.sunsynth') || filename.endsWith('.sunvox')) {
+      return await loadSunVoxInstrument(file);
+    }
+
     // .xml - DB303 preset or pattern
     if (filename.endsWith('.xml')) {
       return await loadXMLFile(file);
@@ -428,4 +433,15 @@ async function loadAudioSample(file: File): Promise<FileLoadResult> {
     success: true,
     message: `Recognized audio sample: ${file.name} (manual import required)`
   };
+}
+
+/**
+ * Load a .sunsynth or .sunvox file as a SunVoxSynth instrument.
+ */
+async function loadSunVoxInstrument(file: File): Promise<FileLoadResult> {
+  const buffer = await file.arrayBuffer();
+  const name = file.name.replace(/\.(sunsynth|sunvox)$/i, '');
+  const config = { patchData: buffer, patchName: name, controlValues: {} };
+  useInstrumentStore.getState().createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
+  return { success: true, message: `Imported SunVox instrument: ${name}` };
 }
