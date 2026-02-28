@@ -169,7 +169,15 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
   // Deduplicates concurrent calls so rapid key presses share one init promise.
   const ensureContextRunning = useCallback((): Promise<void> => {
     const engine = engineRef.current;
-    if (engine.getContextState() === 'running') return Promise.resolve();
+    // Synchronously fire resume attempt before any await. iOS requires AudioContext.resume()
+    // to be called within the user gesture — once we enter an async microtask chain the
+    // gesture activation can be lost on iOS < 14.5. This is always a no-op when running.
+    engine.syncResume();
+    // Use isContextActuallyRunning() which checks both the Tone.js wrapper AND
+    // the native AudioContext. Tone.js can cache a stale 'running' state after
+    // the browser auto-suspends the context (silence timeout, tab focus lost),
+    // causing getSafeTime() to return null even after getContextState() says 'running'.
+    if (engine.isContextActuallyRunning()) return Promise.resolve();
     if (!initPromiseRef.current) {
       initPromiseRef.current = engine.init().finally(() => {
         initPromiseRef.current = null;
