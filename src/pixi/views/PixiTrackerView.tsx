@@ -1,19 +1,19 @@
 /**
  * PixiTrackerView — Tracker view for WebGL mode.
- * Layout: FT2Toolbar (top) | Editor controls bar | Main area split:
- *   [PatternEditorCanvas (flex) | InstrumentList (side panel)]
+ * Layout: FT2Toolbar (top) | [TB303KnobPanel] | Editor controls bar |
+ *   [PatternManagement] | Main area split:
+ *   [PitchSlider | PatternEditor (flex) | InstrumentList (side panel)]
  *
- * Pure Pixi rendering — no DOM overlays except MusicLine (DOM-only) and TB303KnobPanel/PatternManagement/PitchSlider (pending Pixi rewrites).
+ * Pure Pixi rendering — no DOM overlays.
  *
  * Keyboard input (useTrackerInput) and block operations (useBlockOperations)
  * are hooked here — they only attach window event listeners, no DOM rendering.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
-import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
 import { PixiFT2Toolbar, FT2_TOOLBAR_HEIGHT, FT2_TOOLBAR_HEIGHT_COMPACT } from './tracker/PixiFT2Toolbar';
 import { PixiInstrumentPanel } from './tracker/PixiInstrumentPanel';
 import { PixiChannelVUMeters } from './tracker/PixiChannelVUMeters';
@@ -27,8 +27,11 @@ import { PixiRandomizeDialog } from '../dialogs/PixiRandomizeDialog';
 import { PixiAcidPatternDialog } from '../dialogs/PixiAcidPatternDialog';
 import { PixiFurnaceView } from './furnace/PixiFurnaceView';
 import { PixiHivelyView } from './hively/PixiHivelyView';
-import { MusicLineTrackTableEditor } from '@components/tracker/MusicLineTrackTableEditor';
-import { MusicLinePatternViewer } from '@components/tracker/MusicLinePatternViewer';
+import { PixiPitchSlider } from './tracker/PixiPitchSlider';
+import { PixiTB303KnobPanel, TB303_PANEL_COLLAPSED_H, TB303_PANEL_EXPANDED_H } from './tracker/PixiTB303KnobPanel';
+import { PixiPatternManagement } from './tracker/PixiPatternManagement';
+import { PixiMusicLineTrackTable } from './tracker/PixiMusicLineTrackTable';
+import { PixiMusicLinePatternViewer } from './tracker/PixiMusicLinePatternViewer';
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
 import { PixiGridSequencer } from './tracker/PixiGridSequencer';
 import { PixiTB303View } from './tracker/PixiTB303View';
@@ -37,31 +40,13 @@ import { PixiPianoRollView } from './PixiPianoRollView';
 import { useTrackerInput } from '@/hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
-import { useTrackerStore, useUIStore } from '@stores';
+import { useTrackerStore, useUIStore, useInstrumentStore } from '@stores';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
-import { PatternManagement } from '@/components/pattern/PatternManagement';
-/** Deferred pitch slider — avoids circular import from @engine/PatternScheduler */
-const PitchSliderOverlay: React.FC = () => {
-  const [Comp, setComp] = useState<React.ComponentType<{ className?: string }> | null>(null);
-  useEffect(() => {
-    import('@/components/transport/DJPitchSlider').then(m => setComp(() => m.DJPitchSlider));
-  }, []);
-  return Comp ? <Comp className="h-full" /> : null;
-};
-
-/** Deferred TB303KnobPanel — dynamic import avoids circular deps */
-const TB303KnobPanelOverlay: React.FC<{ visible: boolean }> = ({ visible }) => {
-  const [Comp, setComp] = useState<React.ComponentType | null>(null);
-  useEffect(() => {
-    import('@components/tracker/TB303KnobPanel').then(m => setComp(() => m.TB303KnobPanel));
-  }, []);
-  if (!visible || !Comp) return null;
-  return <Comp />;
-};
 
 type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj';
 
 const PATTERN_PANEL_HEIGHT = 180;
+const MUSICLINE_MATRIX_HEIGHT = 220;
 
 export const PixiTrackerView: React.FC = () => {
   // Enable FT2-style keyboard input (window event listeners — no DOM needed)
@@ -92,6 +77,7 @@ export const PixiTrackerView: React.FC = () => {
   const showAutomation = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
   const tb303Collapsed = useUIStore(s => s.tb303Collapsed);
+  const hasTB303 = useInstrumentStore(s => s.instruments.some(i => i.synthType === 'TB303'));
   const currentPattern = patterns[currentPatternIndex];
   const patternId = currentPattern?.id || '';
   const patternLength = currentPattern?.length || 64;
@@ -106,13 +92,16 @@ export const PixiTrackerView: React.FC = () => {
   const nextPatternId = nextPositionIdx >= 0 ? patterns[patternOrder[nextPositionIdx]]?.id : undefined;
   const nextPatternLength = nextPositionIdx >= 0 ? patterns[patternOrder[nextPositionIdx]]?.length : undefined;
 
-  // Compute instrument panel height: window minus navbar + toolbar + controls + statusbar + optional pattern panel
+  // Compute instrument panel height: window minus navbar + toolbar + controls + statusbar + optional panels
   const NAVBAR_H = 98; // NavBar(45px) + TabBar(41px) + borders+padding — must match PixiNavBar height
   const STATUSBAR_H = 32; // must match PixiStatusBar STATUS_BAR_HEIGHT
   const CONTROLS_BAR_H = 32;
   const MACRO_SLOTS_H = showMacroSlots ? 32 : 0;
   const toolbarH = compactToolbar ? FT2_TOOLBAR_HEIGHT_COMPACT : FT2_TOOLBAR_HEIGHT;
-  const instrumentPanelHeight = windowHeight - NAVBAR_H - toolbarH - CONTROLS_BAR_H - STATUSBAR_H - MACRO_SLOTS_H - (showPatterns ? PATTERN_PANEL_HEIGHT : 0);
+  const tb303PanelH = hasTB303 && viewMode !== 'tb303' && viewMode !== 'sunvox'
+    ? (tb303Collapsed ? TB303_PANEL_COLLAPSED_H : TB303_PANEL_EXPANDED_H)
+    : 0;
+  const instrumentPanelHeight = windowHeight - NAVBAR_H - toolbarH - CONTROLS_BAR_H - STATUSBAR_H - MACRO_SLOTS_H - (showPatterns ? PATTERN_PANEL_HEIGHT : 0) - tb303PanelH;
   const editorWidth = windowWidth - (instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0) - 16; // minus instrument panel and minimap
 
   return (
@@ -126,26 +115,18 @@ export const PixiTrackerView: React.FC = () => {
       {/* FT2 Toolbar + Menu bar — native Pixi rendering */}
       <PixiFT2Toolbar />
 
-      {/* TB-303 Knob Panel — shown when not in TB-303 view (matches DOM TrackerView) */}
-      <PixiDOMOverlay
-        layout={{ width: '100%', height: 0 }}
-        style={{ overflow: 'visible', zIndex: 34 }}
-        autoHeight
-      >
-        <TB303KnobPanelOverlay visible={!tb303Collapsed && viewMode !== 'tb303' && viewMode !== 'sunvox'} />
-      </PixiDOMOverlay>
+      {/* TB-303 Knob Panel — shown when a TB-303 instrument is active and not in TB-303/SunVox view */}
+      <pixiContainer layout={{ width: '100%', height: tb303PanelH }} visible={tb303PanelH > 0}>
+        <PixiTB303KnobPanel width={windowWidth} />
+      </pixiContainer>
 
       {/* Editor controls bar — pure Pixi, no DOM overlay */}
       <PixiEditorControlsBar viewMode={viewMode} onViewModeChange={setViewMode} gridChannelIndex={gridChannelIndex} onGridChannelChange={setGridChannelIndex} />
 
-      {/* Pattern management panel (collapsible) — always mounted, height:0 when hidden
-          to avoid Yoga node swap errors in @pixi/layout */}
-      <PixiDOMOverlay
-        layout={{ width: '100%', height: showPatterns ? PATTERN_PANEL_HEIGHT : 0 }}
-        style={{ overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
-      >
-        {showPatterns && <PatternManagement />}
-      </PixiDOMOverlay>
+      {/* Pattern management panel — always mounted, height:0 when hidden */}
+      <pixiContainer layout={{ width: '100%', height: showPatterns ? PATTERN_PANEL_HEIGHT : 0 }} visible={showPatterns}>
+        <PixiPatternManagement width={windowWidth} height={PATTERN_PANEL_HEIGHT} />
+      </pixiContainer>
 
       {/* Main content: editor + instrument panel */}
       <pixiContainer
@@ -247,17 +228,29 @@ export const PixiTrackerView: React.FC = () => {
             <PixiHivelyView width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
           </pixiContainer>
 
-          {/* MusicLine — DOM-based (MusicLineTrackTableEditor + MusicLinePatternViewer are DOM-only) */}
-          <PixiDOMOverlay
+          {/* MusicLine — pure Pixi */}
+          <pixiContainer
+            visible={viewMode === 'tracker' && editorMode === 'musicline'}
             layout={{
               flex: viewMode === 'tracker' && editorMode === 'musicline' ? 1 : 0,
               height: viewMode === 'tracker' && editorMode === 'musicline' ? '100%' : 0,
               width: viewMode === 'tracker' && editorMode === 'musicline' ? '100%' : 0,
+              flexDirection: 'column',
             }}
-            style={{ overflow: 'hidden' }}
           >
-            {viewMode === 'tracker' && editorMode === 'musicline' && <AutoSizeMusicLineView />}
-          </PixiDOMOverlay>
+            <PixiMusicLineTrackTable
+              width={Math.max(100, editorWidth)}
+              height={MUSICLINE_MATRIX_HEIGHT}
+              onSeek={(pos) => {
+                useTrackerStore.getState().setCurrentPosition(pos);
+                getTrackerReplayer().jumpToPosition(pos, 0);
+              }}
+            />
+            <PixiMusicLinePatternViewer
+              width={Math.max(100, editorWidth)}
+              height={Math.max(50, instrumentPanelHeight - MUSICLINE_MATRIX_HEIGHT)}
+            />
+          </pixiContainer>
 
           {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga insertChild crash.
               Conditional mount/unmount of Pixi children triggers BindingError in
@@ -309,13 +302,8 @@ export const PixiTrackerView: React.FC = () => {
           <PixiPatternMinimap height={Math.max(100, instrumentPanelHeight)} />
         </pixiContainer>
 
-        {/* Pitch slider — DOM overlay, matches DOM TrackerView layout */}
-        <PixiDOMOverlay
-          layout={{ width: 32, height: Math.max(100, instrumentPanelHeight) }}
-          style={{ borderLeft: '1px solid rgba(255,255,255,0.1)' }}
-        >
-          <PitchSliderOverlay />
-        </PixiDOMOverlay>
+        {/* Pitch slider — pure Pixi */}
+        <PixiPitchSlider width={32} height={Math.max(100, instrumentPanelHeight)} />
 
         {/* Instrument panel toggle button — pure Pixi */}
         {canShowInstrumentPanel && viewMode !== 'tb303' && viewMode !== 'sunvox' && (
@@ -385,24 +373,3 @@ const PixiInstrumentToggle: React.FC<{ visible: boolean; onClick: () => void }> 
   );
 };
 
-// ─── MusicLine wrapper (DOM-only components) ────────────────────────────────
-
-const MUSICLINE_MATRIX_HEIGHT = 220;
-
-const AutoSizeMusicLineView: React.FC = () => (
-  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-bg-primary, #111)' }}>
-    {/* Per-channel track table matrix (top) */}
-    <div style={{ height: MUSICLINE_MATRIX_HEIGHT, flexShrink: 0, overflowY: 'auto', borderBottom: '2px solid #333' }}>
-      <MusicLineTrackTableEditor
-        onSeek={(pos) => {
-          useTrackerStore.getState().setCurrentPosition(pos);
-          getTrackerReplayer().jumpToPosition(pos, 0);
-        }}
-      />
-    </div>
-    {/* Multi-channel note viewer (bottom, fills remaining space) */}
-    <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <MusicLinePatternViewer />
-    </div>
-  </div>
-);
