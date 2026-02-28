@@ -431,7 +431,6 @@ function extractPCM(
   raw: Uint8Array,
   offset: number,
   byteLength: number,
-  is16bit: boolean,
 ): ArrayBuffer {
   const end       = Math.min(offset + byteLength, raw.length);
   const actualLen = end - offset;
@@ -546,7 +545,7 @@ export function parseSTXFile(buffer: ArrayBuffer, filename: string): TrackerSong
     const bytesPerSample = is16bit ? 2 : 1;
     const byteLength     = hdr.length * bytesPerSample;
 
-    const pcmData = extractPCM(raw, hdr.dataOffset, byteLength, is16bit);
+    const pcmData = extractPCM(raw, hdr.dataOffset, byteLength);
 
     const hasLoop    = !!(hdr.flags & 0x01) && hdr.loopEnd > hdr.loopStart && hdr.loopEnd <= hdr.length;
     const loopLength = hasLoop ? hdr.loopEnd - hdr.loopStart : 0;

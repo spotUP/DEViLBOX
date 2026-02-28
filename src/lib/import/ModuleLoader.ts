@@ -395,6 +395,7 @@ export function getSupportedExtensions(): string[] {
     '.sas', '.sb', '.scr', '.sdr', '.sg',
     '.snk', '.ss',
     '.st26', '.sun', '.syn',
+    '.dh', '.uds', '.octamed',
     '.tpu', '.tcb',
     '.ufo', '.mus',
     '.wn', '.wb',
