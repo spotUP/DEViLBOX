@@ -1,0 +1,42 @@
+Short:    EaglePlayer "Jason Brooke" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  1
+Type:     mus/play
+
+This is a different version of external "Jason Brooke" module replayer
+for EaglePlayer 1.54/2.0x.
+It's a replayer for all known Jason Brooke (Amiga) modules. He made
+music mostly for Amiga versions of famous arcade hits (Pacland, 1943,
+AfterBurner II, Ikari Warriors, OutRun, Space Harrier).
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- Volume
+- SampleInfo with SampleSaver (EP 2.0x only)
+- Balance
+- SongEnd
+- ModuleInfo with Position Counter
+- SubSong
+- as bonus attached is EagleRipper for Jason Brooke modules (all formats)
+
+Notes:
+
+1. ModuleInfo works/looks better for EaglePlayer 1.54.
+
+2. Player was tested only with uninitialized (ripped directly from disk)
+   modules.
+
+3. The latest version of EP players released by Wanted Team are available
+   on Wanted Team's FTP:
+
+address    ftp.union.org.pl (temporary offline)
+login      krzak
+password   Rozany1
+catalog    /Players/
+
+4. Email wt@jho.pol.pl might not be valid after March 2000.

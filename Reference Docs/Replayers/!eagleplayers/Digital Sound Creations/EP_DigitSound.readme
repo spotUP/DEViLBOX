@@ -1,0 +1,55 @@
+Short:    EaglePlayer "Digital Sound Creations" external replayer
+Author:   Wanted Team
+Uploader: Don Adan <DonAdan@wp.pl>
+Version:  1
+Type:     mus/play
+
+This is a new external "Digital Sound Creations" replay for EaglePlayer
+1.54/2.00+. It's a player for all known "Digital Sound Creations" modules.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- Balance
+- ModuleInfo with Position Counter
+- Volume
+- SongEnd
+
+Notes:
+
+1. This sound format appears to have only been used by David Hanlon
+   in early Bullfrog games on the Amiga
+
+2. This player plays tunes in both one-file (newest) and three-file
+   (older) formats.
+
+3. For the three-file format, all the IFF samples files must be joined
+   together, in the correct order, if they are separated.
+
+4. Default file prefixes for three-file format:
+
+   Songdata - HAN. (for example: HAN.Fusion)
+   Samples  - SMP. (for example: SMP.Fusion)
+   Kitdata  - no prefix, unchanged (original) name
+
+5. The play speed for newest type of mods is set correctly, but only
+   for "Populous" music. I can't find/get original calc timer routine for
+   the other (if exists) mods.
+
+6. This player uses the audio device and so wont work on DeliPlayer
+   for the PC.
+
+7. If you have, or know of, unsupported "Digital Sound Creations" modules
+   please contact the Wanted Team.
+
+8. You can get the latest versions of Wanted Team products from:
+
+   http://amiga.emucamp.com/wt/wt.html
+
+Special greetings go to
+
+- the perfect Gaelan G. for help

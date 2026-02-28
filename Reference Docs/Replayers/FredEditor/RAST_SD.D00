@@ -1,0 +1,47 @@
+FINALADR=$40000
+>EXTERN	'DF0:MOD.ILYAD',FINALADR
+
+INIT=0
+PLAY=4
+STOP=8
+FADE=12
+
+Do_PLAY:
+	move.l	#0,d0
+	move.l	FINALADR,a0
+	jsr	Init(a0)
+wait:	
+	cmp.b	#$7e,$dff006
+	bne	wait
+	move.w	#$0fff,$dff180	
+	move.l	FinalAdr,a0
+	move.b	$dff006,EnterVPos
+	jsr	4(a0)
+	move.b	$dff006,ExitVPos
+	move.w	#$0000,$dff180
+
+	clr.l	d0
+	move.b	EnterVPos,d0
+	clr.l	d1
+	move.b	ExitVPos,d1
+	sub.w	d0,d1
+	move.l	MaxRastime,d0
+	cmp.l	d1,d0
+	bhi	nomore
+	move.l	d1,MaxRastime
+nomore:
+	btst	#2,$dff016
+	bne	next
+	move.l	#10,d0
+	move.l	FinalAdr,a0
+	jsr	12(a0)
+next:
+	btst	#6,$bfe001
+	bne	wait
+fin:
+	move.l	FinalAdr,a0
+	jsr	Stop(a0)
+	rts
+EnterVPos:	dc.b	0
+ExitVPos:	dc.b	0
+MaxRastime:	dc.l	0

@@ -1,0 +1,170 @@
+;	MED module load routines by Teijo Kinnunen 1990
+
+;	Function: d0 = _LoadModule(a0)
+;	a0 = module name
+;	d0 = pointer to loaded module, zero if load failed
+
+	xdef	_LoadModule
+	xdef	_UnLoadModule
+	code
+_LoadModule:
+	movem.l a2-a4/a6/d2-d6,-(sp)
+	clr.l   d6			;d6 = return value (zero = error)
+	move.l  a0,a4			;a4 = module name
+	movea.l 4,a6
+	lea     dosname(pc),a1
+	jsr     -$198(a6)	;OldOpenLibrary()
+	tst.l   d0
+	beq     xlm1
+	move.l  d0,a3			;a3 = DOSBase
+	move.l  d0,a6
+	move.l  a4,d1			;name = d1
+	move.l  #1005,d2		;accessmode = MODE_OLDFILE
+	jsr     -$1e(a6)		;Open()
+	move.l  d0,d4			;d4 = file handle
+	beq     xlm2
+	move.l  d4,d1
+	moveq   #0,d2
+	moveq   #1,d3			;OFFSET_END
+	jsr     -$42(a6)		;Seek(fh,0,OFFSET_END)
+	move.l  d4,d1
+	clr.l   d3
+	not.l   d3			;OFFSET_BEGINNING
+	jsr     -$42(a6)		;Seek(fh,0,OFFSET_BEGINNING)
+	move.l  d0,d5			;d5 = file size
+	movea.l 4,a6
+	moveq   #2,d1			;get chip mem
+	jsr     -$c6(a6)		;AllocMem()
+	tst.l   d0
+	beq.s   xlm3
+	move.l  d0,a2			;a2 = pointer to module
+	move.l  d4,d1	;file
+	move.l  d0,d2	;buffer
+	move.l  d5,d3	;length
+	move.l  a3,a6
+	jsr     -$2a(a6)		;Read()
+	cmp.l   d5,d0
+	bne.s   xlm4			;something wrong...
+	cmp.l   #'MMD0',(a2)
+	bne.s   xlm4			;this is not a module!!!
+	movea.l a2,a0
+	bsr.s   _RelocModule
+	move.l  a2,d6		;no error...
+	bra.s   xlm3
+xlm4:	move.l  a2,a1		;error: free the memory
+	move.l  d5,d0
+	movea.l 4,a6
+	jsr     -$d2(a6)	;FreeMem()
+xlm3:	move.l  a3,a6		;close the file
+	move.l  d4,d1
+	jsr     -$24(a6)		;Close(fhandle)
+xlm2:	move.l  a3,a1		;close dos.library
+	movea.l 4,a6
+	jsr     -$19e(a6)
+xlm1:	move.l  d6,d0			;push return value
+	movem.l (sp)+,a2-a4/a6/d2-d6	;restore registers
+	rts				;and exit...
+dosname:	dc.b	'dos.library',0
+
+;	Function: _RelocModule(a0)
+;	a0 = pointer to module
+relocentr:
+	tst.l   (a0)
+	beq.s   norel
+	add.l   d1,(a0)
+norel:	addq.l  #4,a0
+	rts
+_RelocModule:
+	move.l  a2,-(sp)
+	movea.l a0,a2
+	move.l  a2,d1		;d1 = ptr to start of module
+	lea     8(a2),a0
+	bsr.s   relocentr	;reloc song ptr
+	addq.l  #4,a0
+	bsr.s   relocentr	;reloc blockarr ptr
+	addq.l  #4,a0
+	bsr.s   relocentr	;reloc smplarr ptr
+	addq.l  #4,a0
+	bsr.s   relocentr	;reloc expdata ptr
+	movea.l 24(a2),a0
+	movea.l 8(a2),a1
+	moveq   #0,d0
+	move.b  787(a1),d0	;number of samples
+	subq.b  #1,d0
+relocs:	bsr.s   relocentr
+	dbf     d0,relocs
+	movea.l 16(a2),a0
+	move.w  504(a1),d0
+	subq.b  #1,d0
+relocb:	bsr.s   relocentr
+	dbf     d0,relocb
+	move.l  (sp)+,a2
+	rts
+
+
+;	Function: _UnLoadModule(a0)
+;	a0 = pointer to module
+_UnLoadModule:
+	movem.l  d2-d3/a2-a3/a6,-(sp)
+	move.l  a0,d0
+	beq.w   xunl
+	movea.l 4,a6
+	move.l  4(a0),d0
+	beq.s   freencont
+	movea.l a0,a1
+	jsr     -$d2(a6)	;FreeMem()
+	bra.w   xunl
+freencont:
+	movea.l a0,a2
+	movea.l 8(a2),a1
+	moveq.l #0,d2
+	moveq.l #0,d3
+	move.w  504(a1),d2	;remember numblocks
+	move.b  787(a1),d3	;& # of samples
+	move.l  12(a2),d0
+	beq.s   ne1
+	jsr     -$d2(a6)	;free song
+ne1:	tst.l   20(a2)
+	beq.s   ne2
+	movea.l 16(a2),a3
+	subq.w  #1,d2
+fblkl:	movea.l (a3)+,a1	;get block ptr
+	moveq.l #0,d0
+	move.b  (a1),d0	;numtracks
+	moveq.l #0,d1
+	move.b  1(a1),d1	;lines
+	addq.w  #1,d1
+	mulu    d1,d0
+	mulu    #3,d0		;calculated length of the block
+	addq.l  #2,d0		;header
+	jsr     -$d2(a6)	;FreeMem()
+	dbf     d2,fblkl
+	movea.l 16(a2),a1
+	move.l  20(a2),d0
+	beq.s   ne2
+	jsr     -$d2(a6)	;free block array
+ne2:	tst.l   28(a2)
+	beq.s   ne3
+	movea.l 24(a2),a3
+	subq.b  #1,d3
+fsmpl:	movea.l (a3)+,a1
+	move.l  a1,d0
+	beq.s   nos2fr		;no sample to free!!
+	move.l  (a1),d0	;get length
+	addq.l  #6,d0		;add header
+	jsr     -$d2(a6)	;free..
+nos2fr	dbf     d3,fsmpl
+	movea.l 24(a2),a1
+	move.l  28(a2),d0
+	beq.s   ne3
+	jsr     -$d2(a6)	;free sample array
+ne3:	movea.l 32(a2),a1
+	move.l  36(a2),d0
+	beq.s   ne4
+	jsr     -$d2(a6)	;free exp. data
+ne4:	movea.l a2,a1
+	moveq   #52,d0
+	jsr     -$d2(a6)	;and finally, free the module structure
+xunl:	movem.l  (sp)+,d2-d3/a2-a3/a6
+	rts
+	end

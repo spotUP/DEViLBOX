@@ -1,0 +1,93 @@
+; This Installer(TM) script installs the separately distributed
+; catalogs to your hard disk
+; © 1998 DEFECT Softworks, All rights reserved.
+;
+; Written by Henryk Richter
+; Date: 16/Apr/98
+
+(set #EP_Version (cat "2.01"))					;Eagleplayer Version
+(set #Space (cat "40"))							;KiloBytes needed for
+                                                ;installation.
+(set KickVersion (/ (getversion) 65536))
+(debug "Kickversion:" Kickversion)
+
+;=========================== English texts ==================================
+(set #EPNotFound
+(cat "Eagleplayer2: - Assign not found, please Install Eagleplayer V"
+     #EP_Version
+     " first."
+))
+
+(Set #intro
+(cat "This procedurce lets you install the catalogs for Eagleplayer V"
+     #EP_Version
+     " on your hard drive. \n\n"
+     " Please make sure you`ve installed Eagleplayer before doing this step.\n\n"
+     "For installing of this "
+     "package you need about "
+     #Space
+     " kBytes free space on your harddisk. \n\n\n"
+     "Thanks to the ATO members for translating our texts."
+))
+
+
+;=========================== Deutsche Texte =================================
+(if (= @language "deutsch")
+(
+
+(set #EPNotFound
+(cat "Eagleplayer2: - Assign nicht gefunden, bitte installieren Sie zuerst Eagleplayer V"
+     #EP_Version
+     " ."
+))
+
+(Set #intro
+(cat "Dieser Vorgang ermöglicht Ihnen die Installation der Kataloge für Eagleplayer V"
+     #EP_Version
+     " auf Ihrer Harddisk. \n\n"
+     " Bitte stellen Sie sicher, zuerst den Eagleplayer selbst installiert zu haben. \n\n"
+     "Für die Kataloge werden etwa "
+     #Space
+     " kBytes auf der Festplatte benötigt. \n\n\n"
+     "Danke an die ATO-Mitglieder für die Übersetzung unserer Texte."
+))
+
+)
+)
+
+;============================== Welcome the User ===========================
+
+(complete 0)
+
+;(welcome)
+(message #intro)
+
+;====== get target directory where the Eagleplayer is to be installed =====
+;=================== ask for the Iconset to install ================================
+
+    (set yo (exists ("Eagleplayer2:") (noreq)))
+	(debug "Eagleplayer2 gefunden: " yo)
+
+	(if (= yo 0)
+	 (
+	  (abort #EPNotFound)
+	 )
+	)
+	  
+	(set target "Eagleplayer2:")
+	(set @default-dest "Eagleplayer2:")
+
+	(debug "Ziel:" target)
+
+;=========== copy Players,Engines, Catalogs, Docs, Goodies, Developer, Rexxscripts ==
+
+    (copyfiles (source ("Catalogs"))
+               (dest (tackon target "Catalogs"))
+               (all)
+               (optional "force" "nofail")
+    )
+
+	(complete 100)
+
+;========================== done =============================================
+(exit)

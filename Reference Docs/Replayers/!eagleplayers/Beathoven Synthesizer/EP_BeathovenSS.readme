@@ -1,0 +1,51 @@
+Short:    EaglePlayer "Beathoven Synthesizer" external replayer
+Author:   Wanted Team
+Uploader: wt@jho.pol.pl (Don Adan/Wanted Team)
+Version:  1
+Type:     mus/play
+
+This is a new external "Beathoven Synthesizer" module replay for
+EaglePlayer 1.54/2.00+. It's a player for all (?) modules which were
+composed for the Amiga using the Beathoven Synthesizer replay routine.
+
+Version 1
+
+Features:
+
+- Analyzer
+- Voices
+- Volume
+- SampleInfo with SampleSaver (EP 2.00+ only)
+- Balance
+- SongEnd (only for looping songs)
+- ModuleInfo (with Position Counter)
+- SubSong
+
+Notes:
+
+1. This soundformat was created by Thomas Lopatic (Dr.Nobody/HQC) in the
+   year 1987 and was often used in Rainbow Arts & Tristar products from
+   1987-88.
+
+2. To play Beathoven Synthesizer music every module must first be converted
+   to a special format which is very similar to EaglePlayer's "Dave Lowe"
+   format. For more information please contact Wanted Team.
+
+3. Included is a list of all available Beathoven Synthesizer modules that
+   I know of (see BeathovenSynthesizer.txt). If you have, or know of,
+   unsupported Beathoven Synthesizer modules please contact Wanted Team.
+
+4. You can get the latest versions of Wanted Team products from:
+
+   http://amiga.emucamp.com/wt/wt.html
+
+Special greetings go to
+
+- Promax for a lot of files
+- Zeg for a lot of files
+- Thomas Lopatic for help
+
+
+
+
+

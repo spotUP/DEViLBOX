@@ -1,0 +1,17 @@
+DWOLD.ArmyMoves                 43442  David Whittaker
+DWOLD.BMX-Simulator             42614  David Whittaker
+DWOLD.BubbleBobble              20364  David Whittaker
+DWOLD.GrimBlood                  7648  David Whittaker
+DWOLD.Kikstart2                 42678  David Whittaker
+DWOLD.Leatherneck               41588  David Whittaker
+DWOLD.Leviathan                 40952  Rob Hubbard, onefiled by Don Adan/WT
+DWOLD.Obliterator ingame        28332  David Whittaker
+DWOLD.Obliterator title         37618  David Whittaker
+DWOLD.Pandora                   30828  David Whittaker
+DWOLD.QBall                     41460  Rob Hubbard
+DWOLD.ReturnToGenesis           17422  David Whittaker
+DWOLD.Sentinel                  27856  David Whittaker
+DWOLD.Sidewinder                63162  David Whittaker (?)
+DWOLD.StormTrooper              28186  David Whittaker
+DWOLD.Tetris                    61418  David Whittaker
+DWOLD.Xenon                     61612  David Whittaker
