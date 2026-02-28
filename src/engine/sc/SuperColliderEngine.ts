@@ -47,7 +47,7 @@ export class SuperColliderEngine {
 
   private static async _boot(audioContext: AudioContext): Promise<SuperColliderEngine> {
     // 1. Register the AudioWorklet module.
-    const baseUrl = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
+    const baseUrl = import.meta.env.BASE_URL ?? '/';
     await audioContext.audioWorklet.addModule(`${baseUrl}sc/DEViLBOX.SC.worklet.js`);
 
     // 2. Fetch SC.js (text) and SC.wasm (binary) in parallel.
