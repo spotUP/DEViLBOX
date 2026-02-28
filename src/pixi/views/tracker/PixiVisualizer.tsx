@@ -4,7 +4,7 @@
  * Uses Pixi Graphics for GPU-accelerated rendering via app.ticker.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme, type PixiTheme } from '../../theme';
@@ -30,6 +30,13 @@ interface PixiVisualizerProps {
 }
 
 const PEAK_DECAY = 0.02;
+
+// Stable module-level layout objects — inline literals create new references every render,
+// which causes Yoga WASM "Expected null or instance of Node" BindingErrors.
+const LAYOUT_MODE_LABEL: Record<string, unknown> = {};
+const LAYOUT_MODE_LABEL_COLLAPSED: Record<string, unknown> = { width: 0, height: 0 };
+const LAYOUT_MODE_INDICATOR: Record<string, unknown> = { position: 'absolute', right: 4, bottom: 2 };
+const LAYOUT_MODE_INDICATOR_COLLAPSED: Record<string, unknown> = { position: 'absolute', width: 0, height: 0 };
 
 export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
   width = 160,
@@ -108,50 +115,58 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
     return () => cancelAnimationFrame(rafId);
   }, [isPlaying, mode, width, height, theme]);
 
+  // Memoized layout objects for prop-dependent values (width/height change infrequently)
+  const layoutContainer = useMemo(
+    () => ({ width, height, justifyContent: 'center', alignItems: 'center' }),
+    [width, height]
+  );
+  const layoutFill = useMemo(
+    () => ({ position: 'absolute', width, height }),
+    [width, height]
+  );
+
   // Static display when not playing
   const drawStatic = useCallback((g: GraphicsType) => {
     g.clear();
     drawBackground(g, width, height, theme);
   }, [width, height, theme]);
 
+  // Keep the Pixi/Yoga tree structure STABLE across isPlaying changes.
+  // Conditional rendering (ternary / &&) swaps entire subtrees, which creates
+  // fresh Yoga nodes that mismatch existing ones → BindingError.
+  // Instead: always render all elements, toggle via `visible` + collapsed layout.
   return (
     <pixiContainer
       eventMode="static"
       cursor="pointer"
       onPointerUp={handleClick}
-      layout={{ width, height, justifyContent: 'center', alignItems: 'center' }}
+      layout={layoutContainer}
     >
-      {isPlaying ? (
-        <pixiGraphics
-          ref={graphicsRef}
-          draw={() => {}}
-          layout={{ position: 'absolute', width, height }}
-        />
-      ) : (
-        <>
-          <pixiGraphics
-            draw={drawStatic}
-            layout={{ position: 'absolute', width, height }}
-          />
-          <pixiBitmapText
-            text={VIZ_MODE_LABELS[mode]}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
-            tint={theme.textMuted.color}
-            layout={{}}
-          />
-        </>
-      )}
+      {/* Single graphics element — drawStatic when paused, animation loop drives it when playing */}
+      <pixiGraphics
+        ref={graphicsRef}
+        draw={isPlaying ? () => {} : drawStatic}
+        layout={layoutFill}
+      />
 
-      {/* Mode indicator (bottom-right) */}
-      {isPlaying && (
-        <pixiBitmapText
-          text={VIZ_MODE_LABELS[mode]}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
-          tint={theme.textMuted.color}
-          alpha={0.5}
-          layout={{ position: 'absolute', right: 4, bottom: 2 }}
-        />
-      )}
+      {/* Centered mode label — visible when stopped, collapsed when playing */}
+      <pixiBitmapText
+        text={VIZ_MODE_LABELS[mode]}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+        tint={theme.textMuted.color}
+        layout={isPlaying ? LAYOUT_MODE_LABEL_COLLAPSED : LAYOUT_MODE_LABEL}
+        visible={!isPlaying}
+      />
+
+      {/* Bottom-right mode indicator — visible when playing, collapsed when stopped */}
+      <pixiBitmapText
+        text={VIZ_MODE_LABELS[mode]}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
+        tint={theme.textMuted.color}
+        alpha={0.5}
+        layout={isPlaying ? LAYOUT_MODE_INDICATOR : LAYOUT_MODE_INDICATOR_COLLAPSED}
+        visible={isPlaying}
+      />
     </pixiContainer>
   );
 };
