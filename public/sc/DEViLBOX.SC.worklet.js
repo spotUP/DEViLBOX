@@ -177,6 +177,29 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
         globalThis.clearInterval = (id) => globalThis.clearTimeout(id);
       }
 
+      // ---- Worker polyfill ----
+      // SC.wasm is compiled with Emscripten pthreads (-pthread). When callMain runs,
+      // scsynth calls pthread_create(), which Emscripten implements by spawning Web Workers.
+      // AudioWorkletGlobalScope has no Worker constructor, so this crashes.
+      //
+      // We don't need pthreads to function: audio is driven synchronously via WaRun()
+      // from process(), and OSC is handled via direct function calls. The mock lets
+      // pthread_create() return without crashing; the "threads" simply never run.
+      if (typeof globalThis.Worker === 'undefined') {
+        globalThis.Worker = class MockWorker {
+          constructor() {}
+          postMessage() {}
+          terminate() {}
+          addEventListener() {}
+          removeEventListener() {}
+          dispatchEvent() { return false; }
+          set onmessage(_) {}
+          get onmessage() { return null; }
+          set onerror(_) {}
+          get onerror() { return null; }
+        };
+      }
+
       // ---- Load SC.js glue via new Function() ----
       // SC.js is NOT modularized — it uses `var Module = ...` at the top level.
       // We execute it in a new Function scope so its globals don't pollute ours.
