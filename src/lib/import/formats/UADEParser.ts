@@ -431,7 +431,9 @@ export async function parseUADEFile(
       'Oktalyzer':          async () => { const { parseOktalyzerFile } = await import('./OktalyzerParser'); return parseOktalyzerFile(buffer, filename); },
       'MED':                async () => { const { parseMEDFile } = await import('./MEDParser'); return parseMEDFile(buffer, filename); },
       'SoundFX':            async () => { const { parseSoundFXFile } = await import('./SoundFXParser'); return parseSoundFXFile(buffer, filename); },
-      'SoundMon':           async () => { const { parseSoundMonFile } = await import('./SoundMonParser'); return parseSoundMonFile(buffer, filename); },
+      'SoundMon':           async () => { const { parseSoundMonFile } = await import('./SoundMonParser'); return parseSoundMonFile(buffer, filename, 0); },
+      'SoundMon2.0':        async () => { const { parseSoundMonFile } = await import('./SoundMonParser'); return parseSoundMonFile(buffer, filename, 0); },
+      'SoundMon2.2':        async () => { const { parseSoundMonFile } = await import('./SoundMonParser'); return parseSoundMonFile(buffer, filename, 0); },
       'JamCracker':         async () => { const { parseJamCrackerFile } = await import('./JamCrackerParser'); return parseJamCrackerFile(buffer, filename); },
       'Quadra Composer':    async () => { const { parseQuadraComposerFile } = await import('./QuadraComposerParser'); return parseQuadraComposerFile(buffer, filename); },
       'FutureComposer1.3':  async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
@@ -475,7 +477,6 @@ export async function parseUADEFile(
   // NOTE: bare 'fc' is excluded here because .fc covers both FC 1.x (synthesis) and FC 2.0
   // (real PCM samples). FC 2.0 should get enhanced treatment; only FC 1.x is synthesis.
   const SYNTHESIS_FORMATS = new Set([
-    'bp', 'bp3', 'sm', 'sm2', 'sm3', 'sm4',  // SoundMon / BPSoundMon variants
     'fred',                                    // Fred Editor
     'sid', 'sid2',                             // SidMon variants
     'dmu', 'dmu2', 'mug', 'mug2',             // Digital Mugician variants
