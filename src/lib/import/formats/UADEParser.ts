@@ -328,6 +328,60 @@ export function isUADEFormat(filename: string): boolean {
 }
 
 /**
+ * Try to read instrument names from Amiga chip RAM via the UADE memory accessor.
+ *
+ * After the enhanced scan the 68k CPU emulator memory still holds the loaded
+ * (possibly decompressed) module.  For ProTracker-family MOD files, UADE's
+ * eagleplayer depacks the data to chip RAM address 0x000000, so names are
+ * readable even when the original file was packed and the raw buffer returned
+ * null from tryExtractInstrumentNames().
+ *
+ * Detection: reads 4 bytes at chip RAM offset 0x438 (= 1080 decimal), which is
+ * where all ProTracker-family formats store their 4-character channel/magic tag.
+ * If the tag matches a known MOD-family identifier, reads up to 31 instrument
+ * name slots (each 22 bytes) from offset 0x14 in parallel.
+ *
+ * Returns ordered name strings (may contain empty strings for blank slots),
+ * or null if the chip RAM does not contain a recognised MOD-family module.
+ */
+async function tryReadChipRamNames(
+  engine: { readStringFromMemory(addr: number, maxLen?: number): Promise<string> },
+): Promise<string[] | null> {
+  // Standard ProTracker-family magic identifiers at byte offset 1080 (0x438).
+  // All share the same instrument table layout (31 entries × 30 bytes at offset 20).
+  const MOD_MAGIC_TAGS = new Set([
+    'M.K.', 'M!K!', 'M&K!',        // 4-channel ProTracker / Noisetracker variants
+    'FLT4', 'FLT8',                 // StarTrekker 4/8 channel
+    '4CHN', '6CHN', '8CHN',         // Generic channel-count markers
+    '2CHN', '3CHN', '5CHN', '7CHN', '9CHN',
+    '10CH', '11CH', '12CH', '13CH', '14CH', '15CH', '16CH',
+    '18CH', '20CH', '22CH', '24CH', '26CH', '28CH', '30CH', '32CH',
+  ]);
+
+  try {
+    // maxLen=5 → reads up to 4 non-null bytes (loop i=0..3) + null terminator
+    const magic = await engine.readStringFromMemory(0x438, 5);
+    if (!MOD_MAGIC_TAGS.has(magic)) return null;
+
+    // ProTracker/Noisetracker MOD instrument table:
+    //   Starts at byte 20 (0x14), 31 entries × 30 bytes each
+    //   Name occupies bytes 0–21 of each 30-byte entry (22 chars, null-padded)
+    const namePromises = Array.from({ length: 31 }, (_, i) =>
+      engine.readStringFromMemory(0x14 + i * 30, 23), // maxLen=23 → reads up to 22 bytes
+    );
+    const rawNames = await Promise.all(namePromises);
+    const names = rawNames.map(n => n.trim());
+
+    if (!names.some(Boolean)) return null;
+    console.log('[UADEParser] Phase 3b: read', names.filter(Boolean).length, 'instrument names from chip RAM (MOD magic:', magic, ')');
+    return names;
+  } catch {
+    // readStringFromMemory not yet available (older WASM) or memory access failed
+    return null;
+  }
+}
+
+/**
  * Parse an exotic Amiga music file via UADE scan.
  *
  * If the WASM has enhanced exports (read_memory, get_channel_extended, get_cia_state),
@@ -488,10 +542,17 @@ export async function parseUADEFile(
 
   // If enhanced scan data is available AND mode is 'enhanced', build editable song
   if (mode === 'enhanced' && activeEnhancedScan) {
+    // Phase 3b: Try to read instrument names from Amiga chip RAM.
+    // UADE's 68k CPU emulator memory still holds the loaded (possibly decompressed)
+    // module, so names are readable even for packed variants where the file buffer
+    // contains no readable name table.
+    const chipRamNames = await tryReadChipRamNames(engine);
+
     const song = buildEnhancedSong(
       songName, ext, filename, buffer,
       { ...metadata, enhancedScan: activeEnhancedScan },
       activeScanRows, periodToNoteIndex,
+      chipRamNames,
     );
     // Fall back to classic if enhanced scan yielded no playable instruments.
     // This happens for synthesis-only formats, all-zero PCM, or pure VBlank formats
@@ -1073,13 +1134,13 @@ function buildEnhancedSong(
   metadata: UADEMetadata,
   scanRows: Array<Array<{ period: number; volume: number; samplePtr: number; effTyp?: number; eff?: number }>>,
   periodToNoteIndex: (period: number, finetune?: number) => number,
+  chipRamNames?: string[] | null,
 ): TrackerSong {
   const enhanced = metadata.enhancedScan!;
 
-  // Attempt to extract instrument names from the file header.
-  // Names are ordered (index 0 = first instrument in file). We match them
-  // to the scan samples in ascending memory-pointer order.
-  const extractedNames = tryExtractInstrumentNames(buffer, ext);
+  // Prefer chip RAM names (accurate for packed/compressed formats where the file
+  // buffer contains no readable name table) over file-buffer heuristic extraction.
+  const extractedNames = chipRamNames ?? tryExtractInstrumentNames(buffer, ext);
 
   // Build instrument map: samplePtr → instrumentId, and create real Sampler instruments
   const sampleMap = new Map<number, number>();
