@@ -451,6 +451,10 @@ export async function parseUADEFile(
         } catch { /* older WASM without scanMemoryForMagic, moduleBase stays 0 */ }
         return parseSidMon1File(buffer, filename, moduleBase);
       },
+      'SIDMon2.0': async () => {
+        const { parseSidMon2File } = await import('./SidMon2Parser');
+        return parseSidMon2File(buffer, filename, 0);
+      },
     };
     const route = NATIVE_ROUTES[fmt];
     if (route) {
@@ -490,7 +494,6 @@ export async function parseUADEFile(
   // (real PCM samples). FC 2.0 should get enhanced treatment; only FC 1.x is synthesis.
   const SYNTHESIS_FORMATS = new Set([
     'fred',                                    // Fred Editor
-    'sid2',                                    // SidMon 2 (sid1/smn routed to native parser via NATIVE_ROUTES)
     'dmu', 'dmu2', 'mug', 'mug2',             // Digital Mugician variants
   ]);
   if (mode === 'enhanced' && SYNTHESIS_FORMATS.has(ext)) {
