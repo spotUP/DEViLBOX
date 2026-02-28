@@ -41,6 +41,7 @@ import { SidMon1Synth } from './sidmon1/SidMon1Synth';
 import { OctaMEDSynth } from './octamed/OctaMEDSynth';
 import { DavidWhittakerSynth } from './davidwhittaker/DavidWhittakerSynth';
 import { SymphonieSynth } from './symphonie/SymphonieSynth';
+import { SunVoxSynth } from './sunvox/SunVoxSynth';
 import { UADESynth } from './uade/UADESynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
@@ -426,6 +427,7 @@ export class InstrumentFactory {
     'HivelySynth': 0,     // WASM song player — volume managed internally
     'OctaMEDSynth': 0,   // OctaMED synth instrument — volume managed internally
     'UADESynth': 0,       // UADE exotic Amiga player — volume managed internally
+    'SunVoxSynth': 0,     // SunVox WASM patch player — volume managed internally
   };
 
   /**
@@ -915,6 +917,17 @@ export class InstrumentFactory {
           );
         }
         instrument = symphSynth;
+        break;
+      }
+
+      case 'SunVoxSynth': {
+        const svSynth = new SunVoxSynth();
+        if (config.sunvox?.patchData) {
+          svSynth.setModule(config.sunvox.patchData).catch((err: unknown) =>
+            console.error('[InstrumentFactory] SunVox patch load failed:', err)
+          );
+        }
+        instrument = svSynth;
         break;
       }
 

@@ -126,12 +126,13 @@ export interface ChannelData {
     importedFromMOD: boolean;
     originalIndex?: number; // Original position in MOD/XM
     addedAfterImport?: boolean;
-    channelType?: 'sample' | 'synth' | 'hybrid';
+    channelType?: 'sample' | 'synth' | 'hybrid' | 'sunvox';
     furnaceType?: number; // Furnace DivChanType for system presets
     hardwareName?: string; // Hardware-specific channel name
     shortName?: string; // Short display name for channel headers
     effectCols?: number; // Number of effect columns (default 2)
     systemId?: number | string; // System preset identifier (number for Furnace fileID)
+    sunvoxModuleId?: number; // SunVox module ID for SunVox channels
   };
 }
 
