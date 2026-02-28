@@ -563,6 +563,17 @@ export async function parseUADEFile(
         const { parseTFMXFile } = await import('./TFMXParser');
         return parseTFMXFile(buffer, filename);
       },
+      // NOTE: GMC loads at chip RAM address 0 — no scanMemoryForMagic needed.
+      // UADE format name is 'GameMusicCreator'; 'GMC' is included as a fallback
+      // in case the format name string differs across UADE builds.
+      'GameMusicCreator': async () => {
+        const { parseGameMusicCreatorFile } = await import('./GameMusicCreatorParser');
+        return parseGameMusicCreatorFile(new Uint8Array(buffer), filename);
+      },
+      'GMC': async () => {
+        const { parseGameMusicCreatorFile } = await import('./GameMusicCreatorParser');
+        return parseGameMusicCreatorFile(new Uint8Array(buffer), filename);
+      },
     };
     const route = NATIVE_ROUTES[fmt];
     if (route) {
