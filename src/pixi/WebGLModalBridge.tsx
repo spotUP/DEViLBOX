@@ -134,6 +134,9 @@ const LazyImportAudioDialog = lazy(() =>
 const LazyImportTD3Dialog = lazy(() =>
   import('@/components/dialogs/ImportTD3Dialog').then(m => ({ default: m.ImportTD3Dialog }))
 );
+const LazySunVoxImportDialog = lazy(() =>
+  import('@/components/instruments/SunVoxImportDialog').then(m => ({ default: m.SunVoxImportDialog }))
+);
 
 export const WebGLModalBridge: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -155,6 +158,8 @@ export const WebGLModalBridge: React.FC = () => {
   const setPendingAudioFile = useUIStore(s => s.setPendingAudioFile);
   const pendingTD3File = useUIStore(s => s.pendingTD3File);
   const setPendingTD3File = useUIStore(s => s.setPendingTD3File);
+  const pendingSunVoxFile = useUIStore(s => s.pendingSunVoxFile);
+  const setPendingSunVoxFile = useUIStore(s => s.setPendingSunVoxFile);
 
   // Portal container on document.body — ensures modals render above
   // PixiDOMOverlay divs (z-index 10) which are also direct body children.
@@ -284,6 +289,50 @@ export const WebGLModalBridge: React.FC = () => {
       console.error('[WebGLModalBridge] TD-3 import failed:', err);
     }
   }, [setPendingTD3File]);
+
+  // Handler for SunVoxImportDialog in GL mode
+  const handleSunVoxImportGL = useCallback(async (name: string, config: import('@/types/instrument').SunVoxConfig) => {
+    setPendingSunVoxFile(null);
+    try {
+      useInstrumentStore.getState().createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
+
+      if (config.isSong) {
+        // Auto-create a minimal 1-row pattern so the user can press Play immediately.
+        const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
+        const currentInstruments = useInstrumentStore.getState().instruments;
+        const instrumentIndex = currentInstruments.length;
+        const patternId = `svox-${Date.now()}`;
+        const pattern = {
+          id: patternId,
+          name,
+          length: 1,
+          channels: [{
+            id: `ch-svox-${Date.now()}`,
+            name: 'SunVox',
+            muted: false,
+            solo: false,
+            collapsed: false,
+            volume: 100,
+            pan: 0,
+            instrumentId: currentInstruments[currentInstruments.length - 1]?.id ?? '',
+            color: '#facc15',
+            rows: [{ note: 'C-4', instrument: instrumentIndex, volume: 64, effTyp: 0, eff: 0 }],
+          }],
+        };
+        const existing = useTrackerStore.getState().patterns;
+        loadPatterns([...existing, pattern]);
+        const newIdx = existing.length;
+        setCurrentPattern(newIdx);
+        setPatternOrder([...useTrackerStore.getState().patterns.map((_, i) => i)]);
+        notify.success(`Loaded SunVox song: ${name} — press Play to hear it`);
+      } else {
+        notify.success(`Imported SunVox patch: ${name}`);
+      }
+    } catch (err) {
+      notify.error('Failed to import SunVox file');
+      console.error('[WebGLModalBridge] SunVox import failed:', err);
+    }
+  }, [setPendingSunVoxFile]);
 
   // Handler for ImportModuleDialog in GL mode — called when user confirms import.
   // Uses UnifiedFileLoader to keep behaviour identical to the DOM mode confirm path.
@@ -601,6 +650,14 @@ export const WebGLModalBridge: React.FC = () => {
           onClose={() => setPendingTD3File(null)}
           initialFile={pendingTD3File}
           onImport={handleTD3ImportGL}
+        />
+      )}
+      {/* SunVox patch/song import dialog */}
+      {pendingSunVoxFile && (
+        <LazySunVoxImportDialog
+          onClose={() => setPendingSunVoxFile(null)}
+          onImport={handleSunVoxImportGL}
+          initialFile={pendingSunVoxFile}
         />
       )}
       {/* Always-mounted dialogs */}
