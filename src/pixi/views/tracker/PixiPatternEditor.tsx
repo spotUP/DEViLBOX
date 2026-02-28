@@ -139,6 +139,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   const useHex = useUIStore(s => s.useHexNumbers);
   const blankEmpty = useUIStore(s => s.blankEmptyCells);
+  const trackerZoom = useUIStore(s => s.trackerZoom);
+  const rowHighlightInterval = useUIStore(s => s.rowHighlightInterval);
+  const showBeatLabels = useUIStore(s => s.showBeatLabels);
+  const rowHeight = Math.round(24 * (trackerZoom / 100));
+  const rowHeightRef = useRef(rowHeight);
+  useEffect(() => { rowHeightRef.current = rowHeight; }, [rowHeight]);
   const trackerVisualBg = useSettingsStore(s => s.trackerVisualBg);
   const isPlaying = useTransportStore(s => s.isPlaying);
   const smoothScrolling = useTransportStore(s => s.smoothScrolling);
@@ -414,7 +420,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
             ? nextState.time - audioState.time
             : (2.5 / bpm) * speed;
           const progress = Math.min(Math.max((audioTime - audioState.time) / dur, 0), 1);
-          newOffset = progress * ROW_HEIGHT;
+          newOffset = progress * rowHeightRef.current;
         }
       } else {
         newRow = useTransportStore.getState().currentRow;
@@ -456,17 +462,17 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   // ── Visible range ─────────────────────────────────────────────────────────
   const scrollbarHeight = allChannelsFit ? 0 : SCROLLBAR_HEIGHT;
   const gridHeight = height - HEADER_HEIGHT - scrollbarHeight;
-  const visibleLines = Math.ceil(gridHeight / ROW_HEIGHT) + 2;
+  const visibleLines = Math.ceil(gridHeight / rowHeight) + 2;
   const topLines = Math.floor(visibleLines / 2);
-  const centerLineTop = Math.floor(gridHeight / 2) - ROW_HEIGHT / 2;
-  const baseY = centerLineTop - topLines * ROW_HEIGHT - smoothOffset;
+  const centerLineTop = Math.floor(gridHeight / 2) - rowHeight / 2;
+  const baseY = centerLineTop - topLines * rowHeight - smoothOffset;
   const vStart = currentRow - topLines;
   const patternLength = displayPattern?.length ?? 64;
 
   // ── Click → cell mapping ──────────────────────────────────────────────────
   const getCellFromLocal = useCallback((localX: number, localY: number): { rowIndex: number; channelIndex: number; columnType: CursorPosition['columnType'] } | null => {
     if (!pattern) return null;
-    const rowOffset = Math.floor((localY - centerLineTop) / ROW_HEIGHT);
+    const rowOffset = Math.floor((localY - centerLineTop) / rowHeight);
     const rowIndex = currentRow + rowOffset;
 
     let channelIndex = 0;
@@ -806,8 +812,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     // Draw rows
     for (let i = 0; i < visibleLines; i++) {
       const rowNum = vStart + i;
-      const y = baseY + i * ROW_HEIGHT;
-      if (y + ROW_HEIGHT < 0 || y > gridHeight) continue;
+      const y = baseY + i * rowHeight;
+      if (y + rowHeight < 0 || y > gridHeight) continue;
 
       const isInPattern = rowNum >= 0 && rowNum < patternLength;
       const isGhost = !isInPattern && showGhostPatterns;
@@ -815,8 +821,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
       // Row background
       if (isInPattern || isGhost) {
-        const isHighlight = rowNum >= 0 && rowNum % 4 === 0;
-        g.rect(LINE_NUMBER_WIDTH, y, width - LINE_NUMBER_WIDTH, ROW_HEIGHT);
+        const isHighlight = rowNum >= 0 && rowNum % rowHighlightInterval === 0;
+        g.rect(LINE_NUMBER_WIDTH, y, width - LINE_NUMBER_WIDTH, rowHeight);
         g.fill({
           color: isHighlight ? theme.trackerRowHighlight.color : theme.trackerRowOdd.color,
           alpha: (isHighlight ? theme.trackerRowHighlight.alpha : theme.trackerRowOdd.alpha) * ghostAlpha,
@@ -825,7 +831,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
       // Center-line highlight (current row)
       if (rowNum === currentRow) {
-        g.rect(0, y, width, ROW_HEIGHT);
+        g.rect(0, y, width, rowHeight);
         g.fill({ color: theme.accentGlow.color, alpha: trackerVisualBg ? 0.5 : theme.accentGlow.alpha });
       }
     }
@@ -864,8 +870,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       for (let ch = startCh; ch <= endCh && ch < numChannels; ch++) {
         const colX = channelOffsets[ch] - scrollLeftRef.current;
         const chW = channelWidths[ch];
-        const y1 = baseY + (startRow - vStart) * ROW_HEIGHT;
-        const h = (endRow - startRow + 1) * ROW_HEIGHT;
+        const y1 = baseY + (startRow - vStart) * rowHeight;
+        const h = (endRow - startRow + 1) * rowHeight;
         g.rect(colX, y1, chW, h);
         g.fill({ color: theme.accentGlow.color, alpha: 0.15 });
       }
@@ -881,8 +887,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       for (let ch = pStartCh; ch <= pEndCh && ch < numChannels; ch++) {
         const colX = channelOffsets[ch] - scrollLeftRef.current;
         const chW = channelWidths[ch];
-        const y1 = baseY + (pStartRow - vStart) * ROW_HEIGHT;
-        const h = (pEndRow - pStartRow + 1) * ROW_HEIGHT;
+        const y1 = baseY + (pStartRow - vStart) * rowHeight;
+        const h = (pEndRow - pStartRow + 1) * rowHeight;
         g.rect(colX, y1, chW, h);
         g.fill({ color: 0xa855f7, alpha: 0.12 });
         g.rect(colX, y1, chW, 1); g.fill({ color: 0xa855f7, alpha: 0.45 });
@@ -895,9 +901,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     // Peer cursor overlay (purple block)
     const pc = peerCursorRef.current;
     if (pc.active && pc.patternIndex === currentPatternIndex && pc.channel < numChannels) {
-      const py = baseY + (pc.row - vStart) * ROW_HEIGHT;
+      const py = baseY + (pc.row - vStart) * rowHeight;
       const px = channelOffsets[pc.channel] - scrollLeftRef.current + 8;
-      g.rect(px, py, CHAR_WIDTH * 3 + 4, ROW_HEIGHT);
+      g.rect(px, py, CHAR_WIDTH * 3 + 4, rowHeight);
       g.fill({ color: 0xa855f7, alpha: 0.55 });
     }
 
@@ -906,7 +912,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       const cursorCh = cursor.channelIndex;
       if (cursorCh >= 0 && cursorCh < numChannels) {
         const colX = channelOffsets[cursorCh] - scrollLeftRef.current;
-        const y = baseY + (cursor.rowIndex - vStart) * ROW_HEIGHT;
+        const y = baseY + (cursor.rowIndex - vStart) * rowHeight;
         let cursorW = CHAR_WIDTH * 3 + 4; // note
         let cursorX = colX + 8;
         const noteWidth = CHAR_WIDTH * 3 + 4;
@@ -918,7 +924,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         else if (cursor.columnType === 'flag2') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 11 + 24; cursorW = CHAR_WIDTH; }
         else if (cursor.columnType === 'probability') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 12 + 28; cursorW = CHAR_WIDTH * 2; }
 
-        g.rect(cursorX, y, cursorW, ROW_HEIGHT);
+        g.rect(cursorX, y, cursorW, rowHeight);
         g.fill({ color: recordMode ? theme.error.color : theme.accent.color, alpha: 0.45 });
       }
     }
@@ -928,7 +934,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     g.fill({ color: theme.bg.color, alpha: 0.85 });
   }, [width, gridHeight, theme, visibleLines, vStart, baseY, patternLength, currentRow,
       showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
-      cursor, selection, displayPattern, isPlaying, recordMode, scrollLeft, displayPatternIndex]);
+      cursor, selection, displayPattern, isPlaying, recordMode, scrollLeft, displayPatternIndex,
+      rowHeight, rowHighlightInterval]);
 
   // ── Generate text labels for visible rows ─────────────────────────────────
   const cellLabels = useMemo(() => {
@@ -937,8 +944,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
     for (let i = 0; i < visibleLines; i++) {
       const rowNum = vStart + i;
-      const y = baseY + i * ROW_HEIGHT + ROW_HEIGHT / 2 - FONT_SIZE / 2;
-      if (y + ROW_HEIGHT < -ROW_HEIGHT || y > gridHeight + ROW_HEIGHT) continue;
+      const y = baseY + i * rowHeight + rowHeight / 2 - FONT_SIZE / 2;
+      if (y + rowHeight < -rowHeight || y > gridHeight + rowHeight) continue;
 
       // Determine if this row is from the current pattern or a ghost
       let actualRow = rowNum;
@@ -965,10 +972,17 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       }
 
       // Line number
-      const isHighlightRow = actualRow % 4 === 0;
-      const lineNumText = useHex
-        ? actualRow.toString(16).toUpperCase().padStart(2, '0')
-        : actualRow.toString().padStart(2, '0');
+      const isHighlightRow = actualRow % rowHighlightInterval === 0;
+      let lineNumText: string;
+      if (showBeatLabels) {
+        const beat = Math.floor(actualRow / rowHighlightInterval) + 1;
+        const tick = (actualRow % rowHighlightInterval) + 1;
+        lineNumText = `${beat}.${tick}`;
+      } else {
+        lineNumText = useHex
+          ? actualRow.toString(16).toUpperCase().padStart(2, '0')
+          : actualRow.toString().padStart(2, '0');
+      }
       labels.push({
         x: 4,
         y,
@@ -1065,7 +1079,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     return labels;
   }, [displayPattern, patterns, displayPatternIndex, visibleLines, vStart, baseY, gridHeight,
       patternLength, showGhostPatterns, useHex, blankEmpty, numChannels,
-      channelOffsets, channelWidths, width, currentRow, theme, columnVisibility, scrollLeft]);
+      channelOffsets, channelWidths, width, currentRow, theme, columnVisibility, scrollLeft,
+      rowHeight, rowHighlightInterval, showBeatLabels]);
 
   if (!pattern) {
     return (
