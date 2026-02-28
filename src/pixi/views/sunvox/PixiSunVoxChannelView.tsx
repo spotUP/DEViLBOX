@@ -11,7 +11,7 @@
  * Rendering approach follows PixiTB303View:
  *  - pixiGraphics for row backgrounds, separators, cursor, selection
  *  - pixiBitmapText for cell text (note, instrument/velocity, effect)
- *  - PixiDOMOverlay for the transport/header bar
+ *  - PixiLabel/PixiButton for the transport/header bar chrome
  */
 
 import React, { useCallback, useMemo, useRef, useEffect, useState } from 'react';
@@ -19,7 +19,6 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiLabel, PixiButton } from '../../components';
-import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
 import { useTrackerStore, useTransportStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 
