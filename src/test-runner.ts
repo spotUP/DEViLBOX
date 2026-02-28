@@ -1384,6 +1384,13 @@ async function testVolumeLevels() {
             }
           }
 
+          // Let the last note's release tail play out before moving on
+          const tailDeadline = Date.now() + 400;
+          while (Date.now() < tailDeadline) {
+            await new Promise(r => setTimeout(r, 8));
+            sampleLevel();
+          }
+
         } catch (triggerError: unknown) {
           const tMsg = triggerError instanceof Error ? triggerError.message : String(triggerError);
           console.warn(`[Test] ${name} trigger error:`, tMsg);

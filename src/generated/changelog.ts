@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-28T15:19:33.059Z
+ * Generated: 2026-02-28T15:23:46.532Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1670';
-export const BUILD_NUMBER = '1670';
-export const BUILD_HASH = '3157e525';
+export const BUILD_VERSION = '1.0.1671';
+export const BUILD_NUMBER = '1671';
+export const BUILD_HASH = 'ba3d134b';
 export const BUILD_DATE = '2026-02-28';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1670',
+    version: '1.0.1671',
     date: '2026-02-28',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: regenerate changelog to build 1670"
+      },
       {
         type: 'fix',
         "description": "SunVox worklet cleanup + keyboard handler improvements"
@@ -216,14 +220,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add MusicLineEngine.ts + audit/inspection utility scripts"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: regenerate changelog to build 1619"
-      },
-      {
-        type: 'fix',
-        "description": "Route MusicLine audio through separation chain, fix channel tracking when suppressed"
       }
     ]
   }
