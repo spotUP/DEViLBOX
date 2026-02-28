@@ -286,7 +286,8 @@ export const PixiSunVoxChannelView: React.FC<PixiSunVoxChannelViewProps> = ({
       {/* Error overlay — always mounted; shown only when no channel.
           position: 'absolute' keeps it out of the flex layout flow. */}
       <pixiBitmapText
-        visible={!hasChannel}
+        alpha={!hasChannel ? 1 : 0}
+        renderable={!hasChannel}
         text={hasChannel ? '' : `No channel at index ${channelIndex}`}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
         tint={theme.error.color}
