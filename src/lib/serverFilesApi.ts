@@ -10,6 +10,7 @@ import { useAuthStore } from '@stores/useAuthStore';
  * Clears local auth state when the server returns 403 (invalid/expired token).
  */
 async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  const response = await fetch(url, init);
   if (response.status === 403) {
     // Token is invalid or expired — log out so the stale token is cleared
     useAuthStore.getState().logout();

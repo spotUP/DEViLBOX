@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-28T13:43:52.301Z
+ * Generated: 2026-02-28T14:04:02.933Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1644';
-export const BUILD_NUMBER = '1644';
-export const BUILD_HASH = '23c0d8b4';
+export const BUILD_VERSION = '1.0.1650';
+export const BUILD_NUMBER = '1650';
+export const BUILD_HASH = '1724f039';
 export const BUILD_DATE = '2026-02-28';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,33 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1644',
+    version: '1.0.1650',
     date: '2026-02-28',
     changes: [
+      {
+        type: 'fix',
+        "description": "Strip .add/.store/.load/.play from SynthDef before compilation"
+      },
+      {
+        type: 'fix',
+        "description": "Auto-logout on 403 and fall back to static on server 404"
+      },
+      {
+        type: 'improvement',
+        "description": "Mark MusicLine WASM engine plan as complete"
+      },
+      {
+        type: 'fix',
+        "description": "Preview ML instruments via Sampler instead of WASM engine"
+      },
+      {
+        type: 'fix',
+        "description": "Re-route GainNode when SunVoxSynth is recreated after project reset"
+      },
+      {
+        type: 'fix',
+        "description": "Route instrument preview through WASM, pre-init on song load"
+      },
       {
         type: 'fix',
         "description": "Version Zustand stores and add DANGER ZONE reset button"
@@ -204,30 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Add SunVoxSynth and MusicLineSynth to SYNTH_CATEGORIES so they appear in the synth type dropdown"
-      },
-      {
-        type: 'fix',
-        "description": "Pipe script via stdin instead of -D file arg for non-root sclang"
-      },
-      {
-        type: 'fix',
-        "description": "Song mode load, auto-pattern, portable ASCII strToPtr"
-      },
-      {
-        type: 'fix',
-        "description": "Use m.stringToUTF8/lengthBytesUTF8 — TextEncoder unavailable in AudioWorklet scope"
-      },
-      {
-        type: 'fix',
-        "description": "Add amosMusicBank and iceTracker to FormatEnginePreferences"
-      },
-      {
-        type: 'fix',
-        "description": "Cache Yoga Config on window to survive HMR reloads"
-      },
-      {
-        type: 'fix',
-        "description": "Register missing UADE extensions in file picker"
       }
     ]
   }
