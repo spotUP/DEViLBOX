@@ -418,6 +418,14 @@ export class ToneEngine {
     if (!routing) {
       routing = { gain: engineGain, destinations: new Set() };
       this.nativeEngineRouting.set(engineKey, routing);
+    } else if (routing.gain !== engineGain) {
+      // New instance of same synth type (e.g. SunVox song reload after reset).
+      // Disconnect the old GainNode from all its destinations and re-route to the new one.
+      routing.destinations.forEach((dest) => {
+        try { routing!.gain.disconnect(dest); } catch { /* already disconnected */ }
+      });
+      routing.gain = engineGain;
+      routing.destinations.clear();
     }
 
     // Default: connect to synthBus if not connected to anything yet
