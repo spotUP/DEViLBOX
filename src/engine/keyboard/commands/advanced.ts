@@ -34,18 +34,23 @@ export function applyCurrentInstrument(): boolean {
   const currentInstrument = pattern.channels[cursor.channelIndex].rows[cursor.rowIndex].instrument;
   if (!currentInstrument) return true;
   store.applyInstrumentToSelection(currentInstrument);
+  useUIStore.getState().setStatusMessage(`Instrument ${currentInstrument} applied`, false, 1000);
   return true;
 }
 
 export function expandPattern(): boolean {
   const { currentPatternIndex, expandPattern: expand } = useTrackerStore.getState();
   expand(currentPatternIndex);
+  const newLength = useTrackerStore.getState().patterns[currentPatternIndex]?.length ?? 0;
+  useUIStore.getState().setStatusMessage(`Pattern: ${newLength} rows`, false, 1000);
   return true;
 }
 
 export function shrinkPattern(): boolean {
   const { currentPatternIndex, shrinkPattern: shrink } = useTrackerStore.getState();
   shrink(currentPatternIndex);
+  const newLength = useTrackerStore.getState().patterns[currentPatternIndex]?.length ?? 0;
+  useUIStore.getState().setStatusMessage(`Pattern: ${newLength} rows`, false, 1000);
   return true;
 }
 
@@ -62,6 +67,7 @@ export function shrinkSelection(): boolean {
 export function duplicatePattern(): boolean {
   const { currentPatternIndex, duplicatePattern: dup } = useTrackerStore.getState();
   dup(currentPatternIndex);
+  useUIStore.getState().setStatusMessage('Pattern duplicated', false, 1000);
   return true;
 }
 

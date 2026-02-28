@@ -72,6 +72,8 @@ export function toggleDiskBrowser(): boolean {
 
 export function toggleInstrumentPanel(): boolean {
   useUIStore.getState().togglePanel('instrument-editor');
+  const visible = useUIStore.getState().visiblePanels.includes('instrument-editor');
+  useUIStore.getState().setStatusMessage(`Instrument panel: ${visible ? 'shown' : 'hidden'}`, false, 1000);
   return true;
 }
 
@@ -88,6 +90,8 @@ export function toggleMixerPanel(): boolean {
 
 export function toggleAutomationPanel(): boolean {
   useUIStore.getState().togglePanel('automation');
+  const visible = useUIStore.getState().visiblePanels.includes('automation');
+  useUIStore.getState().setStatusMessage(`Automation: ${visible ? 'shown' : 'hidden'}`, false, 1000);
   return true;
 }
 
@@ -148,11 +152,15 @@ export function focusPrevPanel(): boolean {
 
 export function toggleBottomFrame(): boolean {
   useUIStore.getState().toggleTB303Collapsed();
+  const collapsed = useUIStore.getState().tb303Collapsed;
+  useUIStore.getState().setStatusMessage(`TB-303: ${collapsed ? 'hidden' : 'shown'}`, false, 1000);
   return true;
 }
 
 export function toggleUpperFrame(): boolean {
   useUIStore.getState().toggleOscilloscopeVisible();
+  const visible = useUIStore.getState().oscilloscopeVisible;
+  useUIStore.getState().setStatusMessage(`Oscilloscope: ${visible ? 'shown' : 'hidden'}`, false, 1000);
   return true;
 }
 
