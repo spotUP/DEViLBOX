@@ -24,6 +24,8 @@ const SUPPORTED_EXTENSIONS = new Set([
   '.dbx',
   // DEViLBOX instruments
   '.dbi',
+  // SunVox patches and projects
+  '.sunsynth', '.sunvox',
   // DB303 patterns/presets
   '.xml',
   // Behringer TD-3 patterns
