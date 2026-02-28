@@ -439,6 +439,18 @@ export async function parseUADEFile(
       'FutureComposer1.3':  async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
       'FutureComposer1.4':  async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
       'FutureComposer-BSI': async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
+      'SIDMon1.0': async () => {
+        const { parseSidMon1File } = await import('./SidMon1Parser');
+        // SidMon 1 is a compiled Amiga binary; scan chip RAM for the SID-MON header
+        // to find where UADE loaded it. Fallback to 0 if not found.
+        let moduleBase = 0;
+        try {
+          const sidMonMagic = new TextEncoder().encode(' SID-MON BY R');
+          moduleBase = await engine.scanMemoryForMagic(sidMonMagic);
+          if (moduleBase < 0) moduleBase = 0;
+        } catch { /* older WASM without scanMemoryForMagic, moduleBase stays 0 */ }
+        return parseSidMon1File(buffer, filename, moduleBase);
+      },
     };
     const route = NATIVE_ROUTES[fmt];
     if (route) {
@@ -478,7 +490,7 @@ export async function parseUADEFile(
   // (real PCM samples). FC 2.0 should get enhanced treatment; only FC 1.x is synthesis.
   const SYNTHESIS_FORMATS = new Set([
     'fred',                                    // Fred Editor
-    'sid', 'sid2',                             // SidMon variants
+    'sid2',                                    // SidMon 2 (sid1/smn routed to native parser via NATIVE_ROUTES)
     'dmu', 'dmu2', 'mug', 'mug2',             // Digital Mugician variants
   ]);
   if (mode === 'enhanced' && SYNTHESIS_FORMATS.has(ext)) {
