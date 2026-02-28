@@ -599,46 +599,24 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
   // SunVox import handler
   const handleSunVoxImport = useCallback(async (name: string, config: import('@/types/instrument').SunVoxConfig) => {
+    const file = pendingSunVoxFile;
     setPendingSunVoxFile(null);
     try {
-      useInstrumentStore.getState().createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
-
-      if (config.isSong) {
-        const { loadPatterns: lp, setPatternOrder: spo, setCurrentPattern: scp } = useTrackerStore.getState();
-        const currentInstruments = useInstrumentStore.getState().instruments;
-        const instrumentIndex = currentInstruments.length;
-        const patternId = `svox-${Date.now()}`;
-        const pattern = {
-          id: patternId,
-          name,
-          length: 1,
-          channels: [{
-            id: `ch-svox-${Date.now()}`,
-            name: 'SunVox',
-            muted: false,
-            solo: false,
-            collapsed: false,
-            volume: 100,
-            pan: 0,
-            instrumentId: instrumentIndex,
-            color: '#facc15',
-            rows: [{ note: 49, instrument: instrumentIndex, volume: 64, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }],
-          }],
-        };
-        const existing = useTrackerStore.getState().patterns;
-        lp([...existing, pattern]);
-        const newIdx = existing.length;
-        scp(newIdx);
-        spo([...useTrackerStore.getState().patterns.map((_, i) => i)]);
-        notify.success(`Loaded SunVox song: ${name} — press Play to hear it`);
+      if (config.isSong && file) {
+        // Full module extraction — one SunVoxSynth per module + tracker channels
+        const { loadFile } = await import('@lib/file/UnifiedFileLoader');
+        const result = await loadFile(file, { requireConfirmation: false });
+        if (result.success === true) notify.success(result.message);
+        else if (result.success === false) notify.error(result.error);
       } else {
+        useInstrumentStore.getState().createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
         notify.success(`Imported SunVox patch: ${name}`);
       }
     } catch (err) {
       notify.error('Failed to import SunVox file');
       console.error('[TrackerView] SunVox import failed:', err);
     }
-  }, [setPendingSunVoxFile]);
+  }, [pendingSunVoxFile, setPendingSunVoxFile]);
 
   // Module import handler - used by both mobile and desktop views
   const handleModuleImport = useCallback(async (info: ModuleInfo, options: ImportOptions) => {

@@ -88,10 +88,19 @@ export class SunVoxEngine {
 
   private async initialize(): Promise<void> {
     try {
+      console.log('[SunVoxEngine] ensureInitialized start');
       await SunVoxEngine.ensureInitialized(this.audioContext);
+      console.log('[SunVoxEngine] ensureInitialized done, creating node');
       this.createNode();
+      console.log('[SunVoxEngine] node created, init message sent');
     } catch (err) {
       console.error('[SunVoxEngine] Initialization failed:', err);
+      // Propagate to _initPromise so ready() rejects instead of hanging forever
+      if (this._rejectInit) {
+        this._rejectInit(err instanceof Error ? err : new Error(String(err)));
+        this._rejectInit = null;
+        this._resolveInit = null;
+      }
     }
   }
 
@@ -104,19 +113,42 @@ export class SunVoxEngine {
     const initPromise = (async () => {
       const baseUrl = import.meta.env.BASE_URL || '/';
 
+      // AudioContext must be running for addModule to complete reliably.
+      // Fire-and-forget resume (never await — on iOS, awaiting resume() outside a
+      // synchronous gesture handler hangs forever). Poll briefly for state change.
+      // Cast to string: standardized-audio-context types AudioContextState without
+      // 'running' (uses 'interrupted' instead), causing TS2367 narrowing errors below.
+      if ((context.state as string) !== 'running') {
+        console.log('[SunVoxEngine] context suspended — resuming before addModule');
+        context.resume().catch(() => {});
+        // Give the context up to 2 s to reach 'running'. On desktop Chrome this
+        // takes < 10 ms; on iOS it requires a prior user gesture to succeed.
+        for (let i = 0; i < 40 && (context.state as string) !== 'running'; i++) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        if ((context.state as string) !== 'running') {
+          console.warn('[SunVoxEngine] AudioContext still suspended — addModule may hang');
+        }
+      }
+      console.log('[SunVoxEngine] calling addModule, context.state:', context.state);
+
       // Register worklet module with this AudioContext
       try {
         await context.audioWorklet.addModule(`${baseUrl}sunvox/SunVox.worklet.js`);
-      } catch {
+        console.log('[SunVoxEngine] addModule done');
+      } catch (e) {
         // Module might already be registered in this context
+        console.warn('[SunVoxEngine] addModule threw (may be already registered):', e);
       }
 
       // Fetch WASM binary and JS glue code (cached across contexts)
+      console.log('[SunVoxEngine] fetching WASM + JS, cached:', !!this.wasmBinary);
       if (!this.wasmBinary || !this.jsCode) {
         const [wasmResponse, jsResponse] = await Promise.all([
           fetch(`${baseUrl}sunvox/SunVox.wasm`),
           fetch(`${baseUrl}sunvox/SunVox.js`),
         ]);
+        console.log('[SunVoxEngine] fetch done, wasm ok:', wasmResponse.ok, 'js ok:', jsResponse.ok);
 
         if (!wasmResponse.ok) throw new Error(`[SunVoxEngine] Failed to fetch SunVox.wasm: ${wasmResponse.status}`);
         if (!jsResponse.ok) throw new Error(`[SunVoxEngine] Failed to fetch SunVox.js: ${jsResponse.status}`);

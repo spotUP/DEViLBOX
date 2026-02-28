@@ -151,10 +151,19 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       const { getDevilboxAudioContext } = await import('@/utils/audio-context');
       const svEngine = SunVoxEngine.getInstance();
 
+      // Phase 1: wait for WASM to initialise — separate timeout so a slow first-load
+      // doesn't eat into the extraction budget.
+      console.log('[SunVox] waiting for engine ready…');
+      await Promise.race([
+        svEngine.ready(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('SunVox WASM init timed out')), 20000)
+        ),
+      ]);
+      console.log('[SunVox] engine ready');
+
+      // Phase 2: extraction — timed separately from init.
       const doExtract = async () => {
-        console.log('[SunVox] waiting for engine ready…');
-        await svEngine.ready();
-        console.log('[SunVox] engine ready, creating temp handle…');
         const sampleRate = getDevilboxAudioContext().sampleRate;
         const tempHandle = await svEngine.createHandle(sampleRate);
         console.log('[SunVox] temp handle', tempHandle, '— loading song…');
@@ -182,8 +191,8 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
 
       await Promise.race([
         doExtract(),
-        new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error('module extraction timed out')), 6000)
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('module extraction timed out')), 10000)
         ),
       ]);
     } catch (err) {
