@@ -3,14 +3,16 @@
  * Layout: FT2Toolbar (top) | Editor controls bar | Main area split:
  *   [PatternEditorCanvas (flex) | InstrumentList (side panel)]
  *
- * The pattern editor grid and instrument list are DOM <canvas>/<div> overlays
- * (via PixiDOMOverlay), positioned within the PixiJS layout regions.
+ * Pure Pixi rendering — no DOM overlays except MusicLine (DOM-only) and TB303KnobPanel/PatternManagement/PitchSlider (pending Pixi rewrites).
  *
  * Keyboard input (useTrackerInput) and block operations (useBlockOperations)
  * are hooked here — they only attach window event listeners, no DOM rendering.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import type { Graphics as GraphicsType } from 'pixi.js';
+import { usePixiTheme } from '../theme';
+import { PIXI_FONTS } from '../fonts';
 import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
 import { PixiFT2Toolbar, FT2_TOOLBAR_HEIGHT, FT2_TOOLBAR_HEIGHT_COMPACT } from './tracker/PixiFT2Toolbar';
 import { PixiInstrumentPanel } from './tracker/PixiInstrumentPanel';
@@ -221,22 +223,40 @@ export const PixiTrackerView: React.FC = () => {
             <PixiSunVoxChannelView channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
           </pixiContainer>
 
-          {/* Furnace / Hively / MusicLine — still DOM-based, via PixiDOMOverlay */}
+          {/* Furnace editor — pure Pixi */}
+          <pixiContainer
+            visible={viewMode === 'tracker' && editorMode === 'furnace'}
+            layout={{
+              flex: viewMode === 'tracker' && editorMode === 'furnace' ? 1 : 0,
+              height: viewMode === 'tracker' && editorMode === 'furnace' ? '100%' : 0,
+              width: viewMode === 'tracker' && editorMode === 'furnace' ? '100%' : 0,
+            }}
+          >
+            <PixiFurnaceView width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+          </pixiContainer>
+
+          {/* HivelyTracker editor — pure Pixi */}
+          <pixiContainer
+            visible={viewMode === 'tracker' && editorMode === 'hively'}
+            layout={{
+              flex: viewMode === 'tracker' && editorMode === 'hively' ? 1 : 0,
+              height: viewMode === 'tracker' && editorMode === 'hively' ? '100%' : 0,
+              width: viewMode === 'tracker' && editorMode === 'hively' ? '100%' : 0,
+            }}
+          >
+            <PixiHivelyView width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+          </pixiContainer>
+
+          {/* MusicLine — DOM-based (MusicLineTrackTableEditor + MusicLinePatternViewer are DOM-only) */}
           <PixiDOMOverlay
             layout={{
-              flex: viewMode === 'tracker' && (editorMode === 'furnace' || editorMode === 'hively' || editorMode === 'musicline') ? 1 : 0,
-              height: viewMode === 'tracker' && (editorMode === 'furnace' || editorMode === 'hively' || editorMode === 'musicline') ? '100%' : 0,
-              width: viewMode === 'tracker' && (editorMode === 'furnace' || editorMode === 'hively' || editorMode === 'musicline') ? '100%' : 0,
+              flex: viewMode === 'tracker' && editorMode === 'musicline' ? 1 : 0,
+              height: viewMode === 'tracker' && editorMode === 'musicline' ? '100%' : 0,
+              width: viewMode === 'tracker' && editorMode === 'musicline' ? '100%' : 0,
             }}
             style={{ overflow: 'hidden' }}
           >
-            {viewMode === 'tracker' && editorMode === 'furnace' ? (
-              <AutoSizeFurnaceView />
-            ) : viewMode === 'tracker' && editorMode === 'hively' ? (
-              <AutoSizeHivelyView />
-            ) : viewMode === 'tracker' && editorMode === 'musicline' ? (
-              <AutoSizeMusicLineView />
-            ) : null}
+            {viewMode === 'tracker' && editorMode === 'musicline' && <AutoSizeMusicLineView />}
           </PixiDOMOverlay>
 
           {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga insertChild crash.
@@ -297,33 +317,13 @@ export const PixiTrackerView: React.FC = () => {
           <PitchSliderOverlay />
         </PixiDOMOverlay>
 
-        {/* Instrument panel toggle button — always mounted, zero-width when hidden */}
-        <PixiDOMOverlay
-          layout={{ width: canShowInstrumentPanel && viewMode !== 'tb303' && viewMode !== 'sunvox' ? 24 : 0, height: '100%' }}
-          style={{ borderLeft: '1px solid rgba(255,255,255,0.1)' }}
-        >
-          {canShowInstrumentPanel && viewMode !== 'tb303' && viewMode !== 'sunvox' && (
-            <button
-              onClick={() => setShowInstrumentPanel(p => !p)}
-              style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'var(--color-bg-secondary)',
-                border: 'none',
-                cursor: 'pointer',
-                color: instrumentPanelVisible ? 'var(--color-accent)' : 'var(--color-text-dim)',
-                fontSize: '14px',
-                padding: 0,
-              }}
-              title={instrumentPanelVisible ? 'Hide Instruments' : 'Show Instruments'}
-            >
-              {instrumentPanelVisible ? '\u25B6' : '\u25C0'}
-            </button>
-          )}
-        </PixiDOMOverlay>
+        {/* Instrument panel toggle button — pure Pixi */}
+        {canShowInstrumentPanel && viewMode !== 'tb303' && viewMode !== 'sunvox' && (
+          <PixiInstrumentToggle
+            visible={instrumentPanelVisible}
+            onClick={() => setShowInstrumentPanel(p => !p)}
+          />
+        )}
 
         {/* Instrument list — always mounted, zero-width when hidden */}
         <pixiContainer visible={instrumentPanelVisible} layout={{ width: instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0, height: '100%' }}>
@@ -354,66 +354,38 @@ export const PixiTrackerView: React.FC = () => {
   );
 };
 
-// ─── Auto-sizing wrappers for format-specific editors ───────────────────────
+// ─── Instrument panel toggle — pure Pixi ────────────────────────────────────
 
-const AutoSizeFurnaceView: React.FC = () => {
-  const ref = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 800, height: 600 });
+const PixiInstrumentToggle: React.FC<{ visible: boolean; onClick: () => void }> = ({ visible, onClick }) => {
+  const theme = usePixiTheme();
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width;
-        const h = entry.contentRect.height;
-        if (w > 0 && h > 0) setSize({ width: w, height: h });
-      }
-    });
-    obs.observe(el);
-    const w = el.clientWidth;
-    const h = el.clientHeight;
-    if (w > 0 && h > 0) setSize({ width: w, height: h });
-    return () => obs.disconnect();
-  }, []);
+  const drawBorder = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, 1, 9999);
+    g.fill({ color: theme.border.color, alpha: 0.25 });
+  }, [theme]);
 
   return (
-    <div ref={ref} style={{ width: '100%', height: '100%' }}>
-      <PixiFurnaceView width={size.width} height={size.height} />
-    </div>
+    <pixiContainer
+      layout={{ width: 24, height: '100%', alignItems: 'center', justifyContent: 'center' }}
+      eventMode="static"
+      cursor="pointer"
+      onPointerUp={onClick}
+    >
+      {/* Left border */}
+      <pixiGraphics draw={drawBorder} layout={{ position: 'absolute', left: 0, top: 0, width: 1, height: '100%' }} />
+      {/* Arrow */}
+      <pixiBitmapText
+        text={visible ? '\u25B6' : '\u25C0'}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+        tint={visible ? theme.accent.color : theme.textMuted.color}
+        layout={{ alignSelf: 'center' }}
+      />
+    </pixiContainer>
   );
 };
 
-const AutoSizeHivelyView: React.FC = () => {
-  const ref = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 800, height: 600 });
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width;
-        const h = entry.contentRect.height;
-        // Only update when we have real dimensions — the PixiDOMOverlay portal
-        // starts with display:none, so clientWidth/Height are 0 until the Yoga
-        // layout is computed. Updating to (0,0) would make the view black.
-        if (w > 0 && h > 0) setSize({ width: w, height: h });
-      }
-    });
-    obs.observe(el);
-    const w = el.clientWidth;
-    const h = el.clientHeight;
-    if (w > 0 && h > 0) setSize({ width: w, height: h });
-    return () => obs.disconnect();
-  }, []);
-
-  return (
-    <div ref={ref} style={{ width: '100%', height: '100%' }}>
-      <PixiHivelyView width={size.width} height={size.height} />
-    </div>
-  );
-};
+// ─── MusicLine wrapper (DOM-only components) ────────────────────────────────
 
 const MUSICLINE_MATRIX_HEIGHT = 220;
 
