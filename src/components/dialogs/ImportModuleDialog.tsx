@@ -418,9 +418,35 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     if (file) handleFileSelect(file);
   }, [handleFileSelect]);
 
-  const isMusicLine = nativeFmt?.key === 'musicLine';
+  // Native format keys where libopenmpt can successfully preview the file.
+  // All other native formats either need a dedicated engine or have no preview.
+  const LIBOPENMPT_PLAYABLE_NATIVE_KEYS = new Set<NativeFormatKey>([
+    'okt',           // Oktalyzer (.okt)
+    'med',           // OctaMED (.med, .mmd*)
+    'digiBoosterPro',// DigiBooster Pro (.dbm)
+    'ams',           // Extreme's AMS / Velvet Studio (.ams)
+    'faceTheMusic',  // Face the Music (.ftm)
+    'imagoOrpheus',  // Imago Orpheus (.imf)
+    'madTracker2',   // MadTracker 2 (.mt2)
+    'psm',           // Epic MegaGames PSM (.psm)
+    'pt36',          // ProTracker 3.6 (.pt36)
+    'symphoniePro',  // Symphonie Pro (.symmod)
+  ]);
 
-  const stopMLPreview = useCallback(() => {
+  const isMusicLine = nativeFmt?.key === 'musicLine';
+  const isHively    = nativeFmt?.key === 'hvl';
+
+  // Preview is available when:
+  //   - No uadeMetadata (UADE-exclusive formats hide preview already via uadeMetadata)
+  //   - AND one of: no native format (standard libopenmpt), libopenmpt-playable native, or dedicated engine
+  const canPreview = !uadeMetadata && (
+    !nativeFmt ||
+    isMusicLine ||
+    isHively ||
+    LIBOPENMPT_PLAYABLE_NATIVE_KEYS.has(nativeFmt.key)
+  );
+
+  const stopEnginePreview = useCallback(() => {
     if (mlPreviewRef.current) {
       mlPreviewRef.current.stop();
       try { mlPreviewRef.current.output.disconnect(); } catch { /* already disconnected */ }
@@ -431,22 +457,33 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const handlePreview = useCallback(async () => {
     if (!moduleInfo) return;
 
-    if (isMusicLine) {
+    if (isMusicLine || isHively) {
       if (isPlaying) {
-        stopMLPreview();
+        stopEnginePreview();
         setIsPlaying(false);
       } else {
         try {
-          const { MusicLineEngine } = await import('@engine/musicline/MusicLineEngine');
-          const engine = MusicLineEngine.getInstance();
-          await engine.ready();
-          await engine.loadSong(new Uint8Array(moduleInfo.arrayBuffer));
-          engine.output.connect(engine.output.context.destination);
-          mlPreviewRef.current = { stop: () => engine.stop(), output: engine.output };
-          engine.play();
+          if (isMusicLine) {
+            const { MusicLineEngine } = await import('@engine/musicline/MusicLineEngine');
+            const engine = MusicLineEngine.getInstance();
+            await engine.ready();
+            await engine.loadSong(new Uint8Array(moduleInfo.arrayBuffer));
+            engine.output.connect(engine.output.context.destination);
+            mlPreviewRef.current = { stop: () => engine.stop(), output: engine.output };
+            engine.play();
+          } else {
+            // HVL/AHX — use HivelyEngine
+            const { HivelyEngine } = await import('@engine/hively/HivelyEngine');
+            const engine = HivelyEngine.getInstance();
+            await engine.ready();
+            await engine.loadTune(moduleInfo.arrayBuffer.slice(0));
+            engine.output.connect(engine.output.context.destination);
+            mlPreviewRef.current = { stop: () => engine.stop(), output: engine.output };
+            engine.play();
+          }
           setIsPlaying(true);
         } catch (err) {
-          console.error('[ImportModuleDialog] ML preview failed:', err);
+          console.error('[ImportModuleDialog] Engine preview failed:', err);
         }
       }
       return;
@@ -459,22 +496,22 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       previewModule(moduleInfo);
       setIsPlaying(true);
     }
-  }, [moduleInfo, isPlaying, isMusicLine, stopMLPreview]);
+  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview]);
 
   const handleImport = useCallback(() => {
     if (!moduleInfo) return;
     if (isPlaying) {
-      if (isMusicLine) stopMLPreview();
+      if (isMusicLine || isHively) stopEnginePreview();
       else stopPreview(moduleInfo);
       setIsPlaying(false);
     }
     onImport(moduleInfo, { useLibopenmpt, subsong: selectedSubsong, uadeMetadata: uadeMetadata ?? undefined });
     onClose();
-  }, [moduleInfo, isPlaying, isMusicLine, stopMLPreview, onImport, onClose, useLibopenmpt, selectedSubsong]);
+  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, onImport, onClose, useLibopenmpt, selectedSubsong]);
 
   const handleClose = useCallback(() => {
     if (isPlaying) {
-      if (isMusicLine) stopMLPreview();
+      if (isMusicLine || isHively) stopEnginePreview();
       else if (moduleInfo) stopPreview(moduleInfo);
     }
     // Cancel any in-flight UADE scan so it doesn't resolve after the dialog closes
@@ -490,7 +527,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setUadeMetadata(null);
     setSelectedSubsong(0);
     onClose();
-  }, [moduleInfo, isPlaying, isMusicLine, stopMLPreview, onClose]);
+  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, onClose]);
 
   if (!isOpen) return null;
 
@@ -666,8 +703,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                 </div>
               )}
 
-              {/* Preview button — hidden for UADE-exclusive formats (libopenmpt can't play them) */}
-              {!uadeMetadata && (
+              {/* Preview button — shown only when a playback engine exists for this format */}
+              {canPreview && (
                 <Button
                   variant="ghost"
                   fullWidth
