@@ -45,12 +45,16 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import type { TFMXConfig } from '@/types/instrument';
+import type { TFMXConfig, UADEChipRamInfo } from '@/types/instrument';
 import { useThemeStore } from '@stores';
+import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
+import { UADEEngine } from '@/engine/uade/UADEEngine';
 
 interface TFMXControlsProps {
   config: TFMXConfig;
   onChange?: (cfg: TFMXConfig) => void;
+  /** Present when this instrument was loaded via UADE's native TFMX parser. */
+  uadeChipRam?: UADEChipRamInfo;
 }
 
 type TFMXTab = 'summary' | 'volmod' | 'sndmod';
@@ -259,7 +263,7 @@ function hexPreview(data: Uint8Array, maxBytes = 64): string {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange }) => {
+export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, uadeChipRam }) => {
   const [activeTab,    setActiveTab]    = useState<TFMXTab>('summary');
   const [showVolHex,   setShowVolHex]   = useState(false);
   const [showSndHex,   setShowSndHex]   = useState(false);
@@ -267,6 +271,15 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange }) 
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
+
+  // Lazy UADEChipEditor singleton — only created when chip RAM is present
+  const chipEditorRef = useRef<UADEChipEditor | null>(null);
+  const getEditor = useCallback(() => {
+    if (!chipEditorRef.current) {
+      chipEditorRef.current = new UADEChipEditor(UADEEngine.getInstance());
+    }
+    return chipEditorRef.current;
+  }, []);
 
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyan = currentThemeId === 'cyan-lineart';
@@ -282,14 +295,23 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange }) 
 
   // ── Mutation helpers ──────────────────────────────────────────────────────
 
-  /** Write a single byte into volModSeqData and call onChange. */
+  /**
+   * Write a single byte into volModSeqData, call onChange, and mirror the
+   * change to chip RAM when a UADE context is active.
+   *
+   * byteIdx is relative to the start of this instrument's VolModSeq block.
+   * In chip RAM: address = instrBase + byteIdx.
+   */
   const setVolByte = useCallback((byteIdx: number, value: number) => {
     if (!onChange) return;
     const cur = configRef.current;
     const next = new Uint8Array(cur.volModSeqData);
     next[byteIdx] = Math.max(0, Math.min(255, value));
     onChange({ ...cur, volModSeqData: next });
-  }, [onChange]);
+    if (uadeChipRam) {
+      void getEditor().writeU8(uadeChipRam.instrBase + byteIdx, next[byteIdx]);
+    }
+  }, [onChange, uadeChipRam, getEditor]);
 
   // ── Sub-renderers ─────────────────────────────────────────────────────────
 
@@ -355,6 +377,32 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange }) 
                   </span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Export .mdat — only shown when chip RAM context is available */}
+        {uadeChipRam && (
+          <div className={`rounded-lg border p-3 ${panelBg}`}>
+            <SectionLabel label="Export" />
+            <button
+              onClick={() => {
+                void getEditor().exportModule(
+                  uadeChipRam.moduleBase,
+                  uadeChipRam.moduleSize,
+                  'module.mdat',
+                );
+              }}
+              className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded border transition-colors"
+              style={{
+                borderColor: accentDim,
+                color: accentDim,
+                background: 'transparent',
+              }}>
+              Export .mdat (Amiga)
+            </button>
+            <div className="mt-1 text-[9px] text-gray-600">
+              Downloads the full mdat file with any chip RAM edits applied.
             </div>
           </div>
         )}
