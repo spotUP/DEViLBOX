@@ -100,7 +100,8 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef(ToneEngine.getInstance());
   const activeNotesRef = useRef<Set<string>>(new Set());
-  const isInitializedRef = useRef(false);
+  // Single shared init promise — prevents concurrent init() calls from rapid key presses.
+  const initPromiseRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     activeNotesRef.current = activeNotes;
@@ -162,13 +163,19 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
     };
   }, [containerWidth]);
 
-  // Initialize engine once
-  useEffect(() => {
-    if (!isInitializedRef.current) {
-      engineRef.current.init().then(() => {
-        isInitializedRef.current = true;
+  // Ensure audio context is running. Safe to call from user-gesture handlers
+  // (mousedown, keydown) — browser allows AudioContext.resume() within a gesture.
+  // Returns immediately if already running; otherwise resumes and waits.
+  // Deduplicates concurrent calls so rapid key presses share one init promise.
+  const ensureContextRunning = useCallback((): Promise<void> => {
+    const engine = engineRef.current;
+    if (engine.getContextState() === 'running') return Promise.resolve();
+    if (!initPromiseRef.current) {
+      initPromiseRef.current = engine.init().finally(() => {
+        initPromiseRef.current = null;
       });
     }
+    return initPromiseRef.current;
   }, []);
 
   // Attack note - starts playing and sustains until release
@@ -180,28 +187,33 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
     const inst = instrument;
     const { midiPolyphonic } = useSettingsStore.getState();
 
-    console.log(`[TestKeyboard] attackNote: ${note}, polyphonic=${midiPolyphonic}, activeNotes=${activeNotesRef.current.size}, synthType=${inst.synthType}`);
-
-    if (midiPolyphonic) {
-      // Polyphonic mode: use voice allocation for proper chord support
-      engine.triggerPolyNoteAttack(inst.id, note, 0.8, inst);
-    } else {
-      // Monophonic mode: release all other notes first
-      for (const activeNote of activeNotesRef.current) {
-        engine.triggerPolyNoteRelease(inst.id, activeNote, inst);
-      }
-      engine.triggerPolyNoteAttack(inst.id, note, 0.8, inst);
-    }
-
+    // Show visual feedback immediately, before waiting for audio context.
     setActiveNotes((prev) => {
       if (midiPolyphonic) {
         return new Set(prev).add(note);
       } else {
-        // Monophonic: only keep the new note
         return new Set([note]);
       }
     });
-  }, [instrument]);
+
+    const doAttack = () => {
+      if (midiPolyphonic) {
+        engine.triggerPolyNoteAttack(inst.id, note, 0.8, inst);
+      } else {
+        // Monophonic: release all other notes first
+        for (const activeNote of activeNotesRef.current) {
+          engine.triggerPolyNoteRelease(inst.id, activeNote, inst);
+        }
+        engine.triggerPolyNoteAttack(inst.id, note, 0.8, inst);
+      }
+    };
+
+    // Audio context must be running before triggering notes.
+    // ensureContextRunning() calls engine.init() which calls Tone.start() —
+    // resuming a suspended AudioContext is only allowed within a user gesture,
+    // which is exactly where attackNote is called (mousedown / keydown).
+    void ensureContextRunning().then(doAttack);
+  }, [instrument, ensureContextRunning]);
 
   // Release note - stops the sustained note
   const releaseNote = useCallback((note: string) => {

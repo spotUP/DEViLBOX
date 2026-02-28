@@ -27,34 +27,19 @@ class SunVoxProcessor extends AudioWorkletProcessor {
     // Value: { active: true } — all handles share the static render bufs.
     this.handles = {};
 
-    // Pending message queue — drained at the start of each process() call.
-    // Using a queue lets us safely handle messages that arrive between process() calls.
-    this.messageQueue = [];
-
     this.port.onmessage = (event) => {
+      // All messages are handled directly in onmessage. AudioWorklet onmessage and
+      // process() run on the same audio rendering thread and are serialized by the
+      // JS event loop, so there is no concurrency risk. Handling here (rather than
+      // in a queue drained from process()) ensures correctness even when the worklet
+      // node is not connected to an active audio graph — e.g. during pre-read module
+      // extraction where no SunVoxSynth exists yet and process() never fires.
       if (event.data.type === 'init') {
-        // Handle init directly — initWasm() is async and posts 'ready' when done.
-        // It must NOT go through the queue because process() only runs when the
-        // worklet node is connected to an active audio graph. During pre-read
-        // extraction the engine exists before any SunVoxSynth, so process() never
-        // fires and a queued init would hang forever.
         this.initWasm(event.data.sampleRate, event.data.wasmBinary, event.data.jsCode);
       } else {
-        // All other messages are enqueued and drained at the start of process().
-        this.messageQueue.push(event.data);
+        this.handleMessage(event.data);
       }
     };
-  }
-
-  /**
-   * Drain and execute all queued messages from the main thread.
-   * Called at the start of process() so messages are applied before rendering.
-   */
-  drainQueue() {
-    while (this.messageQueue.length > 0) {
-      const data = this.messageQueue.shift();
-      this.handleMessage(data);
-    }
   }
 
   handleMessage(data) {
@@ -295,9 +280,6 @@ class SunVoxProcessor extends AudioWorkletProcessor {
   }
 
   process(_inputs, outputs, _parameters) {
-    // Drain all pending messages before rendering so params take effect this block
-    this.drainQueue();
-
     if (!this.initialized || !this.wasm) return true;
 
     const output = outputs[0];
