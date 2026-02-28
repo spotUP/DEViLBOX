@@ -96,6 +96,7 @@ export class SuperColliderSynth implements DevilboxSynth {
   // ---------------------------------------------------------------------------
 
   triggerAttack(note: string | number, time?: number, velocity?: number): void {
+    // Guard: no compiled binary yet (binary: '') — notes are silently dropped until compiled
     if (this._disposed || !this._config.binary || !this._config.synthDefName) return;
 
     // time parameter is not used — scsynth scheduling is handled internally
