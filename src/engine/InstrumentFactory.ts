@@ -26,6 +26,7 @@ import {
   DEFAULT_PWM_SYNTH,
   DEFAULT_STRING_MACHINE,
   DEFAULT_CHIP_SYNTH,
+  DEFAULT_SUPERCOLLIDER,
 } from '@/types/instrument';
 import { TapeSaturation } from './effects/TapeSaturation';
 import { HivelySynth } from './hively/HivelySynth';
@@ -43,6 +44,7 @@ import { DavidWhittakerSynth } from './davidwhittaker/DavidWhittakerSynth';
 import { SymphonieSynth } from './symphonie/SymphonieSynth';
 import { SunVoxSynth } from './sunvox/SunVoxSynth';
 import { UADESynth } from './uade/UADESynth';
+import { SuperColliderSynth } from './sc/SuperColliderSynth';
 import { WavetableSynth } from './WavetableSynth';
 import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
 import { SpaceEchoEffect } from './effects/SpaceEchoEffect';
@@ -1006,6 +1008,13 @@ export class InstrumentFactory {
           );
         }
         instrument = uadeSynth;
+        break;
+      }
+
+      case 'SuperCollider': {
+        const sc = config.superCollider ?? DEFAULT_SUPERCOLLIDER;
+        const audioCtx = Tone.getContext().rawContext as AudioContext;
+        instrument = new SuperColliderSynth(sc, audioCtx);
         break;
       }
 
