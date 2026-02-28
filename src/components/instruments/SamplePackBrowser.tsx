@@ -28,6 +28,21 @@ async function isSampleCached(url: string): Promise<boolean> {
   }
 }
 
+/** Guard: if downloads are still in progress and this URL isn't cached yet,
+ *  show a warning toast and return true (caller should bail out). */
+async function warnIfNotCached(url: string): Promise<boolean> {
+  // Fast path: flag is set means everything is cached
+  if (localStorage.getItem('samplePacksCached') === 'v1') return false;
+  // Only check factory pack URLs (blob: URLs are always local)
+  if (!url.startsWith('/data/samples/packs/')) return false;
+  const cached = await isSampleCached(url);
+  if (!cached) {
+    notify.warning('Sample packs are still downloading — try again in a moment');
+    return true;
+  }
+  return false;
+}
+
 interface SamplePackBrowserProps {
   onClose: () => void;
   mode?: 'instrument' | 'drumpad';
@@ -255,16 +270,7 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
 
   // Preview a sample
   const previewSample = async (sample: SampleInfo) => {
-    // Guard: only check factory pack URLs (not blob: or user-uploaded URLs)
-    if (sample.url.startsWith('/data/samples/packs/')) {
-      if (localStorage.getItem('samplePacksCached') !== 'v1') {
-        const cached = await isSampleCached(sample.url);
-        if (!cached) {
-          notify.warning('Sample packs are still downloading — try again in a moment');
-          return;
-        }
-      }
-    }
+    if (await warnIfNotCached(sample.url)) return;
 
     // Increment version to invalidate any pending callbacks
     const currentVersion = ++previewVersionRef.current;
@@ -327,17 +333,8 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
   const handleLoadSamples = async () => {
     if (selectedSamples.size === 0 || !selectedPack) return;
 
-    // Guard: if any selected URL is a factory pack URL, check cache before loading
     const firstUrl = Array.from(selectedSamples)[0];
-    if (firstUrl.startsWith('/data/samples/packs/')) {
-      if (localStorage.getItem('samplePacksCached') !== 'v1') {
-        const cached = await isSampleCached(firstUrl);
-        if (!cached) {
-          notify.warning('Sample packs are still downloading — try again in a moment');
-          return;
-        }
-      }
-    }
+    if (await warnIfNotCached(firstUrl)) return;
 
     const urls = Array.from(selectedSamples);
 
@@ -460,17 +457,8 @@ export const SamplePackBrowser: React.FC<SamplePackBrowserProps> = ({ onClose, m
     if (selectedSamples.size === 0 || !selectedPack || !onSelectSample) return;
 
     const url = Array.from(selectedSamples)[0];
+    if (await warnIfNotCached(url)) return;
 
-    // Guard: only check factory pack URLs (not blob: or user-uploaded URLs)
-    if (url.startsWith('/data/samples/packs/')) {
-      if (localStorage.getItem('samplePacksCached') !== 'v1') {
-        const cached = await isSampleCached(url);
-        if (!cached) {
-          notify.warning('Sample packs are still downloading — try again in a moment');
-          return;
-        }
-      }
-    }
     // Find sample info
     let sampleInfo: SampleInfo | undefined;
     for (const cat of selectedPack.categories) {
