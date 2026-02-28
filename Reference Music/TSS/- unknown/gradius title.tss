@@ -1,0 +1,29 @@
+#TITLE		<GRADIUS RANKING>
+#CHANNEL	5
+
+#A	t240 %0 v5,15 q8 s16 o6
+	$
+	c+2^8 d2 e4. d2^8 c+2 d4. a1. b4a8g4 f+4.e8d4.
+	c+2^8 d2 b4. a4b8<c+4d4.e8f+4 g4.f+8d4 >b4.<d8c+4d2>b4a4.g8f+4d8
+
+#B	%0 v13,3 q8 s16 o5
+	$
+	a2^8 b2 <c+4.> b2^8 a2 b4. <c+2^8 d2 e4. d2^8 >b2..
+	a2^8 b2 <d4. c+4.a4f+2b4b4.a8f+4 d4.g8e4g4.f+8e4f+4.e8d4>a8
+
+#C	%0 q6 s16 o4 l8
+	$
+	/:8v5,15g4v15,5d:/ /:4v5,15f+4v15,5c+:/ v13>b4.<c+4d4.ef+4.
+	/:4v5,15g4v15,5d:/ v13f+4.c+4>b4.<c+8d4e4. f+8g4a4.e8>a4<d2g4d4.e8f+4.
+
+#D	%0 v7,1 q8 s16 o6 r8. k-1
+	$
+	c+2^8 d2 e4. d2^8 c+2 d4. a1. b4a8g4 f+4.e8d4.
+	c+2^8 d2 b4. a4b8<c+4d4.e8f+4 g4.f+8d4 >b4.<d8c+4d2>b4a4.g8f+4d8
+
+#E	%0 v1,5 q8 s16 o5 r8. k-1
+	$
+	a2^8 b2 <c+4.> b2^8 a2 b4. <c+2^8 d2 e4. d2^8 >b2..
+	a2^8 b2 <d4. c+4.a4f+2b4b4.a8f+4 d4.g8e4g4.f+8e4f+4.e8d4>a8
+
+#END

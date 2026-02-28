@@ -1,0 +1,67 @@
+#TITLE		<夢大陸アドベンチャー[stage 1]>
+#CHANNEL	3
+
+#A		{ MELODY }
+		o5 l16 t130 %128 v13 q15 s0
+		[cg<c>g<dec>>a+8<fa+f<cd>a+8>g+<d+g+d+a+<c>g+>a+8<fa+fa+aa+b]
+
+		$
+		
+		f8g8fec<c2^8r>a+a+8.g+a+g+8g8g+gfef8e8fefg<c2.r8>a+g2f
+		f8e8fec<c2^8r>a+a+8cga+g+8g8g+gfef8e8f<cg<c2.r8.>a+g2r
+
+		>cg<c>g<dec>>a+8<fa+f<cd>a+8>g+<d+g+d+a+<c>g+>a+8<fa+fa+aa+b
+		f8g8fec<c2^8r>a+a+8.g+a+g+8g8g+gfef8e8fefg<c2.r8>a+g2f
+		f8e8fec<c2^8r>a+a+8cga+g+8g8g+gfef8e8f<cg<c2.r8.>a+g2r>
+
+		[cg<c>g<dec>>a+8<fa+f<cd>a+8>g+<d+g+d+a+<c>g+>a+8<fa+fa+aa+b]
+		da<d>a<ef+d>c8g<c>g<dec8>>a+<fa+f<cd>a+c8g<c>g<c>b<cc+>
+		da<d>a<ef+d>c8g<c>g<dec8>>a+<fa+f<cd>a+c8g<c>g
+		t160 <efg<c
+		t130 grv10grv7grv4grv1gr v13
+
+#B		{ BASS }
+		o3 l16 t130 %128 v12 q10 s64
+		q12 [<c8c8c8r8>a+8.a+fga+fg+8g+8g+8r8a+8.a+gf+gg+]
+		
+		$
+		
+		[11<c8c8c8r8>a+8.a+fga+fg+8g+8g+8r8a+8.a+gf+gg+]
+		<d8d8d8r8c8.c>f+a<c>ga+8a+8a+8r8<c8.c>ag+aa+
+		<d8d8d8r8c8.c>f+a<c>ga+8a+8a+8r8<c8.c>
+		t160 aa+b<c
+		t130 grv10grv8grv6grv4gr v12
+
+#C		{ DRUMS }
+		o7 l16 t130 %128 v13 q13 s32
+		gf+fed+dc+c>ba+ag+gf+fe
+		o5 l32 %0 v15 q1 s32,-16
+		[3a]r [ar]
+		[3e]r [er]
+		[3c]r [cr]
+		>[4ar]
+		o7 l16 %2 q1
+		[4 v10s64>>c<<ccc <v15s32c> v10s64ccc ]
+		
+		$
+		
+		o5 l16 %0 v12 q2 s16,-16
+		ar ar er cc >ar8.
+		o7 l16 %2 q1
+		<v15s32c> v10s64ccc
+
+		[18 v10s64>>c<<ccc <v15s32c> v10s64ccc ]
+
+		o5 l16 %0 v12 q1 s16,-16
+		ar ar er cc >ar8.
+		o7 l16 %2 q1
+		<v15s32c> v10s64ccc
+
+		[28 v10s64>>c<<ccc <v15s32c> v10s64ccc ]
+
+		o5 l32 %0 v15 q2 s32,-16
+		[4ar][4er][4cr]>
+		t160 [4br]
+		t130 r2^8
+
+#END
