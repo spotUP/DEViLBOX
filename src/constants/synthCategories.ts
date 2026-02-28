@@ -1773,7 +1773,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     id: 'samples',
     name: 'Samples',
     description: 'Sample-based instruments',
-    synths: [SYNTH_INFO.Sampler, SYNTH_INFO.Player, SYNTH_INFO.ChiptuneModule],
+    synths: [SYNTH_INFO.Sampler, SYNTH_INFO.Player, SYNTH_INFO.ChiptuneModule, SYNTH_INFO.MusicLineSynth],
   },
   {
     id: 'plugins',
@@ -2061,6 +2061,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     synths: [
       SYNTH_INFO.Dexed,
       SYNTH_INFO.OBXd,
+      SYNTH_INFO.SunVoxSynth,
     ],
   },
   {
