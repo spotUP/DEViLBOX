@@ -1199,8 +1199,6 @@ export class TrackerReplayer {
     if (this.song.musiclineFileData && this.song.format === 'ML') {
       try {
         const mlEngine = MusicLineEngine.getInstance();
-        const ctx = (engine as unknown as { context: AudioContext }).context;
-        await mlEngine.init(ctx);
         await mlEngine.ready();
         await mlEngine.loadSong(this.song.musiclineFileData.slice(0));
         if (!this._muted) {
