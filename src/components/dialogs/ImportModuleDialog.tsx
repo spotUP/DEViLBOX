@@ -270,6 +270,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Track whether a UADE scan is in-flight so handleClose can cancel it
   const uadeScanActiveRef = useRef(false);
+  // MusicLine preview engine reference (connect/disconnect on preview start/stop)
+  const mlPreviewRef = useRef<{ stop: () => void; output: GainNode } | null>(null);
 
   const formatEngine   = useSettingsStore((s) => s.formatEngine);
   const setFormatEngine = useSettingsStore((s) => s.setFormatEngine);
@@ -416,8 +418,40 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     if (file) handleFileSelect(file);
   }, [handleFileSelect]);
 
-  const handlePreview = useCallback(() => {
+  const isMusicLine = nativeFmt?.key === 'musicLine';
+
+  const stopMLPreview = useCallback(() => {
+    if (mlPreviewRef.current) {
+      mlPreviewRef.current.stop();
+      try { mlPreviewRef.current.output.disconnect(); } catch { /* already disconnected */ }
+      mlPreviewRef.current = null;
+    }
+  }, []);
+
+  const handlePreview = useCallback(async () => {
     if (!moduleInfo) return;
+
+    if (isMusicLine) {
+      if (isPlaying) {
+        stopMLPreview();
+        setIsPlaying(false);
+      } else {
+        try {
+          const { MusicLineEngine } = await import('@engine/musicline/MusicLineEngine');
+          const engine = MusicLineEngine.getInstance();
+          await engine.ready();
+          await engine.loadSong(new Uint8Array(moduleInfo.arrayBuffer));
+          engine.output.connect(engine.output.context.destination);
+          mlPreviewRef.current = { stop: () => engine.stop(), output: engine.output };
+          engine.play();
+          setIsPlaying(true);
+        } catch (err) {
+          console.error('[ImportModuleDialog] ML preview failed:', err);
+        }
+      }
+      return;
+    }
+
     if (isPlaying) {
       stopPreview(moduleInfo);
       setIsPlaying(false);
@@ -425,20 +459,24 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       previewModule(moduleInfo);
       setIsPlaying(true);
     }
-  }, [moduleInfo, isPlaying]);
+  }, [moduleInfo, isPlaying, isMusicLine, stopMLPreview]);
 
   const handleImport = useCallback(() => {
     if (!moduleInfo) return;
     if (isPlaying) {
-      stopPreview(moduleInfo);
+      if (isMusicLine) stopMLPreview();
+      else stopPreview(moduleInfo);
       setIsPlaying(false);
     }
     onImport(moduleInfo, { useLibopenmpt, subsong: selectedSubsong, uadeMetadata: uadeMetadata ?? undefined });
     onClose();
-  }, [moduleInfo, isPlaying, onImport, onClose, useLibopenmpt, selectedSubsong]);
+  }, [moduleInfo, isPlaying, isMusicLine, stopMLPreview, onImport, onClose, useLibopenmpt, selectedSubsong]);
 
   const handleClose = useCallback(() => {
-    if (moduleInfo && isPlaying) stopPreview(moduleInfo);
+    if (isPlaying) {
+      if (isMusicLine) stopMLPreview();
+      else if (moduleInfo) stopPreview(moduleInfo);
+    }
     // Cancel any in-flight UADE scan so it doesn't resolve after the dialog closes
     if (uadeScanActiveRef.current) {
       import('@engine/uade/UADEEngine').then(({ UADEEngine }) => {
@@ -452,7 +490,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setUadeMetadata(null);
     setSelectedSubsong(0);
     onClose();
-  }, [moduleInfo, isPlaying, onClose]);
+  }, [moduleInfo, isPlaying, isMusicLine, stopMLPreview, onClose]);
 
   if (!isOpen) return null;
 
