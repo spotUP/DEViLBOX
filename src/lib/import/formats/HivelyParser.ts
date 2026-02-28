@@ -733,7 +733,7 @@ export function parseHivelyFile(buffer: ArrayBuffer, fileName: string): TrackerS
  * Parse a .ahi standalone instrument file (THXI = AHX format, HVLI = HVL format).
  * Returns the HivelyConfig and instrument name.
  */
-export function parseAhiFile(buffer: ArrayBuffer): { config: HivelyConfig; name: string } {
+export function parseAhiFile(buffer: ArrayBufferLike): { config: HivelyConfig; name: string } {
   const buf = new Uint8Array(buffer);
   if (buf.length < 26) throw new Error('Invalid .ahi file: too short');
 
