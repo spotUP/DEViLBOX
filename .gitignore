@@ -106,3 +106,6 @@ projectm-wasm/build/
 # Git worktrees
 .worktrees/
 fred-wasm/build/
+
+# Downloaded TTF source fonts (generated during build)
+public/fonts/ttf/
