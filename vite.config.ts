@@ -121,7 +121,9 @@ export default defineConfig({
       ignored: ['**/node_modules/**', '**/dist/**', '**/Reference Code/**'],
     },
     hmr: {
-      overlay: false, // Reduce DOM operations
+      host: 'localhost',
+      protocol: 'ws',
+      overlay: false,
     },
   },
   build: {

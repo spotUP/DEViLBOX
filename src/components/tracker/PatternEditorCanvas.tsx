@@ -1097,42 +1097,47 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     });
     bridgeRef.current = bridge;
 
-    const dpr   = window.devicePixelRatio || 1;
-    const w     = Math.max(1, container.clientWidth);
-    const h     = Math.max(1, container.clientHeight);
-    const state = useTrackerStore.getState();
+    // Defer canvas transfer + init to next animation frame — flex layout
+    // hasn't run yet at mount/remount time, so clientWidth/clientHeight are
+    // 0 if read synchronously, which initialises the worker with a 1×1 canvas.
+    const initRafId = requestAnimationFrame(() => {
+      const dpr   = window.devicePixelRatio || 1;
+      const w     = Math.max(1, container.clientWidth);
+      const h     = Math.max(1, container.clientHeight);
+      const state = useTrackerStore.getState();
 
-    // Transfer canvas — after this the main thread cannot draw to it
-    const offscreen = canvas.transferControlToOffscreen();
+      // Transfer canvas — after this the main thread cannot draw to it
+      const offscreen = canvas.transferControlToOffscreen();
 
-    bridge.post(
-      {
-        type:               'init',
-        canvas:             offscreen,
-        dpr,
-        width:              w,
-        height:             h,
-        theme:              snapshotTheme(),
-        uiState:            snapshotUI(),
-        patterns:           snapshotPatterns(),
-        currentPatternIndex: state.currentPatternIndex,
-        cursor: {
-          rowIndex:    state.cursor.rowIndex,
-          channelIndex: state.cursor.channelIndex,
-          columnType:  state.cursor.columnType,
-          digitIndex:  state.cursor.digitIndex,
+      bridge.post(
+        {
+          type:               'init',
+          canvas:             offscreen,
+          dpr,
+          width:              w,
+          height:             h,
+          theme:              snapshotTheme(),
+          uiState:            snapshotUI(),
+          patterns:           snapshotPatterns(),
+          currentPatternIndex: state.currentPatternIndex,
+          cursor: {
+            rowIndex:    state.cursor.rowIndex,
+            channelIndex: state.cursor.channelIndex,
+            columnType:  state.cursor.columnType,
+            digitIndex:  state.cursor.digitIndex,
+          },
+          selection:          state.selection ? {
+            startChannel: state.selection.startChannel,
+            endChannel:   state.selection.endChannel,
+            startRow:     state.selection.startRow,
+            endRow:       state.selection.endRow,
+            columnTypes:  state.selection.columnTypes,
+          } : null,
+          channelLayout: snapshotLayout(),
         },
-        selection:          state.selection ? {
-          startChannel: state.selection.startChannel,
-          endChannel:   state.selection.endChannel,
-          startRow:     state.selection.startRow,
-          endRow:       state.selection.endRow,
-          columnTypes:  state.selection.columnTypes,
-        } : null,
-        channelLayout: snapshotLayout(),
-      },
-      [offscreen],
-    );
+        [offscreen],
+      );
+    });
 
     // Subscribe to tracker store — post pattern/cursor/selection deltas
     const unsubTracker = useTrackerStore.subscribe((s, prev) => {
@@ -1180,6 +1185,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     });
 
     return () => {
+      cancelAnimationFrame(initRafId);
       unsubTracker();
       unsubUI();
       unsubSettings();
