@@ -244,7 +244,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── Sound-FX ──────────────────────────────────────────────────────────────
-  if (/\.(sfx|sfx13)$/.test(filename)) {
+  if (/\.(sfx|sfx2|sfx13)$/.test(filename)) {
     const uadeMode = prefs.uade ?? 'enhanced';
     if (prefs.soundfx === 'native') {
       try {
@@ -2760,10 +2760,11 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
   }
 
-  // ── Maximum Effect (MAX.* prefix) ─────────────────────────────────────────
+  // ── Maximum Effect (MAX.* prefix) / MaxTrax (.mxtx) ─────────────────────
   {
     const _maxBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
-    if (_maxBase.startsWith('max.')) {
+    const _maxExt  = _maxBase.split('.').pop() ?? '';
+    if (_maxBase.startsWith('max.') || _maxExt === 'mxtx') {
       const uadeMode = prefs.uade ?? 'enhanced';
       if (prefs.maximumEffect === 'native') {
         try {
@@ -3199,7 +3200,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── MOD (ProTracker / compatible) ────────────────────────────────────────
-  if (/\.mod$/i.test(filename)) {
+  if (/\.(mod|m15)$/i.test(filename)) {
     try {
       const { isMODFormat, parseMODFile } = await import('@lib/import/formats/MODParser');
       if (isMODFormat(buffer)) return await parseMODFile(buffer, file.name);
@@ -3211,7 +3212,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
 
   // ── MOD, XM, IT, S3M, and other tracker formats ────────────────────────
   // MOD files can be routed to UADE for authentic Amiga playback
-  if (filename.endsWith('.mod') && prefs.mod === 'uade') {
+  if ((filename.endsWith('.mod') || filename.endsWith('.m15')) && prefs.mod === 'uade') {
     return await parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 

@@ -586,6 +586,11 @@ export function tryExtractInstrumentNames(buffer: ArrayBuffer, ext: string): str
   // Return null to prevent false positives from the generic scanner.
   if (ext === 'mk2' || ext === 'mkii' || ext === 'mkiio') return null;
 
+  /* ── MaxTrax (.mxtx) ─────────────────────────────────────────────────── */
+  // MaxTrax is a synthesis-only Amiga format with MXTX magic.  No PCM sample
+  // name table exists — return null to prevent false positives.
+  if (ext === 'mxtx') return null;
+
   /* ── Delta Music 2 (.dm2) ─────────────────────────────────────────────── */
   if (ext === 'dm2' || ext === 'dm') {
     // DM2 header: magic "DM2!" at offset 0, followed by song table, then

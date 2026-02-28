@@ -465,6 +465,7 @@ export function getSupportedExtensions(): string[] {
     '.tfx',            // TFMX (alternate extension)
     '.uax',            // Unreal Audio Package
     '.xmf',            // Astroidea XMF (Imperium Galactica)
+    '.mxtx',           // MaxTrax (Maximum Effect MXTX variant)
     // ── Compressed/Packed formats ───────────────────────────────────────────
     '.zip', '.lha', '.rar', '.gz', '.mmcmp', '.xpk', '.pp', '.pack',
     // ── Chip-dump / CPU-code formats ────────────────────────────────────────
