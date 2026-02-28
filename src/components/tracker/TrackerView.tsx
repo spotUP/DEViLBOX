@@ -1435,6 +1435,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               showEditButton={true}
               onEditInstrument={onShowInstruments}
               showHivelyImport={editorMode === 'hively'}
+              showSunVoxImport={true}
             />
           </div>
         )}
