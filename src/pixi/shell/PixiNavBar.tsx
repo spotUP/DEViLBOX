@@ -1,75 +1,151 @@
 /**
- * PixiNavBar — Top navigation bar for WebGL mode.
- * Renders the actual DOM NavBar component via PixiDOMOverlay
- * for pixel-perfect parity with the DOM tracker view.
+ * PixiNavBar — Pure Pixi navigation bar. No DOM overlay.
  *
- * Adds a GL-specific "DOM" mode switch button.
+ * Row 1 (45px): "DEViLBOX" logo text, spacer, theme switcher button, DOM mode button
+ * Row 2 (53px): PixiTabBar with project tabs
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
+import React, { useCallback, useState } from 'react';
+import type { Graphics as GraphicsType } from 'pixi.js';
+import { PIXI_FONTS } from '../fonts';
+import { usePixiTheme } from '../theme';
+import { PixiButton } from '../components/PixiButton';
+import { PixiTabBar, type Tab } from '../components/PixiTabBar';
+import { usePixiResponsive } from '../hooks/usePixiResponsive';
+import { useTabsStore } from '@stores/useTabsStore';
+import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
-import { useThemeStore } from '@stores/useThemeStore';
 
-/**
- * Lazy wrapper for DOM NavBar + GL-specific "DOM" mode switch button.
- * Uses dynamic import() to avoid circular deps.
- */
-const NavBarOverlay: React.FC = () => {
-  const [Comp, setComp] = useState<React.ComponentType | null>(null);
-  const themeColors = useThemeStore(s => s.getCurrentTheme().colors);
-
-  useEffect(() => {
-    import('@components/layout/NavBar').then(m => setComp(() => m.NavBar));
-  }, []);
-
-  const handleSwitchToDom = useCallback(() => {
-    useSettingsStore.getState().setRenderMode('dom');
-  }, []);
-
-  if (!Comp) return null;
-
-  return (
-    <div style={{ width: '100%', position: 'relative' }}>
-      <Comp />
-      {/* GL-specific: Switch to DOM rendering mode — positioned in tab bar row,
-          left of the "+" new-tab button to avoid overlapping navbar controls */}
-      <button
-        onClick={handleSwitchToDom}
-        style={{
-          position: 'absolute',
-          bottom: '5px',
-          right: '44px',
-          padding: '2px 8px',
-          fontSize: '11px',
-          fontFamily: 'monospace',
-          background: `${themeColors.accent}22`,
-          color: themeColors.accent,
-          border: `1px solid ${themeColors.accent}80`,
-          borderRadius: '4px',
-          cursor: 'pointer',
-          zIndex: 100,
-          lineHeight: '18px',
-        }}
-        title="Switch to DOM rendering mode"
-      >
-        DOM
-      </button>
-    </div>
-  );
-};
+const NAV_ROW1_H = 45;
+const NAV_ROW2_H = 53;
+const NAV_H = NAV_ROW1_H + NAV_ROW2_H;
 
 export const PixiNavBar: React.FC = () => {
-  // DOM NavBar actual measured height:
-  //   Top nav: py-2 (16px) + text-lg (28px) + border-b (1px) = 45px
-  //   Tab bar: py-1 (8px) + buttons py-1.5+text-sm (32px) + border-b (1px) = 41px
-  //   Outer border-b (1px) + padding/border accum ≈ 98px
+  const theme = usePixiTheme();
+  const { width } = usePixiResponsive();
+
+  // Tabs store
+  const storeTabs = useTabsStore((s) => s.tabs);
+  const activeTabId = useTabsStore((s) => s.activeTabId);
+  const addTab = useTabsStore((s) => s.addTab);
+  const closeTab = useTabsStore((s) => s.closeTab);
+  const setActiveTab = useTabsStore((s) => s.setActiveTab);
+
+  // Theme store
+  const currentThemeId = useThemeStore((s) => s.currentThemeId);
+  const setTheme = useThemeStore((s) => s.setTheme);
+
+  // Settings store
+  const setRenderMode = useSettingsStore((s) => s.setRenderMode);
+
+  // Theme cycle button state
+  const [themeHovered, setThemeHovered] = useState(false);
+
+  // Map ProjectTab[] → Tab[] (ProjectTab uses `name`, Tab expects `label`)
+  const tabs: Tab[] = storeTabs.map((t) => ({
+    id: t.id,
+    label: t.name,
+    dirty: t.isDirty,
+  }));
+
+  // Theme cycling — cycle through available themes
+  const handleThemeCycle = useCallback(() => {
+    const idx = themes.findIndex((t) => t.id === currentThemeId);
+    const next = themes[(idx + 1) % themes.length];
+    setTheme(next.id);
+  }, [currentThemeId, setTheme]);
+
+  const handleSwitchToDom = useCallback(() => {
+    setRenderMode('dom');
+  }, [setRenderMode]);
+
+  // Row 1 background
+  const drawRow1Bg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, width, NAV_ROW1_H);
+    g.fill({ color: theme.bg.color });
+    // Bottom border
+    g.rect(0, NAV_ROW1_H - 1, width, 1);
+    g.fill({ color: theme.border.color, alpha: 0.5 });
+  }, [width, theme]);
+
+  // Overall container background (full height)
+  const drawOuterBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, width, NAV_H);
+    g.fill({ color: theme.bg.color });
+    // Bottom border under entire nav
+    g.rect(0, NAV_H - 1, width, 1);
+    g.fill({ color: theme.border.color, alpha: 0.4 });
+  }, [width, theme]);
+
   return (
-    <PixiDOMOverlay
-      layout={{ width: '100%', height: 98 }}
-      style={{ overflow: 'hidden', zIndex: 40 }}
+    <pixiContainer
+      layout={{
+        width,
+        height: NAV_H,
+        flexDirection: 'column',
+      }}
     >
-      <NavBarOverlay />
-    </PixiDOMOverlay>
+      {/* Full-height background */}
+      <pixiGraphics
+        draw={drawOuterBg}
+        layout={{ position: 'absolute', width, height: NAV_H }}
+      />
+
+      {/* Row 1: Logo + controls */}
+      <pixiContainer
+        layout={{
+          width,
+          height: NAV_ROW1_H,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingLeft: 16,
+          paddingRight: 12,
+        }}
+      >
+        <pixiGraphics
+          draw={drawRow1Bg}
+          layout={{ position: 'absolute', width, height: NAV_ROW1_H }}
+        />
+
+        {/* Logo */}
+        <pixiBitmapText
+          text="DEViLBOX"
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 16, fill: 0xffffff }}
+          tint={theme.accent.color}
+          layout={{ flex: 1 }}
+        />
+
+        {/* Theme cycler */}
+        <PixiButton
+          label="THEME"
+          variant="ghost"
+          size="sm"
+          onClick={handleThemeCycle}
+          layout={{ marginRight: 8 }}
+        />
+
+        {/* Switch to DOM mode */}
+        <PixiButton
+          label="DOM"
+          variant="ghost"
+          size="sm"
+          onClick={handleSwitchToDom}
+        />
+      </pixiContainer>
+
+      {/* Row 2: Tab bar */}
+      <PixiTabBar
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onSelect={setActiveTab}
+        onClose={closeTab}
+        onNew={addTab}
+        width={width}
+        height={NAV_ROW2_H}
+        layout={{ flexShrink: 0 }}
+      />
+    </pixiContainer>
   );
 };
