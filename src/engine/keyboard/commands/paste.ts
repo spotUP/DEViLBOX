@@ -3,12 +3,14 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useUIStore } from '@stores/useUIStore';
 
 /**
  * Standard paste (overwrite mode)
  */
 export function pasteOverwrite(): boolean {
   useTrackerStore.getState().paste();
+  useUIStore.getState().setStatusMessage('Pasted', false, 800);
   return true;
 }
 
@@ -17,6 +19,7 @@ export function pasteOverwrite(): boolean {
  */
 export function pasteInsert(): boolean {
   useTrackerStore.getState().pastePushForward();
+  useUIStore.getState().setStatusMessage('Pasted (insert)', false, 800);
   return true;
 }
 
@@ -25,6 +28,7 @@ export function pasteInsert(): boolean {
  */
 export function pasteMix(): boolean {
   useTrackerStore.getState().pasteMix();
+  useUIStore.getState().setStatusMessage('Pasted (mix)', false, 800);
   return true;
 }
 
@@ -33,6 +37,7 @@ export function pasteMix(): boolean {
  */
 export function pasteFlood(): boolean {
   useTrackerStore.getState().pasteFlood();
+  useUIStore.getState().setStatusMessage('Pasted (flood)', false, 800);
   return true;
 }
 
@@ -41,6 +46,7 @@ export function pasteFlood(): boolean {
  */
 export function pushForwardPaste(): boolean {
   useTrackerStore.getState().pastePushForward();
+  useUIStore.getState().setStatusMessage('Pasted (push)', false, 800);
   return true;
 }
 
@@ -152,6 +158,7 @@ export function copyPattern(): boolean {
   const store = useTrackerStore.getState();
   store.selectPattern();
   store.copySelection();
+  useUIStore.getState().setStatusMessage('Pattern copied', false, 800);
   return true;
 }
 
@@ -160,6 +167,7 @@ export function copyPattern(): boolean {
  */
 export function pastePattern(): boolean {
   useTrackerStore.getState().paste();
+  useUIStore.getState().setStatusMessage('Pattern pasted', false, 800);
   return true;
 }
 
@@ -169,6 +177,7 @@ export function pastePattern(): boolean {
 export function cutChannel(): boolean {
   const store = useTrackerStore.getState();
   store.cutTrack(store.cursor.channelIndex);
+  useUIStore.getState().setStatusMessage('Channel cut', false, 800);
   return true;
 }
 
@@ -178,6 +187,7 @@ export function cutChannel(): boolean {
 export function copyChannel(): boolean {
   const store = useTrackerStore.getState();
   store.copyTrack(store.cursor.channelIndex);
+  useUIStore.getState().setStatusMessage('Channel copied', false, 800);
   return true;
 }
 
@@ -187,5 +197,6 @@ export function copyChannel(): boolean {
 export function pasteChannel(): boolean {
   const store = useTrackerStore.getState();
   store.pasteTrack(store.cursor.channelIndex);
+  useUIStore.getState().setStatusMessage('Channel pasted', false, 800);
   return true;
 }

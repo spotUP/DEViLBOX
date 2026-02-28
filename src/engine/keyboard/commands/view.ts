@@ -68,6 +68,7 @@ export function toggleTreeView(): boolean {
 
 export function viewGeneral(): boolean {
   useUIStore.getState().setActiveView('tracker');
+  useUIStore.getState().setStatusMessage('General view', false, 1000);
   return true;
 }
 
