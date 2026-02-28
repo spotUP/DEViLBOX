@@ -683,17 +683,23 @@ export class FurnaceRegisterMapper {
    * Reference: ym2610.cpp reset()
    */
   public static mapOPNB(engine: FurnaceChipEngine, channel: number, config: FurnaceConfig): void {
-    const chip = FurnaceChipType.OPNB;  // Use OPNB chip, not OPNA!
-    const part = channel < 3 ? 0 : 1;
-    const chanOffset = (channel % 3);
-    const regBase = part === 0 ? 0x000 : 0x100;
+    // Support both OPNB (YM2610, 4 FM channels) and OPNB_B (YM2610B, 6 FM channels)
+    const chip = config.chipType as typeof FurnaceChipType[keyof typeof FurnaceChipType];
 
-    // === INIT REGISTERS (YM2610 specific) ===
-    // Reference: ym2610.cpp reset()
+    // OPNB/OPNB_B FM channels skip hardware offset 0 in each bank.
+    // konOffs encodes: bit2=bank select, bits0-1=chanOffset within bank.
+    // OPNB:   HW channels 1,2,5,6 → konOffs [1,2,5,6]
+    // OPNB_B: HW channels 1,2,5,6,0,4 → konOffs [1,2,5,6,0,4]
+    const isOpnbB = config.chipType === FurnaceChipType.OPNB_B;
+    const konOffs = isOpnbB ? [1, 2, 5, 6, 0, 4] : [1, 2, 5, 6];
+    const konVal = konOffs[channel % konOffs.length];
+    const chanOffset = konVal & 3;          // chanOffset within bank (0,1, or 2)
+    const regBase = (konVal >> 2) & 1 ? 0x100 : 0x000;  // bank 0 or bank 1
+
+    // === INIT REGISTERS (YM2610/YM2610B specific) ===
     engine.write(chip, 0x22, 0x00);   // LFO off (YM2610 default)
-    // Note: YM2610 doesn't have 0x29 prescaler like YM2608
 
-    // === FM REGISTERS (same as OPN2/OPNA) ===
+    // === FM REGISTERS (same format as OPN2/OPNA) ===
     const b0Val = ((config.feedback & 7) << 3) | (config.algorithm & 7);
     engine.write(chip, regBase | (0xB0 + chanOffset), b0Val);
 
@@ -716,7 +722,6 @@ export class FurnaceRegisterMapper {
       engine.write(chip, regBase | (0x80 + opOff), ((op.sl & 0x0F) << 4) | (op.rr & 0x0F));
       engine.write(chip, regBase | (0x90 + opOff), (op.ssg ?? 0) & 0x0F);
     });
-
   }
 
   /**

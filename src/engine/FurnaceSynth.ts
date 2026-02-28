@@ -629,20 +629,18 @@ export class FurnaceSynth implements DevilboxSynth {
 
     if (this.config.chipType === FurnaceChipType.OPN2) { // OPN2 (0)
       const { block, fnum } = FurnacePitchUtils.freqToOPN2(freq);
-
-      // Register A0-A2: F-Number low (8 bits)
-      this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0xA0 + chanOffset), fnum & 0xFF);
-      // Register A4-A6: Block (bits 3-5), F-Number high (bits 0-2)
+      // CRITICAL: Write A4 BEFORE A0 — OPN2 latches block+fnumHigh in A4 register,
+      // then applies the full frequency when A0 is written. Writing A0 first uses a
+      // stale A4 value (0 after reset = block 0 = ~2 Hz, inaudible).
       this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0xA4 + chanOffset), ((block & 7) << 3) | ((fnum >> 8) & 7));
+      this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0xA0 + chanOffset), fnum & 0xFF);
     } else if (this.config.chipType === FurnaceChipType.OPN) { // OPN/YM2203 (47)
       // OPN uses same frequency format as OPN2 but only has 3 channels (no second bank)
       const { block, fnum } = FurnacePitchUtils.freqToOPN2(freq);
       const opnChanOffset = this.channelIndex % 3;
-
-      // Register A0-A2: F-Number low (8 bits)
-      this.chipEngine.write(FurnaceChipType.OPN, 0xA0 + opnChanOffset, fnum & 0xFF);
-      // Register A4-A6: Block (bits 3-5), F-Number high (bits 0-2)
+      // CRITICAL: Write A4 before A0 (frequency latch, same as OPN2)
       this.chipEngine.write(FurnaceChipType.OPN, 0xA4 + opnChanOffset, ((block & 7) << 3) | ((fnum >> 8) & 7));
+      this.chipEngine.write(FurnaceChipType.OPN, 0xA0 + opnChanOffset, fnum & 0xFF);
     } else if (this.config.chipType === FurnaceChipType.OPM) { // OPM (1)
       const { kc, kf } = FurnacePitchUtils.freqToOPM(freq);
 
@@ -721,11 +719,30 @@ export class FurnaceSynth implements DevilboxSynth {
                this.config.chipType === FurnaceChipType.OPNB_B) { // OPN family
       // Same frequency format as OPN2
       const { block, fnum } = FurnacePitchUtils.freqToOPN2(freq);
-      const opnaChanOff = this.channelIndex % 3;
-      const opnaPart = this.channelIndex < 3 ? 0 : 1;
-      const opnaRegBase = opnaPart === 0 ? 0x00 : 0x100;
-      this.chipEngine.write(this.config.chipType, opnaRegBase | (0xA0 + opnaChanOff), fnum & 0xFF);
+      let opnaChanOff: number;
+      let opnaRegBase: number;
+      if (this.config.chipType === FurnaceChipType.OPNB) {
+        // OPNB (YM2610): FM channels occupy HW offsets 1,2,5,6
+        // konOffs[i] encodes: bit2=bank, bits0-1=chanOffset within bank
+        const opnbKonOffs = [1, 2, 5, 6];
+        const konVal = opnbKonOffs[this.channelIndex & 3];
+        opnaChanOff = konVal & 3;
+        opnaRegBase = (konVal >> 2) & 1 ? 0x100 : 0x000;
+      } else if (this.config.chipType === FurnaceChipType.OPNB_B) {
+        // OPNB_B (YM2610B): 6 FM channels at HW offsets [1,2,5,6,0,4]
+        const opnbBKonOffs = [1, 2, 5, 6, 0, 4];
+        const konVal = opnbBKonOffs[this.channelIndex % 6];
+        opnaChanOff = konVal & 3;
+        opnaRegBase = (konVal >> 2) & 1 ? 0x100 : 0x000;
+      } else {
+        // OPNA (YM2608): 6 FM channels, same layout as OPN2 (channels 0-2 bank0, 3-5 bank1)
+        const opnaPart = this.channelIndex < 3 ? 0 : 1;
+        opnaChanOff = this.channelIndex % 3;
+        opnaRegBase = opnaPart === 0 ? 0x000 : 0x100;
+      }
+      // CRITICAL: Write A4 BEFORE A0 (frequency latch, same as OPN2)
       this.chipEngine.write(this.config.chipType, opnaRegBase | (0xA4 + opnaChanOff), ((block & 7) << 3) | ((fnum >> 8) & 7));
+      this.chipEngine.write(this.config.chipType, opnaRegBase | (0xA0 + opnaChanOff), fnum & 0xFF);
     } else if (this.config.chipType === FurnaceChipType.AY ||
                this.config.chipType === FurnaceChipType.AY8930) { // AY family (12, 50)
       // AY frequency: period = chipClock / (16 * freq)
@@ -2560,10 +2577,9 @@ export class FurnaceSynth implements DevilboxSynth {
       // === NEW CHIP TYPES (47-72) ===
       // Note: FurnaceChipType.OPN is handled above (line ~2270)
 
-      case FurnaceChipType.OPNB_B: { // 48 - YM2610B
-        // Same as OPNB
-        const opnbBKonOffs = [1, 2, 5, 6];
-        const opnbBKonOff = opnbBKonOffs[chan & 3];
+      case FurnaceChipType.OPNB_B: { // 48 - YM2610B (6 FM channels)
+        const opnbBKonOffs = [1, 2, 5, 6, 0, 4];
+        const opnbBKonOff = opnbBKonOffs[chan % 6];
         this.chipEngine.write(FurnaceChipType.OPNB_B, 0x28, opnbBKonOff);
         break;
       }
