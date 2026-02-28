@@ -210,6 +210,7 @@ export type SynthType =
   | 'SymphonieSynth'  // Symphonie / Symphonie Pro (native AudioWorklet replayer)
   | 'MusicLineSynth'  // MusicLine Editor (WASM replayer)
   | 'DeltaMusic1Synth' // Delta Music 1.0 (4-channel Amiga wavetable + ADSR synthesis)
+  | 'DeltaMusic2Synth' // Delta Music 2.0 (4-channel Amiga wavetable + vol/vib table synthesis)
   // SunVox modular synthesizer
   | 'SunVoxSynth'     // SunVox WASM patch player (.sunsynth / .sunvox)
   // Modular Synthesis
@@ -980,6 +981,57 @@ export const DEFAULT_DELTAMUSIC1: DeltaMusic1Config = {
   arpeggio: new Array(8).fill(0),
   isSample: false,
   table: null,
+};
+
+/**
+ * Delta Music 2.0 instrument configuration.
+ *
+ * DM2 instruments carry either a PCM sample (isSample=true) or a synth
+ * waveform sequence (isSample=false) driven by a volume table, vibrato
+ * table, pitch bend, and a 48-byte wavetable sequence.
+ *
+ * Instrument header layout (byte offsets from instrBase):
+ *   +0-1   sampleLength  (u16BE, stored in words; ×2 for bytes)
+ *   +2-3   repeatStart   (u16BE, in bytes)
+ *   +4-5   repeatLength  (u16BE, stored in words; ×2 for bytes)
+ *   +6-20  volTable      5×3 bytes: [speed, level, sustain]
+ *   +21-35 vibTable      5×3 bytes: [speed, delay, sustain]
+ *   +36-37 pitchBend     (u16BE)
+ *   +38    isSample      (0xFF = PCM sample, else = synth)
+ *   +39    sampleNum     (& 0x7, PCM instruments only)
+ *   +40-87 table         48 bytes (wavetable sequence, 0xFF = loop/end)
+ */
+export interface DeltaMusic2VolEntry {
+  speed: number;   // 0-255
+  level: number;   // 0-255 (volume level)
+  sustain: number; // 0-255 (ticks at this level)
+}
+
+export interface DeltaMusic2VibEntry {
+  speed: number;   // 0-255
+  delay: number;   // 0-255 (ticks before this vibrato starts)
+  sustain: number; // 0-255 (ticks at this vibrato)
+}
+
+export interface DeltaMusic2Config {
+  /** Volume envelope: 5 entries, each [speed, level, sustain] */
+  volTable: DeltaMusic2VolEntry[];
+  /** Vibrato table: 5 entries, each [speed, delay, sustain] */
+  vibTable: DeltaMusic2VibEntry[];
+  /** Pitch bend value (0-65535) */
+  pitchBend: number;
+  /** Wavetable sequence: 48 bytes (0xFF = loop/end marker) */
+  table: Uint8Array;
+  /** True if this instrument uses a PCM sample (isSample=0xFF in file) */
+  isSample: boolean;
+}
+
+export const DEFAULT_DELTAMUSIC2: DeltaMusic2Config = {
+  volTable: Array.from({ length: 5 }, () => ({ speed: 0, level: 0, sustain: 0 })),
+  vibTable: Array.from({ length: 5 }, () => ({ speed: 0, delay: 0, sustain: 0 })),
+  pitchBend: 0,
+  table: new Uint8Array(48).fill(0xFF),
+  isSample: false,
 };
 
 /**
@@ -3693,6 +3745,7 @@ export interface InstrumentConfig {
   digMug?: DigMugConfig;
   fc?: FCConfig;
   deltaMusic1?: DeltaMusic1Config;
+  deltaMusic2?: DeltaMusic2Config;
   fred?: FredConfig;
   tfmx?: TFMXConfig;
   hippelCoso?: HippelCoSoConfig;
