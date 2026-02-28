@@ -603,8 +603,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                 </>
               )}
 
-              )}
-
               {/* UADE mode sub-selector — shown when UADE is chosen for this format (non-native-only) */}
               {!isNativeOnly && showUADEModeSelector && (
                 <div className="mt-2 ml-5 pl-3 border-l border-dark-border space-y-1.5">
