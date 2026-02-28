@@ -8,17 +8,21 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import type { DavidWhittakerConfig } from '@/types/instrument';
+import type { DavidWhittakerConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import { SequenceEditor } from '@components/instruments/shared';
 import type { SequencePreset } from '@components/instruments/shared';
+import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
+import { UADEEngine } from '@/engine/uade/UADEEngine';
 
 interface DavidWhittakerControlsProps {
   config: DavidWhittakerConfig;
   onChange: (updates: Partial<DavidWhittakerConfig>) => void;
   volseqPlaybackPosition?: number;
   frqseqPlaybackPosition?: number;
+  /** Present when this instrument was loaded via UADE's native DavidWhittaker parser. */
+  uadeChipRam?: UADEChipRamInfo;
 }
 
 type DWTab = 'main' | 'sequences';
@@ -48,11 +52,20 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
   onChange,
   volseqPlaybackPosition,
   frqseqPlaybackPosition,
+  uadeChipRam,
 }) => {
   const [activeTab, setActiveTab] = useState<DWTab>('main');
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
+
+  const chipEditorRef = useRef<UADEChipEditor | null>(null);
+  const getEditor = useCallback(() => {
+    if (!chipEditorRef.current) {
+      chipEditorRef.current = new UADEChipEditor(UADEEngine.getInstance());
+    }
+    return chipEditorRef.current;
+  }, []);
 
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyan = currentThemeId === 'cyan-lineart';
@@ -209,6 +222,22 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
       </div>
       {activeTab === 'main'      && renderMain()}
       {activeTab === 'sequences' && renderSequences()}
+      {uadeChipRam && (
+        <div className="flex justify-end px-3 py-2 border-t border-opacity-30"
+          style={{ borderColor: dim }}>
+          <button
+            className="text-[10px] px-2 py-1 rounded opacity-70 hover:opacity-100 transition-colors"
+            style={{ background: 'rgba(60,40,100,0.4)', color: '#cc88ff' }}
+            onClick={() => void getEditor().exportModule(
+              uadeChipRam.moduleBase,
+              uadeChipRam.moduleSize,
+              'song.dw'
+            )}
+          >
+            Export .dw (Amiga)
+          </button>
+        </div>
+      )}
     </div>
   );
 };
