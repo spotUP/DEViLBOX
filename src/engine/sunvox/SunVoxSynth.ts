@@ -5,9 +5,11 @@
  * 1. Synth mode: load a .sunsynth patch, trigger notes per-instrument.
  * 2. Song mode: load a full .sunvox song, play/stop via triggerAttack/Release.
  *
- * Follows the same static singleton-connection pattern as SoundMonSynth and
- * HivelySynth: only the first live SunVoxSynth bridges engine.output → its own
- * GainNode; subsequent instances share the same routing.
+ * All SunVoxSynth instances share the same physical audio output: engine.output.
+ * The SunVoxEngine singleton mixes all active handles into its single GainNode,
+ * so there is no per-instance output to manage. This avoids the routing break
+ * that occurred when ToneEngine's routeNativeEngineOutput saw a different GainNode
+ * for each instance and disconnected the previous synth from synthBus.
  */
 
 import type { DevilboxSynth } from '@/types/synth';
@@ -25,27 +27,15 @@ export class SunVoxSynth implements DevilboxSynth {
   private _handle = -1;
   private _moduleId = -1;
 
-  /**
-   * Only the first live SunVoxSynth bridges engine.output → its own GainNode.
-   * Subsequent instances get a silent output node.
-   */
-  private static _engineConnected = false;
-  private _ownsConnection = false;
-
   // Cached control values from the last setControl call, keyed by ctlId string.
   private _controlValues: Map<string, number> = new Map();
 
   constructor() {
     this.audioContext = getDevilboxAudioContext();
-    this.output = this.audioContext.createGain();
-
     this.engine = SunVoxEngine.getInstance();
-
-    if (!SunVoxSynth._engineConnected) {
-      this.engine.output.connect(this.output);
-      SunVoxSynth._engineConnected = true;
-      this._ownsConnection = true;
-    }
+    // All instances share the engine's single output GainNode. The worklet mixes
+    // all active handles into it, so routing through a per-instance node is wrong.
+    this.output = this.engine.output;
   }
 
   // ── Module / song loading ─────────────────────────────────────────────────
@@ -200,14 +190,6 @@ export class SunVoxSynth implements DevilboxSynth {
       this.engine.destroyHandle(this._handle);
       this._handle = -1;
       this._moduleId = -1;
-    }
-
-    if (this._ownsConnection) {
-      try {
-        this.engine.output.disconnect(this.output);
-      } catch { /* may already be disconnected */ }
-      SunVoxSynth._engineConnected = false;
-      this._ownsConnection = false;
     }
   }
 }
