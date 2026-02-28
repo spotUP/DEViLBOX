@@ -63,7 +63,7 @@ export class SuperColliderEngine {
       throw new Error(`[SuperColliderEngine] Failed to fetch SC.wasm: ${wasmResponse.status}`);
     }
 
-    const [scJs, wasmBinary] = await Promise.all([
+    const [jsCode, wasmBinary] = await Promise.all([
       jsResponse.text(),
       wasmResponse.arrayBuffer(),
     ]);
@@ -89,7 +89,7 @@ export class SuperColliderEngine {
       node.port.postMessage(
         {
           type: 'init',
-          scJs,
+          jsCode,
           wasmBinary,
           blockSize: 128,
           sampleRate: audioContext.sampleRate,

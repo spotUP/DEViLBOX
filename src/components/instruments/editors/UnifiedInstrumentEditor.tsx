@@ -19,6 +19,7 @@ import {
   DEFAULT_HIVELY,
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC, DEFAULT_FRED, DEFAULT_TFMX,
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_DAVID_WHITTAKER,
+  DEFAULT_SUPERCOLLIDER,
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
@@ -92,6 +93,7 @@ const HippelCoSoControls = lazy(() => import('../controls/HippelCoSoControls').t
 const RobHubbardControls = lazy(() => import('../controls/RobHubbardControls').then(m => ({ default: m.RobHubbardControls })));
 const DavidWhittakerControls = lazy(() => import('../controls/DavidWhittakerControls').then(m => ({ default: m.DavidWhittakerControls })));
 const MusicLineControls = lazy(() => import('../controls/MusicLineControls').then(m => ({ default: m.MusicLineControls })));
+const SuperColliderEditor = lazy(() => import('../SuperColliderEditor').then(m => ({ default: m.SuperColliderEditor })));
 
 // Lazy-loaded hardware UI components
 const HivelyHardware = lazy(() => import('../hardware/HivelyHardware').then(m => ({ default: m.HivelyHardware })));
@@ -121,7 +123,7 @@ import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
 import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'musicline';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'musicline' | 'supercollider';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -252,6 +254,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'Vital') return 'vital';
   if (synthType === 'Odin2') return 'odin2';
   if (synthType === 'Surge') return 'surge';
+  if (synthType === 'SuperCollider') return 'supercollider';
   if (SYNTH_REGISTRY.has(synthType)) return 'vstbridge';
   return 'generic';
 }
@@ -1455,6 +1458,31 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             />
           </Suspense>
         )}
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SUPERCOLLIDER EDITOR
+  // ============================================================================
+  if (editorMode === 'supercollider') {
+    const scConfig = instrument.superCollider ?? DEFAULT_SUPERCOLLIDER;
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0a0a0a] to-[#050505]" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <div className="flex-1 min-h-0 overflow-hidden p-2">
+          <Suspense fallback={<LoadingControls />}>
+            <SuperColliderEditor
+              config={scConfig}
+              onChange={(sc) => handleChange({ superCollider: sc })}
+            />
+          </Suspense>
+        </div>
       </div>
     );
   }
