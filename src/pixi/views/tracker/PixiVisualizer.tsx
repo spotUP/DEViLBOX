@@ -174,10 +174,11 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
 // ─── Drawing helpers ─────────────────────────────────────────────────────────
 
 function drawBackground(g: GraphicsType, w: number, h: number, theme: PixiTheme) {
+  // Pure black background so the visualizer stands out from the toolbar rows
   g.roundRect(0, 0, w, h, 4);
-  g.fill({ color: theme.bg.color });
+  g.fill({ color: 0x000000 });
   g.roundRect(0, 0, w, h, 4);
-  g.stroke({ color: theme.border.color, alpha: 0.3, width: 1 });
+  g.stroke({ color: theme.border.color, alpha: 0.6, width: 1 });
 }
 
 function drawWaveform(g: GraphicsType, data: Float32Array, w: number, h: number, theme: PixiTheme) {
