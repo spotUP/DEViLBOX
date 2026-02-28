@@ -32,7 +32,7 @@ export const SunVoxControls: React.FC<SunVoxControlsProps> = ({
   const configRef = useRef(config);
   useEffect(() => {
     configRef.current = config;
-  }, [config]);
+  });
 
   // Controls fetched from WASM
   const [controls, setControls] = useState<SunVoxControl[]>([]);
@@ -123,7 +123,7 @@ export const SunVoxControls: React.FC<SunVoxControlsProps> = ({
         {controls.map((ctl, idx) => {
           // Use the persisted value if available; otherwise fall back to the
           // value reported by WASM at load time.
-          const persistedValue = configRef.current.controlValues[idx.toString()];
+          const persistedValue = config.controlValues[idx.toString()];
           const currentValue = persistedValue !== undefined ? persistedValue : ctl.value;
 
           return (
