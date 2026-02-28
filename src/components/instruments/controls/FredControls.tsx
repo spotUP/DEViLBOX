@@ -86,10 +86,6 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
   const dim     = isCyan ? '#004444' : '#332200';
   const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#1a0e00] border-orange-900/30';
 
-  const upd = useCallback(<K extends keyof FredConfig>(key: K, value: FredConfig[K]) => {
-    onChange({ [key]: value } as Partial<FredConfig>);
-  }, [onChange]);
-
   /**
    * Like `upd`, but also writes to chip RAM when a UADE context is active.
    * `chipWriter` receives the editor and instrBase address.
