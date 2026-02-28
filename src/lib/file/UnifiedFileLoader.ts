@@ -143,31 +143,49 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     // Try to extract individual modules before the reset so we can create
     // one SunVoxSynth instrument per module (synth mode) instead of loading
     // the whole project as a single song-mode instrument.
+    // Wrapped in Promise.race with a 6-second timeout: if the worklet is slow
+    // to init or any step hangs, we fall through to song mode rather than
+    // blocking the entire load indefinitely.
     try {
       const { SunVoxEngine } = await import('@/engine/sunvox/SunVoxEngine');
       const { getDevilboxAudioContext } = await import('@/utils/audio-context');
       const svEngine = SunVoxEngine.getInstance();
-      await svEngine.ready();
-      const sampleRate = getDevilboxAudioContext().sampleRate;
-      const tempHandle = await svEngine.createHandle(sampleRate);
-      try {
-        // loadSong internally slices the buffer before transfer — preReadBuffer stays intact.
-        await svEngine.loadSong(tempHandle, preReadBuffer);
-        const modules = await svEngine.getModules(tempHandle);
-        // Module id=0 is always the "Output" bus — skip it.
-        const synthModules = modules.filter((m) => m.id > 0);
-        if (synthModules.length > 0) {
-          preSunVoxModules = await Promise.all(
-            synthModules.map(async (mod) => ({
-              name: mod.name,
-              id: mod.id,
-              synthData: await svEngine.saveSynth(tempHandle, mod.id),
-            }))
-          );
+
+      const doExtract = async () => {
+        console.log('[SunVox] waiting for engine ready…');
+        await svEngine.ready();
+        console.log('[SunVox] engine ready, creating temp handle…');
+        const sampleRate = getDevilboxAudioContext().sampleRate;
+        const tempHandle = await svEngine.createHandle(sampleRate);
+        console.log('[SunVox] temp handle', tempHandle, '— loading song…');
+        try {
+          // loadSong internally slices the buffer before transfer — preReadBuffer stays intact.
+          await svEngine.loadSong(tempHandle, preReadBuffer!);
+          console.log('[SunVox] song loaded — fetching module list…');
+          const modules = await svEngine.getModules(tempHandle);
+          // Module id=0 is always the "Output" bus — skip it.
+          const synthModules = modules.filter((m) => m.id > 0);
+          console.log('[SunVox] modules:', synthModules.map((m) => `${m.id}:${m.name}`));
+          if (synthModules.length > 0) {
+            preSunVoxModules = await Promise.all(
+              synthModules.map(async (mod) => {
+                console.log('[SunVox] saving synth for module', mod.id, mod.name);
+                const synthData = await svEngine.saveSynth(tempHandle, mod.id);
+                return { name: mod.name, id: mod.id, synthData };
+              })
+            );
+          }
+        } finally {
+          svEngine.destroyHandle(tempHandle);
         }
-      } finally {
-        svEngine.destroyHandle(tempHandle);
-      }
+      };
+
+      await Promise.race([
+        doExtract(),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('module extraction timed out')), 6000)
+        ),
+      ]);
     } catch (err) {
       console.warn('[UnifiedFileLoader] SunVox module extraction failed, falling back to song mode:', err);
       preSunVoxModules = null;
