@@ -197,7 +197,7 @@ export const useAudioStore = create<AudioStore>()(
           if ('enabled' in updates) return;
 
           // Clone before passing to ToneEngine — Immer revokes draft proxies after set()
-          const effectCopy = JSON.parse(JSON.stringify(effect)) as EffectConfig;
+          const effectCopy = structuredClone(effect) as EffectConfig;
 
           // Notify ToneEngine to update effect parameters
           const engine = get().toneEngineInstance;

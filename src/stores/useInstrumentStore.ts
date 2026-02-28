@@ -769,7 +769,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const newId = findNextId(existingIds);
 
       set((state) => {
-        const cloned: InstrumentConfig = JSON.parse(JSON.stringify(original));
+        const cloned: InstrumentConfig = structuredClone(original);
         cloned.id = newId;
         cloned.name = `${original.name} (Copy)`;
         state.instruments.push(cloned);
@@ -879,7 +879,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
         // Preservation: Deep clone current config BEFORE switching to Sampler
         // Must use deep clone to avoid nested objects being mutated
-        const preservedConfig = JSON.parse(JSON.stringify(instrument));
+        const preservedConfig = structuredClone(instrument);
         delete preservedConfig.metadata; // Avoid recursion
 
         if (bakeType === 'pro') {
