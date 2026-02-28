@@ -11,7 +11,7 @@
  * Inner knobs mirror: src/components/instruments/controls/JC303StyledKnobPanel.tsx
  */
 
-import React, { useCallback, useRef, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
