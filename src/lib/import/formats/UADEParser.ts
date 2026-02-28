@@ -500,10 +500,18 @@ export async function parseUADEFile(
  * Returns an ordered array of names (may be shorter than the actual instrument
  * count), or null if nothing convincing was found.
  */
-function tryExtractInstrumentNames(buffer: ArrayBuffer, ext: string): string[] | null {
+export function tryExtractInstrumentNames(buffer: ArrayBuffer, ext: string): string[] | null {
   if (buffer.byteLength < 64) return null;
   const bytes = new Uint8Array(buffer);
   const view  = new DataView(buffer);
+
+  /* ── Delitracker Custom (.cus, .cust, .custom) ───────────────────────── */
+  // Delitracker Custom modules are compiled 68k Amiga executables bundling a
+  // proprietary replayer with song data.  There is no static instrument name
+  // table — only raw PCM pointers embedded in player code.  The files often
+  // carry a "DELIRIUM" identifier string and Amiga OS version info, which can
+  // fool the generic 22-byte scanner into returning false positives.
+  if (ext === 'cus' || ext === 'cust' || ext === 'custom') return null;
 
   /* ── Richard Joseph Player (.rjp, .rj) ───────────────────────────────── */
   // The RJP format stores NO instrument names in the SNG file.
@@ -955,7 +963,7 @@ function buildEnhancedSong(
     const instrName = extractedName
       || buildSampleLabel(instrId, sample.typicalPeriod, sample.loopLength);
 
-    instruments.push(createSamplerInstrument(
+    const instr = createSamplerInstrument(
       instrId,
       instrName,
       pcm,
@@ -963,7 +971,10 @@ function buildEnhancedSong(
       sampleRate,
       sample.loopStart,
       loopEnd,
-    ));
+    );
+    // Attach chip RAM address so SampleEditor can call write-back after edits.
+    if (instr.sample) instr.sample.uadeSamplePtr = ptr;
+    instruments.push(instr);
   }
 
   // Build reverse-lookup: loop-start Amiga address → original sample pointer.

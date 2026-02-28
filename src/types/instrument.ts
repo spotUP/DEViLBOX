@@ -2949,6 +2949,10 @@ export interface SampleConfig {
   sourceInstrumentId?: number; // Reference to the original instrument
   sliceStart?: number; // Start frame in the source buffer
   sliceEnd?: number; // End frame in the source buffer
+
+  /** Amiga chip RAM address for UADE enhanced-mode write-back. Present only on
+   *  instruments extracted by UADEParser's enhanced scan. */
+  uadeSamplePtr?: number;
 }
 
 /**
