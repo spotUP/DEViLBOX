@@ -1146,6 +1146,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <SoundMonControls
             config={soundMonConfig}
             onChange={handleSoundMonChange}
+            uadeChipRam={instrument.uadeChipRam}
           />
         </Suspense>
       </div>
@@ -1169,6 +1170,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <SidMonControls
             config={sidMonConfig}
             onChange={handleSidMonChange}
+            uadeChipRam={instrument.uadeChipRam}
           />
         </Suspense>
       </div>
@@ -1215,6 +1217,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <FCControls
             config={fcConfig}
             onChange={handleFCChange}
+            uadeChipRam={instrument.uadeChipRam}
           />
         </Suspense>
       </div>
@@ -1238,6 +1241,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <FredControls
             config={fredConfig}
             onChange={handleFredChange}
+            uadeChipRam={instrument.uadeChipRam}
           />
         </Suspense>
       </div>
@@ -1304,6 +1308,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
           <SidMon1Controls
             config={sidMon1Config}
             onChange={handleSidMon1Change}
+            uadeChipRam={instrument.uadeChipRam}
           />
         </Suspense>
       </div>
