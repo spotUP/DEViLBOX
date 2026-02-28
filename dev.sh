@@ -147,7 +147,7 @@ done
 
 # ── Frontend (Vite) ────────────────────────────────────────────────────────────
 log "Starting frontend on port $FRONTEND_PORT..."
-vite > logs/frontend.log 2>&1 &
+npx vite > logs/frontend.log 2>&1 &
 FRONTEND_PID=$!
 
 log "Waiting for frontend to be ready..."
