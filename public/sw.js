@@ -4,6 +4,7 @@
  */
 
 const CACHE_NAME = 'devilbox-v1';
+const SAMPLE_CACHE_NAME = 'sample-packs-v1';
 const VERSION_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 // Install event - cache essential assets
@@ -20,7 +21,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((name) => name !== CACHE_NAME)
+          .filter((name) => name !== CACHE_NAME && name !== SAMPLE_CACHE_NAME)
           .map((name) => caches.delete(name))
       );
     }).then(() => {
@@ -33,6 +34,23 @@ self.addEventListener('activate', (event) => {
 // Fetch event - network-first strategy for HTML, cache-first for assets
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  // Cache-first for sample pack audio files — served from dedicated cache
+  if (url.pathname.startsWith('/data/samples/packs/')) {
+    event.respondWith(
+      caches.open(SAMPLE_CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(event.request);
+        if (cached) return cached;
+        // Not cached yet — fetch from network and store
+        const response = await fetch(event.request);
+        if (response.ok) {
+          cache.put(event.request, response.clone());
+        }
+        return response;
+      })
+    );
+    return;
+  }
 
   // Always bypass cache for version.json
   if (url.pathname.includes('version.json')) {
