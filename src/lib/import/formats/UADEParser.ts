@@ -842,6 +842,45 @@ export function tryExtractInstrumentNames(buffer: ArrayBuffer, ext: string): str
     }
   }
 
+  /* ── Oktalyzer (.okt, .okta) ─────────────────────────────────────────── */
+  // Format: 8-byte "OKTASONG" magic followed by IFF-style chunks.
+  // The SAMP chunk contains up to 36 sample headers, each 32 bytes:
+  //   [0..19]  name (20 bytes, null-terminated)
+  //   [20..23] length (u32BE)
+  //   [24..25] loopStart (u16BE, ×2 for real offset)
+  //   [26..27] loopLength (u16BE, ×2)
+  //   [28..29] volume (u16BE, 0-64)
+  //   [30..31] type (u16BE)
+  // Reference: OpenMPT soundlib/Load_okt.cpp, struct OktSample
+  if (ext === 'okt' || ext === 'okta') {
+    if (bytes.length >= 16) {
+      const magic = String.fromCharCode(bytes[0],bytes[1],bytes[2],bytes[3],
+                                         bytes[4],bytes[5],bytes[6],bytes[7]);
+      if (magic === 'OKTASONG') {
+        let pos = 8;
+        while (pos + 8 <= bytes.length) {
+          const tag = String.fromCharCode(bytes[pos], bytes[pos+1], bytes[pos+2], bytes[pos+3]);
+          const chunkSize = view.getUint32(pos + 4, false);
+          pos += 8;
+          if (tag === 'SAMP') {
+            const count = Math.min(Math.floor(chunkSize / 32), 36);
+            const names: string[] = [];
+            for (let i = 0; i < count; i++) {
+              const base = pos + i * 32;
+              if (base + 20 > bytes.length) break;
+              const name = readFixedAscii(bytes, base, 20);
+              if (name) names.push(name);
+            }
+            if (names.length > 0) return names;
+            break;
+          }
+          if (chunkSize === 0 || pos + chunkSize > bytes.length) break;
+          pos += chunkSize;
+        }
+      }
+    }
+  }
+
   /* ── Generic: scan for MOD-style 22-byte ASCII name blocks ───────────── */
   // Many Amiga trackers use the same 22-byte fixed-length string convention
   // for instrument names (ProTracker, NoiseTracker, etc. and derivatives).
