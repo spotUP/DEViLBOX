@@ -1196,7 +1196,7 @@ export class TrackerReplayer {
     }
 
     // MusicLine Editor: load raw binary into MusicLineEngine WASM before playback.
-    if (this.song.musiclineFileData && this.song.format === 'ML') {
+    if (this.song.musiclineFileData) {
       try {
         const mlEngine = MusicLineEngine.getInstance();
         await mlEngine.ready();
