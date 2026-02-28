@@ -70,15 +70,20 @@ export class SuperColliderSynth implements DevilboxSynth {
   // ---------------------------------------------------------------------------
 
   private _initEngine(): void {
+    console.log('[SC:Synth] _initEngine called, binary length:', this._config.binary?.length ?? 0, 'synthDefName:', this._config.synthDefName);
     this._enginePromise = SuperColliderEngine.getInstance(this._audioContext)
       .then(engine => {
-        if (this._disposed) return engine;
+        if (this._disposed) { console.log('[SC:Synth] _initEngine: disposed, skipping'); return engine; }
         this._engine = engine;
         // Wire engine output → our gain node so the signal reaches the effect chain.
         engine.output.connect(this._gainNode);
+        console.log('[SC:Synth] engine.output → gainNode connected');
         // Load the SynthDef binary if one is configured.
         if (this._config.binary) {
+          console.log('[SC:Synth] loading binary into scsynth, length:', this._config.binary.length);
           this._loadBinary(engine, this._config.binary);
+        } else {
+          console.log('[SC:Synth] no binary to load');
         }
         return engine;
       })
@@ -98,8 +103,12 @@ export class SuperColliderSynth implements DevilboxSynth {
   // ---------------------------------------------------------------------------
 
   triggerAttack(note: string | number, time?: number, velocity?: number): void {
+    console.log('[SC:Synth] triggerAttack:', note, '| binary:', this._config.binary ? `${this._config.binary.length}b` : 'EMPTY', '| defName:', this._config.synthDefName || 'NONE', '| engine:', this._engine ? 'ready' : 'pending');
     // Guard: no compiled binary yet (binary: '') — notes are silently dropped until compiled
-    if (this._disposed || !this._config.binary || !this._config.synthDefName) return;
+    if (this._disposed || !this._config.binary || !this._config.synthDefName) {
+      console.log('[SC:Synth] triggerAttack DROPPED - disposed:', this._disposed, 'binary:', !!this._config.binary, 'defName:', !!this._config.synthDefName);
+      return;
+    }
 
     // time parameter is not used — scsynth scheduling is handled internally
     void time;
@@ -126,10 +135,15 @@ export class SuperColliderSynth implements DevilboxSynth {
     const defName = this._config.synthDefName;
 
     if (this._engine) {
+      console.log('[SC:Synth] noteOn immediate:', nodeId, defName, 'freq:', params.freq?.toFixed(1));
       this._engine.noteOn(nodeId, defName, params);
     } else {
+      console.log('[SC:Synth] noteOn deferred (engine pending):', nodeId, defName);
       this._enginePromise?.then(engine => {
-        if (!this._disposed) engine.noteOn(nodeId, defName, params);
+        if (!this._disposed) {
+          console.log('[SC:Synth] noteOn deferred fire:', nodeId, defName);
+          engine.noteOn(nodeId, defName, params);
+        }
       });
     }
   }

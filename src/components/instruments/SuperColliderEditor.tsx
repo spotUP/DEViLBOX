@@ -267,8 +267,14 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
       }
     } catch (err) {
       finishProgress(false);
-      const message = err instanceof Error ? err.message : 'Network error';
-      setStatus({ state: 'error', message });
+      const raw = err instanceof Error ? err.message : 'Network error';
+      // "Failed to fetch" means the server isn't reachable at all — give actionable context.
+      const isConnectionError = raw === 'Failed to fetch' || raw.toLowerCase().includes('networkerror');
+      const message = isConnectionError ? 'Compile server unreachable' : raw;
+      const rawOutput = isConnectionError
+        ? `Could not connect to the compile server:\n  ${API_URL}/sc/compile\n\nStart the backend with:\n  cd server && npm run dev\n\nOr set VITE_API_URL in your .env.local to point at a running instance.`
+        : undefined;
+      setStatus({ state: 'error', message, rawOutput });
     }
   }, [startProgress, finishProgress]);
 

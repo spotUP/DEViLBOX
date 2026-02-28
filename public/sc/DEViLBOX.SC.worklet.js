@@ -433,12 +433,15 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
   _sendOsc(oscPacket) {
     if (!this._ready || !this._oscEndpoint) {
       if (typeof console !== 'undefined') {
-        console.warn('[DEViLBOX.SC] OSC packet dropped — worklet not ready');
+        console.warn('[DEViLBOX.SC] OSC packet dropped — worklet not ready:', !this._ready ? 'not ready' : 'no endpoint');
       }
       return;
     }
     try {
       const bytes = oscPacket instanceof Uint8Array ? oscPacket : new Uint8Array(oscPacket);
+      // Log the OSC address pattern (starts after 4-byte bundle marker or directly at offset 0)
+      const addr = String.fromCharCode(...bytes.slice(0, 20)).replace(/\0/g, '').trim();
+      console.log('[SC.worklet] OSC receive', bytes.byteLength, 'bytes, addr:', addr.split('\0')[0]);
       // receive(srcAddr, data): srcAddr=0 means localhost/self
       this._oscEndpoint.receive(0, bytes);
     } catch (e) {
