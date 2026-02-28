@@ -180,6 +180,9 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     setBPM(songData.bpm);
     setMetadata(songData.metadata);
     setGrooveTemplate(songData.grooveTemplateId || 'straight');
+    // Reset to classic editor mode — clears stale native state from any
+    // previously-loaded musicline/furnace/hively file.
+    applyEditorMode({});
 
     return {
       success: true,
@@ -336,6 +339,9 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     setCurrentPattern(0);
     setPatternOrder([0]);
     setMetadata({ name, author: '', description: `Imported from ${file.name}` });
+    // Reset to classic editor mode — clears stale musicline/furnace/hively state
+    // from any previously-loaded file (otherwise the wrong viewer renders).
+    applyEditorMode({});
     return { success: true, message: `Loaded SunVox project: ${name}` };
   }
 
