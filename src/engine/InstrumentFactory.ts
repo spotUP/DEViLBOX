@@ -925,7 +925,10 @@ export class InstrumentFactory {
       case 'SunVoxSynth': {
         const svSynth = new SunVoxSynth();
         if (config.sunvox?.patchData) {
-          svSynth.setModule(config.sunvox.patchData).catch((err: unknown) =>
+          const loader = config.sunvox.isSong
+            ? svSynth.setSong(config.sunvox.patchData)
+            : svSynth.setModule(config.sunvox.patchData);
+          loader.catch((err: unknown) =>
             console.error('[InstrumentFactory] SunVox patch load failed:', err)
           );
         }

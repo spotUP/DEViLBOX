@@ -50,14 +50,14 @@ class SunVoxProcessor extends AudioWorkletProcessor {
 
   handleMessage(data) {
     const m = this.wasm;
-    // Portable string→pointer helper. Works across all Emscripten versions.
-    // Uses m.stringToUTF8 / m.lengthBytesUTF8 which are always exported by Emscripten.
-    // (TextEncoder is unavailable in AudioWorklet scope; allocateUTF8/stringToNewUTF8
-    //  were removed in newer Emscripten builds.)
+    // Portable ASCII→pointer helper.
+    // All paths we pass are pure ASCII (/tmp/input.sunvox etc.) so charCodeAt is correct.
+    // Avoids relying on any Emscripten helper (allocateUTF8/stringToNewUTF8/lengthBytesUTF8
+    // are variously absent depending on build version; TextEncoder is absent in worklet scope).
     const strToPtr = (s) => {
-      const len = m.lengthBytesUTF8(s) + 1;
-      const ptr = m._malloc(len);
-      m.stringToUTF8(s, ptr, len);
+      const ptr = m._malloc(s.length + 1);
+      for (let i = 0; i < s.length; i++) m.HEAPU8[ptr + i] = s.charCodeAt(i);
+      m.HEAPU8[ptr + s.length] = 0;
       return ptr;
     };
 
