@@ -12,12 +12,10 @@
       "F6": "layout_preset_6",
       "F7": "layout_preset_7",
       "F8": "layout_preset_8",
-      
       "Space": "play_stop_toggle",
       "Return": "play_row",
       "Escape": "toggle_edit_mode",
       "NumpadEnter": "play_block_loop",
-      
       "NumpadDivide": "prev_octave",
       "NumpadMultiply": "next_octave",
       "NumpadMinus": "prev_instrument",
@@ -31,25 +29,21 @@
       "Numpad7": "set_instrument_7",
       "Numpad8": "set_instrument_8",
       "Numpad9": "set_instrument_9",
-      
       "Alt+Left": "instrument_page_up",
       "Alt+Right": "instrument_page_down",
       "Alt+Up": "prev_instrument",
       "Alt+Down": "next_instrument",
-      
       "Ctrl+X": "cut_selection",
       "Ctrl+C": "copy_selection",
       "Ctrl+V": "paste_selection",
       "Ctrl+Z": "undo",
       "Ctrl+Y": "redo",
-      
       "Backspace": "delete_and_pull",
       "Insert": "insert_row",
       "Ctrl+Shift+Delete": "delete_column_and_pull",
       "Ctrl+Shift+Insert": "insert_column_row",
       "Ctrl+Shift+Left": "remove_column",
       "Ctrl+Shift+Right": "add_column",
-      
       "Shift+F3": "cut_track",
       "Shift+F4": "copy_track",
       "Shift+F5": "paste_track",
@@ -59,7 +53,6 @@
       "Alt+F3": "cut_selection",
       "Alt+F4": "copy_selection",
       "Alt+F5": "paste_selection",
-      
       "Ctrl+Minus": "decrease_edit_step",
       "Ctrl+Plus": "increase_edit_step",
       "Ctrl+Equals": "increase_edit_step",
@@ -73,7 +66,6 @@
       "Ctrl+8": "set_step_8",
       "Ctrl+9": "set_step_9",
       "Ctrl+0": "set_step_0",
-      
       "Ctrl+Shift+1": "set_quantize_1",
       "Ctrl+Shift+2": "set_quantize_2",
       "Ctrl+Shift+3": "set_quantize_3",
@@ -83,7 +75,6 @@
       "Ctrl+Shift+7": "set_quantize_7",
       "Ctrl+Shift+8": "set_quantize_8",
       "Ctrl+Shift+9": "set_quantize_9",
-      
       "Up": "cursor_up",
       "Down": "cursor_down",
       "Left": "cursor_left",
@@ -92,15 +83,12 @@
       "PageDown": "cursor_page_down",
       "Home": "cursor_pattern_start",
       "End": "cursor_pattern_end",
-      
       "F9": "jump_to_row_0",
       "F10": "jump_to_row_25_percent",
       "F11": "jump_to_row_50_percent",
       "F12": "jump_to_row_75_percent",
-      
       "CapsLock": "insert_note_off",
       "A": "insert_note_off_a",
-      
       "Ctrl+Left": "prev_pattern",
       "Ctrl+Right": "next_pattern",
       "Ctrl+Up": "prev_sequence",
@@ -109,12 +97,34 @@
       "Ctrl+End": "goto_last_pattern",
       "Ctrl+Insert": "insert_pattern",
       "Ctrl+Delete": "delete_pattern",
-      
       "Ctrl+Tab": "next_focus",
       "Ctrl+Shift+Tab": "prev_focus",
-      
       "Tab": "next_channel",
-      "Shift+Tab": "prev_channel"
+      "Shift+Tab": "prev_channel",
+      "Ctrl+Alt+1": "dj_scratch_baby",
+      "Ctrl+Alt+2": "dj_scratch_trans",
+      "Ctrl+Alt+3": "dj_scratch_flare",
+      "Ctrl+Alt+4": "dj_scratch_hydro",
+      "Ctrl+Alt+5": "dj_scratch_crab",
+      "Ctrl+Alt+6": "dj_scratch_orbit",
+      "Ctrl+Alt+0": "dj_scratch_stop",
+      "Ctrl+Alt+7": "dj_fader_lfo_14",
+      "Ctrl+Alt+8": "dj_fader_lfo_18",
+      "Ctrl+Alt+9": "dj_fader_lfo_116",
+      "Shift+Alt+F": "tracker_fader_cut",
+      "Shift+Alt+C": "tracker_crab",
+      "Shift+Alt+T": "tracker_transformer",
+      "Shift+Alt+R": "tracker_flare",
+      "Shift+Alt+1": "tracker_scratch_trans",
+      "Shift+Alt+2": "tracker_scratch_crab",
+      "Shift+Alt+3": "tracker_scratch_flare",
+      "Shift+Alt+4": "tracker_scratch_chirp",
+      "Shift+Alt+5": "tracker_scratch_stab",
+      "Shift+Alt+6": "tracker_scratch_8crab",
+      "Shift+Alt+7": "tracker_scratch_twdl",
+      "Shift+Alt+0": "tracker_scratch_stop",
+      "Shift+Alt+B": "tracker_spinback",
+      "Shift+Space": "power_cut_stop"
     },
     "mac": {
       "F1": "layout_preset_1",
@@ -125,12 +135,10 @@
       "F6": "layout_preset_6",
       "F7": "layout_preset_7",
       "F8": "layout_preset_8",
-      
       "Space": "play_stop_toggle",
       "Return": "play_row",
       "Escape": "toggle_edit_mode",
       "NumpadEnter": "play_block_loop",
-      
       "NumpadDivide": "prev_octave",
       "NumpadMultiply": "next_octave",
       "NumpadMinus": "prev_instrument",
@@ -144,25 +152,21 @@
       "Numpad7": "set_instrument_7",
       "Numpad8": "set_instrument_8",
       "Numpad9": "set_instrument_9",
-      
       "Alt+Left": "instrument_page_up",
       "Alt+Right": "instrument_page_down",
       "Alt+Up": "prev_instrument",
       "Alt+Down": "next_instrument",
-      
       "Cmd+X": "cut_selection",
       "Cmd+C": "copy_selection",
       "Cmd+V": "paste_selection",
       "Cmd+Z": "undo",
       "Cmd+Shift+Z": "redo",
-      
       "Backspace": "delete_and_pull",
       "Fn+Backspace": "insert_row",
       "Cmd+Shift+Backspace": "delete_column_and_pull",
       "Cmd+Shift+Fn+Backspace": "insert_column_row",
       "Cmd+Shift+Left": "remove_column",
       "Cmd+Shift+Right": "add_column",
-      
       "Shift+F3": "cut_track",
       "Shift+F4": "copy_track",
       "Shift+F5": "paste_track",
@@ -172,7 +176,6 @@
       "Alt+F3": "cut_selection",
       "Alt+F4": "copy_selection",
       "Alt+F5": "paste_selection",
-      
       "Cmd+Minus": "decrease_edit_step",
       "Cmd+Plus": "increase_edit_step",
       "Cmd+Equals": "increase_edit_step",
@@ -186,7 +189,6 @@
       "Cmd+8": "set_step_8",
       "Cmd+9": "set_step_9",
       "Cmd+0": "set_step_0",
-      
       "Up": "cursor_up",
       "Down": "cursor_down",
       "Left": "cursor_left",
@@ -197,26 +199,58 @@
       "End": "cursor_pattern_end",
       "Cmd+Up": "cursor_pattern_start",
       "Cmd+Down": "cursor_pattern_end",
-      
       "F9": "jump_to_row_0",
       "F10": "jump_to_row_25_percent",
       "F11": "jump_to_row_50_percent",
       "F12": "jump_to_row_75_percent",
-      
       "CapsLock": "insert_note_off",
-      
       "Cmd+Left": "prev_pattern",
       "Cmd+Right": "next_pattern",
       "Ctrl+Up": "prev_sequence",
       "Ctrl+Down": "next_sequence",
       "Cmd+Home": "goto_first_pattern",
       "Cmd+End": "goto_last_pattern",
-      
       "Cmd+Tab": "next_focus",
       "Cmd+Shift+Tab": "prev_focus",
-      
       "Tab": "next_channel",
-      "Shift+Tab": "prev_channel"
+      "Shift+Tab": "prev_channel",
+      "Cmd+Shift+1": "set_quantize_1",
+      "Cmd+Shift+2": "set_quantize_2",
+      "Cmd+Shift+3": "set_quantize_3",
+      "Cmd+Shift+4": "set_quantize_4",
+      "Cmd+Shift+5": "set_quantize_5",
+      "Cmd+Shift+6": "set_quantize_6",
+      "Cmd+Shift+7": "set_quantize_7",
+      "Cmd+Shift+8": "set_quantize_8",
+      "Cmd+Shift+9": "set_quantize_9",
+      "Cmd+Delete": "delete_pattern",
+      "Cmd+Insert": "insert_pattern",
+      "A": "insert_note_off_a",
+      "Shift+Insert": "paste_selection",
+      "Ctrl+Alt+1": "dj_scratch_baby",
+      "Ctrl+Alt+2": "dj_scratch_trans",
+      "Ctrl+Alt+3": "dj_scratch_flare",
+      "Ctrl+Alt+4": "dj_scratch_hydro",
+      "Ctrl+Alt+5": "dj_scratch_crab",
+      "Ctrl+Alt+6": "dj_scratch_orbit",
+      "Ctrl+Alt+0": "dj_scratch_stop",
+      "Ctrl+Alt+7": "dj_fader_lfo_14",
+      "Ctrl+Alt+8": "dj_fader_lfo_18",
+      "Ctrl+Alt+9": "dj_fader_lfo_116",
+      "Shift+Alt+F": "tracker_fader_cut",
+      "Shift+Alt+C": "tracker_crab",
+      "Shift+Alt+T": "tracker_transformer",
+      "Shift+Alt+R": "tracker_flare",
+      "Shift+Alt+1": "tracker_scratch_trans",
+      "Shift+Alt+2": "tracker_scratch_crab",
+      "Shift+Alt+3": "tracker_scratch_flare",
+      "Shift+Alt+4": "tracker_scratch_chirp",
+      "Shift+Alt+5": "tracker_scratch_stab",
+      "Shift+Alt+6": "tracker_scratch_8crab",
+      "Shift+Alt+7": "tracker_scratch_twdl",
+      "Shift+Alt+0": "tracker_scratch_stop",
+      "Shift+Alt+B": "tracker_spinback",
+      "Shift+Space": "power_cut_stop"
     }
   }
 }

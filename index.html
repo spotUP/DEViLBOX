@@ -2,8 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/DEViLBOX/vite.svg" />
-    <link rel="manifest" href="/DEViLBOX/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Preload fonts to eliminate CLS from late font swaps -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" />
 
     <!-- Mobile-optimized viewport with safe-area support -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -57,12 +62,12 @@
         to { transform: rotate(360deg); }
       }
     </style>
-    <script type="module" crossorigin src="/DEViLBOX/assets/index-E5N9QGOx.js"></script>
-    <link rel="modulepreload" crossorigin href="/DEViLBOX/assets/vendor-react-LeNVipsj.js">
-    <link rel="modulepreload" crossorigin href="/DEViLBOX/assets/vendor-utils-Cm-70yv0.js">
-    <link rel="modulepreload" crossorigin href="/DEViLBOX/assets/vendor-tone-CADp_hfL.js">
-    <link rel="modulepreload" crossorigin href="/DEViLBOX/assets/vendor-ui-BzVyJkLI.js">
-    <link rel="stylesheet" crossorigin href="/DEViLBOX/assets/index-CVeyNCMP.css">
+    <script type="module" crossorigin src="/assets/index-zx6LJBPK.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-react-DkDaD07v.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-utils-XMmR-oGw.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-tone-CADp_hfL.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-ui-uomqNFY-.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-Cnoi0D0R.css">
   </head>
   <body>
     <div id="root">
@@ -72,7 +77,53 @@
         <div class="loading-text">DEViLBOX</div>
       </div>
     </div>
-    <script src="/DEViLBOX/FurnaceChips.js"></script>
-    <script src="/DEViLBOX/MAMEChips.js"></script>
+    <script src="/FurnaceChips.js"></script>
+    <script src="/MAMEChips.js"></script>
+    <!-- iOS Audio Unlock: Play silent MP3 on first touch/click to bypass mute switch.
+         Also resume AudioContext which may be suspended on iOS.
+         This fires as early as possible so audio is ready when React loads. -->
+    <script>
+      (function() {
+        var silentAudio = null;
+        var unlocked = false;
+        function unlockAudio() {
+          if (unlocked) return;
+          unlocked = true;
+          // 1) Play silent MP3 via native HTML audio to bypass iOS mute switch
+          if (!silentAudio) {
+            silentAudio = document.createElement('audio');
+            silentAudio.src = '/silent.mp3';
+            silentAudio.style.display = 'none';
+            document.body.appendChild(silentAudio);
+          }
+          try { silentAudio.play().catch(function(){}); } catch(e) {}
+          // 2) Resume + play silent buffer through the Web Audio context.
+          //    On iOS Safari, just calling resume() is NOT enough — the context
+          //    reports 'running' but won't produce audio until actual data flows
+          //    through it during a user gesture.
+          if (window._toneEngine && window._toneEngine.nativeContext) {
+            var ctx = window._toneEngine.nativeContext;
+            try {
+              if (ctx.state === 'suspended') ctx.resume();
+              var buf = ctx.createBuffer(1, 1, ctx.sampleRate || 44100);
+              var src = ctx.createBufferSource();
+              src.buffer = buf;
+              src.connect(ctx.destination);
+              src.start(0);
+              src.onended = function() { src.disconnect(); };
+              console.log('[iOS Audio Unlock] Silent buffer played through AudioContext');
+            } catch(e) {
+              console.warn('[iOS Audio Unlock] Early unlock failed:', e);
+            }
+          }
+          document.removeEventListener('touchstart', unlockAudio, true);
+          document.removeEventListener('touchend', unlockAudio, true);
+          document.removeEventListener('click', unlockAudio, true);
+        }
+        document.addEventListener('touchstart', unlockAudio, true);
+        document.addEventListener('touchend', unlockAudio, true);
+        document.addEventListener('click', unlockAudio, true);
+      })();
+    </script>
   </body>
 </html>

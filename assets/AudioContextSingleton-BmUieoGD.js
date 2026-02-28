@@ -1,0 +1,1 @@
+import{q as n}from"./index-zx6LJBPK.js";let t=null,e=null;function s(){if(!t){try{const e=n();if(e)return t=e,t}catch{}t=new AudioContext}return t}async function r(){const n=s();"suspended"===n.state&&(e||(e=n.resume().then(()=>{e=null})),await e)}export{s as g,r};
