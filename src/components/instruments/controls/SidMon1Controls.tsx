@@ -5,18 +5,48 @@
  * phase oscillator, tuning, arpeggio table, and waveform data.
  *
  * Enhanced with SequenceEditor for arpeggio and waveform tables.
+ *
+ * When loaded via UADE (uadeChipRam present), scalar params that have a direct
+ * 1-byte equivalent in the SidMon 1 instrument header are written to chip RAM
+ * so UADE picks them up on the next note trigger.
+ *
+ * SidMon 1 instrument byte layout (offset from instrBase):
+ *
+ *   +0..+3  : waveform (uint32 BE) — not written; waveform index into table
+ *   +4..+19 : arpeggio[0..15] (16 × uint8)  ✓ written as block
+ *   +20     : attackSpeed                    ✓ written
+ *   +21     : attackMax                      ✓ written
+ *   +22     : decaySpeed                     ✓ written
+ *   +23     : decayMin                       ✓ written
+ *   +24     : sustain                        ✓ written
+ *   +25     : (unused / padding)             — skipped
+ *   +26     : releaseSpeed                   ✓ written
+ *   +27     : releaseMin                     ✓ written
+ *   +28     : phaseShift                     ✓ written
+ *   +29     : phaseSpeed                     ✓ written
+ *   +30     : finetune (raw index 0-15)      ✓ written (config value / 67)
+ *   +31     : pitchFall (signed int8)        ✓ written via writeS8
+ *
+ * Fields NOT written to chip RAM (with reason):
+ *   mainWave   — 32-byte sample data stored at waveData + waveIndex * 32;
+ *                requires knowing the waveform index stored at +0..+3. TODO.
+ *   phaseWave  — same region as mainWave; same complexity. TODO.
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import type { SidMon1Config } from '@/types/instrument';
+import type { SidMon1Config, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import { SequenceEditor, EnvelopeVisualization } from '@components/instruments/shared';
 import type { SequencePreset } from '@components/instruments/shared';
+import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
+import { UADEEngine } from '@/engine/uade/UADEEngine';
 
 interface SidMon1ControlsProps {
   config: SidMon1Config;
   onChange: (updates: Partial<SidMon1Config>) => void;
+  /** Present when this instrument was loaded via UADE's native SidMon 1 parser. */
+  uadeChipRam?: UADEChipRamInfo;
 }
 
 type SM1Tab = 'main' | 'arpeggio' | 'waveform';
@@ -53,11 +83,19 @@ const WAVE_PRESETS: SequencePreset[] = [
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChange }) => {
+export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChange, uadeChipRam }) => {
   const [activeTab, setActiveTab] = useState<SM1Tab>('main');
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
+
+  const chipEditorRef = useRef<UADEChipEditor | null>(null);
+  const getEditor = useCallback(() => {
+    if (!chipEditorRef.current) {
+      chipEditorRef.current = new UADEChipEditor(UADEEngine.getInstance());
+    }
+    return chipEditorRef.current;
+  }, []);
 
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyan = currentThemeId === 'cyan-lineart';
@@ -70,6 +108,20 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
   const upd = useCallback(<K extends keyof SidMon1Config>(key: K, value: SidMon1Config[K]) => {
     onChange({ [key]: value } as Partial<SidMon1Config>);
   }, [onChange]);
+
+  /**
+   * Like `upd`, but also writes a single unsigned byte to chip RAM when a UADE
+   * context is active. byteOffset is relative to instrBase.
+   */
+  const updU8WithChipRam = useCallback(
+    (key: keyof SidMon1Config, value: SidMon1Config[keyof SidMon1Config], byteOffset: number) => {
+      upd(key as Parameters<typeof upd>[0], value as Parameters<typeof upd>[1]);
+      if (uadeChipRam && typeof value === 'number') {
+        void getEditor().writeU8(uadeChipRam.instrBase + byteOffset, value & 0xFF);
+      }
+    },
+    [upd, uadeChipRam, getEditor],
+  );
 
   const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
     <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
@@ -99,31 +151,32 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
         </div>
         <div className="grid grid-cols-4 gap-3">
           <Knob value={config.attackSpeed ?? 0} min={0} max={255} step={1}
-            onChange={(v) => upd('attackSpeed', Math.round(v))}
+            onChange={(v) => updU8WithChipRam('attackSpeed', Math.round(v), 20)}
             label="Atk Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.attackMax ?? 0} min={0} max={64} step={1}
-            onChange={(v) => upd('attackMax', Math.round(v))}
+            onChange={(v) => updU8WithChipRam('attackMax', Math.round(v), 21)}
             label="Atk Max" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.decaySpeed ?? 0} min={0} max={255} step={1}
-            onChange={(v) => upd('decaySpeed', Math.round(v))}
+            onChange={(v) => updU8WithChipRam('decaySpeed', Math.round(v), 22)}
             label="Dec Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.decayMin ?? 0} min={0} max={64} step={1}
-            onChange={(v) => upd('decayMin', Math.round(v))}
+            onChange={(v) => updU8WithChipRam('decayMin', Math.round(v), 23)}
             label="Dec Min" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.sustain ?? 0} min={0} max={255} step={1}
-            onChange={(v) => upd('sustain', Math.round(v))}
+            onChange={(v) => updU8WithChipRam('sustain', Math.round(v), 24)}
             label="Sustain" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
+          {/* +25 is unused/padding — skipped */}
           <Knob value={config.releaseSpeed ?? 0} min={0} max={255} step={1}
-            onChange={(v) => upd('releaseSpeed', Math.round(v))}
+            onChange={(v) => updU8WithChipRam('releaseSpeed', Math.round(v), 26)}
             label="Rel Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.releaseMin ?? 0} min={0} max={64} step={1}
-            onChange={(v) => upd('releaseMin', Math.round(v))}
+            onChange={(v) => updU8WithChipRam('releaseMin', Math.round(v), 27)}
             label="Rel Min" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
@@ -134,11 +187,11 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
         <SectionLabel label="Phase Oscillator" />
         <div className="flex gap-4 items-center">
           <Knob value={config.phaseShift ?? 0} min={0} max={255} step={1}
-            onChange={(v) => upd('phaseShift', Math.round(v))}
+            onChange={(v) => updU8WithChipRam('phaseShift', Math.round(v), 28)}
             label="Phase Shift" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.phaseSpeed ?? 0} min={0} max={255} step={1}
-            onChange={(v) => upd('phaseSpeed', Math.round(v))}
+            onChange={(v) => updU8WithChipRam('phaseSpeed', Math.round(v), 29)}
             label="Phase Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <span className="text-[10px] text-gray-600">Phase Shift 0 = disabled</span>
@@ -152,12 +205,24 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
           <Knob value={config.finetune ?? 0} min={0} max={1005} step={67}
             onChange={(v) => {
               const steps = Math.round(v / 67);
-              upd('finetune', steps * 67);
+              const newVal = steps * 67;
+              upd('finetune', newVal);
+              // Chip RAM stores raw index 0-15 at +30 (parser: finetune / 67)
+              if (uadeChipRam) {
+                void getEditor().writeU8(uadeChipRam.instrBase + 30, steps & 0xFF);
+              }
             }}
             label="Finetune" color={knob} size="sm"
             formatValue={(v) => `${Math.round(v / 67)}/15`} />
           <Knob value={config.pitchFall ?? 0} min={-128} max={127} step={1}
-            onChange={(v) => upd('pitchFall', Math.round(v))}
+            onChange={(v) => {
+              const val = Math.round(v);
+              upd('pitchFall', val);
+              // Chip RAM stores signed int8 at +31
+              if (uadeChipRam) {
+                void getEditor().writeS8(uadeChipRam.instrBase + 31, val);
+              }
+            }}
             label="Pitch Fall" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
@@ -175,7 +240,13 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
           <SequenceEditor
             label="Arpeggio"
             data={arp}
-            onChange={(d) => upd('arpeggio', d)}
+            onChange={(d) => {
+              upd('arpeggio', d);
+              // Write all 16 arpeggio bytes as a block at instrBase + 4
+              if (uadeChipRam) {
+                void getEditor().writeBlock(uadeChipRam.instrBase + 4, d.slice(0, 16));
+              }
+            }}
             min={0} max={255}
             fixedLength
             presets={ARP_PRESETS}
@@ -211,6 +282,10 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
             color={accent}
             height={80}
           />
+          {/* TODO chip RAM: mainWave lives at sections.waveData + waveIndex * 32.
+              The waveform index is stored as uint32 BE at instrBase + 0..+3.
+              Writing this region requires reading the index first, then writing
+              32 bytes at the correct waveData offset. Deferred. */}
         </div>
 
         {/* Phase Wave */}
@@ -227,6 +302,9 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
             color={knob}
             height={80}
           />
+          {/* TODO chip RAM: phaseWave lives at sections.waveData + phaseShift * 32.
+              The phaseShift index at +28 identifies the waveform. Writing requires
+              the same waveData region lookup as mainWave. Deferred. */}
         </div>
       </div>
     );
@@ -257,6 +335,22 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
       {activeTab === 'main'     && renderMain()}
       {activeTab === 'arpeggio' && renderArpeggio()}
       {activeTab === 'waveform' && renderWaveform()}
+      {uadeChipRam && (
+        <div className="flex justify-end px-3 py-2 border-t border-opacity-30"
+          style={{ borderColor: dim }}>
+          <button
+            className="text-[10px] px-2 py-1 rounded opacity-70 hover:opacity-100 transition-colors"
+            style={{ background: 'rgba(60,40,100,0.4)', color: '#cc88ff' }}
+            onClick={() => void getEditor().exportModule(
+              uadeChipRam.moduleBase,
+              uadeChipRam.moduleSize,
+              'song.sid1'
+            )}
+          >
+            Export .sid1 (Amiga)
+          </button>
+        </div>
+      )}
     </div>
   );
 };
