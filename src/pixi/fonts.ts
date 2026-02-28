@@ -38,7 +38,7 @@ async function doLoadFonts(): Promise<void> {
   // when the Application renders and BitmapText instances are created.
   installFallbackFonts();
 
-  // Then try to load MSDF font atlases (which would override the fallbacks)
+  // Then try to load MSDF font atlases (sharper at all sizes, preferred over fallbacks)
   const fontDefs = [
     { name: PIXI_FONTS.MONO, path: '/fonts/msdf/JetBrainsMono-Regular.json' },
     { name: PIXI_FONTS.MONO_BOLD, path: '/fonts/msdf/JetBrainsMono-Bold.json' },
@@ -53,9 +53,15 @@ async function doLoadFonts(): Promise<void> {
   }
 
   try {
+    // Uninstall dynamic fallbacks before MSDF load — both register under the same
+    // "${name}-bitmap" cache key, and Pixi warns if the key is set twice.
+    for (const def of fontDefs) {
+      BitmapFontManager.uninstall(def.name);
+    }
     await Assets.load(fontDefs.map(d => d.name));
   } catch {
-    // MSDF font atlas files not available — fallback fonts already installed above
+    // MSDF font atlas files not available — reinstall fallback fonts
+    installFallbackFonts();
   }
 }
 
