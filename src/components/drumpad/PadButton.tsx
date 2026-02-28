@@ -4,6 +4,7 @@
 
 import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import type { DrumPad } from '../../types/drumpad';
+import { useUIStore } from '@stores/useUIStore';
 
 interface PadButtonProps {
   pad: DrumPad;
@@ -28,6 +29,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
   onFocus,
   className = '',
 }) => {
+  const useHex = useUIStore(s => s.useHexNumbers);
   const [isPressed, setIsPressed] = useState(false);
   const [triggerIntensity, setTriggerIntensity] = useState(0); // 0-1 animated flash
   const decayTimerRef = useRef<number | null>(null);
@@ -190,7 +192,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
       {/* Pad number */}
       <div className="absolute top-1 left-1 text-[10px] font-mono text-white/60">
-        {pad.id}
+        {useHex ? pad.id.toString(16).toUpperCase().padStart(2, '0') : pad.id}
       </div>
 
       {/* Pad name */}
