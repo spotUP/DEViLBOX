@@ -18,7 +18,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
-import type { SidMon1Config } from '@/types/instrument';
+import type { SidMon1Config, UADEChipRamInfo } from '@/types/instrument';
 
 // ── Binary read helpers ───────────────────────────────────────────────────────
 
@@ -137,8 +137,12 @@ export function isSidMon1Format(buffer: ArrayBuffer): boolean {
 /**
  * Parse a SidMon 1.0 (.sid1, .smn) file into a TrackerSong.
  * Extracts instrument data using the S1Player.js loader logic.
+ *
+ * @param moduleBase - Chip RAM address where the module binary starts (0 if unknown).
+ *                     SidMon 1 is a compiled Amiga binary that may not load at 0x000000.
+ *                     Use UADEEngine.scanMemoryForMagic to find the actual base address.
  */
-export function parseSidMon1File(buffer: ArrayBuffer, filename: string): TrackerSong {
+export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBase = 0): TrackerSong {
   const buf = new Uint8Array(buffer);
 
   // ── Locate position marker (same logic as S1Player loader) ────────────────
@@ -215,6 +219,14 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string): Tracker
     }
     waveformData.push(wave);
   }
+
+  // ── Pre-compute section file offsets (needed for chip RAM info on each instrument) ──
+  // These mirror the offsets computed later when parsing patterns/tracks; computing
+  // them here avoids forward references inside the instrument loop below.
+  const _patStart       = position - 12 >= 0 ? u32BE(buf, position - 12) : 0;
+  const _patDataOffset  = position + _patStart;
+  const _trackBase      = position - 44 >= 0 ? u32BE(buf, position - 44) : 0;
+  const _trackDataOffset = position + _trackBase;
 
   // ── Parse instruments ─────────────────────────────────────────────────────
   // stream.position = position + instrBase (= position + j)
@@ -294,12 +306,26 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string): Tracker
       phaseWave,
     };
 
+    const chipRam: UADEChipRamInfo = {
+      moduleBase,
+      moduleSize: buffer.byteLength,
+      instrBase: moduleBase + base,
+      instrSize: 32,
+      sections: {
+        position:    moduleBase + position,
+        waveData:    moduleBase + waveformDataOffset,
+        patternData: moduleBase + _patDataOffset,
+        trackData:   moduleBase + _trackDataOffset,
+      },
+    };
+
     instruments.push({
       id: i,
       name: `SM1 ${i}`,
       type: 'synth' as const,
       synthType: 'SidMon1Synth' as const,
       sidmon1: sm1Config,
+      uadeChipRam: chipRam,
       effects: [],
       volume: -6,
       pan: 0,
