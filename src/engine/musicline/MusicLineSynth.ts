@@ -89,7 +89,7 @@ export class MusicLineSynth implements DevilboxSynth {
     }
   }
 
-  triggerRelease(note?: string | number, _time?: number): void {
+  triggerRelease(_note?: string | number, _time?: number): void {
     if (this._disposed) return;
 
     const inst = this._instrument;
