@@ -59,18 +59,19 @@ export const WorkbenchBackground: React.FC<Props> = ({
 
       g.setStrokeStyle({ width: 0 });
 
+      // Draw all minor-grid dots in one batch — call fill() ONCE after all circles.
       let col = startX;
       while (col <= width) {
         let row = startY;
         while (row <= height) {
           g.circle(col, row, dotRadius);
-          g.fill({ color: 0x6060a0, alpha });
           row += effectivePitch;
         }
         col += effectivePitch;
       }
+      g.fill({ color: 0x6060a0, alpha });
 
-      // Major grid — every 4 cells, slightly brighter
+      // Major grid — every 4 cells, slightly brighter — also one batch.
       const majorPitch = effectivePitch * 4;
       if (majorPitch < width * 2) {
         const mStartX = ((offsetX % majorPitch) + majorPitch) % majorPitch;
@@ -83,11 +84,11 @@ export const WorkbenchBackground: React.FC<Props> = ({
           let mRow = mStartY;
           while (mRow <= height) {
             g.circle(mCol, mRow, mRadius);
-            g.fill({ color: 0x8080c0, alpha: mAlpha });
             mRow += majorPitch;
           }
           mCol += majorPitch;
         }
+        g.fill({ color: 0x8080c0, alpha: mAlpha });
       }
     },
     [width, height, camera.x, camera.y, camera.scale, gridSize]

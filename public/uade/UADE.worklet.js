@@ -141,6 +141,83 @@ class UADEProcessor extends AudioWorkletProcessor {
         console.log('[UADE.worklet] Wrote ' + bytes.byteLength + ' bytes to chip RAM @ 0x' + samplePtr.toString(16));
         break;
       }
+
+      case 'readString': {
+        // Read a null-terminated string from Amiga chip RAM.
+        // Responds with { type: 'readStringResult', requestId, value } on success
+        // or { type: 'readStringError', requestId, message } on failure.
+        const { requestId, addr, maxLen = 22 } = data;
+        if (!this._wasm || !this._ready) {
+          this.port.postMessage({ type: 'readStringError', requestId, message: 'WASM not ready' });
+          break;
+        }
+        if (!this._wasm._uade_wasm_read_string) {
+          this.port.postMessage({ type: 'readStringError', requestId, message: '_uade_wasm_read_string not in WASM build' });
+          break;
+        }
+        const clampedLen = Math.min(Math.max(maxLen, 1), 256);
+        const strBuf = this._wasm._malloc(clampedLen + 1);
+        if (!strBuf) {
+          this.port.postMessage({ type: 'readStringError', requestId, message: 'malloc failed' });
+          break;
+        }
+        this._wasm._uade_wasm_read_string(addr, strBuf, clampedLen + 1);
+        // Read back from WASM heap as UTF-8 string
+        let str = '';
+        for (let i = 0; i < clampedLen; i++) {
+          const c = this._wasm.HEAPU8[strBuf + i];
+          if (c === 0) break;
+          str += String.fromCharCode(c);
+        }
+        this._wasm._free(strBuf);
+        this.port.postMessage({ type: 'readStringResult', requestId, value: str });
+        break;
+      }
+
+      case 'scanMemory': {
+        // Scan Amiga chip RAM for a magic byte sequence.
+        // Responds with { type: 'scanMemoryResult', requestId, addr } (addr=-1 if not found)
+        // or { type: 'scanMemoryError', requestId, message } on failure.
+        const { requestId, magic, searchLen = 524288 } = data;
+        if (!this._wasm || !this._ready) {
+          this.port.postMessage({ type: 'scanMemoryError', requestId, message: 'WASM not ready' });
+          break;
+        }
+        if (!this._wasm._uade_wasm_read_memory) {
+          this.port.postMessage({ type: 'scanMemoryError', requestId, message: '_uade_wasm_read_memory not available' });
+          break;
+        }
+        const magicBytes = new Uint8Array(magic);
+        const mLen = magicBytes.length;
+        if (mLen === 0) {
+          this.port.postMessage({ type: 'scanMemoryResult', requestId, addr: 0 });
+          break;
+        }
+        // Read chip RAM in 4KB chunks and search for the magic sequence
+        const CHUNK_SIZE = 4096;
+        const readBuf = this._wasm._malloc(CHUNK_SIZE + mLen);
+        if (!readBuf) {
+          this.port.postMessage({ type: 'scanMemoryError', requestId, message: 'malloc failed' });
+          break;
+        }
+        let foundAddr = -1;
+        outer: for (let base = 0; base < searchLen; base += CHUNK_SIZE) {
+          const toRead = Math.min(CHUNK_SIZE + mLen - 1, searchLen - base);
+          if (toRead < mLen) break;
+          this._wasm._uade_wasm_read_memory(base, readBuf, toRead);
+          const chunk = this._wasm.HEAPU8;
+          for (let i = 0; i <= toRead - mLen; i++) {
+            let match = true;
+            for (let j = 0; j < mLen; j++) {
+              if (chunk[readBuf + i + j] !== magicBytes[j]) { match = false; break; }
+            }
+            if (match) { foundAddr = base + i; break outer; }
+          }
+        }
+        this._wasm._free(readBuf);
+        this.port.postMessage({ type: 'scanMemoryResult', requestId, addr: foundAddr });
+        break;
+      }
     }
   }
 
@@ -694,12 +771,19 @@ class UADEProcessor extends AudioWorkletProcessor {
       const ciaChanged = ciaBTA !== prevCiaBTA && ciaBTA > 0;
       prevCiaBTA = ciaBTA;
 
+      // CIA-A tick count: increments once per musical tick (via hook in cia.c).
+      // Present in WASM builds after Phase 1 rebuild; gracefully absent otherwise.
+      const ciaATick = this._wasm._uade_wasm_get_tick_count
+        ? this._wasm._uade_wasm_get_tick_count()
+        : 0;
+
       tickSnapshots.push({
         channels: tickChannels,
         ciaBTA,
         vblankHz,
         ciaChanged,
         frame: totalFrames,
+        ciaATick,
       });
     }
 
@@ -811,12 +895,22 @@ class UADEProcessor extends AudioWorkletProcessor {
 
     const actualFPR = Math.round(sr * 2.5 * detectedSpeed / detectedBPM);
 
+    // Determine whether CIA-A tick count is a reliable row-boundary signal.
+    // It's reliable when CIA-A timer is actively firing (tick count advanced
+    // by at least detectedSpeed * 20 ticks across the scan).
+    const firstCiaATick = tickSnapshots[0]?.ciaATick || 0;
+    const lastCiaATick = tickSnapshots[tickSnapshots.length - 1]?.ciaATick || 0;
+    const ciaATickRange = lastCiaATick - firstCiaATick;
+    const ciaAReliable = ciaATickRange >= detectedSpeed * 20;
+
     // Phase 3: Group tick snapshots into rows and detect effects
     const rows = [];
     const tempoChanges = [];
     let frameSinceRow = 0;
     let currentRowTicks = []; // Ticks within current row
     let currentBPM = detectedBPM;
+    // CIA-A tick tracking for tick-based row boundaries
+    let prevCiaARow = -1; // Last row index derived from CIA-A tick count
 
     // Fingerprint-based loop detection: stops scanning when the song loops back.
     // Uses a sliding window of LOOP_WINDOW consecutive row fingerprints.
@@ -840,8 +934,23 @@ class UADEProcessor extends AudioWorkletProcessor {
         }
       }
 
-      if (frameSinceRow >= actualFPR) {
+      // Determine if a row boundary occurred.
+      // Primary: CIA-A tick count (exact hardware boundary, when reliable).
+      // Fallback: frame counting (heuristic, always available).
+      let rowBoundary = false;
+      if (ciaAReliable) {
+        const ciaARow = Math.floor((tick.ciaATick - firstCiaATick) / detectedSpeed);
+        if (ciaARow > prevCiaARow) {
+          rowBoundary = true;
+          prevCiaARow = ciaARow;
+          frameSinceRow = 0; // Keep frame counter in sync
+        }
+      } else if (frameSinceRow >= actualFPR) {
+        rowBoundary = true;
         frameSinceRow -= actualFPR;
+      }
+
+      if (rowBoundary) {
         rows.push(this._processRowTicks(currentRowTicks));
         currentRowTicks = [];
 
@@ -1031,6 +1140,78 @@ class UADEProcessor extends AudioWorkletProcessor {
           if (rate > 0) {
             effTyp = 0x0A; // Volume slide
             eff = vdiff > 0 ? (rate << 4) : rate; // Up: x0, Down: 0x
+          }
+        }
+      }
+
+      // Check for note delay (0xED): note triggers later than tick 0.
+      // Signature: no trigger at tick 0, trigger appears at tick N > 0.
+      if (effTyp === 0 && ticks.length >= 2) {
+        let firstTriggerTick = -1;
+        for (let t = 0; t < ticks.length; t++) {
+          if (ticks[t].channels[ch].triggered) {
+            firstTriggerTick = t;
+            break;
+          }
+        }
+        if (firstTriggerTick > 0 && firstTriggerTick <= 15) {
+          // Confirm tick 0 had no active DMA or different period
+          const ch0 = ticks[0].channels[ch];
+          if (!ch0.triggered && ch0.period === 0) {
+            effTyp = 0xE; // Extended effect
+            eff = (0xD << 4) | firstTriggerTick; // EDx = note delay
+          }
+        }
+      }
+
+      // Check for note cut (0xEC): volume drops to 0 at a specific tick mid-row.
+      // Signature: volume > 0 in early ticks, then 0 for all remaining ticks.
+      if (effTyp === 0 && volumes.length >= 3) {
+        let cutTick = -1;
+        for (let t = 1; t < volumes.length; t++) {
+          if (volumes[t - 1] > 0 && volumes[t] === 0) {
+            cutTick = t;
+            break;
+          }
+        }
+        if (cutTick > 0 && cutTick <= 15) {
+          // Verify all remaining ticks are 0
+          let allZeroAfter = true;
+          for (let t = cutTick; t < volumes.length; t++) {
+            if (volumes[t] !== 0) { allZeroAfter = false; break; }
+          }
+          if (allZeroAfter) {
+            effTyp = 0xE; // Extended effect
+            eff = (0xC << 4) | Math.min(15, cutTick); // ECx = note cut at tick x
+          }
+        }
+      }
+
+      // Check for fine portamento up/down (0xE1/0xE2): a one-time very small
+      // period change that happens at tick 0 only (subsequent ticks hold the
+      // new period constant).
+      if (effTyp === 0 && periods.length >= 2) {
+        const p0 = periods[0];
+        const p1 = periods[1];
+        const pLast = periods[periods.length - 1];
+        const delta = p0 - p1; // positive = period decreased = pitch up
+        if (Math.abs(delta) > 0 && Math.abs(delta) <= 8 && pLast === p1) {
+          // Check all ticks after tick 1 hold the same period
+          let steady = true;
+          for (let t = 2; t < periods.length; t++) {
+            if (Math.abs(periods[t] - p1) > 2) { steady = false; break; }
+          }
+          if (steady) {
+            const fineAmt = Math.min(15, Math.abs(delta));
+            if (delta > 0) {
+              // Period decreased = pitch went up = fine portamento up (E1x)
+              effTyp = 0xE;
+              eff = (0x1 << 4) | fineAmt;
+            } else {
+              // Period increased = pitch went down = fine portamento down (E2x)
+              effTyp = 0xE;
+              eff = (0x2 << 4) | fineAmt;
+            }
           }
         }
       }

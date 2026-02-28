@@ -69,28 +69,36 @@ export const PixiTrackerView: React.FC = () => {
   const instrumentPanelVisible = viewMode !== 'tb303' && viewMode !== 'sunvox' && canShowInstrumentPanel && showInstrumentPanel;
   const INSTRUMENT_PANEL_W = 200;
 
-  // Pattern data for automation/macro lanes overlay
-  const patterns = useTrackerStore(s => s.patterns);
-  const currentPatternIndex = useTrackerStore(s => s.currentPatternIndex);
-  const patternOrder = useTrackerStore(s => s.patternOrder);
+  // Pattern data for automation/macro lanes overlay.
+  // Use stable primitive selectors — avoids re-rendering the whole tracker view on every cell edit.
+  // Cell edits change s.patterns reference but never change id/length/channelCount/patternOrder.
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const showAutomation = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
   const tb303Collapsed = useUIStore(s => s.tb303Collapsed);
   const hasTB303 = useInstrumentStore(s => s.instruments.some(i => i.synthType === 'TB303'));
-  const currentPattern = patterns[currentPatternIndex];
-  const patternId = currentPattern?.id || '';
-  const patternLength = currentPattern?.length || 64;
-  const channelCount = currentPattern?.channels?.length || 4;
+  const patternId     = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.id ?? '');
+  const patternLength = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.length ?? 64);
+  const channelCount  = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 4);
   const ROW_HEIGHT = 18; // matches PatternEditorCanvas default row height
 
   // Adjacent pattern IDs for ghost automation curves
-  const prevPositionIdx = currentPositionIndex > 0 ? currentPositionIndex - 1 : -1;
-  const nextPositionIdx = currentPositionIndex < patternOrder.length - 1 ? currentPositionIndex + 1 : -1;
-  const prevPatternId = prevPositionIdx >= 0 ? patterns[patternOrder[prevPositionIdx]]?.id : undefined;
-  const prevPatternLength = prevPositionIdx >= 0 ? patterns[patternOrder[prevPositionIdx]]?.length : undefined;
-  const nextPatternId = nextPositionIdx >= 0 ? patterns[patternOrder[nextPositionIdx]]?.id : undefined;
-  const nextPatternLength = nextPositionIdx >= 0 ? patterns[patternOrder[nextPositionIdx]]?.length : undefined;
+  const prevPatternId = useTrackerStore(s => {
+    const prev = s.currentPositionIndex > 0 ? s.currentPositionIndex - 1 : -1;
+    return prev >= 0 ? (s.patterns[s.patternOrder[prev]]?.id ?? undefined) : undefined;
+  });
+  const prevPatternLength = useTrackerStore(s => {
+    const prev = s.currentPositionIndex > 0 ? s.currentPositionIndex - 1 : -1;
+    return prev >= 0 ? (s.patterns[s.patternOrder[prev]]?.length ?? undefined) : undefined;
+  });
+  const nextPatternId = useTrackerStore(s => {
+    const next = s.currentPositionIndex < s.patternOrder.length - 1 ? s.currentPositionIndex + 1 : -1;
+    return next >= 0 ? (s.patterns[s.patternOrder[next]]?.id ?? undefined) : undefined;
+  });
+  const nextPatternLength = useTrackerStore(s => {
+    const next = s.currentPositionIndex < s.patternOrder.length - 1 ? s.currentPositionIndex + 1 : -1;
+    return next >= 0 ? (s.patterns[s.patternOrder[next]]?.length ?? undefined) : undefined;
+  });
 
   // Compute instrument panel height: window minus navbar + toolbar + controls + statusbar + optional panels
   const NAVBAR_H = 98; // NavBar(45px) + TabBar(41px) + borders+padding — must match PixiNavBar height

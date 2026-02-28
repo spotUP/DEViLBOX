@@ -50,6 +50,18 @@ static int s_total_frames = 0;  /* Total frames rendered (for position tracking)
 /* Sample rate for the WASM module (set at init) */
 static int s_sample_rate = 44100;
 
+/* ── CIA-A tick counter ──────────────────────────────────────────────────── */
+/* Counts cumulative CIA-A Timer A overflows (= musical ticks) since last load.
+ * Incremented by uade_wasm_on_cia_a_tick() which is called from cia.c
+ * when CIA-A Timer A fires (via UADE_WASM hook in cia.c CIA_update()).
+ * Used by the JS enhanced scan to derive row boundaries precisely. */
+static uint32_t g_uade_tick_count = 0;
+
+/* Called from cia.c once per CIA-A Timer A overflow (see cia.c CIA_update). */
+void uade_wasm_on_cia_a_tick(void) {
+    g_uade_tick_count++;
+}
+
 /* PCM ring buffer — interleaved int16 stereo */
 #define PCM_BUF_FRAMES  (8192)
 #define PCM_BUF_BYTES   (PCM_BUF_FRAMES * 4)   /* 2 channels * 2 bytes/sample */
@@ -220,10 +232,11 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
      * that doesn't work in our synchronous WASM shim) */
     s_playing = 0;
 
-    /* Reset PCM buffer and frame counter */
+    /* Reset PCM buffer, frame counter, and tick counter */
     s_pcm_read = 0;
     s_pcm_write = 0;
     s_total_frames = 0;
+    g_uade_tick_count = 0;
 
     /* Write the file to MEMFS so UADE can open it */
     const char *vpath = "/uade/song";
@@ -353,6 +366,7 @@ void uade_wasm_set_subsong(int subsong) {
     /* Subsong switching: full IPC reset + replay with new subsong index.
      * Do NOT use uade_stop() — use our clean reset path instead. */
     s_playing = 0;
+    g_uade_tick_count = 0;
     uade_shim_reset_for_load();
     memset(&s_state->song, 0, sizeof(s_state->song));
     s_state->song.state = 0;
@@ -621,6 +635,55 @@ void uade_wasm_cleanup(void) {
         s_state = NULL;
     }
     s_playing = 0;
+}
+
+/* ── CIA-A tick counter exports ──────────────────────────────────────────── */
+
+/*
+ * Reset the cumulative CIA-A tick counter to zero.
+ * Called automatically by uade_wasm_load() and uade_wasm_set_subsong().
+ * May also be called manually before starting an enhanced scan.
+ */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_reset_tick_count(void) {
+    g_uade_tick_count = 0;
+}
+
+/*
+ * Return the current cumulative CIA-A Timer A tick count.
+ * Each tick corresponds to one musical tick (typically 1/50s × speed).
+ * Increases monotonically from 0 while the song plays.
+ * Reset to 0 on each new load or subsong switch.
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t uade_wasm_get_tick_count(void) {
+    return g_uade_tick_count;
+}
+
+/* ── String read from Amiga chip RAM ────────────────────────────────────── */
+
+/*
+ * Read a null-terminated C string from Amiga address space at `addr`
+ * into the caller-provided `out` buffer.  Reads at most `maxlen-1` bytes,
+ * always null-terminates `out`.
+ *
+ * Returns the number of bytes copied (excluding null terminator),
+ * or 0 if addr is out of range, empty, or maxlen <= 0.
+ *
+ * Used by the JS layer to efficiently read instrument names at known
+ * format-specific Amiga addresses without pulling large memory blocks.
+ */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_read_string(uint32_t addr, char *out, int maxlen) {
+    if (maxlen <= 0) return 0;
+    int i;
+    for (i = 0; i < maxlen - 1; i++) {
+        uint8_t c = (uint8_t)byteget(addr + i);
+        if (c == 0) break;
+        out[i] = (char)c;
+    }
+    out[i] = '\0';
+    return i;
 }
 
 /*

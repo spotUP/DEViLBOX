@@ -18,12 +18,12 @@ import { TITLE_H } from './PixiWindow';
 interface WindowTetherProps {
   fromId: string;
   toId: string;
-  /** Current camera scale — used to keep line width constant on screen */
-  cameraScale: number;
 }
 
-export const WindowTether: React.FC<WindowTetherProps> = ({ fromId, toId, cameraScale }) => {
+export const WindowTether: React.FC<WindowTetherProps> = ({ fromId, toId }) => {
   const theme = usePixiTheme();
+  // Subscribe to camera scale to keep line width constant on screen
+  const cameraScale = useWorkbenchStore((s) => s.camera.scale);
 
   // Subscribe only to visibility — positions are read via getState() in RAF loop
   const fromActive = useWorkbenchStore(

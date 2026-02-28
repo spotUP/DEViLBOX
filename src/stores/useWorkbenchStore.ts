@@ -52,10 +52,6 @@ interface WorkbenchStore {
   // Camera state
   camera: CameraState;
 
-  // 3D tilt state
-  isTilted: boolean;
-  tiltAngle: number; // degrees, 0 = flat
-
   // Window state
   windows: Record<string, WindowState>;
   maxZIndex: number;
@@ -74,8 +70,6 @@ interface WorkbenchStore {
   setCamera: (camera: Partial<CameraState>) => void;
   panCamera: (dx: number, dy: number) => void;
   zoomCamera: (delta: number, pivotX: number, pivotY: number) => void;
-
-  setTilted: (tilted: boolean) => void;
 
   // Window management
   showWindow: (id: string) => void;
@@ -103,8 +97,6 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
   persist(
     immer((set, get) => ({
       camera: { x: 0, y: 0, scale: 1 },
-      isTilted: false,
-      tiltAngle: 0,
       windows: { ...DEFAULT_WINDOWS } as Record<string, WindowState>,
       maxZIndex: 10,
       workspaces: {},
@@ -135,14 +127,6 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
           state.camera.x = pivotX - (pivotX - state.camera.x) * scaleRatio;
           state.camera.y = pivotY - (pivotY - state.camera.y) * scaleRatio;
           state.camera.scale = newScale;
-        }),
-
-      // ─── Tilt ──────────────────────────────────────────────────────────────
-
-      setTilted: (tilted) =>
-        set((state) => {
-          state.isTilted = tilted;
-          state.tiltAngle = tilted ? 20 : 0;
         }),
 
       // ─── Windows ───────────────────────────────────────────────────────────
