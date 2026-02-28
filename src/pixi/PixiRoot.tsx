@@ -95,7 +95,7 @@ export const PixiRoot: React.FC = () => {
         flexDirection: 'column',
       }}
     >
-      {/* Navigation bar */}
+      {/* Navigation bar — pure Pixi */}
       <PixiNavBar />
 
       {/* Collaboration toolbar (shown when collab split mode active) */}
