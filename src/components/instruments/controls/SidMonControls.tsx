@@ -8,10 +8,40 @@
  *  - WaveformThumbnail: visual previews on waveform selector buttons
  *  - EnvelopeVisualization mode="adsr": SID-format ADSR curve
  *  - SequenceEditor: arpeggio table editor
+ *
+ * When loaded via UADE (uadeChipRam present), scalar params that have a direct
+ * 1-byte equivalent in the SidMon 2 instrument header are written to chip RAM
+ * so UADE picks them up on the next note trigger.
+ *
+ * SidMon 2 instrument byte layout (offset from instrBase, 32 bytes total):
+ *
+ *   +0   : wave (×16 = table offset)       — skipped
+ *   +1   : waveLen                          — skipped
+ *   +2   : waveSpeed                        — skipped
+ *   +3   : waveDelay                        — skipped
+ *   +4   : arpeggio (×16 = table offset)   — skipped (separate table)
+ *   +5   : arpeggioLen                      — skipped
+ *   +6   : arpeggioSpeed                    ✓ written (arpSpeed * 16)
+ *   +7   : arpeggioDelay                    — skipped
+ *   +8   : vibrato (×16 = table offset)    — skipped
+ *   +9   : vibratoLen (→ vibDepth in UI)   ✓ written
+ *   +10  : vibratoSpeed                     ✓ written
+ *   +11  : vibratoDelay                     ✓ written
+ *   +12  : pitchBend (signed)              — skipped
+ *   +13  : pitchBendDelay                  — skipped
+ *   +14..+15 : (skipped)
+ *   +16  : attackMax                        — skipped (NOT SID attack)
+ *   +17  : attackSpeed → SID attack = 15 - floor(raw*16/256)   ✓ written
+ *   +18  : decayMin   → SID sustain = round(raw*15/255)        ✓ written
+ *   +19  : decaySpeed → SID decay   = 15 - floor(raw*16/256)  ✓ written
+ *   +20  : sustain hold counter                                 — skipped
+ *   +21  : releaseMin                                           — skipped
+ *   +22  : releaseSpeed → SID release = 15 - floor(raw*16/256) ✓ written
+ *   +23..+31 : (skipped)
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import type { SidMonConfig } from '@/types/instrument';
+import type { SidMonConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import {
@@ -22,11 +52,16 @@ import {
 } from '@components/instruments/shared';
 import type { FilterType } from '@components/instruments/shared';
 import type { SequencePreset } from '@components/instruments/shared';
+import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
+import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { Download } from 'lucide-react';
 
 interface SidMonControlsProps {
   config: SidMonConfig;
   onChange: (updates: Partial<SidMonConfig>) => void;
   arpPlaybackPosition?: number;
+  /** Present when this instrument was loaded via UADE's native SidMon 2 parser. */
+  uadeChipRam?: UADEChipRamInfo;
 }
 
 type SMTab = 'main' | 'filter' | 'arpeggio';
@@ -56,11 +91,21 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
   config,
   onChange,
   arpPlaybackPosition,
+  uadeChipRam,
 }) => {
   const [activeTab, setActiveTab] = useState<SMTab>('main');
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
+
+  const chipEditorRef = useRef<UADEChipEditor | null>(null);
+  const getEditor = useCallback((): UADEChipEditor | null => {
+    if (!uadeChipRam) return null;
+    if (!chipEditorRef.current) {
+      chipEditorRef.current = new UADEChipEditor(UADEEngine.getInstance());
+    }
+    return chipEditorRef.current;
+  }, [uadeChipRam]);
 
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyan = currentThemeId === 'cyan-lineart';
@@ -73,6 +118,23 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
   const upd = useCallback(<K extends keyof SidMonConfig>(key: K, value: SidMonConfig[K]) => {
     onChange({ [key]: value } as Partial<SidMonConfig>);
   }, [onChange]);
+
+  /**
+   * Like `upd`, but also writes a chip RAM byte when a UADE context is active.
+   * chipWriter receives the editor and instrBase; any async errors are swallowed
+   * to avoid interrupting the UI interaction.
+   */
+  const updWithChipRam = useCallback(<K extends keyof SidMonConfig>(
+    key: K,
+    value: SidMonConfig[K],
+    chipWriter?: (editor: UADEChipEditor, base: number) => Promise<void>,
+  ) => {
+    onChange({ [key]: value } as Partial<SidMonConfig>);
+    const editor = getEditor();
+    if (editor && uadeChipRam && chipWriter) {
+      chipWriter(editor, uadeChipRam.instrBase).catch(console.error);
+    }
+  }, [onChange, getEditor, uadeChipRam]);
 
   const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
     <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
@@ -145,19 +207,43 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
 
         <div className="flex gap-4">
           <Knob value={config.attack} min={0} max={15} step={1}
-            onChange={(v) => upd('attack', Math.round(v))}
+            onChange={(v) => {
+              const sid = Math.round(v);
+              const raw = Math.round((15 - sid) * 256 / 16);
+              updWithChipRam('attack', sid, async (ed, base) => {
+                await ed.writeU8(base + 17, raw);
+              });
+            }}
             label="Attack" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.decay} min={0} max={15} step={1}
-            onChange={(v) => upd('decay', Math.round(v))}
+            onChange={(v) => {
+              const sid = Math.round(v);
+              const raw = Math.round((15 - sid) * 256 / 16);
+              updWithChipRam('decay', sid, async (ed, base) => {
+                await ed.writeU8(base + 19, raw);
+              });
+            }}
             label="Decay" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.sustain} min={0} max={15} step={1}
-            onChange={(v) => upd('sustain', Math.round(v))}
+            onChange={(v) => {
+              const sid = Math.round(v);
+              const raw = Math.round(sid * 255 / 15);
+              updWithChipRam('sustain', sid, async (ed, base) => {
+                await ed.writeU8(base + 18, raw);
+              });
+            }}
             label="Sustain" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.release} min={0} max={15} step={1}
-            onChange={(v) => upd('release', Math.round(v))}
+            onChange={(v) => {
+              const sid = Math.round(v);
+              const raw = Math.round((15 - sid) * 256 / 16);
+              updWithChipRam('release', sid, async (ed, base) => {
+                await ed.writeU8(base + 22, raw);
+              });
+            }}
             label="Release" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
@@ -168,15 +254,21 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
         <SectionLabel label="Vibrato" />
         <div className="flex gap-4">
           <Knob value={config.vibDelay} min={0} max={255} step={1}
-            onChange={(v) => upd('vibDelay', Math.round(v))}
+            onChange={(v) => updWithChipRam('vibDelay', Math.round(v), async (ed, base) => {
+              await ed.writeU8(base + 11, Math.round(v));
+            })}
             label="Delay" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibSpeed} min={0} max={63} step={1}
-            onChange={(v) => upd('vibSpeed', Math.round(v))}
+            onChange={(v) => updWithChipRam('vibSpeed', Math.round(v), async (ed, base) => {
+              await ed.writeU8(base + 10, Math.round(v));
+            })}
             label="Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibDepth} min={0} max={63} step={1}
-            onChange={(v) => upd('vibDepth', Math.round(v))}
+            onChange={(v) => updWithChipRam('vibDepth', Math.round(v), async (ed, base) => {
+              await ed.writeU8(base + 9, Math.round(v));
+            })}
             label="Depth" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
@@ -234,7 +326,9 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
         <div className="flex items-center justify-between mb-3">
           <SectionLabel label="Arpeggio Speed" />
           <Knob value={config.arpSpeed} min={0} max={15} step={1}
-            onChange={(v) => upd('arpSpeed', Math.round(v))}
+            onChange={(v) => updWithChipRam('arpSpeed', Math.round(v), async (ed, base) => {
+              await ed.writeU8(base + 6, Math.round(v) * 16); // scale 0-15 → 0-240
+            })}
             label="Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
@@ -264,7 +358,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex border-b" style={{ borderColor: dim }}>
+      <div className="flex items-center border-b" style={{ borderColor: dim }}>
         {TABS.map(({ id, label }) => (
           <button key={id}
             onClick={() => setActiveTab(id)}
@@ -277,6 +371,22 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
             {label}
           </button>
         ))}
+        {uadeChipRam && (
+          <button
+            onClick={() => {
+              const editor = getEditor();
+              if (editor && uadeChipRam) {
+                editor.exportModule(uadeChipRam.moduleBase, uadeChipRam.moduleSize, 'sidmon2_instrument.sm2')
+                  .catch(console.error);
+              }
+            }}
+            className="ml-auto flex items-center gap-1 px-2 py-1 text-[10px] font-mono bg-dark-bgSecondary hover:bg-dark-bg border border-dark-border rounded transition-colors"
+            title="Export module with current edits"
+          >
+            <Download size={10} />
+            Export .sm2 (Amiga)
+          </button>
+        )}
       </div>
       {activeTab === 'main'     && renderMain()}
       {activeTab === 'filter'   && renderFilter()}
