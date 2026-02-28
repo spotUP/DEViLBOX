@@ -318,7 +318,9 @@ export class SunVoxEngine {
     }
     return new Promise<void>((resolve, reject) => {
       this._songLoadedQueue.set(handle, { resolve, reject });
-      this.workletNode!.port.postMessage({ type: 'loadSong', handle, buffer }, [buffer]);
+      // Slice to keep the original buffer intact in the instrument store (IDB needs to clone it).
+      const copy = buffer.slice(0);
+      this.workletNode!.port.postMessage({ type: 'loadSong', handle, buffer: copy }, [copy]);
     });
   }
 
@@ -345,7 +347,9 @@ export class SunVoxEngine {
     }
     return new Promise<number>((resolve, reject) => {
       this._synthLoadedQueue.set(handle, { resolve, reject });
-      this.workletNode!.port.postMessage({ type: 'loadSynth', handle, buffer }, [buffer]);
+      // Slice to keep the original buffer intact in the instrument store (IDB needs to clone it).
+      const copy = buffer.slice(0);
+      this.workletNode!.port.postMessage({ type: 'loadSynth', handle, buffer: copy }, [copy]);
     });
   }
 
