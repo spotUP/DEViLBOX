@@ -20,6 +20,9 @@ interface PixiDOMOverlayProps {
   zIndex?: number;                     // Default 10
   className?: string;                  // Optional class on wrapper div
   style?: React.CSSProperties;        // Additional styles on wrapper div
+  /** When false, hides both the Pixi container and DOM portal without unmounting.
+   *  Use instead of conditional rendering to avoid @pixi/layout BindingErrors. */
+  visible?: boolean;
   /** When true, measure DOM content height and update Pixi layout to match.
    *  Eliminates gaps caused by hardcoded height constants not matching actual
    *  rendered DOM content height. The initial `layout.height` serves as a
@@ -33,6 +36,7 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
   zIndex = 10,
   className,
   style,
+  visible = true,
   autoHeight = false,
 }) => {
   const containerRef = useRef<ContainerType>(null);
@@ -40,6 +44,8 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
   const rootRef = useRef<Root | null>(null);
   const autoHeightRef = useRef(autoHeight);
   autoHeightRef.current = autoHeight;
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
   // Persist the last measured autoHeight value so parent re-renders
   // don't overwrite it with the caller's static height prop.
   const measuredHeightRef = useRef<number | null>(null);
@@ -132,8 +138,12 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
               if (!autoHeightRef.current) {
                 div.style.height = `${h}px`;
               }
-              div.style.display = '';
+              if (visibleRef.current) {
+                div.style.display = '';
+              }
             }
+            // Hide/show when visible changes without bounds change
+            div.style.display = visibleRef.current ? (prevW > 0 ? '' : 'none') : 'none';
           }
         }
       }
@@ -160,5 +170,5 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
   // and the effectiveLayout ensures the next React re-render won't overwrite it.
 
   // Only return the Pixi container — the DOM overlay is managed imperatively
-  return <pixiContainer ref={containerRef} layout={effectiveLayout} />;
+  return <pixiContainer ref={containerRef} layout={effectiveLayout} visible={visible} />;
 };

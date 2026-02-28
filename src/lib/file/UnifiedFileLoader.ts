@@ -71,8 +71,8 @@ export async function loadFile(
       return await loadInstrumentFile(file);
     }
 
-    // .sunsynth / .sunvox - SunVox patch or project → show import dialog
-    if (filename.endsWith('.sunsynth') || filename.endsWith('.sunvox')) {
+    // .sunsynth - SunVox patch → show instrument import dialog
+    if (filename.endsWith('.sunsynth')) {
       const { useUIStore } = await import('@stores/useUIStore');
       useUIStore.getState().setPendingSunVoxFile(file);
       return { success: true, message: '' };
@@ -106,6 +106,7 @@ function isSongFormat(filename: string): boolean {
     filename.endsWith('.midi') ||
     filename.endsWith('.sqs') ||
     filename.endsWith('.seq') ||
+    filename.endsWith('.sunvox') ||
     isSupportedModule(filename)
   );
 }
@@ -128,6 +129,16 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   const { reset: resetAutomation } = useAutomationStore.getState();
   const engine = getToneEngine();
 
+  const filename = file.name.toLowerCase();
+
+  // Pre-read binary formats before the reset so there is no `await` between
+  // resetInstruments() and the subsequent loadPatterns/createInstrument calls.
+  // Without this, React flushes after the reset and renders an empty (black) scene.
+  let preReadBuffer: ArrayBuffer | null = null;
+  if (filename.endsWith('.sunvox')) {
+    preReadBuffer = await file.arrayBuffer();
+  }
+
   // === FULL STATE RESET (unless preserveInstruments) ===
   if (isPlaying) stopTransport();
   engine.releaseAll();
@@ -138,8 +149,6 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     resetInstruments();
     engine.disposeAllInstruments();
   }
-
-  const filename = file.name.toLowerCase();
 
   // === .dbx - DEViLBOX project ===
   if (filename.endsWith('.dbx')) {
@@ -276,6 +285,58 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       success: true,
       message: `Imported ${importedPatterns.length} TD-3 pattern(s)`
     };
+  }
+
+  // === .sunvox - SunVox project (replace project) ===
+  if (filename.endsWith('.sunvox')) {
+    // preReadBuffer was populated before the reset — no await here, preventing
+    // React from flushing an empty scene between reset and data load.
+    const buffer = preReadBuffer!;
+    const name = file.name.replace(/\.sunvox$/i, '');
+    const sunvoxConfig = {
+      patchData: buffer,
+      patchName: name,
+      isSong: true,
+      controlValues: {} as Record<string, number>,
+    };
+    useInstrumentStore.getState().createInstrument({
+      name,
+      synthType: 'SunVoxSynth' as const,
+      sunvox: sunvoxConfig,
+    });
+    const instruments = useInstrumentStore.getState().instruments;
+    const newInstrument = instruments[instruments.length - 1];
+    const instrumentIndex = instruments.length; // 1-based tracker index
+    const PATTERN_LEN = 256;
+    const emptyRow = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    const rows = Array.from({ length: PATTERN_LEN }, (_, i) =>
+      i === 0
+        ? { note: 49, instrument: instrumentIndex, volume: 64, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }
+        : { ...emptyRow }
+    );
+    const patternId = `svox-${Date.now()}`;
+    const pattern = {
+      id: patternId,
+      name,
+      length: PATTERN_LEN,
+      channels: [{
+        id: `ch-svox-${Date.now()}`,
+        name: 'SunVox',
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: 0,
+        instrumentId: newInstrument.id,
+        color: '#facc15',
+        rows,
+      }],
+    };
+    loadPatterns([pattern]);
+    setCurrentPattern(0);
+    setPatternOrder([0]);
+    setMetadata({ name, author: '', description: `Imported from ${file.name}` });
+    return { success: true, message: `Loaded SunVox project: ${name}` };
   }
 
   // === All other tracker/module formats ===

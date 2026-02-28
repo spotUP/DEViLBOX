@@ -88,12 +88,10 @@ export const PixiStereoField: React.FC<PixiStereoFieldProps> = ({ width, height 
     g.stroke({ color: theme.border.color, alpha: 0.15, width: 1 });
   };
 
-  return isPlaying ? (
-    <pixiGraphics ref={graphicsRef} draw={() => {}} layout={{ width, height }} />
-  ) : (
+  return (
     <pixiContainer layout={{ width, height, justifyContent: 'center', alignItems: 'center' }}>
-      <pixiGraphics draw={drawStatic} layout={{ position: 'absolute', width, height }} />
-      <pixiBitmapText text="STEREO" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={theme.textMuted.color} layout={{}} />
+      <pixiGraphics ref={graphicsRef} draw={isPlaying ? () => {} : drawStatic} layout={{ position: 'absolute', width, height }} />
+      <pixiBitmapText text="STEREO" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={theme.textMuted.color} layout={{}} visible={!isPlaying} />
     </pixiContainer>
   );
 };

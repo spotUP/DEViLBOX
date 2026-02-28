@@ -92,16 +92,15 @@ export const PixiChannelOscilloscope: React.FC<PixiChannelOscilloscopeProps> = (
     g.fill({ color: theme.bg.color });
   };
 
-  return isPlaying ? (
-    <pixiGraphics ref={graphicsRef} draw={() => {}} layout={{ width, height }} />
-  ) : (
+  return (
     <pixiContainer layout={{ width, height, justifyContent: 'center', alignItems: 'center' }}>
-      <pixiGraphics draw={drawStatic} layout={{ position: 'absolute', width, height }} />
+      <pixiGraphics ref={graphicsRef} draw={isPlaying ? () => {} : drawStatic} layout={{ position: 'absolute', width, height }} />
       <pixiBitmapText
         text="CH SCOPE"
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{}}
+        visible={!isPlaying}
       />
     </pixiContainer>
   );
