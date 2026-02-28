@@ -9,6 +9,8 @@
 //
 // Preview API: ml_preview_load / ml_preview_note_on / ml_preview_note_off
 //              ml_preview_render / ml_preview_stop
+//
+// Utility:    ml_get_sample_rate
 
 #include "mline_backend.h"
 #include "../module.h"
@@ -38,6 +40,20 @@ static const char* safe_str(const char* s) {
 }
 
 extern "C" {
+
+// ============================================================================
+// Utility API
+// ============================================================================
+
+/**
+ * ml_get_sample_rate() → 28150 (INTERNAL_RATE).
+ * MlineBackend always outputs at this fixed rate; the JS worklet must resample
+ * to the Web Audio context rate. Exported so the worklet can query it instead
+ * of hardcoding the value.
+ */
+int ml_get_sample_rate() {
+    return 28150; // INTERNAL_RATE — MlineBackend always outputs at this rate
+}
 
 // ============================================================================
 // Song API
@@ -195,13 +211,24 @@ int ml_get_speed() {
 /**
  * ml_preview_load(data, len) → 1 on success, 0 on failure.
  * Loads a module into the preview backend without affecting song playback.
+ * After a successful load, renders a brief silent warmup to initialize
+ * channel state so that ml_preview_note_on can safely call CheckInst()
+ * without hitting uninitialized mixer state (null CMLineSfx pointers,
+ * divide-by-zero in period calculation, etc.).
  */
 int ml_preview_load(uint8_t* data, int len) {
     if (!data || len <= 0) return 0;
-    if (!s_preview) {
-        s_preview = new MlineBackend();
+    delete s_preview;
+    s_preview = new MlineBackend();
+    bool ok = s_preview->load(data, static_cast<size_t>(len));
+    if (ok) {
+        // Warm up: render a few frames to initialize channel state.
+        // This ensures ml_preview_note_on can safely call CheckInst().
+        float warmup[128];
+        s_preview->render(warmup, 64);
+        // Don't stop here — the module naturally starts; we'll reset via note-on.
     }
-    return s_preview->load(data, static_cast<size_t>(len)) ? 1 : 0;
+    return ok ? 1 : 0;
 }
 
 /**
