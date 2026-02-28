@@ -365,7 +365,9 @@ export const PixiFT2Toolbar: React.FC = () => {
 
       {/* ── Row 3: Visualizer + toggles (hidden when compact) ── */}
       <pixiContainer
-        visible={!compactToolbar}
+        alpha={!compactToolbar ? 1 : 0}
+        renderable={!compactToolbar}
+        eventMode={!compactToolbar ? 'static' : 'none'}
         layout={{
           width: '100%',
           height: compactToolbar ? 0 : VIZ_ROW_H,
