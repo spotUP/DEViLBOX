@@ -176,5 +176,5 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
   // and the effectiveLayout ensures the next React re-render won't overwrite it.
 
   // Only return the Pixi container — the DOM overlay is managed imperatively
-  return <pixiContainer ref={containerRef} layout={effectiveLayout} visible={visible} />;
+  return <pixiContainer ref={containerRef} layout={effectiveLayout} />;
 };

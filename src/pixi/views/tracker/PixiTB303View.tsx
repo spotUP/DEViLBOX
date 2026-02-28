@@ -405,7 +405,7 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
       />
 
       {/* Main content — always mounted; hidden when no instrument */}
-      <pixiContainer visible={hasInstrument} layout={{ width, height, flexDirection: 'column' }}>
+      <pixiContainer alpha={hasInstrument ? 1 : 0} renderable={hasInstrument} eventMode={hasInstrument ? 'static' : 'none'} layout={{ width, height, flexDirection: 'column' }}>
         {/* Transport bar */}
         <pixiContainer layout={{ width, height: TRANSPORT_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, gap: 8 }}>
           <pixiGraphics draw={drawTransport} layout={{ position: 'absolute', width, height: TRANSPORT_H }} />

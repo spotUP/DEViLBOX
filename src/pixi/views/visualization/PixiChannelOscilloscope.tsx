@@ -100,7 +100,7 @@ export const PixiChannelOscilloscope: React.FC<PixiChannelOscilloscopeProps> = (
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{}}
-        visible={!isPlaying}
+        alpha={!isPlaying ? 1 : 0}
       />
     </pixiContainer>
   );

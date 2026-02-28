@@ -126,7 +126,7 @@ export const PixiChannelLevels: React.FC<PixiChannelLevelsProps> = ({ width, hei
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={isPlaying ? LABEL_LAYOUT_COLLAPSED : LABEL_LAYOUT_VISIBLE}
-        visible={!isPlaying}
+        alpha={!isPlaying ? 1 : 0}
       />
     </pixiContainer>
   );
