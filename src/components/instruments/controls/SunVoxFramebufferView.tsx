@@ -245,6 +245,7 @@ export const SunVoxFramebufferView: React.FC<SunVoxFramebufferViewProps> = ({
     const eventCleanups: (() => void)[] = [];
 
     async function init() {
+      if (!canvas) return; // TypeScript closure narrowing — outer guard doesn't flow into async fn
       try {
         // Load SunVoxUI Emscripten module.
         // We fetch the JS source as text, apply the HEAPU8/HEAP32 mirror patch
