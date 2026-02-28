@@ -5,6 +5,18 @@
 
 import { useAuthStore } from '@stores/useAuthStore';
 
+/**
+ * Authenticated fetch wrapper.
+ * Clears local auth state when the server returns 403 (invalid/expired token).
+ */
+async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  if (response.status === 403) {
+    // Token is invalid or expired — log out so the stale token is cleared
+    useAuthStore.getState().logout();
+  }
+  return response;
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
 
 export interface ServerFile {
@@ -45,7 +57,7 @@ export async function listUserFiles(type: 'songs' | 'instruments' | 'presets' = 
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${API_URL}/files?type=${type}`, {
+  const response = await authFetch(`${API_URL}/files?type=${type}`, {
     headers: getAuthHeaders(),
   });
 
@@ -66,7 +78,7 @@ export async function getFile(fileId: string): Promise<ServerFileWithData> {
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${API_URL}/files/${fileId}`, {
+  const response = await authFetch(`${API_URL}/files/${fileId}`, {
     headers: getAuthHeaders(),
   });
 
@@ -90,7 +102,7 @@ export async function saveFile(
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${API_URL}/files`, {
+  const response = await authFetch(`${API_URL}/files`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ filename, data, type }),
@@ -116,7 +128,7 @@ export async function updateFile(
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${API_URL}/files/${fileId}`, {
+  const response = await authFetch(`${API_URL}/files/${fileId}`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify({ filename, data }),
@@ -138,7 +150,7 @@ export async function deleteFile(fileId: string): Promise<{ success: boolean }> 
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${API_URL}/files/${fileId}`, {
+  const response = await authFetch(`${API_URL}/files/${fileId}`, {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
@@ -179,7 +191,7 @@ export async function listRevisions(fileId: string): Promise<{
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${API_URL}/files/${fileId}/revisions`, {
+  const response = await authFetch(`${API_URL}/files/${fileId}/revisions`, {
     headers: getAuthHeaders(),
   });
 
@@ -199,7 +211,7 @@ export async function getRevision(fileId: string, revisionNumber: number): Promi
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${API_URL}/files/${fileId}/revisions/${revisionNumber}`, {
+  const response = await authFetch(`${API_URL}/files/${fileId}/revisions/${revisionNumber}`, {
     headers: getAuthHeaders(),
   });
 
@@ -225,7 +237,7 @@ export async function restoreRevision(fileId: string, revisionNumber: number): P
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${API_URL}/files/${fileId}/revisions/${revisionNumber}/restore`, {
+  const response = await authFetch(`${API_URL}/files/${fileId}/revisions/${revisionNumber}/restore`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
