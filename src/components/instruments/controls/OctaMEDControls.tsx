@@ -6,14 +6,17 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import type { OctaMEDConfig } from '@/types/instrument';
+import type { OctaMEDConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import { SequenceEditor } from '@components/instruments/shared';
+import { UADEChipEditor } from '@engine/uade/UADEChipEditor';
+import { UADEEngine } from '@engine/uade/UADEEngine';
 
 interface OctaMEDControlsProps {
   config: OctaMEDConfig;
   onChange: (updates: Partial<OctaMEDConfig>) => void;
+  uadeChipRam?: UADEChipRamInfo;
 }
 
 type OMTab = 'params' | 'voltbl' | 'wftbl' | 'waveform';
@@ -35,11 +38,28 @@ function wftblCellClass(v: number): 'loop' | 'stop' | 'wait' | 'wavesel' | 'othe
   return 'other';
 }
 
-export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChange }) => {
+export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChange, uadeChipRam }) => {
   const [activeTab, setActiveTab] = useState<OMTab>('params');
 
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
+
+  // Lazy chip editor singleton — only created when uadeChipRam is present
+  const chipEditorRef = useRef<UADEChipEditor | null>(null);
+  function getEditor(): UADEChipEditor | null {
+    if (!uadeChipRam) return null;
+    if (!chipEditorRef.current) {
+      chipEditorRef.current = new UADEChipEditor(UADEEngine.getInstance());
+    }
+    return chipEditorRef.current;
+  }
+
+  const handleExport = useCallback(() => {
+    const editor = getEditor();
+    if (!editor || !uadeChipRam) return;
+    void editor.exportModule(uadeChipRam.moduleBase, uadeChipRam.moduleSize, 'module.med');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uadeChipRam]);
 
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyan = currentThemeId === 'cyan-lineart';
@@ -51,7 +71,29 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
 
   const upd = useCallback(<K extends keyof OctaMEDConfig>(key: K, value: OctaMEDConfig[K]) => {
     onChange({ [key]: value } as Partial<OctaMEDConfig>);
-  }, [onChange]);
+
+    // Write-back to chip RAM so edits take effect in the running UADE player
+    const editor = getEditor();
+    if (!editor || !uadeChipRam) return;
+    const base = uadeChipRam.instrBase;
+
+    if (key === 'voltblSpeed') {
+      void editor.writeU8(base + 18, value as number);
+    } else if (key === 'wfSpeed') {
+      void editor.writeU8(base + 19, value as number);
+    } else if (key === 'loopStart') {
+      // loopStart stored as bytes in config; chip RAM stores words
+      void editor.writeU16(base + 10, Math.floor((value as number) / 2));
+    } else if (key === 'loopLen') {
+      // loopLen stored as bytes in config; chip RAM stores words
+      void editor.writeU16(base + 12, Math.floor((value as number) / 2));
+    } else if (key === 'voltbl') {
+      void editor.writeBlock(base + 22, Array.from(value as Uint8Array));
+    } else if (key === 'wftbl') {
+      void editor.writeBlock(base + 150, Array.from(value as Uint8Array));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onChange, uadeChipRam]);
 
   const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
     <div
@@ -183,7 +225,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
                     if (!isNaN(val)) {
                       const newArr = new Uint8Array(configRef.current.voltbl);
                       newArr[i] = Math.max(0, Math.min(255, val));
-                      onChange({ voltbl: newArr });
+                      upd('voltbl', newArr);
                     }
                   }}
                   className="text-[9px] font-mono text-center border rounded py-0.5"
@@ -243,7 +285,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
                     if (!isNaN(val)) {
                       const newArr = new Uint8Array(configRef.current.wftbl);
                       newArr[i] = Math.max(0, Math.min(255, val));
-                      onChange({ wftbl: newArr });
+                      upd('wftbl', newArr);
                     }
                   }}
                   className="text-[9px] font-mono text-center border rounded py-0.5"
@@ -309,7 +351,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   return (
     <div className="flex flex-col h-full">
       {/* Tab bar */}
-      <div className="flex border-b" style={{ borderColor: dim }}>
+      <div className="flex border-b items-center" style={{ borderColor: dim }}>
         {TAB_LABELS.map(([id, label]) => (
           <button
             key={id}
@@ -324,6 +366,20 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
             {label}
           </button>
         ))}
+        {uadeChipRam && (
+          <button
+            onClick={handleExport}
+            className="ml-auto px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider border rounded transition-colors"
+            style={{
+              color: accent,
+              borderColor: dim,
+              background: 'transparent',
+              marginRight: '8px',
+            }}
+          >
+            Export .med (Amiga)
+          </button>
+        )}
       </div>
 
       {activeTab === 'params'   && renderParams()}

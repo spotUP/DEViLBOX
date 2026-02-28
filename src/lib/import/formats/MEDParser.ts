@@ -23,7 +23,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
-import type { OctaMEDConfig } from '@/types/instrument';
+import type { OctaMEDConfig, UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 const TEXT_DECODER = new TextDecoder('iso-8859-1');
@@ -338,6 +338,17 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
 
         // Sanity-check wforms; emit a silent placeholder for degenerate instruments
         if (wforms === 0xFFFF || wforms === 0 || wforms > 64) {
+          const degenerateChipRam: UADEChipRamInfo = {
+            moduleBase: 0,
+            moduleSize: buf.length,
+            instrBase: synthBase,
+            instrSize: synthLen,
+            sections: {
+              voltbl: synthBase + 22,
+              wftbl: synthBase + 150,
+              waveforms: synthBase + 278,
+            },
+          };
           instruments.push({
             id: i + 1,
             name,
@@ -357,6 +368,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
             effects: [],
             volume: 0,
             pan: 0,
+            uadeChipRam: degenerateChipRam,
           } as InstrumentConfig);
           samplePos += synthLen;
           if (samplePos & 1) samplePos++;
@@ -418,6 +430,18 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           waveforms,
         };
 
+        const octamedChipRam: UADEChipRamInfo = {
+          moduleBase: 0,
+          moduleSize: buf.length,
+          instrBase: synthBase,
+          instrSize: synthLen,
+          sections: {
+            voltbl: synthBase + 22,
+            wftbl: synthBase + 150,
+            waveforms: synthBase + 278,
+          },
+        };
+
         instruments.push({
           id: i + 1,
           name,
@@ -427,12 +451,14 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           effects: [],
           volume: 0,
           pan: 0,
+          uadeChipRam: octamedChipRam,
         } as InstrumentConfig);
 
         samplePos += synthLen;
         if (samplePos & 1) samplePos++;  // word-align
       } else {
-        // Malformed SynthInstr — emit a silent OctaMEDSynth placeholder
+        // Malformed SynthInstr — emit a silent OctaMEDSynth placeholder.
+        // synthLen is 0 or out-of-bounds so we skip uadeChipRam.
         instruments.push({
           id: i + 1,
           name,

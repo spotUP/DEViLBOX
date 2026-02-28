@@ -519,6 +519,12 @@ export async function parseUADEFile(
         } catch { /* older WASM without scanMemoryForMagic, moduleBase stays 0 */ }
         return parseRobHubbardSTFile(buffer, filename, moduleBase);
       },
+      // NOTE: UADE format name for Delta Music 1.0 is 'DeltaMusic' (from uade_wasm_get_format_name()).
+      // DeltaMusic 1.0 loads at chip RAM address 0x000000, so no scanMemoryForMagic is needed.
+      'DeltaMusic': async () => {
+        const { parseDeltaMusic1File } = await import('./DeltaMusic1Parser');
+        return parseDeltaMusic1File(buffer, filename);
+      },
       'JochenHippel-CoSo': async () => {
         const { parseHippelCoSoFile } = await import('./HippelCoSoParser');
         // HippelCoSo is a compiled Amiga binary with a "COSO" magic at byte 0.
