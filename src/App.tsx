@@ -37,6 +37,7 @@ import { usePatternPlayback } from '@hooks/audio/usePatternPlayback';
 import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { notify } from '@stores/useNotificationStore';
 import { loadFile } from '@lib/file/UnifiedFileLoader';
+import { runPrefetchIfNeeded } from '@/lib/SamplePackPrefetcher';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { PeerMouseCursor } from '@components/collaboration/PeerMouseCursor';
 import { PeerVideoWindow } from '@components/collaboration/PeerVideoWindow';
@@ -134,6 +135,23 @@ function App() {
   // Cloud sync: pull on login, push on local mutations
   useCloudSync();
   useEffect(() => { setupCloudSyncSubscribers(); }, []);
+
+  // Background sample pack download on first run
+  useEffect(() => {
+    runPrefetchIfNeeded((completed, total) => {
+      if (completed === total) {
+        // Done — let the status bar revert naturally
+        useUIStore.getState().setStatusMessage('SAMPLES READY', false, 2000);
+      } else {
+        // Persistent message until complete (timeout = 0)
+        useUIStore.getState().setStatusMessage(
+          `SAMPLES ${completed}/${total}`,
+          false,
+          0
+        );
+      }
+    });
+  }, []);
 
   // Register MIDI button mappings for transport/navigation control
   useButtonMappings();
