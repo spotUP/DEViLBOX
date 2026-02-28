@@ -46,6 +46,7 @@ if(EMSCRIPTEN)
     set(EXPORTED_FUNCTIONS
         "_malloc"
         "_free"
+        "_ml_get_sample_rate"
         "_ml_init"
         "_ml_load"
         "_ml_render"
