@@ -49,7 +49,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
 
       case 'load':
-        this._load(data.buffer, data.filenameHint);
+        this._load(data.buffer, data.filenameHint, data.subsong || 0);
         break;
 
       case 'addCompanionFile':
@@ -114,6 +114,33 @@ class UADEProcessor extends AudioWorkletProcessor {
       case 'scanSubsong':
         this._scanSubsong(data.subsong);
         break;
+
+      case 'isolateChannel':
+        this._scanInstrumentIsolated(data.channelIndex, data.durationMs || 2000);
+        break;
+
+      case 'setInstrumentSample': {
+        if (!this._wasm || !this._ready) {
+          console.warn('[UADE.worklet] setInstrumentSample called before WASM ready — ignoring');
+          break;
+        }
+        if (!this._wasm._uade_wasm_write_memory) {
+          console.warn('[UADE.worklet] _uade_wasm_write_memory not available in this WASM build');
+          break;
+        }
+        const { samplePtr, pcmData } = data;
+        const bytes = new Uint8Array(pcmData);
+        const buf = this._wasm._malloc(bytes.byteLength);
+        if (!buf) {
+          console.error('[UADE.worklet] malloc failed for sample write-back (' + bytes.byteLength + ' bytes)');
+          break;
+        }
+        this._wasm.HEAPU8.set(bytes, buf);
+        this._wasm._uade_wasm_write_memory(samplePtr, buf, bytes.byteLength);
+        this._wasm._free(buf);
+        console.log('[UADE.worklet] Wrote ' + bytes.byteLength + ' bytes to chip RAM @ 0x' + samplePtr.toString(16));
+        break;
+      }
     }
   }
 
@@ -326,7 +353,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     return ret;
   }
 
-  _load(buffer, filenameHint) {
+  _load(buffer, filenameHint, subsongIndex = 0) {
     if (!this._wasm || !this._ready) {
       this.port.postMessage({ type: 'error', message: 'WASM not ready' });
       return;
@@ -368,7 +395,7 @@ class UADEProcessor extends AudioWorkletProcessor {
       // Fast-scan the entire song to extract pattern data before playback
       console.log('[UADE.worklet] Starting song scan...');
       const scanStart = performance.now();
-      const scanResult = this._scanSong();
+      const scanResult = this._scanSong(subsongIndex);
       const isEnhanced = scanResult && scanResult.isEnhanced;
       const scanData = isEnhanced ? scanResult.rows : scanResult;
       const scanDuration = Math.round(performance.now() - scanStart);
@@ -430,10 +457,10 @@ class UADEProcessor extends AudioWorkletProcessor {
    * Captures Paula channel state at regular row intervals (~5292 frames at 125BPM/speed 6).
    * Returns array of rows, each containing 4 channels of {period, volume, samplePtr}.
    */
-  _scanSong() {
+  _scanSong(subsongIndex = 0) {
     // Try enhanced scan first; fall back to basic scan if new WASM exports aren't available
     if (typeof this._wasm._uade_wasm_get_channel_extended === 'function') {
-      return this._scanSongEnhanced();
+      return this._scanSongEnhanced(subsongIndex);
     }
     return this._scanSongBasic();
   }
@@ -518,7 +545,12 @@ class UADEProcessor extends AudioWorkletProcessor {
    *   samples: { [samplePtr]: { pcm: Uint8Array, length, loopStart, loopLength, typicalPeriod } }
    *   tempoChanges: [{ row, bpm, speed }]
    */
-  _scanSongEnhanced() {
+  _scanSongEnhanced(subsongIndex = 0) {
+    // Seek to the requested subsong before scanning
+    if (subsongIndex > 0) {
+      this._wasm._uade_wasm_set_subsong(subsongIndex);
+    }
+
     const CHUNK = 128;  // Smaller chunks = higher tick resolution
     const MAX_SECONDS = 600;
     const sr = sampleRate || 44100;
@@ -1036,12 +1068,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         return;
       }
 
-      // Seek to the requested subsong before scanning
-      if (subsong > 0) {
-        this._wasm._uade_wasm_set_subsong(subsong);
-      }
-
-      const scanResult = this._scanSongEnhanced();
+      const scanResult = this._scanSongEnhanced(subsong);
 
       // Reload for playback (scan consumed the WASM state)
       this._wasm._uade_wasm_stop();
@@ -1066,6 +1093,105 @@ class UADEProcessor extends AudioWorkletProcessor {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.port.postMessage({ type: 'subsongScanError', subsong, message: msg });
+    }
+  }
+
+  /**
+   * Render a single Paula channel in isolation.
+   *
+   * channelIndex: 0-3 (Paula channel to isolate)
+   * durationMs: how many milliseconds of audio to render
+   *
+   * Reloads the song, mutes all other channels, renders durationMs of audio,
+   * resets the mute mask, reloads for playback, then posts a message:
+   *   { type: 'instrumentIsolated', channelIndex, pcm: Float32Array }
+   *
+   * Paula channel routing: Ch0→Left, Ch3→Left; Ch1→Right, Ch2→Right.
+   * Returns the contributing output buffer (L for Ch0/Ch3, R for Ch1/Ch2).
+   */
+  _scanInstrumentIsolated(channelIndex, durationMs) {
+    if (!this._wasm || !this._ready) {
+      this.port.postMessage({ type: 'instrumentIsolatedError', channelIndex, message: 'WASM not ready' });
+      return;
+    }
+    if (!this._lastData || !this._lastHint) {
+      this.port.postMessage({ type: 'instrumentIsolatedError', channelIndex, message: 'No file loaded' });
+      return;
+    }
+    if (channelIndex < 0 || channelIndex > 3) {
+      this.port.postMessage({ type: 'instrumentIsolatedError', channelIndex, message: 'Invalid channel index' });
+      return;
+    }
+
+    try {
+      // Reload so we start from the beginning
+      this._wasm._uade_wasm_stop();
+      const ret = this._loadIntoWasm(this._lastData, this._lastHint);
+      if (ret !== 0) {
+        this.port.postMessage({ type: 'instrumentIsolatedError', channelIndex, message: 'Reload failed (ret=' + ret + ')' });
+        return;
+      }
+
+      const sr = sampleRate || 44100;
+      const totalFrames = Math.ceil((durationMs / 1000) * sr);
+      const CHUNK = 4096;
+
+      // Mute all channels except channelIndex
+      const muteMask = (1 << channelIndex) & 0x0F;
+      this._wasm._uade_wasm_mute_channels(muteMask);
+
+      // Allocate render buffers
+      const tmpL = this._wasm._malloc(CHUNK * 4);
+      const tmpR = this._wasm._malloc(CHUNK * 4);
+
+      // Ch0 and Ch3 → Left; Ch1 and Ch2 → Right
+      const useRight = (channelIndex === 1 || channelIndex === 2);
+
+      const pcm = new Float32Array(totalFrames);
+      let framesWritten = 0;
+
+      this._wasm._uade_wasm_set_looping(0);
+
+      while (framesWritten < totalFrames) {
+        const chunk = Math.min(CHUNK, totalFrames - framesWritten);
+        const renderRet = this._wasm._uade_wasm_render(tmpL, tmpR, chunk);
+        if (renderRet <= 0) break;
+
+        const src = useRight
+          ? new Float32Array(this._wasm.HEAPU8.buffer, tmpR, chunk)
+          : new Float32Array(this._wasm.HEAPU8.buffer, tmpL, chunk);
+
+        pcm.set(src, framesWritten);
+        framesWritten += chunk;
+      }
+
+      this._wasm._free(tmpL);
+      this._wasm._free(tmpR);
+
+      // Reset mute mask — all channels active
+      this._wasm._uade_wasm_mute_channels(0x0F);
+
+      // Reload for normal playback
+      this._wasm._uade_wasm_stop();
+      const ret2 = this._loadIntoWasm(this._lastData, this._lastHint);
+      if (ret2 !== 0) {
+        console.warn('[UADE.worklet] Post-isolate reload failed (ret=' + ret2 + ')');
+      }
+      this._playing = false;
+
+      this.port.postMessage({
+        type: 'instrumentIsolated',
+        channelIndex,
+        pcm: pcm.buffer,
+        sampleRate: sr,
+        framesWritten,
+      }, [pcm.buffer]);
+
+    } catch (err) {
+      // Ensure mute mask is always reset on error
+      if (this._wasm) this._wasm._uade_wasm_mute_channels(0x0F);
+      const msg = err instanceof Error ? err.message : String(err);
+      this.port.postMessage({ type: 'instrumentIsolatedError', channelIndex, message: msg });
     }
   }
 

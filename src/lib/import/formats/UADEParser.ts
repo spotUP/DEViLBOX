@@ -390,8 +390,56 @@ export async function parseUADEFile(
     'dmu', 'dmu2', 'mug', 'mug2',             // Digital Mugician variants
   ]);
   if (mode === 'enhanced' && SYNTHESIS_FORMATS.has(ext)) {
-    console.warn(`[UADEParser] ${ext.toUpperCase()} uses synthesis waveforms; using classic mode for accurate playback`);
-    return buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+    console.warn(`[UADEParser] ${ext.toUpperCase()} uses synthesis waveforms; running per-channel isolated renders`);
+    const classicSong = buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+
+    // Render each Paula channel in isolation so users get real waveforms for the
+    // Sampler editor, even though these formats synthesize everything via 68k code.
+    // Paula routing: Ch0→Left, Ch3→Left; Ch1→Right, Ch2→Right.
+    const channelLabels = ['Ch0 (L)', 'Ch1 (R)', 'Ch2 (R)', 'Ch3 (L)'];
+    const DURATION_MS = 2000;
+    try {
+      const renders = await Promise.allSettled([
+        engine.isolateChannel(0, DURATION_MS),
+        engine.isolateChannel(1, DURATION_MS),
+        engine.isolateChannel(2, DURATION_MS),
+        engine.isolateChannel(3, DURATION_MS),
+      ]);
+
+      let nextId = Math.max(...classicSong.instruments.map(i => i.id), 0) + 1;
+
+      for (let ch = 0; ch < 4; ch++) {
+        const result = renders[ch];
+        if (result.status !== 'fulfilled') {
+          console.warn(`[UADEParser] ${ext.toUpperCase()} channel ${ch} isolate render failed:`, (result as PromiseRejectedResult).reason);
+          continue;
+        }
+        const { pcm: pcmBuf, sampleRate: sr, framesWritten } = result.value;
+        if (!framesWritten) continue;
+
+        // Convert Float32 [-1,1] → 8-bit signed Amiga PCM (stored as Uint8, sign bit intact)
+        const f32 = new Float32Array(pcmBuf, 0, framesWritten);
+        const pcm8 = new Uint8Array(framesWritten);
+        for (let i = 0; i < framesWritten; i++) {
+          const s8 = Math.round(Math.max(-1, Math.min(1, f32[i])) * 127);
+          pcm8[i] = s8 < 0 ? s8 + 256 : s8;
+        }
+
+        classicSong.instruments.push(createSamplerInstrument(
+          nextId++,
+          `${ext.toUpperCase()} ${channelLabels[ch]}`,
+          pcm8,
+          64,  // full volume
+          sr,
+          0,   // no loop
+          0,
+        ));
+      }
+    } catch (err) {
+      console.warn('[UADEParser] Isolated channel renders failed:', err);
+    }
+
+    return classicSong;
   }
   // For .fc files, distinguish FC 1.x (synthesis: FC13/FC14/SMOD magic) from FC 2.0 (real PCM).
   if (mode === 'enhanced' && ext === 'fc') {
@@ -456,6 +504,53 @@ function tryExtractInstrumentNames(buffer: ArrayBuffer, ext: string): string[] |
   if (buffer.byteLength < 64) return null;
   const bytes = new Uint8Array(buffer);
   const view  = new DataView(buffer);
+
+  /* ── Richard Joseph Player (.rjp, .rj) ───────────────────────────────── */
+  // The RJP format stores NO instrument names in the SNG file.
+  // Sample descriptors are 32 bytes of pointers, loop offsets, and lengths —
+  // no name field exists (confirmed by Richard Joseph Player_v2.asm: SampleInit
+  // sets EPS_Adr, EPS_Length, EPS_Volume, EPS_Type, EPS_Flags, never EPS_Name).
+  // Return null here to prevent the generic 22-byte scanner below from
+  // misidentifying pointer data as ASCII name blocks.
+  if (ext === 'rjp' || ext === 'rj') return null;
+
+  /* ── Jason Page (.jpn, .jp, .jpnd) ───────────────────────────────────── */
+  // Jason Page modules are compiled 68k executables.  There is no static
+  // instrument name table — only PCM sample pointers embedded in player code.
+  // Return null to prevent the generic scanner from misidentifying instruction
+  // data as ASCII name blocks.
+  if (ext === 'jpn' || ext === 'jp' || ext === 'jpnd') return null;
+
+  /* ── Dave Lowe (.dl) ─────────────────────────────────────────────────── */
+  // Dave Lowe modules are compiled 68k executables with no instrument name
+  // table.  Return null so the generic scanner does not produce false positives.
+  if (ext === 'dl') return null;
+
+  /* ── Ben Daglish (.bd) ───────────────────────────────────────────────── */
+  // Ben Daglish modules are compiled 68k executables with no instrument name
+  // table.  Return null to prevent false positives from the generic scanner.
+  if (ext === 'bd') return null;
+
+  /* ── Wally Beben (.wb) ───────────────────────────────────────────────── */
+  // Wally Beben modules are compiled 68k executables with no instrument name
+  // table.  Return null to prevent false positives from the generic scanner.
+  if (ext === 'wb') return null;
+
+  /* ── Jason Brooke (.jb, .jcb, .jcbo) ────────────────────────────────── */
+  // Jason Brooke modules are compiled 68k executables with no instrument name
+  // table.  Return null to prevent false positives from the generic scanner.
+  if (ext === 'jb' || ext === 'jcb' || ext === 'jcbo') return null;
+
+  /* ── Jeroen Tel (.jt, .mon_old) ──────────────────────────────────────── */
+  // Jeroen Tel modules are compiled 68k executables.  The instrument count is
+  // extracted from a known binary offset but instrument names do not exist.
+  // Return null to prevent the generic scanner from producing false positives.
+  if (ext === 'jt' || ext === 'mon_old') return null;
+
+  /* ── Mark Cooksey (.mc, .mcr, .mco) ─────────────────────────────────── */
+  // Mark Cooksey modules are compiled 68k executables with no instrument name
+  // table.  Return null to prevent false positives from the generic scanner.
+  if (ext === 'mc' || ext === 'mcr' || ext === 'mco') return null;
 
   /* ── Delta Music 2 (.dm2) ─────────────────────────────────────────────── */
   if (ext === 'dm2' || ext === 'dm') {

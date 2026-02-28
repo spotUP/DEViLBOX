@@ -27,6 +27,9 @@ describe('isJasonBrookeFormat', () => {
   it('rejects zeroed buffer', () => {
     expect(isJasonBrookeFormat(new ArrayBuffer(64))).toBe(false);
   });
+  it('rejects a buffer that is too short', () => {
+    expect(isJasonBrookeFormat(new ArrayBuffer(8))).toBe(false);
+  });
 });
 
 describe('parseJasonBrookeFile — 1943.jb', () => {
@@ -40,6 +43,23 @@ describe('parseJasonBrookeFile — 1943.jb', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
+
+  it('creates 1 placeholder instrument (no names in format)', () => {
+    const song = parseJasonBrookeFile(loadBuf(FILE1), '1943.jb');
+    // Jason Brooke is a compiled 68k executable — single placeholder instrument
+    expect(song.instruments).toHaveLength(1);
+    expect(song.instruments[0].name).toBe('Sample 1');
+  });
+
+  it('has 4 channels', () => {
+    const song = parseJasonBrookeFile(loadBuf(FILE1), '1943.jb');
+    expect(song.numChannels).toBe(4);
+  });
+
+  it('derives module name from filename', () => {
+    const song = parseJasonBrookeFile(loadBuf(FILE1), '1943.jb');
+    expect(song.name).toContain('1943');
+  });
 });
 
 describe('parseJasonBrookeFile — afterburner ii.jb', () => {
@@ -52,5 +72,10 @@ describe('parseJasonBrookeFile — afterburner ii.jb', () => {
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
+  });
+
+  it('creates 1 placeholder instrument', () => {
+    const song = parseJasonBrookeFile(loadBuf(FILE2), 'afterburner ii.jb');
+    expect(song.instruments).toHaveLength(1);
   });
 });
