@@ -1747,50 +1747,40 @@ type JudgmentResult =
   | { action: 'replay' };
 
 /**
- * Shows judgment buttons in the given container and returns a promise that
- * resolves when the user makes a choice (OK / Not OK / Play Again).
+ * Shows judgment buttons in the fixed overlay panel (#judgment-panel) and
+ * returns a promise that resolves when the user makes a choice.
  */
-function waitForUserJudgment(
-  name: string,
-  containerId: string,
-): Promise<JudgmentResult> {
+function waitForUserJudgment(name: string): Promise<JudgmentResult> {
   return new Promise((resolve) => {
-    const container = document.getElementById(containerId);
-    if (!container) { resolve({ action: 'ok' }); return; }
+    const panel = document.getElementById('judgment-panel');
+    if (!panel) { resolve({ action: 'ok' }); return; }
 
-    container.innerHTML = `
-      <div class="judgment-area">
-        <span>How does <strong>${name}</strong> sound?</span>
-        <button class="judge-ok">✅ Sounds OK</button>
-        <button class="judge-notok">❌ Not OK</button>
-        <button class="judge-replay">🔄 Play Again</button>
-      </div>
+    panel.innerHTML = `
+      <span style="color:#eee; margin-right:4px;">How does <strong style="color:#00ff88">${name}</strong> sound?</span>
+      <button class="judge-ok">✅ Sounds OK</button>
+      <button class="judge-notok">❌ Not OK</button>
+      <button class="judge-replay">🔄 Play Again</button>
     `;
+    panel.className = 'visible';
 
-    // Scroll buttons into view so user doesn't have to hunt for them
-    container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const okBtn     = panel.querySelector('.judge-ok') as HTMLButtonElement | null;
+    const notOkBtn  = panel.querySelector('.judge-notok') as HTMLButtonElement | null;
+    const replayBtn = panel.querySelector('.judge-replay') as HTMLButtonElement | null;
 
-    const okBtn    = container.querySelector('.judge-ok') as HTMLButtonElement | null;
-    const notOkBtn = container.querySelector('.judge-notok') as HTMLButtonElement | null;
-    const replayBtn = container.querySelector('.judge-replay') as HTMLButtonElement | null;
-
-    const cleanup = () => { container.innerHTML = ''; };
+    const cleanup = () => { panel.className = ''; panel.innerHTML = ''; };
 
     okBtn?.addEventListener('click', () => { cleanup(); resolve({ action: 'ok' }); });
     replayBtn?.addEventListener('click', () => { cleanup(); resolve({ action: 'replay' }); });
 
     notOkBtn?.addEventListener('click', () => {
-      container.innerHTML = `
-        <div class="judgment-area">
-          <div class="reason-input">
-            <span>What's wrong with <strong>${name}</strong>?</span>
-            <input type="text" class="reason-text" placeholder="What's wrong with it?">
-            <button class="judge-confirm">Submit</button>
-          </div>
-        </div>
+      panel.innerHTML = `
+        <span style="color:#eee">What's wrong with <strong style="color:#00ff88">${name}</strong>?</span>
+        <input type="text" class="reason-text" placeholder="What's wrong with it?">
+        <button class="judge-confirm">Submit</button>
       `;
-      const input      = container.querySelector('.reason-text') as HTMLInputElement | null;
-      const confirmBtn = container.querySelector('.judge-confirm') as HTMLButtonElement | null;
+      const input      = panel.querySelector('.reason-text') as HTMLInputElement | null;
+      const confirmBtn = panel.querySelector('.judge-confirm') as HTMLButtonElement | null;
+      input?.focus();
 
       const submit = () => {
         const reason = input?.value?.trim() || 'broken';
@@ -1996,11 +1986,8 @@ async function testVolumeInteractive() {
         } catch (err) { console.warn('[Test] UADESynth: failed to load song', err); }
       }
 
-      // Show "playing" indicator row and scroll it into view
+      // Show "playing" indicator row
       logHtml(`<tr id="irow-${name}"><td>${name}</td><td colspan="3" class="info">▶ Playing...</td></tr>`);
-      document.getElementById(`irow-${name}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      const judgmentContainerId = `judgment-${name}`;
-      logHtml(`<div id="${judgmentContainerId}"></div>`);
 
       let peakDb = -Infinity;
       let judgment: JudgmentResult = { action: 'ok' };
@@ -2008,13 +1995,9 @@ async function testVolumeInteractive() {
       // Play/judge loop — supports "Play Again"
       while (true) {
         peakDb = await playPhraseOnce(name, synthObj, furnaceNativeMeter, meter);
-        judgment = await waitForUserJudgment(name, judgmentContainerId);
+        judgment = await waitForUserJudgment(name);
         if (judgment.action !== 'replay') break;
       }
-
-      // Clean up judgment container
-      const jc = document.getElementById(judgmentContainerId);
-      if (jc) jc.remove();
 
       // Calculate status text for the audio column
       let statusClass = 'pass';
