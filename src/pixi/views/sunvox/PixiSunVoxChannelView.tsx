@@ -294,7 +294,7 @@ export const PixiSunVoxChannelView: React.FC<PixiSunVoxChannelViewProps> = ({
       />
 
       {/* Main content — always mounted; hidden when no channel */}
-      <pixiContainer visible={hasChannel} layout={{ width, height, flexDirection: 'column' }}>
+      <pixiContainer alpha={hasChannel ? 1 : 0} renderable={hasChannel} eventMode={hasChannel ? 'static' : 'none'} layout={{ width, height, flexDirection: 'column' }}>
 
         {/* ── Transport / title bar ─────────────────────────────────────── */}
         <pixiContainer layout={{ width, height: TRANSPORT_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, gap: 8 }}>

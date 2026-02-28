@@ -19,6 +19,7 @@ interface PixiDropdownPanelProps {
   onSelect: (value: string) => void;
   onClose: () => void;
   width: number;
+  visible?: boolean;
   maxItems?: number;
   itemHeight?: number;
   layout?: Record<string, unknown>;
@@ -32,6 +33,7 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
   onSelect,
   onClose,
   width,
+  visible = true,
   maxItems = 12,
   itemHeight = ITEM_H,
   layout: layoutProp,
@@ -42,12 +44,13 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
   const visibleCount = Math.min(options.length, maxItems);
   const panelH = visibleCount * itemHeight + PANEL_PADDING * 2;
 
-  // Close on outside click
+  // Close on outside click — only listen when the panel is actually open
   useEffect(() => {
+    if (!visible) return;
     const handler = () => onClose();
     document.addEventListener('pointerdown', handler, { capture: true });
     return () => document.removeEventListener('pointerdown', handler, true);
-  }, [onClose]);
+  }, [onClose, visible]);
 
   const drawPanel = useCallback((g: GraphicsType) => {
     g.clear();
@@ -59,6 +62,11 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
 
   return (
     <pixiContainer
+      // Use alpha+renderable instead of visible — @pixi/layout detaches Yoga nodes
+      // when visible=false, causing BindingErrors on re-show. alpha/renderable are
+      // not intercepted by the layout system so Yoga stays intact.
+      alpha={visible ? 1 : 0}
+      renderable={visible}
       zIndex={200}
       layout={{
         position: 'absolute',
@@ -69,7 +77,7 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
         gap: 0,
         ...layoutProp,
       }}
-      eventMode="static"
+      eventMode={visible ? 'static' : 'none'}
       onPointerDown={(e: FederatedPointerEvent) => e.stopPropagation()}
     >
       <pixiGraphics
@@ -169,15 +177,14 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
         tint={theme.textMuted.color}
         layout={{ position: 'absolute', left: width - 14, top: (height - 10) / 2 }}
       />
-      {open && (
-        <PixiDropdownPanel
-          options={options}
-          onSelect={onChange}
-          onClose={() => setOpen(false)}
-          width={Math.max(width, 160)}
-          layout={{ position: 'absolute', top: height + 2 }}
-        />
-      )}
+      <PixiDropdownPanel
+        visible={open}
+        options={options}
+        onSelect={onChange}
+        onClose={() => setOpen(false)}
+        width={Math.max(width, 160)}
+        layout={{ position: 'absolute', top: height + 2 }}
+      />
     </pixiContainer>
   );
 };
