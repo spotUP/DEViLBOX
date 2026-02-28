@@ -1076,9 +1076,9 @@ function buildEnhancedSong(
       pan: (chIdx === 0 || chIdx === 3) ? -50 : 50,
       instrumentId: null,
       color: null,
-      rows: Array.from({ length: ROWS_PER_PATTERN }, (_, rowIdx) => {
+      rows: Array.from({ length: rowEnd - rowStart }, (_, rowIdx) => {
         const scanIdx = rowStart + rowIdx;
-        if (scanIdx >= rowEnd || scanIdx >= scanRows.length) {
+        if (scanIdx >= scanRows.length) {
           return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
         }
 
@@ -1152,7 +1152,7 @@ function buildEnhancedSong(
     patterns.push({
       id: `pattern-${pat}`,
       name: pat === 0 ? 'Song' : `Pattern ${pat}`,
-      length: ROWS_PER_PATTERN,
+      length: rowEnd - rowStart,
       channels,
       importMetadata: {
         sourceFormat: 'MOD',
@@ -1270,9 +1270,9 @@ function buildClassicSong(
       pan: (chIdx === 0 || chIdx === 3) ? -50 : 50,
       instrumentId: null,
       color: null,
-      rows: Array.from({ length: ROWS_PER_PATTERN }, (_, rowIdx) => {
+      rows: Array.from({ length: rowEnd - rowStart }, (_, rowIdx) => {
         const scanIdx = rowStart + rowIdx;
-        if (scanIdx >= rowEnd || scanIdx >= scanRows.length) {
+        if (scanIdx >= scanRows.length) {
           return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
         }
 
@@ -1303,7 +1303,7 @@ function buildClassicSong(
     patterns.push({
       id: `pattern-${pat}`,
       name: pat === 0 ? 'Song' : `Pattern ${pat}`,
-      length: ROWS_PER_PATTERN,
+      length: rowEnd - rowStart,
       channels,
       importMetadata: {
         sourceFormat: 'UADE',
