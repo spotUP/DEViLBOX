@@ -519,7 +519,9 @@ export const PixiFT2Toolbar: React.FC = () => {
         >
           {!compactToolbar && (
             <>
-              {/* PAT/AUTO toggles above visualizer */}
+              {/* Visualizer rendered first — PAT/AUTO buttons go on top in Pixi's compositor */}
+              <PixiVisualizer width={VIZ_WIDTH} height={TRANSPORT_ROW_H * 2} />
+              {/* PAT/AUTO toggles overlay — must come after PixiVisualizer in tree so they render on top */}
               <pixiContainer
                 layout={{
                   position: 'absolute',
@@ -546,7 +548,6 @@ export const PixiFT2Toolbar: React.FC = () => {
                   onClick={handleToggleAutomation}
                 />
               </pixiContainer>
-              <PixiVisualizer width={VIZ_WIDTH} height={TRANSPORT_ROW_H * 2} />
             </>
           )}
         </pixiContainer>
