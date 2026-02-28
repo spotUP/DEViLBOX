@@ -397,7 +397,8 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
       {/* Error overlay — always mounted; shown only when no instrument.
           position: 'absolute' keeps it out of the flex layout flow. */}
       <pixiBitmapText
-        visible={!hasInstrument}
+        alpha={!hasInstrument ? 1 : 0}
+        renderable={!hasInstrument}
         text={hasInstrument ? '' : `No instrument on Ch ${channelIndex + 1}`}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
         tint={theme.error.color}
