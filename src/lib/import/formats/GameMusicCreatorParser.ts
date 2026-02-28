@@ -39,7 +39,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { Pattern, ChannelData, TrackerCell, InstrumentConfig, UADEChipRamInfo } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
@@ -322,7 +322,14 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
     const name = `Sample ${id}`;
 
     if (hdr.lengthBytes === 0 || hdr.offset === 0 || hdr.offset >= bytes.byteLength) {
-      // Empty/silent placeholder
+      // Empty/silent placeholder — header slot still exists in chip RAM
+      const emptyChipRam: UADEChipRamInfo = {
+        moduleBase: 0,
+        moduleSize: bytes.byteLength,
+        instrBase: s * SAMPLE_HDR_SIZE,
+        instrSize: SAMPLE_HDR_SIZE,
+        sections: { sampleHeaders: 0 },
+      };
       instruments.push({
         id,
         name,
@@ -331,6 +338,7 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
         effects: [],
         volume: 0,
         pan: 0,
+        uadeChipRam: emptyChipRam,
       } as unknown as InstrumentConfig);
       continue;
     }
@@ -348,17 +356,24 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
       loopEnd   = hdr.lengthBytes;
     }
 
-    instruments.push(
-      createSamplerInstrument(
-        id,
-        name,
-        pcm,
-        hdr.volume,      // volume 0-64
-        8287,            // Amiga C-3 sample rate
-        loopStart,
-        loopEnd,
-      ),
+    const chipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: bytes.byteLength,
+      instrBase: s * SAMPLE_HDR_SIZE,
+      instrSize: SAMPLE_HDR_SIZE,
+      sections: { sampleHeaders: 0 },
+    };
+    const instr = createSamplerInstrument(
+      id,
+      name,
+      pcm,
+      hdr.volume,      // volume 0-64
+      8287,            // Amiga C-3 sample rate
+      loopStart,
+      loopEnd,
     );
+    instr.uadeChipRam = chipRam;
+    instruments.push(instr);
   }
 
   // ── Build TrackerSong patterns ─────────────────────────────────────────────
