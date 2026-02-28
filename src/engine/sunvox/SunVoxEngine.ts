@@ -47,6 +47,7 @@ export class SunVoxEngine {
 
   private _initPromise: Promise<void>;
   private _resolveInit: (() => void) | null = null;
+  private _rejectInit: ((err: Error) => void) | null = null;
   private _disposed = false;
 
   // Promise queues for async responses — keyed by "type:handle" or just "type"
@@ -62,8 +63,9 @@ export class SunVoxEngine {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
 
-    this._initPromise = new Promise<void>((resolve) => {
+    this._initPromise = new Promise<void>((resolve, reject) => {
       this._resolveInit = resolve;
+      this._rejectInit = reject;
     });
 
     this.initialize();
@@ -187,6 +189,7 @@ export class SunVoxEngine {
         if (this._resolveInit) {
           this._resolveInit();
           this._resolveInit = null;
+          this._rejectInit = null;
         }
         break;
 
@@ -252,11 +255,19 @@ export class SunVoxEngine {
         break;
       }
 
-      case 'error':
+      case 'error': {
+        const err = new Error(data.message ?? 'SunVox worklet error');
         console.error('[SunVoxEngine]', data.message);
-        // Reject any pending resolvers that may be waiting
-        this._rejectAll(new Error(data.message ?? 'SunVox worklet error'));
+        // Reject _initPromise if still pending
+        if (this._rejectInit) {
+          this._rejectInit(err);
+          this._rejectInit = null;
+          this._resolveInit = null;
+        }
+        // Reject any other pending resolvers
+        this._rejectAll(err);
         break;
+      }
     }
   }
 
