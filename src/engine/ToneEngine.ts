@@ -583,8 +583,21 @@ export class ToneEngine {
    * This method resumes the context (which starts suspended until user gesture).
    */
   public async init(): Promise<void> {
-    if (Tone.getContext().state === 'suspended') {
+    const nativeCtx = this._nativeContext!;
+
+    // Resume if EITHER Tone.js or the native AudioContext is not running.
+    // Tone.js can cache a stale 'running' state after the browser auto-suspends
+    // the context (30s silence, page focus lost, etc.), so we check both.
+    if (Tone.getContext().state === 'suspended' || nativeCtx.state !== 'running') {
       await Tone.start();
+      // Belt-and-suspenders: also resume native context directly in case
+      // Tone.start() didn't catch the stale-state scenario.
+      if (nativeCtx.state !== 'running') {
+        await nativeCtx.resume().catch(() => {
+          // resume() requires a user gesture — safe to swallow here since
+          // init() is always called from user-gesture handlers.
+        });
+      }
     }
 
     // Configure Transport for rock-solid audio scheduling
@@ -593,8 +606,6 @@ export class ToneEngine {
     Tone.getTransport().bpm.value = 125; // Default BPM
 
     // Wait for context to actually be running
-    const nativeCtx = this._nativeContext!;
-    
     if (nativeCtx.state !== 'running') {
       await new Promise<void>((resolve) => {
         const checkState = () => {
@@ -730,6 +741,35 @@ export class ToneEngine {
    */
   public getContextState(): AudioContextState {
     return Tone.getContext().state;
+  }
+
+  /**
+   * Returns true only when BOTH the Tone.js wrapper AND the native AudioContext
+   * report 'running'. Tone.js can cache a stale 'running' state after the browser
+   * auto-suspends the context (e.g. after 30s of silence), so checking both is
+   * required to avoid false positives.
+   */
+  public isContextActuallyRunning(): boolean {
+    return (
+      Tone.getContext().state === 'running' &&
+      (this._nativeContext?.state ?? 'suspended') === 'running'
+    );
+  }
+
+  /**
+   * Synchronously fire-and-forget resume attempt, for use within iOS user gesture handlers.
+   *
+   * iOS requires AudioContext.resume() to be called synchronously within the gesture event
+   * (or in a microtask directly chained from it). Calling it later via await breaks the
+   * gesture chain on iOS < 14.5. This method must be called synchronously — before any
+   * await — inside a touchstart/mousedown/keydown handler.
+   *
+   * Safe to call on every key press: it's a no-op when the context is already running.
+   */
+  public syncResume(): void {
+    if (this._nativeContext?.state !== 'running') {
+      void this._nativeContext?.resume().catch(() => {});
+    }
   }
 
   /**
@@ -1298,10 +1338,14 @@ export class ToneEngine {
    * Ensures each returned time is strictly greater than the previous one
    */
   private getSafeTime(time?: number): number | null {
-    // Check if audio context is running
-    if (Tone.context.state !== 'running') {
-      // Log the actual state to help diagnose why it's not running
-      console.warn(`[ToneEngine] getSafeTime: context state is '${Tone.context.state}', not 'running'`);
+    // Check if audio context is running — use isContextActuallyRunning() which checks BOTH
+    // the Tone.js wrapper state AND the native AudioContext state. Tone.js can cache a stale
+    // 'running' state after the browser auto-suspends the context (silence timeout, tab focus),
+    // causing getSafeTime to return valid times even when audio is actually suspended.
+    if (!this.isContextActuallyRunning()) {
+      const toneState = Tone.context.state;
+      const nativeState = this._nativeContext?.state ?? 'unknown';
+      console.warn(`[ToneEngine] getSafeTime: context not ready (Tone: '${toneState}', native: '${nativeState}')`);
       return null;
     }
 
@@ -1363,6 +1407,9 @@ export class ToneEngine {
     const key = isSharedType
       ? this.getInstrumentKey(instrumentId, -1)  // Use shared instance
       : this.getInstrumentKey(instrumentId, channelIndex);
+    if (config.synthType === 'SuperCollider') {
+      console.log('[SC:ToneEngine] getInstrument — id:', instrumentId, 'channelIndex:', channelIndex, 'isSharedType:', isSharedType, 'key:', key, 'hasCached:', this.instruments.has(key));
+    }
 
     // Check if instrument already exists for this channel
     if (this.instruments.has(key)) {
@@ -2026,7 +2073,14 @@ export class ToneEngine {
 
       default: {
         // Check VSTBridge registry and new SynthRegistry for dynamically registered synths
-        if (SYNTH_REGISTRY.has(config.synthType || '') || SynthRegistry.knows(config.synthType || '')) {
+        const synthTypeStr = config.synthType || '';
+        if (config.synthType === 'SuperCollider') {
+          console.log('[SC:ToneEngine] getInstrument default case — synthType:', config.synthType, 'SYNTH_REGISTRY.has:', SYNTH_REGISTRY.has(synthTypeStr), 'SynthRegistry.knows:', SynthRegistry.knows(synthTypeStr));
+        }
+        if (SYNTH_REGISTRY.has(synthTypeStr) || SynthRegistry.knows(synthTypeStr)) {
+          if (config.synthType === 'SuperCollider') {
+            console.log('[SC:ToneEngine] creating SuperColliderSynth via InstrumentFactory...');
+          }
           instrument = InstrumentFactory.createInstrument(config);
           break;
         }
@@ -2392,21 +2446,41 @@ export class ToneEngine {
     channelIndex?: number,
     hammer?: boolean
   ): void {
+    if (config.synthType === 'SuperCollider') {
+      console.log('[SC:ToneEngine] triggerNoteAttack called — id:', instrumentId, 'note:', note, 'channelIndex:', channelIndex);
+    }
     const instrument = this.getInstrument(instrumentId, config, channelIndex);
 
     if (!instrument) {
+      if (config.synthType === 'SuperCollider') {
+        console.warn('[SC:ToneEngine] triggerNoteAttack: getInstrument returned null!');
+      }
       return;
+    }
+
+    // Sync the latest config into cached SC instances. The cached synth may have
+    // been created with a stale (empty) config if the React prop hadn't updated yet
+    // when the instance was first created. updateConfig() only reloads the binary
+    // when it actually changes, so this is safe to call on every note trigger.
+    if (config.synthType === 'SuperCollider' && config.superCollider) {
+      (instrument as { updateConfig?: (c: typeof config.superCollider) => void })
+        .updateConfig?.(config.superCollider);
     }
 
     // Check if instrument can play - allow triggerAttack (synths) or start (Players)
     const canPlay = (instrument as any).triggerAttack || (instrument as any).start;
     if (!canPlay) {
+      if (config.synthType === 'SuperCollider') {
+        console.warn('[SC:ToneEngine] triggerNoteAttack: instrument has no triggerAttack or start method!');
+      }
       return;
     }
 
-    // Get safe time for the attack
-    // If instrument is marked as "Live", always use immediate triggering to bypass lookahead
-    const safeTime = config.isLive ? this.getImmediateTime() : this.getSafeTime(time);
+    // Get safe time for the attack.
+    // isLive instruments (and SuperCollider which ignores the time param) always use immediate
+    // triggering to bypass the Tone.js lookahead buffer and the getSafeTime null-check.
+    const useImmediate = config.isLive || config.synthType === 'SuperCollider';
+    const safeTime = useImmediate ? this.getImmediateTime() : this.getSafeTime(time);
     if (safeTime === null) {
       return; // Audio context not ready
     }
@@ -2807,6 +2881,9 @@ export class ToneEngine {
     accent: boolean = false,
     slide: boolean = false
   ): void {
+    if (config.synthType === 'SuperCollider') {
+      console.log('[SC:ToneEngine] triggerPolyNoteAttack called — id:', instrumentId, 'note:', note, 'synthType:', config.synthType, 'binary:', config.superCollider?.binary ? `${config.superCollider.binary.length}b` : 'EMPTY');
+    }
     // Monophonic synths (enforced at runtime for safety, even if config.monophonic isn't set)
     // These synths are architecturally monophonic and will break with polyphonic note allocation
     const monoSynthTypes = new Set([
