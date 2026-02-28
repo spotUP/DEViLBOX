@@ -5,6 +5,8 @@ import { Play, CheckCircle, AlertCircle, Loader, Download, Upload } from 'lucide
 import type { SuperColliderConfig, SCParam } from '@typedefs/instrument';
 import { superColliderLanguage } from '@engine/sc/scLanguage';
 
+const API_URL = import.meta.env.VITE_API_URL as string | undefined ?? 'https://devilbox.uprough.net/api';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -160,7 +162,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
     const source = viewRef.current?.state.doc.toString() ?? configRef.current.source;
 
     try {
-      const res = await fetch('/api/sc/compile', {
+      const res = await fetch(`${API_URL}/sc/compile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source }),
