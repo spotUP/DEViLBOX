@@ -115,19 +115,34 @@ export function restorePanelSizes(): boolean {
   return true;
 }
 
+const PANEL_LABELS: Partial<Record<string, string>> = {
+  'tracker': 'Pattern Editor',
+  'pattern-list': 'Pattern List',
+  'instrument-editor': 'Instrument Editor',
+  'oscilloscope': 'Oscilloscope',
+  'automation': 'Automation',
+  'arrangement': 'Arrangement',
+};
+
 export function focusNextPanel(): boolean {
-  const { visiblePanels, activePanel, setActivePanel } = useUIStore.getState();
+  const { visiblePanels, activePanel, setActivePanel, setStatusMessage } = useUIStore.getState();
   const idx = visiblePanels.indexOf(activePanel);
   const next = visiblePanels[(idx + 1) % visiblePanels.length];
-  if (next) setActivePanel(next);
+  if (next) {
+    setActivePanel(next);
+    setStatusMessage(`Panel: ${PANEL_LABELS[next] ?? next}`, false, 1000);
+  }
   return true;
 }
 
 export function focusPrevPanel(): boolean {
-  const { visiblePanels, activePanel, setActivePanel } = useUIStore.getState();
+  const { visiblePanels, activePanel, setActivePanel, setStatusMessage } = useUIStore.getState();
   const idx = visiblePanels.indexOf(activePanel);
   const prev = visiblePanels[(idx - 1 + visiblePanels.length) % visiblePanels.length];
-  if (prev) setActivePanel(prev);
+  if (prev) {
+    setActivePanel(prev);
+    setStatusMessage(`Panel: ${PANEL_LABELS[prev] ?? prev}`, false, 1000);
+  }
   return true;
 }
 
