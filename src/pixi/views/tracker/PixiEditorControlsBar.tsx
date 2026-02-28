@@ -27,7 +27,7 @@ const BAR_H = 32;
 
 // ─── View Mode ───────────────────────────────────────────────────────────────
 
-type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad';
+type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj';
 
 export interface PixiEditorControlsBarProps {
   viewMode: ViewMode;
@@ -287,7 +287,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
     const v = val as ViewMode;
     // Defer to break cross-reconciler sync (DOM event → Pixi reconciler state)
     if (v === 'arrangement' || v === 'dj' || v === 'drumpad' || v === 'pianoroll' || v === 'vj') {
-      setTimeout(() => useUIStore.getState().setActiveView(v as Parameters<typeof useUIStore.getState>['0'] extends never ? never : any), 0);
+      setTimeout(() => useUIStore.getState().setActiveView(v as any), 0);
     } else {
       setTimeout(() => onViewModeChange(v), 0);
     }

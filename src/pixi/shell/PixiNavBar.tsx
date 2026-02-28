@@ -5,7 +5,7 @@
  * Row 2 (53px): PixiTabBar with project tabs
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -37,9 +37,6 @@ export const PixiNavBar: React.FC = () => {
 
   // Settings store
   const setRenderMode = useSettingsStore((s) => s.setRenderMode);
-
-  // Theme cycle button state
-  const [themeHovered, setThemeHovered] = useState(false);
 
   // Map ProjectTab[] → Tab[] (ProjectTab uses `name`, Tab expects `label`)
   const tabs: Tab[] = storeTabs.map((t) => ({

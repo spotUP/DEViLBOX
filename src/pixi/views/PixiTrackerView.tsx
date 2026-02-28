@@ -57,7 +57,7 @@ const TB303KnobPanelOverlay: React.FC<{ visible: boolean }> = ({ visible }) => {
   return <Comp />;
 };
 
-type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad';
+type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj';
 
 const PATTERN_PANEL_HEIGHT = 180;
 

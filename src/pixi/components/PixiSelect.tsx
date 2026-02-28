@@ -161,13 +161,13 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
         text={selectedLabel}
         style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
         tint={theme.textSecondary.color}
-        layout={{ position: 'absolute', x: 6, y: (height - 11) / 2 }}
+        layout={{ position: 'absolute', left: 6, top: (height - 11) / 2 }}
       />
       <pixiBitmapText
         text="▾"
         style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={{ position: 'absolute', x: width - 14, y: (height - 10) / 2 }}
+        layout={{ position: 'absolute', left: width - 14, top: (height - 10) / 2 }}
       />
       {open && (
         <PixiDropdownPanel

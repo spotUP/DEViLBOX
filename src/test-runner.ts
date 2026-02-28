@@ -8,8 +8,11 @@ import { InstrumentFactory } from './engine/InstrumentFactory';
 import type { InstrumentConfig } from './types/instrument';
 import {
   DEFAULT_FURNACE,
+  DEFAULT_SOUNDMON,
+  DEFAULT_SIDMON,
 } from './types/instrument';
 import type { EffectConfig } from './types/instrument';
+import { HivelyEngine } from './engine/hively/HivelyEngine';
 import { SAMPLE_PACKS } from './constants/samplePacks';
 import type { SampleCategory } from './types/samplePack';
 import { FurnaceChipEngine } from './engine/chips/FurnaceChipEngine';
@@ -31,6 +34,7 @@ interface TestRunnerWindow {
   runBehaviorTests: () => Promise<void>;
   runSamplePackTests: () => Promise<void>;
   runEffectTests: () => Promise<void>;
+  runInteractiveVolumeTests: () => Promise<void>;
 }
 
 declare const window: Window & TestRunnerWindow;
@@ -134,6 +138,100 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
   // === Modular Synthesis ===
   'ModularSynth': { synthType: 'ModularSynth', volume: -12 },
 
+  // === Tone.js Core Synths ===
+  'Synth':         { synthType: 'Synth', volume: -12 },
+  'MonoSynth':     { synthType: 'MonoSynth', volume: -12 },
+  'DuoSynth':      { synthType: 'DuoSynth', volume: -12 },
+  'FMSynth':       { synthType: 'FMSynth', volume: -12 },
+  'AMSynth':       { synthType: 'AMSynth', volume: -12 },
+  'PluckSynth':    { synthType: 'PluckSynth', volume: -12 },
+  'MetalSynth':    { synthType: 'MetalSynth', volume: -12 },
+  'MembraneSynth': { synthType: 'MembraneSynth', volume: -12 },
+  'NoiseSynth':    { synthType: 'NoiseSynth', volume: -12 },
+
+  // === Extended Tone.js Synths ===
+  'SuperSaw':      { synthType: 'SuperSaw', volume: -12 },
+  'PolySynth':     { synthType: 'PolySynth', volume: -12 },
+  'Organ':         { synthType: 'Organ', volume: -12 },
+  'ChipSynth':     { synthType: 'ChipSynth', volume: -12 },
+  'PWMSynth':      { synthType: 'PWMSynth', volume: -12 },
+  'StringMachine': { synthType: 'StringMachine', volume: -12 },
+  'FormantSynth':  { synthType: 'FormantSynth', volume: -12 },
+  'HarmonicSynth': { synthType: 'HarmonicSynth', volume: -12 },
+
+  // === TB-303 and Specialty ===
+  'TB303':      { synthType: 'TB303', volume: -12 },
+  'WobbleBass': { synthType: 'WobbleBass', volume: -12 },
+  'DubSiren':   { synthType: 'DubSiren', volume: -12 },
+  'SpaceLaser': { synthType: 'SpaceLaser', volume: -12 },
+  'Synare':     { synthType: 'Synare', volume: -12 },
+
+  // === Sample-based Synths ===
+  'Sampler': {
+    synthType: 'Sampler', volume: -12,
+    sample: {
+      url: '/data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
+      baseNote: 'C4', detune: 0, loop: false, loopStart: 0, loopEnd: 0,
+      playbackRate: 1, reverse: false,
+    },
+  },
+  'Player': {
+    synthType: 'Player', volume: -12,
+    parameters: { sampleUrl: '/data/samples/packs/drumnibus/kicks/BD_808A1200.wav' },
+    sample: {
+      url: '/data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
+      baseNote: 'C4', detune: 0, loop: false, loopStart: 0, loopEnd: 0,
+      playbackRate: 1, reverse: false,
+    },
+  },
+  'GranularSynth': {
+    synthType: 'GranularSynth', volume: -12,
+    granular: {
+      sampleUrl: '/data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
+      grainSize: 0.1, overlap: 0.1, playbackRate: 1, detune: 0,
+      loop: true, loopStart: 0, loopEnd: 0,
+    },
+  },
+  'Wavetable': { synthType: 'Wavetable', volume: -12 },
+  'DrumKit': {
+    synthType: 'DrumKit', volume: -12,
+    drumKit: {
+      keymap: [{
+        id: 'test-kick',
+        sampleId: 'kick',
+        sampleUrl: '/data/samples/packs/drumnibus/kicks/BD_808A1200.wav',
+        noteStart: 36,
+        noteEnd: 36,
+      }],
+      polyphony: 'poly',
+      maxVoices: 8,
+      noteCut: false,
+    },
+  },
+
+  // === WASM Synths ===
+  'Dexed':  { synthType: 'Dexed', volume: -12 },
+  'OBXd':   { synthType: 'OBXd', volume: -12 },
+  'CZ101':  { synthType: 'CZ101', volume: -12 },
+  'Sam':    { synthType: 'Sam', volume: -12 },
+  // V2 causes AudioWorklet side effects — disabled to prevent cascading test failures
+  // 'V2':       { synthType: 'V2', volume: -12 },
+  // 'V2Speech': { synthType: 'V2Speech', volume: -12 },
+
+  // === Buzzmachine Synths ===
+  'BuzzKick':      { synthType: 'BuzzKick', volume: -12 },
+  'BuzzKickXP':    { synthType: 'BuzzKickXP', volume: -12 },
+  'BuzzNoise':     { synthType: 'BuzzNoise', volume: -12 },
+  'BuzzTrilok':    { synthType: 'BuzzTrilok', volume: -12 },
+  'BuzzFreqBomb':  { synthType: 'BuzzFreqBomb', volume: -12 },
+  'BuzzDTMF':      { synthType: 'BuzzDTMF', volume: -12 },
+  'Buzz4FM2F':     { synthType: 'Buzz4FM2F', volume: -12 },
+  'BuzzDynamite6': { synthType: 'BuzzDynamite6', volume: -12 },
+  'BuzzM3':        { synthType: 'BuzzM3', volume: -12 },
+  'BuzzM4':        { synthType: 'BuzzM4', volume: -12 },
+  'Buzz3o3':       { synthType: 'Buzz3o3', volume: -12 },
+  'Buzz3o3DF':     { synthType: 'Buzz3o3DF', volume: -12 },
+
   // === MAME Standalone WASM Chips ===
   // ROM/sample-dependent (definitively silent without ROM):
   // 'MAMEAICA': { synthType: 'MAMEAICA', volume: -12 },     // needs wavetable ROM
@@ -162,6 +260,16 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
   // === Hardware WASM Chips ===
   'CEM3394': { synthType: 'CEM3394', volume: -12 },
   'SCSP': { synthType: 'SCSP', volume: -12 },
+
+  // === WASM Replayer Synths (song players + instrument synths) ===
+  // HivelySynth: AHX/HVL song player — loads song via HivelyEngine singleton
+  'HivelySynth': { synthType: 'HivelySynth', volume: -12, songUrl: '/data/songs/ahx/amanda.ahx' },
+  // UADESynth: Universal Amiga Dead-player — loads MOD song via setInstrument
+  'UADESynth': { synthType: 'UADESynth', volume: -12, songUrl: '/data/songs/mod/break the box.mod', songFilename: 'break the box.mod' },
+  // SoundMonSynth: SoundMon II instrument synth — note-triggered
+  'SoundMonSynth': { synthType: 'SoundMonSynth', volume: -12, soundMon: DEFAULT_SOUNDMON },
+  // SidMonSynth: SidMon II SID synth — note-triggered
+  'SidMonSynth': { synthType: 'SidMonSynth', volume: -12, sidMon: DEFAULT_SIDMON },
 };
 
 /* ALL FURNACE SYNTHS - FULL TEST CONFIG (for reference)
@@ -537,6 +645,14 @@ END OF FULL CONFIG */
 // TEST RESULTS
 // ============================================
 
+interface VolumeLevel {
+  name: string;
+  peakDb: number;
+  rmsDb: number;
+  judgment?: 'ok' | 'broken' | 'skipped' | 'wasm_unavail';
+  reason?: string;
+}
+
 interface TestResults {
   passed: number;
   failed: number;
@@ -545,7 +661,7 @@ interface TestResults {
   natives: string[];
   errors: { name: string; error: string }[];
   wasmUnavailSynths: string[];
-  volumeLevels: { name: string; peakDb: number; rmsDb: number }[];
+  volumeLevels: VolumeLevel[];
   details: { name: string; status: string; constructor: string }[];
   samplePackResults: SamplePackTestResult[];
 }
@@ -976,6 +1092,256 @@ async function testTriggers() {
   }
 }
 
+// ============================================
+// PHRASE / PLAY HELPERS
+// ============================================
+
+type PhraseStep = { note: string | null; ms: number };
+
+/** Synths that don't take a note parameter (percussion) */
+const NO_NOTE_SYNTHS = [
+  'NoiseSynth', 'MetalSynth', 'MembraneSynth', 'DrumMachine',
+  'BuzzNoise', 'BuzzKick', 'BuzzKickXP', 'BuzzTrilok', 'BuzzFreqBomb', 'Synare',
+];
+
+/** Sample-based synths that use start()/stop() instead of triggerAttack/triggerRelease */
+const START_STOP_SYNTHS = ['Player', 'GranularSynth'];
+
+/** Song-player synths that auto-play a loaded tracker module for 8 seconds then stop */
+const SONG_PLAYER_SYNTHS = ['HivelySynth', 'UADESynth'];
+
+/** Returns the appropriate musical phrase for a given synth name. */
+function getPhraseForSynth(name: string): PhraseStep[] {
+  // TR707 drum machine — MIDI GM drum mapping
+  if (name === 'MAMETR707') return [
+    { note: 'C2',  ms: 120 }, // Bass Drum
+    { note: null,  ms:  60 },
+    { note: 'D2',  ms: 120 }, // Snare
+    { note: null,  ms:  60 },
+    { note: 'C2',  ms: 120 }, // Bass Drum
+    { note: 'F#2', ms: 100 }, // Hi-hat
+    { note: 'D2',  ms: 120 }, // Snare
+    { note: null,  ms:  80 },
+  ];
+  // Simple arcade tone generators
+  if (['MAMETMS36XX', 'MAMEAstrocade', 'MAMESN76477'].includes(name)) return [
+    { note: 'C3', ms: 280 },
+    { note: 'G3', ms: 280 },
+    { note: 'C4', ms: 400 },
+  ];
+  // Speech / phoneme chips + speech synths — single long note triggers phoneme output
+  if (['MAMEVotrax', 'MAMETMS5220', 'MAMEMEA8000', 'MAMESP0250', 'Sam', 'V2Speech'].includes(name)) return [
+    { note: 'A3', ms: 1000 },
+  ];
+  // TB-303 / bass synths — characteristic bass arpeggio
+  if (['TB303', 'WobbleBass'].includes(name)) return [
+    { note: 'C2',  ms: 300 },
+    { note: 'G2',  ms: 300 },
+    { note: 'Bb2', ms: 300 },
+    { note: 'C3',  ms: 450 },
+  ];
+  // Ambient / effect synths — single sustained note
+  if (['DubSiren', 'SpaceLaser'].includes(name)) return [
+    { note: 'G4', ms: 1000 },
+  ];
+  // Percussion synths (MembraneSynth, MetalSynth, NoiseSynth, DrumMachine, Buzz percussion)
+  if (NO_NOTE_SYNTHS.includes(name)) return [
+    { note: 'C1', ms: 200 }, { note: null, ms:  80 },
+    { note: 'C1', ms: 200 }, { note: null, ms:  80 },
+    { note: 'C1', ms: 200 },
+  ];
+  // FM WASM synths (Dexed, OBXd, CZ101) — slower arpeggio to let modulation breathe
+  if (['Dexed', 'OBXd', 'CZ101'].includes(name)) return [
+    { note: 'C3',  ms: 380 },
+    { note: 'E3',  ms: 380 },
+    { note: 'G3',  ms: 380 },
+    { note: 'C4',  ms: 550 },
+  ];
+  // Buzz FM synths
+  if (['Buzz4FM2F', 'BuzzM3', 'BuzzM4', 'Buzz3o3', 'Buzz3o3DF', 'BuzzDynamite6'].includes(name)) return [
+    { note: 'C3',  ms: 380 },
+    { note: 'E3',  ms: 380 },
+    { note: 'G3',  ms: 380 },
+    { note: 'C4',  ms: 550 },
+  ];
+  // FM chips — slower arpeggio to let attack transients and modulation breathe
+  if (/OPN|OPM|OPL|OPZ|ESFM|VRC7|Y8950|YMF|YMOPQ|VASynth|CEM3394|UPD93/.test(name)) return [
+    { note: 'C3',  ms: 380 },
+    { note: 'E3',  ms: 380 },
+    { note: 'G3',  ms: 380 },
+    { note: 'C4',  ms: 550 },
+  ];
+  // Wavetable / wave-channel chips — C major arp in mid range
+  if (/SCC|NAMCO|BUBBLE|X1_010|SNKWave|ASC|ICS2115|ES5503/.test(name)) return [
+    { note: 'C4', ms: 250 },
+    { note: 'E4', ms: 250 },
+    { note: 'G4', ms: 250 },
+    { note: 'C5', ms: 380 },
+  ];
+  // PCM / sample-playback chips — three hits across the range
+  if (/SEGAPCM|QSOUND|ES5506|MULTIPCM|K007232|K053260|GA20|OKI|YMZ280|MSM|K054539|C352|SCSP|RF5C|AMIGA/.test(name)) return [
+    { note: 'C4', ms: 320 }, { note: null, ms: 80 },
+    { note: 'G4', ms: 320 }, { note: null, ms: 80 },
+    { note: 'C5', ms: 450 },
+  ];
+  // SID chips — show the characteristic buzz and filter sweep
+  if (/C64|SID/.test(name)) return [
+    { note: 'C3', ms: 300 },
+    { note: 'G3', ms: 300 },
+    { note: 'C4', ms: 300 },
+    { note: 'G4', ms: 450 },
+  ];
+  // AY/PSG chips — clean square-wave arp
+  if (/AY|PSG|SAA|TED|VIC|POKEY|T6W28|TIA|SUPERVISION|PCSPEAKER|ZXBEEPER/.test(name)) return [
+    { note: 'C4', ms: 200 },
+    { note: 'E4', ms: 200 },
+    { note: 'G4', ms: 200 },
+    { note: 'C5', ms: 320 },
+  ];
+  // Default — single-octave C major arpeggio
+  return [
+    { note: 'C4', ms: 220 },
+    { note: 'E4', ms: 220 },
+    { note: 'G4', ms: 220 },
+    { note: 'C5', ms: 380 },
+  ];
+}
+
+/**
+ * Plays one full phrase for the given synth and returns the measured peak dB.
+ * Handles both START_STOP synths (Player/GranularSynth) and note-triggered synths.
+ */
+async function playPhraseOnce(
+  name: string,
+  synthObj: Record<string, unknown>,
+  furnaceNativeMeter: AnalyserNode | null,
+  meter: Tone.Meter,
+): Promise<number> {
+  let peakDb = -Infinity;
+
+  const sampleLevel = () => {
+    if (furnaceNativeMeter) {
+      const data = new Float32Array(furnaceNativeMeter.fftSize);
+      furnaceNativeMeter.getFloatTimeDomainData(data);
+      let maxSample = 0;
+      for (const s of data) { const a = Math.abs(s); if (a > maxSample) maxSample = a; }
+      const db = maxSample > 0 ? 20 * Math.log10(maxSample) : -Infinity;
+      if (db > peakDb) peakDb = db;
+    } else {
+      const level = meter.getValue();
+      if (typeof level === 'number' && level > peakDb) peakDb = level;
+    }
+  };
+
+  // Handle song player synths (HivelySynth, UADESynth) — play loaded song for 8 seconds
+  if (SONG_PLAYER_SYNTHS.includes(name)) {
+    try {
+      if (typeof synthObj.triggerAttack === 'function') {
+        (synthObj.triggerAttack as () => void)();
+      }
+      const endTime = Date.now() + 8000;
+      while (Date.now() < endTime) {
+        await new Promise(r => setTimeout(r, 50));
+        sampleLevel();
+      }
+      if (typeof synthObj.triggerRelease === 'function') {
+        try { (synthObj.triggerRelease as () => void)(); } catch { /* ignored */ }
+      }
+      await new Promise(r => setTimeout(r, 200));
+    } catch (songErr: unknown) {
+      console.warn(`[Test] ${name} song playback error:`, songErr);
+    }
+
+  // Handle Player and GranularSynth with their native start()/stop() API
+  } else if (START_STOP_SYNTHS.includes(name)) {
+    try {
+      // Check if buffer is loaded before starting
+      const bufObj = synthObj.buffer as { loaded?: boolean } | undefined;
+      const hasBuffer = bufObj && bufObj.loaded;
+      if (!hasBuffer) {
+        // Try waiting longer for the buffer
+        for (let wait = 0; wait < 20; wait++) {
+          await new Promise(r => setTimeout(r, 100));
+          const buf = synthObj.buffer as { loaded?: boolean } | undefined;
+          if (buf && buf.loaded) break;
+        }
+      }
+
+      const bufCheck = synthObj.buffer as { loaded?: boolean } | undefined;
+      if (bufCheck && bufCheck.loaded) {
+        (synthObj.start as () => void)();
+
+        // Sample quickly at first (5ms intervals) to catch fast transients, then slower
+        for (let i = 0; i < 30; i++) {
+          await new Promise(r => setTimeout(r, i < 15 ? 5 : 30));
+          const level = meter.getValue();
+          if (typeof level === 'number' && level > peakDb) peakDb = level;
+        }
+
+        try { (synthObj.stop as () => void)(); } catch { /* ignored */ }
+      } else {
+        console.warn(`[Test] ${name}: buffer not loaded after waiting`);
+      }
+    } catch (triggerError: unknown) {
+      const tMsg = triggerError instanceof Error ? triggerError.message : String(triggerError);
+      console.warn(`[Test] ${name} start/stop error:`, tMsg);
+    }
+  } else if (typeof synthObj.triggerAttack === 'function' || typeof synthObj.triggerAttackRelease === 'function') {
+    try {
+      const phrase = getPhraseForSynth(name);
+      const hasAR     = typeof synthObj.triggerAttackRelease === 'function';
+      const hasAttack = typeof synthObj.triggerAttack === 'function';
+
+      // Play each step in the phrase
+      for (const step of phrase) {
+        if (step.note !== null) {
+          if (NO_NOTE_SYNTHS.includes(name)) {
+            // Percussion: no note argument
+            if (hasAR) {
+              if (name === 'DrumMachine') {
+                (synthObj.triggerAttackRelease as (n: string, d: number) => void)('C4', step.ms / 1000);
+              } else {
+                (synthObj.triggerAttackRelease as (d: string) => void)('8n');
+              }
+            } else if (hasAttack) {
+              (synthObj.triggerAttack as () => void)();
+            }
+          } else if (hasAR) {
+            (synthObj.triggerAttackRelease as (n: string, d: number) => void)(step.note, step.ms / 1000);
+          } else if (hasAttack) {
+            (synthObj.triggerAttack as (n: string) => void)(step.note);
+          }
+        }
+
+        // Sample throughout this step's duration
+        const deadline = Date.now() + step.ms;
+        while (Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 8));
+          sampleLevel();
+        }
+
+        // Release if using attack/release mode (not attackRelease)
+        if (!hasAR && hasAttack && step.note !== null && !NO_NOTE_SYNTHS.includes(name)) {
+          try { (synthObj.triggerRelease as () => void)(); } catch { /* ignored */ }
+        }
+      }
+
+      // Let the last note's release tail play out before moving on
+      const tailDeadline = Date.now() + 400;
+      while (Date.now() < tailDeadline) {
+        await new Promise(r => setTimeout(r, 8));
+        sampleLevel();
+      }
+
+    } catch (triggerError: unknown) {
+      const tMsg = triggerError instanceof Error ? triggerError.message : String(triggerError);
+      console.warn(`[Test] ${name} trigger error:`, tMsg);
+    }
+  }
+
+  return peakDb;
+}
+
 async function testVolumeLevels() {
   logHtml('<h2>Volume Level Tests</h2>');
   logHtml('<p class="info">Testing output levels at volume=-12dB. Target range: -15dB to -6dB peak.</p>');
@@ -999,12 +1365,6 @@ async function testVolumeLevels() {
   // Target peak level in dB (we want all synths to hit roughly this level)
   const TARGET_PEAK = -10;
 
-  // Synths that don't take a note parameter for triggerAttack (percussion synths)
-  const NO_NOTE_SYNTHS = ['NoiseSynth', 'MetalSynth', 'MembraneSynth', 'DrumMachine'];
-
-  // Sample-based synths that use start()/stop() instead of triggerAttack/triggerRelease
-  const START_STOP_SYNTHS = ['Player', 'GranularSynth'];
-
   logHtml('<table><tr><th>Synth</th><th>Peak Level (dB)</th><th>Status</th><th>Suggested Offset</th></tr>');
 
   for (const name of synthsToTest) {
@@ -1023,7 +1383,7 @@ async function testVolumeLevels() {
       // Engine didn't load — mark as WASM UNAVAIL (not a failure)
       testResults.wasmUnavailable++;
       testResults.wasmUnavailSynths.push(name);
-      testResults.volumeLevels.push({ name, peakDb: -Infinity, rmsDb: -Infinity });
+      testResults.volumeLevels.push({ name, peakDb: -Infinity, rmsDb: -Infinity, judgment: 'wasm_unavail' });
       logHtml(`<tr><td>${name}</td><td>-</td><td class="warn">WASM UNAVAIL</td><td>N/A</td></tr>`);
       continue;
     }
@@ -1139,7 +1499,7 @@ async function testVolumeLevels() {
       if (wasmInitFailed && isWasmSynth) {
         testResults.wasmUnavailable++;
         testResults.wasmUnavailSynths.push(name);
-        testResults.volumeLevels.push({ name, peakDb: -Infinity, rmsDb: -Infinity });
+        testResults.volumeLevels.push({ name, peakDb: -Infinity, rmsDb: -Infinity, judgment: 'wasm_unavail' });
         logHtml(`<tr><td>${name}</td><td>-</td><td class="warn">WASM UNAVAIL</td><td>N/A</td></tr>`);
         // Disconnect and dispose synth (meter is recreated at start of next iteration)
         try { if (typeof synthObj.disconnect === 'function') (synthObj.disconnect as () => void)(); } catch { /* ignored */ }
@@ -1158,13 +1518,10 @@ async function testVolumeLevels() {
         }
       }
 
-      // Trigger note and measure peak level
-      let peakDb = -Infinity;
-
       // DrumKit needs sample loading (setSampleLoader) which test doesn't do — skip volume test
       if (name === 'DrumKit') {
         testResults.passed++;
-        testResults.volumeLevels.push({ name, peakDb: NaN, rmsDb: NaN });
+        testResults.volumeLevels.push({ name, peakDb: NaN, rmsDb: NaN, judgment: 'skipped' });
         logHtml(`<tr><td>${name}</td><td>N/A</td><td class="pass">SKIP (needs samples)</td><td>N/A</td></tr>`);
         try { if (typeof synthObj.dispose === 'function') (synthObj.dispose as () => void)(); } catch { /* ignored */ }
         continue;
@@ -1179,7 +1536,7 @@ async function testVolumeLevels() {
       ];
       if (ROM_DEPENDENT_SYNTHS.includes(name)) {
         testResults.passed++;
-        testResults.volumeLevels.push({ name, peakDb: NaN, rmsDb: NaN });
+        testResults.volumeLevels.push({ name, peakDb: NaN, rmsDb: NaN, judgment: 'skipped' });
         logHtml(`<tr><td>${name}</td><td>N/A</td><td class="pass">SKIP (needs ROM)</td><td>N/A</td></tr>`);
         try { if (typeof synthObj.dispose === 'function') (synthObj.dispose as () => void)(); } catch { /* ignored */ }
         continue;
@@ -1222,180 +1579,31 @@ async function testVolumeLevels() {
       // (DrumMachine uses MembraneSynth→Distortion→Filter chain which needs time)
       await new Promise(r => setTimeout(r, 50));
 
-      // Handle Player and GranularSynth with their native start()/stop() API
-      if (START_STOP_SYNTHS.includes(name)) {
+      // For song-player synths: load the tracker module before playing
+      if (name === 'HivelySynth' && config.songUrl) {
         try {
-          // Check if buffer is loaded before starting
-          const bufObj = synthObj.buffer as { loaded?: boolean } | undefined;
-          const hasBuffer = bufObj && bufObj.loaded;
-          if (!hasBuffer) {
-            // Try waiting longer for the buffer
-            for (let wait = 0; wait < 20; wait++) {
-              await new Promise(r => setTimeout(r, 100));
-              const buf = synthObj.buffer as { loaded?: boolean } | undefined;
-              if (buf && buf.loaded) break;
-            }
-          }
-
-          const bufCheck = synthObj.buffer as { loaded?: boolean } | undefined;
-          if (bufCheck && bufCheck.loaded) {
-            (synthObj.start as () => void)();
-
-            // Sample quickly at first (5ms intervals) to catch fast transients, then slower
-            for (let i = 0; i < 30; i++) {
-              await new Promise(r => setTimeout(r, i < 15 ? 5 : 30));
-              const level = meter.getValue();
-              if (typeof level === 'number' && level > peakDb) peakDb = level;
-            }
-
-            try { (synthObj.stop as () => void)(); } catch { /* ignored */ }
-          } else {
-            console.warn(`[Test] ${name}: buffer not loaded after waiting`);
-          }
-        } catch (triggerError: unknown) {
-          const tMsg = triggerError instanceof Error ? triggerError.message : String(triggerError);
-          console.warn(`[Test] ${name} start/stop error:`, tMsg);
-        }
-      } else if (typeof synthObj.triggerAttack === 'function' || typeof synthObj.triggerAttackRelease === 'function') {
-        try {
-          // ── Build a phrase that shows the synth's character ───────────────────
-          // Each step: note (null = silence/gap), ms = duration of note or gap
-          type PhraseStep = { note: string | null; ms: number };
-          const phrase: PhraseStep[] = (() => {
-            // TR707 drum machine — MIDI GM drum mapping
-            if (name === 'MAMETR707') return [
-              { note: 'C2',  ms: 120 }, // Bass Drum
-              { note: null,  ms:  60 },
-              { note: 'D2',  ms: 120 }, // Snare
-              { note: null,  ms:  60 },
-              { note: 'C2',  ms: 120 }, // Bass Drum
-              { note: 'F#2', ms: 100 }, // Hi-hat
-              { note: 'D2',  ms: 120 }, // Snare
-              { note: null,  ms:  80 },
-            ];
-            // Simple arcade tone generators
-            if (['MAMETMS36XX', 'MAMEAstrocade', 'MAMESN76477'].includes(name)) return [
-              { note: 'C3', ms: 280 },
-              { note: 'G3', ms: 280 },
-              { note: 'C4', ms: 400 },
-            ];
-            // Speech / phoneme chips — single long note triggers phoneme output
-            if (['MAMEVotrax', 'MAMETMS5220', 'MAMEMEA8000', 'MAMESP0250'].includes(name)) return [
-              { note: 'A3', ms: 1000 },
-            ];
-            // Percussion synths (MembraneSynth, MetalSynth, NoiseSynth, DrumMachine)
-            if (NO_NOTE_SYNTHS.includes(name)) return [
-              { note: 'C1', ms: 200 }, { note: null, ms:  80 },
-              { note: 'C1', ms: 200 }, { note: null, ms:  80 },
-              { note: 'C1', ms: 200 },
-            ];
-            // FM chips — slower arpeggio to let attack transients and modulation breathe
-            if (/OPN|OPM|OPL|OPZ|ESFM|VRC7|Y8950|YMF|YMOPQ|VASynth|CEM3394|UPD93/.test(name)) return [
-              { note: 'C3',  ms: 380 },
-              { note: 'E3',  ms: 380 },
-              { note: 'G3',  ms: 380 },
-              { note: 'C4',  ms: 550 },
-            ];
-            // Wavetable / wave-channel chips — C major arp in mid range
-            if (/SCC|NAMCO|BUBBLE|X1_010|SNKWave|ASC|ICS2115|ES5503/.test(name)) return [
-              { note: 'C4', ms: 250 },
-              { note: 'E4', ms: 250 },
-              { note: 'G4', ms: 250 },
-              { note: 'C5', ms: 380 },
-            ];
-            // PCM / sample-playback chips — three hits across the range
-            if (/SEGAPCM|QSOUND|ES5506|MULTIPCM|K007232|K053260|GA20|OKI|YMZ280|MSM|K054539|C352|SCSP|RF5C|AMIGA/.test(name)) return [
-              { note: 'C4', ms: 320 }, { note: null, ms: 80 },
-              { note: 'G4', ms: 320 }, { note: null, ms: 80 },
-              { note: 'C5', ms: 450 },
-            ];
-            // SID chips — show the characteristic buzz and filter sweep
-            if (/C64|SID/.test(name)) return [
-              { note: 'C3', ms: 300 },
-              { note: 'G3', ms: 300 },
-              { note: 'C4', ms: 300 },
-              { note: 'G4', ms: 450 },
-            ];
-            // AY/PSG chips — clean square-wave arp
-            if (/AY|PSG|SAA|TED|VIC|POKEY|T6W28|TIA|SUPERVISION|PCSPEAKER|ZXBEEPER/.test(name)) return [
-              { note: 'C4', ms: 200 },
-              { note: 'E4', ms: 200 },
-              { note: 'G4', ms: 200 },
-              { note: 'C5', ms: 320 },
-            ];
-            // Default — single-octave C major arpeggio
-            return [
-              { note: 'C4', ms: 220 },
-              { note: 'E4', ms: 220 },
-              { note: 'G4', ms: 220 },
-              { note: 'C5', ms: 380 },
-            ];
-          })();
-
-          // ── Sample level from whichever path carries audio ─────────────────────
-          const sampleLevel = () => {
-            if (furnaceNativeMeter) {
-              const data = new Float32Array(furnaceNativeMeter.fftSize);
-              furnaceNativeMeter.getFloatTimeDomainData(data);
-              let maxSample = 0;
-              for (const s of data) { const a = Math.abs(s); if (a > maxSample) maxSample = a; }
-              const db = maxSample > 0 ? 20 * Math.log10(maxSample) : -Infinity;
-              if (db > peakDb) peakDb = db;
-            } else {
-              const level = meter.getValue();
-              if (typeof level === 'number' && level > peakDb) peakDb = level;
-            }
-          };
-
-          const hasAR     = typeof synthObj.triggerAttackRelease === 'function';
-          const hasAttack = typeof synthObj.triggerAttack === 'function';
-
-          // ── Play each step in the phrase ───────────────────────────────────────
-          for (const step of phrase) {
-            if (step.note !== null) {
-              if (NO_NOTE_SYNTHS.includes(name)) {
-                // Percussion: no note argument
-                if (hasAR) {
-                  if (name === 'DrumMachine') {
-                    (synthObj.triggerAttackRelease as (n: string, d: number) => void)('C4', step.ms / 1000);
-                  } else {
-                    (synthObj.triggerAttackRelease as (d: string) => void)('8n');
-                  }
-                } else if (hasAttack) {
-                  (synthObj.triggerAttack as () => void)();
-                }
-              } else if (hasAR) {
-                (synthObj.triggerAttackRelease as (n: string, d: number) => void)(step.note, step.ms / 1000);
-              } else if (hasAttack) {
-                (synthObj.triggerAttack as (n: string) => void)(step.note);
-              }
-            }
-
-            // Sample throughout this step's duration
-            const deadline = Date.now() + step.ms;
-            while (Date.now() < deadline) {
-              await new Promise(r => setTimeout(r, 8));
-              sampleLevel();
-            }
-
-            // Release if using attack/release mode (not attackRelease)
-            if (!hasAR && hasAttack && step.note !== null && !NO_NOTE_SYNTHS.includes(name)) {
-              try { (synthObj.triggerRelease as () => void)(); } catch { /* ignored */ }
-            }
-          }
-
-          // Let the last note's release tail play out before moving on
-          const tailDeadline = Date.now() + 400;
-          while (Date.now() < tailDeadline) {
-            await new Promise(r => setTimeout(r, 8));
-            sampleLevel();
-          }
-
-        } catch (triggerError: unknown) {
-          const tMsg = triggerError instanceof Error ? triggerError.message : String(triggerError);
-          console.warn(`[Test] ${name} trigger error:`, tMsg);
-        }
+          const resp = await fetch(config.songUrl as string);
+          const buf = await resp.arrayBuffer();
+          await HivelyEngine.getInstance().loadTune(buf);
+          console.log(`[Test] HivelySynth: loaded AHX from ${config.songUrl}`);
+        } catch (err) { console.warn('[Test] HivelySynth: failed to load song', err); }
       }
+      if (name === 'UADESynth' && config.songUrl && typeof synthObj.setInstrument === 'function') {
+        try {
+          const resp = await fetch(config.songUrl as string);
+          const fileData = await resp.arrayBuffer();
+          const filename = (config.songFilename as string) || 'song.mod';
+          await (synthObj.setInstrument as (cfg: unknown) => Promise<void>)({
+            type: 'uade', filename, fileData,
+            subsongCount: 1, currentSubsong: 0,
+            metadata: { player: 'ProTracker', formatName: 'ProTracker Module', minSubsong: 0, maxSubsong: 0 },
+          });
+          console.log(`[Test] UADESynth: loaded MOD from ${config.songUrl}`);
+        } catch (err) { console.warn('[Test] UADESynth: failed to load song', err); }
+      }
+
+      // Play the phrase and measure peak level
+      const peakDb = await playPhraseOnce(name, synthObj, furnaceNativeMeter, meter);
 
       const offset = TARGET_PEAK - peakDb;
 
@@ -1527,6 +1735,417 @@ async function testVolumeLevels() {
   } catch (e) {
     console.warn('[VolumeTest] Furnace cleanup error:', e);
   }
+}
+
+// ============================================
+// INTERACTIVE JUDGMENT UI
+// ============================================
+
+type JudgmentResult =
+  | { action: 'ok' }
+  | { action: 'broken'; reason: string }
+  | { action: 'replay' };
+
+/**
+ * Shows judgment buttons in the given container and returns a promise that
+ * resolves when the user makes a choice (OK / Not OK / Play Again).
+ */
+function waitForUserJudgment(
+  name: string,
+  containerId: string,
+): Promise<JudgmentResult> {
+  return new Promise((resolve) => {
+    const container = document.getElementById(containerId);
+    if (!container) { resolve({ action: 'ok' }); return; }
+
+    container.innerHTML = `
+      <div class="judgment-area">
+        <span>How does <strong>${name}</strong> sound?</span>
+        <button class="judge-ok">✅ Sounds OK</button>
+        <button class="judge-notok">❌ Not OK</button>
+        <button class="judge-replay">🔄 Play Again</button>
+      </div>
+    `;
+
+    // Scroll buttons into view so user doesn't have to hunt for them
+    container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    const okBtn    = container.querySelector('.judge-ok') as HTMLButtonElement | null;
+    const notOkBtn = container.querySelector('.judge-notok') as HTMLButtonElement | null;
+    const replayBtn = container.querySelector('.judge-replay') as HTMLButtonElement | null;
+
+    const cleanup = () => { container.innerHTML = ''; };
+
+    okBtn?.addEventListener('click', () => { cleanup(); resolve({ action: 'ok' }); });
+    replayBtn?.addEventListener('click', () => { cleanup(); resolve({ action: 'replay' }); });
+
+    notOkBtn?.addEventListener('click', () => {
+      container.innerHTML = `
+        <div class="judgment-area">
+          <div class="reason-input">
+            <span>What's wrong with <strong>${name}</strong>?</span>
+            <input type="text" class="reason-text" placeholder="What's wrong with it?">
+            <button class="judge-confirm">Submit</button>
+          </div>
+        </div>
+      `;
+      const input      = container.querySelector('.reason-text') as HTMLInputElement | null;
+      const confirmBtn = container.querySelector('.judge-confirm') as HTMLButtonElement | null;
+
+      const submit = () => {
+        const reason = input?.value?.trim() || 'broken';
+        cleanup();
+        resolve({ action: 'broken', reason });
+      };
+      confirmBtn?.addEventListener('click', submit);
+      input?.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+    });
+  });
+}
+
+/**
+ * Interactive version of testVolumeLevels().
+ * Pauses after each synth for the user to judge sound quality.
+ */
+async function testVolumeInteractive() {
+  logHtml('<h2>Interactive Volume Tests</h2>');
+  logHtml('<p class="info">Each synth plays its phrase. Judge whether it sounds correct before moving on.</p>');
+
+  // Pre-warm all WASM engines before testing individual synths
+  await preWarmEngines();
+
+  const allSynths = Object.keys(SYNTH_CONFIGS);
+  const furnaceSynths = allSynths.filter(s => s.startsWith('Furnace'));
+  const otherSynths = allSynths.filter(s => !s.startsWith('Furnace'));
+  const synthsToTest = [...furnaceSynths, ...otherSynths];
+
+  logHtml('<table id="interactive-results-table"><tr><th>Synth</th><th>Peak (dB)</th><th>Audio</th><th>Judgment</th></tr>');
+
+  for (const name of synthsToTest) {
+    let meter: Tone.Meter | null = new Tone.Meter(0);
+    meter.connect(Tone.getDestination());
+    const config = SYNTH_CONFIGS[name];
+    if (!config) continue;
+
+    // Check if required WASM engine is available
+    const requiredEngine = getRequiredEngine(name);
+    if (requiredEngine && requiredEngine !== 'standalone-wasm' && !engineStatus[requiredEngine]) {
+      testResults.wasmUnavailable++;
+      testResults.wasmUnavailSynths.push(name);
+      testResults.volumeLevels.push({ name, peakDb: -Infinity, rmsDb: -Infinity, judgment: 'wasm_unavail' });
+      logHtml(`<tr><td>${name}</td><td>-</td><td class="warn">WASM UNAVAIL</td><td>-</td></tr>`);
+      try { meter.disconnect(); meter.dispose(); } catch { /* ignored */ }
+      continue;
+    }
+
+    // FM native analyser
+    let furnaceNativeMeter: AnalyserNode | null = null;
+    const isFMSynth = FM_SYNTHS.includes(name);
+    const isDispatchSynth = name.startsWith('Furnace') && !isFMSynth;
+    if (isFMSynth) {
+      const furnaceEngine = FurnaceChipEngine.getInstance();
+      furnaceEngine.resetWriteCount();
+      const nativeOutput = furnaceEngine.getNativeOutput();
+      if (nativeOutput && nativeOutput.context) {
+        furnaceNativeMeter = nativeOutput.context.createAnalyser();
+        furnaceNativeMeter.fftSize = 256;
+        nativeOutput.connect(furnaceNativeMeter);
+        furnaceNativeMeter.connect(nativeOutput.context.destination);
+      }
+    }
+
+    try {
+      const preset = getFirstPresetForSynthType(config.synthType as string);
+      const presetConfig = preset
+        ? (() => { const p = { ...preset } as Record<string, unknown>; delete p.name; delete p.type; delete p.synthType; return p; })()
+        : {};
+
+      const fullConfig: InstrumentConfig = {
+        id: 999,
+        name: `Test ${name}`,
+        volume: -12,
+        ...presetConfig,
+        ...config,
+      } as InstrumentConfig;
+
+      const synth = InstrumentFactory.createInstrument(fullConfig);
+      const synthObj = synth as unknown as Record<string, unknown>;
+      if (typeof synthObj.connect === 'function') {
+        (synthObj.connect as (dest: unknown) => void)(meter);
+      }
+
+      // Ensure AudioContext is running
+      const isWasmSynth = requiredEngine !== null;
+      try {
+        await Tone.start();
+        const ctx = Tone.getContext();
+        const ctxObj = ctx as unknown as Record<string, unknown>;
+        const rawCtx = (ctxObj.rawContext || ctxObj._context) as { state?: string; resume?: () => Promise<void> } | undefined;
+        if (rawCtx && rawCtx.state !== 'running' && typeof rawCtx.resume === 'function') {
+          await rawCtx.resume();
+        }
+      } catch { /* ignored */ }
+
+      // Wait for WASM initialization
+      const initTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
+        Promise.race([promise, new Promise<null>(r => setTimeout(() => r(null), ms))]);
+
+      let wasmInitFailed = false;
+      if (typeof synthObj.ensureInitialized === 'function') {
+        try { await initTimeout((synthObj.ensureInitialized as () => Promise<void>)(), 15000); } catch { wasmInitFailed = true; }
+      } else if (typeof synthObj.ready === 'function') {
+        try { await initTimeout((synthObj.ready as () => Promise<void>)(), 15000); } catch { wasmInitFailed = true; }
+      }
+
+      if (isWasmSynth) await new Promise(r => setTimeout(r, 500));
+
+      if (isWasmSynth && !wasmInitFailed) {
+        const hasInitProp = '_isReady' in synthObj || 'isInitialized' in synthObj ||
+                            '_initialized' in synthObj || 'useWasmEngine' in synthObj;
+        if (hasInitProp) {
+          const isReady = synthObj._isReady === true || synthObj.isInitialized === true ||
+                          synthObj._initialized === true || synthObj.useWasmEngine === true;
+          if (!isReady) wasmInitFailed = true;
+        }
+      }
+
+      if (wasmInitFailed && isWasmSynth) {
+        testResults.wasmUnavailable++;
+        testResults.wasmUnavailSynths.push(name);
+        testResults.volumeLevels.push({ name, peakDb: -Infinity, rmsDb: -Infinity, judgment: 'wasm_unavail' });
+        logHtml(`<tr><td>${name}</td><td>-</td><td class="warn">WASM UNAVAIL</td><td>-</td></tr>`);
+        try { if (typeof synthObj.disconnect === 'function') (synthObj.disconnect as () => void)(); } catch { /* ignored */ }
+        try { if (typeof synthObj.dispose === 'function') (synthObj.dispose as () => void)(); } catch { /* ignored */ }
+        try { meter.disconnect(); meter.dispose(); } catch { /* ignored */ }
+        continue;
+      }
+
+      // Wait for sample loading
+      const isSampleBased = ['Sampler', 'Player', 'GranularSynth', 'DrumKit'].includes(name);
+      if (isSampleBased) {
+        try { await Tone.loaded(); await new Promise(r => setTimeout(r, 200)); } catch { /* ignored */ }
+      }
+
+      // Skip synths that can't produce sound without extra setup
+      if (name === 'DrumKit') {
+        testResults.volumeLevels.push({ name, peakDb: NaN, rmsDb: NaN, judgment: 'skipped' });
+        logHtml(`<tr><td>${name}</td><td>N/A</td><td class="pass">SKIP (needs samples)</td><td>-</td></tr>`);
+        try { if (typeof synthObj.dispose === 'function') (synthObj.dispose as () => void)(); } catch { /* ignored */ }
+        try { meter.disconnect(); meter.dispose(); } catch { /* ignored */ }
+        continue;
+      }
+
+      const ROM_DEPENDENT_SYNTHS = ['MAMEVFX', 'MAMEDOC', 'MAMERSA', 'MAMESWP30'];
+      if (ROM_DEPENDENT_SYNTHS.includes(name)) {
+        testResults.volumeLevels.push({ name, peakDb: NaN, rmsDb: NaN, judgment: 'skipped' });
+        logHtml(`<tr><td>${name}</td><td>N/A</td><td class="pass">SKIP (needs ROM)</td><td>-</td></tr>`);
+        try { if (typeof synthObj.dispose === 'function') (synthObj.dispose as () => void)(); } catch { /* ignored */ }
+        try { meter.disconnect(); meter.dispose(); } catch { /* ignored */ }
+        continue;
+      }
+
+      // Dispatch synth native analyser
+      let dispatchNativeGain: GainNode | null = null;
+      if (isDispatchSynth && !furnaceNativeMeter) {
+        const nativeGain = synthObj._nativeGain as GainNode | undefined;
+        if (nativeGain && nativeGain.context) {
+          furnaceNativeMeter = nativeGain.context.createAnalyser();
+          furnaceNativeMeter.fftSize = 256;
+          nativeGain.connect(furnaceNativeMeter);
+          nativeGain.connect(nativeGain.context.destination);
+          dispatchNativeGain = nativeGain;
+        }
+      }
+
+      // MAME/HW synth native analyser
+      let mameOutputNode: AudioNode | null = null;
+      const isMAMESynth = name.startsWith('MAME') || name === 'CEM3394' || name === 'SCSP';
+      if (isMAMESynth && !furnaceNativeMeter) {
+        const output = synthObj.output as AudioNode | undefined;
+        if (output && output.context) {
+          furnaceNativeMeter = output.context.createAnalyser();
+          furnaceNativeMeter.fftSize = 256;
+          output.connect(furnaceNativeMeter);
+          furnaceNativeMeter.connect(output.context.destination);
+          mameOutputNode = output;
+        }
+      }
+
+      await new Promise(r => setTimeout(r, 50));
+
+      // For song-player synths: load the tracker module before playing
+      if (name === 'HivelySynth' && config.songUrl) {
+        try {
+          const resp = await fetch(config.songUrl as string);
+          const buf = await resp.arrayBuffer();
+          await HivelyEngine.getInstance().loadTune(buf);
+          console.log(`[Test] HivelySynth: loaded AHX from ${config.songUrl}`);
+        } catch (err) { console.warn('[Test] HivelySynth: failed to load song', err); }
+      }
+      if (name === 'UADESynth' && config.songUrl && typeof synthObj.setInstrument === 'function') {
+        try {
+          const resp = await fetch(config.songUrl as string);
+          const fileData = await resp.arrayBuffer();
+          const filename = (config.songFilename as string) || 'song.mod';
+          await (synthObj.setInstrument as (cfg: unknown) => Promise<void>)({
+            type: 'uade', filename, fileData,
+            subsongCount: 1, currentSubsong: 0,
+            metadata: { player: 'ProTracker', formatName: 'ProTracker Module', minSubsong: 0, maxSubsong: 0 },
+          });
+          console.log(`[Test] UADESynth: loaded MOD from ${config.songUrl}`);
+        } catch (err) { console.warn('[Test] UADESynth: failed to load song', err); }
+      }
+
+      // Show "playing" indicator row and scroll it into view
+      logHtml(`<tr id="irow-${name}"><td>${name}</td><td colspan="3" class="info">▶ Playing...</td></tr>`);
+      document.getElementById(`irow-${name}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const judgmentContainerId = `judgment-${name}`;
+      logHtml(`<div id="${judgmentContainerId}"></div>`);
+
+      let peakDb = -Infinity;
+      let judgment: JudgmentResult = { action: 'ok' };
+
+      // Play/judge loop — supports "Play Again"
+      while (true) {
+        peakDb = await playPhraseOnce(name, synthObj, furnaceNativeMeter, meter);
+        judgment = await waitForUserJudgment(name, judgmentContainerId);
+        if (judgment.action !== 'replay') break;
+      }
+
+      // Clean up judgment container
+      const jc = document.getElementById(judgmentContainerId);
+      if (jc) jc.remove();
+
+      // Calculate status text for the audio column
+      let statusClass = 'pass';
+      let statusText = 'OK';
+      if (peakDb === -Infinity || peakDb < -60) {
+        statusClass = 'fail'; statusText = peakDb === -Infinity ? 'NO AUDIO' : 'SILENT';
+      } else if (peakDb < -25) {
+        statusClass = 'warn'; statusText = 'QUIET';
+      } else if (peakDb > -3) {
+        statusClass = 'warn'; statusText = 'LOUD';
+      }
+
+      // Update the placeholder row with results
+      const row = document.getElementById(`irow-${name}`);
+      if (row) {
+        row.innerHTML = `
+          <td>${name}</td>
+          <td>${peakDb === -Infinity ? '-∞' : peakDb.toFixed(1)}</td>
+          <td class="${statusClass}">${statusText}</td>
+          <td class="${judgment.action === 'ok' ? 'pass' : 'fail'}">
+            ${judgment.action === 'ok' ? '✅ OK' : `❌ ${(judgment as { action: 'broken'; reason: string }).reason || 'broken'}`}
+          </td>`;
+      }
+
+      // Store result
+      testResults.volumeLevels.push({
+        name,
+        peakDb,
+        rmsDb: peakDb,
+        judgment: judgment.action === 'ok' ? 'ok' : 'broken',
+        reason: judgment.action === 'broken' ? (judgment as { action: 'broken'; reason: string }).reason : undefined,
+      });
+
+      // Cleanup
+      if (typeof synthObj.disconnect === 'function') {
+        try { (synthObj.disconnect as () => void)(); } catch { /* ignored */ }
+      }
+      if (typeof synthObj.dispose === 'function') {
+        try { (synthObj.dispose as () => void)(); } catch { /* ignored */ }
+      }
+
+      // Native metre cleanup
+      if (furnaceNativeMeter) {
+        if (isFMSynth) {
+          const furnaceEngine = FurnaceChipEngine.getInstance();
+          const nativeOutput = furnaceEngine.getNativeOutput();
+          if (nativeOutput) {
+            try { nativeOutput.disconnect(furnaceNativeMeter); } catch { /* ignored */ }
+            try { furnaceNativeMeter.disconnect(nativeOutput.context.destination); } catch { /* ignored */ }
+          }
+        } else if (isMAMESynth && mameOutputNode) {
+          try { mameOutputNode.disconnect(furnaceNativeMeter); } catch { /* ignored */ }
+          try { furnaceNativeMeter.disconnect(mameOutputNode.context.destination); } catch { /* ignored */ }
+        } else {
+          if (dispatchNativeGain) {
+            try { dispatchNativeGain.disconnect(dispatchNativeGain.context.destination); } catch { /* ignored */ }
+          }
+          try { furnaceNativeMeter.disconnect(); } catch { /* ignored */ }
+        }
+        furnaceNativeMeter = null;
+        mameOutputNode = null;
+      }
+
+      try { meter.disconnect(); meter.dispose(); } catch { /* ignored */ }
+      meter = null;
+
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logHtml(`<tr><td>${name}</td><td colspan="3" class="fail">Error: ${msg}</td></tr>`);
+      testResults.failed++;
+      testResults.errors.push({ name, error: msg });
+      try { if (meter) { meter.disconnect(); meter.dispose(); } } catch { /* ignored */ }
+    }
+  }
+
+  logHtml('</table>');
+  displayJudgmentSummary();
+}
+
+/**
+ * Shows a summary table of all judgment results after the interactive test.
+ */
+function displayJudgmentSummary() {
+  const judged = testResults.volumeLevels.filter(
+    v => v.judgment === 'ok' || v.judgment === 'broken',
+  );
+  const okCount     = judged.filter(v => v.judgment === 'ok').length;
+  const brokenList  = judged.filter(v => v.judgment === 'broken');
+  const noAudioList = testResults.volumeLevels.filter(v => v.judgment !== 'ok' && v.judgment !== 'broken' && !isNaN(v.peakDb) && v.peakDb < -60);
+  const wasmUnavailCount = testResults.volumeLevels.filter(v => v.judgment === 'wasm_unavail').length;
+
+  const allResults = JSON.stringify(
+    testResults.volumeLevels.filter(v => v.judgment === 'ok' || v.judgment === 'broken'),
+    null, 2
+  );
+
+  logHtml(`
+    <div class="summary">
+      <h2>Judgment Summary</h2>
+      <p>✅ OK: ${okCount} | ❌ Broken: ${brokenList.length} | ⚪ WASM Unavail: ${wasmUnavailCount}</p>
+      ${brokenList.length > 0 ? `
+        <table>
+          <tr><th>Synth</th><th>Judgment</th><th>Reason</th></tr>
+          ${brokenList.map(v => `<tr><td>${v.name}</td><td class="fail">❌ broken</td><td>${v.reason || ''}</td></tr>`).join('')}
+          ${noAudioList.map(v => `<tr><td>${v.name}</td><td class="warn">⚠️ no audio</td><td>${v.peakDb === -Infinity ? '-∞ dB' : v.peakDb.toFixed(1) + 'dB'}</td></tr>`).join('')}
+        </table>` : '<p class="pass">No broken synths reported!</p>'}
+      <pre id="judgment-json">${allResults}</pre>
+      <button onclick="navigator.clipboard.writeText(document.getElementById('judgment-json')?.textContent || '').catch(() => {})">📋 Copy JSON</button>
+    </div>
+  `);
+
+  window.SYNTH_TEST_RESULTS = testResults;
+  window.SYNTH_TEST_COMPLETE = true;
+}
+
+async function runInteractiveVolumeTests() {
+  clearResults();
+  logHtml('<h2>Running Interactive Volume Tests...</h2>');
+
+  const buttons = document.querySelectorAll('button');
+  buttons.forEach(b => (b as HTMLButtonElement).disabled = true);
+
+  try {
+    await initAudio();
+    await testVolumeInteractive();
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log('Test error: ' + msg, 'fail');
+  }
+
+  buttons.forEach(b => (b as HTMLButtonElement).disabled = false);
 }
 
 function displaySummary() {
@@ -3590,6 +4209,7 @@ document.getElementById('runVolumeTests')?.addEventListener('click', runVolumeTe
 document.getElementById('runBehaviorTests')?.addEventListener('click', runBehaviorTests);
 document.getElementById('runSamplePackTests')?.addEventListener('click', runSamplePackTests);
 document.getElementById('runEffectTests')?.addEventListener('click', runEffectTests);
+document.getElementById('runInteractiveTest')?.addEventListener('click', runInteractiveVolumeTests);
 
 // Export for console access
 window.runAllTests = runAllTests;
@@ -3598,3 +4218,4 @@ window.runVolumeTests = runVolumeTests;
 window.runBehaviorTests = runBehaviorTests;
 window.runSamplePackTests = runSamplePackTests;
 window.runEffectTests = runEffectTests;
+window.runInteractiveVolumeTests = runInteractiveVolumeTests;
