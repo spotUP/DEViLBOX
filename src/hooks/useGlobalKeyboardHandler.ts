@@ -801,11 +801,16 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
     if (disabled) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if typing in input/textarea
+      // Skip if focus is inside a text input, contenteditable, or CodeMirror editor.
+      // CodeMirror 6 uses a root div (.cm-editor) with tabindex but the contenteditable
+      // is on the inner .cm-content child — so isContentEditable alone misses the case
+      // where e.target is the root div itself (e.g. after Tab-key focus).
+      const target = e.target as HTMLElement;
       if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        (e.target as HTMLElement)?.isContentEditable
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable ||
+        !!target?.closest?.('.cm-editor')
       ) {
         return;
       }
