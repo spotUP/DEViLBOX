@@ -17,7 +17,7 @@ import { resolveArrangement } from '@lib/arrangement/resolveArrangement';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 
 export const usePatternPlayback = () => {
-  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, channelTrackTables, channelSpeeds, channelGrooves, linearPeriods, hivelyNative, hivelyFileData, hivelyMeta } = useTrackerStore(useShallow((s) => ({
+  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, channelTrackTables, channelSpeeds, channelGrooves, linearPeriods, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
     setCurrentPattern: s.setCurrentPattern,
@@ -31,6 +31,7 @@ export const usePatternPlayback = () => {
     hivelyNative: s.hivelyNative,
     hivelyFileData: s.hivelyFileData,
     hivelyMeta: s.hivelyMeta,
+    musiclineFileData: s.musiclineFileData,
   })));
   const { isPlaying, isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
     isPlaying: s.isPlaying,
@@ -309,6 +310,8 @@ export const usePatternPlayback = () => {
           hivelyNative: hivelyNative ?? undefined,
           hivelyFileData: hivelyFileData ?? undefined,
           hivelyMeta: hivelyMeta ?? undefined,
+          // MusicLine Editor raw binary (required for MusicLineEngine WASM)
+          musiclineFileData: musiclineFileData ?? undefined,
           // Furnace-specific timing data (only set for .fur imports)
           speed2: furnaceData?.speed2,
           hz: furnaceData?.hz,
