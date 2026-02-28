@@ -10,6 +10,7 @@ export const DOMScrollList: React.FC<ScrollListProps> = ({
   itemHeight = 28,
 }) => {
   const lastClickRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleClick = useCallback((id: string) => {
     const now = Date.now();
@@ -22,9 +23,27 @@ export const DOMScrollList: React.FC<ScrollListProps> = ({
     }
   }, [onSelect, onDoubleClick]);
 
+  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    const currentIdx = items.findIndex(i => i.id === selectedId);
+    if (currentIdx === -1) {
+      if (items.length > 0) onSelect(items[0].id);
+      return;
+    }
+    const nextIdx = e.key === 'ArrowDown'
+      ? Math.min(items.length - 1, currentIdx + 1)
+      : Math.max(0, currentIdx - 1);
+    if (nextIdx !== currentIdx) {
+      onSelect(items[nextIdx].id);
+    }
+  }, [items, selectedId, onSelect]);
+
   return (
     <div
+      ref={containerRef}
       role="listbox"
+      onKeyDown={handleContainerKeyDown}
       style={{
         height,
         overflowY: 'auto',
@@ -40,9 +59,14 @@ export const DOMScrollList: React.FC<ScrollListProps> = ({
             key={item.id}
             role="option"
             aria-selected={isSelected}
-            tabIndex={0}
+            tabIndex={isSelected ? 0 : -1}
             onClick={() => handleClick(item.id)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(item.id); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleClick(item.id);
+              }
+            }}
             style={{
               height: itemHeight,
               display: 'flex',
