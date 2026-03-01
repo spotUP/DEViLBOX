@@ -27,6 +27,7 @@ import type { CRTParams } from '@stores/useSettingsStore';
 const VERT = /* glsl */ `
   in vec2 aPosition;
   out vec2 vTextureCoord;
+  out vec2 vUVScale;
 
   uniform vec4 uInputSize;
   uniform vec4 uOutputFrame;
@@ -39,13 +40,10 @@ const VERT = /* glsl */ `
     return vec4(position, 0.0, 1.0);
   }
 
-  vec2 filterTextureCoord(void) {
-    return aPosition * (uOutputFrame.zw * uInputSize.zw);
-  }
-
   void main(void) {
     gl_Position = filterVertexPosition();
-    vTextureCoord = filterTextureCoord();
+    vUVScale = uOutputFrame.zw * uInputSize.zw;
+    vTextureCoord = aPosition * vUVScale;
   }
 `;
 
@@ -74,6 +72,7 @@ const FRAG = /* glsl */ `#version 300 es
   uniform float uFlickerStrength;
 
   in vec2 vTextureCoord;
+  in vec2 vUVScale;
   out vec4 fragColor;
 
   const float PI = 3.14159265;
@@ -109,7 +108,12 @@ const FRAG = /* glsl */ `#version 300 es
   }
 
   void main() {
-    vec2 uv = vTextureCoord;
+    // Normalize vTextureCoord to screen-space [0,1]×[0,1].
+    // When the stage bounding box is larger than the viewport (e.g. windows
+    // positioned off-screen on the infinite canvas), the input RT is oversized
+    // and vTextureCoord only spans a fraction of [0,1].  Dividing by vUVScale
+    // gives a UV that always covers exactly the visible screen.
+    vec2 uv = vTextureCoord / vUVScale;
 
     if (uCurvature > 0.001) {
       uv = curveRemapUV(uv, uCurvature);
@@ -119,12 +123,15 @@ const FRAG = /* glsl */ `#version 300 es
       }
     }
 
-    vec4 pixel = texture(uTexture, uv);
+    // Convert screen UV back to texture UV for sampling.
+    vec2 sampleUV = uv * vUVScale;
+
+    vec4 pixel = texture(uTexture, sampleUV);
 
     if (uBloomIntensity > 0.001) {
       float lum = dot(pixel.rgb, LUMA);
       if (lum > uBloomThreshold * BLOOM_THRESHOLD_FACTOR) {
-        vec4 bloom = sampleBloom(uTexture, uv, 0.005, pixel);
+        vec4 bloom = sampleBloom(uTexture, sampleUV, 0.005 * vUVScale.x, pixel);
         bloom.rgb *= uBrightness;
         float bloomLum = dot(bloom.rgb, LUMA);
         float factor = uBloomIntensity * max(0.0, (bloomLum - uBloomThreshold) * BLOOM_FACTOR_MULT);
@@ -133,9 +140,9 @@ const FRAG = /* glsl */ `#version 300 es
     }
 
     if (uRgbShift > 0.005) {
-      float shift = uRgbShift * RGB_SHIFT_SCALE;
-      pixel.r += texture(uTexture, vec2(uv.x + shift, uv.y)).r * RGB_SHIFT_INTENSITY;
-      pixel.b += texture(uTexture, vec2(uv.x - shift, uv.y)).b * RGB_SHIFT_INTENSITY;
+      float shift = uRgbShift * RGB_SHIFT_SCALE * vUVScale.x;
+      pixel.r += texture(uTexture, vec2(sampleUV.x + shift, sampleUV.y)).r * RGB_SHIFT_INTENSITY;
+      pixel.b += texture(uTexture, vec2(sampleUV.x - shift, sampleUV.y)).b * RGB_SHIFT_INTENSITY;
     }
 
     pixel.rgb *= uBrightness;
