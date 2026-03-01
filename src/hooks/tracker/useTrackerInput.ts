@@ -190,6 +190,10 @@ export const useTrackerInput = () => {
 
   const pattern = patterns[currentPatternIndex];
 
+  // A pattern is read-only when it was imported in UADE classic (playback-only) mode.
+  // Enhanced UADE imports use sourceFormat 'MOD'; only 'UADE' means non-editable.
+  const isPatternEditable = pattern?.importMetadata?.sourceFormat !== 'UADE';
+
   // Track held notes by key to enable proper release
   const heldNotesRef = useRef<Map<string, HeldNote>>(new Map());
 
@@ -996,6 +1000,10 @@ export const useTrackerInput = () => {
         if (getTrackerScratchController().isActive) return;
         e.preventDefault();
         if (!recordMode) {
+          if (!isPatternEditable) {
+            useUIStore.getState().openNonEditableDialog();
+            return;
+          }
           toggleRecordMode(); // Enable record mode
         }
         // Always restart playback from beginning
@@ -1042,6 +1050,11 @@ export const useTrackerInput = () => {
           getToneEngine().releaseAll();
           useUIStore.getState().setStatusMessage('STOPPED');
         } else {
+          // Block entering edit mode on non-editable (UADE classic) patterns
+          if (!recordMode && !isPatternEditable) {
+            useUIStore.getState().openNonEditableDialog();
+            return;
+          }
           // Toggle edit/record mode
           toggleRecordMode();
           const isRec = useTrackerStore.getState().recordMode;
