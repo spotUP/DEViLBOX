@@ -97,17 +97,16 @@ const DJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
       {/* Deck 1 label */}
       <pixiBitmapText text="D1" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={0x60a5fa} layout={{ alignSelf: 'center', marginRight: 4 }} />
       <pixiBitmapText text={d1Label} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={d1Color} layout={textLayout} />
-      {deck1Name ? (
-        <>
-          <PixiSep height={10} />
-          <pixiBitmapText
-            text={deck1Name.length > 14 ? deck1Name.slice(0, 12) + '\u2026' : deck1Name}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-            tint={theme.textMuted.color}
-            layout={textLayout}
-          />
-        </>
-      ) : null}
+      {/* Always mounted — conditional render causes @pixi/layout BindingError */}
+      <pixiContainer alpha={deck1Name ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
+        <PixiSep height={10} />
+        <pixiBitmapText
+          text={deck1Name ? (deck1Name.length > 14 ? deck1Name.slice(0, 12) + '\u2026' : deck1Name) : ''}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={textLayout}
+        />
+      </pixiContainer>
       <PixiSep height={10} />
       <pixiBitmapText text={d1BpmStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={0x60a5fa} layout={textLayout} />
       <pixiBitmapText text=" BPM" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
@@ -118,17 +117,16 @@ const DJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
       <PixiSep height={10} />
       <pixiBitmapText text="D2" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={0xf87171} layout={{ alignSelf: 'center', marginRight: 4 }} />
       <pixiBitmapText text={d2Label} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={d2Color} layout={textLayout} />
-      {deck2Name ? (
-        <>
-          <PixiSep height={10} />
-          <pixiBitmapText
-            text={deck2Name.length > 14 ? deck2Name.slice(0, 12) + '\u2026' : deck2Name}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-            tint={theme.textMuted.color}
-            layout={textLayout}
-          />
-        </>
-      ) : null}
+      {/* Always mounted — conditional render causes @pixi/layout BindingError */}
+      <pixiContainer alpha={deck2Name ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
+        <PixiSep height={10} />
+        <pixiBitmapText
+          text={deck2Name ? (deck2Name.length > 14 ? deck2Name.slice(0, 12) + '\u2026' : deck2Name) : ''}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={textLayout}
+        />
+      </pixiContainer>
       <PixiSep height={10} />
       <pixiBitmapText text={d2BpmStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={0xf87171} layout={textLayout} />
       <pixiBitmapText text=" BPM" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
@@ -244,42 +242,38 @@ const RightSide: React.FC<RightSideProps> = ({
 
   return (
     <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', height: barHeight, paddingRight: 12 }}>
-      {/* Collab badge */}
-      {collabConnected && collabRoomCode ? (
-        <>
-          <PixiDot color={theme.success.color} />
-          <pixiBitmapText text="Collab" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={theme.success.color} layout={textLayout} />
-          <pixiBitmapText text={` ${collabRoomCode}`} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textMuted.color} layout={textLayout} />
-          <PixiSep height={10} />
-        </>
-      ) : null}
+      {/* Collab badge — always mounted to avoid @pixi/layout BindingError */}
+      <pixiContainer alpha={collabConnected && collabRoomCode ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
+        <PixiDot color={theme.success.color} />
+        <pixiBitmapText text="Collab" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={theme.success.color} layout={textLayout} />
+        <pixiBitmapText text={collabRoomCode ? ` ${collabRoomCode}` : ''} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textMuted.color} layout={textLayout} />
+        <PixiSep height={10} />
+      </pixiContainer>
 
-      {/* MIDI device toggle button */}
-      {showMIDI ? (
-        <>
-          <pixiContainer
-            eventMode="static"
-            cursor="pointer"
-            onPointerUp={onToggleKnobBar}
-            layout={{ flexDirection: 'row', alignItems: 'center', height: barHeight }}
-          >
-            <PixiDot color={theme.success.color} />
-            <pixiBitmapText
-              text={deviceName.toUpperCase()}
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-              tint={theme.textMuted.color}
-              layout={textLayout}
-            />
-            <pixiBitmapText
-              text={` ${chevron}`}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-              tint={theme.textMuted.color}
-              layout={textLayout}
-            />
-          </pixiContainer>
-          <PixiSep height={10} />
-        </>
-      ) : null}
+      {/* MIDI device toggle button — always mounted to avoid @pixi/layout BindingError */}
+      <pixiContainer alpha={showMIDI ? 1 : 0} eventMode={showMIDI ? 'static' : 'none'} layout={{ flexDirection: 'row', flexShrink: 0 }}>
+        <pixiContainer
+          eventMode="static"
+          cursor="pointer"
+          onPointerUp={onToggleKnobBar}
+          layout={{ flexDirection: 'row', alignItems: 'center', height: barHeight }}
+        >
+          <PixiDot color={theme.success.color} />
+          <pixiBitmapText
+            text={deviceName.toUpperCase()}
+            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+            layout={textLayout}
+          />
+          <pixiBitmapText
+            text={` ${chevron}`}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+            layout={textLayout}
+          />
+        </pixiContainer>
+        <PixiSep height={10} />
+      </pixiContainer>
 
       {/* TIPS button */}
       <pixiContainer
@@ -566,12 +560,15 @@ const MainStatusRow: React.FC<MainRowProps> = ({
         onShowTips={onShowTips}
       />
 
-      {/* Workbench minimap — sits flush to right edge of status bar */}
-      {minimapVisible && (
-        <pixiContainer layout={{ position: 'absolute', right: 0, bottom: 0 }}>
-          <WorkbenchMinimap screenW={width} screenH={window.innerHeight} />
-        </pixiContainer>
-      )}
+      {/* Workbench minimap — always mounted to avoid @pixi/layout BindingError */}
+      <pixiContainer
+        alpha={minimapVisible ? 1 : 0}
+        renderable={minimapVisible}
+        eventMode={minimapVisible ? 'auto' : 'none'}
+        layout={{ position: 'absolute', right: 0, bottom: 0 }}
+      >
+        <WorkbenchMinimap screenW={width} screenH={window.innerHeight} />
+      </pixiContainer>
     </pixiContainer>
   );
 };
@@ -636,8 +633,12 @@ export const PixiStatusBar: React.FC = () => {
     <pixiContainer layout={{ width, height: totalHeight, flexDirection: 'column' }}>
       <pixiGraphics draw={drawRoot} layout={{ position: 'absolute', width, height: totalHeight }} />
 
-      {/* MIDI knob panel sits ABOVE the main status row to mirror DOM order */}
-      {showMIDIPanel && (
+      {/* MIDI knob panel — always mounted, zero-height when hidden to avoid @pixi/layout BindingError */}
+      <pixiContainer
+        alpha={showMIDIPanel ? 1 : 0}
+        renderable={showMIDIPanel}
+        layout={{ width, height: showMIDIPanel ? KNOB_PANEL_HEIGHT : 0, overflow: 'hidden' }}
+      >
         <KnobPanel
           width={width}
           height={KNOB_PANEL_HEIGHT}
@@ -645,7 +646,7 @@ export const PixiStatusBar: React.FC = () => {
           setKnobBank={setKnobBank}
           assignments={currentAssignments}
         />
-      )}
+      </pixiContainer>
 
       <MainStatusRow
         width={width}
