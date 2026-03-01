@@ -144,10 +144,11 @@ export const WorkbenchContainer: React.FC = () => {
   const zoomTextRef = useRef<BitmapTextType | null>(null);
 
   // Refs so the camera subscription (useEffect([])) always reads fresh values
+  // Use workbench area height (excludes NavBar + StatusBar chrome) for accurate culling
   const viewportWRef = useRef(width);
-  const viewportHRef = useRef(height);
+  const viewportHRef = useRef(height - WORKBENCH_CHROME_H);
   viewportWRef.current = width;
-  viewportHRef.current = height;
+  viewportHRef.current = height - WORKBENCH_CHROME_H;
 
   // Map from windowId → PixiWindow outer Container — populated via onMount callback
   const windowContainerRefs = useRef<Map<string, ContainerType>>(new Map());
