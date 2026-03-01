@@ -123,6 +123,15 @@ export const PixiArrangementView: React.FC = () => {
     }));
   }, [arrangementTracks, trackerChannels]);
 
+  // Markers
+  const storeMarkers = useArrangementStore(s => s.markers);
+  const markers = useMemo(() => storeMarkers.map(m => ({
+    id: m.id,
+    row: m.row,
+    label: m.name,
+    color: cssColorToPixi(m.color, 0x06b6d4),
+  })), [storeMarkers]);
+
   // Clips and selection
   const clips = useArrangementStore(s => s.clips);
   const selectedClipIds = useArrangementStore(s => s.selectedClipIds);
@@ -176,6 +185,8 @@ export const PixiArrangementView: React.FC = () => {
         name,
         muted: clip.muted,
         selected: selectedClipIds.has(clip.id),
+        fadeInRows: clip.fadeInRows || 0,
+        fadeOutRows: clip.fadeOutRows || 0,
       };
     });
   }, [clips, tracks, selectedClipIds, patterns]);
@@ -437,6 +448,7 @@ export const PixiArrangementView: React.FC = () => {
             onToggleSolo={handleToggleSolo}
             onRenameTrack={(trackId) => useArrangementStore.getState().setRenamingTrackId(trackId)}
             onCycleColor={(trackId) => useArrangementStore.getState().cycleTrackColor(trackId)}
+            onResizeTrack={(trackId, height) => useArrangementStore.getState().setTrackHeight(trackId, height)}
           />
           <pixiContainer layout={{ width: TRACK_HEADERS_W, height: SCROLLBAR_SIZE }} />
         </pixiContainer>
@@ -489,6 +501,10 @@ export const PixiArrangementView: React.FC = () => {
               pr.setChannelIndex(channelIndex);
               pr.setScroll(clip.offsetRows || 0, pr.view.scrollY);
               useWorkbenchStore.getState().showWindow('pianoroll');
+            }}
+            markers={markers}
+            onAddMarker={(row) => {
+              useArrangementStore.getState().addMarker({ row, name: `M${row}`, color: '#06b6d4', type: 'cue' });
             }}
             onAddClip={(trackIndex, startRow, lengthRows) => {
               const arr = useArrangementStore.getState();

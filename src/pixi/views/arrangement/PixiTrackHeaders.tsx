@@ -27,6 +27,8 @@ interface PixiTrackHeadersProps {
   onRenameTrack?: (trackId: string) => void;
   /** Called on click of the color swatch */
   onCycleColor?: (trackId: string) => void;
+  /** Called when the user drags the bottom edge of a track to resize it */
+  onResizeTrack?: (trackId: string, newHeight: number) => void;
 }
 
 export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
@@ -38,6 +40,7 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
   onToggleSolo,
   onRenameTrack,
   onCycleColor,
+  onResizeTrack,
 }) => {
   const theme = usePixiTheme();
   // Double-click detection for rename
@@ -184,6 +187,37 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
               }}
               layout={{ position: 'absolute', left: 0, top: trackHeight - 1, width, height: 1 }}
             />
+
+            {/* Resize handle — drag bottom edge to resize track height */}
+            <pixiContainer
+              eventMode="static"
+              cursor="ns-resize"
+              layout={{ position: 'absolute', left: 0, top: trackHeight - 4, width, height: 8 }}
+              onPointerDown={(e: FederatedPointerEvent) => {
+                e.stopPropagation();
+                const startY = e.clientY;
+                const startH = trackHeight;
+                const onMove = (me: PointerEvent) => {
+                  const newH = Math.max(30, Math.min(120, startH + (me.clientY - startY)));
+                  onResizeTrack?.(track.id, newH);
+                };
+                const onUp = () => {
+                  document.removeEventListener('pointermove', onMove);
+                  document.removeEventListener('pointerup', onUp);
+                };
+                document.addEventListener('pointermove', onMove);
+                document.addEventListener('pointerup', onUp);
+              }}
+            >
+              <pixiGraphics
+                draw={(g: GraphicsType) => {
+                  g.clear();
+                  g.rect(0, 2, width, 2);
+                  g.fill({ color: 0xffffff, alpha: 0.1 });
+                }}
+                layout={{ position: 'absolute', width, height: 8 }}
+              />
+            </pixiContainer>
           </pixiContainer>
         );
       })}
