@@ -553,7 +553,7 @@ export async function parseUADEFile(
           try {
             const decompressed = await engine.readMemory(moduleBase, buffer.byteLength * 4);
             if (decompressed && decompressed.byteLength >= 8) {
-              return parseHippelCoSoFile(decompressed.buffer, filename, moduleBase);
+              return parseHippelCoSoFile(decompressed.buffer as ArrayBuffer, filename, moduleBase);
             }
           } catch { /* fall through to original buffer */ }
         }
