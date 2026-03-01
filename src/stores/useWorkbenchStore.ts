@@ -95,6 +95,9 @@ interface WorkbenchStore {
   setGridSize: (size: number) => void;
   setUiSoundVolume: (vol: number) => void;
   setTilted: (tilted: boolean) => void;
+
+  /** Reset all windows to defaults and camera to origin. */
+  resetLayout: () => void;
 }
 
 export const useWorkbenchStore = create<WorkbenchStore>()(
@@ -248,6 +251,15 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       setTilted: (tilted) =>
         set((state) => { state.isTilted = tilted; }),
+
+      resetLayout: () =>
+        set((state) => {
+          state.windows = Object.fromEntries(
+            Object.entries(DEFAULT_WINDOWS).map(([id, w]) => [id, { ...w }])
+          ) as Record<string, WindowState>;
+          state.camera = { x: 0, y: 0, scale: 1 };
+          state.maxZIndex = 10;
+        }),
     })),
     {
       name: 'devilbox-workbench',

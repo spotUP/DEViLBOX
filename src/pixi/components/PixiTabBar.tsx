@@ -157,12 +157,13 @@ const PixiTab: React.FC<PixiTabProps> = ({
         tint={isActive ? theme.text.color : theme.textSecondary.color}
         layout={{ flex: 1, maxWidth: maxLabelW }}
       />
-      {/* Close button — always in layout tree, hidden via display:'none' when inactive */}
+      {/* Close button — always in layout tree, hidden via alpha to avoid @pixi/layout BindingError */}
       <pixiContainer
         eventMode={showClose ? 'static' : 'none'}
         cursor="pointer"
+        alpha={showClose ? 1 : 0}
         onPointerUp={(e: { stopPropagation: () => void }) => { e.stopPropagation(); onClose(); }}
-        layout={{ display: showClose ? 'flex' : 'none', width: CLOSE_BTN_SIZE, height: CLOSE_BTN_SIZE, justifyContent: 'center', alignItems: 'center', marginRight: 4 }}
+        layout={{ width: CLOSE_BTN_SIZE, height: CLOSE_BTN_SIZE, justifyContent: 'center', alignItems: 'center', marginRight: 4 }}
       >
         <pixiBitmapText
           text="×"
@@ -182,7 +183,8 @@ const PixiTabScrollBtn: React.FC<{ label: string; height: number; visible: boole
       eventMode={visible ? 'static' : 'none'}
       cursor="pointer"
       onPointerUp={onClick}
-      layout={{ display: visible ? 'flex' : 'none', width: 20, height, justifyContent: 'center', alignItems: 'center' }}
+      alpha={visible ? 1 : 0}
+      layout={{ width: 20, height, justifyContent: 'center', alignItems: 'center' }}
     >
       <pixiBitmapText
         text={label}
