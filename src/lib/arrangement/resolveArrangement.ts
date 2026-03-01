@@ -29,6 +29,8 @@ const EMPTY: TrackerCell = {
  * @param tracks - All tracks in the arrangement
  * @param patterns - All patterns (by id lookup)
  * @param speed - Ticks per row (for beat/bar calculations)
+ * @param loopStart - Optional loop region start row (inclusive)
+ * @param loopEnd - Optional loop region end row (exclusive)
  * @returns ResolvedArrangement with songPositions, virtualPatterns, etc.
  */
 export function resolveArrangement(
@@ -36,6 +38,8 @@ export function resolveArrangement(
   tracks: ArrangementTrack[],
   patterns: Pattern[],
   speed: number = 6,
+  loopStart?: number,
+  loopEnd?: number,
 ): ResolvedArrangement {
   void speed;
   if (clips.length === 0 || tracks.length === 0) {
@@ -60,7 +64,40 @@ export function resolveArrangement(
     .sort((a, b) => a.index - b.index);
 
   // Filter out muted clips
-  const activeClips = clips.filter(c => !c.muted);
+  let activeClips = clips.filter(c => !c.muted);
+
+  // When loop bounds are provided, restrict clips to the [loopStart, loopEnd) range,
+  // trimming clips at the boundaries so playback stays within the region.
+  const hasLoopBounds = loopStart != null && loopEnd != null && loopEnd > loopStart;
+  if (hasLoopBounds) {
+    const lStart = loopStart!;
+    const lEnd = loopEnd!;
+    const trimmedClips: ArrangementClip[] = [];
+    for (const clip of activeClips) {
+      const pattern = patternById.get(clip.patternId);
+      const clipLen = clip.clipLengthRows ?? (pattern ? pattern.length - clip.offsetRows : 64);
+      const clipEnd = clip.startRow + clipLen;
+
+      // Skip clips entirely outside the loop region
+      if (clipEnd <= lStart || clip.startRow >= lEnd) continue;
+
+      // Compute the overlap of this clip with [lStart, lEnd)
+      const overlapStart = Math.max(clip.startRow, lStart);
+      const overlapEnd = Math.min(clipEnd, lEnd);
+      const overlapLen = overlapEnd - overlapStart;
+
+      // Adjust startRow, offsetRows, and clipLengthRows to the trimmed region,
+      // but shift startRow relative to lStart so the virtual timeline starts at 0.
+      const deltaFromOriginalStart = overlapStart - clip.startRow;
+      trimmedClips.push({
+        ...clip,
+        startRow: overlapStart - lStart,
+        offsetRows: clip.offsetRows + deltaFromOriginalStart,
+        clipLengthRows: overlapLen,
+      });
+    }
+    activeClips = trimmedClips;
+  }
 
   // Find total timeline length
   let totalRows = 0;
