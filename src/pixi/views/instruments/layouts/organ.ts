@@ -4,7 +4,6 @@ import type { SynthPanelLayout } from '../synthPanelTypes';
 // drawbars is a 9-element array: [16', 5⅓', 8', 4', 2⅔', 2', 1⅗', 1⅓', 1']
 // Each drawbar value: 0-8 (9 positions)
 
-const fmtDrawbar = (v: number) => `${Math.round(v)}`;
 const fmtPct = (v: number) => `${Math.round(v)}%`;
 const fmtDb = (v: number) => `${Math.round(v)}dB`;
 const fmtPan = (v: number) => v === 0 ? 'C' : v > 0 ? `R${Math.round(v)}` : `L${Math.round(-v)}`;
