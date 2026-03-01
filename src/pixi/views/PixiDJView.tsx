@@ -72,17 +72,16 @@ export const PixiDJView: React.FC = () => {
       {/* Top control bar */}
       <PixiDJTopBar browserPanel={browserPanel} onBrowserPanelChange={setBrowserPanel} />
 
-      {/* Browser panel (collapsible) */}
-      {browserPanel !== 'none' && (
-        <PixiDOMOverlay
-          layout={{ width: '100%', height: 280 }}
-          style={{ overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
-        >
-          {browserPanel === 'playlists' && <DJPlaylistPanel onClose={() => setBrowserPanel('none')} />}
-          {browserPanel === 'modland' && <DJModlandBrowser onClose={() => setBrowserPanel('none')} />}
-          {browserPanel === 'serato' && <DJSeratoBrowser onClose={() => setBrowserPanel('none')} />}
-        </PixiDOMOverlay>
-      )}
+      {/* Browser panel — always mounted to avoid @pixi/layout BindingError; visible prop hides when 'none' */}
+      <PixiDOMOverlay
+        layout={{ width: '100%', height: browserPanel !== 'none' ? 280 : 0 }}
+        style={{ overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+        visible={browserPanel !== 'none'}
+      >
+        {browserPanel === 'playlists' && <DJPlaylistPanel onClose={() => setBrowserPanel('none')} />}
+        {browserPanel === 'modland' && <DJModlandBrowser onClose={() => setBrowserPanel('none')} />}
+        {browserPanel === 'serato' && <DJSeratoBrowser onClose={() => setBrowserPanel('none')} />}
+      </PixiDOMOverlay>
 
       {/* Main deck area: Deck A | Mixer | Deck B [| Deck C] */}
       <pixiContainer
@@ -95,7 +94,14 @@ export const PixiDJView: React.FC = () => {
         <PixiDJDeck deckId="A" />
         <PixiDJMixer />
         <PixiDJDeck deckId="B" />
-        {thirdDeckActive && <PixiDJDeck deckId="C" />}
+        {/* Third deck — always mounted to avoid @pixi/layout BindingError */}
+        <pixiContainer
+          alpha={thirdDeckActive ? 1 : 0}
+          renderable={thirdDeckActive}
+          layout={{ width: thirdDeckActive ? undefined : 0, height: '100%', overflow: 'hidden' }}
+        >
+          <PixiDJDeck deckId="C" />
+        </pixiContainer>
       </pixiContainer>
     </pixiContainer>
   );
