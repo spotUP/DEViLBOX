@@ -72,6 +72,8 @@ export class FCSynth implements DevilboxSynth {
     this.engine.sendMessage({ type: 'createPlayer' });
     this._playerHandle = await this.engine.waitForPlayerHandle();
 
+    if (this._playerHandle < 0) return; // Pool full — no player allocated
+
     // Serialize and upload instrument
     const blob = serializeFCConfig(config);
     this.engine.sendMessage(

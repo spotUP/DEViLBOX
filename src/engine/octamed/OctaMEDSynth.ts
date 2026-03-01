@@ -41,6 +41,8 @@ export class OctaMEDSynth implements DevilboxSynth {
     this.engine.sendMessage({ type: 'createPlayer' });
     this._playerHandle = await this.engine.waitForPlayerHandle();
 
+    if (this._playerHandle < 0) return; // Pool full — no player allocated
+
     const insBuffer = OctaMEDSynth.serializeInstrument(config);
     this.engine.sendMessage(
       { type: 'setInstrument', handle: this._playerHandle, buffer: insBuffer },
