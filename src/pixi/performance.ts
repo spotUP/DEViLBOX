@@ -53,6 +53,10 @@ export function setIsPlayingFn(fn: () => boolean): void {
 export function attachFPSLimiter(app: Application): () => void {
   if (!app?.ticker) return () => {};
 
+  // Reset FPS tracking state — handles HMR hot-reload correctly
+  _frameTimes.length = 0;
+  _lastFrameMs = 0;
+
   // Track per-frame timing for FPS monitor
   const frameTracker = () => _trackFrame(performance.now());
   app.ticker.add(frameTracker);
