@@ -44,8 +44,8 @@ const VIZ_WIDTH   = 220;
 
 /** Total toolbar height (both transport rows + file row + menu row) */
 export const FT2_TOOLBAR_HEIGHT = MENU_ROW_H + TRANSPORT_ROW_H * 2 + FILE_ROW_H;
-/** Compact height — same structure, only visualizer is hidden */
-export const FT2_TOOLBAR_HEIGHT_COMPACT = FT2_TOOLBAR_HEIGHT;
+/** Compact height — Row 4 (file action buttons) hidden, saving 32px */
+export const FT2_TOOLBAR_HEIGHT_COMPACT = MENU_ROW_H + TRANSPORT_ROW_H * 2;
 
 // ─── Stable layout objects ───────────────────────────────────────────────────
 
@@ -307,7 +307,7 @@ export const PixiFT2Toolbar: React.FC = () => {
     <pixiContainer
       layout={{
         width: '100%',
-        height: FT2_TOOLBAR_HEIGHT,
+        height: compactToolbar ? FT2_TOOLBAR_HEIGHT_COMPACT : FT2_TOOLBAR_HEIGHT,
         flexDirection: 'column',
       }}
     >
@@ -560,7 +560,7 @@ export const PixiFT2Toolbar: React.FC = () => {
         eventMode={!compactToolbar ? 'static' : 'none'}
         layout={{
           width: '100%',
-          height: FILE_ROW_H,
+          height: compactToolbar ? 0 : FILE_ROW_H,
           flexDirection: 'row',
           alignItems: 'center',
           paddingLeft: 8,
