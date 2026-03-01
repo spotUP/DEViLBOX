@@ -20,6 +20,8 @@ interface PixiPianoKeyboardProps {
   chordBuffer?: number[];
   /** Called when a key is clicked (pitch = MIDI note number, shiftHeld = Shift was held) */
   onKeyClick?: (pitch: number, shiftHeld: boolean) => void;
+  /** Called when pointer is released over the keyboard */
+  onKeyRelease?: (pitch: number) => void;
 }
 
 // Black key pattern per octave (C=0): C# D# - F# G# A#
@@ -36,6 +38,7 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
   totalNotes = 128,
   chordBuffer = [],
   onKeyClick,
+  onKeyRelease,
 }) => {
   const theme = usePixiTheme();
 
@@ -120,6 +123,13 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
     onKeyClick(pitch, e.shiftKey);
   }, [onKeyClick, yToMidiNote]);
 
+  const handlePointerUp = useCallback((e: FederatedPointerEvent) => {
+    if (!onKeyRelease) return;
+    const localY = e.getLocalPosition((e.currentTarget as any)).y;
+    const pitch = Math.max(0, Math.min(127, yToMidiNote(localY)));
+    onKeyRelease(pitch);
+  }, [onKeyRelease, yToMidiNote]);
+
   return (
     <pixiContainer layout={{ width, height }}>
       <pixiGraphics draw={drawKeyboard} layout={{ position: 'absolute', width, height }} />
@@ -145,6 +155,7 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
           cursor="pointer"
           layout={{ position: 'absolute', width, height }}
           onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
         />
       )}
     </pixiContainer>
