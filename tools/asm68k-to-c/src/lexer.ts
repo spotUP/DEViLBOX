@@ -396,6 +396,22 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
       }
 
       // No dot in raw — classify the whole token
+
+      // Identifier immediately followed by '(' → DISP_REG (e.g. PlayTick(PC), label(a5))
+      if (!REGISTERS.has(lower) && !DIRECTIVES.has(upper) && peek() === '(') {
+        const parenStart = i;
+        i++; // consume '('
+        let depth = 1;
+        while (i < src.length && depth > 0) {
+          if (src[i] === '(') depth++;
+          else if (src[i] === ')') depth--;
+          i++;
+        }
+        tokens.push(tok('DISP_REG', raw + src.slice(parenStart, i), col));
+        isFirstToken = false;
+        continue;
+      }
+
       if (REGISTERS.has(lower)) {
         tokens.push(tok('REGISTER', lower, col));
       } else if (DIRECTIVES.has(upper)) {
