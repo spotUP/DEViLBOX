@@ -3,8 +3,8 @@
  * Shows track names with mute/solo indicators.
  */
 
-import { useCallback } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
+import { useCallback, useRef } from 'react';
+import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
 
@@ -23,6 +23,10 @@ interface PixiTrackHeadersProps {
   scrollY?: number;
   onToggleMute?: (trackId: string) => void;
   onToggleSolo?: (trackId: string) => void;
+  /** Called on double-click of the track name area */
+  onRenameTrack?: (trackId: string) => void;
+  /** Called on click of the color swatch */
+  onCycleColor?: (trackId: string) => void;
 }
 
 export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
@@ -32,8 +36,12 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
   scrollY = 0,
   onToggleMute,
   onToggleSolo,
+  onRenameTrack,
+  onCycleColor,
 }) => {
   const theme = usePixiTheme();
+  // Double-click detection for rename
+  const lastClickRef = useRef<{ time: number; trackId: string }>({ time: 0, trackId: '' });
 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -53,6 +61,17 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
         return (
           <pixiContainer
             key={track.id}
+            eventMode="static"
+            onPointerDown={(e: FederatedPointerEvent) => {
+              if (e.button !== 0) return;
+              const now = Date.now();
+              if (now - lastClickRef.current.time < 300 && lastClickRef.current.trackId === track.id) {
+                onRenameTrack?.(track.id);
+                lastClickRef.current = { time: 0, trackId: '' };
+              } else {
+                lastClickRef.current = { time: now, trackId: track.id };
+              }
+            }}
             layout={{
               position: 'absolute',
               left: 0,
@@ -61,20 +80,30 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
               height: trackHeight,
               flexDirection: 'row',
               alignItems: 'center',
-              paddingLeft: 8,
+              paddingLeft: 4,
               paddingRight: 4,
               gap: 4,
             }}
           >
-            {/* Color indicator */}
-            <pixiGraphics
-              draw={(g: GraphicsType) => {
-                g.clear();
-                g.roundRect(0, 0, 3, trackHeight - 8, 2);
-                g.fill({ color: track.color, alpha: track.muted ? 0.3 : 1 });
+            {/* Color swatch — click to cycle color */}
+            <pixiContainer
+              eventMode="static"
+              cursor="pointer"
+              onPointerDown={(e: FederatedPointerEvent) => {
+                e.stopPropagation();
+                if (e.button === 0) onCycleColor?.(track.id);
               }}
-              layout={{ width: 3, height: trackHeight - 8 }}
-            />
+              layout={{ width: 8, height: trackHeight - 8 }}
+            >
+              <pixiGraphics
+                draw={(g: GraphicsType) => {
+                  g.clear();
+                  g.roundRect(0, 0, 8, trackHeight - 8, 2);
+                  g.fill({ color: track.color, alpha: track.muted ? 0.3 : 1 });
+                }}
+                layout={{ width: 8, height: trackHeight - 8 }}
+              />
+            </pixiContainer>
 
             {/* Track name */}
             <pixiBitmapText

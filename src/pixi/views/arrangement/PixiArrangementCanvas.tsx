@@ -62,6 +62,8 @@ interface PixiArrangementCanvasProps {
   onSplitClip?: (id: string, splitRow: number) => void;
   /** Called on double-click of a clip in select mode */
   onOpenInPianoRoll?: (clipId: string) => void;
+  /** Called on right-click; clipId is null if clicking empty space */
+  onContextMenu?: (clipId: string | null, screenX: number, screenY: number) => void;
   /** Arrangement loop region start row (null = no loop) */
   loopStart?: number | null;
   /** Arrangement loop region end row */
@@ -150,6 +152,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
   onDeleteClip,
   onSplitClip,
   onOpenInPianoRoll,
+  onContextMenu,
   loopStart,
   loopEnd,
 }) => {
@@ -160,8 +163,8 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
   const paramsRef = useRef({ scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme, loopStart, loopEnd });
   paramsRef.current = { scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme, loopStart, loopEnd };
 
-  const callbacksRef = useRef({ onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll });
-  callbacksRef.current = { onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll };
+  const callbacksRef = useRef({ onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll, onContextMenu });
+  callbacksRef.current = { onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll, onContextMenu };
 
   // Double-click detection for select tool
   const lastClickRef = useRef<{ time: number; clipId: string }>({ time: 0, clipId: '' });
@@ -258,6 +261,12 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
     const hit = findClipAt(lx, ly, cs, sb, ppb, th, sy);
     const trackIndex = Math.max(0, Math.floor((ly - RULER_HEIGHT + sy) / th));
     const rowAtCursor = sb + lx / ppb;
+
+    // Right-click: context menu (any tool)
+    if (e.button === 2) {
+      cbs.onContextMenu?.(hit?.id ?? null, e.clientX, e.clientY);
+      return;
+    }
 
     // Erase tool
     if (t === 'erase') {

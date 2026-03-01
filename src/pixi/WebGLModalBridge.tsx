@@ -134,6 +134,12 @@ const LazyImportTD3Dialog = lazy(() =>
 const LazyClipRenameDialog = lazy(() =>
   import('@/components/arrangement/ClipRenameDialog').then(m => ({ default: m.ClipRenameDialog }))
 );
+const LazyArrangementContextMenu = lazy(() =>
+  import('@/components/arrangement/ArrangementContextMenu').then(m => ({ default: m.ArrangementContextMenu }))
+);
+const LazyTrackRenameDialog = lazy(() =>
+  import('@/components/arrangement/TrackRenameDialog').then(m => ({ default: m.TrackRenameDialog }))
+);
 const LazySunVoxImportDialog = lazy(() =>
   import('@/components/instruments/SunVoxImportDialog').then(m => ({ default: m.SunVoxImportDialog }))
 );
@@ -633,6 +639,10 @@ export const WebGLModalBridge: React.FC = () => {
       )}
       {/* Arrangement clip rename dialog (F2) */}
       <LazyClipRenameDialog />
+      {/* Arrangement clip right-click context menu */}
+      <LazyArrangementContextMenu />
+      {/* Arrangement track rename dialog (double-click header) */}
+      <LazyTrackRenameDialog />
 
       {/* Always-mounted dialogs */}
       <LazySynthErrorDialog />

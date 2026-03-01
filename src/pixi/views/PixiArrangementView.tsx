@@ -59,7 +59,7 @@ export const PixiArrangementView: React.FC = () => {
   // Hover ref for wheel scroll gating
   const isHoveredRef = useRef(false);
 
-  // Wheel → horizontal scroll
+  // Wheel → horizontal scroll; contextmenu → suppress browser menu
   useEffect(() => {
     const canvas = document.querySelector('canvas');
     if (!canvas) return;
@@ -74,8 +74,13 @@ export const PixiArrangementView: React.FC = () => {
         s.setScrollY(s.view.scrollY + e.deltaY);
       }
     };
+    const handleContextMenu = (e: MouseEvent) => e.preventDefault();
     canvas.addEventListener('wheel', handleWheel, { passive: false });
-    return () => canvas.removeEventListener('wheel', handleWheel);
+    canvas.addEventListener('contextmenu', handleContextMenu);
+    return () => {
+      canvas.removeEventListener('wheel', handleWheel);
+      canvas.removeEventListener('contextmenu', handleContextMenu);
+    };
   }, []);
 
   // Arrangement store
@@ -424,7 +429,15 @@ export const PixiArrangementView: React.FC = () => {
       >
         {/* Track headers + blank corner for scrollbar alignment */}
         <pixiContainer layout={{ width: TRACK_HEADERS_W, flexDirection: 'column' }}>
-          <PixiTrackHeaders tracks={tracks} width={TRACK_HEADERS_W} scrollY={scrollY} onToggleMute={handleToggleMute} onToggleSolo={handleToggleSolo} />
+          <PixiTrackHeaders
+            tracks={tracks}
+            width={TRACK_HEADERS_W}
+            scrollY={scrollY}
+            onToggleMute={handleToggleMute}
+            onToggleSolo={handleToggleSolo}
+            onRenameTrack={(trackId) => useArrangementStore.getState().setRenamingTrackId(trackId)}
+            onCycleColor={(trackId) => useArrangementStore.getState().cycleTrackColor(trackId)}
+          />
           <pixiContainer layout={{ width: TRACK_HEADERS_W, height: SCROLLBAR_SIZE }} />
         </pixiContainer>
 
@@ -451,6 +464,11 @@ export const PixiArrangementView: React.FC = () => {
             onResizeClipEnd={(id, newEndRow) => useArrangementStore.getState().resizeClipEnd(id, newEndRow)}
             onDeleteClip={(id) => useArrangementStore.getState().removeClip(id)}
             onSplitClip={(id, splitRow) => useArrangementStore.getState().splitClip(id, splitRow)}
+            onContextMenu={(clipId, screenX, screenY) => {
+              if (clipId) {
+                useArrangementStore.getState().setClipContextMenu({ clipId, screenX, screenY });
+              }
+            }}
             onOpenInPianoRoll={(clipId) => {
               const clip = useArrangementStore.getState().clips.find(c => c.id === clipId);
               if (!clip) return;
