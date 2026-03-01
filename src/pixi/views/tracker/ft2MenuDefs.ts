@@ -6,6 +6,9 @@
 import type { Menu } from '../../components/PixiMenuBar';
 
 export interface FT2MenuActions {
+  onLoadFile: () => void;
+  onSave: () => void;
+  onClearProject: () => void;
   onShowExport: () => void;
   onShowHelp: (tab?: string) => void;
   onShowMasterFX: () => void;
@@ -22,9 +25,14 @@ export function buildFT2Menus(actions: FT2MenuActions): Menu[] {
     {
       label: 'File',
       items: [
+        { type: 'action', label: 'Load...', shortcut: '⌘O', onClick: actions.onLoadFile },
+        { type: 'action', label: 'Save', shortcut: '⌘S', onClick: actions.onSave },
+        { type: 'separator' },
         { type: 'action', label: 'Export...', shortcut: '⌘E', onClick: actions.onShowExport },
         { type: 'separator' },
-        { type: 'action', label: 'Open Module...', onClick: () => {} },
+        { type: 'action', label: 'Open Module...', onClick: actions.onLoadFile },
+        { type: 'separator' },
+        { type: 'action', label: 'Clear Project...', onClick: actions.onClearProject },
       ],
     },
     {
