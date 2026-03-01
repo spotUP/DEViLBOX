@@ -251,6 +251,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
     semiTone: number;     // signed, semitone transposition
     smplRepStart: number; // loop start in words
     smplRepLen: number;   // loop length in words
+    instrBase?: number;   // file offset of this instrument's header (for chip RAM)
   }
   const instList: InstData[] = [];
 
