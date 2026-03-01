@@ -1,10 +1,11 @@
 /**
  * PixiPianoKeyboard — Vertical piano keyboard display.
  * Renders white and black keys with note labels.
+ * Supports click-to-play and chord mode (Shift+click accumulates pitches).
  */
 
 import { useCallback, useMemo } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
+import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
 
@@ -15,10 +16,17 @@ interface PixiPianoKeyboardProps {
   scrollNote?: number;
   /** Total note range (MIDI 0-127) */
   totalNotes?: number;
+  /** Pitches currently in the chord buffer (shown with accent tint) */
+  chordBuffer?: number[];
+  /** Called when a key is clicked (pitch = MIDI note number, shiftHeld = Shift was held) */
+  onKeyClick?: (pitch: number, shiftHeld: boolean) => void;
 }
 
 // Black key pattern per octave (C=0): C# D# - F# G# A#
 const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
+
+/** Gold tint used to highlight keys in the chord buffer */
+const CHORD_TINT = 0xffd700;
 
 export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
   width = 60,
@@ -26,6 +34,8 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
   noteHeight = 12,
   scrollNote = 36,
   totalNotes = 128,
+  chordBuffer = [],
+  onKeyClick,
 }) => {
   const theme = usePixiTheme();
 
@@ -46,19 +56,22 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
 
       const noteInOctave = note % 12;
       const isBlack = BLACK_KEYS.has(noteInOctave);
+      const isInChord = chordBuffer.includes(note);
 
       if (isBlack) {
         // Black key
+        const keyColor = isInChord ? CHORD_TINT : 0x1a1a1d;
         g.rect(0, y, width * 0.65, noteHeight);
-        g.fill({ color: 0x1a1a1d });
+        g.fill({ color: keyColor });
         g.rect(0, y, width * 0.65, 1);
-        g.fill({ color: 0x333338 });
+        g.fill({ color: isInChord ? 0xffe566 : 0x333338 });
       } else {
         // White key
+        const keyColor = isInChord ? CHORD_TINT : 0xe8e8e8;
         g.rect(0, y, width, noteHeight);
-        g.fill({ color: 0xe8e8e8 });
+        g.fill({ color: keyColor });
         g.rect(0, y + noteHeight - 1, width, 1);
-        g.fill({ color: 0xcccccc });
+        g.fill({ color: isInChord ? 0xccaa00 : 0xcccccc });
       }
 
       // C note labels
@@ -72,7 +85,7 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
     // Right border
     g.rect(width - 1, 0, 1, height);
     g.fill({ color: theme.border.color, alpha: 0.3 });
-  }, [width, height, noteHeight, scrollNote, totalNotes, theme]);
+  }, [width, height, noteHeight, scrollNote, totalNotes, theme, chordBuffer]);
 
   // Note labels for C notes
   const cLabels = useMemo(() => {
@@ -93,6 +106,20 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
     return labels;
   }, [height, noteHeight, scrollNote, totalNotes]);
 
+  /** Convert a pointer Y position to the MIDI note number it corresponds to */
+  const yToMidiNote = useCallback((localY: number): number => {
+    // note at bottom = scrollNote, note at top = scrollNote + visibleNotes
+    const noteFromBottom = (height - localY) / noteHeight;
+    return Math.floor(scrollNote + noteFromBottom);
+  }, [height, noteHeight, scrollNote]);
+
+  const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
+    if (!onKeyClick) return;
+    const localY = e.getLocalPosition((e.currentTarget as any)).y;
+    const pitch = Math.max(0, Math.min(127, yToMidiNote(localY)));
+    onKeyClick(pitch, e.shiftKey);
+  }, [onKeyClick, yToMidiNote]);
+
   return (
     <pixiContainer layout={{ width, height }}>
       <pixiGraphics draw={drawKeyboard} layout={{ position: 'absolute', width, height }} />
@@ -106,6 +133,20 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
           y={y}
         />
       ))}
+      {/* Transparent hit-area overlay for click handling */}
+      {onKeyClick && (
+        <pixiGraphics
+          draw={(g: GraphicsType) => {
+            g.clear();
+            g.rect(0, 0, width, height);
+            g.fill({ color: 0xffffff, alpha: 0 });
+          }}
+          eventMode="static"
+          cursor="pointer"
+          layout={{ position: 'absolute', width, height }}
+          onPointerDown={handlePointerDown}
+        />
+      )}
     </pixiContainer>
   );
 };
