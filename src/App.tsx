@@ -13,6 +13,7 @@ import { useDJStore } from './stores/useDJStore';
 import { useSettingsStore } from './stores/useSettingsStore';
 import { useHistoryStore } from './stores/useHistoryStore';
 import { useLiveModeStore } from './stores/useLiveModeStore';
+import { useMixerStore } from './stores/useMixerStore';
 import { useButtonMappings } from './hooks/midi/useButtonMappings';
 import { useMIDIActions } from './hooks/useMIDIActions';
 import { usePadTriggers } from './hooks/usePadTriggers';
@@ -70,6 +71,7 @@ const RevisionBrowserDialog = lazy(() => import('@components/dialogs/RevisionBro
 const PixiApp = lazy(() => import('./pixi/PixiApp').then(m => ({ default: m.PixiApp })));
 const WebGLModalBridge = lazy(() => import('./pixi/WebGLModalBridge').then(m => ({ default: m.WebGLModalBridge })));
 const CollaborationSplitView = lazy(() => import('@components/collaboration/CollaborationSplitView').then(m => ({ default: m.CollaborationSplitView })));
+const MixerPanel = lazy(() => import('./components/panels/MixerPanel').then(m => ({ default: m.MixerPanel })));
 
 function App() {
   // Check for application updates
@@ -347,8 +349,15 @@ function App() {
         return;
       }
 
-      // Ctrl+M: Master effects
+      // Ctrl+M: Toggle mixer DOM panel
       if ((e.ctrlKey || e.metaKey) && e.key === 'm' && !e.shiftKey) {
+        e.preventDefault();
+        useMixerStore.getState().toggleDomPanel();
+        return;
+      }
+
+      // Ctrl+Shift+X: Master effects
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'X') {
         e.preventDefault();
         const s = useUIStore.getState();
         s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx');
@@ -1106,6 +1115,11 @@ function App() {
           </PopOutWindow>
         </Suspense>
       )}
+
+      {/* Floating DOM Mixer Panel — visibility controlled by useMixerStore.domPanelVisible */}
+      <Suspense fallback={null}>
+        <MixerPanel />
+      </Suspense>
 
       {/* Peer mouse cursor — fixed overlay covering entire UI, visible when in shared collab mode */}
       <PeerMouseCursor />
