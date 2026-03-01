@@ -40,7 +40,7 @@ const OFF_VIB_TABLE = 21;
 /** Pitch bend: uint16 BE at +36. */
 const OFF_PITCH_BEND = 36;
 /** Wavetable sequence: 48 bytes at +40. */
-const OFF_TABLE = 40;
+const _OFF_TABLE = 40;
 
 // ── Tab type ────────────────────────────────────────────────────────────────
 
