@@ -52,7 +52,6 @@ import type { MODNote } from '@lib/import/formats/MODParser';
 import { convertToInstrument } from '@lib/import/InstrumentConverter';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
 import { clearSavedProject } from '@hooks/useProjectPersistence';
-import { RevisionBrowserDialog } from '@components/dialogs/RevisionBrowserDialog';
 import { parseDb303Pattern, exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
 import type { InstrumentConfig, TB303Config } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
@@ -271,7 +270,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
-  const [showRevisions, setShowRevisions] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
 
   // PERF: Memoize logo animation complete callback to prevent re-renders
@@ -844,7 +842,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <input ref={fileInputRef} type="file" accept={ACCEPTED_FORMATS} onChange={handleFileLoad} className="hidden" />
         <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
         <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
-        <Button variant="ghost" size="sm" onClick={() => setShowRevisions(true)}>Revisions</Button>
+        <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openModal('revisions')}>Revisions</Button>
         <Button variant="ghost" size="sm" onClick={handleSave}>Download</Button>
         <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>
         <Button variant="ghost" size="sm" onClick={() => addTab()} icon={<FilePlus size={14} />} iconPosition="left">New</Button>
@@ -868,7 +866,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       </div>
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-      <RevisionBrowserDialog isOpen={showRevisions} onClose={() => setShowRevisions(false)} />
       <ImportModuleDialog
         isOpen={showImportDialog}
         onClose={() => { setShowImportDialog(false); setPendingFile(null); }}
