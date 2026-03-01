@@ -250,36 +250,17 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [tool, setTool, view.channelIndex, pianoData, handleNotesChanged]);
 
-  // Get notes from the current pattern/channel
-  const notes = useMemo(() => {
-    const ts = useTrackerStore.getState();
-    const pat = ts.patterns[ts.currentPatternIndex];
-    if (!pat) return [];
-    const ch = pat.channels[view.channelIndex];
-    if (!ch) return [];
-    // Convert tracker rows to piano roll note format
-    const result: { note: number; start: number; duration: number; velocity: number }[] = [];
-    for (let row = 0; row < pat.length; row++) {
-      const cell = ch.rows[row];
-      if (cell && cell.note > 0 && cell.note < 97) {
-        // Find note-off or next note to determine duration
-        let dur = 1;
-        for (let r = row + 1; r < pat.length; r++) {
-          const next = ch.rows[r];
-          if (next && (next.note > 0 || next.note === 97)) break;
-          dur++;
-        }
-        result.push({
-          note: cell.note + 11, // Convert tracker note to MIDI
-          start: row,
-          duration: dur,
-          velocity: cell.volume !== null ? cell.volume : 64,
-        });
-      }
-    }
-    return result;
+  // Derive grid-format notes from pianoData (reactive, correct velocity conversion)
+  const notes = useMemo(() =>
+    pianoData.notes.map(n => ({
+      note: n.midiNote,
+      start: n.startRow,
+      duration: n.endRow - n.startRow,
+      velocity: n.velocity,
+    })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view.channelIndex, noteVersion]);
+    [pianoData.notes, noteVersion],
+  );
 
   const handleCycleGrid = useCallback(() => {
     const s = usePianoRollStore.getState();
@@ -484,7 +465,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           height={VELOCITY_HEIGHT}
           scrollBeat={view.scrollX}
           pixelsPerBeat={horizontalZoom}
-          notes={notes.map(n => ({ id: `${view.channelIndex}-${n.start}`, start: n.start, velocity: n.velocity }))}
+          notes={pianoData.notes.map(n => ({ id: n.id, start: n.startRow, velocity: n.velocity }))}
           selectedIds={selectedNotes}
           onDragStart={() => pianoData.beginVelocityDrag()}
           onVelocityChange={(id, vel) => {
