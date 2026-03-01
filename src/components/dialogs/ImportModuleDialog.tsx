@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Play, Square, Music, FileAudio, AlertCircle, Info } from 'lucide-react';
+import { X, Play, Square, Music, FileAudio, AlertCircle } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import {
   loadModuleFile,
@@ -264,7 +264,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [isLoading, setIsLoading]       = useState(false);
   const [error, setError]               = useState<string | null>(null);
   const [isPlaying, setIsPlaying]       = useState(false);
-  const [useLibopenmpt, setUseLibopenmpt] = useState(true);
   const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
   const [selectedSubsong, setSelectedSubsong] = useState(0);
   // Track whether a UADE scan is in-flight so handleClose can cancel it
@@ -272,26 +271,13 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   // MusicLine preview engine reference (connect/disconnect on preview start/stop)
   const mlPreviewRef = useRef<{ stop: () => void; output: GainNode } | null>(null);
 
-  const formatEngine   = useSettingsStore((s) => s.formatEngine);
   const setFormatEngine = useSettingsStore((s) => s.setFormatEngine);
 
   // Derived format state
   const nativeFmt  = detectNativeFormat(loadedFileName);
   const isChipDump = CHIP_DUMP_FORMAT_RE.test(loadedFileName);
   const isUADE     = !nativeFmt && !isChipDump && isUADEFormat(loadedFileName);
-  // nativeOnly formats always use native — force pref to 'native' if it was previously set to 'uade'
   const isNativeOnly = !!(nativeFmt?.nativeOnly);
-  const isNativeSelected = nativeFmt
-    ? isNativeOnly || (formatEngine[nativeFmt.key] as string) !== 'uade'
-    : false;
-  const uadeMode   = formatEngine.uade ?? 'enhanced';
-
-  // Auto-correct any stale 'uade' preference for native-only formats when the file loads
-  useEffect(() => {
-    if (nativeFmt && isNativeOnly && (formatEngine[nativeFmt.key] as string) === 'uade') {
-      setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'native');
-    }
-  }, [nativeFmt, isNativeOnly, formatEngine, setFormatEngine]);
 
   const handleFileSelect = useCallback(async (file: File) => {
     if (!isSupportedModule(file.name)) {
@@ -489,9 +475,14 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       else stopPreview(moduleInfo);
       setIsPlaying(false);
     }
-    onImport(moduleInfo, { useLibopenmpt, subsong: selectedSubsong, uadeMetadata: uadeMetadata ?? undefined });
+    // Always use native parser when available; always use UADE enhanced (editable) mode.
+    if (nativeFmt && !isNativeOnly) {
+      setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'native');
+    }
+    setFormatEngine('uade', 'enhanced');
+    onImport(moduleInfo, { useLibopenmpt: true, subsong: selectedSubsong, uadeMetadata: uadeMetadata ?? undefined });
     onClose();
-  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, onImport, onClose, useLibopenmpt, selectedSubsong]);
+  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, nativeFmt, isNativeOnly, setFormatEngine, onImport, onClose, selectedSubsong]);
 
   const handleClose = useCallback(() => {
     if (isPlaying) {
@@ -679,169 +670,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
             </div>
           )}
 
-          {/* ── Engine selector for formats with a native parser ── */}
-          {moduleInfo && nativeFmt && (
-            <div className="bg-dark-bg rounded-lg p-3 space-y-2">
-              <p className="text-xs font-medium text-text-primary">
-                Import Engine — <span className="text-accent-primary">{nativeFmt.label}</span>
-              </p>
-
-              {/* Native-only formats: just show info, no engine toggle */}
-              {isNativeOnly ? (
-                <div className="flex items-start gap-2">
-                  <Info size={12} className="mt-0.5 text-accent-primary shrink-0" />
-                  <p className="text-xs text-text-muted">{nativeFmt.description}</p>
-                </div>
-              ) : (
-                <>
-                  {/* Native parser option */}
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="nativeEngine"
-                      checked={isNativeSelected}
-                      onChange={() => setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'native')}
-                      className="mt-0.5 accent-accent-primary"
-                    />
-                    <div>
-                      <span className="text-sm text-text-primary">Native Parser (Fully Editable)</span>
-                      <p className="text-xs text-text-muted">{nativeFmt.description}</p>
-                    </div>
-                  </label>
-
-                  {/* UADE option */}
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="nativeEngine"
-                      checked={!isNativeSelected}
-                      onChange={() => setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'uade')}
-                      className="mt-0.5 accent-accent-primary"
-                    />
-                    <div>
-                      <span className="text-sm text-text-primary">UADE (Amiga Emulation)</span>
-                      <p className="text-xs text-text-muted">Use UADE emulator instead of native parser.</p>
-                    </div>
-                  </label>
-                </>
-              )}
-
-              {/* UADE mode sub-selector — shown when UADE is chosen for this format (non-native-only) */}
-              {!isNativeOnly && showUADEModeSelector && (
-                <div className="mt-2 ml-5 pl-3 border-l border-dark-border space-y-1.5">
-                  <p className="text-xs text-text-muted font-medium">UADE Mode</p>
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="uadeMode"
-                      checked={uadeMode === 'enhanced'}
-                      onChange={() => setFormatEngine('uade', 'enhanced')}
-                      className="mt-0.5 accent-accent-primary"
-                    />
-                    <div>
-                      <span className="text-sm text-text-primary">Enhanced (Editable)</span>
-                      <p className="text-xs text-text-muted">Extracts real samples, detects effects.</p>
-                    </div>
-                  </label>
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="uadeMode"
-                      checked={uadeMode === 'classic'}
-                      onChange={() => setFormatEngine('uade', 'classic')}
-                      className="mt-0.5 accent-accent-primary"
-                    />
-                    <div>
-                      <span className="text-sm text-text-primary">Classic (Playback Only)</span>
-                      <p className="text-xs text-text-muted">Authentic emulation, display-only patterns.</p>
-                    </div>
-                  </label>
-                  {/* Subsong input for native-fallback-to-UADE formats (no pre-scan available) */}
-                  <div className="flex items-center gap-3 pt-1">
-                    <label className="text-xs text-text-muted whitespace-nowrap">Subsong:</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={selectedSubsong + 1}
-                      onChange={(e) => setSelectedSubsong(Math.max(0, Number(e.target.value) - 1))}
-                      className="w-16 text-xs bg-dark-bgSecondary border border-dark-border rounded px-2 py-1 text-text-primary"
-                    />
-                    <span className="text-xs text-text-muted">(1 = default)</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Engine selector for pure UADE formats (no native parser) ── */}
-          {moduleInfo && isUADE && (
-            <div className="bg-dark-bg rounded-lg p-3 space-y-2">
-              <p className="text-xs font-medium text-text-primary">Import Engine</p>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="uadeMode"
-                  checked={uadeMode === 'enhanced'}
-                  onChange={() => setFormatEngine('uade', 'enhanced')}
-                  className="mt-0.5 accent-accent-primary"
-                />
-                <div>
-                  <span className="text-sm text-text-primary">Enhanced (Editable)</span>
-                  <p className="text-xs text-text-muted">
-                    Extracts real samples, detects effects. Fully editable patterns.
-                  </p>
-                </div>
-              </label>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="uadeMode"
-                  checked={uadeMode === 'classic'}
-                  onChange={() => setFormatEngine('uade', 'classic')}
-                  className="mt-0.5 accent-accent-primary"
-                />
-                <div>
-                  <span className="text-sm text-text-primary">Classic (UADE Playback)</span>
-                  <p className="text-xs text-text-muted">
-                    Authentic emulation, display-only patterns.
-                  </p>
-                </div>
-              </label>
-            </div>
-          )}
-
-          {/* ── Playback options for standard tracker formats (MOD/XM/IT/S3M) ── */}
-          {moduleInfo && !nativeFmt && !isUADE && (
-            <div className="bg-dark-bg rounded-lg p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="useLibopenmpt"
-                  checked={useLibopenmpt}
-                  onChange={(e) => setUseLibopenmpt(e.target.checked)}
-                  className="w-4 h-4 rounded border-dark-border bg-dark-bgSecondary accent-accent-primary"
-                />
-                <label htmlFor="useLibopenmpt" className="text-sm text-text-primary cursor-pointer">
-                  Use libopenmpt for sample-accurate playback
-                </label>
-              </div>
-              <div className="flex items-start gap-2 text-xs text-text-muted">
-                <Info size={12} className="mt-0.5 flex-shrink-0" />
-                <span>
-                  When enabled, uses libopenmpt WASM for authentic tracker effects (smooth vibrato, portamento).
-                  Editing will use Tone.js approximation.
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Import note */}
-          {moduleInfo && !nativeFmt && !isUADE && !useLibopenmpt && (
-            <p className="text-xs text-text-muted">
-              Note: Importing will create patterns and sampler instruments from this module.
-              Complex effects may not translate perfectly.
-            </p>
-          )}
         </div>
 
         {/* Footer */}
