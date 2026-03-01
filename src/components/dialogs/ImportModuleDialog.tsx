@@ -275,7 +275,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
   // Derived format state
   const nativeFmt  = detectNativeFormat(loadedFileName);
-  const isChipDump = CHIP_DUMP_FORMAT_RE.test(loadedFileName);
   const isNativeOnly = !!(nativeFmt?.nativeOnly);
 
   const handleFileSelect = useCallback(async (file: File) => {
