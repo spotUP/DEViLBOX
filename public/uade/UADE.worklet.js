@@ -265,9 +265,15 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       case 'enablePaulaLog': {
         const { enable } = data;
-        if (this._wasm?._uade_wasm_enable_paula_log) {
-          this._wasm._uade_wasm_enable_paula_log(enable ? 1 : 0);
+        if (!this._wasm || !this._ready) {
+          console.warn('[UADE.worklet] enablePaulaLog called before WASM ready — ignoring');
+          break;
         }
+        if (!this._wasm._uade_wasm_enable_paula_log) {
+          console.warn('[UADE.worklet] _uade_wasm_enable_paula_log not in WASM build — ignoring');
+          break;
+        }
+        this._wasm._uade_wasm_enable_paula_log(enable ? 1 : 0);
         break;
       }
 
@@ -277,9 +283,17 @@ class UADEProcessor extends AudioWorkletProcessor {
           this.port.postMessage({ type: 'paulaLogError', requestId, error: 'WASM not ready' });
           break;
         }
+        if (!this._wasm._uade_wasm_get_paula_log) {
+          this.port.postMessage({ type: 'paulaLogError', requestId, error: '_uade_wasm_get_paula_log not in WASM build' });
+          break;
+        }
         try {
           const maxEntries = 512;
           const ptr = this._wasm._malloc(maxEntries * 3 * 4); // 3 uint32 per entry
+          if (!ptr) {
+            this.port.postMessage({ type: 'paulaLogError', requestId, error: 'malloc failed' });
+            break;
+          }
           const count = this._wasm._uade_wasm_get_paula_log(ptr, maxEntries);
           const raw = new Uint32Array(this._wasm.HEAPU8.buffer, ptr, count * 3);
           const entries = [];
