@@ -62,6 +62,10 @@ interface PixiArrangementCanvasProps {
   onSplitClip?: (id: string, splitRow: number) => void;
   /** Called on double-click of a clip in select mode */
   onOpenInPianoRoll?: (clipId: string) => void;
+  /** Arrangement loop region start row (null = no loop) */
+  loopStart?: number | null;
+  /** Arrangement loop region end row */
+  loopEnd?: number | null;
 }
 
 const CLIP_PADDING = 2;
@@ -146,13 +150,15 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
   onDeleteClip,
   onSplitClip,
   onOpenInPianoRoll,
+  loopStart,
+  loopEnd,
 }) => {
   const theme = usePixiTheme();
   const gridHeight = height - RULER_HEIGHT;
 
   // Keep latest params/callbacks in refs so drag handlers don't go stale
-  const paramsRef = useRef({ scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme });
-  paramsRef.current = { scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme };
+  const paramsRef = useRef({ scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme, loopStart, loopEnd });
+  paramsRef.current = { scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme, loopStart, loopEnd };
 
   const callbacksRef = useRef({ onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll });
   callbacksRef.current = { onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll };
@@ -491,7 +497,34 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         g.fill({ color: theme.accent.color, alpha: 0.8 });
       }
     }
-  }, [width, height, scrollBeat, scrollY, pixelsPerBeat, totalBeats, beatsPerBar, playbackBeat, theme, gridHeight, clips, trackHeight]);
+
+    // Loop region
+    if (loopStart != null && loopEnd != null && loopEnd > loopStart) {
+      const lx1 = (loopStart - scrollBeat) * pixelsPerBeat;
+      const lx2 = (loopEnd - scrollBeat) * pixelsPerBeat;
+      const visW = Math.min(lx2, width) - Math.max(lx1, 0);
+      if (visW > 0) {
+        const lx = Math.max(lx1, 0);
+        // Ruler band
+        g.rect(lx, 0, visW, RULER_HEIGHT);
+        g.fill({ color: theme.accent.color, alpha: 0.12 });
+        g.rect(lx, 0, visW, 3);
+        g.fill({ color: theme.accent.color, alpha: 0.55 });
+        // Grid band
+        g.rect(lx, RULER_HEIGHT, visW, gridHeight);
+        g.fill({ color: theme.accent.color, alpha: 0.05 });
+      }
+      // Loop brackets
+      if (lx1 >= 0 && lx1 <= width) {
+        g.rect(lx1, 0, 2, height);
+        g.fill({ color: theme.accent.color, alpha: 0.7 });
+      }
+      if (lx2 >= 0 && lx2 <= width) {
+        g.rect(lx2 - 1, 0, 2, height);
+        g.fill({ color: theme.accent.color, alpha: 0.7 });
+      }
+    }
+  }, [width, height, scrollBeat, scrollY, pixelsPerBeat, totalBeats, beatsPerBar, playbackBeat, theme, gridHeight, clips, trackHeight, loopStart, loopEnd]);
 
   const barLabels = useMemo(() => {
     const labels: { x: number; text: string }[] = [];
