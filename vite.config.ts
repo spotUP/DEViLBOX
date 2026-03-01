@@ -106,6 +106,9 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['chiptune3'],
+    // Pre-bundle @dnd-kit packages upfront so lazy-loaded components that use
+    // them don't trigger a runtime re-optimization (504 Outdated Optimize Dep).
+    include: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
     // Don't scan Reference Code folder for dependencies
     entries: ['src/**/*.{ts,tsx,js,jsx}'],
   },
