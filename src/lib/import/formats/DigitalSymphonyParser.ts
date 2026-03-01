@@ -64,6 +64,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEChipRamInfo } from '@/types/instrument';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -704,6 +705,7 @@ function parseDigitalSymphonyFileImpl(bytes: Uint8Array, filename: string): Trac
   const instruments: InstrumentConfig[] = [];
 
   for (let smp = 1; smp <= MAX_SAMPLES; smp++) {
+    const _dsymEntryStart = pos;
     const nameLen = sampleNameLength[smp] & 0x3F; // strip bit7
     const isVirtual = (sampleNameLength[smp] & 0x80) !== 0;
 
@@ -727,13 +729,13 @@ function parseDigitalSymphonyFileImpl(bytes: Uint8Array, filename: string): Trac
 
     if (isVirtual || sampleLength[smp] === 0) {
       // No sample data in file
-      instruments.push(makeEmptyInstrument(smp, smpName || `Sample ${smp}`));
+      instruments.push({ ...makeEmptyInstrument(smp, smpName || "Sample " + smp), uadeChipRam: { moduleBase: 0, moduleSize: bytes.length, instrBase: _dsymEntryStart, instrSize: 0 } as UADEChipRamInfo });
       continue;
     }
 
     // ── Real sample: read loop/volume/finetune metadata ───────────────────
     if (pos + 8 > bytes.length) {
-      instruments.push(makeEmptyInstrument(smp, smpName || `Sample ${smp}`));
+      instruments.push({ ...makeEmptyInstrument(smp, smpName || "Sample " + smp), uadeChipRam: { moduleBase: 0, moduleSize: bytes.length, instrBase: _dsymEntryStart, instrSize: 0 } as UADEChipRamInfo });
       continue;
     }
 
@@ -753,7 +755,7 @@ function parseDigitalSymphonyFileImpl(bytes: Uint8Array, filename: string): Trac
 
     // ── Read packing type and decode sample ───────────────────────────────
     if (pos >= bytes.length) {
-      instruments.push(makeEmptyInstrument(smp, smpName || `Sample ${smp}`));
+      instruments.push({ ...makeEmptyInstrument(smp, smpName || "Sample " + smp), uadeChipRam: { moduleBase: 0, moduleSize: bytes.length, instrBase: _dsymEntryStart, instrSize: 0 } as UADEChipRamInfo });
       continue;
     }
 
@@ -832,12 +834,12 @@ function parseDigitalSymphonyFileImpl(bytes: Uint8Array, filename: string): Trac
 
       default:
         // Unknown packing type — skip this sample
-        instruments.push(makeEmptyInstrument(smp, smpName || `Sample ${smp}`));
+        instruments.push({ ...makeEmptyInstrument(smp, smpName || "Sample " + smp), uadeChipRam: { moduleBase: 0, moduleSize: bytes.length, instrBase: _dsymEntryStart, instrSize: 0 } as UADEChipRamInfo });
         continue;
     }
 
     if (!pcmInt16 || pcmInt16.length === 0) {
-      instruments.push(makeEmptyInstrument(smp, smpName || `Sample ${smp}`));
+      instruments.push({ ...makeEmptyInstrument(smp, smpName || "Sample " + smp), uadeChipRam: { moduleBase: 0, moduleSize: bytes.length, instrBase: _dsymEntryStart, instrSize: 0 } as UADEChipRamInfo });
       continue;
     }
 
@@ -871,6 +873,7 @@ function parseDigitalSymphonyFileImpl(bytes: Uint8Array, filename: string): Trac
         sustain:     1,
         release:     0,
       },
+      uadeChipRam: { moduleBase: 0, moduleSize: bytes.length, instrBase: _dsymEntryStart, instrSize: 9 } as UADEChipRamInfo,
     } as unknown as InstrumentConfig);
   }
 

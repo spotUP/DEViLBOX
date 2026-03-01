@@ -574,6 +574,51 @@ export async function parseUADEFile(
         const { parseGameMusicCreatorFile } = await import('./GameMusicCreatorParser');
         return parseGameMusicCreatorFile(new Uint8Array(buffer), filename);
       },
+      // ── Tier 1 formats wired 2026-03-01 ────────────────────────────────────
+      // All load at chip RAM address 0 — no scanMemoryForMagic needed.
+      'SonicArranger': async () => {
+        const { parseSonicArrangerFile } = await import('./SonicArrangerParser');
+        return parseSonicArrangerFile(new Uint8Array(buffer), filename);
+      },
+      // ArtOfNoise-4V = 4-channel (AON4 magic), ArtOfNoise-8V = 8-channel (AON8 magic).
+      // Both handled by the same parser.
+      'ArtOfNoise-4V': async () => {
+        const { parseArtOfNoiseFile } = await import('./ArtOfNoiseParser');
+        return parseArtOfNoiseFile(new Uint8Array(buffer), filename);
+      },
+      'ArtOfNoise-8V': async () => {
+        const { parseArtOfNoiseFile } = await import('./ArtOfNoiseParser');
+        return parseArtOfNoiseFile(new Uint8Array(buffer), filename);
+      },
+      'InStereo': async () => {
+        const { parseInStereo1File } = await import('./InStereo1Parser');
+        return parseInStereo1File(new Uint8Array(buffer), filename);
+      },
+      'InStereo2.0': async () => {
+        const { parseInStereo2File } = await import('./InStereo2Parser');
+        return parseInStereo2File(new Uint8Array(buffer), filename);
+      },
+      // MusiclineEditor: parseMusicLineFile takes Uint8Array only (no filename param).
+      'MusiclineEditor': async () => {
+        const { parseMusicLineFile } = await import('./MusicLineParser');
+        return parseMusicLineFile(new Uint8Array(buffer));
+      },
+      'DigitalSoundStudio': async () => {
+        const { parseDigitalSoundStudioFile } = await import('./DigitalSoundStudioParser');
+        return parseDigitalSoundStudioFile(new Uint8Array(buffer), filename);
+      },
+      'PumaTracker': async () => {
+        const { parsePumaTrackerFile } = await import('./PumaTrackerParser');
+        return parsePumaTrackerFile(buffer, filename);
+      },
+      'TCB_Tracker': async () => {
+        const { parseTCBTrackerFile } = await import('./TCBTrackerParser');
+        return parseTCBTrackerFile(buffer, filename);
+      },
+      'ActionAmics': async () => {
+        const { parseActionamicsFile } = await import('./ActionamicsParser');
+        return parseActionamicsFile(new Uint8Array(buffer), filename);
+      },
     };
     const route = NATIVE_ROUTES[fmt];
     if (route) {

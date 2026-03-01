@@ -42,6 +42,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import type { UADEChipRamInfo } from '@/types/instrument';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -357,6 +358,7 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
 
       if (info.length === 0 || totalBytes === 0) {
         // Empty sample slot — create a placeholder synth instrument
+        const _dssChipRamInfo: UADEChipRamInfo = { moduleBase: 0, moduleSize: bytes.length, instrBase: SAMPLE_INFO_BASE + i * SAMPLE_INFO_SIZE, instrSize: SAMPLE_INFO_SIZE };
         instruments.push({
           id,
           name: info.name.trim() || `Sample ${id}`,
@@ -365,6 +367,7 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
           effects: [],
           volume: 0,
           pan: 0,
+          uadeChipRam: _dssChipRamInfo,
         } as InstrumentConfig);
         continue;
       }
@@ -375,6 +378,7 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
 
       if (dataEnd > bytes.length) {
         // Sample data extends past file — create placeholder
+        const _dssChipRamInfo2: UADEChipRamInfo = { moduleBase: 0, moduleSize: bytes.length, instrBase: SAMPLE_INFO_BASE + i * SAMPLE_INFO_SIZE, instrSize: SAMPLE_INFO_SIZE };
         instruments.push({
           id,
           name: info.name.trim() || `Sample ${id}`,
@@ -383,6 +387,7 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
           effects: [],
           volume: 0,
           pan: 0,
+          uadeChipRam: _dssChipRamInfo2,
         } as InstrumentConfig);
         continue;
       }
@@ -407,17 +412,9 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
       const c3Period = (ftRow && ftRow[24] !== undefined) ? ftRow[24] : 214;
       const sampleRate = info.frequency > 0 ? info.frequency : periodToFreq(c3Period);
 
-      instruments.push(
-        createSamplerInstrument(
-          id,
-          info.name.trim() || `Sample ${id}`,
-          pcm,
-          info.volume,
-          sampleRate,
-          loopStartBytes,
-          loopEndBytes
-        )
-      );
+      const _dssChipRam: UADEChipRamInfo = { moduleBase: 0, moduleSize: bytes.length, instrBase: SAMPLE_INFO_BASE + i * SAMPLE_INFO_SIZE, instrSize: SAMPLE_INFO_SIZE };
+      const _dssInst = createSamplerInstrument(id, info.name.trim() || "Sample " + id, pcm, info.volume, sampleRate, loopStartBytes, loopEndBytes);
+      instruments.push({ ..._dssInst, uadeChipRam: _dssChipRam });
     }
 
     // ── Convert patterns to TrackerPatterns ───────────────────────────────
