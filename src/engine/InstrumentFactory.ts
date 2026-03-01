@@ -2338,7 +2338,17 @@ export class InstrumentFactory {
   }
 
   private static createWavetable(config: InstrumentConfig): WavetableSynth {
-    const wavetableConfig = config.wavetable || DEFAULT_WAVETABLE;
+    // Deep-merge with DEFAULT_WAVETABLE so old saves missing nested fields
+    // (e.g. `unison`) don't crash the WavetableVoice constructor.
+    const raw = config.wavetable;
+    const wavetableConfig = raw ? {
+      ...DEFAULT_WAVETABLE,
+      ...raw,
+      unison: { ...DEFAULT_WAVETABLE.unison, ...(raw.unison ?? {}) },
+      envelope: { ...DEFAULT_WAVETABLE.envelope, ...(raw.envelope ?? {}) },
+      filter: { ...DEFAULT_WAVETABLE.filter, ...(raw.filter ?? {}) },
+      filterEnvelope: { ...DEFAULT_WAVETABLE.filterEnvelope, ...(raw.filterEnvelope ?? {}) },
+    } : DEFAULT_WAVETABLE;
     const synth = new WavetableSynth(wavetableConfig);
     synth.output.gain.value = Tone.dbToGain(this.getNormalizedVolume('Wavetable', config.volume));
     return synth;
