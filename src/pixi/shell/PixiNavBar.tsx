@@ -191,7 +191,6 @@ export const PixiNavBar: React.FC = () => {
   const isTilted        = useWorkbenchStore((s) => s.isTilted);
   const setTilted       = useWorkbenchStore((s) => s.setTilted);
   const resetLayout     = useWorkbenchStore((s) => s.resetLayout);
-  const activeWindowId  = useWorkbenchStore((s) => s.activeWindowId);
 
   // Workspace picker popup state
   const [wsPickerOpen, setWsPickerOpen] = useState(false);

@@ -30,7 +30,7 @@ export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
 
   const layout = getSynthLayout(synthType);
 
-  const instrConfig = config as InstrumentConfig;
+  const instrConfig = config as unknown as InstrumentConfig;
   const uadeChipRam = instrConfig.uadeChipRam;
   const hasSections = uadeChipRam?.sections?.['volume'] != null
                    || uadeChipRam?.sections?.['period'] != null;
