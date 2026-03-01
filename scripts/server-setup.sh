@@ -66,7 +66,7 @@ LOG="/var/log/devilbox-deploy.log"
 DIST_DIR="/var/www/devilbox-dist"
 TMP_DIR="$(mktemp -d)"
 TARBALL="${TMP_DIR}/devilbox-dist.tar.gz"
-GH_REPO="DEViLBOX/DEViLBOX"
+GH_REPO="spotUP/DEViLBOX"
 RELEASE_TAG="latest"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
