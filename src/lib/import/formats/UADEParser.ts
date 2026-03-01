@@ -984,7 +984,16 @@ export async function parseUADEFile(
         song.instruments.forEach((inst, idx) => {
           const ptr = inst.sample?.uadeSamplePtr;
           if (ptr != null) {
-            samplePtrToInstrIndex.set(ptr, idx + 1); // 1-based instrument index
+            const instrIdx = idx + 1; // 1-based instrument index
+            samplePtrToInstrIndex.set(ptr, instrIdx);
+            // Also map the loop-start chip RAM address.
+            // After the first sample pass, Paula reloads lc to (ptr + loopStart).
+            // Without this alias, tick snapshots during looped playback would fail
+            // the instrument lookup and produce instrument = 0 in pattern rows.
+            const loopStart = inst.sample?.loopStart;
+            if (loopStart != null && loopStart > 0) {
+              samplePtrToInstrIndex.set(ptr + loopStart, instrIdx);
+            }
           }
         });
 

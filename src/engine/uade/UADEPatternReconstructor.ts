@@ -240,7 +240,14 @@ export function reconstructPatterns(
 
         // Only emit a note if DMA is active and period is valid
         if (state.dmaEn && state.period > 0) {
-          const isHeld = state.period === prevPeriod[ch] && state.lc === prevLc[ch];
+          // A loop reload changes lc from sample_start to loop_start_addr, but
+          // the instrument is the same and the period is unchanged — treat it as
+          // "held" so we don't emit a spurious note event every sample loop.
+          const currInstr = samplePtrToInstrIndex.get(state.lc) ?? 0;
+          const prevInstr = samplePtrToInstrIndex.get(prevLc[ch]) ?? 0;
+          const sameInstrument = currInstr !== 0 && currInstr === prevInstr;
+          const isHeld = state.period === prevPeriod[ch] &&
+                         (state.lc === prevLc[ch] || sameInstrument);
 
           if (!isHeld) {
             // Map period → XM note

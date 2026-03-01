@@ -993,15 +993,16 @@ class UADEProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // Only estimate speed from period-change triggers when CIA-B was reliable.
-    // For VBlank-based formats (FC2 etc.), macro systems cause period/sample
-    // pointer changes at VBlank rate, producing completely wrong speed estimates.
+    // Estimate speed from sample pointer change intervals when CIA-B drives BPM.
+    // Use sampleChanged (DMA address changed) rather than triggered (period changed):
+    // arpeggio only cycles the period — it never changes the DMA sample address, so
+    // sampleChanged fires only on genuine new note starts regardless of arpeggio.
     if (ciaReliable) {
       const triggerFrames = [];
       let lastTriggerFrame = 0;
       for (let i = 0; i < tickSnapshots.length; i++) {
         const tick = tickSnapshots[i];
-        const anyTrigger = tick.channels.some(ch => ch.triggered);
+        const anyTrigger = tick.channels.some(ch => ch.sampleChanged);
         if (anyTrigger) {
           if (lastTriggerFrame > 0) {
             triggerFrames.push(tick.frame - lastTriggerFrame);
@@ -1025,11 +1026,37 @@ class UADEProcessor extends AudioWorkletProcessor {
     if (!ciaReliable) {
       const vblankHz = tickSnapshots[0]?.vblankHz || 50;
       const vblankInterval = Math.round(sr / vblankHz);
+
+      // Method 1: CIA-A tick rate.
+      // CIA-A Timer A fires at the music tick rate for many VBlank-based formats
+      // (the player programs CIA-A as the speed counter, firing N times per VBlank).
+      // Derive speed = CIA-A ticks per VBlank elapsed.
+      const ciaA0 = tickSnapshots[0]?.ciaATick || 0;
+      const ciaALast = tickSnapshots[tickSnapshots.length - 1]?.ciaATick || 0;
+      const ciaARange = ciaALast - ciaA0;
+      const firstFrame = tickSnapshots[0]?.frame || 0;
+      const lastFrame2 = tickSnapshots[tickSnapshots.length - 1]?.frame || firstFrame;
+      const vblanksElapsed = (lastFrame2 - firstFrame) / vblankInterval;
+      let ciaASpeed = 0;
+      if (ciaARange >= 100 && vblanksElapsed >= 100) {
+        const ciaAPerVblank = ciaARange / vblanksElapsed;
+        const rounded = Math.round(ciaAPerVblank);
+        // Accept if close to an integer (< 0.2 fractional error) and within sane range.
+        if (rounded >= 1 && rounded <= 31 && Math.abs(ciaAPerVblank - rounded) < 0.2) {
+          ciaASpeed = rounded;
+        }
+      }
+
+      // Method 2: Sample pointer change intervals.
+      // Use sampleChanged (lc register changes) rather than triggered (period changes).
+      // Arpeggio modulations only change the period — they NEVER change the DMA sample
+      // address. So sampleChanged fires only on genuine new note starts, not on arpeggio
+      // ticks, giving accurate inter-note intervals for speed estimation.
       const triggerFrames = [];
       let lastTriggerFrame = 0;
       for (let i = 0; i < tickSnapshots.length; i++) {
         const tick = tickSnapshots[i];
-        const anyTrigger = tick.channels.some(ch => ch.triggered);
+        const anyTrigger = tick.channels.some(ch => ch.sampleChanged);
         if (anyTrigger) {
           if (lastTriggerFrame > 0) {
             triggerFrames.push(tick.frame - lastTriggerFrame);
@@ -1037,20 +1064,26 @@ class UADEProcessor extends AudioWorkletProcessor {
           lastTriggerFrame = tick.frame;
         }
       }
+      let sampleSpeed = 0;
       if (triggerFrames.length > 5) {
         triggerFrames.sort((a, b) => a - b);
         const median = triggerFrames[Math.floor(triggerFrames.length / 2)];
-        const estimatedSpeed = Math.max(1, Math.min(31, Math.round(median / vblankInterval)));
-        if (estimatedSpeed >= 1 && estimatedSpeed <= 31) {
-          detectedSpeed = estimatedSpeed;
-          // BPM back-calculated: standard Amiga formula BPM = vblankHz * 2.5 / speed
-          detectedBPM = Math.max(32, Math.min(999, Math.round(vblankHz * 2.5 / estimatedSpeed)));
-          warnings.push('CIA unreliable — VBlank BPM estimated: ' + detectedBPM + ' BPM / speed ' + detectedSpeed);
-        } else {
-          warnings.push('CIA unreliable — tempo unknown, defaulted to 125 BPM / speed 6');
+        const s = Math.max(1, Math.min(31, Math.round(median / vblankInterval)));
+        if (s >= 1 && s <= 31) {
+          sampleSpeed = s;
         }
+      }
+
+      // Prefer CIA-A derived speed (most accurate), then sample-pointer speed, then default.
+      const finalSpeed = ciaASpeed || sampleSpeed || 6;
+      const finalBPM = Math.max(32, Math.min(999, Math.round(vblankHz * 2.5 / finalSpeed)));
+      if (ciaASpeed || sampleSpeed) {
+        detectedSpeed = finalSpeed;
+        detectedBPM = finalBPM;
+        // BPM back-calculated: standard Amiga formula BPM = vblankHz * 2.5 / speed
+        warnings.push('CIA unreliable — VBlank BPM estimated: ' + detectedBPM + ' BPM / speed ' + detectedSpeed);
       } else {
-        warnings.push('CIA unreliable — too few note triggers to estimate tempo, defaulted to 125 BPM / speed 6');
+        warnings.push('CIA unreliable — tempo unknown, defaulted to 125 BPM / speed 6');
       }
     }
 
