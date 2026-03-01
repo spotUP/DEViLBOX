@@ -252,7 +252,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     curves: s.curves,
     reset: s.reset,
   })));
-  const addTab = useTabsStore((state) => state.addTab);
+  const _addTab = useTabsStore((state) => state.addTab);
 
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
