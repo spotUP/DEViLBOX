@@ -12,6 +12,7 @@
 
 import React, { createContext, useCallback, useContext, useRef, useEffect } from 'react';
 import { useApplication, useTick } from '@pixi/react';
+import { Rectangle } from 'pixi.js';
 import type { FederatedPointerEvent, Container as ContainerType, Graphics as GraphicsType, BitmapText as BitmapTextType } from 'pixi.js';
 import { useWorkbenchStore, type CameraState } from '@stores/useWorkbenchStore';
 import { applyTransform } from './WorkbenchCamera';
@@ -339,6 +340,17 @@ export const WorkbenchContainer: React.FC = () => {
   // Re-create if dimensions change (resize)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app, width, height]);
+
+  // ─── Event hit-area clipping ────────────────────────────────────────────────
+  // Prevent world windows panned above y=0 (into NavBar screen space) from
+  // intercepting pointer events on NavBar buttons. hitArea is tested in the
+  // root container's local coordinates — clicks at local y < 0 are rejected,
+  // so PixiJS falls through to the NavBar which renders below this container.
+  useEffect(() => {
+    const root = rootContainerRef.current;
+    if (!root) return;
+    root.hitArea = new Rectangle(0, 0, width, height);
+  }, [width, height]);
 
   // ─── Tilt per-frame tick ─────────────────────────────────────────────────────
   // Spring-animates tiltFactor and triggers the GL render-to-texture pass.
