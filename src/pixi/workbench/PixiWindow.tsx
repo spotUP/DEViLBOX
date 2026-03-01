@@ -181,6 +181,9 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   // Momentum RAF handle
   const momentumRafRef = useRef<number>(0);
 
+  // Double-click on title bar → toggle maximize
+  const titleDblClickTimeRef = useRef<number>(0);
+
   // Resize state
   const resizeRef = useRef<{
     active: boolean;
@@ -290,6 +293,16 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     e.stopPropagation();
     bringToFront(id);
     setActiveWindowId(id);
+
+    // Double-click on title bar → toggle maximize (same as the ◎ focus button)
+    const now = Date.now();
+    if (now - titleDblClickTimeRef.current < 300) {
+      titleDblClickTimeRef.current = 0;
+      onFocus?.(id);
+      return;
+    }
+    titleDblClickTimeRef.current = now;
+
     // Maximized windows are pinned — drag disabled
     if (storeRef.current.winState?.maximized) return;
 
