@@ -92,7 +92,7 @@ export class HivelyEngine {
 
       // Register worklet module with this context
       try {
-        await context.audioWorklet.addModule(`${baseUrl}hively/Hively.worklet.js?t=${Date.now()}`);
+        await context.audioWorklet.addModule(`${baseUrl}hively/Hively.worklet.js?v=2`);
       } catch {
         // Module might already be registered
       }
