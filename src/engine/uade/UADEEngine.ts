@@ -45,6 +45,24 @@ export interface UADEEnhancedScanData {
   warnings?: string[];  // Degradation notices (e.g. VBlank fallback, no PCM extracted)
 }
 
+/** Paula register write log entry — captured during enhanced scan */
+export interface PaulaLogEntry {
+  channel:    number;  // 0-3
+  reg:        number;  // PAULA_REG_* (0=LCH,1=LCL,2=LEN,3=PER,4=VOL,5=DAT)
+  value:      number;  // Value written to Paula register
+  sourceAddr: number;  // Chip RAM address that sourced the value
+  tick:       number;  // CIA-A tick count at write time
+}
+
+/** Memory watchpoint hit */
+export interface WatchpointHit {
+  addr:    number;
+  value:   number;
+  tick:    number;
+  isWrite: boolean;
+  wpSlot:  number;
+}
+
 export interface UADEMetadata {
   player: string;       // Detected eagleplayer name (e.g. "JochenHippel")
   formatName: string;   // Human-readable format (e.g. "Jochen Hippel")
@@ -112,6 +130,12 @@ export class UADEEngine {
   // Pending writeMemory requests: Map<requestId, {resolve, reject}>
   private _writeMemoryPending = new Map<number, { resolve: () => void; reject: (e: Error) => void }>();
   private _writeMemoryNextId = 0;
+  // Pending getPaulaLog requests: Map<requestId, {resolve, reject}>
+  private _paulaLogPending = new Map<number, { resolve: (v: PaulaLogEntry[]) => void; reject: (e: Error) => void }>();
+  private _paulaLogNextId = 0;
+  // Pending getWatchpointHits requests: Map<requestId, {resolve, reject}>
+  private _wpHitsPending = new Map<number, { resolve: (v: WatchpointHit[]) => void; reject: (e: Error) => void }>();
+  private _wpHitsNextId = 0;
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -383,6 +407,30 @@ export class UADEEngine {
           this._writeMemoryPending.delete(requestId);
           break;
         }
+        case 'paulaLogResult': {
+          const { requestId, entries } = data;
+          this._paulaLogPending.get(requestId)?.resolve(entries as PaulaLogEntry[]);
+          this._paulaLogPending.delete(requestId);
+          break;
+        }
+        case 'paulaLogError': {
+          const { requestId, error } = data;
+          this._paulaLogPending.get(requestId)?.reject(new Error(error));
+          this._paulaLogPending.delete(requestId);
+          break;
+        }
+        case 'watchpointHitsResult': {
+          const { requestId, hits } = data;
+          this._wpHitsPending.get(requestId)?.resolve(hits as WatchpointHit[]);
+          this._wpHitsPending.delete(requestId);
+          break;
+        }
+        case 'watchpointHitsError': {
+          const { requestId, error } = data;
+          this._wpHitsPending.get(requestId)?.reject(new Error(error));
+          this._wpHitsPending.delete(requestId);
+          break;
+        }
       }
     };
 
@@ -630,6 +678,54 @@ export class UADEEngine {
       { type: 'writeMemory', requestId, addr, data: copy.buffer },
       [copy.buffer],
     );
+    return promise;
+  }
+
+  /** Enable or disable Paula write logging (fires-and-forgets; no response). */
+  enablePaulaLog(enable: boolean): void {
+    this.workletNode?.port.postMessage({ type: 'enablePaulaLog', enable });
+  }
+
+  /**
+   * Drain all queued Paula register write log entries accumulated since the
+   * last call to enablePaulaLog(true). Returns entries sorted by tick.
+   * Typically called after the enhanced scan completes.
+   */
+  async getPaulaLog(): Promise<PaulaLogEntry[]> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('UADEEngine not initialized');
+    const requestId = this._paulaLogNextId++;
+    const promise = new Promise<PaulaLogEntry[]>((resolve, reject) => {
+      this._paulaLogPending.set(requestId, { resolve, reject });
+    });
+    this.workletNode.port.postMessage({ type: 'getPaulaLog', requestId });
+    return promise;
+  }
+
+  /** Set a memory watchpoint on chip RAM. mode: 1=read, 2=write, 3=both. */
+  setWatchpoint(slot: number, addr: number, size: number, mode: 1 | 2 | 3): void {
+    this.workletNode?.port.postMessage({ type: 'setWatchpoint', slot, addr, size, mode });
+  }
+
+  /** Clear a single watchpoint slot. */
+  clearWatchpoint(slot: number): void {
+    this.workletNode?.port.postMessage({ type: 'clearWatchpoint', slot });
+  }
+
+  /** Clear all watchpoint slots and drain the hit log. */
+  clearAllWatchpoints(): void {
+    this.workletNode?.port.postMessage({ type: 'clearAllWatchpoints' });
+  }
+
+  /** Drain all accumulated watchpoint hits since the last clear. */
+  async getWatchpointHits(): Promise<WatchpointHit[]> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('UADEEngine not initialized');
+    const requestId = this._wpHitsNextId++;
+    const promise = new Promise<WatchpointHit[]>((resolve, reject) => {
+      this._wpHitsPending.set(requestId, { resolve, reject });
+    });
+    this.workletNode.port.postMessage({ type: 'getWatchpointHits', requestId });
     return promise;
   }
 
