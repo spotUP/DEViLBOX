@@ -450,6 +450,10 @@ export const PixiArrangementView: React.FC = () => {
             onOpenInPianoRoll={(clipId) => {
               const clip = useArrangementStore.getState().clips.find(c => c.id === clipId);
               if (!clip) return;
+              // Switch to the clip's pattern so piano roll edits write to the right data
+              const ts = useTrackerStore.getState();
+              const patternIndex = ts.patterns.findIndex(p => p.id === clip.patternId);
+              if (patternIndex >= 0) ts.setCurrentPattern(patternIndex);
               // Use sourceChannelIndex if set, otherwise derive from track order
               let channelIndex = clip.sourceChannelIndex ?? 0;
               if (!clip.sourceChannelIndex) {
@@ -458,7 +462,10 @@ export const PixiArrangementView: React.FC = () => {
                 const tIdx = sortedTracks.findIndex(t => t.id === clip.trackId);
                 if (tIdx >= 0) channelIndex = tIdx;
               }
-              usePianoRollStore.getState().setChannelIndex(channelIndex);
+              // Scroll piano roll to the clip's start within the pattern
+              const pr = usePianoRollStore.getState();
+              pr.setChannelIndex(channelIndex);
+              pr.setScroll(clip.offsetRows || 0, pr.view.scrollY);
               useWorkbenchStore.getState().showWindow('pianoroll');
             }}
             onAddClip={(trackIndex, startRow, lengthRows) => {

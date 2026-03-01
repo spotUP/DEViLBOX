@@ -79,6 +79,11 @@ interface ArrangementStore {
   duplicateClips: (clipIds: string[]) => string[];
   toggleClipMute: (clipId: string) => void;
   setClipColor: (clipId: string, color: string | null) => void;
+  setClipName: (clipId: string, name: string) => void;
+
+  // === Rename UI state (not persisted) ===
+  renamingClipId: string | null;
+  setRenamingClipId: (id: string | null) => void;
 
   // === Track CRUD ===
   addTrack: (name?: string, instrumentId?: number | null) => string;
@@ -185,6 +190,7 @@ export const useArrangementStore = create<ArrangementStore>()(
 
     drag: null,
     playbackRow: 0,
+    renamingClipId: null,
 
     undoStack: [],
     redoStack: [],
@@ -332,6 +338,16 @@ export const useArrangementStore = create<ArrangementStore>()(
         const clip = state.clips.find(c => c.id === clipId);
         if (clip) clip.color = color;
       }),
+
+    setClipName: (clipId, name) =>
+      set((state) => {
+        const clip = state.clips.find(c => c.id === clipId);
+        if (clip) clip.name = name || undefined;
+      }),
+
+    renamingClipId: null,
+    setRenamingClipId: (id) =>
+      set((state) => { state.renamingClipId = id; }),
 
     // === Track CRUD ===
 
