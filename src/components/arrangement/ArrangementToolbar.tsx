@@ -3,7 +3,7 @@
  * Includes "ARRANGEMENT" label and keyboard shortcuts in button titles
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import * as Tone from 'tone';
 import {
   MousePointer2,
@@ -20,11 +20,11 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useArrangementStore } from '@stores/useArrangementStore';
-import { useUIStore, useTransportStore } from '@stores';
+import { useUIStore, useTransportStore, useTrackerStore } from '@stores';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { ArrangementToolMode } from '@/types/arrangement';
 
-const SNAP_OPTIONS = [
+const SNAP_BASE_OPTIONS = [
   { label: 'Row', value: 1 },
   { label: 'Beat', value: 6 },
   { label: '1/2 Bar', value: 12 },
@@ -38,8 +38,34 @@ export const ArrangementToolbar: React.FC = () => {
   const {
     tool, setTool,
     view, setPixelsPerRow, setSnapDivision, setFollowPlayback,
-    zoomToFit, addTrack,
+    zoomToFit, addTrack, getSnapLabel,
   } = useArrangementStore();
+
+  // Current pattern length for "1 bar" snap label
+  const patternLength = useTrackerStore(s => {
+    const pat = s.patterns[s.currentPatternIndex];
+    return pat?.length ?? 64;
+  });
+
+  // Build snap options: if current snap equals patternLength, show "1 bar"
+  const snapOptions = useMemo(() => {
+    const baseValues = SNAP_BASE_OPTIONS.map(o => o.value);
+    const options = SNAP_BASE_OPTIONS.map(o => ({ ...o }));
+    // If patternLength is not already in the list, insert a dynamic "1 bar" entry
+    if (patternLength > 0 && !baseValues.includes(patternLength)) {
+      // Insert before 'Off' (last entry)
+      options.splice(options.length - 1, 0, { label: '1 bar', value: patternLength });
+    } else if (patternLength > 0) {
+      // Update the label for the entry that equals patternLength
+      for (const opt of options) {
+        if (opt.value === patternLength) {
+          opt.label = getSnapLabel(patternLength);
+          break;
+        }
+      }
+    }
+    return options;
+  }, [patternLength, getSnapLabel]);
 
   const isPlaying = useTransportStore(s => s.isPlaying);
   const togglePlayPause = useTransportStore(s => s.togglePlayPause);
@@ -161,7 +187,7 @@ export const ArrangementToolbar: React.FC = () => {
           value={view.snapDivision}
           onChange={(e) => setSnapDivision(Number(e.target.value))}
         >
-          {SNAP_OPTIONS.map(opt => (
+          {snapOptions.map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>

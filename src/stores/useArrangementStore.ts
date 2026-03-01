@@ -167,6 +167,9 @@ interface ArrangementStore {
   getTotalRows: () => number;
   getClipsForTrack: (trackId: string) => ArrangementClip[];
   getClipEndRow: (clip: ArrangementClip, patterns: Pattern[]) => number;
+  /** Returns the display label for the current snapDivision given the active patternLength.
+   *  e.g. snapDivision === patternLength → "1 bar", otherwise falls back to row count. */
+  getSnapLabel: (patternLength: number) => string;
 }
 
 // ============================================================================
@@ -209,9 +212,46 @@ export const useArrangementStore = create<ArrangementStore>()(
     addClip: (clipData) => {
       const id = generateId('clip');
       set((state) => {
+        // Overlap prevention: auto-trim new clip against same-track clips.
+        let startRow = clipData.startRow;
+        let clipLengthRows = clipData.clipLengthRows;
+        const newEnd = startRow + (clipLengthRows ?? 64);
+
+        const sameTrack = state.clips.filter(c => c.trackId === clipData.trackId);
+        // Sort by startRow so we can find the immediate predecessor and successor.
+        sameTrack.sort((a, b) => a.startRow - b.startRow);
+
+        for (const existing of sameTrack) {
+          const existEnd = existing.startRow + (existing.clipLengthRows ?? 64);
+          // Check if the new clip overlaps this existing clip.
+          if (startRow < existEnd && newEnd > existing.startRow) {
+            // Two possible resolutions:
+            // a) Push new clip's start to after existing clip's end.
+            // b) Trim new clip's end to before existing clip's start.
+            const violationPushStart = existEnd - startRow;       // rows to lose at the front
+            const violationTrimEnd = newEnd - existing.startRow;  // rows to lose at the back
+
+            if (violationPushStart <= violationTrimEnd) {
+              // Smaller violation: push start forward
+              startRow = existEnd;
+            } else {
+              // Smaller violation: trim end back
+              if (clipLengthRows !== null) {
+                clipLengthRows = existing.startRow - startRow;
+              }
+            }
+          }
+        }
+
+        // If the clip has been trimmed to 0 or negative width, don't add it.
+        const finalLength = clipLengthRows ?? 64;
+        if (finalLength <= 0 || startRow < 0) return;
+
         state.clips.push({
           id,
           ...clipData,
+          startRow,
+          clipLengthRows,
           // Defaults for new DAW features (applied only if not provided)
           fadeInRows: clipData.fadeInRows ?? 0,
           fadeOutRows: clipData.fadeOutRows ?? 0,
@@ -846,6 +886,19 @@ export const useArrangementStore = create<ArrangementStore>()(
       }
       const pattern = patterns.find(p => p.id === clip.patternId);
       return clip.startRow + (pattern?.length ?? 64) - clip.offsetRows;
+    },
+
+    getSnapLabel: (patternLength) => {
+      const snap = get().view.snapDivision;
+      if (snap === 0) return 'Off';
+      if (snap === 1) return 'Row';
+      if (patternLength > 0 && snap === patternLength) return '1 bar';
+      if (patternLength > 0 && patternLength % snap === 0) {
+        const barsPerSnap = patternLength / snap;
+        if (barsPerSnap > 1) return `1/${barsPerSnap} bar`;
+        if (barsPerSnap < 1) return `${Math.round(1 / barsPerSnap)} bars`;
+      }
+      return `${snap} rows`;
     },
   }))
 );
