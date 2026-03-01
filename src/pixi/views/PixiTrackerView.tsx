@@ -29,7 +29,6 @@ import { PixiFurnaceView } from './furnace/PixiFurnaceView';
 import { PixiHivelyView } from './hively/PixiHivelyView';
 import { PixiPitchSlider } from './tracker/PixiPitchSlider';
 import { PixiTB303KnobPanel, TB303_PANEL_COLLAPSED_H, TB303_PANEL_EXPANDED_H } from './tracker/PixiTB303KnobPanel';
-import { PixiPatternManagement } from './tracker/PixiPatternManagement';
 import { PixiMusicLineTrackTable } from './tracker/PixiMusicLineTrackTable';
 import { PixiMusicLinePatternViewer } from './tracker/PixiMusicLinePatternViewer';
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
@@ -47,7 +46,6 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
 type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj';
 
-const PATTERN_PANEL_HEIGHT = 180;
 const MUSICLINE_MATRIX_HEIGHT = 220;
 const MIDI_KNOB_BAR_H_COLLAPSED = 20;
 const MIDI_KNOB_BAR_H_EXPANDED = 56;
@@ -59,7 +57,6 @@ export const PixiTrackerView: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<ViewMode>('tracker');
   const [gridChannelIndex, setGridChannelIndex] = useState(0);
-  const showPatterns = useUIStore(s => s.showPatterns);
   const modalOpen = useUIStore(s => s.modalOpen);
   const closeModal = useUIStore(s => s.closeModal);
   const editorMode = useTrackerStore(s => s.editorMode);
@@ -122,7 +119,7 @@ export const PixiTrackerView: React.FC = () => {
     ? (tb303Collapsed ? TB303_PANEL_COLLAPSED_H : TB303_PANEL_EXPANDED_H)
     : 0;
   const midiKnobBarH = showKnobBar ? MIDI_KNOB_BAR_H_EXPANDED : MIDI_KNOB_BAR_H_COLLAPSED;
-  const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - (showPatterns ? PATTERN_PANEL_HEIGHT : 0) - tb303PanelH - midiKnobBarH;
+  const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - tb303PanelH - midiKnobBarH;
   const editorWidth = windowWidth - (instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0) - 16; // minus instrument panel and minimap
 
   return (
@@ -143,11 +140,6 @@ export const PixiTrackerView: React.FC = () => {
 
       {/* Editor controls bar — pure Pixi, no DOM overlay */}
       <PixiEditorControlsBar viewMode={viewMode} onViewModeChange={setViewMode} gridChannelIndex={gridChannelIndex} onGridChannelChange={setGridChannelIndex} />
-
-      {/* Pattern management panel — always mounted, height:0 when hidden */}
-      <pixiContainer layout={{ width: '100%', height: showPatterns ? PATTERN_PANEL_HEIGHT : 0 }} alpha={showPatterns ? 1 : 0} renderable={showPatterns}>
-        <PixiPatternManagement width={windowWidth} height={PATTERN_PANEL_HEIGHT} />
-      </pixiContainer>
 
       {/* Main content: editor + instrument panel */}
       <pixiContainer

@@ -25,7 +25,6 @@ export type DialogCommand =
   | 'strum'
   | 'effect-picker'
   | 'undo-history'
-  | 'pattern-matrix'
   | 'automation'
   | 'collaboration'
   | 'randomize'
@@ -153,6 +152,15 @@ interface UIStore {
   openNonEditableDialog: () => void;
   closeNonEditableDialog: () => void;
 
+  // New Song Wizard
+  newSongWizardOpen: boolean;
+  openNewSongWizard: () => void;
+  closeNewSongWizard: () => void;
+
+  // Active system preset (drives instrument filtering)
+  activeSystemPreset: string | null;
+  setActiveSystemPreset: (id: string | null) => void;
+
   // Dialog bridge actions
   openDialogCommand: (dialog: DialogCommand) => void;
   closeDialogCommand: () => void;
@@ -224,6 +232,12 @@ export const useUIStore = create<UIStore>()(
 
       // Non-editable song dialog
       nonEditableDialogOpen: false,
+
+      // New Song Wizard
+      newSongWizardOpen: false,
+
+      // Active system preset
+      activeSystemPreset: null,
 
       // Actions
       togglePanel: (panel) =>
@@ -500,6 +514,16 @@ export const useUIStore = create<UIStore>()(
         set((state) => { state.nonEditableDialogOpen = true; }),
       closeNonEditableDialog: () =>
         set((state) => { state.nonEditableDialogOpen = false; }),
+
+      // New Song Wizard actions
+      openNewSongWizard: () =>
+        set((state) => { state.newSongWizardOpen = true; }),
+      closeNewSongWizard: () =>
+        set((state) => { state.newSongWizardOpen = false; }),
+
+      // Active system preset actions
+      setActiveSystemPreset: (id) =>
+        set((state) => { state.activeSystemPreset = id; }),
 
       // Dialog bridge actions
       openDialogCommand: (dialog) =>
