@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-01T10:07:08.839Z
+ * Generated: 2026-03-01T17:14:59.962Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1788';
-export const BUILD_NUMBER = '1788';
-export const BUILD_HASH = '7c36d82e';
+export const BUILD_VERSION = '1.0.1820';
+export const BUILD_NUMBER = '1820';
+export const BUILD_HASH = '143bdb98';
 export const BUILD_DATE = '2026-03-01';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,137 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1788',
+    version: '1.0.1820',
     date: '2026-03-01',
     changes: [
+      {
+        type: 'fix',
+        "description": "Duplicate clip key and maximum update depth errors"
+      },
+      {
+        type: 'fix',
+        "description": "Title bar drag, fit button height, and window content clipping"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: remove completed plan docs + update changelog"
+      },
+      {
+        type: 'fix',
+        "description": "Add AMP section to all pre-existing synth layouts"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate PixiUADELiveParams into GL instrument editor"
+      },
+      {
+        type: 'fix',
+        "description": "Restore window dragging broken by chrome buttons hit area"
+      },
+      {
+        type: 'feature',
+        "description": "Add PixiUADELiveParams GL component — live volume/finetune knobs"
+      },
+      {
+        type: 'feature',
+        "description": "Active window selection — FIT targets active window or all"
+      },
+      {
+        type: 'feature',
+        "description": "Render UADELiveParamsBar above waveform in SampleEditor for enhanced-scan instruments"
+      },
+      {
+        type: 'fix',
+        "description": "Hoist useCallback handlers above early return — fix rules of hooks violation"
+      },
+      {
+        type: 'fix',
+        "description": "UseCallback for knob handlers + synchronous basePeriod reset in UADELiveParamsBar"
+      },
+      {
+        type: 'feature',
+        "description": "Add UADELiveParamsBar DOM component — live volume/finetune knobs for enhanced-scan instruments"
+      },
+      {
+        type: 'fix',
+        "description": "Zoom scroll pivots on viewport center, not cursor position"
+      },
+      {
+        type: 'fix',
+        "description": "Fix erasableSyntaxOnly and unused variable TS errors"
+      },
+      {
+        type: 'improvement',
+        "description": "UADELiveParamsBar implementation plan — DOM + GL live volume/finetune knobs"
+      },
+      {
+        type: 'fix',
+        "description": "Fix background click-drag pan not working"
+      },
+      {
+        type: 'improvement',
+        "description": "UADELiveParamsBar design doc — live volume/finetune knobs for UADE enhanced-scan instruments"
+      },
+      {
+        type: 'fix',
+        "description": "Add RESET button and fix PixiTabBar BindingError"
+      },
+      {
+        type: 'feature',
+        "description": "Fix configKey prefix resolution + pixel-perfect synth layouts"
+      },
+      {
+        type: 'fix',
+        "description": "Fix window chrome buttons appearing huge and oblong"
+      },
+      {
+        type: 'feature',
+        "description": "Add Paula write log + memory watchpoints for instrument auto-discovery"
+      },
+      {
+        type: 'feature',
+        "description": "Add standard pan/zoom hotkeys for GL canvas navigation"
+      },
+      {
+        type: 'feature',
+        "description": "Add layouts for Tone.js synths, GranularSynth, and all Furnace chips"
+      },
+      {
+        type: 'fix',
+        "description": "Restructure layout to avoid flex/absolute coord mismatch"
+      },
+      {
+        type: 'improvement',
+        "description": "Replace DOM <select> overlays with native PixiSelect"
+      },
+      {
+        type: 'feature',
+        "description": "Add Sampler/Player layout for Pixi instrument editor"
+      },
+      {
+        type: 'fix',
+        "description": "Hide view-selector DOM overlay when not the active view mode"
+      },
+      {
+        type: 'fix',
+        "description": "Compact toolbar height + MIDIKnobBar layout accounting"
+      },
+      {
+        type: 'fix',
+        "description": "Clip WorkbenchContainer hit area to prevent NavBar event interception"
+      },
+      {
+        type: 'fix',
+        "description": "Replace dynamic cache-buster with static ?v=2 on worklet URLs"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent PixiDOMOverlay leaking when parent view is hidden"
+      },
+      {
+        type: 'feature',
+        "description": "Add sample offset, fine vol slides, and DM1 name extraction"
+      },
       {
         type: 'fix',
         "description": "Eliminate remaining @pixi/layout BindingErrors from conditional rendering"
@@ -104,134 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore: regenerate changelog to build 1671"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore(test): update synth test runner"
-      },
-      {
-        type: 'feature',
-        "description": "Add DOM mode button to NavBar + FT2 CSS utility classes"
-      },
-      {
-        type: 'fix',
-        "description": "Replace layout absolute positioning with x/y on BitmapText"
-      },
-      {
-        type: 'fix',
-        "description": "Improve error messages, add default config, and debug logging"
-      },
-      {
-        type: 'fix',
-        "description": "Route .sunvox drag-drop through import dialog + improve init timeouts"
-      },
-      {
-        type: 'fix',
-        "description": "Fix OPN register write order and OPNB_B channel mapping"
-      },
-      {
-        type: 'fix',
-        "description": "Make ScrollList DOM container keyboard-focusable and scroll selected item into view"
-      },
-      {
-        type: 'feature',
-        "description": "Wire chip RAM for Delta Music 2.0"
-      },
-      {
-        type: 'fix',
-        "description": "Memoize instrument items mapping in PixiInstrumentPanel"
-      },
-      {
-        type: 'feature',
-        "description": "Migrate PixiInstrumentPanel to GL-native ScrollList"
-      },
-      {
-        type: 'fix',
-        "description": "Warn when GLScrollList width is omitted"
-      },
-      {
-        type: 'fix',
-        "description": "Add DeltaMusic1Synth to SYNTH_INFO record in synthCategories"
-      },
-      {
-        type: 'feature',
-        "description": "Wire chip RAM for TFMX (VolModSeq/SndModSeq extraction)"
-      },
-      {
-        type: 'feature',
-        "description": "Wrap Application in GLRenderer context"
-      },
-      {
-        type: 'feature',
-        "description": "Add ScrollList GL adapter, dispatcher, and module exports"
-      },
-      {
-        type: 'fix',
-        "description": "Improve ScrollList DOM accessibility and conventions"
-      },
-      {
-        type: 'fix',
-        "description": "Apply filter to app.stage not layout root — avoids Yoga BindingError on addChild"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused currentPositionIndex variable in PixiTrackerView"
-      },
-      {
-        type: 'feature',
-        "description": "Add ScrollList types and DOM implementation"
-      },
-      {
-        type: 'feature',
-        "description": "Wire chip RAM for OctaMED SynthInstr + Delta Music 1.0"
-      },
-      {
-        type: 'feature',
-        "description": "Add renderer context layer (dom/gl discriminator)"
-      },
-      {
-        type: 'improvement',
-        "description": "GL design system implementation plan"
-      },
-      {
-        type: 'fix',
-        "description": "Rewrite as PixiJS Filter to avoid Yoga layout conflicts during scroll"
-      },
-      {
-        type: 'improvement',
-        "description": "GL renderer-aware design system design doc"
-      },
-      {
-        type: 'feature',
-        "description": "Wire chip RAM for HippelCoSo + RobHubbard formats"
-      },
-      {
-        type: 'fix',
-        "description": "Add #version 300 es to tilt renderer GLSL shaders"
-      },
-      {
-        type: 'fix',
-        "description": "Restore alpha=1 before RT capture, use alpha=0 to hide scene from screen render"
-      },
-      {
-        type: 'fix',
-        "description": "Restore pointer events when CRT active — use eventMode=none on mesh, drop renderable=false on scene"
-      },
-      {
-        type: 'fix',
-        "description": "Fix erasableSyntaxOnly and Uint8Array type errors in UADEChipEditor"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove completed CRT shader plan"
-      },
-      {
-        type: 'feature',
-        "description": "Wire chip RAM for DavidWhittaker format"
-      },
-      {
-        type: 'feature',
-        "description": "Wire chip RAM for DigitalMugician + SoundFX formats"
       }
     ]
   }

@@ -256,20 +256,6 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     };
   }, []);
 
-  // Clip content area to window bounds using a Pixi Graphics mask.
-  // @pixi/layout's overflow:'hidden' only affects layout flow, not Pixi rendering.
-  useEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-    const mask = new Graphics();
-    mask.rect(0, 0, w, contentH).fill({ color: 0xffffff });
-    el.mask = mask;
-    return () => {
-      el.mask = null;
-      mask.destroy();
-    };
-  }, [w, contentH]);
-
   // ─── Viewport edge bounds (world space) ─────────────────────────────────────
 
   const getViewportBounds = useCallback(() => {
@@ -447,6 +433,21 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
 
   const { width: w, height: h } = winState;
   const contentH = h - TITLE_H;
+
+  // Clip content area to window bounds using a Pixi Graphics mask.
+  // @pixi/layout's overflow:'hidden' only affects layout flow, not Pixi rendering.
+  // Must be placed after w/contentH declarations to avoid TDZ error.
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const mask = new Graphics();
+    mask.rect(0, 0, w, contentH).fill({ color: 0xffffff });
+    el.mask = mask;
+    return () => {
+      el.mask = null;
+      mask.destroy();
+    };
+  }, [w, contentH]);
 
   const drawFrame = useCallback((g: GraphicsType) => {
     g.clear();
