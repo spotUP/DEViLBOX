@@ -3,7 +3,7 @@
  * Layout: Toolbar (top) | [Piano keyboard | Note grid] (flex row) | Velocity lane
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PixiButton, PixiLabel, PixiSelect } from '../components';
@@ -12,8 +12,10 @@ import { PixiPianoRollGrid } from './pianoroll/PixiPianoRollGrid';
 import { PixiVelocityLane } from './pianoroll/PixiVelocityLane';
 import { usePianoRollStore, useUIStore } from '@stores';
 import { useTrackerStore } from '@stores';
+import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { usePianoRollData } from '@/hooks/pianoroll/usePianoRollData';
 import { useHistoryStore } from '@/stores/useHistoryStore';
+import { TITLE_H } from '../workbench/PixiWindow';
 
 const VELOCITY_HEIGHT = 80;
 const TOOLBAR_HEIGHT = 36;
@@ -37,11 +39,40 @@ const QWERTY_NOTE_MAP: Record<string, number> = {
   i: 24, '9': 25, o: 26, '0': 27, p: 28,
 };
 
-export const PixiPianoRollView: React.FC<{ isActive?: boolean }> = ({ isActive: _isActive = true }) => {
+export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string }> = ({
+  isActive: _isActive = true,
+  windowId = 'pianoroll',
+}) => {
   const theme = usePixiTheme();
   const tool = usePianoRollStore(s => s.tool);
   const setTool = usePianoRollStore(s => s.setTool);
   const view = usePianoRollStore(s => s.view);
+  const selectedNotes = usePianoRollStore(s => s.selection.notes);
+
+  // Resolve actual window pixel dimensions from the workbench store
+  const win = useWorkbenchStore(s => s.windows[windowId]);
+  const winW = win?.width ?? 700;
+  const winH = win?.height ?? 500;
+  const gridW = Math.max(200, winW - KEYBOARD_WIDTH);
+  const gridH = Math.max(150, winH - TITLE_H - TOOLBAR_HEIGHT - VELOCITY_HEIGHT);
+
+  // Hover ref for scroll event gating
+  const isHoveredRef = useRef(false);
+
+  // Wheel → scroll the piano roll (horizontal = beat scroll, vertical = note scroll)
+  useEffect(() => {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) return;
+    const handleWheel = (e: WheelEvent) => {
+      if (!isHoveredRef.current) return;
+      e.preventDefault();
+      const store = usePianoRollStore.getState();
+      store.scrollBy(e.deltaX / 40, e.deltaY / 12);
+    };
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleWheel);
+  }, []);
+
   // Version counter to force note recalculation after edits
   const [noteVersion, setNoteVersion] = useState(0);
   const handleNotesChanged = useCallback(() => setNoteVersion(v => v + 1), []);
@@ -249,11 +280,11 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean }> = ({ isActive: 
 
   const drawToolbarBg = useCallback((g: GraphicsType) => {
     g.clear();
-    g.rect(0, 0, 4000, TOOLBAR_HEIGHT);
+    g.rect(0, 0, winW, TOOLBAR_HEIGHT);
     g.fill({ color: theme.bgSecondary.color });
-    g.rect(0, TOOLBAR_HEIGHT - 1, 4000, 1);
+    g.rect(0, TOOLBAR_HEIGHT - 1, winW, 1);
     g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [theme]);
+  }, [winW, theme]);
 
   return (
     <pixiContainer
@@ -337,27 +368,35 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean }> = ({ isActive: 
         />
       </pixiContainer>
 
-      {/* Main area: Keyboard | Grid */}
+      {/* Main area: Keyboard | Grid — hover tracked for wheel scroll */}
       <pixiContainer
         layout={{
           flex: 1,
           width: '100%',
           flexDirection: 'row',
         }}
+        eventMode="static"
+        onPointerOver={() => { isHoveredRef.current = true; }}
+        onPointerOut={() => { isHoveredRef.current = false; }}
       >
-        <PixiPianoKeyboard width={KEYBOARD_WIDTH} height={4000} />
+        <PixiPianoKeyboard width={KEYBOARD_WIDTH} height={gridH} />
         <PixiPianoRollGrid
-          width={4000}
-          height={4000}
+          width={gridW}
+          height={gridH}
           notes={notes}
+          scrollBeat={view.scrollX}
+          scrollNote={view.scrollY}
+          channelIndex={view.channelIndex}
+          selectedNotes={selectedNotes}
           onNotesChanged={handleNotesChanged}
         />
       </pixiContainer>
 
       {/* Velocity lane */}
       <PixiVelocityLane
-        width={4000}
+        width={winW}
         height={VELOCITY_HEIGHT}
+        scrollBeat={view.scrollX}
         notes={notes.map(n => ({ start: n.start, velocity: n.velocity }))}
       />
     </pixiContainer>
