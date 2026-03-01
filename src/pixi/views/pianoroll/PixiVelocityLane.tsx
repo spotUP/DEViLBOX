@@ -2,6 +2,9 @@
  * PixiVelocityLane — Velocity bar display and editor for the piano roll.
  * - Click / drag on a bar → set velocity proportional to y position
  * - Drag across multiple bars → draw-mode edit across all bars touched
+ * - Interpolated paint: fills between last and current x to prevent holes
+ * - Visual tint feedback on dragged bars
+ * - No undo entry committed if velocity was unchanged on release
  */
 
 import { useCallback, useRef } from 'react';
@@ -52,6 +55,15 @@ export const PixiVelocityLane: React.FC<PixiVelocityLaneProps> = ({
   const callbacksRef = useRef({ onDragStart, onVelocityChange, onDragEnd });
   callbacksRef.current = { onDragStart, onVelocityChange, onDragEnd };
 
+  // Track which note IDs are being actively dragged (for visual tint)
+  const dragActiveIdsRef = useRef<Set<string>>(new Set());
+  // Track whether any velocity actually changed during this drag session
+  const dragChangedRef = useRef(false);
+  // Track the last local-x position so we can interpolate between frames
+  const lastDragXRef = useRef<number | null>(null);
+  // Track the last local-y for interpolation
+  const lastDragYRef = useRef<number | null>(null);
+
   // ---------- hit testing ----------
   function findNoteAtX(lx: number): VelocityNote | null {
     const { notes: ns, pixelsPerBeat: ppb, scrollBeat: sb } = paramsRef.current;
@@ -69,6 +81,23 @@ export const PixiVelocityLane: React.FC<PixiVelocityLaneProps> = ({
     return best;
   }
 
+  /**
+   * Find all notes whose bar center x falls between x0 and x1 (inclusive).
+   * Returns them sorted left-to-right.
+   */
+  function findNotesBetweenX(x0: number, x1: number): VelocityNote[] {
+    const { notes: ns, pixelsPerBeat: ppb, scrollBeat: sb } = paramsRef.current;
+    const barW = Math.max(4, ppb * BAR_WIDTH_FRAC);
+    const lo = Math.min(x0, x1);
+    const hi = Math.max(x0, x1);
+    return ns
+      .filter(n => {
+        const barCenterX = (n.start - sb) * ppb + barW / 2;
+        return barCenterX >= lo - barW / 2 - 2 && barCenterX <= hi + barW / 2 + 2;
+      })
+      .sort((a, b) => a.start - b.start);
+  }
+
   function velocityFromY(ly: number): number {
     const { height: h } = paramsRef.current;
     const usable = h - 4;
@@ -81,8 +110,20 @@ export const PixiVelocityLane: React.FC<PixiVelocityLaneProps> = ({
     const note = findNoteAtX(pos.x);
     if (!note) return;
 
+    // Capture initial velocity to detect whether anything actually changed
+    const initialVelocity = note.velocity;
+
     callbacksRef.current.onDragStart?.();
-    callbacksRef.current.onVelocityChange?.(note.id, velocityFromY(pos.y));
+    dragChangedRef.current = false;
+    dragActiveIdsRef.current = new Set([note.id]);
+    lastDragXRef.current = pos.x;
+    lastDragYRef.current = pos.y;
+
+    const newVel = velocityFromY(pos.y);
+    if (newVel !== initialVelocity) {
+      dragChangedRef.current = true;
+    }
+    callbacksRef.current.onVelocityChange?.(note.id, newVel);
 
     // Capture initial client coords so we can compute local deltas on document events
     const startClientX = e.clientX;
@@ -96,14 +137,67 @@ export const PixiVelocityLane: React.FC<PixiVelocityLaneProps> = ({
       const laneLocalX = startLocalX + (me.clientX - startClientX) / cameraScale;
       const laneLocalY = startLocalY + (me.clientY - startClientY) / cameraScale;
 
-      const n = findNoteAtX(laneLocalX);
-      if (n) {
-        callbacksRef.current.onVelocityChange?.(n.id, velocityFromY(laneLocalY));
+      const prevX = lastDragXRef.current ?? laneLocalX;
+      const prevY = lastDragYRef.current ?? laneLocalY;
+
+      // Find all notes between the previous x and current x for interpolation
+      const spannedNotes = findNotesBetweenX(prevX, laneLocalX);
+
+      if (spannedNotes.length > 0) {
+        const xRange = Math.abs(laneLocalX - prevX);
+        const newActiveIds = new Set<string>();
+
+        spannedNotes.forEach((n, idx) => {
+          const { pixelsPerBeat: ppb, scrollBeat: sb } = paramsRef.current;
+          const barW = Math.max(4, ppb * BAR_WIDTH_FRAC);
+          const barCenterX = (n.start - sb) * ppb + barW / 2;
+
+          // Interpolate y based on where this bar's center x falls between prevX and laneLocalX
+          let interpY: number;
+          if (xRange < 1) {
+            interpY = laneLocalY;
+          } else {
+            const t = Math.max(0, Math.min(1, (barCenterX - Math.min(prevX, laneLocalX)) / xRange));
+            // t goes from 0 (at earlier x) to 1 (at later x); map to y accordingly
+            if (laneLocalX >= prevX) {
+              interpY = prevY + t * (laneLocalY - prevY);
+            } else {
+              interpY = laneLocalY + t * (prevY - laneLocalY);
+            }
+          }
+
+          const vel = velocityFromY(interpY);
+          callbacksRef.current.onVelocityChange?.(n.id, vel);
+          dragChangedRef.current = true;
+          newActiveIds.add(n.id);
+          void idx; // suppress unused warning
+        });
+
+        dragActiveIdsRef.current = newActiveIds;
+      } else {
+        // No note under cursor — check the nearest note at current x
+        const n = findNoteAtX(laneLocalX);
+        if (n) {
+          const vel = velocityFromY(laneLocalY);
+          callbacksRef.current.onVelocityChange?.(n.id, vel);
+          dragChangedRef.current = true;
+          dragActiveIdsRef.current = new Set([n.id]);
+        }
       }
+
+      lastDragXRef.current = laneLocalX;
+      lastDragYRef.current = laneLocalY;
     };
 
     const onUp = () => {
-      callbacksRef.current.onDragEnd?.();
+      // Only commit undo entry if velocity actually changed
+      if (dragChangedRef.current) {
+        callbacksRef.current.onDragEnd?.();
+      }
+      dragActiveIdsRef.current = new Set();
+      dragChangedRef.current = false;
+      lastDragXRef.current = null;
+      lastDragYRef.current = null;
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
     };
@@ -136,6 +230,7 @@ export const PixiVelocityLane: React.FC<PixiVelocityLaneProps> = ({
 
       const barH = (n.velocity / 127) * (height - 4);
       const isSelected = selectedIds?.has(n.id);
+      const isDragging = dragActiveIdsRef.current.has(n.id);
 
       g.rect(x, height - barH - 2, barW, barH);
       g.fill({ color: isSelected ? theme.warning.color : theme.accent.color, alpha: 0.7 });
@@ -143,6 +238,12 @@ export const PixiVelocityLane: React.FC<PixiVelocityLaneProps> = ({
       // Tip highlight
       g.rect(x, height - barH - 2, barW, 2);
       g.fill({ color: isSelected ? theme.warning.color : theme.accent.color, alpha: 1 });
+
+      // Active drag tint — white overlay at alpha 0.3
+      if (isDragging) {
+        g.rect(x, height - barH - 2, barW, barH + 2);
+        g.fill({ color: 0xffffff, alpha: 0.3 });
+      }
     }
   }, [width, height, notes, pixelsPerBeat, scrollBeat, selectedIds, theme]);
 
