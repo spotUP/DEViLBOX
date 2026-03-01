@@ -14,7 +14,8 @@
  * (avoids 60fps React re-renders during animation).
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Rectangle } from 'pixi.js';
 import type { Container as ContainerType, FederatedPointerEvent, Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -471,6 +472,10 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     setActiveWindowId(id);
   }, [id, bringToFront, setActiveWindowId]);
 
+  // Limit chrome button hit area to the rightmost button zone (2 buttons × 16px + 4px pad).
+  // Without this, the full-size invisible anchor rect would intercept all title bar clicks.
+  const chromeHitArea = useMemo(() => new Rectangle(w - 36, 0, 36, TITLE_H), [w]);
+
   const handleChromePointerDown = useCallback((e: FederatedPointerEvent) => {
     const lx = e.getLocalPosition((e.currentTarget as any)).x;
     if (lx > w - 20) { e.stopPropagation(); playWindowClose(); runSpring('close', () => hideWindow(id)); }
@@ -529,10 +534,11 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
         layout={{ position: 'absolute', width: w, height: h }}
       />
 
-      {/* Chrome buttons (close / minimize / focus) */}
+      {/* Chrome buttons (close / focus) — hitArea limited to button zone so title drag still works */}
       <pixiGraphics
         draw={drawButtons}
         eventMode="static"
+        hitArea={chromeHitArea}
         onPointerDown={handleChromePointerDown}
         cursor="pointer"
         layout={{ position: 'absolute', width: w, height: TITLE_H }}
