@@ -262,6 +262,94 @@ class UADEProcessor extends AudioWorkletProcessor {
         }
         break;
       }
+      case 'enablePaulaLog': {
+        const { enable } = data;
+        this._wasm?._uade_wasm_enable_paula_log?.(enable ? 1 : 0);
+        break;
+      }
+      case 'getPaulaLog': {
+        const { requestId } = data;
+        if (!this._wasm || !this._ready) {
+          this.port.postMessage({ type: 'paulaLogError', requestId, error: 'WASM not ready' });
+          break;
+        }
+        try {
+          // Each entry is 3 uint32s = 12 bytes; max 512 entries = 6144 bytes
+          const MAX_ENTRIES = 512;
+          const byteSize = MAX_ENTRIES * 3 * 4;
+          const ptr = this._wasm._malloc(byteSize);
+          if (!ptr) {
+            this.port.postMessage({ type: 'paulaLogError', requestId, error: 'malloc failed' });
+            break;
+          }
+          const count = this._wasm._uade_wasm_get_paula_log(ptr, MAX_ENTRIES);
+          const raw = new Uint32Array(this._wasm.HEAPU8.buffer, ptr, count * 3);
+          const entries = [];
+          for (let i = 0; i < count; i++) {
+            const packed = raw[i * 3];
+            entries.push({
+              channel:    (packed >>> 24) & 0xFF,
+              reg:        (packed >>> 16) & 0xFF,
+              value:       packed         & 0xFFFF,
+              sourceAddr: raw[i * 3 + 1],
+              tick:       raw[i * 3 + 2],
+            });
+          }
+          this._wasm._free(ptr);
+          this.port.postMessage({ type: 'paulaLogResult', requestId, entries });
+        } catch (e) {
+          this.port.postMessage({ type: 'paulaLogError', requestId, error: String(e) });
+        }
+        break;
+      }
+      case 'setWatchpoint': {
+        const { slot, addr: wpAddr, size, mode } = data;
+        this._wasm?._uade_wasm_set_watchpoint?.(slot, wpAddr, size, mode);
+        break;
+      }
+      case 'clearWatchpoint': {
+        const { slot } = data;
+        this._wasm?._uade_wasm_clear_watchpoint?.(slot);
+        break;
+      }
+      case 'clearAllWatchpoints': {
+        this._wasm?._uade_wasm_clear_all_watchpoints?.();
+        break;
+      }
+      case 'getWatchpointHits': {
+        const { requestId } = data;
+        if (!this._wasm || !this._ready) {
+          this.port.postMessage({ type: 'watchpointHitsError', requestId, error: 'WASM not ready' });
+          break;
+        }
+        try {
+          // Each hit is 4 uint32s = 16 bytes; max 256 hits = 4096 bytes
+          const MAX_HITS = 256;
+          const byteSize = MAX_HITS * 4 * 4;
+          const ptr = this._wasm._malloc(byteSize);
+          if (!ptr) {
+            this.port.postMessage({ type: 'watchpointHitsError', requestId, error: 'malloc failed' });
+            break;
+          }
+          const count = this._wasm._uade_wasm_get_watchpoint_hits(ptr, MAX_HITS);
+          const raw = new Uint32Array(this._wasm.HEAPU8.buffer, ptr, count * 4);
+          const hits = [];
+          for (let i = 0; i < count; i++) {
+            hits.push({
+              addr:    raw[i * 4],
+              value:   raw[i * 4 + 1],
+              tick:    raw[i * 4 + 2],
+              isWrite: !!(raw[i * 4 + 3] >> 8),
+              wpSlot:   raw[i * 4 + 3] & 0xFF,
+            });
+          }
+          this._wasm._free(ptr);
+          this.port.postMessage({ type: 'watchpointHitsResult', requestId, hits });
+        } catch (e) {
+          this.port.postMessage({ type: 'watchpointHitsError', requestId, error: String(e) });
+        }
+        break;
+      }
     }
   }
 
@@ -682,6 +770,9 @@ class UADEProcessor extends AudioWorkletProcessor {
       this._wasm._uade_wasm_set_subsong(subsongIndex);
     }
 
+    // Enable Paula write log for instrument parameter discovery
+    this._wasm._uade_wasm_enable_paula_log?.(1);
+
     const CHUNK = 128;  // Smaller chunks = higher tick resolution
     const MAX_SECONDS = 600;
     const sr = sampleRate || 44100;
@@ -1043,6 +1134,9 @@ class UADEProcessor extends AudioWorkletProcessor {
         typicalPeriod: data.typicalPeriod,
       };
     }
+
+    // Disable Paula write log (scan complete; log holds entries for JS to drain)
+    this._wasm._uade_wasm_enable_paula_log?.(0);
 
     return {
       rows, // Enhanced rows compatible with basic scan format

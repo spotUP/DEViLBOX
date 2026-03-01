@@ -930,6 +930,18 @@ export async function parseUADEFile(
       activeScanRows, periodToNoteIndex,
       chipRamNames,
     );
+
+    // Auto-discover per-instrument chip RAM parameter layouts using the Paula write
+    // log captured during the scan.  Enriches instruments that don't already have
+    // a native-parser chip RAM map (uadeChipRam).
+    try {
+      const { UADEFormatAnalyzer } = await import('@/engine/uade/UADEFormatAnalyzer');
+      const analyzer = new UADEFormatAnalyzer(engine);
+      await analyzer.analyzeAndPopulate(song.instruments, activeEnhancedScan);
+    } catch (e) {
+      console.warn('[UADEParser] UADEFormatAnalyzer failed:', e);
+    }
+
     // Fall back to classic if enhanced scan yielded no playable instruments.
     // This happens for synthesis-only formats, all-zero PCM, or pure VBlank formats
     // where no chip RAM samples were extracted.
