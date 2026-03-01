@@ -62,6 +62,29 @@ void uade_wasm_on_cia_a_tick(void) {
     g_uade_tick_count++;
 }
 
+/* ── Paula write log ────────────────────────────────────────────────────── */
+#include "paula_log.h"
+
+/* Forward declaration — defined in memory.c (full extern in memory.h below) */
+extern uint32_t g_uade_last_chip_read_addr;
+
+static UadePaulaLogEntry g_paula_log[PAULA_LOG_SIZE];
+static uint32_t g_paula_log_write   = 0;
+static uint32_t g_paula_log_read    = 0;
+static uint8_t  g_paula_log_enabled = 0;
+
+/* Called from audio.c AUDx handlers (inside #ifdef UADE_WASM guards). */
+void uade_wasm_log_paula_write(uint8_t channel, uint8_t reg, uint16_t value) {
+    if (!g_paula_log_enabled) return;
+    uint32_t idx = g_paula_log_write & PAULA_LOG_MASK;
+    g_paula_log[idx].channel     = channel;
+    g_paula_log[idx].reg         = reg;
+    g_paula_log[idx].value       = value;
+    g_paula_log[idx].source_addr = g_uade_last_chip_read_addr;
+    g_paula_log[idx].tick        = g_uade_tick_count;
+    g_paula_log_write++;
+}
+
 /* PCM ring buffer — interleaved int16 stereo */
 #define PCM_BUF_FRAMES  (8192)
 #define PCM_BUF_BYTES   (PCM_BUF_FRAMES * 4)   /* 2 channels * 2 bytes/sample */
@@ -647,6 +670,49 @@ void uade_wasm_cleanup(void) {
 EMSCRIPTEN_KEEPALIVE
 void uade_wasm_reset_tick_count(void) {
     g_uade_tick_count = 0;
+    g_paula_log_read  = 0;
+    g_paula_log_write = 0;
+}
+
+/* ── Paula log exports ──────────────────────────────────────────────────── */
+
+/*
+ * Enable or disable Paula write logging.
+ * When enabling, the ring buffer is cleared (read = write = 0).
+ * Called by the worklet around _scanSongEnhanced() to capture only scan data.
+ */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_enable_paula_log(int enable) {
+    g_paula_log_enabled = enable ? 1 : 0;
+    if (enable) {
+        g_paula_log_read  = 0;
+        g_paula_log_write = 0;
+    }
+}
+
+/*
+ * Drain up to maxEntries entries from the Paula log into `out`.
+ * Output format per entry (3 uint32s):
+ *   [0] = (channel<<24)|(reg<<16)|value
+ *   [1] = source_addr (chip RAM address that sourced the value)
+ *   [2] = tick        (CIA-A tick count at write time)
+ * Returns the number of entries written.
+ */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_get_paula_log(uint32_t *out, int maxEntries) {
+    int count = 0;
+    while (count < maxEntries && g_paula_log_read != g_paula_log_write) {
+        uint32_t idx = g_paula_log_read & PAULA_LOG_MASK;
+        UadePaulaLogEntry *e = &g_paula_log[idx];
+        out[count * 3 + 0] = ((uint32_t)e->channel << 24) |
+                             ((uint32_t)e->reg     << 16) |
+                              (uint32_t)e->value;
+        out[count * 3 + 1] = e->source_addr;
+        out[count * 3 + 2] = e->tick;
+        g_paula_log_read++;
+        count++;
+    }
+    return count;
 }
 
 /*
@@ -658,6 +724,128 @@ void uade_wasm_reset_tick_count(void) {
 EMSCRIPTEN_KEEPALIVE
 uint32_t uade_wasm_get_tick_count(void) {
     return g_uade_tick_count;
+}
+
+/* ── Memory watchpoints ─────────────────────────────────────────────────── */
+
+#define WATCHPOINT_MAX    8
+#define WP_HIT_LOG_SIZE  256
+#define WP_HIT_LOG_MASK  (WP_HIT_LOG_SIZE - 1)
+#define WP_MODE_READ  1
+#define WP_MODE_WRITE 2
+#define WP_MODE_BOTH  3
+
+typedef struct {
+    uint32_t addr;
+    uint32_t size;
+    uint8_t  mode;
+    uint8_t  enabled;
+} UadeWatchpoint;
+
+typedef struct {
+    uint32_t addr;
+    uint32_t value;
+    uint32_t tick;
+    uint8_t  is_write;
+    uint8_t  wp_slot;
+} UadeWpHit;
+
+static UadeWatchpoint g_watchpoints[WATCHPOINT_MAX];
+static UadeWpHit      g_wp_hits[WP_HIT_LOG_SIZE];
+static uint32_t g_wp_hit_write = 0;
+static uint32_t g_wp_hit_read  = 0;
+
+/*
+ * Called from memory.c chipmem_bget (inside #ifdef UADE_WASM).
+ * Checks whether the read address falls within any active read watchpoint.
+ */
+void uade_wasm_check_wp_read(uint32_t addr, uint32_t value) {
+    for (int i = 0; i < WATCHPOINT_MAX; i++) {
+        if (!g_watchpoints[i].enabled) continue;
+        if (!(g_watchpoints[i].mode & WP_MODE_READ)) continue;
+        if (addr < g_watchpoints[i].addr ||
+            addr >= g_watchpoints[i].addr + g_watchpoints[i].size) continue;
+        uint32_t idx = g_wp_hit_write++ & WP_HIT_LOG_MASK;
+        g_wp_hits[idx].addr     = addr;
+        g_wp_hits[idx].value    = value;
+        g_wp_hits[idx].tick     = g_uade_tick_count;
+        g_wp_hits[idx].is_write = 0;
+        g_wp_hits[idx].wp_slot  = (uint8_t)i;
+    }
+}
+
+/*
+ * Called from memory.c chipmem_bput (inside #ifdef UADE_WASM).
+ * Checks whether the write address falls within any active write watchpoint.
+ */
+void uade_wasm_check_wp_write(uint32_t addr, uint32_t value) {
+    for (int i = 0; i < WATCHPOINT_MAX; i++) {
+        if (!g_watchpoints[i].enabled) continue;
+        if (!(g_watchpoints[i].mode & WP_MODE_WRITE)) continue;
+        if (addr < g_watchpoints[i].addr ||
+            addr >= g_watchpoints[i].addr + g_watchpoints[i].size) continue;
+        uint32_t idx = g_wp_hit_write++ & WP_HIT_LOG_MASK;
+        g_wp_hits[idx].addr     = addr;
+        g_wp_hits[idx].value    = value;
+        g_wp_hits[idx].tick     = g_uade_tick_count;
+        g_wp_hits[idx].is_write = 1;
+        g_wp_hits[idx].wp_slot  = (uint8_t)i;
+    }
+}
+
+/*
+ * Set a watchpoint slot.
+ * slot: 0-7
+ * addr: chip RAM address to watch
+ * size: byte range to watch (typically 1)
+ * mode: WP_MODE_READ(1), WP_MODE_WRITE(2), or WP_MODE_BOTH(3)
+ */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_set_watchpoint(int slot, uint32_t addr, uint32_t size, int mode) {
+    if (slot < 0 || slot >= WATCHPOINT_MAX) return;
+    g_watchpoints[slot].addr    = addr;
+    g_watchpoints[slot].size    = size;
+    g_watchpoints[slot].mode    = (uint8_t)mode;
+    g_watchpoints[slot].enabled = 1;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_clear_watchpoint(int slot) {
+    if (slot < 0 || slot >= WATCHPOINT_MAX) return;
+    g_watchpoints[slot].enabled = 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_clear_all_watchpoints(void) {
+    for (int i = 0; i < WATCHPOINT_MAX; i++)
+        g_watchpoints[i].enabled = 0;
+    g_wp_hit_read  = 0;
+    g_wp_hit_write = 0;
+}
+
+/*
+ * Drain up to maxHits watchpoint hits into `out`.
+ * Output format per hit (4 uint32s):
+ *   [0] = addr
+ *   [1] = value
+ *   [2] = tick
+ *   [3] = (is_write<<8)|wp_slot
+ * Returns the number of hits written.
+ */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_get_watchpoint_hits(uint32_t *out, int maxHits) {
+    int count = 0;
+    while (count < maxHits && g_wp_hit_read != g_wp_hit_write) {
+        uint32_t idx = g_wp_hit_read & WP_HIT_LOG_MASK;
+        UadeWpHit *h = &g_wp_hits[idx];
+        out[count * 4 + 0] = h->addr;
+        out[count * 4 + 1] = h->value;
+        out[count * 4 + 2] = h->tick;
+        out[count * 4 + 3] = ((uint32_t)h->is_write << 8) | (uint32_t)h->wp_slot;
+        g_wp_hit_read++;
+        count++;
+    }
+    return count;
 }
 
 /* ── String read from Amiga chip RAM ────────────────────────────────────── */
