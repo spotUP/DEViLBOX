@@ -39,8 +39,9 @@ import { PixiSunVoxChannelView } from './sunvox/PixiSunVoxChannelView';
 import { PixiPianoRollView } from './PixiPianoRollView';
 import { useTrackerInput } from '@/hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
-import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useTrackerStore, useUIStore, useInstrumentStore } from '@stores';
+import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { TITLE_H } from '../workbench/PixiWindow';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
 type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj';
@@ -59,10 +60,17 @@ export const PixiTrackerView: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
   const closeModal = useUIStore(s => s.closeModal);
   const editorMode = useTrackerStore(s => s.editorMode);
-  const { width: windowWidth, height: windowHeight } = usePixiResponsive();
   const showMacroSlots = useUIStore(s => s.showMacroSlots);
   const compactToolbar = useUIStore(s => s.compactToolbar);
   const [showInstrumentPanel, setShowInstrumentPanel] = useState(true);
+
+  // PixiTrackerView lives inside a PixiWindow — use the window's own dimensions,
+  // not the screen dimensions, so layout calculations are correct when the window
+  // is resized or is smaller than the screen.
+  const trackerWin = useWorkbenchStore(s => s.windows['tracker']);
+  const windowWidth = trackerWin?.width ?? 900;
+  // Content height = window height minus the PixiWindow title bar
+  const contentH = trackerWin ? (trackerWin.height - TITLE_H) : 572;
 
   // Hide instrument panel on narrow windows (matches DOM TrackerView)
   const canShowInstrumentPanel = windowWidth >= 900;
@@ -100,16 +108,16 @@ export const PixiTrackerView: React.FC = () => {
     return next >= 0 ? (s.patterns[s.patternOrder[next]]?.length ?? undefined) : undefined;
   });
 
-  // Compute instrument panel height: window minus navbar + toolbar + controls + statusbar + optional panels
-  const NAVBAR_H = 98; // NavBar(45px) + TabBar(41px) + borders+padding — must match PixiNavBar height
-  const STATUSBAR_H = 32; // must match PixiStatusBar STATUS_BAR_HEIGHT
+  // Compute usable heights from the PixiWindow's content area.
+  // Unlike the old full-screen layout, PixiTrackerView is inside a PixiWindow so
+  // there's no NavBar or StatusBar to subtract — those are outside the window.
   const CONTROLS_BAR_H = 32;
   const MACRO_SLOTS_H = showMacroSlots ? 32 : 0;
   const toolbarH = compactToolbar ? FT2_TOOLBAR_HEIGHT_COMPACT : FT2_TOOLBAR_HEIGHT;
   const tb303PanelH = hasTB303 && viewMode !== 'tb303' && viewMode !== 'sunvox'
     ? (tb303Collapsed ? TB303_PANEL_COLLAPSED_H : TB303_PANEL_EXPANDED_H)
     : 0;
-  const instrumentPanelHeight = windowHeight - NAVBAR_H - toolbarH - CONTROLS_BAR_H - STATUSBAR_H - MACRO_SLOTS_H - (showPatterns ? PATTERN_PANEL_HEIGHT : 0) - tb303PanelH;
+  const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - (showPatterns ? PATTERN_PANEL_HEIGHT : 0) - tb303PanelH;
   const editorWidth = windowWidth - (instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0) - 16; // minus instrument panel and minimap
 
   return (
