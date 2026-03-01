@@ -31,6 +31,9 @@ export interface ClipRenderData {
   selected: boolean;
   fadeInRows?: number;
   fadeOutRows?: number;
+  /** Note values (XM format: 1-96 = pitched note, 97 = note off, 0 = empty)
+   *  for drawing the mini note-preview bars inside the clip. */
+  noteRows?: number[];
 }
 
 interface PixiArrangementCanvasProps {
@@ -71,9 +74,15 @@ interface PixiArrangementCanvasProps {
   /** Arrangement loop region end row */
   loopEnd?: number | null;
   /** Timeline markers to display in the ruler */
-  markers?: Array<{ id: string; row: number; label: string; color: number }>;
+  markers?: Array<{ id: string; row: number; label: string; color: number; timeSig?: string }>;
   /** Called on right-click in the ruler area — row is the timeline row at cursor */
   onAddMarker?: (row: number) => void;
+  /** Called when a marker is dragged to a new row */
+  onMoveMarker?: (markerId: string, row: number) => void;
+  /** Called when a marker is double-clicked (rename) */
+  onRenameMarker?: (markerId: string) => void;
+  /** Called on Cmd+click in empty ruler area to add a time sig marker */
+  onAddTimeSigMarker?: (row: number) => void;
 }
 
 const CLIP_PADDING = 2;
@@ -214,6 +223,9 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
   loopEnd,
   markers = [],
   onAddMarker,
+  onMoveMarker,
+  onRenameMarker,
+  onAddTimeSigMarker,
 }) => {
   const theme = usePixiTheme();
   const gridHeight = height - RULER_HEIGHT;
@@ -222,14 +234,18 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
   const paramsRef = useRef({ scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme, loopStart, loopEnd, markers });
   paramsRef.current = { scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme, loopStart, loopEnd, markers };
 
-  const callbacksRef = useRef({ onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll, onContextMenu, onAddMarker });
-  callbacksRef.current = { onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll, onContextMenu, onAddMarker };
+  const callbacksRef = useRef({ onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll, onContextMenu, onAddMarker, onMoveMarker, onRenameMarker, onAddTimeSigMarker });
+  callbacksRef.current = { onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll, onContextMenu, onAddMarker, onMoveMarker, onRenameMarker, onAddTimeSigMarker };
 
   // Double-click detection for select tool
   const lastClickRef = useRef<{ time: number; clipId: string }>({ time: 0, clipId: '' });
+  // Double-click detection for markers
+  const lastMarkerClickRef = useRef<{ time: number; markerId: string }>({ time: 0, markerId: '' });
 
   const dragRef = useRef<DragState | null>(null);
   const overlayRef = useRef<GraphicsType | null>(null);
+  // Tracks active marker drag { id, startRow }
+  const draggingMarkerRef = useRef<{ id: string; startRow: number } | null>(null);
 
   // ---------- overlay drawing ----------
   const drawOverlay = useCallback((currentLocalX: number, currentLocalY: number) => {
@@ -368,6 +384,60 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       } else {
         cbs.onContextMenu?.(hit?.id ?? null, e.clientX, e.clientY);
       }
+      return;
+    }
+
+    // Ruler clicks: marker drag, double-click rename, Cmd+click for time sig
+    if (ly < RULER_HEIGHT) {
+      const { markers: ms } = paramsRef.current;
+      // Find closest marker within 10px
+      let closestMarker: typeof ms[0] | null = null;
+      let closestDist = 11;
+      for (const m of ms) {
+        const mx = (m.row - paramsRef.current.scrollBeat) * paramsRef.current.pixelsPerBeat;
+        const d = Math.abs(lx - mx);
+        if (d < closestDist) { closestDist = d; closestMarker = m; }
+      }
+
+      if (closestMarker) {
+        const now = Date.now();
+        // Double-click: rename
+        if (now - lastMarkerClickRef.current.time < 300 && lastMarkerClickRef.current.markerId === closestMarker.id) {
+          cbs.onRenameMarker?.(closestMarker.id);
+          lastMarkerClickRef.current = { time: 0, markerId: '' };
+          return;
+        }
+        lastMarkerClickRef.current = { time: now, markerId: closestMarker.id };
+
+        // Start marker drag via document events
+        const markerId = closestMarker.id;
+        draggingMarkerRef.current = { id: markerId, startRow: closestMarker.row };
+
+        const onMarkerMove = (me: PointerEvent) => {
+          if (!draggingMarkerRef.current) return;
+          const cameraScale = useWorkbenchStore.getState().camera.scale;
+          const deltaX = (me.clientX - e.clientX) / cameraScale;
+          const { scrollBeat: sb2, pixelsPerBeat: ppb2 } = paramsRef.current;
+          const newRow = Math.max(0, Math.round(draggingMarkerRef.current.startRow + deltaX / ppb2));
+          callbacksRef.current.onMoveMarker?.(markerId, newRow);
+        };
+        const onMarkerUp = () => {
+          document.removeEventListener('pointermove', onMarkerMove);
+          document.removeEventListener('pointerup', onMarkerUp);
+          draggingMarkerRef.current = null;
+        };
+        document.addEventListener('pointermove', onMarkerMove);
+        document.addEventListener('pointerup', onMarkerUp);
+        return;
+      }
+
+      // Cmd+click on empty ruler area: add time sig marker
+      if (e.metaKey || e.ctrlKey) {
+        cbs.onAddTimeSigMarker?.(Math.round(rowAtCursor));
+        return;
+      }
+
+      // Plain left-click on empty ruler: do nothing special (fall through)
       return;
     }
 
@@ -655,6 +725,36 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         g.rect(rx, cy + 2, 2, ch - 4);
         g.fill({ color: 0xffffff, alpha: 0.6 });
       }
+
+      // Note preview: draw mini bars for each pitched note in the clip
+      if (pixelsPerBeat >= 1 && clip.noteRows && clip.noteRows.length > 0) {
+        const noteH = Math.max(1, Math.min(4, ch / 24));
+        const noteW = Math.max(1, pixelsPerBeat);
+        const clipBodyLeft = cx + CLIP_PADDING;
+        const clipBodyRight = cx + cw - CLIP_PADDING;
+        const clipBodyTop = cy + 4; // below the header stripe
+        const clipBodyBottom = cy + ch;
+        const clipBodyH = clipBodyBottom - clipBodyTop;
+
+        for (let rowIdx = 0; rowIdx < clip.noteRows.length; rowIdx++) {
+          const note = clip.noteRows[rowIdx];
+          if (note < 1 || note > 96) continue; // skip empty and note-off
+
+          const nx = clipBodyLeft + rowIdx * pixelsPerBeat;
+          if (nx + noteW < clipBodyLeft || nx > clipBodyRight) continue;
+
+          // MIDI note 0-95; map to y: 0 (MIDI 95) at top, 1 (MIDI 0) at bottom
+          const midiNote = note - 1; // XM note 1-96 → MIDI 0-95
+          const ny = clipBodyTop + clipBodyH * (1 - midiNote / 95) - noteH / 2;
+
+          const drawX = Math.max(clipBodyLeft, nx);
+          const drawW = Math.min(clipBodyRight, nx + noteW) - drawX;
+          if (drawW <= 0) continue;
+
+          g.rect(drawX, ny, drawW, noteH);
+          g.fill({ color: 0xffffff, alpha: 0.25 });
+        }
+      }
     }
 
     if (playbackBeat != null) {
@@ -706,6 +806,13 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       g.fill({ color: marker.color, alpha: 0.8 });
       g.rect(mx - 1, 6, 3, 2);
       g.fill({ color: marker.color, alpha: 0.8 });
+      // Time sig markers: draw a small "=" indicator below the chevron
+      if (marker.timeSig) {
+        g.rect(mx + 2, 3, 4, 1);
+        g.fill({ color: marker.color, alpha: 0.9 });
+        g.rect(mx + 2, 5, 4, 1);
+        g.fill({ color: marker.color, alpha: 0.9 });
+      }
     }
   }, [width, height, scrollBeat, scrollY, pixelsPerBeat, totalBeats, beatsPerBar, playbackBeat, theme, gridHeight, clips, trackHeight, loopStart, loopEnd, markers]);
 
@@ -729,9 +836,11 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       .map(marker => {
         const x = (marker.row - scrollBeat) * pixelsPerBeat;
         if (x < -50 || x > width + 50) return null;
-        return { id: marker.id, x, text: marker.label, color: marker.color };
+        // For time sig markers, show the timeSig string (e.g. "3/4") as the label
+        const text = marker.timeSig ?? marker.label;
+        return { id: marker.id, x, text, color: marker.color, isTimeSig: !!marker.timeSig };
       })
-      .filter((m): m is { id: string; x: number; text: string; color: number } => m !== null);
+      .filter((m): m is { id: string; x: number; text: string; color: number; isTimeSig: boolean } => m !== null);
   }, [markers, scrollBeat, pixelsPerBeat, width]);
 
   const clipLabels = useMemo(() => {
@@ -778,14 +887,14 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         />
       ))}
 
-      {markerLabels.map(({ id, x, text, color }) => (
+      {markerLabels.map(({ id, x, text, color, isTimeSig }) => (
         <pixiBitmapText
           key={`marker-${id}`}
           text={text}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
           tint={color}
-          x={x + 3}
-          y={13}
+          x={x + (isTimeSig ? 6 : 3)}
+          y={isTimeSig ? 10 : 13}
         />
       ))}
 

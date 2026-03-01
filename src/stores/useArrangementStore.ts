@@ -108,6 +108,11 @@ interface ArrangementStore {
   removeMarker: (markerId: string) => void;
   moveMarker: (markerId: string, row: number) => void;
   updateMarker: (markerId: string, updates: Partial<ArrangementMarker>) => void;
+  addTimeSigMarker: (row: number, num: number, denom: number) => string;
+
+  // === Marker rename UI state (not persisted) ===
+  renamingMarkerId: string | null;
+  setRenamingMarkerId: (id: string | null) => void;
 
   // === Groups ===
   addGroup: (name: string) => string;
@@ -203,6 +208,7 @@ export const useArrangementStore = create<ArrangementStore>()(
     drag: null,
     playbackRow: 0,
     renamingClipId: null,
+    renamingMarkerId: null,
 
     undoStack: [],
     redoStack: [],
@@ -522,6 +528,25 @@ export const useArrangementStore = create<ArrangementStore>()(
         const marker = state.markers.find(m => m.id === markerId);
         if (marker) Object.assign(marker, updates);
       }),
+
+    addTimeSigMarker: (row, num, denom) => {
+      const id = generateId('marker');
+      set((state) => {
+        state.markers.push({
+          id,
+          row,
+          name: `${num}/${denom}`,
+          type: 'timesig',
+          color: '#f59e0b',
+          timeSigNum: num,
+          timeSigDenom: denom,
+        });
+      });
+      return id;
+    },
+
+    setRenamingMarkerId: (id) =>
+      set((state) => { state.renamingMarkerId = id; }),
 
     // === Groups ===
 
