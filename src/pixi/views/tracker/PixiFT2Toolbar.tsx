@@ -152,7 +152,7 @@ export const PixiFT2Toolbar: React.FC = () => {
     recordMode: s.recordMode,
   })));
 
-  const _addTab = useTabsStore(s => s.addTab);
+
 
   // ── UI store ─────────────────────────────────────────────────────────────
   const modalOpen = useUIStore(s => s.modalOpen);
