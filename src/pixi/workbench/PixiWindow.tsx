@@ -15,7 +15,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Rectangle } from 'pixi.js';
+import { Rectangle, Graphics } from 'pixi.js';
 import type { Container as ContainerType, FederatedPointerEvent, Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -143,6 +143,9 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   // Ref to the outer container for direct Pixi manipulation
   const outerRef = useRef<ContainerType>(null);
 
+  // Ref to the content area container — used to apply a Pixi clipping mask
+  const contentRef = useRef<ContainerType>(null);
+
   // Track previous visibility to detect changes
   const prevVisibleRef = useRef<boolean>(winState?.visible ?? false);
 
@@ -252,6 +255,20 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
       cancelAnimationFrame(momentumRafRef.current);
     };
   }, []);
+
+  // Clip content area to window bounds using a Pixi Graphics mask.
+  // @pixi/layout's overflow:'hidden' only affects layout flow, not Pixi rendering.
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const mask = new Graphics();
+    mask.rect(0, 0, w, contentH).fill({ color: 0xffffff });
+    el.mask = mask;
+    return () => {
+      el.mask = null;
+      mask.destroy();
+    };
+  }, [w, contentH]);
 
   // ─── Viewport edge bounds (world space) ─────────────────────────────────────
 
@@ -453,6 +470,14 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     g.stroke({ color: theme.accent.color, alpha: 0.4, width: 1 });
   }, [theme]);
 
+  // Invisible rect that gives the title drag area proper Pixi hit bounds.
+  // An empty pixiContainer has 0-size bounds and is never hit-tested.
+  const drawTitleDrag = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, w - 44, TITLE_H);
+    g.fill({ color: 0xffffff, alpha: 0 });
+  }, [w]);
+
   const drawButtons = useCallback((g: GraphicsType) => {
     g.clear();
     // Invisible full-size rect anchors pixi bounds so the layout engine
@@ -544,8 +569,10 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
         layout={{ position: 'absolute', width: w, height: TITLE_H }}
       />
 
-      {/* Title bar drag area (avoids the chrome button zone — 2 buttons × 16px + 4px pad) */}
-      <pixiContainer
+      {/* Title bar drag area — pixiGraphics gives it proper Pixi hit bounds.
+          An empty pixiContainer has 0-size bounds and is never hit-tested. */}
+      <pixiGraphics
+        draw={drawTitleDrag}
         eventMode="static"
         cursor="move"
         onPointerDown={handleTitlePointerDown}
@@ -561,8 +588,9 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
         y={TITLE_H / 2 - 5}
       />
 
-      {/* Content area */}
+      {/* Content area — ref used to apply Pixi clipping mask (see useEffect above) */}
       <pixiContainer
+        ref={contentRef}
         y={TITLE_H}
         layout={{ width: w, height: contentH, overflow: 'hidden' }}
       >

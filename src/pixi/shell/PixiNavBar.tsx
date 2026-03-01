@@ -17,6 +17,7 @@ import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { BUILTIN_WORKSPACES, springCameraTo, fitAllWindows, fitWindow } from '../workbench/WorkbenchExpose';
+import { NAV_H as _NAV_H, WORKBENCH_CHROME_H } from '../workbench/workbenchLayout';
 
 /** View window toggle buttons shown in the NavBar */
 const VIEW_WINDOWS = [
@@ -164,7 +165,7 @@ const WorkspaceItem: React.FC<WorkspaceItemProps> = ({ label, isBuiltin, isSave,
 
 const NAV_ROW1_H = 45;
 const NAV_ROW2_H = 53;
-const NAV_H = NAV_ROW1_H + NAV_ROW2_H;
+const NAV_H = _NAV_H; // re-export alias keeps draw callbacks working
 
 export const PixiNavBar: React.FC = () => {
   const theme = usePixiTheme();
@@ -219,34 +220,37 @@ export const PixiNavBar: React.FC = () => {
     springCameraTo({ x: 0, y: 0, scale: 1 });
   }, [resetLayout]);
 
+  // Actual visible workbench area (excludes NavBar + StatusBar chrome)
+  const workbenchH = height - WORKBENCH_CHROME_H;
+
   // Fit active window, or all windows if none selected
   const handleFitAll = useCallback(() => {
     const state = useWorkbenchStore.getState();
     const activeId = state.activeWindowId;
     const win = activeId ? state.windows[activeId] : null;
     if (win?.visible && !win.minimized) {
-      springCameraTo(fitWindow(win, width, height));
+      springCameraTo(fitWindow(win, width, workbenchH));
     } else {
-      springCameraTo(fitAllWindows(state.windows, width, height));
+      springCameraTo(fitAllWindows(state.windows, width, workbenchH));
     }
-  }, [width, height]);
+  }, [width, workbenchH]);
 
   // Camera zoom presets — spring-animate to a fixed scale centred on screen
   const zoomToScale = useCallback((targetScale: number) => {
     const cam = useWorkbenchStore.getState().camera;
     const ratio = targetScale / cam.scale;
-    const x = width  / 2 - (width  / 2 - cam.x) * ratio;
-    const y = height / 2 - (height / 2 - cam.y) * ratio;
+    const x = width       / 2 - (width       / 2 - cam.x) * ratio;
+    const y = workbenchH  / 2 - (workbenchH  / 2 - cam.y) * ratio;
     springCameraTo({ x, y, scale: targetScale });
-  }, [width, height]);
+  }, [width, workbenchH]);
 
   // Bird's-eye: zoom way out so the whole layout is visible
   const handleBird = useCallback(() => {
     const ws = useWorkbenchStore.getState().windows;
-    const cam = fitAllWindows(ws, width, height, 0.08);
+    const cam = fitAllWindows(ws, width, workbenchH, 0.08);
     // Cap scale at 0.3 so it's always a wide-angle view
     springCameraTo({ ...cam, scale: Math.min(cam.scale, 0.3) });
-  }, [width, height]);
+  }, [width, workbenchH]);
 
   // Row 1 background
   const drawRow1Bg = useCallback((g: GraphicsType) => {
