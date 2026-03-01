@@ -262,6 +262,44 @@ class UADEProcessor extends AudioWorkletProcessor {
         }
         break;
       }
+
+      case 'enablePaulaLog': {
+        const { enable } = data;
+        if (this._wasm?._uade_wasm_enable_paula_log) {
+          this._wasm._uade_wasm_enable_paula_log(enable ? 1 : 0);
+        }
+        break;
+      }
+
+      case 'getPaulaLog': {
+        const { requestId } = data;
+        if (!this._wasm || !this._ready) {
+          this.port.postMessage({ type: 'paulaLogError', requestId, error: 'WASM not ready' });
+          break;
+        }
+        try {
+          const maxEntries = 512;
+          const ptr = this._wasm._malloc(maxEntries * 3 * 4); // 3 uint32 per entry
+          const count = this._wasm._uade_wasm_get_paula_log(ptr, maxEntries);
+          const raw = new Uint32Array(this._wasm.HEAPU8.buffer, ptr, count * 3);
+          const entries = [];
+          for (let i = 0; i < count; i++) {
+            const w0 = raw[i * 3 + 0];
+            entries.push({
+              channel:    (w0 >>> 24) & 0xFF,
+              reg:        (w0 >>> 16) & 0xFF,
+              value:      w0 & 0xFFFF,
+              sourceAddr: raw[i * 3 + 1],
+              tick:       raw[i * 3 + 2],
+            });
+          }
+          this._wasm._free(ptr);
+          this.port.postMessage({ type: 'paulaLogResult', requestId, entries });
+        } catch (e) {
+          this.port.postMessage({ type: 'paulaLogError', requestId, error: String(e) });
+        }
+        break;
+      }
     }
   }
 
