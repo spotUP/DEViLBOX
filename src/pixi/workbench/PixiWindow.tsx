@@ -15,6 +15,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTick } from '@pixi/react';
 import { Rectangle, Graphics } from 'pixi.js';
 import type { Container as ContainerType, FederatedPointerEvent, Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
@@ -162,10 +163,12 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   // Track previous visibility to detect changes
   const prevVisibleRef = useRef<boolean>(winState?.visible ?? false);
 
-  // Animation RAF handle
-  const animRafRef = useRef<number>(0);
-  const animStartRef = useRef<number>(0);
-  const animDirRef = useRef<'open' | 'close'>('open');
+  // Spring state for open/close animation — driven by Pixi ticker (not RAF)
+  const springStateRef = useRef<{
+    dir: 'open' | 'close';
+    startTime: number;
+    onDone?: () => void;
+  } | null>(null);
 
   // Drag state
   const dragRef = useRef<{
@@ -195,54 +198,49 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
 
   // ─── Spring open/close animation ────────────────────────────────────────────
 
-  const runSpring = useCallback((dir: 'open' | 'close', onDone?: () => void) => {
-    cancelAnimationFrame(animRafRef.current);
-    animDirRef.current = dir;
-    animStartRef.current = performance.now();
+  useTick(() => {
+    const spring = springStateRef.current;
+    if (!spring) return;
 
-    if (dir === 'open') setAnimVisible(true);
+    const elapsed = performance.now() - spring.startTime;
+    const t = Math.min(1, elapsed / SPRING_DURATION);
 
-    const tick = () => {
-      const elapsed = performance.now() - animStartRef.current;
-      const t = Math.min(1, elapsed / SPRING_DURATION);
+    let progress = spring.dir === 'open'
+      ? springEase(t)
+      : 1 - springEase(1 - t, 8, 6);
+    progress = Math.max(0, progress);
 
-      let progress = dir === 'open' ? springEase(t) : 1 - springEase(1 - t, 8, 6);
-      // Clamp negative values (spring can dip below 0 on close)
-      progress = Math.max(0, progress);
+    const sq = squashStretch(spring.dir === 'open' ? t : 1 - t);
+    const sx = progress * sq.scaleX;
+    const sy = progress * sq.scaleY;
 
-      const sq = squashStretch(dir === 'open' ? t : 1 - t);
-      const sx = progress * sq.scaleX;
-      const sy = progress * sq.scaleY;
+    const el = outerRef.current;
+    if (el) {
+      el.scale.x = sx;
+      el.scale.y = sy;
+      const ww = storeRef.current.winState?.width  ?? 400;
+      const wh = storeRef.current.winState?.height ?? 300;
+      el.pivot.set(ww / 2, wh / 2);
+      el.x = (storeRef.current.winState?.x ?? 0) + ww / 2;
+      el.y = (storeRef.current.winState?.y ?? 0) + wh / 2;
+    }
 
-      // Direct Pixi manipulation for smooth animation
-      const el = outerRef.current;
+    if (t >= 1) {
       if (el) {
-        el.scale.x = sx;
-        el.scale.y = sy;
-        // Keep pivot at center
-        const w = storeRef.current.winState?.width ?? 400;
-        const h = storeRef.current.winState?.height ?? 300;
-        el.pivot.set(w / 2, h / 2);
-        el.x = (storeRef.current.winState?.x ?? 0) + w / 2;
-        el.y = (storeRef.current.winState?.y ?? 0) + h / 2;
+        el.scale.set(1);
+        el.pivot.set(0, 0);
+        el.x = storeRef.current.winState?.x ?? 0;
+        el.y = storeRef.current.winState?.y ?? 0;
       }
+      if (spring.dir === 'close') setAnimVisible(false);
+      spring.onDone?.();
+      springStateRef.current = null;
+    }
+  });
 
-      if (t < 1) {
-        animRafRef.current = requestAnimationFrame(tick);
-      } else {
-        // Animation complete
-        if (el) {
-          el.scale.set(1);
-          el.pivot.set(0, 0);
-          el.x = storeRef.current.winState?.x ?? 0;
-          el.y = storeRef.current.winState?.y ?? 0;
-        }
-        if (dir === 'close') setAnimVisible(false);
-        onDone?.();
-      }
-    };
-
-    animRafRef.current = requestAnimationFrame(tick);
+  const runSpring = useCallback((dir: 'open' | 'close', onDone?: () => void) => {
+    if (dir === 'open') setAnimVisible(true);
+    springStateRef.current = { dir, startTime: performance.now(), onDone };
   }, []);
 
   // Watch for visibility changes
@@ -264,7 +262,7 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      cancelAnimationFrame(animRafRef.current);
+      // animRafRef removed — spring now driven by Pixi ticker
       cancelAnimationFrame(momentumRafRef.current);
     };
   }, []);
