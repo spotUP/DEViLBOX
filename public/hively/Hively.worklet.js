@@ -182,6 +182,17 @@ class HivelyProcessor extends AudioWorkletProcessor {
         wasmBinary: wasmBinary,
       });
 
+      // Use AudioWorkletGlobalScope.sampleRate as the authoritative rate.
+      // On iOS, ctx.sampleRate (passed via message) can differ from the actual
+      // worklet processing rate — globalThis.sampleRate is always correct.
+      const gsr = globalThis.sampleRate;
+      const effectiveSr = (gsr && gsr > 0) ? gsr : sr;
+      if (gsr && sr && Math.abs(gsr - sr) > 1) {
+        console.warn('[Hively.worklet] sampleRate mismatch: passed=' + sr + ', globalScope=' + gsr + ', using=' + effectiveSr);
+      }
+      sr = effectiveSr;
+      console.log('[Hively.worklet] initWasm sampleRate=' + sr);
+
       // Initialize replayer
       this.wasm._hively_init(Math.floor(sr));
 
@@ -319,9 +330,17 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
       // Add ring buffer samples into output
       const available = Math.min(numSamples, this.ringAvailable);
+      const stereo = outputR !== outputL;
       for (let i = 0; i < available; i++) {
-        outputL[i] = this.ringL[this.ringReadPos];
-        outputR[i] = this.ringR[this.ringReadPos];
+        const l = this.ringL[this.ringReadPos];
+        const r = this.ringR[this.ringReadPos];
+        if (stereo) {
+          outputL[i] = l;
+          outputR[i] = r;
+        } else {
+          // Mono fallback (iOS gives 1 channel): mix L+R so no voices are lost
+          outputL[i] = (l + r) * 0.5;
+        }
         this.ringReadPos = (this.ringReadPos + 1) % this.ringSize;
       }
       this.ringAvailable -= available;
@@ -339,9 +358,15 @@ class HivelyProcessor extends AudioWorkletProcessor {
         if (n > 0) {
           const offL = ptrs.l >> 2;
           const offR = ptrs.r >> 2;
-          for (let i = 0; i < n; i++) {
-            outputL[i] += heapF32[offL + i];
-            outputR[i] += heapF32[offR + i];
+          if (stereo) {
+            for (let i = 0; i < n; i++) {
+              outputL[i] += heapF32[offL + i];
+              outputR[i] += heapF32[offR + i];
+            }
+          } else {
+            for (let i = 0; i < n; i++) {
+              outputL[i] += (heapF32[offL + i] + heapF32[offR + i]) * 0.5;
+            }
           }
         }
       }
