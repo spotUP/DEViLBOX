@@ -133,60 +133,42 @@ export const PixiPitchSlider: React.FC<PixiPitchSliderProps> = ({ width, height 
   // Fader track area height = remaining space
   const trackH = height - HEADER_H;
 
-  // Handle vertical position
-  const handleTop = HEADER_H + pitchToHandleTop(pitch, trackH);
-
   // Display helpers
   const atCenter = Math.abs(pitch) < 0.05;
   const displayValue = pitch > 0 ? `+${pitch.toFixed(1)}` : pitch.toFixed(1);
 
-  // ─── Draw scale marks (left side) ─────────────────────────────────────
+  // ─── Draw track area (scale + groove + handle) — coords relative to HEADER_H ──
+  // This single graphics is positioned at top: HEADER_H, so y=0 here == top of
+  // the fader track. No HEADER_H offset needed inside these calculations.
 
-  const drawScale = useCallback((g: GraphicsType) => {
+  const drawTrack = useCallback((g: GraphicsType) => {
     g.clear();
 
     const trackUsable = trackH - HANDLE_H - EDGE_PAD * 2;
 
+    // ── Scale marks (left column) ──
     for (const mark of SCALE_MARKS) {
-      // y position of this tick within the track area (below header)
       const frac = (MAX_PITCH - mark.pitch) / PITCH_RANGE;
-      const tickY = HEADER_H + EDGE_PAD + frac * trackUsable + HANDLE_H / 2;
-
+      const tickY = EDGE_PAD + frac * trackUsable + HANDLE_H / 2;
       const isZero = mark.pitch === 0;
       const tickColor = isZero ? AMBER : theme.textMuted.color;
       const tickAlpha = isZero ? 0.5 : 0.3;
       const tickW = mark.major ? 6 : 4;
-
-      // Tick line pointing right toward groove
       g.rect(scaleW - tickW, tickY - 0.5, tickW, 1);
       g.fill({ color: tickColor, alpha: tickAlpha });
     }
-  }, [trackH, scaleW, theme]);
 
-  // ─── Draw housing background + groove ─────────────────────────────────
-
-  const drawHousing = useCallback((g: GraphicsType) => {
-    g.clear();
-
-    // Groove — 3px wide, centered in housing
+    // ── Groove — 3px wide, centered in housing ──
     const grooveX = scaleW + housingW / 2 - 1.5;
-    g.rect(grooveX, HEADER_H + EDGE_PAD, 3, trackH - EDGE_PAD * 2);
+    g.rect(grooveX, EDGE_PAD, 3, trackH - EDGE_PAD * 2);
     g.fill({ color: 0x000000, alpha: 0.75 });
-  }, [scaleW, housingW, trackH]);
 
-  // ─── Draw handle ───────────────────────────────────────────────────────
-
-  const drawHandle = useCallback((g: GraphicsType) => {
-    g.clear();
-
+    // ── Handle ──
     const handleX = scaleW + 2;
     const handleW = housingW - 4;
-    const y = handleTop;
+    const y = pitchToHandleTop(pitch, trackH); // local y (0 = top of track)
 
-    // Handle body
-    const bodyColor = isDragging
-      ? 0x2a2010
-      : 0x1e1b1b;
+    const bodyColor  = isDragging ? 0x2a2010 : 0x1e1b1b;
     const borderColor = isDragging ? AMBER : theme.border.color;
     const borderAlpha = isDragging ? 0.5 : 1;
 
@@ -195,32 +177,20 @@ export const PixiPitchSlider: React.FC<PixiPitchSliderProps> = ({ width, height 
     g.roundRect(handleX, y, handleW, HANDLE_H, 2);
     g.stroke({ color: borderColor, alpha: borderAlpha, width: 1 });
 
-    // Top highlight inset line (simulate inset box-shadow)
     const highlightAlpha = isDragging ? 0.15 : 0.08;
     g.rect(handleX + 1, y + 1, handleW - 2, 1);
     g.fill({ color: isDragging ? AMBER : 0xffffff, alpha: highlightAlpha });
 
-    // Ribs
-    const ribColor = isDragging ? AMBER : 0xffffff;
-    const topRibAlpha = isDragging ? 0.4 : 0.12;
-    const midRibAlpha = isDragging ? 0.6 : 0.18;
-    const botRibAlpha = isDragging ? 0.4 : 0.12;
-
-    const ribInsetX = handleX + 4;
-    const ribW = handleW - 8;
-
-    // Top rib (5px from top of handle)
-    g.rect(ribInsetX, y + 5, ribW, 1);
-    g.fill({ color: ribColor, alpha: topRibAlpha });
-
-    // Middle rib (center)
+    const ribColor   = isDragging ? AMBER : 0xffffff;
+    const ribInsetX  = handleX + 4;
+    const ribW       = handleW - 8;
+    g.rect(ribInsetX, y + 5,                  ribW, 1);
+    g.fill({ color: ribColor, alpha: isDragging ? 0.4 : 0.12 });
     g.rect(ribInsetX, y + HANDLE_H / 2 - 0.5, ribW, 1);
-    g.fill({ color: ribColor, alpha: midRibAlpha });
-
-    // Bottom rib (5px from bottom of handle)
-    g.rect(ribInsetX, y + HANDLE_H - 5 - 1, ribW, 1);
-    g.fill({ color: ribColor, alpha: botRibAlpha });
-  }, [handleTop, isDragging, scaleW, housingW, theme]);
+    g.fill({ color: ribColor, alpha: isDragging ? 0.6 : 0.18 });
+    g.rect(ribInsetX, y + HANDLE_H - 6,       ribW, 1);
+    g.fill({ color: ribColor, alpha: isDragging ? 0.4 : 0.12 });
+  }, [pitch, trackH, isDragging, scaleW, housingW, theme]);
 
   // ─── Drag interaction ──────────────────────────────────────────────────
 
@@ -279,40 +249,29 @@ export const PixiPitchSlider: React.FC<PixiPitchSliderProps> = ({ width, height 
       cursor="ns-resize"
       onPointerDown={handlePointerDown}
       onRightClick={(e: FederatedPointerEvent) => { e.stopPropagation(); resetPitch(); }}
-      layout={{ width, height, flexDirection: 'column', alignItems: 'center' }}
+      layout={{ width, height }}
     >
-      {/* PITCH label */}
+      {/* PITCH label — pinned to top */}
       <pixiBitmapText
         text="PITCH"
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={{ height: LABEL_H }}
+        layout={{ position: 'absolute', top: 0, left: 0, width }}
       />
 
-      {/* Value readout */}
+      {/* Value readout — below label */}
       <pixiBitmapText
         text={displayValue}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
         tint={atCenter ? theme.textMuted.color : AMBER}
-        layout={{ height: VALUE_H }}
+        layout={{ position: 'absolute', top: LABEL_H + 2, left: 0, width }}
       />
 
-      {/* Scale marks */}
+      {/* Track area: scale marks + groove + handle.
+          Positioned at top: HEADER_H so draw coords start at y=0 = top of track. */}
       <pixiGraphics
-        draw={drawScale}
-        layout={{ position: 'absolute', top: 0, left: 0, width, height }}
-      />
-
-      {/* Housing background + groove */}
-      <pixiGraphics
-        draw={drawHousing}
-        layout={{ position: 'absolute', top: 0, left: 0, width, height }}
-      />
-
-      {/* Fader handle */}
-      <pixiGraphics
-        draw={drawHandle}
-        layout={{ position: 'absolute', top: 0, left: 0, width, height }}
+        draw={drawTrack}
+        layout={{ position: 'absolute', top: HEADER_H, left: 0, width, height: trackH }}
       />
     </pixiContainer>
   );
