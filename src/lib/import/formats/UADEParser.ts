@@ -1114,6 +1114,22 @@ export function tryExtractInstrumentNames(buffer: ArrayBuffer, ext: string): str
   // InStereo modules use a binary format with no ASCII instrument name fields.
   if (ext === 'is' || ext === 'is20') return null;
 
+  /* ── Delta Music 1 (.dm, .dm1) ───────────────────────────────────────── */
+  // Magic: "DM1!" at offset 0. 15 instrument names, each 30 bytes, starting at offset 0x10.
+  // Reference: NostalgicPlayer, libxmp
+  if (ext === 'dm1') {
+    const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+    if (magic === 'DM1!' && bytes.length >= 0x10 + 15 * 30) {
+      const names: string[] = [];
+      for (let i = 0; i < 15; i++) {
+        const off = 0x10 + i * 30;
+        const name = readFixedAscii(bytes, off, 30);
+        if (name) names.push(name);
+      }
+      if (names.length > 0) return names;
+    }
+  }
+
   /* ── Delta Music 2 (.dm2) ─────────────────────────────────────────────── */
   if (ext === 'dm2' || ext === 'dm') {
     // DM2 header: magic "DM2!" at offset 0, followed by song table, then
