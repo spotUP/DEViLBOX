@@ -198,7 +198,9 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
 
   // ─── Spring open/close animation ────────────────────────────────────────────
 
-  useTick(() => {
+  // Wrapped in useCallback so useTick registers the listener once on mount,
+  // not on every render. All state is read from refs — empty dep array is correct.
+  const tickSpring = useCallback(() => {
     const spring = springStateRef.current;
     if (!spring) return;
 
@@ -236,7 +238,9 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
       spring.onDone?.();
       springStateRef.current = null;
     }
-  });
+  }, []);
+
+  useTick(tickSpring);
 
   const runSpring = useCallback((dir: 'open' | 'close', onDone?: () => void) => {
     if (dir === 'open') setAnimVisible(true);
@@ -262,7 +266,8 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // animRafRef removed — spring now driven by Pixi ticker
+      // Spring animation moved to Pixi ticker (animRafRef removed).
+      // Momentum throw still uses its own RAF loop — cancel it on unmount.
       cancelAnimationFrame(momentumRafRef.current);
     };
   }, []);
