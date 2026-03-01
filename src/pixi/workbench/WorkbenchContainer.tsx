@@ -23,7 +23,6 @@ import { PixiWindow, TITLE_H } from './PixiWindow';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import {
   fitAllWindows,
-  fitWindow,
   springCameraTo,
   type CameraSpringHandle,
 } from './WorkbenchExpose';
