@@ -10,6 +10,8 @@ import { usePixiTheme } from '../theme';
 import { PixiLabel } from '../components';
 import { PixiSynthPanel } from './instruments/PixiSynthPanel';
 import { getSynthLayout } from './instruments/layouts';
+import type { InstrumentConfig } from '@/types/instrument';
+import { PixiUADELiveParams } from './instruments/PixiUADELiveParams';
 
 interface PixiInstrumentEditorProps {
   synthType: string;
@@ -27,6 +29,12 @@ export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
   const theme = usePixiTheme();
 
   const layout = getSynthLayout(synthType);
+
+  const instrConfig = config as InstrumentConfig;
+  const uadeChipRam = instrConfig.uadeChipRam;
+  const hasSections = uadeChipRam?.sections?.['volume'] != null
+                   || uadeChipRam?.sections?.['period'] != null;
+  const instrumentId = String(instrConfig.id ?? '');
 
   const drawHeaderBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -107,6 +115,14 @@ export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
           </pixiContainer>
         )}
       </pixiContainer>
+
+      {/* UADE live params (enhanced-scan instruments only) */}
+      {hasSections && (
+        <PixiUADELiveParams
+          instrumentId={instrumentId}
+          sections={uadeChipRam!.sections}
+        />
+      )}
     </pixiContainer>
   );
 };
