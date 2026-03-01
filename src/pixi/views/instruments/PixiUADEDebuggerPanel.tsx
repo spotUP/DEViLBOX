@@ -10,7 +10,7 @@
  * Safe to render when UADEEngine is not running; falls back gracefully.
  */
 
-import { FC, useCallback, useEffect, useRef, useState } from 'react';
+import { type FC, useCallback, useEffect, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { UADEEngine } from '../../../engine/uade/UADEEngine';

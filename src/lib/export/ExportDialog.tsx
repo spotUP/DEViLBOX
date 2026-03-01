@@ -66,7 +66,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
   const [selectedInstrumentId, setSelectedInstrumentId] = useState(currentInstrumentId || 0);
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
-  const [exportFullSong, setExportFullSong] = useState(false);
+  const [exportFullSong] = useState(false);
 
   // Arrangement export scope: 'pattern' | 'song' | 'arrangement'
   type AudioExportScope = 'pattern' | 'song' | 'arrangement';
