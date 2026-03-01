@@ -170,6 +170,10 @@ interface ArrangementStore {
   getSnapshot: () => ArrangementSnapshot;
   loadSnapshot: (snapshot: ArrangementSnapshot) => void;
 
+  // === Consolidate ===
+  /** Merge all selected clips on the same track into a single new pattern+clip per track. */
+  consolidateClips: (clipIds: string[]) => void;
+
   // === Computed ===
   getTotalRows: () => number;
   getClipsForTrack: (trackId: string) => ArrangementClip[];
@@ -902,6 +906,147 @@ export const useArrangementStore = create<ArrangementStore>()(
         state.automationLanes = [];
         state.isArrangementMode = true;
       }),
+
+    // === Consolidate ===
+
+    consolidateClips: (clipIds) => {
+      if (clipIds.length < 2) return;
+
+      const state = get();
+      const clipsToMerge = state.clips.filter(c => clipIds.includes(c.id));
+      if (clipsToMerge.length < 2) return;
+
+      // Lazily import tracker store to avoid circular deps at module load time
+      import('@stores/useTrackerStore').then(({ useTrackerStore }) => {
+        const trackerState = useTrackerStore.getState();
+        const allPatterns = trackerState.patterns;
+
+        // Group clips by trackId — consolidate per track independently
+        const byTrack = new Map<string, ArrangementClip[]>();
+        for (const clip of clipsToMerge) {
+          const group = byTrack.get(clip.trackId) ?? [];
+          group.push(clip);
+          byTrack.set(clip.trackId, group);
+        }
+
+        const idsToRemove: string[] = [];
+        const clipsToAdd: Omit<ArrangementClip, 'id'>[] = [];
+        const newPatterns: Pattern[] = [];
+
+        for (const [, trackClips] of byTrack) {
+          if (trackClips.length < 2) continue;
+
+          // Sort by start position
+          trackClips.sort((a, b) => a.startRow - b.startRow);
+
+          const minStart = trackClips[0].startRow;
+          const maxEnd = Math.max(...trackClips.map(c => {
+            const pattern = allPatterns.find(p => p.id === c.patternId);
+            const len = c.clipLengthRows ?? (pattern ? pattern.length - c.offsetRows : 64);
+            return c.startRow + len;
+          }));
+          const totalLength = maxEnd - minStart;
+          if (totalLength <= 0) continue;
+
+          // Pick channel count from first clip's source pattern
+          const firstPattern = allPatterns.find(p => p.id === trackClips[0].patternId);
+          const numChannels = firstPattern?.channels.length ?? 1;
+
+          // Build merged pattern: empty rows × channels
+          const mergedChannels: Pattern['channels'] = Array.from({ length: numChannels }, (_, i) => ({
+            id: `ch-${i}`,
+            name: firstPattern?.channels[i]?.name ?? `Channel ${i + 1}`,
+            rows: Array.from({ length: totalLength }, () => ({
+              note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+            })),
+            muted: firstPattern?.channels[i]?.muted ?? false,
+            solo: false,
+            collapsed: false,
+            volume: firstPattern?.channels[i]?.volume ?? 80,
+            pan: firstPattern?.channels[i]?.pan ?? 0,
+            instrumentId: firstPattern?.channels[i]?.instrumentId ?? null,
+            color: firstPattern?.channels[i]?.color ?? null,
+          }));
+
+          // Copy each clip's data into merged pattern at the correct row offset
+          for (const clip of trackClips) {
+            const srcPattern = allPatterns.find(p => p.id === clip.patternId);
+            if (!srcPattern) continue;
+
+            const clipLen = clip.clipLengthRows ?? (srcPattern.length - clip.offsetRows);
+            const destOffset = clip.startRow - minStart;
+            const srcChannelIndex = clip.sourceChannelIndex;
+            const srcChannel = srcPattern.channels[srcChannelIndex];
+            if (!srcChannel) continue;
+
+            for (let row = 0; row < clipLen; row++) {
+              const srcRow = clip.offsetRows + row;
+              const destRow = destOffset + row;
+              if (srcRow >= srcChannel.rows.length) break;
+              if (destRow >= totalLength) break;
+
+              // Copy into the matching channel (sourceChannelIndex maps to same index in merged)
+              const destChannel = mergedChannels[srcChannelIndex];
+              if (!destChannel) continue;
+              destChannel.rows[destRow] = { ...srcChannel.rows[srcRow] };
+            }
+          }
+
+          const mergedPattern: Pattern = {
+            id: `pattern-consolidated-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            name: 'Consolidated',
+            length: totalLength,
+            channels: mergedChannels,
+          };
+
+          newPatterns.push(mergedPattern);
+
+          // Queue removal of original clips
+          for (const clip of trackClips) idsToRemove.push(clip.id);
+
+          // Queue addition of new consolidated clip
+          clipsToAdd.push({
+            patternId: mergedPattern.id,
+            trackId: trackClips[0].trackId,
+            startRow: minStart,
+            offsetRows: 0,
+            clipLengthRows: totalLength,
+            sourceChannelIndex: trackClips[0].sourceChannelIndex,
+            color: null,
+            muted: false,
+            fadeInRows: 0,
+            fadeOutRows: 0,
+            fadeInCurve: 'linear',
+            fadeOutCurve: 'linear',
+            gain: 1.0,
+            transpose: 0,
+            reversed: false,
+            timeStretch: 1.0,
+            crossfadeInRows: 0,
+            crossfadeOutRows: 0,
+          });
+        }
+
+        if (newPatterns.length === 0) return;
+
+        // Import new patterns into tracker store
+        for (const pattern of newPatterns) {
+          trackerState.importPattern(pattern);
+        }
+
+        // Apply clip replacements to arrangement store
+        set((draft) => {
+          const idSet = new Set(idsToRemove);
+          draft.clips = draft.clips.filter(c => !idSet.has(c.id));
+          for (const id of idsToRemove) draft.selectedClipIds.delete(id);
+          for (const clipData of clipsToAdd) {
+            const newId = generateId('clip');
+            draft.clips.push({ id: newId, ...clipData });
+            draft.selectedClipIds.add(newId);
+          }
+        });
+      });
+    },
 
     // === Snapshot ===
 

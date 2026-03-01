@@ -11,7 +11,7 @@ import { useUIStore } from '@/stores/useUIStore';
 
 export function useArrangementKeyboard(): void {
   const handleKeyDown = useCallback((_normalized: NormalizedKeyEvent, e: KeyboardEvent): boolean => {
-    const { selectedClipIds, removeClips, duplicateClips, moveClips, setTool, undo, redo } =
+    const { selectedClipIds, removeClips, duplicateClips, moveClips, setTool, undo, redo, consolidateClips } =
       useArrangementStore.getState();
     const key = e.key;
     const ctrl = e.ctrlKey || e.metaKey;
@@ -27,6 +27,14 @@ export function useArrangementKeyboard(): void {
     if (ctrl && key.toLowerCase() === 'd' && selectedClipIds.size > 0) {
       e.preventDefault();
       duplicateClips([...selectedClipIds]);
+      return true;
+    }
+
+    // Ctrl+J: Consolidate selected clips (merge per-track into single pattern+clip)
+    if (ctrl && key.toLowerCase() === 'j' && selectedClipIds.size > 1) {
+      e.preventDefault();
+      consolidateClips([...selectedClipIds]);
+      useUIStore.getState().setStatusMessage('Clips consolidated', false, 1500);
       return true;
     }
 
