@@ -27,6 +27,7 @@ import {
   springCameraTo,
   type CameraSpringHandle,
 } from './WorkbenchExpose';
+import { WORKBENCH_CHROME_H } from './workbenchLayout';
 import type { SnapLine } from './windowSnap';
 import { WindowTether } from './WindowTether';
 import { playFocusZoom } from './workbenchSounds';
@@ -227,14 +228,17 @@ export const WorkbenchContainer: React.FC = () => {
     springRef.current = springCameraTo(target, onDone);
   }, [cancelSpring]);
 
+  // Actual visible workbench height (excludes NavBar + StatusBar chrome)
+  const workbenchH = height - WORKBENCH_CHROME_H;
+
   // ─── Focus window (green ◎ button) ─────────────────────────────────────────
 
   const focusWindow = useCallback((id: string) => {
     const win = useWorkbenchStore.getState().windows[id];
     if (!win || !win.visible) return;
     playFocusZoom();
-    startSpring(fitWindow(win, width, height));
-  }, [width, height, startSpring]);
+    startSpring(fitWindow(win, width, workbenchH));
+  }, [width, workbenchH, startSpring]);
 
   // ─── Exposé (Tab hold) ────────────────────────────────────────────────────
 
@@ -247,7 +251,7 @@ export const WorkbenchContainer: React.FC = () => {
       if (tag === 'input' || tag === 'textarea') return;
       e.preventDefault();
       exposeCameraRef.current = { ...useWorkbenchStore.getState().camera };
-      startSpring(fitAllWindows(useWorkbenchStore.getState().windows, width, height));
+      startSpring(fitAllWindows(useWorkbenchStore.getState().windows, width, workbenchH));
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
@@ -263,7 +267,7 @@ export const WorkbenchContainer: React.FC = () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup',   onKeyUp);
     };
-  }, [width, height, startSpring]);
+  }, [width, workbenchH, startSpring]);
 
   // ─── Space-pan (Space held + drag anywhere) ─────────────────────────────────
 
