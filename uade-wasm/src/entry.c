@@ -57,11 +57,6 @@ static int s_sample_rate = 44100;
  * Used by the JS enhanced scan to derive row boundaries precisely. */
 static uint32_t g_uade_tick_count = 0;
 
-/* Called from cia.c once per CIA-A Timer A overflow (see cia.c CIA_update). */
-void uade_wasm_on_cia_a_tick(void) {
-    g_uade_tick_count++;
-}
-
 /* ── Paula write log ────────────────────────────────────────────────────── */
 #include "paula_log.h"
 
@@ -72,6 +67,13 @@ static UadePaulaLogEntry g_paula_log[PAULA_LOG_SIZE];
 static uint32_t g_paula_log_write   = 0;
 static uint32_t g_paula_log_read    = 0;
 static uint8_t  g_paula_log_enabled = 0;
+
+/* --- CIA Tick Snapshot Buffer -------------------------------------------- */
+static UadeTickSnapshot g_tick_snaps[TICK_SNAP_SIZE];
+static uint32_t         g_tick_snap_write   = 0;
+static uint32_t         g_tick_snap_read    = 0;
+static uint8_t          g_tick_snap_enabled = 0;
+/* ------------------------------------------------------------------------- */
 
 /* Called from audio.c AUDx handlers (inside #ifdef UADE_WASM guards). */
 void uade_wasm_log_paula_write(uint8_t channel, uint8_t reg, uint16_t value) {
@@ -537,6 +539,31 @@ int uade_wasm_render(float *out_l, float *out_r, int frames) {
 #include "audio.h"
 #include "custom.h"
 
+/* Called from cia.c once per CIA-A Timer A overflow (see cia.c CIA_update).
+ * Increments the cumulative tick counter and, when tick snapshots are enabled,
+ * captures the full 4-channel Paula state into the ring buffer.
+ * Reads audio_channel[] directly — same mechanism as uade_wasm_get_channel_snapshot().
+ */
+void uade_wasm_on_cia_a_tick(void) {
+    g_uade_tick_count++;
+
+    if (!g_tick_snap_enabled) return;
+
+    uint32_t idx = g_tick_snap_write & TICK_SNAP_MASK;
+    UadeTickSnapshot *snap = &g_tick_snaps[idx];
+    snap->tick = g_uade_tick_count;
+
+    for (int ch = 0; ch < 4; ch++) {
+        snap->channels[ch].period    = (uint16_t)(audio_channel[ch].per & 0xFFFF);
+        snap->channels[ch].volume    = (uint16_t)(audio_channel[ch].vol & 0xFFFF);
+        snap->channels[ch].lc        = (uint32_t)audio_channel[ch].lc;
+        snap->channels[ch].len       = (uint16_t)(audio_channel[ch].len & 0xFFFF);
+        snap->channels[ch].dma_en    = dmaen(1 << ch) ? 1 : 0;
+        snap->channels[ch].triggered = 0; /* reserved for future DMA-restart detection */
+    }
+    g_tick_snap_write++;
+}
+
 /*
  * Write 4-channel snapshot into caller-provided buffer.
  * Layout per channel (4 uint32s = 16 bytes): period, volume, dmaen, sample_ptr
@@ -724,6 +751,64 @@ int uade_wasm_get_paula_log(uint32_t *out, int maxEntries) {
 EMSCRIPTEN_KEEPALIVE
 uint32_t uade_wasm_get_tick_count(void) {
     return g_uade_tick_count;
+}
+
+/* ── CIA Tick Snapshot exports ──────────────────────────────────────────── */
+
+/*
+ * Enable or disable CIA tick snapshot capture.
+ * When disabling, the ring buffer is cleared (read = write = 0).
+ * Called by the worklet before/after enhanced scan to capture tick data.
+ */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_enable_tick_snapshots(int enable) {
+    g_tick_snap_enabled = (uint8_t)(enable ? 1 : 0);
+    if (!enable) {
+        g_tick_snap_write = 0;
+        g_tick_snap_read  = 0;
+    }
+}
+
+/*
+ * Reset the tick snapshot ring buffer without disabling capture.
+ * Useful to discard data accumulated before the scan region of interest.
+ */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_reset_tick_snapshots(void) {
+    g_tick_snap_write = 0;
+    g_tick_snap_read  = 0;
+}
+
+/*
+ * Drain up to maxSnaps tick snapshots into out buffer.
+ * Each snapshot = 13 uint32_t values:
+ *   [0]      tick
+ *   [1..3]   ch0: (period<<16|volume), lc, (len<<8|dma_en<<1|triggered)
+ *   [4..6]   ch1: same layout
+ *   [7..9]   ch2: same layout
+ *   [10..12] ch3: same layout
+ * Returns number of snapshots written.
+ */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_get_tick_snapshots(uint32_t *out, int maxSnaps) {
+    int count = 0;
+    while (count < maxSnaps && g_tick_snap_read != g_tick_snap_write) {
+        uint32_t idx = g_tick_snap_read & TICK_SNAP_MASK;
+        UadeTickSnapshot *s = &g_tick_snaps[idx];
+        int base = count * 13;
+        out[base + 0] = s->tick;
+        for (int ch = 0; ch < 4; ch++) {
+            UadeChannelTick *c = &s->channels[ch];
+            out[base + 1 + ch * 3 + 0] = ((uint32_t)c->period << 16) | c->volume;
+            out[base + 1 + ch * 3 + 1] = c->lc;
+            out[base + 1 + ch * 3 + 2] = ((uint32_t)c->len << 8) |
+                                          ((uint32_t)c->dma_en << 1) |
+                                          (uint32_t)c->triggered;
+        }
+        g_tick_snap_read++;
+        count++;
+    }
+    return count;
 }
 
 /* ── Memory watchpoints ─────────────────────────────────────────────────── */
