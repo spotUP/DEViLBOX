@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-01T17:14:59.962Z
+ * Generated: 2026-03-01T19:47:53.159Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1820';
-export const BUILD_NUMBER = '1820';
-export const BUILD_HASH = '143bdb98';
+export const BUILD_VERSION = '1.0.1854';
+export const BUILD_NUMBER = '1854';
+export const BUILD_HASH = 'e10d052d';
 export const BUILD_DATE = '2026-03-01';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,145 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1820',
+    version: '1.0.1854',
     date: '2026-03-01',
     changes: [
+      {
+        type: 'fix',
+        "description": "Simplify dialog — remove engine/mode toggles, always load editable"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: trigger pipeline test"
+      },
+      {
+        type: 'improvement',
+        "description": "Unify toolbar state via UI store, match GL UI to DOM UI"
+      },
+      {
+        type: 'fix',
+        "description": "Guard keyboard shortcuts against firing in input fields"
+      },
+      {
+        type: 'feature',
+        "description": "Switch to pull-based deployment via GitHub Release + webhook"
+      },
+      {
+        type: 'feature',
+        "description": "Add vertical scroll for tracks"
+      },
+      {
+        type: 'fix',
+        "description": "Remove File/Module/Help menu bar row from Pixi tracker toolbar"
+      },
+      {
+        type: 'feature',
+        "description": "Add horizontal and vertical zoom controls to toolbar"
+      },
+      {
+        type: 'fix',
+        "description": "Cast Uint8Array.buffer to ArrayBuffer for parseHippelCoSoFile"
+      },
+      {
+        type: 'fix',
+        "description": "Fix BindingError on menu open + wire up Load/Save/Clear buttons"
+      },
+      {
+        type: 'fix',
+        "description": "Handle PP20-compressed HippelCoSo files and guard loadSongFile parse errors"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused cameraScale var, add drawNoop for imperative overlay ref"
+      },
+      {
+        type: 'fix',
+        "description": "Explicit NavBar/StatusBar heights, extract computeEffectivePitch, remove unused navBarH prop"
+      },
+      {
+        type: 'fix',
+        "description": "Correct bloom field name (bloomStrength→bloomIntensity), proper hysteresis, HMR state reset"
+      },
+      {
+        type: 'feature',
+        "description": "Add full clip interaction to arrangement canvas"
+      },
+      {
+        type: 'improvement',
+        "description": "FPS monitor + adaptive CRT bloom gating + 1s idle threshold"
+      },
+      {
+        type: 'feature',
+        "description": "Implement select tool with move/resize/rubber-band"
+      },
+      {
+        type: 'improvement',
+        "description": "CacheAsTexture on NavBar and StatusBar — static chrome composited as GPU quad"
+      },
+      {
+        type: 'fix',
+        "description": "Wrap useTick spring callback in useCallback to prevent re-registration on every render"
+      },
+      {
+        type: 'fix',
+        "description": "Remove ?v=2 query string from worklet addModule URLs"
+      },
+      {
+        type: 'improvement',
+        "description": "Move window open/close spring from RAF to Pixi ticker — respects idle FPS cap"
+      },
+      {
+        type: 'fix',
+        "description": "Use direct ContainerType API for cacheAsTexture — no cast needed in Pixi v8"
+      },
+      {
+        type: 'fix',
+        "description": "Screen-proportional default window sizes, clear stale localStorage"
+      },
+      {
+        type: 'improvement',
+        "description": "CacheAsTexture on window chrome — frame/buttons/title cached as GPU quad"
+      },
+      {
+        type: 'improvement',
+        "description": "Revert(ios): revert worklet sampleRate/mono changes — caused silence on iOS"
+      },
+      {
+        type: 'improvement',
+        "description": "Separate grid pan (position) from zoom (redraw) to eliminate per-pan Graphics rebuild"
+      },
+      {
+        type: 'fix',
+        "description": "Use workbenchH for viewport culling height (excludes NavBar/StatusBar chrome)"
+      },
+      {
+        type: 'improvement',
+        "description": "Cull off-screen windows with renderable=false"
+      },
+      {
+        type: 'improvement',
+        "description": "Disable interactiveChildren on non-focused window content"
+      },
+      {
+        type: 'fix',
+        "description": "Fit views to window size and enable wheel scroll"
+      },
+      {
+        type: 'improvement',
+        "description": "GL performance implementation plan (7 tasks)"
+      },
+      {
+        type: 'improvement',
+        "description": "GL performance optimization design (approach C)"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused activeWindowId, fix type cast, move mask effect after declarations"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(dev): kill existing vite on dev start, remove type-check from predev"
+      },
       {
         type: 'fix',
         "description": "Duplicate clip key and maximum update depth errors"
@@ -96,142 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Fix background click-drag pan not working"
-      },
-      {
-        type: 'improvement',
-        "description": "UADELiveParamsBar design doc — live volume/finetune knobs for UADE enhanced-scan instruments"
-      },
-      {
-        type: 'fix',
-        "description": "Add RESET button and fix PixiTabBar BindingError"
-      },
-      {
-        type: 'feature',
-        "description": "Fix configKey prefix resolution + pixel-perfect synth layouts"
-      },
-      {
-        type: 'fix',
-        "description": "Fix window chrome buttons appearing huge and oblong"
-      },
-      {
-        type: 'feature',
-        "description": "Add Paula write log + memory watchpoints for instrument auto-discovery"
-      },
-      {
-        type: 'feature',
-        "description": "Add standard pan/zoom hotkeys for GL canvas navigation"
-      },
-      {
-        type: 'feature',
-        "description": "Add layouts for Tone.js synths, GranularSynth, and all Furnace chips"
-      },
-      {
-        type: 'fix',
-        "description": "Restructure layout to avoid flex/absolute coord mismatch"
-      },
-      {
-        type: 'improvement',
-        "description": "Replace DOM <select> overlays with native PixiSelect"
-      },
-      {
-        type: 'feature',
-        "description": "Add Sampler/Player layout for Pixi instrument editor"
-      },
-      {
-        type: 'fix',
-        "description": "Hide view-selector DOM overlay when not the active view mode"
-      },
-      {
-        type: 'fix',
-        "description": "Compact toolbar height + MIDIKnobBar layout accounting"
-      },
-      {
-        type: 'fix',
-        "description": "Clip WorkbenchContainer hit area to prevent NavBar event interception"
-      },
-      {
-        type: 'fix',
-        "description": "Replace dynamic cache-buster with static ?v=2 on worklet URLs"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent PixiDOMOverlay leaking when parent view is hidden"
-      },
-      {
-        type: 'feature',
-        "description": "Add sample offset, fine vol slides, and DM1 name extraction"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate remaining @pixi/layout BindingErrors from conditional rendering"
-      },
-      {
-        type: 'fix',
-        "description": "Throw on init failure instead of silently returning"
-      },
-      {
-        type: 'feature',
-        "description": "Wire Tier 2 parsers to NATIVE_ROUTES"
-      },
-      {
-        type: 'fix',
-        "description": "Always mount step label to prevent BindingError on play"
-      },
-      {
-        type: 'fix',
-        "description": "Always mount PixiInstrumentToggle to prevent BindingError"
-      },
-      {
-        type: 'fix',
-        "description": "Use PixiWindow dimensions for layout instead of screen size"
-      },
-      {
-        type: 'fix',
-        "description": "Add sections field, fix UADEChipRamInfo errors, cache-bust worklet URLs"
-      },
-      {
-        type: 'feature',
-        "description": "Wire chip RAM for GraoumfTracker2 + MusicLine parsers"
-      },
-      {
-        type: 'feature',
-        "description": "Wire chip RAM + NATIVE_ROUTES for Tier 1 formats"
-      },
-      {
-        type: 'fix',
-        "description": "Correct UV normalization for oversized stage bounding box"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused OFF_TABLE const and add missing sections field"
-      },
-      {
-        type: 'fix',
-        "description": "Sync stage filterArea to screen size to fix CRT shader distortion"
-      },
-      {
-        type: 'feature',
-        "description": "Add category dot icons and index numbers to GL instrument list"
-      },
-      {
-        type: 'fix',
-        "description": "Detect WASM createChip crashes as WASM_UNAVAIL in test runner"
-      },
-      {
-        type: 'fix',
-        "description": "Fix three TS errors blocking CI build"
-      },
-      {
-        type: 'fix',
-        "description": "Use globalScope sampleRate and fix mono channel mix in worklets"
-      },
-      {
-        type: 'fix',
-        "description": "Add chip RAM info to empty instrument slots in UADE parsers"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: regenerate changelog to build 1671"
       }
     ]
   }
