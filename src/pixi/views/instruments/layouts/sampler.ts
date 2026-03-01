@@ -7,7 +7,7 @@ const fmtRate = (v: number) => `${v.toFixed(2)}x`;
 
 export const SAMPLER_LAYOUT: SynthPanelLayout = {
   name: 'Sampler',
-  configKey: 'sampler',
+  configKey: '',
   sections: [
     {
       label: 'AMP',

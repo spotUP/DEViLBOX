@@ -9,7 +9,7 @@ const fmtCents = (v: number) => `${v > 0 ? '+' : ''}${Math.round(v)}ct`;
 
 export const GRANULAR_SYNTH_LAYOUT: SynthPanelLayout = {
   name: 'Granular',
-  configKey: 'granular',
+  configKey: '',
   sections: [
     {
       label: 'AMP',

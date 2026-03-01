@@ -28,30 +28,46 @@ export const PixiSynthPanel: React.FC<PixiSynthPanelProps> = ({ layout: panelLay
     panelLayout.tabs?.[0]?.id ?? null,
   );
 
-  // Update a single key in config
+  // Resolve a layout key to a full config path.
+  // Keys starting with '~' are absolute (root-level, ignores configKey).
+  // All other keys are prefixed with configKey when set.
+  const resolveKey = (key: string): string => {
+    if (key.startsWith('~')) return key.slice(1);
+    return panelLayout.configKey ? `${panelLayout.configKey}.${key}` : key;
+  };
+
+  // Deep-set a value at a dot-notation path, correctly handling arrays.
+  const deepSet = (container: unknown, pathParts: string[], value: unknown): unknown => {
+    if (pathParts.length === 0) return value;
+    const k = pathParts[0];
+    const copy: Record<string, unknown> | unknown[] = Array.isArray(container)
+      ? [...(container as unknown[])]
+      : { ...(container as Record<string, unknown>) };
+    (copy as Record<string, unknown>)[k] = deepSet(
+      (container as Record<string, unknown>)?.[k],
+      pathParts.slice(1),
+      value,
+    );
+    return copy;
+  };
+
+  // Update a single key in config, supporting nested dot-notation and configKey prefix.
   const updateParam = useCallback((key: string, value: unknown) => {
-    // Support nested keys like 'filter.cutoff'
-    const parts = key.split('.');
+    const full = resolveKey(key);
+    const parts = full.split('.');
     if (parts.length === 1) {
-      onChange({ [key]: value });
+      onChange({ [parts[0]]: value });
     } else {
       const [root, ...rest] = parts;
-      const current = (configRef.current[root] as Record<string, unknown>) || {};
-      let obj = { ...current };
-      let target = obj;
-      for (let i = 0; i < rest.length - 1; i++) {
-        const next = (target[rest[i]] as Record<string, unknown>) || {};
-        target[rest[i]] = { ...next };
-        target = target[rest[i]] as Record<string, unknown>;
-      }
-      target[rest[rest.length - 1]] = value;
-      onChange({ [root]: obj });
+      const newRoot = deepSet(configRef.current[root], rest, value);
+      onChange({ [root]: newRoot });
     }
-  }, [onChange]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onChange, panelLayout.configKey]);
 
-  // Get value from config supporting dot-notation
+  // Get value from config supporting dot-notation and configKey prefix.
   const getValue = (key: string): unknown => {
-    const parts = key.split('.');
+    const parts = resolveKey(key).split('.');
     let current: unknown = config;
     for (const part of parts) {
       if (current == null || typeof current !== 'object') return undefined;
