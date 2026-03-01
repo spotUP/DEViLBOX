@@ -117,11 +117,13 @@ interface PixiWindowProps {
   navBarH?: number;
   /** Called when the green focus (◎) button is clicked */
   onFocus?: (id: string) => void;
+  /** Called with the outer Container on mount, null on unmount */
+  onMount?: (id: string, container: ContainerType | null) => void;
   children?: React.ReactNode;
 }
 
 export const PixiWindow: React.FC<PixiWindowProps> = ({
-  id, title, camera, screenW, screenH, onFocus, children,
+  id, title, camera, screenW, screenH, onFocus, onMount, children,
 }) => {
   const theme = usePixiTheme();
   const winState = useWorkbenchStore((s) => s.windows[id]);
@@ -142,6 +144,14 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
 
   // Ref to the outer container for direct Pixi manipulation
   const outerRef = useRef<ContainerType>(null);
+
+  // Register outer container with the culling system
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    onMount?.(id, el);
+    return () => onMount?.(id, null);
+  }, [id, onMount]);
 
   // Ref to the content area container — used to apply a Pixi clipping mask
   const contentRef = useRef<ContainerType>(null);
