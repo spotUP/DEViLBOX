@@ -52,6 +52,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import type { UADEChipRamInfo } from '@/types/instrument';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -256,6 +257,7 @@ interface AonSampleInstrument {
   envelopeAdd: number;
   envelopeEnd: number;
   envelopeSub: number;
+  instrBase?: number;    // file offset of this 32-byte entry in the INST chunk
 }
 
 interface AonSynthInstrument {
@@ -277,6 +279,7 @@ interface AonSynthInstrument {
   envelopeAdd: number;
   envelopeEnd: number;
   envelopeSub: number;
+  instrBase?: number;    // file offset of this 32-byte entry in the INST chunk
 }
 
 type AonInstrument = AonSampleInstrument | AonSynthInstrument;
@@ -568,6 +571,14 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
   for (let i = 0; i < finalInstruments.length; i++) {
     const instr = finalInstruments[i];
     const id = i + 1; // 1-based
+    const instrBase = instr.instrBase ?? 0;
+    const chipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: bytes.length,
+      instrBase,
+      instrSize: 32,
+      sections: { instTable: instrBase - i * 32 },
+    };
 
     if (instr.type === 'sample' && waveForms) {
       const si = instr as AonSampleInstrument;
@@ -597,11 +608,12 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
         const loopStart = hasLoop ? byteLoopStart : 0;
         const loopEnd   = hasLoop ? byteLoopStart + byteLoopLength : 0;
 
-        instrumentConfigs.push(
-          createSamplerInstrument(id, instr.name || `Sample ${i}`, pcm, si.volume, sampleRate, loopStart, loopEnd)
-        );
+        instrumentConfigs.push({
+          ...createSamplerInstrument(id, instr.name || `Sample ${i}`, pcm, si.volume, sampleRate, loopStart, loopEnd),
+          uadeChipRam: chipRam,
+        });
       } else {
-        instrumentConfigs.push(makeSynthPlaceholder(id, instr.name || `Instrument ${i}`));
+        instrumentConfigs.push({ ...makeSynthPlaceholder(id, instr.name || `Instrument ${i}`), uadeChipRam: chipRam });
       }
     } else if (instr.type === 'synth' && waveForms) {
       const si = instr as AonSynthInstrument;
@@ -621,14 +633,15 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
         const refPeriod = AON_PERIODS[ftRow][AON_REFERENCE_NOTE_IDX];
         const sampleRate = aonPeriodToRate(refPeriod);
 
-        instrumentConfigs.push(
-          createSamplerInstrument(id, instr.name || `Synth ${i}`, pcm, si.volume, sampleRate, 0, playLen)
-        );
+        instrumentConfigs.push({
+          ...createSamplerInstrument(id, instr.name || `Synth ${i}`, pcm, si.volume, sampleRate, 0, playLen),
+          uadeChipRam: chipRam,
+        });
       } else {
-        instrumentConfigs.push(makeSynthPlaceholder(id, instr.name || `Instrument ${i}`));
+        instrumentConfigs.push({ ...makeSynthPlaceholder(id, instr.name || `Instrument ${i}`), uadeChipRam: chipRam });
       }
     } else {
-      instrumentConfigs.push(makeSynthPlaceholder(id, instr.name || `Instrument ${i}`));
+      instrumentConfigs.push({ ...makeSynthPlaceholder(id, instr.name || `Instrument ${i}`), uadeChipRam: chipRam });
     }
   }
 
@@ -816,6 +829,7 @@ function reparseinstruments(
             type: 'sample', name: '', volume, fineTune, waveForm,
             startOffset, length, loopStart, loopLength,
             envelopeStart, envelopeAdd, envelopeEnd, envelopeSub,
+            instrBase: instrStart,
           };
         } else if (type === 1) {
           // Synth: 14 data bytes + 10 skip = 24 bytes
@@ -841,6 +855,7 @@ function reparseinstruments(
             length: synthLength, vibParam, vibDelay, vibWave,
             waveSpeed, waveLength, waveLoopStart, waveLoopLength, waveLoopControl,
             envelopeStart, envelopeAdd, envelopeEnd, envelopeSub,
+            instrBase: instrStart,
           };
         }
 

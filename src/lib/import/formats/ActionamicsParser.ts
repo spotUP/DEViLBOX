@@ -39,7 +39,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { Pattern, TrackerCell, InstrumentConfig, UADEChipRamInfo } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -452,9 +452,14 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       const loopStart = sample.loopLength > 1 ? sample.loopStart * 2 : 0;
       const loopEnd = sample.loopLength > 1 ? (sample.loopStart + sample.loopLength) * 2 : 0;
 
-      instrumentConfigs.push(
-        createSamplerInstrument(id, sample.name || `Sample ${i + 1}`, pcmBytes, 64, sampleRate, loopStart, loopEnd)
-      );
+      const samplerInstr = createSamplerInstrument(id, sample.name || `Sample ${i + 1}`, pcmBytes, 64, sampleRate, loopStart, loopEnd);
+      samplerInstr.uadeChipRam = {
+        moduleBase: 0,
+        moduleSize: bytes.length,
+        instrBase:  sampleInfoOffset + i * 64,  // file offset of this sample's 64-byte header
+        instrSize:  64,
+      } as UADEChipRamInfo;
+      instrumentConfigs.push(samplerInstr);
     } else {
       instrumentConfigs.push({
         id,
@@ -464,6 +469,12 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
         effects: [],
         volume: 0,
         pan: 0,
+        uadeChipRam: {
+          moduleBase: 0,
+          moduleSize: bytes.length,
+          instrBase:  sampleInfoOffset + i * 64,  // file offset of this sample's 64-byte header
+          instrSize:  64,
+        } as UADEChipRamInfo,
       } as InstrumentConfig);
     }
   }
