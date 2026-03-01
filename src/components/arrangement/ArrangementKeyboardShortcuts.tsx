@@ -86,6 +86,16 @@ export const useArrangementKeyboardShortcuts = () => {
         return;
       }
 
+      // F2: Rename selected clip
+      if (e.key === 'F2') {
+        if (state.selectedClipIds.size === 1) {
+          preventDefault();
+          const [clipId] = state.selectedClipIds;
+          state.setRenamingClipId(clipId);
+        }
+        return;
+      }
+
       // Delete: Delete selected clips
       if ((e.key === 'Delete' || e.key === 'Backspace') && !e.metaKey && !e.ctrlKey) {
         if (state.selectedClipIds.size > 0) {
