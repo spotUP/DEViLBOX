@@ -43,12 +43,15 @@ interface PixiGridSequencerProps {
   channelIndex: number;
   width: number;
   height: number;
+  /** When false, PixiDOMOverlay children are hidden (prevents leaking when this view is inactive). */
+  isActive?: boolean;
 }
 
 export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
   channelIndex,
   width,
   height,
+  isActive = true,
 }) => {
   const theme = usePixiTheme();
   const themeColors = useThemeStore(s => s.getCurrentTheme().colors);
@@ -449,8 +452,8 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
         <PixiLabel text="STEPS" size="xs" color="textMuted" />
         <PixiNumericInput value={maxSteps} min={4} max={64} onChange={setMaxSteps} width={44} />
 
-        {/* Scale selector — must remain DOM for <select> dropdown */}
-        <PixiDOMOverlay layout={{ height: 24, width: 100 }} style={{ overflow: 'visible' }}>
+        {/* Scale selector — must remain DOM for <select> dropdown; hidden when grid view is inactive */}
+        <PixiDOMOverlay layout={{ height: 24, width: 100 }} style={{ overflow: 'visible' }} visible={isActive}>
           <select
             value={scaleKey}
             onChange={(e) => setScaleKey(e.target.value)}

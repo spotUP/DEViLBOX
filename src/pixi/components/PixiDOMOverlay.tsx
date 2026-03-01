@@ -151,6 +151,10 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
             }
             // Hide/show when visible or isTilted changes without bounds change
             div.style.display = (visibleRef.current && !isTiltedRef.current) ? (prevW > 0 ? '' : 'none') : 'none';
+          } else {
+            // Zero/invalid bounds — parent is hidden (width:0 from always-mount pattern).
+            // Keep the div hidden so it doesn't leak at its last known position.
+            div.style.display = 'none';
           }
         }
       }
