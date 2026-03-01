@@ -10,7 +10,7 @@
  * - Provides WorkbenchContext (camera + focusWindow + setSnapLines)
  */
 
-import React, { createContext, useCallback, useContext, useRef, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useRef, useEffect, useState } from 'react';
 import { useApplication, useTick } from '@pixi/react';
 import { Rectangle } from 'pixi.js';
 import type { FederatedPointerEvent, Container as ContainerType, Graphics as GraphicsType, BitmapText as BitmapTextType } from 'pixi.js';
@@ -264,6 +264,30 @@ export const WorkbenchContainer: React.FC = () => {
     };
   }, [width, height, startSpring]);
 
+  // ─── Space-pan (Space held + drag anywhere) ─────────────────────────────────
+
+  const [spaceHeld, setSpaceHeld] = useState(false);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat) return;
+      const tag = document.activeElement?.tagName.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      e.preventDefault();
+      setSpaceHeld(true);
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      setSpaceHeld(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup',   onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup',   onKeyUp);
+    };
+  }, []);
+
   // ─── Background pan ────────────────────────────────────────────────────────
 
   const panDragRef = useRef<{ lastX: number; lastY: number } | null>(null);
@@ -296,33 +320,64 @@ export const WorkbenchContainer: React.FC = () => {
   // ─── Wheel zoom ────────────────────────────────────────────────────────────
 
   const handleBgWheel = useCallback((e: WheelEvent) => {
-    // Bail if the pointer is over a workbench window — let the view handle scroll.
-    // Convert screen → world coords and check window bounding rects.
-    const cam = useWorkbenchStore.getState().camera;
-    const worldX = (e.clientX - cam.x) / cam.scale;
-    const worldY = (e.clientY - cam.y) / cam.scale;
-    const wins = useWorkbenchStore.getState().windows;
-    const overWindow = Object.values(wins).some(
-      (w) => w.visible && !w.minimized &&
-        worldX >= w.x && worldX <= w.x + w.width &&
-        worldY >= w.y && worldY <= w.y + w.height,
-    );
-    if (overWindow) return;
+    // Ctrl/Cmd + scroll = always zoom the canvas (bypass window check).
+    // Without modifier, bail if the pointer is over a window (let the view scroll).
+    if (!e.ctrlKey && !e.metaKey) {
+      const cam = useWorkbenchStore.getState().camera;
+      const worldX = (e.clientX - cam.x) / cam.scale;
+      const worldY = (e.clientY - cam.y) / cam.scale;
+      const wins = useWorkbenchStore.getState().windows;
+      const overWindow = Object.values(wins).some(
+        (w) => w.visible && !w.minimized &&
+          worldX >= w.x && worldX <= w.x + w.width &&
+          worldY >= w.y && worldY <= w.y + w.height,
+      );
+      if (overWindow) return;
+    }
 
     e.preventDefault();
     cancelSpring();
-    // Proportional zoom: smooth on trackpad, one-step-per-tick on mouse wheel.
-    // Clamp to ±40% per event to prevent runaway zoom on fast trackpad flicks.
     const delta = Math.max(-0.4, Math.min(0.4, -e.deltaY * 0.001));
     zoomCamera(delta, e.clientX, e.clientY);
   }, [zoomCamera, cancelSpring]);
 
+  // ─── Middle mouse pan ───────────────────────────────────────────────────────
+
+  const handleMiddleMouseDown = useCallback((e: MouseEvent) => {
+    if (e.button !== 1) return;
+    e.preventDefault();
+    cancelSpring();
+    panDragRef.current = { lastX: e.clientX, lastY: e.clientY };
+    document.body.style.cursor = 'grabbing';
+
+    const onMove = (me: MouseEvent) => {
+      if (!panDragRef.current) return;
+      const dx = me.clientX - panDragRef.current.lastX;
+      const dy = me.clientY - panDragRef.current.lastY;
+      panDragRef.current.lastX = me.clientX;
+      panDragRef.current.lastY = me.clientY;
+      panCamera(dx, dy);
+    };
+    const onUp = () => {
+      panDragRef.current = null;
+      document.body.style.cursor = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+  }, [panCamera, cancelSpring]);
+
   useEffect(() => {
     const canvas = document.querySelector('canvas');
     if (!canvas) return;
-    canvas.addEventListener('wheel', handleBgWheel, { passive: false });
-    return () => canvas.removeEventListener('wheel', handleBgWheel);
-  }, [handleBgWheel]);
+    canvas.addEventListener('wheel',     handleBgWheel,         { passive: false });
+    canvas.addEventListener('mousedown', handleMiddleMouseDown);
+    return () => {
+      canvas.removeEventListener('wheel',     handleBgWheel);
+      canvas.removeEventListener('mousedown', handleMiddleMouseDown);
+    };
+  }, [handleBgWheel, handleMiddleMouseDown]);
 
   useEffect(() => () => cancelSpring(), [cancelSpring]);
 
@@ -446,6 +501,15 @@ export const WorkbenchContainer: React.FC = () => {
             zIndex={9999}
           />
         </pixiContainer>
+
+        {/* Space-pan overlay — above windows, active only when Space is held.
+            eventMode="none" when inactive so all events fall through normally. */}
+        <pixiContainer
+          layout={{ position: 'absolute', width, height }}
+          eventMode={spaceHeld ? 'static' : 'none'}
+          cursor={spaceHeld ? 'grab' : 'default'}
+          onPointerDown={handleBgPointerDown}
+        />
       </pixiContainer>
     </WorkbenchContext.Provider>
   );
