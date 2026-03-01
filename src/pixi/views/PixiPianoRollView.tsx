@@ -457,13 +457,27 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
         />
       </pixiContainer>
 
-      {/* Velocity lane */}
-      <PixiVelocityLane
-        width={winW}
-        height={VELOCITY_HEIGHT}
-        scrollBeat={view.scrollX}
-        notes={notes.map(n => ({ start: n.start, velocity: n.velocity }))}
-      />
+      {/* Velocity lane — aligned with grid (keyboard area left blank) */}
+      <pixiContainer layout={{ width: '100%', height: VELOCITY_HEIGHT, flexDirection: 'row' }}>
+        <pixiContainer layout={{ width: KEYBOARD_WIDTH, height: VELOCITY_HEIGHT }} />
+        <PixiVelocityLane
+          width={gridW}
+          height={VELOCITY_HEIGHT}
+          scrollBeat={view.scrollX}
+          pixelsPerBeat={horizontalZoom}
+          notes={notes.map(n => ({ id: `${view.channelIndex}-${n.start}`, start: n.start, velocity: n.velocity }))}
+          selectedIds={selectedNotes}
+          onDragStart={() => pianoData.beginVelocityDrag()}
+          onVelocityChange={(id, vel) => {
+            pianoData.setVelocityNoUndo(id, vel);
+            handleNotesChanged();
+          }}
+          onDragEnd={() => {
+            pianoData.endVelocityDrag();
+            handleNotesChanged();
+          }}
+        />
+      </pixiContainer>
     </pixiContainer>
   );
 };
