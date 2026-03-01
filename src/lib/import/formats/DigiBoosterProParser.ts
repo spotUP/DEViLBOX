@@ -72,7 +72,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { Pattern, ChannelData, TrackerCell, InstrumentConfig, UADEChipRamInfo } from '@/types';
 
 // ── Binary reader ─────────────────────────────────────────────────────────────
 
@@ -141,8 +141,9 @@ function amigaString(data: Uint8Array, offset: number, maxLen: number): string {
 // ── Chunk map builder ─────────────────────────────────────────────────────────
 
 interface DBMChunk {
-  id:   string;
-  data: Uint8Array;
+  id:         string;
+  data:       Uint8Array;
+  fileOffset: number;   // file offset of chunk data start (after 8-byte id+length header)
 }
 
 /**
@@ -157,9 +158,10 @@ function readChunks(data: Uint8Array, startOffset: number): Map<string, DBMChunk
     const id  = String.fromCharCode(r.u8(), r.u8(), r.u8(), r.u8());
     const len = r.u32be();
     if (!r.canRead(len)) break;
+    const chunkFileOffset = r.pos;   // file offset of chunk data start
     const chunkData = r.bytes(len);
     if (!map.has(id)) map.set(id, []);
-    map.get(id)!.push({ id, data: chunkData });
+    map.get(id)!.push({ id, data: chunkData, fileOffset: chunkFileOffset });
   }
 
   return map;
@@ -718,12 +720,20 @@ function _parseDigiBoosterProFile(bytes: Uint8Array, filename: string): TrackerS
   }
 
   // ── Build InstrumentConfig list ───────────────────────────────────────────
+  const instChunkFileOffset = chunkMap.get('INST')?.[0]?.fileOffset ?? 0;
   const instruments: InstrumentConfig[] = [];
   for (let i = 0; i < instHeaders.length; i++) {
     const inst = instHeaders[i];
     const id   = i + 1;
     const pcm  = inst.sample > 0 ? sampleMap.get(inst.sample) : undefined;
-    instruments.push(buildInstrumentConfig(id, inst, pcm));
+    const dbmInstr = buildInstrumentConfig(id, inst, pcm);
+    dbmInstr.uadeChipRam = {
+      moduleBase: 0,
+      moduleSize: bytes.length,
+      instrBase:  instChunkFileOffset + i * INST_SIZE,  // file offset of this instrument's INST entry
+      instrSize:  INST_SIZE,
+    } as UADEChipRamInfo;
+    instruments.push(dbmInstr);
   }
 
   // ── PATT chunk → patterns ─────────────────────────────────────────────────

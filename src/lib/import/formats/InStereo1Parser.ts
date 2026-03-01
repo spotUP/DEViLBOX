@@ -43,6 +43,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import type { UADEChipRamInfo } from '@/types/instrument';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -225,6 +226,7 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
   //   VibratoDelay (1), VibratoSpeed (1), VibratoLevel (1),
   //   EGCOffset (1), EGCMode (1), EGCTableNumber (1), EGCTableLength (2)
   // Total = 1+1+2+2+1+1+1+1+2+2+1+5+1+1+1+1+1+1+2 = 28 bytes
+  const instTableStart = off;  // file offset of first 28-byte instrument entry
   const instruments: IS10Instrument[] = [];
   for (let i = 0; i < numberOfInstruments; i++) {
     if (off + 28 > bytes.length) return null;
@@ -353,6 +355,14 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
   for (let i = 0; i < instruments.length; i++) {
     const instr = instruments[i];
     const id = i + 1;
+    const instrBase = instTableStart + i * 28;
+    const chipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: bytes.length,
+      instrBase,
+      instrSize: 28,
+      sections: { instTable: instTableStart },
+    };
 
     if (!instr.synthesisEnabled) {
       // PCM sample instrument — waveformNumber is the sample index
@@ -372,11 +382,12 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
             loopEnd   = instr.waveformLength + instr.repeatLength;
           }
         }
-        instrConfigs.push(
-          createSamplerInstrument(id, samplesInfo[sampleIdx]?.name || `Sample ${i}`, pcmData, instr.volume, PAL_C3_RATE, loopStart, loopEnd)
-        );
+        instrConfigs.push({
+          ...createSamplerInstrument(id, samplesInfo[sampleIdx]?.name || `Sample ${i}`, pcmData, instr.volume, PAL_C3_RATE, loopStart, loopEnd),
+          uadeChipRam: chipRam,
+        });
       } else {
-        instrConfigs.push(makeSynthPlaceholder(id, `Sample ${i}`));
+        instrConfigs.push({ ...makeSynthPlaceholder(id, `Sample ${i}`), uadeChipRam: chipRam });
       }
     } else {
       // Synth instrument — use waveform table
@@ -388,11 +399,12 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
         for (let j = 0; j < playLen; j++) {
           pcmUint8[j] = wave[j % 256] & 0xff;
         }
-        instrConfigs.push(
-          createSamplerInstrument(id, `Synth ${i}`, pcmUint8, instr.volume, SYNTH_RATE, 0, playLen)
-        );
+        instrConfigs.push({
+          ...createSamplerInstrument(id, `Synth ${i}`, pcmUint8, instr.volume, SYNTH_RATE, 0, playLen),
+          uadeChipRam: chipRam,
+        });
       } else {
-        instrConfigs.push(makeSynthPlaceholder(id, `Synth ${i}`));
+        instrConfigs.push({ ...makeSynthPlaceholder(id, `Synth ${i}`), uadeChipRam: chipRam });
       }
     }
   }

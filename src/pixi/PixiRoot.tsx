@@ -19,6 +19,7 @@ import { PixiPeerCursor } from './views/collaboration/PixiPeerCursor';
 import { WorkbenchContainer } from './workbench/WorkbenchContainer';
 import { CRTRenderer } from './CRTRenderer';
 import { useRef } from 'react';
+import { Rectangle } from 'pixi.js';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -51,6 +52,17 @@ export const PixiRoot: React.FC = () => {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep stage.filterArea in sync with the screen dimensions so the CRT filter's
+  // internal RenderTexture is always exactly screen-sized.  Without this, PixiJS
+  // computes the RT size from app.stage's full bounding box (which includes all
+  // workbench content, potentially far off-screen on the infinite canvas).  A huge
+  // RT causes vTextureCoord to be a tiny fraction of [0,1], making the curvature
+  // shader magnify small objects (e.g. window chrome buttons) into giant blobs.
+  useEffect(() => {
+    if (!app?.stage) return;
+    app.stage.filterArea = new Rectangle(0, 0, width, height);
+  }, [app, width, height]);
 
   // Apply filter to app.stage (not a @pixi/layout container — no Yoga hooks fire).
   // Removing/adding on crtEnabled avoids per-frame filter array churn.

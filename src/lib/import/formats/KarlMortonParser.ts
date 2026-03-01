@@ -66,6 +66,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -204,10 +205,11 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   // ── Parse all chunks ──────────────────────────────────────────────────────
 
   interface SampleChunk {
-    name:       string;
-    loopStart:  number;
-    size:       number;
-    dataOffset: number; // byte offset into `bytes`
+    name:         string;
+    loopStart:    number;
+    size:         number;
+    dataOffset:   number; // byte offset into `bytes` (past KMSampleHeader)
+    headerOffset: number; // byte offset of KMSampleHeader start (= payloadOff)
   }
 
   interface SongChunk {
@@ -241,7 +243,8 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
             name,
             loopStart,
             size,
-            dataOffset: payloadOff + SMPL_HDR_SIZE,
+            dataOffset:   payloadOff + SMPL_HDR_SIZE,
+            headerOffset: payloadOff,
           });
         }
       }
@@ -508,7 +511,16 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     const name = sc.name || `Sample ${id}`;
 
     if (sc.size === 0 || sc.dataOffset + sc.size > bytes.length) {
-      instruments.push(silentInstrument(id, name));
+      const kmSilentChipRam: UADEChipRamInfo = {
+        moduleBase: 0,
+        moduleSize: bytes.length,
+        instrBase: sc.headerOffset,
+        instrSize: SMPL_HDR_SIZE + sc.size,
+        sections: {},
+      };
+      const kmSilentInst = silentInstrument(id, name);
+      kmSilentInst.uadeChipRam = kmSilentChipRam;
+      instruments.push(kmSilentInst);
       continue;
     }
 
@@ -552,6 +564,13 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       inst.metadata.modPlayback.periodMultiplier = AMIGA_PAL_FREQ;
     }
 
+    inst.uadeChipRam = {
+      moduleBase: 0,
+      moduleSize: bytes.length,
+      instrBase: sc.headerOffset,
+      instrSize: SMPL_HDR_SIZE + sc.size,
+      sections: {},
+    } satisfies UADEChipRamInfo;
     instruments.push(inst);
   }
 

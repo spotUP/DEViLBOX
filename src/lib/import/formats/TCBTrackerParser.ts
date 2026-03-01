@@ -60,7 +60,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, UADEChipRamInfo } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -282,9 +282,15 @@ export async function parseTCBTrackerFile(
     }
 
     const name = instrNames[i] || `Sample ${i + 1}`;
-    instruments.push(
-      createSamplerInstrument(i + 1, name, pcm, volume, AMIGA_SAMPLE_RATE, loopStart, loopEnd)
-    );
+    const instr = createSamplerInstrument(i + 1, name, pcm, volume, AMIGA_SAMPLE_RATE, loopStart, loopEnd);
+    const chipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: buf.length,
+      instrBase:  h1Start + i * 4,   // file offset of this sample's h1 header entry (4 bytes)
+      instrSize:  12,                 // h1 entry (4 bytes) + h2 entry (8 bytes) per sample slot
+    };
+    instr.uadeChipRam = chipRam;
+    instruments.push(instr);
   }
 
   // ── Pattern stub ─────────────────────────────────────────────────────────
