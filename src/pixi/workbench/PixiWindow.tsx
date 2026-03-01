@@ -452,11 +452,15 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
 
   const drawButtons = useCallback((g: GraphicsType) => {
     g.clear();
-    g.circle(w - 12, TITLE_H / 2, 5);
+    // Invisible full-size rect anchors pixi bounds so the layout engine
+    // doesn't scale the graphics to fit and distort the circles.
+    g.rect(0, 0, w, TITLE_H);
+    g.fill({ color: 0x000000, alpha: 0 });
+    g.circle(w - 12, TITLE_H / 2, 4);
     g.fill({ color: 0xe05050, alpha: 0.9 });
-    g.circle(w - 28, TITLE_H / 2, 5);
+    g.circle(w - 28, TITLE_H / 2, 4);
     g.fill({ color: 0xe0a030, alpha: 0.9 });
-    g.circle(w - 44, TITLE_H / 2, 5);
+    g.circle(w - 44, TITLE_H / 2, 4);
     g.fill({ color: 0x40b060, alpha: 0.9 });
   }, [w]);
 
