@@ -117,7 +117,7 @@ jobs:
           path: dist-server/
 
       - name: Package server build
-        run: tar -czf release-assets/devilbox-dist.tar.gz -C dist-server/ .
+        run: mkdir -p release-assets && tar -czf release-assets/devilbox-dist.tar.gz -C dist-server/ .
 
       - name: List release assets
         run: ls -la release-assets/ || echo "No assets found"
