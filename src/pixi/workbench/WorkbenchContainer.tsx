@@ -129,11 +129,12 @@ export const WorkbenchContainer: React.FC = () => {
   const theme = usePixiTheme();
   // Camera is read reactively here only for passing to props/context; the world
   // container transform is still applied imperatively via the subscription below.
-  const camera     = useWorkbenchStore((s) => s.camera);
-  const windows    = useWorkbenchStore((s) => s.windows);
-  const panCamera  = useWorkbenchStore((s) => s.panCamera);
-  const zoomCamera = useWorkbenchStore((s) => s.zoomCamera);
-  const isTilted   = useWorkbenchStore((s) => s.isTilted);
+  const camera            = useWorkbenchStore((s) => s.camera);
+  const windows           = useWorkbenchStore((s) => s.windows);
+  const panCamera         = useWorkbenchStore((s) => s.panCamera);
+  const zoomCamera        = useWorkbenchStore((s) => s.zoomCamera);
+  const isTilted          = useWorkbenchStore((s) => s.isTilted);
+  const setActiveWindowId = useWorkbenchStore((s) => s.setActiveWindowId);
 
   // World container ref (camera transform applied here)
   const worldRef = useRef<ContainerType>(null);
@@ -303,6 +304,7 @@ export const WorkbenchContainer: React.FC = () => {
   const panDragRef = useRef<{ lastX: number; lastY: number } | null>(null);
 
   const handleBgPointerDown = useCallback((e: FederatedPointerEvent) => {
+    setActiveWindowId(null);
     cancelSpring();
     panDragRef.current = { lastX: e.globalX, lastY: e.globalY };
     document.body.style.cursor = 'grabbing';
@@ -325,7 +327,7 @@ export const WorkbenchContainer: React.FC = () => {
 
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
-  }, [panCamera, cancelSpring]);
+  }, [panCamera, cancelSpring, setActiveWindowId]);
 
   // ─── Wheel zoom ────────────────────────────────────────────────────────────
 
