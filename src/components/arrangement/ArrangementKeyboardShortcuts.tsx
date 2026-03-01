@@ -22,6 +22,7 @@ const ZOOM_PRESETS = [0.5, 1, 2, 4, 8, 12, 16, 24, 32];
 export const useArrangementKeyboardShortcuts = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const state = useArrangementStore.getState();
       const isMod = e.metaKey || e.ctrlKey;
 
