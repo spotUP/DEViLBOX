@@ -413,9 +413,10 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
 
           <PixiLabel text="TB-303" size="sm" weight="bold" color="accent" />
 
-          {isPlaying && (
+          {/* Always mounted — conditional render causes @pixi/layout BindingError */}
+          <pixiContainer alpha={isPlaying ? 1 : 0} layout={{ flexShrink: 0 }}>
             <PixiLabel text={`Step ${(currentStep + 1).toString().padStart(2, '0')}/16 @ ${bpm} BPM`} size="xs" color="textMuted" />
-          )}
+          </pixiContainer>
 
           <pixiContainer layout={{ flex: 1 }} />
 
