@@ -32,10 +32,10 @@ import { CHANNEL_COLORS } from '@typedefs';
 import { StrumDialog } from '@components/dialogs/StrumDialog';
 import { AdvancedEditModal } from '@components/dialogs/AdvancedEditModal';
 import { NonEditableDialog } from '@components/dialogs/NonEditableDialog';
+import { NewSongWizard } from '@components/dialogs/NewSongWizard';
 import { KeyboardShortcutSheet } from './KeyboardShortcutSheet';
 import { EffectPicker } from './EffectPicker';
 import { UndoHistoryPanel } from './UndoHistoryPanel';
-import { PatternMatrix } from './PatternMatrix';
 import { FT2Toolbar } from './FT2Toolbar';
 import { TB303KnobPanel } from './TB303KnobPanel';
 import { SubsongSelector } from './SubsongSelector';
@@ -414,7 +414,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [showStrum, setShowStrum] = useState(false);
   const [showEffectPicker, setShowEffectPicker] = useState(false);
   const [showUndoHistory, setShowUndoHistory] = useState(false);
-  const [showPatternMatrix, setShowPatternMatrix] = useState(false);
   const [showGrooveSettings, setShowGrooveSettings] = useState(false);
   const [internalShowImportModule, setInternalShowImportModule] = useState(false);
   // FT2 dialogs
@@ -557,12 +556,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       return;
     }
 
-    // Ctrl+M: Pattern matrix
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm' && !e.shiftKey && !e.altKey) {
-      e.preventDefault();
-      setShowPatternMatrix(prev => !prev);
-      return;
-    }
   }, [
     setShowImportModule,
     setShowInterpolate,
@@ -971,6 +964,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         <KeyboardShortcutSheet isOpen={showShortcutSheet} onClose={() => setShowShortcutSheet(false)} />
       <StrumDialog isOpen={showStrum} onClose={() => setShowStrum(false)} />
       <NonEditableDialog />
+      <NewSongWizard />
       <EffectPicker
         isOpen={showEffectPicker}
         onSelect={(effTyp, eff) => {
@@ -991,7 +985,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         })()}
       />
       <UndoHistoryPanel isOpen={showUndoHistory} onClose={() => setShowUndoHistory(false)} />
-      <PatternMatrix isOpen={showPatternMatrix} onClose={() => setShowPatternMatrix(false)} />
         {/\.(fur|dmf)$/i.test(pendingModuleFile?.name ?? '') ? (
           <ImportFurnaceDialog
             isOpen={showImportModule}
@@ -1482,6 +1475,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       <KeyboardShortcutSheet isOpen={showShortcutSheet} onClose={() => setShowShortcutSheet(false)} />
       <StrumDialog isOpen={showStrum} onClose={() => setShowStrum(false)} />
       <NonEditableDialog />
+      <NewSongWizard />
       <EffectPicker
         isOpen={showEffectPicker}
         onSelect={(effTyp, eff) => {
@@ -1502,7 +1496,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         })()}
       />
       <UndoHistoryPanel isOpen={showUndoHistory} onClose={() => setShowUndoHistory(false)} />
-      <PatternMatrix isOpen={showPatternMatrix} onClose={() => setShowPatternMatrix(false)} />
       {/\.(fur|dmf)$/i.test(pendingModuleFile?.name ?? '') ? (
         <ImportFurnaceDialog
           isOpen={showImportModule}

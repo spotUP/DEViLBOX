@@ -265,6 +265,7 @@ interface TrackerStore {
   reorderChannel: (fromIndex: number, toIndex: number) => void;
   updateChannelName: (channelIndex: number, name: string) => void;
   applySystemPreset: (presetId: string) => void;
+  applyAmigaSongSettings: (presetId: string) => void;
   setChannelRecordGroup: (channelIndex: number, group: 0 | 1 | 2) => void;
   getChannelsInRecordGroup: (group: 1 | 2) => number[];
 
@@ -2588,6 +2589,27 @@ export const useTrackerStore = create<TrackerStore>()(
           });
         }
       }),
+
+    applyAmigaSongSettings: (presetId) => {
+      const preset = SYSTEM_PRESETS.find((p) => p.id === presetId);
+      if (!preset?.amigaFormat) return;
+
+      // Paula hard-pan: ch0=Left, ch1=Right, ch2=Right, ch3=Left (repeating for >4ch)
+      const paulaPan = [-100, 100, 100, -100];
+      set((state) => {
+        state.patterns.forEach((pattern) => {
+          pattern.channels.forEach((ch, i) => {
+            ch.pan = paulaPan[i % 4] ?? 0;
+          });
+        });
+      });
+
+      // Apply BPM via transport store (dynamic import to avoid circular deps)
+      const bpm = preset.defaultBpm ?? 125;
+      import('@stores/useTransportStore').then(({ useTransportStore }) => {
+        useTransportStore.getState().setBPM(bpm);
+      });
+    },
 
     setChannelRecordGroup: (channelIndex, group) =>
       set((state) => {
