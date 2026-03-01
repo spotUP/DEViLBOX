@@ -4,6 +4,7 @@ const fmtHz = (v: number) => `${Math.round(v)} Hz`;
 const fmtMs = (v: number) => `${Math.round(v)} ms`;
 const fmtPct = (v: number) => `${Math.round(v)}%`;
 const fmtSec = (v: number) => `${v.toFixed(2)}s`;
+const fmtDb = (v: number) => `${Math.round(v)}dB`;
 
 export const SPACE_LASER_LAYOUT: SynthPanelLayout = {
   name: 'Space Laser',
@@ -13,6 +14,13 @@ export const SPACE_LASER_LAYOUT: SynthPanelLayout = {
       id: 'laser',
       label: 'LASER',
       sections: [
+        {
+          label: 'AMP',
+          controls: [
+            { type: 'knob', key: '~volume', label: 'VOLUME', color: '#00ff99', min: -60, max: 0, defaultValue: -12, formatValue: fmtDb },
+            { type: 'knob', key: '~pan', label: 'PAN', color: '#66ccff', min: -100, max: 100, defaultValue: 0, bipolar: true, formatValue: (v) => v === 0 ? 'C' : v > 0 ? `R${Math.round(v)}` : `L${Math.round(-v)}` },
+          ],
+        },
         {
           label: 'SWEEP',
           controls: [
