@@ -191,7 +191,7 @@ export const PixiList: React.FC<PixiListProps> = ({
                 fill: 0xffffff,
               }}
               tint={isSelected ? theme.accent.color : theme.text.color}
-              layout={{}}
+              layout={{ flex: 1 }}
             />
 
             {item.sublabel && (
@@ -203,7 +203,7 @@ export const PixiList: React.FC<PixiListProps> = ({
                   fill: 0xffffff,
                 }}
                 tint={theme.textMuted.color}
-                layout={{ marginLeft: 8 }}
+                layout={{ flexShrink: 0, marginRight: 8 }}
               />
             )}
           </pixiContainer>
