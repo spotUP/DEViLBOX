@@ -181,6 +181,11 @@ export class HivelyEngine {
             this._resolveTune = null;
             this._rejectTune = null;
           }
+          // Unblock any pending waitForPlayerHandle() callers (e.g. pool-full) with sentinel -1
+          if (this._playerHandleResolvers.length > 0) {
+            const resolve = this._playerHandleResolvers.shift()!;
+            resolve(-1);
+          }
           break;
 
         case 'position':

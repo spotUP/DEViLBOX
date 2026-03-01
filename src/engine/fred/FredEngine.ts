@@ -84,7 +84,10 @@ export class FredEngine {
           code = code
             .replace(/import\.meta\.url/g, "'.'")
             .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];');
+            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+            // Expose heap views on Module so worklet can access them as this.wasm.HEAPU8 / HEAPF32
+            .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
+            .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
           this.jsCode = code;
         }
       }
@@ -116,6 +119,11 @@ export class FredEngine {
 
         case 'error':
           console.error('[FredEngine]', data.message);
+          // Unblock any pending waitForPlayerHandle() callers (e.g. pool-full) with sentinel -1
+          if (this._playerHandleResolvers.length > 0) {
+            const resolve = this._playerHandleResolvers.shift()!;
+            resolve(-1);
+          }
           break;
 
         case 'playerCreated':
