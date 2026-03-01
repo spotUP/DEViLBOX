@@ -44,6 +44,7 @@ import type { DragTarget } from '../../hooks/useSampleEditorState';
 import { addManualSlice } from '../../lib/audio/BeatSliceAnalyzer';
 import { UADEEngine } from '../../engine/uade/UADEEngine';
 import { UADELiveParamsBar } from './controls/UADELiveParamsBar';
+import { UADEDebuggerPanel } from './controls/UADEDebuggerPanel';
 
 // ─── Props & types ─────────────────────────────────────────────────────
 
@@ -100,6 +101,7 @@ const IconBtn: React.FC<{
 
 export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange }) => {
   const { updateInstrument: storeUpdateInstrument } = useInstrumentStore();
+  const allInstruments = useInstrumentStore((s) => s.instruments);
 
   const updateInstrument = useCallback(
     (id: number, updates: DeepPartial<InstrumentConfig>) => {
@@ -987,6 +989,11 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       {(instrument.uadeChipRam?.sections?.volume != null ||
         instrument.uadeChipRam?.sections?.period != null) && (
         <UADELiveParamsBar instrument={instrument} />
+      )}
+
+      {/* ─── UADE Paula Debugger (all UADE instruments) ──────────── */}
+      {instrument.uadeChipRam != null && (
+        <UADEDebuggerPanel instruments={allInstruments} />
       )}
 
       {/* ─── Waveform canvas ─────────────────────────────────────── */}

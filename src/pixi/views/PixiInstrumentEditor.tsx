@@ -12,6 +12,8 @@ import { PixiSynthPanel } from './instruments/PixiSynthPanel';
 import { getSynthLayout } from './instruments/layouts';
 import type { InstrumentConfig } from '@/types/instrument';
 import { PixiUADELiveParams } from './instruments/PixiUADELiveParams';
+import { PixiUADEDebuggerPanel } from './instruments/PixiUADEDebuggerPanel';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 
 interface PixiInstrumentEditorProps {
   synthType: string;
@@ -35,6 +37,8 @@ export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
   const hasSections = uadeChipRam?.sections?.['volume'] != null
                    || uadeChipRam?.sections?.['period'] != null;
   const instrumentId = String(instrConfig.id ?? '');
+  const isUADE = uadeChipRam != null;
+  const allInstruments = useInstrumentStore((s) => s.instruments);
 
   const drawHeaderBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -122,6 +126,11 @@ export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
           instrumentId={instrumentId}
           sections={uadeChipRam!.sections}
         />
+      )}
+
+      {/* UADE Paula debugger (all UADE instruments) */}
+      {isUADE && (
+        <PixiUADEDebuggerPanel instruments={allInstruments} />
       )}
     </pixiContainer>
   );
