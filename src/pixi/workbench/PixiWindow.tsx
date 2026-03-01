@@ -114,8 +114,6 @@ interface PixiWindowProps {
   /** Screen dimensions — needed for edge bounce viewport calc */
   screenW: number;
   screenH: number;
-  /** NavBar height — used as origin for pop-in animation */
-  navBarH?: number;
   /** Called when the green focus (◎) button is clicked */
   onFocus?: (id: string) => void;
   /** Called with the outer Container on mount, null on unmount */
