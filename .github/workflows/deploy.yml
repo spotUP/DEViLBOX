@@ -93,6 +93,7 @@ jobs:
   # Create a GitHub Release with all desktop app binaries + trigger pull-based deploy
   release:
     needs: [electron, build-server]
+    if: ${{ always() && needs.build-server.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
