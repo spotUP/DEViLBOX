@@ -13,6 +13,7 @@ import { SPACE_LASER_LAYOUT } from './spaceLaser';
 import { ODIN2_LAYOUT } from './odin2';
 import { SURGE_LAYOUT } from './surge';
 import { VITAL_LAYOUT } from './vital';
+import { SAMPLER_LAYOUT } from './sampler';
 
 /** Map from SynthType string to layout descriptor */
 export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
@@ -27,6 +28,8 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   Odin2: ODIN2_LAYOUT,
   Surge: SURGE_LAYOUT,
   Vital: VITAL_LAYOUT,
+  Sampler: SAMPLER_LAYOUT,
+  Player: SAMPLER_LAYOUT,
 };
 
 /**
