@@ -205,7 +205,8 @@ export const PixiFT2Toolbar: React.FC = () => {
 
   const handleSave = useCallback(() => {
     try {
-      const { patterns, metadata } = useTrackerStore.getState();
+      const { patterns } = useTrackerStore.getState();
+      const { metadata } = useProjectStore.getState();
       const { bpm, grooveTemplateId: gtId } = useTransportStore.getState();
       const { instruments } = useInstrumentStore.getState();
       const { masterEffects } = useAudioStore.getState();
