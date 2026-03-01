@@ -155,7 +155,7 @@ jobs:
         env:
           DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
         run: |
-          curl -s -X POST https://devilbox.uprough.net/_webhook/deploy \
+          curl -s -X POST https://devilbox.uprough.net/_webhook/hooks/deploy \
             -H "Content-Type: application/json" \
             -H "X-Deploy-Token: ${DEPLOY_SECRET}" \
             -d '{"sha":"${{ github.sha }}"}' \
