@@ -157,7 +157,6 @@ export const PixiFT2Toolbar: React.FC = () => {
   // ── UI store ─────────────────────────────────────────────────────────────
   const modalOpen = useUIStore(s => s.modalOpen);
   const compactToolbar = useUIStore(s => s.compactToolbar);
-  const showPatterns = useUIStore(s => s.showPatterns);
   const showAutomation = useUIStore(s => s.showAutomationLanes);
 
   // ── Project store (isDirty for Save button label) ─────────────────────────
@@ -291,7 +290,6 @@ export const PixiFT2Toolbar: React.FC = () => {
 
   // ── Toggle handlers ───────────────────────────────────────────────────────
   const handleToggleCompact   = useCallback(() => useUIStore.getState().toggleCompactToolbar(), []);
-  const handleTogglePatterns  = useCallback(() => useUIStore.getState().togglePatterns(), []);
   const handleToggleAutomation= useCallback(() => useUIStore.getState().toggleAutomationLanes(), []);
 
   // ── Fullscreen ────────────────────────────────────────────────────────────
@@ -548,14 +546,6 @@ export const PixiFT2Toolbar: React.FC = () => {
                 }}
               >
                 <PixiButton
-                  label="PAT"
-                  variant={showPatterns ? 'ft2' : 'ghost'}
-                  color={showPatterns ? 'blue' : 'default'}
-                  size="sm"
-                  active={showPatterns}
-                  onClick={handleTogglePatterns}
-                />
-                <PixiButton
                   label="AUTO"
                   variant={showAutomation ? 'ft2' : 'ghost'}
                   color={showAutomation ? 'blue' : 'default'}
@@ -591,7 +581,7 @@ export const PixiFT2Toolbar: React.FC = () => {
         <PixiButton label="Revisions"               variant="ghost" size="sm" onClick={handleShowRevisions} />
         <PixiButton label="Download"                variant="ghost" size="sm" onClick={handleSave} />
         <PixiButton label="Export"      variant="ghost" size="sm" onClick={handleShowExport} />
-        <PixiButton label="New"         variant="ghost" size="sm" onClick={() => addTab()} />
+        <PixiButton label="New"         variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} />
         <PixiButton label="Clear"       variant="ghost" size="sm" onClick={handleClearProject} />
         <PixiButton label="Order"       variant="ghost" size="sm" onClick={handleShowPatternOrder} />
         <PixiButton label="Instruments" variant="ghost" size="sm" onClick={handleShowInstruments} />

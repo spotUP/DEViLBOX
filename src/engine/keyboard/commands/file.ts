@@ -3,8 +3,6 @@
  */
 
 import { useUIStore } from '@stores/useUIStore';
-import { useTrackerStore } from '@stores/useTrackerStore';
-import { useTransportStore } from '@stores/useTransportStore';
 import { saveProjectToStorage } from '@hooks/useProjectPersistence';
 
 function openFileBrowser(): boolean {
@@ -20,10 +18,7 @@ function doSave(): boolean {
 }
 
 function doNew(): boolean {
-  if (!confirm('Start a new project? Unsaved changes will be lost.')) return true;
-  useTrackerStore.getState().reset();
-  useTransportStore.getState().reset();
-  useUIStore.getState().setStatusMessage('New project', false, 1500);
+  useUIStore.getState().openNewSongWizard();
   return true;
 }
 

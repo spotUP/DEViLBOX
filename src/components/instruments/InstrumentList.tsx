@@ -25,6 +25,7 @@ import { exportMusicLineInstrument } from '@lib/export/MusicLineExporter';
 import { parseMusicLineInstrument } from '@lib/import/formats/MusicLineParser';
 import { HivelyImportDialog } from './HivelyImportDialog';
 import { SunVoxImportDialog } from './SunVoxImportDialog';
+import { SYSTEM_PRESETS } from '@constants/systemPresets';
 
 interface InstrumentListProps {
   /** Optional: Compact mode for sidebar */
@@ -88,11 +89,12 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
     updateInstrument: state.updateInstrument,
   })));
 
-  const { useHexNumbers, setShowSamplePackModal, setInstrumentEditorPoppedOut, instrumentEditorPoppedOut } = useUIStore(useShallow(s => ({
+  const { useHexNumbers, setShowSamplePackModal, setInstrumentEditorPoppedOut, instrumentEditorPoppedOut, activeSystemPreset } = useUIStore(useShallow(s => ({
     useHexNumbers: s.useHexNumbers,
     setShowSamplePackModal: s.setShowSamplePackModal,
     setInstrumentEditorPoppedOut: s.setInstrumentEditorPoppedOut,
     instrumentEditorPoppedOut: s.instrumentEditorPoppedOut,
+    activeSystemPreset: s.activeSystemPreset,
   })));
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
@@ -351,6 +353,16 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   // Sort instruments by ID
   const sortedInstruments = [...instruments].sort((a, b) => a.id - b.id);
 
+  // Filter by active system preset's compatible synth types (if any)
+  const activePreset = activeSystemPreset
+    ? SYSTEM_PRESETS.find((p) => p.id === activeSystemPreset)
+    : null;
+  const allowedSynthTypes = activePreset?.compatibleSynthTypes ?? null;
+  const visibleInstruments = allowedSynthTypes
+    ? sortedInstruments.filter((i) => allowedSynthTypes.includes(i.synthType ?? ''))
+    : sortedInstruments;
+  const isFiltered = allowedSynthTypes !== null && visibleInstruments.length < sortedInstruments.length;
+
   // Get icon component dynamically
   const getIcon = (iconName: string) => {
     const Icon = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[iconName];
@@ -428,6 +440,16 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         </div>
       )}
 
+      {/* Active system filter banner */}
+      {isFiltered && activePreset && (
+        <div className="px-3 py-1.5 text-[10px] text-accent-primary bg-accent-primary/10 border-b border-accent-primary/20 flex items-center gap-1.5 shrink-0">
+          <span className="font-semibold">Filter:</span>
+          <span className="text-text-muted">
+            Showing instruments compatible with {activePreset.name}
+          </span>
+        </div>
+      )}
+
       {/* Scrollable list */}
       <div
         ref={listRef}
@@ -435,7 +457,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
         style={!isFT2 ? { maxHeight } : undefined}
       >
         <div className="flex flex-col divide-y divide-ft2-border/30">
-        {sortedInstruments.map((instrument, index) => {
+        {visibleInstruments.map((instrument, index) => {
           const displayNum = index + 1; // 1-based display number
           const synthInfo = getSynthInfo(instrument.synthType);
           const isSelected = instrument.id === currentInstrumentId;
@@ -694,7 +716,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
           : 'px-3 py-1 border-t border-dark-border bg-dark-bgSecondary'
       }>
         <span className={isFT2 ? 'text-ft2-textDim text-[10px] font-mono' : 'text-[10px] text-text-muted'}>
-          {instruments.length} instrument{instruments.length !== 1 ? 's' : ''}
+          {isFiltered
+            ? `${visibleInstruments.length} of ${instruments.length} instrument${instruments.length !== 1 ? 's' : ''}`
+            : `${instruments.length} instrument${instruments.length !== 1 ? 's' : ''}`}
         </span>
       </div>
 

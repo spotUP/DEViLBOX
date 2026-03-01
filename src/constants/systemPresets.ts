@@ -44,6 +44,10 @@ export interface SystemPreset {
   sampleFormatMask?: number;
   channelDefs: DivChanDef[];
   color?: string;
+  // Amiga / UADE tracker extensions
+  amigaFormat?: boolean;       // true → Amiga hardware limits apply
+  defaultBpm?: number;         // Override default 125 BPM
+  compatibleSynthTypes?: string[]; // Allowed synth types for instrument filtering
 }
 
 // Helper to generate numbered FM channels
@@ -1070,6 +1074,135 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     ]
   },
 
+  // ============ AMIGA / UADE TRACKER FORMATS ============
+  {
+    id: 'amiga_protracker',
+    name: 'Amiga / ProTracker',
+    description: '4-channel hard-panned Amiga tracker. Classic MOD composition.',
+    fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
+    isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
+    amigaFormat: true, defaultBpm: 125,
+    compatibleSynthTypes: ['Sampler'],
+    channelDefs: [
+      { name: 'Paula L1', shortName: 'L1', type: DivChanType.PCM },
+      { name: 'Paula R1', shortName: 'R1', type: DivChanType.PCM },
+      { name: 'Paula R2', shortName: 'R2', type: DivChanType.PCM },
+      { name: 'Paula L2', shortName: 'L2', type: DivChanType.PCM },
+    ],
+  },
+  {
+    id: 'uade_tfmx',
+    name: 'Amiga / TFMX',
+    description: 'Chris Huelsbeck\'s TFMX tracker. 4-channel Amiga with macro instruments.',
+    fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
+    isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
+    amigaFormat: true, defaultBpm: 125,
+    compatibleSynthTypes: ['Sampler'],
+    channelDefs: [
+      { name: 'TFMX 1', shortName: 'T1', type: DivChanType.PCM },
+      { name: 'TFMX 2', shortName: 'T2', type: DivChanType.PCM },
+      { name: 'TFMX 3', shortName: 'T3', type: DivChanType.PCM },
+      { name: 'TFMX 4', shortName: 'T4', type: DivChanType.PCM },
+    ],
+  },
+  {
+    id: 'uade_tfmx7',
+    name: 'Amiga / TFMX 7-Voice',
+    description: 'TFMX 7-Voice — uses all four Paula channels plus 3 virtual voices.',
+    fileID: 0, fileID_DMF: 0, channels: 7, minChans: 7, maxChans: 7,
+    isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
+    amigaFormat: true, defaultBpm: 125,
+    compatibleSynthTypes: ['Sampler'],
+    channelDefs: [
+      { name: 'TFMX 1', shortName: 'T1', type: DivChanType.PCM },
+      { name: 'TFMX 2', shortName: 'T2', type: DivChanType.PCM },
+      { name: 'TFMX 3', shortName: 'T3', type: DivChanType.PCM },
+      { name: 'TFMX 4', shortName: 'T4', type: DivChanType.PCM },
+      { name: 'TFMX 5', shortName: 'T5', type: DivChanType.PCM },
+      { name: 'TFMX 6', shortName: 'T6', type: DivChanType.PCM },
+      { name: 'TFMX 7', shortName: 'T7', type: DivChanType.PCM },
+    ],
+  },
+  {
+    id: 'uade_soundmon',
+    name: 'Amiga / SoundMon',
+    description: 'Brian Postma\'s SoundMon tracker. Wavetable + ADSR synthesis.',
+    fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
+    isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
+    amigaFormat: true, defaultBpm: 125,
+    compatibleSynthTypes: ['SoundMonSynth', 'Sampler'],
+    channelDefs: [
+      { name: 'SoundMon L1', shortName: 'SL', type: DivChanType.PCM },
+      { name: 'SoundMon R1', shortName: 'SR', type: DivChanType.PCM },
+      { name: 'SoundMon R2', shortName: 'SR', type: DivChanType.PCM },
+      { name: 'SoundMon L2', shortName: 'SL', type: DivChanType.PCM },
+    ],
+  },
+  {
+    id: 'uade_sidmon2',
+    name: 'Amiga / SIDMon 2.0',
+    description: 'SID-style synthesis on Amiga Paula. 4-voice with envelope + arpeggio.',
+    fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
+    isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
+    amigaFormat: true, defaultBpm: 125,
+    compatibleSynthTypes: ['SidMonSynth', 'Sampler'],
+    channelDefs: [
+      { name: 'SIDMon L1', shortName: 'SL', type: DivChanType.PCM },
+      { name: 'SIDMon R1', shortName: 'SR', type: DivChanType.PCM },
+      { name: 'SIDMon R2', shortName: 'SR', type: DivChanType.PCM },
+      { name: 'SIDMon L2', shortName: 'SL', type: DivChanType.PCM },
+    ],
+  },
+  {
+    id: 'uade_futurecomposer',
+    name: 'Amiga / Future Composer',
+    description: 'Future Composer 1.3/1.4. 3 tone channels + 1 percussion.',
+    fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
+    isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
+    amigaFormat: true, defaultBpm: 125,
+    compatibleSynthTypes: ['Sampler'],
+    channelDefs: [
+      { name: 'FC Tone 1', shortName: 'T1', type: DivChanType.PCM },
+      { name: 'FC Tone 2', shortName: 'T2', type: DivChanType.PCM },
+      { name: 'FC Tone 3', shortName: 'T3', type: DivChanType.PCM },
+      { name: 'FC Perc',   shortName: 'PC', type: DivChanType.PCM },
+    ],
+  },
+  {
+    id: 'uade_hippelcoso',
+    name: 'Amiga / Jochen Hippel CoSo',
+    description: 'Jochen Hippel\'s CoSo format. 4-channel Amiga with macro-driven instruments.',
+    fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
+    isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
+    amigaFormat: true, defaultBpm: 125,
+    compatibleSynthTypes: ['Sampler'],
+    channelDefs: [
+      { name: 'HiC L1', shortName: 'HL', type: DivChanType.PCM },
+      { name: 'HiC R1', shortName: 'HR', type: DivChanType.PCM },
+      { name: 'HiC R2', shortName: 'HR', type: DivChanType.PCM },
+      { name: 'HiC L2', shortName: 'HL', type: DivChanType.PCM },
+    ],
+  },
+  {
+    id: 'uade_octamed',
+    name: 'Amiga / OctaMED',
+    description: 'OctaMED 8-channel — 4 hardware Paula channels + 4 mixed channels.',
+    fileID: 0, fileID_DMF: 0, channels: 8, minChans: 4, maxChans: 8,
+    isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
+    amigaFormat: true, defaultBpm: 125,
+    compatibleSynthTypes: ['Sampler'],
+    channelDefs: [
+      { name: 'MED L1', shortName: 'M1', type: DivChanType.PCM },
+      { name: 'MED R1', shortName: 'M2', type: DivChanType.PCM },
+      { name: 'MED R2', shortName: 'M3', type: DivChanType.PCM },
+      { name: 'MED L2', shortName: 'M4', type: DivChanType.PCM },
+      { name: 'MED Mix', shortName: 'X1', type: DivChanType.PCM },
+      { name: 'MED Mix', shortName: 'X2', type: DivChanType.PCM },
+      { name: 'MED Mix', shortName: 'X3', type: DivChanType.PCM },
+      { name: 'MED Mix', shortName: 'X4', type: DivChanType.PCM },
+    ],
+  },
+
   // ============ COMPOUND SYSTEMS (for reference/compatibility) ============
   {
     id: 'genesis',
@@ -1135,6 +1268,7 @@ export function getGroupedPresets(): PresetGroup[] {
     { label: 'OKI', startId: 'msm6258' },
     { label: 'Other', startId: 'dave' },
     { label: 'Fantasy', startId: 'tildearrow_sound_unit' },
+    { label: 'Amiga / UADE', startId: 'amiga_protracker' },
     { label: 'Compound', startId: 'genesis' },
     { label: 'Debug/Test', startId: 'pong' },
   ];

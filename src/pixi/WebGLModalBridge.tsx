@@ -101,9 +101,6 @@ const LazyEffectPicker = lazy(() =>
 const LazyUndoHistoryPanel = lazy(() =>
   import('@/components/tracker/UndoHistoryPanel').then(m => ({ default: m.UndoHistoryPanel }))
 );
-const LazyPatternMatrix = lazy(() =>
-  import('@/components/tracker/PatternMatrix').then(m => ({ default: m.PatternMatrix }))
-);
 const LazyAutomationPanel = lazy(() =>
   import('@/components/automation/AutomationPanel').then(m => ({ default: m.AutomationPanel }))
 );
@@ -225,9 +222,6 @@ export const WebGLModalBridge: React.FC = () => {
         break;
       case 'undo-history':
         openModal('undoHistory');
-        break;
-      case 'pattern-matrix':
-        openModal('patternMatrix');
         break;
       case 'automation':
         openModal('automation');
@@ -552,9 +546,6 @@ export const WebGLModalBridge: React.FC = () => {
       )}
       {modalOpen === 'undoHistory' && (
         <LazyUndoHistoryPanel isOpen={true} onClose={closeModal} />
-      )}
-      {modalOpen === 'patternMatrix' && (
-        <LazyPatternMatrix isOpen={true} onClose={closeModal} />
       )}
       {modalOpen === 'automation' && (
         <div style={{
