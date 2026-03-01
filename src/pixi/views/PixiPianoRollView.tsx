@@ -52,6 +52,10 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   const selectedNotes = usePianoRollStore(s => s.selection.notes);
   const horizontalZoom = usePianoRollStore(s => s.view.horizontalZoom);
   const verticalZoom = usePianoRollStore(s => s.view.verticalZoom);
+  const channelCount = useTrackerStore(s => {
+    const pat = s.patterns[s.currentPatternIndex];
+    return pat?.channels.length ?? 1;
+  });
   const isPlaying = useTransportStore(s => s.isPlaying);
   const currentGlobalRow = useTransportStore(s => s.currentGlobalRow);
 
@@ -382,10 +386,25 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
 
         <pixiContainer layout={{ flex: 1 }} />
 
-        <PixiLabel
-          text={`Ch ${view.channelIndex + 1}`}
-          size="xs"
-          color="textMuted"
+        {/* Channel switcher */}
+        <PixiButton
+          label="<"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            const s = usePianoRollStore.getState();
+            s.setChannelIndex(Math.max(0, s.view.channelIndex - 1));
+          }}
+        />
+        <PixiLabel text={`Ch ${view.channelIndex + 1}/${channelCount}`} size="xs" color="textMuted" />
+        <PixiButton
+          label=">"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            const s = usePianoRollStore.getState();
+            s.setChannelIndex(Math.min(channelCount - 1, s.view.channelIndex + 1));
+          }}
           layout={{ marginRight: 8 }}
         />
       </pixiContainer>
