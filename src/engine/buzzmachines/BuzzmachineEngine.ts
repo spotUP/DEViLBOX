@@ -679,22 +679,14 @@ export class BuzzmachineEngine {
 
       // Check if we got a valid context with AudioWorklet
       if (!nativeCtx || !nativeCtx.audioWorklet) {
-        console.warn('[BuzzmachineEngine] No AudioWorklet on context, type:', typeof nativeCtx,
-          'rawContext:', typeof ctx.rawContext, '_context:', typeof ctx._context);
-        this.initPromise = null; // Allow retry
-        return;
+        this.initPromise = null; // Allow retry on later call
+        throw new Error('AudioWorklet not available on this context');
       }
 
-      // Ensure context is running - try to resume, then wait up to 5s
+      // Ensure context is running - try to resume, then wait up to 2s
       if (nativeCtx.state !== 'running') {
-        console.log('[BuzzmachineEngine] AudioContext state:', nativeCtx.state, '- attempting resume');
-        try {
-          await nativeCtx.resume();
-        } catch {
-          // Ignore resume errors
-        }
+        try { await nativeCtx.resume(); } catch { /* ignore */ }
         if ((nativeCtx.state as string) !== 'running') {
-          console.log('[BuzzmachineEngine] Waiting up to 5s for AudioContext to start...');
           const started = await Promise.race([
             new Promise<boolean>((resolve) => {
               const check = () => {
@@ -703,14 +695,12 @@ export class BuzzmachineEngine {
               };
               setTimeout(check, 100);
             }),
-            new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000))
+            new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000))
           ]);
           if (!started) {
-            console.warn('[BuzzmachineEngine] AudioContext not running after 5s wait');
-            this.initPromise = null; // Allow retry
-            return;
+            this.initPromise = null; // Allow retry on later call
+            throw new Error(`AudioContext not running (state: ${nativeCtx.state}) — user gesture required`);
           }
-          console.log('[BuzzmachineEngine] AudioContext became running');
         }
       }
 
