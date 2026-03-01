@@ -465,7 +465,15 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   // === All other tracker/module formats ===
   if (isSupportedModule(filename)) {
     const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-    const song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata);
+    let song: Awaited<ReturnType<typeof parseModuleToSong>>;
+    try {
+      song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata);
+    } catch (err) {
+      return {
+        success: false,
+        error: `Failed to parse ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
 
     loadInstruments(song.instruments);
     loadPatterns(song.patterns);

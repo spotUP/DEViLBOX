@@ -535,13 +535,28 @@ export async function parseUADEFile(
         const { parseHippelCoSoFile } = await import('./HippelCoSoParser');
         // HippelCoSo is a compiled Amiga binary with a "COSO" magic at byte 0.
         // Scan chip RAM for those 4 bytes to find where UADE loaded the module.
-        // Fallback to 0 if scanMemoryForMagic is not available (older WASM).
+        // PP20-compressed files are decompressed by UADE into chip RAM, so the
+        // original buffer may start with "PP20" rather than "COSO". In that case
+        // we must read the decompressed bytes from chip RAM instead.
         let moduleBase = 0;
         try {
           const cosoMagic = new Uint8Array([0x43, 0x4F, 0x53, 0x4F]); // "COSO"
           const found = await engine.scanMemoryForMagic(cosoMagic);
           if (found >= 0) moduleBase = found;
         } catch { /* older WASM without scanMemoryForMagic, moduleBase stays 0 */ }
+
+        // If the module is PP20-compressed, the original buffer won't have "COSO"
+        // at offset 0 — use the chip RAM copy (already decompressed by UADE).
+        const src = new Uint8Array(buffer);
+        const isPP20 = src[0] === 0x50 && src[1] === 0x50 && src[2] === 0x32 && src[3] === 0x30; // "PP20"
+        if (isPP20 && moduleBase > 0) {
+          try {
+            const decompressed = await engine.readMemory(moduleBase, buffer.byteLength * 4);
+            if (decompressed && decompressed.byteLength >= 8) {
+              return parseHippelCoSoFile(decompressed.buffer, filename, moduleBase);
+            }
+          } catch { /* fall through to original buffer */ }
+        }
         return parseHippelCoSoFile(buffer, filename, moduleBase);
       },
       // NOTE: TFMX loads at chip RAM address 0 — no scanMemoryForMagic needed.
