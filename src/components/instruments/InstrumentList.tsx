@@ -9,7 +9,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getSynthInfo } from '@constants/synthCategories';
-import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package, ExternalLink, Download, Upload } from 'lucide-react';
+import { Plus, Trash2, Copy, Repeat, Repeat1, FolderOpen, Pencil, Package, ExternalLink, Download, Upload, Cpu } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 import { InstrumentContextMenu } from './InstrumentContextMenu';
@@ -25,6 +25,7 @@ import { exportMusicLineInstrument } from '@lib/export/MusicLineExporter';
 import { parseMusicLineInstrument } from '@lib/import/formats/MusicLineParser';
 import { HivelyImportDialog } from './HivelyImportDialog';
 import { SunVoxImportDialog } from './SunVoxImportDialog';
+import { FurnacePresetBrowser } from './FurnacePresetBrowser';
 import { SYSTEM_PRESETS } from '@constants/systemPresets';
 
 interface InstrumentListProps {
@@ -54,6 +55,8 @@ interface InstrumentListProps {
   showHivelyImport?: boolean;
   /** Optional: Show SunSynth import button */
   showSunVoxImport?: boolean;
+  /** Optional: Show Furnace chip preset browser button */
+  showFurnaceBrowser?: boolean;
 }
 
 // PERFORMANCE: Memoize to prevent expensive re-renders on every scroll step
@@ -70,6 +73,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   variant = 'default',
   showHivelyImport = false,
   showSunVoxImport = false,
+  showFurnaceBrowser = false,
 }) => {
   const {
     instruments,
@@ -104,6 +108,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [showHivelyImportDialog, setShowHivelyImportDialog] = useState(false);
   const [showSunVoxImportDialog, setShowSunVoxImportDialog] = useState(false);
+  const [showFurnaceBrowserDialog, setShowFurnaceBrowserDialog] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
 
@@ -370,7 +375,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
   };
 
   // Show action bar if any action buttons are enabled
-  const showActionBar = isFT2 && (showPresetButton || showSamplePackButton || showEditButton || showHivelyImport || showSunVoxImport);
+  const showActionBar = isFT2 && (showPresetButton || showSamplePackButton || showEditButton || showHivelyImport || showSunVoxImport || showFurnaceBrowser);
 
   return (
     <div className={`flex flex-col h-full ${isFT2 ? 'bg-ft2-bg border-l border-ft2-border' : ''}`}>
@@ -434,6 +439,16 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
               >
                 <Upload size={14} />
                 <span className="text-[8px] font-bold">SVX</span>
+              </button>
+            )}
+            {showFurnaceBrowser && (
+              <button
+                onClick={() => setShowFurnaceBrowserDialog(true)}
+                className="flex flex-col items-center gap-0.5 px-1 py-1.5 bg-ft2-bg border border-ft2-border hover:border-accent-primary hover:text-accent-primary transition-colors text-ft2-text"
+                title="Browse Furnace chip synths"
+              >
+                <Cpu size={14} />
+                <span className="text-[8px] font-bold">CHIP</span>
               </button>
             )}
           </div>
@@ -737,6 +752,9 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
           onClose={() => setShowSunVoxImportDialog(false)}
           onImport={handleSunVoxImport}
         />
+      )}
+      {showFurnaceBrowserDialog && (
+        <FurnacePresetBrowser onClose={() => setShowFurnaceBrowserDialog(false)} />
       )}
     </div>
   );
