@@ -49,7 +49,7 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
   channelIndex,
   width,
   height,
-  isActive = true,
+  isActive: _isActive = true,
 }) => {
   const theme = usePixiTheme();
   const {

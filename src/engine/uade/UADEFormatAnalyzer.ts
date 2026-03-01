@@ -26,7 +26,8 @@ const PAULA_REG_VOL = 4;
 const CHIP_RAM_MAX = 0xDFF000;
 
 export class UADEFormatAnalyzer {
-  constructor(private engine: UADEEngine) {}
+  private engine: UADEEngine;
+  constructor(engine: UADEEngine) { this.engine = engine; }
 
   /**
    * Drain the Paula log accumulated during the enhanced scan and correlate each
