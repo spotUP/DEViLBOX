@@ -53,7 +53,8 @@ program
       writeFileSync(join(outDir, `${name}.h`), genHeader(name, resolved.exports));
 
       if (opts.wrapper !== false) {
-        const wrapper = genWrapper({ playerName: name, exports: resolved.exports });
+        const timing = opts.timing === 'ntsc' ? 'ntsc' : 'pal';
+        const wrapper = genWrapper({ playerName: name, exports: resolved.exports, timing });
         const cmake   = genCMake({ playerName: name, playerFile: `${name}.c` });
         writeFileSync(join(outDir, `${name}_wrapper.c`), wrapper);
         writeFileSync(join(outDir, 'CMakeLists.txt'), cmake);
