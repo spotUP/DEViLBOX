@@ -314,6 +314,71 @@ class UADEProcessor extends AudioWorkletProcessor {
         }
         break;
       }
+
+      case 'enableTickSnapshots': {
+        const { enable } = data;
+        if (!this._wasm || !this._ready) {
+          console.warn('[UADE.worklet] enableTickSnapshots called before WASM ready — ignoring');
+          break;
+        }
+        if (!this._wasm._uade_wasm_enable_tick_snapshots) {
+          console.warn('[UADE.worklet] _uade_wasm_enable_tick_snapshots not in WASM build — ignoring');
+          break;
+        }
+        this._wasm._uade_wasm_enable_tick_snapshots(enable ? 1 : 0);
+        break;
+      }
+      case 'resetTickSnapshots': {
+        if (!this._wasm || !this._ready) break;
+        this._wasm?._uade_wasm_reset_tick_snapshots?.();
+        break;
+      }
+      case 'getTickSnapshots': {
+        const { requestId } = data;
+        if (!this._wasm || !this._ready) {
+          this.port.postMessage({ type: 'tickSnapshotsError', requestId, error: 'WASM not ready' });
+          break;
+        }
+        if (!this._wasm._uade_wasm_get_tick_snapshots) {
+          this.port.postMessage({ type: 'tickSnapshotsError', requestId, error: '_uade_wasm_get_tick_snapshots not in WASM build' });
+          break;
+        }
+        try {
+          const maxSnaps = 4096;
+          const wordsPerSnap = 13;
+          const ptr = this._wasm._malloc(maxSnaps * wordsPerSnap * 4);
+          if (!ptr) {
+            this.port.postMessage({ type: 'tickSnapshotsError', requestId, error: 'malloc failed' });
+            break;
+          }
+          const count = this._wasm._uade_wasm_get_tick_snapshots(ptr, maxSnaps);
+          const raw = new Uint32Array(this._wasm.HEAPU8.buffer, ptr, count * wordsPerSnap);
+          const snapshots = [];
+          for (let i = 0; i < count; i++) {
+            const base = i * wordsPerSnap;
+            const channels = [];
+            for (let ch = 0; ch < 4; ch++) {
+              const w0 = raw[base + 1 + ch * 3 + 0];
+              const w1 = raw[base + 1 + ch * 3 + 1];
+              const w2 = raw[base + 1 + ch * 3 + 2];
+              channels.push({
+                period:    (w0 >>> 16) & 0xFFFF,
+                volume:    w0 & 0xFFFF,
+                lc:        w1,
+                len:       (w2 >>> 8) & 0xFFFF,
+                dmaEn:     (w2 >>> 1) & 1,
+                triggered: w2 & 1,
+              });
+            }
+            snapshots.push({ tick: raw[base], channels });
+          }
+          this._wasm._free(ptr);
+          this.port.postMessage({ type: 'tickSnapshotsResult', requestId, snapshots });
+        } catch (e) {
+          this.port.postMessage({ type: 'tickSnapshotsError', requestId, error: String(e) });
+        }
+        break;
+      }
     }
   }
 
