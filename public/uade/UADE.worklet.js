@@ -1270,6 +1270,45 @@ class UADEProcessor extends AudioWorkletProcessor {
         }
       }
 
+      // Check for sample offset (0x9): note triggers with sampleStart > samplePtr,
+      // meaning DMA started somewhere other than the sample's natural beginning.
+      // ProTracker 0x9xx: offset in 256-byte chunks (xx = offset >> 8).
+      // Only meaningful when a note actually triggered.
+      if (effTyp === 0 && triggered && bestSampleStart > bestSamplePtr && bestSampleLen > 0) {
+        const byteOffset = bestSampleStart - bestSamplePtr;
+        if (byteOffset > 0 && byteOffset < bestSampleLen) {
+          const chunks = Math.min(0xFF, byteOffset >> 8);
+          if (chunks > 0) {
+            effTyp = 0x9; // Sample offset
+            eff = chunks;
+          }
+        }
+      }
+
+      // Check for fine volume slide up/down (0xEA/0xEB): volume changes by a
+      // small fixed amount at tick 0 only; all subsequent ticks hold the new value.
+      // EAx: vol goes UP by x at tick 0 (volumes[0] < volumes[1])
+      // EBx: vol goes DOWN by x at tick 0 (volumes[0] > volumes[1])
+      // Distinguish from regular volume slide (0xA) which changes every tick.
+      if (effTyp === 0 && volumes.length >= 3) {
+        const v0 = volumes[0];
+        const v1 = volumes[1];
+        const vdiff = v1 - v0; // positive = up
+        if (Math.abs(vdiff) > 0 && Math.abs(vdiff) <= 15) {
+          // Check all ticks after tick 1 hold v1 constant
+          let steady = true;
+          for (let t = 2; t < volumes.length; t++) {
+            if (volumes[t] !== v1) { steady = false; break; }
+          }
+          if (steady) {
+            effTyp = 0xE;
+            eff = vdiff > 0
+              ? (0xA << 4) | Math.min(15, vdiff)   // EAx = fine vol slide up
+              : (0xB << 4) | Math.min(15, -vdiff);  // EBx = fine vol slide down
+          }
+        }
+      }
+
       result.push({
         period: bestPeriod,
         volume: bestVolume,
