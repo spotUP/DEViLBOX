@@ -54,6 +54,20 @@ export interface PaulaLogEntry {
   tick:       number;  // CIA-A tick count at write time
 }
 
+export interface UADEChannelTickState {
+  period:    number;  // AUDx PER (current Amiga period)
+  volume:    number;  // AUDx VOL (0-64)
+  lc:        number;  // AUDx LC — chip RAM address of current sample
+  len:       number;  // AUDx LEN — sample length in words
+  dmaEn:     number;  // 1 if DMA active on this channel
+  triggered: number;  // 1 if DMA restarted this tick (new note started)
+}
+
+export interface UADETickSnapshot {
+  tick:     number;               // CIA-A Timer A tick count
+  channels: UADEChannelTickState[]; // [ch0, ch1, ch2, ch3]
+}
+
 /** Memory watchpoint hit */
 export interface WatchpointHit {
   addr:    number;
@@ -133,6 +147,9 @@ export class UADEEngine {
   // Pending getPaulaLog requests: Map<requestId, {resolve, reject}>
   private _paulaLogPending = new Map<number, { resolve: (v: PaulaLogEntry[]) => void; reject: (e: Error) => void }>();
   private _paulaLogNextId = 0;
+  // Pending getTickSnapshots requests: Map<requestId, {resolve, reject}>
+  private _tickSnapPending = new Map<number, { resolve: (v: UADETickSnapshot[]) => void; reject: (e: Error) => void }>();
+  private _tickSnapNextId = 0;
   // Pending getWatchpointHits requests: Map<requestId, {resolve, reject}>
   private _wpHitsPending = new Map<number, { resolve: (v: WatchpointHit[]) => void; reject: (e: Error) => void }>();
   private _wpHitsNextId = 0;
@@ -419,6 +436,18 @@ export class UADEEngine {
           this._paulaLogPending.delete(requestId);
           break;
         }
+        case 'tickSnapshotsResult': {
+          const { requestId, snapshots } = data;
+          this._tickSnapPending.get(requestId)?.resolve(snapshots as UADETickSnapshot[]);
+          this._tickSnapPending.delete(requestId);
+          break;
+        }
+        case 'tickSnapshotsError': {
+          const { requestId, error } = data;
+          this._tickSnapPending.get(requestId)?.reject(new Error(error as string));
+          this._tickSnapPending.delete(requestId);
+          break;
+        }
         case 'watchpointHitsResult': {
           const { requestId, hits } = data;
           this._wpHitsPending.get(requestId)?.resolve(hits as WatchpointHit[]);
@@ -699,6 +728,31 @@ export class UADEEngine {
       this._paulaLogPending.set(requestId, { resolve, reject });
     });
     this.workletNode.port.postMessage({ type: 'getPaulaLog', requestId });
+    return promise;
+  }
+
+  /** Enable or disable CIA tick snapshot capture. */
+  enableTickSnapshots(enable: boolean): void {
+    this.workletNode?.port.postMessage({ type: 'enableTickSnapshots', enable });
+  }
+
+  /** Reset (clear) the accumulated tick snapshot ring buffer. */
+  resetTickSnapshots(): void {
+    this.workletNode?.port.postMessage({ type: 'resetTickSnapshots' });
+  }
+
+  /**
+   * Drain all accumulated CIA tick snapshots since the last reset.
+   * Each snapshot contains the CIA-A tick count and per-channel Paula DMA state.
+   */
+  async getTickSnapshots(): Promise<UADETickSnapshot[]> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('UADEEngine not initialized');
+    const requestId = this._tickSnapNextId++;
+    const promise = new Promise<UADETickSnapshot[]>((resolve, reject) => {
+      this._tickSnapPending.set(requestId, { resolve, reject });
+    });
+    this.workletNode.port.postMessage({ type: 'getTickSnapshots', requestId });
     return promise;
   }
 
