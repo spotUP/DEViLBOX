@@ -24,7 +24,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
-import { PixiMenuBar } from '../../components/PixiMenuBar';
 import { PixiButton, PixiNumericInput } from '../../components';
 import { PixiPureTextInput } from '../../input/PixiPureTextInput';
 import { PixiVisualizer } from './PixiVisualizer';
@@ -33,20 +32,18 @@ import { saveProjectToStorage } from '@hooks/useProjectPersistence';
 import { useShallow } from 'zustand/react/shallow';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
-import { buildFT2Menus } from './ft2MenuDefs';
 import { notify } from '@stores/useNotificationStore';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 
-const MENU_ROW_H  = 28;
 const TRANSPORT_ROW_H = 36; // each transport row (×2)
 const FILE_ROW_H  = 32;
 const VIZ_WIDTH   = 220;
 
-/** Total toolbar height (both transport rows + file row + menu row) */
-export const FT2_TOOLBAR_HEIGHT = MENU_ROW_H + TRANSPORT_ROW_H * 2 + FILE_ROW_H;
-/** Compact height — Row 4 (file action buttons) hidden, saving 32px */
-export const FT2_TOOLBAR_HEIGHT_COMPACT = MENU_ROW_H + TRANSPORT_ROW_H * 2;
+/** Total toolbar height (both transport rows + file row) */
+export const FT2_TOOLBAR_HEIGHT = TRANSPORT_ROW_H * 2 + FILE_ROW_H;
+/** Compact height — file action buttons hidden, saving 32px */
+export const FT2_TOOLBAR_HEIGHT_COMPACT = TRANSPORT_ROW_H * 2;
 
 // ─── Stable layout objects ───────────────────────────────────────────────────
 
@@ -191,7 +188,6 @@ export const PixiFT2Toolbar: React.FC = () => {
   const handleShowExport      = useCallback(() => useUIStore.getState().openModal('export'), []);
   const handleShowHelp        = useCallback((tab?: string) => useUIStore.getState().openModal('help', { initialTab: tab ?? 'shortcuts' }), []);
   const handleShowMasterFX    = useCallback(() => { const s = useUIStore.getState(); s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx'); }, []);
-  const handleShowInstrumentFX = useCallback(() => { const s = useUIStore.getState(); s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx'); }, []);
   const handleShowInstruments  = useCallback(() => useUIStore.getState().openModal('instruments'), []);
   const handleShowPatternOrder = useCallback(() => useUIStore.getState().openModal('patternOrder'), []);
   const handleShowDrumpads     = useCallback(() => useUIStore.getState().openModal('drumpads'), []);
@@ -219,21 +215,6 @@ export const PixiFT2Toolbar: React.FC = () => {
     useInstrumentStore.getState().reset();
     notify.success('Project cleared', 1500);
   }, [isPlaying, stop]);
-
-  const menus = buildFT2Menus({
-    onLoadFile: handleLoad,
-    onSave: handleSave,
-    onClearProject: handleClearProject,
-    onShowExport: handleShowExport,
-    onShowHelp: handleShowHelp,
-    onShowMasterFX: handleShowMasterFX,
-    onShowInstrumentFX: handleShowInstrumentFX,
-    onShowInstruments: handleShowInstruments,
-    onShowPatternOrder: handleShowPatternOrder,
-    onShowDrumpads: handleShowDrumpads,
-    showMasterFX: modalOpen === 'masterFx',
-    showInstrumentFX: modalOpen === 'instrumentFx',
-  });
 
   // ── Transport handlers ────────────────────────────────────────────────────
   const handlePlaySong = useCallback(async () => {
@@ -296,14 +277,6 @@ export const PixiFT2Toolbar: React.FC = () => {
   }, []);
 
   // ── Background draws ──────────────────────────────────────────────────────
-  const drawMenuRowBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 4000, MENU_ROW_H);
-    g.fill({ color: theme.bgSecondary.color });
-    g.rect(0, MENU_ROW_H - 1, 4000, 1);
-    g.fill({ color: theme.border.color, alpha: 0.5 });
-  }, [theme]);
-
   const drawTransportRowBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, 4000, TRANSPORT_ROW_H);
@@ -336,21 +309,7 @@ export const PixiFT2Toolbar: React.FC = () => {
         flexDirection: 'column',
       }}
     >
-      {/* ── Row 1: Menu bar ── */}
-      <pixiContainer
-        layout={{
-          width: '100%',
-          height: MENU_ROW_H,
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingLeft: 4,
-        }}
-      >
-        <pixiGraphics draw={drawMenuRowBg} layout={{ ...LAYOUT_FILL_ROW, height: MENU_ROW_H }} />
-        <PixiMenuBar menus={menus} height={MENU_ROW_H} />
-      </pixiContainer>
-
-      {/* ── Rows 2+3: Transport section + Visualizer side-by-side ── */}
+      {/* ── Rows 1+2: Transport section + Visualizer side-by-side ── */}
       <pixiContainer
         layout={{
           width: '100%',
