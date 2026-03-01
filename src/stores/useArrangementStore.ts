@@ -85,6 +85,10 @@ interface ArrangementStore {
   renamingClipId: string | null;
   setRenamingClipId: (id: string | null) => void;
 
+  // === Context menu UI state (not persisted) ===
+  clipContextMenu: { clipId: string; screenX: number; screenY: number } | null;
+  setClipContextMenu: (menu: { clipId: string; screenX: number; screenY: number } | null) => void;
+
   // === Track CRUD ===
   addTrack: (name?: string, instrumentId?: number | null) => string;
   removeTrack: (trackId: string) => void;
@@ -93,6 +97,11 @@ interface ArrangementStore {
   toggleTrackMute: (trackId: string) => void;
   toggleTrackSolo: (trackId: string) => void;
   setTrackHeight: (trackId: string, height: number) => void;
+
+  // === Track rename/color UI state (not persisted) ===
+  renamingTrackId: string | null;
+  setRenamingTrackId: (id: string | null) => void;
+  cycleTrackColor: (trackId: string) => void;
 
   // === Markers ===
   addMarker: (marker: Omit<ArrangementMarker, 'id'>) => string;
@@ -349,6 +358,10 @@ export const useArrangementStore = create<ArrangementStore>()(
     setRenamingClipId: (id) =>
       set((state) => { state.renamingClipId = id; }),
 
+    clipContextMenu: null,
+    setClipContextMenu: (menu) =>
+      set((state) => { state.clipContextMenu = menu as any; }),
+
     // === Track CRUD ===
 
     addTrack: (name?, instrumentId?) => {
@@ -430,6 +443,18 @@ export const useArrangementStore = create<ArrangementStore>()(
       set((state) => {
         const track = state.tracks.find(t => t.id === trackId);
         if (track) track.height = Math.max(30, Math.min(200, height));
+      }),
+
+    renamingTrackId: null,
+    setRenamingTrackId: (id) =>
+      set((state) => { state.renamingTrackId = id; }),
+
+    cycleTrackColor: (trackId) =>
+      set((state) => {
+        const track = state.tracks.find(t => t.id === trackId);
+        if (!track) return;
+        const currentIdx = TRACK_COLORS.indexOf(track.color ?? '');
+        track.color = TRACK_COLORS[(currentIdx + 1) % TRACK_COLORS.length];
       }),
 
     // === Markers ===

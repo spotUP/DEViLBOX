@@ -1,9 +1,15 @@
 /**
- * ArrangementContextMenu - Right-click menu for clips and tracks
+ * ArrangementContextMenu — Right-click context menu for arrangement clips.
+ * Reads position/clipId from useArrangementStore.clipContextMenu.
+ * Rendered via a portal so it floats above the Pixi canvas.
  */
 
-import React from 'react';
+import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useArrangementStore } from '@stores/useArrangementStore';
+import { useTrackerStore } from '@stores';
+import { usePianoRollStore } from '@/stores/usePianoRollStore';
+import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 
 const CLIP_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308',
@@ -12,71 +18,113 @@ const CLIP_COLORS = [
   '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
 ];
 
-interface ArrangementContextMenuProps {
-  x: number;
-  y: number;
-  clipId: string | null;
-  trackId: string | null;
-  row: number;
-  onClose: () => void;
-}
+const MENU_W = 200;
 
-export const ArrangementContextMenu: React.FC<ArrangementContextMenuProps> = ({
-  x, y, clipId, trackId, row, onClose,
-}) => {
-  const {
-    removeClips, duplicateClips, toggleClipMute, setClipColor,
-    splitClip, selectAllClipsOnTrack, selectedClipIds, pushUndo,
-  } = useArrangementStore();
+export const ArrangementContextMenu: React.FC = () => {
+  const menu = useArrangementStore(s => s.clipContextMenu);
+  const setMenu = useArrangementStore(s => s.setClipContextMenu);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const handleAction = (action: () => void) => {
-    pushUndo();
-    action();
-    onClose();
+  useEffect(() => {
+    if (!menu) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenu(null);
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenu(null);
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [menu, setMenu]);
+
+  if (!menu) return null;
+
+  const { clipId, screenX, screenY } = menu;
+  const arr = useArrangementStore.getState();
+  const clip = arr.clips.find(c => c.id === clipId);
+  if (!clip) return null;
+
+  const close = () => setMenu(null);
+
+  const handleOpenInPianoRoll = () => {
+    close();
+    const ts = useTrackerStore.getState();
+    const patternIndex = ts.patterns.findIndex(p => p.id === clip.patternId);
+    if (patternIndex >= 0) ts.setCurrentPattern(patternIndex);
+    const pr = usePianoRollStore.getState();
+    pr.setChannelIndex(clip.sourceChannelIndex ?? 0);
+    pr.setScroll(clip.offsetRows || 0, pr.view.scrollY);
+    useWorkbenchStore.getState().showWindow('pianoroll');
   };
 
-  return (
+  const handleRename = () => {
+    close();
+    arr.setRenamingClipId(clipId);
+  };
+
+  const handleMute = () => {
+    close();
+    arr.toggleClipMute(clipId);
+  };
+
+  const handleDuplicate = () => {
+    close();
+    arr.pushUndo();
+    const newIds = arr.duplicateClips([clipId]);
+    arr.clearSelection();
+    arr.selectClips(newIds);
+  };
+
+  const handleDelete = () => {
+    close();
+    arr.pushUndo();
+    arr.removeClip(clipId);
+  };
+
+  const handleSetColor = (color: string) => {
+    close();
+    arr.pushUndo();
+    arr.setClipColor(clipId, color);
+  };
+
+  // Adjust position so menu stays on screen
+  const left = Math.min(screenX, window.innerWidth - MENU_W - 8);
+  const top = Math.min(screenY, window.innerHeight - 260);
+
+  return createPortal(
     <div
-      className="fixed z-50 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl py-1 text-xs min-w-[160px]"
-      style={{ left: x, top: y }}
-      onMouseDown={(e) => e.stopPropagation()}
+      ref={menuRef}
+      className="fixed z-[10000] bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl py-1 text-xs"
+      style={{ left, top, width: MENU_W }}
+      onMouseDown={e => e.stopPropagation()}
     >
-      {clipId && (
-        <>
-          <MenuItem label="Duplicate" onClick={() => handleAction(() => duplicateClips([...selectedClipIds]))} />
-          <MenuItem label="Split at Cursor" onClick={() => handleAction(() => splitClip(clipId, row))} />
-          <MenuItem label="Mute/Unmute" onClick={() => handleAction(() => toggleClipMute(clipId))} />
-          <Separator />
-          <div className="px-2 py-2">
-            <div className="text-[10px] text-text-muted mb-1">Clip Color</div>
-            <div className="grid grid-cols-8 gap-1">
-              {CLIP_COLORS.map(color => (
-                <button
-                  key={color}
-                  className="w-6 h-6 rounded border border-dark-border hover:scale-110 transition-transform"
-                  style={{ backgroundColor: color }}
-                  onClick={() => {
-                    handleAction(() => setClipColor(clipId, color));
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-          <Separator />
-          <MenuItem label="Delete" onClick={() => handleAction(() => removeClips([...selectedClipIds]))} danger />
-        </>
-      )}
-
-      {trackId && !clipId && (
-        <>
-          <MenuItem label="Select All on Track" onClick={() => { selectAllClipsOnTrack(trackId); onClose(); }} />
-        </>
-      )}
-
-      {!clipId && !trackId && (
-        <div className="px-3 py-1 text-text-muted italic">No selection</div>
-      )}
-    </div>
+      <MenuItem label="Open in Piano Roll" onClick={handleOpenInPianoRoll} />
+      <Separator />
+      <MenuItem label="Rename" onClick={handleRename} />
+      <MenuItem label={clip.muted ? 'Unmute' : 'Mute'} onClick={handleMute} />
+      <MenuItem label="Duplicate" onClick={handleDuplicate} />
+      <Separator />
+      <div className="px-2 py-2">
+        <div className="text-[10px] text-text-muted mb-1 font-mono">Clip Color</div>
+        <div className="grid grid-cols-8 gap-1">
+          {CLIP_COLORS.map(color => (
+            <button
+              key={color}
+              className="w-5 h-5 rounded border border-dark-border hover:scale-110 transition-transform"
+              style={{ backgroundColor: color }}
+              onClick={() => handleSetColor(color)}
+            />
+          ))}
+        </div>
+      </div>
+      <Separator />
+      <MenuItem label="Delete" onClick={handleDelete} danger />
+    </div>,
+    document.body,
   );
 };
 
@@ -84,7 +132,7 @@ const MenuItem: React.FC<{ label: string; onClick: () => void; danger?: boolean 
   label, onClick, danger,
 }) => (
   <button
-    className={`w-full px-3 py-1.5 text-left hover:bg-dark-bgTertiary ${
+    className={`w-full px-3 py-1.5 text-left hover:bg-dark-bgTertiary font-mono ${
       danger ? 'text-red-400 hover:text-red-300' : 'text-text-primary'
     }`}
     onClick={onClick}
