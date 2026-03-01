@@ -288,6 +288,16 @@ export const WorkbenchContainer: React.FC = () => {
     };
   }, []);
 
+  // ─── Background pan hit area draw ──────────────────────────────────────────
+  // Empty containers have 0×0 pixi bounds so they're never hit-tested.
+  // An invisible full-size rect anchors bounds so clicks on empty space register.
+
+  const drawBgHitArea = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, width, height);
+    g.fill({ color: 0x000000, alpha: 0 });
+  }, [width, height]);
+
   // ─── Background pan ────────────────────────────────────────────────────────
 
   const panDragRef = useRef<{ lastX: number; lastY: number } | null>(null);
@@ -440,8 +450,9 @@ export const WorkbenchContainer: React.FC = () => {
       <pixiContainer ref={rootContainerRef} layout={{ width, height: '100%' }} eventMode="static" sortableChildren>
         <WorkbenchBackground width={width} height={height} camera={camera} />
 
-        {/* Pan hit area — grab cursor signals this surface is draggable */}
-        <pixiContainer
+        {/* Pan hit area — invisible rect gives pixi proper bounds for hit-testing */}
+        <pixiGraphics
+          draw={drawBgHitArea}
           layout={{ position: 'absolute', width, height }}
           eventMode="static"
           cursor="grab"
