@@ -167,61 +167,79 @@ export const PixiArrangementView: React.FC = () => {
     return Math.max(128, Math.ceil(maxEnd * 1.25));
   }, [clips]);
 
-  // Pre-compute clip render data for the canvas
+  // Pre-compute clip render data for the canvas — uses visibleTracks for layout index
   const clipRenderData = useMemo((): ClipRenderData[] => {
     const trackIdToIndex = new Map<string, number>();
-    tracks.forEach((t, i) => trackIdToIndex.set(t.id, i));
+    visibleTracks.forEach((t, i) => trackIdToIndex.set(t.id, i));
 
-    return clips.map(clip => {
-      // Effective length: clipLengthRows or pattern length minus offset
-      let lengthRows = clip.clipLengthRows ?? 64;
-      const pat = patterns.find(p => p.id === clip.patternId);
-      if (clip.clipLengthRows == null) {
+    return clips
+      .filter(clip => trackIdToIndex.has(clip.trackId))
+      .map(clip => {
+        // Effective length: clipLengthRows or pattern length minus offset
+        let lengthRows = clip.clipLengthRows ?? 64;
+        const pat = patterns.find(p => p.id === clip.patternId);
+        if (clip.clipLengthRows == null) {
+          if (pat) {
+            const patLen = pat.channels[0]?.rows?.length ?? 64;
+            lengthRows = Math.max(1, patLen - (clip.offsetRows || 0));
+          }
+        }
+
+        // Color: clip color → track color → default
+        const trackIdx = trackIdToIndex.get(clip.trackId) ?? 0;
+        const trackColor = visibleTracks[trackIdx]?.color ?? 0x3b82f6;
+        const color = clip.color ? cssColorToPixi(clip.color, trackColor) : trackColor;
+
+        // Name: custom name → pattern name → generic
+        let name = clip.name || '';
+        if (!name) {
+          name = pat?.name || `Pattern ${clip.sourceChannelIndex}`;
+        }
+
+        // Note preview: collect note values for the clip's channel rows
+        let noteRows: number[] | undefined;
         if (pat) {
-          const patLen = pat.channels[0]?.rows?.length ?? 64;
-          lengthRows = Math.max(1, patLen - (clip.offsetRows || 0));
+          const channelIdx = clip.sourceChannelIndex ?? 0;
+          const channel = pat.channels[channelIdx];
+          if (channel?.rows) {
+            const offsetRows = clip.offsetRows || 0;
+            noteRows = channel.rows
+              .slice(offsetRows, offsetRows + lengthRows)
+              .map(cell => cell.note);
+          }
         }
-      }
 
-      // Color: clip color → track color → default
-      const trackIdx = trackIdToIndex.get(clip.trackId) ?? 0;
-      const trackColor = tracks[trackIdx]?.color ?? 0x3b82f6;
-      const color = clip.color ? cssColorToPixi(clip.color, trackColor) : trackColor;
+        return {
+          id: clip.id,
+          startRow: clip.startRow,
+          lengthRows,
+          trackIndex: trackIdx,
+          color,
+          name,
+          muted: clip.muted,
+          selected: selectedClipIds.has(clip.id),
+          fadeInRows: clip.fadeInRows || 0,
+          fadeOutRows: clip.fadeOutRows || 0,
+          noteRows,
+        };
+      });
+  }, [clips, visibleTracks, selectedClipIds, patterns]);
 
-      // Name: custom name → pattern name → generic
-      let name = clip.name || '';
-      if (!name) {
-        name = pat?.name || `Pattern ${clip.sourceChannelIndex}`;
-      }
+  const AUTOMATION_LANE_H = 40;
 
-      // Note preview: collect note values for the clip's channel rows
-      let noteRows: number[] | undefined;
-      if (pat) {
-        const channelIdx = clip.sourceChannelIndex ?? 0;
-        const channel = pat.channels[channelIdx];
-        if (channel?.rows) {
-          const offsetRows = clip.offsetRows || 0;
-          noteRows = channel.rows
-            .slice(offsetRows, offsetRows + lengthRows)
-            .map(cell => cell.note);
-        }
-      }
-
-      return {
-        id: clip.id,
-        startRow: clip.startRow,
-        lengthRows,
-        trackIndex: trackIdx,
-        color,
-        name,
-        muted: clip.muted,
-        selected: selectedClipIds.has(clip.id),
-        fadeInRows: clip.fadeInRows || 0,
-        fadeOutRows: clip.fadeOutRows || 0,
-        noteRows,
-      };
-    });
-  }, [clips, tracks, selectedClipIds, patterns]);
+  // Per-track visible automation lanes (only for visible tracks)
+  const trackAutomationLanes = useMemo(() => {
+    const visibleTrackIds = new Set(visibleTracks.map(t => t.id));
+    const map = new Map<string, typeof automationLanes>();
+    for (const lane of automationLanes) {
+      if (!lane.visible) continue;
+      if (!visibleTrackIds.has(lane.trackId)) continue;
+      const existing = map.get(lane.trackId) ?? [];
+      existing.push(lane);
+      map.set(lane.trackId, existing);
+    }
+    return map;
+  }, [automationLanes, visibleTracks]);
 
   // Track interaction: mute/solo
   const useArrangementData = arrangementTracks.length > 0;

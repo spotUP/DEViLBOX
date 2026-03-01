@@ -7,6 +7,7 @@ import { useCallback, useRef } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
+import type { TrackGroup } from '@/types/arrangement';
 
 interface Track {
   id: string;
@@ -14,10 +15,12 @@ interface Track {
   muted: boolean;
   solo: boolean;
   color: number;
+  groupId?: string | null;
 }
 
 interface PixiTrackHeadersProps {
   tracks: Track[];
+  groups?: TrackGroup[];
   trackHeight?: number;
   width?: number;
   scrollY?: number;
@@ -29,10 +32,13 @@ interface PixiTrackHeadersProps {
   onCycleColor?: (trackId: string) => void;
   /** Called when the user drags the bottom edge of a track to resize it */
   onResizeTrack?: (trackId: string, newHeight: number) => void;
+  /** Called when fold chevron is clicked for a group */
+  onToggleGroupFold?: (groupId: string) => void;
 }
 
 export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
   tracks,
+  groups = [],
   trackHeight = 40,
   width = 160,
   scrollY = 0,
@@ -41,10 +47,19 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
   onRenameTrack,
   onCycleColor,
   onResizeTrack,
+  onToggleGroupFold,
 }) => {
   const theme = usePixiTheme();
   // Double-click detection for rename
   const lastClickRef = useRef<{ time: number; trackId: string }>({ time: 0, trackId: '' });
+
+  // Pre-compute which track is the first in each group (by lowest track array index)
+  const firstTrackInGroup = useCallback((groupId: string): string | null => {
+    for (const t of tracks) {
+      if (t.groupId === groupId) return t.id;
+    }
+    return null;
+  }, [tracks]);
 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -61,6 +76,12 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
 
       {tracks.map((track, i) => {
         const y = i * trackHeight - scrollY;
+
+        // Determine if this track is the first in its group (shows fold chevron)
+        const isFirstInGroup = track.groupId != null && firstTrackInGroup(track.groupId) === track.id;
+        const group = track.groupId != null ? groups.find(g => g.id === track.groupId) : null;
+        const isFolded = group?.folded ?? false;
+
         return (
           <pixiContainer
             key={track.id}
@@ -88,6 +109,43 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
               gap: 4,
             }}
           >
+            {/* Group background tint for grouped tracks */}
+            {track.groupId != null && (
+              <pixiGraphics
+                draw={(g: GraphicsType) => {
+                  g.clear();
+                  g.rect(0, 0, width, trackHeight);
+                  g.fill({ color: group?.color ? parseInt(group.color.replace('#', ''), 16) : 0x334155, alpha: 0.12 });
+                }}
+                layout={{ position: 'absolute', left: 0, top: 0, width, height: trackHeight }}
+              />
+            )}
+
+            {/* Fold chevron — shown only on first track in a group */}
+            {isFirstInGroup && group != null ? (
+              <pixiContainer
+                eventMode="static"
+                cursor="pointer"
+                onPointerDown={(e: FederatedPointerEvent) => {
+                  e.stopPropagation();
+                  if (e.button === 0) onToggleGroupFold?.(group.id);
+                }}
+                layout={{ width: 12, height: 12, justifyContent: 'center', alignItems: 'center' }}
+              >
+                <pixiBitmapText
+                  text={isFolded ? '\u25B6' : '\u25BC'}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+                  tint={0x94a3b8}
+                  layout={{}}
+                />
+              </pixiContainer>
+            ) : (
+              /* Spacer to keep layout consistent when no chevron */
+              track.groupId != null ? (
+                <pixiContainer layout={{ width: 12, height: 12 }} />
+              ) : null
+            )}
+
             {/* Color swatch — click to cycle color */}
             <pixiContainer
               eventMode="static"
