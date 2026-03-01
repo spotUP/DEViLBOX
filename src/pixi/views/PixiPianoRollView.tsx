@@ -20,6 +20,9 @@ import { useHistoryStore } from '@/stores/useHistoryStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { patternToPianoRollNotes } from '@/hooks/pianoroll/usePianoRollData';
 import { TITLE_H } from '../workbench/PixiWindow';
+import { getMIDIManager } from '@/midi/MIDIManager';
+import type { MIDIMessage } from '@/midi/types';
+import { detectChord } from '@/lib/music/chordDetection';
 
 const VELOCITY_HEIGHT = 80;
 const TOOLBAR_HEIGHT = 36;
@@ -70,6 +73,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   });
   const isPlaying = useTransportStore(s => s.isPlaying);
   const currentGlobalRow = useTransportStore(s => s.currentGlobalRow);
+  const currentRow = useTransportStore(s => s.currentRow);
 
   // Resolve actual window pixel dimensions from the workbench store
   const win = useWorkbenchStore(s => s.windows[windowId]);
@@ -89,6 +93,95 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
 
   // Track held piano key for MIDI note release
   const heldPitchRef = useRef<number | null>(null);
+
+  // -----------------------------------------------------------------------
+  // Feature: MIDI recording into piano roll
+  // -----------------------------------------------------------------------
+  const [isRecording, setIsRecording] = useState(false);
+
+  // Track when each MIDI note was pressed (midiNote → startRow at press time)
+  const midiNoteStartRef = useRef<Map<number, number>>(new Map());
+
+  // Toggle recording mode
+  const handleToggleRecord = useCallback(() => {
+    setIsRecording(prev => !prev);
+  }, []);
+
+  // Subscribe to the MIDIManager when recording is active
+  useEffect(() => {
+    if (!isRecording) {
+      midiNoteStartRef.current.clear();
+      return;
+    }
+
+    const manager = getMIDIManager();
+
+    const handleMIDIMessage = (msg: MIDIMessage) => {
+      if (!msg.data || msg.data.length < 2) return;
+      const [status, note = 0, velocity = 0] = msg.data;
+      const messageType = (status >> 4) & 0x0f;
+
+      // Determine insert row: use transport current row when playing, else scroll position
+      const pianoStore = usePianoRollStore.getState();
+      const insertRow = isPlaying ? currentRow : Math.floor(pianoStore.view.scrollX);
+      const channelIndex = pianoStore.view.channelIndex;
+
+      if (messageType === 0x09 && velocity > 0) {
+        // Note-on: record the start row for this MIDI note number
+        midiNoteStartRef.current.set(note, insertRow);
+
+        // Insert note cell immediately
+        const ts = useTrackerStore.getState();
+        const pattern = ts.patterns[ts.currentPatternIndex];
+        if (!pattern) return;
+        // Convert MIDI note → XM note: XM note = (octave * 12) + semitone + 1
+        const xmNote = note + 1; // simplified XM conversion
+        const volumeValue = Math.round((velocity / 127) * 64);
+        const volume = 0x10 + volumeValue;
+        ts.setCell(channelIndex, insertRow, { note: xmNote, volume });
+      } else if (messageType === 0x08 || (messageType === 0x09 && velocity === 0)) {
+        // Note-off: place note-off marker at current row
+        const startRow = midiNoteStartRef.current.get(note);
+        if (startRow === undefined) return;
+        midiNoteStartRef.current.delete(note);
+
+        const nowRow = isPlaying ? currentRow : Math.floor(usePianoRollStore.getState().view.scrollX);
+        const duration = Math.max(1, nowRow - startRow);
+
+        const ts = useTrackerStore.getState();
+        const pattern = ts.patterns[ts.currentPatternIndex];
+        if (!pattern) return;
+        const chIdx = usePianoRollStore.getState().view.channelIndex;
+        const endRow = startRow + duration;
+        if (endRow < pattern.length) {
+          ts.setCell(chIdx, endRow, { note: 97 }); // 97 = note-off
+        }
+      }
+    };
+
+    manager.addMessageHandler(handleMIDIMessage);
+    return () => {
+      manager.removeMessageHandler(handleMIDIMessage);
+      midiNoteStartRef.current.clear();
+    };
+  }, [isRecording, isPlaying, currentRow]);
+
+  // -----------------------------------------------------------------------
+  // Feature: Chord detection from selected notes
+  // -----------------------------------------------------------------------
+  const chordName = useMemo(() => {
+    if (selectedNotes.size < 2) return '';
+    const selectedNoteIds = Array.from(selectedNotes);
+    const pitches = selectedNoteIds
+      .map(id => {
+        const note = pianoData.notes.find(n => n.id === id);
+        return note?.midiNote ?? null;
+      })
+      .filter((p): p is number => p !== null);
+    if (pitches.length < 2) return '';
+    return detectChord(pitches);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNotes, pianoData.notes, noteVersion]);
 
   // Wheel → scroll the piano roll (horizontal = beat scroll, vertical = note scroll)
   useEffect(() => {
@@ -460,6 +553,16 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           onClick={() => setTool('erase')}
         />
 
+        {/* MIDI Record toggle */}
+        <PixiButton
+          label="●"
+          variant={isRecording ? 'ft2' : 'ghost'}
+          color={isRecording ? 'red' : undefined}
+          size="sm"
+          active={isRecording}
+          onClick={handleToggleRecord}
+        />
+
         {/* Horizontal zoom */}
         <PixiButton label="-" variant="ghost" size="sm" onClick={() => usePianoRollStore.getState().setHorizontalZoom(horizontalZoom / 2)} />
         <PixiLabel text="H" size="xs" color="textMuted" />
@@ -494,6 +597,11 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           active={view.multiChannel}
           onClick={() => usePianoRollStore.getState().setMultiChannel(!view.multiChannel)}
         />
+
+        {/* Chord name display — shown when 2+ notes are selected and a chord is detected */}
+        {chordName !== '' && (
+          <PixiLabel text={chordName} size="sm" weight="bold" color="accent" />
+        )}
 
         <pixiContainer layout={{ flex: 1 }} />
 
