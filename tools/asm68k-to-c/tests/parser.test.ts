@@ -64,3 +64,9 @@ test('parses XDEF exports', () => {
   const ast = parse(tokenize('  XDEF _mt_init'));
   expect(ast[0]).toMatchObject({ kind: 'xdef', name: '_mt_init' });
 });
+
+test('parses PC-relative operand label(PC)', () => {
+  const ast = parse(tokenize('  MOVE.L PlayTick(PC),a0'));
+  const instr = ast[0] as any;
+  expect(instr.operands[0]).toMatchObject({ kind: 'pc_rel', label: 'PlayTick' });
+});

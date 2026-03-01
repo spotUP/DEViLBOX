@@ -16,8 +16,7 @@ function parseNumber(raw: string): number {
   return parseInt(raw, 10);
 }
 
-function parseOperand(tokens: Token[]): Operand {
-  const t = tokens[0];
+function parseOperand(t: Token): Operand {
   switch (t.kind) {
     case 'REGISTER':
       return { kind: 'register', name: t.value };
@@ -38,6 +37,10 @@ function parseOperand(tokens: Token[]): Operand {
       const m = t.value.match(/^(-?[^(]+)\((\w+)(?:,(\w+\.\w+))?\)$/);
       if (m) {
         const offset = /^\d+$/.test(m[1]) ? parseInt(m[1]) : m[1];
+        // PC-relative addressing: label(PC) → pc_rel node
+        if (m[2].toUpperCase() === 'PC' && typeof offset === 'string') {
+          return { kind: 'pc_rel', label: offset };
+        }
         return { kind: 'disp', offset, base: m[2], index: m[3] };
       }
       return { kind: 'label_ref', name: t.value };
@@ -138,11 +141,9 @@ export function parse(tokens: Token[]): AstNode[] {
       const directive = first.value as 'DC' | 'DS';
       j++; // advance past DC/DS
       const sizeToken = lt[j];
-      let size: Size = 'W';
-      if (sizeToken?.kind === 'SIZE') {
-        size = sizeToken.value.slice(1) as Size;
-        j++;
-      }
+      const rawSize = sizeToken?.kind === 'SIZE' ? sizeToken.value.slice(1) : 'W';
+      const size: Size = (rawSize === 'B' || rawSize === 'W' || rawSize === 'L' || rawSize === 'S') ? rawSize : 'W';
+      if (sizeToken?.kind === 'SIZE') j++;
       const values: (number | string)[] = [];
       while (j < lt.length && lt[j]?.kind !== 'COMMENT') {
         if (lt[j].kind === 'COMMA') { j++; continue; }
@@ -163,13 +164,15 @@ export function parse(tokens: Token[]): AstNode[] {
       j++;
       let size: Size = null;
       if (lt[j]?.kind === 'SIZE') {
-        size = lt[j].value.slice(1) as Size;
+        const raw = lt[j].value.slice(1);
+        size = (raw === 'B' || raw === 'W' || raw === 'L' || raw === 'S') ? raw : null;
         j++;
       }
       const operands: Operand[] = [];
       while (j < lt.length && lt[j]?.kind !== 'COMMENT') {
         if (lt[j].kind === 'COMMA') { j++; continue; }
-        operands.push(parseOperand([lt[j]]));
+        if (lt[j] === undefined) { j++; continue; }
+        operands.push(parseOperand(lt[j]));
         j++;
       }
       nodes.push({
