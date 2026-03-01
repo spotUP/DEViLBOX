@@ -27,7 +27,7 @@ import { PIXI_FONTS } from '../../fonts';
 import { PixiButton, PixiNumericInput } from '../../components';
 import { PixiPureTextInput } from '../../input/PixiPureTextInput';
 import { PixiVisualizer } from './PixiVisualizer';
-import { useTransportStore, useTrackerStore, useUIStore, useTabsStore, useInstrumentStore, useProjectStore, useAudioStore, useAutomationStore } from '@stores';
+import { useTransportStore, useTrackerStore, useUIStore, useInstrumentStore, useProjectStore, useAudioStore, useAutomationStore } from '@stores';
 import { exportSong } from '@lib/export/exporters';
 import { useShallow } from 'zustand/react/shallow';
 import { useTapTempo } from '@hooks/useTapTempo';
