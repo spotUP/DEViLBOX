@@ -40,6 +40,7 @@ export const UADELiveParamsBar: React.FC<UADELiveParamsBarProps> = ({ instrument
         .then((b) => setVolume(b[0]))
         .catch(() => { /* default 64 */ });
     }
+    basePeriodRef.current = 0;
     if (sections['period'] != null) {
       editor.readU16(sections['period'])
         .then((p) => { basePeriodRef.current = p; })
@@ -59,21 +60,21 @@ export const UADELiveParamsBar: React.FC<UADELiveParamsBarProps> = ({ instrument
 
   if (!sections || (sections['volume'] == null && sections['period'] == null)) return null;
 
-  const handleVolumeChange = (v: number) => {
+  const handleVolumeChange = useCallback((v: number) => {
     const rounded = Math.round(v);
     setVolume(rounded);
     if (sections['volume'] != null) {
       getEditor().writeU8(sections['volume'], rounded).catch(console.error);
     }
-  };
+  }, [sections, getEditor]);
 
-  const handleFinetuneChange = (f: number) => {
+  const handleFinetuneChange = useCallback((f: number) => {
     setFinetune(f);
     if (sections['period'] != null && basePeriodRef.current > 0) {
       const newPeriod = Math.round(basePeriodRef.current * Math.pow(2, -f / 1200));
       getEditor().writeU16(sections['period'], newPeriod).catch(console.error);
     }
-  };
+  }, [sections, getEditor]);
 
   return (
     <div className={`rounded-lg border p-3 ${panelBg} flex items-center gap-6`}>
