@@ -402,6 +402,34 @@ export const PixiArrangementView: React.FC = () => {
           playbackBeat={isPlaying ? playbackRow : undefined}
           clips={clipRenderData}
           trackHeight={40}
+          tool={tool}
+          snapDivision={view.snapDivision}
+          onSelectClip={(id, add) => useArrangementStore.getState().selectClip(id, add)}
+          onDeselectAll={() => useArrangementStore.getState().clearSelection()}
+          onSelectBox={(ids) => useArrangementStore.getState().selectClips(ids)}
+          onMoveClips={(ids, dr, dt) => useArrangementStore.getState().moveClips(ids, dr, dt)}
+          onResizeClipEnd={(id, newEndRow) => useArrangementStore.getState().resizeClipEnd(id, newEndRow)}
+          onDeleteClip={(id) => useArrangementStore.getState().removeClip(id)}
+          onSplitClip={(id, splitRow) => useArrangementStore.getState().splitClip(id, splitRow)}
+          onAddClip={(trackIndex, startRow, lengthRows) => {
+            const arr = useArrangementStore.getState();
+            const ts = useTrackerStore.getState();
+            const trackList = arr.tracks.slice().sort((a, b) => a.index - b.index);
+            const track = trackList[trackIndex];
+            if (!track) return;
+            const patternId = ts.patterns[ts.currentPatternIndex]?.id ?? ts.patterns[0]?.id;
+            if (!patternId) return;
+            arr.addClip({
+              patternId,
+              trackId: track.id,
+              startRow,
+              offsetRows: 0,
+              clipLengthRows: lengthRows,
+              sourceChannelIndex: 0,
+              color: null,
+              muted: false,
+            });
+          }}
         />
       </pixiContainer>
     </pixiContainer>
