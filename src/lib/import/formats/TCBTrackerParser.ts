@@ -288,6 +288,7 @@ export async function parseTCBTrackerFile(
       moduleSize: buf.length,
       instrBase:  h1Start + i * 4,   // file offset of this sample's h1 header entry (4 bytes)
       instrSize:  12,                 // h1 entry (4 bytes) + h2 entry (8 bytes) per sample slot
+      sections:   {},
     };
     instr.uadeChipRam = chipRam;
     instruments.push(instr);
