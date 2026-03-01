@@ -397,9 +397,19 @@ class UADEProcessor extends AudioWorkletProcessor {
       this._ptrL = this._wasm._malloc(frameBytes);
       this._ptrR = this._wasm._malloc(frameBytes);
 
+      // Use AudioWorkletGlobalScope.sampleRate as the authoritative rate.
+      // On iOS, ctx.sampleRate (passed via message) can differ from the actual
+      // worklet processing rate — globalThis.sampleRate is always correct.
+      const gsr = globalThis.sampleRate;
+      const effectiveSampleRate = (gsr && gsr > 0) ? gsr : (sampleRate || 44100);
+      if (gsr && sampleRate && Math.abs(gsr - sampleRate) > 1) {
+        console.warn('[UADE.worklet] sampleRate mismatch: passed=' + sampleRate + ', globalScope=' + gsr + ', using=' + effectiveSampleRate);
+      }
+      sampleRate = effectiveSampleRate;
+
       // Initialize UADE engine
-      console.log('[UADE.worklet] Calling _uade_wasm_init(' + (sampleRate || 44100) + ')');
-      const ret = this._wasm._uade_wasm_init(sampleRate || 44100);
+      console.log('[UADE.worklet] Calling _uade_wasm_init(' + effectiveSampleRate + ')');
+      const ret = this._wasm._uade_wasm_init(effectiveSampleRate);
       if (ret !== 0) {
         throw new Error('uade_wasm_init failed with code ' + ret);
       }
@@ -1593,9 +1603,18 @@ class UADEProcessor extends AudioWorkletProcessor {
       const baseL = this._ptrL >> 2;  // Convert byte offset to float32 index
       const baseR = this._ptrR >> 2;
 
-      for (let i = 0; i < frames; i++) {
-        outL[i] = heapF32[baseL + i];
-        if (outR !== outL) outR[i] = heapF32[baseR + i];
+      if (outR !== outL) {
+        // Stereo: copy L and R separately
+        for (let i = 0; i < frames; i++) {
+          outL[i] = heapF32[baseL + i];
+          outR[i] = heapF32[baseR + i];
+        }
+      } else {
+        // Mono fallback (iOS gives 1 channel): mix L+R into the single output.
+        // UC_PANNING_VALUE=1.0 makes L≡R anyway, but this is correct for any panning.
+        for (let i = 0; i < frames; i++) {
+          outL[i] = (heapF32[baseL + i] + heapF32[baseR + i]) * 0.5;
+        }
       }
 
       // Read Paula channel state for live pattern display (~20Hz)
