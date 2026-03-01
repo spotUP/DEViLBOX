@@ -101,6 +101,57 @@ function snapRow(row: number, division: number): number {
   return Math.round(row / division) * division;
 }
 
+/** Collect clip-edge rows for all clips on a given track, excluding the specified clip IDs. */
+function getTrackEdgeRows(
+  clips: ClipRenderData[],
+  trackIndex: number,
+  excludeIds: Set<string>,
+): number[] {
+  const edges: number[] = [];
+  for (const c of clips) {
+    if (c.trackIndex !== trackIndex) continue;
+    if (excludeIds.has(c.id)) continue;
+    edges.push(c.startRow);
+    edges.push(c.startRow + c.lengthRows);
+  }
+  return edges;
+}
+
+const MAGNETIC_SNAP_ROWS = 3;
+
+/** Apply magnetic edge snapping: if `row` is within MAGNETIC_SNAP_ROWS of any edge, snap to it. */
+function magneticSnap(row: number, edges: number[]): number {
+  let best = row;
+  let bestDist = MAGNETIC_SNAP_ROWS + 1;
+  for (const e of edges) {
+    const d = Math.abs(row - e);
+    if (d < bestDist) {
+      bestDist = d;
+      best = e;
+    }
+  }
+  return bestDist <= MAGNETIC_SNAP_ROWS ? best : row;
+}
+
+/** Check if the range [startRow, startRow+lengthRows) overlaps any clip on the same trackIndex,
+ *  excluding the specified clip IDs. */
+function hasOverlapOnTrack(
+  clips: ClipRenderData[],
+  trackIndex: number,
+  startRow: number,
+  lengthRows: number,
+  excludeIds: Set<string>,
+): boolean {
+  const endRow = startRow + lengthRows;
+  for (const c of clips) {
+    if (c.trackIndex !== trackIndex) continue;
+    if (excludeIds.has(c.id)) continue;
+    const cEnd = c.startRow + c.lengthRows;
+    if (startRow < cEnd && endRow > c.startRow) return true;
+  }
+  return false;
+}
+
 function findClipAt(
   lx: number, ly: number,
   clips: ClipRenderData[],
@@ -207,10 +258,34 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       const rawDeltaX = currentLocalX - drag.startLocalX;
       const rawDeltaRow = rawDeltaX / ppb;
       const rawDeltaTrack = (currentLocalY - drag.startLocalY) / th;
-
-      const snappedFirstRow = snapRow(drag.originalClips[0].startRow + rawDeltaRow, snap);
-      const dr = snappedFirstRow - drag.originalClips[0].startRow;
       const dt = Math.round(rawDeltaTrack);
+
+      const { clips: allClips } = paramsRef.current;
+      const draggedIds = new Set(drag.originalClips.map(c => c.id));
+
+      // Compute grid-snapped delta from the first clip
+      let snappedFirstRow = snapRow(drag.originalClips[0].startRow + rawDeltaRow, snap);
+
+      // Apply magnetic edge snapping for the first dragged clip on its target track
+      const firstOrig = drag.originalClips[0];
+      const targetTrackIdx = Math.max(0, firstOrig.trackIndex + dt);
+      const edgeRows = getTrackEdgeRows(allClips, targetTrackIdx, draggedIds);
+      const candidateStart = snappedFirstRow;
+      const candidateEnd = candidateStart + firstOrig.lengthRows;
+      const magStart = magneticSnap(candidateStart, edgeRows);
+      const magEnd = magneticSnap(candidateEnd, edgeRows);
+      // Pick whichever magnetic pull is stronger (closest)
+      const distStart = Math.abs(magStart - candidateStart);
+      const distEnd = Math.abs(magEnd - candidateEnd);
+      if (distStart <= MAGNETIC_SNAP_ROWS || distEnd <= MAGNETIC_SNAP_ROWS) {
+        if (distStart <= distEnd) {
+          snappedFirstRow = magStart;
+        } else {
+          snappedFirstRow = magEnd - firstOrig.lengthRows;
+        }
+      }
+
+      const dr = snappedFirstRow - drag.originalClips[0].startRow;
 
       for (const orig of drag.originalClips) {
         const newStart = Math.max(0, orig.startRow + dr);
@@ -231,7 +306,17 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       const orig = drag.originalClips[0];
       if (!orig) return;
       const rawEndRow = sb + currentLocalX / ppb;
-      const newEndRow = Math.max(orig.startRow + 1, snapRow(rawEndRow, snap));
+      let newEndRow = Math.max(orig.startRow + 1, snapRow(rawEndRow, snap));
+
+      // Magnetic edge snapping for resize
+      const { clips: allClips } = paramsRef.current;
+      const draggedIds = new Set([orig.id]);
+      const edgeRows = getTrackEdgeRows(allClips, orig.trackIndex, draggedIds);
+      const magEnd = magneticSnap(newEndRow, edgeRows);
+      if (Math.abs(magEnd - newEndRow) <= MAGNETIC_SNAP_ROWS) {
+        newEndRow = Math.max(orig.startRow + 1, magEnd);
+      }
+
       const cx = (orig.startRow - sb) * ppb;
       const cw = Math.max(4, (newEndRow - orig.startRow) * ppb);
       const cy = RULER_HEIGHT + orig.trackIndex * th + CLIP_PADDING - sy;
@@ -251,10 +336,16 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       const cw = Math.max(4, (endRow - startRow) * ppb);
       const cy = RULER_HEIGHT + drag.drawTrackIndex * th + CLIP_PADDING - sy;
       const ch = th - CLIP_PADDING * 2;
+
+      // Check for overlap with existing clips on the same track
+      const { clips: allClips } = paramsRef.current;
+      const overlaps = hasOverlapOnTrack(allClips, drag.drawTrackIndex, startRow, endRow - startRow, new Set());
+      const ghostColor = overlaps ? 0xff4444 : 0x4a9eff;
+
       g.roundRect(cx + CLIP_PADDING, cy, cw - CLIP_PADDING * 2, ch, 3);
-      g.fill({ color: 0x4a9eff, alpha: 0.35 });
+      g.fill({ color: ghostColor, alpha: 0.35 });
       g.roundRect(cx + CLIP_PADDING, cy, cw - CLIP_PADDING * 2, ch, 3);
-      g.stroke({ color: 0x4a9eff, alpha: 0.85, width: 1 });
+      g.stroke({ color: ghostColor, alpha: 0.85, width: 1 });
     }
   }, []);
 
@@ -405,9 +496,30 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
 
       if (drag.mode === 'move') {
         const rawDeltaRow = (currentLocalX - drag.startLocalX) / ppb2;
-        const snappedFirstRow = snapRow(drag.originalClips[0].startRow + rawDeltaRow, snap2);
-        const dr = snappedFirstRow - drag.originalClips[0].startRow;
         const dt = Math.round((currentLocalY - drag.startLocalY) / th2);
+        const firstOrig = drag.originalClips[0];
+        const draggedIds = new Set(drag.originalClips.map(c => c.id));
+
+        let snappedFirstRow = snapRow(firstOrig.startRow + rawDeltaRow, snap2);
+
+        // Magnetic edge snapping on finalise
+        const targetTrackIdx = Math.max(0, firstOrig.trackIndex + dt);
+        const edgeRows2 = getTrackEdgeRows(cs2, targetTrackIdx, draggedIds);
+        const candidateStart2 = snappedFirstRow;
+        const candidateEnd2 = candidateStart2 + firstOrig.lengthRows;
+        const magStart2 = magneticSnap(candidateStart2, edgeRows2);
+        const magEnd2 = magneticSnap(candidateEnd2, edgeRows2);
+        const distStart2 = Math.abs(magStart2 - candidateStart2);
+        const distEnd2 = Math.abs(magEnd2 - candidateEnd2);
+        if (distStart2 <= MAGNETIC_SNAP_ROWS || distEnd2 <= MAGNETIC_SNAP_ROWS) {
+          if (distStart2 <= distEnd2) {
+            snappedFirstRow = magStart2;
+          } else {
+            snappedFirstRow = magEnd2 - firstOrig.lengthRows;
+          }
+        }
+
+        const dr = snappedFirstRow - firstOrig.startRow;
         if (dr !== 0 || dt !== 0) {
           cbs2.onMoveClips?.(drag.originalClips.map(c => c.id), dr, dt);
         }
@@ -418,7 +530,16 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         const orig = drag.originalClips[0];
         if (!orig) return;
         const rawEndRow = sb2 + currentLocalX / ppb2;
-        const newEndRow = Math.max(orig.startRow + 1, snapRow(rawEndRow, snap2));
+        let newEndRow = Math.max(orig.startRow + 1, snapRow(rawEndRow, snap2));
+
+        // Magnetic edge snapping on finalise
+        const draggedIds2 = new Set([orig.id]);
+        const edgeRowsR = getTrackEdgeRows(cs2, orig.trackIndex, draggedIds2);
+        const magEndR = magneticSnap(newEndRow, edgeRowsR);
+        if (Math.abs(magEndR - newEndRow) <= MAGNETIC_SNAP_ROWS) {
+          newEndRow = Math.max(orig.startRow + 1, magEndR);
+        }
+
         cbs2.onResizeClipEnd?.(orig.id, newEndRow);
         return;
       }
