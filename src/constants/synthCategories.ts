@@ -1712,6 +1712,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Disc',
     color: 'text-gray-400',
   },
+  DeltaMusic2Synth: {
+    type: 'DeltaMusic2Synth',
+    name: 'Delta Music 2.0',
+    shortName: 'DM2',
+    description: 'Amiga Delta Music 2.0 — 4-channel wavetable synth with vol/vib tables',
+    bestFor: ['Amiga chiptune', 'Wavetable', '4-channel'],
+    icon: 'Disc',
+    color: 'text-gray-400',
+  },
 };
 
 // Organized categories
