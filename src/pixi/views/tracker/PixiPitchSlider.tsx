@@ -300,19 +300,19 @@ export const PixiPitchSlider: React.FC<PixiPitchSliderProps> = ({ width, height 
       {/* Scale marks */}
       <pixiGraphics
         draw={drawScale}
-        layout={{ position: 'absolute', width, height }}
+        layout={{ position: 'absolute', top: 0, left: 0, width, height }}
       />
 
       {/* Housing background + groove */}
       <pixiGraphics
         draw={drawHousing}
-        layout={{ position: 'absolute', width, height }}
+        layout={{ position: 'absolute', top: 0, left: 0, width, height }}
       />
 
       {/* Fader handle */}
       <pixiGraphics
         draw={drawHandle}
-        layout={{ position: 'absolute', width, height }}
+        layout={{ position: 'absolute', top: 0, left: 0, width, height }}
       />
     </pixiContainer>
   );
