@@ -1,9 +1,6 @@
 /**
  * PixiHivelyTrackEditor - Note/Instrument/Effects Track Editor
- *
- * Displays the track data for each channel at the current position.
- * Tracks are shared/reusable — editing one track affects all positions
- * that reference it.
+ * Pure Pixi GL rendering — no DOM elements.
  *
  * Layout:
  * ┌────┬──────────────────┬──────────────────┬─────
@@ -15,32 +12,46 @@
  *        Note Ins FX1P FX2P
  */
 
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import type { Container as ContainerType, Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
+import { Graphics } from 'pixi.js';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { PIXI_FONTS } from '@/pixi/fonts';
 import type { HivelyNativeData } from '@/types';
 
-// Layout constants
-const ROW_HEIGHT = 20;
+const ROW_HEIGHT    = 20;
 const ROW_NUM_WIDTH = 28;
-const CHAR_WIDTH = 8;
-const NOTE_WIDTH = CHAR_WIDTH * 3 + 4;
-const INS_WIDTH = CHAR_WIDTH * 2 + 4;
-const FX_WIDTH = CHAR_WIDTH * 3 + 4;   // Effect type(1 hex) + param(2 hex)
-const CHANNEL_WIDTH = NOTE_WIDTH + INS_WIDTH + FX_WIDTH * 2 + 8;
+const CHAR_WIDTH    = 8;
+const NOTE_WIDTH    = CHAR_WIDTH * 3 + 4;  // 28
+const INS_WIDTH     = CHAR_WIDTH * 2 + 4;  // 20
+const FX_WIDTH      = CHAR_WIDTH * 3 + 4;  // 28  (effect type 1 hex + param 2 hex)
+const CHANNEL_WIDTH = NOTE_WIDTH + INS_WIDTH + FX_WIDTH * 2 + 8;  // 112
 const HEADER_HEIGHT = 24;
+const FONT_SIZE     = 11;
+const TEXT_Y        = 4;
 
-// HivelyTracker palette
-const HVL_BG = '#000000';
-const HVL_HIGHLIGHT = '#780000';
-const HVL_TEXT = '#ffffff';
-const HVL_CURSOR = '#ffff88';
-const HVL_DIM = '#808080';
-const HVL_NOTE = '#ffffff';
-const HVL_INST = '#aaffaa';
-const HVL_FX = '#ffaa55';
-const HVL_FX2 = '#55aaff';
+// Sub-column x offsets within each channel (matches original CSS centering)
+const CH_NOTE_X = 1;
+const CH_INS_X  = CH_NOTE_X + NOTE_WIDTH + 2;   // 31
+const CH_FX_X   = CH_INS_X  + INS_WIDTH  + 2;   // 53
+const CH_FXB_X  = CH_FX_X   + FX_WIDTH   + 2;   // 83
 
-// Note names for HVL (C-0 to B-4, 60 notes)
+// HivelyTracker palette (numeric)
+const HVL_BG        = 0x000000;
+const HVL_HEADER_BG = 0x111111;
+const HVL_HIGHLIGHT = 0x780000;
+const HVL_CURSOR_BG = 0x1a1a00;
+const HVL_HEADER_BORDER = 0x333333;
+const HVL_COL_BORDER    = 0x222222;
+const HVL_DIM       = 0x808080;
+const HVL_NOTE      = 0xffffff;
+const HVL_INST      = 0xaaffaa;
+const HVL_FX        = 0xffaa55;
+const HVL_FX2       = 0x55aaff;
+const HVL_TRANS_POS = 0x88ff88;
+const HVL_TRANS_NEG = 0xff8888;
+const HVL_CURSOR_HL = 0xffff88;
+
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
 function formatHvlNote(note: number, transpose: number): string {
@@ -48,11 +59,11 @@ function formatHvlNote(note: number, transpose: number): string {
   const transposed = note + transpose;
   if (transposed < 1 || transposed > 60) return '???';
   const semitone = (transposed - 1) % 12;
-  const octave = Math.floor((transposed - 1) / 12);
+  const octave   = Math.floor((transposed - 1) / 12);
   return `${NOTE_NAMES[semitone]}${octave}`;
 }
 
-function formatHex(val: number, digits: number): string {
+function formatHvlHex(val: number, digits: number): string {
   if (val === 0 && digits <= 2) return '-'.repeat(digits);
   return val.toString(16).toUpperCase().padStart(digits, '0');
 }
@@ -60,6 +71,21 @@ function formatHex(val: number, digits: number): string {
 function formatEffect(fx: number, param: number): string {
   if (fx === 0 && param === 0) return '000';
   return `${fx.toString(16).toUpperCase()}${param.toString(16).toUpperCase().padStart(2, '0')}`;
+}
+
+function hvlColX(col: 'note' | 'ins' | 'fx' | 'fxb'): number {
+  switch (col) {
+    case 'note': return CH_NOTE_X;
+    case 'ins':  return CH_INS_X;
+    case 'fx':   return CH_FX_X;
+    case 'fxb':  return CH_FXB_X;
+  }
+}
+
+function hvlColW(col: 'note' | 'ins' | 'fx' | 'fxb'): number {
+  if (col === 'note') return NOTE_WIDTH;
+  if (col === 'ins')  return INS_WIDTH;
+  return FX_WIDTH;
 }
 
 interface TrackEditorProps {
@@ -71,298 +97,313 @@ interface TrackEditorProps {
 }
 
 export const PixiHivelyTrackEditor: React.FC<TrackEditorProps> = ({
-  width,
-  height,
-  nativeData,
-  currentPosition,
-  onFocusPositionEditor,
+  width, height, nativeData, currentPosition, onFocusPositionEditor,
 }) => {
-  const isPlaying = useTransportStore(s => s.isPlaying);
+  const isPlaying  = useTransportStore(s => s.isPlaying);
   const displayRow = useTransportStore(s => s.currentRow);
-  const trackLength = nativeData.trackLength;
-  const numChannels = nativeData.channels;
 
-  const position = nativeData.positions[currentPosition];
+  const trackLength  = nativeData.trackLength;
+  const numChannels  = nativeData.channels;
 
-  // Cursor state
-  const [cursorRow, setCursorRow] = useState(0);
+  const [cursorRow,  setCursorRow]  = useState(0);
   const [cursorChan, setCursorChan] = useState(0);
-  const [cursorCol, setCursorCol] = useState<'note' | 'ins' | 'fx' | 'fxb'>('note');
+  const [cursorCol,  setCursorCol]  = useState<'note' | 'ins' | 'fx' | 'fxb'>('note');
+  const [scrollTop,  setScrollTop]  = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [focused,    setFocused]    = useState(false);
 
-  // Scroll
-  const containerRef = useRef<HTMLDivElement>(null);
-  const scrollTopRef = useRef(0);
-  const visibleRows = Math.floor((height - HEADER_HEIGHT) / ROW_HEIGHT);
+  const containerRef  = useRef<ContainerType>(null);
+  const scrollTopRef  = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const focusedRef    = useRef(false);
+  focusedRef.current  = focused;
 
-  // Auto-scroll to cursor/playback
+  const totalW     = ROW_NUM_WIDTH + numChannels * CHANNEL_WIDTH;
+  const visRows    = Math.floor((height - HEADER_HEIGHT) / ROW_HEIGHT);
+  const maxScrollY = Math.max(0, trackLength * ROW_HEIGHT - visRows * ROW_HEIGHT);
+  const maxScrollX = Math.max(0, totalW - width);
+
+  // Clip content to component bounds
+  useEffect(() => {
+    const c = containerRef.current;
+    if (!c) return;
+    const m = new Graphics();
+    m.rect(0, 0, width, height).fill({ color: 0xffffff });
+    c.mask = m;
+    return () => { c.mask = null; m.destroy(); };
+  }, [width, height]);
+
+  // Auto-scroll vertical
   useEffect(() => {
     const targetRow = isPlaying ? displayRow : cursorRow;
-    const scrollTop = scrollTopRef.current;
     const rowY = targetRow * ROW_HEIGHT;
-    const viewHeight = visibleRows * ROW_HEIGHT;
-
-    if (rowY < scrollTop || rowY >= scrollTop + viewHeight) {
-      const newScroll = Math.max(0, rowY - Math.floor(visibleRows / 2) * ROW_HEIGHT);
-      scrollTopRef.current = newScroll;
-      if (containerRef.current) containerRef.current.scrollTop = newScroll;
+    const s    = scrollTopRef.current;
+    if (rowY < s || rowY >= s + visRows * ROW_HEIGHT) {
+      const next = Math.max(0, Math.min(maxScrollY, rowY - Math.floor(visRows / 2) * ROW_HEIGHT));
+      scrollTopRef.current = next;
+      setScrollTop(next);
     }
-  }, [cursorRow, displayRow, isPlaying, visibleRows]);
+  }, [cursorRow, displayRow, isPlaying, visRows, maxScrollY]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    switch (e.key) {
-      case 'ArrowUp':
-        e.preventDefault();
-        setCursorRow(r => Math.max(0, r - 1));
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        setCursorRow(r => Math.min(trackLength - 1, r + 1));
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        if (cursorCol === 'fxb') setCursorCol('fx');
-        else if (cursorCol === 'fx') setCursorCol('ins');
-        else if (cursorCol === 'ins') setCursorCol('note');
-        else if (cursorChan > 0) {
-          setCursorChan(c => c - 1);
-          setCursorCol('fxb');
-        }
-        break;
-      case 'ArrowRight':
-        e.preventDefault();
-        if (cursorCol === 'note') setCursorCol('ins');
-        else if (cursorCol === 'ins') setCursorCol('fx');
-        else if (cursorCol === 'fx') setCursorCol('fxb');
-        else if (cursorChan < numChannels - 1) {
-          setCursorChan(c => c + 1);
-          setCursorCol('note');
-        }
-        break;
-      case 'Tab':
-        e.preventDefault();
-        if (e.shiftKey) {
-          setCursorChan(c => Math.max(0, c - 1));
-        } else {
-          setCursorChan(c => Math.min(numChannels - 1, c + 1));
-        }
-        setCursorCol('note');
-        break;
-      case 'Enter':
-        e.preventDefault();
-        onFocusPositionEditor?.();
-        break;
-      case 'PageUp':
-        e.preventDefault();
-        setCursorRow(r => Math.max(0, r - 16));
-        break;
-      case 'PageDown':
-        e.preventDefault();
-        setCursorRow(r => Math.min(trackLength - 1, r + 16));
-        break;
-      case 'Home':
-        e.preventDefault();
-        setCursorRow(0);
-        break;
-      case 'End':
-        e.preventDefault();
-        setCursorRow(trackLength - 1);
-        break;
+  // Auto-scroll horizontal to keep cursor channel visible
+  useEffect(() => {
+    const chX = ROW_NUM_WIDTH + cursorChan * CHANNEL_WIDTH;
+    const sl  = scrollLeftRef.current;
+    if (chX - sl < ROW_NUM_WIDTH) {
+      const next = Math.max(0, chX - ROW_NUM_WIDTH);
+      scrollLeftRef.current = next;
+      setScrollLeft(next);
+    } else if (chX + CHANNEL_WIDTH - sl > width) {
+      const next = Math.min(maxScrollX, chX + CHANNEL_WIDTH - width);
+      scrollLeftRef.current = next;
+      setScrollLeft(next);
     }
-  }, [cursorCol, cursorChan, numChannels, trackLength, onFocusPositionEditor]);
+  }, [cursorChan, maxScrollX, width]);
 
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    scrollTopRef.current = (e.target as HTMLDivElement).scrollTop;
+  // Wheel scroll
+  const scrollStateRef = useRef({ maxScrollY, maxScrollX });
+  scrollStateRef.current = { maxScrollY, maxScrollX };
+
+  useEffect(() => {
+    const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const onWheel = (e: WheelEvent) => {
+      const c = containerRef.current;
+      if (!c) return;
+      const b = c.getBounds();
+      if (e.clientX < b.x || e.clientX > b.x + b.width ||
+          e.clientY < b.y || e.clientY > b.y + b.height) return;
+      e.preventDefault();
+      const { maxScrollY: my, maxScrollX: mx } = scrollStateRef.current;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        const next = Math.max(0, Math.min(mx, scrollLeftRef.current + e.deltaX));
+        scrollLeftRef.current = next;
+        setScrollLeft(next);
+      } else {
+        const next = Math.max(0, Math.min(my, scrollTopRef.current + e.deltaY));
+        scrollTopRef.current = next;
+        setScrollTop(next);
+      }
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', onWheel);
   }, []);
 
-  // Visible row range
-  const startRow = Math.floor(scrollTopRef.current / ROW_HEIGHT);
-  const endRow = Math.min(trackLength, startRow + visibleRows + 2);
+  // Keyboard navigation
+  const stateRef = useRef({ cursorRow, cursorChan, cursorCol, trackLength, numChannels });
+  stateRef.current = { cursorRow, cursorChan, cursorCol, trackLength, numChannels };
 
-  const totalWidth = ROW_NUM_WIDTH + numChannels * CHANNEL_WIDTH;
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!focusedRef.current) return;
+      const { cursorChan: cc, cursorCol: ccol, trackLength: tl, numChannels: nc } = stateRef.current;
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          setCursorRow(r => Math.max(0, r - 1));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setCursorRow(r => Math.min(tl - 1, r + 1));
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          if      (ccol === 'fxb') { setCursorCol('fx'); }
+          else if (ccol === 'fx')  { setCursorCol('ins'); }
+          else if (ccol === 'ins') { setCursorCol('note'); }
+          else if (cc > 0)         { setCursorChan(c => c - 1); setCursorCol('fxb'); }
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          if      (ccol === 'note') { setCursorCol('ins'); }
+          else if (ccol === 'ins')  { setCursorCol('fx'); }
+          else if (ccol === 'fx')   { setCursorCol('fxb'); }
+          else if (cc < nc - 1)     { setCursorChan(c => c + 1); setCursorCol('note'); }
+          break;
+        case 'Tab':
+          e.preventDefault();
+          setCursorChan(c => e.shiftKey ? Math.max(0, c - 1) : Math.min(nc - 1, c + 1));
+          setCursorCol('note');
+          break;
+        case 'Enter':
+          e.preventDefault();
+          onFocusPositionEditor?.();
+          break;
+        case 'PageUp':   e.preventDefault(); setCursorRow(r => Math.max(0, r - 16));       break;
+        case 'PageDown': e.preventDefault(); setCursorRow(r => Math.min(tl - 1, r + 16));  break;
+        case 'Home':     e.preventDefault(); setCursorRow(0);                               break;
+        case 'End':      e.preventDefault(); setCursorRow(tl - 1);                          break;
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onFocusPositionEditor]);
+
+  const startRow = Math.floor(scrollTop / ROW_HEIGHT);
+  const endRow   = Math.min(trackLength, startRow + visRows + 2);
+
+  const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
+    setFocused(true);
+    const c = containerRef.current;
+    if (!c) return;
+    const local = c.toLocal(e.global);
+    if (local.y < HEADER_HEIGHT) return;
+    const row = Math.floor((local.y - HEADER_HEIGHT + scrollTopRef.current) / ROW_HEIGHT);
+    if (row >= 0 && row < trackLength) setCursorRow(row);
+    const lx = local.x + scrollLeftRef.current;
+    if (lx >= ROW_NUM_WIDTH) {
+      const ch = Math.floor((lx - ROW_NUM_WIDTH) / CHANNEL_WIDTH);
+      if (ch >= 0 && ch < numChannels) {
+        const rel = lx - (ROW_NUM_WIDTH + ch * CHANNEL_WIDTH);
+        setCursorChan(ch);
+        if      (rel < CH_INS_X)  setCursorCol('note');
+        else if (rel < CH_FX_X)   setCursorCol('ins');
+        else if (rel < CH_FXB_X)  setCursorCol('fx');
+        else                       setCursorCol('fxb');
+      }
+    }
+  }, [trackLength, numChannels]);
+
+  // Draw all backgrounds, row highlights, cursor, and column borders
+  const drawBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, width, height).fill({ color: HVL_BG });
+    g.rect(0, 0, width, HEADER_HEIGHT).fill({ color: HVL_HEADER_BG });
+    g.rect(0, HEADER_HEIGHT - 1, width, 1).fill({ color: HVL_HEADER_BORDER });
+
+    const position = nativeData.positions[currentPosition];
+
+    for (let row = startRow; row < endRow; row++) {
+      const y = HEADER_HEIGHT + row * ROW_HEIGHT - scrollTop;
+      if (y + ROW_HEIGHT <= HEADER_HEIGHT || y >= height) continue;
+      const isPlayRow   = isPlaying && row === displayRow;
+      const isCursorRow = row === cursorRow;
+      if      (isPlayRow)   g.rect(0, y, width, ROW_HEIGHT).fill({ color: HVL_HIGHLIGHT });
+      else if (isCursorRow) g.rect(0, y, width, ROW_HEIGHT).fill({ color: HVL_CURSOR_BG });
+    }
+
+    // Cursor column highlight
+    const curY = HEADER_HEIGHT + cursorRow * ROW_HEIGHT - scrollTop;
+    if (curY + ROW_HEIGHT > HEADER_HEIGHT && curY < height) {
+      const chBaseX = ROW_NUM_WIDTH + cursorChan * CHANNEL_WIDTH - scrollLeft;
+      const cx = chBaseX + hvlColX(cursorCol);
+      const cw = hvlColW(cursorCol);
+      if (cx < width && cx + cw > 0) {
+        g.rect(cx, curY, cw, ROW_HEIGHT).fill({ color: HVL_CURSOR_HL, alpha: 0.2 });
+      }
+    }
+
+    // Channel column borders
+    for (let ch = 0; ch <= numChannels; ch++) {
+      const bx = ROW_NUM_WIDTH + ch * CHANNEL_WIDTH - scrollLeft;
+      if (bx > 0 && bx < width) {
+        g.rect(bx, 0, 1, height).fill({ color: HVL_COL_BORDER });
+      }
+    }
+
+    void position; // used in cellLabels
+  }, [width, height, scrollTop, scrollLeft, startRow, endRow, isPlaying, displayRow,
+      cursorRow, cursorChan, cursorCol, numChannels, nativeData, currentPosition]);
+
+  // All text labels
+  const cellLabels = useMemo(() => {
+    const labels: { x: number; y: number; text: string; color: number }[] = [];
+    const position = nativeData.positions[currentPosition];
+
+    // Header: "Row" + per-channel "CH0 T007 +3"
+    labels.push({ x: 4, y: TEXT_Y, text: 'Row', color: HVL_DIM });
+    if (position) {
+      for (let ch = 0; ch < numChannels; ch++) {
+        const chX = ROW_NUM_WIDTH + ch * CHANNEL_WIDTH - scrollLeft;
+        if (chX >= width || chX + CHANNEL_WIDTH <= 0) continue;
+        const trackIdx = position.track[ch] ?? 0;
+        const transpose = position.transpose[ch] ?? 0;
+        labels.push({
+          x: chX + 4, y: TEXT_Y,
+          text: `CH${ch} T${trackIdx.toString().padStart(3, '0')}`,
+          color: HVL_DIM,
+        });
+        if (transpose !== 0) {
+          labels.push({
+            x: chX + 4 + (CHAR_WIDTH * 9), y: TEXT_Y,
+            text: transpose > 0 ? `+${transpose}` : `${transpose}`,
+            color: transpose > 0 ? HVL_TRANS_POS : HVL_TRANS_NEG,
+          });
+        }
+      }
+    }
+
+    // Content rows
+    for (let row = startRow; row < endRow; row++) {
+      const y = HEADER_HEIGHT + row * ROW_HEIGHT - scrollTop + TEXT_Y;
+      if (y < HEADER_HEIGHT || y + FONT_SIZE > height) continue;
+      labels.push({
+        x: 4, y,
+        text: row.toString(16).toUpperCase().padStart(2, '0'),
+        color: row % 16 === 0 ? HVL_NOTE : HVL_DIM,
+      });
+
+      if (!position) continue;
+      for (let ch = 0; ch < numChannels; ch++) {
+        const chX = ROW_NUM_WIDTH + ch * CHANNEL_WIDTH - scrollLeft;
+        if (chX + CHANNEL_WIDTH <= 0 || chX >= width) continue;
+
+        const trackIdx = position.track[ch] ?? 0;
+        const transpose = position.transpose[ch] ?? 0;
+        const step = nativeData.tracks[trackIdx]?.steps[row];
+
+        if (!step) {
+          labels.push({ x: chX + CH_NOTE_X, y, text: '---', color: HVL_DIM });
+          labels.push({ x: chX + CH_INS_X,  y, text: '--',  color: HVL_DIM });
+          labels.push({ x: chX + CH_FX_X,   y, text: '000', color: HVL_DIM });
+          labels.push({ x: chX + CH_FXB_X,  y, text: '000', color: HVL_DIM });
+          continue;
+        }
+
+        labels.push({
+          x: chX + CH_NOTE_X, y,
+          text: formatHvlNote(step.note, transpose),
+          color: step.note > 0 ? HVL_NOTE : HVL_DIM,
+        });
+        labels.push({
+          x: chX + CH_INS_X, y,
+          text: step.instrument > 0 ? formatHvlHex(step.instrument, 2) : '--',
+          color: step.instrument > 0 ? HVL_INST : HVL_DIM,
+        });
+        labels.push({
+          x: chX + CH_FX_X, y,
+          text: formatEffect(step.fx, step.fxParam),
+          color: (step.fx > 0 || step.fxParam > 0) ? HVL_FX : HVL_DIM,
+        });
+        labels.push({
+          x: chX + CH_FXB_X, y,
+          text: formatEffect(step.fxb, step.fxbParam),
+          color: (step.fxb > 0 || step.fxbParam > 0) ? HVL_FX2 : HVL_DIM,
+        });
+      }
+    }
+
+    return labels;
+  }, [nativeData, currentPosition, numChannels, startRow, endRow, scrollTop, scrollLeft, height, width]);
 
   return (
-    <div
+    <pixiContainer
       ref={containerRef}
-      style={{
-        width,
-        height,
-        overflow: 'auto',
-        backgroundColor: HVL_BG,
-        fontFamily: 'JetBrains Mono, monospace',
-        fontSize: 11,
-        outline: 'none',
-        userSelect: 'none',
-      }}
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-      onScroll={handleScroll}
+      layout={{ width, height }}
+      eventMode="static"
+      onPointerDown={handlePointerDown}
     >
-      {/* Channel headers showing track assignments */}
-      <div style={{
-        display: 'flex',
-        position: 'sticky',
-        top: 0,
-        zIndex: 2,
-        backgroundColor: '#111',
-        borderBottom: '1px solid #333',
-        height: HEADER_HEIGHT,
-        lineHeight: `${HEADER_HEIGHT}px`,
-      }}>
-        <div style={{ width: ROW_NUM_WIDTH, textAlign: 'center', color: HVL_DIM }}>
-          Row
-        </div>
-        {position && Array.from({ length: numChannels }, (_, ch) => {
-          const trackIdx = position.track[ch] ?? 0;
-          const transpose = position.transpose[ch] ?? 0;
-
-          return (
-            <div key={ch} style={{
-              width: CHANNEL_WIDTH,
-              textAlign: 'center',
-              color: HVL_DIM,
-              borderLeft: '1px solid #333',
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
-            }}>
-              CH{ch} <span style={{ color: HVL_TEXT }}>T{trackIdx.toString().padStart(3, '0')}</span>
-              {transpose !== 0 && (
-                <span style={{ color: transpose > 0 ? '#88ff88' : '#ff8888', marginLeft: 4 }}>
-                  {transpose > 0 ? '+' : ''}{transpose}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Track rows */}
-      <div style={{ height: trackLength * ROW_HEIGHT, position: 'relative' }}>
-        {Array.from({ length: endRow - startRow }, (_, i) => {
-          const row = startRow + i;
-          const isPlayRow = isPlaying && row === displayRow;
-          const isCursorRow = row === cursorRow;
-
-          let bgColor = 'transparent';
-          if (isPlayRow) bgColor = HVL_HIGHLIGHT;
-          else if (isCursorRow) bgColor = '#1a1a00';
-
-          return (
-            <div
-              key={row}
-              style={{
-                display: 'flex',
-                position: 'absolute',
-                top: row * ROW_HEIGHT,
-                height: ROW_HEIGHT,
-                width: totalWidth,
-                lineHeight: `${ROW_HEIGHT}px`,
-                backgroundColor: bgColor,
-              }}
-            >
-              {/* Row number */}
-              <div style={{
-                width: ROW_NUM_WIDTH,
-                textAlign: 'center',
-                color: row % 16 === 0 ? HVL_TEXT : HVL_DIM,
-              }}>
-                {row.toString(16).toUpperCase().padStart(2, '0')}
-              </div>
-
-              {/* Channel data */}
-              {position && Array.from({ length: numChannels }, (_, ch) => {
-                const trackIdx = position.track[ch] ?? 0;
-                const transpose = position.transpose[ch] ?? 0;
-                const track = nativeData.tracks[trackIdx];
-                const step = track?.steps[row];
-
-                if (!step) {
-                  return (
-                    <div key={ch} style={{
-                      width: CHANNEL_WIDTH,
-                      textAlign: 'center',
-                      color: HVL_DIM,
-                      borderLeft: '1px solid #222',
-                    }}>
-                      --- -- 000 000
-                    </div>
-                  );
-                }
-
-                const isNoteCursor = isCursorRow && ch === cursorChan && cursorCol === 'note';
-                const isInsCursor = isCursorRow && ch === cursorChan && cursorCol === 'ins';
-                const isFxCursor = isCursorRow && ch === cursorChan && cursorCol === 'fx';
-                const isFxbCursor = isCursorRow && ch === cursorChan && cursorCol === 'fxb';
-
-                return (
-                  <div key={ch} style={{
-                    display: 'flex',
-                    width: CHANNEL_WIDTH,
-                    borderLeft: '1px solid #222',
-                    justifyContent: 'center',
-                    gap: 2,
-                  }}>
-                    {/* Note */}
-                    <span
-                      onClick={() => { setCursorRow(row); setCursorChan(ch); setCursorCol('note'); }}
-                      style={{
-                        width: NOTE_WIDTH,
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        color: step.note > 0 ? HVL_NOTE : HVL_DIM,
-                        backgroundColor: isNoteCursor ? HVL_CURSOR + '30' : 'transparent',
-                      }}
-                    >
-                      {formatHvlNote(step.note, transpose)}
-                    </span>
-
-                    {/* Instrument */}
-                    <span
-                      onClick={() => { setCursorRow(row); setCursorChan(ch); setCursorCol('ins'); }}
-                      style={{
-                        width: INS_WIDTH,
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        color: step.instrument > 0 ? HVL_INST : HVL_DIM,
-                        backgroundColor: isInsCursor ? HVL_CURSOR + '30' : 'transparent',
-                      }}
-                    >
-                      {step.instrument > 0 ? formatHex(step.instrument, 2) : '--'}
-                    </span>
-
-                    {/* Primary effect */}
-                    <span
-                      onClick={() => { setCursorRow(row); setCursorChan(ch); setCursorCol('fx'); }}
-                      style={{
-                        width: FX_WIDTH,
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        color: (step.fx > 0 || step.fxParam > 0) ? HVL_FX : HVL_DIM,
-                        backgroundColor: isFxCursor ? HVL_CURSOR + '30' : 'transparent',
-                      }}
-                    >
-                      {formatEffect(step.fx, step.fxParam)}
-                    </span>
-
-                    {/* Secondary effect */}
-                    <span
-                      onClick={() => { setCursorRow(row); setCursorChan(ch); setCursorCol('fxb'); }}
-                      style={{
-                        width: FX_WIDTH,
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        color: (step.fxb > 0 || step.fxbParam > 0) ? HVL_FX2 : HVL_DIM,
-                        backgroundColor: isFxbCursor ? HVL_CURSOR + '30' : 'transparent',
-                      }}
-                    >
-                      {formatEffect(step.fxb, step.fxbParam)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
+      {cellLabels.map((l, i) => (
+        <pixiBitmapText
+          key={i}
+          text={l.text}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }}
+          tint={l.color}
+          x={l.x}
+          y={l.y}
+        />
+      ))}
+    </pixiContainer>
   );
 };
