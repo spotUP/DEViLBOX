@@ -60,6 +60,8 @@ interface PixiArrangementCanvasProps {
   onDeleteClip?: (id: string) => void;
   /** Called when a clip is clicked in split mode */
   onSplitClip?: (id: string, splitRow: number) => void;
+  /** Called on double-click of a clip in select mode */
+  onOpenInPianoRoll?: (clipId: string) => void;
 }
 
 const CLIP_PADDING = 2;
@@ -143,6 +145,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
   onAddClip,
   onDeleteClip,
   onSplitClip,
+  onOpenInPianoRoll,
 }) => {
   const theme = usePixiTheme();
   const gridHeight = height - RULER_HEIGHT;
@@ -151,8 +154,11 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
   const paramsRef = useRef({ scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme });
   paramsRef.current = { scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme };
 
-  const callbacksRef = useRef({ onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip });
-  callbacksRef.current = { onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip };
+  const callbacksRef = useRef({ onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll });
+  callbacksRef.current = { onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll };
+
+  // Double-click detection for select tool
+  const lastClickRef = useRef<{ time: number; clipId: string }>({ time: 0, clipId: '' });
 
   const dragRef = useRef<DragState | null>(null);
   const overlayRef = useRef<GraphicsType | null>(null);
@@ -283,6 +289,15 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
     // Select tool
     if (t === 'select') {
       if (hit) {
+        // Double-click detection: open in piano roll
+        const now = Date.now();
+        if (now - lastClickRef.current.time < 300 && lastClickRef.current.clipId === hit.id) {
+          cbs.onOpenInPianoRoll?.(hit.id);
+          lastClickRef.current = { time: 0, clipId: '' };
+          return;
+        }
+        lastClickRef.current = { time: now, clipId: hit.id };
+
         // Select on pointer down
         if (!cs.find(c => c.id === hit.id)?.selected) {
           cbs.onSelectClip?.(hit.id, e.shiftKey);

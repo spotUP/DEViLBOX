@@ -12,6 +12,7 @@ import type { ClipRenderData } from './arrangement/PixiArrangementCanvas';
 import { PixiTrackHeaders } from './arrangement/PixiTrackHeaders';
 import { PixiScrollbar } from './pianoroll/PixiScrollbar';
 import { useTransportStore, useTrackerStore, useUIStore } from '@stores';
+import { usePianoRollStore } from '@/stores/usePianoRollStore';
 import { useArrangementStore } from '@/stores/useArrangementStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { TITLE_H } from '../workbench/PixiWindow';
@@ -446,6 +447,20 @@ export const PixiArrangementView: React.FC = () => {
             onResizeClipEnd={(id, newEndRow) => useArrangementStore.getState().resizeClipEnd(id, newEndRow)}
             onDeleteClip={(id) => useArrangementStore.getState().removeClip(id)}
             onSplitClip={(id, splitRow) => useArrangementStore.getState().splitClip(id, splitRow)}
+            onOpenInPianoRoll={(clipId) => {
+              const clip = useArrangementStore.getState().clips.find(c => c.id === clipId);
+              if (!clip) return;
+              // Use sourceChannelIndex if set, otherwise derive from track order
+              let channelIndex = clip.sourceChannelIndex ?? 0;
+              if (!clip.sourceChannelIndex) {
+                const arr = useArrangementStore.getState();
+                const sortedTracks = arr.tracks.slice().sort((a, b) => a.index - b.index);
+                const tIdx = sortedTracks.findIndex(t => t.id === clip.trackId);
+                if (tIdx >= 0) channelIndex = tIdx;
+              }
+              usePianoRollStore.getState().setChannelIndex(channelIndex);
+              useWorkbenchStore.getState().showWindow('pianoroll');
+            }}
             onAddClip={(trackIndex, startRow, lengthRows) => {
               const arr = useArrangementStore.getState();
               const ts = useTrackerStore.getState();
