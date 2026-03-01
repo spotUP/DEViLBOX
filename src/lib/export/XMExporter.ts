@@ -320,7 +320,7 @@ async function convertSamplerToXMInstrument(
   inst: InstrumentConfig,
   importMetadata?: ImportMetadata
 ): Promise<XMInstrumentData> {
-  // Check if we have preserved original sample
+  // Check if we have preserved original sample (lossless path)
   const originalSample = importMetadata?.originalSamples?.[inst.id];
 
   if (originalSample) {
@@ -342,7 +342,10 @@ async function convertSamplerToXMInstrument(
       ],
       volumeEnvelope: importMetadata?.envelopes?.[inst.id]?.volumeEnvelope,
       panningEnvelope: importMetadata?.envelopes?.[inst.id]?.panningEnvelope,
-      vibratoType: importMetadata?.envelopes?.[inst.id]?.autoVibrato?.type === 'sine' ? 0 : 1,
+      vibratoType: importMetadata?.envelopes?.[inst.id]?.autoVibrato?.type === 'sine' ? 0 :
+                   importMetadata?.envelopes?.[inst.id]?.autoVibrato?.type === 'square' ? 1 :
+                   importMetadata?.envelopes?.[inst.id]?.autoVibrato?.type === 'rampDown' ? 2 :
+                   importMetadata?.envelopes?.[inst.id]?.autoVibrato?.type === 'rampUp' ? 3 : 0,
       vibratoSweep: importMetadata?.envelopes?.[inst.id]?.autoVibrato?.sweep || 0,
       vibratoDepth: importMetadata?.envelopes?.[inst.id]?.autoVibrato?.depth || 0,
       vibratoRate: importMetadata?.envelopes?.[inst.id]?.autoVibrato?.rate || 0,
@@ -350,9 +353,125 @@ async function convertSamplerToXMInstrument(
     };
   }
 
-  // No preserved sample - would need to extract from current sample
-  // For now, create empty instrument
+  // Try to use the live SampleConfig audio buffer
+  const sampleCfg = inst.sample;
+  if (sampleCfg?.audioBuffer && sampleCfg.audioBuffer.byteLength > 0) {
+    // Convert AudioBuffer (Float32 PCM) to 8-bit signed PCM for XM
+    const rawPCM = convertFloat32To8BitPCM(sampleCfg.audioBuffer);
+
+    // Volume: inst.volume is dB (-60..0) → convert to 0-64
+    const volume = dbToXMVolume(inst.volume);
+
+    // Finetune from detune (cents, -100..+100) → XM finetune (-128..+127)
+    const finetune = Math.round(Math.max(-128, Math.min(127, sampleCfg.detune * 1.27)));
+
+    // Relative note from baseNote (e.g. "C-4") → relative to C-4 (XM reference pitch)
+    const relativeNote = baseNoteToRelativeNote(sampleCfg.baseNote);
+
+    // Panning: inst.pan is -100..+100 → 0-255 (128=center)
+    const panning = Math.round(((inst.pan + 100) / 200) * 255);
+
+    // Loop points in bytes (8-bit samples = 1 byte/frame)
+    const loopStart = Math.max(0, sampleCfg.loopStart);
+    const loopEnd = Math.max(loopStart, sampleCfg.loopEnd);
+    const loopLength = sampleCfg.loop ? Math.max(0, loopEnd - loopStart) : 0;
+
+    const loopType: 'none' | 'forward' | 'pingpong' =
+      !sampleCfg.loop ? 'none' :
+      sampleCfg.loopType === 'pingpong' ? 'pingpong' : 'forward';
+
+    return {
+      name: inst.name.substring(0, 22),
+      samples: [
+        {
+          name: inst.name.substring(0, 22),
+          pcmData: rawPCM,
+          loopStart,
+          loopLength,
+          volume,
+          finetune,
+          type: buildTypeFlags(loopType, 8),
+          panning: Math.max(0, Math.min(255, panning)),
+          relativeNote,
+        },
+      ],
+      volumeEnvelope: inst.metadata?.originalEnvelope,
+      panningEnvelope: inst.metadata?.panningEnvelope,
+      vibratoType: inst.metadata?.autoVibrato?.type === 'sine' ? 0 :
+                   inst.metadata?.autoVibrato?.type === 'square' ? 1 :
+                   inst.metadata?.autoVibrato?.type === 'rampDown' ? 2 :
+                   inst.metadata?.autoVibrato?.type === 'rampUp' ? 3 : 0,
+      vibratoSweep: inst.metadata?.autoVibrato?.sweep || 0,
+      vibratoDepth: inst.metadata?.autoVibrato?.depth || 0,
+      vibratoRate: inst.metadata?.autoVibrato?.rate || 0,
+      volumeFadeout: inst.metadata?.fadeout || 0,
+    };
+  }
+
+  // No audio data available — write empty instrument placeholder
   return createEmptyXMInstrument(inst.name);
+}
+
+/**
+ * Convert Float32 PCM ArrayBuffer to 8-bit signed PCM ArrayBuffer.
+ * If the buffer appears to already be 8-bit (byteLength matches expected frame
+ * count from metadata) we use it as-is; otherwise we treat it as Float32.
+ * The heuristic: if byteLength is divisible by 4 and > 0, assume Float32.
+ */
+function convertFloat32To8BitPCM(buffer: ArrayBuffer): ArrayBuffer {
+  const byteLen = buffer.byteLength;
+
+  // Try to interpret as Float32 (4 bytes per sample)
+  if (byteLen % 4 === 0 && byteLen >= 4) {
+    const floats = new Float32Array(buffer);
+    const out = new Int8Array(floats.length);
+    for (let i = 0; i < floats.length; i++) {
+      // Clamp and scale to -128..+127
+      const v = Math.max(-1, Math.min(1, floats[i]));
+      out[i] = Math.round(v * 127);
+    }
+    return out.buffer;
+  }
+
+  // Already appears to be byte data — return as-is
+  return buffer;
+}
+
+/**
+ * Convert dB volume (instrument.volume is -60..0 dB) to XM sample volume 0-64
+ */
+function dbToXMVolume(db: number): number {
+  if (db <= -60) return 0;
+  if (db >= 0) return 64;
+  // Linear approximation: 0 dB → 64, -60 dB → 0
+  return Math.round(((db + 60) / 60) * 64);
+}
+
+/**
+ * Convert a base note string (e.g. "C-4", "A#3") to XM relative note offset.
+ * XM relative note is relative to C-4 (which = 0 relative note in XM convention,
+ * meaning middle C at standard 8363 Hz sample rate plays at concert pitch).
+ * Range: -96 to +95.
+ */
+function baseNoteToRelativeNote(baseNote: string): number {
+  if (!baseNote) return 0;
+
+  const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  // Accept "C-4", "C4", "A#3", "Bb4" (flat not supported, return 0)
+  const match = baseNote.match(/^([A-G]#?)-?(\d)$/);
+  if (!match) return 0;
+
+  const noteIdx = notes.indexOf(match[1]);
+  if (noteIdx === -1) return 0;
+
+  const octave = parseInt(match[2]);
+  // XM note number: C-0 = 1, so MIDI note = octave*12 + noteIdx
+  const midiNote = octave * 12 + noteIdx;
+  // C-4 = octave 4, note C = MIDI 48
+  const c4Midi = 4 * 12 + 0; // 48
+  const relative = midiNote - c4Midi;
+
+  return Math.max(-96, Math.min(95, relative));
 }
 
 /**
@@ -594,37 +713,241 @@ function packPatternData(rows: XMNoteData[][], channelCount: number): Uint8Array
 }
 
 /**
- * Write XM instrument
+ * Write XM instrument block (instrument header + sample headers + sample data).
+ *
+ * XMInstrumentHeader layout (263 bytes total, per OpenMPT XMTools.h):
+ *   Bytes  0- 3: size (uint32LE) — always 263 (0x107) when samples present
+ *   Bytes  4-25: name (22 bytes, null-padded)
+ *   Byte   26:   type (always 0)
+ *   Bytes 27-28: numSamples (uint16LE)
+ *   Bytes 29-32: sampleHeaderSize (uint32LE) — always 40
+ *   Bytes 33-262: XMInstrument (230 bytes):
+ *     Bytes  33-128:  sampleMap[96] (96 bytes, note → sample index)
+ *     Bytes 129-176:  volEnv[24]   (24 × uint16LE = 48 bytes, 12 tick+value pairs)
+ *     Bytes 177-224:  panEnv[24]   (24 × uint16LE = 48 bytes, 12 tick+value pairs)
+ *     Byte  225:      volPoints
+ *     Byte  226:      panPoints
+ *     Byte  227:      volSustain
+ *     Byte  228:      volLoopStart
+ *     Byte  229:      volLoopEnd
+ *     Byte  230:      panSustain
+ *     Byte  231:      panLoopStart
+ *     Byte  232:      panLoopEnd
+ *     Byte  233:      volFlags
+ *     Byte  234:      panFlags
+ *     Byte  235:      vibType
+ *     Byte  236:      vibSweep
+ *     Byte  237:      vibDepth
+ *     Byte  238:      vibRate
+ *     Bytes 239-240:  volFade (uint16LE)
+ *     Bytes 241-262:  MIDI fields + reserved (22 bytes)
+ *
+ * Then immediately following: N × 40-byte XMSample headers, then N × sample data.
+ *
+ * For instruments with no samples: only the 29-byte short header is written
+ *   (size=29, no sampleHeaderSize, no XMInstrument body).
  */
 function writeXMInstrument(instrument: XMInstrumentData): Uint8Array {
-  // TODO: Implement full instrument writing
-  // For now, write minimal empty instrument header
+  const numSamples = instrument.samples.length;
 
-  const headerSize = instrument.samples.length > 0 ? 263 : 29;
-  const buffer = new Uint8Array(headerSize);
-  const view = new DataView(buffer.buffer);
-
-  // Instrument header size (4 bytes)
-  view.setUint32(0, headerSize, true);
-
-  // Instrument name (22 bytes)
-  writeString(buffer, 4, instrument.name, 22);
-
-  // Type (1 byte) - always 0
-  buffer[26] = 0;
-
-  // Sample count (2 bytes)
-  view.setUint16(27, instrument.samples.length, true);
-
-  // If no samples, we're done
-  if (instrument.samples.length === 0) {
-    return buffer;
+  if (numSamples === 0) {
+    // Minimal 29-byte header (no sampleHeaderSize, no XMInstrument body)
+    const buf = new Uint8Array(29);
+    const view = new DataView(buf.buffer);
+    view.setUint32(0, 29, true);       // Header size = 29 for empty instrument
+    writeString(buf, 4, instrument.name, 22);
+    buf[26] = 0;                        // Type
+    view.setUint16(27, 0, true);        // Num samples = 0
+    return buf;
   }
 
-  // TODO: Write full instrument data (sample headers, envelopes, sample data)
-  // This would require implementing the full XM instrument structure
+  // ---- Build delta-encoded sample data blocks first to know their sizes ----
+  const deltaBlocks: Uint8Array[] = instrument.samples.map(s =>
+    deltaEncodeSampleData(s.pcmData, s.type)
+  );
 
-  return buffer;
+  // ---- Full 263-byte XMInstrumentHeader ----
+  const HEADER_SIZE = 263; // XMInstrumentHeader total size
+  const SAMPLE_HEADER_SIZE = 40; // XMSample size
+
+  const header = new Uint8Array(HEADER_SIZE);
+  const hView = new DataView(header.buffer);
+
+  // Bytes 0-3: Instrument header size
+  hView.setUint32(0, HEADER_SIZE, true);
+
+  // Bytes 4-25: Instrument name (22 bytes)
+  writeString(header, 4, instrument.name, 22);
+
+  // Byte 26: Type (always 0)
+  header[26] = 0;
+
+  // Bytes 27-28: Number of samples
+  hView.setUint16(27, numSamples, true);
+
+  // Bytes 29-32: Sample header size (always 40)
+  hView.setUint32(29, SAMPLE_HEADER_SIZE, true);
+
+  // ---- XMInstrument body starts at byte 33 ----
+  // Bytes 33-128: sampleMap[96] — all notes default to sample 0
+  // (header is zero-initialised, nothing to write)
+
+  // Bytes 129-176: volEnv[24] (12 tick+value pairs × 4 bytes each)
+  const volEnv = instrument.volumeEnvelope;
+  if (volEnv) {
+    const pointCount = Math.min(volEnv.points.length, 12);
+    for (let i = 0; i < pointCount; i++) {
+      hView.setUint16(129 + i * 4,     volEnv.points[i].tick,  true);
+      hView.setUint16(129 + i * 4 + 2, volEnv.points[i].value, true);
+    }
+  }
+
+  // Bytes 177-224: panEnv[24] (12 tick+value pairs × 4 bytes each)
+  const panEnv = instrument.panningEnvelope;
+  if (panEnv) {
+    const pointCount = Math.min(panEnv.points.length, 12);
+    for (let i = 0; i < pointCount; i++) {
+      hView.setUint16(177 + i * 4,     panEnv.points[i].tick,  true);
+      hView.setUint16(177 + i * 4 + 2, panEnv.points[i].value, true);
+    }
+  }
+
+  // Byte 225: volPoints
+  header[225] = volEnv ? Math.min(volEnv.points.length, 12) : 0;
+
+  // Byte 226: panPoints
+  header[226] = panEnv ? Math.min(panEnv.points.length, 12) : 0;
+
+  // Byte 227: volSustain
+  header[227] = (volEnv?.sustainPoint != null) ? volEnv.sustainPoint : 0;
+
+  // Byte 228: volLoopStart
+  header[228] = (volEnv?.loopStartPoint != null) ? volEnv.loopStartPoint : 0;
+
+  // Byte 229: volLoopEnd
+  header[229] = (volEnv?.loopEndPoint != null) ? volEnv.loopEndPoint : 0;
+
+  // Byte 230: panSustain
+  header[230] = (panEnv?.sustainPoint != null) ? panEnv.sustainPoint : 0;
+
+  // Byte 231: panLoopStart
+  header[231] = (panEnv?.loopStartPoint != null) ? panEnv.loopStartPoint : 0;
+
+  // Byte 232: panLoopEnd
+  header[232] = (panEnv?.loopEndPoint != null) ? panEnv.loopEndPoint : 0;
+
+  // Byte 233: volFlags (bit 0=enabled, bit 1=sustain, bit 2=loop)
+  let volFlags = 0;
+  if (volEnv?.enabled)                                   volFlags |= 0x01;
+  if (volEnv?.enabled && volEnv.sustainPoint != null)    volFlags |= 0x02;
+  if (volEnv?.enabled && volEnv.loopStartPoint != null)  volFlags |= 0x04;
+  header[233] = volFlags;
+
+  // Byte 234: panFlags
+  let panFlags = 0;
+  if (panEnv?.enabled)                                   panFlags |= 0x01;
+  if (panEnv?.enabled && panEnv.sustainPoint != null)    panFlags |= 0x02;
+  if (panEnv?.enabled && panEnv.loopStartPoint != null)  panFlags |= 0x04;
+  header[234] = panFlags;
+
+  // Byte 235: vibType
+  header[235] = instrument.vibratoType;
+
+  // Byte 236: vibSweep
+  header[236] = instrument.vibratoSweep;
+
+  // Byte 237: vibDepth
+  header[237] = instrument.vibratoDepth;
+
+  // Byte 238: vibRate
+  header[238] = instrument.vibratoRate;
+
+  // Bytes 239-240: volFade (uint16LE)
+  hView.setUint16(239, Math.min(instrument.volumeFadeout, 0xFFFF), true);
+
+  // Bytes 241-262: MIDI/reserved fields — zeroed (already done by new Uint8Array)
+
+  // ---- N × 40-byte XMSample headers ----
+  const sampleHeaders = new Uint8Array(numSamples * SAMPLE_HEADER_SIZE);
+  const shView = new DataView(sampleHeaders.buffer);
+
+  for (let i = 0; i < numSamples; i++) {
+    const s = instrument.samples[i];
+    const base = i * SAMPLE_HEADER_SIZE;
+
+    shView.setUint32(base + 0,  deltaBlocks[i].byteLength, true); // length in bytes
+    shView.setUint32(base + 4,  s.loopStart,               true); // loopStart in bytes
+    shView.setUint32(base + 8,  s.loopLength,              true); // loopLength in bytes
+    sampleHeaders[base + 12] = Math.max(0, Math.min(64, s.volume));
+    shView.setInt8(base + 13,   Math.max(-128, Math.min(127, s.finetune)));
+    sampleHeaders[base + 14] = s.type;
+    sampleHeaders[base + 15] = Math.max(0, Math.min(255, s.panning));
+    shView.setInt8(base + 16,   Math.max(-96, Math.min(95, s.relativeNote)));
+    sampleHeaders[base + 17] = 0; // reserved
+    writeString(sampleHeaders, base + 18, s.name, 22);
+  }
+
+  // ---- Concatenate: header + sample headers + sample data ----
+  const totalLength =
+    header.length +
+    sampleHeaders.length +
+    deltaBlocks.reduce((sum, b) => sum + b.byteLength, 0);
+
+  const result = new Uint8Array(totalLength);
+  let pos = 0;
+
+  result.set(header, pos);       pos += header.length;
+  result.set(sampleHeaders, pos); pos += sampleHeaders.length;
+
+  for (const block of deltaBlocks) {
+    result.set(block, pos);
+    pos += block.byteLength;
+  }
+
+  return result;
+}
+
+/**
+ * Delta-encode sample data for XM format.
+ *
+ * XM stores sample data as delta values: each byte/word is the DIFFERENCE
+ * from the previous value, not the absolute value. This is sometimes called
+ * "delta modulation" or "DPCM-style" coding.
+ *
+ * For 8-bit samples: input is signed Int8, output is signed Int8 deltas.
+ * For 16-bit samples: input is signed Int16 LE, output is signed Int16 LE deltas.
+ */
+function deltaEncodeSampleData(pcmData: ArrayBuffer, typeFlags: number): Uint8Array {
+  const is16Bit = (typeFlags & 0x10) !== 0;
+
+  if (is16Bit) {
+    const samples = new Int16Array(pcmData);
+    const out = new Uint8Array(samples.length * 2);
+    const outView = new DataView(out.buffer);
+    let prev = 0;
+    for (let i = 0; i < samples.length; i++) {
+      const delta = samples[i] - prev;
+      prev = samples[i];
+      // Wrap delta to int16 range
+      const wrapped = ((delta & 0xFFFF) << 16) >> 16;
+      outView.setInt16(i * 2, wrapped, true);
+    }
+    return out;
+  } else {
+    // 8-bit path — interpret input as Int8 array
+    const src = new Uint8Array(pcmData);
+    const out = new Uint8Array(src.length);
+    let prev = 0;
+    for (let i = 0; i < src.length; i++) {
+      // Reinterpret as signed
+      const signed = (src[i] << 24) >> 24;
+      const delta = signed - prev;
+      prev = signed;
+      // Wrap to int8 range and store as unsigned byte
+      out[i] = delta & 0xFF;
+    }
+    return out;
+  }
 }
 
 /**

@@ -24,9 +24,9 @@ function defaultChannels(): MixerChannelState[] {
   }));
 }
 
-/** Convert 0-1 linear to dB: 0 → -60 dB, 1 → 0 dB */
+/** Convert 0-1 linear to dB: 0 → -60 dB, 0.5 → ≈-6 dB, 1 → 0 dB */
 function toDb(v: number): number {
-  return v * 60 - 60;
+  return v <= 0 ? -60 : 20 * Math.log10(v);
 }
 
 /** Silently call ToneEngine — swallows errors when engine is not yet ready (e.g. in tests). */
