@@ -348,7 +348,7 @@ export const WorkbenchContainer: React.FC = () => {
     e.preventDefault();
     cancelSpring();
     const delta = Math.max(-0.4, Math.min(0.4, -e.deltaY * 0.001));
-    zoomCamera(delta, e.clientX, e.clientY);
+    zoomCamera(delta, width / 2, height / 2);
   }, [zoomCamera, cancelSpring]);
 
   // ─── Middle mouse pan ───────────────────────────────────────────────────────
