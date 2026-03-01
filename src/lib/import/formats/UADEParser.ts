@@ -975,13 +975,18 @@ export async function parseUADEFile(
       if (tickSnapshots.length >= 2) {
         const { reconstructPatterns } = await import('@engine/uade/UADEPatternReconstructor');
 
-        // Build samplePtr → instrument index map from the enhanced scan's sample table.
-        // Keys are chip RAM addresses (lc register values) seen during scan.
+        // Build samplePtr → instrument index map from song.instruments so the
+        // index matches the actual 1-based position in the instruments array.
+        // Using song.instruments (not Object.keys(activeEnhancedScan.samples))
+        // avoids order mismatches when buildEnhancedSong skips zero-length or
+        // PCM-less samples that are still present as keys in the scan table.
         const samplePtrToInstrIndex = new Map<number, number>();
-        let instrIdx = 1;
-        for (const ptrStr of Object.keys(activeEnhancedScan.samples)) {
-          samplePtrToInstrIndex.set(Number(ptrStr), instrIdx++);
-        }
+        song.instruments.forEach((inst, idx) => {
+          const ptr = inst.sample?.uadeSamplePtr;
+          if (ptr != null) {
+            samplePtrToInstrIndex.set(ptr, idx + 1); // 1-based instrument index
+          }
+        });
 
         const reconstructed = reconstructPatterns(
           tickSnapshots,
@@ -1004,8 +1009,6 @@ export async function parseUADEFile(
             `[UADEParser] CIA tick reconstructor: ${reconstructed.patterns.length} patterns, speed=${reconstructed.speed}`,
           );
         }
-      } else {
-        engine.enableTickSnapshots(false);
       }
     } catch (e) {
       console.warn('[UADEParser] CIA tick pattern reconstruction failed (non-critical):', e);
