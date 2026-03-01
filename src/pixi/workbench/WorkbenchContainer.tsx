@@ -27,7 +27,7 @@ import {
   springCameraTo,
   type CameraSpringHandle,
 } from './WorkbenchExpose';
-import { WORKBENCH_CHROME_H } from './workbenchLayout';
+import { WORKBENCH_CHROME_H, STATUS_BAR_H } from './workbenchLayout';
 import type { SnapLine } from './windowSnap';
 import { WindowTether } from './WindowTether';
 import { playFocusZoom } from './workbenchSounds';
@@ -268,10 +268,21 @@ export const WorkbenchContainer: React.FC = () => {
   // ─── Focus window (green ◎ button) ─────────────────────────────────────────
 
   const focusWindow = useCallback((id: string) => {
-    const win = useWorkbenchStore.getState().windows[id];
+    const s = useWorkbenchStore.getState();
+    const win = s.windows[id];
     if (!win || !win.visible) return;
     playFocusZoom();
-    startSpring(fitWindow(win, width, workbenchH));
+
+    if (win.maximized) {
+      // Restore: put geometry back, animate camera back to saved position
+      const savedCamera = win.preMaximize?.camera ?? { x: 0, y: 0, scale: 1 };
+      s.restoreWindow(id);
+      startSpring(savedCamera);
+    } else {
+      // Maximize: fill the entire workbench viewport
+      s.maximizeWindow(id, width, workbenchH);
+      startSpring({ x: 0, y: 0, scale: 1 });
+    }
   }, [width, workbenchH, startSpring]);
 
   // ─── Exposé (Tab hold) ────────────────────────────────────────────────────
@@ -458,19 +469,28 @@ export const WorkbenchContainer: React.FC = () => {
   }, [width, workbenchH]);
 
   // ─── Rendering mask ─────────────────────────────────────────────────────────
-  // Clip all workbench rendering to the visible workbench area so PixiJS cannot
-  // paint window content on top of the NavBar or StatusBar pixels.
+  // Clip all workbench rendering so PixiJS cannot paint window content on top
+  // of the StatusBar pixels.
+  //
+  // The mask is in world/screen space (Graphics not added to the display list,
+  // so its origin is at screen (0,0)).  The workbench container is positioned
+  // at screen y=NAV_H by @pixi/layout's flex layout, so its content spans
+  // screen y=NAV_H to y=windowHeight-STATUS_BAR_H.  The mask must cover that
+  // full range, i.e. from screen y=0 to y=height-STATUS_BAR_H.
+  //
+  // We do NOT need to stop the mask at y=NAV_H: the NavBar has zIndex=100 and
+  // renders on top of any workbench content that bleeds into its area.
   useEffect(() => {
     const root = rootContainerRef.current;
     if (!root) return;
     const mask = new Graphics();
-    mask.rect(0, 0, width, workbenchH).fill({ color: 0xffffff });
+    mask.rect(0, 0, width, height - STATUS_BAR_H).fill({ color: 0xffffff });
     root.mask = mask;
     return () => {
       root.mask = null;
       mask.destroy();
     };
-  }, [width, workbenchH]);
+  }, [width, height]);
 
   // ─── Tilt per-frame tick ─────────────────────────────────────────────────────
   // Spring-animates tiltFactor and triggers the GL render-to-texture pass.

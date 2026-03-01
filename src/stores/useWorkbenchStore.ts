@@ -17,6 +17,9 @@ export interface WindowState {
   zIndex: number;
   visible: boolean;
   minimized: boolean;
+  maximized: boolean;
+  /** Saved geometry + camera for restore after maximize */
+  preMaximize?: { x: number; y: number; width: number; height: number; camera: CameraState };
 }
 
 export interface CameraState {
@@ -49,12 +52,12 @@ function computeDefaultWindows(): Record<WindowId, WindowState> {
   const trackerW   = Math.max(700, ww - 80);
   const trackerH   = Math.max(500, workbenchH - 20);
   return {
-    tracker:     { x: 20, y: 10, width: trackerW, height: trackerH,         zIndex: 1, visible: true,  minimized: false },
-    pianoroll:   { x: 20, y: trackerH + 80, width: 900,      height: 400,   zIndex: 2, visible: false, minimized: false },
-    arrangement: { x: 20, y: trackerH + 80, width: trackerW, height: 300,   zIndex: 3, visible: false, minimized: false },
-    dj:          { x: 20, y: 10, width: Math.min(1100, ww - 80), height: 500, zIndex: 4, visible: false, minimized: false },
-    vj:          { x: 800, y: 40, width: 600, height: 400,                  zIndex: 5, visible: false, minimized: false },
-    instrument:  { x: 20, y: trackerH + 80, width: 700, height: 260,        zIndex: 6, visible: true,  minimized: false },
+    tracker:     { x: 20, y: 10, width: trackerW, height: trackerH,         zIndex: 1, visible: true,  minimized: false, maximized: false },
+    pianoroll:   { x: 20, y: trackerH + 80, width: 900,      height: 400,   zIndex: 2, visible: false, minimized: false, maximized: false },
+    arrangement: { x: 20, y: trackerH + 80, width: trackerW, height: 300,   zIndex: 3, visible: false, minimized: false, maximized: false },
+    dj:          { x: 20, y: 10, width: Math.min(1100, ww - 80), height: 500, zIndex: 4, visible: false, minimized: false, maximized: false },
+    vj:          { x: 800, y: 40, width: 600, height: 400,                  zIndex: 5, visible: false, minimized: false, maximized: false },
+    instrument:  { x: 20, y: trackerH + 80, width: 700, height: 260,        zIndex: 6, visible: true,  minimized: false, maximized: false },
   };
 }
 
@@ -93,6 +96,7 @@ interface WorkbenchStore {
   resizeWindow: (id: string, width: number, height: number, x?: number, y?: number) => void;
   minimizeWindow: (id: string) => void;
   restoreWindow: (id: string) => void;
+  maximizeWindow: (id: string, viewportW: number, viewportH: number) => void;
 
   // Workspace snapshots
   saveWorkspace: (name: string) => void;
@@ -215,10 +219,37 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       restoreWindow: (id) =>
         set((state) => {
-          if (!state.windows[id]) return;
-          state.windows[id].minimized = false;
+          const win = state.windows[id];
+          if (!win) return;
+          win.minimized = false;
+          // If restoring from maximize, put geometry back
+          if (win.maximized && win.preMaximize) {
+            win.x = win.preMaximize.x;
+            win.y = win.preMaximize.y;
+            win.width = win.preMaximize.width;
+            win.height = win.preMaximize.height;
+            win.maximized = false;
+            win.preMaximize = undefined;
+          }
           state.maxZIndex++;
-          state.windows[id].zIndex = state.maxZIndex;
+          win.zIndex = state.maxZIndex;
+        }),
+
+      maximizeWindow: (id, viewportW, viewportH) =>
+        set((state) => {
+          const win = state.windows[id];
+          if (!win) return;
+          win.preMaximize = {
+            x: win.x, y: win.y, width: win.width, height: win.height,
+            camera: { ...state.camera },
+          };
+          win.x = 0;
+          win.y = 0;
+          win.width = viewportW;
+          win.height = viewportH;
+          win.maximized = true;
+          state.maxZIndex++;
+          win.zIndex = state.maxZIndex;
         }),
 
       // ─── Workspaces ────────────────────────────────────────────────────────
