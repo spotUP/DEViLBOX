@@ -10,6 +10,7 @@ import { PixiButton, PixiLabel, PixiSelect } from '../components';
 import { PixiArrangementCanvas } from './arrangement/PixiArrangementCanvas';
 import type { ClipRenderData } from './arrangement/PixiArrangementCanvas';
 import { PixiTrackHeaders } from './arrangement/PixiTrackHeaders';
+import { PixiScrollbar } from './pianoroll/PixiScrollbar';
 import { useTransportStore, useTrackerStore, useUIStore } from '@stores';
 import { useArrangementStore } from '@/stores/useArrangementStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
@@ -38,6 +39,9 @@ function cssColorToPixi(color: string | null, fallback: number): number {
 
 const TRACK_HEADERS_W = 160;
 const ARR_TOOLBAR_H = 36;
+const SCROLLBAR_SIZE = 8;
+const ARR_TRACK_HEIGHT = 40;
+const ARR_RULER_HEIGHT = 24;
 
 export const PixiArrangementView: React.FC = () => {
   const theme = usePixiTheme();
@@ -48,8 +52,8 @@ export const PixiArrangementView: React.FC = () => {
   const win = useWorkbenchStore(s => s.windows['arrangement']);
   const winW = win?.width ?? 900;
   const winH = win?.height ?? 400;
-  const canvasW = Math.max(200, winW - TRACK_HEADERS_W);
-  const canvasH = Math.max(100, winH - TITLE_H - ARR_TOOLBAR_H);
+  const canvasW = Math.max(200, winW - TRACK_HEADERS_W - SCROLLBAR_SIZE);
+  const canvasH = Math.max(100, winH - TITLE_H - ARR_TOOLBAR_H - SCROLLBAR_SIZE);
 
   // Hover ref for wheel scroll gating
   const isHoveredRef = useRef(false);
@@ -408,56 +412,90 @@ export const PixiArrangementView: React.FC = () => {
         />
       </pixiContainer>
 
-      {/* Main area: Track headers | Canvas — hover tracked for wheel scroll */}
+      {/* Main area: Track headers | Canvas + scrollbars — hover tracked for wheel scroll */}
       <pixiContainer
-        layout={{
-          flex: 1,
-          width: '100%',
-          flexDirection: 'row',
-        }}
+        layout={{ flex: 1, width: '100%', flexDirection: 'row' }}
         eventMode="static"
         onPointerOver={() => { isHoveredRef.current = true; }}
         onPointerOut={() => { isHoveredRef.current = false; }}
       >
-        <PixiTrackHeaders tracks={tracks} width={TRACK_HEADERS_W} scrollY={scrollY} onToggleMute={handleToggleMute} onToggleSolo={handleToggleSolo} />
+        {/* Track headers + blank corner for scrollbar alignment */}
+        <pixiContainer layout={{ width: TRACK_HEADERS_W, flexDirection: 'column' }}>
+          <PixiTrackHeaders tracks={tracks} width={TRACK_HEADERS_W} scrollY={scrollY} onToggleMute={handleToggleMute} onToggleSolo={handleToggleSolo} />
+          <pixiContainer layout={{ width: TRACK_HEADERS_W, height: SCROLLBAR_SIZE }} />
+        </pixiContainer>
 
-        <PixiArrangementCanvas
-          width={canvasW}
-          height={canvasH}
-          scrollBeat={view.scrollRow}
-          pixelsPerBeat={view.pixelsPerRow}
-          playbackBeat={isPlaying ? playbackRow : undefined}
-          totalBeats={totalRows}
-          clips={clipRenderData}
-          trackHeight={40}
-          scrollY={scrollY}
-          tool={tool}
-          snapDivision={view.snapDivision}
-          onSelectClip={(id, add) => useArrangementStore.getState().selectClip(id, add)}
-          onDeselectAll={() => useArrangementStore.getState().clearSelection()}
-          onSelectBox={(ids) => useArrangementStore.getState().selectClips(ids)}
-          onMoveClips={(ids, dr, dt) => useArrangementStore.getState().moveClips(ids, dr, dt)}
-          onResizeClipEnd={(id, newEndRow) => useArrangementStore.getState().resizeClipEnd(id, newEndRow)}
-          onDeleteClip={(id) => useArrangementStore.getState().removeClip(id)}
-          onSplitClip={(id, splitRow) => useArrangementStore.getState().splitClip(id, splitRow)}
-          onAddClip={(trackIndex, startRow, lengthRows) => {
-            const arr = useArrangementStore.getState();
-            const ts = useTrackerStore.getState();
-            const trackList = arr.tracks.slice().sort((a, b) => a.index - b.index);
-            const track = trackList[trackIndex];
-            if (!track) return;
-            const patternId = ts.patterns[ts.currentPatternIndex]?.id ?? ts.patterns[0]?.id;
-            if (!patternId) return;
-            arr.addClip({
-              patternId,
-              trackId: track.id,
-              startRow,
-              offsetRows: 0,
-              clipLengthRows: lengthRows,
-              sourceChannelIndex: 0,
-              color: null,
-              muted: false,
-            });
+        {/* Canvas column: grid + H-scrollbar */}
+        <pixiContainer layout={{ flex: 1, flexDirection: 'column' }}>
+          <PixiArrangementCanvas
+            width={canvasW}
+            height={canvasH}
+            scrollBeat={view.scrollRow}
+            pixelsPerBeat={view.pixelsPerRow}
+            playbackBeat={isPlaying ? playbackRow : undefined}
+            totalBeats={totalRows}
+            clips={clipRenderData}
+            trackHeight={ARR_TRACK_HEIGHT}
+            scrollY={scrollY}
+            tool={tool}
+            snapDivision={view.snapDivision}
+            onSelectClip={(id, add) => useArrangementStore.getState().selectClip(id, add)}
+            onDeselectAll={() => useArrangementStore.getState().clearSelection()}
+            onSelectBox={(ids) => useArrangementStore.getState().selectClips(ids)}
+            onMoveClips={(ids, dr, dt) => useArrangementStore.getState().moveClips(ids, dr, dt)}
+            onResizeClipEnd={(id, newEndRow) => useArrangementStore.getState().resizeClipEnd(id, newEndRow)}
+            onDeleteClip={(id) => useArrangementStore.getState().removeClip(id)}
+            onSplitClip={(id, splitRow) => useArrangementStore.getState().splitClip(id, splitRow)}
+            onAddClip={(trackIndex, startRow, lengthRows) => {
+              const arr = useArrangementStore.getState();
+              const ts = useTrackerStore.getState();
+              const trackList = arr.tracks.slice().sort((a, b) => a.index - b.index);
+              const track = trackList[trackIndex];
+              if (!track) return;
+              const patternId = ts.patterns[ts.currentPatternIndex]?.id ?? ts.patterns[0]?.id;
+              if (!patternId) return;
+              arr.addClip({
+                patternId,
+                trackId: track.id,
+                startRow,
+                offsetRows: 0,
+                clipLengthRows: lengthRows,
+                sourceChannelIndex: 0,
+                color: null,
+                muted: false,
+              });
+            }}
+          />
+          {/* Horizontal scrollbar */}
+          <PixiScrollbar
+            orientation="horizontal"
+            width={canvasW}
+            height={SCROLLBAR_SIZE}
+            value={Math.max(0, Math.min(1, view.scrollRow / Math.max(1, totalRows - canvasW / view.pixelsPerRow)))}
+            thumbSize={Math.min(1, (canvasW / view.pixelsPerRow) / Math.max(1, totalRows))}
+            onChange={(v) => {
+              const s = useArrangementStore.getState();
+              s.setScrollRow(v * Math.max(0, totalRows - canvasW / s.view.pixelsPerRow));
+            }}
+          />
+        </pixiContainer>
+
+        {/* Vertical scrollbar */}
+        <PixiScrollbar
+          orientation="vertical"
+          width={SCROLLBAR_SIZE}
+          height={canvasH + SCROLLBAR_SIZE}
+          value={(() => {
+            const totalH = tracks.length * ARR_TRACK_HEIGHT;
+            const visibleH = canvasH - ARR_RULER_HEIGHT;
+            const maxScroll = Math.max(0, totalH - visibleH);
+            return maxScroll > 0 ? Math.min(1, scrollY / maxScroll) : 0;
+          })()}
+          thumbSize={Math.min(1, (canvasH - ARR_RULER_HEIGHT) / Math.max(1, tracks.length * ARR_TRACK_HEIGHT))}
+          onChange={(v) => {
+            const totalH = tracks.length * ARR_TRACK_HEIGHT;
+            const visibleH = canvasH - ARR_RULER_HEIGHT;
+            useArrangementStore.getState().setScrollY(v * Math.max(0, totalH - visibleH));
           }}
         />
       </pixiContainer>
