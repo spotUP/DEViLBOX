@@ -145,7 +145,13 @@ export function resolveArrangement(
             const patternRow = clip.offsetRows + (globalRow - clip.startRow);
             const channel = pattern.channels[clip.sourceChannelIndex];
             if (channel && patternRow >= 0 && patternRow < channel.rows.length) {
-              rows.push({ ...channel.rows[patternRow] });
+              const cell = { ...channel.rows[patternRow] };
+              const semitones = clip.transpose ?? 0;
+              if (semitones !== 0 && cell.note > 0 && cell.note < 97) {
+                // XM note range: 1–96 (1=C-0, 96=B-7), 0=empty, 97=note off
+                cell.note = Math.max(1, Math.min(96, cell.note + semitones));
+              }
+              rows.push(cell);
             } else {
               rows.push({ ...EMPTY });
             }
