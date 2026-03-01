@@ -338,13 +338,12 @@ export const PixiTrackerView: React.FC = () => {
         {/* Pitch slider — pure Pixi */}
         <PixiPitchSlider width={32} height={Math.max(100, instrumentPanelHeight)} />
 
-        {/* Instrument panel toggle button — pure Pixi */}
-        {canShowInstrumentPanel && viewMode !== 'tb303' && viewMode !== 'sunvox' && (
-          <PixiInstrumentToggle
-            visible={instrumentPanelVisible}
-            onClick={() => setShowInstrumentPanel(p => !p)}
-          />
-        )}
+        {/* Instrument panel toggle button — always mounted, zero-width when hidden */}
+        <PixiInstrumentToggle
+          show={canShowInstrumentPanel && viewMode !== 'tb303' && viewMode !== 'sunvox'}
+          visible={instrumentPanelVisible}
+          onClick={() => setShowInstrumentPanel(p => !p)}
+        />
 
         {/* Instrument list — always mounted, zero-width when hidden */}
         <pixiContainer alpha={instrumentPanelVisible ? 1 : 0} renderable={instrumentPanelVisible} eventMode={instrumentPanelVisible ? 'static' : 'none'} layout={{ width: instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0, height: '100%' }}>
@@ -377,7 +376,7 @@ export const PixiTrackerView: React.FC = () => {
 
 // ─── Instrument panel toggle — pure Pixi ────────────────────────────────────
 
-const PixiInstrumentToggle: React.FC<{ visible: boolean; onClick: () => void }> = ({ visible, onClick }) => {
+const PixiInstrumentToggle: React.FC<{ show: boolean; visible: boolean; onClick: () => void }> = ({ show, visible, onClick }) => {
   const theme = usePixiTheme();
 
   const drawBorder = useCallback((g: GraphicsType) => {
@@ -388,8 +387,10 @@ const PixiInstrumentToggle: React.FC<{ visible: boolean; onClick: () => void }> 
 
   return (
     <pixiContainer
-      layout={{ width: 24, height: '100%', alignItems: 'center', justifyContent: 'center' }}
-      eventMode="static"
+      alpha={show ? 1 : 0}
+      renderable={show}
+      eventMode={show ? 'static' : 'none'}
+      layout={{ width: show ? 24 : 0, height: '100%', alignItems: 'center', justifyContent: 'center' }}
       cursor="pointer"
       onPointerUp={onClick}
     >
