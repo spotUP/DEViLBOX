@@ -106,7 +106,7 @@ export const DEFAULT_PIANO_ROLL_VIEW: PianoRollViewState = {
   horizontalZoom: 24,        // 24 pixels per row (increased from 16)
   verticalZoom: 18,          // 18 pixels per semitone (increased from 12)
   scrollX: 0,
-  scrollY: 0,                // Start at C4 (middle C) at top, showing down to ~C1
+  scrollY: 36,               // Start with C2 (MIDI 36) at bottom of view
   snapToGrid: true,
   gridDivision: 4,           // Quarter note grid
   showVelocity: true,

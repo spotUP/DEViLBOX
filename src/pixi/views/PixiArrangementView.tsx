@@ -12,6 +12,8 @@ import type { ClipRenderData } from './arrangement/PixiArrangementCanvas';
 import { PixiTrackHeaders } from './arrangement/PixiTrackHeaders';
 import { useTransportStore, useTrackerStore, useUIStore } from '@stores';
 import { useArrangementStore } from '@/stores/useArrangementStore';
+import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { TITLE_H } from '../workbench/PixiWindow';
 import type { ArrangementToolMode } from '@/types/arrangement';
 import { useArrangementKeyboardShortcuts } from '@/components/arrangement/ArrangementKeyboardShortcuts';
 
@@ -34,10 +36,38 @@ function cssColorToPixi(color: string | null, fallback: number): number {
   return parseInt(hex, 16) || fallback;
 }
 
+const TRACK_HEADERS_W = 160;
+const ARR_TOOLBAR_H = 36;
+
 export const PixiArrangementView: React.FC = () => {
   const theme = usePixiTheme();
   const isPlaying = useTransportStore(s => s.isPlaying);
   const playbackRowRef = useRef(0);
+
+  // Resolve actual window pixel dimensions
+  const win = useWorkbenchStore(s => s.windows['arrangement']);
+  const winW = win?.width ?? 900;
+  const winH = win?.height ?? 400;
+  const canvasW = Math.max(200, winW - TRACK_HEADERS_W);
+  const canvasH = Math.max(100, winH - TITLE_H - ARR_TOOLBAR_H);
+
+  // Hover ref for wheel scroll gating
+  const isHoveredRef = useRef(false);
+
+  // Wheel → horizontal scroll
+  useEffect(() => {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) return;
+    const handleWheel = (e: WheelEvent) => {
+      if (!isHoveredRef.current) return;
+      e.preventDefault();
+      const s = useArrangementStore.getState();
+      const rowDelta = (e.deltaX || e.deltaY) / s.view.pixelsPerRow;
+      s.setScrollRow(Math.max(0, s.view.scrollRow + rowDelta));
+    };
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleWheel);
+  }, []);
 
   // Arrangement store
   const arrangementTracks = useArrangementStore(s => s.tracks);
@@ -244,11 +274,11 @@ export const PixiArrangementView: React.FC = () => {
 
   const drawToolbarBg = useCallback((g: GraphicsType) => {
     g.clear();
-    g.rect(0, 0, 4000, 36);
+    g.rect(0, 0, winW, ARR_TOOLBAR_H);
     g.fill({ color: theme.bgSecondary.color });
-    g.rect(0, 35, 4000, 1);
+    g.rect(0, ARR_TOOLBAR_H - 1, winW, 1);
     g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [theme]);
+  }, [winW, theme]);
 
   return (
     <pixiContainer
@@ -351,19 +381,22 @@ export const PixiArrangementView: React.FC = () => {
         />
       </pixiContainer>
 
-      {/* Main area: Track headers | Canvas */}
+      {/* Main area: Track headers | Canvas — hover tracked for wheel scroll */}
       <pixiContainer
         layout={{
           flex: 1,
           width: '100%',
           flexDirection: 'row',
         }}
+        eventMode="static"
+        onPointerOver={() => { isHoveredRef.current = true; }}
+        onPointerOut={() => { isHoveredRef.current = false; }}
       >
-        <PixiTrackHeaders tracks={tracks} width={160} onToggleMute={handleToggleMute} onToggleSolo={handleToggleSolo} />
+        <PixiTrackHeaders tracks={tracks} width={TRACK_HEADERS_W} onToggleMute={handleToggleMute} onToggleSolo={handleToggleSolo} />
 
         <PixiArrangementCanvas
-          width={4000}
-          height={4000}
+          width={canvasW}
+          height={canvasH}
           scrollBeat={view.scrollRow}
           pixelsPerBeat={view.pixelsPerRow}
           playbackBeat={isPlaying ? playbackRow : undefined}

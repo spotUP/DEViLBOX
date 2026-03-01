@@ -27,7 +27,10 @@ interface PixiPianoRollGridProps {
   scrollBeat?: number;
   totalBeats?: number;
   gridDivision?: number;
-  selectedNotes?: Set<number>;
+  /** Selected note IDs in "${channelIndex}-${startRow}" format */
+  selectedNotes?: Set<string>;
+  /** Channel index used to build note IDs for selection checking */
+  channelIndex?: number;
   onNotesChanged?: () => void;
 }
 
@@ -44,6 +47,7 @@ export const PixiPianoRollGrid: React.FC<PixiPianoRollGridProps> = ({
   totalBeats = 64,
   gridDivision = 4,
   selectedNotes,
+  channelIndex,
   onNotesChanged,
 }) => {
   const theme = usePixiTheme();
@@ -141,7 +145,7 @@ export const PixiPianoRollGrid: React.FC<PixiPianoRollGridProps> = ({
 
       if (x + w < 0 || x > width || y + noteHeight < 0 || y > height) continue;
 
-      const isSelected = selectedNotes?.has(i);
+      const isSelected = channelIndex !== undefined && selectedNotes?.has(`${channelIndex}-${n.start}`);
       const velAlpha = 0.4 + (n.velocity / 127) * 0.6;
 
       // Note body
