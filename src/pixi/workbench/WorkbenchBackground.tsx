@@ -17,6 +17,13 @@ interface Props {
   gridSize?: number; // base grid interval in world units (default 40)
 }
 
+/** Compute the visible dot grid pitch at the given scale, coarsening when zoomed far out. */
+function computeEffectivePitch(gridSz: number, scale: number): number {
+  const p = gridSz * scale;
+  const s = p < 8 ? Math.ceil(8 / p) : 1;
+  return p * s;
+}
+
 export const WorkbenchBackground: React.FC<Props> = ({
   width,
   height,
@@ -26,9 +33,7 @@ export const WorkbenchBackground: React.FC<Props> = ({
   const dotsContainerRef = useRef<ContainerType>(null);
 
   // ── Compute effective pitch (depends on scale only) ──────────────────────
-  const pitch = gridSize * camera.scale;
-  const step = pitch < 8 ? Math.ceil(8 / pitch) : 1;
-  const effectivePitch = pitch * step;
+  const effectivePitch = computeEffectivePitch(gridSize, camera.scale);
 
   // ── Reposition dots container on pan — no graphics rebuild ───────────────
   useLayoutEffect(() => {
@@ -57,9 +62,7 @@ export const WorkbenchBackground: React.FC<Props> = ({
   // Container position (above) handles the pan offset.
   const drawDots = useCallback((g: GraphicsType) => {
     g.clear();
-    const p = gridSize * camera.scale;
-    const s = p < 8 ? Math.ceil(8 / p) : 1;
-    const ep = p * s;
+    const ep = computeEffectivePitch(gridSize, camera.scale);
     if (ep > 200) return;
 
     const bufW = width  + ep * 2;
