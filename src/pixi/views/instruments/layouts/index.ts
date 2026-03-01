@@ -21,6 +21,17 @@ import {
 } from './toneSynths';
 import { GRANULAR_SYNTH_LAYOUT } from './granularSynth';
 import { FURNACE_LAYOUT } from './furnace';
+import { SUPER_SAW_LAYOUT } from './superSaw';
+import { WAVETABLE_LAYOUT } from './wavetable';
+import { PWM_SYNTH_LAYOUT } from './pwmSynth';
+import { WOBBLE_BASS_LAYOUT } from './wobbleBass';
+import { SYNARE_LAYOUT } from './synare';
+import { ORGAN_LAYOUT } from './organ';
+import { STRING_MACHINE_LAYOUT } from './stringMachine';
+import { FORMANT_SYNTH_LAYOUT } from './formantSynth';
+import { DRUM_MACHINE_LAYOUT } from './drumMachine';
+import { DRUM_KIT_LAYOUT } from './drumKit';
+import { POLY_SYNTH_LAYOUT } from './polySynth';
 
 /** Map from SynthType string to layout descriptor */
 export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
@@ -45,6 +56,19 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   Sampler: SAMPLER_LAYOUT,
   Player: SAMPLER_LAYOUT,
   GranularSynth: GRANULAR_SYNTH_LAYOUT,
+  DrumKit: DRUM_KIT_LAYOUT,
+
+  // New custom synths
+  SuperSaw: SUPER_SAW_LAYOUT,
+  PolySynth: POLY_SYNTH_LAYOUT,
+  Organ: ORGAN_LAYOUT,
+  PWMSynth: PWM_SYNTH_LAYOUT,
+  StringMachine: STRING_MACHINE_LAYOUT,
+  FormantSynth: FORMANT_SYNTH_LAYOUT,
+  WobbleBass: WOBBLE_BASS_LAYOUT,
+  Synare: SYNARE_LAYOUT,
+  Wavetable: WAVETABLE_LAYOUT,
+  DrumMachine: DRUM_MACHINE_LAYOUT,
 
   // Tone.js core synths
   Synth: SYNTH_LAYOUT,

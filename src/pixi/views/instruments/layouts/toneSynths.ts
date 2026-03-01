@@ -34,54 +34,54 @@ const DECAY_ENVELOPE_SECTION = {
 
 export const SYNTH_LAYOUT: SynthPanelLayout = {
   name: 'Synth',
-  configKey: 'tone',
+  configKey: '',
   sections: [AMP_SECTION, ENVELOPE_SECTION],
 };
 
 export const MONO_SYNTH_LAYOUT: SynthPanelLayout = {
   name: 'Mono Synth',
-  configKey: 'tone',
+  configKey: '',
   sections: [AMP_SECTION, ENVELOPE_SECTION],
 };
 
 export const DUO_SYNTH_LAYOUT: SynthPanelLayout = {
   name: 'Duo Synth',
-  configKey: 'tone',
+  configKey: '',
   sections: [AMP_SECTION, ENVELOPE_SECTION],
 };
 
 export const FM_SYNTH_LAYOUT: SynthPanelLayout = {
   name: 'FM Synth',
-  configKey: 'tone',
+  configKey: '',
   sections: [AMP_SECTION, ENVELOPE_SECTION],
 };
 
 export const AM_SYNTH_LAYOUT: SynthPanelLayout = {
   name: 'AM Synth',
-  configKey: 'tone',
+  configKey: '',
   sections: [AMP_SECTION, ENVELOPE_SECTION],
 };
 
 export const PLUCK_SYNTH_LAYOUT: SynthPanelLayout = {
   name: 'Pluck Synth',
-  configKey: 'tone',
+  configKey: '',
   sections: [AMP_SECTION],
 };
 
 export const METAL_SYNTH_LAYOUT: SynthPanelLayout = {
   name: 'Metal Synth',
-  configKey: 'tone',
+  configKey: '',
   sections: [AMP_SECTION, DECAY_ENVELOPE_SECTION],
 };
 
 export const MEMBRANE_SYNTH_LAYOUT: SynthPanelLayout = {
   name: 'Membrane Synth',
-  configKey: 'tone',
+  configKey: '',
   sections: [AMP_SECTION, DECAY_ENVELOPE_SECTION],
 };
 
 export const NOISE_SYNTH_LAYOUT: SynthPanelLayout = {
   name: 'Noise Synth',
-  configKey: 'tone',
+  configKey: '',
   sections: [AMP_SECTION, ENVELOPE_SECTION],
 };

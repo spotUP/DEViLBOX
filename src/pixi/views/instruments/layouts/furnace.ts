@@ -6,7 +6,7 @@ const fmtPan = (v: number) => v === 0 ? 'C' : v > 0 ? `R${Math.round(v)}` : `L${
 /** Minimal layout shared by all Furnace chip types (volume + pan). */
 export const FURNACE_LAYOUT: SynthPanelLayout = {
   name: 'Furnace Chip',
-  configKey: 'furnace',
+  configKey: '',
   sections: [
     {
       label: 'AMP',
