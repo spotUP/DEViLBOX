@@ -41,7 +41,10 @@ export const PixiArrangementView: React.FC = () => {
 
   // Arrangement store
   const arrangementTracks = useArrangementStore(s => s.tracks);
-  const isArrangementMode = useArrangementStore(s => s.isArrangementMode);
+  // NOTE: do NOT subscribe to isArrangementMode here — we set it on mount and
+  // the synchronous Zustand notification fires during React's commit phase in
+  // @pixi/react, causing "Maximum update depth exceeded". Use a ref instead.
+  const isArrangementModeRef = useRef(false);
   const playbackRow = useArrangementStore(s => s.playbackRow);
   const tool = useArrangementStore(s => s.tool);
   const setTool = useArrangementStore(s => s.setTool);
@@ -124,6 +127,7 @@ export const PixiArrangementView: React.FC = () => {
 
   // Activate arrangement mode on mount, deactivate on unmount
   useEffect(() => {
+    isArrangementModeRef.current = true;
     useArrangementStore.getState().setIsArrangementMode(true);
 
     // Auto-import from pattern order if no arrangement tracks exist
@@ -137,16 +141,18 @@ export const PixiArrangementView: React.FC = () => {
     }
 
     return () => {
+      isArrangementModeRef.current = false;
       useArrangementStore.getState().setIsArrangementMode(false);
     };
   }, []);
 
   // Playback row sync via rAF loop
   useEffect(() => {
-    if (!isPlaying || !isArrangementMode) return;
+    if (!isPlaying) return;
 
     let rafId: number;
     const update = () => {
+      if (!isArrangementModeRef.current) return;
       const globalRow = useTransportStore.getState().currentGlobalRow;
       if (globalRow !== playbackRowRef.current) {
         playbackRowRef.current = globalRow;
@@ -157,7 +163,7 @@ export const PixiArrangementView: React.FC = () => {
     rafId = requestAnimationFrame(update);
 
     return () => cancelAnimationFrame(rafId);
-  }, [isPlaying, isArrangementMode]);
+  }, [isPlaying]);
 
   // Full arrangement keyboard shortcuts (Cmd+D duplicate, Cmd+E split, zoom presets, etc.)
   useArrangementKeyboardShortcuts();
