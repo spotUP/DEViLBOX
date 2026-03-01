@@ -92,8 +92,7 @@ jobs:
 
   # Create a GitHub Release with all desktop app binaries + trigger pull-based deploy
   release:
-    needs: [electron, build-server]
-    if: ${{ always() && needs.build-server.result == 'success' }}
+    needs: [build-server]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -105,6 +104,7 @@ jobs:
 
       - name: Download all Electron artifacts
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           path: release-assets
           pattern: electron-*
