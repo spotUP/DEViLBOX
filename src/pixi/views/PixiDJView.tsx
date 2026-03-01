@@ -7,12 +7,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
-import { PixiButton } from '../components';
+import { PixiButton, PixiSelect } from '../components';
 import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
 import { PixiDJDeck } from './dj/PixiDJDeck';
 import { PixiDJMixer } from './dj/PixiDJMixer';
 import { useUIStore } from '@stores';
-import { useThemeStore } from '@stores/useThemeStore';
 import { useDJStore } from '@stores/useDJStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getDJEngine, disposeDJEngine } from '@engine/dj/DJEngine';
@@ -27,6 +26,15 @@ import { DJControllerSelector } from '@components/dj/DJControllerSelector';
 import { DJFxQuickPresets } from '@components/dj/DJFxQuickPresets';
 
 type DJBrowserPanel = 'none' | 'playlists' | 'modland' | 'serato';
+
+const VIEW_OPTIONS = [
+  { value: 'tracker', label: 'Tracker' },
+  { value: 'arrangement', label: 'Arrangement' },
+  { value: 'pianoroll', label: 'Piano Roll' },
+  { value: 'dj', label: 'DJ Mixer' },
+  { value: 'drumpad', label: 'Drum Pads' },
+  { value: 'vj', label: 'VJ View' },
+];
 
 export const PixiDJView: React.FC = () => {
   const engineRef = useRef<DJEngine | null>(null);
@@ -116,7 +124,6 @@ interface DJTopBarProps {
 
 const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelChange }) => {
   const theme = usePixiTheme();
-  const themeColors = useThemeStore(s => s.getCurrentTheme().colors);
   const modalOpen = useUIStore(s => s.modalOpen);
 
   const handleBrowser = useCallback(() => {
@@ -165,38 +172,13 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: '100%', height: 40 }} />
 
       {/* View mode selector */}
-      <PixiDOMOverlay
-        layout={{ height: 24, width: 100 }}
-        style={{ overflow: 'visible' }}
-      >
-        <select
-          value="dj"
-          onChange={(e) => {
-            const v = e.target.value;
-            setTimeout(() => useUIStore.getState().setActiveView(v as any), 0);
-          }}
-          style={{
-            width: '100%',
-            height: '100%',
-            padding: '0 4px',
-            fontSize: '11px',
-            fontFamily: 'monospace',
-            background: themeColors.bg,
-            color: themeColors.text,
-            border: `1px solid ${themeColors.border}`,
-            borderRadius: '3px',
-            cursor: 'pointer',
-            outline: 'none',
-          }}
-        >
-          <option value="tracker">Tracker</option>
-          <option value="arrangement">Arrangement</option>
-          <option value="pianoroll">Piano Roll</option>
-          <option value="dj">DJ Mixer</option>
-          <option value="drumpad">Drum Pads</option>
-          <option value="vj">VJ View</option>
-        </select>
-      </PixiDOMOverlay>
+      <PixiSelect
+        value="dj"
+        options={VIEW_OPTIONS}
+        onChange={(v) => useUIStore.getState().setActiveView(v as any)}
+        width={100}
+        height={24}
+      />
 
       <pixiBitmapText
         text="DEViLBOX DJ"

@@ -6,16 +6,23 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
-import { PixiButton, PixiLabel } from '../components';
-import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
+import { PixiButton, PixiLabel, PixiSelect } from '../components';
 import { PixiArrangementCanvas } from './arrangement/PixiArrangementCanvas';
 import type { ClipRenderData } from './arrangement/PixiArrangementCanvas';
 import { PixiTrackHeaders } from './arrangement/PixiTrackHeaders';
 import { useTransportStore, useTrackerStore, useUIStore } from '@stores';
-import { useThemeStore } from '@stores/useThemeStore';
 import { useArrangementStore } from '@/stores/useArrangementStore';
 import type { ArrangementToolMode } from '@/types/arrangement';
 import { useArrangementKeyboardShortcuts } from '@/components/arrangement/ArrangementKeyboardShortcuts';
+
+const VIEW_OPTIONS = [
+  { value: 'tracker', label: 'Tracker' },
+  { value: 'arrangement', label: 'Arrangement' },
+  { value: 'pianoroll', label: 'Piano Roll' },
+  { value: 'dj', label: 'DJ Mixer' },
+  { value: 'drumpad', label: 'Drum Pads' },
+  { value: 'vj', label: 'VJ View' },
+];
 
 // Default channel colors when falling back to tracker channels
 const CHANNEL_COLORS = [0x60a5fa, 0xf87171, 0x4ade80, 0xfbbf24, 0xa78bfa, 0xfb923c, 0x38bdf8, 0xe879f9];
@@ -29,7 +36,6 @@ function cssColorToPixi(color: string | null, fallback: number): number {
 
 export const PixiArrangementView: React.FC = () => {
   const theme = usePixiTheme();
-  const themeColors = useThemeStore(s => s.getCurrentTheme().colors);
   const isPlaying = useTransportStore(s => s.isPlaying);
   const playbackRowRef = useRef(0);
 
@@ -259,39 +265,14 @@ export const PixiArrangementView: React.FC = () => {
       >
         <pixiGraphics draw={drawToolbarBg} layout={{ position: 'absolute', width: '100%', height: 36 }} />
 
-        {/* View mode selector — switch back to tracker or other views */}
-        <PixiDOMOverlay
-          layout={{ height: 24, width: 100 }}
-          style={{ overflow: 'visible' }}
-        >
-          <select
-            value="arrangement"
-            onChange={(e) => {
-              const v = e.target.value;
-              setTimeout(() => useUIStore.getState().setActiveView(v as any), 0);
-            }}
-            style={{
-              width: '100%',
-              height: '100%',
-              padding: '0 4px',
-              fontSize: '11px',
-              fontFamily: 'monospace',
-              background: themeColors.bg,
-              color: themeColors.text,
-              border: `1px solid ${themeColors.border}`,
-              borderRadius: '3px',
-              cursor: 'pointer',
-              outline: 'none',
-            }}
-          >
-            <option value="tracker">Tracker</option>
-            <option value="arrangement">Arrangement</option>
-            <option value="pianoroll">Piano Roll</option>
-            <option value="dj">DJ Mixer</option>
-            <option value="drumpad">Drum Pads</option>
-            <option value="vj">VJ View</option>
-          </select>
-        </PixiDOMOverlay>
+        {/* View mode selector */}
+        <PixiSelect
+          value="arrangement"
+          options={VIEW_OPTIONS}
+          onChange={(v) => useUIStore.getState().setActiveView(v as any)}
+          width={100}
+          height={24}
+        />
 
         <PixiLabel text="ARRANGEMENT" size="sm" weight="bold" color="accent" />
 
