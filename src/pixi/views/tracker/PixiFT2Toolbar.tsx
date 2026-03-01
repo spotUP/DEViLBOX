@@ -27,8 +27,8 @@ import { PIXI_FONTS } from '../../fonts';
 import { PixiButton, PixiNumericInput } from '../../components';
 import { PixiPureTextInput } from '../../input/PixiPureTextInput';
 import { PixiVisualizer } from './PixiVisualizer';
-import { useTransportStore, useTrackerStore, useUIStore, useTabsStore, useInstrumentStore } from '@stores';
-import { saveProjectToStorage } from '@hooks/useProjectPersistence';
+import { useTransportStore, useTrackerStore, useUIStore, useTabsStore, useInstrumentStore, useProjectStore, useAudioStore, useAutomationStore } from '@stores';
+import { exportSong } from '@lib/export/exporters';
 import { useShallow } from 'zustand/react/shallow';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
@@ -160,6 +160,9 @@ export const PixiFT2Toolbar: React.FC = () => {
   const showPatterns = useUIStore(s => s.showPatterns);
   const showAutomation = useUIStore(s => s.showAutomationLanes);
 
+  // ── Project store (isDirty for Save button label) ─────────────────────────
+  const isDirty = useProjectStore(s => s.isDirty);
+
   // ── Derived values ────────────────────────────────────────────────────────
   const currentPattern = patterns[currentPatternIndex];
   const patternName = currentPattern?.name ?? '';
@@ -201,10 +204,37 @@ export const PixiFT2Toolbar: React.FC = () => {
   }, []);
 
   const handleSave = useCallback(() => {
-    void saveProjectToStorage().then(ok => {
-      if (ok) notify.success('Project saved', 1500);
-      else notify.error('Save failed');
-    });
+    try {
+      const { patterns, metadata } = useTrackerStore.getState();
+      const { bpm, grooveTemplateId: gtId } = useTransportStore.getState();
+      const { instruments } = useInstrumentStore.getState();
+      const { masterEffects } = useAudioStore.getState();
+      const { curves } = useAutomationStore.getState();
+      const sequence = patterns.map((p) => p.id);
+      const automationData: Record<string, Record<number, Record<string, unknown>>> = {};
+      patterns.forEach((pattern) => {
+        pattern.channels.forEach((_ch, channelIndex) => {
+          const ch = curves.filter((c) => c.patternId === pattern.id && c.channelIndex === channelIndex);
+          if (ch.length > 0) {
+            if (!automationData[pattern.id]) automationData[pattern.id] = {};
+            automationData[pattern.id][channelIndex] = ch.reduce(
+              (acc, c) => { acc[c.parameter] = c; return acc; },
+              {} as Record<string, unknown>
+            );
+          }
+        });
+      });
+      exportSong(
+        metadata, bpm, instruments, patterns, sequence,
+        Object.keys(automationData).length > 0 ? automationData : undefined,
+        masterEffects.length > 0 ? masterEffects : undefined,
+        curves.length > 0 ? curves : undefined,
+        { prettify: true }, gtId
+      );
+      notify.success('Song downloaded!', 2000);
+    } catch {
+      notify.error('Failed to download file');
+    }
   }, []);
 
   const handleClearProject = useCallback(() => {
@@ -213,6 +243,7 @@ export const PixiFT2Toolbar: React.FC = () => {
     useTrackerStore.getState().reset();
     useTransportStore.getState().reset();
     useInstrumentStore.getState().reset();
+    useAutomationStore.getState().reset();
     notify.success('Project cleared', 1500);
   }, [isPlaying, stop]);
 
@@ -554,9 +585,10 @@ export const PixiFT2Toolbar: React.FC = () => {
       >
         <pixiGraphics draw={drawFileRowBg} layout={{ ...LAYOUT_FILL_ROW, height: FILE_ROW_H }} />
 
-        <PixiButton label="Load"        variant="ghost" size="sm" onClick={handleLoad} />
-        <PixiButton label="Save"        variant="ghost" size="sm" onClick={handleSave} />
-        <PixiButton label="Revisions"   variant="ghost" size="sm" onClick={handleShowRevisions} />
+        <PixiButton label="Load"                    variant="ghost" size="sm" onClick={handleLoad} />
+        <PixiButton label={isDirty ? 'Save*' : 'Save'} variant="ghost" size="sm" onClick={handleSave} />
+        <PixiButton label="Revisions"               variant="ghost" size="sm" onClick={handleShowRevisions} />
+        <PixiButton label="Download"                variant="ghost" size="sm" onClick={handleSave} />
         <PixiButton label="Export"      variant="ghost" size="sm" onClick={handleShowExport} />
         <PixiButton label="New"         variant="ghost" size="sm" onClick={() => addTab()} />
         <PixiButton label="Clear"       variant="ghost" size="sm" onClick={handleClearProject} />
