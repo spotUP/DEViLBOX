@@ -97,6 +97,8 @@ interface ArrangementStore {
   toggleTrackMute: (trackId: string) => void;
   toggleTrackSolo: (trackId: string) => void;
   setTrackHeight: (trackId: string, height: number) => void;
+  setTrackVolume: (trackId: string, volume: number) => void;
+  setTrackPan: (trackId: string, pan: number) => void;
 
   // === Track rename/color UI state (not persisted) ===
   renamingTrackId: string | null;
@@ -488,6 +490,18 @@ export const useArrangementStore = create<ArrangementStore>()(
       set((state) => {
         const track = state.tracks.find(t => t.id === trackId);
         if (track) track.height = Math.max(30, Math.min(200, height));
+      }),
+
+    setTrackVolume: (trackId, volume) =>
+      set((state) => {
+        const track = state.tracks.find(t => t.id === trackId);
+        if (track) track.volume = Math.max(0, Math.min(100, volume));
+      }),
+
+    setTrackPan: (trackId, pan) =>
+      set((state) => {
+        const track = state.tracks.find(t => t.id === trackId);
+        if (track) track.pan = Math.max(-100, Math.min(100, pan));
       }),
 
     renamingTrackId: null,
