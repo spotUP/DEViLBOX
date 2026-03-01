@@ -23,6 +23,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -357,11 +358,15 @@ export async function parsePumaTrackerFile(
   // Vol script first event MUST be C0 (SetWaveform); data[1] = waveform slot (0-51).
 
   const waveformIndices: number[] = [];
+  // Byte offsets for each instrument's data block (for uadeChipRam).
+  // Each entry: { start: file offset of "inst" marker, end: file offset after pitch script }
+  const instrOffsets: Array<{ start: number; end: number }> = [];
 
   for (let ins = 0; ins < numInstruments; ins++) {
     if (!readMagic(view, pos, 'inst')) {
       throw new Error(`PumaTracker: expected "inst" at 0x${pos.toString(16)} (instrument ${ins})`);
     }
+    const instrStart = pos;  // file offset of this instrument's "inst" marker
     pos += 4;
 
     const volResult = parseVolScript(view, pos);
@@ -374,6 +379,7 @@ export async function parsePumaTrackerFile(
     pos += 4;
 
     pos = skipPitchScript(view, pos);
+    instrOffsets.push({ start: instrStart, end: pos });
   }
 
   // Terminating "inst" marker
@@ -423,9 +429,18 @@ export async function parsePumaTrackerFile(
       loopEnd   = 32;  // All built-in waveforms loop their full 32 samples
     }
 
+    const pumaInstrOffset = instrOffsets[ins];
+    const pumaChipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: buffer.byteLength,
+      instrBase: pumaInstrOffset ? pumaInstrOffset.start : 0,
+      instrSize: pumaInstrOffset ? pumaInstrOffset.end - pumaInstrOffset.start : 0,
+      sections: {},
+    };
+
     if (!pcm || pcm.length === 0) {
       // Empty/silent instrument placeholder
-      instruments.push({
+      const pumaEmptyInst: InstrumentConfig = {
         id,
         name,
         type: 'sample' as const,
@@ -433,17 +448,19 @@ export async function parsePumaTrackerFile(
         effects: [],
         volume: -60,
         pan: 0,
-      } as unknown as InstrumentConfig);
+      } as unknown as InstrumentConfig;
+      pumaEmptyInst.uadeChipRam = pumaChipRam;
+      instruments.push(pumaEmptyInst);
     } else {
-      instruments.push(
-        createSamplerInstrument(
-          id, name, pcm,
-          64,     // volume (full; actual volume controlled by vol script at runtime)
-          8363,   // Amiga ProTracker standard sample rate (A-3 = 8363 Hz)
-          loopStart,
-          loopEnd,
-        ),
+      const pumaSamplerInst = createSamplerInstrument(
+        id, name, pcm,
+        64,     // volume (full; actual volume controlled by vol script at runtime)
+        8363,   // Amiga ProTracker standard sample rate (A-3 = 8363 Hz)
+        loopStart,
+        loopEnd,
       );
+      pumaSamplerInst.uadeChipRam = pumaChipRam;
+      instruments.push(pumaSamplerInst);
     }
   }
 

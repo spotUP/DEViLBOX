@@ -23,6 +23,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -256,6 +257,13 @@ export async function parseICEFile(buffer: ArrayBuffer, filename: string): Promi
 
     if (byteLength === 0) {
       // Silent placeholder
+      const uadeChipRamEmpty: UADEChipRamInfo = {
+        moduleBase: 0,
+        moduleSize: buf.byteLength,
+        instrBase: OFFSET_SAMPLES + i * 30,
+        instrSize: 30,
+        sections: {},
+      };
       instruments.push({
         id,
         name: hdr.name || `Sample ${id}`,
@@ -264,6 +272,7 @@ export async function parseICEFile(buffer: ArrayBuffer, filename: string): Promi
         effects: [],
         volume: -60,
         pan: 0,
+        uadeChipRam: uadeChipRamEmpty,
       } as InstrumentConfig);
       continue;
     }
@@ -282,17 +291,24 @@ export async function parseICEFile(buffer: ArrayBuffer, filename: string): Promi
     const loopStart = hasLoop ? loopStartBytes : 0;
     const loopEnd = hasLoop ? loopStartBytes + loopLenBytes : 0;
 
-    instruments.push(
-      createSamplerInstrument(
-        id,
-        hdr.name || `Sample ${id}`,
-        rawPcm,
-        hdr.volume,
-        8287,      // Amiga standard C-3 sample rate
-        loopStart,
-        loopEnd
-      )
+    const uadeChipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: buf.byteLength,
+      instrBase: OFFSET_SAMPLES + i * 30,
+      instrSize: 30,
+      sections: {},
+    };
+    const iceInst = createSamplerInstrument(
+      id,
+      hdr.name || `Sample ${id}`,
+      rawPcm,
+      hdr.volume,
+      8287,      // Amiga standard C-3 sample rate
+      loopStart,
+      loopEnd
     );
+    iceInst.uadeChipRam = uadeChipRam;
+    instruments.push(iceInst);
   }
 
   // ── Song positions (one per order, pointing to matching pattern index) ────

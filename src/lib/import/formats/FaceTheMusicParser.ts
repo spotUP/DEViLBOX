@@ -59,6 +59,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
@@ -346,6 +347,13 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
     const pcm  = pcmData[s];
 
     if (!pcm || pcm.length === 0) {
+      const uadeChipRamEmpty: UADEChipRamInfo = {
+        moduleBase: 0,
+        moduleSize: bytes.byteLength,
+        instrBase: HEADER_SIZE + s * SAMPLE_HDR_SIZE,
+        instrSize: SAMPLE_HDR_SIZE,
+        sections: {},
+      };
       instruments.push({
         id,
         name,
@@ -354,6 +362,7 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
         effects: [],
         volume: 0,
         pan: 0,
+        uadeChipRam: uadeChipRamEmpty,
       } as unknown as InstrumentConfig);
       continue;
     }
@@ -362,17 +371,24 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
     const loopLength = loopLengths[s];
     const loopEnd    = loopLength > 0 ? loopStart + loopLength : 0;
 
-    instruments.push(
-      createSamplerInstrument(
-        id,
-        name,
-        pcm,
-        Math.round((globalVolume / 63) * 64),  // globalVolume 0-63 → 0-64
-        8287,    // FTM C-3 sample rate (per Load_ftm.cpp nC5Speed = 8287)
-        loopStart,
-        loopEnd,
-      ),
+    const uadeChipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: bytes.byteLength,
+      instrBase: HEADER_SIZE + s * SAMPLE_HDR_SIZE,
+      instrSize: SAMPLE_HDR_SIZE,
+      sections: {},
+    };
+    const samplerInst = createSamplerInstrument(
+      id,
+      name,
+      pcm,
+      Math.round((globalVolume / 63) * 64),  // globalVolume 0-63 → 0-64
+      8287,    // FTM C-3 sample rate (per Load_ftm.cpp nC5Speed = 8287)
+      loopStart,
+      loopEnd,
     );
+    samplerInst.uadeChipRam = uadeChipRam;
+    instruments.push(samplerInst);
   }
 
   // ── Build TrackerSong patterns ─────────────────────────────────────────────

@@ -38,6 +38,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import type { UADEChipRamInfo } from '@/types/instrument';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -250,6 +251,7 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
   off += 4;
 
   const numberOfSamples = u32BE(bytes, off); off += 4;
+  const sampDescTableStart = off;  // file offset of first 16-byte SAMP descriptor entry
   const samplesInfo: IS20Sample[] = [];
 
   // Each sample descriptor: 16 bytes
@@ -306,6 +308,7 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
   off += 4;
 
   const numberOfInstruments = u32BE(bytes, off); off += 4;
+  const syntTableStart = off;  // file offset of first IS20 synth instrument entry
   const synthInstruments: IS20Instrument[] = [];
 
   for (let i = 0; i < numberOfInstruments; i++) {
@@ -402,6 +405,13 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
   for (let i = 0; i < numberOfSamples; i++) {
     const samp = samplesInfo[i];
     const id = i + 1;
+    const sampChipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: bytes.length,
+      instrBase: sampDescTableStart + i * 16,
+      instrSize: 16,
+      sections: { instTable: sampDescTableStart },
+    };
     const rawPcm = samp.sampleNumber >= 0 && samp.sampleNumber < sampleData.length
       ? sampleData[samp.sampleNumber]
       : sampleData[i] ?? null;
@@ -419,11 +429,12 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
           loopEnd   = (samp.oneShotLength + samp.repeatLength) * 2;
         }
       }
-      instrConfigs.push(
-        createSamplerInstrument(id, samp.name || `Sample ${i}`, rawPcm, samp.volume, PAL_C3_RATE, loopStart, loopEnd)
-      );
+      instrConfigs.push({
+        ...createSamplerInstrument(id, samp.name || `Sample ${i}`, rawPcm, samp.volume, PAL_C3_RATE, loopStart, loopEnd),
+        uadeChipRam: sampChipRam,
+      });
     } else {
-      instrConfigs.push(makeSynthPlaceholder(id, samp.name || `Sample ${i}`));
+      instrConfigs.push({ ...makeSynthPlaceholder(id, samp.name || `Sample ${i}`), uadeChipRam: sampChipRam });
     }
   }
 
@@ -431,15 +442,23 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
   for (let i = 0; i < synthInstruments.length; i++) {
     const instr = synthInstruments[i];
     const id = numberOfSamples + i + 1;
+    const syntChipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: bytes.length,
+      instrBase: syntTableStart + i * 1010,
+      instrSize: 1010,
+      sections: { instTable: syntTableStart },
+    };
     const wave = instr.waveform1;
     const playLen = Math.min(Math.max(2, instr.waveformLength), 256);
     const pcmUint8 = new Uint8Array(playLen);
     for (let j = 0; j < playLen; j++) {
       pcmUint8[j] = wave[j % 256] & 0xff;
     }
-    instrConfigs.push(
-      createSamplerInstrument(id, instr.name || `Synth ${i}`, pcmUint8, instr.volume, SYNTH_RATE, 0, playLen)
-    );
+    instrConfigs.push({
+      ...createSamplerInstrument(id, instr.name || `Synth ${i}`, pcmUint8, instr.volume, SYNTH_RATE, 0, playLen),
+      uadeChipRam: syntChipRam,
+    });
   }
 
   // ── Build instrument number remap table ───────────────────────────────

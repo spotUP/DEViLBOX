@@ -92,7 +92,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { Pattern, ChannelData, TrackerCell, InstrumentConfig, UADEChipRamInfo } from '@/types';
 import type {
   SymphoniePlaybackData,
   SymphonieInstrumentData,
@@ -568,6 +568,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
   let patternData    = new Uint8Array(0);
   let instrumentData = new Uint8Array(0);
   let infoText       = '';
+  let instrumentChunkFileOffset = 0;  // file offset of INSTRUMENT_LIST chunk payload start
 
   while (r.canRead(4)) {
     const chunkType = r.s32be();
@@ -644,6 +645,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
 
       case CHUNK_INSTRUMENT_LIST:
         if (instrumentData.length === 0) {
+          instrumentChunkFileOffset = r.pos;  // record before length+data are consumed
           instrumentData = new Uint8Array(decodeSymArray(r));
         } else {
           if (r.canRead(4)) { const l = r.u32be(); r.skip(l); }
@@ -703,6 +705,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
   // instrument by its 1-based ID. parseSymphonieProFile will attach the full
   // SymphoniePlaybackData (and set synthType = 'SymphonieSynth') to index 0.
   const songTitle = infoText || filename.replace(/\.symmod$/i, '');
+  const SYMMOD_INST_SIZE = 256;
   const instruments: InstrumentConfig[] = symInstruments.length > 0
     ? symInstruments.map((si, i) => ({
         id:        i + 1,
@@ -712,6 +715,12 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
         effects:   [],
         volume:    si.volume ?? 0,
         pan:       0,
+        uadeChipRam: {
+          moduleBase: 0,
+          moduleSize: bytes.length,
+          instrBase:  instrumentChunkFileOffset + i * SYMMOD_INST_SIZE,  // offset into decoded instrument chunk
+          instrSize:  SYMMOD_INST_SIZE,
+        } as UADEChipRamInfo,
       } as unknown as InstrumentConfig))
     : [{
         id:        1,
@@ -721,6 +730,12 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
         effects:   [],
         volume:    0,
         pan:       0,
+        uadeChipRam: {
+          moduleBase: 0,
+          moduleSize: bytes.length,
+          instrBase:  instrumentChunkFileOffset,
+          instrSize:  SYMMOD_INST_SIZE,
+        } as UADEChipRamInfo,
       } as unknown as InstrumentConfig];
 
   // ── Build patterns ────────────────────────────────────────────────────────

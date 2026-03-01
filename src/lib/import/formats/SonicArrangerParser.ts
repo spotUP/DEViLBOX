@@ -53,6 +53,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import type { UADEChipRamInfo } from '@/types/instrument';
 
 // -- Binary helpers -----------------------------------------------------------
 
@@ -305,6 +306,7 @@ export async function parseSonicArrangerFile(
   pos += 4;
 
   const numInstruments = u32(v, pos); pos += 4;
+  const instTableStart = pos;  // file offset of first 152-byte instrument entry
   const saInstruments: SAInstrument[] = [];
   for (let i = 0; i < numInstruments; i++) {
     const base = pos;
@@ -388,6 +390,14 @@ export async function parseSonicArrangerFile(
   for (let i = 0; i < numInstruments; i++) {
     const inst = saInstruments[i];
     const id   = i + 1;
+    const instrBase = instTableStart + i * 152;
+    const chipRam: UADEChipRamInfo = {
+      moduleBase: 0,
+      moduleSize: bytes.length,
+      instrBase,
+      instrSize: 152,
+      sections: { instTable: instTableStart },
+    };
 
     if (!inst.isSynth) {
       // PCM sample instrument
@@ -398,6 +408,7 @@ export async function parseSonicArrangerFile(
           id, name: inst.name,
           type: 'sample' as const, synthType: 'Sampler' as const,
           effects: [], volume: -60, pan: 0,
+          uadeChipRam: chipRam,
         } as unknown as InstrumentConfig);
       } else {
         // Loop logic (from NostalgicPlayer Samples property):
@@ -416,9 +427,10 @@ export async function parseSonicArrangerFile(
           }
         }
 
-        instruments.push(
-          createSamplerInstrument(id, inst.name, pcm, inst.volume, 8287, loopStart, loopEnd),
-        );
+        instruments.push({
+          ...createSamplerInstrument(id, inst.name, pcm, inst.volume, 8287, loopStart, loopEnd),
+          uadeChipRam: chipRam,
+        });
       }
     } else {
       // Synth instrument — use first waveform (waveformNumber) as approximation
@@ -429,12 +441,14 @@ export async function parseSonicArrangerFile(
           id, name: inst.name,
           type: 'synth' as const, synthType: 'Sampler' as const,
           effects: [], volume: -60, pan: 0,
+          uadeChipRam: chipRam,
         } as unknown as InstrumentConfig);
       } else {
         // Use the 128-byte waveform as a single-cycle oscillator (loop entire wave)
-        instruments.push(
-          createSamplerInstrument(id, inst.name, wf, inst.volume, 8287, 0, wf.length),
-        );
+        instruments.push({
+          ...createSamplerInstrument(id, inst.name, wf, inst.volume, 8287, 0, wf.length),
+          uadeChipRam: chipRam,
+        });
       }
     }
   }
