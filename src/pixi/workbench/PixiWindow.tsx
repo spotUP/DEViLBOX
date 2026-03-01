@@ -156,6 +156,9 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   // Ref to the content area container — used to apply a Pixi clipping mask
   const contentRef = useRef<ContainerType>(null);
 
+  // Chrome visual container — cached as texture; invalidated on resize/focus/theme
+  const chromeVisualRef = useRef<ContainerType>(null);
+
   // Track previous visibility to detect changes
   const prevVisibleRef = useRef<boolean>(winState?.visible ?? false);
 
@@ -459,6 +462,21 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     };
   }, [w, contentH]);
 
+  // Enable texture caching for static chrome visuals
+  useEffect(() => {
+    const el = chromeVisualRef.current;
+    if (!el) return;
+    // Pixi v8: cacheAsTexture(true) converts the container to a cached GPU texture
+    (el as ContainerType & { cacheAsTexture?: (v: boolean) => void }).cacheAsTexture?.(true);
+  }, []);
+
+  // Invalidate cache when visible content changes
+  useEffect(() => {
+    const el = chromeVisualRef.current;
+    if (!el) return;
+    (el as ContainerType & { updateCacheTexture?: () => void }).updateCacheTexture?.();
+  }, [w, h, focused, theme]);
+
   const drawFrame = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, w, h);
@@ -564,39 +582,39 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
       eventMode="static"
       onPointerDown={handlePointerDownWindow}
     >
-      {/* Window frame */}
-      <pixiGraphics
-        draw={drawFrame}
+      {/* Chrome visuals — cached as texture. Only redrawn on resize/focus/theme. */}
+      <pixiContainer
+        ref={chromeVisualRef}
         layout={{ position: 'absolute', width: w, height: h }}
-      />
+      >
+        <pixiGraphics
+          draw={drawFrame}
+          layout={{ position: 'absolute', width: w, height: h }}
+        />
+        <pixiGraphics
+          draw={drawButtons}
+          eventMode="static"
+          hitArea={chromeHitArea}
+          onPointerDown={handleChromePointerDown}
+          cursor="pointer"
+          layout={{ position: 'absolute', width: w, height: TITLE_H }}
+        />
+        <pixiBitmapText
+          text={title.toUpperCase()}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+          tint={focused ? theme.accent.color : theme.textSecondary.color}
+          x={12}
+          y={TITLE_H / 2 - 5}
+        />
+      </pixiContainer>
 
-      {/* Chrome buttons (close / focus) — hitArea limited to button zone so title drag still works */}
-      <pixiGraphics
-        draw={drawButtons}
-        eventMode="static"
-        hitArea={chromeHitArea}
-        onPointerDown={handleChromePointerDown}
-        cursor="pointer"
-        layout={{ position: 'absolute', width: w, height: TITLE_H }}
-      />
-
-      {/* Title bar drag area — pixiGraphics gives it proper Pixi hit bounds.
-          An empty pixiContainer has 0-size bounds and is never hit-tested. */}
+      {/* Title drag — transparent hit-area, NOT cached (always interactive) */}
       <pixiGraphics
         draw={drawTitleDrag}
         eventMode="static"
         cursor="move"
         onPointerDown={handleTitlePointerDown}
         layout={{ position: 'absolute', width: w - 44, height: TITLE_H }}
-      />
-
-      {/* Title text */}
-      <pixiBitmapText
-        text={title.toUpperCase()}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
-        tint={focused ? theme.accent.color : theme.textSecondary.color}
-        x={12}
-        y={TITLE_H / 2 - 5}
       />
 
       {/* Content area — ref used to apply Pixi clipping mask (see useEffect above) */}
