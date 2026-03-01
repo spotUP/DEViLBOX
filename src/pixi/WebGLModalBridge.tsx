@@ -143,6 +143,9 @@ const LazyTrackRenameDialog = lazy(() =>
 const LazySunVoxImportDialog = lazy(() =>
   import('@/components/instruments/SunVoxImportDialog').then(m => ({ default: m.SunVoxImportDialog }))
 );
+const LazyFurnacePresetBrowser = lazy(() =>
+  import('@/components/instruments/FurnacePresetBrowser').then(m => ({ default: m.FurnacePresetBrowser }))
+);
 
 export const WebGLModalBridge: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -636,6 +639,10 @@ export const WebGLModalBridge: React.FC = () => {
           onImport={handleSunVoxImportGL}
           initialFile={pendingSunVoxFile}
         />
+      )}
+      {/* Furnace chip preset browser */}
+      {modalOpen === 'furnacePresets' && (
+        <LazyFurnacePresetBrowser onClose={closeModal} />
       )}
       {/* Arrangement clip rename dialog (F2) */}
       <LazyClipRenameDialog />

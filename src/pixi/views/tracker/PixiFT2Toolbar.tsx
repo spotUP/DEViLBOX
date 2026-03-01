@@ -585,6 +585,7 @@ export const PixiFT2Toolbar: React.FC = () => {
         <PixiButton label="Clear"       variant="ghost" size="sm" onClick={handleClearProject} />
         <PixiButton label="Order"       variant="ghost" size="sm" onClick={handleShowPatternOrder} />
         <PixiButton label="Instruments" variant="ghost" size="sm" onClick={handleShowInstruments} />
+        <PixiButton label="Furnace"     variant="ghost" size="sm" onClick={() => useUIStore.getState().openModal('furnacePresets')} />
         <PixiButton label="Pads"        variant="ghost" size="sm" onClick={handleShowDrumpads} />
         <PixiButton
           label="Master FX"
