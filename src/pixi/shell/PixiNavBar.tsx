@@ -27,6 +27,7 @@ const VIEW_WINDOWS = [
   { id: 'dj',         label: 'DJ'  },
   { id: 'vj',         label: 'VJ'  },
   { id: 'instrument', label: 'INS' },
+  { id: 'mixer',      label: 'MIX' },
 ] as const;
 
 // ─── Workspace Picker Popup ───────────────────────────────────────────────────
