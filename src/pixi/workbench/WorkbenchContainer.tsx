@@ -37,6 +37,7 @@ import { PixiArrangementView } from '../views/PixiArrangementView';
 import { PixiPianoRollView } from '../views/PixiPianoRollView';
 import { PixiVJView } from '../views/PixiVJView';
 import { PixiInstrumentEditor } from '../views/PixiInstrumentEditor';
+import { PixiMixerView } from '../views/PixiMixerView';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 
 /** Wrapper that pulls the current instrument from the store — no props needed. */
@@ -98,6 +99,7 @@ const WINDOW_CONTENT: Record<string, { title: string; component: React.Component
   dj:          { title: 'DJ',               component: PixiDJView },
   vj:          { title: 'VJ',               component: PixiVJView },
   instrument:  { title: 'Instrument Editor',component: PixiInstrumentEditorWindow },
+  mixer:       { title: 'Mixer',            component: PixiMixerView },
 };
 
 // ─── Guide line draw ──────────────────────────────────────────────────────────
