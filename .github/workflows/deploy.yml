@@ -66,11 +66,14 @@ jobs:
         run: npm ci
 
       - name: Build web app
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npm run build
 
       - name: Build Electron App
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npx electron-builder build --${{ matrix.platform }} --publish never
 
       - name: Upload Electron artifacts
