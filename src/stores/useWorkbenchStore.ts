@@ -38,15 +38,25 @@ export type WindowId =
   | 'vj'
   | 'instrument';
 
-/** Default window layout (world units, origin = top-left of canvas) */
-const DEFAULT_WINDOWS: Record<WindowId, WindowState> = {
-  tracker:     { x: 40,   y: 40,  width: 900, height: 600, zIndex: 1, visible: true,  minimized: false },
-  pianoroll:   { x: 980,  y: 300, width: 700, height: 400, zIndex: 2, visible: false, minimized: false },
-  arrangement: { x: 40,   y: 680, width: 900, height: 300, zIndex: 3, visible: false, minimized: false },
-  dj:          { x: 40,   y: 40,  width: 1100,height: 500, zIndex: 4, visible: false, minimized: false },
-  vj:          { x: 800,  y: 40,  width: 600, height: 400, zIndex: 5, visible: false, minimized: false },
-  instrument:  { x: 980,  y: 40,  width: 700, height: 260, zIndex: 6, visible: true,  minimized: false },
-};
+/** Total height of NavBar + StatusBar chrome (matches workbenchLayout.ts WORKBENCH_CHROME_H) */
+const CHROME_H = 130;
+
+/** Default window layout computed from screen dimensions at load time. */
+function computeDefaultWindows(): Record<WindowId, WindowState> {
+  const ww = typeof window !== 'undefined' ? window.innerWidth  : 1280;
+  const wh = typeof window !== 'undefined' ? window.innerHeight : 768;
+  const workbenchH = Math.max(400, wh - CHROME_H);
+  const trackerW   = Math.max(700, ww - 80);
+  const trackerH   = Math.max(500, workbenchH - 20);
+  return {
+    tracker:     { x: 20, y: 10, width: trackerW, height: trackerH,         zIndex: 1, visible: true,  minimized: false },
+    pianoroll:   { x: 20, y: trackerH + 80, width: 900,      height: 400,   zIndex: 2, visible: false, minimized: false },
+    arrangement: { x: 20, y: trackerH + 80, width: trackerW, height: 300,   zIndex: 3, visible: false, minimized: false },
+    dj:          { x: 20, y: 10, width: Math.min(1100, ww - 80), height: 500, zIndex: 4, visible: false, minimized: false },
+    vj:          { x: 800, y: 40, width: 600, height: 400,                  zIndex: 5, visible: false, minimized: false },
+    instrument:  { x: 20, y: trackerH + 80, width: 700, height: 260,        zIndex: 6, visible: true,  minimized: false },
+  };
+}
 
 interface WorkbenchStore {
   // Camera state
@@ -108,7 +118,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
   persist(
     immer((set, get) => ({
       camera: { x: 0, y: 0, scale: 1 },
-      windows: { ...DEFAULT_WINDOWS } as Record<string, WindowState>,
+      windows: computeDefaultWindows() as Record<string, WindowState>,
       maxZIndex: 10,
       workspaces: {},
       minimapVisible: true,
@@ -263,8 +273,9 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       resetLayout: () =>
         set((state) => {
+          const defaults = computeDefaultWindows();
           state.windows = Object.fromEntries(
-            Object.entries(DEFAULT_WINDOWS).map(([id, w]) => [id, { ...w }])
+            Object.entries(defaults).map(([id, w]) => [id, { ...w }])
           ) as Record<string, WindowState>;
           state.camera = { x: 0, y: 0, scale: 1 };
           state.maxZIndex = 10;
@@ -272,7 +283,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
     })),
     {
       name: 'devilbox-workbench',
-      version: 1,
+      version: 2,
       partialize: (state) => ({
         camera: state.camera,
         windows: state.windows,
