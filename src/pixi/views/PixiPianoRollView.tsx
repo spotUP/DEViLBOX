@@ -30,7 +30,7 @@ const QWERTY_NOTE_MAP: Record<string, number> = {
   i: 24, '9': 25, o: 26, '0': 27, p: 28,
 };
 
-export const PixiPianoRollView: React.FC = () => {
+export const PixiPianoRollView: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
   const theme = usePixiTheme();
   const themeColors = useThemeStore(s => s.getCurrentTheme().colors);
   const tool = usePianoRollStore(s => s.tool);
@@ -274,6 +274,7 @@ export const PixiPianoRollView: React.FC = () => {
         <PixiDOMOverlay
           layout={{ height: 24, width: 100 }}
           style={{ overflow: 'visible' }}
+          visible={isActive}
         >
           <select
             value="pianoroll"
