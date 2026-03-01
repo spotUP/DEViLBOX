@@ -8,6 +8,7 @@ import { parse } from './parser.js';
 import { resolve } from './resolver.js';
 import { emit } from './emitter.js';
 import { genWrapper, genCMake } from './gen-wrapper.js';
+import { restructure } from './restructure.js';
 
 const program = new Command();
 
@@ -22,6 +23,7 @@ program
   .option('--no-wrapper', 'Skip Wrapper.c / CMakeLists.txt generation')
   .option('--dry-run', 'Parse and report only, no output files')
   .option('--verbose', 'Show symbol table and warnings')
+  .option('--pass2', 'Enable Pass 2 restructuring (experimental)', false)
   .action((inputs: string[], opts) => {
     for (const inputPath of inputs) {
       const source = readFileSync(inputPath, 'utf8');
@@ -42,6 +44,7 @@ program
       }
 
       const cOutput = emit(ast, resolved);
+      const finalOutput = opts.pass2 ? restructure(cOutput) : cOutput;
 
       if (opts.dryRun) {
         console.log(`[${name}] Dry run complete. ${ast.length} AST nodes.`);
@@ -49,7 +52,7 @@ program
       }
 
       mkdirSync(outDir, { recursive: true });
-      writeFileSync(join(outDir, `${name}.c`), cOutput);
+      writeFileSync(join(outDir, `${name}.c`), finalOutput);
       writeFileSync(join(outDir, `${name}.h`), genHeader(name, resolved.exports));
 
       if (opts.wrapper !== false) {
