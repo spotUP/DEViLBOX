@@ -561,7 +561,7 @@ export class InstrumentFactory {
       case 'FurnaceYMZ280B': case 'FurnaceX1_010': case 'FurnaceMSM6258':
       case 'FurnaceMSM5232': case 'FurnaceMULTIPCM': case 'FurnaceNAMCO':
       case 'FurnacePCMDAC': case 'FurnaceBUBBLE': case 'FurnaceSM8521':
-      case 'FurnaceT6W28': case 'FurnaceSUPERVISION': case 'FurnaceUPD1771': {
+      case 'FurnaceT6W28': case 'FurnaceSUPERVISION': case 'FurnaceUPD1771': case 'FurnaceSCVTONE': {
         const dispatchPlatform = SYNTH_TO_DISPATCH[config.synthType];
         if (dispatchPlatform !== undefined) {
           instrument = new FurnaceDispatchSynth(dispatchPlatform);
