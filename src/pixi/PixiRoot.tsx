@@ -23,6 +23,7 @@ import { Rectangle } from 'pixi.js';
 import type { Container as ContainerType } from 'pixi.js';
 import { usePixiTheme } from './theme';
 import { getAverageFps } from './performance';
+import { NAV_H, STATUS_BAR_H } from './workbench/workbenchLayout';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -115,8 +116,8 @@ export const PixiRoot: React.FC = () => {
         flexDirection: 'column',
       }}
     >
-      {/* Navigation bar — pure Pixi */}
-      <pixiContainer ref={navBarLayerRef} layout={{ width: '100%' }}>
+      {/* Navigation bar — pure Pixi; explicit height prevents implicit child dependency */}
+      <pixiContainer ref={navBarLayerRef} layout={{ width: '100%', height: NAV_H }}>
         <PixiNavBar />
       </pixiContainer>
 
@@ -125,8 +126,8 @@ export const PixiRoot: React.FC = () => {
         <WorkbenchContainer />
       </pixiContainer>
 
-      {/* Status bar */}
-      <pixiContainer ref={statusBarLayerRef} layout={{ width: '100%' }}>
+      {/* Status bar; explicit height prevents implicit child dependency */}
+      <pixiContainer ref={statusBarLayerRef} layout={{ width: '100%', height: STATUS_BAR_H }}>
         <PixiStatusBar />
       </pixiContainer>
 
