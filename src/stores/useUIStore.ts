@@ -148,6 +148,11 @@ interface UIStore {
   showFileBrowser: boolean;
   showChannelNames: boolean;
 
+  // Non-editable song dialog
+  nonEditableDialogOpen: boolean;
+  openNonEditableDialog: () => void;
+  closeNonEditableDialog: () => void;
+
   // Dialog bridge actions
   openDialogCommand: (dialog: DialogCommand) => void;
   closeDialogCommand: () => void;
@@ -216,6 +221,9 @@ export const useUIStore = create<UIStore>()(
       dialogOpen: null,
       showFileBrowser: false,
       showChannelNames: false,
+
+      // Non-editable song dialog
+      nonEditableDialogOpen: false,
 
       // Actions
       togglePanel: (panel) =>
@@ -486,6 +494,12 @@ export const useUIStore = create<UIStore>()(
         set((state) => {
           state.pendingSunVoxFile = file;
         }),
+
+      // Non-editable song dialog actions
+      openNonEditableDialog: () =>
+        set((state) => { state.nonEditableDialogOpen = true; }),
+      closeNonEditableDialog: () =>
+        set((state) => { state.nonEditableDialogOpen = false; }),
 
       // Dialog bridge actions
       openDialogCommand: (dialog) =>

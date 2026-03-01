@@ -31,6 +31,7 @@ import { SYSTEM_PRESETS, DivChanType, getGroupedPresets } from '@/constants/syst
 import { CHANNEL_COLORS } from '@typedefs';
 import { StrumDialog } from '@components/dialogs/StrumDialog';
 import { AdvancedEditModal } from '@components/dialogs/AdvancedEditModal';
+import { NonEditableDialog } from '@components/dialogs/NonEditableDialog';
 import { KeyboardShortcutSheet } from './KeyboardShortcutSheet';
 import { EffectPicker } from './EffectPicker';
 import { UndoHistoryPanel } from './UndoHistoryPanel';
@@ -969,6 +970,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         <FindReplaceDialog isOpen={showFindReplace} onClose={() => setShowFindReplace(false)} />
         <KeyboardShortcutSheet isOpen={showShortcutSheet} onClose={() => setShowShortcutSheet(false)} />
       <StrumDialog isOpen={showStrum} onClose={() => setShowStrum(false)} />
+      <NonEditableDialog />
       <EffectPicker
         isOpen={showEffectPicker}
         onSelect={(effTyp, eff) => {
@@ -1479,6 +1481,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       <FindReplaceDialog isOpen={showFindReplace} onClose={() => setShowFindReplace(false)} />
       <KeyboardShortcutSheet isOpen={showShortcutSheet} onClose={() => setShowShortcutSheet(false)} />
       <StrumDialog isOpen={showStrum} onClose={() => setShowStrum(false)} />
+      <NonEditableDialog />
       <EffectPicker
         isOpen={showEffectPicker}
         onSelect={(effTyp, eff) => {
