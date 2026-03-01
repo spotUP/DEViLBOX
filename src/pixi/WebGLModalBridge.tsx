@@ -131,6 +131,9 @@ const LazyImportAudioDialog = lazy(() =>
 const LazyImportTD3Dialog = lazy(() =>
   import('@/components/dialogs/ImportTD3Dialog').then(m => ({ default: m.ImportTD3Dialog }))
 );
+const LazyClipRenameDialog = lazy(() =>
+  import('@/components/arrangement/ClipRenameDialog').then(m => ({ default: m.ClipRenameDialog }))
+);
 const LazySunVoxImportDialog = lazy(() =>
   import('@/components/instruments/SunVoxImportDialog').then(m => ({ default: m.SunVoxImportDialog }))
 );
@@ -628,6 +631,9 @@ export const WebGLModalBridge: React.FC = () => {
           initialFile={pendingSunVoxFile}
         />
       )}
+      {/* Arrangement clip rename dialog (F2) */}
+      <LazyClipRenameDialog />
+
       {/* Always-mounted dialogs */}
       <LazySynthErrorDialog />
       <LazyRomUploadDialog />
