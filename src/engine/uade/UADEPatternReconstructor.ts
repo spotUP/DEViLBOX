@@ -256,8 +256,8 @@ export function reconstructPatterns(
             }
 
             // Set volume column if volume is not default max (64)
-            if (state.volume > 0 && state.volume < 64) {
-              // XM volume column: 0x10 + vol (0-64)
+            if (state.volume >= 0 && state.volume < 64) {
+              // XM volume column: 0x10 + vol (0-64); vol=0 → 0x10 (explicit mute)
               cell.volume = 0x10 + Math.min(64, state.volume);
             } else if (state.volume === 64) {
               // Full volume — leave volume column empty (0x00 means nothing)
