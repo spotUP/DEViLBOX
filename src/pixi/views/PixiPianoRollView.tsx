@@ -389,6 +389,17 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           channelIndex={view.channelIndex}
           selectedNotes={selectedNotes}
           onNotesChanged={handleNotesChanged}
+          onSelectNote={(id, add) => usePianoRollStore.getState().selectNote(id, add)}
+          onDeselectAll={() => usePianoRollStore.getState().clearSelection()}
+          onSelectBox={(ids) => usePianoRollStore.getState().selectNotes(ids)}
+          onMoveNotes={(ids, dr, dp) => {
+            ids.forEach(id => pianoData.moveNote(id, dr, dp));
+            handleNotesChanged();
+          }}
+          onResizeNote={(id, newEndRow) => {
+            pianoData.resizeNote(id, newEndRow);
+            handleNotesChanged();
+          }}
         />
       </pixiContainer>
 
