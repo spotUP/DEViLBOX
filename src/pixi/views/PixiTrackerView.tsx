@@ -172,7 +172,7 @@ export const PixiTrackerView: React.FC = () => {
               width: viewMode === 'tracker' && editorMode === 'classic' ? '100%' : 0,
             }}
           >
-            <PixiPatternEditor width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+            <PixiPatternEditor width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} isActive={viewMode === 'tracker' && editorMode === 'classic'} />
           </pixiContainer>
 
           {/* Grid sequencer — native Pixi */}
@@ -186,7 +186,7 @@ export const PixiTrackerView: React.FC = () => {
               width: viewMode === 'grid' ? '100%' : 0,
             }}
           >
-            <PixiGridSequencer channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+            <PixiGridSequencer channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} isActive={viewMode === 'grid'} />
           </pixiContainer>
 
           {/* Piano Roll — native Pixi (existing PixiPianoRollView) */}

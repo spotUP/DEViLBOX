@@ -89,9 +89,11 @@ function probColor(val: number): number {
 interface PixiPatternEditorProps {
   width: number;
   height: number;
+  /** When false, always-visible PixiDOMOverlay children are hidden to prevent leaking when this view is inactive. */
+  isActive?: boolean;
 }
 
-export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, height }) => {
+export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, height, isActive = true }) => {
   const theme = usePixiTheme();
 
   // ── Store subscriptions ────────────────────────────────────────────────────
@@ -1115,6 +1117,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       <PixiDOMOverlay
         layout={{ width, height: HEADER_HEIGHT }}
         style={{ overflow: 'hidden', zIndex: 20, borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+        visible={isActive}
       >
         <ChannelHeaderDOM
           pattern={pattern}
@@ -1208,6 +1211,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       <PixiDOMOverlay
         layout={{ position: 'absolute', width, height, left: 0, top: 0 }}
         style={{ pointerEvents: 'none', zIndex: 30 }}
+        visible={isActive}
       >
         {/* Cell context menu */}
         <CellContextMenu
