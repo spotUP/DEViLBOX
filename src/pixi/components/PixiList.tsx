@@ -13,6 +13,8 @@ interface PixiListItem {
   id: string;
   label: string;
   sublabel?: string;
+  /** Hex color for a small category dot rendered before the label */
+  dotColor?: number;
 }
 
 interface PixiListProps {
@@ -171,6 +173,16 @@ export const PixiList: React.FC<PixiListProps> = ({
               layout={{ position: 'absolute', width: width - 10, height: itemHeight }}
             />
 
+            {item.dotColor != null && (
+              <pixiGraphics
+                draw={(g) => {
+                  g.clear();
+                  g.roundRect(0, 0, 6, 6, 1);
+                  g.fill({ color: item.dotColor! });
+                }}
+                layout={{ width: 6, height: 6, flexShrink: 0, marginRight: 5 }}
+              />
+            )}
             <pixiBitmapText
               text={item.label}
               style={{

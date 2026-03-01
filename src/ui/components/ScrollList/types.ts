@@ -3,6 +3,8 @@ export interface ScrollListItem {
   label: string;
   /** Secondary label shown muted (e.g. synth type) */
   sublabel?: string;
+  /** GL only: hex color for the small category dot rendered before the label */
+  dotColor?: number;
 }
 
 export interface ScrollListProps {
