@@ -13,15 +13,26 @@ import { PixiScrollbar } from './pianoroll/PixiScrollbar';
 import { PixiVelocityLane } from './pianoroll/PixiVelocityLane';
 import { usePianoRollStore, useUIStore, useTransportStore } from '@stores';
 import { useTrackerStore } from '@stores';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { usePianoRollData } from '@/hooks/pianoroll/usePianoRollData';
 import { useHistoryStore } from '@/stores/useHistoryStore';
+import { getToneEngine } from '@/engine/ToneEngine';
+import { patternToPianoRollNotes } from '@/hooks/pianoroll/usePianoRollData';
 import { TITLE_H } from '../workbench/PixiWindow';
 
 const VELOCITY_HEIGHT = 80;
 const TOOLBAR_HEIGHT = 36;
 const KEYBOARD_WIDTH = 60;
 const SCROLLBAR_SIZE = 8;
+
+const CHANNEL_COLORS = [0x4a9eff, 0xff6b6b, 0x51cf66, 0xffd43b, 0xcc5de8, 0xff922b, 0x20c997, 0xf06595];
+
+const MIDI_NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function midiToNoteStr(midi: number): string {
+  const oct = Math.floor(midi / 12);
+  return MIDI_NOTE_NAMES[midi % 12] + oct;
+}
 
 const GRID_DIVISIONS = [1, 2, 4, 8, 16];
 
@@ -75,6 +86,9 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
 
   // Hover ref for scroll event gating
   const isHoveredRef = useRef(false);
+
+  // Track held piano key for MIDI note release
+  const heldPitchRef = useRef<number | null>(null);
 
   // Wheel → scroll the piano roll (horizontal = beat scroll, vertical = note scroll)
   useEffect(() => {
@@ -291,6 +305,37 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
     [pianoData.notes, noteVersion],
   );
 
+  // Derive multi-channel notes for the "all channels" overview mode
+  const allChannelNotes = useMemo(() => {
+    if (!view.multiChannel) return null;
+    const ts = useTrackerStore.getState();
+    const pattern = ts.patterns[ts.currentPatternIndex];
+    if (!pattern) return null;
+    const allNotes = patternToPianoRollNotes(pattern);
+    return allNotes.map(n => ({
+      note: n.midiNote,
+      start: n.startRow,
+      duration: n.endRow - n.startRow,
+      velocity: n.velocity,
+      channelIndex: n.channelIndex,
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.multiChannel, noteVersion]);
+
+  // Release a held piano key — stop audio preview
+  const handlePianoKeyRelease = useCallback((_pitch: number) => {
+    const held = heldPitchRef.current;
+    if (held === null) return;
+    heldPitchRef.current = null;
+    const instrumentId = useInstrumentStore.getState().currentInstrumentId;
+    const instruments = useInstrumentStore.getState().instruments;
+    const instrument = instruments.find(i => i.id === instrumentId);
+    if (!instrument) return;
+    const engine = getToneEngine();
+    const note = midiToNoteStr(held);
+    engine.triggerNoteRelease(instrumentId!, note, 0, instrument.config);
+  }, []);
+
   // Piano keyboard click handler — Shift+click adds to chord buffer, plain click plays note
   const handlePianoKeyClick = useCallback((pitch: number, shiftHeld: boolean) => {
     const store = usePianoRollStore.getState();
@@ -309,7 +354,33 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
         handleNotesChanged();
       }
     }
-  }, [pianoData, handleNotesChanged]);
+
+    // Trigger audio preview for any click (not shift)
+    if (!shiftHeld) {
+      const instrumentId = useInstrumentStore.getState().currentInstrumentId;
+      const instruments = useInstrumentStore.getState().instruments;
+      const instrument = instruments.find(i => i.id === instrumentId);
+      if (instrument) {
+        // Release previously held key if any
+        if (heldPitchRef.current !== null) {
+          const engine = getToneEngine();
+          const prevNote = midiToNoteStr(heldPitchRef.current);
+          engine.triggerNoteRelease(instrumentId!, prevNote, 0, instrument.config);
+        }
+        heldPitchRef.current = pitch;
+        const engine = getToneEngine();
+        const note = midiToNoteStr(pitch);
+        engine.triggerNoteAttack(instrumentId!, note, 0, 100, instrument.config);
+
+        // Also release on global pointerup (handles release outside the canvas)
+        const onGlobalUp = () => {
+          document.removeEventListener('pointerup', onGlobalUp);
+          handlePianoKeyRelease(pitch);
+        };
+        document.addEventListener('pointerup', onGlobalUp, { once: true });
+      }
+    }
+  }, [pianoData, handleNotesChanged, handlePianoKeyRelease]);
 
   const handleCycleGrid = useCallback(() => {
     const s = usePianoRollStore.getState();
@@ -414,6 +485,16 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           onClick={handleToggleSnap}
         />
 
+        {/* All-channels overview toggle */}
+        <PixiButton
+          label="ALL CH"
+          variant={view.multiChannel ? 'ft2' : 'ghost'}
+          color={view.multiChannel ? 'blue' : undefined}
+          size="sm"
+          active={view.multiChannel}
+          onClick={() => usePianoRollStore.getState().setMultiChannel(!view.multiChannel)}
+        />
+
         <pixiContainer layout={{ flex: 1 }} />
 
         {/* Channel switcher */}
@@ -457,6 +538,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           scrollNote={view.scrollY}
           chordBuffer={chordBuffer}
           onKeyClick={handlePianoKeyClick}
+          onKeyRelease={handlePianoKeyRelease}
         />
         <pixiContainer layout={{ flex: 1, flexDirection: 'column' }}>
         <PixiPianoRollGrid
@@ -470,6 +552,8 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           channelIndex={view.channelIndex}
           selectedNotes={selectedNotes}
           playbackBeat={isPlaying ? currentGlobalRow : undefined}
+          allChannelNotes={allChannelNotes ?? undefined}
+          channelColors={CHANNEL_COLORS}
           onNotesChanged={handleNotesChanged}
           onSelectNote={(id, add) => usePianoRollStore.getState().selectNote(id, add)}
           onDeselectAll={() => usePianoRollStore.getState().clearSelection()}
