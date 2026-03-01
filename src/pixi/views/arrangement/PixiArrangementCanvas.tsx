@@ -41,6 +41,7 @@ interface PixiArrangementCanvasProps {
   playbackBeat?: number;
   clips?: ClipRenderData[];
   trackHeight?: number;
+  scrollY?: number;
   tool?: ArrangementToolMode;
   snapDivision?: number;
   /** Called when a clip is clicked in select mode */
@@ -89,13 +90,13 @@ function snapRow(row: number, division: number): number {
 function findClipAt(
   lx: number, ly: number,
   clips: ClipRenderData[],
-  scrollBeat: number, pixelsPerBeat: number, trackHeight: number
+  scrollBeat: number, pixelsPerBeat: number, trackHeight: number, scrollY: number
 ): { id: string; mode: 'move' | 'resize-end' } | null {
   for (let i = clips.length - 1; i >= 0; i--) {
     const clip = clips[i];
     const cx = (clip.startRow - scrollBeat) * pixelsPerBeat;
     const cw = clip.lengthRows * pixelsPerBeat;
-    const cy = RULER_HEIGHT + clip.trackIndex * trackHeight + CLIP_PADDING;
+    const cy = RULER_HEIGHT + clip.trackIndex * trackHeight + CLIP_PADDING - scrollY;
     const ch = trackHeight - CLIP_PADDING * 2;
     if (lx >= cx + CLIP_PADDING && lx <= cx + cw - CLIP_PADDING && ly >= cy && ly <= cy + ch) {
       const isResizeZone = lx >= cx + cw - CLIP_PADDING - RESIZE_ZONE_PX && cw > RESIZE_ZONE_PX * 2;
@@ -108,14 +109,14 @@ function findClipAt(
 function findClipsInBox(
   lx1: number, ly1: number, lx2: number, ly2: number,
   clips: ClipRenderData[],
-  scrollBeat: number, pixelsPerBeat: number, trackHeight: number
+  scrollBeat: number, pixelsPerBeat: number, trackHeight: number, scrollY: number
 ): string[] {
   const bx1 = Math.min(lx1, lx2), bx2 = Math.max(lx1, lx2);
   const by1 = Math.min(ly1, ly2), by2 = Math.max(ly1, ly2);
   return clips.filter(clip => {
     const cx = (clip.startRow - scrollBeat) * pixelsPerBeat;
     const cw = clip.lengthRows * pixelsPerBeat;
-    const cy = RULER_HEIGHT + clip.trackIndex * trackHeight + CLIP_PADDING;
+    const cy = RULER_HEIGHT + clip.trackIndex * trackHeight + CLIP_PADDING - scrollY;
     const ch = trackHeight - CLIP_PADDING * 2;
     return cx + cw > bx1 && cx < bx2 && cy + ch > by1 && cy < by2;
   }).map(c => c.id);
@@ -131,6 +132,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
   playbackBeat,
   clips = [],
   trackHeight = 40,
+  scrollY = 0,
   tool = 'select',
   snapDivision = 4,
   onSelectClip,
@@ -146,8 +148,8 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
   const gridHeight = height - RULER_HEIGHT;
 
   // Keep latest params/callbacks in refs so drag handlers don't go stale
-  const paramsRef = useRef({ scrollBeat, pixelsPerBeat, trackHeight, clips, tool, snapDivision, width, height, theme });
-  paramsRef.current = { scrollBeat, pixelsPerBeat, trackHeight, clips, tool, snapDivision, width, height, theme };
+  const paramsRef = useRef({ scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme });
+  paramsRef.current = { scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme };
 
   const callbacksRef = useRef({ onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip });
   callbacksRef.current = { onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip };
@@ -163,7 +165,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
     g.clear();
     if (!drag.didDrag) return;
 
-    const { scrollBeat: sb, pixelsPerBeat: ppb, trackHeight: th, snapDivision: snap } = paramsRef.current;
+    const { scrollBeat: sb, pixelsPerBeat: ppb, trackHeight: th, snapDivision: snap, scrollY: sy } = paramsRef.current;
     const { theme: t } = paramsRef.current;
 
     if (drag.mode === 'box') {
@@ -191,7 +193,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         const newStart = Math.max(0, orig.startRow + dr);
         const newTrackIdx = Math.max(0, orig.trackIndex + dt);
         const cx = (newStart - sb) * ppb;
-        const cy = RULER_HEIGHT + newTrackIdx * th + CLIP_PADDING;
+        const cy = RULER_HEIGHT + newTrackIdx * th + CLIP_PADDING - sy;
         const cw = orig.lengthRows * ppb;
         const ch = th - CLIP_PADDING * 2;
         g.roundRect(cx + CLIP_PADDING, cy, cw - CLIP_PADDING * 2, ch, 3);
@@ -209,7 +211,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       const newEndRow = Math.max(orig.startRow + 1, snapRow(rawEndRow, snap));
       const cx = (orig.startRow - sb) * ppb;
       const cw = Math.max(4, (newEndRow - orig.startRow) * ppb);
-      const cy = RULER_HEIGHT + orig.trackIndex * th + CLIP_PADDING;
+      const cy = RULER_HEIGHT + orig.trackIndex * th + CLIP_PADDING - sy;
       const ch = th - CLIP_PADDING * 2;
       g.roundRect(cx + CLIP_PADDING, cy, cw - CLIP_PADDING * 2, ch, 3);
       g.fill({ color: orig.color, alpha: 0.5 });
@@ -224,7 +226,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       const endRow = Math.max(startRow + Math.max(1, snap), snapRow(rawEndRow, snap));
       const cx = (startRow - sb) * ppb;
       const cw = Math.max(4, (endRow - startRow) * ppb);
-      const cy = RULER_HEIGHT + drag.drawTrackIndex * th + CLIP_PADDING;
+      const cy = RULER_HEIGHT + drag.drawTrackIndex * th + CLIP_PADDING - sy;
       const ch = th - CLIP_PADDING * 2;
       g.roundRect(cx + CLIP_PADDING, cy, cw - CLIP_PADDING * 2, ch, 3);
       g.fill({ color: 0x4a9eff, alpha: 0.35 });
@@ -238,11 +240,11 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
     const pos = e.getLocalPosition(e.currentTarget as any);
     const lx = pos.x;
     const ly = pos.y;
-    const { clips: cs, tool: t, scrollBeat: sb, pixelsPerBeat: ppb, trackHeight: th, snapDivision: snap } = paramsRef.current;
+    const { clips: cs, tool: t, scrollBeat: sb, pixelsPerBeat: ppb, trackHeight: th, snapDivision: snap, scrollY: sy } = paramsRef.current;
     const cbs = callbacksRef.current;
 
-    const hit = findClipAt(lx, ly, cs, sb, ppb, th);
-    const trackIndex = Math.max(0, Math.floor((ly - RULER_HEIGHT) / th));
+    const hit = findClipAt(lx, ly, cs, sb, ppb, th, sy);
+    const trackIndex = Math.max(0, Math.floor((ly - RULER_HEIGHT + sy) / th));
     const rowAtCursor = sb + lx / ppb;
 
     // Erase tool
@@ -339,7 +341,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       if (g) g.clear();
 
       if (!drag) return;
-      const { scrollBeat: sb2, pixelsPerBeat: ppb2, trackHeight: th2, snapDivision: snap2, clips: cs2 } = paramsRef.current;
+      const { scrollBeat: sb2, pixelsPerBeat: ppb2, trackHeight: th2, snapDivision: snap2, clips: cs2, scrollY: sy2 } = paramsRef.current;
       const cbs2 = callbacksRef.current;
       const cameraScale = useWorkbenchStore.getState().camera.scale;
       const currentLocalX = drag.startLocalX + (ue.clientX - drag.startGlobalX) / cameraScale;
@@ -354,7 +356,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       }
 
       if (drag.mode === 'box') {
-        const ids = findClipsInBox(drag.startLocalX, drag.startLocalY, currentLocalX, currentLocalY, cs2, sb2, ppb2, th2);
+        const ids = findClipsInBox(drag.startLocalX, drag.startLocalY, currentLocalX, currentLocalY, cs2, sb2, ppb2, th2, sy2);
         cbs2.onSelectBox?.(ids);
         return;
       }
@@ -410,7 +412,8 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       ? Math.max(...clips.map(c => c.trackIndex)) + 1
       : 0;
     for (let t = 1; t <= numTracks; t++) {
-      const ty = RULER_HEIGHT + t * trackHeight;
+      const ty = RULER_HEIGHT + t * trackHeight - scrollY;
+      if (ty < RULER_HEIGHT) continue;
       if (ty > height) break;
       g.rect(0, ty, width, 1);
       g.fill({ color: theme.border.color, alpha: 0.15 });
@@ -433,9 +436,10 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
     for (const clip of clips) {
       const cx = (clip.startRow - scrollBeat) * pixelsPerBeat;
       const cw = clip.lengthRows * pixelsPerBeat;
-      const cy = RULER_HEIGHT + clip.trackIndex * trackHeight + CLIP_PADDING;
+      const cy = RULER_HEIGHT + clip.trackIndex * trackHeight + CLIP_PADDING - scrollY;
       const ch = trackHeight - CLIP_PADDING * 2;
       if (cx + cw < 0 || cx > width) continue;
+      if (cy + ch < RULER_HEIGHT || cy > height) continue;
 
       g.roundRect(cx + CLIP_PADDING, cy, cw - CLIP_PADDING * 2, ch, 3);
       g.fill({ color: clip.color, alpha: clip.muted ? 0.15 : 0.35 });
@@ -472,7 +476,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         g.fill({ color: theme.accent.color, alpha: 0.8 });
       }
     }
-  }, [width, height, scrollBeat, pixelsPerBeat, totalBeats, beatsPerBar, playbackBeat, theme, gridHeight, clips, trackHeight]);
+  }, [width, height, scrollBeat, scrollY, pixelsPerBeat, totalBeats, beatsPerBar, playbackBeat, theme, gridHeight, clips, trackHeight]);
 
   const barLabels = useMemo(() => {
     const labels: { x: number; text: string }[] = [];
@@ -495,11 +499,13 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       const cx = (clip.startRow - scrollBeat) * pixelsPerBeat;
       const cw = clip.lengthRows * pixelsPerBeat;
       if (cx + cw < 0 || cx > width) continue;
+      const cy = RULER_HEIGHT + clip.trackIndex * trackHeight + CLIP_PADDING - scrollY;
+      if (cy + trackHeight < RULER_HEIGHT || cy > height) continue;
       if (cw > 30) {
         labels.push({
           id: clip.id,
           x: cx + CLIP_PADDING + 4,
-          y: RULER_HEIGHT + clip.trackIndex * trackHeight + CLIP_PADDING + 6,
+          y: cy + 6,
           text: clip.name.length > 20 ? clip.name.slice(0, 18) + '..' : clip.name,
           color: clip.color,
           muted: clip.muted,
@@ -507,7 +513,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       }
     }
     return labels;
-  }, [clips, scrollBeat, pixelsPerBeat, width, trackHeight]);
+  }, [clips, scrollBeat, scrollY, pixelsPerBeat, width, height, trackHeight]);
 
   return (
     <pixiContainer
