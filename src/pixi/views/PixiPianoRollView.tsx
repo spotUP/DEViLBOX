@@ -37,7 +37,7 @@ const QWERTY_NOTE_MAP: Record<string, number> = {
   i: 24, '9': 25, o: 26, '0': 27, p: 28,
 };
 
-export const PixiPianoRollView: React.FC<{ isActive?: boolean }> = ({ isActive = true }) => {
+export const PixiPianoRollView: React.FC<{ isActive?: boolean }> = ({ isActive: _isActive = true }) => {
   const theme = usePixiTheme();
   const tool = usePianoRollStore(s => s.tool);
   const setTool = usePianoRollStore(s => s.setTool);
