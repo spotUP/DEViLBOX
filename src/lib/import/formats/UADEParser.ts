@@ -411,6 +411,14 @@ export async function parseUADEFile(
   // (avoids a second full scan which can take several seconds per file)
   const engine = UADEEngine.getInstance();
   await engine.ready();
+
+  // Enable CIA tick snapshot capture BEFORE the scan so snapshots are accumulated
+  // during UADE's internal enhanced scan playback.
+  if (mode === 'enhanced' && !preScannedMeta) {
+    engine.enableTickSnapshots(true);
+    engine.resetTickSnapshots();
+  }
+
   const metadata = preScannedMeta ?? await engine.load(buffer, filename);
   const scanRows = metadata.scanData ?? [];
 
@@ -955,6 +963,53 @@ export async function parseUADEFile(
       await analyzer.analyzeAndPopulate(song.instruments, activeEnhancedScan);
     } catch (e) {
       console.warn('[UADEParser] UADEFormatAnalyzer failed:', e);
+    }
+
+    // CIA tick snapshot reconstruction: replace display-only patterns with
+    // editable patterns derived from real Paula DMA trigger events.
+    // Conservative: only replaces when reconstruction yields ≥ 1 pattern.
+    try {
+      const tickSnapshots = await engine.getTickSnapshots();
+      engine.enableTickSnapshots(false);
+
+      if (tickSnapshots.length >= 2) {
+        const { reconstructPatterns } = await import('@engine/uade/UADEPatternReconstructor');
+
+        // Build samplePtr → instrument index map from the enhanced scan's sample table.
+        // Keys are chip RAM addresses (lc register values) seen during scan.
+        const samplePtrToInstrIndex = new Map<number, number>();
+        let instrIdx = 1;
+        for (const ptrStr of Object.keys(activeEnhancedScan.samples)) {
+          samplePtrToInstrIndex.set(Number(ptrStr), instrIdx++);
+        }
+
+        const reconstructed = reconstructPatterns(
+          tickSnapshots,
+          samplePtrToInstrIndex,
+          song.numChannels,
+        );
+
+        if (reconstructed.warnings.length > 0) {
+          console.warn('[UADEParser] Reconstructor warnings:', reconstructed.warnings);
+        }
+
+        if (reconstructed.patterns.length > 0) {
+          // Replace the scan-row display patterns with tick-reconstructed editable patterns.
+          // The instruments (from enhanced scan PCM extraction) are kept unchanged.
+          song.patterns = reconstructed.patterns;
+          song.songPositions = reconstructed.patterns.map((_, i) => i);
+          song.songLength = reconstructed.patterns.length;
+          song.initialSpeed = reconstructed.speed;
+          console.log(
+            `[UADEParser] CIA tick reconstructor: ${reconstructed.patterns.length} patterns, speed=${reconstructed.speed}`,
+          );
+        }
+      } else {
+        engine.enableTickSnapshots(false);
+      }
+    } catch (e) {
+      console.warn('[UADEParser] CIA tick pattern reconstruction failed (non-critical):', e);
+      engine.enableTickSnapshots(false);
     }
 
     // Fall back to classic if enhanced scan yielded no playable instruments.
