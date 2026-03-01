@@ -80,6 +80,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult): string {
   // Walk AST
   let inFunction = false;
   let pendingLabel: string | undefined;
+  let anonCount = 0;
 
   for (let i = 0; i < ast.length; i++) {
     const node = ast[i];
@@ -117,6 +118,12 @@ export function emit(ast: AstNode[], resolved: ResolveResult): string {
 
         if (next?.kind === 'instruction' || next?.kind === 'label') {
           // Start a new function
+          if (next?.kind === 'label') {
+            // Note: consecutive labels — fall-through not preserved in C
+            if (inFunction) {
+              lines.push('  /* NOTE: fall-through to next label not preserved */');
+            }
+          }
           if (inFunction) lines.push('}');
           const isExported = resolved.exports.includes(node.name);
           const qualifier = isExported ? '' : 'static ';
@@ -132,7 +139,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult): string {
 
       case 'instruction': {
         if (!inFunction) {
-          lines.push('\nstatic void _anon(void) {');
+          lines.push(`\nstatic void _anon${anonCount++}(void) {`);
           inFunction = true;
         }
         const c = emitInstruction(node);
