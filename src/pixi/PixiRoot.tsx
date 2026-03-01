@@ -22,6 +22,7 @@ import { useRef } from 'react';
 import { Rectangle } from 'pixi.js';
 import type { Container as ContainerType } from 'pixi.js';
 import { usePixiTheme } from './theme';
+import { getAverageFps } from './performance';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -89,7 +90,15 @@ export const PixiRoot: React.FC = () => {
 
     if (crtEnabled) {
       if (!app.stage.filters?.includes(crt)) app.stage.filters = [crt];
-      crt.updateParams(performance.now() / 1000, crtParams);
+
+      // Adaptive quality: disable bloom when FPS is low (< 45), re-enable when recovered (> 55)
+      const fps = getAverageFps();
+      const bloomAllowed = fps > 45; // hysteresis: off below 45, stays off until > 55 implied by next frame check
+
+      crt.updateParams(performance.now() / 1000, {
+        ...crtParams,
+        bloomStrength: bloomAllowed ? crtParams.bloomStrength : 0,
+      });
     } else {
       if (app.stage.filters?.length) app.stage.filters = [];
     }
