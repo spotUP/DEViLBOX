@@ -191,7 +191,18 @@ export const PixiArrangementView: React.FC = () => {
       const globalRow = useTransportStore.getState().currentGlobalRow;
       if (globalRow !== playbackRowRef.current) {
         playbackRowRef.current = globalRow;
-        useArrangementStore.getState().setPlaybackRow(globalRow);
+        const arr = useArrangementStore.getState();
+        arr.setPlaybackRow(globalRow);
+
+        // Follow playback: auto-scroll to keep playhead visible
+        if (arr.view.followPlayback) {
+          const { scrollRow, pixelsPerRow } = arr.view;
+          const visibleRows = canvasW / pixelsPerRow;
+          const playheadX = (globalRow - scrollRow) * pixelsPerRow;
+          if (playheadX < 0 || playheadX > canvasW - 20) {
+            arr.setScrollRow(Math.max(0, globalRow - visibleRows * 0.1));
+          }
+        }
       }
       rafId = requestAnimationFrame(update);
     };

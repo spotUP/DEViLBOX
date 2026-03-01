@@ -11,7 +11,7 @@ import { PixiPianoKeyboard } from './pianoroll/PixiPianoKeyboard';
 import { PixiPianoRollGrid } from './pianoroll/PixiPianoRollGrid';
 import { PixiScrollbar } from './pianoroll/PixiScrollbar';
 import { PixiVelocityLane } from './pianoroll/PixiVelocityLane';
-import { usePianoRollStore, useUIStore } from '@stores';
+import { usePianoRollStore, useUIStore, useTransportStore } from '@stores';
 import { useTrackerStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { usePianoRollData } from '@/hooks/pianoroll/usePianoRollData';
@@ -52,6 +52,8 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   const selectedNotes = usePianoRollStore(s => s.selection.notes);
   const horizontalZoom = usePianoRollStore(s => s.view.horizontalZoom);
   const verticalZoom = usePianoRollStore(s => s.view.verticalZoom);
+  const isPlaying = useTransportStore(s => s.isPlaying);
+  const currentGlobalRow = useTransportStore(s => s.currentGlobalRow);
 
   // Resolve actual window pixel dimensions from the workbench store
   const win = useWorkbenchStore(s => s.windows[windowId]);
@@ -411,6 +413,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           scrollNote={view.scrollY}
           channelIndex={view.channelIndex}
           selectedNotes={selectedNotes}
+          playbackBeat={isPlaying ? currentGlobalRow : undefined}
           onNotesChanged={handleNotesChanged}
           onSelectNote={(id, add) => usePianoRollStore.getState().selectNote(id, add)}
           onDeselectAll={() => usePianoRollStore.getState().clearSelection()}
