@@ -20,6 +20,8 @@ import { WorkbenchContainer } from './workbench/WorkbenchContainer';
 import { CRTRenderer } from './CRTRenderer';
 import { useRef } from 'react';
 import { Rectangle } from 'pixi.js';
+import type { Container as ContainerType } from 'pixi.js';
+import { usePixiTheme } from './theme';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -31,6 +33,21 @@ export const PixiRoot: React.FC = () => {
   const crtParams  = useSettingsStore((s) => s.crtParams);
 
   const crtRef = useRef<CRTRenderer | null>(null);
+  const navBarLayerRef    = useRef<ContainerType>(null);
+  const statusBarLayerRef = useRef<ContainerType>(null);
+  const theme = usePixiTheme();
+
+  // Enable texture cache for static chrome layers
+  useEffect(() => {
+    navBarLayerRef.current?.cacheAsTexture(true);
+    statusBarLayerRef.current?.cacheAsTexture(true);
+  }, []);
+
+  // Invalidate on theme change (colors change)
+  useEffect(() => {
+    navBarLayerRef.current?.updateCacheTexture();
+    statusBarLayerRef.current?.updateCacheTexture();
+  }, [theme]);
 
   // Keep drumpad modal auto-open behavior
   useEffect(() => {
@@ -87,7 +104,9 @@ export const PixiRoot: React.FC = () => {
       }}
     >
       {/* Navigation bar — pure Pixi */}
-      <PixiNavBar />
+      <pixiContainer ref={navBarLayerRef} layout={{ width: '100%' }}>
+        <PixiNavBar />
+      </pixiContainer>
 
       {/* Main content area — workbench fills remaining space */}
       <pixiContainer layout={{ flex: 1, width: '100%' }}>
@@ -95,7 +114,9 @@ export const PixiRoot: React.FC = () => {
       </pixiContainer>
 
       {/* Status bar */}
-      <PixiStatusBar />
+      <pixiContainer ref={statusBarLayerRef} layout={{ width: '100%' }}>
+        <PixiStatusBar />
+      </pixiContainer>
 
       {/* Peer cursor overlay — always mounted to avoid @pixi/layout BindingError */}
       <pixiContainer
