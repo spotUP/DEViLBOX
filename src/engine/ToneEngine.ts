@@ -6563,6 +6563,30 @@ export class ToneEngine {
     }
   }
 
+  /** Sets the persistent mixer fader volume (dB) on the channel output.
+   *  Unlike setChannelVolume (which affects active voice gains), this sets
+   *  the channel's Tone.Channel node directly — persists across notes. */
+  public setMixerChannelVolume(channelIndex: number, volumeDb: number): void {
+    if (!this.channelOutputs.has(channelIndex)) {
+      this.getChannelOutput(channelIndex);
+    }
+    const channelOutput = this.channelOutputs.get(channelIndex);
+    if (channelOutput) {
+      channelOutput.channel.volume.value = volumeDb;
+    }
+  }
+
+  /** Sets the persistent mixer pan on the channel output (-1..1). */
+  public setMixerChannelPan(channelIndex: number, pan: number): void {
+    if (!this.channelOutputs.has(channelIndex)) {
+      this.getChannelOutput(channelIndex);
+    }
+    const channelOutput = this.channelOutputs.get(channelIndex);
+    if (channelOutput) {
+      channelOutput.channel.pan.value = pan;
+    }
+  }
+
   /**
    * Update mute states for all channels considering solo logic
    * Solo logic: if any channel is solo'd, only solo'd channels play

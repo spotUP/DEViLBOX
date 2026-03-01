@@ -79,7 +79,7 @@ export const useMixerStore = create<MixerStore>()(
         state.channels[ch].volume = vol;
       });
       applyToEngine(() => {
-        (getToneEngine() as any).setMixerChannelVolume(ch, toDb(vol));
+        getToneEngine().setMixerChannelVolume(ch, toDb(vol));
       });
     },
 
@@ -88,7 +88,7 @@ export const useMixerStore = create<MixerStore>()(
         state.channels[ch].pan = pan;
       });
       applyToEngine(() => {
-        (getToneEngine() as any).setMixerChannelPan(ch, pan);
+        getToneEngine().setMixerChannelPan(ch, pan);
       });
     },
 
