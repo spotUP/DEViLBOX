@@ -164,7 +164,7 @@ const WorkspaceItem: React.FC<WorkspaceItemProps> = ({ label, isBuiltin, isSave,
 };
 
 const NAV_ROW1_H = 45;
-const NAV_ROW2_H = 53;
+const NAV_ROW2_H = 34;
 const NAV_H = _NAV_H; // re-export alias keeps draw callbacks working
 
 export const PixiNavBar: React.FC = () => {

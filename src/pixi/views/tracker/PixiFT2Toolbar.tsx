@@ -311,7 +311,7 @@ export const PixiFT2Toolbar: React.FC = () => {
   const drawTransportRowBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, 4000, TRANSPORT_ROW_H);
-    g.fill({ color: theme.bgTertiary.color });
+    g.fill({ color: theme.bgSecondary.color });
     g.rect(0, TRANSPORT_ROW_H - 1, 4000, 1);
     g.fill({ color: theme.border.color, alpha: 0.4 });
   }, [theme]);
@@ -319,7 +319,7 @@ export const PixiFT2Toolbar: React.FC = () => {
   const drawTransportRow2Bg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, 4000, TRANSPORT_ROW_H);
-    g.fill({ color: theme.bg.color });
+    g.fill({ color: theme.bgSecondary.color });
     g.rect(0, TRANSPORT_ROW_H - 1, 4000, 1);
     g.fill({ color: theme.border.color, alpha: 0.4 });
   }, [theme]);
