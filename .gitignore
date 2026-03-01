@@ -26,6 +26,10 @@ dist-ssr
 *.sln
 *.sw?
 Reference Code/
+Reference Music/
+Reference Docs/
+Reference Images/
+docs/
 .cache/
 */.cache/
 juce-wasm/build/
