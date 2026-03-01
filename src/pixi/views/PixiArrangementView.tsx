@@ -116,6 +116,17 @@ export const PixiArrangementView: React.FC = () => {
   const selectedClipIds = useArrangementStore(s => s.selectedClipIds);
   const patterns = useTrackerStore(s => s.patterns);
 
+  // Dynamic total rows: end of last clip + 25% padding, minimum 128
+  const totalRows = useMemo(() => {
+    if (clips.length === 0) return 128;
+    let maxEnd = 0;
+    for (const clip of clips) {
+      const len = clip.clipLengthRows ?? 64;
+      maxEnd = Math.max(maxEnd, clip.startRow + len);
+    }
+    return Math.max(128, Math.ceil(maxEnd * 1.25));
+  }, [clips]);
+
   // Pre-compute clip render data for the canvas
   const clipRenderData = useMemo((): ClipRenderData[] => {
     const trackIdToIndex = new Map<string, number>();
@@ -416,6 +427,7 @@ export const PixiArrangementView: React.FC = () => {
           scrollBeat={view.scrollRow}
           pixelsPerBeat={view.pixelsPerRow}
           playbackBeat={isPlaying ? playbackRow : undefined}
+          totalBeats={totalRows}
           clips={clipRenderData}
           trackHeight={40}
           scrollY={scrollY}
