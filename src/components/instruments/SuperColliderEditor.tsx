@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import { EditorView } from '@codemirror/view';
+import { EditorView, keymap } from '@codemirror/view';
 import { EditorState, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, type DecorationSet } from '@codemirror/view';
-import { Play, CheckCircle, AlertCircle, Loader, Download, Upload, Plus, X, Copy } from 'lucide-react';
+import { Play, CheckCircle, AlertCircle, Loader, Download, Upload, Plus, X, Copy, RefreshCw } from 'lucide-react';
 import type { SuperColliderConfig, SCParam } from '@typedefs/instrument';
 import { superColliderLanguage } from '@engine/sc/scLanguage';
 
@@ -130,6 +130,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   const onChangeRef = useRef(onChange);
   const importInputRef = useRef<HTMLInputElement>(null);
   const logRef = useRef<HTMLPreElement>(null);
+  const handleCompileRef = useRef<() => Promise<void>>(async () => { /* set below */ });
   const [status, setStatus] = React.useState<CompileStatus>({ state: 'idle' });
   const [progress, setProgress] = React.useState(0);
   const [showProgress, setShowProgress] = React.useState(false);
@@ -178,6 +179,15 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
         editorTheme,
         errorLineField,
         EditorView.lineWrapping,
+        keymap.of([
+          {
+            key: 'Mod-Enter',
+            run: () => {
+              void handleCompileRef.current();
+              return true;
+            },
+          },
+        ]),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             const newSource = update.state.doc.toString();
@@ -277,6 +287,9 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
       setStatus({ state: 'error', message, rawOutput });
     }
   }, [startProgress, finishProgress]);
+
+  // Keep handleCompileRef in sync so the Cmd+Enter keymap always calls the latest version.
+  useEffect(() => { handleCompileRef.current = handleCompile; }, [handleCompile]);
 
   // -------------------------------------------------------------------------
   // Param handlers
@@ -441,6 +454,20 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
               \{config.synthDefName}
             </span>
           )}
+          <button
+            onClick={() => { void handleCompile(); }}
+            disabled={status.state === 'compiling'}
+            title="Compile & reload SynthDef (Cmd+Enter)"
+            className={[
+              'flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors',
+              status.state === 'compiling'
+                ? 'text-text-muted cursor-not-allowed'
+                : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgTertiary',
+            ].join(' ')}
+          >
+            <RefreshCw size={11} className={status.state === 'compiling' ? 'animate-spin' : ''} />
+            Reload
+          </button>
           <button
             onClick={() => { importInputRef.current?.click(); }}
             title="Import .scpreset"
@@ -623,6 +650,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
         <button
           onClick={() => { void handleCompile(); }}
           disabled={status.state === 'compiling'}
+          title="Compile & load SynthDef (Cmd+Enter)"
           className={[
             'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors shrink-0 ml-3',
             status.state === 'compiling'
