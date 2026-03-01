@@ -58,23 +58,23 @@ export const UADELiveParamsBar: React.FC<UADELiveParamsBarProps> = ({ instrument
   const dim     = isCyan ? '#004444' : '#001833';
   const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#000e1a] border-blue-900/30';
 
-  if (!sections || (sections['volume'] == null && sections['period'] == null)) return null;
-
   const handleVolumeChange = useCallback((v: number) => {
     const rounded = Math.round(v);
     setVolume(rounded);
-    if (sections['volume'] != null) {
+    if (sections != null && sections['volume'] != null) {
       getEditor().writeU8(sections['volume'], rounded).catch(console.error);
     }
   }, [sections, getEditor]);
 
   const handleFinetuneChange = useCallback((f: number) => {
     setFinetune(f);
-    if (sections['period'] != null && basePeriodRef.current > 0) {
+    if (sections != null && sections['period'] != null && basePeriodRef.current > 0) {
       const newPeriod = Math.round(basePeriodRef.current * Math.pow(2, -f / 1200));
       getEditor().writeU16(sections['period'], newPeriod).catch(console.error);
     }
   }, [sections, getEditor]);
+
+  if (!sections || (sections['volume'] == null && sections['period'] == null)) return null;
 
   return (
     <div className={`rounded-lg border p-3 ${panelBg} flex items-center gap-6`}>
