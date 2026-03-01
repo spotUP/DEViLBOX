@@ -136,6 +136,7 @@ export const WorkbenchContainer: React.FC = () => {
   const zoomCamera        = useWorkbenchStore((s) => s.zoomCamera);
   const isTilted          = useWorkbenchStore((s) => s.isTilted);
   const setActiveWindowId = useWorkbenchStore((s) => s.setActiveWindowId);
+  const activeWindowId    = useWorkbenchStore((s) => s.activeWindowId);
 
   // World container ref (camera transform applied here)
   const worldRef = useRef<ContainerType>(null);
@@ -501,6 +502,8 @@ export const WorkbenchContainer: React.FC = () => {
                     height: win.height - TITLE_H,
                     flexDirection: 'column',
                   }}
+                  interactiveChildren={id === activeWindowId}
+                  eventMode={id === activeWindowId ? 'auto' : 'none'}
                 >
                   <ViewComponent />
                 </pixiContainer>
