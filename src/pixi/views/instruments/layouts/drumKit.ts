@@ -1,11 +1,12 @@
 import type { SynthPanelLayout } from '../synthPanelTypes';
 
+// DrumKitConfig has no audio synthesis parameters (only sample mappings).
+// Expose volume/pan only; the keymap editor is handled in a separate UI.
 const fmtDb = (v: number) => `${Math.round(v)}dB`;
 const fmtPan = (v: number) => v === 0 ? 'C' : v > 0 ? `R${Math.round(v)}` : `L${Math.round(-v)}`;
 
-/** Minimal layout shared by all Furnace chip types (volume + pan). */
-export const FURNACE_LAYOUT: SynthPanelLayout = {
-  name: 'Furnace Chip',
+export const DRUM_KIT_LAYOUT: SynthPanelLayout = {
+  name: 'Drum Kit',
   configKey: '',
   sections: [
     {
