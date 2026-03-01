@@ -456,9 +456,14 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     if (!el) return;
     const mask = new Graphics();
     mask.rect(0, 0, w, contentH).fill({ color: 0xffffff });
+    // Must be a child of the masked container so the mask lives in local space,
+    // not world space. Without this the clip rect stays fixed at screen (0,0)
+    // and the viewport appears frozen when the window is moved.
+    el.addChild(mask);
     el.mask = mask;
     return () => {
       el.mask = null;
+      el.removeChild(mask);
       mask.destroy();
     };
   }, [w, contentH]);
