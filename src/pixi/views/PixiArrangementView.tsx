@@ -88,6 +88,8 @@ export const PixiArrangementView: React.FC = () => {
   const tool = useArrangementStore(s => s.tool);
   const setTool = useArrangementStore(s => s.setTool);
   const view = useArrangementStore(s => s.view);
+  const loopStart = useArrangementStore(s => s.view.loopStart);
+  const loopEnd = useArrangementStore(s => s.view.loopEnd);
   const scrollY = useArrangementStore(s => s.view.scrollY);
 
   // Fall back to tracker channels if no arrangement tracks
@@ -440,6 +442,8 @@ export const PixiArrangementView: React.FC = () => {
             scrollY={scrollY}
             tool={tool}
             snapDivision={view.snapDivision}
+            loopStart={loopStart}
+            loopEnd={loopEnd}
             onSelectClip={(id, add) => useArrangementStore.getState().selectClip(id, add)}
             onDeselectAll={() => useArrangementStore.getState().clearSelection()}
             onSelectBox={(ids) => useArrangementStore.getState().selectClips(ids)}
@@ -474,7 +478,9 @@ export const PixiArrangementView: React.FC = () => {
               const trackList = arr.tracks.slice().sort((a, b) => a.index - b.index);
               const track = trackList[trackIndex];
               if (!track) return;
-              const patternId = ts.patterns[ts.currentPatternIndex]?.id ?? ts.patterns[0]?.id;
+              // Create a fresh empty pattern for this clip so each clip has independent data
+              ts.addPattern();
+              const patternId = useTrackerStore.getState().patterns.at(-1)?.id;
               if (!patternId) return;
               arr.addClip({
                 patternId,
@@ -482,7 +488,7 @@ export const PixiArrangementView: React.FC = () => {
                 startRow,
                 offsetRows: 0,
                 clipLengthRows: lengthRows,
-                sourceChannelIndex: 0,
+                sourceChannelIndex: trackIndex,
                 color: null,
                 muted: false,
               });
