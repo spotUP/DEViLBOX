@@ -41,6 +41,7 @@ import { useTrackerInput } from '@/hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
 import { useTrackerStore, useUIStore, useInstrumentStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { useMIDIStore } from '@stores/useMIDIStore';
 import { TITLE_H } from '../workbench/PixiWindow';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
@@ -48,6 +49,8 @@ type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrange
 
 const PATTERN_PANEL_HEIGHT = 180;
 const MUSICLINE_MATRIX_HEIGHT = 220;
+const MIDI_KNOB_BAR_H_COLLAPSED = 20;
+const MIDI_KNOB_BAR_H_EXPANDED = 56;
 
 export const PixiTrackerView: React.FC = () => {
   // Enable FT2-style keyboard input (window event listeners — no DOM needed)
@@ -62,6 +65,7 @@ export const PixiTrackerView: React.FC = () => {
   const editorMode = useTrackerStore(s => s.editorMode);
   const showMacroSlots = useUIStore(s => s.showMacroSlots);
   const compactToolbar = useUIStore(s => s.compactToolbar);
+  const showKnobBar = useMIDIStore(s => s.showKnobBar);
   const [showInstrumentPanel, setShowInstrumentPanel] = useState(true);
 
   // PixiTrackerView lives inside a PixiWindow — use the window's own dimensions,
@@ -117,7 +121,8 @@ export const PixiTrackerView: React.FC = () => {
   const tb303PanelH = hasTB303 && viewMode !== 'tb303' && viewMode !== 'sunvox'
     ? (tb303Collapsed ? TB303_PANEL_COLLAPSED_H : TB303_PANEL_EXPANDED_H)
     : 0;
-  const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - (showPatterns ? PATTERN_PANEL_HEIGHT : 0) - tb303PanelH;
+  const midiKnobBarH = showKnobBar ? MIDI_KNOB_BAR_H_EXPANDED : MIDI_KNOB_BAR_H_COLLAPSED;
+  const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - (showPatterns ? PATTERN_PANEL_HEIGHT : 0) - tb303PanelH - midiKnobBarH;
   const editorWidth = windowWidth - (instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0) - 16; // minus instrument panel and minimap
 
   return (
