@@ -34,6 +34,8 @@ export const PixiRoot: React.FC = () => {
   const crtParams  = useSettingsStore((s) => s.crtParams);
 
   const crtRef = useRef<CRTRenderer | null>(null);
+  // Hysteresis state: bloom off below 45fps, back on above 55fps
+  const bloomEnabledRef = useRef(true);
   const navBarLayerRef    = useRef<ContainerType>(null);
   const statusBarLayerRef = useRef<ContainerType>(null);
   const theme = usePixiTheme();
@@ -91,13 +93,14 @@ export const PixiRoot: React.FC = () => {
     if (crtEnabled) {
       if (!app.stage.filters?.includes(crt)) app.stage.filters = [crt];
 
-      // Adaptive quality: disable bloom when FPS is low (< 45), re-enable when recovered (> 55)
+      // Adaptive quality: hysteresis — bloom off below 45fps, stays off until > 55fps
       const fps = getAverageFps();
-      const bloomAllowed = fps > 45; // hysteresis: off below 45, stays off until > 55 implied by next frame check
+      if (bloomEnabledRef.current  && fps < 45) bloomEnabledRef.current = false;
+      if (!bloomEnabledRef.current && fps > 55) bloomEnabledRef.current = true;
 
       crt.updateParams(performance.now() / 1000, {
         ...crtParams,
-        bloomStrength: bloomAllowed ? crtParams.bloomStrength : 0,
+        bloomIntensity: bloomEnabledRef.current ? crtParams.bloomIntensity : 0,
       });
     } else {
       if (app.stage.filters?.length) app.stage.filters = [];
