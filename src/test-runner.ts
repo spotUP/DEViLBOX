@@ -1428,6 +1428,7 @@ async function testVolumeLevels() {
         ...config          // Explicit test config wins
       } as InstrumentConfig;
 
+      const errorCountBefore = capturedConsoleErrors.length;
       const synth = InstrumentFactory.createInstrument(fullConfig);
       const synthObj = synth as unknown as Record<string, unknown>;
       if (typeof synthObj.connect === 'function') {
@@ -1478,6 +1479,15 @@ async function testVolumeLevels() {
       // a 'ready' message via the message port. This wait covers that gap.
       if (isWasmSynth) {
         await new Promise(r => setTimeout(r, 500));
+      }
+
+      // Check if a WASM chip crashed during creation (chip not implemented in binary).
+      // FurnaceDispatch worklet reports these as "createChip(N) crashed: memory access out of bounds".
+      if (!wasmInitFailed) {
+        const newErrors = capturedConsoleErrors.slice(errorCountBefore);
+        if (newErrors.some(e => e.includes('createChip') && e.includes('crashed'))) {
+          wasmInitFailed = true;
+        }
       }
 
       // Check if the synth actually initialized after the attempt + stabilization.
@@ -1858,6 +1868,7 @@ async function testVolumeInteractive() {
         ...config,
       } as InstrumentConfig;
 
+      const errorCountBefore = capturedConsoleErrors.length;
       const synth = InstrumentFactory.createInstrument(fullConfig);
       const synthObj = synth as unknown as Record<string, unknown>;
       if (typeof synthObj.connect === 'function') {
@@ -1888,6 +1899,14 @@ async function testVolumeInteractive() {
       }
 
       if (isWasmSynth) await new Promise(r => setTimeout(r, 500));
+
+      // Check if a WASM chip crashed during creation (chip not implemented in binary).
+      if (!wasmInitFailed) {
+        const newErrors = capturedConsoleErrors.slice(errorCountBefore);
+        if (newErrors.some(e => e.includes('createChip') && e.includes('crashed'))) {
+          wasmInitFailed = true;
+        }
+      }
 
       if (isWasmSynth && !wasmInitFailed) {
         const hasInitProp = '_isReady' in synthObj || 'isInitialized' in synthObj ||
