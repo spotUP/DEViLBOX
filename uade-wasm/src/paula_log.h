@@ -27,6 +27,27 @@ typedef struct {
     uint32_t tick;          /* g_uade_tick_count at write time */
 } UadePaulaLogEntry;        /* 12 bytes */
 
+/* Snapshot of all 4 Paula channels captured at each CIA-A Timer A tick.
+ * Each tick corresponds to one tracker "speed" unit. Every `speed` ticks = one pattern row.
+ * Unlike the Paula write log, tick snapshots capture held notes (no register writes).
+ */
+#define TICK_SNAP_SIZE  4096
+#define TICK_SNAP_MASK  (TICK_SNAP_SIZE - 1)
+
+typedef struct {
+    uint16_t period;      /* AUDx PER register (current playing period) */
+    uint16_t volume;      /* AUDx VOL register (0-64) */
+    uint32_t lc;          /* AUDx LC — current sample pointer (chip RAM addr) */
+    uint16_t len;         /* AUDx LEN — sample length in words */
+    uint8_t  dma_en;      /* Paula DMA enable bit for this channel */
+    uint8_t  triggered;   /* 1 if DMA restarted this tick (new note), else 0 */
+} UadeChannelTick;        /* 12 bytes */
+
+typedef struct {
+    uint32_t        tick;        /* CIA-A Timer A tick count */
+    UadeChannelTick channels[4]; /* All 4 Paula channels */
+} UadeTickSnapshot;              /* 4 + 4*12 = 52 bytes */
+
 #ifdef UADE_WASM
 extern void uade_wasm_log_paula_write(uint8_t channel, uint8_t reg, uint16_t value);
 #endif
