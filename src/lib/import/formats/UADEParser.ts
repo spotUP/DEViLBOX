@@ -578,7 +578,7 @@ export async function parseUADEFile(
       // All load at chip RAM address 0 — no scanMemoryForMagic needed.
       'SonicArranger': async () => {
         const { parseSonicArrangerFile } = await import('./SonicArrangerParser');
-        return parseSonicArrangerFile(new Uint8Array(buffer), filename);
+        return parseSonicArrangerFile(buffer, filename);
       },
       // ArtOfNoise-4V = 4-channel (AON4 magic), ArtOfNoise-8V = 8-channel (AON8 magic).
       // Both handled by the same parser.
