@@ -9,6 +9,7 @@ import { usePixiTheme } from '../theme';
 import { PixiButton, PixiLabel, PixiSelect } from '../components';
 import { PixiPianoKeyboard } from './pianoroll/PixiPianoKeyboard';
 import { PixiPianoRollGrid } from './pianoroll/PixiPianoRollGrid';
+import { PixiScrollbar } from './pianoroll/PixiScrollbar';
 import { PixiVelocityLane } from './pianoroll/PixiVelocityLane';
 import { usePianoRollStore, useUIStore } from '@stores';
 import { useTrackerStore } from '@stores';
@@ -20,6 +21,7 @@ import { TITLE_H } from '../workbench/PixiWindow';
 const VELOCITY_HEIGHT = 80;
 const TOOLBAR_HEIGHT = 36;
 const KEYBOARD_WIDTH = 60;
+const SCROLLBAR_SIZE = 8;
 
 const GRID_DIVISIONS = [1, 2, 4, 8, 16];
 
@@ -55,8 +57,14 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   const win = useWorkbenchStore(s => s.windows[windowId]);
   const winW = win?.width ?? 700;
   const winH = win?.height ?? 500;
-  const gridW = Math.max(200, winW - KEYBOARD_WIDTH);
-  const gridH = Math.max(150, winH - TITLE_H - TOOLBAR_HEIGHT - VELOCITY_HEIGHT);
+  const gridW = Math.max(200, winW - KEYBOARD_WIDTH - SCROLLBAR_SIZE);
+  const gridH = Math.max(150, winH - TITLE_H - TOOLBAR_HEIGHT - VELOCITY_HEIGHT - SCROLLBAR_SIZE);
+
+  // Pattern length for scrollbar calculations
+  const patternLength = useTrackerStore(s => {
+    const pat = s.patterns[s.currentPatternIndex];
+    return pat?.length ?? 64;
+  });
 
   // Hover ref for scroll event gating
   const isHoveredRef = useRef(false);
@@ -380,7 +388,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
         />
       </pixiContainer>
 
-      {/* Main area: Keyboard | Grid — hover tracked for wheel scroll */}
+      {/* Main area: Keyboard | Grid | V-scrollbar — hover tracked for wheel scroll */}
       <pixiContainer
         layout={{
           flex: 1,
@@ -392,6 +400,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
         onPointerOut={() => { isHoveredRef.current = false; }}
       >
         <PixiPianoKeyboard width={KEYBOARD_WIDTH} height={gridH} noteHeight={verticalZoom} scrollNote={view.scrollY} />
+        <pixiContainer layout={{ flex: 1, flexDirection: 'column' }}>
         <PixiPianoRollGrid
           width={gridW}
           height={gridH}
@@ -413,6 +422,34 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           onResizeNote={(id, newEndRow) => {
             pianoData.resizeNote(id, newEndRow);
             handleNotesChanged();
+          }}
+        />
+        {/* Horizontal scrollbar */}
+        <PixiScrollbar
+          orientation="horizontal"
+          width={gridW}
+          height={SCROLLBAR_SIZE}
+          value={Math.max(0, Math.min(1, view.scrollX / Math.max(1, patternLength - gridW / horizontalZoom)))}
+          thumbSize={Math.min(1, (gridW / horizontalZoom) / Math.max(1, patternLength))}
+          onChange={(v) => {
+            const s = usePianoRollStore.getState();
+            const target = v * Math.max(0, patternLength - gridW / horizontalZoom);
+            s.scrollBy(target - s.view.scrollX, 0);
+          }}
+        />
+        </pixiContainer>
+
+        {/* Vertical scrollbar */}
+        <PixiScrollbar
+          orientation="vertical"
+          width={SCROLLBAR_SIZE}
+          height={gridH + SCROLLBAR_SIZE}
+          value={Math.max(0, Math.min(1, 1 - (view.scrollY + gridH / verticalZoom) / 128))}
+          thumbSize={Math.min(1, (gridH / verticalZoom) / 128)}
+          onChange={(v) => {
+            const s = usePianoRollStore.getState();
+            const target = Math.max(0, (1 - v) * 128 - gridH / verticalZoom);
+            s.scrollBy(0, target - s.view.scrollY);
           }}
         />
       </pixiContainer>
