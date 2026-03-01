@@ -6,6 +6,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Download, Upload, FileMusic, Zap, Settings, Volume2, Music2 } from 'lucide-react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, notify } from '@stores';
+import { useUIStore } from '@stores/useUIStore';
+import { useArrangementStore } from '@/stores/useArrangementStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import {
   exportSong,
@@ -66,6 +68,22 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
   const [renderProgress, setRenderProgress] = useState(0);
   const [exportFullSong, setExportFullSong] = useState(false);
 
+  // Arrangement export scope: 'pattern' | 'song' | 'arrangement'
+  type AudioExportScope = 'pattern' | 'song' | 'arrangement';
+  const [audioExportScope, setAudioExportScope] = useState<AudioExportScope>('pattern');
+
+  // Read modal data and arrangement store for arrangement export
+  const modalData = useUIStore(s => s.modalData);
+  const arrangementClips = useArrangementStore(s => s.clips);
+  const arrangementTotalRows = useArrangementStore(s => {
+    let max = 0;
+    for (const clip of s.clips) {
+      const end = clip.startRow + (clip.clipLengthRows ?? 64);
+      if (end > max) max = end;
+    }
+    return max;
+  });
+
   // MIDI export options
   const [midiType, setMidiType] = useState<0 | 1>(1);
   const [midiIncludeAutomation, setMidiIncludeAutomation] = useState(true);
@@ -121,6 +139,14 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
   useEffect(() => {
     setExportWarnings([]);
   }, [exportMode]);
+
+  // Auto-select arrangement scope when opened from arrangement toolbar
+  useEffect(() => {
+    if (isOpen && modalData?.audioScope === 'arrangement') {
+      setExportMode('audio');
+      setAudioExportScope('arrangement');
+    }
+  }, [isOpen, modalData]);
 
   // Cleanup chip recording timer on unmount
   useEffect(() => {
@@ -269,7 +295,30 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 0,
                 (progress) => setRenderProgress(progress)
               );
-            } else if (exportFullSong) {
+            } else if (audioExportScope === 'arrangement' && arrangementClips.length > 0) {
+              // Export arrangement: build pattern sequence from clips sorted by startRow
+              // Each clip references a patternId; resolve index and deduplicate consecutive repeats
+              const sortedClips = [...arrangementClips]
+                .filter(c => !c.muted)
+                .sort((a, b) => a.startRow - b.startRow);
+              const patternIndexSet: number[] = [];
+              for (const clip of sortedClips) {
+                const idx = patterns.findIndex(p => p.id === clip.patternId);
+                if (idx >= 0) patternIndexSet.push(idx);
+              }
+              if (patternIndexSet.length === 0) {
+                notify.warning('No unmuted clips in arrangement to export');
+                return;
+              }
+              await exportSongAsWav(
+                patterns,
+                patternIndexSet,
+                instruments,
+                bpm,
+                `${metadata.name || 'arrangement'}.wav`,
+                (progress) => setRenderProgress(progress)
+              );
+            } else if (audioExportScope === 'song' || exportFullSong) {
               // Export all patterns in sequence
               const sequence = patterns.map((_, index) => index);
               await exportSongAsWav(
@@ -892,11 +941,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     {/* Export scope toggle */}
                     <div className="flex gap-2">
                       <button
-                        onClick={() => setExportFullSong(false)}
+                        onClick={() => setAudioExportScope('pattern')}
                         disabled={isRendering}
                         className={`
                           flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
-                          ${!exportFullSong
+                          ${audioExportScope === 'pattern'
                             ? 'bg-accent-primary text-text-inverse'
                             : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
                           }
@@ -905,11 +954,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                         Single Pattern
                       </button>
                       <button
-                        onClick={() => setExportFullSong(true)}
+                        onClick={() => setAudioExportScope('song')}
                         disabled={isRendering}
                         className={`
                           flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
-                          ${exportFullSong
+                          ${audioExportScope === 'song'
                             ? 'bg-accent-primary text-text-inverse'
                             : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
                           }
@@ -917,10 +966,25 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       >
                         Full Song ({patterns.length} patterns)
                       </button>
+                      {arrangementClips.length > 0 && (
+                        <button
+                          onClick={() => setAudioExportScope('arrangement')}
+                          disabled={isRendering}
+                          className={`
+                            flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
+                            ${audioExportScope === 'arrangement'
+                              ? 'bg-accent-primary text-text-inverse'
+                              : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
+                            }
+                          `}
+                        >
+                          Arrangement ({arrangementClips.filter(c => !c.muted).length} clips)
+                        </button>
+                      )}
                     </div>
 
                     {/* Pattern selector (only shown for single pattern mode) */}
-                    {!exportFullSong && (
+                    {audioExportScope === 'pattern' && (
                       <div>
                         <label className="block text-xs font-mono text-text-muted mb-1">
                           Pattern to Render
@@ -943,7 +1007,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="text-sm font-mono text-text-secondary space-y-1">
                       <div>Format: <span className="text-accent-primary">WAV (16-bit, 44.1kHz)</span></div>
                       <div>BPM: <span className="text-accent-primary">{bpm}</span></div>
-                      {exportFullSong ? (
+                      {audioExportScope === 'arrangement' ? (
+                        <>
+                          <div>Clips: <span className="text-accent-primary">{arrangementClips.filter(c => !c.muted).length} unmuted</span></div>
+                          <div>Total Rows: <span className="text-accent-primary">{arrangementTotalRows}</span></div>
+                        </>
+                      ) : audioExportScope === 'song' ? (
                         <>
                           <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
                           <div>Total Rows: <span className="text-accent-primary">{patterns.reduce((sum, p) => sum + p.length, 0)}</span></div>
@@ -955,7 +1024,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     {isRendering && (
                       <div className="mt-3">
                         <div className="text-xs font-mono text-text-muted mb-1">
-                          Rendering{exportFullSong ? ' song' : ''}... {renderProgress}%
+                          Rendering{audioExportScope !== 'pattern' ? ` ${audioExportScope}` : ''}... {renderProgress}%
                         </div>
                         <div className="w-full bg-dark-border rounded-full h-2">
                           <div

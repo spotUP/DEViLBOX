@@ -48,6 +48,9 @@ export const PixiArrangementView: React.FC = () => {
   const theme = usePixiTheme();
   const isPlaying = useTransportStore(s => s.isPlaying);
   const playbackRowRef = useRef(0);
+  // Track the last pattern id we switched to during arrangement playback
+  // to avoid redundant setCurrentPattern calls on every frame.
+  const lastArrangementPatternIdRef = useRef<string | null>(null);
 
   // Resolve actual window pixel dimensions
   const win = useWorkbenchStore(s => s.windows['arrangement']);
@@ -237,6 +240,33 @@ export const PixiArrangementView: React.FC = () => {
             arr.setScrollRow(Math.max(0, globalRow - visibleRows * 0.1));
           }
         }
+
+        // Arrangement clip switching: find which clip covers the current global row
+        // and update the tracker's current pattern to reflect it in the UI.
+        // We pass fromReplayer=true so setCurrentPattern only updates the UI
+        // and does NOT call replayer.jumpToPattern() — the replayer is already
+        // playing the correct virtual arrangement built by resolveArrangement.
+        if (arr.isArrangementMode) {
+          const ts = useTrackerStore.getState();
+          const activeClip = arr.clips.find((clip) => {
+            if (clip.muted) return false;
+            const pat = ts.patterns.find(p => p.id === clip.patternId);
+            const clipLen = clip.clipLengthRows ?? (pat ? pat.length - clip.offsetRows : 64);
+            return globalRow >= clip.startRow && globalRow < clip.startRow + clipLen;
+          });
+          if (activeClip) {
+            if (activeClip.patternId !== lastArrangementPatternIdRef.current) {
+              lastArrangementPatternIdRef.current = activeClip.patternId;
+              const patIdx = ts.patterns.findIndex(p => p.id === activeClip.patternId);
+              if (patIdx >= 0 && patIdx !== ts.currentPatternIndex) {
+                ts.setCurrentPattern(patIdx, true);
+              }
+            }
+          } else {
+            // No clip covers this row — clear the last active clip tracking
+            lastArrangementPatternIdRef.current = null;
+          }
+        }
       }
       rafId = requestAnimationFrame(update);
     };
@@ -419,6 +449,14 @@ export const PixiArrangementView: React.FC = () => {
         />
 
         <pixiContainer layout={{ flex: 1 }} />
+
+        {/* Export arrangement */}
+        <PixiButton
+          label="Export"
+          variant="ghost"
+          size="sm"
+          onClick={() => useUIStore.getState().openModal('export', { audioScope: 'arrangement' })}
+        />
 
         {/* Add track */}
         <PixiButton label="+ Track" variant="ghost" size="sm" onClick={handleAddTrack} />
