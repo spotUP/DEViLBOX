@@ -1,9 +1,6 @@
 /**
  * PixiFurnacePatternEditor - Per-Channel Pattern Editor
- *
- * Renders pattern data for each channel's current pattern (from the order matrix).
- * Supports variable effect columns per channel (1-8), cursor navigation,
- * block selection, and effect color coding.
+ * Pure Pixi GL rendering — no DOM elements.
  *
  * Layout:
  * ┌────┬───────────────────────┬───────────────────────┬─────
@@ -15,34 +12,35 @@
  * └────┴───────────────────────┴───────────────────────┘
  */
 
-import React, { useCallback, useRef, useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import type { Container as ContainerType, Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
+import { Graphics } from 'pixi.js';
 import { usePixiTheme } from '@/pixi/theme';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { PIXI_FONTS } from '@/pixi/fonts';
 import type { FurnaceNativeData, FurnaceRow } from '@/types';
 
-// Layout constants
-const ROW_HEIGHT = 20;
+const ROW_HEIGHT    = 20;
 const ROW_NUM_WIDTH = 32;
-const CHAR_WIDTH = 8;
-const NOTE_WIDTH = CHAR_WIDTH * 3 + 4;
-const INS_WIDTH = CHAR_WIDTH * 2 + 4;
-const VOL_WIDTH = CHAR_WIDTH * 2 + 4;
-const EFF_WIDTH = CHAR_WIDTH * 4 + 4; // cmd(2) + val(2)
-const CHANNEL_GAP = 2;
+const CHAR_WIDTH    = 8;
+const NOTE_WIDTH    = CHAR_WIDTH * 3 + 4;  // 28
+const INS_WIDTH     = CHAR_WIDTH * 2 + 4;  // 20
+const VOL_WIDTH     = CHAR_WIDTH * 2 + 4;  // 20
+const EFF_WIDTH     = CHAR_WIDTH * 4 + 4;  // 36  (cmd 2 + val 2)
+const CHANNEL_GAP   = 2;
 const HEADER_HEIGHT = 24;
+const FONT_SIZE     = 11;
+const TEXT_Y        = 4;
 
-// Note names
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
 function formatFurnaceNote(noteVal: number): string {
-  if (noteVal === -1) return '---';
-  if (noteVal === 253) return '==='; // Note off
-  if (noteVal === 254) return 'REL'; // Release
-  if (noteVal === 255) return 'MRL'; // Macro release
+  if (noteVal === -1)  return '---';
+  if (noteVal === 253) return '===';
+  if (noteVal === 254) return 'REL';
+  if (noteVal === 255) return 'MRL';
   if (noteVal >= 0 && noteVal < 180) {
-    const semitone = noteVal % 12;
-    const octave = Math.floor(noteVal / 12);
-    return `${NOTE_NAMES[semitone]}${octave}`;
+    return `${NOTE_NAMES[noteVal % 12]}${Math.floor(noteVal / 12)}`;
   }
   return '---';
 }
@@ -52,24 +50,35 @@ function formatHex(val: number, digits: number): string {
   return val.toString(16).toUpperCase().padStart(digits, '0');
 }
 
-// Effect category colors
-function getEffectColor(cmd: number, theme: ReturnType<typeof usePixiTheme>): string {
-  if (cmd <= 0) return hexColor(theme.cellEmpty.color);
-  // Pitch effects (1-3, E1, E2)
-  if (cmd >= 1 && cmd <= 3) return '#00ff00';
-  // Volume effects (A, 5, 6, 7, C)
-  if (cmd === 0x0A || cmd === 0x05 || cmd === 0x06 || cmd === 0x07 || cmd === 0x0C) return '#ff8800';
-  // Pan effects (8)
-  if (cmd === 0x08) return '#ff00ff';
-  // Speed/tempo (F, 09)
-  if (cmd === 0x0F || cmd === 0x09) return '#ffff00';
-  // Pattern (B, D)
-  if (cmd === 0x0B || cmd === 0x0D) return '#ff4444';
-  return hexColor(theme.cellEffect.color);
+type PixiTheme = ReturnType<typeof usePixiTheme>;
+
+function effectColor(cmd: number, theme: PixiTheme): number {
+  if (cmd <= 0) return theme.cellEmpty.color;
+  if (cmd >= 1 && cmd <= 3)                                                          return 0x00ff00;
+  if (cmd === 0x0A || cmd === 0x05 || cmd === 0x06 || cmd === 0x07 || cmd === 0x0C) return 0xff8800;
+  if (cmd === 0x08)                                                                  return 0xff00ff;
+  if (cmd === 0x0F || cmd === 0x09)                                                  return 0xffff00;
+  if (cmd === 0x0B || cmd === 0x0D)                                                  return 0xff4444;
+  return theme.cellEffect.color;
 }
 
-function hexColor(val: number): string {
-  return `#${val.toString(16).padStart(6, '0')}`;
+// X offset of a sub-column within a channel, relative to channel start x
+function subColX(col: 'note' | 'ins' | 'vol' | number): number {
+  switch (col) {
+    case 'note': return 0;
+    case 'ins':  return NOTE_WIDTH;
+    case 'vol':  return NOTE_WIDTH + INS_WIDTH;
+    default:     return NOTE_WIDTH + INS_WIDTH + VOL_WIDTH + (col as number) * EFF_WIDTH;
+  }
+}
+
+function subColW(col: 'note' | 'ins' | 'vol' | number): number {
+  switch (col) {
+    case 'note': return NOTE_WIDTH;
+    case 'ins':  return INS_WIDTH;
+    case 'vol':  return VOL_WIDTH;
+    default:     return EFF_WIDTH;
+  }
 }
 
 interface FurnacePatternEditorProps {
@@ -81,346 +90,352 @@ interface FurnacePatternEditorProps {
 }
 
 export const PixiFurnacePatternEditor: React.FC<FurnacePatternEditorProps> = ({
-  width,
-  height,
-  nativeData,
-  currentPosition,
-  playbackRow,
+  width, height, nativeData, currentPosition, playbackRow,
 }) => {
-  const theme = usePixiTheme();
+  const theme     = usePixiTheme();
   const isPlaying = useTransportStore(s => s.isPlaying);
 
-  const sub = nativeData.subsongs[nativeData.activeSubsong];
+  const sub         = nativeData.subsongs[nativeData.activeSubsong];
   const numChannels = sub?.channels.length ?? 0;
-  const patLen = sub?.patLen ?? 64;
+  const patLen      = sub?.patLen ?? 64;
 
-  // Cursor state
-  const [cursorRow, setCursorRow] = useState(0);
+  const [cursorRow,  setCursorRow]  = useState(0);
   const [cursorChan, setCursorChan] = useState(0);
-  const [cursorCol, setCursorCol] = useState<'note' | 'ins' | 'vol' | number>(
-    'note'
-  ); // 'note', 'ins', 'vol', or effect index (0-7)
+  const [cursorCol,  setCursorCol]  = useState<'note' | 'ins' | 'vol' | number>('note');
+  const [scrollTop,  setScrollTop]  = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [focused,    setFocused]    = useState(false);
 
-  // Scroll
-  const containerRef = useRef<HTMLDivElement>(null);
-  const scrollTopRef = useRef(0);
-  const visibleRows = Math.floor((height - HEADER_HEIGHT) / ROW_HEIGHT);
+  const containerRef  = useRef<ContainerType>(null);
+  const scrollTopRef  = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const focusedRef    = useRef(false);
+  focusedRef.current  = focused;
 
-  // Auto-scroll to cursor/playback
-  useEffect(() => {
-    const targetRow = isPlaying ? playbackRow : cursorRow;
-    const scrollTop = scrollTopRef.current;
-    const rowY = targetRow * ROW_HEIGHT;
-    const viewTop = scrollTop;
-    const viewBottom = scrollTop + visibleRows * ROW_HEIGHT;
-
-    if (rowY < viewTop || rowY >= viewBottom) {
-      const newScroll = Math.max(0, rowY - Math.floor(visibleRows / 2) * ROW_HEIGHT);
-      scrollTopRef.current = newScroll;
-      if (containerRef.current) containerRef.current.scrollTop = newScroll;
-    }
-  }, [cursorRow, playbackRow, isPlaying, visibleRows]);
-
-  // Compute channel widths
+  // Per-channel pixel widths
   const channelWidths = useMemo(() => {
-    if (!sub) return [];
-    return sub.channels.map(ch => {
-      const effCols = ch.effectCols;
-      return NOTE_WIDTH + INS_WIDTH + VOL_WIDTH + effCols * EFF_WIDTH + CHANNEL_GAP;
-    });
+    if (!sub) return [] as number[];
+    return sub.channels.map(ch =>
+      NOTE_WIDTH + INS_WIDTH + VOL_WIDTH + ch.effectCols * EFF_WIDTH + CHANNEL_GAP
+    );
   }, [sub]);
 
-  const totalContentWidth = ROW_NUM_WIDTH + channelWidths.reduce((s, w) => s + w, 0);
+  // Cumulative channel start x (absolute, before scroll offset)
+  const chanXStarts = useMemo(() => {
+    const starts: number[] = [];
+    let x = ROW_NUM_WIDTH;
+    for (const w of channelWidths) { starts.push(x); x += w; }
+    return starts;
+  }, [channelWidths]);
 
-  // Get pattern data for current position
-  const getRow = useCallback((ch: number, row: number): FurnaceRow | null => {
-    if (!sub) return null;
-    const patIdx = sub.orders[ch]?.[currentPosition];
-    if (patIdx === undefined) return null;
-    const pat = sub.channels[ch]?.patterns.get(patIdx);
-    return pat?.rows[row] ?? null;
-  }, [sub, currentPosition]);
+  const totalW     = ROW_NUM_WIDTH + channelWidths.reduce((s, w) => s + w, 0);
+  const visRows    = Math.floor((height - HEADER_HEIGHT) / ROW_HEIGHT);
+  const maxScrollY = Math.max(0, patLen * ROW_HEIGHT - visRows * ROW_HEIGHT);
+  const maxScrollX = Math.max(0, totalW - width);
 
-  // Keyboard navigation
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    switch (e.key) {
-      case 'ArrowUp':
-        e.preventDefault();
-        setCursorRow(r => Math.max(0, r - 1));
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        setCursorRow(r => Math.min(patLen - 1, r + 1));
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        // Move left through columns: effects → vol → ins → note → prev channel
-        if (cursorCol === 'note') {
-          if (cursorChan > 0) {
-            setCursorChan(c => c - 1);
-            const prevEffCols = sub?.channels[cursorChan - 1]?.effectCols ?? 1;
-            setCursorCol(prevEffCols - 1);
-          }
-        } else if (cursorCol === 'ins') {
-          setCursorCol('note');
-        } else if (cursorCol === 'vol') {
-          setCursorCol('ins');
-        } else if (typeof cursorCol === 'number') {
-          if (cursorCol === 0) {
-            setCursorCol('vol');
-          } else {
-            setCursorCol(cursorCol - 1);
-          }
-        }
-        break;
-      case 'ArrowRight':
-        e.preventDefault();
-        // Move right through columns: note → ins → vol → effects → next channel
-        if (cursorCol === 'note') {
-          setCursorCol('ins');
-        } else if (cursorCol === 'ins') {
-          setCursorCol('vol');
-        } else if (cursorCol === 'vol') {
-          setCursorCol(0);
-        } else if (typeof cursorCol === 'number') {
-          const effCols = sub?.channels[cursorChan]?.effectCols ?? 1;
-          if (cursorCol < effCols - 1) {
-            setCursorCol(cursorCol + 1);
-          } else if (cursorChan < numChannels - 1) {
-            setCursorChan(c => c + 1);
-            setCursorCol('note');
-          }
-        }
-        break;
-      case 'Tab':
-        e.preventDefault();
-        if (e.shiftKey) {
-          setCursorChan(c => Math.max(0, c - 1));
-        } else {
-          setCursorChan(c => Math.min(numChannels - 1, c + 1));
-        }
-        setCursorCol('note');
-        break;
-      case 'PageUp':
-        e.preventDefault();
-        setCursorRow(r => Math.max(0, r - 16));
-        break;
-      case 'PageDown':
-        e.preventDefault();
-        setCursorRow(r => Math.min(patLen - 1, r + 16));
-        break;
-      case 'Home':
-        e.preventDefault();
-        setCursorRow(0);
-        break;
-      case 'End':
-        e.preventDefault();
-        setCursorRow(patLen - 1);
-        break;
+  // Clip content to component bounds
+  useEffect(() => {
+    const c = containerRef.current;
+    if (!c) return;
+    const m = new Graphics();
+    m.rect(0, 0, width, height).fill({ color: 0xffffff });
+    c.mask = m;
+    return () => { c.mask = null; m.destroy(); };
+  }, [width, height]);
+
+  // Auto-scroll vertical to keep cursor/playback row visible
+  useEffect(() => {
+    const targetRow = isPlaying ? playbackRow : cursorRow;
+    const rowY = targetRow * ROW_HEIGHT;
+    const s    = scrollTopRef.current;
+    if (rowY < s || rowY >= s + visRows * ROW_HEIGHT) {
+      const next = Math.max(0, Math.min(maxScrollY, rowY - Math.floor(visRows / 2) * ROW_HEIGHT));
+      scrollTopRef.current = next;
+      setScrollTop(next);
     }
-  }, [cursorCol, cursorChan, numChannels, patLen, sub]);
+  }, [cursorRow, playbackRow, isPlaying, visRows, maxScrollY]);
 
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    scrollTopRef.current = (e.target as HTMLDivElement).scrollTop;
+  // Auto-scroll horizontal to keep cursor channel visible
+  useEffect(() => {
+    if (cursorChan >= chanXStarts.length) return;
+    const chX = chanXStarts[cursorChan];
+    const chW = channelWidths[cursorChan];
+    const sl  = scrollLeftRef.current;
+    if (chX - sl < ROW_NUM_WIDTH) {
+      const next = Math.max(0, chX - ROW_NUM_WIDTH);
+      scrollLeftRef.current = next;
+      setScrollLeft(next);
+    } else if (chX + chW - sl > width) {
+      const next = Math.min(maxScrollX, chX + chW - width);
+      scrollLeftRef.current = next;
+      setScrollLeft(next);
+    }
+  }, [cursorChan, chanXStarts, channelWidths, maxScrollX, width]);
+
+  // Wheel scroll — native canvas listener with bounds check
+  const scrollStateRef = useRef({ maxScrollY, maxScrollX });
+  scrollStateRef.current = { maxScrollY, maxScrollX };
+
+  useEffect(() => {
+    const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const onWheel = (e: WheelEvent) => {
+      const c = containerRef.current;
+      if (!c) return;
+      const b = c.getBounds();
+      if (e.clientX < b.x || e.clientX > b.x + b.width ||
+          e.clientY < b.y || e.clientY > b.y + b.height) return;
+      e.preventDefault();
+      const { maxScrollY: my, maxScrollX: mx } = scrollStateRef.current;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        const next = Math.max(0, Math.min(mx, scrollLeftRef.current + e.deltaX));
+        scrollLeftRef.current = next;
+        setScrollLeft(next);
+      } else {
+        const next = Math.max(0, Math.min(my, scrollTopRef.current + e.deltaY));
+        scrollTopRef.current = next;
+        setScrollTop(next);
+      }
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', onWheel);
   }, []);
 
-  // Render visible rows
-  const startRow = Math.floor(scrollTopRef.current / ROW_HEIGHT);
-  const endRow = Math.min(patLen, startRow + visibleRows + 2);
+  // Keyboard navigation — fresh state via ref pattern
+  const stateRef = useRef({ cursorRow, cursorChan, cursorCol, patLen, numChannels, sub });
+  stateRef.current = { cursorRow, cursorChan, cursorCol, patLen, numChannels, sub };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!focusedRef.current) return;
+      const { cursorRow: cr, cursorChan: cc, cursorCol: ccol,
+              patLen: pl, numChannels: nc, sub: s } = stateRef.current;
+      void cr; // used via setCursorRow functional update
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          setCursorRow(r => Math.max(0, r - 1));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setCursorRow(r => Math.min(pl - 1, r + 1));
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (ccol === 'note') {
+            if (cc > 0) {
+              const prevEff = s?.channels[cc - 1]?.effectCols ?? 1;
+              setCursorChan(c => c - 1);
+              setCursorCol(prevEff - 1);
+            }
+          } else if (ccol === 'ins') {
+            setCursorCol('note');
+          } else if (ccol === 'vol') {
+            setCursorCol('ins');
+          } else if (typeof ccol === 'number') {
+            setCursorCol(ccol === 0 ? 'vol' : ccol - 1);
+          }
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          if (ccol === 'note') {
+            setCursorCol('ins');
+          } else if (ccol === 'ins') {
+            setCursorCol('vol');
+          } else if (ccol === 'vol') {
+            setCursorCol(0);
+          } else if (typeof ccol === 'number') {
+            const effCols = s?.channels[cc]?.effectCols ?? 1;
+            if (ccol < effCols - 1) { setCursorCol(ccol + 1); }
+            else if (cc < nc - 1)   { setCursorChan(c => c + 1); setCursorCol('note'); }
+          }
+          break;
+        case 'Tab':
+          e.preventDefault();
+          setCursorChan(c => e.shiftKey ? Math.max(0, c - 1) : Math.min(nc - 1, c + 1));
+          setCursorCol('note');
+          break;
+        case 'PageUp':   e.preventDefault(); setCursorRow(r => Math.max(0, r - 16));       break;
+        case 'PageDown': e.preventDefault(); setCursorRow(r => Math.min(pl - 1, r + 16));  break;
+        case 'Home':     e.preventDefault(); setCursorRow(0);                               break;
+        case 'End':      e.preventDefault(); setCursorRow(pl - 1);                          break;
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const startRow = Math.floor(scrollTop / ROW_HEIGHT);
+  const endRow   = Math.min(patLen, startRow + visRows + 2);
+
+  const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
+    setFocused(true);
+    const c = containerRef.current;
+    if (!c || !sub) return;
+    const local = c.toLocal(e.global);
+    if (local.y < HEADER_HEIGHT) return;
+    const row = Math.floor((local.y - HEADER_HEIGHT + scrollTopRef.current) / ROW_HEIGHT);
+    if (row >= 0 && row < patLen) setCursorRow(row);
+    const lx = local.x + scrollLeftRef.current;
+    if (lx >= ROW_NUM_WIDTH) {
+      for (let ch = 0; ch < numChannels; ch++) {
+        const chX = chanXStarts[ch];
+        if (chX === undefined) break;
+        if (lx < chX + channelWidths[ch]) {
+          const rel = lx - chX;
+          setCursorChan(ch);
+          if      (rel < NOTE_WIDTH)                            setCursorCol('note');
+          else if (rel < NOTE_WIDTH + INS_WIDTH)                setCursorCol('ins');
+          else if (rel < NOTE_WIDTH + INS_WIDTH + VOL_WIDTH)    setCursorCol('vol');
+          else {
+            const idx = Math.floor((rel - NOTE_WIDTH - INS_WIDTH - VOL_WIDTH) / EFF_WIDTH);
+            setCursorCol(Math.min(idx, (sub.channels[ch]?.effectCols ?? 1) - 1));
+          }
+          break;
+        }
+      }
+    }
+  }, [patLen, numChannels, chanXStarts, channelWidths, sub]);
+
+  // Draw all backgrounds, row highlights, cursor column, and channel borders
+  const drawBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, width, height).fill({ color: theme.bg.color });
+    g.rect(0, 0, width, HEADER_HEIGHT).fill({ color: theme.bgSecondary.color });
+    g.rect(0, HEADER_HEIGHT - 1, width, 1).fill({ color: theme.border.color });
+
+    for (let row = startRow; row < endRow; row++) {
+      const y = HEADER_HEIGHT + row * ROW_HEIGHT - scrollTop;
+      if (y + ROW_HEIGHT <= HEADER_HEIGHT || y >= height) continue;
+      const isPlayRow   = isPlaying && row === playbackRow;
+      const isCursorRow = row === cursorRow;
+      const isHilightB  = row % 16 === 0;
+      const isHilightA  = !isHilightB && row % 4 === 0;
+
+      if      (isPlayRow)   g.rect(0, y, width, ROW_HEIGHT).fill({ color: theme.trackerRowCurrent.color });
+      else if (isCursorRow) g.rect(0, y, width, ROW_HEIGHT).fill({ color: theme.trackerRowCursor.color, alpha: 0.3 });
+      else if (isHilightB)  g.rect(0, y, width, ROW_HEIGHT).fill({ color: theme.trackerRowHighlight.color, alpha: 0.25 });
+      else if (isHilightA)  g.rect(0, y, width, ROW_HEIGHT).fill({ color: theme.trackerRowHighlight.color, alpha: 0.13 });
+      else if (row % 2 === 1) g.rect(0, y, width, ROW_HEIGHT).fill({ color: theme.trackerRowOdd.color });
+    }
+
+    // Cursor column highlight
+    const curY = HEADER_HEIGHT + cursorRow * ROW_HEIGHT - scrollTop;
+    if (curY + ROW_HEIGHT > HEADER_HEIGHT && curY < height) {
+      const chBaseX = (chanXStarts[cursorChan] ?? ROW_NUM_WIDTH) - scrollLeft;
+      const cx = chBaseX + subColX(cursorCol);
+      const cw = subColW(cursorCol);
+      if (cx < width && cx + cw > 0) {
+        g.rect(cx, curY, cw, ROW_HEIGHT).fill({ color: theme.accent.color, alpha: 0.25 });
+      }
+    }
+
+    // Channel column borders
+    for (let ch = 0; ch < numChannels; ch++) {
+      const bx = chanXStarts[ch] - scrollLeft;
+      if (bx > 0 && bx < width) {
+        g.rect(bx, 0, 1, height).fill({ color: theme.border.color, alpha: 0.2 });
+      }
+    }
+  }, [width, height, theme, scrollTop, scrollLeft, startRow, endRow, isPlaying, playbackRow,
+      cursorRow, cursorChan, cursorCol, chanXStarts, numChannels]);
+
+  // All text labels
+  const cellLabels = useMemo(() => {
+    const labels: { x: number; y: number; text: string; color: number }[] = [];
+
+    // Header
+    labels.push({ x: 4, y: TEXT_Y, text: 'Row', color: theme.textMuted.color });
+    if (sub) {
+      for (let ch = 0; ch < numChannels; ch++) {
+        const chX = chanXStarts[ch] - scrollLeft;
+        if (chX >= width || chX + channelWidths[ch] <= 0) continue;
+        const chanName = sub.channels[ch]?.name?.substring(0, 6) || `CH${ch}`;
+        const effCols  = sub.channels[ch]?.effectCols ?? 1;
+        labels.push({
+          x: chX + 4, y: TEXT_Y,
+          text: `${chanName} ${effCols}fx`.substring(0, 12),
+          color: theme.textSecondary.color,
+        });
+      }
+    }
+
+    // Content rows
+    if (sub) {
+      for (let row = startRow; row < endRow; row++) {
+        const y = HEADER_HEIGHT + row * ROW_HEIGHT - scrollTop + TEXT_Y;
+        if (y < HEADER_HEIGHT || y + FONT_SIZE > height) continue;
+        const isHilightB = row % 16 === 0;
+        labels.push({
+          x: 4, y,
+          text: row.toString(16).toUpperCase().padStart(2, '0'),
+          color: isHilightB ? theme.text.color : theme.textMuted.color,
+        });
+
+        for (let ch = 0; ch < numChannels; ch++) {
+          const chX = chanXStarts[ch] - scrollLeft;
+          const chW = channelWidths[ch];
+          if (chX + chW <= 0 || chX >= width) continue;
+
+          const patIdx = sub.orders[ch]?.[currentPosition];
+          const fRow: FurnaceRow | null = patIdx !== undefined
+            ? (sub.channels[ch]?.patterns.get(patIdx)?.rows[row] ?? null)
+            : null;
+
+          labels.push({
+            x: chX + 2, y,
+            text: fRow ? formatFurnaceNote(fRow.note) : '---',
+            color: fRow && fRow.note !== -1 ? theme.cellNote.color : theme.cellEmpty.color,
+          });
+          labels.push({
+            x: chX + NOTE_WIDTH + 2, y,
+            text: fRow ? formatHex(fRow.ins, 2) : '--',
+            color: fRow && fRow.ins !== -1 ? theme.cellInstrument.color : theme.cellEmpty.color,
+          });
+          labels.push({
+            x: chX + NOTE_WIDTH + INS_WIDTH + 2, y,
+            text: fRow ? formatHex(fRow.vol, 2) : '--',
+            color: fRow && fRow.vol !== -1 ? theme.cellVolume.color : theme.cellEmpty.color,
+          });
+
+          const effCols = sub.channels[ch]?.effectCols ?? 1;
+          for (let fxIdx = 0; fxIdx < effCols; fxIdx++) {
+            const fxData = fRow?.effects[fxIdx];
+            const hasData = !!fxData && (fxData.cmd > 0 || fxData.val > 0);
+            const fxX = chX + NOTE_WIDTH + INS_WIDTH + VOL_WIDTH + fxIdx * EFF_WIDTH + 2;
+            if (fxX >= width || fxX + EFF_WIDTH <= 0) continue;
+            labels.push({
+              x: fxX, y,
+              text: hasData ? `${formatHex(fxData.cmd, 2)}${formatHex(fxData.val, 2)}` : '----',
+              color: hasData ? effectColor(fxData.cmd, theme) : theme.cellEmpty.color,
+            });
+          }
+        }
+      }
+    }
+
+    return labels;
+  }, [sub, numChannels, startRow, endRow, scrollTop, scrollLeft, height, width, theme,
+      currentPosition, chanXStarts, channelWidths]);
 
   return (
-    <div
+    <pixiContainer
       ref={containerRef}
-      style={{
-        width,
-        height,
-        overflow: 'auto',
-        backgroundColor: hexColor(theme.bg.color),
-        fontFamily: 'JetBrains Mono, monospace',
-        fontSize: 11,
-        outline: 'none',
-        userSelect: 'none',
-      }}
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-      onScroll={handleScroll}
+      layout={{ width, height }}
+      eventMode="static"
+      onPointerDown={handlePointerDown}
     >
-      {/* Channel headers */}
-      <div style={{
-        display: 'flex',
-        position: 'sticky',
-        top: 0,
-        zIndex: 2,
-        backgroundColor: hexColor(theme.bgSecondary.color),
-        borderBottom: `1px solid ${hexColor(theme.border.color)}`,
-        height: HEADER_HEIGHT,
-        lineHeight: `${HEADER_HEIGHT}px`,
-      }}>
-        <div style={{ width: ROW_NUM_WIDTH, textAlign: 'center', color: hexColor(theme.textMuted.color) }}>
-          Row
-        </div>
-        {sub && sub.channels.map((ch, chIdx) => (
-          <div key={chIdx} style={{
-            width: channelWidths[chIdx],
-            textAlign: 'center',
-            color: hexColor(theme.textSecondary.color),
-            borderLeft: `1px solid ${hexColor(theme.border.color)}`,
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-          }}>
-            {ch.name || `CH ${chIdx}`}
-            <span style={{ color: hexColor(theme.textMuted.color), marginLeft: 4, fontSize: 9 }}>
-              ({ch.effectCols}fx)
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* Pattern rows */}
-      <div style={{ height: patLen * ROW_HEIGHT, position: 'relative' }}>
-        {Array.from({ length: endRow - startRow }, (_, i) => {
-          const row = startRow + i;
-          const isPlayRow = isPlaying && row === playbackRow;
-          const isCursorRow = row === cursorRow;
-
-          // Row highlighting: hilightA every 4, hilightB every 16
-          const isHilightB = row % 16 === 0;
-          const isHilightA = row % 4 === 0;
-
-          let bgColor = 'transparent';
-          if (isPlayRow) bgColor = hexColor(theme.trackerRowCurrent.color);
-          else if (isCursorRow) bgColor = `${hexColor(theme.trackerRowCursor.color)}30`;
-          else if (isHilightB) bgColor = `${hexColor(theme.trackerRowHighlight.color)}40`;
-          else if (isHilightA) bgColor = `${hexColor(theme.trackerRowHighlight.color)}20`;
-          else if (row % 2 === 1) bgColor = hexColor(theme.trackerRowOdd.color);
-
-          return (
-            <div
-              key={row}
-              style={{
-                display: 'flex',
-                position: 'absolute',
-                top: row * ROW_HEIGHT,
-                height: ROW_HEIGHT,
-                width: totalContentWidth,
-                lineHeight: `${ROW_HEIGHT}px`,
-                backgroundColor: bgColor,
-              }}
-            >
-              {/* Row number */}
-              <div style={{
-                width: ROW_NUM_WIDTH,
-                textAlign: 'center',
-                color: isHilightB
-                  ? hexColor(theme.text.color)
-                  : hexColor(theme.textMuted.color),
-              }}>
-                {row.toString(16).toUpperCase().padStart(2, '0')}
-              </div>
-
-              {/* Channel cells */}
-              {sub && sub.channels.map((ch, chIdx) => {
-                const fRow = getRow(chIdx, row);
-                const effCols = ch.effectCols;
-
-                return (
-                  <div
-                    key={chIdx}
-                    style={{
-                      display: 'flex',
-                      width: channelWidths[chIdx],
-                      borderLeft: `1px solid ${hexColor(theme.border.color)}20`,
-                    }}
-                  >
-                    {/* Note */}
-                    <span
-                      onClick={() => { setCursorRow(row); setCursorChan(chIdx); setCursorCol('note'); }}
-                      style={{
-                        width: NOTE_WIDTH,
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        color: fRow && fRow.note !== -1
-                          ? hexColor(theme.cellNote.color)
-                          : hexColor(theme.cellEmpty.color),
-                        backgroundColor: isCursorRow && chIdx === cursorChan && cursorCol === 'note'
-                          ? `${hexColor(theme.accent.color)}40`
-                          : 'transparent',
-                      }}
-                    >
-                      {fRow ? formatFurnaceNote(fRow.note) : '---'}
-                    </span>
-
-                    {/* Instrument */}
-                    <span
-                      onClick={() => { setCursorRow(row); setCursorChan(chIdx); setCursorCol('ins'); }}
-                      style={{
-                        width: INS_WIDTH,
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        color: fRow && fRow.ins !== -1
-                          ? hexColor(theme.cellInstrument.color)
-                          : hexColor(theme.cellEmpty.color),
-                        backgroundColor: isCursorRow && chIdx === cursorChan && cursorCol === 'ins'
-                          ? `${hexColor(theme.accent.color)}40`
-                          : 'transparent',
-                      }}
-                    >
-                      {fRow ? formatHex(fRow.ins, 2) : '--'}
-                    </span>
-
-                    {/* Volume */}
-                    <span
-                      onClick={() => { setCursorRow(row); setCursorChan(chIdx); setCursorCol('vol'); }}
-                      style={{
-                        width: VOL_WIDTH,
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        color: fRow && fRow.vol !== -1
-                          ? hexColor(theme.cellVolume.color)
-                          : hexColor(theme.cellEmpty.color),
-                        backgroundColor: isCursorRow && chIdx === cursorChan && cursorCol === 'vol'
-                          ? `${hexColor(theme.accent.color)}40`
-                          : 'transparent',
-                      }}
-                    >
-                      {fRow ? formatHex(fRow.vol, 2) : '--'}
-                    </span>
-
-                    {/* Effect columns */}
-                    {Array.from({ length: effCols }, (_, fxIdx) => {
-                      const fx = fRow?.effects[fxIdx];
-                      const hasData = fx && (fx.cmd > 0 || fx.val > 0);
-                      const isCursorFx = isCursorRow && chIdx === cursorChan && cursorCol === fxIdx;
-
-                      return (
-                        <span
-                          key={fxIdx}
-                          onClick={() => { setCursorRow(row); setCursorChan(chIdx); setCursorCol(fxIdx); }}
-                          style={{
-                            width: EFF_WIDTH,
-                            textAlign: 'center',
-                            cursor: 'pointer',
-                            color: hasData
-                              ? getEffectColor(fx!.cmd, theme)
-                              : hexColor(theme.cellEmpty.color),
-                            backgroundColor: isCursorFx
-                              ? `${hexColor(theme.accent.color)}40`
-                              : 'transparent',
-                          }}
-                        >
-                          {hasData
-                            ? `${formatHex(fx!.cmd, 2)}${formatHex(fx!.val, 2)}`
-                            : '----'}
-                        </span>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
+      {cellLabels.map((l, i) => (
+        <pixiBitmapText
+          key={i}
+          text={l.text}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }}
+          tint={l.color}
+          x={l.x}
+          y={l.y}
+        />
+      ))}
+    </pixiContainer>
   );
 };

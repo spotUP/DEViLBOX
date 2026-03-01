@@ -817,6 +817,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
       notify.success(`Imported "${info.metadata.title}" - ${result.patterns.length} patterns, ${instruments.length} instruments`);
 
+      // Reset editor mode to 'classic' and clear any stale native data (furnace, hively, etc.)
+      // from a previously loaded module. XM uses linear periods; MOD always uses Amiga periods.
+      const xmFreqType = importMetadata?.xmData?.frequencyType;
+      const linearPeriods = format === 'XM' ? (xmFreqType === 'linear' || xmFreqType === undefined) : false;
+      useTrackerStore.getState().applyEditorMode({ linearPeriods });
+
       return;
     }
 

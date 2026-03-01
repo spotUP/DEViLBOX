@@ -42,6 +42,7 @@
   "build": {
     "appId": "com.devilbox.app",
     "productName": "DEViLBOX",
+    "icon": "build/icon",
     "directories": {
       "output": "dist_electron"
     },
