@@ -69,6 +69,8 @@ export class FredSynth implements DevilboxSynth {
     this.engine.sendMessage({ type: 'createPlayer' });
     this._playerHandle = await this.engine.waitForPlayerHandle();
 
+    if (this._playerHandle < 0) return; // Pool full — no player allocated
+
     const blob = serializeFredConfig(config);
     this.engine.sendMessage(
       { type: 'loadInstrument', handle: this._playerHandle, buffer: blob },
