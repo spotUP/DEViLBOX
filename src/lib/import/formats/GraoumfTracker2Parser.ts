@@ -446,7 +446,7 @@ function parseGTKFile(buf: Uint8Array, filename: string): TrackerSong | null {
     const loopStart = meta.hasLoop ? meta.loopStart : 0;
     const loopEnd   = meta.hasLoop ? meta.loopEnd   : 0;
     const rate      = meta.sampleRate > 0 ? meta.sampleRate : 8363;
-    const _gtkChipRam: UADEChipRamInfo = { moduleBase: 0, moduleSize: buf.length, instrBase: GTK_HEADER_SIZE + i * sampleHeaderSize, instrSize: sampleHeaderSize };
+    const _gtkChipRam: UADEChipRamInfo = { moduleBase: 0, moduleSize: buf.length, instrBase: GTK_HEADER_SIZE + i * sampleHeaderSize, instrSize: sampleHeaderSize, sections: {} };
     const _gtkInst = createSamplerInstrument(id, meta.name || "Sample " + id, mono8, vol, rate, loopStart, loopEnd);
     instruments.push({ ..._gtkInst, uadeChipRam: _gtkChipRam });
 
