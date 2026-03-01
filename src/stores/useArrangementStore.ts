@@ -394,7 +394,6 @@ export const useArrangementStore = create<ArrangementStore>()(
         if (clip) clip.name = name || undefined;
       }),
 
-    renamingClipId: null,
     setRenamingClipId: (id) =>
       set((state) => { state.renamingClipId = id; }),
 
