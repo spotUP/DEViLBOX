@@ -9,12 +9,46 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useArrangementStore } from '@stores/useArrangementStore';
 import { useTrackerStore } from '@stores';
 import { useTransportStore } from '@stores';
+import { useMixerStore } from '@stores/useMixerStore';
 import { notify } from '@stores/useNotificationStore';
 import { useArrangementKeyboard } from '@/hooks/arrangement/useArrangementKeyboard';
 import { ArrangementToolbar } from './ArrangementToolbar';
 import { TrackHeaderPanel } from './TrackHeaderPanel';
 import { ArrangementCanvas } from './ArrangementCanvas';
 import { ArrangementContextMenu } from './ArrangementContextMenu';
+import type { TimelineAutomationPoint } from '@/types/arrangement';
+
+/**
+ * Linearly interpolate automation value at a given row.
+ * - Flat before the first point (returns first point's value).
+ * - Flat after the last point (returns last point's value).
+ * - Linear interpolation between surrounding points.
+ * Points must be sorted by row (ascending).
+ */
+function getAutomationValue(points: TimelineAutomationPoint[], row: number): number {
+  if (points.length === 0) return 0;
+  if (points.length === 1) return points[0].value;
+
+  // Before first point: hold first value
+  if (row <= points[0].row) return points[0].value;
+
+  // After last point: hold last value
+  if (row >= points[points.length - 1].row) return points[points.length - 1].value;
+
+  // Find surrounding pair
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    if (row >= a.row && row <= b.row) {
+      const span = b.row - a.row;
+      if (span === 0) return a.value;
+      const t = (row - a.row) / span;
+      return a.value + t * (b.value - a.value);
+    }
+  }
+
+  return points[points.length - 1].value;
+}
 
 export const ArrangementView: React.FC = () => {
   // Register keyboard shortcuts for arrangement view
@@ -63,7 +97,7 @@ export const ArrangementView: React.FC = () => {
     }
   }, [isArrangementMode, setIsArrangementMode, tracks.length]);
 
-  // Sync playback position with arrangement
+  // Sync playback position with arrangement and apply automation lanes
   useEffect(() => {
     if (!isPlaying || !isArrangementMode) return;
 
@@ -73,6 +107,21 @@ export const ArrangementView: React.FC = () => {
 
       // Update arrangement playback position
       useArrangementStore.getState().setPlaybackRow(globalRow);
+
+      // Apply automation lanes
+      const { automationLanes, tracks } = useArrangementStore.getState();
+      for (const lane of automationLanes) {
+        if (!lane.enabled || lane.points.length === 0) continue;
+        const value = getAutomationValue(lane.points, globalRow);
+        if (lane.parameter === 'volume') {
+          // Find the track's channel index (tracks sorted by index, 0-based)
+          const sortedTracks = [...tracks].sort((a, b) => a.index - b.index);
+          const chIdx = sortedTracks.findIndex(t => t.id === lane.trackId);
+          if (chIdx >= 0) {
+            useMixerStore.getState().setChannelVolume(chIdx, value);
+          }
+        }
+      }
 
       // Continue updating while playing
       if (useTransportStore.getState().isPlaying && useArrangementStore.getState().isArrangementMode) {
