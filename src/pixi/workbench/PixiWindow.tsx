@@ -290,6 +290,8 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     e.stopPropagation();
     bringToFront(id);
     setActiveWindowId(id);
+    // Maximized windows are pinned — drag disabled
+    if (storeRef.current.winState?.maximized) return;
 
     // Cancel any active momentum
     cancelAnimationFrame(momentumRafRef.current);
@@ -389,6 +391,8 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
 
   const handleResizeStart = useCallback((dir: ResizeDir, e: FederatedPointerEvent) => {
     e.stopPropagation();
+    // Maximized windows cannot be resized — click restores instead
+    if (storeRef.current.winState?.maximized) return;
     bringToFront(id);
     const w = storeRef.current.winState;
     resizeRef.current = {
@@ -618,7 +622,7 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
       <pixiGraphics
         draw={drawTitleDrag}
         eventMode="static"
-        cursor="move"
+        cursor={winState.maximized ? 'default' : 'move'}
         onPointerDown={handleTitlePointerDown}
         layout={{ position: 'absolute', width: w - 44, height: TITLE_H }}
       />
