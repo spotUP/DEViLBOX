@@ -48,6 +48,8 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   const setTool = usePianoRollStore(s => s.setTool);
   const view = usePianoRollStore(s => s.view);
   const selectedNotes = usePianoRollStore(s => s.selection.notes);
+  const horizontalZoom = usePianoRollStore(s => s.view.horizontalZoom);
+  const verticalZoom = usePianoRollStore(s => s.view.verticalZoom);
 
   // Resolve actual window pixel dimensions from the workbench store
   const win = useWorkbenchStore(s => s.windows[windowId]);
@@ -343,6 +345,16 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           onClick={() => setTool('erase')}
         />
 
+        {/* Horizontal zoom */}
+        <PixiButton label="-" variant="ghost" size="sm" onClick={() => usePianoRollStore.getState().setHorizontalZoom(horizontalZoom / 2)} />
+        <PixiLabel text="H" size="xs" color="textMuted" />
+        <PixiButton label="+" variant="ghost" size="sm" onClick={() => usePianoRollStore.getState().setHorizontalZoom(horizontalZoom * 2)} />
+
+        {/* Vertical zoom */}
+        <PixiButton label="-" variant="ghost" size="sm" onClick={() => usePianoRollStore.getState().setVerticalZoom(verticalZoom - 4)} />
+        <PixiLabel text="V" size="xs" color="textMuted" />
+        <PixiButton label="+" variant="ghost" size="sm" onClick={() => usePianoRollStore.getState().setVerticalZoom(verticalZoom + 4)} />
+
         <PixiButton
           label={`Grid:1/${view.gridDivision}`}
           variant="ghost"
@@ -379,11 +391,13 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
         onPointerOver={() => { isHoveredRef.current = true; }}
         onPointerOut={() => { isHoveredRef.current = false; }}
       >
-        <PixiPianoKeyboard width={KEYBOARD_WIDTH} height={gridH} />
+        <PixiPianoKeyboard width={KEYBOARD_WIDTH} height={gridH} noteHeight={verticalZoom} scrollNote={view.scrollY} />
         <PixiPianoRollGrid
           width={gridW}
           height={gridH}
           notes={notes}
+          pixelsPerBeat={horizontalZoom}
+          noteHeight={verticalZoom}
           scrollBeat={view.scrollX}
           scrollNote={view.scrollY}
           channelIndex={view.channelIndex}
