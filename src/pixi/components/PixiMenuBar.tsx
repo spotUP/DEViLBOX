@@ -113,19 +113,19 @@ const PixiMenuButton: React.FC<PixiMenuButtonProps> = ({
         tint={isOpen ? theme.accent.color : theme.textSecondary.color}
         layout={{}}
       />
-      {isOpen && (
-        <pixiContainer
-          zIndex={300}
-          eventMode="static"
-          onPointerDown={(e: FederatedPointerEvent) => e.stopPropagation()}
-          layout={{ position: 'absolute', top: height, left: 0, width: dropdownW, height: dropdownH, flexDirection: 'column', padding: 4 }}
-        >
-          <pixiGraphics draw={drawDropdownBg} layout={{ position: 'absolute', width: dropdownW, height: dropdownH }} />
-          {menu.items.map((item, j) => (
-            <PixiMenuItem key={j} item={item} width={dropdownW - 8} onClose={onClose} />
-          ))}
-        </pixiContainer>
-      )}
+      {/* Always mounted — conditional render causes @pixi/layout BindingError on open */}
+      <pixiContainer
+        zIndex={300}
+        renderable={isOpen}
+        eventMode={isOpen ? 'static' : 'none'}
+        onPointerDown={(e: FederatedPointerEvent) => e.stopPropagation()}
+        layout={{ position: 'absolute', top: height, left: 0, width: dropdownW, height: dropdownH, flexDirection: 'column', padding: 4 }}
+      >
+        <pixiGraphics draw={drawDropdownBg} layout={{ position: 'absolute', width: dropdownW, height: dropdownH }} />
+        {menu.items.map((item, j) => (
+          <PixiMenuItem key={j} item={item} width={dropdownW - 8} onClose={onClose} />
+        ))}
+      </pixiContainer>
     </pixiContainer>
   );
 };

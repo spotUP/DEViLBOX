@@ -28,7 +28,8 @@ import { PixiMenuBar } from '../../components/PixiMenuBar';
 import { PixiButton, PixiNumericInput } from '../../components';
 import { PixiPureTextInput } from '../../input/PixiPureTextInput';
 import { PixiVisualizer } from './PixiVisualizer';
-import { useTransportStore, useTrackerStore, useUIStore, useTabsStore } from '@stores';
+import { useTransportStore, useTrackerStore, useUIStore, useTabsStore, useInstrumentStore } from '@stores';
+import { saveProjectToStorage } from '@hooks/useProjectPersistence';
 import { useShallow } from 'zustand/react/shallow';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
@@ -198,7 +199,31 @@ export const PixiFT2Toolbar: React.FC = () => {
   const handleShowGroove       = useCallback(() => useUIStore.getState().openModal('grooveSettings'), []);
   const handleShowRevisions    = useCallback(() => useUIStore.getState().openModal('revisions'), []);
 
+  // ── File operations ───────────────────────────────────────────────────────
+  const handleLoad = useCallback(() => {
+    useUIStore.getState().setShowFileBrowser(true);
+  }, []);
+
+  const handleSave = useCallback(() => {
+    void saveProjectToStorage().then(ok => {
+      if (ok) notify.success('Project saved', 1500);
+      else notify.error('Save failed');
+    });
+  }, []);
+
+  const handleClearProject = useCallback(() => {
+    if (!window.confirm('Clear project? Unsaved changes will be lost.')) return;
+    if (isPlaying) stop();
+    useTrackerStore.getState().reset();
+    useTransportStore.getState().reset();
+    useInstrumentStore.getState().reset();
+    notify.success('Project cleared', 1500);
+  }, [isPlaying, stop]);
+
   const menus = buildFT2Menus({
+    onLoadFile: handleLoad,
+    onSave: handleSave,
+    onClearProject: handleClearProject,
     onShowExport: handleShowExport,
     onShowHelp: handleShowHelp,
     onShowMasterFX: handleShowMasterFX,
@@ -570,12 +595,12 @@ export const PixiFT2Toolbar: React.FC = () => {
       >
         <pixiGraphics draw={drawFileRowBg} layout={{ ...LAYOUT_FILL_ROW, height: FILE_ROW_H }} />
 
-        <PixiButton label="Load"        variant="ghost" size="sm" onClick={() => notify.info('Use File menu to load')} />
-        <PixiButton label="Save"        variant="ghost" size="sm" onClick={() => notify.info('Use File menu to save')} />
+        <PixiButton label="Load"        variant="ghost" size="sm" onClick={handleLoad} />
+        <PixiButton label="Save"        variant="ghost" size="sm" onClick={handleSave} />
         <PixiButton label="Revisions"   variant="ghost" size="sm" onClick={handleShowRevisions} />
         <PixiButton label="Export"      variant="ghost" size="sm" onClick={handleShowExport} />
         <PixiButton label="New"         variant="ghost" size="sm" onClick={() => addTab()} />
-        <PixiButton label="Clear"       variant="ghost" size="sm" onClick={() => notify.info('Use File menu to clear')} />
+        <PixiButton label="Clear"       variant="ghost" size="sm" onClick={handleClearProject} />
         <PixiButton label="Order"       variant="ghost" size="sm" onClick={handleShowPatternOrder} />
         <PixiButton label="Instruments" variant="ghost" size="sm" onClick={handleShowInstruments} />
         <PixiButton label="Pads"        variant="ghost" size="sm" onClick={handleShowDrumpads} />
