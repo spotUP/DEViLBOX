@@ -205,7 +205,7 @@ export const PixiTrackerView: React.FC = () => {
               width: viewMode === 'pianoroll' ? '100%' : 0,
             }}
           >
-            <PixiPianoRollView />
+            <PixiPianoRollView isActive={viewMode === 'pianoroll'} />
           </pixiContainer>
 
           {/* TB-303 view — native Pixi */}
