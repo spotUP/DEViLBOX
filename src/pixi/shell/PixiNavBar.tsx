@@ -16,7 +16,7 @@ import { useTabsStore } from '@stores/useTabsStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
-import { BUILTIN_WORKSPACES, springCameraTo, fitAllWindows } from '../workbench/WorkbenchExpose';
+import { BUILTIN_WORKSPACES, springCameraTo, fitAllWindows, fitWindow } from '../workbench/WorkbenchExpose';
 
 /** View window toggle buttons shown in the NavBar */
 const VIEW_WINDOWS = [
@@ -185,11 +185,12 @@ export const PixiNavBar: React.FC = () => {
   const setRenderMode = useSettingsStore((s) => s.setRenderMode);
 
   // Workbench store — window visibility + 3D tilt
-  const windows       = useWorkbenchStore((s) => s.windows);
-  const toggleWindow  = useWorkbenchStore((s) => s.toggleWindow);
-  const isTilted      = useWorkbenchStore((s) => s.isTilted);
-  const setTilted     = useWorkbenchStore((s) => s.setTilted);
-  const resetLayout   = useWorkbenchStore((s) => s.resetLayout);
+  const windows         = useWorkbenchStore((s) => s.windows);
+  const toggleWindow    = useWorkbenchStore((s) => s.toggleWindow);
+  const isTilted        = useWorkbenchStore((s) => s.isTilted);
+  const setTilted       = useWorkbenchStore((s) => s.setTilted);
+  const resetLayout     = useWorkbenchStore((s) => s.resetLayout);
+  const activeWindowId  = useWorkbenchStore((s) => s.activeWindowId);
 
   // Workspace picker popup state
   const [wsPickerOpen, setWsPickerOpen] = useState(false);
@@ -218,10 +219,16 @@ export const PixiNavBar: React.FC = () => {
     springCameraTo({ x: 0, y: 0, scale: 1 });
   }, [resetLayout]);
 
-  // Fit all visible windows into view
+  // Fit active window, or all windows if none selected
   const handleFitAll = useCallback(() => {
-    const ws = useWorkbenchStore.getState().windows;
-    springCameraTo(fitAllWindows(ws, width, height));
+    const state = useWorkbenchStore.getState();
+    const activeId = state.activeWindowId;
+    const win = activeId ? state.windows[activeId] : null;
+    if (win?.visible && !win.minimized) {
+      springCameraTo(fitWindow(win, width, height));
+    } else {
+      springCameraTo(fitAllWindows(state.windows, width, height));
+    }
   }, [width, height]);
 
   // Camera zoom presets — spring-animate to a fixed scale centred on screen

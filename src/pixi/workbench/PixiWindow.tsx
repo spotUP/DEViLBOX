@@ -130,11 +130,13 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   const hideWindow     = useWorkbenchStore((s) => s.hideWindow);
   const minimizeWindow = useWorkbenchStore((s) => s.minimizeWindow);
   const restoreWindow  = useWorkbenchStore((s) => s.restoreWindow);
-  const snapToGrid     = useWorkbenchStore((s) => s.snapToGrid);
-  const gridSize       = useWorkbenchStore((s) => s.gridSize);
-  const setSnapLines   = useSetSnapLines();
+  const snapToGrid        = useWorkbenchStore((s) => s.snapToGrid);
+  const gridSize          = useWorkbenchStore((s) => s.gridSize);
+  const activeWindowId    = useWorkbenchStore((s) => s.activeWindowId);
+  const setActiveWindowId = useWorkbenchStore((s) => s.setActiveWindowId);
+  const setSnapLines      = useSetSnapLines();
 
-  const [focused, setFocused] = useState(false);
+  const focused = activeWindowId === id;
   const [animVisible, setAnimVisible] = useState(winState?.visible ?? false);
 
   // Ref to the outer container for direct Pixi manipulation
@@ -269,7 +271,7 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   const handleTitlePointerDown = useCallback((e: FederatedPointerEvent) => {
     e.stopPropagation();
     bringToFront(id);
-    setFocused(true);
+    setActiveWindowId(id);
 
     // Cancel any active momentum
     cancelAnimationFrame(momentumRafRef.current);
@@ -363,7 +365,7 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
 
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
-  }, [id, bringToFront, getViewportBounds]);
+  }, [id, bringToFront, setActiveWindowId, getViewportBounds]);
 
   // ─── Resize ────────────────────────────────────────────────────────────────
 
@@ -456,25 +458,24 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     // doesn't scale the graphics to fit and distort the circles.
     g.rect(0, 0, w, TITLE_H);
     g.fill({ color: 0x000000, alpha: 0 });
+    // Red = close/hide
     g.circle(w - 12, TITLE_H / 2, 4);
     g.fill({ color: 0xe05050, alpha: 0.9 });
+    // Green = focus/fit this window
     g.circle(w - 28, TITLE_H / 2, 4);
-    g.fill({ color: 0xe0a030, alpha: 0.9 });
-    g.circle(w - 44, TITLE_H / 2, 4);
     g.fill({ color: 0x40b060, alpha: 0.9 });
   }, [w]);
 
   const handlePointerDownWindow = useCallback((_e: FederatedPointerEvent) => {
     bringToFront(id);
-    setFocused(true);
-  }, [id, bringToFront]);
+    setActiveWindowId(id);
+  }, [id, bringToFront, setActiveWindowId]);
 
   const handleChromePointerDown = useCallback((e: FederatedPointerEvent) => {
     const lx = e.getLocalPosition((e.currentTarget as any)).x;
     if (lx > w - 20) { e.stopPropagation(); playWindowClose(); runSpring('close', () => hideWindow(id)); }
-    else if (lx > w - 36) { e.stopPropagation(); handleMinimize(e); }
-    else if (lx > w - 52) { e.stopPropagation(); onFocus?.(id); }
-  }, [w, id, hideWindow, handleMinimize, runSpring]);
+    else if (lx > w - 36) { e.stopPropagation(); onFocus?.(id); }
+  }, [w, id, hideWindow, onFocus, runSpring]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -537,12 +538,12 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
         layout={{ position: 'absolute', width: w, height: TITLE_H }}
       />
 
-      {/* Title bar drag area (avoids the chrome button zone) */}
+      {/* Title bar drag area (avoids the chrome button zone — 2 buttons × 16px + 4px pad) */}
       <pixiContainer
         eventMode="static"
         cursor="move"
         onPointerDown={handleTitlePointerDown}
-        layout={{ position: 'absolute', width: w - 60, height: TITLE_H }}
+        layout={{ position: 'absolute', width: w - 44, height: TITLE_H }}
       />
 
       {/* Title text */}

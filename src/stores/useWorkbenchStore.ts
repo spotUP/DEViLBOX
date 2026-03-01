@@ -96,6 +96,10 @@ interface WorkbenchStore {
   setUiSoundVolume: (vol: number) => void;
   setTilted: (tilted: boolean) => void;
 
+  /** The window that last received a pointerdown — null when background is clicked. */
+  activeWindowId: string | null;
+  setActiveWindowId: (id: string | null) => void;
+
   /** Reset all windows to defaults and camera to origin. */
   resetLayout: () => void;
 }
@@ -112,6 +116,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       snapToGrid: false,
       gridSize: 40,
       isTilted: false,
+      activeWindowId: null,
 
       // ─── Camera ────────────────────────────────────────────────────────────
 
@@ -153,6 +158,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
         set((state) => {
           if (!state.windows[id]) return;
           state.windows[id].visible = false;
+          if (state.activeWindowId === id) state.activeWindowId = null;
         }),
 
       toggleWindow: (id) => {
@@ -251,6 +257,9 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       setTilted: (tilted) =>
         set((state) => { state.isTilted = tilted; }),
+
+      setActiveWindowId: (id) =>
+        set((state) => { state.activeWindowId = id; }),
 
       resetLayout: () =>
         set((state) => {
