@@ -43,6 +43,7 @@ import { useSampleEditorState } from '../../hooks/useSampleEditorState';
 import type { DragTarget } from '../../hooks/useSampleEditorState';
 import { addManualSlice } from '../../lib/audio/BeatSliceAnalyzer';
 import { UADEEngine } from '../../engine/uade/UADEEngine';
+import { UADELiveParamsBar } from './controls/UADELiveParamsBar';
 
 // ─── Props & types ─────────────────────────────────────────────────────
 
@@ -980,6 +981,12 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           <AlertCircle size={14} className="shrink-0" />
           {error}
         </div>
+      )}
+
+      {/* ─── UADE Live Params (enhanced-scan instruments only) ──── */}
+      {(instrument.uadeChipRam?.sections?.volume != null ||
+        instrument.uadeChipRam?.sections?.period != null) && (
+        <UADELiveParamsBar instrument={instrument} />
       )}
 
       {/* ─── Waveform canvas ─────────────────────────────────────── */}
