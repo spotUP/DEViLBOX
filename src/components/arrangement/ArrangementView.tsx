@@ -29,6 +29,7 @@ export const ArrangementView: React.FC = () => {
     importFromPatternOrder,
     isArrangementMode,
     setIsArrangementMode,
+    setClipContextMenu,
   } = useArrangementStore();
   const isPlaying = useTransportStore(s => s.isPlaying);
   const hasMigratedRef = useRef(false);
@@ -127,11 +128,6 @@ export const ArrangementView: React.FC = () => {
     return result;
   }, [tracks, groups, automationLanes]);
 
-  // Context menu state
-  const [ctxMenu, setCtxMenu] = React.useState<{
-    x: number; y: number; clipId: string | null; trackId: string | null; row: number;
-  } | null>(null);
-
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Keyboard shortcuts
@@ -196,36 +192,23 @@ export const ArrangementView: React.FC = () => {
     // Escape: Clear selection
     if (e.key === 'Escape') {
       clearSelection();
-      setCtxMenu(null);
+      setClipContextMenu(null);
       e.preventDefault();
     }
-  }, [selectedClipIds, setTool, removeClips, duplicateClips, clearSelection, selectAllClipsOnTrack, pushUndo, undo, redo]);
+  }, [selectedClipIds, setTool, removeClips, duplicateClips, clearSelection, selectAllClipsOnTrack, pushUndo, undo, redo, setClipContextMenu]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // Context menu handler
+  // Context menu handler — only show if exactly one clip is selected
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    // For now, show basic context menu at click position
-    setCtxMenu({
-      x: e.clientX,
-      y: e.clientY,
-      clipId: selectedClipIds.size === 1 ? [...selectedClipIds][0] : null,
-      trackId: null,
-      row: 0,
-    });
-  }, [selectedClipIds]);
-
-  // Close context menu on click outside
-  useEffect(() => {
-    if (!ctxMenu) return;
-    const handleClick = () => setCtxMenu(null);
-    window.addEventListener('mousedown', handleClick);
-    return () => window.removeEventListener('mousedown', handleClick);
-  }, [ctxMenu]);
+    if (selectedClipIds.size !== 1) return;
+    const clipId = [...selectedClipIds][0];
+    setClipContextMenu({ clipId, screenX: e.clientX, screenY: e.clientY });
+  }, [selectedClipIds, setClipContextMenu]);
 
   return (
     <div
@@ -250,17 +233,8 @@ export const ArrangementView: React.FC = () => {
         <ArrangementCanvas />
       </div>
 
-      {/* Context menu */}
-      {ctxMenu && (
-        <ArrangementContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          clipId={ctxMenu.clipId}
-          trackId={ctxMenu.trackId}
-          row={ctxMenu.row}
-          onClose={() => setCtxMenu(null)}
-        />
-      )}
+      {/* Context menu — reads position/clipId from store */}
+      <ArrangementContextMenu />
     </div>
   );
 };
