@@ -218,6 +218,7 @@ export const PixiArrangementView: React.FC = () => {
     };
   }, []);
 
+
   // Playback row sync via rAF loop
   useEffect(() => {
     if (!isPlaying) return;
@@ -266,6 +267,18 @@ export const PixiArrangementView: React.FC = () => {
             // No clip covers this row — clear the last active clip tracking
             lastArrangementPatternIdRef.current = null;
           }
+        }
+
+        // Visual playhead wrap-around for loop region.
+        // When the loop is active and the playhead reaches or passes loopEnd,
+        // reset the visual playhead to loopStart. Audio looping is handled
+        // by the replayer's virtual pattern sequence — this is visual-only.
+        const isLooping = useTransportStore.getState().isLooping;
+        const ls = arr.view.loopStart;
+        const le = arr.view.loopEnd;
+        if (isLooping && ls != null && le != null && globalRow >= le) {
+          playbackRowRef.current = ls;
+          arr.setPlaybackRow(ls);
         }
       }
       rafId = requestAnimationFrame(update);

@@ -43,6 +43,8 @@ export const usePatternPlayback = () => {
   const { instruments } = useInstrumentStore();
   const { masterEffects } = useAudioStore();
   const isArrangementMode = useArrangementStore((state) => state.isArrangementMode);
+  const loopStart = useArrangementStore((state) => state.view.loopStart);
+  const loopEnd = useArrangementStore((state) => state.view.loopEnd);
 
   // Pattern depends on currentPatternIndex and currentPositionIndex.
   // We use refs for these to prevent the main playback loop from restarting 
@@ -88,10 +90,14 @@ export const usePatternPlayback = () => {
   // Structural fingerprint — changes only when the pattern structure changes
   // (add/remove channels, change length, different module format), NOT on cell
   // content edits. This prevents the heavy stop/loadSong/play cycle on every edit.
+  // Also includes arrangement loop bounds so a loop region change triggers a reload.
   const patternStructureKey = useMemo(() => {
     if (!pattern) return '';
-    return `${patterns.length}:${pattern.channels.length}:${pattern.length}:${pattern.importMetadata?.sourceFormat ?? ''}`;
-  }, [patterns.length, pattern?.channels.length, pattern?.length, pattern?.importMetadata?.sourceFormat]);
+    const loopBoundsKey = (isArrangementMode && isLooping && loopStart != null && loopEnd != null)
+      ? `:loop:${loopStart}-${loopEnd}`
+      : '';
+    return `${patterns.length}:${pattern.channels.length}:${pattern.length}:${pattern.importMetadata?.sourceFormat ?? ''}${loopBoundsKey}`;
+  }, [patterns.length, pattern?.channels.length, pattern?.length, pattern?.importMetadata?.sourceFormat, isArrangementMode, isLooping, loopStart, loopEnd]);
 
   // Track if we've started playback
   const hasStartedRef = useRef(false);
@@ -262,11 +268,18 @@ export const usePatternPlayback = () => {
 
         if (arrangement.isArrangementMode && arrangement.clips.length > 0) {
           // --- Arrangement Mode ---
+          // When looping with a loop region set, pass bounds to resolveArrangement
+          // so only the loop region's clips are included and the audio loops within it.
+          const useLoopBounds = isLooping &&
+            arrangement.view.loopStart != null &&
+            arrangement.view.loopEnd != null;
           const resolved = resolveArrangement(
             arrangement.clips,
             arrangement.tracks,
             patterns,
             modData?.initialSpeed ?? 6,
+            useLoopBounds ? arrangement.view.loopStart! : undefined,
+            useLoopBounds ? arrangement.view.loopEnd! : undefined,
           );
 
           effectivePatterns = resolved.virtualPatterns;
@@ -423,7 +436,7 @@ export const usePatternPlayback = () => {
         replayerRef.current.onSongEnd = null;
       }
     };
-  }, [isPlaying, isLooping, loopTargetKey, patternStructureKey, patternOrder, setCurrentPattern, setCurrentPosition, setCurrentRow, setCurrentRowThrottled, isArrangementMode]);
+  }, [isPlaying, isLooping, loopTargetKey, patternStructureKey, patternOrder, setCurrentPattern, setCurrentPosition, setCurrentRow, setCurrentRowThrottled, isArrangementMode, loopStart, loopEnd]);
 
   return {
     isPlaying,
