@@ -10,6 +10,7 @@ import { PixiButton, PixiLabel, PixiSelect } from '../components';
 import { PixiArrangementCanvas } from './arrangement/PixiArrangementCanvas';
 import type { ClipRenderData } from './arrangement/PixiArrangementCanvas';
 import { PixiTrackHeaders } from './arrangement/PixiTrackHeaders';
+import { PixiArrangementAutomationLane } from './arrangement/PixiArrangementAutomationLane';
 import { PixiScrollbar } from './pianoroll/PixiScrollbar';
 import { useTransportStore, useTrackerStore, useUIStore } from '@stores';
 import { usePianoRollStore } from '@/stores/usePianoRollStore';
@@ -18,6 +19,7 @@ import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { TITLE_H } from '../workbench/PixiWindow';
 import type { ArrangementToolMode } from '@/types/arrangement';
 import { useArrangementKeyboardShortcuts } from '@/components/arrangement/ArrangementKeyboardShortcuts';
+import { MarkerRenameInput } from '@/components/arrangement/MarkerRenameInput';
 
 const VIEW_OPTIONS = [
   { value: 'tracker', label: 'Tracker' },
@@ -88,6 +90,8 @@ export const PixiArrangementView: React.FC = () => {
 
   // Arrangement store
   const arrangementTracks = useArrangementStore(s => s.tracks);
+  const groups = useArrangementStore(s => s.groups);
+  const automationLanes = useArrangementStore(s => s.automationLanes);
   // NOTE: do NOT subscribe to isArrangementMode here — we set it on mount and
   // the synchronous Zustand notification fires during React's commit phase in
   // @pixi/react, causing "Maximum update depth exceeded". Use a ref instead.
@@ -115,6 +119,7 @@ export const PixiArrangementView: React.FC = () => {
         muted: t.muted,
         solo: t.solo,
         color: cssColorToPixi(t.color, CHANNEL_COLORS[i % CHANNEL_COLORS.length]),
+        groupId: t.groupId,
       }));
     }
     return trackerChannels.map((ch, i) => ({
@@ -123,8 +128,18 @@ export const PixiArrangementView: React.FC = () => {
       muted: ch.muted,
       solo: ch.solo,
       color: cssColorToPixi(ch.color, CHANNEL_COLORS[i % CHANNEL_COLORS.length]),
+      groupId: null as string | null,
     }));
   }, [arrangementTracks, trackerChannels]);
+
+  // Filter out tracks whose group is folded
+  const visibleTracks = useMemo(() => {
+    return tracks.filter(track => {
+      if (!track.groupId) return true;
+      const group = groups.find(g => g.id === track.groupId);
+      return !group?.folded;
+    });
+  }, [tracks, groups]);
 
   // Markers
   const storeMarkers = useArrangementStore(s => s.markers);
@@ -133,6 +148,7 @@ export const PixiArrangementView: React.FC = () => {
     row: m.row,
     label: m.name,
     color: cssColorToPixi(m.color, 0x06b6d4),
+    timeSig: m.type === 'timesig' ? m.name : undefined,
   })), [storeMarkers]);
 
   // Clips and selection
@@ -159,8 +175,8 @@ export const PixiArrangementView: React.FC = () => {
     return clips.map(clip => {
       // Effective length: clipLengthRows or pattern length minus offset
       let lengthRows = clip.clipLengthRows ?? 64;
+      const pat = patterns.find(p => p.id === clip.patternId);
       if (clip.clipLengthRows == null) {
-        const pat = patterns.find(p => p.id === clip.patternId);
         if (pat) {
           const patLen = pat.channels[0]?.rows?.length ?? 64;
           lengthRows = Math.max(1, patLen - (clip.offsetRows || 0));
@@ -175,8 +191,20 @@ export const PixiArrangementView: React.FC = () => {
       // Name: custom name → pattern name → generic
       let name = clip.name || '';
       if (!name) {
-        const pat = patterns.find(p => p.id === clip.patternId);
         name = pat?.name || `Pattern ${clip.sourceChannelIndex}`;
+      }
+
+      // Note preview: collect note values for the clip's channel rows
+      let noteRows: number[] | undefined;
+      if (pat) {
+        const channelIdx = clip.sourceChannelIndex ?? 0;
+        const channel = pat.channels[channelIdx];
+        if (channel?.rows) {
+          const offsetRows = clip.offsetRows || 0;
+          noteRows = channel.rows
+            .slice(offsetRows, offsetRows + lengthRows)
+            .map(cell => cell.note);
+        }
       }
 
       return {
@@ -190,6 +218,7 @@ export const PixiArrangementView: React.FC = () => {
         selected: selectedClipIds.has(clip.id),
         fadeInRows: clip.fadeInRows || 0,
         fadeOutRows: clip.fadeOutRows || 0,
+        noteRows,
       };
     });
   }, [clips, tracks, selectedClipIds, patterns]);
@@ -557,6 +586,15 @@ export const PixiArrangementView: React.FC = () => {
             onAddMarker={(row) => {
               useArrangementStore.getState().addMarker({ row, name: `M${row}`, color: '#06b6d4', type: 'cue' });
             }}
+            onMoveMarker={(markerId, row) => {
+              useArrangementStore.getState().moveMarker(markerId, row);
+            }}
+            onRenameMarker={(markerId) => {
+              useArrangementStore.getState().setRenamingMarkerId(markerId);
+            }}
+            onAddTimeSigMarker={(row) => {
+              useArrangementStore.getState().addTimeSigMarker(row, 3, 4);
+            }}
             onAddClip={(trackIndex, startRow, lengthRows) => {
               const arr = useArrangementStore.getState();
               const ts = useTrackerStore.getState();
@@ -612,6 +650,9 @@ export const PixiArrangementView: React.FC = () => {
           }}
         />
       </pixiContainer>
+
+      {/* Marker rename input — DOM overlay rendered via portal */}
+      <MarkerRenameInput />
     </pixiContainer>
   );
 };

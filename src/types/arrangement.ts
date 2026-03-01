@@ -83,9 +83,11 @@ export interface ArrangementMarker {
   id: string;
   row: number;                  // Global row position
   name: string;
-  type: 'section' | 'loop-start' | 'loop-end' | 'tempo' | 'cue';
+  type: 'section' | 'loop-start' | 'loop-end' | 'tempo' | 'cue' | 'timesig';
   color: string;
   bpm?: number;                 // For tempo markers
+  timeSigNum?: number;          // e.g. 3 for 3/4. Only used when type === 'timesig'
+  timeSigDenom?: number;        // e.g. 4. Only used when type === 'timesig'
 }
 
 /**
