@@ -179,10 +179,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
     }
 
     if (drag.mode === 'move') {
-      const cameraScale = useWorkbenchStore.getState().camera.scale;
-      const rawDeltaX = (drag.startGlobalX === drag.startGlobalX) // always true, just for clarity
-        ? (currentLocalX - drag.startLocalX)
-        : 0;
+      const rawDeltaX = currentLocalX - drag.startLocalX;
       const rawDeltaRow = rawDeltaX / ppb;
       const rawDeltaTrack = (currentLocalY - drag.startLocalY) / th;
 
@@ -394,6 +391,9 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
     document.addEventListener('pointerup', onUp);
   }, [drawOverlay]);
 
+  // No-op draw for containers drawn imperatively via ref
+  const drawNoop = useCallback((_g: GraphicsType) => {}, []);
+
   // ---------- grid drawing ----------
   const drawGrid = useCallback((g: GraphicsType) => {
     g.clear();
@@ -517,8 +517,8 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
     >
       <pixiGraphics draw={drawGrid} layout={{ position: 'absolute', width, height }} />
 
-      {/* Drag overlay (rubber-band / ghost clips) */}
-      <pixiGraphics layout={{ position: 'absolute', width, height }} ref={overlayRef} />
+      {/* Drag overlay (rubber-band / ghost clips) — drawn imperatively via ref */}
+      <pixiGraphics draw={drawNoop} layout={{ position: 'absolute', width, height }} ref={overlayRef} />
 
       {barLabels.map(({ x, text }) => (
         <pixiBitmapText
