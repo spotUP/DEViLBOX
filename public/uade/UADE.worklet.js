@@ -262,94 +262,6 @@ class UADEProcessor extends AudioWorkletProcessor {
         }
         break;
       }
-      case 'enablePaulaLog': {
-        const { enable } = data;
-        this._wasm?._uade_wasm_enable_paula_log?.(enable ? 1 : 0);
-        break;
-      }
-      case 'getPaulaLog': {
-        const { requestId } = data;
-        if (!this._wasm || !this._ready) {
-          this.port.postMessage({ type: 'paulaLogError', requestId, error: 'WASM not ready' });
-          break;
-        }
-        try {
-          // Each entry is 3 uint32s = 12 bytes; max 512 entries = 6144 bytes
-          const MAX_ENTRIES = 512;
-          const byteSize = MAX_ENTRIES * 3 * 4;
-          const ptr = this._wasm._malloc(byteSize);
-          if (!ptr) {
-            this.port.postMessage({ type: 'paulaLogError', requestId, error: 'malloc failed' });
-            break;
-          }
-          const count = this._wasm._uade_wasm_get_paula_log(ptr, MAX_ENTRIES);
-          const raw = new Uint32Array(this._wasm.HEAPU8.buffer, ptr, count * 3);
-          const entries = [];
-          for (let i = 0; i < count; i++) {
-            const packed = raw[i * 3];
-            entries.push({
-              channel:    (packed >>> 24) & 0xFF,
-              reg:        (packed >>> 16) & 0xFF,
-              value:       packed         & 0xFFFF,
-              sourceAddr: raw[i * 3 + 1],
-              tick:       raw[i * 3 + 2],
-            });
-          }
-          this._wasm._free(ptr);
-          this.port.postMessage({ type: 'paulaLogResult', requestId, entries });
-        } catch (e) {
-          this.port.postMessage({ type: 'paulaLogError', requestId, error: String(e) });
-        }
-        break;
-      }
-      case 'setWatchpoint': {
-        const { slot, addr: wpAddr, size, mode } = data;
-        this._wasm?._uade_wasm_set_watchpoint?.(slot, wpAddr, size, mode);
-        break;
-      }
-      case 'clearWatchpoint': {
-        const { slot } = data;
-        this._wasm?._uade_wasm_clear_watchpoint?.(slot);
-        break;
-      }
-      case 'clearAllWatchpoints': {
-        this._wasm?._uade_wasm_clear_all_watchpoints?.();
-        break;
-      }
-      case 'getWatchpointHits': {
-        const { requestId } = data;
-        if (!this._wasm || !this._ready) {
-          this.port.postMessage({ type: 'watchpointHitsError', requestId, error: 'WASM not ready' });
-          break;
-        }
-        try {
-          // Each hit is 4 uint32s = 16 bytes; max 256 hits = 4096 bytes
-          const MAX_HITS = 256;
-          const byteSize = MAX_HITS * 4 * 4;
-          const ptr = this._wasm._malloc(byteSize);
-          if (!ptr) {
-            this.port.postMessage({ type: 'watchpointHitsError', requestId, error: 'malloc failed' });
-            break;
-          }
-          const count = this._wasm._uade_wasm_get_watchpoint_hits(ptr, MAX_HITS);
-          const raw = new Uint32Array(this._wasm.HEAPU8.buffer, ptr, count * 4);
-          const hits = [];
-          for (let i = 0; i < count; i++) {
-            hits.push({
-              addr:    raw[i * 4],
-              value:   raw[i * 4 + 1],
-              tick:    raw[i * 4 + 2],
-              isWrite: !!(raw[i * 4 + 3] >> 8),
-              wpSlot:   raw[i * 4 + 3] & 0xFF,
-            });
-          }
-          this._wasm._free(ptr);
-          this.port.postMessage({ type: 'watchpointHitsResult', requestId, hits });
-        } catch (e) {
-          this.port.postMessage({ type: 'watchpointHitsError', requestId, error: String(e) });
-        }
-        break;
-      }
     }
   }
 
@@ -485,19 +397,9 @@ class UADEProcessor extends AudioWorkletProcessor {
       this._ptrL = this._wasm._malloc(frameBytes);
       this._ptrR = this._wasm._malloc(frameBytes);
 
-      // Use AudioWorkletGlobalScope.sampleRate as the authoritative rate.
-      // On iOS, ctx.sampleRate (passed via message) can differ from the actual
-      // worklet processing rate — globalThis.sampleRate is always correct.
-      const gsr = globalThis.sampleRate;
-      const effectiveSampleRate = (gsr && gsr > 0) ? gsr : (sampleRate || 44100);
-      if (gsr && sampleRate && Math.abs(gsr - sampleRate) > 1) {
-        console.warn('[UADE.worklet] sampleRate mismatch: passed=' + sampleRate + ', globalScope=' + gsr + ', using=' + effectiveSampleRate);
-      }
-      sampleRate = effectiveSampleRate;
-
       // Initialize UADE engine
-      console.log('[UADE.worklet] Calling _uade_wasm_init(' + effectiveSampleRate + ')');
-      const ret = this._wasm._uade_wasm_init(effectiveSampleRate);
+      console.log('[UADE.worklet] Calling _uade_wasm_init(' + (sampleRate || 44100) + ')');
+      const ret = this._wasm._uade_wasm_init(sampleRate || 44100);
       if (ret !== 0) {
         throw new Error('uade_wasm_init failed with code ' + ret);
       }
@@ -769,9 +671,6 @@ class UADEProcessor extends AudioWorkletProcessor {
     if (subsongIndex > 0) {
       this._wasm._uade_wasm_set_subsong(subsongIndex);
     }
-
-    // Enable Paula write log for instrument parameter discovery
-    this._wasm._uade_wasm_enable_paula_log?.(1);
 
     const CHUNK = 128;  // Smaller chunks = higher tick resolution
     const MAX_SECONDS = 600;
@@ -1135,9 +1034,6 @@ class UADEProcessor extends AudioWorkletProcessor {
       };
     }
 
-    // Disable Paula write log (scan complete; log holds entries for JS to drain)
-    this._wasm._uade_wasm_enable_paula_log?.(0);
-
     return {
       rows, // Enhanced rows compatible with basic scan format
       samples,
@@ -1360,45 +1256,6 @@ class UADEProcessor extends AudioWorkletProcessor {
               effTyp = 0xE;
               eff = (0x2 << 4) | fineAmt;
             }
-          }
-        }
-      }
-
-      // Check for sample offset (0x9): note triggers with sampleStart > samplePtr,
-      // meaning DMA started somewhere other than the sample's natural beginning.
-      // ProTracker 0x9xx: offset in 256-byte chunks (xx = offset >> 8).
-      // Only meaningful when a note actually triggered.
-      if (effTyp === 0 && triggered && bestSampleStart > bestSamplePtr && bestSampleLen > 0) {
-        const byteOffset = bestSampleStart - bestSamplePtr;
-        if (byteOffset > 0 && byteOffset < bestSampleLen) {
-          const chunks = Math.min(0xFF, byteOffset >> 8);
-          if (chunks > 0) {
-            effTyp = 0x9; // Sample offset
-            eff = chunks;
-          }
-        }
-      }
-
-      // Check for fine volume slide up/down (0xEA/0xEB): volume changes by a
-      // small fixed amount at tick 0 only; all subsequent ticks hold the new value.
-      // EAx: vol goes UP by x at tick 0 (volumes[0] < volumes[1])
-      // EBx: vol goes DOWN by x at tick 0 (volumes[0] > volumes[1])
-      // Distinguish from regular volume slide (0xA) which changes every tick.
-      if (effTyp === 0 && volumes.length >= 3) {
-        const v0 = volumes[0];
-        const v1 = volumes[1];
-        const vdiff = v1 - v0; // positive = up
-        if (Math.abs(vdiff) > 0 && Math.abs(vdiff) <= 15) {
-          // Check all ticks after tick 1 hold v1 constant
-          let steady = true;
-          for (let t = 2; t < volumes.length; t++) {
-            if (volumes[t] !== v1) { steady = false; break; }
-          }
-          if (steady) {
-            effTyp = 0xE;
-            eff = vdiff > 0
-              ? (0xA << 4) | Math.min(15, vdiff)   // EAx = fine vol slide up
-              : (0xB << 4) | Math.min(15, -vdiff);  // EBx = fine vol slide down
           }
         }
       }
@@ -1736,18 +1593,9 @@ class UADEProcessor extends AudioWorkletProcessor {
       const baseL = this._ptrL >> 2;  // Convert byte offset to float32 index
       const baseR = this._ptrR >> 2;
 
-      if (outR !== outL) {
-        // Stereo: copy L and R separately
-        for (let i = 0; i < frames; i++) {
-          outL[i] = heapF32[baseL + i];
-          outR[i] = heapF32[baseR + i];
-        }
-      } else {
-        // Mono fallback (iOS gives 1 channel): mix L+R into the single output.
-        // UC_PANNING_VALUE=1.0 makes L≡R anyway, but this is correct for any panning.
-        for (let i = 0; i < frames; i++) {
-          outL[i] = (heapF32[baseL + i] + heapF32[baseR + i]) * 0.5;
-        }
+      for (let i = 0; i < frames; i++) {
+        outL[i] = heapF32[baseL + i];
+        if (outR !== outL) outR[i] = heapF32[baseR + i];
       }
 
       // Read Paula channel state for live pattern display (~20Hz)
