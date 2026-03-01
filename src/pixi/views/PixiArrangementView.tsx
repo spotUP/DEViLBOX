@@ -62,8 +62,12 @@ export const PixiArrangementView: React.FC = () => {
       if (!isHoveredRef.current) return;
       e.preventDefault();
       const s = useArrangementStore.getState();
-      const rowDelta = (e.deltaX || e.deltaY) / s.view.pixelsPerRow;
-      s.setScrollRow(Math.max(0, s.view.scrollRow + rowDelta));
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        const rowDelta = e.deltaX / s.view.pixelsPerRow;
+        s.setScrollRow(Math.max(0, s.view.scrollRow + rowDelta));
+      } else {
+        s.setScrollY(s.view.scrollY + e.deltaY);
+      }
     };
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
@@ -79,6 +83,7 @@ export const PixiArrangementView: React.FC = () => {
   const tool = useArrangementStore(s => s.tool);
   const setTool = useArrangementStore(s => s.setTool);
   const view = useArrangementStore(s => s.view);
+  const scrollY = useArrangementStore(s => s.view.scrollY);
 
   // Fall back to tracker channels if no arrangement tracks
   const trackerChannels = useTrackerStore(s => {
@@ -392,7 +397,7 @@ export const PixiArrangementView: React.FC = () => {
         onPointerOver={() => { isHoveredRef.current = true; }}
         onPointerOut={() => { isHoveredRef.current = false; }}
       >
-        <PixiTrackHeaders tracks={tracks} width={TRACK_HEADERS_W} onToggleMute={handleToggleMute} onToggleSolo={handleToggleSolo} />
+        <PixiTrackHeaders tracks={tracks} width={TRACK_HEADERS_W} scrollY={scrollY} onToggleMute={handleToggleMute} onToggleSolo={handleToggleSolo} />
 
         <PixiArrangementCanvas
           width={canvasW}
@@ -402,6 +407,7 @@ export const PixiArrangementView: React.FC = () => {
           playbackBeat={isPlaying ? playbackRow : undefined}
           clips={clipRenderData}
           trackHeight={40}
+          scrollY={scrollY}
           tool={tool}
           snapDivision={view.snapDivision}
           onSelectClip={(id, add) => useArrangementStore.getState().selectClip(id, add)}
