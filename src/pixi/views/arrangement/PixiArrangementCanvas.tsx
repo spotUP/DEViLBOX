@@ -165,7 +165,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
 
   // Visible clip labels
   const clipLabels = useMemo(() => {
-    const labels: { x: number; y: number; text: string; color: number; muted: boolean }[] = [];
+    const labels: { id: string; x: number; y: number; text: string; color: number; muted: boolean }[] = [];
     for (const clip of clips) {
       const cx = (clip.startRow - scrollBeat) * pixelsPerBeat;
       const cw = clip.lengthRows * pixelsPerBeat;
@@ -173,6 +173,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       // Only show label if clip is wide enough
       if (cw > 30) {
         labels.push({
+          id: clip.id,
           x: cx + CLIP_PADDING + 4,
           y: RULER_HEIGHT + clip.trackIndex * trackHeight + CLIP_PADDING + 6,
           text: clip.name.length > 20 ? clip.name.slice(0, 18) + '..' : clip.name,
@@ -201,9 +202,9 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       ))}
 
       {/* Clip name labels */}
-      {clipLabels.map(({ x, y, text, color, muted }) => (
+      {clipLabels.map(({ id, x, y, text, color, muted }) => (
         <pixiBitmapText
-          key={`clip-${text}-${x}`}
+          key={`clip-${id}`}
           text={text}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
           tint={muted ? theme.textMuted.color : color}
