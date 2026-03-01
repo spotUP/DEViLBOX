@@ -506,9 +506,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
   if (!isOpen) return null;
 
-  // Whether to show UADE enhanced/classic sub-selector
-  const showUADEModeSelector = isUADE || (nativeFmt && !isNativeSelected);
-
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-[480px] max-h-[80vh] overflow-hidden">
