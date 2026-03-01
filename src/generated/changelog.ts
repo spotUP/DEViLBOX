@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-02-28T23:45:50.380Z
+ * Generated: 2026-03-01T10:07:08.839Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1757';
-export const BUILD_NUMBER = '1757';
-export const BUILD_HASH = 'b5c96cd3';
-export const BUILD_DATE = '2026-02-28';
+export const BUILD_VERSION = '1.0.1788';
+export const BUILD_NUMBER = '1788';
+export const BUILD_HASH = '7c36d82e';
+export const BUILD_DATE = '2026-03-01';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,133 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1757',
+    version: '1.0.1788',
     date: '2026-03-01',
     changes: [
+      {
+        type: 'fix',
+        "description": "Eliminate remaining @pixi/layout BindingErrors from conditional rendering"
+      },
+      {
+        type: 'fix',
+        "description": "Throw on init failure instead of silently returning"
+      },
+      {
+        type: 'feature',
+        "description": "Wire Tier 2 parsers to NATIVE_ROUTES"
+      },
+      {
+        type: 'fix',
+        "description": "Always mount step label to prevent BindingError on play"
+      },
+      {
+        type: 'fix',
+        "description": "Always mount PixiInstrumentToggle to prevent BindingError"
+      },
+      {
+        type: 'fix',
+        "description": "Use PixiWindow dimensions for layout instead of screen size"
+      },
+      {
+        type: 'fix',
+        "description": "Add sections field, fix UADEChipRamInfo errors, cache-bust worklet URLs"
+      },
+      {
+        type: 'feature',
+        "description": "Wire chip RAM for GraoumfTracker2 + MusicLine parsers"
+      },
+      {
+        type: 'feature',
+        "description": "Wire chip RAM + NATIVE_ROUTES for Tier 1 formats"
+      },
+      {
+        type: 'fix',
+        "description": "Correct UV normalization for oversized stage bounding box"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused OFF_TABLE const and add missing sections field"
+      },
+      {
+        type: 'fix',
+        "description": "Sync stage filterArea to screen size to fix CRT shader distortion"
+      },
+      {
+        type: 'feature',
+        "description": "Add category dot icons and index numbers to GL instrument list"
+      },
+      {
+        type: 'fix',
+        "description": "Detect WASM createChip crashes as WASM_UNAVAIL in test runner"
+      },
+      {
+        type: 'fix',
+        "description": "Fix three TS errors blocking CI build"
+      },
+      {
+        type: 'fix',
+        "description": "Use globalScope sampleRate and fix mono channel mix in worklets"
+      },
+      {
+        type: 'fix',
+        "description": "Add chip RAM info to empty instrument slots in UADE parsers"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: regenerate changelog to build 1671"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(test): update synth test runner"
+      },
+      {
+        type: 'feature',
+        "description": "Add DOM mode button to NavBar + FT2 CSS utility classes"
+      },
+      {
+        type: 'fix',
+        "description": "Replace layout absolute positioning with x/y on BitmapText"
+      },
+      {
+        type: 'fix',
+        "description": "Improve error messages, add default config, and debug logging"
+      },
+      {
+        type: 'fix',
+        "description": "Route .sunvox drag-drop through import dialog + improve init timeouts"
+      },
+      {
+        type: 'fix',
+        "description": "Fix OPN register write order and OPNB_B channel mapping"
+      },
+      {
+        type: 'fix',
+        "description": "Make ScrollList DOM container keyboard-focusable and scroll selected item into view"
+      },
+      {
+        type: 'feature',
+        "description": "Wire chip RAM for Delta Music 2.0"
+      },
+      {
+        type: 'fix',
+        "description": "Memoize instrument items mapping in PixiInstrumentPanel"
+      },
+      {
+        type: 'feature',
+        "description": "Migrate PixiInstrumentPanel to GL-native ScrollList"
+      },
+      {
+        type: 'fix',
+        "description": "Warn when GLScrollList width is omitted"
+      },
+      {
+        type: 'fix',
+        "description": "Add DeltaMusic1Synth to SYNTH_INFO record in synthCategories"
+      },
+      {
+        type: 'feature',
+        "description": "Wire chip RAM for TFMX (VolModSeq/SndModSeq extraction)"
+      },
       {
         type: 'feature',
         "description": "Wrap Application in GLRenderer context"
@@ -108,136 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Wire chip RAM for DigitalMugician + SoundFX formats"
-      }
-    ]
-  },
-  {
-    version: '2026-02-28',
-    date: '2026-02-28',
-    changes: [
-      {
-        type: 'feature',
-        "description": "Integrate CRTRenderer into PixiRoot with useTick drive loop"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused upd helper from FredControls"
-      },
-      {
-        type: 'feature',
-        "description": "Pass uadeChipRam to all UADE synthesis controls in UnifiedInstrumentEditor"
-      },
-      {
-        type: 'feature',
-        "description": "Extend FredControls with chip RAM write-back"
-      },
-      {
-        type: 'feature',
-        "description": "Extend SidMonControls with chip RAM write-back"
-      },
-      {
-        type: 'feature',
-        "description": "Add CRTRenderer — RenderTexture + Mesh + GlProgram shader"
-      },
-      {
-        type: 'feature',
-        "description": "SidMon1Controls writes ADSR/arp/phase params to chip RAM when loaded via UADE"
-      },
-      {
-        type: 'feature',
-        "description": "SoundMonControls writes synth params to chip RAM when loaded via UADE"
-      },
-      {
-        type: 'feature',
-        "description": "Add CRT shader settings section to SettingsModal"
-      },
-      {
-        type: 'feature',
-        "description": "FCControls writes vibrato/speed params to chip RAM when loaded via UADE"
-      },
-      {
-        type: 'feature',
-        "description": "Add CRTParams type and state to useSettingsStore"
-      },
-      {
-        type: 'improvement',
-        "description": "CRT shader implementation plan — 4 tasks for full-screen WebGL post-processing"
-      },
-      {
-        type: 'feature',
-        "description": "Future Composer chip RAM instrument editor with export"
-      },
-      {
-        type: 'feature',
-        "description": "Wire Fred Editor native parser + chip RAM scanning"
-      },
-      {
-        type: 'feature',
-        "description": "Wire SidMon 2 native parser + chip RAM addresses"
-      },
-      {
-        type: 'feature',
-        "description": "Wire SidMon 1 native parser + chip RAM scanning for module base"
-      },
-      {
-        type: 'feature',
-        "description": "Wire SoundMon native parser + chip RAM addresses"
-      },
-      {
-        type: 'feature',
-        "description": "Wire Future Composer native parser + embed chip RAM addresses in instruments"
-      },
-      {
-        type: 'fix',
-        "description": "Fix TS errors in WorkbenchTiltRenderer"
-      },
-      {
-        type: 'feature',
-        "description": "UADEChipEditor — typed read/write helpers + module export for chip RAM editing"
-      },
-      {
-        type: 'feature',
-        "description": "Add UADEChipRamInfo type for chip RAM address metadata on instruments"
-      },
-      {
-        type: 'fix',
-        "description": "Add malloc null checks and WASM-ready guards to readMemory/writeMemory handlers"
-      },
-      {
-        type: 'feature',
-        "description": "Add general-purpose readMemory/writeMemory to worklet and UADEEngine"
-      },
-      {
-        type: 'improvement',
-        "description": "UADE chip RAM editing implementation plan — 12 tasks for Phase 1 synthesis formats"
-      },
-      {
-        type: 'improvement',
-        "description": "UADE chip RAM editing design — full format editability via chip RAM read/write"
-      },
-      {
-        type: 'fix',
-        "description": "Fix silent audio failure when AudioContext is suspended on iOS"
-      },
-      {
-        type: 'feature',
-        "description": "Phase 3b — read instrument names from Amiga chip RAM"
-      },
-      {
-        type: 'feature',
-        "description": "CIA-A tick counter, native parser routing, expanded effects"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate remaining visible= BindingErrors on layout containers"
-      },
-      {
-        type: 'feature',
-        "description": "Infinite canvas workbench with floating windows"
-      },
-      {
-        type: 'fix',
-        "description": "Rewrite PixiFurnaceView and PixiHivelyView to pure Pixi"
       }
     ]
   }
