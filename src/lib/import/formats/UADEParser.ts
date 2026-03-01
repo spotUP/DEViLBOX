@@ -577,6 +577,10 @@ export async function parseUADEFile(
       // ── Tier 1 formats wired 2026-03-01 ────────────────────────────────────
       // All load at chip RAM address 0 — no scanMemoryForMagic needed.
       'SonicArranger': async () => {
+        // Only route SOARV1.0 IFF files to the native parser.
+        // 4EFA player binaries lack embedded instrument data; fall back to enhanced scan.
+        const magic = new TextDecoder().decode(new Uint8Array(buffer, 0, 8));
+        if (magic !== 'SOARV1.0') return null;
         const { parseSonicArrangerFile } = await import('./SonicArrangerParser');
         return parseSonicArrangerFile(buffer, filename);
       },
@@ -618,6 +622,203 @@ export async function parseUADEFile(
       'ActionAmics': async () => {
         const { parseActionamicsFile } = await import('./ActionamicsParser');
         return parseActionamicsFile(new Uint8Array(buffer), filename);
+      },
+      // ── Tier 2 formats wired 2026-03-01 ────────────────────────────────────
+      'DIGI-Booster': async () => {
+        const { parseDigiBoosterFile } = await import('./DigiBoosterParser');
+        return parseDigiBoosterFile(buffer, filename);
+      },
+      'Tronic': async () => {
+        const { parseTronicFile } = await import('./TronicParser');
+        return parseTronicFile(buffer, filename);
+      },
+      'UFO': async () => {
+        const { parseUFOFile } = await import('./UFOParser');
+        return parseUFOFile(buffer, filename);
+      },
+      'LegglessMusicEditor': async () => {
+        const { parseLMEFile } = await import('./LMEParser');
+        return parseLMEFile(buffer, filename);
+      },
+      'ProfessionalSoundArtists': async () => {
+        const { parsePSAFile } = await import('./PSAParser');
+        return parsePSAFile(buffer, filename);
+      },
+      'MMDC': async () => {
+        const { parseMMDCFile } = await import('./MMDCParser');
+        return parseMMDCFile(buffer, filename);
+      },
+      'Infogrames': async () => {
+        const { parseInfogramesFile } = await import('./InfogramesParser');
+        return parseInfogramesFile(buffer, filename);
+      },
+      'TimeTracker': async () => {
+        const { parseTimeTrackerFile } = await import('./TimeTrackerParser');
+        return parseTimeTrackerFile(buffer, filename);
+      },
+      'Cinemaware': async () => {
+        const { parseCinemawareFile } = await import('./CinemawareParser');
+        return parseCinemawareFile(buffer, filename);
+      },
+      'BladePacker': async () => {
+        const { parseBladePackerFile } = await import('./BladePackerParser');
+        return parseBladePackerFile(buffer, filename);
+      },
+      'TheMusicalEnlightenment': async () => {
+        const { parseTMEFile } = await import('./TMEParser');
+        return parseTMEFile(buffer, filename);
+      },
+      'ImagesMusicSystem': async () => {
+        const { parseImagesMusicSystemFile } = await import('./ImagesMusicSystemParser');
+        return parseImagesMusicSystemFile(buffer, filename);
+      },
+      'FashionTracker': async () => {
+        const { parseFashionTrackerFile } = await import('./FashionTrackerParser');
+        return parseFashionTrackerFile(buffer, filename);
+      },
+      'MultiMedia_Sound': async () => {
+        const { parseMultiMediaSoundFile } = await import('./MultiMediaSoundParser');
+        return parseMultiMediaSoundFile(buffer, filename);
+      },
+      'Titanics_Packer': async () => {
+        const { parseTitanicsPackerFile } = await import('./TitanicsPackerParser');
+        return parseTitanicsPackerFile(buffer, filename);
+      },
+      'SeanConran': async () => {
+        const { parseSeanConranFile } = await import('./SeanConranParser');
+        return parseSeanConranFile(buffer, filename);
+      },
+      'NTSP-system': async () => {
+        const { parseNTSPFile } = await import('./NTSPParser');
+        return parseNTSPFile(buffer, filename);
+      },
+      'Nick_Pelling_Packer': async () => {
+        const { parseNickPellingPackerFile } = await import('./NickPellingPackerParser');
+        return parseNickPellingPackerFile(buffer, filename);
+      },
+      'Special-FX': async () => {
+        const { parseSpecialFXFile } = await import('./SpecialFXParser');
+        return parseSpecialFXFile(buffer, filename);
+      },
+      'Special-FX_ST': async () => {
+        const { parseSpecialFXFile } = await import('./SpecialFXParser');
+        return parseSpecialFXFile(buffer, filename);
+      },
+      'PeterVerswyvelen': async () => {
+        const { parsePeterVerswyvelenPackerFile } = await import('./PeterVerswyvelenPackerParser');
+        return parsePeterVerswyvelenPackerFile(buffer, filename);
+      },
+      'WallyBeben': async () => {
+        const { parseWallyBebenFile } = await import('./WallyBebenParser');
+        return parseWallyBebenFile(buffer, filename);
+      },
+      'Desire': async () => {
+        const { parseDesireFile } = await import('./DesireParser');
+        return parseDesireFile(buffer, filename);
+      },
+      'DaveLoweNew': async () => {
+        const { parseDaveLoweNewFile } = await import('./DaveLoweNewParser');
+        return parseDaveLoweNewFile(buffer, filename);
+      },
+      'DigitalSonixChrome': async () => {
+        const { parseDscFile } = await import('./DigitalSonixChromeParser');
+        return parseDscFile(buffer, filename);
+      },
+      'JesperOlsen': async () => {
+        const { parseJesperOlsenFile } = await import('./JesperOlsenParser');
+        return parseJesperOlsenFile(buffer, filename);
+      },
+      'MartinWalker': async () => {
+        const { parseMartinWalkerFile } = await import('./MartinWalkerParser');
+        return parseMartinWalkerFile(buffer, filename);
+      },
+      'PaulShields': async () => {
+        const { parsePaulShieldsFile } = await import('./PaulShieldsParser');
+        return parsePaulShieldsFile(buffer, filename);
+      },
+      'MagneticFieldsPacker': async () => {
+        const { parseMagneticFieldsPackerFile } = await import('./MagneticFieldsPackerParser');
+        return parseMagneticFieldsPackerFile(buffer, filename);
+      },
+      'ADPCM_mono': async () => {
+        const { parseADPCMmonoFile } = await import('./ADPCMmonoParser');
+        return parseADPCMmonoFile(buffer, filename);
+      },
+      'Janne_Salmijarvi_Optimizer': async () => {
+        const { parseJanneSalmijarviFile } = await import('./JanneSalmijarviParser');
+        return parseJanneSalmijarviFile(buffer, filename);
+      },
+      'Anders_0land': async () => {
+        const { parseAnders0landFile } = await import('./Anders0landParser');
+        return parseAnders0landFile(buffer, filename);
+      },
+      'Andrew_Parton': async () => {
+        const { parseAndrewPartonFile } = await import('./AndrewPartonParser');
+        return parseAndrewPartonFile(buffer, filename);
+      },
+      'MIDI-Loriciel': async () => {
+        const { parseMIDILoricielFile } = await import('./MIDILoricielParser');
+        return parseMIDILoricielFile(buffer, filename);
+      },
+      'onEscapee': async () => {
+        const { parseOnEscapeeFile } = await import('./OnEscapeeParser');
+        return parseOnEscapeeFile(buffer, filename);
+      },
+      'Paul_Tonge': async () => {
+        const { parsePaulTongeFile } = await import('./PaulTongeParser');
+        return parsePaulTongeFile(buffer, filename);
+      },
+      'Alcatraz_Packer': async () => {
+        const { parseAlcatrazPackerFile } = await import('./AlcatrazPackerParser');
+        return parseAlcatrazPackerFile(buffer, filename);
+      },
+      'Medley': async () => {
+        const { parseMedleyFile } = await import('./MedleyParser');
+        return parseMedleyFile(buffer, filename);
+      },
+      'SynthPack': async () => {
+        const { parseSynthPackFile } = await import('./SynthPackParser');
+        return parseSynthPackFile(buffer, filename);
+      },
+      'Laxity': async () => {
+        const { parseLaxityFile } = await import('./LaxityParser');
+        return parseLaxityFile(buffer, filename);
+      },
+      'FredGray': async () => {
+        const { parseFredGrayFile } = await import('./FredGrayParser');
+        return parseFredGrayFile(buffer, filename);
+      },
+      'Kim_Christensen': async () => {
+        const { parseKimChristensenFile } = await import('./KimChristensenParser');
+        return parseKimChristensenFile(buffer, filename);
+      },
+      'SonixMusicDriver': async () => {
+        const { parseSonixFile } = await import('./SonixMusicDriverParser');
+        return parseSonixFile(buffer, filename);
+      },
+      'ChipTracker': async () => {
+        const { parseKRISFile } = await import('./KRISParser');
+        return parseKRISFile(buffer, filename);
+      },
+      'AMOS': async () => {
+        const { parseAMOSMusicBankFile } = await import('./AMOSMusicBankParser');
+        return parseAMOSMusicBankFile(buffer, filename);
+      },
+      'SoundFactory': async () => {
+        const { parseSoundFactoryFile } = await import('./SoundFactoryParser');
+        return parseSoundFactoryFile(new Uint8Array(buffer), filename);
+      },
+      'Quartet': async () => {
+        const { parseQuartetFile } = await import('./QuartetParser');
+        return parseQuartetFile(buffer, filename);
+      },
+      'Quartet_PSG': async () => {
+        const { parseQuartetFile } = await import('./QuartetParser');
+        return parseQuartetFile(buffer, filename);
+      },
+      'Quartet_ST': async () => {
+        const { parseQuartetFile } = await import('./QuartetParser');
+        return parseQuartetFile(buffer, filename);
       },
     };
     const route = NATIVE_ROUTES[fmt];
