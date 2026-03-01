@@ -2,6 +2,7 @@ import type { SynthPanelLayout } from '../synthPanelTypes';
 
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`;
 const fmtHz = (v: number) => `${Math.round(v)} Hz`;
+const fmtDb = (v: number) => `${Math.round(v)}dB`;
 const fmtMs = (v: number) => `${Math.round(v)} ms`;
 
 export const HARMONIC_SYNTH_LAYOUT: SynthPanelLayout = {
@@ -12,6 +13,13 @@ export const HARMONIC_SYNTH_LAYOUT: SynthPanelLayout = {
       id: 'harmonics',
       label: 'HARM',
       sections: [
+        {
+          label: 'AMP',
+          controls: [
+            { type: 'knob', key: '~volume', label: 'VOLUME', color: '#00ff99', min: -60, max: 0, defaultValue: -12, formatValue: fmtDb },
+            { type: 'knob', key: '~pan', label: 'PAN', color: '#66ccff', min: -100, max: 100, defaultValue: 0, bipolar: true, formatValue: (v) => v === 0 ? 'C' : v > 0 ? `R${Math.round(v)}` : `L${Math.round(-v)}` },
+          ],
+        },
         {
           label: 'SPECTRAL',
           controls: [

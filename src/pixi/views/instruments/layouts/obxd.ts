@@ -2,6 +2,7 @@ import type { SynthPanelLayout } from '../synthPanelTypes';
 
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`;
 const fmtSec = (v: number) => v < 0.1 ? `${Math.round(v * 1000)}ms` : `${v.toFixed(2)}s`;
+const fmtDb = (v: number) => `${Math.round(v)}dB`;
 
 export const OBXD_LAYOUT: SynthPanelLayout = {
   name: 'OB-Xd Analog',
@@ -11,6 +12,13 @@ export const OBXD_LAYOUT: SynthPanelLayout = {
       id: 'osc',
       label: 'OSC',
       sections: [
+        {
+          label: 'AMP',
+          controls: [
+            { type: 'knob', key: '~volume', label: 'VOLUME', color: '#00ff99', min: -60, max: 0, defaultValue: -12, formatValue: fmtDb },
+            { type: 'knob', key: '~pan', label: 'PAN', color: '#66ccff', min: -100, max: 100, defaultValue: 0, bipolar: true, formatValue: (v) => v === 0 ? 'C' : v > 0 ? `R${Math.round(v)}` : `L${Math.round(-v)}` },
+          ],
+        },
         {
           label: 'OSCILLATOR 1',
           controls: [

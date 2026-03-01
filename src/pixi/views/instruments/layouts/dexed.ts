@@ -1,6 +1,7 @@
 import type { SynthPanelLayout } from '../synthPanelTypes';
 
 const fmtLevel = (v: number) => `${Math.round(v * 99)}`;
+const fmtDb = (v: number) => `${Math.round(v)}dB`;
 
 const makeOperatorTab = (opNum: number): { id: string; label: string; sections: import('../synthPanelTypes').SectionDescriptor[] } => ({
   id: `op${opNum}`,
@@ -38,6 +39,13 @@ export const DEXED_LAYOUT: SynthPanelLayout = {
       id: 'global',
       label: 'GLOBAL',
       sections: [
+        {
+          label: 'AMP',
+          controls: [
+            { type: 'knob', key: '~volume', label: 'VOLUME', color: '#00ff99', min: -60, max: 0, defaultValue: -12, formatValue: fmtDb },
+            { type: 'knob', key: '~pan', label: 'PAN', color: '#66ccff', min: -100, max: 100, defaultValue: 0, bipolar: true, formatValue: (v) => v === 0 ? 'C' : v > 0 ? `R${Math.round(v)}` : `L${Math.round(-v)}` },
+          ],
+        },
         {
           label: 'GLOBAL',
           controls: [

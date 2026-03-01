@@ -3,6 +3,7 @@ import type { SynthPanelLayout } from '../synthPanelTypes';
 const fmtHz = (v: number) => `${Math.round(v)} Hz`;
 const fmtMs = (v: number) => `${Math.round(v)} ms`;
 const fmtPct = (v: number) => `${Math.round(v)}%`;
+const fmtDb = (v: number) => `${Math.round(v)}dB`;
 
 export const CHIP_SYNTH_LAYOUT: SynthPanelLayout = {
   name: 'Chip Synth',
@@ -12,6 +13,13 @@ export const CHIP_SYNTH_LAYOUT: SynthPanelLayout = {
       id: 'main',
       label: 'MAIN',
       sections: [
+        {
+          label: 'AMP',
+          controls: [
+            { type: 'knob', key: '~volume', label: 'VOLUME', color: '#00ff99', min: -60, max: 0, defaultValue: -12, formatValue: fmtDb },
+            { type: 'knob', key: '~pan', label: 'PAN', color: '#66ccff', min: -100, max: 100, defaultValue: 0, bipolar: true, formatValue: (v) => v === 0 ? 'C' : v > 0 ? `R${Math.round(v)}` : `L${Math.round(-v)}` },
+          ],
+        },
         {
           label: 'SOUND',
           controls: [
