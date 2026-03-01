@@ -30,6 +30,9 @@ interface PianoRollStore {
   // Clipboard
   clipboard: PianoRollClipboard | null;
 
+  // Chord buffer — pitches accumulated before committing as a chord
+  chordBuffer: number[];
+
   // Context menu
   contextMenu: ContextMenuState;
 
@@ -81,6 +84,11 @@ interface PianoRollStore {
   copyNotes: (notes: PianoRollNote[]) => void;
   getClipboard: () => PianoRollClipboard | null;
 
+  // Actions - Chord buffer
+  addToChordBuffer: (pitch: number) => void;
+  removeFromChordBuffer: (pitch: number) => void;
+  clearChordBuffer: () => void;
+
   // Actions - Context Menu
   showContextMenu: (x: number, y: number, noteId: string | null, row: number, midiNote: number) => void;
   hideContextMenu: () => void;
@@ -110,6 +118,7 @@ export const usePianoRollStore = create<PianoRollStore>()(
     },
     tool: 'select',
     clipboard: null,
+    chordBuffer: [],
     contextMenu: {
       visible: false,
       x: 0,
@@ -278,6 +287,24 @@ export const usePianoRollStore = create<PianoRollStore>()(
 
     getClipboard: () => get().clipboard,
 
+    // Chord buffer actions
+    addToChordBuffer: (pitch) =>
+      set((state) => {
+        if (!state.chordBuffer.includes(pitch)) {
+          state.chordBuffer.push(pitch);
+        }
+      }),
+
+    removeFromChordBuffer: (pitch) =>
+      set((state) => {
+        state.chordBuffer = state.chordBuffer.filter(p => p !== pitch);
+      }),
+
+    clearChordBuffer: () =>
+      set((state) => {
+        state.chordBuffer = [];
+      }),
+
     // Context menu actions
     showContextMenu: (x, y, noteId, row, midiNote) =>
       set((state) => {
@@ -317,6 +344,7 @@ export const usePianoRollStore = create<PianoRollStore>()(
         };
         state.tool = 'select';
         state.clipboard = null;
+        state.chordBuffer = [];
         state.contextMenu = { visible: false, x: 0, y: 0, noteId: null, row: 0, midiNote: 60 };
         state.ghostNotes = [];
       }),

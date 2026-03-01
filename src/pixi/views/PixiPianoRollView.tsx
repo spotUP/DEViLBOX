@@ -50,6 +50,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   const setTool = usePianoRollStore(s => s.setTool);
   const view = usePianoRollStore(s => s.view);
   const selectedNotes = usePianoRollStore(s => s.selection.notes);
+  const chordBuffer = usePianoRollStore(s => s.chordBuffer);
   const horizontalZoom = usePianoRollStore(s => s.view.horizontalZoom);
   const verticalZoom = usePianoRollStore(s => s.view.verticalZoom);
   const channelCount = useTrackerStore(s => {
@@ -160,6 +161,22 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
         return;
       }
 
+      // Enter — commit chord buffer (if non-empty) as notes at current scroll position
+      if (key === 'enter') {
+        const chordPitches = store.chordBuffer;
+        if (chordPitches.length > 0) {
+          const gridStep = Math.max(1, Math.floor(4 / store.view.gridDivision));
+          const startRow = Math.floor(store.view.scrollX);
+          chordPitches.forEach(pitch => {
+            pianoData.addNote(pitch, startRow, gridStep, 100);
+          });
+          store.clearChordBuffer();
+          handleNotesChanged();
+          e.preventDefault();
+          return;
+        }
+      }
+
       // Delete/Backspace
       if (key === 'delete' || key === 'backspace') {
         if (selectedIds.length > 0) {
@@ -261,6 +278,26 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pianoData.notes, noteVersion],
   );
+
+  // Piano keyboard click handler — Shift+click adds to chord buffer, plain click plays note
+  const handlePianoKeyClick = useCallback((pitch: number, shiftHeld: boolean) => {
+    const store = usePianoRollStore.getState();
+    if (shiftHeld) {
+      // Toggle pitch in chord buffer
+      if (store.chordBuffer.includes(pitch)) {
+        store.removeFromChordBuffer(pitch);
+      } else {
+        store.addToChordBuffer(pitch);
+      }
+    } else {
+      // Plain click in draw mode: insert a single note at current scroll position
+      if (store.tool === 'draw') {
+        const gridStep = Math.max(1, Math.floor(4 / store.view.gridDivision));
+        pianoData.addNote(pitch, Math.floor(store.view.scrollX), gridStep, 100);
+        handleNotesChanged();
+      }
+    }
+  }, [pianoData, handleNotesChanged]);
 
   const handleCycleGrid = useCallback(() => {
     const s = usePianoRollStore.getState();
@@ -401,7 +438,14 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
         onPointerOver={() => { isHoveredRef.current = true; }}
         onPointerOut={() => { isHoveredRef.current = false; }}
       >
-        <PixiPianoKeyboard width={KEYBOARD_WIDTH} height={gridH} noteHeight={verticalZoom} scrollNote={view.scrollY} />
+        <PixiPianoKeyboard
+          width={KEYBOARD_WIDTH}
+          height={gridH}
+          noteHeight={verticalZoom}
+          scrollNote={view.scrollY}
+          chordBuffer={chordBuffer}
+          onKeyClick={handlePianoKeyClick}
+        />
         <pixiContainer layout={{ flex: 1, flexDirection: 'column' }}>
         <PixiPianoRollGrid
           width={gridW}
