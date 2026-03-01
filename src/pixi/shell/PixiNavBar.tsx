@@ -185,10 +185,11 @@ export const PixiNavBar: React.FC = () => {
   const setRenderMode = useSettingsStore((s) => s.setRenderMode);
 
   // Workbench store — window visibility + 3D tilt
-  const windows      = useWorkbenchStore((s) => s.windows);
-  const toggleWindow = useWorkbenchStore((s) => s.toggleWindow);
-  const isTilted     = useWorkbenchStore((s) => s.isTilted);
-  const setTilted    = useWorkbenchStore((s) => s.setTilted);
+  const windows       = useWorkbenchStore((s) => s.windows);
+  const toggleWindow  = useWorkbenchStore((s) => s.toggleWindow);
+  const isTilted      = useWorkbenchStore((s) => s.isTilted);
+  const setTilted     = useWorkbenchStore((s) => s.setTilted);
+  const resetLayout   = useWorkbenchStore((s) => s.resetLayout);
 
   // Workspace picker popup state
   const [wsPickerOpen, setWsPickerOpen] = useState(false);
@@ -210,6 +211,12 @@ export const PixiNavBar: React.FC = () => {
   const handleSwitchToDom = useCallback(() => {
     setRenderMode('dom');
   }, [setRenderMode]);
+
+  // Reset all windows + camera to defaults
+  const handleReset = useCallback(() => {
+    resetLayout();
+    springCameraTo({ x: 0, y: 0, scale: 1 });
+  }, [resetLayout]);
 
   // Fit all visible windows into view
   const handleFitAll = useCallback(() => {
@@ -311,6 +318,15 @@ export const PixiNavBar: React.FC = () => {
 
         {/* Spacer */}
         <pixiContainer layout={{ flex: 1 }} />
+
+        {/* Reset all windows + camera to defaults */}
+        <PixiButton
+          label="RESET"
+          variant="ghost"
+          size="sm"
+          onClick={handleReset}
+          layout={{ marginRight: 8 }}
+        />
 
         {/* Camera presets: bird's-eye, fit-all, 1:1 */}
         <PixiButton
