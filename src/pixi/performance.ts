@@ -12,7 +12,29 @@ import type { Application } from 'pixi.js';
 
 const ACTIVE_FPS = 60;
 const IDLE_FPS = 10;
-const IDLE_TIMEOUT_MS = 2000;
+const IDLE_TIMEOUT_MS = 1000; // drop to idle 1 second after last activity
+
+// ─── Rolling FPS Monitor ───────────────────────────────────────────────────
+
+const ROLLING_WINDOW = 30;
+const _frameTimes: number[] = [];
+let   _lastFrameMs = 0;
+
+/** Record a frame tick — called from the Pixi ticker inside attachFPSLimiter */
+function _trackFrame(nowMs: number): void {
+  if (_lastFrameMs > 0) {
+    _frameTimes.push(nowMs - _lastFrameMs);
+    if (_frameTimes.length > ROLLING_WINDOW) _frameTimes.shift();
+  }
+  _lastFrameMs = nowMs;
+}
+
+/** 30-frame rolling average FPS. Returns 60 until enough frames have been tracked. */
+export function getAverageFps(): number {
+  if (_frameTimes.length < 5) return 60;
+  const avgMs = _frameTimes.reduce((a, b) => a + b, 0) / _frameTimes.length;
+  return avgMs > 0 ? 1000 / avgMs : 60;
+}
 
 /** Optional callback to check if audio is playing — set via setIsPlayingFn() */
 let _isPlayingFn: (() => boolean) | null = null;
@@ -30,6 +52,10 @@ export function setIsPlayingFn(fn: () => boolean): void {
  */
 export function attachFPSLimiter(app: Application): () => void {
   if (!app?.ticker) return () => {};
+
+  // Track per-frame timing for FPS monitor
+  const frameTracker = () => _trackFrame(performance.now());
+  app.ticker.add(frameTracker);
 
   let lastActivityMs = performance.now();
   let isIdle = false;
@@ -72,6 +98,7 @@ export function attachFPSLimiter(app: Application): () => void {
   app.ticker.maxFPS = ACTIVE_FPS;
 
   return () => {
+    app.ticker.remove(frameTracker);
     for (const evt of events) {
       window.removeEventListener(evt, markActive);
     }
