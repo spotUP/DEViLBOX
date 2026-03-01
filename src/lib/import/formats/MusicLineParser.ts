@@ -51,7 +51,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
-import type { InstrumentConfig } from '@/types/instrument';
+import type { InstrumentConfig, UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -157,6 +157,7 @@ export function parseMusicLineInstrument(data: Uint8Array): InstrumentConfig | n
   // Collect the first INST and first SMPL chunk
   let instData: ReturnType<typeof parseInst> | null = null;
   let smplData: ReturnType<typeof parseSmpl> | null = null;
+  let _mlInstDataStart = 0;
 
   while (pos + 8 <= len) {
     const chunkId   = v.getUint32(pos);
@@ -169,6 +170,7 @@ export function parseMusicLineInstrument(data: Uint8Array): InstrumentConfig | n
     } else if (chunkId === CHUNK_INST) {
       if (chunkSize >= INST_SIZE && dataStart + INST_SIZE <= len) {
         instData = parseInst(v, data, dataStart);
+        _mlInstDataStart = dataStart;
       }
       pos = dataStart + chunkSize;
 
@@ -189,7 +191,7 @@ export function parseMusicLineInstrument(data: Uint8Array): InstrumentConfig | n
 
   if (!instData) return null;
 
-  const instruments = buildInstruments([instData], smplData ? [smplData] : []);
+  const instruments = buildInstruments([{ ...instData!, instrBase: _mlInstDataStart }], smplData ? [smplData] : [], data.byteLength);
   return instruments[0] ?? null;
 }
 
@@ -371,7 +373,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
         continue;
       }
 
-      instList.push(parseInst(v, data, dataStart));
+      instList.push({ ...parseInst(v, data, dataStart), instrBase: dataStart });
       pos = dataStart + chunkSize;
 
     } else if (chunkId === CHUNK_SMPL) {
@@ -445,7 +447,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   const songPositions = mappedTrackTables.length > 0 ? mappedTrackTables[0] : [0];
 
   // Build InstrumentConfig list from INST + SMPL
-  const instruments = buildInstruments(instList, smplList);
+  const instruments = buildInstruments(instList, smplList, data.byteLength);
 
   // Stamp importMetadata on all patterns now that totals are known
   const importedAt = new Date().toISOString();
@@ -989,8 +991,9 @@ const ML_WAVE_DISPLAY_NAMES: Record<number, string> = {
  * Each INST references a SMPL by smplNumber (1-based: smplNumber=1 → smplList[0]).
  */
 function buildInstruments(
-  instList: Array<{ title: string; smplNumber: number; smplType: number; volume: number; fineTune: number; semiTone: number; smplRepStart: number; smplRepLen: number }>,
-  smplList: Array<{ title: string; pcm: Uint8Array; smplLength: number; repLength: number; fineTune: number; semiTone: number }>
+  instList: Array<{ title: string; smplNumber: number; smplType: number; volume: number; fineTune: number; semiTone: number; smplRepStart: number; smplRepLen: number; instrBase?: number }>,
+  smplList: Array<{ title: string; pcm: Uint8Array; smplLength: number; repLength: number; fineTune: number; semiTone: number }>,
+  moduleSize = 0
 ) {
   const instruments = [];
 
@@ -1037,6 +1040,7 @@ function buildInstruments(
           isMusicLine: true,
           mlInstIdx: i,
         },
+        uadeChipRam: { moduleBase: 0, moduleSize: moduleSize, instrBase: inst.instrBase ?? 0, instrSize: INST_SIZE } as UADEChipRamInfo,
       });
       continue;
     }
@@ -1047,7 +1051,7 @@ function buildInstruments(
       // Instrument has no sample — create a silent placeholder
       const silentPcm = new Uint8Array(2);
       const placeholder = createSamplerInstrument(i + 1, inst.title || `Instrument ${i + 1}`, silentPcm, inst.volume || 64, PAL_C3_RATE, 0, 0);
-      instruments.push({ ...placeholder, metadata: { ...placeholder.metadata!, isMusicLine: true, mlInstIdx: i } });
+      instruments.push({ ...placeholder, metadata: { ...placeholder.metadata!, isMusicLine: true, mlInstIdx: i }, uadeChipRam: { moduleBase: 0, moduleSize: moduleSize, instrBase: inst.instrBase ?? 0, instrSize: INST_SIZE } as UADEChipRamInfo });
       continue;
     }
 
@@ -1065,7 +1069,7 @@ function buildInstruments(
       loopStart,
       loopEnd > loopStart + 2 ? loopEnd : 0
     );
-    instruments.push({ ...base2, metadata: { ...base2.metadata!, isMusicLine: true, mlInstIdx: i } });
+    instruments.push({ ...base2, metadata: { ...base2.metadata!, isMusicLine: true, mlInstIdx: i }, uadeChipRam: { moduleBase: 0, moduleSize: moduleSize, instrBase: inst.instrBase ?? 0, instrSize: INST_SIZE } as UADEChipRamInfo });
   }
 
   // If no instruments were parsed, add a placeholder
