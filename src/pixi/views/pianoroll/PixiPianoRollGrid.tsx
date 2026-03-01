@@ -26,6 +26,10 @@ interface Note {
   velocity: number;  // 0-127
 }
 
+interface MultiChannelNote extends Note {
+  channelIndex: number;
+}
+
 interface PixiPianoRollGridProps {
   width: number;
   height: number;
@@ -53,6 +57,10 @@ interface PixiPianoRollGridProps {
   onResizeNote?: (id: string, newEndRow: number) => void;
   /** Current playback row — draws a vertical cursor line when set */
   playbackBeat?: number;
+  /** When set, renders notes from all channels color-coded (multi-channel overview) */
+  allChannelNotes?: MultiChannelNote[];
+  /** Per-channel color palette for multi-channel mode */
+  channelColors?: number[];
 }
 
 const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
@@ -97,13 +105,15 @@ export const PixiPianoRollGrid: React.FC<PixiPianoRollGridProps> = ({
   onMoveNotes,
   onResizeNote,
   playbackBeat,
+  allChannelNotes,
+  channelColors = [],
 }) => {
   const theme = usePixiTheme();
 
   // ─── Refs (keep latest values accessible in document event handlers) ─────────
 
-  const paramsRef = useRef({ scrollBeat, scrollNote, pixelsPerBeat, noteHeight, height, width, channelIndex, notes, theme });
-  paramsRef.current = { scrollBeat, scrollNote, pixelsPerBeat, noteHeight, height, width, channelIndex, notes, theme };
+  const paramsRef = useRef({ scrollBeat, scrollNote, pixelsPerBeat, noteHeight, height, width, channelIndex, notes, theme, allChannelNotes, channelColors });
+  paramsRef.current = { scrollBeat, scrollNote, pixelsPerBeat, noteHeight, height, width, channelIndex, notes, theme, allChannelNotes, channelColors };
 
   const callbacksRef = useRef({ onSelectNote, onDeselectAll, onSelectBox, onMoveNotes, onResizeNote, onNotesChanged });
   callbacksRef.current = { onSelectNote, onDeselectAll, onSelectBox, onMoveNotes, onResizeNote, onNotesChanged };
@@ -390,6 +400,27 @@ export const PixiPianoRollGrid: React.FC<PixiPianoRollGridProps> = ({
       }
     }
 
+    // Multi-channel overview: draw all-channel notes first (behind active channel)
+    if (allChannelNotes) {
+      for (let i = 0; i < allChannelNotes.length; i++) {
+        const n = allChannelNotes[i];
+        const isActiveChannel = n.channelIndex === channelIndex;
+        if (isActiveChannel) continue; // Active channel drawn separately below
+        const x = (n.start - scrollBeat) * pixelsPerBeat;
+        const y = height - (n.note - scrollNote + 1) * noteHeight;
+        const w = n.duration * pixelsPerBeat;
+        if (x + w < 0 || x > width || y + noteHeight < 0 || y > height) continue;
+        const color = channelColors.length > 0
+          ? channelColors[n.channelIndex % channelColors.length]
+          : 0x888888;
+        const velAlpha = (0.3 + (n.velocity / 127) * 0.3) * 0.5; // Dimmed for non-active channels
+        g.roundRect(x + 0.5, y + 1, Math.max(2, w - 1), noteHeight - 2, 2);
+        g.fill({ color, alpha: velAlpha });
+        g.roundRect(x + 0.5, y + 1, Math.max(2, w - 1), noteHeight - 2, 2);
+        g.stroke({ color, alpha: 0.5, width: 1 });
+      }
+    }
+
     for (let i = 0; i < notes.length; i++) {
       const n = notes[i];
       const x = (n.start - scrollBeat) * pixelsPerBeat;
@@ -400,10 +431,15 @@ export const PixiPianoRollGrid: React.FC<PixiPianoRollGridProps> = ({
       const isSelected = channelIndex !== undefined && selectedNotes?.has(`${channelIndex}-${n.start}`);
       const velAlpha = 0.4 + (n.velocity / 127) * 0.6;
 
+      // In multi-channel mode, use the active channel's color from the palette
+      const activeColor = allChannelNotes && channelColors.length > 0 && channelIndex !== undefined
+        ? channelColors[channelIndex % channelColors.length]
+        : theme.accent.color;
+
       g.roundRect(x + 0.5, y + 1, Math.max(2, w - 1), noteHeight - 2, 2);
-      g.fill({ color: isSelected ? theme.warning.color : theme.accent.color, alpha: velAlpha });
+      g.fill({ color: isSelected ? theme.warning.color : activeColor, alpha: velAlpha });
       g.roundRect(x + 0.5, y + 1, Math.max(2, w - 1), noteHeight - 2, 2);
-      g.stroke({ color: isSelected ? theme.warning.color : theme.accent.color, alpha: 0.8, width: 1 });
+      g.stroke({ color: isSelected ? theme.warning.color : activeColor, alpha: 0.8, width: 1 });
 
       // Resize handle on selected notes
       if (isSelected && w > RESIZE_ZONE_PX + 4) {
@@ -420,7 +456,7 @@ export const PixiPianoRollGrid: React.FC<PixiPianoRollGridProps> = ({
         g.fill({ color: theme.accent.color, alpha: 0.85 });
       }
     }
-  }, [width, height, notes, noteHeight, pixelsPerBeat, scrollNote, scrollBeat, totalBeats, gridDivision, selectedNotes, channelIndex, playbackBeat, theme]);
+  }, [width, height, notes, noteHeight, pixelsPerBeat, scrollNote, scrollBeat, totalBeats, gridDivision, selectedNotes, channelIndex, playbackBeat, theme, allChannelNotes, channelColors]);
 
   // Initial empty draw for overlay (only runs once on mount)
   const drawOverlayInit = useCallback((g: GraphicsType) => { g.clear(); }, []);
