@@ -17,13 +17,11 @@ import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
-import { PixiButton, PixiNumericInput, PixiLabel } from '../../components';
-import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
+import { PixiButton, PixiNumericInput, PixiLabel, PixiSelect } from '../../components';
 import { useGridPattern } from '@/hooks/useGridPattern';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
-import { useThemeStore } from '@/stores/useThemeStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SCALES, isNoteInScale } from '@/lib/scales';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -54,8 +52,6 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
   isActive = true,
 }) => {
   const theme = usePixiTheme();
-  const themeColors = useThemeStore(s => s.getCurrentTheme().colors);
-
   const {
     gridPattern,
     baseOctave,
@@ -452,20 +448,14 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
         <PixiLabel text="STEPS" size="xs" color="textMuted" />
         <PixiNumericInput value={maxSteps} min={4} max={64} onChange={setMaxSteps} width={44} />
 
-        {/* Scale selector — must remain DOM for <select> dropdown; hidden when grid view is inactive */}
-        <PixiDOMOverlay layout={{ height: 24, width: 100 }} style={{ overflow: 'visible' }} visible={isActive}>
-          <select
-            value={scaleKey}
-            onChange={(e) => setScaleKey(e.target.value)}
-            style={{
-              width: '100%', height: '100%', padding: '0 4px', fontSize: '11px',
-              fontFamily: 'monospace', background: themeColors.bg, color: themeColors.text,
-              border: `1px solid ${themeColors.border}`, borderRadius: '3px', cursor: 'pointer', outline: 'none',
-            }}
-          >
-            {Object.keys(SCALES).map(k => <option key={k} value={k}>{k.toUpperCase()}</option>)}
-          </select>
-        </PixiDOMOverlay>
+        {/* Scale selector */}
+        <PixiSelect
+          value={scaleKey}
+          options={Object.keys(SCALES).map(k => ({ value: k, label: k.toUpperCase() }))}
+          onChange={setScaleKey}
+          width={100}
+          height={24}
+        />
 
         {/* Spacer */}
         <pixiContainer layout={{ flex: 1 }} />
