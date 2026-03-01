@@ -150,14 +150,14 @@ const WorkspaceItem: React.FC<WorkspaceItemProps> = ({ label, isBuiltin, isSave,
         tint={textColor}
         layout={{ alignSelf: 'center' }}
       />
-      {isBuiltin && (
-        <pixiBitmapText
-          text=" ★"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-          tint={theme.textMuted.color}
-          layout={{ alignSelf: 'center', marginLeft: 4 }}
-        />
-      )}
+      {/* Always mounted to avoid @pixi/layout BindingError */}
+      <pixiBitmapText
+        text={isBuiltin ? ' ★' : ''}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+        tint={theme.textMuted.color}
+        alpha={isBuiltin ? 1 : 0}
+        layout={{ alignSelf: 'center', marginLeft: isBuiltin ? 4 : 0 }}
+      />
     </pixiContainer>
   );
 };
@@ -354,9 +354,15 @@ export const PixiNavBar: React.FC = () => {
             active={wsPickerOpen}
             onClick={() => setWsPickerOpen((v) => !v)}
           />
-          {wsPickerOpen && (
+          {/* Always mounted to avoid @pixi/layout BindingError; position: absolute so it doesn't affect flex siblings */}
+          <pixiContainer
+            alpha={wsPickerOpen ? 1 : 0}
+            renderable={wsPickerOpen}
+            eventMode={wsPickerOpen ? 'auto' : 'none'}
+            layout={{ position: 'absolute', top: 0, left: 0 }}
+          >
             <WorkspacePopup offsetY={NAV_ROW1_H} onClose={() => setWsPickerOpen(false)} />
-          )}
+          </pixiContainer>
         </pixiContainer>
 
         {/* Theme cycler */}

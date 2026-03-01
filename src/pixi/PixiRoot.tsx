@@ -97,10 +97,15 @@ export const PixiRoot: React.FC = () => {
       {/* Status bar */}
       <PixiStatusBar />
 
-      {/* Peer cursor overlay (collaboration) */}
-      {collabStatus === 'connected' && (
+      {/* Peer cursor overlay — always mounted to avoid @pixi/layout BindingError */}
+      <pixiContainer
+        alpha={collabStatus === 'connected' ? 1 : 0}
+        renderable={collabStatus === 'connected'}
+        eventMode={collabStatus === 'connected' ? 'auto' : 'none'}
+        layout={{ position: 'absolute', width, height }}
+      >
         <PixiPeerCursor width={width} height={height} />
-      )}
+      </pixiContainer>
     </pixiContainer>
   );
 };
