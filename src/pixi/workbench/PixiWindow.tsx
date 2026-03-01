@@ -466,15 +466,15 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   useEffect(() => {
     const el = chromeVisualRef.current;
     if (!el) return;
-    // Pixi v8: cacheAsTexture(true) converts the container to a cached GPU texture
-    (el as ContainerType & { cacheAsTexture?: (v: boolean) => void }).cacheAsTexture?.(true);
+    el.cacheAsTexture(true);
+    return () => { el.cacheAsTexture(false); };
   }, []);
 
   // Invalidate cache when visible content changes
   useEffect(() => {
     const el = chromeVisualRef.current;
     if (!el) return;
-    (el as ContainerType & { updateCacheTexture?: () => void }).updateCacheTexture?.();
+    el.updateCacheTexture();
   }, [w, h, focused, theme]);
 
   const drawFrame = useCallback((g: GraphicsType) => {
