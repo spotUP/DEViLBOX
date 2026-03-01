@@ -539,7 +539,8 @@ export const PixiArrangementView: React.FC = () => {
         {/* Track headers + blank corner for scrollbar alignment */}
         <pixiContainer layout={{ width: TRACK_HEADERS_W, flexDirection: 'column' }}>
           <PixiTrackHeaders
-            tracks={tracks}
+            tracks={visibleTracks}
+            groups={groups}
             width={TRACK_HEADERS_W}
             scrollY={scrollY}
             onToggleMute={handleToggleMute}
@@ -547,6 +548,7 @@ export const PixiArrangementView: React.FC = () => {
             onRenameTrack={(trackId) => useArrangementStore.getState().setRenamingTrackId(trackId)}
             onCycleColor={(trackId) => useArrangementStore.getState().cycleTrackColor(trackId)}
             onResizeTrack={(trackId, height) => useArrangementStore.getState().setTrackHeight(trackId, height)}
+            onToggleGroupFold={(groupId) => useArrangementStore.getState().toggleGroupFold(groupId)}
           />
           <pixiContainer layout={{ width: TRACK_HEADERS_W, height: SCROLLBAR_SIZE }} />
         </pixiContainer>
@@ -635,6 +637,26 @@ export const PixiArrangementView: React.FC = () => {
               });
             }}
           />
+          {/* Automation lanes — rendered below the clip canvas, one per visible lane per track */}
+          {visibleTracks.map((track) => {
+            const lanes = trackAutomationLanes.get(track.id);
+            if (!lanes || lanes.length === 0) return null;
+            return lanes.map((lane) => (
+              <PixiArrangementAutomationLane
+                key={lane.id}
+                lane={lane}
+                width={canvasW}
+                height={AUTOMATION_LANE_H}
+                scrollBeat={view.scrollRow}
+                pixelsPerBeat={view.pixelsPerRow}
+                totalRows={totalRows}
+                onAddPoint={(row, value) => useArrangementStore.getState().addAutomationPoint(lane.id, { row, value, curve: 'linear' })}
+                onMovePoint={(index, row, value) => useArrangementStore.getState().moveAutomationPoint(lane.id, index, row, value)}
+                onRemovePoint={(index) => useArrangementStore.getState().removeAutomationPoint(lane.id, index)}
+              />
+            ));
+          })}
+
           {/* Horizontal scrollbar */}
           <PixiScrollbar
             orientation="horizontal"
@@ -649,20 +671,20 @@ export const PixiArrangementView: React.FC = () => {
           />
         </pixiContainer>
 
-        {/* Vertical scrollbar */}
+        {/* Vertical scrollbar — uses visibleTracks count for scroll range */}
         <PixiScrollbar
           orientation="vertical"
           width={SCROLLBAR_SIZE}
           height={canvasH + SCROLLBAR_SIZE}
           value={(() => {
-            const totalH = tracks.length * ARR_TRACK_HEIGHT;
+            const totalH = visibleTracks.length * ARR_TRACK_HEIGHT;
             const visibleH = canvasH - ARR_RULER_HEIGHT;
             const maxScroll = Math.max(0, totalH - visibleH);
             return maxScroll > 0 ? Math.min(1, scrollY / maxScroll) : 0;
           })()}
-          thumbSize={Math.min(1, (canvasH - ARR_RULER_HEIGHT) / Math.max(1, tracks.length * ARR_TRACK_HEIGHT))}
+          thumbSize={Math.min(1, (canvasH - ARR_RULER_HEIGHT) / Math.max(1, visibleTracks.length * ARR_TRACK_HEIGHT))}
           onChange={(v) => {
-            const totalH = tracks.length * ARR_TRACK_HEIGHT;
+            const totalH = visibleTracks.length * ARR_TRACK_HEIGHT;
             const visibleH = canvasH - ARR_RULER_HEIGHT;
             useArrangementStore.getState().setScrollY(v * Math.max(0, totalH - visibleH));
           }}

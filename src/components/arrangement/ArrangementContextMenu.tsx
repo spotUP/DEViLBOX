@@ -107,6 +107,11 @@ export const ArrangementContextMenu: React.FC = () => {
     arr.setClipColor(clipId, null);
   };
 
+  const handleAddVolumeAutomation = () => {
+    close();
+    arr.addAutomationLane(clip.trackId, 'volume');
+  };
+
   // Adjust position so menu stays on screen
   const left = Math.min(screenX, window.innerWidth - MENU_W - 8);
   const top = Math.min(screenY, window.innerHeight - 320);
@@ -159,6 +164,8 @@ export const ArrangementContextMenu: React.FC = () => {
           </button>
         </div>
       )}
+      <Separator />
+      <MenuItem label="Add volume automation" onClick={handleAddVolumeAutomation} />
       <Separator />
       <MenuItem label="Delete" onClick={handleDelete} danger />
     </div>,
