@@ -158,6 +158,18 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           }
           return;
         }
+        if (key === 'q') {
+          e.preventDefault();
+          const gridDivision = usePianoRollStore.getState().view.gridDivision;
+          const idsToQuantize = selectedIds.length > 0
+            ? selectedIds
+            : pianoData.notes.map(n => n.id);
+          if (idsToQuantize.length > 0) {
+            pianoData.quantizeNotes(idsToQuantize, gridDivision);
+            handleNotesChanged();
+          }
+          return;
+        }
         return;
       }
 
