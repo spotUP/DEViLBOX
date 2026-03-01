@@ -8,7 +8,7 @@
  * that have no parent layout to resolve percentages against.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useApplication, useTick } from '@pixi/react';
 import { useUIStore, useSettingsStore } from '@stores';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
@@ -18,10 +18,7 @@ import { PixiStatusBar } from './shell/PixiStatusBar';
 import { PixiPeerCursor } from './views/collaboration/PixiPeerCursor';
 import { WorkbenchContainer } from './workbench/WorkbenchContainer';
 import { CRTRenderer } from './CRTRenderer';
-import { useRef } from 'react';
 import { Rectangle } from 'pixi.js';
-import type { Container as ContainerType } from 'pixi.js';
-import { usePixiTheme } from './theme';
 import { getAverageFps } from './performance';
 import { NAV_H, STATUS_BAR_H } from './workbench/workbenchLayout';
 
@@ -37,21 +34,6 @@ export const PixiRoot: React.FC = () => {
   const crtRef = useRef<CRTRenderer | null>(null);
   // Hysteresis state: bloom off below 45fps, back on above 55fps
   const bloomEnabledRef = useRef(true);
-  const navBarLayerRef    = useRef<ContainerType>(null);
-  const statusBarLayerRef = useRef<ContainerType>(null);
-  const theme = usePixiTheme();
-
-  // Enable texture cache for static chrome layers
-  useEffect(() => {
-    navBarLayerRef.current?.cacheAsTexture(true);
-    statusBarLayerRef.current?.cacheAsTexture(true);
-  }, []);
-
-  // Invalidate on theme change (colors change)
-  useEffect(() => {
-    navBarLayerRef.current?.updateCacheTexture();
-    statusBarLayerRef.current?.updateCacheTexture();
-  }, [theme]);
 
   // Keep drumpad modal auto-open behavior
   useEffect(() => {
@@ -117,7 +99,7 @@ export const PixiRoot: React.FC = () => {
       }}
     >
       {/* Navigation bar — pure Pixi; explicit height prevents implicit child dependency */}
-      <pixiContainer ref={navBarLayerRef} layout={{ width: '100%', height: NAV_H }}>
+      <pixiContainer layout={{ width: '100%', height: NAV_H }}>
         <PixiNavBar />
       </pixiContainer>
 
@@ -127,7 +109,7 @@ export const PixiRoot: React.FC = () => {
       </pixiContainer>
 
       {/* Status bar; explicit height prevents implicit child dependency */}
-      <pixiContainer ref={statusBarLayerRef} layout={{ width: '100%', height: STATUS_BAR_H }}>
+      <pixiContainer layout={{ width: '100%', height: STATUS_BAR_H }}>
         <PixiStatusBar />
       </pixiContainer>
 
