@@ -17,8 +17,8 @@
   "scripts": {
     "start": "npm run dev",
     "prebuild": "node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js",
-    "predev": "node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js && npm run type-check",
-    "dev": "npm run asbuild && vite",
+    "predev": "node scripts/generate-changelog.cjs && node scripts/generate-file-manifest.js",
+    "dev": "pkill -f 'node.*vite' 2>/dev/null || true && npm run asbuild && vite",
     "dev:fullstack": "./dev.sh",
     "dev:persistent": "./dev-persistent.sh",
     "build": "npm run asbuild && npm run type-check && vite build",
