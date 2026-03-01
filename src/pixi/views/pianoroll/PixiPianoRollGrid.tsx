@@ -51,6 +51,8 @@ interface PixiPianoRollGridProps {
   onMoveNotes?: (ids: string[], deltaRow: number, deltaPitch: number) => void;
   /** Called on resize-drag release with the new endRow */
   onResizeNote?: (id: string, newEndRow: number) => void;
+  /** Current playback row — draws a vertical cursor line when set */
+  playbackBeat?: number;
 }
 
 const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
@@ -94,6 +96,7 @@ export const PixiPianoRollGrid: React.FC<PixiPianoRollGridProps> = ({
   onSelectBox,
   onMoveNotes,
   onResizeNote,
+  playbackBeat,
 }) => {
   const theme = usePixiTheme();
 
@@ -408,7 +411,16 @@ export const PixiPianoRollGrid: React.FC<PixiPianoRollGridProps> = ({
         g.fill({ color: 0xffffff, alpha: 0.45 });
       }
     }
-  }, [width, height, notes, noteHeight, pixelsPerBeat, scrollNote, scrollBeat, totalBeats, gridDivision, selectedNotes, channelIndex, theme]);
+
+    // Playback cursor
+    if (playbackBeat != null) {
+      const px = (playbackBeat - scrollBeat) * pixelsPerBeat;
+      if (px >= 0 && px <= width) {
+        g.rect(px, 0, 2, height);
+        g.fill({ color: theme.accent.color, alpha: 0.85 });
+      }
+    }
+  }, [width, height, notes, noteHeight, pixelsPerBeat, scrollNote, scrollBeat, totalBeats, gridDivision, selectedNotes, channelIndex, playbackBeat, theme]);
 
   // Initial empty draw for overlay (only runs once on mount)
   const drawOverlayInit = useCallback((g: GraphicsType) => { g.clear(); }, []);
