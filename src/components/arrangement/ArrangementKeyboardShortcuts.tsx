@@ -96,6 +96,24 @@ export const useArrangementKeyboardShortcuts = () => {
         return;
       }
 
+      // Cmd+Z: Undo
+      if (isMod && e.key === 'z' && !e.shiftKey) {
+        if (state.canUndo()) {
+          preventDefault();
+          state.undo();
+        }
+        return;
+      }
+
+      // Cmd+Shift+Z: Redo
+      if (isMod && e.shiftKey && e.key === 'z') {
+        if (state.canRedo()) {
+          preventDefault();
+          state.redo();
+        }
+        return;
+      }
+
       // Delete: Delete selected clips
       if ((e.key === 'Delete' || e.key === 'Backspace') && !e.metaKey && !e.ctrlKey) {
         if (state.selectedClipIds.size > 0) {
