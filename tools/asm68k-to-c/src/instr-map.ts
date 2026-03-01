@@ -91,7 +91,7 @@ function emitPaula(addr: number, value: string, _size: Size): string {
     if (addr === PAULA_PERIOD[ch]) return `paula_set_period(${ch}, ${v16});`;
     if (addr === PAULA_VOLUME[ch]) return `paula_set_volume(${ch}, ${v8});`;
     if (addr === PAULA_LEN[ch])    return `paula_set_length(${ch}, ${v16});`;
-    if (addr === PAULA_LC[ch])     return `paula_set_sample_ptr(${ch}, (const int8_t*)(uintptr_t)${maybeParens(value)}, 0);`;
+    if (addr === PAULA_LC[ch])     return `paula_set_sample_ptr(${ch}, (const int8_t*)(uintptr_t)${maybeParens(value)});`;
     if (addr === PAULA_DAT[ch])    return `/* AUD${ch}DAT ${value} */`;
   }
   return `/* paula $${addr.toString(16)} */ (void)(${value});`;
@@ -170,9 +170,15 @@ export function emitInstruction(node: InstructionNode): string {
       if (dst.kind === 'register' && s === 'L') return `${dst.name} ^= ${src};`;
       if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} ^= ${emitRegSized(src, s)};`;
       return regWrite(dst, `${emitOperand(dst, s)} ^ ${src}`, s);
-    case 'NOT': return `${src} = ~${src};`;
-    case 'NEG': return `${src} = (uint32_t)(-(int32_t)${src});`;
-    case 'CLR': return dst ? regWrite(dst, '0', s) : regWrite(ops[0], '0', s);
+    case 'NOT':
+      if (s === 'W') return `W(${ops[0].kind === 'register' ? ops[0].name : src}) = (uint16_t)(~W(${ops[0].kind === 'register' ? ops[0].name : src}));`;
+      if (s === 'B') return `B(${ops[0].kind === 'register' ? ops[0].name : src}) = (uint8_t)(~B(${ops[0].kind === 'register' ? ops[0].name : src}));`;
+      return `${src} = ~${src};`;
+    case 'NEG':
+      if (s === 'W') return `W(${ops[0].kind === 'register' ? ops[0].name : src}) = (uint16_t)(-(int16_t)W(${ops[0].kind === 'register' ? ops[0].name : src}));`;
+      if (s === 'B') return `B(${ops[0].kind === 'register' ? ops[0].name : src}) = (uint8_t)(-(int8_t)B(${ops[0].kind === 'register' ? ops[0].name : src}));`;
+      return `${src} = (uint32_t)(-(int32_t)${src});`;
+    case 'CLR': return regWrite(ops[0], '0', s);
     case 'EXT':
       if (s === 'W') return `${src} = (uint32_t)(int32_t)(int16_t)(int8_t)${src};`;
       return `${src} = (uint32_t)(int32_t)(int16_t)${src};`;
@@ -227,11 +233,11 @@ export function emitInstruction(node: InstructionNode): string {
     case 'BLS': return `if (flag_c||flag_z) goto ${src};`;
 
     case 'DBRA': case 'DBF':
-      return `if ((int16_t)(--${src}) >= 0) goto ${ops[1] ? emitOperand(ops[1]) : '???'};`;
+      return `if ((int16_t)(--${src}) >= 0) goto ${ops[1] ? emitOperand(ops[1]) : '/* missing_label */'};`;
     case 'DBEQ':
-      return `if (!flag_z && (int16_t)(--${src}) >= 0) goto ${ops[1] ? emitOperand(ops[1]) : '???'};`;
+      return `if (!flag_z && (int16_t)(--${src}) >= 0) goto ${ops[1] ? emitOperand(ops[1]) : '/* missing_label */'};`;
     case 'DBNE':
-      return `if (flag_z && (int16_t)(--${src}) >= 0) goto ${ops[1] ? emitOperand(ops[1]) : '???'};`;
+      return `if (flag_z && (int16_t)(--${src}) >= 0) goto ${ops[1] ? emitOperand(ops[1]) : '/* missing_label */'};`;
 
     case 'BSR': case 'JSR': return `${src}();`;
     case 'RTS':     return 'return;';
