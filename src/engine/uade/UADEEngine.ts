@@ -156,7 +156,7 @@ export class UADEEngine {
       const baseUrl = import.meta.env.BASE_URL || '/';
 
       try {
-        await context.audioWorklet.addModule(`${baseUrl}uade/UADE.worklet.js?t=${Date.now()}`);
+        await context.audioWorklet.addModule(`${baseUrl}uade/UADE.worklet.js?v=2`);
       } catch {
         // Module might already be registered
       }
