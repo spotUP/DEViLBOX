@@ -180,7 +180,7 @@ export class UADEEngine {
       const baseUrl = import.meta.env.BASE_URL || '/';
 
       try {
-        await context.audioWorklet.addModule(`${baseUrl}uade/UADE.worklet.js?v=2`);
+        await context.audioWorklet.addModule(`${baseUrl}uade/UADE.worklet.js`);
       } catch {
         // Module might already be registered
       }
