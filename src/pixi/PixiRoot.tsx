@@ -92,29 +92,31 @@ export const PixiRoot: React.FC = () => {
 
   return (
     <pixiContainer
+      sortableChildren
       layout={{
         width,
         height,
         flexDirection: 'column',
       }}
     >
-      {/* Navigation bar — pure Pixi; explicit height prevents implicit child dependency */}
-      <pixiContainer layout={{ width: '100%', height: NAV_H }}>
+      {/* Navigation bar — flex position: top. zIndex 100 ensures it renders above workbench. */}
+      <pixiContainer zIndex={100} layout={{ width: '100%', height: NAV_H }}>
         <PixiNavBar />
       </pixiContainer>
 
-      {/* Main content area — workbench fills remaining space */}
-      <pixiContainer layout={{ flex: 1, width: '100%' }}>
+      {/* Main content area — workbench fills remaining space; zIndex 0 (default, behind chrome). */}
+      <pixiContainer zIndex={0} layout={{ flex: 1, width: '100%' }}>
         <WorkbenchContainer />
       </pixiContainer>
 
-      {/* Status bar; explicit height prevents implicit child dependency */}
-      <pixiContainer layout={{ width: '100%', height: STATUS_BAR_H }}>
+      {/* Status bar — flex position: bottom. zIndex 100 ensures it renders above workbench. */}
+      <pixiContainer zIndex={100} layout={{ width: '100%', height: STATUS_BAR_H }}>
         <PixiStatusBar />
       </pixiContainer>
 
-      {/* Peer cursor overlay — always mounted to avoid @pixi/layout BindingError */}
+      {/* Peer cursor overlay — above everything */}
       <pixiContainer
+        zIndex={200}
         alpha={collabStatus === 'connected' ? 1 : 0}
         renderable={collabStatus === 'connected'}
         eventMode={collabStatus === 'connected' ? 'auto' : 'none'}
