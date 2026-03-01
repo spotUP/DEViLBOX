@@ -29,6 +29,8 @@ export interface ClipRenderData {
   name: string;
   muted: boolean;
   selected: boolean;
+  fadeInRows?: number;
+  fadeOutRows?: number;
 }
 
 interface PixiArrangementCanvasProps {
@@ -68,6 +70,10 @@ interface PixiArrangementCanvasProps {
   loopStart?: number | null;
   /** Arrangement loop region end row */
   loopEnd?: number | null;
+  /** Timeline markers to display in the ruler */
+  markers?: Array<{ id: string; row: number; label: string; color: number }>;
+  /** Called on right-click in the ruler area — row is the timeline row at cursor */
+  onAddMarker?: (row: number) => void;
 }
 
 const CLIP_PADDING = 2;
@@ -155,16 +161,18 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
   onContextMenu,
   loopStart,
   loopEnd,
+  markers = [],
+  onAddMarker,
 }) => {
   const theme = usePixiTheme();
   const gridHeight = height - RULER_HEIGHT;
 
   // Keep latest params/callbacks in refs so drag handlers don't go stale
-  const paramsRef = useRef({ scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme, loopStart, loopEnd });
-  paramsRef.current = { scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme, loopStart, loopEnd };
+  const paramsRef = useRef({ scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme, loopStart, loopEnd, markers });
+  paramsRef.current = { scrollBeat, pixelsPerBeat, trackHeight, scrollY, clips, tool, snapDivision, width, height, theme, loopStart, loopEnd, markers };
 
-  const callbacksRef = useRef({ onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll, onContextMenu });
-  callbacksRef.current = { onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll, onContextMenu };
+  const callbacksRef = useRef({ onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll, onContextMenu, onAddMarker });
+  callbacksRef.current = { onSelectClip, onDeselectAll, onSelectBox, onMoveClips, onResizeClipEnd, onAddClip, onDeleteClip, onSplitClip, onOpenInPianoRoll, onContextMenu, onAddMarker };
 
   // Double-click detection for select tool
   const lastClickRef = useRef<{ time: number; clipId: string }>({ time: 0, clipId: '' });
@@ -262,9 +270,13 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
     const trackIndex = Math.max(0, Math.floor((ly - RULER_HEIGHT + sy) / th));
     const rowAtCursor = sb + lx / ppb;
 
-    // Right-click: context menu (any tool)
+    // Right-click: add marker in ruler, context menu elsewhere
     if (e.button === 2) {
-      cbs.onContextMenu?.(hit?.id ?? null, e.clientX, e.clientY);
+      if (ly < RULER_HEIGHT) {
+        cbs.onAddMarker?.(Math.round(rowAtCursor));
+      } else {
+        cbs.onContextMenu?.(hit?.id ?? null, e.clientX, e.clientY);
+      }
       return;
     }
 
@@ -477,6 +489,31 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
       g.roundRect(cx + CLIP_PADDING, cy, cw - CLIP_PADDING * 2, 4, 3);
       g.fill({ color: clip.color, alpha: clip.muted ? 0.3 : 0.8 });
 
+      // Fade-in overlay: left-to-right gradient using thin rects
+      const fadeInPx = (clip.fadeInRows ?? 0) * pixelsPerBeat;
+      if (fadeInPx > 2) {
+        const numSlices = 4;
+        const sliceW = fadeInPx / numSlices;
+        for (let s = 0; s < numSlices; s++) {
+          const sliceAlpha = 0.3 * (1 - s / numSlices);
+          g.rect(cx + CLIP_PADDING + s * sliceW, cy, sliceW, ch);
+          g.fill({ color: 0x000000, alpha: sliceAlpha });
+        }
+      }
+
+      // Fade-out overlay: right-to-left gradient using thin rects
+      const fadeOutPx = (clip.fadeOutRows ?? 0) * pixelsPerBeat;
+      if (fadeOutPx > 2) {
+        const numSlices = 4;
+        const sliceW = fadeOutPx / numSlices;
+        const rightEdge = cx + cw - CLIP_PADDING;
+        for (let s = 0; s < numSlices; s++) {
+          const sliceAlpha = 0.3 * (1 - s / numSlices);
+          g.rect(rightEdge - (s + 1) * sliceW, cy, sliceW, ch);
+          g.fill({ color: 0x000000, alpha: sliceAlpha });
+        }
+      }
+
       g.roundRect(cx + CLIP_PADDING, cy, cw - CLIP_PADDING * 2, ch, 3);
       g.stroke({
         color: clip.selected ? 0xffffff : clip.color,
@@ -533,7 +570,23 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         g.fill({ color: theme.accent.color, alpha: 0.7 });
       }
     }
-  }, [width, height, scrollBeat, scrollY, pixelsPerBeat, totalBeats, beatsPerBar, playbackBeat, theme, gridHeight, clips, trackHeight, loopStart, loopEnd]);
+
+    // Draw markers in the ruler
+    for (const marker of markers) {
+      const mx = (marker.row - scrollBeat) * pixelsPerBeat;
+      if (mx < -4 || mx > width + 4) continue;
+      // Vertical line spanning full ruler height
+      g.rect(mx, 0, 1, RULER_HEIGHT);
+      g.fill({ color: marker.color, alpha: 0.8 });
+      // Small downward-pointing chevron at the top: 3 rects approximating an arrow
+      g.rect(mx - 3, 2, 7, 2);
+      g.fill({ color: marker.color, alpha: 0.8 });
+      g.rect(mx - 2, 4, 5, 2);
+      g.fill({ color: marker.color, alpha: 0.8 });
+      g.rect(mx - 1, 6, 3, 2);
+      g.fill({ color: marker.color, alpha: 0.8 });
+    }
+  }, [width, height, scrollBeat, scrollY, pixelsPerBeat, totalBeats, beatsPerBar, playbackBeat, theme, gridHeight, clips, trackHeight, loopStart, loopEnd, markers]);
 
   const barLabels = useMemo(() => {
     const labels: { x: number; text: string }[] = [];
@@ -549,6 +602,16 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
     }
     return labels;
   }, [scrollBeat, width, pixelsPerBeat, totalBeats, beatsPerBar]);
+
+  const markerLabels = useMemo(() => {
+    return markers
+      .map(marker => {
+        const x = (marker.row - scrollBeat) * pixelsPerBeat;
+        if (x < -50 || x > width + 50) return null;
+        return { id: marker.id, x, text: marker.label, color: marker.color };
+      })
+      .filter((m): m is { id: string; x: number; text: string; color: number } => m !== null);
+  }, [markers, scrollBeat, pixelsPerBeat, width]);
 
   const clipLabels = useMemo(() => {
     const labels: { id: string; x: number; y: number; text: string; color: number; muted: boolean }[] = [];
@@ -591,6 +654,17 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
           tint={theme.textMuted.color}
           x={x + 3}
           y={3}
+        />
+      ))}
+
+      {markerLabels.map(({ id, x, text, color }) => (
+        <pixiBitmapText
+          key={`marker-${id}`}
+          text={text}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+          tint={color}
+          x={x + 3}
+          y={13}
         />
       ))}
 
