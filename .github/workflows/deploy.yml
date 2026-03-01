@@ -1,4 +1,4 @@
-name: Deploy to Custom Server & Build Desktop Apps
+name: Build & Deploy DEViLBOX
 
 on:
   push:
