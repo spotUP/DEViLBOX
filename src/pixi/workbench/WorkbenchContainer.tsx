@@ -12,7 +12,7 @@
 
 import React, { createContext, useCallback, useContext, useRef, useEffect, useState } from 'react';
 import { useApplication, useTick } from '@pixi/react';
-import { Rectangle } from 'pixi.js';
+import { Rectangle, Graphics } from 'pixi.js';
 import type { FederatedPointerEvent, Container as ContainerType, Graphics as GraphicsType, BitmapText as BitmapTextType } from 'pixi.js';
 import { useWorkbenchStore, type CameraState } from '@stores/useWorkbenchStore';
 import { applyTransform } from './WorkbenchCamera';
@@ -143,6 +143,20 @@ export const WorkbenchContainer: React.FC = () => {
   // Zoom level indicator — updated imperatively alongside camera
   const zoomTextRef = useRef<BitmapTextType | null>(null);
 
+  // Refs so the camera subscription (useEffect([])) always reads fresh values
+  const viewportWRef = useRef(width);
+  const viewportHRef = useRef(height);
+  viewportWRef.current = width;
+  viewportHRef.current = height;
+
+  // Map from windowId → PixiWindow outer Container — populated via onMount callback
+  const windowContainerRefs = useRef<Map<string, ContainerType>>(new Map());
+
+  const handleWindowMount = useCallback((winId: string, container: ContainerType | null) => {
+    if (container) windowContainerRefs.current.set(winId, container);
+    else windowContainerRefs.current.delete(winId);
+  }, []);
+
   // Snap guide line Graphics ref
   const snapGfxRef   = useRef<GraphicsType>(null);
   const snapLinesRef = useRef<SnapLine[]>([]);
@@ -166,6 +180,24 @@ export const WorkbenchContainer: React.FC = () => {
   useEffect(() => {
     const apply = (cam: CameraState) => {
       if (worldRef.current) applyTransform(worldRef.current, cam);
+
+      // ── Off-screen culling ──────────────────────────────────────────────────
+      const vw = viewportWRef.current;
+      const vh = viewportHRef.current;
+      const wins = useWorkbenchStore.getState().windows;
+      for (const [winId, container] of windowContainerRefs.current) {
+        const win = wins[winId];
+        if (!win) continue;
+        // Window AABB in screen space
+        const sx = cam.x + win.x * cam.scale;
+        const sy = cam.y + win.y * cam.scale;
+        const sw = win.width  * cam.scale;
+        const sh = win.height * cam.scale;
+        // Render only if it overlaps the viewport (with 1px tolerance)
+        container.renderable = sx + sw >= -1 && sy + sh >= -1 && sx <= vw + 1 && sy <= vh + 1;
+      }
+      // ─────────────────────────────────────────────────────────────────────────
+
       if (snapGfxRef.current && snapLinesRef.current.length > 0) {
         redrawSnapLines(snapGfxRef.current, snapLinesRef.current, snapAlphaRef.current, cam.scale);
       }
@@ -421,8 +453,23 @@ export const WorkbenchContainer: React.FC = () => {
   useEffect(() => {
     const root = rootContainerRef.current;
     if (!root) return;
-    root.hitArea = new Rectangle(0, 0, width, height);
-  }, [width, height]);
+    root.hitArea = new Rectangle(0, 0, width, workbenchH);
+  }, [width, workbenchH]);
+
+  // ─── Rendering mask ─────────────────────────────────────────────────────────
+  // Clip all workbench rendering to the visible workbench area so PixiJS cannot
+  // paint window content on top of the NavBar or StatusBar pixels.
+  useEffect(() => {
+    const root = rootContainerRef.current;
+    if (!root) return;
+    const mask = new Graphics();
+    mask.rect(0, 0, width, workbenchH).fill({ color: 0xffffff });
+    root.mask = mask;
+    return () => {
+      root.mask = null;
+      mask.destroy();
+    };
+  }, [width, workbenchH]);
 
   // ─── Tilt per-frame tick ─────────────────────────────────────────────────────
   // Spring-animates tiltFactor and triggers the GL render-to-texture pass.
@@ -495,6 +542,7 @@ export const WorkbenchContainer: React.FC = () => {
                 screenW={width}
                 screenH={height}
                 onFocus={focusWindow}
+                onMount={handleWindowMount}
               >
                 <pixiContainer
                   layout={{
