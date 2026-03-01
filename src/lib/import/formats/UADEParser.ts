@@ -529,7 +529,7 @@ export async function parseUADEFile(
       // DeltaMusic 2.0 loads at chip RAM address 0x000000, so no scanMemoryForMagic is needed.
       'Delta Music 2': async () => {
         const { parseDeltaMusic2File } = await import('./DeltaMusic2Parser');
-        return parseDeltaMusic2File(buffer, filename);
+        return parseDeltaMusic2File(new Uint8Array(buffer), filename);
       },
       'JochenHippel-CoSo': async () => {
         const { parseHippelCoSoFile } = await import('./HippelCoSoParser');
