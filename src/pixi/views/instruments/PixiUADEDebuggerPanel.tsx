@@ -10,7 +10,7 @@
  * Safe to render when UADEEngine is not running; falls back gracefully.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { UADEEngine } from '../../../engine/uade/UADEEngine';
@@ -68,7 +68,7 @@ interface StripProps {
   instruments: InstrumentConfig[];
 }
 
-const PixiChannelStrip: React.FC<StripProps> = ({ index, ch, instruments }) => {
+const PixiChannelStrip: FC<StripProps> = ({ index, ch, instruments }) => {
   const noteInfo   = ch.period > 0 ? amigaPeriodToNote(ch.period) : null;
   const volPct     = ch.volume / 64;
   const instrName  = resolveInstrumentName(ch.samplePtr, instruments);
@@ -189,7 +189,7 @@ interface PixiUADEDebuggerPanelProps {
   instruments: InstrumentConfig[];
 }
 
-export const PixiUADEDebuggerPanel: React.FC<PixiUADEDebuggerPanelProps> = ({ instruments }) => {
+export const PixiUADEDebuggerPanel: FC<PixiUADEDebuggerPanelProps> = ({ instruments }) => {
   const [channels, setChannels] = useState<UADEChannelData[] | null>(null);
   const instrumentsRef = useRef(instruments);
   useEffect(() => { instrumentsRef.current = instruments; }, [instruments]);
@@ -208,15 +208,15 @@ export const PixiUADEDebuggerPanel: React.FC<PixiUADEDebuggerPanelProps> = ({ in
     return unsub;
   }, []);
 
+  const LABEL_Y_PAD = 18;
+
   const drawPanelBg = useCallback((g: GraphicsType) => {
     g.clear();
-    g.rect(0, 0, PANEL_W, STRIP_H + 28);
+    g.rect(0, 0, PANEL_W, STRIP_H + LABEL_Y_PAD);
     g.fill({ color: 0x000e1a });
     g.rect(0, 0, PANEL_W, 1);
     g.fill({ color: 0x112233, alpha: 0.6 });
   }, []);
-
-  const LABEL_Y_PAD = 18;
 
   if (!channels) {
     return (
