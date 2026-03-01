@@ -12,7 +12,7 @@
  * Dims to alpha 0.4 when another channel is soloed and this one is not.
  */
 
-import { useCallback } from 'react';
+import React, { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PixiLabel } from '../components/PixiLabel';
 import { PixiSlider } from '../components/PixiSlider';
