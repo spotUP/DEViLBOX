@@ -75,7 +75,7 @@ export function resolveArrangement(
     const trimmedClips: ArrangementClip[] = [];
     for (const clip of activeClips) {
       const pattern = patternById.get(clip.patternId);
-      const clipLen = clip.clipLengthRows ?? (pattern ? pattern.length - clip.offsetRows : 64);
+      const clipLen = clip.clipLength ?? clip.clipLengthRows ?? (pattern ? pattern.length - clip.offsetRows : 64);
       const clipEnd = clip.startRow + clipLen;
 
       // Skip clips entirely outside the loop region
@@ -103,7 +103,7 @@ export function resolveArrangement(
   let totalRows = 0;
   for (const clip of activeClips) {
     const pattern = patternById.get(clip.patternId);
-    const clipLen = clip.clipLengthRows ?? (pattern ? pattern.length - clip.offsetRows : 64);
+    const clipLen = clip.clipLength ?? clip.clipLengthRows ?? (pattern ? pattern.length - clip.offsetRows : 64);
     const endRow = clip.startRow + clipLen;
     if (endRow > totalRows) totalRows = endRow;
   }
@@ -142,7 +142,15 @@ export function resolveArrangement(
         if (clip) {
           const pattern = patternById.get(clip.patternId);
           if (pattern) {
-            const patternRow = clip.offsetRows + (globalRow - clip.startRow);
+            const rowInClip = globalRow - clip.startRow;
+            // Determine the effective pattern row, accounting for loopClip
+            let patternRow: number;
+            if (clip.loopClip && pattern.length > 0) {
+              // Cyclic: repeat pattern rows to fill the clip region
+              patternRow = clip.offsetRows + (rowInClip % pattern.length);
+            } else {
+              patternRow = clip.offsetRows + rowInClip;
+            }
             const channel = pattern.channels[clip.sourceChannelIndex];
             if (channel && patternRow >= 0 && patternRow < channel.rows.length) {
               const cell = { ...channel.rows[patternRow] };
@@ -220,7 +228,8 @@ function findActiveClip(
     if (globalRow < clip.startRow) continue;
 
     const pattern = patternById.get(clip.patternId);
-    const clipLen = clip.clipLengthRows ?? (pattern ? pattern.length - clip.offsetRows : 64);
+    // clipLength (crop/loop length) takes priority over clipLengthRows, then pattern length
+    const clipLen = clip.clipLength ?? clip.clipLengthRows ?? (pattern ? pattern.length - clip.offsetRows : 64);
     if (globalRow >= clip.startRow + clipLen) continue;
 
     // Latest-starting clip wins in overlap

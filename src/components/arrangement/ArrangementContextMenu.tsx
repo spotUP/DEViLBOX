@@ -112,6 +112,23 @@ export const ArrangementContextMenu: React.FC = () => {
     arr.addAutomationLane(clip.trackId, 'volume');
   };
 
+  const handleSetClipLength = () => {
+    close();
+    const input = prompt('Set clip length (rows):', String(clip.clipLength ?? ''));
+    if (input === null) return; // cancelled
+    const rows = parseInt(input, 10);
+    if (isNaN(rows) || rows < 1) {
+      arr.setClipLength(clipId, undefined);
+    } else {
+      arr.setClipLength(clipId, rows);
+    }
+  };
+
+  const handleToggleLoop = () => {
+    close();
+    arr.setClipLoop(clipId, !clip.loopClip);
+  };
+
   // Adjust position so menu stays on screen
   const left = Math.min(screenX, window.innerWidth - MENU_W - 8);
   const top = Math.min(screenY, window.innerHeight - 320);
@@ -166,6 +183,9 @@ export const ArrangementContextMenu: React.FC = () => {
       )}
       <Separator />
       <MenuItem label="Add volume automation" onClick={handleAddVolumeAutomation} />
+      <Separator />
+      <MenuItem label="Set clip length..." onClick={handleSetClipLength} />
+      <MenuItem label={clip.loopClip ? 'Disable loop' : 'Toggle loop'} onClick={handleToggleLoop} />
       <Separator />
       <MenuItem label="Delete" onClick={handleDelete} danger />
     </div>,
