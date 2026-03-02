@@ -305,6 +305,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
       {/* 3. VU meter */}
       <pixiGraphics
         ref={vuGraphicsRef as any}
+        draw={() => {}}
         layout={{ width: VU_WIDTH, height: VU_HEIGHT }}
       />
 
