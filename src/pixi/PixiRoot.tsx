@@ -17,6 +17,7 @@ import { PixiNavBar } from './shell/PixiNavBar';
 import { PixiStatusBar } from './shell/PixiStatusBar';
 import { PixiPeerCursor } from './views/collaboration/PixiPeerCursor';
 import { WorkbenchContainer } from './workbench/WorkbenchContainer';
+import { PixiGlobalDropdownLayer } from './components/PixiGlobalDropdownLayer';
 import { CRTRenderer } from './CRTRenderer';
 import { Rectangle } from 'pixi.js';
 import { getAverageFps } from './performance';
@@ -113,6 +114,9 @@ export const PixiRoot: React.FC = () => {
       <pixiContainer zIndex={100} layout={{ width: '100%', height: STATUS_BAR_H }}>
         <PixiStatusBar />
       </pixiContainer>
+
+      {/* Global dropdown layer — above all window masks (zIndex 9999) */}
+      <PixiGlobalDropdownLayer />
 
       {/* Peer cursor overlay — above everything */}
       <pixiContainer

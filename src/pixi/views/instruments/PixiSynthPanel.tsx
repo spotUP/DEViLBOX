@@ -15,9 +15,10 @@ interface PixiSynthPanelProps {
   layout: SynthPanelLayout;
   config: Record<string, unknown>;
   onChange: (updates: Record<string, unknown>) => void;
+  synthType?: string;
 }
 
-export const PixiSynthPanel: React.FC<PixiSynthPanelProps> = ({ layout: panelLayout, config, onChange }) => {
+export const PixiSynthPanel: React.FC<PixiSynthPanelProps> = ({ layout: panelLayout, config, onChange, synthType }) => {
   const theme = usePixiTheme();
 
   // Stale-ref pattern per CLAUDE.md
@@ -147,6 +148,11 @@ export const PixiSynthPanel: React.FC<PixiSynthPanelProps> = ({ layout: panelLay
           updateParam={updateParam}
         />
       ))}
+
+      {/* Sampler waveform preview */}
+      {(synthType === 'Sampler' || synthType === 'Player') && (
+        <PixiSamplerWaveform config={config} />
+      )}
     </pixiContainer>
   );
 };
@@ -262,4 +268,109 @@ const PixiSynthControl: React.FC<SynthControlProps> = ({ descriptor, value, onCh
     default:
       return null;
   }
+};
+
+// ─── Sampler waveform preview ────────────────────────────────────────────────
+
+interface PixiSamplerWaveformProps {
+  config: Record<string, unknown>;
+}
+
+const WAVEFORM_HEIGHT = 60;
+const WAVEFORM_BARS = 128;
+
+const PixiSamplerWaveform: React.FC<PixiSamplerWaveformProps> = ({ config }) => {
+  const theme = usePixiTheme();
+
+  const sample = config.sample as Record<string, unknown> | undefined;
+  const audioBuffer = sample?.audioBuffer as ArrayBuffer | undefined;
+
+  const drawWaveform = useCallback((g: GraphicsType) => {
+    g.clear();
+
+    // Background
+    g.rect(0, 0, 9999, WAVEFORM_HEIGHT);
+    g.fill({ color: theme.bgTertiary.color });
+
+    // Border
+    g.rect(0, 0, 9999, WAVEFORM_HEIGHT);
+    g.stroke({ color: theme.border.color, alpha: 0.4, width: 1 });
+
+    if (!audioBuffer || audioBuffer.byteLength < 4) {
+      return;
+    }
+
+    // Interpret as Float32 PCM
+    const floats = new Float32Array(audioBuffer);
+    const totalSamples = floats.length;
+    if (totalSamples === 0) return;
+
+    const samplesPerBar = Math.max(1, Math.floor(totalSamples / WAVEFORM_BARS));
+    const centerY = WAVEFORM_HEIGHT / 2;
+
+    for (let bar = 0; bar < WAVEFORM_BARS; bar++) {
+      const start = bar * samplesPerBar;
+      const end = Math.min(start + samplesPerBar, totalSamples);
+      let peak = 0;
+      for (let i = start; i < end; i++) {
+        const abs = Math.abs(floats[i]);
+        if (abs > peak) peak = abs;
+      }
+      peak = Math.min(1, peak);
+      const barH = Math.max(1, peak * centerY);
+      // We cannot measure container width inside draw without a ref, so use bar index
+      // relative to WAVEFORM_BARS. The container is width:'100%' so bars run left-to-right.
+      // Use a large fixed display width (800px) as an upper bound — layout clips overflow.
+      const barX = (bar / WAVEFORM_BARS) * 800;
+      const barW = Math.max(1, 800 / WAVEFORM_BARS - 1);
+
+      g.rect(barX, centerY - barH, barW, barH * 2);
+      g.fill({ color: theme.accent.color, alpha: 0.6 });
+    }
+  }, [audioBuffer, theme]);
+
+  return (
+    <pixiContainer layout={{ flexDirection: 'column', gap: 4, marginTop: 4 }}>
+      <pixiBitmapText
+        text="WAVEFORM"
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+        tint={theme.textMuted.color}
+        layout={{}}
+      />
+      <pixiContainer layout={{ width: '100%', height: WAVEFORM_HEIGHT, overflow: 'hidden' }}>
+        {audioBuffer && audioBuffer.byteLength >= 4 ? (
+          <pixiGraphics
+            draw={drawWaveform}
+            layout={{ width: '100%', height: WAVEFORM_HEIGHT }}
+          />
+        ) : (
+          <pixiContainer
+            layout={{
+              width: '100%',
+              height: WAVEFORM_HEIGHT,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <pixiGraphics
+              draw={(g: GraphicsType) => {
+                g.clear();
+                g.rect(0, 0, 9999, WAVEFORM_HEIGHT);
+                g.fill({ color: theme.bgTertiary.color });
+                g.rect(0, 0, 9999, WAVEFORM_HEIGHT);
+                g.stroke({ color: theme.border.color, alpha: 0.4, width: 1 });
+              }}
+              layout={{ position: 'absolute', width: '100%', height: WAVEFORM_HEIGHT }}
+            />
+            <pixiBitmapText
+              text="NO SAMPLE"
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{}}
+            />
+          </pixiContainer>
+        )}
+      </pixiContainer>
+    </pixiContainer>
+  );
 };

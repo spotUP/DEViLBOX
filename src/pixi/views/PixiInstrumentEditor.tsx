@@ -9,8 +9,9 @@ import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiLabel } from '../components';
 import { PixiSynthPanel } from './instruments/PixiSynthPanel';
+import { PixiEnvelopeEditor } from './instruments/PixiEnvelopeEditor';
 import { getSynthLayout } from './instruments/layouts';
-import type { InstrumentConfig } from '@/types/instrument';
+import type { InstrumentConfig, EnvelopeConfig } from '@/types/instrument';
 import { PixiUADELiveParams } from './instruments/PixiUADELiveParams';
 import { PixiUADEDebuggerPanel } from './instruments/PixiUADEDebuggerPanel';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
@@ -21,6 +22,85 @@ interface PixiInstrumentEditorProps {
   onChange: (updates: Record<string, unknown>) => void;
   instrumentName?: string;
 }
+
+// ─── Envelope section sub-component ─────────────────────────────────────────
+
+interface PixiEnvelopeSectionProps {
+  envelope: EnvelopeConfig;
+  config: Record<string, unknown>;
+  onChange: (updates: Record<string, unknown>) => void;
+}
+
+const PixiEnvelopeSection: React.FC<PixiEnvelopeSectionProps> = ({ envelope, config, onChange }) => {
+  const theme = usePixiTheme();
+
+  const configRef = useCallback(() => config, [config]);
+
+  const handleEnvelopeChange = useCallback((param: 'attack' | 'decay' | 'sustain' | 'release', value: number) => {
+    const current = (configRef() as unknown as InstrumentConfig).envelope ?? {};
+    onChange({ envelope: { ...current, [param]: value } });
+  }, [configRef, onChange]);
+
+  const drawSectionBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, 4000, 1);
+    g.fill({ color: theme.border.color, alpha: 0.15 });
+  }, [theme]);
+
+  // Normalize envelope values to 0-1 for the editor.
+  // EnvelopeConfig uses raw ms/% values; normalize against max ranges:
+  // attack 0-2000ms, decay 0-2000ms, sustain 0-100%, release 0-5000ms
+  const attackNorm = Math.max(0, Math.min(1, (envelope.attack ?? 0) / 2000));
+  const decayNorm = Math.max(0, Math.min(1, (envelope.decay ?? 0) / 2000));
+  const sustainNorm = Math.max(0, Math.min(1, (envelope.sustain ?? 0) / 100));
+  const releaseNorm = Math.max(0, Math.min(1, (envelope.release ?? 0) / 5000));
+
+  const handleChange = useCallback((param: 'attack' | 'decay' | 'sustain' | 'release', normValue: number) => {
+    // Denormalize back to raw values
+    const denorm: Record<'attack' | 'decay' | 'sustain' | 'release', number> = {
+      attack: Math.round(normValue * 2000),
+      decay: Math.round(normValue * 2000),
+      sustain: Math.round(normValue * 100),
+      release: Math.round(normValue * 5000),
+    };
+    handleEnvelopeChange(param, denorm[param]);
+  }, [handleEnvelopeChange]);
+
+  return (
+    <pixiContainer
+      layout={{
+        width: '100%',
+        flexDirection: 'column',
+        gap: 6,
+        padding: 8,
+        paddingTop: 4,
+      }}
+    >
+      {/* Section divider */}
+      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <pixiBitmapText
+          text="ENVELOPE"
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={{}}
+        />
+        <pixiGraphics draw={drawSectionBg} layout={{ flex: 1, height: 1 }} />
+      </pixiContainer>
+
+      <PixiEnvelopeEditor
+        attack={attackNorm}
+        decay={decayNorm}
+        sustain={sustainNorm}
+        release={releaseNorm}
+        onChange={handleChange}
+        width={300}
+        height={100}
+      />
+    </pixiContainer>
+  );
+};
+
+// ─── Main editor ──────────────────────────────────────────────────────────────
 
 export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
   synthType,
@@ -90,11 +170,23 @@ export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
         }}
       >
         {layout ? (
-          <PixiSynthPanel
-            layout={layout}
-            config={config}
-            onChange={onChange}
-          />
+          <pixiContainer layout={{ flex: 1, width: '100%', flexDirection: 'column', overflow: 'hidden' }}>
+            <PixiSynthPanel
+              layout={layout}
+              config={config}
+              onChange={onChange}
+              synthType={synthType}
+            />
+
+            {/* Envelope editor — shown for Sampler/Player with an envelope config */}
+            {(synthType === 'Sampler' || synthType === 'Player') && instrConfig.envelope && (
+              <PixiEnvelopeSection
+                envelope={instrConfig.envelope}
+                onChange={onChange}
+                config={config}
+              />
+            )}
+          </pixiContainer>
         ) : (
           <pixiContainer
             layout={{
