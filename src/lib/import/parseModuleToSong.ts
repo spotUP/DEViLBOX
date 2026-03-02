@@ -1379,7 +1379,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       }
       try {
         const { isSonixFormat, parseSonixFile } = await import('@lib/import/formats/SonixMusicDriverParser');
-        if (isSonixFormat(buffer)) return parseSonixFile(buffer, file.name);
+        if (isSonixFormat(buffer)) return await parseSonixFile(buffer, file.name);
       } catch (err) {
         console.warn(`[SonixMusicDriverParser] Native parse failed for ${filename}, falling back to UADE:`, err);
       }
@@ -2633,7 +2633,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
         // for the binary SNX and TINY sub-formats.
         try {
           const { isSonixFormat, parseSonixFile } = await import('@lib/import/formats/SonixMusicDriverParser');
-          if (isSonixFormat(buffer)) return parseSonixFile(buffer, file.name);
+          if (isSonixFormat(buffer)) return await parseSonixFile(buffer, file.name);
         } catch (err) {
           console.warn(`[SonixMusicDriverParser] Native parse failed for ${filename}, falling back to UADE:`, err);
         }
