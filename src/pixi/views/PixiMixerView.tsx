@@ -8,6 +8,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { PixiMixerChannelStrip } from '../mixer/PixiMixerChannelStrip';
 import { PixiLabel } from '../components/PixiLabel';
 import { usePixiTheme } from '../theme';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,7 @@ export const PixiMixerView: React.FC = () => {
   const channels       = useMixerStore(s => s.channels);
   const master         = useMixerStore(s => s.master);
   const isSoloing      = useMixerStore(s => s.isSoloing);
+  const instruments    = useInstrumentStore(s => s.instruments);
   const setChannelVolume = useMixerStore(s => s.setChannelVolume);
   const setChannelPan    = useMixerStore(s => s.setChannelPan);
   const setMute          = useMixerStore(s => s.setChannelMute);
@@ -132,6 +134,7 @@ export const PixiMixerView: React.FC = () => {
               key={i}
               channelIndex={i}
               name={ch.name}
+              instrumentName={instruments[i]?.name ?? ''}
               volume={ch.volume}
               pan={ch.pan}
               muted={ch.muted}
