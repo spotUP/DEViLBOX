@@ -196,17 +196,17 @@ const TrackerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) =>
   let metadataStr = '';
   if (hasMetadata) {
     const parts: string[] = [];
-    if (songDBInfo!.authors?.length) {
-      parts.push(`by ${songDBInfo!.authors.join(', ')}`);
-    }
     if (songDBInfo!.album) {
-      parts.push(`• ${songDBInfo!.album}`);
+      parts.push(songDBInfo!.album);
     }
     if (songDBInfo!.year) {
       parts.push(`(${songDBInfo!.year})`);
     }
     if (songDBInfo!.format) {
       parts.push(`[${songDBInfo!.format}]`);
+    }
+    if (songDBInfo!.authors?.length) {
+      parts.push(`by ${songDBInfo!.authors.join(', ')}`);
     }
     metadataStr = parts.join(' ');
   }
