@@ -9,6 +9,7 @@ import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { Toggle } from '@components/controls/Toggle';
 import { KeyboardShortcutSheet } from '@components/tracker/KeyboardShortcutSheet';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
@@ -846,6 +847,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               <div>TB-303 Acid Tracker</div>
               <div className="text-ft2-highlight">Settings are saved automatically</div>
             </div>
+            
+            {/* Modland Integration */}
+            <div className="mb-4">
+              <h3 className="text-ft2-text text-xs font-bold mb-2 tracking-wide">MODLAND INTEGRATION</h3>
+              <p className="text-ft2-textDim text-[9px] font-mono mb-2 leading-relaxed">
+                When you import a module not in Modland's 727K+ file archive, a contribution modal appears.
+                Dismiss it per-file to avoid notifications while working on your own music.
+              </p>
+              <button
+                onClick={() => {
+                  const { clearDismissedHashes } = useModlandContributionModal.getState();
+                  clearDismissedHashes();
+                  alert('Dismissed files cleared. Contribution modal will show again for all unknown modules.');
+                }}
+                className="px-3 py-1.5 bg-transparent border border-ft2-border text-ft2-text text-[10px] font-mono hover:bg-ft2-rowEven transition-colors focus:outline-none"
+              >
+                CLEAR DISMISSED FILES
+              </button>
+            </div>
+            
             <div>
               <h3 className="text-ft2-highlight text-xs font-bold mb-2 tracking-wide">DANGER ZONE</h3>
               <p className="text-ft2-textDim text-[9px] font-mono mb-2">

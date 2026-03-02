@@ -557,6 +557,7 @@ function App() {
           <ModlandContributionModal 
             isOpen={useModlandContributionModal((s) => s.isOpen)}
             onClose={() => useModlandContributionModal.getState().closeModal()}
+            onDismiss={() => useModlandContributionModal.getState().dismissForFile()}
             filename={useModlandContributionModal((s) => s.filename)}
             hash={useModlandContributionModal((s) => s.hash)}
           />
