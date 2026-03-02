@@ -73,7 +73,7 @@ const samplerDescs: SynthDescriptor[] = [
       if (hasMODMetadata) {
         // Use Player for period-based playback
         const pp = config.parameters as Record<string, string | number> | undefined;
-        const sampleUrl = pp?.sampleUrl as string | undefined;
+        const sampleUrl = config.sample?.url || pp?.sampleUrl as string | undefined;
         if (sampleUrl) {
           return new Tone.Player({
             url: sampleUrl,
