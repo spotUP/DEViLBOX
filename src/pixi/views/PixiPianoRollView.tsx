@@ -59,6 +59,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   isActive: _isActive = true,
   windowId = 'pianoroll',
 }) => {
+  const [followPlayback, setFollowPlayback] = useState(true);
   const theme = usePixiTheme();
   const tool = usePianoRollStore(s => s.tool);
   const setTool = usePianoRollStore(s => s.setTool);
@@ -191,18 +192,41 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   }, [selectedNotes, pianoData.notes, noteVersion]);
 
   // Wheel → scroll the piano roll (horizontal = beat scroll, vertical = note scroll)
+  // Ctrl+wheel → horizontal zoom
   useEffect(() => {
     const canvas = document.querySelector('canvas');
     if (!canvas) return;
     const handleWheel = (e: WheelEvent) => {
       if (!isHoveredRef.current) return;
       e.preventDefault();
+      if (e.ctrlKey) {
+        const store = usePianoRollStore.getState();
+        const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+        store.setHorizontalZoom(store.view.horizontalZoom * factor);
+        return;
+      }
       const store = usePianoRollStore.getState();
       store.scrollBy(e.deltaX / 40, e.deltaY / 12);
     };
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
   }, []);
+
+  // Follow-playback auto-scroll: keep playhead visible when playing
+  useEffect(() => {
+    if (!isPlaying || !followPlayback) return;
+    const gridWidthBeats = gridW / horizontalZoom;
+    const currentView = usePianoRollStore.getState().view;
+    if (
+      currentGlobalRow < currentView.scrollX ||
+      currentGlobalRow > currentView.scrollX + gridWidthBeats * 0.9
+    ) {
+      usePianoRollStore.getState().setScroll(
+        Math.max(0, currentGlobalRow - gridWidthBeats * 0.1),
+        currentView.scrollY,
+      );
+    }
+  }, [isPlaying, currentGlobalRow, followPlayback, gridW, horizontalZoom]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -561,6 +585,16 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           size="sm"
           active={isRecording}
           onClick={handleToggleRecord}
+        />
+
+        {/* Follow playback toggle */}
+        <PixiButton
+          label="FOLLOW"
+          variant={followPlayback ? 'ft2' : 'ghost'}
+          color={followPlayback ? 'blue' : 'default'}
+          size="sm"
+          active={followPlayback}
+          onClick={() => setFollowPlayback(prev => !prev)}
         />
 
         {/* Horizontal zoom */}
