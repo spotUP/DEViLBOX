@@ -118,8 +118,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     copyTrack,
     cutTrack,
     pasteTrack,
-    channelMuted,
-    channelSolo,
   } = useTrackerStore(useShallow((s) => ({
     pattern: s.patterns[s.currentPatternIndex],
     patterns: s.patterns,
@@ -140,10 +138,16 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     copyTrack: s.copyTrack,
     cutTrack: s.cutTrack,
     pasteTrack: s.pasteTrack,
-    // Mute/Solo arrays for GL button rendering
-    channelMuted: (s.patterns[s.currentPatternIndex]?.channels ?? []).map(ch => ch.muted),
-    channelSolo: (s.patterns[s.currentPatternIndex]?.channels ?? []).map(ch => ch.solo),
   })));
+  // Derived boolean arrays — must NOT live inside the useShallow object above.
+  // .map() always creates a new array reference; inside a useShallow object,
+  // Zustand compares with Object.is (reference equality), so the new array is
+  // always seen as changed → forceStoreRerender → infinite loop.
+  // Separate useShallow selectors compare array elements directly.
+  const channelMuted = useTrackerStore(useShallow((s) =>
+    (s.patterns[s.currentPatternIndex]?.channels ?? []).map(ch => ch.muted)));
+  const channelSolo = useTrackerStore(useShallow((s) =>
+    (s.patterns[s.currentPatternIndex]?.channels ?? []).map(ch => ch.solo)));
 
   const useHex = useUIStore(s => s.useHexNumbers);
   const blankEmpty = useUIStore(s => s.blankEmptyCells);
