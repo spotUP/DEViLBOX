@@ -20,6 +20,7 @@ import {
   Link,
   X,
   Zap,
+  Minus,
 } from 'lucide-react';
 import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -87,6 +88,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     transposeSelection,
     interpolateSelection,
     clearSelection,
+    removeChannel,
   } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
@@ -101,6 +103,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     transposeSelection: s.transposeSelection,
     interpolateSelection: s.interpolateSelection,
     clearSelection: s.clearSelection,
+    removeChannel: s.removeChannel,
   })));
 
   const pattern = patterns[currentPatternIndex];
@@ -269,6 +272,12 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     selectChannel(channelIndex);
     onClose();
   }, [channelIndex, selectChannel, onClose]);
+
+  // Remove channel
+  const handleRemoveChannel = useCallback(() => {
+    removeChannel(channelIndex);
+    onClose();
+  }, [removeChannel, channelIndex, onClose]);
 
   const menuItems = useMemo((): MenuItemType[] => [
     // Block Operations (if selection active)
@@ -466,6 +475,15 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       icon: <LayoutGrid size={14} />,
       onClick: handleSelectChannel,
     },
+    ...(pattern && pattern.channels.length > 1 ? [
+      { type: 'divider' as const },
+      {
+        id: 'remove-channel',
+        label: 'Remove Channel',
+        icon: <Minus size={14} />,
+        onClick: handleRemoveChannel,
+      },
+    ] : []),
   ], [
     handleCut,
     handleCopy,
@@ -480,6 +498,27 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     onOpenParameterEditor,
     handleSelectColumn,
     handleSelectChannel,
+    handleRemoveChannel,
+    pattern,
+    hasSelection,
+    handleCopyBlock,
+    handleCutBlock,
+    handlePasteBlock,
+    handleTransposeBlock,
+    handleInterpolateBlock,
+    handleClearBlock,
+    onReverseVisual,
+    onPolyrhythm,
+    onFibonacci,
+    onEuclidean,
+    onPingPong,
+    onGlitch,
+    onStrobe,
+    onVisualEcho,
+    onConverge,
+    onSpiral,
+    onBounce,
+    onChaos,
   ]);
 
   if (!position) return null;
