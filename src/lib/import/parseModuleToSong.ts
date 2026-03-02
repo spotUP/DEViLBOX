@@ -1257,20 +1257,19 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
   }
 
   // ── Karl Morton Music Format (.mus) ───────────────────────────────────────
-  if (/\.mus$/.test(filename)) {
-    if (prefs.karlMorton === 'native') {
-      try {
-        const { isKarlMortonFormat, parseKarlMortonFile } = await import('@lib/import/formats/KarlMortonParser');
-        const bytes = new Uint8Array(buffer);
-        if (isKarlMortonFormat(bytes)) {
-          const result = parseKarlMortonFile(bytes, file.name);
-          if (result) return result;
-        }
-      } catch (err) {
-        console.warn(`[KarlMortonParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+  // Note: .mus is also used by UFO/MicroProse format (DDAT magic, checked later).
+  if (/\.mus$/.test(filename) && prefs.karlMorton === 'native') {
+    try {
+      const { isKarlMortonFormat, parseKarlMortonFile } = await import('@lib/import/formats/KarlMortonParser');
+      const bytes = new Uint8Array(buffer);
+      if (isKarlMortonFormat(bytes)) {
+        const result = parseKarlMortonFile(bytes, file.name);
+        if (result) return result;
       }
+    } catch (err) {
+      console.warn(`[KarlMortonParser] Native parse failed for ${filename}:`, err);
     }
-    // Fall through to libopenmpt
+    // Don't fall through to libopenmpt yet - let UFO/MicroProse handler try it
   }
 
   // ── UFO / MicroProse (.ufo, .mus with DDAT magic) ─────────────────────────
