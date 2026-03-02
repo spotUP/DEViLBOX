@@ -20,7 +20,7 @@ import { usePianoRollData } from '@/hooks/pianoroll/usePianoRollData';
 import { useHistoryStore } from '@/stores/useHistoryStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { patternToPianoRollNotes } from '@/hooks/pianoroll/usePianoRollData';
-import { TITLE_H } from '../workbench/PixiWindow';
+import { TITLE_H } from '../workbench/workbenchLayout';
 import { getMIDIManager } from '@/midi/MIDIManager';
 import type { MIDIMessage } from '@/midi/types';
 import { detectChord } from '@/lib/music/chordDetection';

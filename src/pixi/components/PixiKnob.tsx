@@ -46,8 +46,8 @@ interface PixiKnobProps {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SIZE_CONFIG = {
-  sm: { knob: 40, fontSize: 9,  stroke: 3, indicatorLen: 6, bodyRadius: 12 },
-  md: { knob: 56, fontSize: 11, stroke: 4, indicatorLen: 8, bodyRadius: 17 },
+  sm: { knob: 40, fontSize: 9,  stroke: 3, indicatorLen: 6,  bodyRadius: 12 },
+  md: { knob: 56, fontSize: 11, stroke: 4, indicatorLen: 8,  bodyRadius: 17 },
   lg: { knob: 72, fontSize: 12, stroke: 5, indicatorLen: 10, bodyRadius: 22 },
 } as const;
 
@@ -201,12 +201,15 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
     g.circle(cx, cy, bodyR);
     g.stroke({ color: bodyStroke, width: 1 });
 
-    // Indicator line
+    // Indicator line + dot at tip
     const indicatorOuter = polarToXY(cx, cy, arcRadius - 2, rotation);
     const indicatorInner = polarToXY(cx, cy, arcRadius - 2 - config.indicatorLen, rotation);
     g.moveTo(indicatorInner.x, indicatorInner.y);
     g.lineTo(indicatorOuter.x, indicatorOuter.y);
     g.stroke({ color: accent, width: 2, cap: 'round' });
+    // Dot at indicator tip (modern aesthetic)
+    g.circle(indicatorOuter.x, indicatorOuter.y, 2.5);
+    g.fill({ color: accent });
 
     // Active glow ring
     if (isActive) {
