@@ -227,10 +227,10 @@ export function emitInstruction(node: InstructionNode): string {
 
     case 'ADD':  case 'ADDA':  case 'ADDI': case 'ADDQ': {
       if (!dst) return '';
-      // ADDA does NOT affect condition codes.
+      // ADDA does NOT affect condition codes. Always writes full 32-bit address register.
       if (mnemonic === 'ADDA') {
-        if (dst.kind === 'register' && s === 'L') return `${dst.name} += ${src};`;
-        return regWrite(dst, `${emitOperand(dst, s)} + ${src}`, s);
+        if (dst.kind === 'register') return `${dst.name} = (uint32_t)((int32_t)${dst.name} + (int32_t)(int16_t)(${src}));`;
+        return regWrite(dst, `${emitOperand(dst, 'L')} + ${src}`, 'L');
       }
       // ADD/ADDI/ADDQ set N, Z (and X, V, C which we approximate).
       const addType = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
@@ -246,10 +246,10 @@ export function emitInstruction(node: InstructionNode): string {
       return dst ? regWrite(dst, `${emitOperand(dst, s)} + ${src} + flag_x`, s) : '';
     case 'SUB':  case 'SUBA':  case 'SUBI': case 'SUBQ': {
       if (!dst) return '';
-      // SUBA does NOT affect condition codes.
+      // SUBA does NOT affect condition codes. Always writes full 32-bit address register.
       if (mnemonic === 'SUBA') {
-        if (dst.kind === 'register' && s === 'L') return `${dst.name} -= ${src};`;
-        return regWrite(dst, `${emitOperand(dst, s)} - ${src}`, s);
+        if (dst.kind === 'register') return `${dst.name} = (uint32_t)((int32_t)${dst.name} - (int32_t)(int16_t)(${src}));`;
+        return regWrite(dst, `${emitOperand(dst, 'L')} - ${src}`, 'L');
       }
       // SUB/SUBI/SUBQ set N, Z (and X, V, C which we approximate).
       const subType = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
