@@ -518,6 +518,12 @@ function App() {
     }
   }, []);
 
+  // Folder/multi-file drop handler — stores companions then delegates to handleFileDrop
+  const handleFolderDrop = useCallback(async (mainFile: File, companions: File[]) => {
+    useUIStore.getState().setPendingCompanionFiles(companions);
+    await handleFileDrop(mainFile);
+  }, [handleFileDrop]);
+
   // Handler to start audio context on user interaction
   const handleStartAudio = async () => {
     try {
@@ -540,7 +546,7 @@ function App() {
           <span className="text-text-muted font-mono text-sm">Loading WebGL UI...</span>
         </div>
       }>
-        <GlobalDragDropHandler onFileLoaded={handleFileDrop}>
+        <GlobalDragDropHandler onFileLoaded={handleFileDrop} onFolderLoaded={handleFolderDrop}>
           <PixiApp />
           {/* Store-driven overlays — render null when inactive */}
           <ToastNotification />
@@ -825,7 +831,7 @@ function App() {
 
   // Show main tracker interface
   return (
-    <GlobalDragDropHandler onFileLoaded={handleFileDrop}>
+    <GlobalDragDropHandler onFileLoaded={handleFileDrop} onFolderLoaded={handleFolderDrop}>
       <AppLayout
         onShowExport={() => openModal('export')}
         onShowHelp={() => openModal('help')}

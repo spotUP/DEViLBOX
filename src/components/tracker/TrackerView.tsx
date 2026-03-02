@@ -391,6 +391,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const statusMessage = useUIStore((state) => state.statusMessage);
   const pendingModuleFile = useUIStore((state) => state.pendingModuleFile);
   const setPendingModuleFile = useUIStore((state) => state.setPendingModuleFile);
+  const pendingCompanionFiles = useUIStore((state) => state.pendingCompanionFiles);
   const pendingAudioFile = useUIStore((state) => state.pendingAudioFile);
   const setPendingAudioFile = useUIStore((state) => state.setPendingAudioFile);
   const pendingTD3File = useUIStore((state) => state.pendingTD3File);
@@ -1008,9 +1009,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         ) : (
           <ImportModuleDialog
             isOpen={showImportModule}
-            onClose={() => { setShowImportModule(false); setPendingModuleFile(null); }}
+            onClose={() => { setShowImportModule(false); setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
             onImport={handleModuleImport}
             initialFile={pendingModuleFile}
+            companionFiles={pendingCompanionFiles}
           />
         )}
         {/* Audio sample import dialog */}
@@ -1520,9 +1522,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       ) : (
         <ImportModuleDialog
           isOpen={showImportModule}
-          onClose={() => { setShowImportModule(false); setPendingModuleFile(null); }}
+          onClose={() => { setShowImportModule(false); setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
           onImport={handleModuleImport}
           initialFile={pendingModuleFile}
+          companionFiles={pendingCompanionFiles}
         />
       )}
 

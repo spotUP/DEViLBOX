@@ -256,7 +256,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingCompanions, setPendingCompanions] = useState<File[]>([]);
   type VizMode = 'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll' | 'amLED' | 'amBars' | 'amMirror' | 'amRadial' | 'amGraph' | 'amRadialGraph' | 'amDualStereo' | 'amLumi' | 'amAlpha' | 'amOutline' | 'amDualV' | 'amDualOverlay' | 'amBark' | 'amMel' | 'amOctave' | 'amNotes' | 'amMirrorReflex' | 'amRadialInvert' | 'amRadialLED' | 'amLinear' | 'amAWeight' | 'amLumiMirror';
   const [vizMode, setVizMode] = useState<VizMode>('logo');
 
@@ -576,6 +578,18 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     }
   };
 
+  const handleFolderLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = '';
+    if (files.length === 0) return;
+    const mainFile = files.find(f => isSupportedModule(f.name));
+    if (!mainFile) return;
+    const companions = files.filter(f => f !== mainFile);
+    setPendingCompanions(companions);
+    setPendingFile(mainFile);
+    setShowImportDialog(true);
+  };
+
   const pattern = patterns[currentPatternIndex];
   const patternLength = pattern?.length || 64;
   const songLength = patternOrder.length;
@@ -840,6 +854,13 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
       <div className="flex items-center gap-1.5 py-1 w-full overflow-x-auto no-scrollbar">
         <input ref={fileInputRef} type="file" accept={ACCEPTED_FORMATS} onChange={handleFileLoad} className="hidden" />
+        <input
+          ref={folderInputRef}
+          type="file"
+          {...({ webkitdirectory: '', directory: '' } as React.InputHTMLAttributes<HTMLInputElement>)}
+          onChange={handleFolderLoad}
+          className="hidden"
+        />
         <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
         <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
         <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openModal('revisions')}>Revisions</Button>
@@ -868,9 +889,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       <ImportModuleDialog
         isOpen={showImportDialog}
-        onClose={() => { setShowImportDialog(false); setPendingFile(null); }}
+        onClose={() => { setShowImportDialog(false); setPendingFile(null); setPendingCompanions([]); }}
         onImport={handleModuleImport}
         initialFile={pendingFile}
+        companionFiles={pendingCompanions}
       />
       <FileBrowser isOpen={showFileBrowser} onClose={() => setShowFileBrowser(false)} mode="load" onLoad={async (data, filename) => {
         if (isPlaying) { stop(); engine.releaseAll(); }
