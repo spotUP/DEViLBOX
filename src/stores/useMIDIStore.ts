@@ -919,16 +919,22 @@ useInstrumentStore.subscribe((state, prevState) => {
     const instrument = state.instruments.find(i => i.id === state.currentInstrumentId);
     if (!instrument) return;
 
-    const store = useMIDIStore.getState();
-    // Auto-switch bank
-    const autoBank = getKnobBankForSynth(instrument.synthType);
-    if (autoBank && store.knobBank !== autoBank) {
-      store.setKnobBank(autoBank);
-    }
-    // Sync NKS2 knob assignments + pages
-    if (store.nksActiveSynthType !== instrument.synthType) {
-      store.syncKnobsToSynth(instrument.synthType);
-    }
+    // Defer to microtask to avoid triggering pixi-react reconciliation
+    // synchronously during bulk instrument loading (e.g. song file import).
+    // Without this, the Zustand set() inside syncKnobsToSynth fires pixi-react
+    // subscribers mid-load, causing BindingError from stale Node references.
+    queueMicrotask(() => {
+      const store = useMIDIStore.getState();
+      // Auto-switch bank
+      const autoBank = getKnobBankForSynth(instrument.synthType);
+      if (autoBank && store.knobBank !== autoBank) {
+        store.setKnobBank(autoBank);
+      }
+      // Sync NKS2 knob assignments + pages
+      if (store.nksActiveSynthType !== instrument.synthType) {
+        store.syncKnobsToSynth(instrument.synthType);
+      }
+    });
   }
 });
 
