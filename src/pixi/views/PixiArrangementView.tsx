@@ -16,7 +16,7 @@ import { useTransportStore, useTrackerStore, useUIStore } from '@stores';
 import { usePianoRollStore } from '@/stores/usePianoRollStore';
 import { useArrangementStore } from '@/stores/useArrangementStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
-import { TITLE_H } from '../workbench/PixiWindow';
+import { TITLE_H } from '../workbench/workbenchLayout';
 import type { ArrangementToolMode } from '@/types/arrangement';
 import { useArrangementKeyboardShortcuts } from '@/components/arrangement/ArrangementKeyboardShortcuts';
 import { MarkerRenameInput } from '@/components/arrangement/MarkerRenameInput';
@@ -43,7 +43,7 @@ function cssColorToPixi(color: string | null, fallback: number): number {
   return parseInt(hex, 16) || fallback;
 }
 
-const TRACK_HEADERS_W = 160;
+const TRACK_HEADERS_W = 200;
 const ARR_TOOLBAR_H = 36;
 const SCROLLBAR_SIZE = 8;
 const ARR_TRACK_HEIGHT = 40;
