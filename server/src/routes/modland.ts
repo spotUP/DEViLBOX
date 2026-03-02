@@ -13,6 +13,12 @@ import {
   cacheFile,
   forceReindex,
 } from '../services/modlandIndexer';
+import {
+  findByHash,
+  getSamplesBySongId,
+  findByPatternHash,
+  getHashDbStats,
+} from '../services/modlandHash';
 
 const router = Router();
 
@@ -200,6 +206,77 @@ router.get('/download', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[Modland] Download error:', err);
     res.status(500).json({ error: 'Download failed' });
+  }
+});
+
+// ── POST /api/modland/lookup-hash ───────────────────────────────────────────
+
+router.post('/lookup-hash', (req: Request, res: Response) => {
+  try {
+    const { hash } = req.body;
+
+    if (!hash || typeof hash !== 'string') {
+      return res.status(400).json({ error: 'Hash required (SHA-256 hex string)' });
+    }
+
+    // Validate hash format (64 hex chars)
+    if (!/^[a-f0-9]{64}$/i.test(hash)) {
+      return res.status(400).json({ error: 'Invalid hash format (expected 64 hex chars)' });
+    }
+
+    const result = findByHash(hash.toLowerCase());
+    res.json(result);
+  } catch (err) {
+    console.error('[Modland] Hash lookup error:', err);
+    res.status(500).json({ error: 'Hash lookup failed' });
+  }
+});
+
+// ── GET /api/modland/samples/:song_id ───────────────────────────────────────
+
+router.get('/samples/:song_id', (req: Request, res: Response) => {
+  try {
+    const songId = parseInt(req.params.song_id, 10);
+
+    if (isNaN(songId)) {
+      return res.status(400).json({ error: 'Invalid song_id' });
+    }
+
+    const samples = getSamplesBySongId(songId);
+    res.json({ samples });
+  } catch (err) {
+    console.error('[Modland] Samples query error:', err);
+    res.status(500).json({ error: 'Samples query failed' });
+  }
+});
+
+// ── GET /api/modland/pattern-matches/:pattern_hash ──────────────────────────
+
+router.get('/pattern-matches/:pattern_hash', (req: Request, res: Response) => {
+  try {
+    const patternHash = parseInt(req.params.pattern_hash, 10);
+
+    if (isNaN(patternHash)) {
+      return res.status(400).json({ error: 'Invalid pattern_hash' });
+    }
+
+    const matches = findByPatternHash(patternHash);
+    res.json({ matches });
+  } catch (err) {
+    console.error('[Modland] Pattern match error:', err);
+    res.status(500).json({ error: 'Pattern match failed' });
+  }
+});
+
+// ── GET /api/modland/hash-stats ─────────────────────────────────────────────
+
+router.get('/hash-stats', (_req: Request, res: Response) => {
+  try {
+    const stats = getHashDbStats();
+    res.json(stats);
+  } catch (err) {
+    console.error('[Modland] Hash stats error:', err);
+    res.status(500).json({ error: 'Failed to get hash stats' });
   }
 });
 
