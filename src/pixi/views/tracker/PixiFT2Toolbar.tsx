@@ -26,6 +26,7 @@ import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton, PixiNumericInput } from '../../components';
 import { PixiPureTextInput } from '../../input/PixiPureTextInput';
+import { PixiFXSearchReplace } from '../../components/PixiFXSearchReplace';
 import { PixiVisualizer } from './PixiVisualizer';
 import { useTransportStore, useTrackerStore, useUIStore, useInstrumentStore, useProjectStore, useAudioStore, useAutomationStore } from '@stores';
 import { exportSong } from '@lib/export/exporters';
@@ -291,6 +292,10 @@ export const PixiFT2Toolbar: React.FC = () => {
   // ── Toggle handlers ───────────────────────────────────────────────────────
   const handleToggleCompact   = useCallback(() => useUIStore.getState().toggleCompactToolbar(), []);
   const handleToggleAutomation= useCallback(() => useUIStore.getState().toggleAutomationLanes(), []);
+
+  // ── FX Search & Replace panel ─────────────────────────────────────────────
+  const [showFXSearchReplace, setShowFXSearchReplace] = useState(false);
+  const handleToggleFXSearchReplace = useCallback(() => setShowFXSearchReplace(v => !v), []);
 
   // ── Fullscreen ────────────────────────────────────────────────────────────
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
@@ -584,6 +589,14 @@ export const PixiFT2Toolbar: React.FC = () => {
         <PixiButton label="New"         variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} />
         <PixiButton label="Clear"       variant="ghost" size="sm" onClick={handleClearProject} />
         <PixiButton label="Order"       variant="ghost" size="sm" onClick={handleShowPatternOrder} />
+        <PixiButton
+          label="FX Search"
+          variant={showFXSearchReplace ? 'ft2' : 'ghost'}
+          color={showFXSearchReplace ? 'blue' : 'default'}
+          size="sm"
+          active={showFXSearchReplace}
+          onClick={handleToggleFXSearchReplace}
+        />
         <PixiButton label="Instruments" variant="ghost" size="sm" onClick={handleShowInstruments} />
         <PixiButton label="Furnace"     variant="ghost" size="sm" onClick={() => useUIStore.getState().openModal('furnacePresets')} />
         <PixiButton label="Pads"        variant="ghost" size="sm" onClick={handleShowDrumpads} />
@@ -607,6 +620,15 @@ export const PixiFT2Toolbar: React.FC = () => {
           onClick={handleToggleFullscreen}
         />
       </pixiContainer>
+
+      {/* FX Search & Replace floating panel */}
+      {showFXSearchReplace && (
+        <PixiFXSearchReplace
+          width={380}
+          height={196}
+          onClose={() => setShowFXSearchReplace(false)}
+        />
+      )}
     </pixiContainer>
   );
 };
