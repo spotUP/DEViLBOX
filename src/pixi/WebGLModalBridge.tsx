@@ -328,6 +328,7 @@ export const WebGLModalBridge: React.FC = () => {
         subsong: options.subsong,
         uadeMetadata: options.uadeMetadata,
         midiOptions: options.midiOptions,
+        companionFiles: options.companionFiles,
       });
       if (result.success === true) {
         notify.success(result.message);
