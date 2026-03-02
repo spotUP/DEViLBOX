@@ -30,6 +30,7 @@ const VIEW_WINDOWS = [
   { id: 'vj',         label: 'VJ'  },
   { id: 'instrument', label: 'INS' },
   { id: 'mixer',      label: 'MIX' },
+  { id: 'master-fx', label: 'FX'  },
 ] as const;
 
 // ─── Workspace Picker Popup ───────────────────────────────────────────────────

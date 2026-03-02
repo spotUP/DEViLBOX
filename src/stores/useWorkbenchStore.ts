@@ -40,7 +40,8 @@ export type WindowId =
   | 'dj'
   | 'vj'
   | 'instrument'
-  | 'mixer';
+  | 'mixer'
+  | 'master-fx';
 
 /** Total height of NavBar + StatusBar chrome (matches workbenchLayout.ts WORKBENCH_CHROME_H) */
 const CHROME_H = 130;
@@ -60,6 +61,7 @@ function computeDefaultWindows(): Record<WindowId, WindowState> {
     vj:          { x: 800, y: 40, width: 600, height: 400,                  zIndex: 5, visible: false, minimized: false, maximized: false },
     instrument:  { x: 20, y: trackerH + 80, width: 700, height: 260,        zIndex: 6, visible: true,  minimized: false, maximized: false },
     mixer:       { x: 20, y: trackerH + 80, width: Math.min(900, ww - 80), height: 220, zIndex: 7, visible: false, minimized: false, maximized: false },
+    'master-fx': { x: 20 + Math.min(900, ww - 80) + 20, y: trackerH + 80, width: 280, height: 360, zIndex: 8, visible: false, minimized: false, maximized: false },
   };
 }
 
