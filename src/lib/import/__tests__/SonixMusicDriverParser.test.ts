@@ -230,8 +230,6 @@ describe('parseSonixFile — yessonix.smus', () => {
 
 describe('companion file pipeline — yessonix folder', () => {
   const YESSONIX_DIR = resolve(REF, 'IFF-SMUS/- unknown/yessonix');
-  const INSTRUMENTS_DIR = resolve(YESSONIX_DIR, 'Instruments');
-
   // Read all files from the folder (simulates what GlobalDragDropHandler does)
   function enumerateFolder(): { mainFile: string; companions: string[] } {
     const fs = require('fs');
