@@ -554,30 +554,36 @@ export const WorkbenchContainer: React.FC = () => {
           {/* Windows */}
           {Object.entries(WINDOW_CONTENT).map(([id, { title, component: ViewComponent }]) => {
             const win = windows[id];
-            if (!win?.visible) return null;
+            // Stable wrapper — always rendered so worldRef's direct child count never
+            // changes after mount. Without this, @pixi/react's insertBefore/removeChild
+            // would fire on worldRef (sortableChildren=true), and Yoga WASM throws a
+            // BindingError when zIndex changes trigger a sort before the next commit.
             return (
-              <PixiWindow
-                key={id}
-                id={id}
-                title={title}
-                camera={camera}
-                screenW={width}
-                screenH={height}
-                onFocus={focusWindow}
-                onMount={handleWindowMount}
-              >
-                <pixiContainer
-                  layout={{
-                    width: win.width,
-                    height: win.height - TITLE_H,
-                    flexDirection: 'column',
-                  }}
-                  interactiveChildren={id === activeWindowId}
-                  eventMode={id === activeWindowId ? 'auto' : 'none'}
-                >
-                  <ViewComponent />
-                </pixiContainer>
-              </PixiWindow>
+              <pixiContainer key={id} zIndex={win?.zIndex ?? 0}>
+                {win?.visible && (
+                  <PixiWindow
+                    id={id}
+                    title={title}
+                    camera={camera}
+                    screenW={width}
+                    screenH={height}
+                    onFocus={focusWindow}
+                    onMount={handleWindowMount}
+                  >
+                    <pixiContainer
+                      layout={{
+                        width: win.width,
+                        height: win.height - TITLE_H,
+                        flexDirection: 'column',
+                      }}
+                      interactiveChildren={id === activeWindowId}
+                      eventMode={id === activeWindowId ? 'auto' : 'none'}
+                    >
+                      <ViewComponent />
+                    </pixiContainer>
+                  </PixiWindow>
+                )}
+              </pixiContainer>
             );
           })}
 

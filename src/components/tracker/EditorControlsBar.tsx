@@ -22,7 +22,7 @@ import {
   Activity, LayoutGrid, Cpu, SlidersHorizontal,
 } from 'lucide-react';
 
-type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'arrangement' | 'dj' | 'drumpad' | 'vj';
+type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer';
 
 export interface EditorControlsBarProps {
   viewMode: ViewMode;
@@ -79,7 +79,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleViewModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value as ViewMode;
-    if (val === 'arrangement' || val === 'dj' || val === 'drumpad' || val === 'pianoroll' || val === 'vj') {
+    if (val === 'arrangement' || val === 'dj' || val === 'drumpad' || val === 'pianoroll' || val === 'vj' || val === 'mixer') {
       setActiveView(val);
     } else {
       onViewModeChange(val);
@@ -150,6 +150,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             <option value="dj">DJ Mixer</option>
             <option value="drumpad">Drum Pads</option>
             <option value="vj">VJ View</option>
+            <option value="mixer">Mixer</option>
           </select>
         </div>
 

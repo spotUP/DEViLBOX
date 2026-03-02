@@ -72,6 +72,7 @@ const PixiApp = lazy(() => import('./pixi/PixiApp').then(m => ({ default: m.Pixi
 const WebGLModalBridge = lazy(() => import('./pixi/WebGLModalBridge').then(m => ({ default: m.WebGLModalBridge })));
 const CollaborationSplitView = lazy(() => import('@components/collaboration/CollaborationSplitView').then(m => ({ default: m.CollaborationSplitView })));
 const MixerPanel = lazy(() => import('./components/panels/MixerPanel').then(m => ({ default: m.MixerPanel })));
+const MixerView  = lazy(() => import('./components/panels/MixerPanel').then(m => ({ default: m.MixerView })));
 
 function App() {
   // Check for application updates
@@ -286,7 +287,7 @@ function App() {
         const state = useUIStore.getState();
         if (state.modalOpen) state.closeModal();
         else if (state.showPatterns) state.togglePatterns();
-        else if (state.activeView === 'vj' || state.activeView === 'drumpad') state.setActiveView('tracker');
+        else if (state.activeView === 'vj' || state.activeView === 'drumpad' || state.activeView === 'mixer') state.setActiveView('tracker');
         return;
       }
 
@@ -915,6 +916,12 @@ function App() {
             {activeView === 'vj' && (
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted bg-black">Loading VJ...</div>}>
                 <VJView />
+              </Suspense>
+            )}
+
+            {activeView === 'mixer' && (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading mixer...</div>}>
+                <MixerView />
               </Suspense>
             )}
           </div>

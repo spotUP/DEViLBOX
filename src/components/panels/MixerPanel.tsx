@@ -146,23 +146,73 @@ const DOMChannelStrip: React.FC<DOMStripProps> = ({
   );
 };
 
-// ─── MixerPanel ───────────────────────────────────────────────────────────────
+// ─── MixerContent (shared strip area) ─────────────────────────────────────────
 
-export const MixerPanel: React.FC = () => {
-  // ── Store ────────────────────────────────────────────────────────────────
+interface MixerContentProps {
+  channels: ReturnType<typeof useMixerStore.getState>['channels'];
+  master: ReturnType<typeof useMixerStore.getState>['master'];
+  isSoloing: boolean;
+  levels: number[];
+  onVolumeChange: (i: number, v: number) => void;
+  onPanChange: (i: number, p: number) => void;
+  onMuteToggle: (i: number) => void;
+  onSoloToggle: (i: number) => void;
+  onMasterVolumeChange: (v: number) => void;
+}
 
+const MixerContent: React.FC<MixerContentProps> = ({
+  channels, master, isSoloing, levels,
+  onVolumeChange, onPanChange, onMuteToggle, onSoloToggle, onMasterVolumeChange,
+}) => {
+  const masterLevel = Math.max(...levels, 0);
+  return (
+    <div className="flex flex-row overflow-x-auto items-start pb-2">
+      {channels.map((ch, i) => (
+        <DOMChannelStrip
+          key={i}
+          index={i}
+          name={ch.name}
+          volume={ch.volume}
+          pan={ch.pan}
+          muted={ch.muted}
+          soloed={ch.soloed}
+          level={levels[i] ?? 0}
+          dimmed={isSoloing && !ch.soloed}
+          onVolumeChange={(v) => onVolumeChange(i, v)}
+          onPanChange={(p) => onPanChange(i, p)}
+          onMuteToggle={() => onMuteToggle(i)}
+          onSoloToggle={() => onSoloToggle(i)}
+        />
+      ))}
+      <div className="self-stretch w-px bg-white/10 mx-1 my-2" />
+      <DOMChannelStrip
+        index={-1}
+        name="MASTER"
+        volume={master.volume}
+        pan={0}
+        muted={false}
+        soloed={false}
+        level={masterLevel}
+        dimmed={false}
+        onVolumeChange={onMasterVolumeChange}
+        onPanChange={() => {}}
+        onMuteToggle={() => {}}
+        onSoloToggle={() => {}}
+        isMaster={true}
+      />
+    </div>
+  );
+};
+
+function useMixerState() {
   const channels        = useMixerStore(s => s.channels);
   const master          = useMixerStore(s => s.master);
   const isSoloing       = useMixerStore(s => s.isSoloing);
-  const domPanelVisible = useMixerStore(s => s.domPanelVisible);
-  const toggleDomPanel  = useMixerStore(s => s.toggleDomPanel);
   const setChannelVolume = useMixerStore(s => s.setChannelVolume);
   const setChannelPan    = useMixerStore(s => s.setChannelPan);
   const setMasterVolume  = useMixerStore(s => s.setMasterVolume);
   const setChannelMute   = useMixerStore(s => s.setChannelMute);
   const setChannelSolo   = useMixerStore(s => s.setChannelSolo);
-
-  // ── VU meter rAF loop ─────────────────────────────────────────────────
 
   const [levels, setLevels] = useState<number[]>(() => Array(NUM_CHANNELS).fill(0));
   const rafRef     = useRef<number>(0);
@@ -170,51 +220,54 @@ export const MixerPanel: React.FC = () => {
 
   useEffect(() => {
     mountedRef.current = true;
-
     const tick = () => {
       if (!mountedRef.current) return;
-      try {
-        setLevels(getToneEngine().getChannelLevels(NUM_CHANNELS));
-      } catch {
-        // Engine not yet ready — ignore
-      }
+      try { setLevels(getToneEngine().getChannelLevels(NUM_CHANNELS)); } catch { /* not ready */ }
       rafRef.current = requestAnimationFrame(tick);
     };
-
     rafRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      mountedRef.current = false;
-      cancelAnimationFrame(rafRef.current);
-    };
+    return () => { mountedRef.current = false; cancelAnimationFrame(rafRef.current); };
   }, []);
 
-  // ── Stale-closure guards ──────────────────────────────────────────────
-
   const channelsRef = useRef(channels);
-  useEffect(() => {
-    channelsRef.current = channels;
-  }, [channels]);
-
-  // ── Handlers ─────────────────────────────────────────────────────────
+  useEffect(() => { channelsRef.current = channels; }, [channels]);
 
   const handleMuteToggle = useCallback((ch: number) => {
     setChannelMute(ch, !channelsRef.current[ch].muted);
   }, [setChannelMute]);
-
   const handleSoloToggle = useCallback((ch: number) => {
     setChannelSolo(ch, !channelsRef.current[ch].soloed);
   }, [setChannelSolo]);
 
-  // ── Master VU (max of all channels) ──────────────────────────────────
+  return {
+    channels, master, isSoloing, levels,
+    onVolumeChange: setChannelVolume,
+    onPanChange: setChannelPan,
+    onMuteToggle: handleMuteToggle,
+    onSoloToggle: handleSoloToggle,
+    onMasterVolumeChange: setMasterVolume,
+  };
+}
 
-  const masterLevel = Math.max(...levels, 0);
+// ─── MixerView — full-page view for the DOM UI ────────────────────────────────
 
-  // ── Early-out when hidden ─────────────────────────────────────────────
+export const MixerView: React.FC = () => {
+  const state = useMixerState();
+  return (
+    <div className="flex flex-col flex-1 min-h-0 bg-[#0e0e14]">
+      <MixerContent {...state} />
+    </div>
+  );
+};
+
+// ─── MixerPanel ───────────────────────────────────────────────────────────────
+
+export const MixerPanel: React.FC = () => {
+  const state = useMixerState();
+  const domPanelVisible = useMixerStore(s => s.domPanelVisible);
+  const toggleDomPanel  = useMixerStore(s => s.toggleDomPanel);
 
   if (!domPanelVisible) return null;
-
-  // ── Render ───────────────────────────────────────────────────────────
 
   return (
     <div
@@ -234,48 +287,7 @@ export const MixerPanel: React.FC = () => {
           ✕
         </button>
       </div>
-
-      {/* Strip area — horizontally scrollable */}
-      <div className="flex flex-row overflow-x-auto items-start pb-2">
-        {/* 16 channel strips */}
-        {channels.map((ch, i) => (
-          <DOMChannelStrip
-            key={i}
-            index={i}
-            name={ch.name}
-            volume={ch.volume}
-            pan={ch.pan}
-            muted={ch.muted}
-            soloed={ch.soloed}
-            level={levels[i] ?? 0}
-            dimmed={isSoloing && !ch.soloed}
-            onVolumeChange={(v) => setChannelVolume(i, v)}
-            onPanChange={(p) => setChannelPan(i, p)}
-            onMuteToggle={() => handleMuteToggle(i)}
-            onSoloToggle={() => handleSoloToggle(i)}
-          />
-        ))}
-
-        {/* Divider */}
-        <div className="self-stretch w-px bg-white/10 mx-1 my-2" />
-
-        {/* Master strip */}
-        <DOMChannelStrip
-          index={-1}
-          name="MASTER"
-          volume={master.volume}
-          pan={0}
-          muted={false}
-          soloed={false}
-          level={masterLevel}
-          dimmed={false}
-          onVolumeChange={(v) => setMasterVolume(v)}
-          onPanChange={() => {}}
-          onMuteToggle={() => {}}
-          onSoloToggle={() => {}}
-          isMaster={true}
-        />
-      </div>
+      <MixerContent {...state} />
     </div>
   );
 };

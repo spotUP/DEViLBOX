@@ -65,7 +65,7 @@ interface UIStore {
   platterMass: number; // Turntable platter mass 0-1 (0=CDJ light, 0.5=Technics 1200, 1=heavy)
 
   // View switching (tracker vs arrangement vs DJ vs drum pads vs piano roll vs VJ)
-  activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj';
+  activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer';
 
   // Pop-out window state
   tb303PoppedOut: boolean;
@@ -123,7 +123,7 @@ interface UIStore {
   setPlatterMass: (mass: number) => void;
 
   // View switching actions
-  setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj') => void;
+  setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer') => void;
   toggleActiveView: () => void;
 
   // Pop-out window actions
