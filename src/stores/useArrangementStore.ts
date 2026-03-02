@@ -80,6 +80,8 @@ interface ArrangementStore {
   toggleClipMute: (clipId: string) => void;
   setClipColor: (clipId: string, color: string | null) => void;
   setClipName: (clipId: string, name: string) => void;
+  setClipLength: (clipId: string, rows: number | undefined) => void;
+  setClipLoop: (clipId: string, loop: boolean) => void;
 
   // === Rename UI state (not persisted) ===
   renamingClipId: string | null;
@@ -404,6 +406,18 @@ export const useArrangementStore = create<ArrangementStore>()(
       set((state) => {
         const clip = state.clips.find(c => c.id === clipId);
         if (clip) clip.name = name || undefined;
+      }),
+
+    setClipLength: (clipId, rows) =>
+      set((state) => {
+        const clip = state.clips.find(c => c.id === clipId);
+        if (clip) clip.clipLength = rows;
+      }),
+
+    setClipLoop: (clipId, loop) =>
+      set((state) => {
+        const clip = state.clips.find(c => c.id === clipId);
+        if (clip) clip.loopClip = loop;
       }),
 
     setRenamingClipId: (id) =>

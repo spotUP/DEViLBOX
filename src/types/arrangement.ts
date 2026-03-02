@@ -36,6 +36,10 @@ export interface ArrangementClip {
   timeStretch?: number;         // Time stretch factor (0.5 = half speed, 2.0 = double speed)
   crossfadeInRows?: number;     // Crossfade with previous clip (default 0)
   crossfadeOutRows?: number;    // Crossfade with next clip (default 0)
+
+  // Clip loop / crop
+  clipLength?: number;          // If set, clip plays only this many rows (crop). Defaults to pattern length.
+  loopClip?: boolean;           // If true, pattern repeats cyclically to fill clipLength rows.
 }
 
 /**

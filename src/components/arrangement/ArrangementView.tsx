@@ -10,6 +10,7 @@ import { useArrangementStore } from '@stores/useArrangementStore';
 import { useTrackerStore } from '@stores';
 import { useTransportStore } from '@stores';
 import { useMixerStore } from '@stores/useMixerStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { notify } from '@stores/useNotificationStore';
 import { useArrangementKeyboard } from '@/hooks/arrangement/useArrangementKeyboard';
 import { ArrangementToolbar } from './ArrangementToolbar';
@@ -110,15 +111,33 @@ export const ArrangementView: React.FC = () => {
 
       // Apply automation lanes
       const { automationLanes, tracks } = useArrangementStore.getState();
+      const sortedTracks = [...tracks].sort((a, b) => a.index - b.index);
       for (const lane of automationLanes) {
         if (!lane.enabled || lane.points.length === 0) continue;
         const value = getAutomationValue(lane.points, globalRow);
+
         if (lane.parameter === 'volume') {
-          // Find the track's channel index (tracks sorted by index, 0-based)
-          const sortedTracks = [...tracks].sort((a, b) => a.index - b.index);
           const chIdx = sortedTracks.findIndex(t => t.id === lane.trackId);
           if (chIdx >= 0) {
             useMixerStore.getState().setChannelVolume(chIdx, value);
+          }
+        } else if (lane.parameter === 'pan') {
+          const chIdx = sortedTracks.findIndex(t => t.id === lane.trackId);
+          if (chIdx >= 0) {
+            useMixerStore.getState().setChannelPan(chIdx, value);
+          }
+        } else if (
+          lane.parameter === 'cutoff' ||
+          lane.parameter === 'resonance' ||
+          lane.parameter === 'envMod'
+        ) {
+          // Synth parameter: find the instrument assigned to this track
+          const track = tracks.find(t => t.id === lane.trackId);
+          const instrumentId = track?.instrumentId ?? null;
+          if (instrumentId !== null) {
+            useInstrumentStore.getState().updateInstrument(instrumentId, {
+              tb303: { [lane.parameter]: value },
+            });
           }
         }
       }
