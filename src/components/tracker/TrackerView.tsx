@@ -837,7 +837,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
       let song: TrackerSong;
       try {
-        song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions);
+        song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
       } catch (err) {
         notify.error(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
         return;

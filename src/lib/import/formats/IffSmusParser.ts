@@ -151,9 +151,37 @@ export function isIffSmusFormat(buffer: ArrayBuffer): boolean {
   return type === 'SMUS' || type === 'TINY';
 }
 
+// -- Sonix .ss sample file parser ---------------------------------------------
+// Header: 66 bytes. Data: numOctaves octaves of 8-bit signed PCM, longest first.
+// Total data size = 2^numOctaves * oneShot bytes.
+const SS_HEADER_SIZE = 66;
+
+function parseSonixSampleFile(data: Uint8Array): { pcm: Uint8Array; loopStart: number; loopEnd: number } | null {
+  if (data.length < SS_HEADER_SIZE + 4) return null;
+  const oneShot = (data[0] << 8) | data[1];         // u16BE: base octave length
+  const repeat  = (data[2] << 8) | data[3];          // u16BE: loop length (0 = no loop)
+  const numOctaves = data[4];                         // u8: number of pre-computed octaves
+  if (oneShot === 0 || numOctaves === 0 || numOctaves > 8) return null;
+
+  // Longest octave (lowest pitch) = oneShot * 2^(numOctaves-1) bytes, stored first
+  const longestLen = oneShot * (1 << (numOctaves - 1));
+  const availableData = data.length - SS_HEADER_SIZE;
+  const pcmLen = Math.min(longestLen, availableData);
+  if (pcmLen < 4) return null;
+
+  const pcm = data.slice(SS_HEADER_SIZE, SS_HEADER_SIZE + pcmLen);
+
+  // Loop points scaled to longest octave
+  const loopStart = repeat > 0 ? oneShot * (1 << (numOctaves - 1)) - repeat * (1 << (numOctaves - 1)) : 0;
+  const loopEnd = repeat > 0 ? pcmLen : 0;
+
+  return { pcm, loopStart: Math.max(0, loopStart), loopEnd };
+}
+
 export async function parseIffSmusFile(
   buffer: ArrayBuffer,
   filename: string,
+  companionFiles?: Map<string, ArrayBuffer>,
 ): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
   if (buf.length < 12) { const _m = 'File too small to be an IFF SMUS module'; throw new Error(_m); }
@@ -305,10 +333,41 @@ export async function parseIffSmusFile(
   const numCh = Math.max(1, moduleInfo.numChannels);
   const { speed, bpm } = tempoIndexToSpeedBPM(moduleInfo.tempoIndex);
 
+  // Build a lookup of companion files by lowercase basename (without extension)
+  const companionByBase = new Map<string, { instr?: Uint8Array; ss?: Uint8Array }>();
+  if (companionFiles) {
+    for (const [name, buf] of companionFiles) {
+      const lower = name.toLowerCase();
+      const dotIdx = lower.lastIndexOf('.');
+      const base = dotIdx > 0 ? lower.slice(0, dotIdx) : lower;
+      const ext = dotIdx > 0 ? lower.slice(dotIdx) : '';
+      if (!companionByBase.has(base)) companionByBase.set(base, {});
+      const entry = companionByBase.get(base)!;
+      if (ext === '.instr') entry.instr = new Uint8Array(buf);
+      else if (ext === '.ss') entry.ss = new Uint8Array(buf);
+    }
+  }
+
   const instrConfigs: InstrumentConfig[] = [];
   for (let i = 0; i < instruments.length; i++) {
     const instr = instruments[i];
     const id = i + 1;
+    const instrNameLower = instr.name.toLowerCase();
+
+    // Try to load PCM data from companion .ss file
+    const companion = companionByBase.get(instrNameLower);
+    if (companion?.ss) {
+      const parsed = parseSonixSampleFile(companion.ss);
+      if (parsed && parsed.pcm.length > 2) {
+        instrConfigs.push(createSamplerInstrument(
+          id, instr.name || `Instrument ${id}`,
+          parsed.pcm, 64, 8287, parsed.loopStart, parsed.loopEnd,
+        ));
+        continue;
+      }
+    }
+
+    // Fallback: silent placeholder
     const silentPcm = new Uint8Array(2);
     instrConfigs.push(createSamplerInstrument(
       id, instr.name || `Instrument ${id}`,

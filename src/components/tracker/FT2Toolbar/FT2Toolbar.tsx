@@ -442,7 +442,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         // based on format engine prefs, passing the pre-scanned UADE metadata if present.
         const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
         const file = moduleInfo.file || new File([moduleInfo.arrayBuffer], moduleInfo.metadata.title || 'track');
-        const song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata);
+        const song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata, undefined, options.companionFiles);
         loadInstruments(song.instruments);
         loadPatterns(song.patterns);
         setCurrentPattern(0);
