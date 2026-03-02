@@ -91,7 +91,6 @@ export const PixiMainLayout: React.FC = () => {
 
   // Determine which view component to render
   const mainViewId = resolveMainView(activeView);
-  const MainViewComponent = MAIN_VIEW_COMPONENTS[mainViewId];
 
   // Force compact toolbar in modern layout for maximum vertical space
   useEffect(() => {
