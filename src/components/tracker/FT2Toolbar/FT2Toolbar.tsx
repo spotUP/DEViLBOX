@@ -44,7 +44,6 @@ import { SettingsModal } from '@components/dialogs/SettingsModal';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
-import { ModlandBrowser } from '@components/modland/ModlandBrowser';
 import { importSong, exportSong } from '@lib/export/exporters';
 import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
 import { computeSongDBHash, lookupSongDB } from '@lib/songdb';
@@ -273,7 +272,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
-  const [showModlandBrowser, setShowModlandBrowser] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
 
@@ -879,10 +877,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           className="hidden"
         />
         <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
-        <Button variant="ghost" size="sm" onClick={() => setShowModlandBrowser(true)} disabled={isLoading} title="Browse 727K+ tracker modules from Modland archive">
-          <Globe className="w-4 h-4 mr-1" />
-          Modland
-        </Button>
         <Button variant="ghost" size="sm" onClick={handleSave}>{isDirty ? 'Save*' : 'Save'}</Button>
         <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openModal('revisions')}>Revisions</Button>
         <Button variant="ghost" size="sm" onClick={handleSave}>Download</Button>
@@ -1299,11 +1293,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
             </div>
           </div>
         </div>
-      )}
-
-      {/* Modland Browser */}
-      {showModlandBrowser && (
-        <ModlandBrowser onClose={() => setShowModlandBrowser(false)} />
       )}
     </div>
   );
