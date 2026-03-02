@@ -96,9 +96,14 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
             <pixiGraphics
               draw={(g: GraphicsType) => {
                 g.clear();
-                if (hoveredIndex !== i) return;
+                // Always draw the rect so the item always has hittable geometry.
+                // Without this, fast clicks fall through to the backdrop because
+                // the hover bg is empty until React re-renders on pointerOver.
                 g.rect(0, 0, width - PANEL_PADDING * 2, itemHeight);
-                g.fill({ color: theme.accent.color, alpha: 0.2 });
+                g.fill({
+                  color: hoveredIndex === i ? theme.accent.color : 0x000000,
+                  alpha: hoveredIndex === i ? 0.2 : 0.001,
+                });
               }}
               layout={{ position: 'absolute', width: width - PANEL_PADDING * 2, height: itemHeight }}
             />
