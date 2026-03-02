@@ -30,6 +30,8 @@ import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
 import { RomUploadDialog } from '@components/ui/RomUploadDialog';
+import { ModlandContributionModal } from '@components/modland/ModlandContributionModal';
+import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { ImportDBXDialog } from '@components/dialogs/ImportDBXDialog';
 import { ImportInstrumentDialog } from '@components/dialogs/ImportInstrumentDialog';
 import { Button } from '@components/ui/Button';
@@ -552,6 +554,12 @@ function App() {
           <ToastNotification />
           <SynthErrorDialog />
           <RomUploadDialog />
+          <ModlandContributionModal 
+            isOpen={useModlandContributionModal((s) => s.isOpen)}
+            onClose={() => useModlandContributionModal.getState().closeModal()}
+            filename={useModlandContributionModal((s) => s.filename)}
+            hash={useModlandContributionModal((s) => s.hash)}
+          />
           {isDevServerDown && <DevServerDownBanner />}
           {updateAvailable && !updateDismissed && (
             <UpdateNotification

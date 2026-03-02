@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-02T22:05:17.283Z
+ * Generated: 2026-03-02T22:33:24.242Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1979';
-export const BUILD_NUMBER = '1979';
-export const BUILD_HASH = '79f818c0';
+export const BUILD_VERSION = '1.0.1987';
+export const BUILD_NUMBER = '1987';
+export const BUILD_HASH = '490eb8e0';
 export const BUILD_DATE = '2026-03-02';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,41 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1979',
+    version: '1.0.1987',
     date: '2026-03-02',
     changes: [
+      {
+        type: 'fix',
+        "description": "Lazy-initialize songdb prepared statements"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: Update generated changelog (post-push)"
+      },
+      {
+        type: 'improvement',
+        "description": "Add scroll performance tracking"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: Update asm68k instruction map"
+      },
+      {
+        type: 'improvement',
+        "description": "Add Modland server deployment documentation"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove client-side Modland database (645MB reduction)"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate server-side Modland hash API"
+      },
+      {
+        type: 'feature',
+        "description": "Add Modland hash database API endpoints"
+      },
       {
         type: 'feature',
         "description": "Add Modland browser for 727K+ tracker module discovery"
@@ -200,38 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Mount MixerPanel in App + Ctrl+M shortcut"
-      },
-      {
-        type: 'feature',
-        "description": "Add DOM MixerPanel floating panel"
-      },
-      {
-        type: 'feature',
-        "description": "Implement PixiMixerView with live VU meters"
-      },
-      {
-        type: 'fix',
-        "description": "Add React import to PixiMixerChannelStrip"
-      },
-      {
-        type: 'feature',
-        "description": "Add PixiMixerChannelStrip GL component"
-      },
-      {
-        type: 'feature',
-        "description": "Register mixer window in workbench + nav"
-      },
-      {
-        type: 'fix',
-        "description": "Increase 68k stack space for complex eagleplayers"
-      },
-      {
-        type: 'feature',
-        "description": "Add setMixerChannelVolume + setMixerChannelPan to ToneEngine"
-      },
-      {
-        type: 'feature',
-        "description": "Track group folding and per-track automation lane rendering"
       }
     ]
   }
