@@ -8,7 +8,8 @@
  *   - MIDI knob panel (KNOB_PANEL_HEIGHT): bank tabs + 8-knob grid (conditional)
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { useTick } from '@pixi/react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useShallow } from 'zustand/react/shallow';
 import { PIXI_FONTS } from '../fonts';
@@ -148,12 +149,20 @@ const TrackerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) =>
       patternLength: s.patterns[s.currentPatternIndex]?.length || 64,
     }))
   );
-  const { isPlaying, currentRow } = useTransportStore(
-    useShallow((s) => ({ isPlaying: s.isPlaying, currentRow: s.currentRow }))
-  );
+  const isPlaying = useTransportStore(s => s.isPlaying);
 
-  const displayRow = isPlaying ? currentRow : cursor.rowIndex;
-  const rowStr = String(displayRow).padStart(2, '0') + '/' + String(patternLength - 1).padStart(2, '0');
+  // Row BitmapText is updated imperatively in useTick — no React re-render per row advance
+  const rowBitmapTextRef = useRef<import('pixi.js').BitmapText | null>(null);
+
+  useTick(() => {
+    if (!rowBitmapTextRef.current) return;
+    const currentRow = isPlaying
+      ? useTransportStore.getState().currentRow
+      : cursor.rowIndex;
+    const rowStr = String(currentRow).padStart(2, '0') + '/' + String(patternLength - 1).padStart(2, '0');
+    rowBitmapTextRef.current.text = rowStr;
+  });
+
   const channelStr = `Ch ${cursor.channelIndex + 1}`;
   const columnStr = cursor.columnType.charAt(0).toUpperCase() + cursor.columnType.slice(1);
   const octStr = String(currentOctave);
@@ -167,7 +176,13 @@ const TrackerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) =>
   return (
     <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', flex: 1, height: barHeight }}>
       <pixiBitmapText text="Row" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={{ ...textLayout, marginRight: 4 }} />
-      <pixiBitmapText text={rowStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={theme.accent.color} layout={textLayout} />
+      <pixiBitmapText
+        ref={rowBitmapTextRef as any}
+        text="00/00"
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+        tint={theme.accent.color}
+        layout={textLayout}
+      />
       <PixiSep height={10} />
       <pixiBitmapText text={channelStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
       <PixiSep height={10} />

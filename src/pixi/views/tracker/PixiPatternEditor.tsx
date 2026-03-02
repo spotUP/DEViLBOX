@@ -17,7 +17,7 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
+import type { Graphics as GraphicsType, FederatedPointerEvent, Container as ContainerType } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
@@ -114,7 +114,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     setChannelColor,
     updateChannelName,
     setCell,
-    moveCursorToChannelAndColumn,
     copyTrack,
     cutTrack,
     pasteTrack,
@@ -344,8 +343,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const scrollLeftRef = useRef(0);
   const scrollAccumulatorRef = useRef(0);
 
-  // Playback row tracking
-  const [playbackState, setPlaybackState] = useState({ row: 0, smoothOffset: 0, patternIndex: 0 });
+  // Playback row tracking — smooth offset is imperative (no React state)
+  const [playbackRow, setPlaybackRow] = useState(0);
+  const [playbackPatternIdx, setPlaybackPatternIdx] = useState(0);
+  const smoothOffsetRef = useRef(0);          // frame-rate smooth offset — NO React state
+  const gridScrollContainerRef = useRef<ContainerType | null>(null); // inner scroll container
+  const prevRowRef = useRef(-1);
+  const prevPatternRef = useRef(-1);
 
   // ── Channel layout ────────────────────────────────────────────────────────
   const { numChannels, channelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
@@ -398,16 +402,17 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   }, [allChannelsFit, scrollLeft]);
 
   // ── RAF loop for playback tracking ─────────────────────────────────────────
-  // Track previous values to skip redundant state updates (avoids costly
-  // React re-renders + @pixi/react reconciliation of hundreds of BitmapText nodes)
-  const prevPlaybackRef = useRef({ row: -1, smoothOffset: 0, patternIndex: -1 });
-
+  // Smooth scroll offset is applied imperatively to the inner container (no React
+  // setState), so React re-renders only happen when the INTEGER row or pattern changes.
   useEffect(() => {
     let rafId: number;
     const tick = () => {
       if (!isPlaying) {
-        // Reset prev so we re-render on first play frame
-        prevPlaybackRef.current = { row: -1, smoothOffset: 0, patternIndex: -1 };
+        // Reset smooth scroll when stopped
+        smoothOffsetRef.current = 0;
+        if (gridScrollContainerRef.current) gridScrollContainerRef.current.y = 0;
+        prevRowRef.current = -1;
+        prevPatternRef.current = -1;
         rafId = requestAnimationFrame(tick);
         return;
       }
@@ -440,15 +445,16 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         newPattern = ts.currentPatternIndex;
       }
 
-      // Only update state when values actually change — avoids creating a new
-      // object reference every frame which would trigger a full React re-render
-      const prev = prevPlaybackRef.current;
-      if (newRow !== prev.row ||
-          newPattern !== prev.patternIndex ||
-          Math.abs(newOffset - prev.smoothOffset) > 0.5) {
-        const state = { row: newRow, smoothOffset: newOffset, patternIndex: newPattern };
-        prevPlaybackRef.current = state;
-        setPlaybackState(state);
+      // Always update smooth offset imperatively — NO React setState
+      smoothOffsetRef.current = newOffset;
+      if (gridScrollContainerRef.current) gridScrollContainerRef.current.y = -newOffset;
+
+      // Only update React state when integer row or pattern changes
+      if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
+        prevRowRef.current = newRow;
+        prevPatternRef.current = newPattern;
+        setPlaybackRow(newRow);
+        setPlaybackPatternIdx(newPattern);
       }
 
       rafId = requestAnimationFrame(tick);
@@ -458,8 +464,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   }, [isPlaying, smoothScrolling]);
 
   // ── Current row (playback or cursor) ───────────────────────────────────────
-  const currentRow = isPlaying ? playbackState.row : cursor.rowIndex;
-  const smoothOffset = isPlaying ? playbackState.smoothOffset : 0;
+  const currentRow = isPlaying ? playbackRow : cursor.rowIndex;
+  // smoothOffset is now only in smoothOffsetRef.current — no React-visible value.
+  // The inner gridScrollContainerRef container's .y is mutated imperatively by the RAF.
 
   // During playback, use the replayer's pattern index for rendering rather than
   // the store's currentPatternIndex. The RAF loop reads the replayer directly,
@@ -467,9 +474,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   // re-render. This 1-3 frame timing gap caused visible jumps at pattern transitions
   // because currentRow would be from the new pattern while pattern data was still old.
   const displayPattern = isPlaying
-    ? (patterns[playbackState.patternIndex] ?? pattern)
+    ? (patterns[playbackPatternIdx] ?? pattern)
     : pattern;
-  const displayPatternIndex = isPlaying ? playbackState.patternIndex : currentPatternIndex;
+  const displayPatternIndex = isPlaying ? playbackPatternIdx : currentPatternIndex;
 
   // ── Visible range ─────────────────────────────────────────────────────────
   const scrollbarHeight = allChannelsFit ? 0 : SCROLLBAR_HEIGHT;
@@ -479,7 +486,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const visibleLines = Math.ceil(cellGridHeight / rowHeight) + 2;
   const topLines = Math.floor(visibleLines / 2);
   const centerLineTop = GL_MUTE_SOLO_H + Math.floor(cellGridHeight / 2) - rowHeight / 2;
-  const baseY = centerLineTop - topLines * rowHeight - smoothOffset;
+  // baseY no longer includes smoothOffset — the inner scroll container handles sub-pixel offset imperatively
+  const baseY = centerLineTop - topLines * rowHeight;
   const vStart = currentRow - topLines;
   const patternLength = displayPattern?.length ?? 64;
 
@@ -1292,22 +1300,29 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
           <TrackerVisualBackground width={width} height={gridHeight} />
         </PixiDOMOverlay>
 
-        <pixiGraphics draw={drawGrid} layout={{ position: 'absolute', width, height: gridHeight }} />
+        {/* Smooth-scroll layer — y updated imperatively by RAF; eventMode="none" so clicks pass to outer container */}
+        <pixiContainer
+          ref={gridScrollContainerRef}
+          layout={{ position: 'absolute', width, height: gridHeight }}
+          eventMode="none"
+        >
+          <pixiGraphics draw={drawGrid} layout={{ position: 'absolute', width, height: gridHeight }} />
 
-        {/* Cell text labels — positioned via x/y (not layout) so that React can freely
-            add/remove them without freeing Yoga nodes. Variable-count layout children
-            trigger Yoga BindingErrors when the array shrinks during scroll. */}
-        {cellLabels.map((label, i) => (
-          <pixiBitmapText
-            key={`cell-${i}`}
-            text={label.text}
-            style={{ fontFamily: label.bold ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }}
-            tint={label.color}
-            alpha={label.alpha ?? 1.0}
-            x={label.x}
-            y={label.y}
-          />
-        ))}
+          {/* Cell text labels — positioned via x/y (not layout) so that React can freely
+              add/remove them without freeing Yoga nodes. Variable-count layout children
+              trigger Yoga BindingErrors when the array shrinks during scroll. */}
+          {cellLabels.map((label, i) => (
+            <pixiBitmapText
+              key={`cell-${i}`}
+              text={label.text}
+              style={{ fontFamily: label.bold ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }}
+              tint={label.color}
+              alpha={label.alpha ?? 1.0}
+              x={label.x}
+              y={label.y}
+            />
+          ))}
+        </pixiContainer>
 
         {/* Drag-and-drop overlay for instruments — only visible during drag */}
         <PixiDOMOverlay

@@ -1,7 +1,7 @@
 // src/pixi/views/PixiMixerView.tsx
 // Full GL mixer: 16 channel strips + master, scrollable, live VU meters
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useMixerStore } from '../../stores/useMixerStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -31,10 +31,10 @@ export const PixiMixerView: React.FC = () => {
   const setSolo          = useMixerStore(s => s.setChannelSolo);
   const setMasterVol     = useMixerStore(s => s.setMasterVolume);
 
-  // ── VU meter state ────────────────────────────────────────────────────────
+  // ── VU meter refs (no React state — avoids re-renders on every frame) ────
 
-  const [levels, setLevels] = useState<number[]>(() => Array(NUM_CHANNELS).fill(0));
-  const [masterLevel, setMasterLevel] = useState(0);
+  const levelsRef = useRef<number[]>(Array(NUM_CHANNELS).fill(0));
+  const masterLevelRef = useRef(0);
   const mountedRef = useRef(true);
   const rafRef = useRef<number | null>(null);
 
@@ -46,8 +46,8 @@ export const PixiMixerView: React.FC = () => {
 
       try {
         const channelLevels = getToneEngine().getChannelLevels(NUM_CHANNELS);
-        setLevels(channelLevels);
-        setMasterLevel(Math.max(...channelLevels));
+        levelsRef.current = channelLevels;
+        masterLevelRef.current = Math.max(...channelLevels);
       } catch {
         // Engine not ready — ignore
       }
@@ -139,7 +139,7 @@ export const PixiMixerView: React.FC = () => {
               pan={ch.pan}
               muted={ch.muted}
               soloed={ch.soloed}
-              level={levels[i] ?? 0}
+              getLevelCallback={() => levelsRef.current[i] ?? 0}
               isSoloing={isSoloing}
               onVolumeChange={setChannelVolume}
               onPanChange={setChannelPan}
@@ -182,7 +182,7 @@ export const PixiMixerView: React.FC = () => {
           pan={0}
           muted={false}
           soloed={false}
-          level={masterLevel}
+          getLevelCallback={() => masterLevelRef.current}
           isSoloing={isSoloing}
           onVolumeChange={(_, v) => setMasterVol(v)}
           onPanChange={() => {}}
