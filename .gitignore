@@ -113,3 +113,4 @@ fred-wasm/build/
 
 # Downloaded TTF source fonts (generated during build)
 public/fonts/ttf/
+public/modland/modland_hash.db
