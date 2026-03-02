@@ -8,20 +8,40 @@
  *
  *   smus.*  — IFF SMUS variant with SNX1/INS1/TRAK/NAME chunks
  *             Detected when the first 4 bytes are 'FORM'.
+ *             Delegated to IffSmusParser.
  *
- *   tiny.*  — TINY variant
- *             Detected when the low nibble of the first byte is non-zero
- *             (i.e. word & 0x00F0 != 0).
+ *   tiny.*  — TINY variant (binary, < 400 bytes header + 4 section pointers)
+ *             Detected when the low nibble of the first byte is non-zero.
+ *             External .instr files required; throws to trigger UADE fallback.
  *
- *   snx.*   — Generic SNX variant (default when neither FORM nor TINY)
+ *   snx.*   — Generic SNX variant (binary, 4 section lengths + speed + event streams)
  *             Detected when the low nibble of the first byte is zero.
+ *             Parsed to TrackerSong: tempo, 4-channel note event streams.
+ *             Instruments are silent Sampler placeholders (real samples are external).
  *
  * Detection is ported 1:1 from the DTP_Check2 routine in
  * "Sonix Music Driver_v1.asm" (Wanted Team eagleplayer).
+ *
+ * SNX binary layout (from SonixMusicDriver_v1.asm InitScore + PlaySNX):
+ *   Bytes  0–15:  4 × u32BE section lengths (one per voice channel)
+ *   Bytes 16–17:  u16BE speed/tempo value (CIA timer divisor)
+ *   Bytes 18–19:  u16BE loop/repeat count
+ *   Bytes 20+:    4 voice event streams (packed after each other, lengths from above)
+ *
+ * SNX voice event stream (16-bit words, big-endian):
+ *   0xFFFF          end of track (loop back)
+ *   0xC000–0xFFFE   rest/delay for (word & 0x3FFF) ticks
+ *   0x83nn          volume set to nn (0–127)
+ *   0x82nn          tempo change to nn
+ *   0x81nn          loop control
+ *   0x80nn          instrument change to register nn
+ *   0x0000          empty (end-of-row marker or rest, advance one row)
+ *   0x0Nnn–0x7Fnn   note on: high byte = note index (1–127), low byte = volume
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import { idGenerator } from '@utils/idGenerator';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -317,57 +337,273 @@ export function isSonixFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   return detectSonixFormat(buffer) !== null;
 }
 
-// ── Main parser ─────────────────────────────────────────────────────────────
+// ── SNX binary parser ──────────────────────────────────────────────────────
 
-export function parseSonixFile(buffer: ArrayBuffer, filename: string): TrackerSong {
+function emptyCell(): TrackerCell {
+  return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+}
+
+/**
+ * Parse a single SNX voice event stream into TrackerCells.
+ *
+ * SNX event format (16-bit words, big-endian):
+ *   0xFFFF          end of track (stop parsing)
+ *   0xC000–0xFFFE   rest for (word & 0x3FFF) ticks
+ *   0x83nn          volume set to nn
+ *   0x82nn          tempo change to nn (ignored — apply in initialBPM)
+ *   0x81nn          loop control (ignored)
+ *   0x80nn          instrument change (nn = register 0–63, map to 1-based index)
+ *   0x0000          rest for 1 tick
+ *   0x0Nnn          note on: high byte = note index (1–127), low byte = volume
+ *
+ * Note index → XM note: note indices are a direct pitch offset used by the SNX player
+ * against the instrument's base frequency. Without instrument data we map index
+ * directly: xmNote = clamp(noteIndex, 1, 96).
+ */
+function parseSnxVoiceStream(
+  buf: Uint8Array,
+  startOff: number,
+  length: number,
+): TrackerCell[] {
+  const cells: TrackerCell[] = [];
+  const endOff = Math.min(startOff + length, buf.length);
+  let pos = startOff;
+  let currentInstr = 1;
+  let currentVol = 0; // 0 = not set (leave empty in cell)
+
+  while (pos + 2 <= endOff) {
+    const word = u16BE(buf, pos);
+    pos += 2;
+
+    if (word === 0xFFFF) break; // end of track
+
+    if (word >= 0xC000) {
+      // Rest/delay for N ticks
+      const ticks = Math.max(1, word & 0x3FFF);
+      for (let t = 0; t < ticks; t++) cells.push(emptyCell());
+      continue;
+    }
+
+    if (word >= 0x8000) {
+      const cmd = (word >> 8) & 0xFF;
+      const param = word & 0xFF;
+      switch (cmd) {
+        case 0x80:
+          // Instrument change: register param maps to 1-based instrument index
+          currentInstr = param + 1;
+          break;
+        case 0x83:
+          // Volume set: 0–127 → XM volume column 0x10–0x50
+          currentVol = param > 0
+            ? 0x10 + Math.min(64, Math.round((param / 127) * 64))
+            : 0x10; // explicit mute
+          break;
+        // 0x81 loop, 0x82 tempo: no visual representation needed
+        default:
+          break;
+      }
+      // Commands don't advance pattern rows; continue
+      continue;
+    }
+
+    if (word === 0x0000) {
+      // Rest for one tick
+      cells.push(emptyCell());
+      continue;
+    }
+
+    // Note on: high byte = note index (1–127), low byte = volume
+    const noteIndex = (word >> 8) & 0x7F;
+    const velByte   = word & 0xFF;
+
+    if (noteIndex === 0) {
+      cells.push(emptyCell());
+    } else {
+      const xmNote = Math.max(1, Math.min(96, noteIndex));
+      const xmVol = currentVol !== 0
+        ? currentVol
+        : velByte > 0
+          ? 0x10 + Math.min(64, Math.round((velByte / 127) * 64))
+          : 0; // no explicit volume column
+      cells.push({
+        note: xmNote,
+        instrument: currentInstr,
+        volume: xmVol,
+        effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+      });
+    }
+  }
+
+  return cells;
+}
+
+function buildPatterns(
+  channelFlat: TrackerCell[][],
+  filename: string,
+  numChannels: number,
+): Pattern[] {
+  let totalRows = 0;
+  for (const ch of channelFlat) {
+    if (ch.length > totalRows) totalRows = ch.length;
+  }
+  if (totalRows === 0) totalRows = 64;
+  for (const ch of channelFlat) {
+    while (ch.length < totalRows) ch.push(emptyCell());
+  }
+
+  const PATTERN_LENGTH = 64;
+  const numPatterns = Math.max(1, Math.ceil(totalRows / PATTERN_LENGTH));
+  const patterns: Pattern[] = [];
+  const AMIGA_PAN = [-50, 50, 50, -50];
+
+  for (let p = 0; p < numPatterns; p++) {
+    const startRow = p * PATTERN_LENGTH;
+    const endRow = Math.min(startRow + PATTERN_LENGTH, totalRows);
+    const patLen = endRow - startRow;
+
+    const channels: ChannelData[] = channelFlat.map((cells, ch) => ({
+      id:         idGenerator.generate('sonix-ch'),
+      name:       `Channel ${ch + 1}`,
+      muted:      false,
+      solo:       false,
+      collapsed:  false,
+      volume:     100,
+      pan:        AMIGA_PAN[ch % 4] ?? 0,
+      instrumentId: null,
+      color:      null,
+      rows:       cells.slice(startRow, endRow),
+    }));
+
+    patterns.push({
+      id:     idGenerator.generate('sonix-pat'),
+      name:   `Pattern ${p + 1}`,
+      length: patLen,
+      channels,
+      importMetadata: {
+        sourceFormat:          'MOD' as const,
+        sourceFile:            filename,
+        importedAt:            new Date().toISOString(),
+        originalChannelCount:  numChannels,
+        originalPatternCount:  numPatterns,
+        originalInstrumentCount: 0,
+      },
+    });
+  }
+
+  return patterns;
+}
+
+/**
+ * Parse SNX binary format (snx.* prefix).
+ *
+ * Layout (from SonixMusicDriver_v1.asm InitScore):
+ *   Bytes  0–15:  4 × u32BE section lengths
+ *   Bytes 16–17:  u16BE speed/CIA-timer-divisor
+ *   Bytes 18–19:  u16BE loop count
+ *   Bytes 20+:    4 packed voice event streams
+ *
+ * Instruments are placeholder Samplers — actual samples live in external files
+ * (.instr / .ss) that UADE loads separately.
+ */
+function parseSnxBinary(buf: Uint8Array, filename: string): TrackerSong {
+  const fileSize = buf.length;
+  if (fileSize < 22) throw new Error('SNX file too small');
+
+  // Read 4 section lengths
+  const sectionLengths = [
+    u32BE(buf, 0), u32BE(buf, 4), u32BE(buf, 8), u32BE(buf, 12),
+  ];
+
+  // Sanity check
+  let totalVoiceBytes = 20;
+  for (const len of sectionLengths) totalVoiceBytes += len;
+  if (totalVoiceBytes > fileSize) throw new Error('SNX section lengths exceed file size');
+
+  // Speed word (bytes 16–17); used as CIA timer divisor in player
+  // We can't reliably convert this to BPM without knowing the CIA clock context,
+  // so default to ProTracker 125 BPM / speed 6.
+  const _speedWord = u16BE(buf, 16); // preserved for future use
+
+  // Parse 4 voice streams
+  const voiceStart = 20;
+  let offset = voiceStart;
+  const channelFlat: TrackerCell[][] = [];
+  for (let ch = 0; ch < 4; ch++) {
+    channelFlat.push(parseSnxVoiceStream(buf, offset, sectionLengths[ch]));
+    offset += sectionLengths[ch];
+  }
+
+  // Build placeholder instruments (1 per used register, up to 16)
+  const usedRegisters = new Set<number>();
+  for (const cells of channelFlat) {
+    for (const cell of cells) {
+      if (cell.instrument > 0) usedRegisters.add(cell.instrument);
+    }
+  }
+  const instruments: InstrumentConfig[] = Array.from(
+    { length: Math.max(1, usedRegisters.size) },
+    (_, i) => ({
+      id:         i + 1,
+      name:       `Sample ${i + 1}`,
+      type:       'synth' as const,
+      synthType:  'Sampler' as const,
+      effects:    [],
+      volume:     0,
+      pan:        0,
+    }) as InstrumentConfig,
+  );
+
+  const baseName = (filename.split('/').pop() ?? filename).replace(/^snx\./i, '');
+  const patterns = buildPatterns(channelFlat, filename, 4);
+
+  return {
+    name:           `${baseName} [SNX]`,
+    format:         'MOD' as TrackerFormat,
+    patterns,
+    instruments,
+    songPositions:  patterns.map((_, i) => i),
+    songLength:     patterns.length,
+    restartPosition: 0,
+    numChannels:    4,
+    initialSpeed:   6,
+    initialBPM:     125,
+    linearPeriods:  false,
+  };
+}
+
+// ── Main export ───────────────────────────────────────────────────────────
+
+/**
+ * Parse a Sonix Music Driver module into a TrackerSong.
+ *
+ * Sub-format routing:
+ *   smus → IffSmusParser.parseIffSmusFile (complete IFF SMUS implementation)
+ *   snx  → parseSnxBinary (basic binary parser; instruments are placeholders)
+ *   tiny → throws (external .instr files required; UADE fallback handles it)
+ */
+export async function parseSonixFile(
+  buffer: ArrayBuffer,
+  filename: string,
+): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
   const subFormat = detectSonixFormat(buf);
   if (subFormat === null) throw new Error('Not a Sonix Music Driver module');
 
-  const baseName = filename.split('/').pop() ?? filename;
-
-  // Strip the appropriate prefix from the module name
-  let moduleName: string;
-  switch (subFormat) {
-    case 'smus':
-      moduleName = baseName.replace(/^smus\./i, '') || baseName;
-      break;
-    case 'tiny':
-      moduleName = baseName.replace(/^tiny\./i, '') || baseName;
-      break;
-    default:
-      moduleName = baseName.replace(/^snx\./i, '') || baseName;
-      break;
+  if (subFormat === 'smus') {
+    // IFF SMUS: full implementation in IffSmusParser
+    const { parseIffSmusFile } = await import('./IffSmusParser');
+    return parseIffSmusFile(buffer, filename);
   }
 
-  const instruments: InstrumentConfig[] = [{
-    id: 1, name: 'Sample 1', type: 'synth' as const,
-    synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-  } as InstrumentConfig];
+  if (subFormat === 'tiny') {
+    // TINY binary format references external instrument files (.instr/.ss).
+    // Without those files the note-to-pitch mapping is impossible to recover
+    // statically.  Throw so UADE (via CIA tick reconstruction) handles this.
+    throw new Error(
+      'Sonix TINY binary format requires external instrument files; use UADE for playback',
+    );
+  }
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
-
-  const pattern = {
-    id: 'pattern-0', name: 'Pattern 0', length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false,
-      solo: false, collapsed: false, volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null, color: null, rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const, sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 0,
-    },
-  };
-
-  return {
-    name: `${moduleName} [Sonix Music Driver]`, format: 'MOD' as TrackerFormat,
-    patterns: [pattern], instruments, songPositions: [0],
-    songLength: 1, restartPosition: 0, numChannels: 4,
-    initialSpeed: 6, initialBPM: 125, linearPeriods: false,
-  };
+  // SNX binary format: parse note streams, placeholder instruments
+  return parseSnxBinary(buf, filename);
 }
