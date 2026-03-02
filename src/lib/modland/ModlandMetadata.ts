@@ -1,13 +1,19 @@
 // Modland metadata extraction utilities
 
-import type { ModlandFile, ModlandMetadata } from '../types/modland';
+import type { ModlandHashFile } from '../modlandApi';
+
+export interface ModlandMetadata {
+  artist: string;
+  title: string;
+  format: string;
+}
 
 /**
  * Extract metadata from Modland URL path structure
  * Example: /pub/modules/Protracker/Tip/acidjazzed.mod
  * Returns: { artist: "Tip", title: "acidjazzed", format: "Protracker" }
  */
-export function extractMetadata(file: ModlandFile): ModlandMetadata {
+export function extractMetadata(file: ModlandHashFile): ModlandMetadata {
   const url = decodeURIComponent(file.url);
   const parts = url.split('/').filter(Boolean);
 
@@ -66,6 +72,6 @@ export function getFormatName(extension: string): string {
 /**
  * Build Modland CDN URL for downloading
  */
-export function getModlandDownloadUrl(file: ModlandFile): string {
+export function getModlandDownloadUrl(file: ModlandHashFile): string {
   return `https://ftp.modland.com${encodeURI(file.url)}`;
 }
