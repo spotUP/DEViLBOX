@@ -24,7 +24,6 @@ export const PixiTransportBar: React.FC<PixiTransportBarProps> = ({ width, heigh
   const isLooping = useTransportStore((s) => s.isLooping);
   const bpm = useTransportStore((s) => s.bpm);
   const metronomeEnabled = useTransportStore((s) => s.metronomeEnabled);
-  const play = useTransportStore((s) => s.play);
   const stop = useTransportStore((s) => s.stop);
   const togglePlayPause = useTransportStore((s) => s.togglePlayPause);
   const setIsLooping = useTransportStore((s) => s.setIsLooping);
