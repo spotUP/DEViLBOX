@@ -13,6 +13,7 @@ import { ModalFooter } from '../ui/ModalFooter';
 interface ModlandContributionModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onDismiss: () => void;
   filename: string;
   hash?: string;
 }
@@ -20,6 +21,7 @@ interface ModlandContributionModalProps {
 export const ModlandContributionModal: React.FC<ModlandContributionModalProps> = ({
   isOpen,
   onClose,
+  onDismiss,
   filename,
   hash
 }) => {
@@ -103,6 +105,13 @@ export const ModlandContributionModal: React.FC<ModlandContributionModalProps> =
         </div>
 
         <ModalFooter>
+          <button
+            onClick={onDismiss}
+            className="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded transition-colors text-sm"
+            title="Don't show this message again for this file"
+          >
+            Don't Show Again
+          </button>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-dark-600 hover:bg-dark-500 text-white rounded transition-colors"
