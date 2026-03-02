@@ -11,6 +11,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useApplication, useTick } from '@pixi/react';
+import { isRapidScrolling } from './scrollPerf';
 import { useUIStore, useSettingsStore } from '@stores';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { usePixiResponsive } from './hooks/usePixiResponsive';
@@ -64,6 +65,7 @@ export const PixiRoot: React.FC = () => {
 
   // Apply CRT filter to app.stage.
   useTick(() => {
+    if (isRapidScrolling()) return;
     const crt = crtRef.current;
     if (!crt || !app?.stage) return;
 

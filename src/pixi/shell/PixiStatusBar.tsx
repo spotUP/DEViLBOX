@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTick } from '@pixi/react';
+import { isRapidScrolling } from '../scrollPerf';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useShallow } from 'zustand/react/shallow';
 import { PIXI_FONTS } from '../fonts';
@@ -166,6 +167,7 @@ const TrackerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) =>
   const columnBitmapTextRef = useRef<import('pixi.js').BitmapText | null>(null);
 
   useTick(() => {
+    if (isRapidScrolling()) return;
     const cur = cursorRef.current;
     if (rowBitmapTextRef.current) {
       const currentRow = isPlaying

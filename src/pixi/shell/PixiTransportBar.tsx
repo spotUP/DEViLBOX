@@ -5,6 +5,7 @@
 
 import React, { useCallback, useRef } from 'react';
 import { useTick } from '@pixi/react';
+import { isRapidScrolling } from '../scrollPerf';
 import type { Graphics as GraphicsType, BitmapText as BitmapTextType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -35,6 +36,7 @@ export const PixiTransportBar: React.FC<PixiTransportBarProps> = ({ width, heigh
   const posTextRef = useRef<BitmapTextType | null>(null);
 
   useTick(() => {
+    if (isRapidScrolling()) return;
     if (!posTextRef.current) return;
     const row = useTransportStore.getState().currentRow;
     const posText = `${String(currentPatternIndex).padStart(2, '0')}:${String(row).padStart(3, '0')}`;

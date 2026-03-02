@@ -15,6 +15,7 @@ import { loadPixiFonts } from './fonts';
 import { usePixiTheme } from './theme';
 import { PixiRoot } from './PixiRoot';
 import { attachFPSLimiter, setIsPlayingFn } from './performance';
+import { setScrollPerfApp } from './scrollPerf';
 import { useTransportStore } from '@stores';
 
 // Register PixiJS classes for use in @pixi/react JSX
@@ -140,6 +141,7 @@ const PixiAppContent: React.FC = () => {
   useEffect(() => {
     if (!app) return;
     setIsPlayingFn(() => useTransportStore.getState().isPlaying);
+    setScrollPerfApp(app);
     return attachFPSLimiter(app);
   }, [app]);
 

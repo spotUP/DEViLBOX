@@ -18,6 +18,7 @@
 
 import React, { useCallback, useRef, useState } from 'react';
 import { useTick } from '@pixi/react';
+import { isRapidScrolling } from '../scrollPerf';
 import type { Graphics as GraphicsType, Container as ContainerType } from 'pixi.js';
 import { PixiLabel } from '../components/PixiLabel';
 import { PixiSlider } from '../components/PixiSlider';
@@ -228,6 +229,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
   const prevPeakRef = useRef(-1);
 
   useTick(() => {
+    if (isRapidScrolling()) return;
     const level = getLevelCallback();
 
     // Update peak hold
