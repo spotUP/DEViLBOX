@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-02T21:02:29.619Z
+ * Generated: 2026-03-02T22:05:17.283Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1976';
-export const BUILD_NUMBER = '1976';
-export const BUILD_HASH = '31440c01';
+export const BUILD_VERSION = '1.0.1979';
+export const BUILD_NUMBER = '1979';
+export const BUILD_HASH = '79f818c0';
 export const BUILD_DATE = '2026-03-02';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,21 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1976',
+    version: '1.0.1979',
     date: '2026-03-02',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add Modland browser for 727K+ tracker module discovery"
+      },
+      {
+        type: 'improvement',
+        "description": "Reorder status bar metadata"
+      },
+      {
+        type: 'improvement',
+        "description": "Enhance(songdb): enrich status bar metadata display"
+      },
       {
         type: 'fix',
         "description": "Fix Sonix SMUS playback — tempo, companion files, register 0"
@@ -220,14 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Track group folding and per-track automation lane rendering"
-      },
-      {
-        type: 'fix',
-        "description": "Call setMixerChannelVolume/Pan in store (cast any until Task 2)"
-      },
-      {
-        type: 'feature',
-        "description": "MIDI key preview on click and multi-channel note display"
       }
     ]
   }
