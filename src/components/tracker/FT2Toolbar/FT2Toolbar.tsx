@@ -46,6 +46,7 @@ import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/Impo
 import { FileBrowser } from '@components/dialogs/FileBrowser';
 import { importSong, exportSong } from '@lib/export/exporters';
 import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
+import { computeSongDBHash, lookupSongDB } from '@lib/songdb';
 import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
 import type { XMNote } from '@lib/import/formats/XMParser';
 import type { MODNote } from '@lib/import/formats/MODParser';
@@ -366,6 +367,20 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   };
 
   const handleModuleImport = async (moduleInfo: ModuleInfo, options: ImportOptions = { useLibopenmpt: true }) => {
+    // Fire-and-forget SongDB metadata lookup (non-blocking)
+    const songBuf = moduleInfo.arrayBuffer ?? (moduleInfo.file ? await moduleInfo.file.arrayBuffer() : null);
+    if (songBuf) {
+      lookupSongDB(computeSongDBHash(songBuf)).then(result => {
+        useTrackerStore.getState().setSongDBInfo(result ? {
+          authors: result.authors, publishers: result.publishers,
+          album: result.album, year: result.year, format: result.format,
+          duration_ms: result.subsongs[0]?.duration_ms ?? 0,
+        } : null);
+      });
+    } else {
+      useTrackerStore.getState().setSongDBInfo(null);
+    }
+
     // Always clean up before import to prevent stale state from previous imports
     if (isPlaying) stop();
     engine.releaseAll();

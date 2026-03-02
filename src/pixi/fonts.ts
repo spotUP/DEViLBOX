@@ -1,16 +1,17 @@
 /**
- * MSDF Font Loading for PixiJS
- * Loads pre-generated MSDF bitmap font atlases for resolution-independent text rendering.
- * Falls back to dynamic bitmap fonts generated from system fonts when MSDF files aren't available.
+ * Bitmap Font Loading for PixiJS
  *
- * NOTE: Pixi v8's built-in `loadBitmapFont` only handles .xml and .fnt extensions.
- * Our MSDF atlases are .json, so we must manually parse and register them as BitmapFont objects.
- * Without this, Assets.load() for .json falls through to the generic JSON loader, returning a
- * plain object that never gets registered — causing BitmapText to fall back to a DynamicBitmapFont
- * using 'Inter-Regular' as a CSS font family (invalid), rendering with the system default font.
+ * Uses DynamicBitmapFont (Canvas-rasterized at high resolution) instead of MSDF atlases.
+ * MSDF fonts require a custom SDF shader per BitmapText, which forces isBatchable=false
+ * in PixiJS v8's GraphicsContextSystem — each of the 183 BitmapText elements in the UI
+ * becomes a separate draw call (400+ per frame).
+ *
+ * DynamicBitmapFont uses no custom shader → batchable → all BitmapText elements batch
+ * into a handful of draw calls. Rasterized at 48px with 2x resolution (96px effective)
+ * for crisp rendering even at high zoom levels.
  */
 
-import { Assets, BitmapFont, BitmapFontManager, Cache, type Texture, type TextStyleFontWeight } from 'pixi.js';
+import { BitmapFontManager, Cache, type TextStyleFontWeight } from 'pixi.js';
 
 /** Font family names used throughout the PixiJS UI */
 export const PIXI_FONTS = {
@@ -29,122 +30,21 @@ export const PIXI_FONTS = {
 let fontLoadPromise: Promise<void> | null = null;
 
 /**
- * Load all MSDF bitmap fonts. Call once during app initialization.
+ * Load all bitmap fonts. Call once during app initialization.
  * Safe to call multiple times — subsequent calls await the same promise.
  */
 export function loadPixiFonts(): Promise<void> {
   if (!fontLoadPromise) {
-    fontLoadPromise = doLoadFonts();
+    fontLoadPromise = Promise.resolve(installFonts());
   }
   return fontLoadPromise;
 }
 
-async function doLoadFonts(): Promise<void> {
-  // Install fallback fonts FIRST so they're available immediately
-  // when the Application renders and BitmapText instances are created.
-  installFallbackFonts();
-
-  // Then try to load MSDF font atlases (sharper at all sizes, preferred over fallbacks)
-  const fontDefs = [
-    { name: PIXI_FONTS.MONO,         path: '/fonts/msdf/JetBrainsMono-Regular.json' },
-    { name: PIXI_FONTS.MONO_BOLD,    path: '/fonts/msdf/JetBrainsMono-Bold.json' },
-    { name: PIXI_FONTS.SANS,         path: '/fonts/msdf/Inter-Regular.json' },
-    { name: PIXI_FONTS.SANS_MEDIUM,  path: '/fonts/msdf/Inter-Medium.json' },
-    { name: PIXI_FONTS.SANS_SEMIBOLD,path: '/fonts/msdf/Inter-SemiBold.json' },
-    { name: PIXI_FONTS.SANS_BOLD,    path: '/fonts/msdf/Inter-Bold.json' },
-  ];
-
-  try {
-    await Promise.all(fontDefs.map(def => loadMSDFFontFromJson(def.name, def.path)));
-  } catch {
-    // MSDF font atlas files not available — reinstall fallback fonts
-    installFallbackFonts();
-  }
-}
-
 /**
- * Manually load an MSDF bitmap font from a JSON (Angelcode BMFont JSON) file.
- *
- * Pixi v8's loadBitmapFont loader only handles .xml/.fnt extensions, not .json.
- * We manually fetch + parse + construct the BitmapFont so it gets registered
- * under the correct `${name}-bitmap` cache key that BitmapFontManager.getFont() looks up.
+ * Install DynamicBitmapFont for all UI font families.
+ * Canvas-rasterized at 48px / 2x resolution (96px effective detail).
  */
-async function loadMSDFFontFromJson(name: string, jsonPath: string): Promise<void> {
-  const response = await fetch(jsonPath);
-  if (!response.ok) throw new Error(`Failed to fetch MSDF font: ${jsonPath}`);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const json: any = await response.json();
-
-  // Build chars map: Record<charString, RawCharData>
-  // Pixi's BitmapFont constructor expects chars keyed by character string,
-  // with camelCase offset fields (xOffset, yOffset, xAdvance) and a `letter` field.
-  const chars: Record<string, unknown> = {};
-
-  for (const c of json.chars) {
-    chars[c.char] = {
-      id:       c.id,
-      letter:   c.char,
-      page:     c.page,
-      x:        c.x,
-      y:        c.y,
-      width:    c.width,
-      height:   c.height,
-      xOffset:  c.xoffset,
-      yOffset:  c.yoffset,
-      xAdvance: c.xadvance,
-      kerning:  {} as Record<string, number>,
-    };
-  }
-
-  // Apply kerning pairs
-  for (const k of (json.kernings ?? [])) {
-    const second = String.fromCharCode(k.second);
-    const first  = String.fromCharCode(k.first);
-    if (chars[second]) (chars[second] as { kerning: Record<string, number> }).kerning[first] = k.amount;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data: any = {
-    fontFamily:     json.info.face,
-    fontSize:       json.info.size,
-    lineHeight:     json.common.lineHeight,
-    baseLineOffset: json.common.lineHeight - json.common.base,
-    pages: (json.pages as string[]).map((file: string, id: number) => ({ id, file })),
-    chars,
-    distanceField: json.distanceField ? {
-      type:  json.distanceField.fieldType,
-      range: json.distanceField.distanceRange,
-    } : undefined,
-  };
-
-  // Load texture atlas pages (paths are relative to the JSON directory)
-  const baseDir = jsonPath.substring(0, jsonPath.lastIndexOf('/'));
-  const textures: Texture[] = [];
-  for (let i = 0; i < (json.pages as string[]).length; i++) {
-    // eslint-disable-next-line no-await-in-loop
-    textures[i] = await Assets.load(`${baseDir}/${json.pages[i] as string}`);
-  }
-
-  // Replace any existing fallback DynamicBitmapFont in cache before registering MSDF version.
-  // Use Cache.remove() (NOT BitmapFontManager.uninstall()) to avoid destroying in-use textures.
-  const cacheKey = `${name}-bitmap`;
-  if (Cache.has(cacheKey)) Cache.remove(cacheKey);
-
-  // Create BitmapFont and register under the cache key BitmapFontManager.getFont() looks up.
-  // NOTE: The BitmapFont constructor auto-registers under `data.fontFamily + '-bitmap'`.
-  // When json.info.face is an empty string, this creates a stray '-bitmap' cache entry.
-  // Remove it immediately to prevent the "[Cache] already has key" warning.
-  const bitmapFont = new BitmapFont({ data, textures }, jsonPath);
-  const autoKey = `${(data.fontFamily as string) ?? ''}-bitmap`;
-  if (autoKey !== cacheKey && Cache.has(autoKey)) Cache.remove(autoKey);
-  Cache.set(cacheKey, bitmapFont);
-}
-
-/**
- * Install dynamic bitmap fonts as fallbacks when MSDF files aren't available.
- * These use system fonts rendered via Canvas, which works but isn't as crisp as MSDF.
- */
-function installFallbackFonts(): void {
+function installFonts(): void {
   const monoFamily = 'JetBrains Mono, Menlo, Consolas, monospace';
   const sansFamily = 'Inter, -apple-system, BlinkMacSystemFont, sans-serif';
 
@@ -167,10 +67,11 @@ function installFallbackFonts(): void {
         style: {
           fontFamily: fb.family,
           fontWeight: fb.weight,
-          fontSize: 32,
+          fontSize: 48,
           fill: 0xffffff,
         },
         chars: BitmapFontManager.ASCII,
+        resolution: 2, // 96px effective — crisp up to ~8x zoom
       });
     } catch {
       // Font install failed — continue with remaining fonts

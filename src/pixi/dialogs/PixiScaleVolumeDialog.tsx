@@ -4,7 +4,7 @@
 
 import { useState, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiKnob, PixiLabel } from '../components';
-import { useTrackerStore } from '@stores';
+import { useCursorStore } from '@stores';
 
 interface PixiScaleVolumeDialogProps {
   isOpen: boolean;
@@ -12,7 +12,7 @@ interface PixiScaleVolumeDialogProps {
 }
 
 export const PixiScaleVolumeDialog: React.FC<PixiScaleVolumeDialogProps> = ({ isOpen, onClose }) => {
-  const selection = useTrackerStore(s => s.selection);
+  const selection = useCursorStore(s => s.selection);
 
   const [scale, setScale] = useState(100);
   const hasSelection = selection != null;

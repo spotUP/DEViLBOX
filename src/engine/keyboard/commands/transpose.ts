@@ -3,13 +3,15 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useCursorStore } from '@/stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
 
 /**
  * Transpose selection up one semitone
  */
 export function transposeUp(): boolean {
-  const { selection, transposeSelection } = useTrackerStore.getState();
+  const { selection } = useCursorStore.getState();
+  const { transposeSelection } = useTrackerStore.getState();
   if (!selection) {
     useUIStore.getState().setStatusMessage('No selection to transpose', false, 1000);
     return true;
@@ -23,7 +25,8 @@ export function transposeUp(): boolean {
  * Transpose selection down one semitone
  */
 export function transposeDown(): boolean {
-  const { selection, transposeSelection } = useTrackerStore.getState();
+  const { selection } = useCursorStore.getState();
+  const { transposeSelection } = useTrackerStore.getState();
   if (!selection) {
     useUIStore.getState().setStatusMessage('No selection to transpose', false, 1000);
     return true;
@@ -37,7 +40,8 @@ export function transposeDown(): boolean {
  * Transpose selection up one octave
  */
 export function transposeOctaveUp(): boolean {
-  const { selection, transposeSelection } = useTrackerStore.getState();
+  const { selection } = useCursorStore.getState();
+  const { transposeSelection } = useTrackerStore.getState();
   if (!selection) {
     useUIStore.getState().setStatusMessage('No selection to transpose', false, 1000);
     return true;
@@ -51,7 +55,8 @@ export function transposeOctaveUp(): boolean {
  * Transpose selection down one octave
  */
 export function transposeOctaveDown(): boolean {
-  const { selection, transposeSelection } = useTrackerStore.getState();
+  const { selection } = useCursorStore.getState();
+  const { transposeSelection } = useTrackerStore.getState();
   if (!selection) {
     useUIStore.getState().setStatusMessage('No selection to transpose', false, 1000);
     return true;
@@ -93,7 +98,8 @@ export function transposeBlockOctaveDown(): boolean {
  * Transpose track up (ProTracker: Ctrl+A)
  */
 export function transposeTrackUp(): boolean {
-  const { cursor, selectChannel, transposeSelection } = useTrackerStore.getState();
+  const { cursor, selectChannel } = useCursorStore.getState();
+  const { transposeSelection } = useTrackerStore.getState();
   selectChannel(cursor.channelIndex);
   transposeSelection(1);
   useUIStore.getState().setStatusMessage(`Track ${cursor.channelIndex + 1} transposed +1`, false, 1000);
@@ -104,7 +110,8 @@ export function transposeTrackUp(): boolean {
  * Transpose track down (ProTracker: Ctrl+Q)
  */
 export function transposeTrackDown(): boolean {
-  const { cursor, selectChannel, transposeSelection } = useTrackerStore.getState();
+  const { cursor, selectChannel } = useCursorStore.getState();
+  const { transposeSelection } = useTrackerStore.getState();
   selectChannel(cursor.channelIndex);
   transposeSelection(-1);
   useUIStore.getState().setStatusMessage(`Track ${cursor.channelIndex + 1} transposed -1`, false, 1000);

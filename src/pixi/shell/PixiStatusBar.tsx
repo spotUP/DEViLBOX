@@ -8,14 +8,14 @@
  *   - MIDI knob panel (KNOB_PANEL_HEIGHT): bank tabs + 8-knob grid (conditional)
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTick } from '@pixi/react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useShallow } from 'zustand/react/shallow';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
-import { useUIStore, useAudioStore, useTrackerStore, useTransportStore } from '@stores';
+import { useUIStore, useAudioStore, useTrackerStore, useTransportStore, useCursorStore } from '@stores';
 import { useMIDIStore } from '@/stores/useMIDIStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
@@ -140,36 +140,76 @@ const DJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
 const TrackerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
   const theme = usePixiTheme();
 
-  const { cursor, currentOctave, insertMode, recordMode, patternLength } = useTrackerStore(
+  const { currentOctave, insertMode, recordMode, patternLength, songDBInfo } = useTrackerStore(
     useShallow((s) => ({
-      cursor: s.cursor,
       currentOctave: s.currentOctave,
       insertMode: s.insertMode,
       recordMode: s.recordMode,
       patternLength: s.patterns[s.currentPatternIndex]?.length || 64,
+      songDBInfo: s.songDBInfo,
     }))
   );
   const isPlaying = useTransportStore(s => s.isPlaying);
 
-  // Row BitmapText is updated imperatively in useTick — no React re-render per row advance
+  // Cursor ref — updated via subscription, NOT React state (avoids @pixi/react reconciliation)
+  const cursorRef = useRef(useCursorStore.getState().cursor);
+  useEffect(() => {
+    const unsub = useCursorStore.subscribe((state, prev) => {
+      if (state.cursor !== prev.cursor) cursorRef.current = state.cursor;
+    });
+    return unsub;
+  }, []);
+
+  // Row, channel, column BitmapTexts are updated imperatively in useTick — no React re-render
   const rowBitmapTextRef = useRef<import('pixi.js').BitmapText | null>(null);
+  const channelBitmapTextRef = useRef<import('pixi.js').BitmapText | null>(null);
+  const columnBitmapTextRef = useRef<import('pixi.js').BitmapText | null>(null);
 
   useTick(() => {
-    if (!rowBitmapTextRef.current) return;
-    const currentRow = isPlaying
-      ? useTransportStore.getState().currentRow
-      : cursor.rowIndex;
-    const rowStr = String(currentRow).padStart(2, '0') + '/' + String(patternLength - 1).padStart(2, '0');
-    rowBitmapTextRef.current.text = rowStr;
+    const cur = cursorRef.current;
+    if (rowBitmapTextRef.current) {
+      const currentRow = isPlaying
+        ? useTransportStore.getState().currentRow
+        : cur.rowIndex;
+      const rowText = String(currentRow).padStart(2, '0') + '/' + String(patternLength - 1).padStart(2, '0');
+      if (rowBitmapTextRef.current.text !== rowText) rowBitmapTextRef.current.text = rowText;
+    }
+    if (channelBitmapTextRef.current) {
+      const chText = `Ch ${cur.channelIndex + 1}`;
+      if (channelBitmapTextRef.current.text !== chText) channelBitmapTextRef.current.text = chText;
+    }
+    if (columnBitmapTextRef.current) {
+      const colText = cur.columnType.charAt(0).toUpperCase() + cur.columnType.slice(1);
+      if (columnBitmapTextRef.current.text !== colText) columnBitmapTextRef.current.text = colText;
+    }
   });
 
-  const channelStr = `Ch ${cursor.channelIndex + 1}`;
-  const columnStr = cursor.columnType.charAt(0).toUpperCase() + cursor.columnType.slice(1);
+  const channelStr = `Ch ${cursorRef.current.channelIndex + 1}`;
+  const columnStr = cursorRef.current.columnType.charAt(0).toUpperCase() + cursorRef.current.columnType.slice(1);
   const octStr = String(currentOctave);
   const modeStr = insertMode ? 'INS' : 'OVR';
   const modeColor = insertMode ? theme.warning.color : theme.accent.color;
   const recStr = recordMode ? 'REC' : 'EDIT';
   const recColor = recordMode ? theme.error.color : theme.text.color;
+
+  const hasMetadata = !!songDBInfo;
+  let metadataStr = '';
+  if (hasMetadata) {
+    const parts: string[] = [];
+    if (songDBInfo!.authors?.length) {
+      parts.push(`by ${songDBInfo!.authors.join(', ')}`);
+    }
+    if (songDBInfo!.album) {
+      parts.push(`• ${songDBInfo!.album}`);
+    }
+    if (songDBInfo!.year) {
+      parts.push(`(${songDBInfo!.year})`);
+    }
+    if (songDBInfo!.format) {
+      parts.push(`[${songDBInfo!.format}]`);
+    }
+    metadataStr = parts.join(' ');
+  }
 
   const textLayout = useMemo(() => ({ alignSelf: 'center' as const }), []);
 
@@ -184,9 +224,9 @@ const TrackerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) =>
         layout={textLayout}
       />
       <PixiSep height={10} />
-      <pixiBitmapText text={channelStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
+      <pixiBitmapText ref={channelBitmapTextRef as any} text={channelStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
       <PixiSep height={10} />
-      <pixiBitmapText text={columnStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
+      <pixiBitmapText ref={columnBitmapTextRef as any} text={columnStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
       <PixiSep height={10} />
       <pixiBitmapText text="Oct" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={{ ...textLayout, marginRight: 4 }} />
       <pixiBitmapText text={octStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={theme.accent.color} layout={textLayout} />
@@ -195,6 +235,16 @@ const TrackerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) =>
       <pixiBitmapText text={modeStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={modeColor} layout={textLayout} />
       <PixiSep height={10} />
       <pixiBitmapText text={recStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={recColor} layout={textLayout} />
+      {/* SongDB metadata — always mounted to avoid @pixi/layout BindingError */}
+      <pixiContainer alpha={hasMetadata ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
+        <PixiSep height={10} />
+        <pixiBitmapText
+          text={metadataStr}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={textLayout}
+        />
+      </pixiContainer>
     </pixiContainer>
   );
 };

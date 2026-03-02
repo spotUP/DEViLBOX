@@ -19,6 +19,7 @@ import {
   DEFAULT_HIVELY,
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC, DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_DAVID_WHITTAKER,
+  DEFAULT_SONIC_ARRANGER,
   DEFAULT_SUPERCOLLIDER,
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
@@ -95,6 +96,9 @@ const DavidWhittakerControls = lazy(() => import('../controls/DavidWhittakerCont
 const MusicLineControls = lazy(() => import('../controls/MusicLineControls').then(m => ({ default: m.MusicLineControls })));
 const DeltaMusic1Controls = lazy(() => import('../controls/DeltaMusic1Controls').then(m => ({ default: m.DeltaMusic1Controls })));
 const DeltaMusic2Controls = lazy(() => import('../controls/DeltaMusic2Controls').then(m => ({ default: m.DeltaMusic2Controls })));
+const SonicArrangerControls = lazy(() =>
+  import('../controls/SonicArrangerControls').then(m => ({ default: m.SonicArrangerControls }))
+);
 const SuperColliderEditor = lazy(() => import('../SuperColliderEditor').then(m => ({ default: m.SuperColliderEditor })));
 
 // Lazy-loaded hardware UI components
@@ -125,7 +129,7 @@ import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
 import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'musicline' | 'supercollider';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'sonic-arranger' | 'musicline' | 'supercollider';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -231,6 +235,11 @@ function isTFMXType(synthType: SynthType): boolean {
   return synthType === 'TFMXSynth';
 }
 
+/** Check if synth type is Sonic Arranger */
+function isSonicArrangerType(synthType: SynthType): boolean {
+  return synthType === 'SonicArrangerSynth';
+}
+
 /** Get the editor mode for a synth type */
 function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'TB303' || synthType === 'Buzz3o3') return 'tb303';
@@ -250,6 +259,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isSoundMonType(synthType)) return 'soundmon';
   if (isSidMonType(synthType)) return 'sidmon';
   if (isDigMugType(synthType)) return 'digmug';
+  if (isSonicArrangerType(synthType)) return 'sonic-arranger';
   if (isFCType(synthType)) return 'fc';
   if (isDeltaMusic1Type(synthType)) return 'deltamusic1';
   if (isDeltaMusic2Type(synthType)) return 'deltamusic2';
@@ -706,6 +716,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     const current = instrument.davidWhittaker || DEFAULT_DAVID_WHITTAKER;
     handleChange({ davidWhittaker: { ...current, ...updates } });
   }, [instrument.davidWhittaker, handleChange]);
+
+  // Handle Sonic Arranger config updates
+  const handleSonicArrangerChange = useCallback((updates: Partial<typeof instrument.sonicArranger>) => {
+    const current = instrument.sonicArranger || DEFAULT_SONIC_ARRANGER;
+    handleChange({ sonicArranger: { ...current, ...updates } });
+  }, [instrument.sonicArranger, handleChange]);
 
   // Handle Space Laser config updates
   const handleSpaceLaserChange = useCallback((updates: Partial<typeof instrument.spaceLaser>) => {
@@ -1221,6 +1237,29 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             config={digMugConfig}
             onChange={handleDigMugChange}
             uadeChipRam={instrument.uadeChipRam}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SONIC ARRANGER EDITOR
+  // ============================================================================
+  if (editorMode === 'sonic-arranger') {
+    const saConfig = deepMerge(DEFAULT_SONIC_ARRANGER, instrument.sonicArranger || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0a0a14] to-[#040408]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <SonicArrangerControls
+            config={saConfig}
+            onChange={handleSonicArrangerChange}
           />
         </Suspense>
       </div>

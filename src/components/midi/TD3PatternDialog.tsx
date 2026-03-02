@@ -6,6 +6,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Upload, Download, AlertTriangle, Check, Loader2, FileUp, FileDown } from 'lucide-react';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { useTrackerStore } from '../../stores/useTrackerStore';
+import { useCursorStore } from '../../stores/useCursorStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { createDefaultTB303Instrument } from '../../lib/instrumentFactory';
 import { getMIDIManager } from '../../midi/MIDIManager';
@@ -47,7 +48,8 @@ export const TD3PatternDialog: React.FC<TD3PatternDialogProps> = ({ isOpen, onCl
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { selectedOutputId, selectedInputId } = useMIDIStore();
-  const { patterns, currentPatternIndex, cursor, setCell } = useTrackerStore();
+  const { patterns, currentPatternIndex, setCell } = useTrackerStore();
+  const cursor = useCursorStore((s) => s.cursor);
 
   const currentPattern = patterns[currentPatternIndex];
   const channels = currentPattern?.channels || [];

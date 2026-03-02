@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { useTrackerStore } from '@stores';
+import { useCursorStore } from '@stores';
 import { MacroSlotsPanel } from '../tracker/MacroSlotsPanel';
 import { Sliders, Shuffle, Download, X, ArrowUpDown, Maximize2, Minimize2, Copy, Calculator, BookOpen } from 'lucide-react';
 
@@ -35,7 +35,7 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
   onDuplicate,
   onMath,
 }) => {
-  const { selection } = useTrackerStore();
+  const selection = useCursorStore((s) => s.selection);
   const [expandedSection, setExpandedSection] = useState<string | null>('macros');
   const [mathValue, setMathValue] = useState(1);
   const [mathColumn, setMathColumn] = useState<'volume' | 'eff'>('volume');

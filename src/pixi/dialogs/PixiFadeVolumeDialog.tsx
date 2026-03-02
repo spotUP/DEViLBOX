@@ -4,7 +4,7 @@
 
 import { useState, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiNumericInput, PixiLabel } from '../components';
-import { useTrackerStore } from '@stores';
+import { useCursorStore } from '@stores';
 
 interface PixiFadeVolumeDialogProps {
   isOpen: boolean;
@@ -12,7 +12,7 @@ interface PixiFadeVolumeDialogProps {
 }
 
 export const PixiFadeVolumeDialog: React.FC<PixiFadeVolumeDialogProps> = ({ isOpen, onClose }) => {
-  const selection = useTrackerStore(s => s.selection);
+  const selection = useCursorStore(s => s.selection);
 
   const [startVol, setStartVol] = useState(64);
   const [endVol, setEndVol] = useState(0);

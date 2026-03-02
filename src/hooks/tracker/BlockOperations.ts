@@ -1,10 +1,15 @@
 /**
  * BlockOperations - Copy/Paste/Cut operations for tracker blocks
  * FT2-style block selection with Alt+B/E/C/V/X shortcuts
+ *
+ * PERF: This hook must NOT subscribe to cursor/selection via React hooks.
+ * It's mounted in PixiTrackerView — any re-render cascades through the
+ * entire @pixi/react reconciler + Yoga layout (~25ms). All cursor/selection
+ * reads use getState() at call time instead.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore, useCursorStore } from '@stores';
 import { xmNoteToMidi, midiToXMNote } from '@/lib/xmConversions';
 import type { TrackerCell } from '@typedefs';
 
@@ -32,20 +37,9 @@ export interface BlockOperationsState {
 }
 
 export const useBlockOperations = () => {
-  const {
-    cursor,
-    selection,
-    clipboard,
-    patterns,
-    currentPatternIndex,
-    startSelection,
-    endSelection,
-    clearSelection,
-    copySelection,
-    cutSelection,
-    paste,
-    setCell,
-  } = useTrackerStore();
+  // PERF: NO React hooks for ANY store — use getState() at call time.
+  // useBlockOperations() is called in PixiTrackerView; any re-render here
+  // cascades through the entire @pixi/react reconciler + Yoga layout (~25ms).
 
   const [blockState, setBlockState] = useState<BlockOperationsState>({
     blockStartMarked: false,
@@ -53,85 +47,48 @@ export const useBlockOperations = () => {
     isBlockSelected: false,
   });
 
-  const pattern = patterns[currentPatternIndex];
-
   /**
    * Mark block start (Alt+B)
    */
   const markBlockStart = useCallback(() => {
-    startSelection();
+    useCursorStore.getState().startSelection();
     setBlockState((prev) => ({
       ...prev,
       blockStartMarked: true,
       blockEndMarked: false,
       isBlockSelected: false,
     }));
-  }, [startSelection, cursor]);
+  }, []);
 
-  /**
-   * Mark block end (Alt+E)
-   */
   const markBlockEnd = useCallback(() => {
-    endSelection();
+    useCursorStore.getState().endSelection();
     setBlockState((prev) => ({
       ...prev,
       blockEndMarked: true,
       isBlockSelected: true,
     }));
-  }, [endSelection, cursor]);
+  }, []);
 
-  /**
-   * Copy block (Alt+C)
-   */
   const copyBlock = useCallback(() => {
-    if (!selection) {
-      console.warn('No block selected');
-      return;
-    }
+    if (!useCursorStore.getState().selection) { console.warn('No block selected'); return; }
+    useTrackerStore.getState().copySelection();
+  }, []);
 
-    copySelection();
-  }, [selection, copySelection]);
-
-  /**
-   * Paste block (Alt+V or Alt+P)
-   */
   const pasteBlock = useCallback(() => {
-    if (!clipboard) {
-      console.warn('No clipboard data');
-      return;
-    }
+    if (!useTrackerStore.getState().clipboard) { console.warn('No clipboard data'); return; }
+    useTrackerStore.getState().paste();
+  }, []);
 
-    paste();
-  }, [clipboard, paste, cursor]);
-
-  /**
-   * Cut block (Alt+X) - copy + clear
-   */
   const cutBlock = useCallback(() => {
-    if (!selection) {
-      console.warn('No block selected');
-      return;
-    }
+    if (!useCursorStore.getState().selection) { console.warn('No block selected'); return; }
+    useTrackerStore.getState().cutSelection();
+    setBlockState({ blockStartMarked: false, blockEndMarked: false, isBlockSelected: false });
+  }, []);
 
-    cutSelection();
-    setBlockState({
-      blockStartMarked: false,
-      blockEndMarked: false,
-      isBlockSelected: false,
-    });
-  }, [selection, cutSelection]);
-
-  /**
-   * Clear block selection (Escape)
-   */
   const clearBlock = useCallback(() => {
-    clearSelection();
-    setBlockState({
-      blockStartMarked: false,
-      blockEndMarked: false,
-      isBlockSelected: false,
-    });
-  }, [clearSelection]);
+    useCursorStore.getState().clearSelection();
+    setBlockState({ blockStartMarked: false, blockEndMarked: false, isBlockSelected: false });
+  }, []);
 
   /**
    * Get normalized block bounds
@@ -142,6 +99,7 @@ export const useBlockOperations = () => {
     startRow: number;
     endRow: number;
   } | null => {
+    const selection = useCursorStore.getState().selection;
     if (!selection) return null;
 
     return {
@@ -150,7 +108,7 @@ export const useBlockOperations = () => {
       startRow: Math.min(selection.startRow, selection.endRow),
       endRow: Math.max(selection.startRow, selection.endRow),
     };
-  }, [selection]);
+  }, []);
 
   /**
    * Check if a cell is within the selected block
@@ -178,28 +136,25 @@ export const useBlockOperations = () => {
       const bounds = getBlockBounds();
       if (!bounds) return;
 
+      const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
+
       for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
         for (let row = bounds.startRow; row <= bounds.endRow; row++) {
           const cell = pattern.channels[ch].rows[row];
-          // Skip empty cells (0) and note-offs (97)
           if (cell.note && cell.note !== 0 && cell.note !== 97) {
-            // Convert XM note to MIDI
             const midiNote = xmNoteToMidi(cell.note);
             if (midiNote !== null) {
               const newMidiNote = midiNote + semitones;
-
-              // Clamp to valid MIDI range
               if (newMidiNote >= 12 && newMidiNote <= 107) {
-                const newXmNote = midiToXMNote(newMidiNote);
-                setCell(ch, row, { note: newXmNote });
+                setCell(ch, row, { note: midiToXMNote(newMidiNote) });
               }
             }
           }
         }
       }
-
     },
-    [getBlockBounds, pattern, setCell]
+    [getBlockBounds]
   );
 
   /**
@@ -209,6 +164,9 @@ export const useBlockOperations = () => {
     (factor: number) => {
       const bounds = getBlockBounds();
       if (!bounds) return;
+
+      const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
 
       for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
         for (let row = bounds.startRow; row <= bounds.endRow; row++) {
@@ -221,7 +179,7 @@ export const useBlockOperations = () => {
       }
 
     },
-    [getBlockBounds, pattern, setCell]
+    [getBlockBounds]
   );
 
   /**
@@ -231,6 +189,9 @@ export const useBlockOperations = () => {
     (columnType: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan') => {
       const bounds = getBlockBounds();
       if (!bounds) return;
+
+      const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
 
       for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
         const startCell = pattern.channels[ch].rows[bounds.startRow];
@@ -251,7 +212,7 @@ export const useBlockOperations = () => {
       }
 
     },
-    [getBlockBounds, pattern, setCell]
+    [getBlockBounds]
   );
 
   /**
@@ -260,6 +221,9 @@ export const useBlockOperations = () => {
   const reverseBlock = useCallback(() => {
     const bounds = getBlockBounds();
     if (!bounds) return;
+
+    const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+    const pattern = patterns[currentPatternIndex];
 
     const rowCount = bounds.endRow - bounds.startRow + 1;
     if (rowCount < 2) return;
@@ -293,7 +257,7 @@ export const useBlockOperations = () => {
       }
     }
 
-  }, [getBlockBounds, pattern, setCell]);
+  }, [getBlockBounds]);
 
   /**
    * Expand block - double the content by inserting empty rows between each row
@@ -302,6 +266,9 @@ export const useBlockOperations = () => {
   const expandBlock = useCallback(() => {
     const bounds = getBlockBounds();
     if (!bounds) return;
+
+    const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+    const pattern = patterns[currentPatternIndex];
 
     const rowCount = bounds.endRow - bounds.startRow + 1;
     const patternLength = pattern.channels[0]?.rows.length || 64;
@@ -333,7 +300,7 @@ export const useBlockOperations = () => {
             effTyp: srcCell.effTyp,
             eff: srcCell.eff,
             effTyp2: srcCell.effTyp2,
-          eff2: srcCell.eff2,
+            eff2: srcCell.eff2,
             flag1: srcCell.flag1,
             flag2: srcCell.flag2,
           });
@@ -354,7 +321,7 @@ export const useBlockOperations = () => {
       }
     }
 
-  }, [getBlockBounds, pattern, setCell]);
+  }, [getBlockBounds]);
 
   /**
    * Shrink block - compress content by removing every other row
@@ -362,6 +329,9 @@ export const useBlockOperations = () => {
   const shrinkBlock = useCallback(() => {
     const bounds = getBlockBounds();
     if (!bounds) return;
+
+    const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+    const pattern = patterns[currentPatternIndex];
 
     const rowCount = bounds.endRow - bounds.startRow + 1;
     if (rowCount < 2) return;
@@ -391,7 +361,7 @@ export const useBlockOperations = () => {
             effTyp: srcCell.effTyp,
             eff: srcCell.eff,
             effTyp2: srcCell.effTyp2,
-          eff2: srcCell.eff2,
+            eff2: srcCell.eff2,
             flag1: srcCell.flag1,
             flag2: srcCell.flag2,
           });
@@ -412,7 +382,7 @@ export const useBlockOperations = () => {
       }
     }
 
-  }, [getBlockBounds, pattern, setCell]);
+  }, [getBlockBounds]);
 
   /**
    * Math operation on block values (volume or effect parameter)
@@ -421,6 +391,9 @@ export const useBlockOperations = () => {
     (op: 'add' | 'sub' | 'mul' | 'div', value: number, column: 'volume' | 'eff') => {
       const bounds = getBlockBounds();
       if (!bounds) return;
+
+      const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+      const pattern = patterns[currentPatternIndex];
 
       for (let ch = bounds.startChannel; ch <= bounds.endChannel; ch++) {
         for (let row = bounds.startRow; row <= bounds.endRow; row++) {
@@ -443,7 +416,7 @@ export const useBlockOperations = () => {
       }
 
     },
-    [getBlockBounds, pattern, setCell]
+    [getBlockBounds]
   );
 
   /**
@@ -452,6 +425,9 @@ export const useBlockOperations = () => {
   const duplicateBlock = useCallback(() => {
     const bounds = getBlockBounds();
     if (!bounds) return;
+
+    const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+    const pattern = patterns[currentPatternIndex];
 
     const rowCount = bounds.endRow - bounds.startRow + 1;
     const patternLength = pattern.channels[0]?.rows.length || 64;
@@ -488,7 +464,7 @@ export const useBlockOperations = () => {
       writeRow++;
     }
 
-  }, [getBlockBounds, pattern, setCell]);
+  }, [getBlockBounds]);
 
   /**
    * Handle keyboard shortcuts
@@ -539,7 +515,7 @@ export const useBlockOperations = () => {
       }
 
       // Escape - Clear block selection
-      if (e.key === 'Escape' && selection) {
+      if (e.key === 'Escape' && useCursorStore.getState().selection) {
         e.preventDefault();
         clearBlock();
         return;
@@ -588,13 +564,12 @@ export const useBlockOperations = () => {
     transposeBlock,
     reverseBlock,
     duplicateBlock,
-    selection,
   ]);
 
   return {
     blockState,
-    selection,
-    clipboard,
+    get selection() { return useCursorStore.getState().selection; },
+    get clipboard() { return useTrackerStore.getState().clipboard; },
     markBlockStart,
     markBlockEnd,
     copyBlock,

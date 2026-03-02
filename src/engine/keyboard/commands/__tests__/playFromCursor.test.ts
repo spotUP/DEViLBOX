@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { playFromCursor } from '../playFromCursor';
-import { useTrackerStore } from '@stores/useTrackerStore';
+import { useCursorStore } from '@/stores/useCursorStore';
 import { useTransportStore } from '@stores/useTransportStore';
 
 // Mock stores and engine
-vi.mock('@stores/useTrackerStore');
+vi.mock('@/stores/useCursorStore');
 vi.mock('@stores/useTransportStore');
 vi.mock('@engine/ToneEngine', () => ({
   getToneEngine: vi.fn(() => ({
@@ -23,7 +23,7 @@ describe('playFromCursor', () => {
     const mockPlay = vi.fn();
     const mockSetCurrentRow = vi.fn();
 
-    (useTrackerStore.getState as any) = vi.fn(() => ({ cursor: mockCursor }));
+    (useCursorStore.getState as any) = vi.fn(() => ({ cursor: mockCursor }));
     (useTransportStore.getState as any) = vi.fn(() => ({
       isPlaying: false,
       stop: mockStop,
@@ -43,7 +43,7 @@ describe('playFromCursor', () => {
     const mockPlay = vi.fn();
     const mockSetCurrentRow = vi.fn();
 
-    (useTrackerStore.getState as any) = vi.fn(() => ({ cursor: mockCursor }));
+    (useCursorStore.getState as any) = vi.fn(() => ({ cursor: mockCursor }));
     (useTransportStore.getState as any) = vi.fn(() => ({
       isPlaying: true,
       stop: mockStop,

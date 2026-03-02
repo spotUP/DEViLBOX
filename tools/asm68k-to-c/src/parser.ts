@@ -26,22 +26,27 @@ function parseOperand(t: Token): Operand {
     }
     case 'ADDRESS': {
       if (t.value.startsWith('-')) {
-        const reg = t.value.match(/\((\w+)\)/)?.[1] ?? 'sp';
+        const reg = (t.value.match(/\((\w+)\)/)?.[1] ?? 'sp').toLowerCase();
         return { kind: 'address', mode: 'pre_dec', reg };
       }
-      const reg = t.value.match(/\((\w+)\)/)?.[1] ?? 'a0';
+      const reg = (t.value.match(/\((\w+)\)/)?.[1] ?? 'a0').toLowerCase();
       const mode = t.value.endsWith('+') ? 'post_inc' : 'indirect';
       return { kind: 'address', mode, reg };
     }
     case 'DISP_REG': {
       const m = t.value.match(/^(-?[^(]+)\((\w+)(?:,(\w+\.\w+))?\)$/);
       if (m) {
-        const offset = /^\d+$/.test(m[1]) ? parseInt(m[1]) : m[1];
+        const rawOff = m[1];
+        const offset: number | string =
+          /^-?\d+$/.test(rawOff) ? parseInt(rawOff) :
+          /^\$[0-9A-Fa-f]+$/.test(rawOff) ? parseInt(rawOff.slice(1), 16) :
+          /^-\$[0-9A-Fa-f]+$/.test(rawOff) ? -parseInt(rawOff.slice(2), 16) :
+          rawOff;
         // PC-relative addressing: label(PC) → pc_rel node
         if (m[2].toUpperCase() === 'PC' && typeof offset === 'string') {
           return { kind: 'pc_rel', label: offset };
         }
-        return { kind: 'disp', offset, base: m[2], index: m[3] };
+        return { kind: 'disp', offset, base: m[2].toLowerCase(), index: m[3] };
       }
       return { kind: 'label_ref', name: t.value };
     }
@@ -148,10 +153,13 @@ export function parse(tokens: Token[]): AstNode[] {
       while (j < lt.length && lt[j]?.kind !== 'COMMENT') {
         if (lt[j].kind === 'COMMA') { j++; continue; }
         const v = lt[j].value;
-        if (lt[j].kind === 'STRING') {
+        if (lt[j].kind === 'STRING' || lt[j].kind === 'IDENTIFIER') {
+          // String literals and symbolic references stored as strings
           values.push(v);
         } else {
-          values.push(parseNumber(v));
+          const n = parseNumber(v);
+          // Non-numeric tokens (e.g. label refs not caught above) → keep as string
+          values.push(Number.isNaN(n) ? v : n);
         }
         j++;
       }
@@ -172,6 +180,52 @@ export function parse(tokens: Token[]): AstNode[] {
       while (j < lt.length && lt[j]?.kind !== 'COMMENT') {
         if (lt[j].kind === 'COMMA') { j++; continue; }
         if (lt[j] === undefined) { j++; continue; }
+        // Expand register ranges: D0 RANGE D3 → D0,D1,D2,D3
+        if (lt[j].kind === 'RANGE' && j > 0 && lt[j+1]?.kind === 'REGISTER') {
+          j++; // skip RANGE token
+          const prevReg = operands[operands.length - 1];
+          if (prevReg?.kind === 'register') {
+            const prefix = prevReg.name[0]; // 'd' or 'a'
+            const startNum = parseInt(prevReg.name.slice(1));
+            const endReg = lt[j].value.toLowerCase();
+            const endNum = parseInt(endReg.slice(1));
+            // Fill in the intermediate registers
+            for (let k = startNum + 1; k <= endNum; k++) {
+              operands.push({ kind: 'register', name: `${prefix}${k}` });
+            }
+            j++; // skip the end register (already added by range expansion)
+            continue;
+          }
+        }
+        if (lt[j].kind === 'RANGE') { j++; continue; } // skip stray RANGE tokens
+        // NUMBER + DISP_REG: combine displacement arithmetic, e.g. 12-12(A4) → 0(A4)
+        if ((lt[j].kind === 'NUMBER' || lt[j].kind === 'IMMEDIATE') && lt[j + 1]?.kind === 'DISP_REG') {
+          const numVal = parseNumber(lt[j].value.replace(/^#/, ''));
+          const dispRaw = lt[j + 1].value;  // e.g. "-12(A4)"
+          const m = dispRaw.match(/^(-?[^(]+)\((.+)\)$/);
+          if (m) {
+            const dispVal = /^-?\d+$/.test(m[1]) ? parseInt(m[1]) :
+                            /^-?\$[0-9A-Fa-f]+$/i.test(m[1]) ? parseInt(m[1].replace('$','0x')) : 0;
+            const combined = numVal + dispVal;
+            const base = m[2].toLowerCase();
+            if (base === 'pc') {
+              operands.push({ kind: 'pc_rel', label: `${combined}` });
+            } else {
+              operands.push({ kind: 'disp', offset: combined, base });
+            }
+            j += 2;
+            continue;
+          }
+        }
+        // #'SMUS' → character constant immediate (lexer splits '#' and 'SMUS' separately)
+        if (lt[j].kind === 'IMMEDIATE' && lt[j].value === '#' && lt[j + 1]?.kind === 'STRING') {
+          const chars = lt[j + 1].value;
+          let val = 0;
+          for (const c of chars) val = (((val << 8) | c.charCodeAt(0)) >>> 0);
+          operands.push({ kind: 'immediate', value: val, raw: '#$' + val.toString(16) });
+          j += 2;
+          continue;
+        }
         operands.push(parseOperand(lt[j]));
         j++;
       }

@@ -18,10 +18,11 @@
 
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent, Container as ContainerType } from 'pixi.js';
-import { usePixiTheme } from '../../theme';
+import { usePixiTheme, type PixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
+import { MegaText, type GlyphLabel } from '../../utils/MegaText';
 import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
-import { useTrackerStore, useTransportStore, useUIStore } from '@stores';
+import { useTrackerStore, useTransportStore, useUIStore, useCursorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useCollaborationStore, getCollabClient } from '@stores/useCollaborationStore';
@@ -37,7 +38,7 @@ import { Plus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'l
 import { TrackerVisualBackground } from '@/components/tracker/TrackerVisualBackground';
 import { haptics } from '@/utils/haptics';
 import * as Tone from 'tone';
-import type { CursorPosition } from '@typedefs';
+import type { CursorPosition, BlockSelection } from '@typedefs';
 const SCROLLBAR_HEIGHT = 12;
 
 // ─── Layout constants (must match worker-types / TrackerGLRenderer) ──────────
@@ -85,6 +86,369 @@ function probColor(val: number): number {
   return 0xf87171;
 }
 
+// ─── Imperative render helpers (pure functions, no closures over React state) ─
+
+type TrackerPattern = NonNullable<ReturnType<typeof useTrackerStore.getState>['patterns'][0]>;
+
+type LabelData = GlyphLabel;
+
+interface PeerCursorData {
+  row: number; channel: number; active: boolean; patternIndex: number;
+}
+interface PeerSelectionData {
+  startChannel: number; endChannel: number; startRow: number; endRow: number; patternIndex: number;
+}
+
+/** All non-cursor render parameters, captured synchronously each React render. */
+interface RenderParams {
+  width: number;
+  gridHeight: number;
+  theme: PixiTheme;
+  visibleLines: number;
+  topLines: number;
+  baseY: number;
+  patternLength: number;
+  showGhostPatterns: boolean;
+  trackerVisualBg: boolean;
+  numChannels: number;
+  channelOffsets: number[];
+  channelWidths: number[];
+  displayPattern: TrackerPattern | undefined;
+  displayPatternIndex: number;
+  patterns: TrackerPattern[];
+  isPlaying: boolean;
+  recordMode: boolean;
+  scrollLeft: number;
+  rowHeight: number;
+  rowHighlightInterval: number;
+  channelMuted: boolean[];
+  channelSolo: boolean[];
+  useHex: boolean;
+  blankEmpty: boolean;
+  showBeatLabels: boolean;
+  columnVisibility: { flag1: boolean; flag2: boolean; probability: boolean };
+  currentPatternIndex: number;
+  playbackRow: number;
+  playbackPatternIdx: number;
+}
+
+/** Static grid layer — backgrounds, separators, M/S strip, gutter. */
+function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
+  g.clear();
+
+  if (!p.trackerVisualBg) {
+    g.rect(0, 0, p.width, p.gridHeight);
+    g.fill({ color: p.theme.bg.color });
+  }
+
+  for (let i = 0; i < p.visibleLines; i++) {
+    const rowNum = vStart + i;
+    const y = p.baseY + i * p.rowHeight;
+    if (y + p.rowHeight < 0 || y > p.gridHeight) continue;
+
+    const isInPattern = rowNum >= 0 && rowNum < p.patternLength;
+    const isGhost = !isInPattern && p.showGhostPatterns;
+    const ghostAlpha = isGhost ? 0.35 : 1;
+
+    if (isInPattern || isGhost) {
+      const isHighlight = rowNum >= 0 && rowNum % p.rowHighlightInterval === 0;
+      g.rect(LINE_NUMBER_WIDTH, y, p.width - LINE_NUMBER_WIDTH, p.rowHeight);
+      g.fill({
+        color: isHighlight ? p.theme.trackerRowHighlight.color : p.theme.trackerRowOdd.color,
+        alpha: (isHighlight ? p.theme.trackerRowHighlight.alpha : p.theme.trackerRowOdd.alpha) * ghostAlpha,
+      });
+    }
+
+    // Center-line highlight moved to renderOverlay to avoid grid redraw during scrolling
+  }
+
+  for (let ch = 0; ch < p.numChannels; ch++) {
+    const colX = p.channelOffsets[ch] - p.scrollLeft;
+    const chW = p.channelWidths[ch];
+    if (colX + chW < 0 || colX > p.width) continue;
+
+    if (p.channelMuted[ch]) {
+      g.rect(colX, GL_MUTE_SOLO_H, chW, p.gridHeight - GL_MUTE_SOLO_H);
+      g.fill({ color: 0x000000, alpha: 0.45 });
+    }
+
+    const channelColor = p.displayPattern?.channels[ch]?.color;
+    if (channelColor) {
+      g.rect(colX, GL_MUTE_SOLO_H, 2, p.gridHeight - GL_MUTE_SOLO_H);
+      g.fill({ color: parseInt(channelColor.replace('#', ''), 16), alpha: 0.4 });
+    }
+
+    g.rect(colX + chW - 1, 0, 1, p.gridHeight);
+    g.fill({ color: p.theme.border.color, alpha: p.theme.border.alpha });
+  }
+
+  // GL Mute/Solo button strip
+  const MS_BTN_W = 16;
+  const MS_BTN_H = 12;
+  const MS_BTN_Y = 1;
+  const MS_GAP = 2;
+
+  g.rect(LINE_NUMBER_WIDTH, 0, p.width - LINE_NUMBER_WIDTH, GL_MUTE_SOLO_H);
+  g.fill({ color: p.theme.bgTertiary.color, alpha: 0.9 });
+  g.rect(LINE_NUMBER_WIDTH, GL_MUTE_SOLO_H - 1, p.width - LINE_NUMBER_WIDTH, 1);
+  g.fill({ color: p.theme.border.color, alpha: 0.4 });
+
+  for (let ch = 0; ch < p.numChannels; ch++) {
+    const colX = p.channelOffsets[ch] - p.scrollLeft;
+    const chW = p.channelWidths[ch];
+    if (colX + chW < 0 || colX > p.width) continue;
+    const isMuted = p.channelMuted[ch] ?? false;
+    const isSolo = p.channelSolo[ch] ?? false;
+    const btnBaseX = colX + chW - (MS_BTN_W * 2 + MS_GAP + 4);
+
+    g.rect(btnBaseX, MS_BTN_Y, MS_BTN_W, MS_BTN_H);
+    g.fill({ color: isMuted ? p.theme.warning.color : p.theme.bgSecondary.color, alpha: isMuted ? 0.85 : 0.6 });
+
+    g.rect(btnBaseX + MS_BTN_W + MS_GAP, MS_BTN_Y, MS_BTN_W, MS_BTN_H);
+    g.fill({ color: isSolo ? p.theme.accent.color : p.theme.bgSecondary.color, alpha: isSolo ? 0.85 : 0.6 });
+  }
+
+  g.rect(0, 0, LINE_NUMBER_WIDTH, p.gridHeight);
+  g.fill({ color: p.theme.bg.color, alpha: 0.85 });
+}
+
+/** Cursor/selection overlay — active channel, caret, selection, peer cursors. */
+function renderOverlay(
+  g: GraphicsType, p: RenderParams, cursor: CursorPosition, selection: BlockSelection | null,
+  vStart: number, currentRow: number,
+  peerCursor: PeerCursorData, peerSel: PeerSelectionData | null,
+): void {
+  g.clear();
+
+  // Center-line highlight (current row) — drawn here to avoid grid Graphics rebuild during scrolling
+  const centerY = p.baseY + (currentRow - vStart) * p.rowHeight;
+  g.rect(0, centerY, p.width, p.rowHeight);
+  g.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : p.theme.accentGlow.alpha });
+
+  // Active channel highlight
+  const cursorCh = cursor.channelIndex;
+  if (cursorCh >= 0 && cursorCh < p.numChannels) {
+    const colX = p.channelOffsets[cursorCh] - p.scrollLeft;
+    const chW = p.channelWidths[cursorCh];
+    g.rect(colX, GL_MUTE_SOLO_H, chW, p.gridHeight - GL_MUTE_SOLO_H);
+    g.fill({ color: 0xffffff, alpha: 0.02 });
+  }
+
+  // Selection overlay
+  if (selection && p.displayPattern) {
+    const startCh = Math.min(selection.startChannel, selection.endChannel);
+    const endCh = Math.max(selection.startChannel, selection.endChannel);
+    const startRow = Math.min(selection.startRow, selection.endRow);
+    const endRow = Math.max(selection.startRow, selection.endRow);
+
+    for (let ch = startCh; ch <= endCh && ch < p.numChannels; ch++) {
+      const colX = p.channelOffsets[ch] - p.scrollLeft;
+      const chW = p.channelWidths[ch];
+      const y1 = p.baseY + (startRow - vStart) * p.rowHeight;
+      const h = (endRow - startRow + 1) * p.rowHeight;
+      g.rect(colX, y1, chW, h);
+      g.fill({ color: p.theme.accentGlow.color, alpha: 0.15 });
+    }
+  }
+
+  // Peer selection overlay (purple)
+  if (peerSel && peerSel.patternIndex === p.currentPatternIndex) {
+    const pStartCh = Math.min(peerSel.startChannel, peerSel.endChannel);
+    const pEndCh = Math.max(peerSel.startChannel, peerSel.endChannel);
+    const pStartRow = Math.min(peerSel.startRow, peerSel.endRow);
+    const pEndRow = Math.max(peerSel.startRow, peerSel.endRow);
+    for (let ch = pStartCh; ch <= pEndCh && ch < p.numChannels; ch++) {
+      const colX = p.channelOffsets[ch] - p.scrollLeft;
+      const chW = p.channelWidths[ch];
+      const y1 = p.baseY + (pStartRow - vStart) * p.rowHeight;
+      const h = (pEndRow - pStartRow + 1) * p.rowHeight;
+      g.rect(colX, y1, chW, h);
+      g.fill({ color: 0xa855f7, alpha: 0.12 });
+      g.rect(colX, y1, chW, 1); g.fill({ color: 0xa855f7, alpha: 0.45 });
+      g.rect(colX, y1 + h - 1, chW, 1); g.fill({ color: 0xa855f7, alpha: 0.45 });
+      g.rect(colX, y1, 1, h); g.fill({ color: 0xa855f7, alpha: 0.45 });
+      g.rect(colX + chW - 1, y1, 1, h); g.fill({ color: 0xa855f7, alpha: 0.45 });
+    }
+  }
+
+  // Peer cursor overlay (purple block)
+  if (peerCursor.active && peerCursor.patternIndex === p.currentPatternIndex && peerCursor.channel < p.numChannels) {
+    const py = p.baseY + (peerCursor.row - vStart) * p.rowHeight;
+    const px = p.channelOffsets[peerCursor.channel] - p.scrollLeft + 8;
+    g.rect(px, py, CHAR_WIDTH * 3 + 4, p.rowHeight);
+    g.fill({ color: 0xa855f7, alpha: 0.55 });
+  }
+
+  // Cursor caret
+  if (!p.isPlaying && cursorCh >= 0 && cursorCh < p.numChannels) {
+    const colX = p.channelOffsets[cursorCh] - p.scrollLeft;
+    const y = p.baseY + (cursor.rowIndex - vStart) * p.rowHeight;
+    let cursorW = CHAR_WIDTH * 3 + 4;
+    let cursorX = colX + 8;
+    const noteWidth = CHAR_WIDTH * 3 + 4;
+    if (cursor.columnType === 'instrument') { cursorX = colX + 8 + noteWidth + 4; cursorW = CHAR_WIDTH * 2; }
+    else if (cursor.columnType === 'volume') { cursorX = colX + 8 + noteWidth + 4 + CHAR_WIDTH * 2 + 4; cursorW = CHAR_WIDTH * 2; }
+    else if (cursor.columnType === 'effTyp') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 4 + 12; cursorW = CHAR_WIDTH * 3; }
+    else if (cursor.columnType === 'effTyp2') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 7 + 16; cursorW = CHAR_WIDTH * 3; }
+    else if (cursor.columnType === 'flag1') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 10 + 20; cursorW = CHAR_WIDTH; }
+    else if (cursor.columnType === 'flag2') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 11 + 24; cursorW = CHAR_WIDTH; }
+    else if (cursor.columnType === 'probability') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 12 + 28; cursorW = CHAR_WIDTH * 2; }
+
+    g.rect(cursorX, y, cursorW, p.rowHeight);
+    g.fill({ color: p.recordMode ? p.theme.error.color : p.theme.accent.color, alpha: 0.45 });
+  }
+}
+
+/** Generate text labels for visible rows (M/S buttons + cell data). */
+function generateLabels(p: RenderParams, vStart: number, currentRow: number): LabelData[] {
+  if (!p.displayPattern) return [];
+  const labels: LabelData[] = [];
+
+  // M/S button labels
+  const MS_BTN_W = 16;
+  const MS_BTN_H = 12;
+  const MS_BTN_Y = 1;
+  const MS_GAP = 2;
+  const MS_FONT_SIZE = 8;
+  const MS_TEXT_Y = MS_BTN_Y + (MS_BTN_H - MS_FONT_SIZE) / 2;
+
+  for (let ch = 0; ch < p.numChannels; ch++) {
+    const colX = p.channelOffsets[ch] - p.scrollLeft;
+    const chW = p.channelWidths[ch];
+    if (colX + chW < 0 || colX > p.width) continue;
+    const isMuted = p.channelMuted[ch] ?? false;
+    const isSolo = p.channelSolo[ch] ?? false;
+    const btnBaseX = colX + chW - (MS_BTN_W * 2 + MS_GAP + 4);
+
+    labels.push({ x: btnBaseX + (MS_BTN_W - MS_FONT_SIZE * 0.6) / 2, y: MS_TEXT_Y, text: 'M',
+      color: isMuted ? 0xffffff : p.theme.textMuted.color, fontFamily: PIXI_FONTS.MONO });
+    labels.push({ x: btnBaseX + MS_BTN_W + MS_GAP + (MS_BTN_W - MS_FONT_SIZE * 0.6) / 2, y: MS_TEXT_Y, text: 'S',
+      color: isSolo ? 0xffffff : p.theme.textMuted.color, fontFamily: PIXI_FONTS.MONO });
+  }
+
+  for (let i = 0; i < p.visibleLines; i++) {
+    const rowNum = vStart + i;
+    const y = p.baseY + i * p.rowHeight + p.rowHeight / 2 - FONT_SIZE / 2;
+    if (y + p.rowHeight < -p.rowHeight || y > p.gridHeight + p.rowHeight) continue;
+
+    let actualRow = rowNum;
+    let actualPattern = p.displayPattern;
+    let isGhost = false;
+
+    if (rowNum < 0 || rowNum >= p.patternLength) {
+      if (!p.showGhostPatterns) continue;
+      isGhost = true;
+      if (rowNum < 0) {
+        const prevPatIdx = p.displayPatternIndex > 0 ? p.displayPatternIndex - 1 : p.patterns.length - 1;
+        actualPattern = p.patterns[prevPatIdx];
+        if (!actualPattern) continue;
+        actualRow = actualPattern.length + rowNum;
+        if (actualRow < 0) continue;
+      } else {
+        const nextPatIdx = p.displayPatternIndex < p.patterns.length - 1 ? p.displayPatternIndex + 1 : 0;
+        actualPattern = p.patterns[nextPatIdx];
+        if (!actualPattern) continue;
+        actualRow = rowNum - p.patternLength;
+        if (actualRow >= actualPattern.length) continue;
+      }
+    }
+
+    const isHighlightRow = actualRow % p.rowHighlightInterval === 0;
+    let lineNumText: string;
+    if (p.showBeatLabels) {
+      const beat = Math.floor(actualRow / p.rowHighlightInterval) + 1;
+      const tick = (actualRow % p.rowHighlightInterval) + 1;
+      lineNumText = `${beat}.${tick}`;
+    } else {
+      lineNumText = p.useHex
+        ? actualRow.toString(16).toUpperCase().padStart(2, '0')
+        : actualRow.toString().padStart(2, '0');
+    }
+    labels.push({
+      x: 4, y, text: lineNumText,
+      color: isHighlightRow ? p.theme.accentSecondary.color : p.theme.textMuted.color,
+      fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined,
+    });
+
+    for (let ch = 0; ch < p.numChannels; ch++) {
+      const colX = p.channelOffsets[ch] - p.scrollLeft;
+      const chW = p.channelWidths[ch];
+      if (colX + chW < 0 || colX > p.width) continue;
+
+      const channel = actualPattern.channels[ch];
+      if (!channel) continue;
+      const isCollapsed = channel.collapsed;
+      const cell = channel.rows[actualRow];
+      if (!cell) continue;
+      const isCurrentRow = rowNum === currentRow;
+      const baseX = colX + 8;
+
+      const noteText = noteToString(cell.note ?? 0);
+      const noteColor = cell.note === 97
+        ? p.theme.cellEffect.color
+        : (cell.note > 0 && cell.note < 97)
+          ? (isCurrentRow ? 0xffffff : p.theme.cellNote.color)
+          : p.theme.cellEmpty.color;
+      if (noteText !== '---' || !p.blankEmpty) {
+        labels.push({ x: baseX, y, text: noteText, color: noteColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+      }
+
+      if (isCollapsed) continue;
+
+      const noteWidth = CHAR_WIDTH * 3 + 4;
+      let px = baseX + noteWidth + 4;
+
+      const insText = cell.instrument > 0 ? hexByte(cell.instrument) : (p.blankEmpty ? '' : '..');
+      if (insText) {
+        labels.push({ x: px, y, text: insText, color: cell.instrument > 0 ? p.theme.cellInstrument.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+      }
+      px += CHAR_WIDTH * 2 + 4;
+
+      const volValid = cell.volume >= 0x10 && cell.volume <= 0x50;
+      const volText = volValid ? hexByte(cell.volume) : (p.blankEmpty ? '' : '..');
+      if (volText) {
+        labels.push({ x: px, y, text: volText, color: volValid ? p.theme.cellVolume.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+      }
+      px += CHAR_WIDTH * 2 + 4;
+
+      const effectCols = channel.channelMeta?.effectCols ?? 2;
+      for (let e = 0; e < effectCols; e++) {
+        const typ = e === 0 ? (cell.effTyp ?? 0) : (cell.effTyp2 ?? 0);
+        const val = e === 0 ? (cell.eff ?? 0) : (cell.eff2 ?? 0);
+        const effText = formatEffect(typ, val, p.useHex);
+        if (effText !== '...' || !p.blankEmpty) {
+          labels.push({ x: px, y, text: effText, color: (typ > 0 || val > 0) ? p.theme.cellEffect.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        }
+        px += CHAR_WIDTH * 3 + 4;
+      }
+
+      if (p.columnVisibility.flag1 && cell.flag1 !== undefined) {
+        const flagChar = cell.flag1 === 1 ? 'A' : cell.flag1 === 2 ? 'S' : '.';
+        const flagColor = cell.flag1 === 1 ? FLAG_COLORS.accent : cell.flag1 === 2 ? FLAG_COLORS.slide : p.theme.cellEmpty.color;
+        labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        px += CHAR_WIDTH + 4;
+      }
+      if (p.columnVisibility.flag2 && cell.flag2 !== undefined) {
+        const flagChar = cell.flag2 === 1 ? 'M' : cell.flag2 === 2 ? 'H' : '.';
+        const flagColor = cell.flag2 === 1 ? FLAG_COLORS.mute : cell.flag2 === 2 ? FLAG_COLORS.hammer : p.theme.cellEmpty.color;
+        labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        px += CHAR_WIDTH + 4;
+      }
+
+      if (p.columnVisibility.probability && cell.probability !== undefined) {
+        const probText = cell.probability > 0
+          ? (p.useHex ? hexByte(cell.probability) : cell.probability.toString().padStart(2, '0'))
+          : (p.blankEmpty ? '' : '..');
+        if (probText) {
+          labels.push({ x: px, y, text: probText, color: cell.probability > 0 ? probColor(cell.probability) : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        }
+      }
+    }
+  }
+
+  return labels;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface PixiPatternEditorProps {
@@ -102,8 +466,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     pattern,
     patterns,
     currentPatternIndex,
-    cursor,
-    selection,
     showGhostPatterns,
     columnVisibility,
     recordMode,
@@ -121,8 +483,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     pattern: s.patterns[s.currentPatternIndex],
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
-    cursor: s.cursor,
-    selection: s.selection,
     showGhostPatterns: s.showGhostPatterns,
     columnVisibility: s.columnVisibility,
     recordMode: s.recordMode,
@@ -133,7 +493,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     setChannelColor: s.setChannelColor,
     updateChannelName: s.updateChannelName,
     setCell: s.setCell,
-    moveCursorToChannelAndColumn: s.moveCursorToChannelAndColumn,
     copyTrack: s.copyTrack,
     cutTrack: s.cutTrack,
     pasteTrack: s.pasteTrack,
@@ -160,6 +519,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const isPlaying = useTransportStore(s => s.isPlaying);
   const smoothScrolling = useTransportStore(s => s.smoothScrolling);
 
+  // ── Cursor/selection refs — updated via subscription, NOT React state ──────
+  // Cursor/selection changes are the hottest path (every keypress). By keeping
+  // them in refs and redrawing imperatively we bypass @pixi/react reconciliation,
+  // which previously caused "Maximum update depth exceeded" crashes on key-repeat.
+  const cursorRef = useRef(useCursorStore.getState().cursor);
+  const selectionRef = useRef(useCursorStore.getState().selection);
+
   // ── Cell context menu ─────────────────────────────────────────────────────
   const cellContextMenu = useCellContextMenu();
 
@@ -174,21 +540,24 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   const handleOpenParameterEditor = useCallback((field: 'volume' | 'effect' | 'effectParam') => {
     if (!pattern) return;
-    const channelIdx = cellContextMenu.cellInfo?.channelIndex ?? cursor.channelIndex;
-    const start = selection?.startRow ?? cursor.rowIndex;
-    const end = selection?.endRow ?? Math.min(cursor.rowIndex + 15, pattern.length - 1);
+    const cur = cursorRef.current;
+    const sel = selectionRef.current;
+    const channelIdx = cellContextMenu.cellInfo?.channelIndex ?? cur.channelIndex;
+    const start = sel?.startRow ?? cur.rowIndex;
+    const end = sel?.endRow ?? Math.min(cur.rowIndex + 15, pattern.length - 1);
     setParameterEditorState({ isOpen: true, field, channelIndex: channelIdx, startRow: start, endRow: end });
     cellContextMenu.closeMenu();
-  }, [cellContextMenu, cursor, selection, pattern]);
+  }, [cellContextMenu, pattern]);
 
   // ── B/D Animation handlers ────────────────────────────────────────────────
   const bdAnimations = useBDAnimations();
 
   const getBDAnimationOptions = useCallback((channelIndex: number) => {
-    const startRow = selection ? Math.min(selection.startRow, selection.endRow) : 0;
-    const endRow = selection ? Math.max(selection.startRow, selection.endRow) : (pattern?.length ?? 64) - 1;
+    const sel = selectionRef.current;
+    const startRow = sel ? Math.min(sel.startRow, sel.endRow) : 0;
+    const endRow = sel ? Math.max(sel.startRow, sel.endRow) : (pattern?.length ?? 64) - 1;
     return { patternIndex: currentPatternIndex, channelIndex, startRow, endRow };
-  }, [selection, currentPatternIndex, pattern?.length]);
+  }, [currentPatternIndex, pattern?.length]);
 
   const handleReverseVisual = useCallback((ch: number) => bdAnimations.applyReverseVisual(getBDAnimationOptions(ch)), [bdAnimations, getBDAnimationOptions]);
   const handlePolyrhythm = useCallback((ch: number) => { const o = getBDAnimationOptions(ch); bdAnimations.applyPolyrhythm(o.patternIndex, [ch], [3], o.startRow, o.endRow); }, [bdAnimations, getBDAnimationOptions]);
@@ -320,14 +689,14 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   // Broadcast local selection to peer
   useEffect(() => {
-    const unsub = useTrackerStore.subscribe((state, prev) => {
+    const unsub = useCursorStore.subscribe((state, prev) => {
       if (state.selection === prev.selection) return;
       if (useCollaborationStore.getState().status !== 'connected') return;
       const sel = state.selection;
       if (sel) {
         getCollabClient()?.send({
           type: 'peer_selection',
-          patternIndex: state.currentPatternIndex,
+          patternIndex: useTrackerStore.getState().currentPatternIndex,
           startChannel: sel.startChannel, endChannel: sel.endChannel,
           startRow: sel.startRow, endRow: sel.endRow,
         });
@@ -348,8 +717,25 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const [playbackPatternIdx, setPlaybackPatternIdx] = useState(0);
   const smoothOffsetRef = useRef(0);          // frame-rate smooth offset — NO React state
   const gridScrollContainerRef = useRef<ContainerType | null>(null); // inner scroll container
+  const gridGraphicsRef = useRef<GraphicsType | null>(null);
+  const overlayGraphicsRef = useRef<GraphicsType | null>(null);
+  const megaTextRef = useRef<MegaText | null>(null);
   const prevRowRef = useRef(-1);
   const prevPatternRef = useRef(-1);
+
+  // ── MegaText — single Graphics object for all pattern text ───────────────
+  useEffect(() => {
+    const container = gridScrollContainerRef.current;
+    if (!container) return;
+    const mega = new MegaText();
+    container.addChild(mega);
+    megaTextRef.current = mega;
+    return () => {
+      container.removeChild(mega);
+      mega.destroy();
+      megaTextRef.current = null;
+    };
+  }, []);
 
   // ── Channel layout ────────────────────────────────────────────────────────
   const { numChannels, channelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
@@ -463,11 +849,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     return () => cancelAnimationFrame(rafId);
   }, [isPlaying, smoothScrolling]);
 
-  // ── Current row (playback or cursor) ───────────────────────────────────────
-  const currentRow = isPlaying ? playbackRow : cursor.rowIndex;
-  // smoothOffset is now only in smoothOffsetRef.current — no React-visible value.
-  // The inner gridScrollContainerRef container's .y is mutated imperatively by the RAF.
-
   // During playback, use the replayer's pattern index for rendering rather than
   // the store's currentPatternIndex. The RAF loop reads the replayer directly,
   // but the store only updates after queueMicrotask → setCurrentPattern → React
@@ -488,14 +869,85 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const centerLineTop = GL_MUTE_SOLO_H + Math.floor(cellGridHeight / 2) - rowHeight / 2;
   // baseY no longer includes smoothOffset — the inner scroll container handles sub-pixel offset imperatively
   const baseY = centerLineTop - topLines * rowHeight;
-  const vStart = currentRow - topLines;
   const patternLength = displayPattern?.length ?? 64;
+
+  // ── Render params ref — captured each React render, read by imperativeRedraw ──
+  const renderParamsRef = useRef<RenderParams>(null!);
+  renderParamsRef.current = {
+    width, gridHeight, theme, visibleLines, topLines, baseY, patternLength,
+    showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
+    displayPattern, displayPatternIndex, patterns, isPlaying, recordMode,
+    scrollLeft: scrollLeftRef.current, rowHeight, rowHighlightInterval,
+    channelMuted, channelSolo, useHex, blankEmpty, showBeatLabels, columnVisibility,
+    currentPatternIndex, playbackRow, playbackPatternIdx,
+  };
+
+  // ── Imperative redraw — called from subscription (cursor) and useEffect (other deps) ──
+  const prevVStartRef = useRef(-9999);
+  const fullRedrawRef = useRef(true); // Force full redraw on non-cursor dep changes
+
+  const imperativeRedraw = useCallback(() => {
+    const p = renderParamsRef.current;
+    const cursor = cursorRef.current;
+    const selection = selectionRef.current;
+    const currentRow = p.isPlaying ? p.playbackRow : cursor.rowIndex;
+    const vStart = currentRow - p.topLines;
+    const vStartChanged = vStart !== prevVStartRef.current;
+    const mega = megaTextRef.current;
+
+    if (fullRedrawRef.current) {
+      fullRedrawRef.current = false;
+      prevVStartRef.current = vStart;
+      const gGrid = gridGraphicsRef.current;
+      if (gGrid) renderGrid(gGrid, p, vStart);
+      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+    } else if (vStartChanged) {
+      prevVStartRef.current = vStart;
+      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+    }
+
+    const gOverlay = overlayGraphicsRef.current;
+    if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
+      peerCursorRef.current, peerSelectionRef.current);
+  }, []); // Empty deps — everything read from refs
+
+  // ── Cursor/selection subscription with RAF coalescing ─────────────────────
+  const cursorRafRef = useRef(0);
+
+  useEffect(() => {
+    const unsub = useCursorStore.subscribe((state, prev) => {
+      const cursorChanged = state.cursor !== prev.cursor;
+      const selChanged = state.selection !== prev.selection;
+      if (!cursorChanged && !selChanged) return;
+      cursorRef.current = state.cursor;
+      selectionRef.current = state.selection;
+      if (!cursorRafRef.current) {
+        cursorRafRef.current = requestAnimationFrame(() => {
+          cursorRafRef.current = 0;
+          imperativeRedraw();
+        });
+      }
+    });
+    return () => { unsub(); if (cursorRafRef.current) cancelAnimationFrame(cursorRafRef.current); };
+  }, [imperativeRedraw]);
+
+  // ── React-driven redraw — for all non-cursor dep changes ──────────────────
+  useEffect(() => {
+    fullRedrawRef.current = true;
+    imperativeRedraw();
+  }, [width, gridHeight, theme, visibleLines, baseY, patternLength,
+      showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
+      displayPattern, displayPatternIndex, patterns, isPlaying, recordMode, scrollLeft,
+      rowHeight, rowHighlightInterval, channelMuted, channelSolo, useHex, blankEmpty,
+      showBeatLabels, columnVisibility, currentPatternIndex, playbackRow, playbackPatternIdx,
+      imperativeRedraw]);
 
   // ── Click → cell mapping ──────────────────────────────────────────────────
   const getCellFromLocal = useCallback((localX: number, localY: number): { rowIndex: number; channelIndex: number; columnType: CursorPosition['columnType'] } | null => {
     if (!pattern) return null;
+    const currentRowLocal = isPlaying ? playbackRow : cursorRef.current.rowIndex;
     const rowOffset = Math.floor((localY - centerLineTop) / rowHeight);
-    const rowIndex = currentRow + rowOffset;
+    const rowIndex = currentRowLocal + rowOffset;
 
     let channelIndex = 0;
     let foundChannel = false;
@@ -542,7 +994,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     }
 
     return { rowIndex: Math.max(0, Math.min(rowIndex, patternLength - 1)), channelIndex, columnType };
-  }, [pattern, numChannels, channelOffsets, channelWidths, centerLineTop, currentRow, patternLength, columnVisibility]);
+  }, [pattern, numChannels, channelOffsets, channelWidths, centerLineTop, isPlaying, playbackRow, patternLength, columnVisibility, rowHeight]);
 
   // ── Instrument drag-and-drop handlers (need getCellFromLocal) ─────────────
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -626,7 +1078,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     const cell = getCellFromLocal(local.x, local.y);
     if (!cell) return;
 
-    const store = useTrackerStore.getState();
+    const cursorStore = useCursorStore.getState();
 
     // Right-click → context menu
     if (nativeEvent.button === 2) {
@@ -648,11 +1100,11 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     }
 
     if (nativeEvent.shiftKey) {
-      store.updateSelection(cell.channelIndex, cell.rowIndex);
+      cursorStore.updateSelection(cell.channelIndex, cell.rowIndex);
     } else {
-      store.moveCursorToRow(cell.rowIndex);
-      store.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any);
-      store.startSelection();
+      cursorStore.moveCursorToRow(cell.rowIndex);
+      cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any);
+      cursorStore.startSelection();
     }
     isDraggingRef.current = true;
   }, [getCellFromLocal, cellContextMenu, numChannels, channelOffsets, channelWidths, width]);
@@ -669,7 +1121,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     const local = e.getLocalPosition(e.currentTarget);
     const cell = getCellFromLocal(local.x, local.y);
     if (cell) {
-      useTrackerStore.getState().updateSelection(cell.channelIndex, cell.rowIndex, cell.columnType as any);
+      useCursorStore.getState().updateSelection(cell.channelIndex, cell.rowIndex, cell.columnType as any);
     }
   }, [getCellFromLocal]);
 
@@ -713,11 +1165,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
         // Vertical scroll — move cursor
         const delta = Math.sign(e.deltaY) * 2;
-        const store = useTrackerStore.getState();
-        const pat = store.patterns[store.currentPatternIndex];
+        const trackerState = useTrackerStore.getState();
+        const pat = trackerState.patterns[trackerState.currentPatternIndex];
         if (!pat) return;
-        const newRow = Math.max(0, Math.min(pat.length + 32, store.cursor.rowIndex + delta));
-        store.moveCursorToRow(newRow);
+        const cursorState = useCursorStore.getState();
+        const newRow = Math.max(0, Math.min(pat.length + 32, cursorState.cursor.rowIndex + delta));
+        cursorState.moveCursorToRow(newRow);
       } else if (!allFit) {
         // Horizontal scroll — stepped with accumulator (matches DOM behavior)
         scrollAccumulatorRef.current += e.deltaX;
@@ -851,363 +1304,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     };
   }, []);
 
-  // ── Draw grid backgrounds ─────────────────────────────────────────────────
-  const drawGrid = useCallback((g: GraphicsType) => {
-    g.clear();
-
-    // Background
-    if (!trackerVisualBg) {
-      g.rect(0, 0, width, gridHeight);
-      g.fill({ color: theme.bg.color });
-    }
-
-    // Draw rows
-    for (let i = 0; i < visibleLines; i++) {
-      const rowNum = vStart + i;
-      const y = baseY + i * rowHeight;
-      if (y + rowHeight < 0 || y > gridHeight) continue;
-
-      const isInPattern = rowNum >= 0 && rowNum < patternLength;
-      const isGhost = !isInPattern && showGhostPatterns;
-      const ghostAlpha = isGhost ? 0.35 : 1;
-
-      // Row background
-      if (isInPattern || isGhost) {
-        const isHighlight = rowNum >= 0 && rowNum % rowHighlightInterval === 0;
-        g.rect(LINE_NUMBER_WIDTH, y, width - LINE_NUMBER_WIDTH, rowHeight);
-        g.fill({
-          color: isHighlight ? theme.trackerRowHighlight.color : theme.trackerRowOdd.color,
-          alpha: (isHighlight ? theme.trackerRowHighlight.alpha : theme.trackerRowOdd.alpha) * ghostAlpha,
-        });
-      }
-
-      // Center-line highlight (current row)
-      if (rowNum === currentRow) {
-        g.rect(0, y, width, rowHeight);
-        g.fill({ color: theme.accentGlow.color, alpha: trackerVisualBg ? 0.5 : theme.accentGlow.alpha });
-      }
-    }
-
-    // Channel separators and active channel highlight
-    for (let ch = 0; ch < numChannels; ch++) {
-      const colX = channelOffsets[ch] - scrollLeftRef.current;
-      const chW = channelWidths[ch];
-      if (colX + chW < 0 || colX > width) continue;
-
-      // Muted channel overlay — dim the cell area (below M/S strip)
-      if (channelMuted[ch]) {
-        g.rect(colX, GL_MUTE_SOLO_H, chW, gridHeight - GL_MUTE_SOLO_H);
-        g.fill({ color: 0x000000, alpha: 0.45 });
-      }
-
-      // Active channel highlight
-      if (ch === cursor.channelIndex) {
-        g.rect(colX, GL_MUTE_SOLO_H, chW, gridHeight - GL_MUTE_SOLO_H);
-        g.fill({ color: 0xffffff, alpha: 0.02 });
-      }
-
-      // Channel color stripe
-      const channelColor = displayPattern?.channels[ch]?.color;
-      if (channelColor) {
-        g.rect(colX, GL_MUTE_SOLO_H, 2, gridHeight - GL_MUTE_SOLO_H);
-        g.fill({ color: parseInt(channelColor.replace('#', ''), 16), alpha: 0.4 });
-      }
-
-      // Right separator
-      g.rect(colX + chW - 1, 0, 1, gridHeight);
-      g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-    }
-
-    // Selection overlay
-    if (selection && displayPattern) {
-      const startCh = Math.min(selection.startChannel, selection.endChannel);
-      const endCh = Math.max(selection.startChannel, selection.endChannel);
-      const startRow = Math.min(selection.startRow, selection.endRow);
-      const endRow = Math.max(selection.startRow, selection.endRow);
-
-      for (let ch = startCh; ch <= endCh && ch < numChannels; ch++) {
-        const colX = channelOffsets[ch] - scrollLeftRef.current;
-        const chW = channelWidths[ch];
-        const y1 = baseY + (startRow - vStart) * rowHeight;
-        const h = (endRow - startRow + 1) * rowHeight;
-        g.rect(colX, y1, chW, h);
-        g.fill({ color: theme.accentGlow.color, alpha: 0.15 });
-      }
-    }
-
-    // Peer selection overlay (purple)
-    const ps = peerSelectionRef.current;
-    if (ps && ps.patternIndex === currentPatternIndex) {
-      const pStartCh = Math.min(ps.startChannel, ps.endChannel);
-      const pEndCh = Math.max(ps.startChannel, ps.endChannel);
-      const pStartRow = Math.min(ps.startRow, ps.endRow);
-      const pEndRow = Math.max(ps.startRow, ps.endRow);
-      for (let ch = pStartCh; ch <= pEndCh && ch < numChannels; ch++) {
-        const colX = channelOffsets[ch] - scrollLeftRef.current;
-        const chW = channelWidths[ch];
-        const y1 = baseY + (pStartRow - vStart) * rowHeight;
-        const h = (pEndRow - pStartRow + 1) * rowHeight;
-        g.rect(colX, y1, chW, h);
-        g.fill({ color: 0xa855f7, alpha: 0.12 });
-        g.rect(colX, y1, chW, 1); g.fill({ color: 0xa855f7, alpha: 0.45 });
-        g.rect(colX, y1 + h - 1, chW, 1); g.fill({ color: 0xa855f7, alpha: 0.45 });
-        g.rect(colX, y1, 1, h); g.fill({ color: 0xa855f7, alpha: 0.45 });
-        g.rect(colX + chW - 1, y1, 1, h); g.fill({ color: 0xa855f7, alpha: 0.45 });
-      }
-    }
-
-    // Peer cursor overlay (purple block)
-    const pc = peerCursorRef.current;
-    if (pc.active && pc.patternIndex === currentPatternIndex && pc.channel < numChannels) {
-      const py = baseY + (pc.row - vStart) * rowHeight;
-      const px = channelOffsets[pc.channel] - scrollLeftRef.current + 8;
-      g.rect(px, py, CHAR_WIDTH * 3 + 4, rowHeight);
-      g.fill({ color: 0xa855f7, alpha: 0.55 });
-    }
-
-    // Cursor position
-    if (!isPlaying) {
-      const cursorCh = cursor.channelIndex;
-      if (cursorCh >= 0 && cursorCh < numChannels) {
-        const colX = channelOffsets[cursorCh] - scrollLeftRef.current;
-        const y = baseY + (cursor.rowIndex - vStart) * rowHeight;
-        let cursorW = CHAR_WIDTH * 3 + 4; // note
-        let cursorX = colX + 8;
-        const noteWidth = CHAR_WIDTH * 3 + 4;
-        if (cursor.columnType === 'instrument') { cursorX = colX + 8 + noteWidth + 4; cursorW = CHAR_WIDTH * 2; }
-        else if (cursor.columnType === 'volume') { cursorX = colX + 8 + noteWidth + 4 + CHAR_WIDTH * 2 + 4; cursorW = CHAR_WIDTH * 2; }
-        else if (cursor.columnType === 'effTyp') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 4 + 12; cursorW = CHAR_WIDTH * 3; }
-        else if (cursor.columnType === 'effTyp2') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 7 + 16; cursorW = CHAR_WIDTH * 3; }
-        else if (cursor.columnType === 'flag1') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 10 + 20; cursorW = CHAR_WIDTH; }
-        else if (cursor.columnType === 'flag2') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 11 + 24; cursorW = CHAR_WIDTH; }
-        else if (cursor.columnType === 'probability') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 12 + 28; cursorW = CHAR_WIDTH * 2; }
-
-        g.rect(cursorX, y, cursorW, rowHeight);
-        g.fill({ color: recordMode ? theme.error.color : theme.accent.color, alpha: 0.45 });
-      }
-    }
-
-    // ── GL Mute/Solo button strip (top of grid canvas) ─────────────────
-    const MS_BTN_W = 16;
-    const MS_BTN_H = 12;
-    const MS_BTN_Y = 1;
-    const MS_GAP = 2;
-
-    // Strip background
-    g.rect(LINE_NUMBER_WIDTH, 0, width - LINE_NUMBER_WIDTH, GL_MUTE_SOLO_H);
-    g.fill({ color: theme.bgTertiary.color, alpha: 0.9 });
-    // Bottom separator line
-    g.rect(LINE_NUMBER_WIDTH, GL_MUTE_SOLO_H - 1, width - LINE_NUMBER_WIDTH, 1);
-    g.fill({ color: theme.border.color, alpha: 0.4 });
-
-    for (let ch = 0; ch < numChannels; ch++) {
-      const colX = channelOffsets[ch] - scrollLeftRef.current;
-      const chW = channelWidths[ch];
-      if (colX + chW < 0 || colX > width) continue;
-      const isMuted = channelMuted[ch] ?? false;
-      const isSolo = channelSolo[ch] ?? false;
-      const btnBaseX = colX + chW - (MS_BTN_W * 2 + MS_GAP + 4);
-
-      // M button background
-      const mBgColor = isMuted ? theme.warning.color : theme.bgSecondary.color;
-      const mBgAlpha = isMuted ? 0.85 : 0.6;
-      g.rect(btnBaseX, MS_BTN_Y, MS_BTN_W, MS_BTN_H);
-      g.fill({ color: mBgColor, alpha: mBgAlpha });
-
-      // S button background
-      const sBgColor = isSolo ? theme.accent.color : theme.bgSecondary.color;
-      const sBgAlpha = isSolo ? 0.85 : 0.6;
-      g.rect(btnBaseX + MS_BTN_W + MS_GAP, MS_BTN_Y, MS_BTN_W, MS_BTN_H);
-      g.fill({ color: sBgColor, alpha: sBgAlpha });
-    }
-
-    // Line number gutter background
-    g.rect(0, 0, LINE_NUMBER_WIDTH, gridHeight);
-    g.fill({ color: theme.bg.color, alpha: 0.85 });
-  }, [width, gridHeight, theme, visibleLines, vStart, baseY, patternLength, currentRow,
-      showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
-      cursor, selection, displayPattern, isPlaying, recordMode, scrollLeft, displayPatternIndex,
-      rowHeight, rowHighlightInterval, channelMuted, channelSolo]);
-
-  // ── Generate text labels for visible rows ─────────────────────────────────
-  const cellLabels = useMemo(() => {
-    if (!displayPattern) return [];
-    const labels: { x: number; y: number; text: string; color: number; bold?: boolean; alpha?: number }[] = [];
-
-    // ── GL Mute/Solo button labels ─────────────────────────────────────────
-    const MS_BTN_W = 16;
-    const MS_BTN_H = 12;
-    const MS_BTN_Y = 1;
-    const MS_GAP = 2;
-    const MS_FONT_SIZE = 8;
-    const MS_TEXT_Y = MS_BTN_Y + (MS_BTN_H - MS_FONT_SIZE) / 2;
-
-    for (let ch = 0; ch < numChannels; ch++) {
-      const colX = channelOffsets[ch] - scrollLeftRef.current;
-      const chW = channelWidths[ch];
-      if (colX + chW < 0 || colX > width) continue;
-      const isMuted = channelMuted[ch] ?? false;
-      const isSolo = channelSolo[ch] ?? false;
-      const btnBaseX = colX + chW - (MS_BTN_W * 2 + MS_GAP + 4);
-
-      // M label
-      labels.push({
-        x: btnBaseX + (MS_BTN_W - MS_FONT_SIZE * 0.6) / 2,
-        y: MS_TEXT_Y,
-        text: 'M',
-        color: isMuted ? theme.warning.color : theme.textMuted.color,
-        bold: isMuted,
-      });
-      // S label
-      labels.push({
-        x: btnBaseX + MS_BTN_W + MS_GAP + (MS_BTN_W - MS_FONT_SIZE * 0.6) / 2,
-        y: MS_TEXT_Y,
-        text: 'S',
-        color: isSolo ? theme.accent.color : theme.textMuted.color,
-        bold: isSolo,
-      });
-    }
-
-    for (let i = 0; i < visibleLines; i++) {
-      const rowNum = vStart + i;
-      const y = baseY + i * rowHeight + rowHeight / 2 - FONT_SIZE / 2;
-      if (y + rowHeight < -rowHeight || y > gridHeight + rowHeight) continue;
-
-      // Determine if this row is from the current pattern or a ghost
-      let actualRow = rowNum;
-      let actualPattern = displayPattern;
-      let isGhost = false;
-
-      if (rowNum < 0 || rowNum >= patternLength) {
-        if (!showGhostPatterns) continue;
-        isGhost = true;
-        // Wrap into adjacent patterns
-        if (rowNum < 0) {
-          const prevPatIdx = displayPatternIndex > 0 ? displayPatternIndex - 1 : patterns.length - 1;
-          actualPattern = patterns[prevPatIdx];
-          if (!actualPattern) continue;
-          actualRow = actualPattern.length + rowNum;
-          if (actualRow < 0) continue;
-        } else {
-          const nextPatIdx = displayPatternIndex < patterns.length - 1 ? displayPatternIndex + 1 : 0;
-          actualPattern = patterns[nextPatIdx];
-          if (!actualPattern) continue;
-          actualRow = rowNum - patternLength;
-          if (actualRow >= actualPattern.length) continue;
-        }
-      }
-
-      // Line number
-      const isHighlightRow = actualRow % rowHighlightInterval === 0;
-      let lineNumText: string;
-      if (showBeatLabels) {
-        const beat = Math.floor(actualRow / rowHighlightInterval) + 1;
-        const tick = (actualRow % rowHighlightInterval) + 1;
-        lineNumText = `${beat}.${tick}`;
-      } else {
-        lineNumText = useHex
-          ? actualRow.toString(16).toUpperCase().padStart(2, '0')
-          : actualRow.toString().padStart(2, '0');
-      }
-      labels.push({
-        x: 4,
-        y,
-        text: lineNumText,
-        color: isHighlightRow ? theme.accentSecondary.color : theme.textMuted.color,
-        bold: isHighlightRow,
-        alpha: isGhost ? 0.35 : undefined,
-      });
-
-      // Per-channel cells
-      for (let ch = 0; ch < numChannels; ch++) {
-        const colX = channelOffsets[ch] - scrollLeftRef.current;
-        const chW = channelWidths[ch];
-        if (colX + chW < 0 || colX > width) continue;
-
-        const channel = actualPattern.channels[ch];
-        if (!channel) continue;
-        const isCollapsed = channel.collapsed;
-        const cell = channel.rows[actualRow];
-        if (!cell) continue;
-
-        const isCurrentRow = rowNum === currentRow;
-        const baseX = colX + 8;
-
-        // Note column
-        const noteText = noteToString(cell.note ?? 0);
-        const noteColor = cell.note === 97
-          ? theme.cellEffect.color
-          : (cell.note > 0 && cell.note < 97)
-            ? (isCurrentRow ? 0xffffff : theme.cellNote.color)
-            : theme.cellEmpty.color;
-        if (noteText !== '---' || !blankEmpty) {
-          labels.push({ x: baseX, y, text: noteText, color: noteColor, alpha: isGhost ? 0.35 : undefined });
-        }
-
-        if (isCollapsed) continue;
-
-        const noteWidth = CHAR_WIDTH * 3 + 4;
-        let px = baseX + noteWidth + 4;
-
-        // Instrument
-        const insText = cell.instrument > 0 ? hexByte(cell.instrument) : (blankEmpty ? '' : '..');
-        if (insText) {
-          labels.push({ x: px, y, text: insText, color: cell.instrument > 0 ? theme.cellInstrument.color : theme.cellEmpty.color, alpha: isGhost ? 0.35 : undefined });
-        }
-        px += CHAR_WIDTH * 2 + 4;
-
-        // Volume
-        const volValid = cell.volume >= 0x10 && cell.volume <= 0x50;
-        const volText = volValid ? hexByte(cell.volume) : (blankEmpty ? '' : '..');
-        if (volText) {
-          labels.push({ x: px, y, text: volText, color: volValid ? theme.cellVolume.color : theme.cellEmpty.color, alpha: isGhost ? 0.35 : undefined });
-        }
-        px += CHAR_WIDTH * 2 + 4;
-
-        // Effect columns
-        const effectCols = channel.channelMeta?.effectCols ?? 2;
-        for (let e = 0; e < effectCols; e++) {
-          const typ = e === 0 ? (cell.effTyp ?? 0) : (cell.effTyp2 ?? 0);
-          const val = e === 0 ? (cell.eff ?? 0) : (cell.eff2 ?? 0);
-          const effText = formatEffect(typ, val, useHex);
-          if (effText !== '...' || !blankEmpty) {
-            labels.push({ x: px, y, text: effText, color: (typ > 0 || val > 0) ? theme.cellEffect.color : theme.cellEmpty.color, alpha: isGhost ? 0.35 : undefined });
-          }
-          px += CHAR_WIDTH * 3 + 4;
-        }
-
-        // Flag columns
-        if (columnVisibility.flag1 && cell.flag1 !== undefined) {
-          const flagChar = cell.flag1 === 1 ? 'A' : cell.flag1 === 2 ? 'S' : '.';
-          const flagColor = cell.flag1 === 1 ? FLAG_COLORS.accent : cell.flag1 === 2 ? FLAG_COLORS.slide : theme.cellEmpty.color;
-          labels.push({ x: px, y, text: flagChar, color: flagColor, alpha: isGhost ? 0.35 : undefined });
-          px += CHAR_WIDTH + 4;
-        }
-        if (columnVisibility.flag2 && cell.flag2 !== undefined) {
-          const flagChar = cell.flag2 === 1 ? 'M' : cell.flag2 === 2 ? 'H' : '.';
-          const flagColor = cell.flag2 === 1 ? FLAG_COLORS.mute : cell.flag2 === 2 ? FLAG_COLORS.hammer : theme.cellEmpty.color;
-          labels.push({ x: px, y, text: flagChar, color: flagColor, alpha: isGhost ? 0.35 : undefined });
-          px += CHAR_WIDTH + 4;
-        }
-
-        // Probability
-        if (columnVisibility.probability && cell.probability !== undefined) {
-          const probText = cell.probability > 0
-            ? (useHex ? hexByte(cell.probability) : cell.probability.toString().padStart(2, '0'))
-            : (blankEmpty ? '' : '..');
-          if (probText) {
-            labels.push({ x: px, y, text: probText, color: cell.probability > 0 ? probColor(cell.probability) : theme.cellEmpty.color, alpha: isGhost ? 0.35 : undefined });
-          }
-        }
-      }
-    }
-
-    return labels;
-  }, [displayPattern, patterns, displayPatternIndex, visibleLines, vStart, baseY, gridHeight,
-      patternLength, showGhostPatterns, useHex, blankEmpty, numChannels,
-      channelOffsets, channelWidths, width, currentRow, theme, columnVisibility, scrollLeft,
-      rowHeight, rowHighlightInterval, showBeatLabels, channelMuted, channelSolo]);
-
   if (!pattern) {
     return (
       <pixiContainer layout={{ width, height }}>
@@ -1306,22 +1402,10 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
           layout={{ position: 'absolute', width, height: gridHeight }}
           eventMode="none"
         >
-          <pixiGraphics draw={drawGrid} layout={{ position: 'absolute', width, height: gridHeight }} />
+          <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={{ position: 'absolute', width, height: gridHeight }} />
+          <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={{ position: 'absolute', width, height: gridHeight }} />
 
-          {/* Cell text labels — positioned via x/y (not layout) so that React can freely
-              add/remove them without freeing Yoga nodes. Variable-count layout children
-              trigger Yoga BindingErrors when the array shrinks during scroll. */}
-          {cellLabels.map((label, i) => (
-            <pixiBitmapText
-              key={`cell-${i}`}
-              text={label.text}
-              style={{ fontFamily: label.bold ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }}
-              tint={label.color}
-              alpha={label.alpha ?? 1.0}
-              x={label.x}
-              y={label.y}
-            />
-          ))}
+          {/* MegaText added imperatively to gridScrollContainerRef */}
         </pixiContainer>
 
         {/* Drag-and-drop overlay for instruments — only visible during drag */}

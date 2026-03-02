@@ -134,6 +134,7 @@ import {
 } from '@engine/keyboard/commands/trackerScratch';
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useCursorStore } from '@stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
 
@@ -150,14 +151,16 @@ export function getGlobalRegistry(): CommandRegistry {
 }
 
 function setVolumeInCell(volume: number): boolean {
-  const { cursor, setCell } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
+  const { setCell } = useTrackerStore.getState();
   setCell(cursor.channelIndex, cursor.rowIndex, { volume });
   return true;
 }
 
 function adjustVolumeInCell(delta: number): () => boolean {
   return () => {
-    const { cursor, patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+    const { cursor } = useCursorStore.getState();
+    const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
     const cell = patterns[currentPatternIndex]?.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
     if (!cell) return true;
     const newVol = Math.max(0, Math.min(64, (cell.volume || 0) + delta));
@@ -640,7 +643,8 @@ function initializeRegistry() {
       return true;
     }, description: 'Kill sample' },
     { name: 'kill_to_end', contexts: ['pattern'], handler: () => {
-      const { cursor, patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
+      const { cursor } = useCursorStore.getState();
+      const { patterns, currentPatternIndex, setCell } = useTrackerStore.getState();
       const pattern = patterns[currentPatternIndex];
       for (let r = cursor.rowIndex; r < pattern.length; r++) {
         setCell(cursor.channelIndex, r, { note: 97, instrument: 0 });
@@ -649,7 +653,8 @@ function initializeRegistry() {
       return true;
     }, description: 'Kill notes to end of pattern' },
     { name: 'kill_to_start', contexts: ['pattern'], handler: () => {
-      const { cursor, setCell } = useTrackerStore.getState();
+      const { cursor } = useCursorStore.getState();
+      const { setCell } = useTrackerStore.getState();
       for (let r = 0; r <= cursor.rowIndex; r++) {
         setCell(cursor.channelIndex, r, { note: 97, instrument: 0 });
       }

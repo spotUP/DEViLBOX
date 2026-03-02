@@ -84,6 +84,33 @@ export function initDatabase() {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- SongDB tables (audacious-uade-tools metadata database)
+    CREATE TABLE IF NOT EXISTS songdb_lengths (
+      hash TEXT NOT NULL,
+      min_subsong INTEGER NOT NULL,
+      subsong_data TEXT NOT NULL,
+      PRIMARY KEY (hash, min_subsong)
+    );
+
+    CREATE TABLE IF NOT EXISTS songdb_modinfos (
+      hash TEXT PRIMARY KEY,
+      format TEXT,
+      channels INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS songdb_metadata (
+      hash TEXT PRIMARY KEY,
+      authors TEXT,
+      publishers TEXT,
+      album TEXT,
+      year TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS songdb_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   // Migration: add type column to files table

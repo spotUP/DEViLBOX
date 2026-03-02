@@ -19,7 +19,7 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiLabel, PixiButton } from '../../components';
-import { useTrackerStore, useTransportStore } from '@stores';
+import { useTrackerStore, useTransportStore, useCursorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 
 // ─── Note formatting ─────────────────────────────────────────────────────────
@@ -102,16 +102,31 @@ export const PixiSunVoxChannelView: React.FC<PixiSunVoxChannelViewProps> = ({
   const [scrollTop, setScrollTop] = useState(0);
   const scrollTopRef = useRef(0);
 
-  // Keep scrollTop centred on the current row (playback or cursor)
-  const cursorRow = useTrackerStore((s) => s.cursor.rowIndex);
-  const displayRow = isPlaying ? (currentRow % patternLength) : cursorRow;
-
   const gridHeight = height - TRANSPORT_H - HEADER_H;
   const visibleRows = Math.ceil(gridHeight / ROW_HEIGHT) + 2;
   const topRows     = Math.floor(visibleRows / 2);
   const centerLineY = Math.floor(gridHeight / 2) - ROW_HEIGHT / 2;
 
-  // Derive scroll so the display row is centred
+  // Cursor ref — avoids @pixi/react reconciliation on every cursor move
+  const cursorRowRef = useRef(useCursorStore.getState().cursor.rowIndex);
+  useEffect(() => {
+    const unsub = useCursorStore.subscribe((state, prev) => {
+      if (state.cursor.rowIndex !== prev.cursor.rowIndex) {
+        cursorRowRef.current = state.cursor.rowIndex;
+        if (!isPlaying) {
+          const target = state.cursor.rowIndex - topRows;
+          if (target !== scrollTopRef.current) {
+            scrollTopRef.current = target;
+            setScrollTop(target);
+          }
+        }
+      }
+    });
+    return unsub;
+  }, [isPlaying, topRows]);
+  const displayRow = isPlaying ? (currentRow % patternLength) : cursorRowRef.current;
+
+  // Derive scroll so the display row is centred (for playback + initial render)
   useEffect(() => {
     const target = displayRow - topRows;
     if (target !== scrollTopRef.current) {

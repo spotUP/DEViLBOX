@@ -3,13 +3,15 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useCursorStore } from '@/stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
 
 /**
  * Toggle mute on current channel
  */
 export function muteChannel(): boolean {
-  const { cursor, toggleChannelMute, patterns, currentPatternIndex } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
+  const { toggleChannelMute, patterns, currentPatternIndex } = useTrackerStore.getState();
   const pattern = patterns[currentPatternIndex];
   if (!pattern) return false;
   
@@ -30,7 +32,8 @@ export function muteChannel(): boolean {
  * Toggle solo on current channel
  */
 export function soloChannel(): boolean {
-  const { cursor, toggleChannelSolo, patterns, currentPatternIndex } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
+  const { toggleChannelSolo, patterns, currentPatternIndex } = useTrackerStore.getState();
   const pattern = patterns[currentPatternIndex];
   if (!pattern) return false;
   
@@ -74,7 +77,7 @@ export function unmuteAll(): boolean {
  */
 function createSetTrackCommand(track: number) {
   return function(): boolean {
-    const { moveCursorToChannel } = useTrackerStore.getState();
+    const { moveCursorToChannel } = useCursorStore.getState();
     moveCursorToChannel(track - 1);
     useUIStore.getState().setStatusMessage(`Channel ${track}`, false, 1000);
     return true;

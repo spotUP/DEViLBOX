@@ -89,10 +89,11 @@ export function attachFPSLimiter(app: Application): () => void {
     }
   };
 
-  // Listen for user activity
+  // Listen for user activity — use capture phase so stopPropagation() in
+  // keyboard handlers doesn't prevent us from seeing keydown events.
   const events = ['pointerdown', 'pointermove', 'wheel', 'keydown'] as const;
   for (const evt of events) {
-    window.addEventListener(evt, markActive, { passive: true });
+    window.addEventListener(evt, markActive, { passive: true, capture: true });
   }
 
   // Check periodically
@@ -104,7 +105,7 @@ export function attachFPSLimiter(app: Application): () => void {
   return () => {
     app.ticker.remove(frameTracker);
     for (const evt of events) {
-      window.removeEventListener(evt, markActive);
+      window.removeEventListener(evt, markActive, { capture: true });
     }
     clearInterval(intervalId);
   };

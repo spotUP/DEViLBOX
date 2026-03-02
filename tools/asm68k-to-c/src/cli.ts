@@ -24,9 +24,14 @@ program
   .option('--dry-run', 'Parse and report only, no output files')
   .option('--verbose', 'Show symbol table and warnings')
   .option('--pass2', 'Enable Pass 2 restructuring (experimental)', false)
+  .option('-P, --preamble <file>', 'Prepend ASM file before main source (repeatable)', (v: string, acc: string[]) => [...acc, v], [] as string[])
   .action((inputs: string[], opts) => {
     for (const inputPath of inputs) {
-      const source = readFileSync(inputPath, 'utf8');
+      // Build source: optional preamble files + main source
+      const preambles = (opts.preamble as string[] | undefined) ?? [];
+      const preambleSource = preambles.map(p => readFileSync(p, 'utf8')).join('\n');
+      const mainSource = readFileSync(inputPath, 'utf8');
+      const source = preambleSource ? preambleSource + '\n' + mainSource : mainSource;
       const name   = opts.playerName ?? basename(inputPath, extname(inputPath));
       const outDir = join(opts.outputDir, name);
 

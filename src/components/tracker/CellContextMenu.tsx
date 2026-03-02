@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useCursorStore } from '@stores/useCursorStore';
 
 interface CellContextMenuProps {
   isOpen?: boolean;
@@ -74,35 +75,30 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   onBounce,
   onChaos,
 }) => {
+  const cursor = useCursorStore((s) => s.cursor);
+  const selection = useCursorStore((s) => s.selection);
+  const selectColumn = useCursorStore((s) => s.selectColumn);
+  const selectChannel = useCursorStore((s) => s.selectChannel);
+  const clearSelection = useCursorStore((s) => s.clearSelection);
   const {
     patterns,
     currentPatternIndex,
     setCell,
-    cursor,
-    selection,
-    selectColumn,
-    selectChannel,
     copySelection,
     cutSelection,
     paste,
     transposeSelection,
     interpolateSelection,
-    clearSelection,
     removeChannel,
   } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
     setCell: s.setCell,
-    cursor: s.cursor,
-    selection: s.selection,
-    selectColumn: s.selectColumn,
-    selectChannel: s.selectChannel,
     copySelection: s.copySelection,
     cutSelection: s.cutSelection,
     paste: s.paste,
     transposeSelection: s.transposeSelection,
     interpolateSelection: s.interpolateSelection,
-    clearSelection: s.clearSelection,
     removeChannel: s.removeChannel,
   })));
 

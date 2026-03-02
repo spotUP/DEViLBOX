@@ -3,6 +3,7 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useCursorStore } from '@/stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
 
 /**
@@ -55,7 +56,8 @@ export function pushForwardPaste(): boolean {
  */
 export function cutRow(): boolean {
   const store = useTrackerStore.getState();
-  const { cursor, patterns, currentPatternIndex } = store;
+  const { cursor } = useCursorStore.getState();
+  const { patterns, currentPatternIndex } = store;
   const pattern = patterns[currentPatternIndex];
   // Copy row data to clipboard
   const rowData = pattern.channels.map(ch => [{ ...ch.rows[cursor.rowIndex] }]);
@@ -72,7 +74,8 @@ export function cutRow(): boolean {
  */
 export function copyRow(): boolean {
   const store = useTrackerStore.getState();
-  const { cursor, patterns, currentPatternIndex } = store;
+  const { cursor } = useCursorStore.getState();
+  const { patterns, currentPatternIndex } = store;
   const pattern = patterns[currentPatternIndex];
   const rowData = pattern.channels.map(ch => [{ ...ch.rows[cursor.rowIndex] }]);
   store.setClipboard({ channels: pattern.channels.length, rows: 1, data: rowData, columnTypes: [] });
@@ -84,7 +87,8 @@ export function copyRow(): boolean {
  */
 export function cutNote(): boolean {
   const store = useTrackerStore.getState();
-  const { cursor, patterns, currentPatternIndex } = store;
+  const { cursor } = useCursorStore.getState();
+  const { patterns, currentPatternIndex } = store;
   const cell = patterns[currentPatternIndex].channels[cursor.channelIndex].rows[cursor.rowIndex];
   store.setClipboard({ channels: 1, rows: 1, data: [[{ ...cell }]], columnTypes: ['note', 'instrument'] });
   store.setCell(cursor.channelIndex, cursor.rowIndex, { note: 0, instrument: 0 });
@@ -96,7 +100,7 @@ export function cutNote(): boolean {
  */
 export function clearNote(): boolean {
   const store = useTrackerStore.getState();
-  const { cursor } = store;
+  const { cursor } = useCursorStore.getState();
   store.setCell(cursor.channelIndex, cursor.rowIndex, { note: 0, instrument: 0 });
   return true;
 }
@@ -106,7 +110,8 @@ export function clearNote(): boolean {
  */
 export function clearRow(): boolean {
   const store = useTrackerStore.getState();
-  const { cursor, patterns, currentPatternIndex } = store;
+  const { cursor } = useCursorStore.getState();
+  const { patterns, currentPatternIndex } = store;
   const pattern = patterns[currentPatternIndex];
   for (let ch = 0; ch < pattern.channels.length; ch++) {
     store.clearCell(ch, cursor.rowIndex);
@@ -119,7 +124,8 @@ export function clearRow(): boolean {
  */
 export function deleteRowPullUp(): boolean {
   const store = useTrackerStore.getState();
-  const { cursor, patterns, currentPatternIndex } = store;
+  const { cursor } = useCursorStore.getState();
+  const { patterns, currentPatternIndex } = store;
   const pattern = patterns[currentPatternIndex];
   for (let ch = 0; ch < pattern.channels.length; ch++) {
     store.deleteRow(ch, cursor.rowIndex);
@@ -132,7 +138,8 @@ export function deleteRowPullUp(): boolean {
  */
 export function insertRowPushDown(): boolean {
   const store = useTrackerStore.getState();
-  const { cursor, patterns, currentPatternIndex } = store;
+  const { cursor } = useCursorStore.getState();
+  const { patterns, currentPatternIndex } = store;
   const pattern = patterns[currentPatternIndex];
   for (let ch = 0; ch < pattern.channels.length; ch++) {
     store.insertRow(ch, cursor.rowIndex);
@@ -156,7 +163,7 @@ export function clearSelection(): boolean {
  */
 export function copyPattern(): boolean {
   const store = useTrackerStore.getState();
-  store.selectPattern();
+  useCursorStore.getState().selectPattern();
   store.copySelection();
   useUIStore.getState().setStatusMessage('Pattern copied', false, 800);
   return true;
@@ -176,7 +183,7 @@ export function pastePattern(): boolean {
  */
 export function cutChannel(): boolean {
   const store = useTrackerStore.getState();
-  store.cutTrack(store.cursor.channelIndex);
+  store.cutTrack(useCursorStore.getState().cursor.channelIndex);
   useUIStore.getState().setStatusMessage('Channel cut', false, 800);
   return true;
 }
@@ -186,7 +193,7 @@ export function cutChannel(): boolean {
  */
 export function copyChannel(): boolean {
   const store = useTrackerStore.getState();
-  store.copyTrack(store.cursor.channelIndex);
+  store.copyTrack(useCursorStore.getState().cursor.channelIndex);
   useUIStore.getState().setStatusMessage('Channel copied', false, 800);
   return true;
 }
@@ -196,7 +203,7 @@ export function copyChannel(): boolean {
  */
 export function pasteChannel(): boolean {
   const store = useTrackerStore.getState();
-  store.pasteTrack(store.cursor.channelIndex);
+  store.pasteTrack(useCursorStore.getState().cursor.channelIndex);
   useUIStore.getState().setStatusMessage('Channel pasted', false, 800);
   return true;
 }

@@ -13,6 +13,7 @@ import { SignalingClient } from '@lib/collaboration/SignalingClient';
 import { startSongSync, stopSongSync, snapshotProject, applyRemotePatch } from '@lib/collaboration/SongSyncLayer';
 import type { SignalingServerMsg } from '@lib/collaboration/types';
 import { useTrackerStore } from './useTrackerStore';
+import { useCursorStore } from './useCursorStore';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -256,11 +257,12 @@ function _setupClientCallbacks(): void {
     // without needing to wait for us to move the cursor.
     setTimeout(() => {
       const ts = useTrackerStore.getState();
+      const cs = useCursorStore.getState();
       _client?.send({
         type: 'peer_cursor',
         patternIndex: ts.currentPatternIndex,
-        channelIndex: ts.cursor.channelIndex,
-        rowIndex: ts.cursor.rowIndex,
+        channelIndex: cs.cursor.channelIndex,
+        rowIndex: cs.cursor.rowIndex,
       });
     }, 300);
 
@@ -375,16 +377,15 @@ useTrackerStore.subscribe((state, prev) => {
 });
 
 // ─── Side effect: broadcast peer_cursor when local cursor moves ────────────────
-useTrackerStore.subscribe((state, prev) => {
+useCursorStore.subscribe((state, prev) => {
   if (
     state.cursor.rowIndex === prev.cursor.rowIndex &&
-    state.cursor.channelIndex === prev.cursor.channelIndex &&
-    state.currentPatternIndex === prev.currentPatternIndex
+    state.cursor.channelIndex === prev.cursor.channelIndex
   ) return;
   if (useCollaborationStore.getState().status !== 'connected') return;
   _client?.send({
     type: 'peer_cursor',
-    patternIndex: state.currentPatternIndex,
+    patternIndex: useTrackerStore.getState().currentPatternIndex,
     channelIndex: state.cursor.channelIndex,
     rowIndex: state.cursor.rowIndex,
   });

@@ -1,5 +1,5 @@
 import * as Tone from 'tone';
-import { useTrackerStore } from '@stores/useTrackerStore';
+import { useCursorStore } from '@/stores/useCursorStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
@@ -18,7 +18,7 @@ export function playFromCursor(): boolean {
   unlockIOSAudio();
   Tone.start();
   
-  const { cursor } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
   const { isPlaying, stop, play, setCurrentRow } = useTransportStore.getState();
 
   // Stop if currently playing

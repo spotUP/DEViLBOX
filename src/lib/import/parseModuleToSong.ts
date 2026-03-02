@@ -1653,17 +1653,18 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     }
   }
 
-  // ── ZoundMonitor (sng.* prefix) ──────────────────────────────────────────────
-  // Amiga compiled 68k music format (UADE eagleplayer prefix "sng").
-  // Note: .sng extension is Richard Joseph; this block only matches sng.* prefix.
+  // ── ZoundMonitor (sng.* prefix OR *.sng extension) ──────────────────────────
+  // Amiga 4-channel PCM tracker by A.J. van Dongen.
+  // Matched by: "sng." prefix (UADE convention) OR ".sng" extension (non-RJP files;
+  // Richard Joseph .sng files are caught earlier by the RJP magic check).
   // Detection: computed offset from bytes[0..1], then "df?:" or "?amp" tag check.
   {
     const _zBase = (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
-    if (_zBase.startsWith('sng.')) {
+    if (_zBase.startsWith('sng.') || _zBase.endsWith('.sng')) {
       if (prefs.zoundMonitor === 'native') {
         try {
           const { isZoundMonitorFormat, parseZoundMonitorFile } = await import('@lib/import/formats/ZoundMonitorParser');
-          if (isZoundMonitorFormat(buffer, file.name)) return parseZoundMonitorFile(buffer, file.name);
+          if (isZoundMonitorFormat(buffer, file.name)) return parseZoundMonitorFile(buffer, file.name, companionFiles);
         } catch (err) {
           console.warn(`[ZoundMonitorParser] Native parse failed for ${filename}, falling back to UADE:`, err);
         }

@@ -959,7 +959,7 @@ export class ToneEngine {
       ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth', 'SymphonieSynth', 'MusicLineSynth',
        'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth', 'TFMXSynth',
        'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'DavidWhittakerSynth',
-       'SunVoxSynth'].includes(c.synthType || '') ||
+       'SonicArrangerSynth', 'SunVoxSynth'].includes(c.synthType || '') ||
       c.synthType?.startsWith('Furnace')
     );
     if (wasmConfigs.length === 0) return;
@@ -2065,6 +2065,7 @@ export class ToneEngine {
       case 'HippelCoSoSynth':
       case 'RobHubbardSynth':
       case 'DavidWhittakerSynth':
+      case 'SonicArrangerSynth':
       // SunVox WASM patch player
       case 'SunVoxSynth': {
         instrument = InstrumentFactory.createInstrument(config);

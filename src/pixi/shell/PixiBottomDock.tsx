@@ -229,48 +229,20 @@ export const PixiBottomDock: React.FC<PixiBottomDockProps> = ({
         </pixiContainer>
       </pixiContainer>
 
-      {/* Content area */}
-      <pixiContainer layout={{ width, height: Math.max(0, contentH), flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Mixer */}
+      {/* Content area — only active tab is mounted.
+          Inactive tabs unmount completely, stopping their useTick handlers
+          (e.g. 16 mixer VU meters that redraw Graphics every frame). */}
+      <pixiContainer key={activeTab} layout={{ width, height: Math.max(0, contentH), flexDirection: 'column', overflow: 'hidden' }}>
         <pixiContainer
-          alpha={activeTab === 'mixer' ? 1 : 0}
-          renderable={activeTab === 'mixer'}
-          eventMode={activeTab === 'mixer' ? 'auto' : 'none'}
           layout={{
             width,
             height: Math.max(0, contentH),
-            ...(activeTab !== 'mixer' ? { position: 'absolute' as const } : {}),
+            flexDirection: 'column',
           }}
         >
-          <PixiMixerView />
-        </pixiContainer>
-
-        {/* Device (Instrument Editor) */}
-        <pixiContainer
-          alpha={activeTab === 'device' ? 1 : 0}
-          renderable={activeTab === 'device'}
-          eventMode={activeTab === 'device' ? 'auto' : 'none'}
-          layout={{
-            width,
-            height: Math.max(0, contentH),
-            ...(activeTab !== 'device' ? { position: 'absolute' as const } : {}),
-          }}
-        >
-          <InstrumentEditorDockPanel />
-        </pixiContainer>
-
-        {/* Master FX */}
-        <pixiContainer
-          alpha={activeTab === 'master-fx' ? 1 : 0}
-          renderable={activeTab === 'master-fx'}
-          eventMode={activeTab === 'master-fx' ? 'auto' : 'none'}
-          layout={{
-            width,
-            height: Math.max(0, contentH),
-            ...(activeTab !== 'master-fx' ? { position: 'absolute' as const } : {}),
-          }}
-        >
-          <PixiMasterFxView />
+          {activeTab === 'mixer' && <PixiMixerView />}
+          {activeTab === 'device' && <InstrumentEditorDockPanel />}
+          {activeTab === 'master-fx' && <PixiMasterFxView />}
         </pixiContainer>
       </pixiContainer>
     </pixiContainer>
