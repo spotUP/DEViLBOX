@@ -3,27 +3,32 @@
  *
  * Renders top-to-bottom:
  *   1. Channel name label
- *   2. VU meter (pixiGraphics, live level)
- *   3. Volume fader (PixiSlider, vertical, detent at 1.0)
- *   4. Pan knob (PixiKnob, bipolar, defaultValue 0)
- *   5. Mute button
- *   6. Solo button (hidden when isMaster=true)
+ *   2. Instrument name label (truncated, 8 chars max)
+ *   3. VU meter (pixiGraphics, live level) with peak hold
+ *   4. dB level readout
+ *   5. Volume fader (PixiSlider, vertical, detent at 1.0)
+ *   6. Pan knob (PixiKnob, bipolar, defaultValue 0)
+ *   7. Mute button
+ *   8. Solo button (hidden when isMaster=true)
  *
  * Dims to alpha 0.4 when another channel is soloed and this one is not.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PixiLabel } from '../components/PixiLabel';
 import { PixiSlider } from '../components/PixiSlider';
 import { PixiKnob } from '../components/PixiKnob';
 import { PixiButton } from '../components/PixiButton';
+import { PIXI_FONTS } from '../fonts';
+import { usePixiTheme } from '../theme';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface PixiMixerChannelStripProps {
   channelIndex: number;
   name: string;
+  instrumentName?: string;
   volume: number;       // 0-1 (1 = unity)
   pan: number;          // -1..1
   muted: boolean;
@@ -66,6 +71,7 @@ const formatPan = (v: number): string => {
 export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
   channelIndex,
   name,
+  instrumentName = '',
   volume,
   pan,
   muted,
@@ -78,8 +84,15 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
   onSoloToggle,
   isMaster = false,
 }) => {
+  const theme = usePixiTheme();
+
   // Dim when another channel is soloed and this one is not (and it's not master)
   const stripAlpha = isSoloing && !soloed && !isMaster ? 0.4 : 1;
+
+  // ── Peak hold refs ───────────────────────────────────────────────────────
+
+  const peakRef = useRef(0);
+  const peakDecayRef = useRef(0); // timestamp when peak was last set
 
   // ── Event handlers ──────────────────────────────────────────────────────────
 
@@ -128,9 +141,34 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
       // Border
       g.rect(0, 0, VU_WIDTH, VU_HEIGHT);
       g.stroke({ color: 0x333333, alpha: 1, width: 1 });
+
+      // Peak hold: update peak if current level is higher
+      if (level >= peakRef.current) {
+        peakRef.current = level;
+        peakDecayRef.current = Date.now();
+      } else if (Date.now() - peakDecayRef.current > 1500) {
+        // Decay after 1500ms
+        peakRef.current = Math.max(0, peakRef.current - 0.01);
+      }
+      // Draw peak hold line
+      const peakY = VU_HEIGHT - Math.round(peakRef.current * VU_HEIGHT);
+      if (peakRef.current > 0.01) {
+        g.rect(0, peakY, VU_WIDTH, 1);
+        g.fill({ color: peakRef.current > 0.9 ? VU_COLOR_RED : 0xffffff, alpha: 0.9 });
+      }
     },
     [level],
   );
+
+  // ── dB text ─────────────────────────────────────────────────────────────────
+
+  const dbText = level < 0.001 ? '-\u221e' : `${Math.round(20 * Math.log10(level))}dB`;
+
+  // ── Instrument name (truncated) ──────────────────────────────────────────────
+
+  const displayName = instrumentName.length > 7
+    ? instrumentName.slice(0, 7) + '\u2026'
+    : instrumentName;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -154,13 +192,29 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
         layout={{ width: STRIP_WIDTH, height: 12 }}
       />
 
-      {/* 2. VU meter */}
+      {/* 2. Instrument name label */}
+      <pixiBitmapText
+        text={displayName}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 8, fill: 0xffffff }}
+        tint={theme.textMuted.color}
+        layout={{ width: STRIP_WIDTH, height: 10 }}
+      />
+
+      {/* 3. VU meter */}
       <pixiGraphics
         draw={drawVU}
         layout={{ width: VU_WIDTH, height: VU_HEIGHT }}
       />
 
-      {/* 3. Volume fader */}
+      {/* 4. dB level readout */}
+      <pixiBitmapText
+        text={dbText}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+        tint={theme.textMuted.color}
+        layout={{ width: STRIP_WIDTH, marginTop: 1 }}
+      />
+
+      {/* 5. Volume fader */}
       <PixiSlider
         value={volume}
         min={0}
@@ -177,7 +231,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
         layout={{ width: STRIP_WIDTH }}
       />
 
-      {/* 4. Pan knob */}
+      {/* 6. Pan knob */}
       <PixiKnob
         value={pan}
         min={-1}
@@ -191,7 +245,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
         layout={{ width: STRIP_WIDTH }}
       />
 
-      {/* 5. Mute button */}
+      {/* 7. Mute button */}
       <PixiButton
         label="M"
         variant="ft2"
@@ -202,7 +256,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
         width={STRIP_WIDTH - 8}
       />
 
-      {/* 6. Solo button (hidden for master channel) */}
+      {/* 8. Solo button (hidden for master channel) */}
       {!isMaster && (
         <PixiButton
           label="S"
