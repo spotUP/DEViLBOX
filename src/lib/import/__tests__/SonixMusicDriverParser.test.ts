@@ -225,3 +225,114 @@ describe('parseSonixFile — yessonix.smus', () => {
     expect(report.numChannels).toBeGreaterThan(0);
   });
 });
+
+// ── Companion file pipeline — yessonix folder ─────────────────────────────
+
+describe('companion file pipeline — yessonix folder', () => {
+  const YESSONIX_DIR = resolve(REF, 'IFF-SMUS/- unknown/yessonix');
+  const INSTRUMENTS_DIR = resolve(YESSONIX_DIR, 'Instruments');
+
+  // Read all files from the folder (simulates what GlobalDragDropHandler does)
+  function enumerateFolder(): { mainFile: string; companions: string[] } {
+    const fs = require('fs');
+    const path = require('path');
+    const allFiles: string[] = [];
+    function walk(dir: string) {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) walk(path.join(dir, entry.name));
+        else allFiles.push(path.join(dir, entry.name));
+      }
+    }
+    walk(YESSONIX_DIR);
+
+    // GlobalDragDropHandler logic: find main module via isSupportedModule
+    const mainFile = allFiles.find(f => f.endsWith('.smus'));
+    const companions = allFiles.filter(f => f !== mainFile);
+    return { mainFile: mainFile!, companions };
+  }
+
+  it('identifies yessonix.smus as the main module', () => {
+    const { mainFile } = enumerateFolder();
+    expect(mainFile).toBeDefined();
+    expect(mainFile).toContain('yessonix.smus');
+  });
+
+  it('collects 9 companion instrument files', () => {
+    const { companions } = enumerateFolder();
+    expect(companions).toHaveLength(9);
+    const names = companions.map(f => f.split('/').pop()!).sort();
+    expect(names).toEqual([
+      'yes1.instr', 'yes1.ss', 'yes2.instr', 'yes2.ss', 'yes2end.instr',
+      'yesdrumintro.instr', 'yesdrumintro.ss', 'yesguitar.instr', 'yesguitar2.instr',
+    ]);
+  });
+
+  it('companion files are all readable as ArrayBuffers', () => {
+    const { companions } = enumerateFolder();
+    for (const path of companions) {
+      const buf = loadBuf(path);
+      expect(buf.byteLength).toBeGreaterThan(0);
+    }
+  });
+
+  it('.instr files are valid Sonix instrument definitions', () => {
+    const { companions } = enumerateFolder();
+    const instrFiles = companions.filter(f => f.endsWith('.instr'));
+    expect(instrFiles.length).toBe(6);
+    // Sonix .instr files come in two forms:
+    //   - SampledSound: starts with 'Samp' header (e.g. yes1.instr, yesdrumintro.instr)
+    //   - Synthesis definition: starts with zeros (e.g. yesguitar.instr)
+    const sampledCount = instrFiles.filter(path => {
+      const u8 = new Uint8Array(loadBuf(path));
+      return u8[0] === 0x53 && u8[1] === 0x61; // 'Sa'
+    }).length;
+    expect(sampledCount).toBeGreaterThan(0);
+    expect(sampledCount).toBeLessThan(instrFiles.length); // mix of both types
+  });
+
+  it('.ss sample files are non-trivial in size', () => {
+    const { companions } = enumerateFolder();
+    const ssFiles = companions.filter(f => f.endsWith('.ss'));
+    expect(ssFiles.length).toBeGreaterThan(0);
+    for (const path of ssFiles) {
+      const buf = loadBuf(path);
+      // .ss files contain raw 8-bit PCM sample data — should be > 1KB
+      expect(buf.byteLength).toBeGreaterThan(1024);
+    }
+  });
+
+  it('native parser creates placeholder instruments referencing companion names', async () => {
+    const buf = loadBuf(SMUS_FILE);
+    const song = await parseSonixFile(buf, 'yessonix.smus');
+    // IffSmusParser creates Sampler placeholders for each INS1 chunk.
+    // The instrument names should match the external .instr filenames.
+    expect(song.instruments.length).toBeGreaterThan(0);
+    const instNames = song.instruments.map(i => i.name.toLowerCase());
+    // At least some instrument names should reference the companion file basenames
+    const companionBases = [
+      'yes1', 'yes2', 'yes2end', 'yesdrumintro', 'yesguitar', 'yesguitar2',
+    ];
+    const matchCount = companionBases.filter(base =>
+      instNames.some(name => name.includes(base))
+    ).length;
+    // At least some instruments should reference known companion basenames
+    expect(matchCount).toBeGreaterThan(0);
+  });
+
+  it('native parser produces a multi-channel song with notes', async () => {
+    const buf = loadBuf(SMUS_FILE);
+    const song = await parseSonixFile(buf, 'yessonix.smus');
+    expect(song.numChannels).toBeGreaterThanOrEqual(2);
+    expect(song.patterns.length).toBeGreaterThan(0);
+    // Verify at least some rows have actual note data (not all empty)
+    let noteCount = 0;
+    for (const pat of song.patterns) {
+      for (const ch of pat.channels) {
+        for (const row of ch.rows) {
+          if (row.note > 0) noteCount++;
+        }
+      }
+    }
+    expect(noteCount).toBeGreaterThan(0);
+  });
+});
