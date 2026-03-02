@@ -35,6 +35,7 @@ import { playWindowOpen, playWindowClose, playSnap } from './workbenchSounds';
 
 // Re-exported from workbenchLayout to avoid circular dependency
 export { TITLE_H } from './workbenchLayout';
+import { TITLE_H } from './workbenchLayout';
 const HANDLE_SIZE = 8;
 const MIN_W = 200;
 const MIN_H = 150;
