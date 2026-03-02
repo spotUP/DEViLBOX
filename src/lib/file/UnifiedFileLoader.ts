@@ -20,6 +20,7 @@ import { notify } from '@/stores/useNotificationStore';
 import { isSupportedModule } from '@/lib/import/ModuleLoader';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { checkModlandFile } from '@/lib/modland/ModlandDetector';
+import { useModlandContributionModal } from '@/stores/useModlandContributionModal';
 
 export interface FileLoadOptions {
   /** Whether to show confirmation dialog before replacing project (song formats only) */
@@ -59,7 +60,15 @@ export async function loadFile(
   const filename = file.name.toLowerCase();
   
   // Check if file exists in Modland database (non-blocking)
-  checkModlandFile(file).catch(() => {});
+  // If it's a new/unknown module, show contribution modal
+  checkModlandFile(file).then((result) => {
+    if (!result.found && result.hash && isSongFormat(filename)) {
+      // Unknown tracker module - show contribution modal!
+      const { showModal } = useModlandContributionModal.getState();
+      showModal(file.name, result.hash);
+      console.log('🆕 Unknown module detected (hash: ' + result.hash + ') - showing contribution modal');
+    }
+  }).catch(() => {});
   
   try {
     // === SONG FORMATS (replace project) ===
