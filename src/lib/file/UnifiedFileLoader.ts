@@ -50,6 +50,29 @@ export type FileLoadResult =
   | { success: 'pending-confirmation'; file: File };
 
 /**
+ * Check Modland with optional pattern hash (from parseModuleToSong)
+ * This is called AFTER module parsing so we have the pattern hash available
+ */
+async function checkModlandFileWithPatternHash(file: File, patternHash: string | null): Promise<void> {
+  try {
+    const result = await checkModlandFile(file, null); // We don't have libopenmpt meta at this point
+    
+    // If not found, show contribution modal
+    if (!result.found && result.hash && isSongFormat(file.name.toLowerCase())) {
+      const { showModal } = useModlandContributionModal.getState();
+      showModal(file.name, result.hash);
+      console.log('🆕 Unknown module detected (hash: ' + result.hash + ', pattern hash: ' + (patternHash || 'unavailable') + ') - showing contribution modal');
+    } else if (result.found && patternHash) {
+      // Found in Modland - could query for remixes using pattern hash here
+      console.log('[Modland] Module found. Pattern hash:', patternHash);
+      // TODO: Query /api/modland/pattern-matches/:pattern_hash for remixes
+    }
+  } catch (error) {
+    console.debug('[Modland] Hash check failed:', error);
+  }
+}
+
+/**
  * Load any supported file format.
  * Handles state reset, format detection, parsing, and store updates.
  */
@@ -479,7 +502,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
 
   // === All other tracker/module formats ===
   if (isSupportedModule(filename)) {
-    const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
+    const { parseModuleToSong, getLastPatternHash } = await import('@lib/import/parseModuleToSong');
     let song: Awaited<ReturnType<typeof parseModuleToSong>>;
     try {
       song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
@@ -489,6 +512,10 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
         error: `Failed to parse ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
       };
     }
+
+    // After parsing, check Modland (now with pattern hash from parseModuleToSong)
+    const patternHash = getLastPatternHash();
+    checkModlandFileWithPatternHash(file, patternHash).catch(() => {});
 
     loadInstruments(song.instruments);
     loadPatterns(song.patterns);
