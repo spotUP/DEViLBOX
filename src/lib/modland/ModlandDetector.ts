@@ -1,43 +1,36 @@
-// Modland file detection during import
+// Modland file detection during import (server-side hash lookup)
 
 import { hashFile } from '../modland/ModlandHasher';
-import { modlandService } from '../modland/ModlandService';
+import { lookupFileByHash } from '../modlandApi';
 import { extractMetadata } from '../modland/ModlandMetadata';
 import { notify } from '@/stores/useNotificationStore';
 
 /**
- * Check if imported file exists in Modland database
+ * Check if imported file exists in Modland database via server API
  * If found, show metadata notification
  */
 export async function checkModlandFile(file: File): Promise<void> {
   try {
-    // Skip if database not initialized
-    if (!modlandService.isLoaded()) {
-      // Try to init in background (won't block import)
-      modlandService.init().catch(() => {});
-      return;
-    }
-
-    // Hash the file
+    // Hash the file (50-200ms)
     const hash = await hashFile(file);
     
-    // Query Modland database
-    const modlandFile = await modlandService.findByHash(hash);
+    // Query server API (non-blocking)
+    const result = await lookupFileByHash(hash);
     
-    if (modlandFile) {
-      const metadata = extractMetadata(modlandFile);
+    if (result.match && result.file) {
+      const metadata = extractMetadata(result.file);
       
       // Show notification with Modland metadata
+      const sampleInfo = result.sample_count ? ` • ${result.sample_count} samples` : '';
       notify.info(
-        `📦 Modland Archive File Detected`,
-        `${metadata.title} by ${metadata.artist} (${metadata.format})`,
-        5000
+        `✓ Verified Modland File: ${metadata.title} by ${metadata.artist} (${metadata.format})${sampleInfo}`
       );
       
-      console.log('✅ Modland file detected:', {
+      console.log('✅ Modland file verified:', {
         hash,
         metadata,
-        url: modlandFile.url
+        url: result.file.url,
+        samples: result.sample_count
       });
     }
   } catch (error) {

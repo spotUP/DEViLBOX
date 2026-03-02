@@ -35,6 +35,34 @@ export interface ModlandStatus {
   status: 'ready' | 'indexing' | 'not_initialized';
 }
 
+export interface ModlandHashFile {
+  song_id: number;
+  hash_id: string;
+  pattern_hash: number | null;
+  url: string;
+}
+
+export interface ModlandHashSample {
+  hash_id: string;
+  song_id: number;
+  song_sample_id: number;
+  text: string;
+  length_bytes: number;
+  length: number;
+}
+
+export interface ModlandHashLookupResult {
+  match: boolean;
+  file?: ModlandHashFile;
+  sample_count?: number;
+}
+
+export interface ModlandHashStats {
+  files: number;
+  samples: number;
+  unique_patterns: number;
+}
+
 // ── API Functions ───────────────────────────────────────────────────────────
 
 export async function searchModland(params: {
@@ -125,6 +153,60 @@ export async function reindexModland(): Promise<{ success: boolean; totalFiles: 
   if (!response.ok) {
     const err = await response.json().catch(() => ({ error: 'Reindex failed' }));
     throw new Error(err.error || 'Reindex failed');
+  }
+  return response.json();
+}
+
+// ── Hash-Based Lookup (SHA-256 verification) ────────────────────────────────
+
+/**
+ * Look up a file by its SHA-256 hash
+ * @param hash - 64-character hex SHA-256 hash
+ */
+export async function lookupFileByHash(hash: string): Promise<ModlandHashLookupResult> {
+  const response = await fetch(`${API_URL}/modland/lookup-hash`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hash }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Hash lookup failed' }));
+    throw new Error(err.error || 'Hash lookup failed');
+  }
+  return response.json();
+}
+
+/**
+ * Get all samples for a file by song_id
+ */
+export async function getSamplesBySongId(songId: number): Promise<ModlandHashSample[]> {
+  const response = await fetch(`${API_URL}/modland/samples/${songId}`);
+  if (!response.ok) {
+    throw new Error('Failed to get samples');
+  }
+  const data = await response.json();
+  return data.samples;
+}
+
+/**
+ * Find files with the same pattern hash (remixes, variations)
+ */
+export async function findPatternMatches(patternHash: number): Promise<ModlandHashFile[]> {
+  const response = await fetch(`${API_URL}/modland/pattern-matches/${patternHash}`);
+  if (!response.ok) {
+    throw new Error('Failed to find pattern matches');
+  }
+  const data = await response.json();
+  return data.matches;
+}
+
+/**
+ * Get hash database statistics
+ */
+export async function getHashStats(): Promise<ModlandHashStats> {
+  const response = await fetch(`${API_URL}/modland/hash-stats`);
+  if (!response.ok) {
+    throw new Error('Failed to get hash stats');
   }
   return response.json();
 }
