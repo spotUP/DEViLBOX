@@ -1,11 +1,15 @@
 /**
  * PixiMenuBar — Horizontal menu bar with dropdown menus.
  * Used by PixiFT2Toolbar for File / Edit / Module / Help menus.
+ *
+ * Dropdowns register in usePixiDropdownStore so they are rendered by
+ * PixiGlobalDropdownLayer at root stage level — above all PixiWindow masks.
  */
-import React, { useCallback, useState } from 'react';
-import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
+import React, { useCallback, useRef, useState } from 'react';
+import type { Graphics as GraphicsType, Container as ContainerType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
+import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 
 export type MenuSeparator = { type: 'separator' };
 export type MenuAction = { type: 'action'; label: string; shortcut?: string; onClick: () => void; disabled?: boolean };
@@ -20,14 +24,15 @@ interface PixiMenuBarProps {
 }
 
 const MENU_BTN_PADDING = 10;
-const ITEM_H = 22;
-const SEP_H = 9;
 const DROPDOWN_MIN_W = 200;
-const SHORTCUT_COL_W = 80;
+const SEP_H = 9;
+const ITEM_H = 22;
 
 function itemHeight(item: MenuItem): number {
   return item.type === 'separator' ? SEP_H : ITEM_H;
 }
+
+let _menuIdCounter = 0;
 
 export const PixiMenuBar: React.FC<PixiMenuBarProps> = ({
   menus,
@@ -37,7 +42,10 @@ export const PixiMenuBar: React.FC<PixiMenuBarProps> = ({
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
 
   const openMenu = useCallback((i: number) => setOpenMenuIndex(i), []);
-  const closeAll = useCallback(() => setOpenMenuIndex(null), []);
+  const closeAll = useCallback(() => {
+    setOpenMenuIndex(null);
+    usePixiDropdownStore.getState().closeAll();
+  }, []);
 
   return (
     <pixiContainer
@@ -49,6 +57,7 @@ export const PixiMenuBar: React.FC<PixiMenuBarProps> = ({
         return (
           <PixiMenuButton
             key={menu.label}
+            menuIndex={i}
             menu={menu}
             isOpen={isOpen}
             height={height}
@@ -63,6 +72,7 @@ export const PixiMenuBar: React.FC<PixiMenuBarProps> = ({
 };
 
 interface PixiMenuButtonProps {
+  menuIndex: number;
   menu: Menu;
   isOpen: boolean;
   height: number;
@@ -72,12 +82,49 @@ interface PixiMenuButtonProps {
 }
 
 const PixiMenuButton: React.FC<PixiMenuButtonProps> = ({
-  menu, isOpen, height, onOpen, onClose, onHoverOpen,
+  menuIndex, menu, isOpen, height, onOpen, onClose, onHoverOpen,
 }) => {
   const theme = usePixiTheme();
   const [hovered, setHovered] = useState(false);
+  const containerRef = useRef<ContainerType>(null);
+  const idRef = useRef(`pixi-menu-${menuIndex}-${++_menuIdCounter}`);
 
   const btnW = menu.label.length * 8 + MENU_BTN_PADDING * 2;
+  const dropdownW = DROPDOWN_MIN_W;
+
+  const handleOpen = useCallback(() => {
+    onOpen();
+    const el = containerRef.current;
+    if (!el) return;
+    const pos = el.toGlobal({ x: 0, y: height });
+    usePixiDropdownStore.getState().openDropdown({
+      kind: 'menu',
+      id: idRef.current,
+      x: pos.x,
+      y: pos.y,
+      width: dropdownW,
+      items: menu.items,
+      onClose,
+    });
+  }, [onOpen, height, dropdownW, menu.items, onClose]);
+
+  const handleToggle = useCallback(() => {
+    if (isOpen) {
+      onClose();
+    } else {
+      handleOpen();
+    }
+  }, [isOpen, onClose, handleOpen]);
+
+  const handleHoverOpen = useCallback(() => {
+    if (isOpen) return;
+    onHoverOpen();
+    // If a different menu is open, switch to this one
+    const store = usePixiDropdownStore.getState();
+    if (store.dropdown && store.dropdown.id !== idRef.current) {
+      handleOpen();
+    }
+  }, [isOpen, onHoverOpen, handleOpen]);
 
   const drawBtnBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -86,24 +133,14 @@ const PixiMenuButton: React.FC<PixiMenuButtonProps> = ({
     g.fill({ color: isOpen ? theme.accent.color : theme.bgHover.color, alpha: isOpen ? 0.25 : 0.5 });
   }, [isOpen, hovered, btnW, height, theme]);
 
-  const dropdownH = menu.items.reduce((sum, item) => sum + itemHeight(item), 0) + 8;
-  const dropdownW = DROPDOWN_MIN_W;
-
-  const drawDropdownBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.roundRect(0, 0, dropdownW, dropdownH, 4);
-    g.fill({ color: theme.bgSecondary.color });
-    g.roundRect(0, 0, dropdownW, dropdownH, 4);
-    g.stroke({ color: theme.border.color, alpha: 0.8, width: 1 });
-  }, [dropdownW, dropdownH, theme]);
-
   return (
     <pixiContainer
+      ref={containerRef}
       eventMode="static"
       cursor="pointer"
-      onPointerOver={() => { setHovered(true); onHoverOpen(); }}
+      onPointerOver={() => { setHovered(true); handleHoverOpen(); }}
       onPointerOut={() => setHovered(false)}
-      onPointerUp={() => isOpen ? onClose() : onOpen()}
+      onPointerUp={handleToggle}
       layout={{ width: btnW, height, justifyContent: 'center', alignItems: 'center' }}
     >
       <pixiGraphics draw={drawBtnBg} layout={{ position: 'absolute', width: btnW, height }} />
@@ -113,22 +150,11 @@ const PixiMenuButton: React.FC<PixiMenuButtonProps> = ({
         tint={isOpen ? theme.accent.color : theme.textSecondary.color}
         layout={{}}
       />
-      {/* Always mounted — conditional render causes @pixi/layout BindingError on open */}
-      <pixiContainer
-        zIndex={300}
-        renderable={isOpen}
-        eventMode={isOpen ? 'static' : 'none'}
-        onPointerDown={(e: FederatedPointerEvent) => e.stopPropagation()}
-        layout={{ position: 'absolute', top: height, left: 0, width: dropdownW, height: dropdownH, flexDirection: 'column', padding: 4 }}
-      >
-        <pixiGraphics draw={drawDropdownBg} layout={{ position: 'absolute', width: dropdownW, height: dropdownH }} />
-        {menu.items.map((item, j) => (
-          <PixiMenuItem key={j} item={item} width={dropdownW - 8} onClose={onClose} />
-        ))}
-      </pixiContainer>
     </pixiContainer>
   );
 };
+
+// ── PixiMenuItem — exported for use in PixiGlobalDropdownLayer ───────────────
 
 interface PixiMenuItemProps {
   item: MenuItem;
@@ -136,21 +162,23 @@ interface PixiMenuItemProps {
   onClose: () => void;
 }
 
-const PixiMenuItem: React.FC<PixiMenuItemProps> = ({ item, width, onClose }) => {
+const SEP_ITEM_H = SEP_H;
+
+export const PixiMenuItem: React.FC<PixiMenuItemProps> = ({ item, width, onClose }) => {
   const theme = usePixiTheme();
   const [hovered, setHovered] = useState(false);
   const h = itemHeight(item);
 
   if (item.type === 'separator') {
     return (
-      <pixiContainer layout={{ width, height: h, justifyContent: 'center' }}>
+      <pixiContainer layout={{ width, height: SEP_ITEM_H, justifyContent: 'center' }}>
         <pixiGraphics
           draw={(g: GraphicsType) => {
             g.clear();
-            g.rect(0, h / 2 - 0.5, width, 1);
+            g.rect(0, SEP_ITEM_H / 2 - 0.5, width, 1);
             g.fill({ color: theme.border.color, alpha: 0.5 });
           }}
-          layout={{ width, height: h }}
+          layout={{ width, height: SEP_ITEM_H }}
         />
       </pixiContainer>
     );
@@ -197,7 +225,7 @@ const PixiMenuItem: React.FC<PixiMenuItemProps> = ({ item, width, onClose }) => 
           text={shortcut}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
           tint={theme.textMuted.color}
-          layout={{ width: SHORTCUT_COL_W, marginRight: 8 }}
+          layout={{ width: 80, marginRight: 8 }}
         />
       )}
     </pixiContainer>

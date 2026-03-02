@@ -417,7 +417,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
           if (!draggingMarkerRef.current) return;
           const cameraScale = useWorkbenchStore.getState().camera.scale;
           const deltaX = (me.clientX - e.clientX) / cameraScale;
-          const { scrollBeat: sb2, pixelsPerBeat: ppb2 } = paramsRef.current;
+          const { pixelsPerBeat: ppb2 } = paramsRef.current;
           const newRow = Math.max(0, Math.round(draggingMarkerRef.current.startRow + deltaX / ppb2));
           callbacksRef.current.onMoveMarker?.(markerId, newRow);
         };

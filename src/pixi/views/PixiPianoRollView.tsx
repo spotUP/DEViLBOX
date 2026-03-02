@@ -166,6 +166,13 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
     };
   }, [isRecording, isPlaying, currentRow]);
 
+  // Version counter to force note recalculation after edits
+  const [noteVersion, setNoteVersion] = useState(0);
+  const handleNotesChanged = useCallback(() => setNoteVersion(v => v + 1), []);
+
+  // Note manipulation API from usePianoRollData
+  const pianoData = usePianoRollData(view.channelIndex);
+
   // -----------------------------------------------------------------------
   // Feature: Chord detection from selected notes
   // -----------------------------------------------------------------------
@@ -196,13 +203,6 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
   }, []);
-
-  // Version counter to force note recalculation after edits
-  const [noteVersion, setNoteVersion] = useState(0);
-  const handleNotesChanged = useCallback(() => setNoteVersion(v => v + 1), []);
-
-  // Note manipulation API from usePianoRollData
-  const pianoData = usePianoRollData(view.channelIndex);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -426,7 +426,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
     if (!instrument) return;
     const engine = getToneEngine();
     const note = midiToNoteStr(held);
-    engine.triggerNoteRelease(instrumentId!, note, 0, instrument.config);
+    engine.triggerNoteRelease(instrumentId!, note, 0, instrument);
   }, []);
 
   // Piano keyboard click handler — Shift+click adds to chord buffer, plain click plays note
@@ -458,12 +458,12 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
         if (heldPitchRef.current !== null) {
           const engine = getToneEngine();
           const prevNote = midiToNoteStr(heldPitchRef.current);
-          engine.triggerNoteRelease(instrumentId!, prevNote, 0, instrument.config);
+          engine.triggerNoteRelease(instrumentId!, prevNote, 0, instrument);
         }
         heldPitchRef.current = pitch;
         const engine = getToneEngine();
         const note = midiToNoteStr(pitch);
-        engine.triggerNoteAttack(instrumentId!, note, 0, 100, instrument.config);
+        engine.triggerNoteAttack(instrumentId!, note, 0, 100, instrument);
 
         // Also release on global pointerup (handles release outside the canvas)
         const onGlobalUp = () => {
