@@ -51,13 +51,13 @@ interface PixiMixerChannelStripProps {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const VU_WIDTH = 8;
-const VU_HEIGHT = 80;
+const VU_WIDTH = 10;
+const VU_HEIGHT = 120;
 const VU_COLOR_GREEN  = 0x22dd66;
 const VU_COLOR_YELLOW = 0xffcc00;
 const VU_COLOR_RED    = 0xff2222;
 
-const STRIP_WIDTH = 56;
+const STRIP_WIDTH = 72;
 
 // ─── FX slot ──────────────────────────────────────────────────────────────────
 
@@ -143,7 +143,7 @@ const PixiEffectSlot: React.FC<PixiEffectSlotProps> = ({
       />
       <pixiBitmapText
         text={label}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
         tint={effectType ? theme.accent.color : theme.textMuted.color}
         layout={{ position: 'absolute', left: 4, top: 3 }}
       />
@@ -297,7 +297,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
       {/* 2. Instrument name label */}
       <pixiBitmapText
         text={displayName}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{ width: STRIP_WIDTH, height: 10 }}
       />
@@ -312,7 +312,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
       <pixiBitmapText
         ref={dbTextRef as any}
         text="-∞"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{ width: STRIP_WIDTH, marginTop: 1 }}
       />

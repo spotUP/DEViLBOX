@@ -17,11 +17,11 @@ export type LabelFont = 'mono' | 'sans';
 export type LabelColor = 'text' | 'textSecondary' | 'textMuted' | 'accent' | 'error' | 'success' | 'warning' | 'custom';
 
 const SIZE_MAP: Record<LabelSize, number> = {
-  xs: 9,
-  sm: 11,
-  md: 13,
-  lg: 16,
-  xl: 20,
+  xs: 10,
+  sm: 12,
+  md: 14,
+  lg: 17,
+  xl: 21,
 };
 
 const FONT_MAP: Record<`${LabelFont}-${LabelWeight}`, string> = {
