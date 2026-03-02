@@ -427,6 +427,72 @@ export async function clearSavedProject(): Promise<void> {
   try { await idbDelete(); } catch { /* ignore */ }
 }
 
+/**
+ * Serialize the current project to a JSON Blob suitable for file download.
+ * This is the same data that saveProjectToStorage() writes to IndexedDB.
+ */
+export function serializeProjectToBlob(): Blob {
+  const savedProject = buildSavedProject();
+  const json = JSON.stringify(savedProject, null, 2);
+  return new Blob([json], { type: 'application/json' });
+}
+
+/**
+ * Deserialize and load a project from a parsed JSON object.
+ * Accepts the same SavedProject structure written by serializeProjectToBlob().
+ * Returns true on success, false on failure/incompatible schema.
+ */
+export async function loadProjectFromObject(data: unknown): Promise<boolean> {
+  try {
+    const project = data as SavedProject;
+    if (!project?.version || !project?.patterns || !project?.instruments) {
+      console.warn('[Persistence] Invalid project structure in file');
+      return false;
+    }
+
+    if (!project.schemaVersion || project.schemaVersion < SCHEMA_VERSION) {
+      console.warn(
+        `[Persistence] Discarding outdated project file (schema ${project.schemaVersion ?? 1} < ${SCHEMA_VERSION}).`
+      );
+      return false;
+    }
+
+    if (needsMigration(project.patterns, project.instruments)) {
+      const migrated = migrateProject(project.patterns, project.instruments);
+      project.patterns = migrated.patterns;
+      project.instruments = migrated.instruments;
+    }
+
+    const trackerStore = useTrackerStore.getState();
+    const instrumentStore = useInstrumentStore.getState();
+    const projectStore = useProjectStore.getState();
+    const transportStore = useTransportStore.getState();
+    const automationStore = useAutomationStore.getState();
+    const audioStore = useAudioStore.getState();
+
+    trackerStore.loadPatterns(project.patterns);
+    if (project.patternOrder && project.patternOrder.length > 0) {
+      trackerStore.setPatternOrder(project.patternOrder);
+    }
+    instrumentStore.loadInstruments(project.instruments);
+    projectStore.setMetadata(project.metadata);
+    transportStore.setBPM(project.bpm);
+    if (project.automation) automationStore.loadCurves(project.automation);
+    if (project.masterEffects) audioStore.setMasterEffects(project.masterEffects);
+    transportStore.setGrooveTemplate(project.grooveTemplateId || 'straight');
+    if (project.arrangement) {
+      const arrangementStore = useArrangementStore.getState();
+      arrangementStore.loadSnapshot(project.arrangement);
+    }
+    instrumentStore.autoBakeInstruments();
+    projectStore.markAsSaved();
+    return true;
+  } catch (err) {
+    console.error('[Persistence] Failed to load project from object:', err);
+    return false;
+  }
+}
+
 // ============================================================================
 // LOCAL REVISIONS PUBLIC API
 // ============================================================================

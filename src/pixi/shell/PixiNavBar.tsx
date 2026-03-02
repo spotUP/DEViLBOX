@@ -16,8 +16,10 @@ import { useTabsStore } from '@stores/useTabsStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { useProjectStore } from '@stores/useProjectStore';
 import { BUILTIN_WORKSPACES, springCameraTo, fitAllWindows, fitWindow } from '../workbench/WorkbenchExpose';
 import { NAV_H as _NAV_H, WORKBENCH_CHROME_H } from '../workbench/workbenchLayout';
+import { serializeProjectToBlob, loadProjectFromObject } from '@hooks/useProjectPersistence';
 
 /** View window toggle buttons shown in the NavBar */
 const VIEW_WINDOWS = [
@@ -193,8 +195,50 @@ export const PixiNavBar: React.FC = () => {
   const setTilted       = useWorkbenchStore((s) => s.setTilted);
   const resetLayout     = useWorkbenchStore((s) => s.resetLayout);
 
+  // Project store — for reading project name on save
+  const projectName = useProjectStore((s) => s.metadata?.name ?? 'project');
+
   // Workspace picker popup state
   const [wsPickerOpen, setWsPickerOpen] = useState(false);
+
+  // ─── Project Save (download as .dvbx file) ──────────────────────────────
+  const handleSaveFile = useCallback(() => {
+    try {
+      const blob = serializeProjectToBlob();
+      const safeName = (projectName || 'project').replace(/[^a-z0-9_\-. ]/gi, '_');
+      const filename = `${safeName}.dvbx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[PixiNavBar] Failed to save project file:', err);
+    }
+  }, [projectName]);
+
+  // ─── Project Load (open file picker) ────────────────────────────────────
+  const handleLoadFile = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.dvbx,.json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text) as unknown;
+        const ok = await loadProjectFromObject(data);
+        if (!ok) {
+          console.warn('[PixiNavBar] Failed to load project — incompatible or outdated file.');
+        }
+      } catch (err) {
+        console.error('[PixiNavBar] Failed to parse project file:', err);
+      }
+    };
+    input.click();
+  }, []);
 
   // Map ProjectTab[] → Tab[] (ProjectTab uses `name`, Tab expects `label`)
   const tabs: Tab[] = storeTabs.map((t) => ({
@@ -329,6 +373,22 @@ export const PixiNavBar: React.FC = () => {
 
         {/* Spacer */}
         <pixiContainer layout={{ flex: 1 }} />
+
+        {/* Project save/load file buttons */}
+        <PixiButton
+          label="SAVE"
+          variant="ghost"
+          size="sm"
+          onClick={handleSaveFile}
+          layout={{ marginRight: 2 }}
+        />
+        <PixiButton
+          label="LOAD"
+          variant="ghost"
+          size="sm"
+          onClick={handleLoadFile}
+          layout={{ marginRight: 8 }}
+        />
 
         {/* Reset all windows + camera to defaults */}
         <PixiButton
