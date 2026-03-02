@@ -43,7 +43,7 @@ interface ParseOptions {
  * Format engine preferences (Settings → Format Engine) control which parser
  * is used for formats supported by multiple engines (MOD, HVL, MED, FC, etc.).
  */
-export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?: UADEMetadata, midiOptions?: ParseOptions['midiOptions']): Promise<TrackerSong> {
+export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?: UADEMetadata, midiOptions?: ParseOptions['midiOptions'], companionFiles?: Map<string, ArrayBuffer>): Promise<TrackerSong> {
   const filename = file.name.toLowerCase();
   const buffer = await file.arrayBuffer();
   const prefs = getFormatEngine();
@@ -1373,7 +1373,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     if (prefs.iffSmus === 'native') {
       try {
         const { isIffSmusFormat, parseIffSmusFile } = await import('@lib/import/formats/IffSmusParser');
-        if (isIffSmusFormat(buffer)) return await parseIffSmusFile(buffer, file.name);
+        if (isIffSmusFormat(buffer)) return await parseIffSmusFile(buffer, file.name, companionFiles);
       } catch (err) {
         console.warn(`[IffSmusParser] Native parse failed for ${filename}, falling back to UADE:`, err);
       }
@@ -2625,7 +2625,7 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
       if (prefs.iffSmus === 'native') {
         try {
           const { isIffSmusFormat, parseIffSmusFile } = await import('@lib/import/formats/IffSmusParser');
-          if (isIffSmusFormat(buffer)) return await parseIffSmusFile(buffer, file.name);
+          if (isIffSmusFormat(buffer)) return await parseIffSmusFile(buffer, file.name, companionFiles);
         } catch (err) {
           console.warn(`[IffSmusParser] Native parse failed for ${filename}, falling back to UADE:`, err);
         }

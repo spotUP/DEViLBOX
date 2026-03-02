@@ -23,6 +23,7 @@ export interface ImportOptions {
   useLibopenmpt: boolean;     // Use libopenmpt for sample-accurate playback
   subsong?: number;           // UADE subsong index (0-based)
   uadeMetadata?: UADEMetadata; // Pre-scanned UADE metadata (avoids double scan on import)
+  companionFiles?: Map<string, ArrayBuffer>; // Companion files for multi-file formats (name → buffer)
   midiOptions?: {             // MIDI-specific import settings
     quantize?: number;
     mergeChannels?: boolean;
@@ -494,7 +495,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     }
   }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview]);
 
-  const handleImport = useCallback(() => {
+  const handleImport = useCallback(async () => {
     if (!moduleInfo) return;
     if (isPlaying) {
       if (isMusicLine || isHively) stopEnginePreview();
@@ -506,9 +507,17 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       setFormatEngine(nativeFmt.key as keyof FormatEnginePreferences, 'native');
     }
     setFormatEngine('uade', 'enhanced');
-    onImport(moduleInfo, { useLibopenmpt: true, subsong: selectedSubsong, uadeMetadata: uadeMetadata ?? undefined });
+    // Convert companion File[] to Map<string, ArrayBuffer> for the import pipeline
+    let companionMap: Map<string, ArrayBuffer> | undefined;
+    if (activeCompanions.length > 0) {
+      companionMap = new Map();
+      for (const f of activeCompanions) {
+        companionMap.set(f.name, await f.arrayBuffer());
+      }
+    }
+    onImport(moduleInfo, { useLibopenmpt: true, subsong: selectedSubsong, uadeMetadata: uadeMetadata ?? undefined, companionFiles: companionMap });
     onClose();
-  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, nativeFmt, isNativeOnly, setFormatEngine, onImport, onClose, selectedSubsong]);
+  }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, nativeFmt, isNativeOnly, setFormatEngine, onImport, onClose, selectedSubsong, activeCompanions]);
 
   const handleClose = useCallback(() => {
     if (isPlaying) {
