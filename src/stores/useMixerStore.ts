@@ -12,6 +12,7 @@ export interface MixerChannelState {
   muted: boolean;
   soloed: boolean;
   name: string;
+  effects: [string | null, string | null]; // 2 FX slots: effect type name or null
 }
 
 function defaultChannels(): MixerChannelState[] {
@@ -21,6 +22,7 @@ function defaultChannels(): MixerChannelState[] {
     muted: false,
     soloed: false,
     name: `CH ${i + 1}`,
+    effects: [null, null],
   }));
 }
 
@@ -50,6 +52,7 @@ interface MixerStoreActions {
   setChannelPan: (ch: number, pan: number) => void;
   setChannelMute: (ch: number, muted: boolean) => void;
   setChannelSolo: (ch: number, soloed: boolean) => void;
+  setChannelEffect: (ch: number, slot: 0 | 1, type: string | null) => void;
   setMasterVolume: (vol: number) => void;
   toggleDomPanel: () => void;
   getInitialState: () => MixerStoreState;
@@ -115,6 +118,14 @@ export const useMixerStore = create<MixerStore>()(
           const effectiveMute = isSoloing ? !c.soloed : c.muted;
           getToneEngine().setChannelMute(i, effectiveMute);
         });
+      });
+    },
+
+    setChannelEffect(ch: number, slot: 0 | 1, type: string | null): void {
+      set((state) => {
+        if (state.channels[ch]) {
+          state.channels[ch].effects[slot] = type;
+        }
       });
     },
 

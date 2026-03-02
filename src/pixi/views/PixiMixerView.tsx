@@ -145,6 +145,8 @@ export const PixiMixerView: React.FC = () => {
               onPanChange={setChannelPan}
               onMuteToggle={handleMuteToggle}
               onSoloToggle={handleSoloToggle}
+              effects={ch.effects ?? [null, null]}
+              onEffectChange={(slot, type) => useMixerStore.getState().setChannelEffect(i, slot, type)}
             />
           ))}
         </pixiContainer>
