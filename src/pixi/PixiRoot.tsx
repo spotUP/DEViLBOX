@@ -93,7 +93,6 @@ export const PixiRoot: React.FC = () => {
 
   return (
     <pixiContainer
-      sortableChildren
       layout={{
         width,
         height,
