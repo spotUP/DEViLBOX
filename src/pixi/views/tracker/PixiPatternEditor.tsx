@@ -45,6 +45,7 @@ const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
 const FONT_SIZE = 11;
 const HEADER_HEIGHT = 28;
+const GL_MUTE_SOLO_H = 14; // Height of GL-rendered M/S button strip at top of grid
 const SCROLL_THRESHOLD = 50; // Horizontal scroll accumulator resistance
 
 // ─── Note formatting ─────────────────────────────────────────────────────────
@@ -113,9 +114,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     setChannelColor,
     updateChannelName,
     setCell,
+    moveCursorToChannelAndColumn,
     copyTrack,
     cutTrack,
     pasteTrack,
+    channelMuted,
+    channelSolo,
   } = useTrackerStore(useShallow((s) => ({
     pattern: s.patterns[s.currentPatternIndex],
     patterns: s.patterns,
@@ -136,6 +140,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     copyTrack: s.copyTrack,
     cutTrack: s.cutTrack,
     pasteTrack: s.pasteTrack,
+    // Mute/Solo arrays for GL button rendering
+    channelMuted: (s.patterns[s.currentPatternIndex]?.channels ?? []).map(ch => ch.muted),
+    channelSolo: (s.patterns[s.currentPatternIndex]?.channels ?? []).map(ch => ch.solo),
   })));
 
   const useHex = useUIStore(s => s.useHexNumbers);
@@ -462,10 +469,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   // ── Visible range ─────────────────────────────────────────────────────────
   const scrollbarHeight = allChannelsFit ? 0 : SCROLLBAR_HEIGHT;
+  // gridHeight includes the GL M/S strip at the top; cellGridHeight is the usable cell area
   const gridHeight = height - HEADER_HEIGHT - scrollbarHeight;
-  const visibleLines = Math.ceil(gridHeight / rowHeight) + 2;
+  const cellGridHeight = gridHeight - GL_MUTE_SOLO_H;
+  const visibleLines = Math.ceil(cellGridHeight / rowHeight) + 2;
   const topLines = Math.floor(visibleLines / 2);
-  const centerLineTop = Math.floor(gridHeight / 2) - rowHeight / 2;
+  const centerLineTop = GL_MUTE_SOLO_H + Math.floor(cellGridHeight / 2) - rowHeight / 2;
   const baseY = centerLineTop - topLines * rowHeight - smoothOffset;
   const vStart = currentRow - topLines;
   const patternLength = displayPattern?.length ?? 64;
@@ -571,11 +580,41 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
     const local = e.getLocalPosition(e.currentTarget);
+    const nativeEvent = e.nativeEvent as PointerEvent;
+
+    // ── GL Mute/Solo button hit detection ─────────────────────────────────
+    if (local.y >= 0 && local.y < GL_MUTE_SOLO_H && nativeEvent.button === 0) {
+      const MS_BTN_W = 16;
+      const MS_BTN_H = 12;
+      const MS_BTN_Y = 1;
+      const MS_GAP = 2;
+      for (let ch = 0; ch < numChannels; ch++) {
+        const colX = channelOffsets[ch] - scrollLeftRef.current;
+        const chW = channelWidths[ch];
+        if (colX + chW < 0 || colX > width) continue;
+        const btnBaseX = colX + chW - (MS_BTN_W * 2 + MS_GAP + 4);
+
+        // M button hit area
+        if (local.x >= btnBaseX && local.x < btnBaseX + MS_BTN_W &&
+            local.y >= MS_BTN_Y && local.y < MS_BTN_Y + MS_BTN_H) {
+          useTrackerStore.getState().toggleChannelMute(ch);
+          return;
+        }
+        // S button hit area
+        const sBtnX = btnBaseX + MS_BTN_W + MS_GAP;
+        if (local.x >= sBtnX && local.x < sBtnX + MS_BTN_W &&
+            local.y >= MS_BTN_Y && local.y < MS_BTN_Y + MS_BTN_H) {
+          useTrackerStore.getState().toggleChannelSolo(ch);
+          return;
+        }
+      }
+      return; // click in M/S strip but not on a button — ignore
+    }
+
     const cell = getCellFromLocal(local.x, local.y);
     if (!cell) return;
 
     const store = useTrackerStore.getState();
-    const nativeEvent = e.nativeEvent as PointerEvent;
 
     // Right-click → context menu
     if (nativeEvent.button === 2) {
@@ -604,7 +643,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       store.startSelection();
     }
     isDraggingRef.current = true;
-  }, [getCellFromLocal, cellContextMenu]);
+  }, [getCellFromLocal, cellContextMenu, numChannels, channelOffsets, channelWidths, width]);
 
   const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
     // Scratch drag — route to scratch controller
@@ -843,16 +882,22 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       const chW = channelWidths[ch];
       if (colX + chW < 0 || colX > width) continue;
 
+      // Muted channel overlay — dim the cell area (below M/S strip)
+      if (channelMuted[ch]) {
+        g.rect(colX, GL_MUTE_SOLO_H, chW, gridHeight - GL_MUTE_SOLO_H);
+        g.fill({ color: 0x000000, alpha: 0.45 });
+      }
+
       // Active channel highlight
       if (ch === cursor.channelIndex) {
-        g.rect(colX, 0, chW, gridHeight);
+        g.rect(colX, GL_MUTE_SOLO_H, chW, gridHeight - GL_MUTE_SOLO_H);
         g.fill({ color: 0xffffff, alpha: 0.02 });
       }
 
       // Channel color stripe
       const channelColor = displayPattern?.channels[ch]?.color;
       if (channelColor) {
-        g.rect(colX, 0, 2, gridHeight);
+        g.rect(colX, GL_MUTE_SOLO_H, 2, gridHeight - GL_MUTE_SOLO_H);
         g.fill({ color: parseInt(channelColor.replace('#', ''), 16), alpha: 0.4 });
       }
 
@@ -930,18 +975,86 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       }
     }
 
+    // ── GL Mute/Solo button strip (top of grid canvas) ─────────────────
+    const MS_BTN_W = 16;
+    const MS_BTN_H = 12;
+    const MS_BTN_Y = 1;
+    const MS_GAP = 2;
+
+    // Strip background
+    g.rect(LINE_NUMBER_WIDTH, 0, width - LINE_NUMBER_WIDTH, GL_MUTE_SOLO_H);
+    g.fill({ color: theme.bgTertiary.color, alpha: 0.9 });
+    // Bottom separator line
+    g.rect(LINE_NUMBER_WIDTH, GL_MUTE_SOLO_H - 1, width - LINE_NUMBER_WIDTH, 1);
+    g.fill({ color: theme.border.color, alpha: 0.4 });
+
+    for (let ch = 0; ch < numChannels; ch++) {
+      const colX = channelOffsets[ch] - scrollLeftRef.current;
+      const chW = channelWidths[ch];
+      if (colX + chW < 0 || colX > width) continue;
+      const isMuted = channelMuted[ch] ?? false;
+      const isSolo = channelSolo[ch] ?? false;
+      const btnBaseX = colX + chW - (MS_BTN_W * 2 + MS_GAP + 4);
+
+      // M button background
+      const mBgColor = isMuted ? theme.warning.color : theme.bgSecondary.color;
+      const mBgAlpha = isMuted ? 0.85 : 0.6;
+      g.rect(btnBaseX, MS_BTN_Y, MS_BTN_W, MS_BTN_H);
+      g.fill({ color: mBgColor, alpha: mBgAlpha });
+
+      // S button background
+      const sBgColor = isSolo ? theme.accent.color : theme.bgSecondary.color;
+      const sBgAlpha = isSolo ? 0.85 : 0.6;
+      g.rect(btnBaseX + MS_BTN_W + MS_GAP, MS_BTN_Y, MS_BTN_W, MS_BTN_H);
+      g.fill({ color: sBgColor, alpha: sBgAlpha });
+    }
+
     // Line number gutter background
     g.rect(0, 0, LINE_NUMBER_WIDTH, gridHeight);
     g.fill({ color: theme.bg.color, alpha: 0.85 });
   }, [width, gridHeight, theme, visibleLines, vStart, baseY, patternLength, currentRow,
       showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
       cursor, selection, displayPattern, isPlaying, recordMode, scrollLeft, displayPatternIndex,
-      rowHeight, rowHighlightInterval]);
+      rowHeight, rowHighlightInterval, channelMuted, channelSolo]);
 
   // ── Generate text labels for visible rows ─────────────────────────────────
   const cellLabels = useMemo(() => {
     if (!displayPattern) return [];
     const labels: { x: number; y: number; text: string; color: number; bold?: boolean; alpha?: number }[] = [];
+
+    // ── GL Mute/Solo button labels ─────────────────────────────────────────
+    const MS_BTN_W = 16;
+    const MS_BTN_H = 12;
+    const MS_BTN_Y = 1;
+    const MS_GAP = 2;
+    const MS_FONT_SIZE = 8;
+    const MS_TEXT_Y = MS_BTN_Y + (MS_BTN_H - MS_FONT_SIZE) / 2;
+
+    for (let ch = 0; ch < numChannels; ch++) {
+      const colX = channelOffsets[ch] - scrollLeftRef.current;
+      const chW = channelWidths[ch];
+      if (colX + chW < 0 || colX > width) continue;
+      const isMuted = channelMuted[ch] ?? false;
+      const isSolo = channelSolo[ch] ?? false;
+      const btnBaseX = colX + chW - (MS_BTN_W * 2 + MS_GAP + 4);
+
+      // M label
+      labels.push({
+        x: btnBaseX + (MS_BTN_W - MS_FONT_SIZE * 0.6) / 2,
+        y: MS_TEXT_Y,
+        text: 'M',
+        color: isMuted ? theme.warning.color : theme.textMuted.color,
+        bold: isMuted,
+      });
+      // S label
+      labels.push({
+        x: btnBaseX + MS_BTN_W + MS_GAP + (MS_BTN_W - MS_FONT_SIZE * 0.6) / 2,
+        y: MS_TEXT_Y,
+        text: 'S',
+        color: isSolo ? theme.accent.color : theme.textMuted.color,
+        bold: isSolo,
+      });
+    }
 
     for (let i = 0; i < visibleLines; i++) {
       const rowNum = vStart + i;
@@ -1081,7 +1194,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   }, [displayPattern, patterns, displayPatternIndex, visibleLines, vStart, baseY, gridHeight,
       patternLength, showGhostPatterns, useHex, blankEmpty, numChannels,
       channelOffsets, channelWidths, width, currentRow, theme, columnVisibility, scrollLeft,
-      rowHeight, rowHighlightInterval, showBeatLabels]);
+      rowHeight, rowHighlightInterval, showBeatLabels, channelMuted, channelSolo]);
 
   if (!pattern) {
     return (
