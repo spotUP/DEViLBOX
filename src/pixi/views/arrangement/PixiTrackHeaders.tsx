@@ -3,7 +3,7 @@
  * Shows track names with mute/solo indicators.
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
@@ -34,6 +34,8 @@ interface PixiTrackHeadersProps {
   onResizeTrack?: (trackId: string, newHeight: number) => void;
   /** Called when fold chevron is clicked for a group */
   onToggleGroupFold?: (groupId: string) => void;
+  /** Called when the remove (×) button is clicked */
+  onRemoveTrack?: (trackId: string) => void;
 }
 
 export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
@@ -48,10 +50,13 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
   onCycleColor,
   onResizeTrack,
   onToggleGroupFold,
+  onRemoveTrack,
 }) => {
   const theme = usePixiTheme();
   // Double-click detection for rename
   const lastClickRef = useRef<{ time: number; trackId: string }>({ time: 0, trackId: '' });
+  // Hover state for remove button visibility per track
+  const [hoveredTrackId, setHoveredTrackId] = useState<string | null>(null);
 
   // Pre-compute which track is the first in each group (by lowest track array index)
   const firstTrackInGroup = useCallback((groupId: string): string | null => {
@@ -96,6 +101,8 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
                 lastClickRef.current = { time: now, trackId: track.id };
               }
             }}
+            onPointerOver={() => setHoveredTrackId(track.id)}
+            onPointerOut={() => setHoveredTrackId(prev => prev === track.id ? null : prev)}
             layout={{
               position: 'absolute',
               left: 0,
@@ -235,6 +242,28 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
                 layout={{}}
               />
             </pixiContainer>
+
+            {/* Remove button — only shown on hover when onRemoveTrack is provided and track list has more than 1 track */}
+            {onRemoveTrack != null && tracks.length > 1 && (
+              <pixiContainer
+                eventMode="static"
+                cursor="pointer"
+                onPointerOver={() => setHoveredTrackId(track.id)}
+                onPointerUp={(e: FederatedPointerEvent) => {
+                  e.stopPropagation();
+                  onRemoveTrack(track.id);
+                }}
+                layout={{ width: 16, height: 16, justifyContent: 'center', alignItems: 'center' }}
+                alpha={hoveredTrackId === track.id ? 1.0 : 0.4}
+              >
+                <pixiBitmapText
+                  text="\u00D7"
+                  style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+                  tint={theme.error.color}
+                  layout={{}}
+                />
+              </pixiContainer>
+            )}
 
             {/* Bottom border */}
             <pixiGraphics
