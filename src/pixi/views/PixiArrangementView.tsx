@@ -8,7 +8,7 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PixiButton, PixiLabel, PixiSelect } from '../components';
 import { PixiArrangementCanvas } from './arrangement/PixiArrangementCanvas';
-import type { ClipRenderData } from './arrangement/PixiArrangementCanvas';
+import type { ClipRenderData, ClipChannelNotes } from './arrangement/PixiArrangementCanvas';
 import { PixiTrackHeaders } from './arrangement/PixiTrackHeaders';
 import { PixiArrangementAutomationLane } from './arrangement/PixiArrangementAutomationLane';
 import { PixiScrollbar } from './pianoroll/PixiScrollbar';
@@ -20,6 +20,7 @@ import { TITLE_H } from '../workbench/PixiWindow';
 import type { ArrangementToolMode } from '@/types/arrangement';
 import { useArrangementKeyboardShortcuts } from '@/components/arrangement/ArrangementKeyboardShortcuts';
 import { MarkerRenameInput } from '@/components/arrangement/MarkerRenameInput';
+import { TrackRenameDialog } from '@/components/arrangement/TrackRenameDialog';
 
 const VIEW_OPTIONS = [
   { value: 'tracker', label: 'Tracker' },
@@ -72,6 +73,11 @@ export const PixiArrangementView: React.FC = () => {
       if (!isHoveredRef.current) return;
       e.preventDefault();
       const s = useArrangementStore.getState();
+      if (e.ctrlKey) {
+        const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+        s.setPixelsPerRow(s.view.pixelsPerRow * factor);
+        return;
+      }
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
         const rowDelta = e.deltaX / s.view.pixelsPerRow;
         s.setScrollRow(Math.max(0, s.view.scrollRow + rowDelta));
@@ -198,14 +204,33 @@ export const PixiArrangementView: React.FC = () => {
 
         // Note preview: collect note values for the clip's channel rows
         let noteRows: number[] | undefined;
+        let noteChannels: ClipChannelNotes[] | undefined;
         if (pat) {
           const channelIdx = clip.sourceChannelIndex ?? 0;
           const channel = pat.channels[channelIdx];
+          const offsetRows = clip.offsetRows || 0;
           if (channel?.rows) {
-            const offsetRows = clip.offsetRows || 0;
             noteRows = channel.rows
               .slice(offsetRows, offsetRows + lengthRows)
               .map(cell => cell.note);
+          }
+
+          // Multi-channel waveform: up to 4 channels
+          const numChannels = Math.min(4, pat.channels.length);
+          if (numChannels > 0) {
+            noteChannels = [];
+            for (let ci = 0; ci < numChannels; ci++) {
+              const ch = pat.channels[ci];
+              if (!ch?.rows) continue;
+              const rows = ch.rows
+                .slice(offsetRows, offsetRows + lengthRows)
+                .map(cell => cell.note);
+              noteChannels.push({
+                noteRows: rows,
+                color: CHANNEL_COLORS[ci % CHANNEL_COLORS.length],
+              });
+            }
+            if (noteChannels.length === 0) noteChannels = undefined;
           }
         }
 
@@ -221,6 +246,7 @@ export const PixiArrangementView: React.FC = () => {
           fadeInRows: clip.fadeInRows || 0,
           fadeOutRows: clip.fadeOutRows || 0,
           noteRows,
+          noteChannels,
         };
       });
   }, [clips, visibleTracks, selectedClipIds, patterns]);
@@ -549,6 +575,7 @@ export const PixiArrangementView: React.FC = () => {
             onCycleColor={(trackId) => useArrangementStore.getState().cycleTrackColor(trackId)}
             onResizeTrack={(trackId, height) => useArrangementStore.getState().setTrackHeight(trackId, height)}
             onToggleGroupFold={(groupId) => useArrangementStore.getState().toggleGroupFold(groupId)}
+            onRemoveTrack={(trackId) => useArrangementStore.getState().removeTrack(trackId)}
           />
           <pixiContainer layout={{ width: TRACK_HEADERS_W, height: SCROLLBAR_SIZE }} />
         </pixiContainer>
@@ -693,6 +720,8 @@ export const PixiArrangementView: React.FC = () => {
 
       {/* Marker rename input — DOM overlay rendered via portal */}
       <MarkerRenameInput />
+      {/* Track rename dialog — DOM overlay rendered via portal */}
+      <TrackRenameDialog />
     </pixiContainer>
   );
 };
