@@ -16,7 +16,6 @@
  */
 
 import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import type { Graphics as GraphicsType, Container as ContainerType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -132,6 +131,7 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
   const theme = usePixiTheme();
   const containerRef = useRef<ContainerType>(null);
   const graphicsRef = useRef<GraphicsType>(null);
+  const tooltipDivRef = useRef<HTMLDivElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [, setIsHovered] = useState(false);
 
@@ -309,38 +309,46 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
     };
   }, []);
 
-  // ─── Tooltip (DOM portal during drag) ───────────────────────────────────
+  // ─── Tooltip (imperative DOM div — NOT a React portal) ──────────────────
+  // createPortal from react-dom does not work inside @pixi/react's custom
+  // renderer — it routes through the PixiJS reconciler, which can't render
+  // HTML elements. Manage the tooltip div directly via useEffect instead.
 
-  const tooltipContent = useMemo(() => {
-    if (!isDragging) return null;
-    const el = containerRef.current;
-    if (!el) return null;
-    // Get screen position from PixiJS global transform
-    const bounds = el.getBounds();
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          left: bounds.x + config.knob / 2,
-          top: bounds.y - 8,
-          transform: 'translate(-50%, -100%)',
-          padding: '2px 6px',
-          background: 'rgba(0,0,0,0.9)',
-          border: `1px solid #${accent.toString(16).padStart(6, '0')}`,
-          borderRadius: 4,
-          fontFamily: 'JetBrains Mono, monospace',
-          fontSize: 11,
-          fontWeight: 700,
-          color: '#fff',
-          whiteSpace: 'nowrap',
-          pointerEvents: 'none',
-          zIndex: 9999,
-        }}
-      >
-        {formatValueFn(displayVal)}{unit}
-      </div>,
-      document.body,
-    );
+  useEffect(() => {
+    const div = document.createElement('div');
+    Object.assign(div.style, {
+      position: 'fixed',
+      display: 'none',
+      transform: 'translate(-50%, -100%)',
+      padding: '2px 6px',
+      background: 'rgba(0,0,0,0.9)',
+      borderRadius: '4px',
+      fontFamily: 'JetBrains Mono, monospace',
+      fontSize: '11px',
+      fontWeight: '700',
+      color: '#fff',
+      whiteSpace: 'nowrap',
+      pointerEvents: 'none',
+      zIndex: '9999',
+    });
+    document.body.appendChild(div);
+    tooltipDivRef.current = div;
+    return () => { div.remove(); tooltipDivRef.current = null; };
+  }, []);
+
+  useEffect(() => {
+    const div = tooltipDivRef.current;
+    if (!div) return;
+    if (!isDragging || !containerRef.current) {
+      div.style.display = 'none';
+      return;
+    }
+    const bounds = containerRef.current.getBounds();
+    div.style.left = `${bounds.x + config.knob / 2}px`;
+    div.style.top = `${bounds.y - 8}px`;
+    div.style.border = `1px solid #${accent.toString(16).padStart(6, '0')}`;
+    div.textContent = `${formatValueFn(displayVal)}${unit}`;
+    div.style.display = 'block';
   }, [isDragging, displayVal, unit, formatValueFn, accent, config.knob]);
 
   // Total component dimensions
@@ -350,8 +358,7 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
   const totalHeight = config.knob + labelHeight + valueHeight + 4;
 
   return (
-    <>
-      <pixiContainer
+    <pixiContainer
         ref={containerRef}
         eventMode={disabled ? 'none' : 'static'}
         cursor={disabled ? 'not-allowed' : isDragging ? 'ns-resize' : 'pointer'}
@@ -405,9 +412,5 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
           layout={{ height: valueHeight }}
         />
       </pixiContainer>
-
-      {/* Floating tooltip during drag */}
-      {tooltipContent}
-    </>
   );
 };
