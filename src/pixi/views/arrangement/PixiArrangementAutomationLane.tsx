@@ -143,8 +143,7 @@ export const PixiArrangementAutomationLane: React.FC<PixiArrangementAutomationLa
     if (e.button !== 0) return;
     e.stopPropagation();
 
-    const localX = e.localX;
-    const localY = e.localY;
+    const { x: localX, y: localY } = e.getLocalPosition(e.currentTarget);
     const now = Date.now();
 
     const hitIdx = findNearestPoint(lane.points, localX, localY, scrollBeat, pixelsPerBeat, height);
@@ -173,8 +172,7 @@ export const PixiArrangementAutomationLane: React.FC<PixiArrangementAutomationLa
     if (!dragRef.current) return;
     e.stopPropagation();
 
-    const localX = e.localX;
-    const localY = e.localY;
+    const { x: localX, y: localY } = e.getLocalPosition(e.currentTarget);
     const row = Math.max(0, xToRow(localX, scrollBeat, pixelsPerBeat));
     const value = yToValue(localY, height);
     onMovePoint(dragRef.current.index, Math.round(row), value);
