@@ -238,9 +238,17 @@ export interface SongDBNotFound {
   found: false;
 }
 
-const lookupModinfo = db.prepare('SELECT format, channels FROM songdb_modinfos WHERE hash = ?');
-const lookupMetadata = db.prepare('SELECT authors, publishers, album, year FROM songdb_metadata WHERE hash = ?');
-const lookupLengths = db.prepare('SELECT min_subsong, subsong_data FROM songdb_lengths WHERE hash = ?');
+let lookupModinfo: ReturnType<typeof db.prepare> | null = null;
+let lookupMetadata: ReturnType<typeof db.prepare> | null = null;
+let lookupLengths: ReturnType<typeof db.prepare> | null = null;
+
+function initStatements() {
+  if (!lookupModinfo) {
+    lookupModinfo = db.prepare('SELECT format, channels FROM songdb_modinfos WHERE hash = ?');
+    lookupMetadata = db.prepare('SELECT authors, publishers, album, year FROM songdb_metadata WHERE hash = ?');
+    lookupLengths = db.prepare('SELECT min_subsong, subsong_data FROM songdb_lengths WHERE hash = ?');
+  }
+}
 
 /**
  * Parse subsong_data string like "174520,p 42880,l 53120,l" into subsong array
@@ -257,9 +265,10 @@ function parseSubsongData(data: string, minSubsong: number): SongDBSubsong[] {
 }
 
 export function lookupHash(hash: string): SongDBResult | SongDBNotFound {
-  const modinfo = lookupModinfo.get(hash) as { format: string; channels: number | null } | undefined;
-  const metadata = lookupMetadata.get(hash) as { authors: string; publishers: string; album: string; year: string } | undefined;
-  const lengths = lookupLengths.get(hash) as { min_subsong: number; subsong_data: string } | undefined;
+  initStatements();
+  const modinfo = lookupModinfo!.get(hash) as { format: string; channels: number | null } | undefined;
+  const metadata = lookupMetadata!.get(hash) as { authors: string; publishers: string; album: string; year: string } | undefined;
+  const lengths = lookupLengths!.get(hash) as { min_subsong: number; subsong_data: string } | undefined;
 
   if (!modinfo && !metadata && !lengths) {
     return { found: false };
