@@ -17,7 +17,17 @@ import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { useTrackerStore, usePianoRollStore } from '@stores';
+import { useArrangementStore } from '@stores/useArrangementStore';
 import type { ArrangementToolMode } from '@/types/arrangement';
+
+/** Per-channel note data for multi-channel waveform rendering inside a clip. */
+export interface ClipChannelNotes {
+  /** XM note values per row for this channel: 1-96 = pitched, 97 = note-off, 0 = empty */
+  noteRows: number[];
+  /** RGBA hex color for this channel's bars (uses clip color if omitted) */
+  color?: number;
+}
 
 /** Pre-processed clip data ready for rendering */
 export interface ClipRenderData {
@@ -32,8 +42,11 @@ export interface ClipRenderData {
   fadeInRows?: number;
   fadeOutRows?: number;
   /** Note values (XM format: 1-96 = pitched note, 97 = note off, 0 = empty)
-   *  for drawing the mini note-preview bars inside the clip. */
+   *  for drawing the mini note-preview bars inside the clip (single-channel legacy). */
   noteRows?: number[];
+  /** Multi-channel note data for the waveform preview. Up to 4 channels rendered.
+   *  When provided, takes precedence over noteRows for the multi-channel draw pass. */
+  noteChannels?: ClipChannelNotes[];
 }
 
 interface PixiArrangementCanvasProps {
@@ -480,8 +493,23 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         // Double-click detection: open in piano roll
         const now = Date.now();
         if (now - lastClickRef.current.time < 300 && lastClickRef.current.clipId === hit.id) {
-          cbs.onOpenInPianoRoll?.(hit.id);
           lastClickRef.current = { time: 0, clipId: '' };
+          if (cbs.onOpenInPianoRoll) {
+            // Prefer the provided callback (handles full navigation in PixiArrangementView)
+            cbs.onOpenInPianoRoll(hit.id);
+          } else {
+            // Fallback: wire directly to stores when no callback is provided
+            const arrClip = useArrangementStore.getState().clips.find(c => c.id === hit.id);
+            if (arrClip) {
+              const ts = useTrackerStore.getState();
+              const patternIndex = ts.patterns.findIndex(p => p.id === (arrClip as { patternId?: string }).patternId);
+              if (patternIndex >= 0) ts.setCurrentPattern(patternIndex);
+              const channelIndex = (arrClip as { sourceChannelIndex?: number }).sourceChannelIndex ?? 0;
+              const pr = usePianoRollStore.getState();
+              pr.setChannelIndex(channelIndex);
+              useWorkbenchStore.getState().showWindow('pianoroll');
+            }
+          }
           return;
         }
         lastClickRef.current = { time: now, clipId: hit.id };
@@ -726,33 +754,70 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         g.fill({ color: 0xffffff, alpha: 0.6 });
       }
 
-      // Note preview: draw mini bars for each pitched note in the clip
-      if (pixelsPerBeat >= 1 && clip.noteRows && clip.noteRows.length > 0) {
-        const noteH = Math.max(1, Math.min(4, ch / 24));
-        const noteW = Math.max(1, pixelsPerBeat);
-        const clipBodyLeft = cx + CLIP_PADDING;
-        const clipBodyRight = cx + cw - CLIP_PADDING;
-        const clipBodyTop = cy + 4; // below the header stripe
-        const clipBodyBottom = cy + ch;
-        const clipBodyH = clipBodyBottom - clipBodyTop;
+      // Note preview: draw mini note bars inside the clip body.
+      // Supports both legacy single-channel noteRows and multi-channel noteChannels.
+      // Only render when the clip is wide enough to show meaningful detail.
+      const clipBodyLeft = cx + CLIP_PADDING;
+      const clipBodyRight = cx + cw - CLIP_PADDING;
+      const clipBodyTop = cy + 4; // below the header stripe
+      const clipBodyBottom = cy + ch;
+      const clipBodyH = clipBodyBottom - clipBodyTop;
+      const clipBodyW = clipBodyRight - clipBodyLeft;
 
-        for (let rowIdx = 0; rowIdx < clip.noteRows.length; rowIdx++) {
-          const note = clip.noteRows[rowIdx];
-          if (note < 1 || note > 96) continue; // skip empty and note-off
+      if (clipBodyW >= 30 && pixelsPerBeat >= 1) {
+        // ── Multi-channel waveform (noteChannels) ──────────────────────────
+        if (clip.noteChannels && clip.noteChannels.length > 0) {
+          const channelsToDraw = clip.noteChannels.slice(0, 4);
+          const noteH = 2;
 
-          const nx = clipBodyLeft + rowIdx * pixelsPerBeat;
-          if (nx + noteW < clipBodyLeft || nx > clipBodyRight) continue;
+          for (let chIdx = 0; chIdx < channelsToDraw.length; chIdx++) {
+            const channelData = channelsToDraw[chIdx];
+            const barColor = channelData.color ?? clip.color;
+            const { noteRows: chNoteRows } = channelData;
 
-          // MIDI note 0-95; map to y: 0 (MIDI 95) at top, 1 (MIDI 0) at bottom
-          const midiNote = note - 1; // XM note 1-96 → MIDI 0-95
-          const ny = clipBodyTop + clipBodyH * (1 - midiNote / 95) - noteH / 2;
+            for (let rowIdx = 0; rowIdx < chNoteRows.length; rowIdx++) {
+              const note = chNoteRows[rowIdx];
+              if (note < 1 || note > 96) continue; // skip empty and note-off
 
-          const drawX = Math.max(clipBodyLeft, nx);
-          const drawW = Math.min(clipBodyRight, nx + noteW) - drawX;
-          if (drawW <= 0) continue;
+              const nx = clipBodyLeft + (rowIdx / clip.lengthRows) * clipBodyW;
+              const barW = Math.max(2, pixelsPerBeat);
 
-          g.rect(drawX, ny, drawW, noteH);
-          g.fill({ color: 0xffffff, alpha: 0.25 });
+              if (nx + barW < clipBodyLeft || nx > clipBodyRight) continue;
+
+              // Map MIDI note to Y: high notes near top, low notes near bottom
+              const midiNote = note - 1; // XM 1-96 → MIDI 0-95
+              const ny = clipBodyTop + clipBodyH * (1 - midiNote / 95) - noteH / 2;
+
+              const drawX = Math.max(clipBodyLeft, nx);
+              const drawW = Math.min(clipBodyRight, nx + barW) - drawX;
+              if (drawW <= 0) continue;
+
+              g.rect(drawX, ny, drawW, noteH);
+              g.fill({ color: barColor, alpha: clip.muted ? 0.15 : 0.4 });
+            }
+          }
+        } else if (clip.noteRows && clip.noteRows.length > 0) {
+          // ── Legacy single-channel noteRows ─────────────────────────────
+          const noteH = Math.max(1, Math.min(4, ch / 24));
+          const noteW = Math.max(1, pixelsPerBeat);
+
+          for (let rowIdx = 0; rowIdx < clip.noteRows.length; rowIdx++) {
+            const note = clip.noteRows[rowIdx];
+            if (note < 1 || note > 96) continue; // skip empty and note-off
+
+            const nx = clipBodyLeft + rowIdx * noteW;
+            if (nx + noteW < clipBodyLeft || nx > clipBodyRight) continue;
+
+            const midiNote = note - 1; // XM note 1-96 → MIDI 0-95
+            const ny = clipBodyTop + clipBodyH * (1 - midiNote / 95) - noteH / 2;
+
+            const drawX = Math.max(clipBodyLeft, nx);
+            const drawW = Math.min(clipBodyRight, nx + noteW) - drawX;
+            if (drawW <= 0) continue;
+
+            g.rect(drawX, ny, drawW, noteH);
+            g.fill({ color: 0xffffff, alpha: 0.25 });
+          }
         }
       }
     }
