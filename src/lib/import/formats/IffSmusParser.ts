@@ -135,8 +135,26 @@ function tempoIndexToSpeedBPM(tempoIdx: number): { speed: number; bpm: number } 
   const clamped = Math.max(0, Math.min(127, tempoIdx));
   const tableVal = TEMPO_TABLE[clamped];
   const speed = Math.max(1, (tableVal >> 12) & 0x0f);
-  const bpm = Math.max(32, Math.min(255, Math.round(900 / speed)));
-  return { speed, bpm };
+
+  // Replicate the asm CIA timer calculation from lbC0007F2:
+  //   D1 = tableVal * 32768
+  //   D1 = D1 / (speed << 12)    (integer division)
+  //   D1 = D1 * 0x2E9C            (= 11932)
+  //   D1 = D1 >> 15               (integer shift)
+  //   dtg_Timer = D1
+  const intermediate = Math.floor((tableVal * 32768) / (speed * 4096));
+  const ciaTimer = Math.floor((intermediate * 0x2E9C) / 32768);
+
+  // BPM derived from CIA timer: XM row rate must match Sonix event rate
+  //   XM rows/sec = (2 * BPM) / (5 * speed)
+  //   Sonix events/sec = CIA_CLOCK / (ciaTimer * speed)
+  //   → BPM = 5 * CIA_CLOCK / (2 * ciaTimer)
+  const CIA_CLOCK_PAL = 709379;
+  const bpm = ciaTimer > 0
+    ? Math.round((5 * CIA_CLOCK_PAL) / (2 * ciaTimer))
+    : 125;
+
+  return { speed, bpm: Math.max(32, Math.min(255, bpm)) };
 }
 
 function smusNoteToXM(midiNote: number): number {
@@ -379,14 +397,14 @@ export async function parseIffSmusFile(
     const track = ch < moduleInfo.tracks.length ? moduleInfo.tracks[ch] : null;
     const cells: TrackerCell[] = [];
     if (!track) { channelFlat.push(cells); continue; }
-    let currentInstrReg = 0;
+    let currentInstrReg = -1;
     for (const ev of track.events) {
       if (ev.type === EVENT_MARK) break;
       if (ev.type <= EVENT_LAST_NOTE) {
         const transposeOff = Math.round(moduleInfo.transpose / 16) - 8;
         const xmNote = smusNoteToXM(ev.type + transposeOff);
         let xmInstr = 0;
-        if (currentInstrReg !== 0) {
+        if (currentInstrReg >= 0) {
           const mapped = moduleInfo.instrumentMapper[currentInstrReg];
           if (mapped !== 0) xmInstr = mapped;
         }

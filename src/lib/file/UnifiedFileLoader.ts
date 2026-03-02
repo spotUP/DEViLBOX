@@ -36,6 +36,8 @@ export interface FileLoadOptions {
     velocityToVolume?: boolean;
     defaultPatternLength?: number;
   };
+  /** Companion files (e.g. Sonix .ss/.instr) for multi-file formats */
+  companionFiles?: Map<string, ArrayBuffer>;
   /** TD-3: if true, clear existing patterns before importing */
   replacePatterns?: boolean;
 }
@@ -467,7 +469,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
     let song: Awaited<ReturnType<typeof parseModuleToSong>>;
     try {
-      song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata);
+      song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
     } catch (err) {
       return {
         success: false,
