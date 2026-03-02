@@ -13,7 +13,7 @@ import React, { useEffect, useRef } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { usePixiTheme } from '../theme';
-import { TITLE_H } from './PixiWindow';
+import { TITLE_H } from './workbenchLayout';
 
 interface WindowTetherProps {
   fromId: string;
