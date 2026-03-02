@@ -15,6 +15,10 @@ import { PixiDropdownPanel } from './PixiSelect';
 import { PixiMenuItem, type MenuItem } from './PixiMenuBar';
 import { usePixiTheme } from '../theme';
 
+// Large enough to cover any screen; drawn with near-zero alpha so it's
+// invisible but still hittable for outside-click close behaviour.
+const BACKDROP_SIZE = 20000;
+
 const MENU_PANEL_PADDING = 4;
 const SEP_H = 9;
 const ITEM_H = 22;
@@ -25,6 +29,13 @@ function itemH(item: { type: string }): number {
 
 export const PixiGlobalDropdownLayer: React.FC = () => {
   const dropdown = usePixiDropdownStore(s => s.dropdown);
+
+  const drawBackdrop = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, BACKDROP_SIZE, BACKDROP_SIZE);
+    // Near-zero alpha: invisible but the geometry exists so PixiJS hit-tests it.
+    g.fill({ color: 0x000000, alpha: 0.01 });
+  }, []);
 
   // IMPORTANT: Always render a stable wrapper container — never return null.
   // The parent root pixiContainer has sortableChildren=true. If this component
@@ -38,6 +49,18 @@ export const PixiGlobalDropdownLayer: React.FC = () => {
       eventMode={dropdown ? 'static' : 'none'}
       layout={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0 }}
     >
+      {dropdown && (
+        // Transparent backdrop rendered BEFORE (below) the panel so the
+        // panel's e.stopPropagation() on pointerDown absorbs panel clicks.
+        // Outside clicks reach this backdrop and close the dropdown.
+        <pixiGraphics
+          draw={drawBackdrop}
+          layout={{ position: 'absolute', left: 0, top: 0, width: BACKDROP_SIZE, height: BACKDROP_SIZE }}
+          eventMode="static"
+          cursor="default"
+          onPointerDown={() => dropdown.onClose()}
+        />
+      )}
       {dropdown?.kind === 'select' && (
         <pixiContainer
           key={dropdown.id}

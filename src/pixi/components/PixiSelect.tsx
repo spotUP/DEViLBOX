@@ -49,13 +49,10 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
   const visibleCount = Math.min(options.length, maxItems);
   const panelH = visibleCount * itemHeight + PANEL_PADDING * 2;
 
-  // Close on outside click — only listen when the panel is actually open
-  useEffect(() => {
-    if (!visible) return;
-    const handler = () => onClose();
-    document.addEventListener('pointerdown', handler, { capture: true });
-    return () => document.removeEventListener('pointerdown', handler, true);
-  }, [onClose, visible]);
+  // Outside-click close is handled by the transparent backdrop rendered in
+  // PixiGlobalDropdownLayer — no document-level listener needed here.
+  // (A document capture listener fires before PixiJS dispatches events, which
+  // would unmount items before their onPointerUp selection handler could run.)
 
   const drawPanel = useCallback((g: GraphicsType) => {
     g.clear();
