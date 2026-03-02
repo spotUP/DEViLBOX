@@ -163,6 +163,7 @@ export const WebGLModalBridge: React.FC = () => {
   const closePatternDialog = useMIDIStore(s => s.closePatternDialog);
   const pendingModuleFile = useUIStore(s => s.pendingModuleFile);
   const setPendingModuleFile = useUIStore(s => s.setPendingModuleFile);
+  const pendingCompanionFiles = useUIStore(s => s.pendingCompanionFiles);
   const pendingAudioFile = useUIStore(s => s.pendingAudioFile);
   const setPendingAudioFile = useUIStore(s => s.setPendingAudioFile);
   const pendingTD3File = useUIStore(s => s.pendingTD3File);
@@ -595,23 +596,24 @@ export const WebGLModalBridge: React.FC = () => {
         /\.(fur|dmf)$/i.test(pendingModuleFile.name) ? (
           <LazyImportFurnaceDialog
             isOpen={true}
-            onClose={() => setPendingModuleFile(null)}
+            onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
             onImport={handleModuleImportGL}
             initialFile={pendingModuleFile}
           />
         ) : /\.(mid|midi)$/i.test(pendingModuleFile.name) ? (
           <LazyImportMIDIDialog
             isOpen={true}
-            onClose={() => setPendingModuleFile(null)}
+            onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
             onImport={handleModuleImportGL}
             initialFile={pendingModuleFile}
           />
         ) : (
           <LazyImportModuleDialog
             isOpen={true}
-            onClose={() => setPendingModuleFile(null)}
+            onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
             onImport={handleModuleImportGL}
             initialFile={pendingModuleFile}
+            companionFiles={pendingCompanionFiles}
           />
         )
       )}

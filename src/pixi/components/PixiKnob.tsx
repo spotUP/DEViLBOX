@@ -15,7 +15,7 @@
  * Reference: src/components/controls/Knob.tsx (670 lines)
  */
 
-import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import type { Graphics as GraphicsType, Container as ContainerType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';

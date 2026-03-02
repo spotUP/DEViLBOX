@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-01T23:57:46.793Z
+ * Generated: 2026-03-02T02:27:46.231Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1941';
-export const BUILD_NUMBER = '1941';
-export const BUILD_HASH = 'b18ad3c8';
-export const BUILD_DATE = '2026-03-01';
+export const BUILD_VERSION = '1.0.1968';
+export const BUILD_NUMBER = '1968';
+export const BUILD_HASH = 'b907787e';
+export const BUILD_DATE = '2026-03-02';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,117 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1941',
+    version: '1.0.1968',
     date: '2026-03-02',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Move frame-rate updates from React state to imperative PixiJS mutations"
+      },
+      {
+        type: 'feature',
+        "description": "Per-channel FX slots with GL dropdown selector"
+      },
+      {
+        type: 'feature',
+        "description": "Convert clip/empty-area context menus to GL dropdown"
+      },
+      {
+        type: 'feature',
+        "description": "Add octave control to FT2 toolbar transport row"
+      },
+      {
+        type: 'fix',
+        "description": "Always draw item hit rect in dropdown panel to eliminate shaky clicks"
+      },
+      {
+        type: 'feature',
+        "description": "Right-click GL context menu (quantize, transpose, delete)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix dropdown item selection by replacing DOM-capture close with PixiJS backdrop"
+      },
+      {
+        type: 'feature',
+        "description": "Instrument names, VU peak hold, dB level readout in GL mixer"
+      },
+      {
+        type: 'feature',
+        "description": "Follow-playback auto-scroll + ctrl+wheel zoom"
+      },
+      {
+        type: 'feature',
+        "description": "Remove channel in GL context menu"
+      },
+      {
+        type: 'feature',
+        "description": "Multi-channel waveforms, track rename, track remove, ctrl+wheel zoom"
+      },
+      {
+        type: 'fix',
+        "description": "Remove layout+sortableChildren from worldRef to eliminate Yoga BindingError"
+      },
+      {
+        type: 'improvement',
+        "description": "Test(sonix): expand SonixMusicDriverParser tests — SNX/TINY/SMUS coverage"
+      },
+      {
+        type: 'feature',
+        "description": "Improve SonixMusicDriverParser with full smus/snx/tiny routing"
+      },
+      {
+        type: 'fix',
+        "description": "Stable wrappers for worldRef children prevent Yoga BindingError"
+      },
+      {
+        type: 'fix',
+        "description": "Correct VBlank BPM formula and amiga period-to-note octave mapping"
+      },
+      {
+        type: 'fix',
+        "description": "Separate channelMuted/channelSolo selectors to prevent infinite loop"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate double-scan and enable tick snapshots for dialog imports"
+      },
+      {
+        type: 'feature',
+        "description": "GL envelope editor + sampler waveform + dropdown overlay store"
+      },
+      {
+        type: 'fix',
+        "description": "Replace react-dom portal in PixiKnob with imperative DOM div"
+      },
+      {
+        type: 'feature',
+        "description": "Per-channel mute/solo GL buttons + FX search and replace panel"
+      },
+      {
+        type: 'feature',
+        "description": "GL save/load nav actions + clip note waveforms + double-click clip opens piano roll"
+      },
+      {
+        type: 'feature',
+        "description": "Automation pan/synth params + clip crop and loop"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve 14 TypeScript errors across pixi views"
+      },
+      {
+        type: 'feature',
+        "description": "Cmd+J consolidation, MIDI recording, and chord detection in piano roll"
+      },
+      {
+        type: 'feature',
+        "description": "Implement full XM instrument/sample writing in XMExporter"
+      },
+      {
+        type: 'fix',
+        "description": "Use logarithmic toDb conversion for perceptually correct fader taper"
+      },
       {
         type: 'fix',
         "description": "Correct instrument numbers and speed detection in pattern reconstructor"
@@ -126,114 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Magnetic clip-edge snapping, overlap detection, BPM-aware snap labels"
-      },
-      {
-        type: 'fix',
-        "description": "Fix volume-0 drop and instrument index ordering in pattern reconstructor"
-      },
-      {
-        type: 'feature',
-        "description": "Add Pass 2 restructurer and --pass2 CLI flag"
-      },
-      {
-        type: 'feature',
-        "description": "SynthDef hot-reload via Reload button and Cmd+Enter"
-      },
-      {
-        type: 'feature',
-        "description": "Arrangement export button and length auto-calculation"
-      },
-      {
-        type: 'feature',
-        "description": "Implement CIA tick-based pattern reconstructor and wire into UADEParser"
-      },
-      {
-        type: 'fix',
-        "description": "Fix wrapper tick rate, remove extern linkage, wire --timing option"
-      },
-      {
-        type: 'feature',
-        "description": "Note copy/paste (Cmd+C/X/V) and chord mode"
-      },
-      {
-        type: 'feature',
-        "description": "Wire Cmd+Z / Cmd+Shift+Z undo/redo in arrangement keyboard shortcuts"
-      },
-      {
-        type: 'feature',
-        "description": "Clip fade visualization, track height resize, timeline markers"
-      },
-      {
-        type: 'fix',
-        "description": "Fix React.FC import and panel background height in PixiUADEDebuggerPanel"
-      },
-      {
-        type: 'feature',
-        "description": "Add Phase B live Paula debugger panels (DOM + GL)"
-      },
-      {
-        type: 'feature',
-        "description": "Add CLI with full pipeline integration"
-      },
-      {
-        type: 'feature',
-        "description": "Right-click context menu, track rename, and track color cycling"
-      },
-      {
-        type: 'feature',
-        "description": "Add Emscripten wrapper and CMake generator"
-      },
-      {
-        type: 'feature',
-        "description": "Expose CIA tick snapshots via worklet and UADEEngine API"
-      },
-      {
-        type: 'feature',
-        "description": "Add soft Paula chip emulator (C runtime)"
-      },
-      {
-        type: 'feature',
-        "description": "Rebuild UADE.wasm with CIA tick snapshot exports"
-      },
-      {
-        type: 'improvement',
-        "description": "Wip(arrangement): save uncommitted arrangement view changes"
-      },
-      {
-        type: 'feature',
-        "description": "Add CIA tick snapshot buffer to WASM core (C implementation)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix NOT/NEG size handling, CLR operand, paula LC signature, anon naming"
-      },
-      {
-        type: 'feature',
-        "description": "Scroll sync, pattern switch, and clip rename"
-      },
-      {
-        type: 'fix',
-        "description": "Add malloc guard and WASM export checks to paulaLog worklet handlers"
-      },
-      {
-        type: 'fix',
-        "description": "Add missing worklet handlers for enablePaulaLog and getPaulaLog"
-      },
-      {
-        type: 'feature',
-        "description": "Implement Pass 1 flat C emitter"
-      },
-      {
-        type: 'feature',
-        "description": "Implement 68k instruction → C mapper"
-      },
-      {
-        type: 'feature',
-        "description": "Double-click clip opens piano roll; title-bar double-click toggles maximize"
-      },
-      {
-        type: 'fix',
-        "description": "Fix HEAPU8/HEAPF32 exposure and pool-full deadlock in all Emscripten worklet engines"
       }
     ]
   }
