@@ -1076,11 +1076,13 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       // Prefer CIA-A derived speed (most accurate), then sample-pointer speed, then default.
       const finalSpeed = ciaASpeed || sampleSpeed || 6;
-      const finalBPM = Math.max(32, Math.min(999, Math.round(vblankHz * 2.5 / finalSpeed)));
+      // BPM = vblankHz * 2.5 (ProTracker formula: tick_rate = BPM * 2/5, so BPM = vblankHz * 5/2).
+      // Speed is a separate parameter; dividing by speed here was incorrect.
+      // PAL 50 Hz → 125 BPM, NTSC 60 Hz → 150 BPM.
+      const finalBPM = Math.max(32, Math.min(999, Math.round(vblankHz * 2.5)));
       if (ciaASpeed || sampleSpeed) {
         detectedSpeed = finalSpeed;
         detectedBPM = finalBPM;
-        // BPM back-calculated: standard Amiga formula BPM = vblankHz * 2.5 / speed
         warnings.push('CIA unreliable — VBlank BPM estimated: ' + detectedBPM + ' BPM / speed ' + detectedSpeed);
       } else {
         warnings.push('CIA unreliable — tempo unknown, defaulted to 125 BPM / speed 6');
