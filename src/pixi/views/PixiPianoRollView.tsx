@@ -4,8 +4,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
+import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../theme';
+import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import { PixiButton, PixiLabel, PixiSelect } from '../components';
 import { PixiPianoKeyboard } from './pianoroll/PixiPianoKeyboard';
 import { PixiPianoRollGrid } from './pianoroll/PixiPianoRollGrid';
@@ -210,6 +211,15 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
     };
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  // Prevent browser native right-click context menu on the canvas
+  useEffect(() => {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) return;
+    const handleContextMenu = (e: MouseEvent) => e.preventDefault();
+    canvas.addEventListener('contextmenu', handleContextMenu);
+    return () => canvas.removeEventListener('contextmenu', handleContextMenu);
   }, []);
 
   // Follow-playback auto-scroll: keep playhead visible when playing
@@ -682,7 +692,91 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           onKeyClick={handlePianoKeyClick}
           onKeyRelease={handlePianoKeyRelease}
         />
-        <pixiContainer layout={{ flex: 1, flexDirection: 'column' }}>
+        <pixiContainer
+          layout={{ flex: 1, flexDirection: 'column' }}
+          eventMode="static"
+          onPointerDown={(e: FederatedPointerEvent) => {
+            if (e.button !== 2) return;
+            e.stopPropagation();
+            const pr = usePianoRollStore.getState();
+            const selectedIds = Array.from(pr.selection.notes);
+            const noNotes = pianoData.notes.length === 0;
+            const noSelection = selectedIds.length === 0;
+            const close = () => usePixiDropdownStore.getState().closeAll();
+            usePixiDropdownStore.getState().openDropdown({
+              kind: 'menu',
+              id: 'pianoroll-ctx',
+              x: e.global.x,
+              y: e.global.y,
+              width: 180,
+              items: [
+                {
+                  type: 'action',
+                  label: 'Select All',
+                  shortcut: 'Ctrl+A',
+                  onClick: () => {
+                    pr.selectAll(pianoData.notes.map(n => n.id));
+                    close();
+                  },
+                },
+                { type: 'separator' },
+                {
+                  type: 'action',
+                  label: 'Quantize',
+                  shortcut: 'Q',
+                  disabled: noNotes,
+                  onClick: () => {
+                    const gridDivision = usePianoRollStore.getState().view.gridDivision;
+                    const idsToQuantize = selectedIds.length > 0
+                      ? selectedIds
+                      : pianoData.notes.map(n => n.id);
+                    if (idsToQuantize.length > 0) {
+                      pianoData.quantizeNotes(idsToQuantize, gridDivision);
+                      handleNotesChanged();
+                    }
+                    close();
+                  },
+                },
+                {
+                  type: 'action',
+                  label: 'Transpose +1',
+                  shortcut: '↑',
+                  disabled: noSelection,
+                  onClick: () => {
+                    pianoData.transposeNotes(selectedIds, 1);
+                    handleNotesChanged();
+                    close();
+                  },
+                },
+                {
+                  type: 'action',
+                  label: 'Transpose −1',
+                  shortcut: '↓',
+                  disabled: noSelection,
+                  onClick: () => {
+                    pianoData.transposeNotes(selectedIds, -1);
+                    handleNotesChanged();
+                    close();
+                  },
+                },
+                { type: 'separator' },
+                {
+                  type: 'action',
+                  label: 'Delete',
+                  shortcut: 'Del',
+                  disabled: noSelection,
+                  onClick: () => {
+                    pianoData.deleteNotes(selectedIds);
+                    pr.clearSelection();
+                    handleNotesChanged();
+                    close();
+                  },
+                },
+              ],
+              onClose: close,
+            });
+          }}
+        >
         <PixiPianoRollGrid
           width={gridW}
           height={gridH}
