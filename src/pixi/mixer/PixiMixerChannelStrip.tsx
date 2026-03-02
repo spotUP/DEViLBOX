@@ -6,22 +6,26 @@
  *   2. Instrument name label (truncated, 8 chars max)
  *   3. VU meter (pixiGraphics, live level) with peak hold
  *   4. dB level readout
- *   5. Volume fader (PixiSlider, vertical, detent at 1.0)
- *   6. Pan knob (PixiKnob, bipolar, defaultValue 0)
- *   7. Mute button
- *   8. Solo button (hidden when isMaster=true)
+ *   5. FX slot 0 (GL dropdown, optional — omitted for master)
+ *   6. FX slot 1 (GL dropdown, optional — omitted for master)
+ *   7. Volume fader (PixiSlider, vertical, detent at 1.0)
+ *   8. Pan knob (PixiKnob, bipolar, defaultValue 0)
+ *   9. Mute button
+ *  10. Solo button (hidden when isMaster=true)
  *
  * Dims to alpha 0.4 when another channel is soloed and this one is not.
  */
 
-import React, { useCallback, useRef } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
+import React, { useCallback, useRef, useState } from 'react';
+import type { Graphics as GraphicsType, Container as ContainerType } from 'pixi.js';
 import { PixiLabel } from '../components/PixiLabel';
 import { PixiSlider } from '../components/PixiSlider';
 import { PixiKnob } from '../components/PixiKnob';
 import { PixiButton } from '../components/PixiButton';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
+import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
+import type { SelectOption } from '../components/PixiSelect';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +44,8 @@ interface PixiMixerChannelStripProps {
   onMuteToggle: (ch: number) => void;
   onSoloToggle: (ch: number) => void;
   isMaster?: boolean;   // if true, hides the solo button
+  effects?: [string | null, string | null];
+  onEffectChange?: (slot: 0 | 1, type: string | null) => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -51,6 +57,98 @@ const VU_COLOR_YELLOW = 0xffcc00;
 const VU_COLOR_RED    = 0xff2222;
 
 const STRIP_WIDTH = 56;
+
+// ─── FX slot ──────────────────────────────────────────────────────────────────
+
+const EFFECT_OPTIONS: SelectOption[] = [
+  { value: '__none__', label: '—  none' },
+  { value: 'reverb', label: 'Reverb' },
+  { value: 'delay', label: 'Delay' },
+  { value: 'chorus', label: 'Chorus' },
+  { value: 'distortion', label: 'Distort' },
+  { value: 'compressor', label: 'Comprs.' },
+];
+
+const FX_SLOT_H = 16;
+
+interface PixiEffectSlotProps {
+  channelIndex: number;
+  slotIndex: 0 | 1;
+  effectType: string | null;
+  width: number;
+  onChange: (slot: 0 | 1, type: string | null) => void;
+}
+
+const PixiEffectSlot: React.FC<PixiEffectSlotProps> = ({
+  channelIndex,
+  slotIndex,
+  effectType,
+  width,
+  onChange,
+}) => {
+  const theme = usePixiTheme();
+  const [hovered, setHovered] = useState(false);
+  const containerRef = useRef<ContainerType>(null);
+  const idRef = useRef(`fx-slot-${channelIndex}-${slotIndex}`);
+
+  const drawBg = useCallback(
+    (g: GraphicsType) => {
+      g.clear();
+      g.roundRect(0, 0, width, FX_SLOT_H, 2);
+      g.fill({ color: hovered ? theme.bgHover.color : theme.bgTertiary.color });
+      g.roundRect(0, 0, width, FX_SLOT_H, 2);
+      g.stroke({ color: theme.border.color, alpha: 0.5, width: 1 });
+    },
+    [hovered, width, theme],
+  );
+
+  const label = effectType
+    ? (EFFECT_OPTIONS.find(o => o.value === effectType)?.label ?? effectType)
+    : '—';
+
+  const handleClick = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const pos = el.toGlobal({ x: 0, y: FX_SLOT_H });
+    const id = idRef.current;
+    usePixiDropdownStore.getState().openDropdown({
+      kind: 'select',
+      id,
+      x: pos.x,
+      y: pos.y,
+      width: 120,
+      options: EFFECT_OPTIONS,
+      onSelect: (value) => {
+        onChange(slotIndex, value === '__none__' ? null : value);
+        usePixiDropdownStore.getState().closeDropdown(id);
+      },
+      onClose: () => usePixiDropdownStore.getState().closeDropdown(id),
+    });
+  }, [slotIndex, onChange]);
+
+  return (
+    <pixiContainer
+      ref={containerRef}
+      eventMode="static"
+      cursor="pointer"
+      onPointerOver={() => setHovered(true)}
+      onPointerOut={() => setHovered(false)}
+      onPointerUp={handleClick}
+      layout={{ width, height: FX_SLOT_H }}
+    >
+      <pixiGraphics
+        draw={drawBg}
+        layout={{ position: 'absolute', width, height: FX_SLOT_H }}
+      />
+      <pixiBitmapText
+        text={label}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 8, fill: 0xffffff }}
+        tint={effectType ? theme.accent.color : theme.textMuted.color}
+        layout={{ position: 'absolute', left: 4, top: 3 }}
+      />
+    </pixiContainer>
+  );
+};
 
 // ─── Volume format ────────────────────────────────────────────────────────────
 
@@ -83,6 +181,8 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
   onMuteToggle,
   onSoloToggle,
   isMaster = false,
+  effects,
+  onEffectChange,
 }) => {
   const theme = usePixiTheme();
 
@@ -214,7 +314,27 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
         layout={{ width: STRIP_WIDTH, marginTop: 1 }}
       />
 
-      {/* 5. Volume fader */}
+      {/* 5. FX slots */}
+      {effects && onEffectChange && (
+        <>
+          <PixiEffectSlot
+            channelIndex={channelIndex}
+            slotIndex={0}
+            effectType={effects[0]}
+            width={STRIP_WIDTH - 4}
+            onChange={onEffectChange}
+          />
+          <PixiEffectSlot
+            channelIndex={channelIndex}
+            slotIndex={1}
+            effectType={effects[1]}
+            width={STRIP_WIDTH - 4}
+            onChange={onEffectChange}
+          />
+        </>
+      )}
+
+      {/* 6. Volume fader */}
       <PixiSlider
         value={volume}
         min={0}
@@ -231,7 +351,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
         layout={{ width: STRIP_WIDTH }}
       />
 
-      {/* 6. Pan knob */}
+      {/* 7. Pan knob */}
       <PixiKnob
         value={pan}
         min={-1}
@@ -245,7 +365,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
         layout={{ width: STRIP_WIDTH }}
       />
 
-      {/* 7. Mute button */}
+      {/* 8. Mute button */}
       <PixiButton
         label="M"
         variant="ft2"
@@ -256,7 +376,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
         width={STRIP_WIDTH - 8}
       />
 
-      {/* 8. Solo button (hidden for master channel) */}
+      {/* 9. Solo button (hidden for master channel) */}
       {!isMaster && (
         <PixiButton
           label="S"
