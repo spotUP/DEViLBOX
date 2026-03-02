@@ -13,6 +13,22 @@ import type { Pattern, InstrumentConfig } from '@/types';
 import type { UADEMetadata } from '@/engine/uade/UADEEngine';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
 import { isAudioFile } from '@/lib/audioFileUtils';
+import { extractPatternsFromLibOpenMPT, hashPatterns } from '@/lib/modland/PatternHasher';
+import type { ModuleMetadata } from '@/lib/import/ModuleLoader';
+
+// Store the last computed pattern hash and metadata for access by UnifiedFileLoader
+let lastPatternHash: string | null = null;
+let lastLibOpenMPTMetadata: ModuleMetadata | null = null;
+
+/** Get the pattern hash from the last parsed module (if available) */
+export function getLastPatternHash(): string | null {
+  return lastPatternHash;
+}
+
+/** Get the libopenmpt metadata from the last parsed module (for hash computation) */
+export function getLastLibOpenMPTMetadata(): ModuleMetadata | null {
+  return lastLibOpenMPTMetadata;
+}
 
 /** Get current format engine preferences (non-reactive, snapshot read) */
 function getFormatEngine(): FormatEnginePreferences {
@@ -3444,6 +3460,24 @@ async function parseTrackerModule(buffer: ArrayBuffer, fileName: string): Promis
 
   const moduleInfo = await loadModuleFile(new File([buffer], fileName));
   if (!moduleInfo) throw new Error(`Failed to load ${fileName}`);
+
+  // Store libopenmpt metadata for pattern hash computation by UnifiedFileLoader
+  lastLibOpenMPTMetadata = moduleInfo.metadata;
+
+  // Compute pattern hash if we have libopenmpt pattern data
+  if (moduleInfo.metadata.song) {
+    try {
+      const patternData = extractPatternsFromLibOpenMPT(moduleInfo.metadata.song);
+      const hashBigInt = hashPatterns(patternData);
+      lastPatternHash = hashBigInt.toString();
+      console.log('[parseModuleToSong] Computed pattern hash:', lastPatternHash);
+    } catch (error) {
+      console.warn('[parseModuleToSong] Failed to compute pattern hash:', error);
+      lastPatternHash = null;
+    }
+  } else {
+    lastPatternHash = null;
+  }
 
   let result;
   let instruments: InstrumentConfig[] = [];
