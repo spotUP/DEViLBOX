@@ -21,6 +21,8 @@ import type { ArrangementToolMode } from '@/types/arrangement';
 import { useArrangementKeyboardShortcuts } from '@/components/arrangement/ArrangementKeyboardShortcuts';
 import { MarkerRenameInput } from '@/components/arrangement/MarkerRenameInput';
 import { TrackRenameDialog } from '@/components/arrangement/TrackRenameDialog';
+import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
+import type { MenuItem } from '../components/PixiMenuBar';
 
 const VIEW_OPTIONS = [
   { value: 'tracker', label: 'Tracker' },
@@ -604,8 +606,100 @@ export const PixiArrangementView: React.FC = () => {
             onDeleteClip={(id) => useArrangementStore.getState().removeClip(id)}
             onSplitClip={(id, splitRow) => useArrangementStore.getState().splitClip(id, splitRow)}
             onContextMenu={(clipId, screenX, screenY) => {
+              const arr = useArrangementStore.getState();
+              const close = () => usePixiDropdownStore.getState().closeAll();
+
               if (clipId) {
-                useArrangementStore.getState().setClipContextMenu({ clipId, screenX, screenY });
+                const clip = arr.clips.find(c => c.id === clipId);
+                if (!clip) return;
+                const items: MenuItem[] = [
+                  {
+                    type: 'action',
+                    label: 'Open in Piano Roll',
+                    onClick: () => {
+                      close();
+                      const ts = useTrackerStore.getState();
+                      const patternIndex = ts.patterns.findIndex(p => p.id === clip.patternId);
+                      if (patternIndex >= 0) ts.setCurrentPattern(patternIndex);
+                      const pr = usePianoRollStore.getState();
+                      pr.setChannelIndex(clip.sourceChannelIndex ?? 0);
+                      pr.setScroll(clip.offsetRows || 0, pr.view.scrollY);
+                      useWorkbenchStore.getState().showWindow('pianoroll');
+                    },
+                  },
+                  { type: 'separator' },
+                  {
+                    type: 'action',
+                    label: 'Rename',
+                    onClick: () => { close(); arr.setRenamingClipId(clipId); },
+                  },
+                  {
+                    type: 'action',
+                    label: clip.muted ? 'Unmute' : 'Mute',
+                    onClick: () => { close(); arr.toggleClipMute(clipId); },
+                  },
+                  {
+                    type: 'action',
+                    label: 'Duplicate',
+                    onClick: () => {
+                      close();
+                      arr.pushUndo();
+                      const newIds = arr.duplicateClips([clipId]);
+                      arr.clearSelection();
+                      arr.selectClips(newIds);
+                    },
+                  },
+                  { type: 'separator' },
+                  {
+                    type: 'checkbox',
+                    label: 'Loop clip',
+                    checked: !!clip.loopClip,
+                    onChange: (v: boolean) => { arr.setClipLoop(clipId, v); close(); },
+                  },
+                  {
+                    type: 'action',
+                    label: 'Add volume automation',
+                    onClick: () => { close(); arr.addAutomationLane(clip.trackId, 'volume'); },
+                  },
+                  { type: 'separator' },
+                  {
+                    type: 'action',
+                    label: 'Delete',
+                    onClick: () => { close(); arr.pushUndo(); arr.removeClip(clipId); },
+                  },
+                ];
+                usePixiDropdownStore.getState().openDropdown({
+                  kind: 'menu',
+                  id: 'arr-clip-ctx',
+                  x: screenX,
+                  y: screenY,
+                  width: 200,
+                  items,
+                  onClose: close,
+                });
+              } else {
+                const items: MenuItem[] = [
+                  {
+                    type: 'action',
+                    label: 'Add Track',
+                    onClick: () => { close(); arr.addTrack(); },
+                  },
+                  { type: 'separator' },
+                  {
+                    type: 'action',
+                    label: 'Fit All',
+                    onClick: () => { close(); arr.zoomToFit(); },
+                  },
+                ];
+                usePixiDropdownStore.getState().openDropdown({
+                  kind: 'menu',
+                  id: 'arr-empty-ctx',
+                  x: screenX,
+                  y: screenY,
+                  width: 160,
+                  items,
+                  onClose: close,
+                });
               }
             }}
             onOpenInPianoRoll={(clipId) => {
