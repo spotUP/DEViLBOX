@@ -132,6 +132,7 @@ export const PixiFT2Toolbar: React.FC = () => {
     patternOrder, setPatternOrder,
     currentPositionIndex, setCurrentPosition,
     editStep, setEditStep,
+    currentOctave, setCurrentOctave,
     duplicatePosition, removeFromOrder,
     resizePattern, updatePatternName,
     toggleRecordMode, recordMode,
@@ -145,6 +146,8 @@ export const PixiFT2Toolbar: React.FC = () => {
     setCurrentPosition: s.setCurrentPosition,
     editStep: s.editStep,
     setEditStep: s.setEditStep,
+    currentOctave: s.currentOctave,
+    setCurrentOctave: s.setCurrentOctave,
     duplicatePosition: s.duplicatePosition,
     removeFromOrder: s.removeFromOrder,
     resizePattern: s.resizePattern,
@@ -397,6 +400,11 @@ export const PixiFT2Toolbar: React.FC = () => {
 
             {/* Edit Step */}
             <FT2Cell label="Edit Step" value={editStep} min={0} max={16} onChange={setEditStep} width={48} />
+
+            <TransportSep />
+
+            {/* Octave */}
+            <FT2Cell label="Oct" value={currentOctave} min={1} max={7} onChange={setCurrentOctave} width={40} />
 
             <TransportSep />
 
