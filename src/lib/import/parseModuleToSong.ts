@@ -499,10 +499,30 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     return parseSIDFile(buffer, file.name);
   }
 
-  // ── SID — Commodore 64 PSID/RSID (.sid only — .sid1 handled above)
+  // ── SID files (.sid) — Ambiguous: could be SidMon 1.0 (Amiga) or C64 PSID/RSID
+  // Try magic detection: C64 SID has "PSID"/"RSID" at offset 0, SidMon has signature string
   if (/\.sid$/.test(filename)) {
-    const { parseSIDFile } = await import('@lib/import/formats/SIDParser');
-    return parseSIDFile(buffer, file.name);
+    // First check if it's C64 SID (PSID/RSID magic at offset 0)
+    const { isSIDFormat, parseSIDFile } = await import('@lib/import/formats/SIDParser');
+    if (isSIDFormat(buffer)) {
+      return parseSIDFile(buffer, file.name);
+    }
+    
+    // Not C64 SID — try SidMon 1.0 (if not disabled)
+    if (prefs.sidmon1 !== 'uade') {
+      try {
+        const { isSidMon1Format, parseSidMon1File } = await import('@lib/import/formats/SidMon1Parser');
+        if (isSidMon1Format(buffer)) {
+          return parseSidMon1File(buffer, file.name);
+        }
+      } catch (err) {
+        console.warn(`[SidMon1Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+      }
+    }
+    
+    // Last resort: UADE (handles obscure Amiga formats with .sid extension)
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── SAP — Atari 8-bit POKEY ───────────────────────────────────────────────
