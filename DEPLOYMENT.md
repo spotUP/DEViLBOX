@@ -75,6 +75,9 @@ scp -r dist/* root@your-server-ip:/var/www/devilbox/dist/
 # Upload server code
 scp -r server root@your-server-ip:/var/www/devilbox/
 
+# Upload Modland hash database (865MB - separate transfer)
+scp server/data/modland_hash.db root@your-server-ip:/var/www/devilbox/server/data/
+
 # SSH into server
 ssh root@your-server-ip
 
@@ -99,6 +102,9 @@ DB_DIR=/var/www/devilbox/server/data
 ```bash
 # Build TypeScript
 npm run build
+
+# Verify modland_hash.db exists (should be ~865MB)
+ls -lh data/modland_hash.db
 
 # Test server
 npm start
@@ -273,8 +279,53 @@ scp -r dist/* root@your-server-ip:/var/www/devilbox/dist/
 - [ ] SSL certificate installed
 - [ ] DNS A record configured
 - [ ] Demo content uploaded
+- [ ] **Modland hash database uploaded (865MB)**
 - [ ] Permissions set correctly
 - [ ] API health endpoint accessible: `https://devilbox.uprough.net/api/health`
+- [ ] Modland endpoints accessible: `https://devilbox.uprough.net/api/modland/hash-stats`
+
+## Modland Hash Database
+
+The server requires the Modland hash database (865MB) for file verification.
+
+**Initial Setup:**
+```bash
+# Upload database to server
+scp server/data/modland_hash.db root@server-ip:/var/www/devilbox/server/data/
+
+# Verify upload
+ssh root@server-ip
+ls -lh /var/www/devilbox/server/data/modland_hash.db
+# Should show ~865MB
+
+# Set permissions
+chown www-data:www-data /var/www/devilbox/server/data/modland_hash.db
+chmod 644 /var/www/devilbox/server/data/modland_hash.db
+```
+
+**Update Database (run daily or weekly):**
+```bash
+# Download latest from Dropbox
+# URL: https://www.dropbox.com/scl/fi/gtk2yri6iizlaeb6b0j0j/modland_hash.db.7z
+
+# On server:
+cd /var/www/devilbox/server/data
+wget -O modland_hash.db.7z "https://www.dropbox.com/scl/fi/gtk2yri6iizlaeb6b0j0j/modland_hash.db.7z?rlkey=axcrqv54eg2c1yju6vf043ly1&dl=1"
+7z x modland_hash.db.7z
+rm modland_hash.db.7z
+systemctl restart devilbox-api
+```
+
+**Test Hash Endpoints:**
+```bash
+# Get stats
+curl https://devilbox.uprough.net/api/modland/hash-stats
+
+# Test hash lookup (example)
+curl -X POST https://devilbox.uprough.net/api/modland/lookup-hash \
+  -H "Content-Type: application/json" \
+  -d '{"hash":"0000000000000000000000000000000000000000000000000000000000000000"}'
+```
 
 ## Updating the App
 
@@ -293,6 +344,16 @@ scp -r server/src root@server-ip:/var/www/devilbox/server/
 # On server
 cd /var/www/devilbox/server
 npm run build
+systemctl restart devilbox-api
+```
+
+### Modland Database Update
+```bash
+# Download latest hash database (updated daily)
+cd /var/www/devilbox/server/data
+wget -O modland_hash.db.7z "https://www.dropbox.com/scl/fi/gtk2yri6iizlaeb6b0j0j/modland_hash.db.7z?rlkey=axcrqv54eg2c1yju6vf043ly1&dl=1"
+7z x -y modland_hash.db.7z
+rm modland_hash.db.7z
 systemctl restart devilbox-api
 ```
 
