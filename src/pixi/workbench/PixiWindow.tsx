@@ -570,7 +570,6 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
       <pixiContainer
         x={winState.x}
         y={winState.y}
-        zIndex={winState.zIndex}
         eventMode="static"
         onPointerDown={handlePointerDownWindow}
       >
@@ -601,7 +600,6 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
       ref={outerRef}
       x={winState.x}
       y={winState.y}
-      zIndex={winState.zIndex}
       eventMode="static"
       onPointerDown={handlePointerDownWindow}
     >
