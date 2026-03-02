@@ -887,6 +887,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const fullRedrawRef = useRef(true); // Force full redraw on non-cursor dep changes
 
   const imperativeRedraw = useCallback(() => {
+    const _t0 = performance.now();
     const p = renderParamsRef.current;
     const cursor = cursorRef.current;
     const selection = selectionRef.current;
@@ -895,20 +896,32 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     const vStartChanged = vStart !== prevVStartRef.current;
     const mega = megaTextRef.current;
 
+    let _labelTime = 0;
     if (fullRedrawRef.current) {
       fullRedrawRef.current = false;
       prevVStartRef.current = vStart;
       const gGrid = gridGraphicsRef.current;
       if (gGrid) renderGrid(gGrid, p, vStart);
-      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+      if (mega) {
+        const _tl = performance.now();
+        mega.updateLabels(generateLabels(p, vStart, currentRow));
+        _labelTime = performance.now() - _tl;
+      }
     } else if (vStartChanged) {
       prevVStartRef.current = vStart;
-      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+      if (mega) {
+        const _tl = performance.now();
+        mega.updateLabels(generateLabels(p, vStart, currentRow));
+        _labelTime = performance.now() - _tl;
+      }
     }
 
     const gOverlay = overlayGraphicsRef.current;
     if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
       peerCursorRef.current, peerSelectionRef.current);
+
+    const _total = performance.now() - _t0;
+    if (_total > 2) console.log(`[imperativeRedraw] total=${_total.toFixed(1)}ms labels=${_labelTime.toFixed(1)}ms vStartChanged=${vStartChanged}`);
   }, []); // Empty deps — everything read from refs
 
   // ── Cursor/selection subscription with RAF coalescing ─────────────────────

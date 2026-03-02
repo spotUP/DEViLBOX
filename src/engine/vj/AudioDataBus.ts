@@ -164,8 +164,6 @@ export class AudioDataBus {
     }
   }
 
-  private _diagCounter = 0;
-
   /** Call once per rAF frame. Returns the current audio frame. */
   update(): VJAudioFrame {
     const now = performance.now();

@@ -13,6 +13,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { stringNoteToXM } from '@/lib/xmConversions';
+import { diagKeyRepeatRate, diagFrameStart, diagFrameEnd } from '../pixi/scrollPerf';
 
 // Track currently held notes to prevent retriggering and enable proper release
 interface HeldNote {
@@ -398,6 +399,8 @@ export const useTrackerInput = () => {
   // Handle keyboard input
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      diagKeyRepeatRate();
+      const _t0 = performance.now();
       // Only handle keys when tracker view is active
       const activeView = useUIStore.getState().activeView;
       if (activeView !== 'tracker') {
@@ -1497,10 +1500,23 @@ export const useTrackerInput = () => {
   // Attach keyboard listeners
   // Use capture phase to intercept F1-F12 before browser handles them
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    // PERF DIAG: Wrap handler to measure total event dispatch time
+    const wrappedKeyDown = (e: KeyboardEvent) => {
+      const t0 = performance.now();
+      handleKeyDown(e);
+      const syncTime = performance.now() - t0;
+      // Measure time until all microtasks complete (zustand subscribers, React batch)
+      queueMicrotask(() => {
+        const totalTime = performance.now() - t0;
+        if (e.repeat && totalTime > 1) {
+          console.log(`[keydown] key=${e.key} sync=${syncTime.toFixed(1)}ms total+microtask=${totalTime.toFixed(1)}ms`);
+        }
+      });
+    };
+    window.addEventListener('keydown', wrappedKeyDown, { capture: true });
     window.addEventListener('keyup', handleKeyUp, { capture: true });
     return () => {
-      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+      window.removeEventListener('keydown', wrappedKeyDown, { capture: true });
       window.removeEventListener('keyup', handleKeyUp, { capture: true });
     };
   }, [handleKeyDown, handleKeyUp]);
