@@ -10,7 +10,7 @@
  * - Provides WorkbenchContext (camera + focusWindow + setSnapLines)
  */
 
-import React, { createContext, useCallback, useContext, useRef, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useEffect, useState } from 'react';
 import { useApplication, useTick } from '@pixi/react';
 import { Rectangle, Graphics } from 'pixi.js';
 import type { FederatedPointerEvent, Container as ContainerType, Graphics as GraphicsType, BitmapText as BitmapTextType } from 'pixi.js';
@@ -517,13 +517,26 @@ export const WorkbenchContainer: React.FC = () => {
     }
   });
 
+  // ─── Window render order ─────────────────────────────────────────────────────
+  // Sort by zIndex ascending so the highest-zIndex window renders last = on top.
+  // This replaces sortableChildren on worldRef. worldRef has no layout prop so
+  // its children are NOT Yoga-tracked — React can freely reorder them via
+  // insertBefore without triggering @pixi/layout BindingErrors.
+  const sortedWindowEntries = useMemo(() => {
+    return Object.entries(WINDOW_CONTENT).sort(([idA], [idB]) => {
+      const zA = windows[idA]?.zIndex ?? 0;
+      const zB = windows[idB]?.zIndex ?? 0;
+      return zA - zB;
+    });
+  }, [windows]);
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   const contextValue: WorkbenchContextValue = { camera, focusWindow, setSnapLines };
 
   return (
     <WorkbenchContext.Provider value={contextValue}>
-      <pixiContainer ref={rootContainerRef} layout={{ width, height: '100%' }} eventMode="static" sortableChildren>
+      <pixiContainer ref={rootContainerRef} layout={{ width, height: '100%' }} eventMode="static">
         <WorkbenchBackground width={width} height={height} camera={camera} />
 
         {/* Pan hit area — invisible rect gives pixi proper bounds for hit-testing */}
@@ -545,21 +558,18 @@ export const WorkbenchContainer: React.FC = () => {
           layout={{ position: 'absolute', bottom: 8, left: 10 }}
         />
 
-        {/* World container — camera transform via ref */}
-        <pixiContainer
-          ref={worldRef}
-          layout={{ position: 'absolute', width, height }}
-          sortableChildren
-        >
-          {/* Windows */}
-          {Object.entries(WINDOW_CONTENT).map(([id, { title, component: ViewComponent }]) => {
+        {/* World container — camera transform via ref.
+            NO layout prop: worldRef is not a Yoga container, so its children
+            (window wrappers) are never Yoga-tracked. This prevents @pixi/layout
+            BindingErrors when React reorders wrappers via insertBefore.
+            NO sortableChildren: React sorts windows by zIndex instead (see
+            sortedWindowEntries above) — highest zIndex renders last = on top. */}
+        <pixiContainer ref={worldRef}>
+          {/* Windows — rendered in ascending zIndex order (highest = last = on top) */}
+          {sortedWindowEntries.map(([id, { title, component: ViewComponent }]) => {
             const win = windows[id];
-            // Stable wrapper — always rendered so worldRef's direct child count never
-            // changes after mount. Without this, @pixi/react's insertBefore/removeChild
-            // would fire on worldRef (sortableChildren=true), and Yoga WASM throws a
-            // BindingError when zIndex changes trigger a sort before the next commit.
             return (
-              <pixiContainer key={id} zIndex={win?.zIndex ?? 0}>
+              <pixiContainer key={id}>
                 {win?.visible && (
                   <PixiWindow
                     id={id}
