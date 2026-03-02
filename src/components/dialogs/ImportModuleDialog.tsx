@@ -304,6 +304,10 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
         const engine = UADEEngine.getInstance();
         await engine.ready();
         uadeScanActiveRef.current = true;
+        // Enable CIA tick snapshot capture so pattern reconstruction works
+        // when parseUADEFile is called later with this preScannedMeta.
+        engine.enableTickSnapshots(true);
+        engine.resetTickSnapshots();
         const uadeMeta = await engine.load(buf, file.name);
         setUadeMetadata(uadeMeta);
         // Create a minimal ModuleInfo so the Import button is enabled
