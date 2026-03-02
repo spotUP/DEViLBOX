@@ -11,10 +11,12 @@ import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth';
 import filesRoutes from './routes/files';
 import modlandRoutes from './routes/modland';
+import songdbRoutes from './routes/songdb';
 import scRoutes from './routes/sc';
 import { initDatabase } from './db/database';
 import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
+import { initSongDB, scheduleSongDBUpdates } from './services/songdbIndexer';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -57,10 +59,19 @@ const modlandLimiter = rateLimit({
 });
 app.use('/api/modland/', modlandLimiter as unknown as express.RequestHandler);
 
+// SongDB rate limiter (same as modland — 500/15min, public catalog)
+const songdbLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  message: 'Too many requests from this IP'
+});
+app.use('/api/songdb/', songdbLimiter as unknown as express.RequestHandler);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/modland', modlandRoutes);
+app.use('/api/songdb', songdbRoutes);
 app.use('/api/sc', scRoutes);
 
 // Health check
@@ -138,6 +149,12 @@ initModlandIndex().catch((err) => {
   console.error('[Modland] Init failed:', err);
 });
 scheduleModlandUpdates();
+
+// Initialize SongDB index (non-blocking — runs in background)
+initSongDB().catch((err) => {
+  console.error('[SongDB] Init failed:', err);
+});
+scheduleSongDBUpdates();
 
 // Start server
 app.listen(PORT, () => {

@@ -224,6 +224,9 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
 
   // ── Imperative VU draw — runs in PixiJS ticker, no React re-render ──────────
 
+  const prevLevelRef = useRef(-1);
+  const prevPeakRef = useRef(-1);
+
   useTick(() => {
     const level = getLevelCallback();
 
@@ -235,26 +238,32 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
       peakRef.current = Math.max(0, peakRef.current - 0.01);
     }
 
+    // Skip Graphics rebuild if nothing visually changed
+    const quantizedLevel = Math.round(level * VU_HEIGHT);
+    const quantizedPeak = Math.round(peakRef.current * VU_HEIGHT);
+    if (quantizedLevel === prevLevelRef.current && quantizedPeak === prevPeakRef.current) return;
+    prevLevelRef.current = quantizedLevel;
+    prevPeakRef.current = quantizedPeak;
+
     const g = vuGraphicsRef.current;
     if (g) {
       g.clear();
       g.rect(0, 0, VU_WIDTH, VU_HEIGHT);
       g.fill({ color: 0x111111, alpha: 1 });
 
-      const filledH = Math.round(level * VU_HEIGHT);
-      if (filledH > 0) {
+      if (quantizedLevel > 0) {
         const vuColor =
           level > 0.9 ? VU_COLOR_RED :
           level > 0.7 ? VU_COLOR_YELLOW :
           VU_COLOR_GREEN;
-        g.rect(0, VU_HEIGHT - filledH, VU_WIDTH, filledH);
+        g.rect(0, VU_HEIGHT - quantizedLevel, VU_WIDTH, quantizedLevel);
         g.fill({ color: vuColor, alpha: 1 });
       }
 
       g.rect(0, 0, VU_WIDTH, VU_HEIGHT);
       g.stroke({ color: 0x333333, alpha: 1, width: 1 });
 
-      const peakY = VU_HEIGHT - Math.round(peakRef.current * VU_HEIGHT);
+      const peakY = VU_HEIGHT - quantizedPeak;
       if (peakRef.current > 0.01) {
         g.rect(0, peakY, VU_WIDTH, 1);
         g.fill({ color: peakRef.current > 0.9 ? VU_COLOR_RED : 0xffffff, alpha: 0.9 });

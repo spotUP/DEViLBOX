@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Keyboard, Zap, BookOpen, Cpu } from 'lucide-react';
 import { CHIP_EFFECT_REFERENCE } from '../../data/ChipEffectReference';
-import { useTrackerStore, useInstrumentStore } from '../../stores';
+import { useTrackerStore, useCursorStore, useInstrumentStore } from '../../stores';
 import { FurnaceChipType } from '../../engine/chips/FurnaceChipEngine';
 
 type HelpTab = 'shortcuts' | 'effects' | 'chip-effects' | 'tutorial';
@@ -468,7 +468,8 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, initialTa
   }, [isOpen, onClose]);
   const [tutorialStep, setTutorialStep] = useState(0);
 
-  const { cursor, patterns, currentPatternIndex } = useTrackerStore();
+  const cursor = useCursorStore((s) => s.cursor);
+  const { patterns, currentPatternIndex } = useTrackerStore();
   const { instruments } = useInstrumentStore();
 
   const currentChip = useMemo(() => {

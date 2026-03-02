@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import { Search, Replace } from 'lucide-react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore, useCursorStore } from '@stores';
 import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
 import { ModalFooter } from '@components/ui/ModalFooter';
@@ -21,7 +21,8 @@ type SearchType = 'note' | 'instrument' | 'effect';
 type SearchScope = 'selection' | 'pattern' | 'all';
 
 export const FindReplaceDialog: React.FC<FindReplaceDialogProps> = ({ isOpen, onClose }) => {
-  const { patterns, currentPatternIndex, selection } = useTrackerStore();
+  const { patterns, currentPatternIndex } = useTrackerStore();
+  const selection = useCursorStore((s) => s.selection);
   const [searchType, setSearchType] = useState<SearchType>('note');
   const [scope, setScope] = useState<SearchScope>('pattern');
   const [findValue, setFindValue] = useState('');

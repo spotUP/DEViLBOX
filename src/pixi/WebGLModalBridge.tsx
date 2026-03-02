@@ -22,6 +22,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { ModuleInfo } from '@/lib/import/ModuleLoader';
 import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
+import { computeSongDBHash, lookupSongDB } from '@lib/songdb';
 
 const LazySettingsModal = lazy(() =>
   import('@/components/dialogs/SettingsModal').then(m => ({ default: m.SettingsModal }))
@@ -322,6 +323,18 @@ export const WebGLModalBridge: React.FC = () => {
   // Uses UnifiedFileLoader to keep behaviour identical to the DOM mode confirm path.
   const handleModuleImportGL = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
     setPendingModuleFile(null);
+    // Fire-and-forget SongDB metadata lookup (non-blocking)
+    if (info.file) {
+      info.file.arrayBuffer().then(buf => {
+        lookupSongDB(computeSongDBHash(buf)).then(result => {
+          useTrackerStore.getState().setSongDBInfo(result ? {
+            authors: result.authors, publishers: result.publishers,
+            album: result.album, year: result.year, format: result.format,
+            duration_ms: result.subsongs[0]?.duration_ms ?? 0,
+          } : null);
+        });
+      });
+    }
     try {
       const { loadFile } = await import('@lib/file/UnifiedFileLoader');
       const result = await loadFile(info.file, {

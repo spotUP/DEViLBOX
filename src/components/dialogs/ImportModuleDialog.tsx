@@ -18,6 +18,7 @@ import { isUADEFormat } from '@lib/import/formats/UADEParser';
 import { getNativeFormatMetadata } from '@lib/import/NativeFormatMetadata';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
+import { computeSongDBHash, lookupSongDB, type SongDBResult } from '@lib/songdb';
 
 export interface ImportOptions {
   useLibopenmpt: boolean;     // Use libopenmpt for sample-accurate playback
@@ -269,6 +270,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [isPlaying, setIsPlaying]       = useState(false);
   const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
   const [selectedSubsong, setSelectedSubsong] = useState(0);
+  const [songDBInfo, setSongDBInfo] = useState<SongDBResult | null>(null);
   // Track the companions used for the currently loaded file
   const [activeCompanions, setActiveCompanions] = useState<File[]>([]);
   // Track whether a UADE scan is in-flight so handleClose can cancel it
@@ -313,6 +315,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setError(null);
     setModuleInfo(null);
     setUadeMetadata(null);
+    setSongDBInfo(null);
     setSelectedSubsong(0);
     setLoadedFileName(fname);
 
@@ -320,6 +323,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       // UADE-exclusive format: libopenmpt cannot parse it; use UADEEngine directly
       try {
         const buf = await file.arrayBuffer();
+        // Fire-and-forget songdb lookup (non-blocking)
+        lookupSongDB(computeSongDBHash(buf)).then(setSongDBInfo);
         const { UADEEngine } = await import('@engine/uade/UADEEngine');
         const engine = UADEEngine.getInstance();
         await engine.ready();
@@ -369,6 +374,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     if (nativeFmtForFile || isFurnace) {
       try {
         const buf = await file.arrayBuffer();
+        // Fire-and-forget songdb lookup (non-blocking)
+        lookupSongDB(computeSongDBHash(buf)).then(setSongDBInfo);
 
         // Fast header-only metadata extraction per format
         const meta = nativeFmtForFile
@@ -399,6 +406,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
     // Standard path: libopenmpt (MOD, XM, IT, S3M, etc.)
     try {
+      // Fire-and-forget songdb lookup (non-blocking)
+      file.arrayBuffer().then(buf => lookupSongDB(computeSongDBHash(buf)).then(setSongDBInfo));
       const info = await loadModuleFile(file);
       setModuleInfo(info);
     } catch (err) {
@@ -715,6 +724,50 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                   </>
                 )}
               </div>
+
+              {/* SongDB metadata (author, album, year, group) */}
+              {songDBInfo && (
+                <div className="grid grid-cols-2 gap-2 text-xs border-t border-dark-border pt-2 mt-1">
+                  {songDBInfo.authors.length > 0 && (
+                    <div className="flex justify-between text-text-muted col-span-2">
+                      <span>Author:</span>
+                      <span className="text-text-primary">{songDBInfo.authors.join(', ')}</span>
+                    </div>
+                  )}
+                  {songDBInfo.album && (
+                    <div className="flex justify-between text-text-muted">
+                      <span>Album:</span>
+                      <span className="text-text-primary">{songDBInfo.album}</span>
+                    </div>
+                  )}
+                  {songDBInfo.year && (
+                    <div className="flex justify-between text-text-muted">
+                      <span>Year:</span>
+                      <span className="text-text-primary">{songDBInfo.year}</span>
+                    </div>
+                  )}
+                  {songDBInfo.publishers.length > 0 && (
+                    <div className="flex justify-between text-text-muted col-span-2">
+                      <span>Group:</span>
+                      <span className="text-text-primary">{songDBInfo.publishers.join(', ')}</span>
+                    </div>
+                  )}
+                  {songDBInfo.subsongs.length > 0 && !moduleInfo.metadata.duration && (
+                    <div className="flex justify-between text-text-muted">
+                      <span>Duration:</span>
+                      <span className="text-text-primary font-mono">
+                        {Math.floor(songDBInfo.subsongs[0].duration_ms / 60000)}:{String(Math.floor((songDBInfo.subsongs[0].duration_ms % 60000) / 1000)).padStart(2, '0')}
+                      </span>
+                    </div>
+                  )}
+                  {songDBInfo.format && !uadeMetadata && (
+                    <div className="flex justify-between text-text-muted">
+                      <span>Format:</span>
+                      <span className="text-text-primary">{songDBInfo.format}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Subsong picker — shown when UADE pre-scan detected multiple subsongs */}
               {uadeMetadata && uadeMetadata.subsongCount > 1 && (

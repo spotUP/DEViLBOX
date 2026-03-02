@@ -4,7 +4,7 @@
 
 import { useState, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiKnob, PixiLabel } from '../components';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore, useCursorStore } from '@stores';
 
 interface PixiHumanizeDialogProps {
   isOpen: boolean;
@@ -12,7 +12,7 @@ interface PixiHumanizeDialogProps {
 }
 
 export const PixiHumanizeDialog: React.FC<PixiHumanizeDialogProps> = ({ isOpen, onClose }) => {
-  const selection = useTrackerStore(s => s.selection);
+  const selection = useCursorStore(s => s.selection);
   const humanizeSelection = useTrackerStore(s => s.humanizeSelection);
 
   const [variation, setVariation] = useState(15);

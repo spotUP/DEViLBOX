@@ -58,9 +58,19 @@ export function resolve(ast: AstNode[]): ResolveResult {
         break;
       case 'instruction': {
         const instr = node as InstructionNode;
-        // Check for Paula register writes: MOVE.W src,$DFFxxx
+        // Check for Paula register writes: MOVE/CLR to $DFFxxx
         if (instr.mnemonic === 'MOVE' || instr.mnemonic === 'MOVEA') {
           const dest = instr.operands[1];
+          if (dest?.kind === 'abs_addr' && dest.tag === 'paula') {
+            const paulaReg = PAULA_REGS[dest.value];
+            if (paulaReg) {
+              paulaWrites.push({ ...paulaReg, line: instr.line });
+            }
+          }
+        }
+        // CLR to Paula register also counts as a write (value = 0)
+        if (instr.mnemonic === 'CLR') {
+          const dest = instr.operands[0];
           if (dest?.kind === 'abs_addr' && dest.tag === 'paula') {
             const paulaReg = PAULA_REGS[dest.value];
             if (paulaReg) {

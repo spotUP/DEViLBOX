@@ -3,6 +3,7 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useCursorStore } from '@/stores/useCursorStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useUIStore } from '@stores/useUIStore';
 
@@ -17,7 +18,7 @@ export function interpolateEffect(): boolean {
 }
 
 export function amplifySelection(): boolean {
-  const { selection } = useTrackerStore.getState();
+  const { selection } = useCursorStore.getState();
   if (!selection) {
     useUIStore.getState().setStatusMessage('Select a range first', false, 1500);
     return true;
@@ -29,7 +30,8 @@ export function amplifySelection(): boolean {
 
 export function applyCurrentInstrument(): boolean {
   const store = useTrackerStore.getState();
-  const { cursor, patterns, currentPatternIndex } = store;
+  const { cursor } = useCursorStore.getState();
+  const { patterns, currentPatternIndex } = store;
   const pattern = patterns[currentPatternIndex];
   const currentInstrument = pattern.channels[cursor.channelIndex].rows[cursor.rowIndex].instrument;
   if (!currentInstrument) return true;
@@ -91,7 +93,8 @@ export function scaleVolumeBlock(): boolean {
 }
 
 export function swapChannels(): boolean {
-  const { cursor, patterns, currentPatternIndex } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
+  const { patterns, currentPatternIndex } = useTrackerStore.getState();
   const pattern = patterns[currentPatternIndex];
   const nextCh = (cursor.channelIndex + 1) % pattern.channels.length;
   useTrackerStore.getState().swapChannels(cursor.channelIndex, nextCh);

@@ -232,11 +232,20 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
       continue;
     }
 
-    // -- String literal (DC.B "hello") --
-    if (ch === '"') {
+    // -- Equals sign: SET / assignment EQU (e.g. LoadSize = 12) --
+    if (ch === '=') {
+      advance();
+      tokens.push(tok('DIRECTIVE', 'EQU', col));
+      isFirstToken = false;
+      continue;
+    }
+
+    // -- String literal (DC.B "hello" or DC.B 'hello') --
+    if (ch === '"' || ch === "'") {
+      const closing = ch;
       advance(); // consume opening quote
       const start = i;
-      while (i < src.length && src[i] !== '"') {
+      while (i < src.length && src[i] !== closing) {
         if (src[i] === '\\') i++; // skip escape
         i++;
       }
@@ -352,7 +361,8 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
       if (peek() === ':') {
         advance(); // consume ':'
         tokens.push(tok('LABEL', raw, col));
-        isFirstToken = false;
+        // Do NOT reset isFirstToken — an instruction may immediately follow on the same line
+        // (e.g. "myLabel: RTS" or the Devpac bare-label form "myLabel  RTS").
         continue;
       }
 
@@ -416,6 +426,24 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
         tokens.push(tok('REGISTER', lower, col));
       } else if (DIRECTIVES.has(upper)) {
         tokens.push(tok('DIRECTIVE', upper, col));
+      } else if (col === 1 && isFirstToken) {
+        // Column-0 bare label (Devpac/AsmOne/VASM convention):
+        // Any non-register, non-directive identifier at column 1 (no leading whitespace)
+        // is a label unless followed by a directive keyword (EQU/SET/= LHS context).
+        const savedI = i;
+        skipWS();
+        const nextCh = i < src.length ? src[i] : '';
+        let nextWord = '';
+        while (i < src.length && isIdentContinue(src[i])) nextWord += src[i++];
+        i = savedI; // restore
+        if (DIRECTIVES.has(nextWord.toUpperCase()) || nextCh === '=') {
+          tokens.push(tok('IDENTIFIER', raw, col)); // EQU/SET name (or = assignment)
+        } else {
+          tokens.push(tok('LABEL', raw, col));       // bare label
+          // Do NOT reset isFirstToken — an instruction may follow on the same line
+          // (e.g. Devpac convention "lbC001A28\tRTS" with label and mnemonic on same line).
+          continue;
+        }
       } else if (isFirstToken) {
         // First token on a (non-label) line: could be a mnemonic if it looks like one
         // (all alphabetic). Otherwise IDENTIFIER.
@@ -427,7 +455,6 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
           // Peek ahead to see if next non-ws token is a directive
           const savedI = i;
           skipWS();
-          const nextStart = i;
           let nextWord = '';
           while (i < src.length && isIdentContinue(src[i])) nextWord += src[i++];
           i = savedI; // restore
@@ -448,6 +475,15 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
       }
 
       isFirstToken = false;
+      continue;
+    }
+
+    // -- Hyphen between registers: emit RANGE token for MOVEM register range expansion.
+    // Only emit RANGE if the PREVIOUS token was a REGISTER (avoids breaking
+    // displacement arithmetic like 12-12(A4) where '-' is subtraction). --
+    if (ch === '-' && !isFirstToken && tokens.length > 0 && tokens[tokens.length - 1].kind === 'REGISTER') {
+      advance();
+      tokens.push(tok('RANGE', '-', col));
       continue;
     }
 

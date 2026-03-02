@@ -37,7 +37,8 @@ export const PixiTransportBar: React.FC<PixiTransportBarProps> = ({ width, heigh
   useTick(() => {
     if (!posTextRef.current) return;
     const row = useTransportStore.getState().currentRow;
-    posTextRef.current.text = `${String(currentPatternIndex).padStart(2, '0')}:${String(row).padStart(3, '0')}`;
+    const posText = `${String(currentPatternIndex).padStart(2, '0')}:${String(row).padStart(3, '0')}`;
+    if (posTextRef.current.text !== posText) posTextRef.current.text = posText;
   });
 
   const handlePlay = useCallback(() => { togglePlayPause(); }, [togglePlayPause]);

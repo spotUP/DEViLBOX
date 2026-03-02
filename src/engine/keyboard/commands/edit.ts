@@ -3,13 +3,15 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useCursorStore } from '@/stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
 
 /**
  * Delete note/data at cursor position
  */
 export function deleteNote(): boolean {
-  const { cursor, clearCell } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
+  const { clearCell } = useTrackerStore.getState();
   clearCell(cursor.channelIndex, cursor.rowIndex);
   return true;
 }
@@ -18,7 +20,8 @@ export function deleteNote(): boolean {
  * Delete row and pull up remaining rows
  */
 export function deleteAndPull(): boolean {
-  const { cursor, deleteRow } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
+  const { deleteRow } = useTrackerStore.getState();
   deleteRow(cursor.channelIndex, cursor.rowIndex);
   useUIStore.getState().setStatusMessage('Row deleted', false, 1000);
   return true;
@@ -28,7 +31,8 @@ export function deleteAndPull(): boolean {
  * Insert empty row at cursor (push down)
  */
 export function insertRow(): boolean {
-  const { cursor, insertRow: insert } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
+  const { insertRow: insert } = useTrackerStore.getState();
   insert(cursor.channelIndex, cursor.rowIndex);
   useUIStore.getState().setStatusMessage('Row inserted', false, 1000);
   return true;
@@ -58,7 +62,8 @@ export function clearPattern(): boolean {
  * Clear current channel
  */
 export function clearChannel(): boolean {
-  const { cursor, clearChannel: clear } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
+  const { clearChannel: clear } = useTrackerStore.getState();
   clear(cursor.channelIndex);
   useUIStore.getState().setStatusMessage(`Channel ${cursor.channelIndex + 1} cleared`, false, 1000);
   return true;
@@ -153,6 +158,6 @@ export function toggleInsertMode(): boolean {
  * Advance cursor to next row (ProTracker: Enter in edit mode)
  */
 export function advanceToNextRow(): boolean {
-  useTrackerStore.getState().moveCursor('down');
+  useCursorStore.getState().moveCursor('down');
   return true;
 }

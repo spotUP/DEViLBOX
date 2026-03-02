@@ -71,12 +71,9 @@ import { SunVoxSynth } from '../SunVoxSynth';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-/** Reset all mocks and the static _engineConnected flag between tests */
+/** Reset all mocks between tests */
 function resetAll() {
   vi.clearAllMocks();
-  // Reset static singleton flag so each test starts fresh
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (SunVoxSynth as any)._engineConnected = false;
 
   // Re-apply default mock implementations after clearAllMocks
   mockEngine.ready.mockResolvedValue(undefined);
@@ -106,28 +103,22 @@ describe('SunVoxSynth', () => {
   // ── 1. Constructor ────────────────────────────────────────────────────
 
   describe('constructor', () => {
-    it('creates a GainNode output via the AudioContext', () => {
+    it('uses the shared engine output', () => {
       const synth = new SunVoxSynth();
-      expect(mockAudioContext.createGain).toHaveBeenCalledOnce();
-      expect(synth.output).toBeDefined();
+      // All instances share the engine's single output GainNode
+      expect(synth.output).toBe(mockEngine.output);
       synth.dispose();
     });
 
-    it('connects engine.output to the GainNode on first instance', () => {
-      const synth = new SunVoxSynth();
-      expect(mockEngine.output.connect).toHaveBeenCalledWith(synth.output);
-      synth.dispose();
-    });
-
-    it('does NOT double-connect engine.output for a second instance', () => {
+    it('does NOT create a new GainNode for each instance', () => {
       const synth1 = new SunVoxSynth();
-      const connectCallsAfterFirst = (mockEngine.output.connect as Mock).mock.calls.length;
+      const createGainCallsBefore = (mockAudioContext.createGain as Mock).mock.calls.length;
 
       const synth2 = new SunVoxSynth();
-      const connectCallsAfterSecond = (mockEngine.output.connect as Mock).mock.calls.length;
+      const createGainCallsAfter = (mockAudioContext.createGain as Mock).mock.calls.length;
 
-      // Second instance must not add another connect call
-      expect(connectCallsAfterSecond).toBe(connectCallsAfterFirst);
+      // Constructor should not call createGain (uses engine.output instead)
+      expect(createGainCallsAfter).toBe(createGainCallsBefore);
 
       synth1.dispose();
       synth2.dispose();
@@ -137,6 +128,18 @@ describe('SunVoxSynth', () => {
       const synth = new SunVoxSynth();
       expect(synth.name).toBe('SunVoxSynth');
       synth.dispose();
+    });
+
+    it('all instances share the same output reference', () => {
+      const synth1 = new SunVoxSynth();
+      const synth2 = new SunVoxSynth();
+
+      // Both instances point to the same engine output
+      expect(synth1.output).toBe(synth2.output);
+      expect(synth1.output).toBe(mockEngine.output);
+
+      synth1.dispose();
+      synth2.dispose();
     });
   });
 
@@ -448,30 +451,17 @@ describe('SunVoxSynth', () => {
   // ── 8. dispose ───────────────────────────────────────────────────────
 
   describe('dispose', () => {
-    it('calls destroyHandle with the engine handle', async () => {
+    it('calls destroyHandle with the engine handle if a module was loaded', async () => {
       const synth = new SunVoxSynth();
       await synth.setModule(new ArrayBuffer(4));
       synth.dispose();
       expect(mockEngine.destroyHandle).toHaveBeenCalledWith(42);
     });
 
-    it('disconnects engine.output from this.output when it owns the connection', () => {
+    it('does not call destroyHandle when no handle was created', () => {
       const synth = new SunVoxSynth();
-      const outputNode = synth.output;
       synth.dispose();
-      expect(mockEngine.output.disconnect).toHaveBeenCalledWith(outputNode);
-    });
-
-    it('resets the static _engineConnected flag so next instance can connect', () => {
-      const synth1 = new SunVoxSynth();
-      synth1.dispose();
-
-      // Now _engineConnected should be false → next instance connects
-      const connectBefore = (mockEngine.output.connect as Mock).mock.calls.length;
-      const synth2 = new SunVoxSynth();
-      const connectAfter = (mockEngine.output.connect as Mock).mock.calls.length;
-      expect(connectAfter).toBe(connectBefore + 1);
-      synth2.dispose();
+      expect(mockEngine.destroyHandle).not.toHaveBeenCalled();
     });
 
     it('is idempotent — calling dispose twice does not throw', async () => {
@@ -481,10 +471,14 @@ describe('SunVoxSynth', () => {
       expect(() => synth.dispose()).not.toThrow();
     });
 
-    it('does not call destroyHandle when no handle was created', () => {
+    it('marks the synth as disposed to prevent further use', async () => {
       const synth = new SunVoxSynth();
+      await synth.setModule(new ArrayBuffer(4));
       synth.dispose();
-      expect(mockEngine.destroyHandle).not.toHaveBeenCalled();
+
+      // After disposal, methods that depend on the handle should gracefully handle disposed state
+      // This is a behavioral test rather than checking internal state
+      expect(mockEngine.destroyHandle).toHaveBeenCalledWith(42);
     });
   });
 

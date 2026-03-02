@@ -1,0 +1,31 @@
+; AmigaOS exec.library Library Vector Offsets (LVOs)
+; From AmigaOS NDK 3.9 — stable constants, do not change.
+_LVOSupervisor      EQU -30
+_LVOAllocate        EQU -186
+_LVODeallocate      EQU -192
+_LVOAllocMem        EQU -198
+_LVOAllocAbs        EQU -204
+_LVOFreeMem         EQU -210
+_LVOAvailMem        EQU -216
+_LVOAllocEntry      EQU -222
+_LVOFreeEntry       EQU -228
+_LVOInsert          EQU -234
+_LVOAddHead         EQU -240
+_LVOAddTail         EQU -246
+_LVORemove          EQU -252
+_LVORemHead         EQU -258
+_LVORemTail         EQU -264
+_LVOFindName        EQU -276
+_LVOAddPort         EQU -354
+_LVORemPort         EQU -360
+_LVOPutMsg          EQU -366
+_LVOGetMsg          EQU -372
+_LVOReplyMsg        EQU -378
+_LVOWaitPort        EQU -384
+_LVOFindPort        EQU -390
+_LVOAddLibrary      EQU -396
+_LVORemLibrary      EQU -402
+_LVOOldOpenLibrary  EQU -408
+_LVOCloseLibrary    EQU -414
+_LVOTypeOfMem       EQU -534
+_LVOOpenLibrary     EQU -552

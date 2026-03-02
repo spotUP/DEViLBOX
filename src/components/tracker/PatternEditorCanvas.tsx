@@ -6,7 +6,7 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
-import { useTrackerStore, useTransportStore, useThemeStore, useInstrumentStore } from '@stores';
+import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useInstrumentStore } from '@stores';
 import { AutomationLanes } from './AutomationLanes';
 import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
@@ -128,13 +128,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     setChannelColor,
     updateChannelName,
     setCell,
-    moveCursorToChannelAndColumn,
     copyTrack,
     cutTrack,
     pasteTrack,
-    mobileChannelIndex,
-    cursor,
-    selection,
     showGhostPatterns,
     columnVisibility
   } = useTrackerStore(useShallow((state) => ({
@@ -148,16 +144,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     setChannelColor: state.setChannelColor,
     updateChannelName: state.updateChannelName,
     setCell: state.setCell,
-    moveCursorToChannelAndColumn: state.moveCursorToChannelAndColumn,
     copyTrack: state.copyTrack,
     cutTrack: state.cutTrack,
     pasteTrack: state.pasteTrack,
-    mobileChannelIndex: state.cursor.channelIndex,
-    cursor: state.cursor,
-    selection: state.selection,
     showGhostPatterns: state.showGhostPatterns,
     columnVisibility: state.columnVisibility,
   })));
+
+  const cursor = useCursorStore((s) => s.cursor);
+  const selection = useCursorStore((s) => s.selection);
+  const moveCursorToChannelAndColumn = useCursorStore((s) => s.moveCursorToChannelAndColumn);
+  const mobileChannelIndex = cursor.channelIndex;
 
   const { instruments } = useInstrumentStore(useShallow((state) => ({
     instruments: state.instruments
@@ -191,14 +188,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Broadcast peer_selection whenever local selection changes
   useEffect(() => {
-    const unsub = useTrackerStore.subscribe((state, prev) => {
+    const unsub = useCursorStore.subscribe((state, prev) => {
       if (state.selection === prev.selection) return;
       if (useCollaborationStore.getState().status !== 'connected') return;
       const sel = state.selection;
       if (sel) {
         getCollabClient()?.send({
           type: 'peer_selection',
-          patternIndex: state.currentPatternIndex,
+          patternIndex: useTrackerStore.getState().currentPatternIndex,
           startChannel: sel.startChannel, endChannel: sel.endChannel,
           startRow: sel.startRow, endRow: sel.endRow,
         });
@@ -285,13 +282,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const handleSwipeUp = useCallback(() => {
     if (!pattern || !isMobile) return;
     const newRow = Math.max(0, cursor.rowIndex - 4); // Move up 4 rows
-    useTrackerStore.getState().moveCursorToRow(newRow);
+    useCursorStore.getState().moveCursorToRow(newRow);
   }, [pattern, isMobile, cursor.rowIndex]);
 
   const handleSwipeDown = useCallback(() => {
     if (!pattern || !isMobile) return;
     const newRow = Math.min(pattern.length - 1, cursor.rowIndex + 4); // Move down 4 rows
-    useTrackerStore.getState().moveCursorToRow(newRow);
+    useCursorStore.getState().moveCursorToRow(newRow);
   }, [pattern, isMobile, cursor.rowIndex]);
 
   // Continuous scroll handler for drag scrolling
@@ -317,7 +314,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     if (Math.abs(rowDelta) > 0) {
       const newRow = Math.max(0, Math.min(pattern.length + 31, cursor.rowIndex + rowDelta));
-      useTrackerStore.getState().moveCursorToRow(newRow);
+      useCursorStore.getState().moveCursorToRow(newRow);
     }
   }, [pattern, isMobile, cursor.rowIndex]);
 
@@ -337,9 +334,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       horizontalAccumulatorRef.current -= steps * COLUMN_STEP_THRESHOLD;
 
       // Move cursor by N steps
-      const store = useTrackerStore.getState();
+      const cursorStore = useCursorStore.getState();
       for (let i = 0; i < Math.abs(steps); i++) {
-        store.moveCursor(steps > 0 ? 'right' : 'left');
+        cursorStore.moveCursor(steps > 0 ? 'right' : 'left');
       }
     }
   }, [pattern, isMobile]);
@@ -488,18 +485,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       return;
     }
 
-    const store = useTrackerStore.getState();
-    
+    const cursorStore = useCursorStore.getState();
+
     if (e.shiftKey) {
       // Extend selection
-      store.updateSelection(cell.channelIndex, cell.rowIndex);
+      cursorStore.updateSelection(cell.channelIndex, cell.rowIndex);
     } else {
       // Start new selection or just move cursor
-      store.moveCursorToRow(cell.rowIndex);
-      store.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any);
-      
+      cursorStore.moveCursorToRow(cell.rowIndex);
+      cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any);
+
       // If we move the cursor, start a new selection
-      store.startSelection();
+      cursorStore.startSelection();
     }
     
     setIsDragging(true);
@@ -517,8 +514,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const cell = getCellFromCoords(e.clientX, e.clientY);
     if (!cell) return;
 
-    const store = useTrackerStore.getState();
-    store.updateSelection(cell.channelIndex, cell.rowIndex, cell.columnType as any);
+    useCursorStore.getState().updateSelection(cell.channelIndex, cell.rowIndex, cell.columnType as any);
   }, [isDragging, isMobile, getCellFromCoords]);
 
   const handleMouseUp = useCallback(() => {
@@ -539,10 +535,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const cell = getCellFromCoords(x, y);
     if (!cell) return;
 
-    const store = useTrackerStore.getState();
-    store.moveCursorToRow(cell.rowIndex);
-    store.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any);
-    store.startSelection();
+    const cursorStore = useCursorStore.getState();
+    cursorStore.moveCursorToRow(cell.rowIndex);
+    cursorStore.moveCursorToChannelAndColumn(cell.channelIndex, cell.columnType as any);
+    cursorStore.startSelection();
     
     haptics.heavy();
     useUIStore.getState().setStatusMessage('BLOCK START');
@@ -631,18 +627,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const validRow = Math.max(0, Math.min(rowIndex, pattern.length - 1));
 
     // Move cursor to tapped position
-    const store = useTrackerStore.getState();
-    const currentSelection = store.selection;
+    const cursorStore = useCursorStore.getState();
+    const currentSelection = cursorStore.selection;
 
     if (currentSelection) {
       // If we already have a selection, tapping a new cell extends it
-      store.updateSelection(channelIndex, validRow);
+      cursorStore.updateSelection(channelIndex, validRow);
       haptics.soft();
       useUIStore.getState().setStatusMessage('BLOCK UPDATED');
     } else {
       // Normal move behavior
-      store.moveCursorToRow(validRow);
-      store.moveCursorToChannelAndColumn(channelIndex, columnType as any);
+      cursorStore.moveCursorToRow(validRow);
+      cursorStore.moveCursorToChannelAndColumn(channelIndex, columnType as any);
     }
   }, [pattern, isMobile, mobileChannelIndex, cursor.columnType, moveCursorToChannelAndColumn]);
 
@@ -651,11 +647,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     
     // Vertical scroll moves rows
     if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-      const store = useTrackerStore.getState();
       const rows = Math.round(e.deltaY / 20);
       if (rows !== 0) {
         const newRow = Math.max(0, Math.min(pattern.length - 1, cursor.rowIndex + rows));
-        store.moveCursorToRow(newRow);
+        useCursorStore.getState().moveCursorToRow(newRow);
       }
     }
   }, [pattern.length, cursor.rowIndex]);
@@ -681,7 +676,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     
     // If we're not at the last column, move to next column
     if (currentIndex !== -1 && currentIndex < columnOrder.length - 1) {
-      useTrackerStore.getState().moveCursorToColumn(columnOrder[currentIndex + 1]);
+      useCursorStore.getState().moveCursorToColumn(columnOrder[currentIndex + 1]);
     } else {
       // Move to next channel's note column
       const nextChannel = Math.min(pattern.channels.length - 1, mobileChannelIndex + 1);
@@ -711,7 +706,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     
     // If we're not at the first column (note), move to previous column
     if (currentIndex > 0) {
-      useTrackerStore.getState().moveCursorToColumn(columnOrder[currentIndex - 1]);
+      useCursorStore.getState().moveCursorToColumn(columnOrder[currentIndex - 1]);
     } else {
       // Move to previous channel's last column (typically effParam2 or probability)
       const prevChannel = Math.max(0, mobileChannelIndex - 1);
@@ -1139,6 +1134,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const w     = Math.max(1, container.clientWidth);
       const h     = Math.max(1, container.clientHeight);
       const state = useTrackerStore.getState();
+      const cursorState = useCursorStore.getState();
 
       // Transfer canvas — after this the main thread cannot draw to it
       const offscreen = canvas.transferControlToOffscreen();
@@ -1155,17 +1151,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           patterns:           snapshotPatterns(),
           currentPatternIndex: state.currentPatternIndex,
           cursor: {
-            rowIndex:    state.cursor.rowIndex,
-            channelIndex: state.cursor.channelIndex,
-            columnType:  state.cursor.columnType,
-            digitIndex:  state.cursor.digitIndex,
+            rowIndex:    cursorState.cursor.rowIndex,
+            channelIndex: cursorState.cursor.channelIndex,
+            columnType:  cursorState.cursor.columnType,
+            digitIndex:  cursorState.cursor.digitIndex,
           },
-          selection:          state.selection ? {
-            startChannel: state.selection.startChannel,
-            endChannel:   state.selection.endChannel,
-            startRow:     state.selection.startRow,
-            endRow:       state.selection.endRow,
-            columnTypes:  state.selection.columnTypes,
+          selection:          cursorState.selection ? {
+            startChannel: cursorState.selection.startChannel,
+            endChannel:   cursorState.selection.endChannel,
+            startRow:     cursorState.selection.startRow,
+            endRow:       cursorState.selection.endRow,
+            columnTypes:  cursorState.selection.columnTypes,
           } : null,
           channelLayout: snapshotLayout(),
         },
@@ -1173,13 +1169,22 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       );
     });
 
-    // Subscribe to tracker store — post pattern/cursor/selection deltas
+    // Subscribe to tracker store — post pattern/ui deltas
     const unsubTracker = useTrackerStore.subscribe((s, prev) => {
       const b = bridgeRef.current;
       if (!b) return;
       if (s.patterns !== prev.patterns || s.currentPatternIndex !== prev.currentPatternIndex) {
         b.post({ type: 'patterns', patterns: snapshotPatterns(), currentPatternIndex: s.currentPatternIndex });
       }
+      if (s.columnVisibility !== prev.columnVisibility || s.showGhostPatterns !== prev.showGhostPatterns || s.recordMode !== prev.recordMode) {
+        b.post({ type: 'uiState', uiState: snapshotUI() });
+      }
+    });
+
+    // Subscribe to cursor store — post cursor/selection deltas
+    const unsubCursor = useCursorStore.subscribe((s, prev) => {
+      const b = bridgeRef.current;
+      if (!b) return;
       // PERF: Skip cursor posts during playback — the RAF loop sends 'playback' messages
       // at animation frame rate which the worker uses for row highlighting instead.
       if (s.cursor !== prev.cursor && !useTransportStore.getState().isPlaying) {
@@ -1198,9 +1203,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           endRow:       s.selection.endRow,
           columnTypes:  s.selection.columnTypes,
         } : null });
-      }
-      if (s.columnVisibility !== prev.columnVisibility || s.showGhostPatterns !== prev.showGhostPatterns || s.recordMode !== prev.recordMode) {
-        b.post({ type: 'uiState', uiState: snapshotUI() });
       }
     });
 
@@ -1225,6 +1227,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       cancelAnimationFrame(initRafId);
       clearTimeout(readyTimeoutId);
       unsubTracker();
+      unsubCursor();
       unsubUI();
       unsubSettings();
       bridge.dispose();
@@ -1261,7 +1264,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const isPlaying      = transportState.isPlaying;
       const smoothScrolling = transportState.smoothScrolling;
 
-      let currentRow   = trackerState.cursor.rowIndex;
+      let currentRow   = useCursorStore.getState().cursor.rowIndex;
       let smoothOffset = 0;
       let activePatternIdx = trackerState.currentPatternIndex;
 
@@ -1457,10 +1460,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const pattern = state.patterns[state.currentPatternIndex];
         if (!pattern) return;
 
-        const currentRow = state.cursor.rowIndex;
+        const currentRow = useCursorStore.getState().cursor.rowIndex;
         // Allow scrolling beyond pattern boundaries to see ghost patterns
         const newRow = Math.min(pattern.length + 32, currentRow + delta); // Allow scrolling 32 rows into next pattern
-        useTrackerStore.getState().moveCursorToRow(newRow);
+        useCursorStore.getState().moveCursorToRow(newRow);
       } else {
         // Horizontal scroll - scroll channels STEPPED (one by one)
         // Use totalChannelsWidth from useMemo for consistency

@@ -13,7 +13,7 @@ test('emits valid C for simple replayer fixture', () => {
   expect(output).toContain('paula_set_volume(0,');
   expect(output).toContain('paula_set_period(0,');
   expect(output).toContain('return;');
-  expect(output).toContain('static const uint16_t SongData[]');
+  expect(output).toMatch(/#define SongData \(\(uint16_t\*\)\(_ds \+/);
 });
 
 test('emitter output has required preamble', () => {

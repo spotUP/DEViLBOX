@@ -130,7 +130,7 @@ export const PixiTrackerView: React.FC = () => {
         flexDirection: 'column',
       }}
     >
-      {/* FT2 Toolbar + Menu bar — native Pixi rendering */}
+      {/* FT2 Toolbar + Menu bar */}
       <PixiFT2Toolbar />
 
       {/* TB-303 Knob Panel — shown when a TB-303 instrument is active and not in TB-303/SunVox view */}
@@ -152,134 +152,49 @@ export const PixiTrackerView: React.FC = () => {
       >
         {/* Editor area with overlays */}
         <pixiContainer layout={{ flex: 1, width: '100%', height: '100%' }}>
-          {/* Editor — native Pixi components for each view mode.
-              All editors are ALWAYS mounted to avoid @pixi/layout BindingError
-              when swapping Yoga child nodes. Visibility is controlled via
-              alpha/renderable (NOT visible — @pixi/layout calls _onChildRemoved()
-              when visible=false, detaching Yoga nodes and causing BindingErrors). */}
-
-          {/* Classic tracker pattern editor — native Pixi */}
-          <pixiContainer
-            alpha={viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0}
-            renderable={viewMode === 'tracker' && editorMode === 'classic'}
-            eventMode={viewMode === 'tracker' && editorMode === 'classic' ? 'static' : 'none'}
-            layout={{
-              flex: viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0,
-              height: viewMode === 'tracker' && editorMode === 'classic' ? '100%' : 0,
-              width: viewMode === 'tracker' && editorMode === 'classic' ? '100%' : 0,
-            }}
-          >
-            <PixiPatternEditor width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} isActive={viewMode === 'tracker' && editorMode === 'classic'} />
-          </pixiContainer>
-
-          {/* Grid sequencer — native Pixi */}
-          <pixiContainer
-            alpha={viewMode === 'grid' ? 1 : 0}
-            renderable={viewMode === 'grid'}
-            eventMode={viewMode === 'grid' ? 'static' : 'none'}
-            layout={{
-              flex: viewMode === 'grid' ? 1 : 0,
-              height: viewMode === 'grid' ? '100%' : 0,
-              width: viewMode === 'grid' ? '100%' : 0,
-            }}
-          >
-            <PixiGridSequencer channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} isActive={viewMode === 'grid'} />
-          </pixiContainer>
-
-          {/* Piano Roll — native Pixi (existing PixiPianoRollView) */}
-          <pixiContainer
-            alpha={viewMode === 'pianoroll' ? 1 : 0}
-            renderable={viewMode === 'pianoroll'}
-            eventMode={viewMode === 'pianoroll' ? 'static' : 'none'}
-            layout={{
-              flex: viewMode === 'pianoroll' ? 1 : 0,
-              height: viewMode === 'pianoroll' ? '100%' : 0,
-              width: viewMode === 'pianoroll' ? '100%' : 0,
-            }}
-          >
-            <PixiPianoRollView isActive={viewMode === 'pianoroll'} />
-          </pixiContainer>
-
-          {/* TB-303 view — native Pixi */}
-          <pixiContainer
-            alpha={viewMode === 'tb303' ? 1 : 0}
-            renderable={viewMode === 'tb303'}
-            eventMode={viewMode === 'tb303' ? 'static' : 'none'}
-            layout={{
-              flex: viewMode === 'tb303' ? 1 : 0,
-              height: viewMode === 'tb303' ? '100%' : 0,
-              width: viewMode === 'tb303' ? '100%' : 0,
-            }}
-          >
-            <PixiTB303View channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
-          </pixiContainer>
-
-          {/* SunVox channel view — native Pixi */}
-          <pixiContainer
-            alpha={viewMode === 'sunvox' ? 1 : 0}
-            renderable={viewMode === 'sunvox'}
-            eventMode={viewMode === 'sunvox' ? 'static' : 'none'}
-            layout={{
-              flex: viewMode === 'sunvox' ? 1 : 0,
-              height: viewMode === 'sunvox' ? '100%' : 0,
-              width: viewMode === 'sunvox' ? '100%' : 0,
-            }}
-          >
-            <PixiSunVoxChannelView channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
-          </pixiContainer>
-
-          {/* Furnace editor — pure Pixi */}
-          <pixiContainer
-            alpha={viewMode === 'tracker' && editorMode === 'furnace' ? 1 : 0}
-            renderable={viewMode === 'tracker' && editorMode === 'furnace'}
-            eventMode={viewMode === 'tracker' && editorMode === 'furnace' ? 'static' : 'none'}
-            layout={{
-              flex: viewMode === 'tracker' && editorMode === 'furnace' ? 1 : 0,
-              height: viewMode === 'tracker' && editorMode === 'furnace' ? '100%' : 0,
-              width: viewMode === 'tracker' && editorMode === 'furnace' ? '100%' : 0,
-            }}
-          >
-            <PixiFurnaceView width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
-          </pixiContainer>
-
-          {/* HivelyTracker editor — pure Pixi */}
-          <pixiContainer
-            alpha={viewMode === 'tracker' && editorMode === 'hively' ? 1 : 0}
-            renderable={viewMode === 'tracker' && editorMode === 'hively'}
-            eventMode={viewMode === 'tracker' && editorMode === 'hively' ? 'static' : 'none'}
-            layout={{
-              flex: viewMode === 'tracker' && editorMode === 'hively' ? 1 : 0,
-              height: viewMode === 'tracker' && editorMode === 'hively' ? '100%' : 0,
-              width: viewMode === 'tracker' && editorMode === 'hively' ? '100%' : 0,
-            }}
-          >
-            <PixiHivelyView width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
-          </pixiContainer>
-
-          {/* MusicLine — pure Pixi */}
-          <pixiContainer
-            alpha={viewMode === 'tracker' && editorMode === 'musicline' ? 1 : 0}
-            renderable={viewMode === 'tracker' && editorMode === 'musicline'}
-            eventMode={viewMode === 'tracker' && editorMode === 'musicline' ? 'static' : 'none'}
-            layout={{
-              flex: viewMode === 'tracker' && editorMode === 'musicline' ? 1 : 0,
-              height: viewMode === 'tracker' && editorMode === 'musicline' ? '100%' : 0,
-              width: viewMode === 'tracker' && editorMode === 'musicline' ? '100%' : 0,
-              flexDirection: 'column',
-            }}
-          >
-            <PixiMusicLineTrackTable
-              width={Math.max(100, editorWidth)}
-              height={MUSICLINE_MATRIX_HEIGHT}
-              onSeek={(pos) => {
-                useTrackerStore.getState().setCurrentPosition(pos);
-                getTrackerReplayer().jumpToPosition(pos, 0);
-              }}
-            />
-            <PixiMusicLinePatternViewer
-              width={Math.max(100, editorWidth)}
-              height={Math.max(50, instrumentPanelHeight - MUSICLINE_MATRIX_HEIGHT)}
-            />
+          {/* Editor — only the ACTIVE view is mounted.
+              Inactive views are fully unmounted (no React fibers, no Yoga nodes,
+              no subscriptions, no pixi subtrees). This eliminates ~25ms of
+              @pixi/react reconciler + Yoga layout overhead per frame.
+              Views receive explicit dimensions — no Yoga layout needed. */}
+          <pixiContainer layout={{ flex: 1, width: '100%', height: '100%' }}>
+            {viewMode === 'tracker' && editorMode === 'classic' && (
+              <PixiPatternEditor width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} isActive />
+            )}
+            {viewMode === 'grid' && (
+              <PixiGridSequencer channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} isActive />
+            )}
+            {viewMode === 'pianoroll' && (
+              <PixiPianoRollView isActive />
+            )}
+            {viewMode === 'tb303' && (
+              <PixiTB303View channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+            )}
+            {viewMode === 'sunvox' && (
+              <PixiSunVoxChannelView channelIndex={gridChannelIndex} width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+            )}
+            {viewMode === 'tracker' && editorMode === 'furnace' && (
+              <PixiFurnaceView width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+            )}
+            {viewMode === 'tracker' && editorMode === 'hively' && (
+              <PixiHivelyView width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
+            )}
+            {viewMode === 'tracker' && editorMode === 'musicline' && (
+              <pixiContainer>
+                <PixiMusicLineTrackTable
+                  width={Math.max(100, editorWidth)}
+                  height={MUSICLINE_MATRIX_HEIGHT}
+                  onSeek={(pos) => {
+                    useTrackerStore.getState().setCurrentPosition(pos);
+                    getTrackerReplayer().jumpToPosition(pos, 0);
+                  }}
+                />
+                <PixiMusicLinePatternViewer
+                  width={Math.max(100, editorWidth)}
+                  height={Math.max(50, instrumentPanelHeight - MUSICLINE_MATRIX_HEIGHT)}
+                />
+              </pixiContainer>
+            )}
           </pixiContainer>
 
           {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga BindingErrors.
@@ -342,7 +257,7 @@ export const PixiTrackerView: React.FC = () => {
           onClick={() => setShowInstrumentPanel(p => !p)}
         />
 
-        {/* Instrument list — always mounted, zero-width when hidden */}
+        {/* Instrument list */}
         <pixiContainer alpha={instrumentPanelVisible ? 1 : 0} renderable={instrumentPanelVisible} eventMode={instrumentPanelVisible ? 'static' : 'none'} layout={{ width: instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0, height: '100%' }}>
           <PixiInstrumentPanel width={INSTRUMENT_PANEL_W} height={Math.max(100, instrumentPanelHeight)} />
         </pixiContainer>

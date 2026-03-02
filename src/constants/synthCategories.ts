@@ -1721,6 +1721,15 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
     icon: 'Disc',
     color: 'text-gray-400',
   },
+  SonicArrangerSynth: {
+    type: 'SonicArrangerSynth',
+    name: 'Sonic Arranger',
+    shortName: 'SA',
+    description: 'Amiga Sonic Arranger — 4-channel synth with 18 real-time waveform effects',
+    bestFor: ['Amiga chiptune', 'Wavetable', 'Synthesis effects'],
+    icon: 'Disc',
+    color: 'text-gray-400',
+  },
 };
 
 // Organized categories

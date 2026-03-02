@@ -53,7 +53,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
-import type { UADEChipRamInfo } from '@/types/instrument';
+import type { UADEChipRamInfo, SonicArrangerConfig } from '@/types/instrument';
+import { DEFAULT_SONIC_ARRANGER } from '@/types/instrument';
 
 // -- Binary helpers -----------------------------------------------------------
 
@@ -80,12 +81,13 @@ function readString(v: DataView, off: number, len: number): string {
 }
 
 // -- SA note → XM note --------------------------------------------------------
-// Period table (1-based): index 49 = 856 = C-1 = DEViLBOX XM 13
-// xmNote = saNote - 36  (valid for saNote >= 37; below that → 0)
+// SA period table is 1-based: index 37 = period 856 = ProTracker C-1.
+// ProTracker C-1 = XM note 13 (MIDI 24).  So xmNote = saNote - 24.
+// This maps SA 25→XM 1 (lowest valid XM note) up through SA 120→XM 96.
 
 function saNote2XM(note: number): number {
   if (note === 0) return 0;
-  const xm = note - 36;
+  const xm = note - 24;
   return xm >= 1 ? xm : 0;
 }
 
@@ -108,6 +110,27 @@ interface SAInstrument {
   waveformLength: number;   // one-shot length in words → *2 bytes
   repeatLength:   number;   // loop length in words → *2 bytes (0=all, 1=no loop)
   volume:         number;   // 0-64
+  fineTuning:     number;   // int16 at +18
+  portamentoSpeed: number;  // uint16 at +20
+  vibratoDelay:   number;   // uint16 at +22
+  vibratoSpeed:   number;   // uint16 at +24
+  vibratoLevel:   number;   // uint16 at +26
+  amfNumber:      number;   // uint16 at +28
+  amfDelay:       number;   // uint16 at +30
+  amfLength:      number;   // uint16 at +32
+  amfRepeat:      number;   // uint16 at +34
+  adsrNumber:     number;   // uint16 at +36
+  adsrDelay:      number;   // uint16 at +38
+  adsrLength:     number;   // uint16 at +40
+  adsrRepeat:     number;   // uint16 at +42
+  sustainPoint:   number;   // uint16 at +44
+  sustainDelay:   number;   // uint16 at +46
+  effectArg1:     number;   // uint16 at +64
+  effect:         number;   // uint16 at +66
+  effectArg2:     number;   // uint16 at +68
+  effectArg3:     number;   // uint16 at +70
+  effectDelay:    number;   // uint16 at +72
+  arpeggios:      Array<{ length: number; repeat: number; values: number[] }>;  // 3 × 16 bytes at +74
   name:           string;
 }
 
@@ -191,50 +214,48 @@ export async function parseSonicArrangerFile(
   let magic = '';
   for (let i = 0; i < 8; i++) magic += String.fromCharCode(v.getUint8(i));
 
-  // ── 4EFA player binary — return metadata stub ─────────────────────────────
+  // ── 4EFA player binary — find embedded song data ──────────────────────────
+  // The 4EFA format embeds song data inside a player binary. The data uses an
+  // offset table (8 longwords) instead of chunk markers (STBL/OVTB/etc.).
+  // Algorithm from UADE Sonic Arranger_v1.asm InitPlayer → NoAR (line 772):
+  //   A0 += word[2]; A0 += 8; A0 += word[A0]; → SongPtr
+  let songBase = 0;  // absolute offset where song data starts
+  let useOffsetTable = false;  // true for 4EFA format (offset table), false for SOARV1.0 (chunks)
+
   if (magic !== 'SOARV1.0') {
     if (v.getUint16(0, false) !== 0x4EFA) {
       throw new Error(`SonicArranger: unrecognised format (magic="${magic}")`);
     }
-    const moduleName = filename.replace(/\.[^/.]+$/, '');
-    const emptyRows = Array.from({ length: 64 }, (): TrackerCell => ({
-      note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-    }));
-    return {
-      name:   moduleName,
-      format: 'MOD' as TrackerFormat,
-      patterns: [{
-        id: 'pattern-0', name: 'Pattern 0', length: 64,
-        channels: Array.from({ length: 4 }, (_, ch) => ({
-          id: `channel-${ch}`, name: `Channel ${ch + 1}`,
-          muted: false, solo: false, collapsed: false,
-          volume: 100, pan: [-50, 50, 50, -50][ch],
-          instrumentId: null, color: null, rows: emptyRows,
-        } as ChannelData)),
-        importMetadata: {
-          sourceFormat: 'SonicArranger', sourceFile: filename,
-          importedAt: new Date().toISOString(),
-          originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 0,
-        },
-      }],
-      instruments: [{
-        id: 1, name: 'Sample 1', type: 'synth' as const,
-        synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-      } as InstrumentConfig],
-      songPositions: [0], songLength: 1, restartPosition: 0,
-      numChannels: 4, initialSpeed: 6, initialBPM: 125, linearPeriods: false,
-    };
+    // Calculate song data offset from 4EFA player binary
+    const d1 = v.getUint16(2, false);  // first JSR displacement
+    const leaOff = d1 + 8;             // skip past JSR + 8 bytes
+    if (leaOff + 2 > buffer.byteLength) throw new Error('SonicArranger: 4EFA binary too small');
+    const d2 = v.getUint16(leaOff, false);  // lea displacement
+    songBase = leaOff + d2;
+    if (songBase + 32 > buffer.byteLength) throw new Error('SonicArranger: 4EFA song data out of bounds');
+    useOffsetTable = true;
   }
 
-  if (buffer.byteLength < 16) throw new Error('SonicArranger: file too small');
+  if (buffer.byteLength < songBase + 16) throw new Error('SonicArranger: file too small');
 
-  let pos = 8;  // cursor after magic
+  let pos: number;
+  let numSubSongs: number;
 
-  // ── STBL — sub-song table ──────────────────────────────────────────────────
-  if (readMark(v, pos) !== 'STBL') throw new Error('SonicArranger: missing STBL chunk');
-  pos += 4;
-
-  const numSubSongs = u32(v, pos); pos += 4;
+  if (useOffsetTable) {
+    // 4EFA format: 8 longword offsets relative to songBase
+    // [0]=STBL [1]=OVTB [2]=NTBL [3]=INST [4]=SYWT [5]=SYAR [6]=SYAF [7]=SD8B
+    const offSTBL = u32(v, songBase + 0);
+    const offOVTB = u32(v, songBase + 4);
+    // Number of sub-songs = (offOVTB - offSTBL) / 12
+    numSubSongs = Math.floor((offOVTB - offSTBL) / 12);
+    pos = songBase + offSTBL;  // cursor at sub-song table data
+  } else {
+    // SOARV1.0 chunk format
+    pos = 8;  // cursor after magic
+    if (readMark(v, pos) !== 'STBL') throw new Error('SonicArranger: missing STBL chunk');
+    pos += 4;
+    numSubSongs = u32(v, pos); pos += 4;
+  }
   const subSongs: SASong[] = [];
   for (let i = 0; i < numSubSongs; i++) {
     const ss: SASong = {
@@ -259,10 +280,17 @@ export async function parseSonicArrangerFile(
   };
 
   // ── OVTB — position/order table ────────────────────────────────────────────
-  if (readMark(v, pos) !== 'OVTB') throw new Error('SonicArranger: missing OVTB chunk');
-  pos += 4;
-
-  const numPositions = u32(v, pos); pos += 4;
+  let numPositions: number;
+  if (useOffsetTable) {
+    const offOVTB = u32(v, songBase + 4);
+    const offNTBL = u32(v, songBase + 8);
+    numPositions = Math.floor((offNTBL - offOVTB) / 16);  // 16 bytes per position (4 channels × 4 bytes)
+    pos = songBase + offOVTB;
+  } else {
+    if (readMark(v, pos) !== 'OVTB') throw new Error('SonicArranger: missing OVTB chunk');
+    pos += 4;
+    numPositions = u32(v, pos); pos += 4;
+  }
   // positions[posIdx][ch] → SAPosition
   const positions: SAPosition[][] = [];
   for (let p = 0; p < numPositions; p++) {
@@ -279,10 +307,17 @@ export async function parseSonicArrangerFile(
   }
 
   // ── NTBL — track rows ──────────────────────────────────────────────────────
-  if (readMark(v, pos) !== 'NTBL') throw new Error('SonicArranger: missing NTBL chunk');
-  pos += 4;
-
-  const numTrackRows = u32(v, pos); pos += 4;
+  let numTrackRows: number;
+  if (useOffsetTable) {
+    const offNTBL = u32(v, songBase + 8);
+    const offINST = u32(v, songBase + 12);
+    numTrackRows = Math.floor((offINST - offNTBL) / 4);  // 4 bytes per track row
+    pos = songBase + offNTBL;
+  } else {
+    if (readMark(v, pos) !== 'NTBL') throw new Error('SonicArranger: missing NTBL chunk');
+    pos += 4;
+    numTrackRows = u32(v, pos); pos += 4;
+  }
   const trackLines: SARow[] = [];
   for (let i = 0; i < numTrackRows; i++) {
     const b0 = u8(v, pos);
@@ -302,10 +337,17 @@ export async function parseSonicArrangerFile(
   }
 
   // ── INST — instruments ─────────────────────────────────────────────────────
-  if (readMark(v, pos) !== 'INST') throw new Error('SonicArranger: missing INST chunk');
-  pos += 4;
-
-  const numInstruments = u32(v, pos); pos += 4;
+  let numInstruments: number;
+  if (useOffsetTable) {
+    const offINST = u32(v, songBase + 12);
+    const offSYWT = u32(v, songBase + 16);  // SYWT follows INST
+    numInstruments = Math.floor((offSYWT - offINST) / 152);
+    pos = songBase + offINST;
+  } else {
+    if (readMark(v, pos) !== 'INST') throw new Error('SonicArranger: missing INST chunk');
+    pos += 4;
+    numInstruments = u32(v, pos); pos += 4;
+  }
   const instTableStart = pos;  // file offset of first 152-byte instrument entry
   const saInstruments: SAInstrument[] = [];
   for (let i = 0; i < numInstruments; i++) {
@@ -316,7 +358,41 @@ export async function parseSonicArrangerFile(
     const repeatLength   = u16(v, base + 6);
     // +8: skip 8 bytes
     const volume = u16(v, base + 16) & 0xFF;  // effective 0-255, but SA uses 0-64
-    // +18: fineTuning, +20: portamentoSpeed, etc. — not needed for static import
+    const fineTuning     = v.getInt16(base + 18, false);
+    const portamentoSpeed = u16(v, base + 20);
+    const vibratoDelay   = u16(v, base + 22);
+    const vibratoSpeed   = u16(v, base + 24);
+    const vibratoLevel   = u16(v, base + 26);
+    const amfNumber      = u16(v, base + 28);
+    const amfDelay       = u16(v, base + 30);
+    const amfLength      = u16(v, base + 32);
+    const amfRepeat      = u16(v, base + 34);
+    const adsrNumber     = u16(v, base + 36);
+    const adsrDelay      = u16(v, base + 38);
+    const adsrLength     = u16(v, base + 40);
+    const adsrRepeat     = u16(v, base + 42);
+    const sustainPoint   = u16(v, base + 44);
+    const sustainDelay   = u16(v, base + 46);
+    // +48: skip 16 bytes
+    const effectArg1     = u16(v, base + 64);
+    const effect         = u16(v, base + 66);
+    const effectArg2     = u16(v, base + 68);
+    const effectArg3     = u16(v, base + 70);
+    const effectDelay    = u16(v, base + 72);
+
+    // 3 arpeggio sub-tables at +74, each 16 bytes: length(u8), repeat(u8), values(int8[14])
+    const arpeggios: Array<{ length: number; repeat: number; values: number[] }> = [];
+    for (let a = 0; a < 3; a++) {
+      const arpBase = base + 74 + a * 16;
+      const arpLen = u8(v, arpBase);
+      const arpRepeat = u8(v, arpBase + 1);
+      const arpValues: number[] = [];
+      for (let j = 0; j < 14; j++) {
+        arpValues.push(i8(v, arpBase + 2 + j));
+      }
+      arpeggios.push({ length: arpLen, repeat: arpRepeat, values: arpValues });
+    }
+
     // Name at +122, 30 bytes
     const name = readString(v, base + 122, 30) || `Instrument ${i + 1}`;
 
@@ -326,23 +402,50 @@ export async function parseSonicArrangerFile(
       waveformLength,
       repeatLength,
       volume: Math.min(volume, 64),
+      fineTuning,
+      portamentoSpeed,
+      vibratoDelay,
+      vibratoSpeed,
+      vibratoLevel,
+      amfNumber,
+      amfDelay,
+      amfLength,
+      amfRepeat,
+      adsrNumber,
+      adsrDelay,
+      adsrLength,
+      adsrRepeat,
+      sustainPoint,
+      sustainDelay,
+      effectArg1,
+      effect,
+      effectArg2,
+      effectArg3,
+      effectDelay,
+      arpeggios,
       name,
     });
     pos += 152;
   }
 
   // ── SD8B — sample data ─────────────────────────────────────────────────────
-  if (readMark(v, pos) !== 'SD8B') throw new Error('SonicArranger: missing SD8B chunk');
-  pos += 4;
+  if (useOffsetTable) {
+    pos = songBase + u32(v, songBase + 28);  // offset[7] = SD8B
+  } else {
+    if (readMark(v, pos) !== 'SD8B') throw new Error('SonicArranger: missing SD8B chunk');
+    pos += 4;
+  }
 
   const numSamples = i32(v, pos); pos += 4;
 
   const samplePCM: (Uint8Array | null)[] = [];
 
   if (numSamples > 0) {
-    // Skip sample info header: 38 bytes per sample
-    // (4 words = 8 bytes: sampleLen/loopStart/loopLen/??? + 30 bytes name)
-    pos += numSamples * 38;
+    // SOARV1.0 chunk format has 38-byte sample info headers before the size table;
+    // 4EFA offset table format does NOT have these headers (sizes follow count directly)
+    if (!useOffsetTable) {
+      pos += numSamples * 38;
+    }
 
     // Read per-sample byte-lengths
     const sampleLengths: number[] = [];
@@ -367,9 +470,19 @@ export async function parseSonicArrangerFile(
   // ── SYWT — waveform data (for synth instruments) ───────────────────────────
   // Each waveform: 128 signed int8 bytes
   const waveformData: (Uint8Array | null)[] = [];
-  if (pos + 4 <= buffer.byteLength && readMark(v, pos) === 'SYWT') {
-    pos += 4;
-    const numWaveforms = u32(v, pos); pos += 4;
+  {
+    let numWaveforms: number;
+    if (useOffsetTable) {
+      const offSYWT = u32(v, songBase + 16);  // offset[4] = SYWT
+      const offSYAR = u32(v, songBase + 20);  // offset[5] = SYAR
+      numWaveforms = Math.floor((offSYAR - offSYWT) / 128);
+      pos = songBase + offSYWT;
+    } else if (pos + 4 <= buffer.byteLength && readMark(v, pos) === 'SYWT') {
+      pos += 4;
+      numWaveforms = u32(v, pos); pos += 4;
+    } else {
+      numWaveforms = 0;
+    }
     for (let i = 0; i < numWaveforms; i++) {
       if (pos + 128 <= buffer.byteLength) {
         waveformData.push(bytes.slice(pos, pos + 128));
@@ -381,7 +494,55 @@ export async function parseSonicArrangerFile(
     }
   }
 
-  // Remaining chunks (SYAR, SYAF) are not needed for static instrument import
+  // ── SYAR — ADSR tables (128 bytes each, unsigned uint8) ──────────────────
+  const adsrTables: number[][] = [];
+  {
+    let numAdsrTables: number;
+    if (useOffsetTable) {
+      const offSYAR = u32(v, songBase + 20);  // offset[5] = SYAR
+      const offSYAF = u32(v, songBase + 24);  // offset[6] = SYAF
+      numAdsrTables = Math.floor((offSYAF - offSYAR) / 128);
+      pos = songBase + offSYAR;
+    } else if (pos + 4 <= buffer.byteLength && readMark(v, pos) === 'SYAR') {
+      pos += 4;
+      numAdsrTables = u32(v, pos); pos += 4;
+    } else {
+      numAdsrTables = 0;
+    }
+    for (let i = 0; i < numAdsrTables; i++) {
+      const table: number[] = [];
+      for (let j = 0; j < 128; j++) {
+        table.push(u8(v, pos + j));
+      }
+      adsrTables.push(table);
+      pos += 128;
+    }
+  }
+
+  // ── SYAF — AMF tables (128 bytes each, signed int8) ────────────────────
+  const amfTables: number[][] = [];
+  {
+    let numAmfTables: number;
+    if (useOffsetTable) {
+      const offSYAF = u32(v, songBase + 24);  // offset[6] = SYAF
+      const offSD8B = u32(v, songBase + 28);   // offset[7] = SD8B (next section)
+      numAmfTables = Math.floor((offSD8B - offSYAF) / 128);
+      pos = songBase + offSYAF;
+    } else if (pos + 4 <= buffer.byteLength && readMark(v, pos) === 'SYAF') {
+      pos += 4;
+      numAmfTables = u32(v, pos); pos += 4;
+    } else {
+      numAmfTables = 0;
+    }
+    for (let i = 0; i < numAmfTables; i++) {
+      const table: number[] = [];
+      for (let j = 0; j < 128; j++) {
+        table.push(i8(v, pos + j));
+      }
+      amfTables.push(table);
+      pos += 128;
+    }
+  }
 
   // ── Build InstrumentConfig list ─────────────────────────────────────────────
 
@@ -428,28 +589,63 @@ export async function parseSonicArrangerFile(
         }
 
         instruments.push({
-          ...createSamplerInstrument(id, inst.name, pcm, inst.volume, 8287, loopStart, loopEnd),
+          // sampleRate = PAL_CLOCK / 214 = 16574 Hz (period 214 = SA note 61 = XM 37 = C3).
+          // baseNote in createSamplerInstrument is 'C3' (MIDI 48 = XM 37),
+          // so the rate must match the DMA rate at that period for correct pitch.
+          ...createSamplerInstrument(id, inst.name, pcm, inst.volume, 16574, loopStart, loopEnd),
           uadeChipRam: chipRam,
         });
       }
     } else {
-      // Synth instrument — use first waveform (waveformNumber) as approximation
+      // Synth instrument → SonicArrangerSynth with full config
       const wf = inst.waveformNumber < waveformData.length ? waveformData[inst.waveformNumber] : null;
 
-      if (!wf || wf.length === 0) {
-        instruments.push({
-          id, name: inst.name,
-          type: 'synth' as const, synthType: 'Sampler' as const,
-          effects: [], volume: -60, pan: 0,
-          uadeChipRam: chipRam,
-        } as unknown as InstrumentConfig);
-      } else {
-        // Use the 128-byte waveform as a single-cycle oscillator (loop entire wave)
-        instruments.push({
-          ...createSamplerInstrument(id, inst.name, wf, inst.volume, 8287, 0, wf.length),
-          uadeChipRam: chipRam,
-        });
-      }
+      // Build allWaveforms (all waveform tables as number[][])
+      const allWaveforms: number[][] = waveformData.map(wfData =>
+        wfData ? Array.from(wfData).map(b => b > 127 ? b - 256 : b) : new Array(128).fill(0)
+      );
+
+      const saConfig: SonicArrangerConfig = {
+        ...DEFAULT_SONIC_ARRANGER,
+        volume: inst.volume,
+        fineTuning: inst.fineTuning,
+        waveformNumber: inst.waveformNumber,
+        waveformLength: inst.waveformLength,
+        portamentoSpeed: inst.portamentoSpeed,
+        vibratoDelay: inst.vibratoDelay,
+        vibratoSpeed: inst.vibratoSpeed,
+        vibratoLevel: inst.vibratoLevel,
+        amfNumber: inst.amfNumber,
+        amfDelay: inst.amfDelay,
+        amfLength: inst.amfLength,
+        amfRepeat: inst.amfRepeat,
+        adsrNumber: inst.adsrNumber,
+        adsrDelay: inst.adsrDelay,
+        adsrLength: inst.adsrLength,
+        adsrRepeat: inst.adsrRepeat,
+        sustainPoint: inst.sustainPoint,
+        sustainDelay: inst.sustainDelay,
+        effect: inst.effect,
+        effectArg1: inst.effectArg1,
+        effectArg2: inst.effectArg2,
+        effectArg3: inst.effectArg3,
+        effectDelay: inst.effectDelay,
+        arpeggios: inst.arpeggios as SonicArrangerConfig['arpeggios'],
+        waveformData: wf ? Array.from(wf).map(b => b > 127 ? b - 256 : b) : new Array(128).fill(0),
+        adsrTable: inst.adsrNumber < adsrTables.length ? adsrTables[inst.adsrNumber] : new Array(128).fill(255),
+        amfTable: inst.amfNumber < amfTables.length ? amfTables[inst.amfNumber] : new Array(128).fill(0),
+        allWaveforms,
+        name: inst.name,
+      };
+
+      instruments.push({
+        id, name: inst.name,
+        type: 'synth' as const,
+        synthType: 'SonicArrangerSynth' as const,
+        effects: [], volume: 0, pan: 0,
+        sonicArranger: saConfig,
+        uadeChipRam: chipRam,
+      } as unknown as InstrumentConfig);
     }
   }
 
@@ -505,24 +701,82 @@ export async function parseSonicArrangerFile(
   // ── Build patterns ──────────────────────────────────────────────────────────
   // Each position in the order list becomes one Pattern.
   // The song order is positions[firstPosition..lastPosition] (inclusive).
+  //
+  // SA's SetTrackLen (effect 9) dynamically changes the global pattern length
+  // at runtime. We simulate this by pre-scanning track data to find the
+  // effective length for each position, tracking the running trackLen state
+  // across positions in song order (firstPosition..lastPosition).
+  //
+  // SoundTranspose: each channel in a position has a signed offset that is
+  // added to the instrument number (unless the track row disables it).
 
-  const rowsPerTrack = Math.max(1, song.rowsPerTrack);
+  const defaultRowsPerTrack = Math.max(1, song.rowsPerTrack);
   const PANNING = [-50, 50, 50, -50] as const;  // Amiga LRRL
+  const first = Math.min(song.firstPosition, positions.length - 1);
+  const last  = Math.min(song.lastPosition,  positions.length - 1);
+
+  // Pre-scan: determine effective track length for each position in song order.
+  // SetTrackLen (effect 9) persists across positions (global state), so we scan
+  // in playback order and propagate the running length.
+  //
+  // SA row advancement: after processing row N, counter becomes N+1.
+  // If N+1 >= RowsPerTrack, the position ends. Effect 9 on row N changes
+  // RowsPerTrack immediately, affecting the check for that same row.
+  const positionTrackLen: Map<number, number> = new Map();
+  let runningTrackLen = defaultRowsPerTrack;
+
+  for (let pidx = first; pidx <= last; pidx++) {
+    const posEntry = positions[pidx];
+    if (!posEntry) continue;
+
+    // Simulate row-by-row with effect 9 handling
+    let currentLen = runningTrackLen;
+    let actualRows = 0;
+
+    for (let row = 0; row < 128; row++) {  // 128 = max possible (safety cap)
+      // Check all 4 channels on this row for effect 9
+      for (let ch = 0; ch < 4; ch++) {
+        const tlidx = posEntry[ch].startTrackRow + row;
+        if (tlidx < trackLines.length) {
+          const tl = trackLines[tlidx];
+          if (tl.effect === 0x9 && tl.effArg > 0 && tl.effArg <= 64) {
+            currentLen = tl.effArg;
+          }
+        }
+      }
+      actualRows = row + 1;
+
+      // After processing this row, check: row+1 >= currentLen → end of position
+      if (row + 1 >= currentLen) break;
+    }
+
+    positionTrackLen.set(pidx, actualRows);
+    runningTrackLen = currentLen;  // propagate for next position
+  }
+
+  // Also pre-compute for positions outside the song range (use default)
+  for (let pidx = 0; pidx < positions.length; pidx++) {
+    if (!positionTrackLen.has(pidx)) {
+      positionTrackLen.set(pidx, defaultRowsPerTrack);
+    }
+  }
 
   // We build a pattern for EVERY position in positions[], then build the song order
   const builtPatterns: Pattern[] = [];
 
   for (let pidx = 0; pidx < positions.length; pidx++) {
     const posEntry = positions[pidx];
+    const trackLen = positionTrackLen.get(pidx) ?? defaultRowsPerTrack;
 
     const channels: ChannelData[] = Array.from({ length: 4 }, (_, ch) => {
       const posCh   = posEntry[ch];
       const rowBase = posCh.startTrackRow;
-      const noteTranspose = posCh.noteTranspose;
+      const noteTranspose  = posCh.noteTranspose;
+      const soundTranspose = posCh.soundTranspose;
 
       const rows: TrackerCell[] = [];
 
-      for (let row = 0; row < rowsPerTrack; row++) {
+      for (let row = 0; row < trackLen; row++) {
         const tlidx = rowBase + row;
         const tl    = tlidx < trackLines.length ? trackLines[tlidx] : null;
 
@@ -537,16 +791,27 @@ export async function parseSonicArrangerFile(
           xmNote = Math.max(1, Math.min(96, xmNote + noteTranspose));
         }
 
-        const instrNum = tl.instr > 0 ? tl.instr : 0;
+        // Instrument: apply SoundTranspose unless disabled
+        let instrNum = tl.instr > 0 ? tl.instr : 0;
+        if (instrNum > 0 && !tl.disableSoundTranspose && soundTranspose !== 0) {
+          instrNum = instrNum + soundTranspose;
+          if (instrNum < 1) instrNum = 0;  // invalid → no instrument
+        }
 
-        const { effTyp, eff, volCol } = saEffectToXM(tl.effect, tl.effArg);
+        let { effTyp, eff: effVal, volCol } = saEffectToXM(tl.effect, tl.effArg);
+
+        // Adjust PositionJump (Bxx) arg relative to firstPosition offset
+        // SA position args are absolute; our songPositions start at firstPosition
+        if (effTyp === 0x0B && first > 0) {
+          effVal = Math.max(0, effVal - first);
+        }
 
         rows.push({
           note:       xmNote,
           instrument: instrNum,
           volume:     volCol,
           effTyp,
-          eff,
+          eff:        effVal,
           effTyp2: 0,
           eff2:    0,
         });
@@ -569,7 +834,7 @@ export async function parseSonicArrangerFile(
     builtPatterns.push({
       id:       `pattern-${pidx}`,
       name:     `Pattern ${pidx}`,
-      length:   rowsPerTrack,
+      length:   trackLen,
       channels,
       importMetadata: {
         sourceFormat:          'SonicArranger',
@@ -603,10 +868,7 @@ export async function parseSonicArrangerFile(
   }
 
   // ── Song order ──────────────────────────────────────────────────────────────
-  // Use firstPosition..lastPosition from sub-song 0 (inclusive)
-  const first = Math.min(song.firstPosition, builtPatterns.length - 1);
-  const last  = Math.min(song.lastPosition,  builtPatterns.length - 1);
-
+  // first/last already computed above for the pre-scan; reuse them.
   const songPositions: number[] = [];
   for (let p = first; p <= last; p++) songPositions.push(p);
   if (songPositions.length === 0) songPositions.push(0);

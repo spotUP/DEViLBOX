@@ -21,19 +21,42 @@ function immValue(op: { value: number; raw: string }): string {
   const stripped = op.raw.startsWith('#') ? op.raw.slice(1) : op.raw;
   if (stripped.startsWith('$')) return `0x${stripped.slice(1)}`;
   if (stripped.startsWith('%')) return `0b${stripped.slice(1)}`;
+  // Symbolic identifier (e.g. #EPR_CorruptModule) — value is NaN, use the name directly.
+  if (Number.isNaN(op.value)) return stripped;
   return `${op.value}`;
 }
 
 // For sub-expressions: emit a register with the appropriate width accessor.
 function emitRegSized(name: string, size: Size): string {
+  // Address registers (a0-a6, sp) always operate on the full 32 bits,
+  // even with .W/.B instructions (68k sign-extends and adds to full reg).
+  if (name.startsWith('a') || name === 'sp') return name;
   if (size === 'W') return `W(${name})`;
   if (size === 'B') return `B(${name})`;
   return name;
 }
 
+// Sanitize 68k local labels (starting with '.') to valid C identifiers.
+function sanitizeLabel(name: string): string {
+  return name.startsWith('.') ? '_' + name.slice(1) : name;
+}
+
+// Emit a source operand with the correct sub-word width.
+// Unlike emitRegSized(string), this works for immediate/register/memory.
+function sizedSrc(op: Operand, size: Size): string {
+  if (op.kind === 'immediate') {
+    const v = immValue(op);
+    if (size === 'W') return `(uint16_t)(${v})`;
+    if (size === 'B') return `(uint8_t)(${v})`;
+    return v;
+  }
+  if (op.kind === 'register') return emitRegSized(op.name, size);
+  return emitOperand(op, size); // memory reads already return correctly-sized values
+}
+
 export function emitOperand(op: Operand, size: Size = 'L'): string {
   switch (op.kind) {
-    case 'register': return op.name;
+    case 'register': return emitRegSized(op.name, size);
     case 'immediate': return immValue(op);
     case 'address': {
       const bits = sizeStr(size);
@@ -46,9 +69,12 @@ export function emitOperand(op: Operand, size: Size = 'L'): string {
       const addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + (intptr_t)${op.offset}`;
       return `READ${bits}(${addr})`;
     }
-    case 'abs_addr': return `READ${sizeStr(size)}(${op.raw})`;
-    case 'label_ref': return op.name;
-    case 'pc_rel': return op.label;
+    case 'abs_addr': {
+      const addrC = op.raw.startsWith('$') ? `0x${op.raw.slice(1)}` : op.raw;
+      return `READ${sizeStr(size)}(${addrC})`;
+    }
+    case 'label_ref': return sanitizeLabel(op.name);
+    case 'pc_rel': return sanitizeLabel(op.label);
     default: return '/* unknown_operand */';
   }
 }
@@ -66,6 +92,11 @@ function regWrite(op: Operand, value: string, size: Size): string {
     return `WRITE${bits}(${op.reg}, ${value});`;
   }
   if (op.kind === 'disp') {
+    // PC-relative writes are self-modifying code (patching MOVEQ immediates).
+    // In C, we can't modify code. The pattern is: MOVEQ #0,Dn; MOVE.B val,-N(PC)
+    // which patches the MOVEQ immediate. The net effect: Dn.b = val.
+    // We approximate this by writing to a scratch variable that has no effect.
+    if (op.base === 'pc') return `/* self-modify pc${op.offset}: */ (void)(${value});`;
     const addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + (intptr_t)${op.offset}`;
     return `WRITE${bits}(${addr}, ${value});`;
   }
@@ -105,40 +136,132 @@ export function emitInstruction(node: InstructionNode): string {
 
   switch (mnemonic) {
     case 'MOVE':
-    case 'MOVEA':
+    case 'MOVEA': {
       if (!dst) return `/* MOVE no dest */`;
-      return regWrite(dst, src, s);
+      let moveVal = src;
+      if (ops[0].kind === 'label_ref' || ops[0].kind === 'pc_rel') {
+        // label_ref and pc_rel are memory reads (MOVE.x label,dst reads from memory).
+        // Address loads use LEA or immediate (#label).
+        moveVal = `READ${sizeStr(s)}((uintptr_t)${src})`;
+      }
+      // MOVEA does NOT affect condition codes.
+      if (mnemonic === 'MOVEA') return regWrite(dst, moveVal, s);
+      // 68k MOVE sets N and Z flags based on the moved value; clears V and C.
+      // Capture src in a temp to avoid double-evaluation of side-effect macros.
+      const mvType = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
+      const signCastM = s === 'B' ? '(int8_t)' : s === 'W' ? '(int16_t)' : '(int32_t)';
+      return `{ ${mvType} _mv=(${mvType})(${moveVal}); ${regWrite(dst, '_mv', s)} flag_z=(${signCastM}(_mv)==0); flag_n=(${signCastM}(_mv)<0); flag_v=0; flag_c=0; }`;
+    }
 
-    case 'MOVEQ':
-      return dst ? `${emitOperand(dst, 'L')} = (uint32_t)(int32_t)(int8_t)(${src});` : '';
+    case 'MOVEQ': {
+      // Lexer may split `#62+8,D2` into 3 operands: [imm:62, imm:8, reg:D2].
+      // Combine arithmetic immediates when there are 3 operands.
+      let mqDst = dst;
+      let mqVal = src;
+      if (ops.length >= 3 && ops[0].kind === 'immediate' &&
+          (ops[1].kind === 'immediate' || ops[1].kind === 'label_ref')) {
+        const v0 = ops[0].kind === 'immediate' ? (ops[0] as { value: number }).value : 0;
+        const v1 = ops[1].kind === 'immediate' ? (ops[1] as { value: number }).value : 0;
+        mqVal = `${v0 + v1}`;
+        mqDst = ops[2] ?? null;
+      }
+      if (!mqDst) return '';
+      if (mqDst.kind !== 'register') return `/* MOVEQ invalid dst (${emitOperand(mqDst,'L')}) */`;
+      return `${mqDst.name} = (uint32_t)(int32_t)(int8_t)(${mqVal});`;
+    }
 
-    case 'MOVEM':
-      return `/* MOVEM.${s} ${ops.map(o => o.kind === 'register' ? o.name : '?').join(',')} */`;
+    case 'MOVEM': {
+      // Use register list as-is from parser. The lexer drops both '-' (range) and
+      // '/' (separator), so we can't distinguish D0-D3 (range) from D0/D3 (individual).
+      // Since both push and pop pass through the same parser, the register counts match,
+      // keeping the stack balanced even if some mid-range registers are missed.
+      const regOps = ops.filter(o => o.kind === 'register');
+      const addrOp = ops.find(o => o.kind === 'address');
+      const regs = regOps.map(o => o.name === 'a7' ? 'sp' : o.name);
+      if (!addrOp) return `/* MOVEM: no addr operand */`;
+      const bits = sizeStr(s);
+      const stackReg = addrOp.reg === 'a7' ? 'sp' : addrOp.reg;
+      if (addrOp.mode === 'pre_dec') {
+        // MOVEM regs,-(An): push registers (highest first)
+        const reversed = [...regs].reverse();
+        return reversed.map(r => `WRITE${bits}_PRE(${stackReg}, ${r});`).join(' ');
+      } else if (addrOp.mode === 'post_inc') {
+        // MOVEM (An)+,regs: pop registers (lowest first)
+        return regs.map(r => `{ ${s === 'W' ? 'uint16_t' : 'uint32_t'} _mv = READ${bits}_POST(${stackReg}); ${r} = ${s === 'W' ? '(uint32_t)(int32_t)(int16_t)' : ''}_mv; }`).join(' ');
+      }
+      return `/* MOVEM.${s} unhandled mode */`;
+    }
 
     case 'LEA': {
       if (!dst) return '';
+      // Compound source: "StructAdr+UPS_Voice1Adr(PC),A1" or "Buffer2+132,A1" tokenizes as
+      // [label_ref, pc_rel|immediate, register] — lexer splits on '+', drops it.
+      if (ops.length >= 3 && ops[0].kind === 'label_ref' &&
+          (ops[1].kind === 'pc_rel' || ops[1].kind === 'immediate')) {
+        const realDst = ops[ops.length - 1];
+        const leaDst2 = realDst.kind === 'register' ? realDst.name : emitOperand(realDst, 'L');
+        const offsetExpr = ops[1].kind === 'immediate'
+          ? immValue(ops[1] as { value: number; raw: string })
+          : ops[1].label;
+        return `${leaDst2} = (uint32_t)((uintptr_t)${ops[0].name} + ${offsetExpr});`;
+      }
       const leaDst = dst.kind === 'register' ? dst.name : emitOperand(dst, 'L');
       const op0 = ops[0];
-      if (op0.kind === 'label_ref') return `${leaDst} = (uint32_t)(uintptr_t)&${op0.name};`;
-      if (op0.kind === 'pc_rel') return `${leaDst} = (uint32_t)(uintptr_t)&${op0.label};`;
-      if (op0.kind === 'disp') return `${leaDst} = (uint32_t)(${op0.base} + ${op0.offset});`;
+      // No `&` — data labels are pointer macros into _ds; function names decay to pointers.
+      if (op0.kind === 'label_ref') return `${leaDst} = (uint32_t)(uintptr_t)${sanitizeLabel(op0.name)};`;
+      if (op0.kind === 'pc_rel') return `${leaDst} = (uint32_t)(uintptr_t)${sanitizeLabel(op0.label)};`;
+      if (op0.kind === 'disp') {
+        const offPart = typeof op0.offset === 'number' ? op0.offset : `(intptr_t)${op0.offset}`;
+        return `${leaDst} = (uint32_t)(${op0.base} + ${offPart});`;
+      }
+      // abs_addr: LEA loads the address value itself, not the memory contents
+      if (op0.kind === 'abs_addr') {
+        const addrC = op0.raw.startsWith('$') ? `0x${op0.raw.slice(1)}` : op0.raw;
+        return `${leaDst} = (uint32_t)${addrC};`;
+      }
       return `${leaDst} = (uint32_t)(uintptr_t)(${src});`;
     }
 
     case 'PEA':
       return `sp -= 4; WRITE32(sp, (uint32_t)(uintptr_t)&${src});`;
 
-    case 'ADD':  case 'ADDA':  case 'ADDI': case 'ADDQ':
+    case 'ADD':  case 'ADDA':  case 'ADDI': case 'ADDQ': {
       if (!dst) return '';
-      if (dst.kind === 'register' && s === 'L') return `${dst.name} += ${src};`;
-      return regWrite(dst, `${emitOperand(dst, s)} + ${src}`, s);
+      // ADDA does NOT affect condition codes.
+      if (mnemonic === 'ADDA') {
+        if (dst.kind === 'register' && s === 'L') return `${dst.name} += ${src};`;
+        return regWrite(dst, `${emitOperand(dst, s)} + ${src}`, s);
+      }
+      // ADD/ADDI/ADDQ set N, Z (and X, V, C which we approximate).
+      const addType = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
+      const addSign = s === 'B' ? '(int8_t)' : s === 'W' ? '(int16_t)' : '(int32_t)';
+      if (dst.kind === 'register') {
+        const dstExpr = s === 'L' ? dst.name : emitRegSized(dst.name, s);
+        return `{ ${addType} _ar=(${addType})(${dstExpr} + ${src}); ${regWrite(dst, `(${addType})_ar`, s)} flag_z=(${addSign}(_ar)==0); flag_n=(${addSign}(_ar)<0); }`;
+      }
+      const addRd = emitOperand(dst, s);
+      return `{ ${addType} _ar=(${addType})(${addRd} + ${src}); ${regWrite(dst, `(${addType})_ar`, s)} flag_z=(${addSign}(_ar)==0); flag_n=(${addSign}(_ar)<0); }`;
+    }
     case 'ADDX':
       return dst ? regWrite(dst, `${emitOperand(dst, s)} + ${src} + flag_x`, s) : '';
-    case 'SUB':  case 'SUBA':  case 'SUBI': case 'SUBQ':
+    case 'SUB':  case 'SUBA':  case 'SUBI': case 'SUBQ': {
       if (!dst) return '';
-      if (dst.kind === 'register' && s === 'L') return `${dst.name} -= ${src};`;
-      if (dst.kind === 'register') return regWrite(dst, `${emitRegSized(dst.name, s)} - ${emitRegSized(src, s)}`, s);
-      return regWrite(dst, `${emitOperand(dst, s)} - ${src}`, s);
+      // SUBA does NOT affect condition codes.
+      if (mnemonic === 'SUBA') {
+        if (dst.kind === 'register' && s === 'L') return `${dst.name} -= ${src};`;
+        return regWrite(dst, `${emitOperand(dst, s)} - ${src}`, s);
+      }
+      // SUB/SUBI/SUBQ set N, Z (and X, V, C which we approximate).
+      const subType = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
+      const subSign = s === 'B' ? '(int8_t)' : s === 'W' ? '(int16_t)' : '(int32_t)';
+      if (dst.kind === 'register') {
+        const srcExpr = sizedSrc(ops[0], s);
+        const dstExpr = s === 'L' ? dst.name : emitRegSized(dst.name, s);
+        return `{ ${subType} _sr=(${subType})(${dstExpr} - ${srcExpr}); ${regWrite(dst, `(${subType})_sr`, s)} flag_z=(${subSign}(_sr)==0); flag_n=(${subSign}(_sr)<0); }`;
+      }
+      const subRd = emitOperand(dst, s);
+      return `{ ${subType} _sr=(${subType})(${subRd} - ${src}); ${regWrite(dst, `(${subType})_sr`, s)} flag_z=(${subSign}(_sr)==0); flag_n=(${subSign}(_sr)<0); }`;
+    }
     case 'SUBX':
       return dst ? regWrite(dst, `${emitOperand(dst, s)} - ${src} - flag_x`, s) : '';
 
@@ -158,27 +281,47 @@ export function emitInstruction(node: InstructionNode): string {
     case 'AND':  case 'ANDI':
       if (!dst) return '';
       if (dst.kind === 'register' && s === 'L') return `${dst.name} &= ${src};`;
-      if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} &= ${emitRegSized(src, s)};`;
+      if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} &= ${sizedSrc(ops[0], s)};`;
       return regWrite(dst, `${emitOperand(dst, s)} & ${src}`, s);
     case 'OR':   case 'ORI':
       if (!dst) return '';
       if (dst.kind === 'register' && s === 'L') return `${dst.name} |= ${src};`;
-      if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} |= ${emitRegSized(src, s)};`;
+      if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} |= ${sizedSrc(ops[0], s)};`;
       return regWrite(dst, `${emitOperand(dst, s)} | ${src}`, s);
     case 'EOR':  case 'EORI':
       if (!dst) return '';
       if (dst.kind === 'register' && s === 'L') return `${dst.name} ^= ${src};`;
-      if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} ^= ${emitRegSized(src, s)};`;
+      if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} ^= ${sizedSrc(ops[0], s)};`;
       return regWrite(dst, `${emitOperand(dst, s)} ^ ${src}`, s);
-    case 'NOT':
-      if (s === 'W') return `W(${ops[0].kind === 'register' ? ops[0].name : src}) = (uint16_t)(~W(${ops[0].kind === 'register' ? ops[0].name : src}));`;
-      if (s === 'B') return `B(${ops[0].kind === 'register' ? ops[0].name : src}) = (uint8_t)(~B(${ops[0].kind === 'register' ? ops[0].name : src}));`;
-      return `${src} = ~${src};`;
-    case 'NEG':
-      if (s === 'W') return `W(${ops[0].kind === 'register' ? ops[0].name : src}) = (uint16_t)(-(int16_t)W(${ops[0].kind === 'register' ? ops[0].name : src}));`;
-      if (s === 'B') return `B(${ops[0].kind === 'register' ? ops[0].name : src}) = (uint8_t)(-(int8_t)B(${ops[0].kind === 'register' ? ops[0].name : src}));`;
-      return `${src} = (uint32_t)(-(int32_t)${src});`;
+    case 'NOT': {
+      const op0 = ops[0];
+      if (op0.kind === 'register') {
+        if (s === 'W') return `W(${op0.name}) = (uint16_t)(~W(${op0.name}));`;
+        if (s === 'B') return `B(${op0.name}) = (uint8_t)(~B(${op0.name}));`;
+        return `${op0.name} = ~${op0.name};`;
+      }
+      // Memory destination: read-modify-write via WRITE/READ macros
+      const rdN = emitOperand(op0, s);
+      if (s === 'W') return regWrite(op0, `(uint16_t)(~(uint16_t)(${rdN}))`, s);
+      if (s === 'B') return regWrite(op0, `(uint8_t)(~(uint8_t)(${rdN}))`, s);
+      return regWrite(op0, `~(uint32_t)(${rdN})`, s);
+    }
+    case 'NEG': {
+      const op0 = ops[0];
+      if (op0.kind === 'register') {
+        if (s === 'W') return `W(${op0.name}) = (uint16_t)(-(int16_t)W(${op0.name}));`;
+        if (s === 'B') return `B(${op0.name}) = (uint8_t)(-(int8_t)B(${op0.name}));`;
+        return `${op0.name} = (uint32_t)(-(int32_t)${op0.name});`;
+      }
+      // Memory destination: read-modify-write via WRITE/READ macros
+      const rdG = emitOperand(op0, s);
+      if (s === 'W') return regWrite(op0, `(uint16_t)(-(int16_t)(${rdG}))`, s);
+      if (s === 'B') return regWrite(op0, `(uint8_t)(-(int8_t)(${rdG}))`, s);
+      return regWrite(op0, `(uint32_t)(-(int32_t)(${rdG}))`, s);
+    }
     case 'CLR': return regWrite(ops[0], '0', s);
+    case 'ST': return regWrite(ops[0], '0xFF', 'B');   // Set True: dest byte = $FF
+    case 'SF': return regWrite(ops[0], '0', 'B');      // Set False: dest byte = $00
     case 'EXT':
       if (s === 'W') return `${src} = (uint32_t)(int32_t)(int16_t)(int8_t)${src};`;
       return `${src} = (uint32_t)(int32_t)(int16_t)${src};`;
@@ -211,12 +354,39 @@ export function emitInstruction(node: InstructionNode): string {
 
     case 'CMP':  case 'CMPA': case 'CMPI': case 'CMPM': {
       const cmpOp = dst ?? ops[0];
-      return `{ int32_t _cmp=(int32_t)${emitOperand(cmpOp,s)}-(int32_t)${src}; flag_z=(_cmp==0); flag_n=(_cmp<0); flag_c=((uint32_t)${emitOperand(cmpOp,s)}<(uint32_t)${src}); }`;
+      // Evaluate both operands into temps first — either may contain READ32_POST or similar
+      // macros with side effects (register increment). Emitting them twice in a template
+      // would double-increment the register and corrupt traversal.
+      return `{ int32_t _lhs=(int32_t)(${emitOperand(cmpOp,s)}),_rhs=(int32_t)(${src}); int32_t _cmp=_lhs-_rhs; flag_z=(_cmp==0); flag_n=(_cmp<0); flag_c=((uint32_t)_lhs<(uint32_t)_rhs); }`;
     }
-    case 'TST':
-      return `flag_z=(${src}==0); flag_n=((int32_t)${src}<0); flag_c=0; flag_v=0;`;
+    case 'TST': {
+      // Capture src in a temp — src may contain READ8_POST etc. with side effects.
+      // Without this, the macro runs twice (once for flag_z, once for flag_n),
+      // double-incrementing the register and causing infinite loops.
+      const tstType = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
+      const signCast = s === 'B' ? '(int8_t)' : s === 'W' ? '(int16_t)' : '(int32_t)';
+      return `{ ${tstType} _tst=(${tstType})(${src}); flag_z=(_tst==0); flag_n=(${signCast}(_tst)<0); flag_c=0; flag_v=0; }`;
+    }
 
-    case 'BRA': case 'JMP': return `goto ${src};`;
+    case 'BRA': case 'JMP': {
+      // Direct branch to a label — always valid as a goto target.
+      if (ops[0].kind === 'label_ref') return `goto ${sanitizeLabel(ops[0].name)};`;
+      if (ops[0].kind === 'pc_rel')    return `goto ${sanitizeLabel(ops[0].label)};`;
+      // Indirect jump through register: JMP (An) — An IS the target address.
+      if (ops[0].kind === 'address') {
+        return `((void(*)(void))(uintptr_t)${ops[0].reg})(); return;`;
+      }
+      // Indirect jump through displacement: JMP d(An) — effective address An+d.
+      if (ops[0].kind === 'disp') {
+        const addr = typeof ops[0].offset === 'number'
+          ? `${ops[0].base} + ${ops[0].offset}`
+          : `${ops[0].base} + (intptr_t)${ops[0].offset}`;
+        return `((void(*)(void))(uintptr_t)(${addr}))(); return;`;
+      }
+      // abs_addr or other: can only goto if it happens to be an identifier
+      if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(src)) return `goto ${src};`;
+      return `/* JMP ${src} */`;
+    }
     case 'BEQ': return `if (flag_z) goto ${src};`;
     case 'BNE': return `if (!flag_z) goto ${src};`;
     case 'BMI': return `if (flag_n) goto ${src};`;
@@ -239,7 +409,16 @@ export function emitInstruction(node: InstructionNode): string {
     case 'DBNE':
       return `if (flag_z && (int16_t)(--${src}) >= 0) goto ${ops[1] ? emitOperand(ops[1]) : '/* missing_label */'};`;
 
-    case 'BSR': case 'JSR': return `${src}();`;
+    case 'BSR': case 'JSR': {
+      // Simple identifier → direct call
+      if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(src)) return `${src}();`;
+      // JSR (An) — register indirect: the register IS the function address (no dereference).
+      // JSR d(An)  — displacement: model library jump-tables as fn-ptr tables → READ32.
+      const callTarget = ops[0]?.kind === 'address' && ops[0].mode === 'indirect'
+        ? ops[0].reg   // e.g. jsr (a0) → call a0 directly
+        : src;          // e.g. jsr -198(a6) → READ32(a6 + -198)
+      return `{ uintptr_t _jt=(uintptr_t)(${callTarget}); if(_jt) ((void(*)(void))_jt)(); }`;
+    }
     case 'RTS':     return 'return;';
     case 'RTR':     return 'return; /* RTR: CCR restore omitted */';
     case 'RTE':     return 'return; /* RTE */';

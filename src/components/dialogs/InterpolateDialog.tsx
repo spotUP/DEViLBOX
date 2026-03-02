@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { TrendingUp } from 'lucide-react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore, useCursorStore } from '@stores';
 import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
 import { ModalFooter } from '@components/ui/ModalFooter';
@@ -36,7 +36,8 @@ const CURVE_OPTIONS: { value: InterpolateCurve; label: string; description: stri
 ];
 
 export const InterpolateDialog: React.FC<InterpolateDialogProps> = ({ isOpen, onClose }) => {
-  const { selection, interpolateSelection } = useTrackerStore();
+  const selection = useCursorStore((s) => s.selection);
+  const { interpolateSelection } = useTrackerStore();
   const [column, setColumn] = useState<InterpolateColumn>('volume');
   const [startValue, setStartValue] = useState(64);
   const [endValue, setEndValue] = useState(0);

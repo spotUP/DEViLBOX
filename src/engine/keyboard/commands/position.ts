@@ -3,17 +3,20 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useCursorStore } from '@/stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
 
 function savePosition(index: number): boolean {
-  const { cursor, setPtnJumpPos } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
+  const { setPtnJumpPos } = useTrackerStore.getState();
   setPtnJumpPos(index, cursor.rowIndex);
   useUIStore.getState().setStatusMessage(`Position ${index} saved (row ${cursor.rowIndex})`, false, 1000);
   return true;
 }
 
 function gotoPosition(index: number): boolean {
-  const { getPtnJumpPos, moveCursorToRow } = useTrackerStore.getState();
+  const { getPtnJumpPos } = useTrackerStore.getState();
+  const { moveCursorToRow } = useCursorStore.getState();
   const row = getPtnJumpPos(index);
   moveCursorToRow(row);
   useUIStore.getState().setStatusMessage(`Position ${index}: row ${row}`, false, 1000);
@@ -43,25 +46,27 @@ export function gotoPosition8(): boolean { return gotoPosition(8); }
 export function gotoPosition9(): boolean { return gotoPosition(9); }
 
 export function gotoPatternStart(): boolean {
-  useTrackerStore.getState().moveCursorToRow(0);
+  useCursorStore.getState().moveCursorToRow(0);
   return true;
 }
 
 export function gotoPatternEnd(): boolean {
-  const { patterns, currentPatternIndex, moveCursorToRow } = useTrackerStore.getState();
+  const { patterns, currentPatternIndex } = useTrackerStore.getState();
+  const { moveCursorToRow } = useCursorStore.getState();
   const pattern = patterns[currentPatternIndex];
   if (pattern) moveCursorToRow(pattern.length - 1);
   return true;
 }
 
 export function gotoSongStart(): boolean {
-  useTrackerStore.getState().moveCursorToRow(0);
+  useCursorStore.getState().moveCursorToRow(0);
   useUIStore.getState().setStatusMessage('Song start', false, 800);
   return true;
 }
 
 export function gotoSongEnd(): boolean {
-  const { patterns, moveCursorToRow } = useTrackerStore.getState();
+  const { patterns } = useTrackerStore.getState();
+  const { moveCursorToRow } = useCursorStore.getState();
   const last = patterns[patterns.length - 1];
   if (last) moveCursorToRow(last.length - 1);
   useUIStore.getState().setStatusMessage('Song end', false, 800);
@@ -69,12 +74,13 @@ export function gotoSongEnd(): boolean {
 }
 
 export function gotoFirstChannel(): boolean {
-  useTrackerStore.getState().moveCursorToChannel(0);
+  useCursorStore.getState().moveCursorToChannel(0);
   return true;
 }
 
 export function gotoLastChannel(): boolean {
-  const { patterns, currentPatternIndex, moveCursorToChannel } = useTrackerStore.getState();
+  const { patterns, currentPatternIndex } = useTrackerStore.getState();
+  const { moveCursorToChannel } = useCursorStore.getState();
   const pattern = patterns[currentPatternIndex];
   if (pattern?.channels) moveCursorToChannel(pattern.channels.length - 1);
   return true;
@@ -102,20 +108,21 @@ export function gotoTime(): boolean {
 
 export function jumpToNextBookmark(): boolean {
   useTrackerStore.getState().nextBookmark();
-  const { cursor } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
   useUIStore.getState().setStatusMessage(`Bookmark: row ${cursor.rowIndex}`, false, 800);
   return true;
 }
 
 export function jumpToPrevBookmark(): boolean {
   useTrackerStore.getState().prevBookmark();
-  const { cursor } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
   useUIStore.getState().setStatusMessage(`Bookmark: row ${cursor.rowIndex}`, false, 800);
   return true;
 }
 
 export function toggleBookmark(): boolean {
-  const { cursor, toggleBookmark: toggle } = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
+  const { toggleBookmark: toggle } = useTrackerStore.getState();
   toggle(cursor.rowIndex);
   const added = useTrackerStore.getState().bookmarks.includes(cursor.rowIndex);
   useUIStore.getState().setStatusMessage(`Bookmark row ${cursor.rowIndex}: ${added ? 'set' : 'cleared'}`, false, 1000);

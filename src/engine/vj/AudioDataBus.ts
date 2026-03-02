@@ -245,16 +245,11 @@ export class AudioDataBus {
 
     if (beat) this.lastBeatTime = now;
 
-    // Periodic diagnostic (every ~2 seconds)
-    this._diagCounter++;
-    if (this._diagCounter % 120 === 0) {
-      console.log('[AudioDataBus] rms:', rawRms.toFixed(4),
-        'peak:', rawPeak.toFixed(4),
-        'sub:', sub.toFixed(3), 'bass:', bass.toFixed(3),
-        'mid:', mid.toFixed(3), 'high:', high.toFixed(3),
-        'fft[0..3]:', fft[0]?.toFixed(1), fft[1]?.toFixed(1), fft[2]?.toFixed(1), fft[3]?.toFixed(1),
-        'ctx:', this.waveformAnalyser?.context?.state);
-    }
+    // Periodic diagnostic — disabled for performance
+    // this._diagCounter++;
+    // if (this._diagCounter % 120 === 0) {
+    //   console.log('[AudioDataBus] rms:', rawRms.toFixed(4), ...);
+    // }
 
     // Update frame
     this.frame.waveform = waveform;

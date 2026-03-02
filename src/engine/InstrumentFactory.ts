@@ -41,6 +41,7 @@ import { RobHubbardSynth } from './robhubbard/RobHubbardSynth';
 import { SidMon1Synth } from './sidmon1/SidMon1Synth';
 import { OctaMEDSynth } from './octamed/OctaMEDSynth';
 import { DavidWhittakerSynth } from './davidwhittaker/DavidWhittakerSynth';
+import { SonicArrangerSynth } from './sonic-arranger/SonicArrangerSynth';
 import { SymphonieSynth } from './symphonie/SymphonieSynth';
 import { SunVoxSynth } from './sunvox/SunVoxSynth';
 import { UADESynth } from './uade/UADESynth';
@@ -999,6 +1000,17 @@ export class InstrumentFactory {
           );
         }
         instrument = dwSynth;
+        break;
+      }
+
+      case 'SonicArrangerSynth': {
+        const saSynth = new SonicArrangerSynth();
+        if (config.sonicArranger) {
+          saSynth.setInstrument(config.sonicArranger).catch(err =>
+            console.error('[InstrumentFactory] SonicArranger load failed:', err)
+          );
+        }
+        instrument = saSynth;
         break;
       }
 

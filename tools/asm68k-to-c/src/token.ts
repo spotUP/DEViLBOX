@@ -11,6 +11,7 @@ export type TokenKind =
   | 'NUMBER'       // standalone decimal/hex/binary/octal literal
   | 'STRING'       // "hello" string literal in DC.B
   | 'COMMA'
+  | 'RANGE'        // "-" between registers in MOVEM register list
   | 'NEWLINE'
   | 'DIRECTIVE'    // "EQU", "DC", "DS", "SECTION", "INCLUDE", "MACRO", "ENDM", "XDEF", "XREF"
   | 'COMMENT'      // "; ..." or "* ..."
