@@ -17,6 +17,7 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
+import { useTick } from '@pixi/react';
 import type { Graphics as GraphicsType, Container as ContainerType } from 'pixi.js';
 import { PixiLabel } from '../components/PixiLabel';
 import { PixiSlider } from '../components/PixiSlider';
@@ -37,7 +38,7 @@ interface PixiMixerChannelStripProps {
   pan: number;          // -1..1
   muted: boolean;
   soloed: boolean;
-  level: number;        // 0-1 (live VU meter level, updated by parent)
+  getLevelCallback: () => number;  // imperative read — avoids React re-render per frame
   isSoloing: boolean;   // true if ANY channel is currently soloed
   onVolumeChange: (ch: number, v: number) => void;
   onPanChange: (ch: number, pan: number) => void;
@@ -174,7 +175,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
   pan,
   muted,
   soloed,
-  level,
+  getLevelCallback,
   isSoloing,
   onVolumeChange,
   onPanChange,
@@ -193,6 +194,11 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
 
   const peakRef = useRef(0);
   const peakDecayRef = useRef(0); // timestamp when peak was last set
+
+  // ── Imperative VU refs (drawn in useTick, no React re-render) ────────────
+
+  const vuGraphicsRef = useRef<import('pixi.js').Graphics | null>(null);
+  const dbTextRef = useRef<import('pixi.js').BitmapText | null>(null);
 
   // ── Event handlers ──────────────────────────────────────────────────────────
 
@@ -216,53 +222,49 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
     [channelIndex, onSoloToggle],
   );
 
-  // ── VU meter draw ───────────────────────────────────────────────────────────
+  // ── Imperative VU draw — runs in PixiJS ticker, no React re-render ──────────
 
-  const drawVU = useCallback(
-    (g: GraphicsType) => {
+  useTick(() => {
+    const level = getLevelCallback();
+
+    // Update peak hold
+    if (level >= peakRef.current) {
+      peakRef.current = level;
+      peakDecayRef.current = Date.now();
+    } else if (Date.now() - peakDecayRef.current > 1500) {
+      peakRef.current = Math.max(0, peakRef.current - 0.01);
+    }
+
+    const g = vuGraphicsRef.current;
+    if (g) {
       g.clear();
-
-      // Background track
       g.rect(0, 0, VU_WIDTH, VU_HEIGHT);
       g.fill({ color: 0x111111, alpha: 1 });
 
-      // Filled level bar (bottom-up)
       const filledH = Math.round(level * VU_HEIGHT);
       if (filledH > 0) {
         const vuColor =
           level > 0.9 ? VU_COLOR_RED :
           level > 0.7 ? VU_COLOR_YELLOW :
           VU_COLOR_GREEN;
-
         g.rect(0, VU_HEIGHT - filledH, VU_WIDTH, filledH);
         g.fill({ color: vuColor, alpha: 1 });
       }
 
-      // Border
       g.rect(0, 0, VU_WIDTH, VU_HEIGHT);
       g.stroke({ color: 0x333333, alpha: 1, width: 1 });
 
-      // Peak hold: update peak if current level is higher
-      if (level >= peakRef.current) {
-        peakRef.current = level;
-        peakDecayRef.current = Date.now();
-      } else if (Date.now() - peakDecayRef.current > 1500) {
-        // Decay after 1500ms
-        peakRef.current = Math.max(0, peakRef.current - 0.01);
-      }
-      // Draw peak hold line
       const peakY = VU_HEIGHT - Math.round(peakRef.current * VU_HEIGHT);
       if (peakRef.current > 0.01) {
         g.rect(0, peakY, VU_WIDTH, 1);
         g.fill({ color: peakRef.current > 0.9 ? VU_COLOR_RED : 0xffffff, alpha: 0.9 });
       }
-    },
-    [level],
-  );
+    }
 
-  // ── dB text ─────────────────────────────────────────────────────────────────
-
-  const dbText = level < 0.001 ? '-\u221e' : `${Math.round(20 * Math.log10(level))}dB`;
+    if (dbTextRef.current) {
+      dbTextRef.current.text = level < 0.001 ? '-\u221e' : `${Math.round(20 * Math.log10(level))}dB`;
+    }
+  });
 
   // ── Instrument name (truncated) ──────────────────────────────────────────────
 
@@ -302,13 +304,14 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
 
       {/* 3. VU meter */}
       <pixiGraphics
-        draw={drawVU}
+        ref={vuGraphicsRef as any}
         layout={{ width: VU_WIDTH, height: VU_HEIGHT }}
       />
 
       {/* 4. dB level readout */}
       <pixiBitmapText
-        text={dbText}
+        ref={dbTextRef as any}
+        text="-∞"
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{ width: STRIP_WIDTH, marginTop: 1 }}
