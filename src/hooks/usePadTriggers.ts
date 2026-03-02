@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import * as Tone from 'tone';
 import { getPadMappingManager, type PadMapping } from '../midi/PadMappingManager';
 import { ToneEngine } from '../engine/ToneEngine';
-import { useInstrumentStore, useTrackerStore, useTransportStore, useMIDIStore } from '../stores';
+import { useInstrumentStore, useTrackerStore, useCursorStore, useTransportStore, useMIDIStore } from '../stores';
 import { stringNoteToXM } from '../lib/xmConversions';
 
 export function usePadTriggers() {
@@ -45,14 +45,15 @@ export function usePadTriggers() {
 
         // RECORDING LOGIC
         const tStore = useTrackerStore.getState();
+        const cStore = useCursorStore.getState();
         const transStore = useTransportStore.getState();
 
         if (tStore.recordMode) {
           // Determine target row (playback row if playing, cursor row if stopped)
-          const targetRow = transStore.isPlaying ? transStore.currentRow : tStore.cursor.rowIndex;
-          
+          const targetRow = transStore.isPlaying ? transStore.currentRow : cStore.cursor.rowIndex;
+
           // Determine target channel
-          let targetChannel = tStore.cursor.channelIndex;
+          let targetChannel = cStore.cursor.channelIndex;
           
           // Use multi-channel allocation if enabled (for drum kits)
           if (tStore.multiRecEnabled && transStore.isPlaying) {
@@ -73,7 +74,7 @@ export function usePadTriggers() {
             const currentPattern = tStore.patterns[tStore.currentPatternIndex];
             if (currentPattern) {
               const nextRow = (targetRow + tStore.editStep) % currentPattern.length;
-              tStore.moveCursorToRow(nextRow);
+              cStore.moveCursorToRow(nextRow);
             }
           }
         }

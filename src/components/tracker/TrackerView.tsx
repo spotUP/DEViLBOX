@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { GridSequencer } from '@components/grid/GridSequencer';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAudioStore, useUIStore } from '@stores';
+import { useTrackerStore, useCursorStore, useInstrumentStore, useProjectStore, useTransportStore, useAudioStore, useUIStore } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useShallow } from 'zustand/react/shallow';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
@@ -16,6 +16,7 @@ import { InterpolateDialog } from '@components/dialogs/InterpolateDialog';
 import { HumanizeDialog } from '@components/dialogs/HumanizeDialog';
 import { FindReplaceDialog } from '@components/dialogs/FindReplaceDialog';
 import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
+import { computeSongDBHash, lookupSongDB } from '@lib/songdb';
 import { ImportFurnaceDialog } from '@components/dialogs/ImportFurnaceDialog';
 import { ImportMIDIDialog } from '@components/dialogs/ImportMIDIDialog';
 import { ImportAudioDialog } from '@components/dialogs/ImportAudioDialog';
@@ -359,7 +360,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   })));
   // Fine-grained selector for cursor.channelIndex only — avoids re-rendering
   // the entire TrackerView on every cursor row/column move
-  const cursorChannelIndex = useTrackerStore((state) => state.cursor.channelIndex);
+  const cursorChannelIndex = useCursorStore((state) => state.cursor.channelIndex);
 
   const { loadInstruments } = useInstrumentStore(useShallow(s => ({ loadInstruments: s.loadInstruments })));
   const { setMetadata } = useProjectStore(useShallow(s => ({ setMetadata: s.setMetadata })));
@@ -436,14 +437,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Mobile swipe handlers for cursor navigation
   const handleSwipeLeft = useCallback(() => {
     if (!isMobile) return;
-    const store = useTrackerStore.getState();
-    store.moveCursor('left');
+    useCursorStore.getState().moveCursor('left');
   }, [isMobile]);
 
   const handleSwipeRight = useCallback(() => {
     if (!isMobile) return;
-    const store = useTrackerStore.getState();
-    store.moveCursor('right');
+    useCursorStore.getState().moveCursor('right');
   }, [isMobile]);
 
   // Use external or internal import state
@@ -617,6 +616,23 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const handleModuleImport = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
     const { useLibopenmpt } = options;
     let format = info.metadata.type; // Default from metadata
+
+    // Fire-and-forget SongDB metadata lookup (non-blocking)
+    const buf = info.arrayBuffer ?? (info.file ? await info.file.arrayBuffer() : null);
+    if (buf) {
+      lookupSongDB(computeSongDBHash(buf)).then(result => {
+        useTrackerStore.getState().setSongDBInfo(result ? {
+          authors: result.authors,
+          publishers: result.publishers,
+          album: result.album,
+          year: result.year,
+          format: result.format,
+          duration_ms: result.subsongs[0]?.duration_ms ?? 0,
+        } : null);
+      });
+    } else {
+      useTrackerStore.getState().setSongDBInfo(null);
+    }
 
     // Always clean up engine state before import to prevent stale instruments/state
     getToneEngine().releaseAll();
@@ -975,14 +991,16 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       <EffectPicker
         isOpen={showEffectPicker}
         onSelect={(effTyp, eff) => {
-          const { cursor, setCell } = useTrackerStore.getState();
+          const { setCell } = useTrackerStore.getState();
+          const { cursor } = useCursorStore.getState();
           setCell(cursor.channelIndex, cursor.rowIndex, { effTyp, eff });
           setShowEffectPicker(false);
         }}
         onClose={() => setShowEffectPicker(false)}
         synthType={(() => {
           // Get synth type from current cell's instrument
-          const { cursor, patterns, currentPatternIndex } = useTrackerStore.getState();
+          const { cursor } = useCursorStore.getState();
+          const { patterns, currentPatternIndex } = useTrackerStore.getState();
           const pattern = patterns[currentPatternIndex];
           if (!pattern) return undefined;
           const cell = pattern.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
@@ -1488,14 +1506,16 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       <EffectPicker
         isOpen={showEffectPicker}
         onSelect={(effTyp, eff) => {
-          const { cursor, setCell } = useTrackerStore.getState();
+          const { setCell } = useTrackerStore.getState();
+          const { cursor } = useCursorStore.getState();
           setCell(cursor.channelIndex, cursor.rowIndex, { effTyp, eff });
           setShowEffectPicker(false);
         }}
         onClose={() => setShowEffectPicker(false)}
         synthType={(() => {
           // Get synth type from current cell's instrument
-          const { cursor, patterns, currentPatternIndex } = useTrackerStore.getState();
+          const { cursor } = useCursorStore.getState();
+          const { patterns, currentPatternIndex } = useTrackerStore.getState();
           const pattern = patterns[currentPatternIndex];
           if (!pattern) return undefined;
           const cell = pattern.channels[cursor.channelIndex]?.rows[cursor.rowIndex];
@@ -1606,7 +1626,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           }}
           onExportTrack={() => {
             const pattern = patterns[currentPatternIndex];
-            downloadTrack(useTrackerStore.getState().cursor.channelIndex, pattern);
+            downloadTrack(useCursorStore.getState().cursor.channelIndex, pattern);
           }}
           onReverse={blockOps.reverseBlock}
           onExpand={blockOps.expandBlock}

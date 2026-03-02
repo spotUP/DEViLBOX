@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-02T02:27:46.231Z
+ * Generated: 2026-03-02T21:02:29.619Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1968';
-export const BUILD_NUMBER = '1968';
-export const BUILD_HASH = 'b907787e';
+export const BUILD_VERSION = '1.0.1976';
+export const BUILD_NUMBER = '1976';
+export const BUILD_HASH = '31440c01';
 export const BUILD_DATE = '2026-03-02';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,41 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1968',
+    version: '1.0.1976',
     date: '2026-03-02',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix Sonix SMUS playback — tempo, companion files, register 0"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused INSTRUMENTS_DIR variable in SonixMusicDriverParser test"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve type errors in modern shell components"
+      },
+      {
+        type: 'feature',
+        "description": "Load Sonix companion .ss sample files into instruments"
+      },
+      {
+        type: 'improvement',
+        "description": "Merge: resolve PixiNavBar conflict in favor of modern rewrite"
+      },
+      {
+        type: 'feature',
+        "description": "Modern fixed-zone shell with Ableton-inspired design"
+      },
+      {
+        type: 'feature',
+        "description": "Multi-file/folder support for Amiga formats needing companion files"
+      },
+      {
+        type: 'feature',
+        "description": "Add Master FX GL window"
+      },
       {
         type: 'improvement',
         "description": "Move frame-rate updates from React state to imperative PixiJS mutations"
@@ -196,44 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "MIDI key preview on click and multi-channel note display"
-      },
-      {
-        type: 'feature',
-        "description": "Clip note preview, marker rename/drag, time signature markers"
-      },
-      {
-        type: 'feature',
-        "description": "Add useMixerStore with 16-channel + master state"
-      },
-      {
-        type: 'feature',
-        "description": "Clip color picker — 16-color palette in context menu with per-clip override"
-      },
-      {
-        type: 'fix',
-        "description": "Fix 4 TypeScript errors from parallel agent changes"
-      }
-    ]
-  },
-  {
-    version: '2026-03-01',
-    date: '2026-03-01',
-    changes: [
-      {
-        type: 'feature',
-        "description": "Chip preset browser — browse and insert Furnace chip synths by family"
-      },
-      {
-        type: 'feature',
-        "description": "Cmd+Q quantize selection and velocity lane interpolated drag"
-      },
-      {
-        type: 'feature',
-        "description": "Loop region playback — clip trimming, loop bounds, visual wrap-around"
-      },
-      {
-        type: 'feature',
-        "description": "Magnetic clip-edge snapping, overlap detection, BPM-aware snap labels"
       }
     ]
   }

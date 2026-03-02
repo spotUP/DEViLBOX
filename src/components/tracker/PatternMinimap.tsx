@@ -5,6 +5,7 @@
 
 import React, { useCallback, useRef, useMemo } from 'react';
 import { useTrackerStore } from '@stores';
+import { useCursorStore } from '@stores';
 import { useTransportStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -13,14 +14,14 @@ interface PatternMinimapProps {
 }
 
 export const PatternMinimap: React.FC<PatternMinimapProps> = React.memo(({ height }) => {
-  const { patterns, currentPatternIndex, cursor, selection } = useTrackerStore(
+  const { patterns, currentPatternIndex } = useTrackerStore(
     useShallow((state) => ({
       patterns: state.patterns,
       currentPatternIndex: state.currentPatternIndex,
-      cursor: state.cursor,
-      selection: state.selection,
     }))
   );
+  const cursor = useCursorStore((s) => s.cursor);
+  const selection = useCursorStore((s) => s.selection);
   const { isPlaying, currentRow } = useTransportStore(
     useShallow((state) => ({ isPlaying: state.isPlaying, currentRow: state.currentRow }))
   );
@@ -59,7 +60,7 @@ export const PatternMinimap: React.FC<PatternMinimapProps> = React.memo(({ heigh
     const y = e.clientY - rect.top;
     const row = Math.floor((y / height) * patternLength);
     const clampedRow = Math.max(0, Math.min(patternLength - 1, row));
-    useTrackerStore.getState().moveCursorToRow(clampedRow);
+    useCursorStore.getState().moveCursorToRow(clampedRow);
   }, [height, patternLength]);
 
   if (!pattern) return null;

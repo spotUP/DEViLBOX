@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { useTrackerStore, useTransportStore, useAudioStore, useMIDIStore, useUIStore } from '@stores';
+import { useTrackerStore, useCursorStore, useTransportStore, useAudioStore, useMIDIStore, useUIStore } from '@stores';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -108,13 +108,14 @@ const DJStatusContent: React.FC = () => {
 // ─── Tracker Status Bar Content ───────────────────────────────────────────────
 
 const TrackerStatusContent: React.FC = () => {
-  const { cursor, currentOctave, insertMode, recordMode, patternLength } = useTrackerStore(
+  const cursor = useCursorStore((s) => s.cursor);
+  const { currentOctave, insertMode, recordMode, patternLength, songDBInfo } = useTrackerStore(
     useShallow((s) => ({
-      cursor: s.cursor,
       currentOctave: s.currentOctave,
       insertMode: s.insertMode,
       recordMode: s.recordMode,
       patternLength: s.patterns[s.currentPatternIndex]?.length || 64,
+      songDBInfo: s.songDBInfo,
     }))
   );
   const { isPlaying, currentRow } = useTransportStore(
@@ -146,6 +147,31 @@ const TrackerStatusContent: React.FC = () => {
       <span className={`px-2 py-0.5 rounded ${recordMode ? 'bg-accent-error/20 text-accent-error' : 'text-text-primary'}`}>
         {recordMode ? 'REC' : 'EDIT'}
       </span>
+      {songDBInfo && (
+        <>
+          <div className="w-px h-3 bg-border opacity-50" />
+          <div className="flex items-center gap-2 text-text-muted text-xs">
+            {songDBInfo.authors?.length > 0 && (
+              <span>
+                by <span className="text-text-primary font-semibold">{songDBInfo.authors.join(', ')}</span>
+              </span>
+            )}
+            {songDBInfo.album && (
+              <span>
+                • <span className="text-text-primary">{songDBInfo.album}</span>
+              </span>
+            )}
+            {songDBInfo.year && (
+              <span className="text-text-muted">({songDBInfo.year})</span>
+            )}
+            {songDBInfo.format && (
+              <span className="text-text-muted">
+                [{songDBInfo.format}]
+              </span>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };

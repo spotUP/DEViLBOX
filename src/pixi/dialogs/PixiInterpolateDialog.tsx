@@ -5,7 +5,7 @@
 
 import { useState, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiNumericInput, PixiLabel } from '../components';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore, useCursorStore } from '@stores';
 
 interface PixiInterpolateDialogProps {
   isOpen: boolean;
@@ -31,7 +31,7 @@ const CURVES: { id: CurveType; label: string }[] = [
 ];
 
 export const PixiInterpolateDialog: React.FC<PixiInterpolateDialogProps> = ({ isOpen, onClose }) => {
-  const selection = useTrackerStore(s => s.selection);
+  const selection = useCursorStore(s => s.selection);
   const interpolateSelection = useTrackerStore(s => s.interpolateSelection);
 
   const [column, setColumn] = useState<InterpolateColumn>('volume');

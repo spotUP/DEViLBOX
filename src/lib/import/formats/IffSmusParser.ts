@@ -27,9 +27,11 @@
  * Note conversion: SMUS EventType = MIDI note number.
  *   XM note = MIDInote - 11, clamped 1-96.
  *   MIDI 60 (middle C) -> XM 49. MIDI 12 -> XM 1 (C-0).
+ *   Pitch: Standard ProTracker periods via replayer's noteToPeriod (no custom Sonix periods).
+ *   The .ss multi-octave sample data encodes the octave; sampleRate compensates.
  *
- * Tempo: SHDR uint16 is a CIA timer value. We find matching index in TEMPO_TABLE
- *   (128 entries), then extract speed from high nibble for XM speed/BPM.
+ * Tempo: SHDR uint16 = divisions per minute * 128 (division = quarter note).
+ *   Quarter note = 8 rows. BPM = rawTempo / 64, XM speed = 6.
  *
  * Instruments: external .instr files (SampledSound, Synthesis, IFF 8SVX formats).
  *   We create silent Sampler placeholders -- no bundled .instr files available.
@@ -37,7 +39,7 @@
  * Playback: 1 tick = 1 pattern row. Note of duration N = 1 note-on + (N-1) empty cells.
  * Flat cell arrays are split into 64-row patterns.
  *
- * Reference: NostalgicPlayer IffSmusWorker.cs, Tables.cs, EventType.cs by Polycode
+ * Reference: SonixMusicDriver_v1.asm (Eagle Player), NostalgicPlayer IffSmusWorker.cs
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -94,7 +96,7 @@ interface SmusTrack {
 
 interface SmusModuleInfo {
   globalVolume: number;
-  tempoIndex: number;
+  rawTempo: number;
   transpose: number;
   tune: number;
   timeSigNumerator: number;
@@ -110,51 +112,92 @@ interface SmusInstrument {
   name: string;
 }
 
-// -- Tempo table (from Tables.cs) --------------------------------------------
+// -- Tempo table (from SonixMusicDriver_v1.asm, lbW000CAE) -------------------
+// 128 entries. Used to convert SHDR raw tempo to a speed + CIA timer pair.
+// Each entry encodes: speed = entry >> 12, CIA timer derived from remainder.
+// Proven by ASM trace: SHDR 0x1F57 → table[36] = 0x72DC → speed=7, BPM≈145.
 
 const TEMPO_TABLE: number[] = [
-  0xfa83, 0xf525, 0xefe4, 0xeac0, 0xe5b9, 0xe0cc, 0xdbfb, 0xd744,
-  0xd2a8, 0xce24, 0xc9b9, 0xc567, 0xc12c, 0xbd08, 0xb8fb, 0xb504,
-  0xb123, 0xad58, 0xa9a1, 0xa5fe, 0xa270, 0x9ef5, 0x9b8d, 0x9837,
-  0x94f4, 0x91c3, 0x8ea4, 0x8b95, 0x8898, 0x85aa, 0x82cd, 0x8000,
-  0x7d41, 0x7a92, 0x77f2, 0x7560, 0x72dc, 0x7066, 0x6dfd, 0x6ba2,
-  0x6954, 0x6712, 0x64dc, 0x62b3, 0x6096, 0x5e84, 0x5c7d, 0x5a82,
-  0x5891, 0x56ac, 0x54d0, 0x52ff, 0x5138, 0x4f7a, 0x4dc6, 0x4c1b,
-  0x4a7a, 0x48e1, 0x4752, 0x45ca, 0x444c, 0x42d5, 0x4166, 0x4000,
-  0x3ea0, 0x3d49, 0x3bf9, 0x3ab0, 0x396e, 0x3833, 0x36fe, 0x35d1,
-  0x34aa, 0x3389, 0x326e, 0x3159, 0x304b, 0x2f42, 0x2e3e, 0x2d41,
-  0x2c48, 0x2b56, 0x2a68, 0x297f, 0x289c, 0x27bd, 0x26e3, 0x260d,
-  0x253d, 0x2470, 0x23a9, 0x22e5, 0x2226, 0x216a, 0x20b3, 0x2000,
-  0x1f50, 0x1ea4, 0x1dfc, 0x1d58, 0x1cb7, 0x1c19, 0x1b7f, 0x1ae8,
-  0x1a55, 0x19c4, 0x1937, 0x18ac, 0x1825, 0x17a1, 0x171f, 0x16a0,
-  0x1624, 0x15ab, 0x1534, 0x14bf, 0x144e, 0x13de, 0x1371, 0x1306,
-  0x129e, 0x1238, 0x11d4, 0x1172, 0x1113, 0x10b5, 0x1059, 0x1000,
+  0xFA83, 0xF525, 0xEFE4, 0xEAC0, 0xE5B9, 0xE0CC, 0xDBFB, 0xD744,
+  0xD2A8, 0xCE24, 0xC9B9, 0xC567, 0xC12C, 0xBD08, 0xB8FB, 0xB504,
+  0xB123, 0xAD58, 0xA9A1, 0xA5FE, 0xA270, 0x9EF5, 0x9B8D, 0x9837,
+  0x94F4, 0x91C3, 0x8EA4, 0x8B95, 0x8898, 0x85AA, 0x82CD, 0x8000,
+  0x7D41, 0x7A92, 0x77F2, 0x7560, 0x72DC, 0x7066, 0x6DFD, 0x6BA2,
+  0x6954, 0x6712, 0x64DC, 0x62B3, 0x6096, 0x5E84, 0x5C7D, 0x5A82,
+  0x5891, 0x56AC, 0x54D0, 0x52FF, 0x5138, 0x4F7A, 0x4DC6, 0x4C1B,
+  0x4A7A, 0x48E1, 0x4752, 0x45CA, 0x444C, 0x42D5, 0x4166, 0x4000,
+  0x3EA0, 0x3D49, 0x3BF9, 0x3AB0, 0x396E, 0x3833, 0x36FE, 0x35D1,
+  0x34AA, 0x3389, 0x326E, 0x3159, 0x304B, 0x2F42, 0x2E3E, 0x2D41,
+  0x2C48, 0x2B56, 0x2A68, 0x297F, 0x289C, 0x27BD, 0x26E3, 0x260D,
+  0x253D, 0x2470, 0x23A9, 0x22E5, 0x2226, 0x216A, 0x20B3, 0x2000,
+  0x1F50, 0x1EA4, 0x1DFC, 0x1D58, 0x1CB7, 0x1C19, 0x1B7F, 0x1AE8,
+  0x1A55, 0x19C4, 0x1937, 0x18AC, 0x1825, 0x17A1, 0x171F, 0x16A0,
+  0x1624, 0x15AB, 0x1534, 0x14BF, 0x144E, 0x13DE, 0x1371, 0x1306,
+  0x129E, 0x1238, 0x11D4, 0x1172, 0x1113, 0x10B5, 0x1059, 0x1000,
 ];
 
-function tempoIndexToSpeedBPM(tempoIdx: number): { speed: number; bpm: number } {
-  const clamped = Math.max(0, Math.min(127, tempoIdx));
-  const tableVal = TEMPO_TABLE[clamped];
-  const speed = Math.max(1, (tableVal >> 12) & 0x0f);
+// -- Tempo conversion ---------------------------------------------------------
+// Mirrors the Eagle Player ASM (SonixMusicDriver_v1.asm) exactly:
+//
+// SHDR parsing (lbC000388):
+//   1. If rawTempo < 0xE11 (3601) → tempoIndex = 0 (slowest)
+//   2. quotient = 0x0E100000 / rawTempo
+//   3. Search TEMPO_TABLE for first entry where quotient >= entry
+//   4. Store byte offset as tempoIndex
+//
+// Playback handler (lbC0007F2):
+//   1. tableVal = TEMPO_TABLE[tempoIndex]
+//   2. speed = tableVal >> 12
+//   3. calculatedTempo = (tableVal << 15) / (speed << 12)
+//   4. ciaTimer = (calculatedTempo * 0x2E9C) >> 15
+//   5. Eagle Player sets dtg_Timer → CIA interrupt rate = 709379 / ciaTimer Hz
+//   6. Events fire every `speed` CIA ticks
+//
+// XM mapping:
+//   eventRate = (709379 / ciaTimer) / speed  [events per second]
+//   XM eventRate = (2 * BPM) / (5 * xmSpeed) [events per second]
+//   We set xmSpeed = speed, so: BPM = eventRate * 5 * speed / 2
+//   Simplifies to: BPM = 709379 * 5 / (2 * ciaTimer)
 
-  // Replicate the asm CIA timer calculation from lbC0007F2:
-  //   D1 = tableVal * 32768
-  //   D1 = D1 / (speed << 12)    (integer division)
-  //   D1 = D1 * 0x2E9C            (= 11932)
-  //   D1 = D1 >> 15               (integer shift)
-  //   dtg_Timer = D1
-  const intermediate = Math.floor((tableVal * 32768) / (speed * 4096));
-  const ciaTimer = Math.floor((intermediate * 0x2E9C) / 32768);
+function smusTempoToSpeedBPM(rawTempo: number): { speed: number; bpm: number } {
+  if (rawTempo === 0) return { speed: 6, bpm: 125 };
 
-  // BPM derived from CIA timer: XM row rate must match Sonix event rate
-  //   XM rows/sec = (2 * BPM) / (5 * speed)
-  //   Sonix events/sec = CIA_CLOCK / (ciaTimer * speed)
-  //   → BPM = 5 * CIA_CLOCK / (2 * ciaTimer)
-  const CIA_CLOCK_PAL = 709379;
-  const bpm = ciaTimer > 0
-    ? Math.round((5 * CIA_CLOCK_PAL) / (2 * ciaTimer))
-    : 125;
+  // Step 1: SHDR → tempo table index (ASM lbC000388)
+  let tempoIndex = 0;
+  if (rawTempo >= 0xE11) {
+    const quotient = Math.floor(0x0E100000 / rawTempo);
+    for (let i = 0; i < TEMPO_TABLE.length; i++) {
+      if (quotient >= TEMPO_TABLE[i]) {
+        tempoIndex = i;
+        break;
+      }
+      if (i === TEMPO_TABLE.length - 1) tempoIndex = i;
+    }
+  }
 
-  return { speed, bpm: Math.max(32, Math.min(255, bpm)) };
+  // Step 2: Table entry → speed + CIA timer (ASM lbC0007F2)
+  const tableVal = TEMPO_TABLE[tempoIndex];
+  const speed = tableVal >>> 12;
+  if (speed === 0) return { speed: 6, bpm: 125 };
+
+  const speedShifted = speed << 12;  // speed * 4096
+  // ASM: SWAP D1; CLR.W D1; LSR.L #1,D1 → (tableVal << 16) >>> 1 = tableVal << 15
+  // Then DIVU.W by speedShifted
+  const calculatedTempo = Math.floor((tableVal * 32768) / speedShifted);
+  const ciaTimer = Math.floor((calculatedTempo * 0x2E9C) / 32768);
+
+  if (ciaTimer === 0) return { speed: 6, bpm: 125 };
+
+  // Step 3: CIA timer → XM BPM
+  // eventRate = 709379 / ciaTimer / speed
+  // XM: eventRate = 2*BPM / (5*speed)
+  // → BPM = eventRate * 5 * speed / 2 = 709379 * 5 / (2 * ciaTimer)
+  const bpm = Math.round((709379 * 5) / (2 * ciaTimer));
+
+  return {
+    speed: Math.max(1, Math.min(31, speed)),
+    bpm: Math.max(32, Math.min(255, bpm)),
+  };
 }
 
 function smusNoteToXM(midiNote: number): number {
@@ -170,30 +213,82 @@ export function isIffSmusFormat(buffer: ArrayBuffer): boolean {
 }
 
 // -- Sonix .ss sample file parser ---------------------------------------------
-// Header: 66 bytes. Data: numOctaves octaves of 8-bit signed PCM, longest first.
-// Total data size = 2^numOctaves * oneShot bytes.
-const SS_HEADER_SIZE = 66;
+// Reference: NostalgicPlayer SampledSoundFormat.cs
+//
+// Header: 0x3E (62) bytes.
+//   Offset 0: u16BE LengthOfOctaveOne — byte length of the smallest (highest-pitch) octave
+//   Offset 2: u16BE LoopOffsetOfOctaveOne — non-looping portion length (loop starts after this)
+//   Offset 4: u8    StartOctave — smallest octave index (highest pitch, shortest data)
+//   Offset 5: u8    EndOctave — largest octave index (lowest pitch, longest data)
+//   Offset 6..0x3D: padding / instrument data (ignored here)
+//
+// Data at 0x3E: octaves stored shortest first. Octave O has LengthOfOctaveOne * 2^O bytes.
+// Offset for octave O = (2^O - 2^StartOctave) * LengthOfOctaveOne.
+//
+// Sonix driver selects per-note octave data: octaveIdx = 10 - floor(midiNote/12).
+// Since we can only have one sample per instrument, we extract a single middle octave
+// and calibrate sampleRate so standard ProTracker periods produce correct pitch.
+const SS_HEADER_SIZE = 0x3E; // 62 bytes
 
-function parseSonixSampleFile(data: Uint8Array): { pcm: Uint8Array; loopStart: number; loopEnd: number } | null {
+interface SonixSampleResult {
+  pcm: Uint8Array;
+  loopStart: number;
+  loopEnd: number;
+  sampleRate: number;
+}
+
+function parseSonixSampleFile(data: Uint8Array): SonixSampleResult | null {
   if (data.length < SS_HEADER_SIZE + 4) return null;
-  const oneShot = (data[0] << 8) | data[1];         // u16BE: base octave length
-  const repeat  = (data[2] << 8) | data[3];          // u16BE: loop length (0 = no loop)
-  const numOctaves = data[4];                         // u8: number of pre-computed octaves
-  if (oneShot === 0 || numOctaves === 0 || numOctaves > 8) return null;
 
-  // Longest octave (lowest pitch) = oneShot * 2^(numOctaves-1) bytes, stored first
-  const longestLen = oneShot * (1 << (numOctaves - 1));
-  const availableData = data.length - SS_HEADER_SIZE;
-  const pcmLen = Math.min(longestLen, availableData);
-  if (pcmLen < 4) return null;
+  const lengthOfOctaveOne = u16BE(data, 0);
+  const loopOffsetOfOctaveOne = u16BE(data, 2);
+  const startOctave = data[4];
+  const endOctave = data[5];
 
-  const pcm = data.slice(SS_HEADER_SIZE, SS_HEADER_SIZE + pcmLen);
+  if (lengthOfOctaveOne === 0) return null;
+  if (startOctave > 10 || endOctave > 10) return null;
 
-  // Loop points scaled to longest octave
-  const loopStart = repeat > 0 ? oneShot * (1 << (numOctaves - 1)) - repeat * (1 << (numOctaves - 1)) : 0;
-  const loopEnd = repeat > 0 ? pcmLen : 0;
+  // Single-octave or out-of-range: treat as one block
+  const isSingleOctave = (startOctave === endOctave) || (startOctave >= 8);
 
-  return { pcm, loopStart: Math.max(0, loopStart), loopEnd };
+  let extractOctave: number;
+  if (isSingleOctave) {
+    extractOctave = startOctave;
+  } else {
+    if (startOctave > endOctave) return null;
+    // Pick the middle available octave
+    extractOctave = Math.round((startOctave + endOctave) / 2);
+  }
+
+  // Data offset: (2^O - 2^start) * lengthOfOctaveOne
+  const octaveOffsetMul = (1 << extractOctave) - (1 << startOctave);
+  const dataOffset = SS_HEADER_SIZE + octaveOffsetMul * lengthOfOctaveOne;
+  const octaveLength = lengthOfOctaveOne * (1 << extractOctave);
+
+  const availableData = data.length - dataOffset;
+  if (availableData < 4) return null;
+  const pcmLen = Math.min(octaveLength, availableData);
+
+  const pcm = data.slice(dataOffset, dataOffset + pcmLen);
+
+  // Loop: loopOffsetOfOctaveOne is the non-looping (one-shot) portion length.
+  // If it differs from lengthOfOctaveOne, the sample loops from that offset to end.
+  let loopStart = 0;
+  let loopEnd = 0;
+  if (lengthOfOctaveOne !== loopOffsetOfOctaveOne && loopOffsetOfOctaveOne > 0) {
+    const scaledLoopOffset = loopOffsetOfOctaveOne * (1 << extractOctave);
+    if (scaledLoopOffset < pcmLen) {
+      loopStart = scaledLoopOffset;
+      loopEnd = pcmLen;
+    }
+  }
+
+  // SampleRate calibration: octave 6 maps to 8287 Hz with the smusNoteToXM
+  // mapping (MIDI-11). For other octaves, shift by one factor of 2 per octave.
+  // This makes standard ProTracker periods produce correct pitch.
+  const sampleRate = Math.round(8287 * Math.pow(2, 6 - extractOctave));
+
+  return { pcm, loopStart, loopEnd, sampleRate };
 }
 
 export async function parseIffSmusFile(
@@ -216,7 +311,7 @@ export async function parseIffSmusFile(
 
   const moduleInfo: SmusModuleInfo = {
     globalVolume: 0xff,
-    tempoIndex: 0,
+    rawTempo: 0,
     transpose: 0,
     tune: 0x80,
     timeSigNumerator: 4,
@@ -253,15 +348,7 @@ export async function parseIffSmusFile(
 
       case 'SHDR': {
         if (chunkStart + 4 > fileLen) break;
-        const rawTempo = u16BE(buf, chunkStart);
-        if (rawTempo >= 0xe11) {
-          const findTempo = Math.floor(0xe100000 / rawTempo);
-          let i = 0;
-          for (; i < 128; i++) { if (findTempo >= TEMPO_TABLE[i]) break; }
-          moduleInfo.tempoIndex = Math.min(i, 127);
-        } else {
-          moduleInfo.tempoIndex = 0;
-        }
+        moduleInfo.rawTempo = u16BE(buf, chunkStart);
         let globalVol = u8(buf, chunkStart + 2);
         if (globalVol < 128) globalVol *= 2;
         moduleInfo.globalVolume = globalVol;
@@ -349,7 +436,7 @@ export async function parseIffSmusFile(
     pos = chunkStart + advance;
   }
   const numCh = Math.max(1, moduleInfo.numChannels);
-  const { speed, bpm } = tempoIndexToSpeedBPM(moduleInfo.tempoIndex);
+  const { speed, bpm } = smusTempoToSpeedBPM(moduleInfo.rawTempo);
 
   // Build a lookup of companion files by lowercase basename (without extension)
   const companionByBase = new Map<string, { instr?: Uint8Array; ss?: Uint8Array }>();
@@ -379,7 +466,7 @@ export async function parseIffSmusFile(
       if (parsed && parsed.pcm.length > 2) {
         instrConfigs.push(createSamplerInstrument(
           id, instr.name || `Instrument ${id}`,
-          parsed.pcm, 64, 8287, parsed.loopStart, parsed.loopEnd,
+          parsed.pcm, 64, parsed.sampleRate, parsed.loopStart, parsed.loopEnd,
         ));
         continue;
       }
@@ -398,11 +485,19 @@ export async function parseIffSmusFile(
     const cells: TrackerCell[] = [];
     if (!track) { channelFlat.push(cells); continue; }
     let currentInstrReg = -1;
+
+    // Transpose: asm uses ASR.W #4 (signed shift right 4) then subtract 8.
+    // moduleInfo.transpose is unsigned u16; convert to signed int16 first.
+    const transposeS16 = moduleInfo.transpose >= 0x8000
+      ? moduleInfo.transpose - 0x10000
+      : moduleInfo.transpose;
+    const transposeOff = (transposeS16 >> 4) - 8;
+
     for (const ev of track.events) {
       if (ev.type === EVENT_MARK) break;
       if (ev.type <= EVENT_LAST_NOTE) {
-        const transposeOff = Math.round(moduleInfo.transpose / 16) - 8;
-        const xmNote = smusNoteToXM(ev.type + transposeOff);
+        const transposedMidi = ev.type + transposeOff;
+        const xmNote = smusNoteToXM(transposedMidi);
         let xmInstr = 0;
         if (currentInstrReg >= 0) {
           const mapped = moduleInfo.instrumentMapper[currentInstrReg];

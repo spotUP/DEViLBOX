@@ -211,6 +211,7 @@ export type SynthType =
   | 'MusicLineSynth'  // MusicLine Editor (WASM replayer)
   | 'DeltaMusic1Synth' // Delta Music 1.0 (4-channel Amiga wavetable + ADSR synthesis)
   | 'DeltaMusic2Synth' // Delta Music 2.0 (4-channel Amiga wavetable + vol/vib table synthesis)
+  | 'SonicArrangerSynth' // Sonic Arranger (18-mode wavetable synthesis + ADSR/AMF tables)
   // SunVox modular synthesizer
   | 'SunVoxSynth'     // SunVox WASM patch player (.sunsynth / .sunvox)
   // Modular Synthesis
@@ -1032,6 +1033,118 @@ export const DEFAULT_DELTAMUSIC2: DeltaMusic2Config = {
   pitchBend: 0,
   table: new Uint8Array(48).fill(0xFF),
   isSample: false,
+};
+
+/**
+ * Sonic Arranger (.sa) synth instrument configuration.
+ * 18 synthesis effect modes, table-based ADSR/AMF envelopes, 3 arpeggio tables.
+ *
+ * All values are raw integer values matching the Amiga format (not 0-1 normalized).
+ * The WASM synth receives them in a binary serialization blob.
+ */
+export interface SonicArrangerConfig {
+  // --- Core instrument params ---
+  volume: number;              // 0-64 (Amiga standard)
+  fineTuning: number;          // signed int8 (-128..127), init value for SlideValue
+  waveformNumber: number;      // index into waveform table (for initial waveform copy)
+  waveformLength: number;      // one-shot length in WORDS (multiply by 2 for bytes)
+
+  // --- Portamento ---
+  portamentoSpeed: number;     // 0-65535
+
+  // --- Vibrato ---
+  vibratoDelay: number;        // 0-65535 (0xFF = disabled in hardware)
+  vibratoSpeed: number;        // 0-65535
+  vibratoLevel: number;        // 0-65535 (divisor for vibrato amplitude)
+
+  // --- AMF (pitch modulation table) ---
+  amfNumber: number;           // index into AMF table array
+  amfDelay: number;            // ticks between AMF steps
+  amfLength: number;           // one-shot portion length
+  amfRepeat: number;           // loop portion length
+
+  // --- ADSR (volume envelope table) ---
+  adsrNumber: number;          // index into ADSR table array
+  adsrDelay: number;           // ticks between ADSR steps
+  adsrLength: number;          // one-shot portion length
+  adsrRepeat: number;          // loop portion length
+  sustainPoint: number;        // position in ADSR table where sustain holds
+  sustainDelay: number;        // ticks to hold at sustain (0 = hold forever)
+
+  // --- Synthesis effect ---
+  effect: number;              // 0-17 (synthesis effect mode)
+  effectArg1: number;          // effect-specific param (uint16)
+  effectArg2: number;          // typically start position (uint16)
+  effectArg3: number;          // typically stop position (uint16)
+  effectDelay: number;         // ticks between effect applications (uint16)
+
+  // --- Arpeggio (3 sub-tables, 16 bytes each) ---
+  arpeggios: [
+    { length: number; repeat: number; values: number[] },  // 14 signed int8 entries
+    { length: number; repeat: number; values: number[] },
+    { length: number; repeat: number; values: number[] },
+  ];
+
+  // --- Table data (binary, passed to WASM) ---
+  /** 128 bytes of signed int8 waveform PCM data (the instrument's base waveform) */
+  waveformData: number[];      // 128 entries, signed int8 (-128..127)
+
+  /** 128 bytes of uint8 ADSR envelope values (0-255) */
+  adsrTable: number[];         // 128 entries, uint8 (0-255)
+
+  /** 128 bytes of signed int8 AMF pitch modulation values */
+  amfTable: number[];          // 128 entries, signed int8 (-128..127)
+
+  /** All waveform tables from the file (needed for effects that reference other waveforms).
+   *  Array of 128-byte arrays. Index matches the instrument's EffectArg1 references. */
+  allWaveforms: number[][];    // array of 128-entry arrays
+
+  // --- Instrument name (display only) ---
+  name: string;
+}
+
+export const DEFAULT_SONIC_ARRANGER: SonicArrangerConfig = {
+  volume: 64,
+  fineTuning: 0,
+  waveformNumber: 0,
+  waveformLength: 64,  // 64 words = 128 bytes (full buffer)
+
+  portamentoSpeed: 0,
+
+  vibratoDelay: 0xFF,  // disabled
+  vibratoSpeed: 0,
+  vibratoLevel: 0,
+
+  amfNumber: 0,
+  amfDelay: 1,
+  amfLength: 0,
+  amfRepeat: 0,
+
+  adsrNumber: 0,
+  adsrDelay: 1,
+  adsrLength: 0,
+  adsrRepeat: 0,
+  sustainPoint: 0,
+  sustainDelay: 0,
+
+  effect: 0,           // None
+  effectArg1: 0,
+  effectArg2: 0,
+  effectArg3: 0,
+  effectDelay: 1,
+
+  arpeggios: [
+    { length: 0, repeat: 0, values: new Array(14).fill(0) },
+    { length: 0, repeat: 0, values: new Array(14).fill(0) },
+    { length: 0, repeat: 0, values: new Array(14).fill(0) },
+  ],
+
+  waveformData: new Array(128).fill(0),
+  adsrTable: new Array(128).fill(255),  // flat max volume
+  amfTable: new Array(128).fill(0),     // no pitch mod
+  allWaveforms: [],
+
+  name: 'SA Synth',
 };
 
 /**
@@ -3746,6 +3859,7 @@ export interface InstrumentConfig {
   fc?: FCConfig;
   deltaMusic1?: DeltaMusic1Config;
   deltaMusic2?: DeltaMusic2Config;
+  sonicArranger?: SonicArrangerConfig;
   fred?: FredConfig;
   tfmx?: TFMXConfig;
   hippelCoso?: HippelCoSoConfig;

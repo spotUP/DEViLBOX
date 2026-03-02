@@ -169,7 +169,7 @@ export const PixiMainLayout: React.FC = () => {
         )}
       </pixiContainer>
 
-      {/* Bottom dock — docked mode (hidden when collapsed or undocked) */}
+      {/* Bottom dock */}
       <pixiContainer
         zIndex={100}
         visible={!dockCollapsed && !dockUndocked}

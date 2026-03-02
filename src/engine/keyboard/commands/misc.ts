@@ -3,6 +3,7 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useCursorStore } from '@/stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -103,7 +104,8 @@ export function toggleChannelNames(): boolean {
 // ====== INSERT SPECIAL NOTES ======
 
 export function insertKeyoff(): boolean {
-  const { cursor, setCell, moveCursor } = useTrackerStore.getState();
+  const { cursor, moveCursor } = useCursorStore.getState();
+  const { setCell } = useTrackerStore.getState();
   setCell(cursor.channelIndex, cursor.rowIndex, { note: 97, instrument: 0 });
   moveCursor('down');
   useUIStore.getState().setStatusMessage('Key off', false, 600);
@@ -112,7 +114,8 @@ export function insertKeyoff(): boolean {
 
 export function insertNoteCut(): boolean {
   // XM note cut: effect EC0 (cut at tick 0)
-  const { cursor, setCell, moveCursor } = useTrackerStore.getState();
+  const { cursor, moveCursor } = useCursorStore.getState();
+  const { setCell } = useTrackerStore.getState();
   setCell(cursor.channelIndex, cursor.rowIndex, { effTyp: 0x0E, eff: 0xC0 });
   moveCursor('down');
   useUIStore.getState().setStatusMessage('Note cut', false, 600);

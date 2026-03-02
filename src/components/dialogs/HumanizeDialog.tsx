@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Sparkles } from 'lucide-react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore, useCursorStore } from '@stores';
 import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
 import { ModalFooter } from '@components/ui/ModalFooter';
@@ -18,7 +18,8 @@ interface HumanizeDialogProps {
 }
 
 export const HumanizeDialog: React.FC<HumanizeDialogProps> = ({ isOpen, onClose }) => {
-  const { selection, humanizeSelection } = useTrackerStore();
+  const selection = useCursorStore((s) => s.selection);
+  const { humanizeSelection } = useTrackerStore();
   const [volumeVariation, setVolumeVariation] = useState(15);
 
   const handleApply = () => {

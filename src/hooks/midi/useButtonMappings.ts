@@ -4,7 +4,7 @@
 
 import { useEffect } from 'react';
 import { getButtonMapManager } from '../../midi/ButtonMapManager';
-import { useTransportStore, useTrackerStore } from '../../stores';
+import { useTransportStore, useTrackerStore, useCursorStore } from '../../stores';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 
 /**
@@ -12,14 +12,14 @@ import { useMIDIStore } from '../../stores/useMIDIStore';
  */
 export function useButtonMappings(): void {
   const { isPlaying, togglePlayPause, stop } = useTransportStore();
+  const cursor = useCursorStore((s) => s.cursor);
+  const moveCursorToChannel = useCursorStore((s) => s.moveCursorToChannel);
   const {
     currentPatternIndex,
     patterns,
     setCurrentPattern,
     currentOctave,
     setCurrentOctave,
-    cursor,
-    moveCursorToChannel,
   } = useTrackerStore();
 
   useEffect(() => {

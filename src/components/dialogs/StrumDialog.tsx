@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Music } from 'lucide-react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore, useCursorStore } from '@stores';
 import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
 import { ModalFooter } from '@components/ui/ModalFooter';
@@ -18,7 +18,8 @@ interface StrumDialogProps {
 }
 
 export const StrumDialog: React.FC<StrumDialogProps> = ({ isOpen, onClose }) => {
-  const { selection, strumSelection } = useTrackerStore();
+  const selection = useCursorStore((s) => s.selection);
+  const { strumSelection } = useTrackerStore();
   const [tickDelay, setTickDelay] = useState(1);
   const [direction, setDirection] = useState<'up' | 'down'>('down');
 

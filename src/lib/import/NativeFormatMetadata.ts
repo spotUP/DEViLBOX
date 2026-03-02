@@ -408,6 +408,68 @@ function tfmxMeta(buf: Uint8Array): NativeFormatMeta {
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
+/** Sonic Arranger: SOARV1.0 or 4EFA player binary */
+function sonicArrangerMeta(buf: Uint8Array): NativeFormatMeta {
+  if (buf.length < 32) return UNKNOWN;
+  const magic = str(buf, 0, 8);
+
+  if (magic === 'SOARV1.0') {
+    // Chunk-based: STBL count at offset 12, OVTB after STBL, INST, SD8B
+    let pos = 8;
+    if (str(buf, pos, 4) !== 'STBL') return UNKNOWN;
+    pos += 4;
+    const numSubSongs = u32BE(buf, pos); pos += 4;
+    pos += numSubSongs * 12;
+    if (str(buf, pos, 4) !== 'OVTB') return { channels: 4, patterns: -1, orders: -1, instruments: -1, samples: -1 };
+    pos += 4;
+    const numPositions = u32BE(buf, pos); pos += 4;
+    pos += numPositions * 16;
+    if (str(buf, pos, 4) !== 'NTBL') return { channels: 4, patterns: numPositions, orders: numPositions, instruments: -1, samples: -1 };
+    pos += 4;
+    const numTrackRows = u32BE(buf, pos); pos += 4;
+    pos += numTrackRows * 4;
+    if (str(buf, pos, 4) !== 'INST') return { channels: 4, patterns: numPositions, orders: numPositions, instruments: -1, samples: -1 };
+    pos += 4;
+    const numInstruments = u32BE(buf, pos); pos += 4;
+    // Count samples vs synths
+    let samples = 0;
+    for (let i = 0; i < numInstruments; i++) {
+      if (u16BE(buf, pos) === 0) samples++;
+      pos += 152;
+    }
+    return { channels: 4, patterns: numPositions, orders: numPositions, instruments: numInstruments, samples };
+  }
+
+  // 4EFA player binary: offset table format
+  if (u16BE(buf, 0) === 0x4EFA) {
+    const d1 = u16BE(buf, 2);
+    if (d1 === 0 || (d1 & 0x8000) || (d1 & 1)) return UNKNOWN;
+    const leaOff = d1 + 8;
+    if (leaOff + 2 > buf.length) return UNKNOWN;
+    const d2 = u16BE(buf, leaOff);
+    const songBase = leaOff + d2;
+    if (songBase + 32 > buf.length) return UNKNOWN;
+
+    const offOVTB = u32BE(buf, songBase + 4);
+    const offNTBL = u32BE(buf, songBase + 8);
+    const offINST = u32BE(buf, songBase + 12);
+    const offSYWT = u32BE(buf, songBase + 16);  // SYWT follows INST
+
+    const numPositions = Math.floor((offNTBL - offOVTB) / 16);
+    const numInstruments = Math.floor((offSYWT - offINST) / 152);
+    // Count samples vs synths
+    let samples = 0;
+    const instStart = songBase + offINST;
+    for (let i = 0; i < numInstruments; i++) {
+      const iOff = instStart + i * 152;
+      if (iOff + 2 <= buf.length && u16BE(buf, iOff) === 0) samples++;
+    }
+    return { channels: 4, patterns: numPositions, orders: numPositions, instruments: numInstruments, samples };
+  }
+
+  return UNKNOWN;
+}
+
 /**
  * Extract header metadata for a native tracker format.
  *
@@ -430,6 +492,7 @@ export function getNativeFormatMetadata(key: string, buffer: ArrayBuffer): Nativ
     case 'mugician': return mugicianMeta(buf);
     case 'musicLine': return musicLineMeta(buf);
     case 'tfmx':     return tfmxMeta(buf);
+    case 'sonicArranger': return sonicArrangerMeta(buf);
     default:         return { ...UNKNOWN };
   }
 }
