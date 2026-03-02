@@ -303,16 +303,39 @@ ORDER BY f.url;
 
 ## Implementation Status in DEViLBOX
 
-- ✅ File hash (SHA-256) - Implemented in `ModlandHasher.ts`
-- ✅ Sample hash (SHA-256) - Implemented in `PatternHasher.ts::hashSampleData()`
-- ⚠️  Pattern hash (FNV-1a) - Skeleton implemented in `PatternHasher.ts`
-  - ✅ Algorithm correct
-  - ⚠️  Needs format-specific pattern extraction (Furnace, MOD, XM, IT)
-  - ⚠️  Needs integration with module loaders
+- ✅ **File hash (SHA-256)** - Implemented in `ModlandHasher.ts`
+  - Client-side hashing works perfectly
+  - Used to look up files in the database
+  
+- ❌ **Sample hash (SHA-256)** - NOT IMPLEMENTED (requires sample extraction)
+  - Would need libopenmpt or custom parsers
+  - Database already has 5.6M pre-computed sample hashes
+  - Use server API to query samples by song_id instead
+  
+- ❌ **Pattern hash (FNV-1a)** - NOT IMPLEMENTED (requires libopenmpt)
+  - modland_hash uses native libopenmpt C++ library
+  - Cannot extract pattern data in browser
+  - Database already has 180K pre-computed pattern hashes
+  - **Solution**: Look up file in database, get its pattern_hash, then query pattern matches
 
-**Next Steps**:
-1. Add pattern extraction for Furnace modules
-2. Add pattern extraction for MOD/XM/IT (via existing parsers)
-3. Compute pattern hash during import
-4. Store in local IndexedDB or send to server
-5. Query server for remixes/covers via `/api/modland/pattern-matches/:hash`
+**Correct Architecture:**
+```
+1. User imports file
+2. Client computes SHA-256 hash ✅
+3. Server looks up hash → returns file with pattern_hash ✅
+4. Client uses pattern_hash to query similar tunes ✅
+5. Server returns remixes/covers from database ✅
+```
+
+**Why we can't compute pattern hash client-side:**
+- Requires libopenmpt (C++ library, 70+ tracker formats)
+- No WebAssembly build available
+- Would be massive bundle size (10+ MB)
+- Database already has all hashes pre-computed
+
+**What we CAN do:**
+- ✅ Hash files (SHA-256)
+- ✅ Look up in database by hash
+- ✅ Get pattern_hash from lookup result
+- ✅ Query `/api/modland/pattern-matches/:pattern_hash`
+- ✅ Show "Similar Tunes" based on database pattern matches

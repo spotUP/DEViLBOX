@@ -68,60 +68,50 @@ export function hashPatterns(patternData: PatternData): bigint {
 }
 
 /**
- * Extract pattern data from a Furnace module
- * (Furnace-specific implementation)
+ * Extract pattern data from libopenmpt ChiptuneMetadata
+ * (Uses the pattern data already extracted by libopenmpt WASM)
  */
-export async function extractPatternsFromFurnace(
-  furnaceWasm: any,
-  songPtr: number
-): Promise<PatternData | null> {
-  try {
-    // Get song structure
-    const numOrders = furnaceWasm._furnace_get_order_len(songPtr);
-    const numChannels = furnaceWasm._furnace_get_channel_count(songPtr);
-    
-    // Get order list
-    const orders: number[] = [];
-    for (let i = 0; i < numOrders; i++) {
-      const patternIdx = furnaceWasm._furnace_get_order(songPtr, 0, i); // subsong 0
-      orders.push(patternIdx);
-    }
-    
-    // Extract patterns
-    const patterns = new Map();
-    const uniquePatterns = new Set(orders);
-    
-    for (const patternIdx of uniquePatterns) {
-      const numRows = furnaceWasm._furnace_get_pattern_len(songPtr, patternIdx);
-      const notes = new Uint8Array(numRows * numChannels);
-      
-      for (let row = 0; row < numRows; row++) {
-        for (let ch = 0; ch < numChannels; ch++) {
-          // Get note value (0 = empty, 1-96 = notes, 100 = note off, 101 = note off env, 102 = note rel)
-          const note = furnaceWasm._furnace_get_pattern_note(songPtr, ch, patternIdx, row);
-          notes[row * numChannels + ch] = note;
-        }
-      }
-      
-      patterns.set(patternIdx, { numRows, notes });
-    }
-    
-    return { numOrders, numChannels, orders, patterns };
-  } catch (error) {
-    console.error('[PatternHash] Failed to extract Furnace patterns:', error);
-    return null;
+export function extractPatternsFromLibOpenMPT(
+  songData: {
+    channels: string[];
+    orders: { name: string; pat: number }[];
+    patterns: {
+      name: string;
+      rows: number[][][]; // [row][channel][command]
+    }[];
   }
-}
-
-/**
- * Extract pattern data from a ProTracker/FastTracker module
- * (Generic tracker implementation - needs module format parser)
- */
-export function extractPatternsFromMOD(moduleData: Uint8Array): PatternData | null {
-  // TODO: Implement MOD/XM/IT pattern extraction
-  // For now, return null - this requires format-specific parsers
-  console.warn('[PatternHash] MOD/XM/IT pattern extraction not yet implemented');
-  return null;
+): PatternData {
+  const numChannels = songData.channels.length;
+  const orders = songData.orders.map(o => o.pat);
+  
+  // Extract patterns
+  const patterns = new Map();
+  
+  for (const pattern of songData.patterns) {
+    const patternIdx = songData.patterns.indexOf(pattern);
+    const numRows = pattern.rows.length;
+    const notes = new Uint8Array(numRows * numChannels);
+    
+    for (let row = 0; row < numRows; row++) {
+      const rowData = pattern.rows[row];
+      for (let ch = 0; ch < numChannels; ch++) {
+        const cell = rowData[ch];
+        // cell[0] = NOTE value (matches modland_hash algorithm)
+        // cell indices: 0=NOTE, 1=INSTRUMENT, 2=VOLUMEEFFECT, 3=EFFECT, 4=VOLUME, 5=PARAMETER
+        const note = cell[0] || 0;
+        notes[row * numChannels + ch] = note;
+      }
+    }
+    
+    patterns.set(patternIdx, { numRows, notes });
+  }
+  
+  return {
+    numOrders: orders.length,
+    numChannels,
+    orders,
+    patterns
+  };
 }
 
 /**
@@ -142,16 +132,20 @@ export async function hashSampleData(sampleData: ArrayBuffer): Promise<string> {
  * Example usage:
  * 
  * ```typescript
- * // 1. Extract pattern data from loaded module
- * const patternData = await extractPatternsFromFurnace(furnaceWasm, songPtr);
+ * // 1. Load module with libopenmpt
+ * const player = new ChiptunePlayer();
+ * await player.play(arrayBuffer);
  * 
- * // 2. Compute pattern hash
- * if (patternData) {
+ * // 2. Extract pattern data from metadata
+ * if (player.meta?.song) {
+ *   const patternData = extractPatternsFromLibOpenMPT(player.meta.song);
+ *   
+ *   // 3. Compute pattern hash
  *   const hash = hashPatterns(patternData);
- *   console.log('Pattern hash:', hash.toString(16));
+ *   console.log('Pattern hash:', hash.toString());
+ *   
+ *   // 4. Find similar tunes in database
+ *   const matches = await findPatternMatches(hash.toString());
  * }
- * 
- * // 3. Find similar tunes in database
- * const matches = await findPatternMatches(hash);
  * ```
  */

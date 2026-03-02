@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-02T22:33:24.242Z
+ * Generated: 2026-03-02T22:46:29.085Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1987';
-export const BUILD_NUMBER = '1987';
-export const BUILD_HASH = '490eb8e0';
+export const BUILD_VERSION = '1.0.1989';
+export const BUILD_NUMBER = '1989';
+export const BUILD_HASH = 'c396c1ef';
 export const BUILD_DATE = '2026-03-02';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1987',
+    version: '1.0.1989',
     date: '2026-03-02',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Add Modland pattern hash algorithm implementation"
+      },
+      {
+        type: 'feature',
+        "description": "Add Modland contribution prompt for unknown modules"
+      },
       {
         type: 'fix',
         "description": "Lazy-initialize songdb prepared statements"
@@ -224,14 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add interactive volume/pan faders to track headers"
-      },
-      {
-        type: 'feature',
-        "description": "Clip transpose and automation lane playback"
-      },
-      {
-        type: 'feature',
-        "description": "Mount MixerPanel in App + Ctrl+M shortcut"
       }
     ]
   }
