@@ -40,11 +40,16 @@ export function loadPixiFonts(): Promise<void> {
   return fontLoadPromise;
 }
 
+/** Guard against multiple installs across HMR reloads / StrictMode double-mounts */
+let _fontsInstalled = false;
+
 /**
  * Install DynamicBitmapFont for all UI font families.
  * Canvas-rasterized at 48px / 2x resolution (96px effective detail).
  */
 function installFonts(): void {
+  if (_fontsInstalled) return;
+  _fontsInstalled = true;
   const monoFamily = 'JetBrains Mono, Menlo, Consolas, monospace';
   const sansFamily = 'Inter, -apple-system, BlinkMacSystemFont, sans-serif';
 

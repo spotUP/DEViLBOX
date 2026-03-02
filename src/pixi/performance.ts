@@ -64,7 +64,10 @@ export function attachFPSLimiter(app: Application): () => void {
   let lastActivityMs = performance.now();
   let isIdle = false;
 
+  let _disposed = false;
+
   const markActive = () => {
+    if (_disposed || !app.ticker) return;
     lastActivityMs = performance.now();
     if (isIdle) {
       isIdle = false;
@@ -73,6 +76,7 @@ export function attachFPSLimiter(app: Application): () => void {
   };
 
   const checkIdle = () => {
+    if (_disposed || !app.ticker) return;
     // Treat audio playback as activity — prevents Pixi ticker dropping to
     // idle FPS while the pattern editor is scrolling and VU meters animate.
     if (_isPlayingFn && _isPlayingFn()) {
@@ -85,7 +89,7 @@ export function attachFPSLimiter(app: Application): () => void {
       app.ticker.maxFPS = IDLE_FPS;
       // Force one final render so the last active frame persists on-screen
       // (prevents black screen when FPS drops to idle with preserveDrawingBuffer)
-      app.renderer.render(app.stage);
+      try { app.renderer.render(app.stage); } catch { /* app may be destroyed */ }
     }
   };
 
@@ -103,7 +107,8 @@ export function attachFPSLimiter(app: Application): () => void {
   app.ticker.maxFPS = ACTIVE_FPS;
 
   return () => {
-    app.ticker.remove(frameTracker);
+    _disposed = true;
+    try { app.ticker?.remove(frameTracker); } catch { /* app may be destroyed */ }
     for (const evt of events) {
       window.removeEventListener(evt, markActive, { capture: true });
     }
