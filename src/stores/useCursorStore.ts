@@ -15,6 +15,7 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 // Safe because both stores are initialized at module load time, and
 // getTrackerState() is only called at action invocation time.
 import { useTrackerStore } from './useTrackerStore';
+import { notifyScrollEvent } from '../pixi/scrollPerf';
 
 // Define column order for range selection
 const COLUMN_ORDER: CursorPosition['columnType'][] = [
@@ -144,6 +145,9 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
       digitIndex === cur.digitIndex
     ) return;
 
+    // PERF: Notify scroll perf manager for vertical movement (suppresses Yoga layout)
+    if (direction === 'up' || direction === 'down') notifyScrollEvent();
+
     set({ cursor: { channelIndex, rowIndex, columnType, digitIndex } });
   },
 
@@ -151,6 +155,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     const ts = getTrackerState();
     const pattern = ts.patterns[ts.currentPatternIndex];
     if (row >= 0 && row < pattern.length) {
+      notifyScrollEvent();
       set({ cursor: { ...get().cursor, rowIndex: row } });
       const replayer = getTrackerReplayer();
       if (replayer.isPlaying()) {
