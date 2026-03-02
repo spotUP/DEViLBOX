@@ -33,7 +33,8 @@ import { useSetSnapLines } from './WorkbenchContainer';
 import { computeSnap } from './windowSnap';
 import { playWindowOpen, playWindowClose, playSnap } from './workbenchSounds';
 
-export const TITLE_H = 28;
+// Re-exported from workbenchLayout to avoid circular dependency
+export { TITLE_H } from './workbenchLayout';
 const HANDLE_SIZE = 8;
 const MIN_W = 200;
 const MIN_H = 150;
