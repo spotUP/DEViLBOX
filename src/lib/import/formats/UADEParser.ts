@@ -1696,32 +1696,6 @@ function buildEnhancedSong(
     }
   }
 
-  // Add a muted UADE reference instrument for comparison playback
-  const uadeRefId = nextInstrId++;
-  const uadeConfig: UADEConfig = {
-    type: 'uade',
-    filename,
-    fileData: buffer,
-    subsongCount: metadata.subsongCount,
-    currentSubsong: 0,
-    metadata: {
-      player: metadata.player,
-      formatName: metadata.formatName || guessFormatName(ext),
-      minSubsong: metadata.minSubsong,
-      maxSubsong: metadata.maxSubsong,
-    },
-  };
-  instruments.push({
-    id: uadeRefId,
-    name: 'UADE Reference',
-    type: 'synth' as const,
-    synthType: 'UADESynth' as const,
-    effects: [],
-    volume: -60, // Muted by default
-    pan: 0,
-    uade: uadeConfig,
-  });
-
   // Build patterns from enhanced scan rows (64 rows per pattern)
   const ROWS_PER_PATTERN = 64;
   const PAULA_CHANNEL_NAMES = ['Paula 1', 'Paula 2', 'Paula 3', 'Paula 4'];
