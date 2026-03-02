@@ -180,7 +180,57 @@ const devilboxTheme: Theme = {
   },
 };
 
-export const themes: Theme[] = [devilboxTheme, neoDarkTheme, cyanLineartTheme];
+// DEViLBOX Modern Theme — Ableton-inspired, warm amber accent, spacious layout
+const modernTheme: Theme = {
+  id: 'modern',
+  name: 'Modern',
+  colors: {
+    // Background layers (light → dark: bg, surface, elevated, raised, hover, active)
+    bg: '#1a1a1a',
+    bgSecondary: '#222222',   // bgSurface — panels, strips
+    bgTertiary: '#2c2c2c',    // bgElevated — toolbars, dock
+    bgHover: '#404040',
+    bgActive: '#4c4c4c',
+
+    // Borders
+    border: '#383838',
+    borderLight: '#505050',   // borderMid — separators
+
+    // Accent: warm amber
+    accent: '#f59e0b',
+    accentSecondary: '#b45309',   // accentDim
+    accentGlow: 'rgba(245, 158, 11, 0.25)',
+
+    // Text
+    text: '#f0f0f0',
+    textSecondary: '#a0a0a0',
+    textMuted: '#606060',
+    textInverse: '#1a1a1a',
+
+    // Semantic
+    error: '#ef4444',
+    success: '#22c55e',
+    warning: '#f59e0b',
+
+    // Tracker rows — warm amber-tinted backgrounds
+    trackerRowEven: '#1e1e1e',
+    trackerRowOdd: '#222222',
+    trackerRowHighlight: '#282828',
+    trackerRowCurrent: '#2a2219',
+    trackerRowCursor: '#f59e0b33',
+
+    // Cell colors
+    cellNote: '#f0f0f0',
+    cellInstrument: '#fbbf24',
+    cellVolume: '#22c55e',
+    cellEffect: '#f59e0b',
+    cellAccent: '#fbbf24',
+    cellSlide: '#a0a0a0',
+    cellEmpty: '#404040',
+  },
+};
+
+export const themes: Theme[] = [devilboxTheme, neoDarkTheme, cyanLineartTheme, modernTheme];
 
 interface ThemeStore {
   currentThemeId: string;

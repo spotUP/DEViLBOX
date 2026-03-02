@@ -41,7 +41,7 @@ import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
 import { useTrackerStore, useUIStore, useInstrumentStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
-import { TITLE_H } from '../workbench/PixiWindow';
+import { TITLE_H } from '../workbench/workbenchLayout';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
 type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj';
