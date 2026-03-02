@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Play, Square, Music, FileAudio, AlertCircle } from 'lucide-react';
+import { X, Play, Square, Music, FileAudio, AlertCircle, Folder } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import {
   loadModuleFile,
@@ -36,6 +36,7 @@ interface ImportModuleDialogProps {
   onClose: () => void;
   onImport: (info: ModuleInfo, options: ImportOptions) => void;
   initialFile?: File | null; // Pre-loaded file (from drag-drop)
+  companionFiles?: File[];    // Additional files for multi-file formats (e.g. SMUS instruments)
 }
 
 // ── Format detection ──────────────────────────────────────────────────────────
@@ -258,6 +259,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   onClose,
   onImport,
   initialFile,
+  companionFiles,
 }) => {
   const [moduleInfo, setModuleInfo]     = useState<ModuleInfo | null>(null);
   const [loadedFileName, setLoadedFileName] = useState('');
@@ -266,10 +268,15 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [isPlaying, setIsPlaying]       = useState(false);
   const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
   const [selectedSubsong, setSelectedSubsong] = useState(0);
+  // Track the companions used for the currently loaded file
+  const [activeCompanions, setActiveCompanions] = useState<File[]>([]);
   // Track whether a UADE scan is in-flight so handleClose can cancel it
   const uadeScanActiveRef = useRef(false);
   // MusicLine preview engine reference (connect/disconnect on preview start/stop)
   const mlPreviewRef = useRef<{ stop: () => void; output: GainNode } | null>(null);
+  // Keep companion files fresh in callbacks without re-creating handleFileSelect
+  const companionFilesRef = useRef<File[]>(companionFiles ?? []);
+  useEffect(() => { companionFilesRef.current = companionFiles ?? []; }, [companionFiles]);
 
   const setFormatEngine = useSettingsStore((s) => s.setFormatEngine);
 
@@ -277,11 +284,23 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const nativeFmt  = detectNativeFormat(loadedFileName);
   const isNativeOnly = !!(nativeFmt?.nativeOnly);
 
-  const handleFileSelect = useCallback(async (file: File) => {
+  // Formats that require companion files (e.g. external Instruments/ folder)
+  // Shown as a warning when none were loaded alongside the module.
+  const MULTI_FILE_FORMAT_KEYS = new Set<NativeFormatKey>(['iffSmus']);
+  const needsCompanionFiles =
+    nativeFmt !== null &&
+    MULTI_FILE_FORMAT_KEYS.has(nativeFmt.key) &&
+    activeCompanions.length === 0;
+
+  const handleFileSelect = useCallback(async (file: File, overrideCompanions?: File[]) => {
     if (!isSupportedModule(file.name)) {
       setError(`Unsupported file format. Supported: ${getSupportedExtensions().slice(0, 5).join(', ')}...`);
       return;
     }
+
+    // Determine which companions apply: explicit overrides take precedence over prop companions
+    const companions = overrideCompanions ?? companionFilesRef.current;
+    setActiveCompanions(companions);
 
     const fname = file.name.toLowerCase();
     const nativeFmtForFile = detectNativeFormat(fname);
@@ -304,6 +323,11 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
         const engine = UADEEngine.getInstance();
         await engine.ready();
         uadeScanActiveRef.current = true;
+        // Register all companion files into UADE's virtual FS before loading the module
+        for (const companion of companions) {
+          const companionBuf = await companion.arrayBuffer();
+          await engine.addCompanionFile(companion.name, companionBuf);
+        }
         // Enable CIA tick snapshot capture so pattern reconstruction works
         // when parseUADEFile is called later with this preScannedMeta.
         engine.enableTickSnapshots(true);
@@ -503,10 +527,45 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setIsPlaying(false);
     setUadeMetadata(null);
     setSelectedSubsong(0);
+    setActiveCompanions([]);
     onClose();
   }, [moduleInfo, isPlaying, isMusicLine, isHively, stopEnginePreview, onClose]);
 
+  // Build accept string for the single-file picker inside the dialog
+  const ACCEPTED_FORMATS = getSupportedExtensions().join(',');
+
+  const handleSingleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) {
+      handleFileSelect(file, []);
+    }
+  }, [handleFileSelect]);
+
+  const handleFolderInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = '';
+    if (files.length === 0) return;
+    const mainFile = files.find(f => isSupportedModule(f.name));
+    if (!mainFile) return;
+    const companions = files.filter(f => f !== mainFile);
+    handleFileSelect(mainFile, companions);
+  }, [handleFileSelect]);
+
+  const handleInternalDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    const mainFile = files.find(f => isSupportedModule(f.name)) ?? files[0];
+    const companions = files.filter(f => f !== mainFile);
+    handleFileSelect(mainFile, companions);
+  }, [handleFileSelect]);
+
   if (!isOpen) return null;
+
+  // Companions to display in the badge: use activeCompanions (set when file was loaded)
+  const displayedCompanions = activeCompanions;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
@@ -524,6 +583,42 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
         {/* Body */}
         <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(80vh-110px)]">
+          {/* Drop zone / file pickers — shown before a file is loaded */}
+          {!moduleInfo && !isLoading && !error && (
+            <div
+              className="border-2 border-dashed border-dark-border rounded-lg p-8 flex flex-col items-center gap-4 text-center"
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              onDrop={handleInternalDrop}
+            >
+              <FileAudio size={32} className="text-text-muted" />
+              <p className="text-sm text-text-muted">Drop a file or folder here</p>
+              <div className="flex gap-2">
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept={ACCEPTED_FORMATS}
+                    onChange={handleSingleFileInput}
+                    className="hidden"
+                  />
+                  <span className="text-xs px-3 py-1.5 bg-dark-bg border border-dark-border rounded hover:border-dark-borderHover text-text-muted hover:text-text-primary transition-colors cursor-pointer">
+                    Pick File
+                  </span>
+                </label>
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    {...({ webkitdirectory: '', directory: '' } as React.InputHTMLAttributes<HTMLInputElement>)}
+                    onChange={handleFolderInput}
+                    className="hidden"
+                  />
+                  <span className="text-xs px-3 py-1.5 bg-dark-bg border border-dark-border rounded hover:border-dark-borderHover text-text-muted hover:text-text-primary transition-colors cursor-pointer">
+                    Pick Folder
+                  </span>
+                </label>
+              </div>
+            </div>
+          )}
+
           {/* Loading indicator */}
           {isLoading && (
             <div className="flex items-center gap-2">
@@ -645,6 +740,32 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                       ))}
                     </select>
                   )}
+                </div>
+              )}
+
+              {/* Companion files badge */}
+              {displayedCompanions.length > 0 && (
+                <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded text-xs text-green-400">
+                  <Folder size={12} />
+                  {displayedCompanions.length} companion file{displayedCompanions.length > 1 ? 's' : ''} loaded
+                  <span className="text-text-muted ml-1 truncate">
+                    ({displayedCompanions.map(f => f.name).join(', ')})
+                  </span>
+                </div>
+              )}
+
+              {/* Warning: multi-file format loaded without its companion files */}
+              {needsCompanionFiles && (
+                <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-400">
+                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">Audio requires companion files.</span>
+                    {' '}Samples live in an{' '}
+                    <span className="font-mono bg-dark-bg px-1 rounded">Instruments/</span>
+                    {' '}folder next to this module. Drop the parent folder or use{' '}
+                    <span className="font-semibold">📁 Pick Folder</span>
+                    {' '}below to load them.
+                  </div>
                 </div>
               )}
 

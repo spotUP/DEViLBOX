@@ -522,7 +522,7 @@ function parseSnxBinary(buf: Uint8Array, filename: string): TrackerSong {
   // Speed word (bytes 16–17); used as CIA timer divisor in player
   // We can't reliably convert this to BPM without knowing the CIA clock context,
   // so default to ProTracker 125 BPM / speed 6.
-  const _speedWord = u16BE(buf, 16); // preserved for future use
+  // Speed word at offset 16 — not mapped to BPM (CIA clock context unknown)
 
   // Parse 4 voice streams
   const voiceStart = 20;
