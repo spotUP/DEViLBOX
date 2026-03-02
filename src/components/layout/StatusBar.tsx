@@ -151,14 +151,9 @@ const TrackerStatusContent: React.FC = () => {
         <>
           <div className="w-px h-3 bg-border opacity-50" />
           <div className="flex items-center gap-2 text-text-muted text-xs">
-            {songDBInfo.authors?.length > 0 && (
-              <span>
-                by <span className="text-text-primary font-semibold">{songDBInfo.authors.join(', ')}</span>
-              </span>
-            )}
             {songDBInfo.album && (
               <span>
-                • <span className="text-text-primary">{songDBInfo.album}</span>
+                <span className="text-text-primary">{songDBInfo.album}</span>
               </span>
             )}
             {songDBInfo.year && (
@@ -167,6 +162,11 @@ const TrackerStatusContent: React.FC = () => {
             {songDBInfo.format && (
               <span className="text-text-muted">
                 [{songDBInfo.format}]
+              </span>
+            )}
+            {songDBInfo.authors?.length > 0 && (
+              <span>
+                by <span className="text-text-primary font-semibold">{songDBInfo.authors.join(', ')}</span>
               </span>
             )}
           </div>
