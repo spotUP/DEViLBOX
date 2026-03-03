@@ -8,7 +8,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   X, Loader2, Cpu, Music, Clock, User, Disc, Globe, Calendar,
   Star, ExternalLink, Briefcase, Tag, Play, Youtube, ChevronDown, ChevronUp,
-  Zap,
+  Zap, Download,
 } from 'lucide-react';
 import { useTrackerStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
@@ -18,6 +18,8 @@ import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import type { SIDEngineType } from '@engine/deepsid/DeepSIDEngineManager';
 import { fetchComposerProfile, fetchComposerTunes, fetchFileInfoByPath, getComposerPhotoUrl } from '@/lib/sid/composerApi';
 import type { ComposerProfile as ComposerData, DeepSIDFileInfo, ComposerTune } from '@/lib/sid/composerApi';
+import { downloadHVSCFile } from '@/lib/hvscApi';
+import { loadFile } from '@/lib/file/UnifiedFileLoader';
 
 interface SIDInfoModalProps {
   onClose: () => void;
@@ -41,6 +43,27 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
   const [tunes, setTunes] = useState<ComposerTune[]>([]);
   const [tunesTotal, setTunesTotal] = useState(0);
   const [showAllTunes, setShowAllTunes] = useState(false);
+  const [loadingTuneId, setLoadingTuneId] = useState<number | null>(null);
+
+  const handleLoadTune = useCallback(async (tune: ComposerTune) => {
+    if (loadingTuneId !== null) return;
+    setLoadingTuneId(tune.id);
+    try {
+      const buffer = await downloadHVSCFile(tune.path);
+      const file = new File([buffer], tune.filename || tune.path.split('/').pop() || 'tune.sid');
+      const result = await loadFile(file, { requireConfirmation: false });
+      if (result.success === true) {
+        notify.success(result.message);
+        onClose();
+      } else if (result.success === false) {
+        notify.error(result.error);
+      }
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : 'Failed to load tune');
+    } finally {
+      setLoadingTuneId(null);
+    }
+  }, [loadingTuneId, onClose]);
 
   const handleSubsongChange = useCallback(
     async (newIdx: number) => {
@@ -288,21 +311,17 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                   {/* Composer Bio Card */}
                   <div className="bg-blue-950/30 border border-blue-800/30 rounded-lg p-4">
                     <div className="flex gap-4">
-                      {/* Photo */}
-                      <div className="shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-blue-900/30 border border-blue-800/30">
-                        {photoUrl ? (
+                      {/* Photo — only shown when available */}
+                      {photoUrl && (
+                        <div className="shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-blue-900/30 border border-blue-800/30">
                           <img
                             src={photoUrl}
                             alt={composer.name}
                             className="w-full h-full object-cover"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
                           />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <User className="w-10 h-10 text-blue-800/50" />
-                          </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
                       {/* Bio Info */}
                       <div className="flex-1 min-w-0 space-y-1.5">
@@ -493,12 +512,22 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5">
                 {displayTunes.map((tune) => (
-                  <div key={tune.id} className="flex items-center gap-2 py-1 text-xs border-b border-dark-border/20 last:border-0">
+                  <button
+                    key={tune.id}
+                    onClick={() => handleLoadTune(tune)}
+                    disabled={loadingTuneId !== null}
+                    className="flex items-center gap-2 py-1 text-xs border-b border-dark-border/20 last:border-0 hover:bg-blue-900/20 rounded px-1 transition-colors text-left w-full group"
+                  >
+                    {loadingTuneId === tune.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin text-blue-400 shrink-0" />
+                    ) : (
+                      <Download className="w-3 h-3 text-blue-400/0 group-hover:text-blue-400/80 shrink-0 transition-colors" />
+                    )}
                     <span className="text-text-primary truncate flex-1">{tune.filename}</span>
                     {tune.player && (
                       <span className="text-text-muted/60 shrink-0 text-[10px]">{tune.player}</span>
                     )}
-                  </div>
+                  </button>
                 ))}
               </div>
               {tunes.length > 10 && (
