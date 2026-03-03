@@ -35,11 +35,12 @@ export class TinyRSIDEngine {
   private numSubsongs = 1;
   private metadata: any = null;
 
-  constructor(
-    private sidData: Uint8Array,
-    private config: TinyRSIDConfig = {}
-  ) {}
-
+  private readonly sidData: Uint8Array;
+  private readonly config: TinyRSIDConfig;  ) {}
+  constructor(sidData: Uint8Array, config: TinyRSIDConfig = {}) {
+    this.sidData = sidData;
+    this.config = config;
+  }
   /**
    * Initialize the engine
    */
