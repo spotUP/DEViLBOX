@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T00:35:14.891Z
+ * Generated: 2026-03-03T00:51:26.557Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2003';
-export const BUILD_NUMBER = '2003';
-export const BUILD_HASH = '3fed5b99';
+export const BUILD_VERSION = '1.0.2005';
+export const BUILD_NUMBER = '2005';
+export const BUILD_HASH = 'fc22b359';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2003',
+    version: '1.0.2005',
     date: '2026-03-03',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add HVSC API endpoints"
+      },
+      {
+        type: 'feature',
+        "description": "Add HVSC browser tab to FileBrowser"
+      },
       {
         type: 'feature',
         "description": "Implement STIL parser for SID tune metadata"
@@ -230,14 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Test(sonix): expand SonixMusicDriverParser tests — SNX/TINY/SMUS coverage"
-      },
-      {
-        type: 'feature',
-        "description": "Improve SonixMusicDriverParser with full smus/snx/tiny routing"
-      },
-      {
-        type: 'fix',
-        "description": "Stable wrappers for worldRef children prevent Yoga BindingError"
       }
     ]
   }

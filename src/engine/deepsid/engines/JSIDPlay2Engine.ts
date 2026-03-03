@@ -42,11 +42,12 @@ export class JSIDPlay2Engine {
   private metadata: any = null;
   private currentTime = 0;
 
-  constructor(
-    private sidData: Uint8Array,
-    private config: JSIDPlay2Config = {}
-  ) {}
-
+  private readonly sidData: Uint8Array;
+  private readonly config: JSIDPlay2Config;  ) {}
+  constructor(sidData: Uint8Array, config: JSIDPlay2Config = {}) {
+    this.sidData = sidData;
+    this.config = config;
+  }
   /**
    * Initialize the engine
    */
