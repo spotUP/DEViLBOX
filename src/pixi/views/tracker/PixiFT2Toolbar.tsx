@@ -627,6 +627,14 @@ export const PixiFT2Toolbar: React.FC = () => {
           active={modalOpen === 'masterFx'}
           onClick={handleShowMasterFX}
         />
+        <PixiButton
+          label="Inst FX"
+          variant={modalOpen === 'instrumentFx' ? 'ft2' : 'ghost'}
+          color={modalOpen === 'instrumentFx' ? 'purple' : 'default'}
+          size="sm"
+          active={modalOpen === 'instrumentFx'}
+          onClick={() => { const s = useUIStore.getState(); s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx'); }}
+        />
         <PixiButton label="Reference" variant="ghost" size="sm" onClick={() => handleShowHelp('chip-effects')} />
         <PixiButton label="Help"      variant="ghost" size="sm" onClick={() => handleShowHelp('shortcuts')} />
         <PixiButton label="Settings"  variant="ghost" size="sm" onClick={handleShowSettings} />
