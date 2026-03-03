@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { Sparkles, Share2, ExternalLink } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { ModalHeader } from '../ui/ModalHeader';
 import { ModalFooter } from '../ui/ModalFooter';
@@ -25,7 +26,7 @@ export const ModlandContributionModal: React.FC<ModlandContributionModalProps> =
   filename,
   hash
 }) => {
-  const demozooDiscord = 'https://demozoo.org/discord/';
+  const demozooDiscord = 'https://discord.gg/AJ2xV8X';
 
   return (
     <Modal
@@ -39,7 +40,7 @@ export const ModlandContributionModal: React.FC<ModlandContributionModalProps> =
       <div className="bg-dark-800 border border-dark-600 rounded-lg shadow-2xl">
         <ModalHeader 
           title="Rare Find!"
-          icon={<span className="text-3xl">🎉</span>}
+          icon={<Sparkles size={24} className="text-purple-400" />}
           onClose={onClose}
         />
 
@@ -58,7 +59,7 @@ export const ModlandContributionModal: React.FC<ModlandContributionModalProps> =
           {/* Contribution Info */}
           <div className="space-y-3">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <span>📦</span>
+              <Share2 size={18} className="text-purple-400" />
               Share It With The Community
             </h3>
 
@@ -125,7 +126,7 @@ export const ModlandContributionModal: React.FC<ModlandContributionModalProps> =
             onClick={onClose}
             className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded transition-colors font-semibold flex items-center gap-2"
           >
-            <span>🎨</span>
+            <ExternalLink size={16} />
             Join Demozoo Discord
           </a>
         </ModalFooter>
