@@ -233,7 +233,9 @@ const SIDSubsongAndInfo: React.FC = () => {
   }, [sidMetadata, setSidMetadata]);
 
   const handleInfoClick = useCallback(() => {
-    useUIStore.getState().openModal('sidInfo');
+    requestAnimationFrame(() => {
+      useUIStore.getState().openModal('sidInfo');
+    });
   }, []);
 
   if (!hasInfo) return null;
