@@ -259,6 +259,28 @@ export class C64SIDEngine {
   getEngineType(): SIDEngineType | null {
     return this.engineType;
   }
+  
+  /**
+   * Check if ASID hardware output is active
+   * Only jsSID engine supports ASID
+   */
+  isASIDActive(): boolean {
+    if (this.engineType === 'jssid' && this.engine) {
+      return (this.engine as JSSIDEngine).isASIDActive();
+    }
+    return false;
+  }
+  
+  /**
+   * Get engine info including ASID status
+   */
+  getEngineInfo(): { name: string; type: SIDEngineType | null; asid: boolean } {
+    return {
+      name: this.engineType || 'none',
+      type: this.engineType,
+      asid: this.isASIDActive(),
+    };
+  }
 
   /**
    * Cleanup
