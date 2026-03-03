@@ -1,0 +1,58 @@
+import type { SynthInfo } from './types';
+
+export const percussionSynthEntries: Record<string, SynthInfo> = {
+  MembraneSynth: {
+    type: 'MembraneSynth',
+    name: 'Membrane Synth',
+    shortName: 'Membrane',
+    description: 'Drum membrane simulation for kicks and toms',
+    bestFor: ['Kick drums', 'Toms', 'Percussion'],
+    icon: 'Circle',
+    color: 'text-orange-400',
+  },
+  MetalSynth: {
+    type: 'MetalSynth',
+    name: 'Metal Synth',
+    shortName: 'Metal',
+    description: 'Metallic percussion synthesis with harmonics',
+    bestFor: ['Hi-hats', 'Cymbals', 'Bells', 'Metallic hits'],
+    icon: 'Hexagon',
+    color: 'text-yellow-400',
+  },
+  NoiseSynth: {
+    type: 'NoiseSynth',
+    name: 'Noise Synth',
+    shortName: 'Noise',
+    description: 'Filtered noise generator with envelope',
+    bestFor: ['Snares', 'Hi-hats', 'Risers', 'FX'],
+    icon: 'Hash',
+    color: 'text-gray-400',
+  },
+  DrumMachine: {
+    type: 'DrumMachine',
+    name: 'Roland TR-808/909',
+    shortName: '808/909',
+    description: 'Analog drum synthesis (808/909 style)',
+    bestFor: ['Kicks', 'Snares', 'Hi-hats', 'Electronic drums'],
+    icon: 'Disc',
+    color: 'text-red-500',
+  },
+  DrumKit: {
+    type: 'DrumKit',
+    name: 'Drum Kit',
+    shortName: 'Kit',
+    description: 'Multi-sample instrument with keymap - assign different samples to different notes',
+    bestFor: ['Drum kits', 'Instrument layers', 'Velocity splits', 'Sample mapping'],
+    icon: 'Piano',
+    color: 'text-amber-500',
+  },
+  Synare: {
+    type: 'Synare',
+    name: 'Synare 3',
+    shortName: 'Synare',
+    description: 'Classic electronic percussion synthesizer for "disco tom" and dub sounds',
+    bestFor: ['Dub percussion', 'Disco toms', 'Electronic drums', 'SFX'],
+    icon: 'Drum',
+    color: 'text-yellow-500',
+  },
+};

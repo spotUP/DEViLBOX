@@ -1,0 +1,49 @@
+import type { SynthInfo } from './types';
+
+export const fxSynthEntries: Record<string, SynthInfo> = {
+  DubSiren: {
+    type: 'DubSiren',
+    name: 'Dub Siren',
+    shortName: 'Siren',
+    description: 'Classic dub sound system siren with LFO and delay',
+    bestFor: ['Dub FX', 'Reggae', 'Sound system', 'Alerts'],
+    icon: 'Megaphone',
+    color: 'text-red-500',
+  },
+  SpaceLaser: {
+    type: 'SpaceLaser',
+    name: 'Space Laser',
+    shortName: 'Laser',
+    description: 'FM-based cosmic zap generator for classic reggae and anime effects',
+    bestFor: ['Laser shots', 'Anime FX', 'Reggae dubs', 'Sci-fi'],
+    icon: 'Zap',
+    color: 'text-green-500',
+  },
+  V2: {
+    type: 'V2',
+    name: 'Farbrausch V2 Synth',
+    shortName: 'V2',
+    description: 'Authentic 4k/64k demoscene synthesis with multi-voice subtractive engine.',
+    bestFor: ['Demoscene', 'Trance', 'Techno', 'Leads'],
+    icon: 'Radio',
+    color: 'amber',
+  },
+  V2Speech: {
+    type: 'V2Speech',
+    name: 'V2 Speech',
+    shortName: 'V2Sp',
+    description: 'Farbrausch V2 speech synthesis module for robotic and vocoder-style voices.',
+    bestFor: ['Speech', 'Robotic Voices', 'Demoscene', 'FX'],
+    icon: 'Radio',
+    color: 'amber',
+  },
+  Sam: {
+    type: 'Sam',
+    name: 'Commodore SAM',
+    shortName: 'SAM',
+    description: 'Software Automatic Mouth - classic 8-bit speech synthesizer from 1982.',
+    bestFor: ['Speech', 'Robotic Voices', 'Lo-Fi', 'FX'],
+    icon: 'MessageSquare',
+    color: 'amber',
+  },
+};
