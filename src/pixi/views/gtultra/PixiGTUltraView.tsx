@@ -75,7 +75,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
           const store = useGTUltraStore.getState();
           // Load any pending song data that arrived before engine was ready
           if (store.pendingSongData) {
-            gtEngine!.loadSong(store.pendingSongData.buffer);
+            gtEngine!.loadSong(store.pendingSongData.buffer as ArrayBuffer);
             store.setPendingSongData(null);
           }
           store.refreshSongInfo();
