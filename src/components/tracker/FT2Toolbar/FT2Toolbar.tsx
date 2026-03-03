@@ -54,6 +54,8 @@ import { convertToInstrument } from '@lib/import/InstrumentConverter';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
 import { clearSavedProject } from '@hooks/useProjectPersistence';
 import { parseDb303Pattern, exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
+import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import type { InstrumentConfig, TB303Config } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
@@ -265,6 +267,39 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   // Tap Tempo
   const { tap: handleTapTempo, tapCount, isActive: tapActive } = useTapTempo(setBPM);
+
+  // ASID hardware toggle
+  const asidEnabled = useSettingsStore((s) => s.asidEnabled);
+  const asidDeviceId = useSettingsStore((s) => s.asidDeviceId);
+  const [asidReady, setAsidReady] = useState(false);
+
+  const handleToggleASID = useCallback(async () => {
+    const settings = useSettingsStore.getState();
+    if (settings.asidEnabled) {
+      settings.setAsidEnabled(false);
+      setAsidReady(false);
+      notify({ type: 'info', message: 'ASID hardware output disabled' });
+    } else {
+      try {
+        const mgr = getASIDDeviceManager();
+        await mgr.init();
+        const devices = mgr.getDevices();
+        if (devices.length === 0) {
+          notify({ type: 'warning', message: 'No ASID devices found. Connect USB-SID-Pico and retry.' });
+          return;
+        }
+        if (!settings.asidDeviceId && devices.length > 0) {
+          settings.setAsidDeviceId(devices[0].id);
+          mgr.selectDevice(devices[0].id);
+        }
+        settings.setAsidEnabled(true);
+        setAsidReady(mgr.isDeviceReady());
+        notify({ type: 'success', message: `ASID enabled: ${devices[0]?.name || 'device'}` });
+      } catch (err) {
+        notify({ type: 'error', message: `ASID init failed: ${err}` });
+      }
+    }
+  }, []);
   
   const [showFxPresetsMenu, setShowFxPresetsMenu] = useState(false);
   const [showGrooveSettings, setShowGrooveSettings] = useState(false);
@@ -738,6 +773,15 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 }}
                 title={isPlayingPattern ? 'Click: Stop · Shift+click/Right-click: Power off' : 'Play Pattern'}
                 className="min-w-[88px]">{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
+              <Button
+                variant={asidEnabled ? 'primary' : 'default'}
+                size="sm"
+                onClick={handleToggleASID}
+                title={asidEnabled ? `ASID active${asidReady ? '' : ' (no device)'}` : 'Enable ASID hardware SID output'}
+                className={`min-w-[44px] ${asidEnabled ? 'text-green-400 border-green-500/50' : 'text-gray-500'}`}
+              >
+                {asidEnabled ? '🔊 HW' : '🔇 HW'}
+              </Button>
             </div>
           </div>
 
