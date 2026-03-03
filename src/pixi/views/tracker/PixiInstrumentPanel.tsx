@@ -1,17 +1,20 @@
 /**
  * PixiInstrumentPanel — GL-native instrument list with action bar.
  * Feature parity with the DOM InstrumentList (FT2 variant):
- *   - Top action bar: ADD, PRESET, SAMPLE, EDIT, CHIP
- *   - Per-row: number, colored dot, name, type badge, clone/delete on selected
+ *   - Top action bar: ADD, PRESET, SAMPLE, EDIT, CHIP (with fontaudio icons)
+ *   - Per-row: number, synth-type icon, name, type badge, hover-reveal clone/delete
+ *   - Footer with instrument count
+ *   - Double-click to open editor, scroll-to-selected
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedWheelEvent, FederatedPointerEvent } from 'pixi.js';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getSynthInfo } from '@constants/synthCategories';
 import { BASS_PRESETS } from '@constants/factoryPresets';
 import { PIXI_FONTS } from '../../fonts';
+import { FAD_ICONS } from '../../fontaudioIcons';
 import { usePixiTheme } from '../../theme';
 import { PixiButton } from '../../components/PixiButton';
 
@@ -20,7 +23,7 @@ interface PixiInstrumentPanelProps {
   height: number;
 }
 
-/** Map Tailwind color classes used in synthCategories → Pixi hex colors */
+/** Map Tailwind color classes → Pixi hex colors */
 const TAILWIND_HEX: Record<string, number> = {
   'text-accent-primary': 0x00ff88,
   'text-blue-300':   0x93c5fd, 'text-blue-400':   0x60a5fa, 'text-blue-500':   0x3b82f6,
@@ -46,8 +49,63 @@ const TAILWIND_HEX: Record<string, number> = {
   'text-white':      0xffffff,
 };
 
-const ITEM_H = 28;
-const ACTION_BAR_H = 38;
+/** Map Lucide icon names (from synthCategories) → fontaudio icon characters */
+const LUCIDE_TO_FAD: Record<string, string> = {
+  Zap:           FAD_ICONS['thunderbolt'] ?? '',
+  AudioLines:    FAD_ICONS['waveform'] ?? '',
+  Music2:        FAD_ICONS['keyboard'] ?? '',
+  Layers:        FAD_ICONS['modularplug'] ?? '',
+  Radio:         FAD_ICONS['speaker'] ?? '',
+  Activity:      FAD_ICONS['modsine'] ?? '',
+  Guitar:        FAD_ICONS['waveform'] ?? '',
+  LayoutGrid:    FAD_ICONS['drumpad'] ?? '',
+  Piano:         FAD_ICONS['keyboard'] ?? '',
+  Gamepad2:      FAD_ICONS['cpu'] ?? '',
+  Gamepad:       FAD_ICONS['cpu'] ?? '',
+  Waves:         FAD_ICONS['modsine'] ?? '',
+  Music4:        FAD_ICONS['keyboard'] ?? '',
+  Mic:           FAD_ICONS['microphone'] ?? '',
+  BarChart3:     FAD_ICONS['waveform'] ?? '',
+  Cable:         FAD_ICONS['modularplug'] ?? '',
+  Cpu:           FAD_ICONS['cpu'] ?? '',
+  Disc:          FAD_ICONS['diskio'] ?? '',
+  Drum:          FAD_ICONS['drumpad'] ?? '',
+  Headphones:    FAD_ICONS['headphones'] ?? '',
+  Speaker:       FAD_ICONS['speaker'] ?? '',
+  Volume2:       FAD_ICONS['speaker'] ?? '',
+  Waveform:      FAD_ICONS['waveform'] ?? '',
+  Wind:          FAD_ICONS['modsine'] ?? '',
+  Plug:          FAD_ICONS['modularplug'] ?? '',
+  Star:          FAD_ICONS['preset-a'] ?? '',
+  Save:          FAD_ICONS['save'] ?? '',
+  Plus:          FAD_ICONS['preset-a'] ?? '',
+  Monitor:       FAD_ICONS['speaker'] ?? '',
+  Code2:         FAD_ICONS['cpu'] ?? '',
+  Hexagon:       FAD_ICONS['cpu'] ?? '',
+  Joystick:      FAD_ICONS['cpu'] ?? '',
+  Globe:         FAD_ICONS['speaker'] ?? '',
+  Sparkles:      FAD_ICONS['modsine'] ?? '',
+  Hash:          FAD_ICONS['cpu'] ?? '',
+  Megaphone:     FAD_ICONS['speaker'] ?? '',
+  Phone:         FAD_ICONS['speaker'] ?? '',
+  FileAudio:     FAD_ICONS['diskio'] ?? '',
+  Sun:           FAD_ICONS['modsine'] ?? '',
+  Tv:            FAD_ICONS['speaker'] ?? '',
+  Play:          FAD_ICONS['play'] ?? '',
+  Bomb:          FAD_ICONS['thunderbolt'] ?? '',
+  Circle:        FAD_ICONS['modsine'] ?? '',
+  Glasses:       FAD_ICONS['headphones'] ?? '',
+  MessageSquare: FAD_ICONS['speaker'] ?? '',
+  Smartphone:    FAD_ICONS['speaker'] ?? '',
+  SquareStack:   FAD_ICONS['modularplug'] ?? '',
+  Music:         FAD_ICONS['keyboard'] ?? '',
+};
+
+const DEFAULT_ICON_CHAR = FAD_ICONS['keyboard'] ?? '';
+
+const ITEM_H = 26;
+const ACTION_BAR_H = 34;
+const FOOTER_H = 22;
 const BUFFER = 3;
 
 export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width, height }) => {
@@ -61,6 +119,7 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
   const useHexNumbers    = useUIStore((s) => s.useHexNumbers);
 
   const [scrollY, setScrollY] = useState(0);
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
   const lastClickRef = useRef<{ id: number; time: number }>({ id: -1, time: 0 });
 
   const sorted = useMemo(
@@ -68,9 +127,22 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
     [instruments],
   );
 
-  const listH = height - ACTION_BAR_H;
+  const listH = height - ACTION_BAR_H - FOOTER_H;
   const totalHeight = sorted.length * ITEM_H;
   const maxScroll = Math.max(0, totalHeight - listH);
+
+  // Scroll to selected instrument when it changes
+  useEffect(() => {
+    const idx = sorted.findIndex((inst) => inst.id === currentId);
+    if (idx < 0) return;
+    const itemTop = idx * ITEM_H;
+    const itemBot = itemTop + ITEM_H;
+    setScrollY((prev) => {
+      if (itemTop < prev) return itemTop;
+      if (itemBot > prev + listH) return itemBot - listH;
+      return prev;
+    });
+  }, [currentId, sorted, listH]);
 
   // Virtual scrolling
   const startIdx = Math.max(0, Math.floor(scrollY / ITEM_H) - BUFFER);
@@ -85,7 +157,6 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
   const handleItemClick = useCallback((id: number) => {
     const now = Date.now();
     if (lastClickRef.current.id === id && now - lastClickRef.current.time < 300) {
-      // Double-click: open instrument editor modal
       useUIStore.getState().openModal('instruments');
       lastClickRef.current = { id: -1, time: 0 };
     } else {
@@ -97,8 +168,7 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
   // ─── Action bar handlers ────────────────────────────────────────────────────
 
   const handleAdd = useCallback(() => {
-    const startingPreset = BASS_PRESETS[0];
-    createInstrument(startingPreset);
+    createInstrument(BASS_PRESETS[0]);
   }, [createInstrument]);
 
   const handlePreset = useCallback(() => {
@@ -163,7 +233,7 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
     g.clear();
     if (maxScroll <= 0) return;
     g.roundRect(0, 0, 6, thumbHeight, 3);
-    g.fill({ color: theme.textMuted.color, alpha: 0.4 });
+    g.fill({ color: theme.textMuted.color, alpha: 0.5 });
   }, [thumbHeight, maxScroll, theme]);
 
   // ─── Draw helpers ───────────────────────────────────────────────────────────
@@ -182,19 +252,27 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
     g.fill({ color: theme.bg.color });
   }, [width, listH, theme]);
 
-  // Width budget: 8px pad + 24px num + 4px gap + 8px dot + 4px gap + name(flex) + badge + actions(64px) + 12px scrollbar
-  const nameMaxW = width - 8 - 24 - 4 - 8 - 4 - 60 - 64 - 12;
+  const drawFooterBg = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, width, 1);
+    g.fill({ color: theme.border.color, alpha: 0.3 });
+    g.rect(0, 1, width, FOOTER_H - 1);
+    g.fill({ color: theme.bgTertiary.color });
+  }, [width, theme]);
+
+  // Width budget: 6px pad + 22px num + 16px icon + 4px gap + name(flex) + badge(56) + actions(44) + 10px scrollbar
+  const nameMaxW = width - 6 - 22 - 16 - 4 - 56 - 44 - 10;
 
   return (
     <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
       {/* ═══ Action Bar ═══ */}
-      <pixiContainer layout={{ width, height: ACTION_BAR_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 4, paddingRight: 4, gap: 2, flexShrink: 0 }}>
+      <pixiContainer layout={{ width, height: ACTION_BAR_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 3, paddingRight: 3, gap: 2, flexShrink: 0 }}>
         <pixiGraphics draw={drawActionBarBg} layout={{ position: 'absolute', width, height: ACTION_BAR_H }} />
-        <PixiButton label="ADD"    variant="ghost" size="sm" onClick={handleAdd}        width={36} />
-        <PixiButton label="PRESET" variant="ghost" size="sm" onClick={handlePreset}     width={48} />
-        <PixiButton label="SAMPLE" variant="ghost" size="sm" onClick={handleSamplePack} width={50} color="green" />
-        <PixiButton label="EDIT"   variant="ghost" size="sm" onClick={handleEdit}       width={36} />
-        <PixiButton label="CHIP"   variant="ghost" size="sm" onClick={handleChip}       width={36} />
+        <PixiButton label="ADD"    icon="preset-a"    variant="ghost" size="sm" onClick={handleAdd}        width={40} />
+        <PixiButton label="PRESET" icon="open"        variant="ghost" size="sm" onClick={handlePreset}     width={56} />
+        <PixiButton label="SAMPLE" icon="diskio"      variant="ghost" size="sm" onClick={handleSamplePack} width={56} color="green" />
+        <PixiButton label="EDIT"   icon="pen"         variant="ghost" size="sm" onClick={handleEdit}       width={40} />
+        <PixiButton label="CHIP"   icon="cpu"         variant="ghost" size="sm" onClick={handleChip}       width={40} />
       </pixiContainer>
 
       {/* ═══ Instrument List ═══ */}
@@ -212,13 +290,17 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
           const actualIdx = startIdx + i;
           const y = actualIdx * ITEM_H - scrollY;
           const isSelected = inst.id === currentId;
+          const isHovered = inst.id === hoveredId;
           const isEven = actualIdx % 2 === 0;
           const synthInfo = getSynthInfo(inst.synthType);
-          const dotColor = TAILWIND_HEX[synthInfo?.color ?? ''] ?? 0x888888;
+          const iconColor = TAILWIND_HEX[synthInfo?.color ?? ''] ?? 0x888888;
+          const iconChar = LUCIDE_TO_FAD[synthInfo?.icon ?? ''] || DEFAULT_ICON_CHAR;
           const displayNum = useHexNumbers
             ? (actualIdx + 1).toString(16).toUpperCase().padStart(2, '0')
             : (actualIdx + 1).toString(10).padStart(2, '0');
           const badge = inst.metadata?.displayType || synthInfo?.shortName || inst.synthType;
+          const showActions = isSelected || isHovered;
+          const rowW = width - 10;
 
           return (
             <pixiContainer
@@ -226,47 +308,52 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
               eventMode="static"
               cursor="pointer"
               onPointerUp={() => handleItemClick(inst.id)}
+              onPointerEnter={() => setHoveredId(inst.id)}
+              onPointerLeave={() => setHoveredId((prev) => (prev === inst.id ? null : prev))}
               layout={{
                 position: 'absolute',
                 left: 0,
                 top: y,
-                width: width - 10,
+                width: rowW,
                 height: ITEM_H,
                 flexDirection: 'row',
                 alignItems: 'center',
-                paddingLeft: 8,
+                paddingLeft: 6,
               }}
             >
               {/* Row background */}
               <pixiGraphics
                 draw={(g) => {
                   g.clear();
-                  g.rect(0, 0, width - 10, ITEM_H);
+                  g.rect(0, 0, rowW, ITEM_H);
                   if (isSelected) {
-                    g.fill({ color: theme.accent.color, alpha: 0.15 });
+                    g.fill({ color: theme.accent.color, alpha: 0.2 });
+                    // Left accent bar
+                    g.rect(0, 0, 2, ITEM_H);
+                    g.fill({ color: theme.accent.color });
+                  } else if (isHovered) {
+                    g.fill({ color: theme.bgActive.color, alpha: 0.5 });
                   } else {
-                    g.fill({ color: isEven ? theme.bg.color : theme.bgSecondary.color });
+                    g.fill({ color: isEven ? theme.bg.color : theme.bgSecondary.color, alpha: isEven ? 0 : 0.5 });
                   }
                 }}
-                layout={{ position: 'absolute', width: width - 10, height: ITEM_H }}
+                layout={{ position: 'absolute', width: rowW, height: ITEM_H }}
               />
 
               {/* Number */}
               <pixiBitmapText
                 text={displayNum}
-                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
                 tint={isSelected ? theme.accent.color : theme.textMuted.color}
-                layout={{ width: 24, flexShrink: 0 }}
+                layout={{ width: 22, flexShrink: 0 }}
               />
 
-              {/* Colored dot */}
-              <pixiGraphics
-                draw={(g) => {
-                  g.clear();
-                  g.circle(4, 4, 4);
-                  g.fill({ color: isSelected ? theme.bgTertiary.color : dotColor });
-                }}
-                layout={{ width: 8, height: 8, flexShrink: 0, marginRight: 4 }}
+              {/* Synth type icon (fontaudio) */}
+              <pixiBitmapText
+                text={iconChar}
+                style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 12, fill: 0xffffff }}
+                tint={isSelected ? 0xffffff : iconColor}
+                layout={{ width: 16, flexShrink: 0, marginRight: 4 }}
               />
 
               {/* Name */}
@@ -277,16 +364,26 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
                 layout={{ flex: 1, overflow: 'hidden', maxWidth: Math.max(40, nameMaxW) }}
               />
 
+              {/* Loop indicator */}
+              {inst.sample?.loop && (
+                <pixiBitmapText
+                  text={FAD_ICONS[inst.sample.loopType === 'pingpong' ? 'repeat' : 'repeat-one'] ?? ''}
+                  style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
+                  tint={inst.sample.loopType === 'pingpong' ? 0x60a5fa : 0x4ade80}
+                  layout={{ flexShrink: 0, marginRight: 2 }}
+                />
+              )}
+
               {/* Type badge */}
               <pixiContainer layout={{ flexShrink: 0, marginLeft: 2, marginRight: 2 }}>
                 <pixiGraphics
                   draw={(g) => {
                     g.clear();
-                    const bw = Math.min(52, badge.length * 6 + 8);
-                    g.roundRect(0, 0, bw, 16, 3);
+                    const bw = Math.min(52, badge.length * 5.5 + 8);
+                    g.roundRect(0, 0, bw, 15, 3);
                     g.fill({ color: isSelected ? theme.bgActive.color : theme.bgTertiary.color, alpha: 0.8 });
                   }}
-                  layout={{ position: 'absolute', width: 52, height: 16 }}
+                  layout={{ position: 'absolute', width: 52, height: 15 }}
                 />
                 <pixiBitmapText
                   text={badge.length > 8 ? badge.slice(0, 7) + '…' : badge}
@@ -296,12 +393,10 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
                 />
               </pixiContainer>
 
-              {/* Action buttons (clone / delete) — visible on selected row */}
-              {isSelected && (
-                <pixiContainer layout={{ flexDirection: 'row', gap: 2, flexShrink: 0, marginLeft: 2 }}>
-                  {/* Clone */}
+              {/* Action buttons — visible on hover and selected */}
+              {showActions && (
+                <pixiContainer layout={{ flexDirection: 'row', gap: 1, flexShrink: 0, marginLeft: 2 }}>
                   <PixiButton label="" icon="copy" variant="ghost" size="sm" onClick={() => handleClone(inst.id)} width={20} />
-                  {/* Delete */}
                   {instruments.length > 1 && (
                     <PixiButton label="" icon="close" variant="ghost" size="sm" color="red" onClick={() => handleDelete(inst.id)} width={20} />
                   )}
@@ -324,6 +419,17 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
             />
           </pixiContainer>
         )}
+      </pixiContainer>
+
+      {/* ═══ Footer ═══ */}
+      <pixiContainer layout={{ width, height: FOOTER_H, flexShrink: 0, alignItems: 'center', paddingLeft: 8 }}>
+        <pixiGraphics draw={drawFooterBg} layout={{ position: 'absolute', width, height: FOOTER_H }} />
+        <pixiBitmapText
+          text={`${instruments.length} instrument${instruments.length !== 1 ? 's' : ''}`}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={{ marginTop: 4 }}
+        />
       </pixiContainer>
     </pixiContainer>
   );
