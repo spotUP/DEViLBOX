@@ -722,17 +722,22 @@ export const useTrackerInput = () => {
         moveCursor(dir);
         if (selecting) endSelection();
         // Start RAF-driven scroll if not already running.
-        // PERF: Move cursor every frame. Tile-shift scrolling in
-        // PixiPatternEditor makes most frames cheap (~1ms) by shifting
-        // the container's y instead of regenerating labels. Only every
-        // ~10th frame triggers full label regeneration (~15ms).
+        // PERF: Move cursor every 3rd frame (~20Hz). Each cursor move
+        // triggers full label regeneration (~15ms) in the pattern editor,
+        // exceeding the 16.7ms vsync budget. Spacing moves 3 frames apart
+        // gives 2 cheap "coast" frames between expensive redraws, keeping
+        // average FPS at ~45 instead of the 30fps ceiling from macOS's
+        // 30Hz key repeat rate.
         heldArrowRef.current = { dir, selecting };
         if (!arrowRafRef.current) {
+          let frameCount = 0;
           const tick = () => {
             const held = heldArrowRef.current;
             if (!held) { arrowRafRef.current = 0; return; }
-            moveCursorRef.current(held.dir);
-            if (held.selecting) endSelectionRef.current();
+            if (++frameCount % 3 === 0) {
+              moveCursorRef.current(held.dir);
+              if (held.selecting) endSelectionRef.current();
+            }
             arrowRafRef.current = requestAnimationFrame(tick);
           };
           arrowRafRef.current = requestAnimationFrame(tick);
