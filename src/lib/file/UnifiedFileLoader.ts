@@ -18,6 +18,7 @@ import { useAudioStore } from '@/stores/useAudioStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { notify } from '@/stores/useNotificationStore';
 import { isSupportedFormat } from '@/lib/import/FormatRegistry';
+import { isSupportedModule } from '@/lib/import/ModuleLoader';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { checkModlandFile } from '@/lib/modland/ModlandDetector';
 import { useModlandContributionModal } from '@/stores/useModlandContributionModal';
