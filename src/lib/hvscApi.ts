@@ -136,10 +136,10 @@ export async function getFeaturedTunes(): Promise<HVSCEntry[]> {
   
   // Fallback: return some well-known classics
   return [
-    { name: 'Commando.sid', path: 'Hubbard_Rob/Commando.sid', isDirectory: false },
-    { name: 'Last_Ninja.sid', path: 'Hubbard_Rob/Last_Ninja.sid', isDirectory: false },
-    { name: 'Monty_on_the_Run.sid', path: 'Hubbard_Rob/Monty_on_the_Run.sid', isDirectory: false },
-    { name: 'One_Man_and_His_Droid.sid', path: 'Galway_Martin/One_Man_and_His_Droid.sid', isDirectory: false },
-    { name: 'Parallax.sid', path: 'Galway_Martin/Parallax.sid', isDirectory: false },
+    { name: 'Commando.sid', path: 'MUSICIANS/H/Hubbard_Rob/Commando.sid', isDirectory: false },
+    { name: 'Last_Ninja.sid', path: 'MUSICIANS/H/Hubbard_Rob/Last_Ninja.sid', isDirectory: false },
+    { name: 'Monty_on_the_Run.sid', path: 'MUSICIANS/H/Hubbard_Rob/Monty_on_the_Run.sid', isDirectory: false },
+    { name: 'One_Man_and_His_Droid.sid', path: 'MUSICIANS/G/Galway_Martin/One_Man_and_His_Droid.sid', isDirectory: false },
+    { name: 'Parallax.sid', path: 'MUSICIANS/G/Galway_Martin/Parallax.sid', isDirectory: false },
   ];
 }
