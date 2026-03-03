@@ -61,13 +61,22 @@ async function loadManifest(): Promise<void> {
 async function fetchPresetContent(name: string): Promise<string | null> {
   if (presetContentCache.has(name)) return presetContentCache.get(name)!;
   const entry = manifestPresets?.find(p => p.name === name);
-  if (!entry) return null;
+  if (!entry) {
+    console.warn('[ProjectMCanvas] No manifest entry for preset:', name, '(manifestPresets:', manifestPresets?.length ?? 'null', ')');
+    return null;
+  }
   try {
-    const resp = await fetch(`/projectm/presets/${entry.path}`);
+    const encodedPath = entry.path.split('/').map(encodeURIComponent).join('/');
+    const resp = await fetch(`/projectm/presets/${encodedPath}`);
+    if (!resp.ok) {
+      console.error('[ProjectMCanvas] Fetch failed for preset:', name, resp.status);
+      return null;
+    }
     const text = await resp.text();
     presetContentCache.set(name, text);
     return text;
-  } catch {
+  } catch (err) {
+    console.error('[ProjectMCanvas] Fetch error for preset:', name, err);
     return null;
   }
 }
@@ -230,6 +239,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
     const doLoadPresetByName = useCallback(async (name: string) => {
       const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
       const idx = names.indexOf(name);
+      console.log('[ProjectMCanvas] loadPresetByName:', name, 'idx:', idx, 'total:', names.length);
       if (idx >= 0) {
         await doLoadPreset(idx);
       }
