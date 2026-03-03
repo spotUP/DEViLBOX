@@ -128,13 +128,18 @@ interface TrackerStore {
 
   // C64 SID metadata (extracted from SID header during import)
   sidMetadata: {
+    format: string;
+    version: number;
     title: string;
     author: string;
     copyright: string;
     chipModel: '6581' | '8580' | 'Unknown';
     clockSpeed: 'PAL' | 'NTSC' | 'Unknown';
     subsongs: number;
+    defaultSubsong: number;
     currentSubsong: number;
+    secondSID: boolean;
+    thirdSID: boolean;
   } | null;
   setSidMetadata: (info: TrackerState['sidMetadata']) => void;
 

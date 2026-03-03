@@ -417,13 +417,18 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       const sidInfo = parseSIDHeader(new Uint8Array(songBuf));
       if (sidInfo) {
         useTrackerStore.getState().setSidMetadata({
+          format: sidInfo.format,
+          version: sidInfo.version,
           title: sidInfo.title,
           author: sidInfo.author,
           copyright: sidInfo.copyright,
           chipModel: sidInfo.chipModel,
           clockSpeed: sidInfo.clockSpeed,
           subsongs: sidInfo.subsongs,
+          defaultSubsong: sidInfo.defaultSubsong,
           currentSubsong: options.subsong ?? sidInfo.defaultSubsong,
+          secondSID: sidInfo.secondSID,
+          thirdSID: sidInfo.thirdSID,
         });
       } else {
         useTrackerStore.getState().setSidMetadata(null);

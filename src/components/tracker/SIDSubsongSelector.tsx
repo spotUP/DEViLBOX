@@ -1,14 +1,15 @@
 /**
- * SIDSubsongSelector — Dropdown for switching between C64 SID subsongs.
- * Displayed when a .sid file with multiple subsongs is loaded.
- * Calls C64SIDEngine.setSubsong() to switch subsongs during playback.
+ * SIDSubsongSelector — SID chip badge, subsong dropdown, and info button.
+ * Displayed when a .sid file is loaded. Shows info button for all SID files,
+ * subsong dropdown only when there are multiple subsongs.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useTrackerStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
-import { Cpu } from 'lucide-react';
+import { Cpu, Info } from 'lucide-react';
 import { notify } from '@stores/useNotificationStore';
+import { SIDInfoModal } from '@components/dialogs/SIDInfoModal';
 
 export const SIDSubsongSelector: React.FC = React.memo(() => {
   const { sidMetadata, setSidMetadata } = useTrackerStore(
@@ -17,6 +18,7 @@ export const SIDSubsongSelector: React.FC = React.memo(() => {
       setSidMetadata: state.setSidMetadata,
     }))
   );
+  const [showInfo, setShowInfo] = useState(false);
 
   const handleSubsongChange = useCallback(
     async (newIdx: number) => {
@@ -38,26 +40,38 @@ export const SIDSubsongSelector: React.FC = React.memo(() => {
     [sidMetadata, setSidMetadata]
   );
 
-  if (!sidMetadata || sidMetadata.subsongs <= 1) return null;
+  if (!sidMetadata) return null;
 
   const chipBadge = sidMetadata.chipModel !== 'Unknown' ? sidMetadata.chipModel : 'SID';
 
   return (
-    <div className="flex items-center gap-1.5 px-2">
-      <Cpu size={12} className="text-blue-400 shrink-0" />
-      <span className="text-[10px] text-blue-300/70 font-mono">{chipBadge}</span>
-      <select
-        value={sidMetadata.currentSubsong}
-        onChange={(e) => handleSubsongChange(Number(e.target.value))}
-        className="text-[10px] bg-dark-bgSecondary border border-blue-800/40 rounded px-1.5 py-0.5 text-text-primary min-w-[80px]"
-      >
-        {Array.from({ length: sidMetadata.subsongs }, (_, i) => (
-          <option key={i} value={i}>
-            Sub {i + 1}{i === sidMetadata.currentSubsong ? ' ●' : ''}
-          </option>
-        ))}
-      </select>
-    </div>
+    <>
+      <div className="flex items-center gap-1.5 px-2">
+        <Cpu size={12} className="text-blue-400 shrink-0" />
+        <span className="text-[10px] text-blue-300/70 font-mono">{chipBadge}</span>
+        {sidMetadata.subsongs > 1 && (
+          <select
+            value={sidMetadata.currentSubsong}
+            onChange={(e) => handleSubsongChange(Number(e.target.value))}
+            className="text-[10px] bg-dark-bgSecondary border border-blue-800/40 rounded px-1.5 py-0.5 text-text-primary min-w-[80px]"
+          >
+            {Array.from({ length: sidMetadata.subsongs }, (_, i) => (
+              <option key={i} value={i}>
+                Sub {i + 1}{i === sidMetadata.currentSubsong ? ' ●' : ''}
+              </option>
+            ))}
+          </select>
+        )}
+        <button
+          onClick={() => setShowInfo(true)}
+          className="p-0.5 text-blue-400/60 hover:text-blue-300 transition-colors rounded"
+          title="SID file info"
+        >
+          <Info size={13} />
+        </button>
+      </div>
+      {showInfo && <SIDInfoModal onClose={() => setShowInfo(false)} />}
+    </>
   );
 });
 
