@@ -36,7 +36,7 @@ export const ModlandContributionModal: React.FC<ModlandContributionModalProps> =
       closeOnEscape={true}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-accent-primary/20 to-purple-500/20 border-b border-dark-border">
+      <div className="flex items-center justify-between px-5 py-3 bg-dark-bgSecondary border-b border-dark-border">
         <div className="flex items-center gap-3">
           <div className="p-1.5 bg-accent-primary/20 rounded-lg">
             <Sparkles size={18} className="text-accent-primary" />
@@ -55,12 +55,12 @@ export const ModlandContributionModal: React.FC<ModlandContributionModalProps> =
       <div className="p-5 flex gap-5">
         {/* Left: context */}
         <div className="flex-1 space-y-3">
-          <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-accent-primary/20 rounded-lg p-3">
+          <div className="border border-accent-primary/20 rounded-lg p-3">
             <p className="text-sm font-semibold text-text-primary mb-1">
               Not in Modland's <span className="text-accent-primary">727,000+</span> file archive!
             </p>
             <p className="text-text-secondary text-xs">
-              <span className="font-mono bg-dark-bgTertiary px-1.5 py-0.5 rounded text-text-muted">{filename}</span> may be a rare release, personal creation, or lost demoscene gem.
+              <span className="font-mono text-accent-primary">{filename}</span> may be a rare release, personal creation, or lost demoscene gem.
             </p>
           </div>
 
