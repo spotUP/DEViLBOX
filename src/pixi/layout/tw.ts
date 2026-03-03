@@ -238,7 +238,7 @@ export function tw(classNames: string, theme?: PixiTheme): LayoutStyles {
     if (theme && cls.startsWith('bg-')) {
       const colorKey = cls.slice(3); // e.g., "dark-bgSecondary"
       // Handle bg-accent-primary/10 (alpha variant)
-      const [base, alphaStr] = colorKey.split('/');
+      const [base] = colorKey.split('/');
       const color = resolveColor(base, theme);
       if (color !== undefined) {
         s.backgroundColor = color;
