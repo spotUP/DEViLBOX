@@ -46,6 +46,7 @@ const FONT_SIZE = 11;
 const HEADER_HEIGHT = 28;
 // GL_MUTE_SOLO_H removed — M/S buttons are now in PixiChannelHeaders
 const SCROLL_THRESHOLD = 50; // Horizontal scroll accumulator resistance
+const V_SCROLL_THRESHOLD = 30; // Vertical scroll accumulator — absorbs trackpad momentum
 
 // ─── Note formatting ─────────────────────────────────────────────────────────
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
@@ -661,6 +662,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const [scrollLeft, setScrollLeft] = useState(0);
   const scrollLeftRef = useRef(0);
   const scrollAccumulatorRef = useRef(0);
+  const vScrollAccRef = useRef(0);
 
   // Playback row tracking — smooth offset is imperative (no React state)
   const [playbackRow, setPlaybackRow] = useState(0);
@@ -1083,14 +1085,18 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       if (playing) return; // Horizontal scroll disabled during playback
 
       if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-        // Vertical scroll — move cursor
-        const delta = Math.sign(e.deltaY) * 2;
-        const trackerState = useTrackerStore.getState();
-        const pat = trackerState.patterns[trackerState.currentPatternIndex];
-        if (!pat) return;
-        const cursorState = useCursorStore.getState();
-        const newRow = Math.max(0, Math.min(pat.length + 32, cursorState.cursor.rowIndex + delta));
-        cursorState.moveCursorToRow(newRow);
+        // Vertical scroll — stepped with accumulator (absorbs trackpad momentum)
+        vScrollAccRef.current += e.deltaY;
+        if (Math.abs(vScrollAccRef.current) > V_SCROLL_THRESHOLD) {
+          const delta = Math.sign(vScrollAccRef.current);
+          vScrollAccRef.current = 0;
+          const trackerState = useTrackerStore.getState();
+          const pat = trackerState.patterns[trackerState.currentPatternIndex];
+          if (!pat) return;
+          const cursorState = useCursorStore.getState();
+          const newRow = Math.max(0, Math.min(pat.length + 32, cursorState.cursor.rowIndex + delta));
+          cursorState.moveCursorToRow(newRow);
+        }
       } else if (!allFit) {
         // Horizontal scroll — stepped with accumulator (matches DOM behavior)
         scrollAccumulatorRef.current += e.deltaX;
