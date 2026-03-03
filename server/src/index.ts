@@ -11,6 +11,7 @@ import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth';
 import filesRoutes from './routes/files';
 import modlandRoutes from './routes/modland';
+import hvscRoutes from './routes/hvsc';
 import songdbRoutes from './routes/songdb';
 import scRoutes from './routes/sc';
 import { initDatabase } from './db/database';
@@ -67,10 +68,19 @@ const songdbLimiter = rateLimit({
 });
 app.use('/api/songdb/', songdbLimiter as unknown as express.RequestHandler);
 
+// HVSC rate limiter (same as modland — 500/15min, public catalog)
+const hvscLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  message: 'Too many requests from this IP'
+});
+app.use('/api/hvsc/', hvscLimiter as unknown as express.RequestHandler);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/modland', modlandRoutes);
+app.use('/api/hvsc', hvscRoutes);
 app.use('/api/songdb', songdbRoutes);
 app.use('/api/sc', scRoutes);
 
