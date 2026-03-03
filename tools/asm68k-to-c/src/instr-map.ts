@@ -73,8 +73,8 @@ export function emitOperand(op: Operand, size: Size = 'L'): string {
       const addrC = op.raw.startsWith('$') ? `0x${op.raw.slice(1)}` : op.raw;
       return `READ${sizeStr(size)}(${addrC})`;
     }
-    case 'label_ref': return `READ${sizeStr(size)}((uintptr_t)${sanitizeLabel(op.name)})`;
-    case 'pc_rel': return `READ${sizeStr(size)}((uintptr_t)${sanitizeLabel(op.label)})`;
+    case 'label_ref': return sanitizeLabel(op.name);
+    case 'pc_rel': return sanitizeLabel(op.label);
     default: return '/* unknown_operand */';
   }
 }
@@ -132,6 +132,13 @@ function emitPaula(addr: number, value: string, _size: Size): string {
     if (addr === PAULA_DAT[ch])    return `/* AUD${ch}DAT ${value} */`;
   }
   return `/* paula $${addr.toString(16)} */ (void)(${value});`;
+}
+
+// Like emitOperand but wraps label_ref/pc_rel in READ (for value access, not address)
+function emitOperandRead(op: Operand, size: Size): string {
+  if (op.kind === 'label_ref') return \`READ\${sizeStr(size)}((uintptr_t)\${sanitizeLabel(op.name)})\`;
+  if (op.kind === 'pc_rel') return \`READ\${sizeStr(size)}((uintptr_t)\${sanitizeLabel(op.label)})\`;
+  return emitOperand(op, size);
 }
 
 export function emitInstruction(node: InstructionNode): string {
@@ -247,7 +254,7 @@ export function emitInstruction(node: InstructionNode): string {
         const dstExpr = s === 'L' ? dst.name : emitRegSized(dst.name, s);
         return `{ ${addType} _ar=(${addType})(${dstExpr} + ${src}); ${regWrite(dst, `(${addType})_ar`, s)} flag_z=(${addSign}(_ar)==0); flag_n=(${addSign}(_ar)<0); }`;
       }
-      const addRd = emitOperand(dst, s);
+      const addRd = emitOperandRead(dst, s);
       return `{ ${addType} _ar=(${addType})(${addRd} + ${src}); ${regWrite(dst, `(${addType})_ar`, s)} flag_z=(${addSign}(_ar)==0); flag_n=(${addSign}(_ar)<0); }`;
     }
     case 'ADDX':
@@ -268,7 +275,7 @@ export function emitInstruction(node: InstructionNode): string {
         const dstExpr = s === 'L' ? dst.name : emitRegSized(dst.name, s);
         return `{ ${subType} _sr=(${subType})(${dstExpr} - ${srcExpr}); ${regWrite(dst, `(${subType})_sr`, s)} flag_z=(${subSign}(_sr)==0); flag_n=(${subSign}(_sr)<0); }`;
       }
-      const subRd = emitOperand(dst, s);
+      const subRd = emitOperandRead(dst, s);
       return `{ ${subType} _sr=(${subType})(${subRd} - ${src}); ${regWrite(dst, `(${subType})_sr`, s)} flag_z=(${subSign}(_sr)==0); flag_n=(${subSign}(_sr)<0); }`;
     }
     case 'SUBX':
