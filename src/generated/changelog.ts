@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T23:13:17.405Z
+ * Generated: 2026-03-03T23:17:32.538Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2132';
-export const BUILD_NUMBER = '2132';
-export const BUILD_HASH = 'b8de79c3';
+export const BUILD_VERSION = '1.0.2133';
+export const BUILD_NUMBER = '2133';
+export const BUILD_HASH = 'db5d5b69';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2132',
+    version: '1.0.2133',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'fix',
+        "description": "Resolve 10 TypeScript compilation errors"
+      },
       {
         type: 'fix',
         "description": "Switch to tracker view after loading GoatTracker .sng"
@@ -234,10 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Redesign Rare Finds modal with design system tokens"
-      },
-      {
-        type: 'fix',
-        "description": "Conditionally mount WorkbenchContainer to avoid Yoga BindingError"
       }
     ]
   }

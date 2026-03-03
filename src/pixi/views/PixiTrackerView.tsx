@@ -65,7 +65,7 @@ export const PixiTrackerView: React.FC = () => {
   const showMacroSlots = useUIStore(s => s.showMacroSlots);
   const showKnobBar = useMIDIStore(s => s.showKnobBar);
   const showInstrumentPanel = useUIStore(s => s.showInstrumentPanel);
-  const setShowInstrumentPanel = useUIStore(s => s.setShowInstrumentPanel);
+
 
   // PixiTrackerView lives inside a PixiWindow — use the window's own dimensions,
   // not the screen dimensions, so layout calculations are correct when the window
