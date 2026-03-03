@@ -137,7 +137,7 @@ export const PixiMixerView: React.FC = () => {
       <pixiContainer
         layout={{
           flexDirection: 'row',
-          alignItems: 'flex-start',
+          alignItems: 'flex-end',
           gap: 8,
           paddingLeft: 8,
           paddingRight: 8,
@@ -173,7 +173,7 @@ export const PixiMixerView: React.FC = () => {
         </pixiContainer>
 
         {/* Divider */}
-        <pixiGraphics draw={drawDivider} layout={{ width: 1, height: 240, marginTop: 16 }} />
+        <pixiGraphics draw={drawDivider} layout={{ width: 1, height: 240 }} />
 
         {/* MASTER */}
         <pixiContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
