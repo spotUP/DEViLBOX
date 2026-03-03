@@ -114,3 +114,8 @@ fred-wasm/build/
 # Downloaded TTF source fonts (generated during build)
 public/fonts/ttf/
 public/modland/modland_hash.db
+
+# DeepSID data (downloaded from chordian.net, too large for git)
+server/data/deepsid.db
+server/data/deepsid-import/
+server/data/deepsid-images/
