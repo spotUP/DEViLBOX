@@ -23,198 +23,47 @@ import { StereoSeparationNode } from './StereoSeparationNode';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { getPatternScheduler } from './PatternScheduler';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
-import { getGrooveOffset, getGrooveVelocity, GROOVE_TEMPLATES } from '@/types/audio';
-import type { GrooveTemplate } from '@/types/audio';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate, ft2ArpeggioPeriod, ft2Period2NotePeriod, FT2_ARPEGGIO_TAB } from './effects/FT2Tables';
 import { HivelyEngine } from './hively/HivelyEngine';
 import { MusicLineEngine } from './musicline/MusicLineEngine';
-import { C64SIDEngine } from './C64SIDEngine';
+
+// Extracted modules
+import {
+  AMIGA_PAL_FREQUENCY, FINETUNE_MULTIPLIERS, SEMITONE_RATIOS,
+  OCTAVE_UP, OCTAVE_DOWN, AUTO_VIB_SINE_TAB,
+  DEBUG_NOTE_NAMES, NOTE_STRING_MAP, PERIOD_TABLE,
+  NOTE_NAMES, NOTE_NAMES_CLEAN, XM_NOTE_NAMES,
+  FURNACE_CHIP_ENGINE_TYPES, PERIOD_NOTE_MAP,
+  VIBRATO_TABLE, GROOVE_MAP,
+  xmNoteToNoteName, periodToNoteName,
+  getGrooveOffset, getGrooveVelocity,
+} from './replayer/PeriodTables';
+import {
+  doArpeggio as _doArpeggio,
+  doTonePortamento as _doTonePortamento,
+  doVibrato as _doVibrato,
+  doTremolo as _doTremolo,
+  doVolumeSlide as _doVolumeSlide,
+  doGlobalVolumeSlide as _doGlobalVolumeSlide,
+  doPanSlide as _doPanSlide,
+  doMultiNoteRetrig as _doMultiNoteRetrig,
+  doTremor as _doTremor,
+} from './replayer/EffectHandlers';
+import {
+  C64SIDEngine,
+  startNativeEngines,
+  stopNativeEngines,
+  pauseNativeEngines,
+  resumeNativeEngines,
+  restoreNativeRouting,
+  preInitMusicLine,
+} from './replayer/NativeEngineRouting';
 // ============================================================================
-// CONSTANTS
+// CONSTANTS (imported from replayer/PeriodTables.ts)
 // ============================================================================
 
-const AMIGA_PAL_FREQUENCY = 3546895;
 const PLAYERS_PER_CHANNEL = 2; // Double-buffered pool for overlap-free note transitions
-
-// PERF: Pre-computed finetune multipliers (finetune -8..+7 = 16 values)
-// Avoids Math.pow() per note trigger. finetune in 1/8 semitone units.
-const FINETUNE_MULTIPLIERS: number[] = new Array(16);
-for (let ft = -8; ft <= 7; ft++) {
-  FINETUNE_MULTIPLIERS[ft + 8] = Math.pow(2, ft / (8 * 12));
-}
-
-// PERF: Pre-computed semitone ratios for arpeggio macro and pitch slide
-// Covers -128..+127 semitones (full signed byte range). Index = semitones + 128.
-const SEMITONE_RATIOS: number[] = new Array(256);
-for (let s = -128; s <= 127; s++) {
-  SEMITONE_RATIOS[s + 128] = Math.pow(2, s / 12);
-}
-
-// PERF: Pre-computed octave multipliers for period conversion
-// Covers octave shifts 0..10 (more than enough for any tracker format)
-const OCTAVE_UP: number[] = new Array(11);
-const OCTAVE_DOWN: number[] = new Array(11);
-for (let o = 0; o <= 10; o++) {
-  OCTAVE_UP[o] = Math.pow(2, o);
-  OCTAVE_DOWN[o] = Math.pow(2, -o);
-}
-
-// FT2 auto-vibrato sine table (256 entries, -64..+64)
-// From ft2_replayer.c: autoVibSineTab[256]
-const AUTO_VIB_SINE_TAB: Int8Array = new Int8Array(256);
-for (let i = 0; i < 256; i++) {
-  AUTO_VIB_SINE_TAB[i] = Math.round(Math.sin((i * 2 * Math.PI) / 256) * 64);
-}
-
-// PERF: Module-level constants to avoid per-call allocation
-const DEBUG_NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const NOTE_STRING_MAP: { [key: string]: number } = {
-  'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
-  'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11,
-};
-
-// Complete period table with all 16 finetune variations
-const PERIOD_TABLE = [
-  // Finetune 0
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-  // Finetune 1
-  850, 802, 757, 715, 674, 637, 601, 567, 535, 505, 477, 450,
-  425, 401, 379, 357, 337, 318, 300, 284, 268, 253, 239, 225,
-  213, 201, 189, 179, 169, 159, 150, 142, 134, 126, 119, 113,
-  // Finetune 2
-  844, 796, 752, 709, 670, 632, 597, 563, 532, 502, 474, 447,
-  422, 398, 376, 355, 335, 316, 298, 282, 266, 251, 237, 224,
-  211, 199, 188, 177, 167, 158, 149, 141, 133, 125, 118, 112,
-  // Finetune 3
-  838, 791, 746, 704, 665, 628, 592, 559, 528, 498, 470, 444,
-  419, 395, 373, 352, 332, 314, 296, 280, 264, 249, 235, 222,
-  209, 198, 187, 176, 166, 157, 148, 140, 132, 125, 118, 111,
-  // Finetune 4
-  832, 785, 741, 699, 660, 623, 588, 555, 524, 495, 467, 441,
-  416, 392, 370, 350, 330, 312, 294, 278, 262, 247, 233, 220,
-  208, 196, 185, 175, 165, 156, 147, 139, 131, 124, 117, 110,
-  // Finetune 5
-  826, 779, 736, 694, 655, 619, 584, 551, 520, 491, 463, 437,
-  413, 390, 368, 347, 328, 309, 292, 276, 260, 245, 232, 219,
-  206, 195, 184, 174, 164, 155, 146, 138, 130, 123, 116, 109,
-  // Finetune 6
-  820, 774, 730, 689, 651, 614, 580, 547, 516, 487, 460, 434,
-  410, 387, 365, 345, 325, 307, 290, 274, 258, 244, 230, 217,
-  205, 193, 183, 172, 163, 154, 145, 137, 129, 122, 115, 109,
-  // Finetune 7
-  814, 768, 725, 684, 646, 610, 575, 543, 513, 484, 457, 431,
-  407, 384, 363, 342, 323, 305, 288, 272, 256, 242, 228, 216,
-  204, 192, 181, 171, 161, 152, 144, 136, 128, 121, 114, 108,
-  // Finetune -8
-  907, 856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480,
-  453, 428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240,
-  226, 214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120,
-  // Finetune -7
-  900, 850, 802, 757, 715, 675, 636, 601, 567, 535, 505, 477,
-  450, 425, 401, 379, 357, 337, 318, 300, 284, 268, 253, 238,
-  225, 212, 200, 189, 179, 169, 159, 150, 142, 134, 126, 119,
-  // Finetune -6
-  894, 844, 796, 752, 709, 670, 632, 597, 563, 532, 502, 474,
-  447, 422, 398, 376, 355, 335, 316, 298, 282, 266, 251, 237,
-  223, 211, 199, 188, 177, 167, 158, 149, 141, 133, 125, 118,
-  // Finetune -5
-  887, 838, 791, 746, 704, 665, 628, 592, 559, 528, 498, 470,
-  444, 419, 395, 373, 352, 332, 314, 296, 280, 264, 249, 235,
-  222, 209, 198, 187, 176, 166, 157, 148, 140, 132, 125, 118,
-  // Finetune -4
-  881, 832, 785, 741, 699, 660, 623, 588, 555, 524, 494, 467,
-  441, 416, 392, 370, 350, 330, 312, 294, 278, 262, 247, 233,
-  220, 208, 196, 185, 175, 165, 156, 147, 139, 131, 123, 117,
-  // Finetune -3
-  875, 826, 779, 736, 694, 655, 619, 584, 551, 520, 491, 463,
-  437, 413, 390, 368, 347, 328, 309, 292, 276, 260, 245, 232,
-  219, 206, 195, 184, 174, 164, 155, 146, 138, 130, 123, 116,
-  // Finetune -2
-  868, 820, 774, 730, 689, 651, 614, 580, 547, 516, 487, 460,
-  434, 410, 387, 365, 345, 325, 307, 290, 274, 258, 244, 230,
-  217, 205, 193, 183, 172, 163, 154, 145, 137, 129, 122, 115,
-  // Finetune -1
-  862, 814, 768, 725, 684, 646, 610, 575, 543, 513, 484, 457,
-  431, 407, 384, 363, 342, 323, 305, 288, 272, 256, 242, 228,
-  216, 203, 192, 181, 171, 161, 152, 144, 136, 128, 121, 114,
-];
-
-// Note names for period-to-note conversion
-const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-const NOTE_NAMES_CLEAN = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-// Pre-computed XM note → note name lookup (avoids string allocation per call)
-// Index 0 = invalid/unused, indices 1-96 = valid note names
-const XM_NOTE_NAMES: string[] = new Array(97);
-XM_NOTE_NAMES[0] = 'C4'; // Default for invalid note
-for (let i = 1; i <= 96; i++) {
-  const midi = i + 11;
-  const octave = Math.floor(midi / 12) - 1;
-  const semitone = midi % 12;
-  XM_NOTE_NAMES[i] = `${NOTE_NAMES_CLEAN[semitone]}${octave}`;
-}
-
-// FurnaceChipEngine synthTypes — these use the register-write path and need TS-side macros.
-// All other Furnace* synthTypes use FurnaceDispatchEngine (WASM processes macros internally).
-const FURNACE_CHIP_ENGINE_TYPES = new Set([
-  'Furnace', 'FurnaceOPN', 'FurnaceOPM', 'FurnaceOPL', 'FurnaceOPLL', 'FurnaceOPZ',
-  'FurnaceOPNA', 'FurnaceOPNB', 'FurnaceOPL4', 'FurnaceY8950', 'FurnaceESFM',
-  'FurnaceVRC7', 'FurnaceOPN2203', 'FurnaceOPNBB',
-]);
-
-// Pre-computed Amiga period → note name lookup (avoids iteration + string alloc per call)
-const PERIOD_NOTE_MAP = new Map<number, string>();
-for (let oct = 0; oct < 3; oct++) {
-  for (let note = 0; note < 12; note++) {
-    const idx = oct * 12 + note;
-    if (idx < 36) {
-      const period = PERIOD_TABLE[idx];
-      if (!PERIOD_NOTE_MAP.has(period)) {
-        PERIOD_NOTE_MAP.set(period, `${NOTE_NAMES[note].replace('-', '')}${oct + 1}`);
-      }
-    }
-  }
-}
-
-/** Convert XM note number to note name (e.g. "C2")
- * XM note format: 1 = C-0, 13 = C-1, 25 = C-2, etc.
- * Maps to MIDI: XM + 11 = MIDI (so XM 25 = MIDI 36 = C2)
- */
-function xmNoteToNoteName(xmNote: number): string {
-  return XM_NOTE_NAMES[xmNote] || 'C4';
-}
-
-/** Convert Amiga period to note name (e.g. "C4") */
-function periodToNoteName(period: number): string {
-  // Fast path: exact match in pre-computed map
-  const cached = PERIOD_NOTE_MAP.get(period);
-  if (cached) return cached;
-  // Slow path: find closest period (rarely hit — only for non-standard periods)
-  for (let oct = 0; oct < 8; oct++) {
-    for (let note = 0; note < 12; note++) {
-      const idx = oct * 12 + note;
-      if (idx < 36 && PERIOD_TABLE[idx] <= period) {
-        const name = `${NOTE_NAMES[note].replace('-', '')}${oct + 1}`;
-        // Cache for next hit
-        PERIOD_NOTE_MAP.set(period, name);
-        return name;
-      }
-    }
-  }
-  return 'C4';
-}
-
-// Vibrato/Tremolo sine table
-const VIBRATO_TABLE = [
-  0, 24, 49, 74, 97, 120, 141, 161, 180, 197, 212, 224, 235, 244, 250, 253,
-  255, 253, 250, 244, 235, 224, 212, 197, 180, 161, 141, 120, 97, 74, 49, 24
-];
-
-// Pre-computed groove template lookup (avoids linear scan per call)
-const GROOVE_MAP = new Map<string, GrooveTemplate>(GROOVE_TEMPLATES.map(t => [t.id, t]));
 
 // ============================================================================
 // TYPES
@@ -248,7 +97,7 @@ export type TrackerFormat =
 /**
  * Channel state - all the per-channel data needed for playback
  */
-interface ChannelState {
+export interface ChannelState {
   // Note state
   note: number;                  // Current note (period for MOD, note number for XM)
   period: number;                // Current period (after effects)
@@ -872,13 +721,7 @@ export class TrackerReplayer {
     this.stop();
 
     // Restore any native engines rerouted to separation chain (UADE/Hively)
-    if (this.routedNativeEngines.size > 0) {
-      const engine = getToneEngine();
-      for (const key of this.routedNativeEngines) {
-        engine.restoreNativeEngineRouting(key);
-      }
-      this.routedNativeEngines.clear();
-    }
+    restoreNativeRouting(this.routedNativeEngines);
 
     this.song = song;
 
@@ -913,15 +756,7 @@ export class TrackerReplayer {
     // Pre-initialize MusicLine WASM when an ML song is loaded so instrument preview
     // works immediately (before the user presses play).
     if (song.musiclineFileData) {
-      void (async () => {
-        try {
-          const mlEngine = MusicLineEngine.getInstance();
-          await mlEngine.ready();
-          await mlEngine.loadSong(song.musiclineFileData!.slice(0));
-        } catch (err) {
-          console.warn('[TrackerReplayer] ML WASM pre-init failed:', err);
-        }
-      })();
+      preInitMusicLine(song.musiclineFileData);
     }
 
     // Dispose old channels before creating new ones (prevent Web Audio node leaks)
@@ -1188,126 +1023,17 @@ export class TrackerReplayer {
     const engine = getToneEngine();
     await engine.ensureWASMSynthsReady(this.song.instruments);
 
-    // HVL/AHX: Load the raw tune binary into the HivelyEngine WASM before playback.
-    // The WASM engine does all synthesis; TrackerReplayer just triggers play/stop.
-    // We pre-create ONE HivelySynth here so the audio graph is connected BEFORE
-    // play() is called — otherwise the first few rows could be silent.
-    if (this.song.hivelyFileData && (this.song.format === 'HVL' || this.song.format === 'AHX')) {
-      try {
-        const hivelyEngine = HivelyEngine.getInstance();
-        await hivelyEngine.ready();
-        const stereoMode = this.song.hivelyMeta?.stereoMode ?? 2;
-        await hivelyEngine.loadTune(this.song.hivelyFileData.slice(0), stereoMode);
-
-        // Pre-create a HivelySynth so its output is routed through the audio graph
-        // before we call play(). This ensures engine.output → synthBus is connected.
-        const firstHVL = this.song.instruments.find(i => i.synthType === 'HivelySynth');
-        if (firstHVL) {
-          engine.getInstrument(firstHVL.id, firstHVL);
-        }
-
-        // Start WASM playback immediately — skip if muted (DJ mode visuals)
-        if (!this._muted) {
-          hivelyEngine.play();
-          console.log('[TrackerReplayer] HivelyEngine tune loaded & playing for', this.song.format);
-        } else {
-          console.log('[TrackerReplayer] HivelyEngine tune loaded but skipping play (muted for DJ visuals)');
-        }
-      } catch (err) {
-        console.error('[TrackerReplayer] Failed to load HVL tune into WASM engine:', err);
-      }
-    }
-
-    // JamCracker: Load the raw .jam binary into the JamCrackerEngine WASM.
-    // The WASM replayer (transpiled 68k + Paula emulation) handles all synthesis.
-    if (this.song.jamCrackerFileData && this.song.format === 'JamCracker') {
-      try {
-        const { JamCrackerEngine } = await import('@/engine/jamcracker/JamCrackerEngine');
-        const jcEngine = JamCrackerEngine.getInstance();
-        await jcEngine.ready();
-        await jcEngine.loadTune(this.song.jamCrackerFileData.slice(0));
-
-        // Pre-create a JamCrackerSynth so its output is routed through the audio graph
-        const firstJC = this.song.instruments.find(i => i.synthType === 'JamCrackerSynth');
-        if (firstJC) {
-          engine.getInstrument(firstJC.id, firstJC);
-        }
-
-        if (!this._muted) {
-          jcEngine.play();
-          console.log('[TrackerReplayer] JamCrackerEngine tune loaded & playing');
-        } else {
-          console.log('[TrackerReplayer] JamCrackerEngine tune loaded but skipping play (muted)');
-        }
-      } catch (err) {
-        console.error('[TrackerReplayer] Failed to load JamCracker tune into WASM engine:', err);
-      }
-    }
-
-    // C64 SID: Load the raw SID file into C64SIDEngine for hardware-accurate playback.
-    // Similar to HivelyEngine, the SID engine handles all synthesis.
-    if (this.song.c64SidFileData && this.song.format === 'SID') {
-      try {
-        const audioContext = Tone.getContext().rawContext as AudioContext;
-        this.c64SidEngine = new C64SIDEngine(this.song.c64SidFileData);
-        await this.c64SidEngine.init(audioContext);
-
-        // Start playback immediately — skip if muted (DJ mode visuals)
-        if (!this._muted) {
-          await this.c64SidEngine.play();
-          console.log('[TrackerReplayer] C64SIDEngine loaded & playing for SID format');
-        } else {
-          console.log('[TrackerReplayer] C64SIDEngine loaded but skipping play (muted for DJ visuals)');
-        }
-      } catch (err) {
-        console.error('[TrackerReplayer] Failed to load SID tune into C64SIDEngine:', err);
-      }
-    }
-
-    // MusicLine Editor: load raw binary into MusicLineEngine WASM before playback.
-    if (this.song.musiclineFileData) {
-      // WASM handles all audio for ML songs — suppress Sampler note triggers to avoid double audio.
-      this._suppressNotes = true;
-      try {
-        const mlEngine = MusicLineEngine.getInstance();
-        await mlEngine.ready();
-        await mlEngine.loadSong(this.song.musiclineFileData.slice(0));
-        if (!this._muted) {
-          mlEngine.play();
-          console.log('[TrackerReplayer] MusicLineEngine loaded & playing');
-
-          // Route ML engine audio through the stereo separation chain.
-          // ML songs don't have a 'MusicLineSynth' instrument in their instrument list
-          // (parser uses Sampler instruments for display), so we route directly here
-          // instead of relying on the instrument-iteration block below.
-          if (!this.isDJDeck && !this.routedNativeEngines.has('MusicLineSynth')) {
-            engine.routeNativeEngineOutput({ name: 'MusicLineSynth', output: mlEngine.output } as any);
-            const nativeInput = getNativeAudioNode(this.separationNode.inputTone as any);
-            if (nativeInput) {
-              engine.rerouteNativeEngine('MusicLineSynth', nativeInput);
-              this.routedNativeEngines.add('MusicLineSynth');
-            }
-          }
-        }
-      } catch (err) {
-        console.error('[TrackerReplayer] Failed to load ML tune into WASM:', err);
-      }
-    }
-
-    // Route UADE/Hively native engine output through the stereo separation chain
-    // so the Amiga stereo mix (hard-pan LRRL) gets narrowed by stereoSeparation.
-    // In DJ mode, DeckEngine.loadSong() handles this; only do it for tracker view.
-    if (!this.isDJDeck) {
-      for (const inst of this.song.instruments) {
-        const st = inst.synthType;
-        if ((st === 'UADESynth' || st === 'HivelySynth' || st === 'MusicLineSynth') && !this.routedNativeEngines.has(st)) {
-          const nativeInput = getNativeAudioNode(this.separationNode.inputTone as any);
-          if (nativeInput) {
-            engine.rerouteNativeEngine(st, nativeInput);
-            this.routedNativeEngines.add(st);
-          }
-        }
-      }
+    // Start all native WASM engines (HVL, JamCracker, SID, MusicLine, UADE routing)
+    {
+      const result = await startNativeEngines(
+        this.song,
+        this.separationNode.inputTone,
+        this.isDJDeck,
+        this._muted,
+        this.routedNativeEngines,
+      );
+      if (result.suppressNotes) this._suppressNotes = true;
+      if (result.c64SidEngine) this.c64SidEngine = result.c64SidEngine;
     }
 
     this.playing = true;
@@ -1333,55 +1059,8 @@ export class TrackerReplayer {
       this.schedulerTimerId = null;
     }
 
-    // Stop routed native engines (UADE/Hively)
-    if (this.routedNativeEngines.size > 0) {
-      const engine = getToneEngine();
-      for (const st of this.routedNativeEngines) {
-        try {
-          engine.stopNativeEngine(st);
-        } catch { /* ignored */ }
-      }
-    }
-
-    // Stop HivelyEngine if this is an HVL/AHX song
-    if (this.song?.hivelyFileData && (this.song.format === 'HVL' || this.song.format === 'AHX')) {
-      try {
-        if (HivelyEngine.hasInstance()) {
-          HivelyEngine.getInstance().stop();
-        }
-      } catch { /* HivelyEngine may not be loaded */ }
-    }
-
-    // Stop JamCrackerEngine if this is a JamCracker song
-    if (this.song?.jamCrackerFileData && this.song.format === 'JamCracker') {
-      try {
-        import('@/engine/jamcracker/JamCrackerEngine').then(({ JamCrackerEngine }) => {
-          if (JamCrackerEngine.hasInstance()) {
-            JamCrackerEngine.getInstance().stop();
-          }
-        }).catch(() => { /* JamCrackerEngine may not be loaded */ });
-      } catch { /* ignore */ }
-    }
-
-    // Stop MusicLineEngine if this is an ML song
-    if (this.song?.musiclineFileData && this.song.format === 'ML') {
-      try {
-        if (MusicLineEngine.hasInstance()) {
-          MusicLineEngine.getInstance().stop();
-        }
-      } catch { /* MusicLineEngine may not be loaded */ }
-    }
-
-    // Stop C64SIDEngine if this is a SID song
-    if (this.c64SidEngine) {
-      try {
-        this.c64SidEngine.stop();
-        this.c64SidEngine.dispose();
-        this.c64SidEngine = null;
-      } catch (err) {
-        console.warn('[TrackerReplayer] Error stopping C64SIDEngine:', err);
-      }
-    }
+    // Stop routed native engines (UADE/Hively/SID/MusicLine/JamCracker)
+    this.c64SidEngine = stopNativeEngines(this.song, this.routedNativeEngines, this.c64SidEngine);
 
     // Stop all channels (release synth notes + stop sample players)
     for (let i = 0; i < this.channels.length; i++) {
@@ -1422,31 +1101,15 @@ export class TrackerReplayer {
     this.playing = false;
 
     // Pause routed native engines (UADE/Hively) on pause
-    if (this.routedNativeEngines.size > 0) {
-      const engine = getToneEngine();
-      for (const st of this.routedNativeEngines) {
-        try {
-          if (st === 'HivelySynth') {
-            // Use pause() — not stop() — so the ring buffer is preserved and
-            // resume() can restart playback without reloading the tune.
-            HivelyEngine.getInstance().pause();
-          } else {
-            engine.stopNativeEngine(st);
-          }
-        } catch { /* ignored */ }
-      }
-    }
+    pauseNativeEngines(this.routedNativeEngines);
   }
 
   resume(): void {
     if (this.song && !this.playing) {
       this.playing = true;
 
-      // Restart WASM playback for HVL/AHX — the worklet won't output audio
-      // until play() is called after a pause().
-      if (this.routedNativeEngines.has('HivelySynth') && !this._muted) {
-        HivelyEngine.getInstance().play();
-      }
+      // Restart WASM playback for HVL/AHX
+      resumeNativeEngines(this.routedNativeEngines, this._muted);
 
       this.startScheduler();
     }
@@ -2771,32 +2434,9 @@ export class TrackerReplayer {
         this.doMultiNoteRetrig(ch, chIndex, time);
         break;
 
-      case 0x1D: { // Txy - Tremor (FT2: effect 29)
-        // FT2: alternates between volume on/off over time
-        // x = on-time ticks, y = off-time ticks
-        const tp = param !== 0 ? param : ch.tremorParam;
-        ch.tremorParam = tp;
-
-        let tremorSign = ch.tremorPos & 0x80; // bit 7: on/off state
-        let tremorData = ch.tremorPos & 0x7F; // bits 0-6: counter
-
-        tremorData--;
-        if (tremorData < 0 || (tremorData & 0x80) !== 0) {
-          // Counter underflow — toggle state
-          if (tremorSign === 0x80) {
-            tremorSign = 0x00; // switch to OFF
-            tremorData = tp & 0x0F; // off-time = low nibble
-          } else {
-            tremorSign = 0x80; // switch to ON
-            tremorData = (tp >> 4) & 0x0F; // on-time = high nibble
-          }
-        }
-
-        ch.tremorPos = tremorSign | (tremorData & 0x7F);
-        const tremorVol = tremorSign === 0x80 ? ch.volume : 0;
-        ch.gainNode.gain.setValueAtTime(tremorVol / 64, time);
+      case 0x1D: // Txy - Tremor (FT2: effect 29)
+        _doTremor(ch, param, time);
         break;
-      }
     }
   }
 
@@ -2899,32 +2539,9 @@ export class TrackerReplayer {
         this.doMultiNoteRetrig(ch, chIndex, time);
         break;
 
-      case 0x1D: { // Txx - Tremor (FT2: effect 29)
-        // FT2: alternates between volume on/off over time
-        // x = on-time ticks, y = off-time ticks
-        const tp = param !== 0 ? param : ch.tremorParam;
-        ch.tremorParam = tp;
-
-        let tremorSign = ch.tremorPos & 0x80; // bit 7: on/off state
-        let tremorData = ch.tremorPos & 0x7F; // bits 0-6: counter
-
-        tremorData--;
-        if (tremorData < 0 || (tremorData & 0x80) !== 0) {
-          // Counter underflow — toggle state
-          if (tremorSign === 0x80) {
-            tremorSign = 0x00; // switch to OFF
-            tremorData = tp & 0x0F; // off-time = low nibble
-          } else {
-            tremorSign = 0x80; // switch to ON
-            tremorData = (tp >> 4) & 0x0F; // on-time = high nibble
-          }
-        }
-
-        ch.tremorPos = tremorSign | (tremorData & 0x7F);
-        const tremorVol = tremorSign === 0x80 ? ch.volume : 0;
-        ch.gainNode.gain.setValueAtTime(tremorVol / 64, time);
+      case 0x1D: // Txx - Tremor (FT2: effect 29)
+        _doTremor(ch, param, time);
         break;
-      }
     }
   }
 
@@ -2945,179 +2562,31 @@ export class TrackerReplayer {
   }
 
   // ==========================================================================
-  // EFFECT IMPLEMENTATIONS
+  // EFFECT IMPLEMENTATIONS (delegated to replayer/EffectHandlers.ts)
   // ==========================================================================
 
   private doArpeggio(ch: ChannelState, param: number): void {
-    if (this.useXMPeriods) {
-      // FT2 arpeggio: uses arpeggioTab to select tick offset, then binary search on LUT
-      const tick = FT2_ARPEGGIO_TAB[this.currentTick & 31];
-      if (tick === 0) {
-        this.updatePeriodDirect(ch, ch.period);
-      } else {
-        const noteOffset = tick === 1 ? (param >> 4) & 0x0F : param & 0x0F;
-        const newPeriod = ft2ArpeggioPeriod(ch.period, noteOffset, ch.finetune, this.linearPeriods);
-        this.updatePeriodDirect(ch, newPeriod);
-      }
-    } else {
-      // MOD arpeggio: simple tick % 3 cycle with period table lookup
-      const x = (param >> 4) & 0x0F;
-      const y = param & 0x0F;
-
-      const tick = this.currentTick % 3;
-      let period = ch.note;
-
-      if (tick === 1) {
-        period = this.periodPlusSemitones(ch.note, x, ch.finetune);
-      } else if (tick === 2) {
-        period = this.periodPlusSemitones(ch.note, y, ch.finetune);
-      }
-
-      this.updatePeriodDirect(ch, period);
-    }
+    _doArpeggio(ch, param, this.currentTick, this.useXMPeriods, this.linearPeriods,
+      (c, p) => this.updatePeriodDirect(c, p),
+      (b, s, f) => this.periodPlusSemitones(b, s, f));
   }
 
   private doTonePortamento(ch: ChannelState): void {
-    if (ch.portaTarget === 0 || ch.period === ch.portaTarget) return;
-
-    if (ch.period < ch.portaTarget) {
-      ch.period += ch.tonePortaSpeed;
-      if (ch.period > ch.portaTarget) ch.period = ch.portaTarget;
-    } else {
-      ch.period -= ch.tonePortaSpeed;
-      if (ch.period < ch.portaTarget) ch.period = ch.portaTarget;
-    }
-
-    // FT2: E3x glissando — quantize output period to nearest note
-    // Reference: ft2_replayer.c portamento() line 1901-1904
-    if (ch.glissandoMode && this.useXMPeriods) {
-      const quantized = ft2Period2NotePeriod(ch.period, ch.finetune, this.linearPeriods);
-      this.updatePeriodDirect(ch, quantized);
-    } else {
-      this.updatePeriod(ch);
-    }
+    _doTonePortamento(ch, this.useXMPeriods, this.linearPeriods,
+      (c) => this.updatePeriod(c),
+      (c, p) => this.updatePeriodDirect(c, p));
   }
 
   private doVibrato(ch: ChannelState): void {
-    const speed = (ch.vibratoCmd >> 4) & 0x0F;
-    const depth = ch.vibratoCmd & 0x0F;
-
-    if (this.useXMPeriods) {
-      // FT2 vibrato: phase is uint8_t (0-255), extracted as (pos>>2) & 0x1F
-      const waveform = ch.waveControl & 0x03;
-      let tmpVib = (ch.vibratoPos >> 2) & 0x1F;
-
-      if (waveform === 0) {
-        tmpVib = VIBRATO_TABLE[tmpVib];
-      } else if (waveform === 1) {
-        tmpVib <<= 3;
-        if ((ch.vibratoPos & 0x80) !== 0) tmpVib = ~tmpVib & 0xFF;
-      } else {
-        tmpVib = 255;
-      }
-
-      tmpVib = (tmpVib * depth) >> 5; // FT2 uses >> 5 (not >> 7)
-
-      if ((ch.vibratoPos & 0x80) !== 0)
-        this.updatePeriodDirect(ch, ch.period - tmpVib);
-      else
-        this.updatePeriodDirect(ch, ch.period + tmpVib);
-
-      // FT2 stores vibratoSpeed as (param >> 4) << 2, i.e. 4x our extracted speed
-      ch.vibratoPos = (ch.vibratoPos + (speed * 4)) & 0xFF; // uint8_t wrapping
-    } else {
-      // MOD vibrato: original ProTracker style
-      const waveform = ch.waveControl & 0x03;
-      let value: number;
-
-      if (waveform === 0) {
-        value = VIBRATO_TABLE[ch.vibratoPos & 31];
-      } else if (waveform === 1) {
-        value = (ch.vibratoPos & 31) * 8;
-        if (ch.vibratoPos >= 32) value = 255 - value;
-      } else {
-        value = 255;
-      }
-
-      let delta = (value * depth) >> 7;
-      if (ch.vibratoPos >= 32) delta = -delta;
-
-      this.updatePeriodDirect(ch, ch.period + delta);
-      ch.vibratoPos = (ch.vibratoPos + speed) & 63;
-    }
+    _doVibrato(ch, this.useXMPeriods, (c, p) => this.updatePeriodDirect(c, p));
   }
 
   private doTremolo(ch: ChannelState, time: number): void {
-    if (this.useXMPeriods) {
-      // FT2 tremolo: phase is uint8_t (0-255), same extraction as vibrato
-      const waveform = (ch.waveControl >> 4) & 0x03;
-      let tmpTrem = (ch.tremoloPos >> 2) & 0x1F;
-
-      if (waveform === 0) {
-        tmpTrem = VIBRATO_TABLE[tmpTrem];
-      } else if (waveform === 1) {
-        tmpTrem <<= 3;
-        // FT2 BUG: checks vibratoPos instead of tremoloPos for ramp direction
-        if ((ch.vibratoPos & 0x80) !== 0) tmpTrem = ~tmpTrem & 0xFF;
-      } else {
-        tmpTrem = 255;
-      }
-
-      tmpTrem = (tmpTrem * ch.tremoloDepth) >> 6;
-
-      let tremVol: number;
-      if ((ch.tremoloPos & 0x80) !== 0) {
-        tremVol = ch.volume - tmpTrem;
-        if (tremVol < 0) tremVol = 0;
-      } else {
-        tremVol = ch.volume + tmpTrem;
-        if (tremVol > 64) tremVol = 64;
-      }
-
-      ch.gainNode.gain.setValueAtTime(tremVol / 64, time);
-      ch.tremoloPos = (ch.tremoloPos + ch.tremoloSpeed) & 0xFF;
-    } else {
-      // MOD tremolo: original ProTracker style
-      const speed = (ch.tremoloCmd >> 4) & 0x0F;
-      const depth = ch.tremoloCmd & 0x0F;
-
-      const waveform = (ch.waveControl >> 4) & 0x03;
-      let value: number;
-
-      if (waveform === 0) {
-        value = VIBRATO_TABLE[ch.tremoloPos & 31];
-      } else if (waveform === 1) {
-        value = (ch.tremoloPos & 31) * 8;
-        if (ch.tremoloPos >= 32) value = 255 - value;
-      } else {
-        value = 255;
-      }
-
-      let delta = (value * depth) >> 6;
-      if (ch.tremoloPos >= 32) delta = -delta;
-
-      const newVol = Math.max(0, Math.min(64, ch.volume + delta));
-      ch.gainNode.gain.setValueAtTime(newVol / 64, time);
-
-      ch.tremoloPos = (ch.tremoloPos + speed) & 63;
-    }
+    _doTremolo(ch, time, this.useXMPeriods);
   }
 
   private doVolumeSlide(ch: ChannelState, param: number, time: number): void {
-    // FT2: use speed memory when param is 0
-    if (param === 0) param = ch.volSlideSpeed;
-    ch.volSlideSpeed = param;
-
-    const x = (param >> 4) & 0x0F;
-    const y = param & 0x0F;
-
-    if (x > 0) {
-      ch.volume = Math.min(64, ch.volume + x);
-    } else if (y > 0) {
-      ch.volume = Math.max(0, ch.volume - y);
-    }
-
-    ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+    _doVolumeSlide(ch, param, time);
   }
 
   /**
@@ -3125,16 +2594,20 @@ export class TrackerReplayer {
    * x = slide up, y = slide down
    */
   private doGlobalVolumeSlide(param: number, time: number): void {
-    const x = (param >> 4) & 0x0F;
-    const y = param & 0x0F;
-
-    if (x > 0) {
-      this.globalVolume = Math.min(64, this.globalVolume + x);
-    } else if (y > 0) {
-      this.globalVolume = Math.max(0, this.globalVolume - y);
-    }
-
+    this.globalVolume = _doGlobalVolumeSlide(param, this.globalVolume);
     this.updateAllChannelVolumes(time);
+  }
+
+  /**
+   * Pan slide (effect Pxx)
+   * x = slide right, y = slide left
+   */
+  private doPanSlide(ch: ChannelState, param: number, time: number): void {
+    _doPanSlide(ch, param, time, (c, p, t) => this.applyPanEffect(c, p, t));
+  }
+
+  private doMultiNoteRetrig(ch: ChannelState, chIndex: number, time: number): void {
+    _doMultiNoteRetrig(ch, chIndex, time, (c, t, o, ci, a, s, cs) => this.triggerNote(c, t, o, ci, a, s, cs));
   }
 
   /**
@@ -3192,76 +2665,6 @@ export class TrackerReplayer {
       const scheduler = getPatternScheduler();
       scheduler.setGlobalPitchOffset(this.globalPitchCurrent);
     }
-  }
-
-  /**
-   * Pan slide (effect Pxx)
-   * x = slide right, y = slide left
-   */
-  private doPanSlide(ch: ChannelState, param: number, time: number): void {
-    const x = (param >> 4) & 0x0F;
-    const y = param & 0x0F;
-
-    if (x > 0) {
-      ch.panning = Math.min(255, ch.panning + x);
-    } else if (y > 0) {
-      ch.panning = Math.max(0, ch.panning - y);
-    }
-
-    this.applyPanEffect(ch, ch.panning, time);
-  }
-
-  /**
-   * Apply volume slide for IT-style retrigger (Rxy)
-   * Based on the y nibble value
-   */
-  /**
-   * FT2 doMultiNoteRetrig — counter-based retrigger with volume slide
-   * Reference: ft2_replayer.c lines 1202-1251
-   */
-  private doMultiNoteRetrig(ch: ChannelState, chIndex: number, time: number): void {
-    const cnt = ch.noteRetrigCounter + 1;
-    if (cnt < ch.noteRetrigSpeed) {
-      ch.noteRetrigCounter = cnt;
-      return;
-    }
-    ch.noteRetrigCounter = 0;
-
-    // Apply volume slide
-    let vol = ch.volume;
-    switch (ch.noteRetrigVol) {
-      case 0x1: vol -= 1; break;
-      case 0x2: vol -= 2; break;
-      case 0x3: vol -= 4; break;
-      case 0x4: vol -= 8; break;
-      case 0x5: vol -= 16; break;
-      case 0x6: vol = (vol >> 1) + (vol >> 3) + (vol >> 4); break; // FT2: 11/16 = 0.6875
-      case 0x7: vol >>= 1; break;
-      case 0x8: break;
-      case 0x9: vol += 1; break;
-      case 0xA: vol += 2; break;
-      case 0xB: vol += 4; break;
-      case 0xC: vol += 8; break;
-      case 0xD: vol += 16; break;
-      case 0xE: vol = (vol >> 1) + vol; break; // 1.5x
-      case 0xF: vol += vol; break; // 2x
-      default: break;
-    }
-    if (vol < 0) vol = 0;
-    if (vol > 64) vol = 64;
-    ch.volume = vol;
-    ch.outVol = vol;
-
-    // FT2: apply volume column set-volume / set-panning overrides
-    if (ch.volColumnVol >= 0x10 && ch.volColumnVol <= 0x50) {
-      ch.outVol = ch.volColumnVol - 0x10;
-      ch.volume = ch.outVol;
-    } else if (ch.volColumnVol >= 0xC0 && ch.volColumnVol <= 0xCF) {
-      ch.outPan = (ch.volColumnVol & 0x0F) << 4;
-    }
-
-    ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
-    this.triggerNote(ch, time, 0, chIndex, false, false, false);
   }
 
   // ==========================================================================
@@ -4768,13 +4171,7 @@ export class TrackerReplayer {
     this.stop();
 
     // Restore any native engines rerouted to separation chain
-    if (this.routedNativeEngines.size > 0) {
-      const engine = getToneEngine();
-      for (const key of this.routedNativeEngines) {
-        engine.restoreNativeEngineRouting(key);
-      }
-      this.routedNativeEngines.clear();
-    }
+    restoreNativeRouting(this.routedNativeEngines);
 
     for (const ch of this.channels) {
       // Dispose all pooled players
