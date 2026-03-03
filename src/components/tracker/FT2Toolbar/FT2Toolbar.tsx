@@ -47,6 +47,7 @@ import { FileBrowser } from '@components/dialogs/FileBrowser';
 import { importSong, exportSong } from '@lib/export/exporters';
 import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
 import { computeSongDBHash, lookupSongDB } from '@lib/songdb';
+import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
 import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
 import type { XMNote } from '@lib/import/formats/XMParser';
 import type { MODNote } from '@lib/import/formats/MODParser';
@@ -412,8 +413,24 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           duration_ms: result.subsongs[0]?.duration_ms ?? 0,
         } : null);
       });
+      // Extract C64 SID header metadata if applicable
+      const sidInfo = parseSIDHeader(new Uint8Array(songBuf));
+      if (sidInfo) {
+        useTrackerStore.getState().setSidMetadata({
+          title: sidInfo.title,
+          author: sidInfo.author,
+          copyright: sidInfo.copyright,
+          chipModel: sidInfo.chipModel,
+          clockSpeed: sidInfo.clockSpeed,
+          subsongs: sidInfo.subsongs,
+          currentSubsong: options.subsong ?? sidInfo.defaultSubsong,
+        });
+      } else {
+        useTrackerStore.getState().setSidMetadata(null);
+      }
     } else {
       useTrackerStore.getState().setSongDBInfo(null);
+      useTrackerStore.getState().setSidMetadata(null);
     }
 
     // Always clean up before import to prevent stale state from previous imports

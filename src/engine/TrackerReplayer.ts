@@ -401,6 +401,11 @@ export class TrackerReplayer {
   // External playback engines for formats that don't use standard tracker playback
   private c64SidEngine: C64SIDEngine | null = null;
 
+  /** Get the active C64 SID engine (for subsong switching etc.) */
+  public getC64SIDEngine(): C64SIDEngine | null {
+    return this.c64SidEngine;
+  }
+
   // Stereo separation (0-100): controls how wide the stereo image is.
   // 100 = full Amiga hard-pan (LRRL), 0 = mono, 20 = pt2-clone default for MOD.
   // Based on per-channel pan narrowing: actual_pan = basePan * (separation / 100)

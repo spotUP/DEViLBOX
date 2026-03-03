@@ -23,6 +23,7 @@ import type { InstrumentConfig } from '@/types/instrument';
 import type { ModuleInfo } from '@/lib/import/ModuleLoader';
 import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import { computeSongDBHash, lookupSongDB } from '@lib/songdb';
+import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
 
 const LazySettingsModal = lazy(() =>
   import('@/components/dialogs/SettingsModal').then(m => ({ default: m.SettingsModal }))
@@ -333,6 +334,13 @@ export const WebGLModalBridge: React.FC = () => {
             duration_ms: result.subsongs[0]?.duration_ms ?? 0,
           } : null);
         });
+        // Extract C64 SID header metadata if applicable
+        const sidInfo = parseSIDHeader(new Uint8Array(buf));
+        useTrackerStore.getState().setSidMetadata(sidInfo ? {
+          title: sidInfo.title, author: sidInfo.author, copyright: sidInfo.copyright,
+          chipModel: sidInfo.chipModel, clockSpeed: sidInfo.clockSpeed,
+          subsongs: sidInfo.subsongs, currentSubsong: options.subsong ?? sidInfo.defaultSubsong,
+        } : null);
       });
     }
     try {

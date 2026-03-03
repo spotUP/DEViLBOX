@@ -485,7 +485,7 @@ function c64SidMeta(buf: Uint8Array): NativeFormatMeta {
 /**
  * Extract header metadata for a native tracker format.
  *
- * @param key  The format key matching NATIVE_FORMAT_PATTERNS in ImportModuleDialog
+ * @param key  The format key from FormatRegistry
  * @param buffer  Raw file bytes
  * @returns  NativeFormatMeta with -1 for any fields that could not be determined
  */
