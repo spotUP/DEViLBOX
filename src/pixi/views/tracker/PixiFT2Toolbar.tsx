@@ -378,7 +378,7 @@ export const PixiFT2Toolbar: React.FC = () => {
               alignItems: 'center',
               paddingLeft: 8,
               paddingRight: 8,
-              gap: 8,
+              gap: 6,
             }}
           >
             <pixiGraphics draw={drawTransportRowBg} layout={{ ...LAYOUT_FILL_ROW, height: TRANSPORT_ROW_H }} />
@@ -456,7 +456,7 @@ export const PixiFT2Toolbar: React.FC = () => {
               alignItems: 'center',
               paddingLeft: 8,
               paddingRight: 8,
-              gap: 8,
+              gap: 6,
             }}
           >
             <pixiGraphics draw={drawTransportRow2Bg} layout={{ ...LAYOUT_FILL_ROW, height: TRANSPORT_ROW_H }} />
@@ -547,39 +547,36 @@ export const PixiFT2Toolbar: React.FC = () => {
           </pixiContainer>
         </pixiContainer>
 
-        {/* Right: Visualizer (hidden when compact) */}
+        {/* Right: Visualizer (collapsed when compact — always rendered to avoid Yoga BindingError) */}
         <pixiContainer
+          renderable={!compactToolbar}
           layout={{
             width: compactToolbar ? 0 : VIZ_WIDTH,
-            height: TRANSPORT_ROW_H * 2,
+            height: compactToolbar ? 0 : TRANSPORT_ROW_H * 2,
             overflow: 'hidden',
           }}
         >
-          {!compactToolbar && (
-            <>
-              {/* Visualizer rendered first — PAT/AUTO buttons go on top in Pixi's compositor */}
-              <PixiVisualizer width={VIZ_WIDTH} height={TRANSPORT_ROW_H * 2} />
-              {/* PAT/AUTO toggles overlay — must come after PixiVisualizer in tree so they render on top */}
-              <pixiContainer
-                layout={{
-                  position: 'absolute',
-                  top: 4,
-                  right: 4,
-                  flexDirection: 'row',
-                  gap: 4,
-                }}
-              >
-                <PixiButton
-                  label="AUTO"
-                  variant={showAutomation ? 'ft2' : 'ghost'}
-                  color={showAutomation ? 'blue' : 'default'}
-                  size="sm"
-                  active={showAutomation}
-                  onClick={handleToggleAutomation}
-                />
-              </pixiContainer>
-            </>
-          )}
+          {/* Visualizer rendered first — PAT/AUTO buttons go on top in Pixi's compositor */}
+          <PixiVisualizer width={VIZ_WIDTH} height={TRANSPORT_ROW_H * 2} />
+          {/* PAT/AUTO toggles overlay — must come after PixiVisualizer in tree so they render on top */}
+          <pixiContainer
+            layout={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              flexDirection: 'row',
+              gap: 4,
+            }}
+          >
+            <PixiButton
+              label="AUTO"
+              variant={showAutomation ? 'ft2' : 'ghost'}
+              color={showAutomation ? 'blue' : 'default'}
+              size="sm"
+              active={showAutomation}
+              onClick={handleToggleAutomation}
+            />
+          </pixiContainer>
         </pixiContainer>
       </pixiContainer>
 
@@ -595,7 +592,7 @@ export const PixiFT2Toolbar: React.FC = () => {
           alignItems: 'center',
           paddingLeft: 8,
           paddingRight: 8,
-          gap: 6,
+          gap: 4,
         }}
       >
         <pixiGraphics draw={drawFileRowBg} layout={{ ...LAYOUT_FILL_ROW, height: FILE_ROW_H }} />
