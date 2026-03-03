@@ -100,6 +100,12 @@ function regWrite(op: Operand, value: string, size: Size): string {
     const addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + (intptr_t)${op.offset}`;
     return `WRITE${bits}(${addr}, ${value});`;
   }
+  if (op.kind === 'label_ref') {
+    return `WRITE${bits}((uintptr_t)${sanitizeLabel(op.name)}, ${value});`;
+  }
+  if (op.kind === 'pc_rel') {
+    return `WRITE${bits}((uintptr_t)${sanitizeLabel(op.label)}, ${value});`;
+  }
   if (op.kind === 'abs_addr') {
     if (op.tag === 'paula') return emitPaula(op.value, value, size);
     if (op.tag === 'dmacon') return `paula_dma_write((uint16_t)(${value}));`;

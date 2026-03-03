@@ -33,28 +33,37 @@ export interface HVSCBrowseResult {
 /**
  * Browse HVSC directory structure
  * 
- * Since HVSC mirrors are HTTP-only (no directory listing API), we use
- * the server's proxy endpoint that maintains a cached directory tree.
+ * **IMPORTANT:** Requires the server to be running (npm run dev:fullstack).
+ * HVSC mirrors don't provide directory listing APIs, so we need the server proxy.
  */
 export async function browseHVSC(path: string = ''): Promise<HVSCBrowseResult> {
-  const encodedPath = encodeURIComponent(path);
-  const response = await fetch(`${API_URL}/hvsc/browse?path=${encodedPath}`);
-  
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: 'Browse failed' }));
-    throw new Error(err.error || 'Failed to browse HVSC');
+  try {
+    const encodedPath = encodeURIComponent(path);
+    const response = await fetch(`${API_URL}/hvsc/browse?path=${encodedPath}`);
+    
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'Browse failed' }));
+      throw new Error(err.error || 'Failed to browse HVSC');
+    }
+    
+    return response.json();
+  } catch (err) {
+    // Check if this is a network error (server not running)
+    if (err instanceof TypeError && err.message.includes('fetch')) {
+      throw new Error('Server not running. Start with: npm run dev:fullstack');
+    }
+    throw err;
   }
-  
-  return response.json();
 }
 
 /**
  * Download a .sid file from HVSC
  * 
- * Tries mirrors in order until one succeeds.
+ * **IMPORTANT:** HVSC mirrors don't support CORS, so direct browser access fails.
+ * This function REQUIRES the server proxy to be running (npm run dev:fullstack).
  */
 export async function downloadHVSCFile(path: string): Promise<ArrayBuffer> {
-  // Try server proxy first (handles caching + rate limiting)
+  // Try server proxy (required - direct mirror access blocked by CORS)
   try {
     const encodedPath = encodeURIComponent(path);
     const response = await fetch(`${API_URL}/hvsc/download?path=${encodedPath}`);
@@ -62,25 +71,17 @@ export async function downloadHVSCFile(path: string): Promise<ArrayBuffer> {
     if (response.ok) {
       return response.arrayBuffer();
     }
+    
+    // If proxy returns error, throw with details
+    const errorData = await response.json().catch(() => ({ error: 'Download failed' }));
+    throw new Error(errorData.error || `HTTP ${response.status}`);
   } catch (err) {
-    console.warn('HVSC proxy download failed, trying direct mirrors:', err);
-  }
-  
-  // Fallback: try direct mirror access
-  for (const mirror of HVSC_MIRRORS) {
-    try {
-      const url = `${mirror}/${path}`;
-      const response = await fetch(url);
-      
-      if (response.ok) {
-        return response.arrayBuffer();
-      }
-    } catch (err) {
-      console.warn(`HVSC mirror ${mirror} failed:`, err);
+    // Check if this is a network error (server not running)
+    if (err instanceof TypeError && err.message.includes('fetch')) {
+      throw new Error('Server not running. Start with: npm run dev:fullstack');
     }
+    throw err;
   }
-  
-  throw new Error('Failed to download file from all HVSC mirrors');
 }
 
 /**
