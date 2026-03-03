@@ -547,12 +547,13 @@ export const PixiFT2Toolbar: React.FC = () => {
           </pixiContainer>
         </pixiContainer>
 
-        {/* Right: Visualizer (collapsed when compact — always rendered to avoid Yoga BindingError) */}
+        {/* Right: Visualizer (hidden via display:'none' when compact to avoid Yoga BindingError) */}
         <pixiContainer
           renderable={!compactToolbar}
           layout={{
-            width: compactToolbar ? 0 : VIZ_WIDTH,
-            height: compactToolbar ? 0 : TRANSPORT_ROW_H * 2,
+            display: compactToolbar ? 'none' : 'flex',
+            width: VIZ_WIDTH,
+            height: TRANSPORT_ROW_H * 2,
             overflow: 'hidden',
           }}
         >
@@ -586,8 +587,9 @@ export const PixiFT2Toolbar: React.FC = () => {
         renderable={!compactToolbar}
         eventMode={!compactToolbar ? 'static' : 'none'}
         layout={{
+          display: compactToolbar ? 'none' : 'flex',
           width: '100%',
-          height: compactToolbar ? 0 : FILE_ROW_H,
+          height: FILE_ROW_H,
           flexDirection: 'row',
           alignItems: 'center',
           paddingLeft: 8,
