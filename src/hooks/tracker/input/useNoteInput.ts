@@ -4,7 +4,7 @@
  * F1-F7 octave selection, numpad octave changes, and edit step cycling.
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore, useInstrumentStore } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -317,7 +317,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
     [releaseNote]
   );
 
-  return {
+  return useMemo(() => ({
     handleKeyDown,
     handleKeyUp,
     previewNote,
@@ -325,5 +325,5 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
     heldNotesRef,
     currentOctave,
     setCurrentOctave,
-  };
+  }), [handleKeyDown, handleKeyUp, previewNote, enterNote, heldNotesRef, currentOctave, setCurrentOctave]);
 };
