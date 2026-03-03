@@ -70,6 +70,7 @@ export async function startNativeEngines(
   // JamCracker: Load the raw .jam binary into the JamCrackerEngine WASM.
   // The WASM replayer (transpiled 68k + Paula emulation) handles all synthesis.
   if (song.jamCrackerFileData && song.format === 'JamCracker') {
+    suppressNotes = true;
     try {
       const { JamCrackerEngine } = await import('@/engine/jamcracker/JamCrackerEngine');
       const jcEngine = JamCrackerEngine.getInstance();
@@ -151,7 +152,7 @@ export async function startNativeEngines(
   if (!isDJDeck) {
     for (const inst of song.instruments) {
       const st = inst.synthType;
-      if ((st === 'UADESynth' || st === 'HivelySynth' || st === 'MusicLineSynth') && !routedNativeEngines.has(st)) {
+      if ((st === 'UADESynth' || st === 'HivelySynth' || st === 'MusicLineSynth' || st === 'JamCrackerSynth') && !routedNativeEngines.has(st)) {
         const nativeInput = getNativeAudioNode(separationInputTone as any);
         if (nativeInput) {
           engine.rerouteNativeEngine(st, nativeInput);
