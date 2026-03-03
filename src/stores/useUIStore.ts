@@ -9,6 +9,8 @@ import type { PanelType } from '@typedefs/project';
 
 export type PerformanceQuality = 'high' | 'medium' | 'low';
 
+export type TrackerViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer';
+
 export type DialogCommand =
   | 'interpolate-volume'
   | 'interpolate-effect'
@@ -65,6 +67,11 @@ interface UIStore {
 
   // View switching (tracker vs arrangement vs DJ vs drum pads vs piano roll vs VJ vs studio)
   activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio';
+
+  // Tracker sub-view state (shared between DOM and GL renderers)
+  trackerViewMode: TrackerViewMode;
+  gridChannelIndex: number;
+  showInstrumentPanel: boolean;
 
   // View Exposé (macOS Mission Control style view switcher)
   viewExposeActive: boolean;
@@ -127,6 +134,12 @@ interface UIStore {
   // View switching actions
   setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio') => void;
   toggleActiveView: () => void;
+
+  // Tracker sub-view actions
+  setTrackerViewMode: (mode: TrackerViewMode) => void;
+  setGridChannelIndex: (index: number) => void;
+  setShowInstrumentPanel: (show: boolean) => void;
+  toggleInstrumentPanel: () => void;
 
   // View Exposé actions
   toggleViewExpose: () => void;
@@ -213,6 +226,11 @@ export const useUIStore = create<UIStore>()(
 
       // View switching
       activeView: 'tracker' as const,
+
+      // Tracker sub-view state
+      trackerViewMode: 'tracker' as TrackerViewMode,
+      gridChannelIndex: 0,
+      showInstrumentPanel: true,
 
       // View Exposé
       viewExposeActive: false,
@@ -451,6 +469,16 @@ export const useUIStore = create<UIStore>()(
           state.activeView = state.activeView === 'tracker' ? 'arrangement' : 'tracker';
         }),
 
+      // Tracker sub-view actions
+      setTrackerViewMode: (mode) =>
+        set((state) => { state.trackerViewMode = mode; }),
+      setGridChannelIndex: (index) =>
+        set((state) => { state.gridChannelIndex = index; }),
+      setShowInstrumentPanel: (show) =>
+        set((state) => { state.showInstrumentPanel = show; }),
+      toggleInstrumentPanel: () =>
+        set((state) => { state.showInstrumentPanel = !state.showInstrumentPanel; }),
+
       // View Exposé actions
       toggleViewExpose: () =>
         set((state) => {
@@ -585,6 +613,9 @@ export const useUIStore = create<UIStore>()(
         scratchAcceleration: state.scratchAcceleration,
         platterMass: state.platterMass,
         activeView: state.activeView,
+        trackerViewMode: state.trackerViewMode,
+        gridChannelIndex: state.gridChannelIndex,
+        showInstrumentPanel: state.showInstrumentPanel,
         uiVersion: state.uiVersion,
       }),
     }
