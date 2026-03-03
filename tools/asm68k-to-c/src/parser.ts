@@ -208,6 +208,7 @@ export function parse(tokens: Token[]): AstNode[] {
       const operands: Operand[] = [];
       while (j < lt.length && lt[j]?.kind !== 'COMMENT') {
         if (lt[j].kind === 'COMMA') { j++; continue; }
+        if (lt[j].kind === 'SIZE') { j++; continue; }  // skip address mode qualifiers (e.g. .W in 4.W)
         if (lt[j] === undefined) { j++; continue; }
         // Expand register ranges: D0 RANGE D3 → D0,D1,D2,D3
         if (lt[j].kind === 'RANGE' && j > 0 && lt[j+1]?.kind === 'REGISTER') {
