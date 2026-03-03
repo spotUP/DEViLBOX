@@ -2080,6 +2080,10 @@ export class ToneEngine {
         break;
       }
 
+      // C64 SID: audio handled entirely by C64SIDEngine — no synth needed
+      case 'C64SID':
+        return null;
+
       default: {
         // Check VSTBridge registry and new SynthRegistry for dynamically registered synths
         const synthTypeStr = config.synthType || '';

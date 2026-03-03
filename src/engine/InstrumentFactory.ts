@@ -163,6 +163,10 @@ export class InstrumentFactory {
         instrument = createTB303(config);
         break;
 
+      // C64 SID: audio handled by C64SIDEngine — no synth needed
+      case 'C64SID':
+        return null;
+
       case 'Furnace':
         instrument = createFurnace(config);
         break;
