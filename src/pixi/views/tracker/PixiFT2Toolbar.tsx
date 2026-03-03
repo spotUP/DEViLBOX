@@ -250,6 +250,18 @@ export const PixiFT2Toolbar: React.FC = () => {
     notify.success('Project cleared', 1500);
   }, [isPlaying, stop]);
 
+  // ── Import file (module/midi/audio) ────────────────────────────────────────
+  const handleImportFile = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xm,.mod,.s3m,.it,.mptm,.fur,.dmf,.mid,.midi,.wav,.mp3,.ogg,.flac,.aiff,.sid,.sng,.med,.hvl,.ahx,.jam,.td3,.sunvox,.sunsynth';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (file) useUIStore.getState().setPendingModuleFile(file);
+    };
+    input.click();
+  }, []);
+
   // ── Transport handlers ────────────────────────────────────────────────────
   const handlePlaySong = useCallback(async () => {
     if (isPlayingSong) { stop(); return; }
@@ -595,6 +607,7 @@ export const PixiFT2Toolbar: React.FC = () => {
         <PixiButton label="Export"      variant="ghost" size="sm" onClick={handleShowExport} />
         <PixiButton label="New"         variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} />
         <PixiButton label="Clear"       variant="ghost" size="sm" onClick={handleClearProject} />
+        <PixiButton label="Import"      variant="ghost" size="sm" onClick={handleImportFile} />
         <PixiButton label="Order"       variant="ghost" size="sm" onClick={handleShowPatternOrder} />
         <PixiButton
           label="FX Search"
