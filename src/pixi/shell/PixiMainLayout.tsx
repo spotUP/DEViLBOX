@@ -8,7 +8,7 @@
  *   StatusBar (28px)
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApplication } from '@pixi/react';
 import type { Container as ContainerType, Texture } from 'pixi.js';
 import { Rectangle } from 'pixi.js';
@@ -17,12 +17,10 @@ import { useUIStore } from '@stores/useUIStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { PixiNavBar } from './PixiNavBar';
 import { PixiStatusBar } from './PixiStatusBar';
-import { PixiBottomDock, type DockTab } from './PixiBottomDock';
 import { PixiExposeOverlay } from './PixiExposeOverlay';
 import {
   MODERN_NAV_H,
   MODERN_STATUS_BAR_H,
-  MODERN_DOCK_DEFAULT_H,
   TITLE_H,
 } from '../workbench/workbenchLayout';
 
@@ -74,40 +72,7 @@ export const PixiMainLayout: React.FC = () => {
   const thumbnailsRef = useRef<Record<string, Texture>>({});
   const [thumbnails, setThumbnails] = useState<Record<string, Texture>>({});
 
-  // Dock state (local — will be persisted to store later)
-  const [dockHeight, setDockHeight] = useState(MODERN_DOCK_DEFAULT_H);
-  const [dockCollapsed, setDockCollapsed] = useState(false);
-  const [dockTab, setDockTab] = useState<DockTab>('device');
-  const [dockUndocked, setDockUndocked] = useState(false);
-
-  // When undocked, dock takes 0 height (content renders as floating overlay)
-  const effectiveDockH = (dockCollapsed || dockUndocked) ? 0 : dockHeight;
-  const mainViewH = height - MODERN_NAV_H - MODERN_STATUS_BAR_H - effectiveDockH;
-
-  const handleDockResize = useCallback((newH: number) => {
-    setDockHeight(newH);
-    if (newH <= 0) setDockCollapsed(true);
-  }, []);
-
-  const handleDockCollapse = useCallback(() => {
-    setDockCollapsed(true);
-  }, []);
-
-  const handleDockExpand = useCallback(() => {
-    setDockCollapsed(false);
-    setDockUndocked(false);
-    if (dockHeight <= 0) setDockHeight(MODERN_DOCK_DEFAULT_H);
-  }, [dockHeight]);
-
-  const handleUndock = useCallback(() => {
-    setDockUndocked(true);
-  }, []);
-
-  const handleRedock = useCallback(() => {
-    setDockUndocked(false);
-    setDockCollapsed(false);
-    if (dockHeight <= 0) setDockHeight(MODERN_DOCK_DEFAULT_H);
-  }, [dockHeight]);
+  const mainViewH = height - MODERN_NAV_H - MODERN_STATUS_BAR_H;
 
   // Determine which view component to render
   const mainViewId = resolveMainView(activeView);
@@ -212,19 +177,16 @@ export const PixiMainLayout: React.FC = () => {
     // Also sync dock views (instrument, master-fx)
     for (const dockWinId of ['instrument', 'master-fx']) {
       if (store.windows[dockWinId]) {
-        store.resizeWindow(dockWinId, width, effectiveDockH + TITLE_H);
+        store.resizeWindow(dockWinId, width, TITLE_H);
       }
     }
-  }, [mainViewId, width, mainViewH, effectiveDockH]);
+  }, [mainViewId, width, mainViewH]);
 
   return (
     <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
       {/* NavBar */}
       <pixiContainer zIndex={100} layout={{ width, height: MODERN_NAV_H, flexShrink: 0 }}>
-        <PixiNavBar
-          dockCollapsed={dockCollapsed}
-          onExpandDock={handleDockExpand}
-        />
+        <PixiNavBar />
       </pixiContainer>
 
       {/* Main view zone — always-mounted views are stacked; only the active one is visible.
@@ -279,57 +241,9 @@ export const PixiMainLayout: React.FC = () => {
         )}
       </pixiContainer>
 
-      {/* Bottom dock */}
-      <pixiContainer
-        zIndex={100}
-        visible={!dockCollapsed && !dockUndocked}
-        eventMode={(!dockCollapsed && !dockUndocked) ? 'auto' : 'none'}
-        layout={{
-          width,
-          height: (dockCollapsed || dockUndocked) ? 0 : effectiveDockH,
-          flexShrink: 0,
-          overflow: 'hidden',
-        }}
-      >
-        <PixiBottomDock
-          width={width}
-          height={dockHeight}
-          activeTab={dockTab}
-          onChangeTab={setDockTab}
-          onResize={handleDockResize}
-          onCollapse={handleDockCollapse}
-          onUndock={handleUndock}
-        />
-      </pixiContainer>
-
       {/* Status bar */}
       <pixiContainer zIndex={100} layout={{ width, height: MODERN_STATUS_BAR_H, flexShrink: 0 }}>
         <PixiStatusBar />
-      </pixiContainer>
-
-      {/* Floating dock overlay — undocked mode.
-          Renders as absolute overlay above the main view, near the bottom. */}
-      <pixiContainer
-        zIndex={500}
-        visible={dockUndocked}
-        eventMode={dockUndocked ? 'auto' : 'none'}
-        layout={{
-          position: 'absolute',
-          bottom: MODERN_STATUS_BAR_H + 8,
-          left: 40,
-          width: Math.min(width - 80, 1200),
-          height: dockHeight,
-        }}
-      >
-        <PixiBottomDock
-          width={Math.min(width - 80, 1200)}
-          height={dockHeight}
-          activeTab={dockTab}
-          onChangeTab={setDockTab}
-          onResize={handleDockResize}
-          onCollapse={handleRedock}
-          onUndock={handleRedock}
-        />
       </pixiContainer>
 
       {/* View Exposé overlay — macOS Mission Control style view switcher */}
