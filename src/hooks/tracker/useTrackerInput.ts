@@ -586,16 +586,21 @@ export const useTrackerInput = () => {
     [navInput, noteInput]
   );
 
-  // Attach keyboard listeners
+  // Attach keyboard listeners (re-registers when handlers change identity)
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     window.addEventListener('keyup', handleKeyUp, { capture: true });
     return () => {
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       window.removeEventListener('keyup', handleKeyUp, { capture: true });
-      navInput.cleanup();
     };
-  }, [handleKeyDown, handleKeyUp, navInput]);
+  }, [handleKeyDown, handleKeyUp]);
+
+  // Cleanup RAF only on unmount — NOT when handlers re-register
+  useEffect(() => {
+    return () => { navInput.cleanup(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     previewNote: noteInput.previewNote,
