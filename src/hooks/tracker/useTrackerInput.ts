@@ -110,6 +110,7 @@ export const useTrackerInput = () => {
 
       // Ignore if typing in input field or operating a dropdown
       if (
+        (window as any).__pixiInputFocused ||
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
         e.target instanceof HTMLSelectElement

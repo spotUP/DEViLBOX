@@ -104,7 +104,7 @@ export function usePadTriggers() {
     // NUMERIC KEYBOARD MAPPING
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in input fields
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+      if ((window as any).__pixiInputFocused || document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
 
       const midiStore = useMIDIStore.getState();
 
@@ -140,7 +140,7 @@ export function usePadTriggers() {
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+      if ((window as any).__pixiInputFocused || document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
 
       const midiStore = useMIDIStore.getState();
 
