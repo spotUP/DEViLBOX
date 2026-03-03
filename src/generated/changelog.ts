@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T07:30:21.004Z
+ * Generated: 2026-03-03T10:44:50.314Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2015';
-export const BUILD_NUMBER = '2015';
-export const BUILD_HASH = '48033708';
+export const BUILD_VERSION = '1.0.2026';
+export const BUILD_NUMBER = '2026';
+export const BUILD_HASH = '72417f35';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,53 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2015',
+    version: '1.0.2026',
     date: '2026-03-03',
     changes: [
+      {
+        type: 'feature',
+        "description": "GTUltra block operations + SID register monitor"
+      },
+      {
+        type: 'feature',
+        "description": "GoatTracker .sng file detection and loading pipeline"
+      },
+      {
+        type: 'feature',
+        "description": "GoatTracker Ultra Phase 3 — Pixi/WebGL UI components"
+      },
+      {
+        type: 'feature',
+        "description": "GoatTracker Ultra Phase 2 — DOM UI components"
+      },
+      {
+        type: 'feature',
+        "description": "GoatTracker Ultra WASM engine — Phase 1 complete"
+      },
+      {
+        type: 'feature',
+        "description": "Add label destination writes, SIZE token skip, emitOperandRead"
+      },
+      {
+        type: 'improvement',
+        "description": "Revert(tracker): restore 47fps every-3rd-frame scroll baseline"
+      },
+      {
+        type: 'improvement',
+        "description": "Add ASID hardware support documentation"
+      },
+      {
+        type: 'feature',
+        "description": "Add ASID status tracking to C64SIDEngine"
+      },
+      {
+        type: 'feature',
+        "description": "Wire ASID protocol into jsSID engine"
+      },
+      {
+        type: 'feature',
+        "description": "Add ASID hardware protocol and settings UI"
+      },
       {
         type: 'improvement',
         "description": "Note that HVSC browser requires backend server"
@@ -194,50 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Enhance(songdb): enrich status bar metadata display"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Sonix SMUS playback — tempo, companion files, register 0"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused INSTRUMENTS_DIR variable in SonixMusicDriverParser test"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve type errors in modern shell components"
-      },
-      {
-        type: 'feature',
-        "description": "Load Sonix companion .ss sample files into instruments"
-      },
-      {
-        type: 'improvement',
-        "description": "Merge: resolve PixiNavBar conflict in favor of modern rewrite"
-      },
-      {
-        type: 'feature',
-        "description": "Modern fixed-zone shell with Ableton-inspired design"
-      },
-      {
-        type: 'feature',
-        "description": "Multi-file/folder support for Amiga formats needing companion files"
-      },
-      {
-        type: 'feature',
-        "description": "Add Master FX GL window"
-      },
-      {
-        type: 'improvement',
-        "description": "Move frame-rate updates from React state to imperative PixiJS mutations"
-      },
-      {
-        type: 'feature',
-        "description": "Per-channel FX slots with GL dropdown selector"
-      },
-      {
-        type: 'feature',
-        "description": "Convert clip/empty-area context menus to GL dropdown"
       }
     ]
   }

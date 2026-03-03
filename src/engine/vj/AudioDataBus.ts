@@ -91,9 +91,6 @@ function acquireAnalysers(): { waveform: AnalyserNode; fft: AnalyserNode } {
     // Side-branch tap: destInput → analyser (no output, doesn't affect audio)
     destInput.connect(sharedWaveformAnalyser);
     destInput.connect(sharedFFTAnalyser);
-    console.log('[AudioDataBus] Tapped native node:', destInput.constructor.name,
-      'channelCount:', destInput.channelCount,
-      'context state:', ctx.state);
   }
   sharedRefCount++;
   return { waveform: sharedWaveformAnalyser, fft: sharedFFTAnalyser };
@@ -150,7 +147,7 @@ export class AudioDataBus {
         this.fftAnalyser = analysers.fft;
         this.enabled = true;
       } catch (e) {
-        console.warn('[AudioDataBus] enable failed:', e);
+        void e;
       }
     }
   }

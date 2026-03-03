@@ -64,7 +64,7 @@ export const ISFCanvas = React.forwardRef<ISFCanvasHandle, ISFCanvasProps>(
           onPresetChange?.(currentIdxRef.current, ISF_PRESETS[currentIdxRef.current].name);
         }
       } catch (err) {
-        console.error('[ISFCanvas] Failed to initialize:', err);
+        void err;
       }
 
       return () => {

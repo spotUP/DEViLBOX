@@ -22,6 +22,9 @@ import { PixiGTPatternGrid } from './PixiGTPatternGrid';
 import { PixiGTOrderList } from './PixiGTOrderList';
 import { PixiGTInstrumentPanel } from './PixiGTInstrumentPanel';
 import { PixiGTTableEditor } from './PixiGTTableEditor';
+import { PixiGTSIDMonitor } from './PixiGTSIDMonitor';
+import { PixiGTOscilloscope } from './PixiGTOscilloscope';
+import { PixiGTStudioInstrument } from './PixiGTStudioInstrument';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 
 const TOOLBAR_H = 32;
@@ -51,12 +54,16 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const playbackPos = useGTUltraStore((s) => s.playbackPos);
   const followPlay = useGTUltraStore((s) => s.followPlay);
   const engine = useGTUltraStore((s) => s.engine);
+  const viewMode = useGTUltraStore((s) => s.viewMode);
 
   const editorWidth = width - SIDEBAR_W;
   const editorHeight = height - TOOLBAR_H;
-  const orderH = Math.floor(editorHeight * 0.25);
-  const instrH = Math.floor(editorHeight * 0.35);
-  const tableH = editorHeight - orderH - instrH;
+  const oscH = 80;
+  const orderH = Math.floor((editorHeight - oscH) * 0.2);
+  const instrH = Math.floor((editorHeight - oscH) * 0.3);
+  const sideRemain = editorHeight - oscH - orderH - instrH;
+  const tableH = Math.floor(sideRemain * 0.5);
+  const regMonH = sideRemain - tableH;
 
   // Toolbar info
   const infoText = useMemo(() => {
@@ -81,6 +88,11 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const toggleFollow = useCallback(() => {
     useGTUltraStore.getState().setFollowPlay(!followPlay);
   }, [followPlay]);
+
+  const toggleViewMode = useCallback(() => {
+    const store = useGTUltraStore.getState();
+    store.setViewMode(store.viewMode === 'pro' ? 'studio' : 'pro');
+  }, []);
 
   // Draw callbacks
   const drawBg = useCallback((g: GraphicsType) => {
@@ -187,6 +199,10 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
 
         {/* Sidebar */}
         <pixiContainer layout={{ width: SIDEBAR_W, flexDirection: 'column' }}>
+          <PixiGTOscilloscope
+            width={SIDEBAR_W}
+            height={oscH}
+          />
           <PixiGTOrderList
             width={SIDEBAR_W}
             height={orderH}
@@ -198,6 +214,11 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
           <PixiGTTableEditor
             width={SIDEBAR_W}
             height={tableH}
+          />
+          <PixiGTSIDMonitor
+            width={SIDEBAR_W}
+            height={regMonH}
+            sidIndex={0}
           />
         </pixiContainer>
       </pixiContainer>

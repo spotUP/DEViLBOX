@@ -605,13 +605,17 @@ const MainStatusRow: React.FC<MainRowProps> = ({
     }}>
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height: STATUS_BAR_HEIGHT }} />
 
-      {/* Left content — view specific */}
-      {activeView === 'dj'
-        ? <DJStatusContent barHeight={STATUS_BAR_HEIGHT} />
-        : activeView === 'vj'
-          ? <VJStatusContent barHeight={STATUS_BAR_HEIGHT} />
-          : <TrackerStatusContent barHeight={STATUS_BAR_HEIGHT} />
-      }
+      {/* Left content — all always mounted to avoid @pixi/layout BindingError.
+          Stacked via position:absolute, only active one visible via alpha. */}
+      <pixiContainer alpha={activeView === 'dj' ? 1 : 0} layout={{ position: 'absolute', left: 0, top: 0, right: 0, height: STATUS_BAR_HEIGHT }}>
+        <DJStatusContent barHeight={STATUS_BAR_HEIGHT} />
+      </pixiContainer>
+      <pixiContainer alpha={activeView === 'vj' ? 1 : 0} layout={{ position: 'absolute', left: 0, top: 0, right: 0, height: STATUS_BAR_HEIGHT }}>
+        <VJStatusContent barHeight={STATUS_BAR_HEIGHT} />
+      </pixiContainer>
+      <pixiContainer alpha={activeView !== 'dj' && activeView !== 'vj' ? 1 : 0} layout={{ position: 'absolute', left: 0, top: 0, right: 0, height: STATUS_BAR_HEIGHT }}>
+        <TrackerStatusContent barHeight={STATUS_BAR_HEIGHT} />
+      </pixiContainer>
 
       {/* Right content */}
       <RightSide
