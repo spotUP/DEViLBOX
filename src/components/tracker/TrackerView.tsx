@@ -137,10 +137,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Import handlers (extracted to hook)
   const { handleModuleImport, handleTD3Import, handleSunVoxImport } = useModuleImport();
 
-  // View mode state
-  type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer';
-  const [viewMode, setViewMode] = useState<ViewMode>('tracker');
-  const [gridChannelIndex, setGridChannelIndex] = useState(0);
+  // View mode state (shared with GL via store)
+  const viewMode = useUIStore((s) => s.trackerViewMode);
+  const setViewMode = useUIStore((s) => s.setTrackerViewMode);
+  const gridChannelIndex = useUIStore((s) => s.gridChannelIndex);
+  const setGridChannelIndex = useUIStore((s) => s.setGridChannelIndex);
 
   // Dialog state
   const [showInterpolate, setShowInterpolate] = useState(false);
@@ -182,8 +183,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const showImportModule = externalShowImportModule ?? internalShowImportModule;
   const setShowImportModule = onShowImportModule ?? setInternalShowImportModule;
 
-  // Instrument panel state
-  const [showInstrumentPanel, setShowInstrumentPanel] = useState(true);
+  // Instrument panel state (shared with GL via store)
+  const showInstrumentPanel = useUIStore((s) => s.showInstrumentPanel);
+  const setShowInstrumentPanel = useUIStore((s) => s.setShowInstrumentPanel);
   const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
 

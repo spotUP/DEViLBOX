@@ -10,7 +10,7 @@
  * are hooked here — they only attach window event listeners, no DOM rendering.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
@@ -45,7 +45,6 @@ import { useMIDIStore } from '@stores/useMIDIStore';
 import { TITLE_H } from '../workbench/workbenchLayout';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
-type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj';
 
 const MUSICLINE_MATRIX_HEIGHT = 220;
 const MIDI_KNOB_BAR_H_COLLAPSED = 20;
@@ -56,14 +55,17 @@ export const PixiTrackerView: React.FC = () => {
   useTrackerInput();
   useBlockOperations();
 
-  const [viewMode, setViewMode] = useState<ViewMode>('tracker');
-  const [gridChannelIndex, setGridChannelIndex] = useState(0);
+  const viewMode = useUIStore(s => s.trackerViewMode);
+  const setViewMode = useUIStore(s => s.setTrackerViewMode);
+  const gridChannelIndex = useUIStore(s => s.gridChannelIndex);
+  const setGridChannelIndex = useUIStore(s => s.setGridChannelIndex);
   const modalOpen = useUIStore(s => s.modalOpen);
   const closeModal = useUIStore(s => s.closeModal);
   const editorMode = useTrackerStore(s => s.editorMode);
   const showMacroSlots = useUIStore(s => s.showMacroSlots);
   const showKnobBar = useMIDIStore(s => s.showKnobBar);
-  const [showInstrumentPanel, setShowInstrumentPanel] = useState(true);
+  const showInstrumentPanel = useUIStore(s => s.showInstrumentPanel);
+  const setShowInstrumentPanel = useUIStore(s => s.setShowInstrumentPanel);
 
   // PixiTrackerView lives inside a PixiWindow — use the window's own dimensions,
   // not the screen dimensions, so layout calculations are correct when the window
