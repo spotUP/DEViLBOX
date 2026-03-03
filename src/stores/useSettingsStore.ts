@@ -207,6 +207,11 @@ interface SettingsStore {
   
   // C64 SID Engine
   sidEngine: SIDEngineType;  // Default SID player engine (websid recommended)
+  
+  // ASID Hardware Support
+  asidEnabled: boolean;          // Enable ASID hardware output
+  asidDeviceId: string | null;   // Selected MIDI device ID
+  asidDeviceAddress: number;     // ASID device address (0x4D for USB-SID-Pico)
 
   // Audio Settings
   performanceQuality: 'high' | 'medium' | 'low';
@@ -235,6 +240,9 @@ interface SettingsStore {
   setMasterTuning: (hz: number) => void;
   setFormatEngine: (format: keyof FormatEnginePreferences, engine: FormatEngineChoice | UADEImportMode) => void;
   setSidEngine: (engine: SIDEngineType) => void;
+  setAsidEnabled: (enabled: boolean) => void;
+  setAsidDeviceId: (deviceId: string | null) => void;
+  setAsidDeviceAddress: (address: number) => void;
   setPerformanceQuality: (quality: 'high' | 'medium' | 'low') => void;
   setUseBLEP: (enabled: boolean) => void;
   setStereoSeparation: (percent: number) => void;
@@ -403,6 +411,11 @@ export const useSettingsStore = create<SettingsStore>()(
       crtEnabled: false,
       crtParams:  { ...CRT_DEFAULT_PARAMS },
       renderMode: 'webgl' as const,  // Default: WebGL/workbench rendering
+      
+      // ASID Hardware defaults
+      asidEnabled: false,
+      asidDeviceId: null,
+      asidDeviceAddress: 0x4D,  // USB-SID-Pico default address
 
     // Actions
     setAmigaLimits: (amigaLimits) =>
@@ -428,6 +441,21 @@ export const useSettingsStore = create<SettingsStore>()(
     setSidEngine: (engine) =>
       set((state) => {
         state.sidEngine = engine;
+      }),
+      
+    setAsidEnabled: (asidEnabled) =>
+      set((state) => {
+        state.asidEnabled = asidEnabled;
+      }),
+      
+    setAsidDeviceId: (asidDeviceId) =>
+      set((state) => {
+        state.asidDeviceId = asidDeviceId;
+      }),
+      
+    setAsidDeviceAddress: (asidDeviceAddress) =>
+      set((state) => {
+        state.asidDeviceAddress = asidDeviceAddress;
       }),
 
     setPerformanceQuality: (performanceQuality) =>

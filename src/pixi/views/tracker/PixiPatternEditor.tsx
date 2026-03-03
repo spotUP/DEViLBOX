@@ -48,6 +48,7 @@ const FONT_SIZE = 11;
 const HEADER_HEIGHT = 28;
 const GL_MUTE_SOLO_H = 14; // Height of GL-rendered M/S button strip at top of grid
 const SCROLL_THRESHOLD = 50; // Horizontal scroll accumulator resistance
+const SCROLL_BUFFER_ROWS = 10; // Buffer rows above/below visible area for tile-shift scrolling
 
 // ─── Note formatting ─────────────────────────────────────────────────────────
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
@@ -133,18 +134,18 @@ interface RenderParams {
 }
 
 /** Static grid layer — backgrounds, separators, M/S strip, gutter. */
-function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
+function renderGrid(g: GraphicsType, p: RenderParams, vStart: number, bufferRows = 0): void {
   g.clear();
 
   if (!p.trackerVisualBg) {
-    g.rect(0, 0, p.width, p.gridHeight);
+    g.rect(0, 0, p.width, p.gridHeight + bufferRows * 2 * p.rowHeight);
     g.fill({ color: p.theme.bg.color });
   }
 
-  for (let i = 0; i < p.visibleLines; i++) {
+  for (let i = -bufferRows; i < p.visibleLines + bufferRows; i++) {
     const rowNum = vStart + i;
     const y = p.baseY + i * p.rowHeight;
-    if (y + p.rowHeight < 0 || y > p.gridHeight) continue;
+    if (y + p.rowHeight < -bufferRows * p.rowHeight || y > p.gridHeight + bufferRows * p.rowHeight) continue;
 
     const isInPattern = rowNum >= 0 && rowNum < p.patternLength;
     const isGhost = !isInPattern && p.showGhostPatterns;
@@ -300,7 +301,7 @@ function renderOverlay(
 }
 
 /** Generate text labels for visible rows (M/S buttons + cell data). */
-function generateLabels(p: RenderParams, vStart: number, currentRow: number): LabelData[] {
+function generateLabels(p: RenderParams, vStart: number, currentRow: number, bufferRows = 0): LabelData[] {
   if (!p.displayPattern) return [];
   const labels: LabelData[] = [];
 
@@ -326,10 +327,10 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
       color: isSolo ? 0xffffff : p.theme.textMuted.color, fontFamily: PIXI_FONTS.MONO });
   }
 
-  for (let i = 0; i < p.visibleLines; i++) {
+  for (let i = -bufferRows; i < p.visibleLines + bufferRows; i++) {
     const rowNum = vStart + i;
     const y = p.baseY + i * p.rowHeight + p.rowHeight / 2 - FONT_SIZE / 2;
-    if (y + p.rowHeight < -p.rowHeight || y > p.gridHeight + p.rowHeight) continue;
+    if (y + p.rowHeight < -bufferRows * p.rowHeight - p.rowHeight || y > p.gridHeight + bufferRows * p.rowHeight + p.rowHeight) continue;
 
     let actualRow = rowNum;
     let actualPattern = p.displayPattern;
@@ -717,6 +718,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const [playbackPatternIdx, setPlaybackPatternIdx] = useState(0);
   const smoothOffsetRef = useRef(0);          // frame-rate smooth offset — NO React state
   const gridScrollContainerRef = useRef<ContainerType | null>(null); // inner scroll container
+  const labelContainerRef = useRef<ContainerType | null>(null); // render group for grid+text (tile-shift target)
   const gridGraphicsRef = useRef<GraphicsType | null>(null);
   const overlayGraphicsRef = useRef<GraphicsType | null>(null);
   const megaTextRef = useRef<MegaText | null>(null);
@@ -725,7 +727,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   // ── MegaText — single Graphics object for all pattern text ───────────────
   useEffect(() => {
-    const container = gridScrollContainerRef.current;
+    const container = labelContainerRef.current;
     if (!container) return;
     const mega = new MegaText();
     container.addChild(mega);
@@ -794,7 +796,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     let rafId: number;
     const tick = () => {
       if (!isPlaying) {
-        // Reset smooth scroll when stopped
+        // Reset smooth scroll when stopped — tile-shift imperativeRedraw manages labelContainer.y
         smoothOffsetRef.current = 0;
         if (gridScrollContainerRef.current) gridScrollContainerRef.current.y = 0;
         prevRowRef.current = -1;
@@ -884,7 +886,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   // ── Imperative redraw — called from subscription (cursor) and useEffect (other deps) ──
   const prevVStartRef = useRef(-9999);
+  const labelVStartRef = useRef(-9999); // vStart used when labels were last generated (tile-shift origin)
   const fullRedrawRef = useRef(true); // Force full redraw on non-cursor dep changes
+  // Overlay dirty tracking — skip overlay redraw on pure tile-shift frames
+  const overlayCursorChRef = useRef(-1);
+  const overlayCursorColRef = useRef('');
+  const overlaySelRef = useRef<BlockSelection | null>(null);
 
   const imperativeRedraw = useCallback(() => {
     const p = renderParamsRef.current;
@@ -894,22 +901,52 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     const vStart = currentRow - p.topLines;
     const vStartChanged = vStart !== prevVStartRef.current;
     const mega = megaTextRef.current;
+    const bufferExhausted = Math.abs(vStart - labelVStartRef.current) > SCROLL_BUFFER_ROWS;
+    let needOverlay = false;
 
-    if (fullRedrawRef.current) {
+    if (fullRedrawRef.current || bufferExhausted) {
+      // Full regeneration — generate labels with buffer rows
       fullRedrawRef.current = false;
       prevVStartRef.current = vStart;
+      labelVStartRef.current = vStart;
       const gGrid = gridGraphicsRef.current;
-      if (gGrid) renderGrid(gGrid, p, vStart);
-      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+      if (gGrid) renderGrid(gGrid, p, vStart, SCROLL_BUFFER_ROWS);
+      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow, SCROLL_BUFFER_ROWS));
+      // Reset label container shift after full regen
+      const lc = labelContainerRef.current;
+      if (lc) lc.y = 0;
+      needOverlay = true;
     } else if (vStartChanged) {
+      // Tile-shift — skip label regen, just shift the label render group (THE WIN)
+      // isRenderGroup makes this a GPU-only matrix change, no CPU transform recalc
       prevVStartRef.current = vStart;
-      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+      const lc = labelContainerRef.current;
+      if (!p.isPlaying && lc) {
+        lc.y = (labelVStartRef.current - vStart) * p.rowHeight;
+      }
+    } else {
+      // No scroll — cursor channel/column change, or other state change
+      needOverlay = true;
     }
 
-    // Overlay ALWAYS redraws — cursor highlight, selection, peer cursors (cheap)
-    const gOverlay = overlayGraphicsRef.current;
-    if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
-      peerCursorRef.current, peerSelectionRef.current);
+    // Check if overlay-relevant state changed on tile-shift frames
+    if (!needOverlay) {
+      if (cursor.channelIndex !== overlayCursorChRef.current ||
+          cursor.columnType !== overlayCursorColRef.current ||
+          selection !== overlaySelRef.current) {
+        needOverlay = true;
+      }
+    }
+
+    if (needOverlay) {
+      overlayCursorChRef.current = cursor.channelIndex;
+      overlayCursorColRef.current = cursor.columnType;
+      overlaySelRef.current = selection;
+      // Overlay is outside the label render group — uses real vStart
+      const gOverlay = overlayGraphicsRef.current;
+      if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
+        peerCursorRef.current, peerSelectionRef.current);
+    }
   }, []); // Empty deps — everything read from refs
 
   // ── Cursor/selection subscription with RAF coalescing ─────────────────────
@@ -1403,10 +1440,19 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
           layout={{ position: 'absolute', width, height: gridHeight }}
           eventMode="none"
         >
-          <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={{ position: 'absolute', width, height: gridHeight }} />
-          <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={{ position: 'absolute', width, height: gridHeight }} />
+          {/* Label render group — isRenderGroup makes y-shift a GPU-only matrix op (no CPU transform recalc).
+              Tile-shift scrolling shifts this container's y instead of regenerating labels. */}
+          <pixiContainer
+            ref={labelContainerRef}
+            isRenderGroup
+            layout={{ position: 'absolute', width, height: gridHeight }}
+          >
+            <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={{ position: 'absolute', width, height: gridHeight }} />
+            {/* MegaText added imperatively to labelContainerRef */}
+          </pixiContainer>
 
-          {/* MegaText added imperatively to gridScrollContainerRef */}
+          {/* Overlay OUTSIDE render group — uses real vStart so positions are constants during tile-shift */}
+          <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={{ position: 'absolute', width, height: gridHeight }} />
         </pixiContainer>
 
         {/* Drag-and-drop overlay for instruments — only visible during drag */}

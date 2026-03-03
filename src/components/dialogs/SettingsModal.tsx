@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Maximize2, Keyboard } from 'lucide-react';
+import { X, Maximize2, Keyboard, Usb } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore, type SIDEngineType } from '@stores/useSettingsStore';
@@ -17,6 +17,7 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { useAudioStore } from '@stores/useAudioStore';
 import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
+import { getASIDDeviceManager, isASIDSupported } from '@lib/sid/ASIDDeviceManager';
 
 interface CRTSliderProps {
   label: string;
@@ -101,6 +102,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     resetCrtParams,
     sidEngine,
     setSidEngine,
+    asidEnabled,
+    setAsidEnabled,
+    asidDeviceId,
+    setAsidDeviceId,
+    asidDeviceAddress,
+    setAsidDeviceAddress,
   } = useSettingsStore();
 
   const { sampleBusGain, setSampleBusGain, synthBusGain, setSynthBusGain, autoGain, setAutoGain } = useAudioStore();
@@ -118,6 +125,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  
+  // ASID device management
+  const [asidDevices, setAsidDevices] = useState<Array<{ id: string; name: string }>>([]);
+  const [asidSupported, setAsidSupported] = useState(false);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -125,6 +136,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+  
+  // Initialize ASID device manager
+  useEffect(() => {
+    setAsidSupported(isASIDSupported());
+    if (isASIDSupported()) {
+      const manager = getASIDDeviceManager();
+      manager.init().then(() => {
+        const devices = manager.getDevices();
+        setAsidDevices(devices.map(d => ({ id: d.id, name: d.name })));
+      });
+      
+      // Listen for device changes
+      const unsubscribe = manager.onStateChange((state) => {
+        setAsidDevices(state.devices.map(d => ({ id: d.id, name: d.name })));
+      });
+      
+      return unsubscribe;
+    }
   }, []);
 
   const toggleFullscreen = async () => {
@@ -930,6 +960,138 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   </label>
                 ))}
               </div>
+            </div>
+            
+            {/* ASID Hardware Support */}
+            <div className="mb-4">
+              <h3 className="text-ft2-text text-xs font-bold mb-2 tracking-wide flex items-center gap-2">
+                <Usb size={14} className="text-ft2-highlight" />
+                ASID HARDWARE OUTPUT
+              </h3>
+              <p className="text-ft2-textDim text-[9px] font-mono mb-2 leading-relaxed">
+                Route SID playback to real hardware (USB-SID-Pico, TherapSID) via MIDI for authentic
+                MOS 6581/8580 sound. Requires ASID-compatible device connected via USB.
+              </p>
+              
+              {!asidSupported ? (
+                <div className="p-3 bg-ft2-bg/50 border border-ft2-border/50 rounded">
+                  <div className="text-ft2-textDim text-[9px] font-mono">
+                    <span className="text-red-400">❌ Not Supported</span>
+                    <p className="mt-1">
+                      Web MIDI API not available in this browser. ASID hardware support requires
+                      Chrome, Edge, or Opera. Firefox and Safari do not support Web MIDI.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {/* Enable ASID Toggle */}
+                  <label className="block p-2 border cursor-pointer transition-colors bg-transparent border-ft2-border hover:bg-ft2-rowEven/50">
+                    <div className="flex items-center gap-2">
+                      <Toggle
+                        label=""
+                        value={asidEnabled}
+                        onChange={(enabled) => {
+                          setAsidEnabled(enabled);
+                          if (enabled && asidDevices.length === 1) {
+                            setAsidDeviceId(asidDevices[0].id);
+                            getASIDDeviceManager().selectDevice(asidDevices[0].id);
+                          }
+                        }}
+                        size="sm"
+                      />
+                      <div className="flex-1">
+                        <span className="text-ft2-text text-[10px] font-mono font-bold">
+                          Enable ASID Hardware Output
+                        </span>
+                        <div className="text-ft2-textDim text-[9px] font-mono mt-0.5">
+                          {asidEnabled ? 'SID writes sent to hardware' : 'Software emulation only'}
+                        </div>
+                      </div>
+                    </div>
+                  </label>
+                  
+                  {/* Device Selection */}
+                  {asidEnabled && (
+                    <div className="pl-2 space-y-2">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-ft2-text text-[9px] font-mono">MIDI Device:</label>
+                        <select
+                          value={asidDeviceId || ''}
+                          onChange={(e) => {
+                            const deviceId = e.target.value || null;
+                            setAsidDeviceId(deviceId);
+                            getASIDDeviceManager().selectDevice(deviceId);
+                          }}
+                          className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
+                        >
+                          {asidDevices.length === 0 ? (
+                            <option value="">No ASID devices found</option>
+                          ) : (
+                            <>
+                              <option value="">Select a device...</option>
+                              {asidDevices.map((device) => (
+                                <option key={device.id} value={device.id}>
+                                  {device.name}
+                                </option>
+                              ))}
+                            </>
+                          )}
+                        </select>
+                      </div>
+                      
+                      {asidDevices.length === 0 && (
+                        <div className="text-ft2-textDim text-[8px] font-mono leading-tight bg-ft2-bg/30 rounded p-2">
+                          <p className="font-bold mb-1">No ASID devices detected.</p>
+                          <ol className="list-decimal list-inside space-y-0.5">
+                            <li>Connect USB-SID-Pico or TherapSID via USB</li>
+                            <li>Ensure device drivers are installed</li>
+                            <li>Grant MIDI permissions in browser if prompted</li>
+                            <li>Refresh this settings modal</li>
+                          </ol>
+                        </div>
+                      )}
+                      
+                      {/* Device Address */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-ft2-text text-[9px] font-mono">Device Address:</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={0}
+                            max={255}
+                            value={asidDeviceAddress}
+                            onChange={(e) => setAsidDeviceAddress(parseInt(e.target.value) || 0x4D)}
+                            className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 w-20 focus:outline-none focus:border-ft2-highlight"
+                          />
+                          <span className="text-ft2-textDim text-[9px] font-mono">
+                            (0x{asidDeviceAddress.toString(16).toUpperCase().padStart(2, '0')})
+                          </span>
+                          {asidDeviceAddress === 0x4D && (
+                            <span className="text-ft2-highlight text-[9px] font-mono">Default</span>
+                          )}
+                        </div>
+                        <div className="text-ft2-textDim text-[8px] font-mono">
+                          USB-SID-Pico default: 0x4D (77)
+                        </div>
+                      </div>
+                      
+                      {/* Info Box */}
+                      <div className="text-ft2-textDim text-[8px] font-mono leading-tight bg-ft2-bg/30 rounded p-2">
+                        <p className="font-bold mb-1">About ASID:</p>
+                        <p>
+                          ASID (Audio over Serial Interface Device) protocol sends SID register writes
+                          via MIDI SysEx to real hardware. Only jsSID engine supports ASID — other engines
+                          will fall back to software emulation.
+                        </p>
+                        <p className="mt-1">
+                          Learn more: <a href="https://github.com/LouDnl/USBSID-Pico" target="_blank" rel="noopener noreferrer" className="text-ft2-highlight underline">USB-SID-Pico GitHub</a>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             
             <div>
