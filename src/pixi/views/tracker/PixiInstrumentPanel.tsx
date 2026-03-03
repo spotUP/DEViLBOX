@@ -103,7 +103,7 @@ const LUCIDE_TO_FAD: Record<string, string> = {
 
 const DEFAULT_ICON_CHAR = FAD_ICONS['keyboard'] ?? '';
 
-const ITEM_H = 26;
+const ITEM_H = 28;
 const ACTION_BAR_H = 46;
 const FOOTER_H = 22;
 const BUFFER = 3;
@@ -260,8 +260,8 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
     g.fill({ color: theme.bgTertiary.color });
   }, [width, theme]);
 
-  // Width budget: 6px pad + 22px num + 16px icon + 4px gap + name(flex) + badge(56) + actions(44) + 10px scrollbar
-  const nameMaxW = width - 6 - 22 - 16 - 4 - 56 - 44 - 10;
+  // Width budget: 8px pad + 24px num + 16px icon + 8px gap + name(flex) + badge(56) + actions(44) + 10px scrollbar
+  const nameMaxW = width - 8 - 24 - 16 - 8 - 56 - 44 - 10;
 
   return (
     <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
@@ -318,7 +318,7 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
                 height: ITEM_H,
                 flexDirection: 'row',
                 alignItems: 'center',
-                paddingLeft: 6,
+                paddingLeft: 8,
               }}
             >
               {/* Row background */}
@@ -343,9 +343,9 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
               {/* Number */}
               <pixiBitmapText
                 text={displayNum}
-                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
                 tint={isSelected ? theme.accent.color : theme.textMuted.color}
-                layout={{ width: 22, flexShrink: 0 }}
+                layout={{ width: 24, flexShrink: 0 }}
               />
 
               {/* Synth type icon (fontaudio) */}
@@ -353,13 +353,13 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
                 text={iconChar}
                 style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 12, fill: 0xffffff }}
                 tint={isSelected ? 0xffffff : iconColor}
-                layout={{ width: 16, flexShrink: 0, marginRight: 4 }}
+                layout={{ width: 16, flexShrink: 0, marginRight: 8 }}
               />
 
               {/* Name */}
               <pixiBitmapText
                 text={inst.name || `Instrument ${inst.id}`}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
                 tint={isSelected ? 0xffffff : theme.text.color}
                 layout={{ flex: 1, overflow: 'hidden', maxWidth: Math.max(40, nameMaxW) }}
               />
@@ -426,7 +426,7 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
         <pixiGraphics draw={drawFooterBg} layout={{ position: 'absolute', width, height: FOOTER_H }} />
         <pixiBitmapText
           text={`${instruments.length} instrument${instruments.length !== 1 ? 's' : ''}`}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ marginTop: 4 }}
         />
