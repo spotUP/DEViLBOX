@@ -1,6 +1,10 @@
 /**
  * PixiPureTextInput — Pure Pixi text input. No DOM <input> element.
  * Handles keyboard capture, cursor, selection, copy/paste via Pixi events.
+ *
+ * Sets a global flag (window.__pixiInputFocused) when focused so that
+ * capture-phase keyboard routers (KeyboardRouter, useGlobalKeyboardHandler)
+ * can skip interception.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
@@ -75,6 +79,12 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
     return () => clearInterval(id);
   }, [focused]);
 
+  // Set global flag so KeyboardRouter skips interception while Pixi input is focused
+  useEffect(() => {
+    (window as any).__pixiInputFocused = focused;
+    return () => { (window as any).__pixiInputFocused = false; };
+  }, [focused]);
+
   // Click-outside to blur
   useEffect(() => {
     if (!focused) return;
@@ -83,12 +93,13 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
     return () => document.removeEventListener('pointerdown', handler, true);
   }, [focused]);
 
-  // Keyboard handler when focused
+  // Keyboard handler when focused — uses CAPTURE phase to run before KeyboardRouter
   useEffect(() => {
     if (!focused) return;
 
     const handler = (e: KeyboardEvent) => {
-      e.stopPropagation();
+      // Stop the event from reaching other capture-phase handlers (KeyboardRouter)
+      e.stopImmediatePropagation();
       const v = valueRef.current;
       const pos = cursorPosRef.current;
       const ss = selStartRef.current;
@@ -215,8 +226,8 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
       }
     };
 
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    window.addEventListener('keydown', handler, { capture: true });
+    return () => window.removeEventListener('keydown', handler, { capture: true });
   }, [focused, numeric, min, max]);
 
   const charWidth = fontSize * (font === 'mono' ? 0.6 : 0.55);
