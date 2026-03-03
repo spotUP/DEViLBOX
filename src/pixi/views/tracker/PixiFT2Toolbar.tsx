@@ -595,7 +595,7 @@ export const PixiFT2Toolbar: React.FC = () => {
           alignItems: 'center',
           paddingLeft: 8,
           paddingRight: 8,
-          gap: 4,
+          gap: 6,
         }}
       >
         <pixiGraphics draw={drawFileRowBg} layout={{ ...LAYOUT_FILL_ROW, height: FILE_ROW_H }} />

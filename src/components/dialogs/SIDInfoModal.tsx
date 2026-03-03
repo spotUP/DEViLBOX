@@ -45,9 +45,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
     [sidMetadata, setSidMetadata]
   );
 
-  if (!sidMetadata) return null;
-
-  // Tab state
+  // Tab state — hooks must be called unconditionally (before any early return)
   const [activeTab, setActiveTab] = useState<'info' | 'composer'>('info');
   const [composer, setComposer] = useState<ComposerData | null>(null);
   const [composerLoading, setComposerLoading] = useState(false);
@@ -62,6 +60,8 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
       })
       .finally(() => setComposerLoading(false));
   }, [sidMetadata?.author]);
+
+  if (!sidMetadata) return null;
 
   // Build SIDHeaderInfo from store metadata
   const header: SIDHeaderInfo = {
