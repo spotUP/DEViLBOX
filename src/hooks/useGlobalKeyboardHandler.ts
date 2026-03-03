@@ -806,6 +806,9 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
     if (disabled) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if a Pixi pure-text input is focused (no DOM element to check)
+      if ((window as any).__pixiInputFocused) return;
+
       // Skip if focus is inside a text input, contenteditable, or CodeMirror editor.
       // CodeMirror 6 uses a root div (.cm-editor) with tabindex but the contenteditable
       // is on the inner .cm-content child — so isContentEditable alone misses the case
@@ -856,6 +859,7 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
 
     // Handle keyup for hold-to-release commands (fader cut, crab, transformer, flare)
     const handleKeyUp = (e: KeyboardEvent) => {
+      if ((window as any).__pixiInputFocused) return;
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||

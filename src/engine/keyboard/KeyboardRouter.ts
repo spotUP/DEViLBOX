@@ -35,6 +35,9 @@ const state: RouterState = {
  * Check if event target is an input field where we shouldn't intercept keys.
  */
 function isInputElement(e: KeyboardEvent): boolean {
+  // Check for focused Pixi text input (no DOM element, uses global flag)
+  if ((window as any).__pixiInputFocused) return true;
+
   const target = e.target as HTMLElement;
   if (!target) return false;
 
@@ -72,6 +75,11 @@ function isModalOpen(): boolean {
  * Main keyboard event handler.
  */
 function handleKeyDown(e: KeyboardEvent): void {
+  // Skip if target is an input field (must check FIRST, before arrow suppression)
+  if (isInputElement(e)) {
+    return;
+  }
+
   // PERF: Suppress repeat arrow key events entirely. macOS key repeat fires
   // at 30Hz which caps scroll FPS at 30. useTrackerInput drives cursor movement
   // via its own RAF loop at 60fps. Killing repeats here (the first capture-phase
@@ -79,11 +87,6 @@ function handleKeyDown(e: KeyboardEvent): void {
   if (e.repeat && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
     e.preventDefault();
     e.stopImmediatePropagation();
-    return;
-  }
-
-  // Skip if target is an input field
-  if (isInputElement(e)) {
     return;
   }
 
