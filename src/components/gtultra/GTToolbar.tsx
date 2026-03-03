@@ -2,8 +2,10 @@
  * GTToolbar — Transport controls, song info, SID config for GoatTracker Ultra.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
+import { getGTUltraASIDBridge } from '../../engine/gtultra/GTUltraASIDBridge';
+import { getASIDDeviceManager } from '../../lib/sid/ASIDDeviceManager';
 
 export const GTToolbar: React.FC<{ width: number; height: number }> = ({ width, height }) => {
   const playing = useGTUltraStore((s) => s.playing);
@@ -106,6 +108,58 @@ export const GTToolbar: React.FC<{ width: number; height: number }> = ({ width, 
         <option value={1}>1xSID (3ch)</option>
         <option value={2}>2xSID (6ch)</option>
       </select>
+
+      <ASIDToggle />
     </div>
+  );
+};
+
+/** ASID hardware toggle — shows connection status and enables/disables hardware output */
+const ASIDToggle: React.FC = () => {
+  const [asidEnabled, setAsidEnabled] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const engine = useGTUltraStore((s) => s.engine);
+
+  useEffect(() => {
+    const dm = getASIDDeviceManager();
+    dm.init();
+    const unsub = dm.onStateChange((state) => {
+      setConnected(state.selectedDevice?.state === 'connected');
+    });
+    setConnected(dm.isDeviceReady());
+    return unsub;
+  }, []);
+
+  const toggle = useCallback(() => {
+    const bridge = getGTUltraASIDBridge();
+    if (asidEnabled) {
+      bridge.disable();
+      engine?.enableAsid(false);
+      setAsidEnabled(false);
+    } else {
+      bridge.enable();
+      engine?.enableAsid(true);
+      setAsidEnabled(true);
+    }
+  }, [asidEnabled, engine]);
+
+  return (
+    <button
+      onClick={toggle}
+      title={connected ? (asidEnabled ? 'ASID: ON (click to disable)' : 'ASID: OFF (click to enable)') : 'No ASID device connected'}
+      style={{
+        background: asidEnabled && connected ? '#2a9d8f' : '#333',
+        color: connected ? '#fff' : '#666',
+        border: `1px solid ${connected ? '#2a9d8f' : '#555'}`,
+        padding: '2px 8px',
+        cursor: connected ? 'pointer' : 'not-allowed',
+        fontSize: 10,
+        fontWeight: 'bold',
+        opacity: connected ? 1 : 0.5,
+      }}
+      disabled={!connected}
+    >
+      🔌 ASID {asidEnabled && connected ? 'ON' : 'OFF'}
+    </button>
   );
 };
