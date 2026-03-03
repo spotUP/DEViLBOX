@@ -171,16 +171,20 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
     if (!el) return;
     // Compute screen-space position of the bottom-left of this trigger
     const pos = el.toGlobal({ x: 0, y: height + 2 });
-    setOpen(true);
-    usePixiDropdownStore.getState().openDropdown({
-      kind: 'select',
-      id: idRef.current,
-      x: pos.x,
-      y: pos.y,
-      width: dropdownWidth,
-      options,
-      onSelect: (v) => { onChangeRef.current(v); closeDropdown(); },
-      onClose: closeDropdown,
+    // Defer state update so React doesn't modify the PixiJS node tree
+    // while the pointer event is still being dispatched (BindingError).
+    requestAnimationFrame(() => {
+      setOpen(true);
+      usePixiDropdownStore.getState().openDropdown({
+        kind: 'select',
+        id: idRef.current,
+        x: pos.x,
+        y: pos.y,
+        width: dropdownWidth,
+        options,
+        onSelect: (v) => { onChangeRef.current(v); closeDropdown(); },
+        onClose: closeDropdown,
+      });
     });
   }, [open, height, dropdownWidth, options, closeDropdown]);
 

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T23:17:32.538Z
+ * Generated: 2026-03-03T23:18:19.902Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2133';
-export const BUILD_NUMBER = '2133';
-export const BUILD_HASH = 'db5d5b69';
+export const BUILD_VERSION = '1.0.2135';
+export const BUILD_NUMBER = '2135';
+export const BUILD_HASH = 'f8a26c2c';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2133',
+    version: '1.0.2135',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'fix',
+        "description": "Null-guard instrument.dispose() and remove unused import"
+      },
+      {
+        type: 'feature',
+        "description": "Complete starter instrument coverage for all system presets"
+      },
       {
         type: 'fix',
         "description": "Resolve 10 TypeScript compilation errors"
@@ -230,14 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Soften all 100% white borders with opacity"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove gradients from Rare Finds modal, highlight filename in accent color"
-      },
-      {
-        type: 'improvement',
-        "description": "Redesign Rare Finds modal with design system tokens"
       }
     ]
   }
