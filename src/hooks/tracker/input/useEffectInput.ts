@@ -4,7 +4,7 @@
  * effect2 type/param, flag columns, and probability column.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
 import {
@@ -252,5 +252,5 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
     [recordMode, pattern, setCell, advanceByEditStep, cursorRef]
   );
 
-  return { handleKeyDown };
+  return useMemo(() => ({ handleKeyDown }), [handleKeyDown]);
 };

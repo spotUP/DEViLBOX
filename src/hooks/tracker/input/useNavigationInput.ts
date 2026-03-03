@@ -4,7 +4,7 @@
  * and arrow keys with RAF-driven smooth scrolling.
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -280,5 +280,5 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
     heldArrowRef.current = null;
   }, []);
 
-  return { handleKeyDown, handleKeyUp, cleanup };
+  return useMemo(() => ({ handleKeyDown, handleKeyUp, cleanup }), [handleKeyDown, handleKeyUp, cleanup]);
 };
