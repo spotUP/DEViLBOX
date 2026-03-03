@@ -47,8 +47,12 @@ export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width
       gtEngine = new GTUltraEngine(audioCtx, {
         onReady: () => {
           console.log('[GTUltra] Engine ready');
-          // Request initial song data from WASM
           const store = useGTUltraStore.getState();
+          // Load any pending song data that arrived before engine was ready
+          if (store.pendingSongData) {
+            gtEngine!.loadSong(store.pendingSongData.buffer);
+            store.setPendingSongData(null);
+          }
           store.refreshSongInfo();
           store.refreshAllOrders();
           store.refreshAllInstruments();

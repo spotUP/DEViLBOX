@@ -13,7 +13,7 @@
  * └────────────────────────────┴─────────────────────┘
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { PixiButton } from '@/pixi/components/PixiButton';
@@ -28,6 +28,8 @@ import { PixiGTStudioTables } from './PixiGTStudioTables';
 import { PixiGTPianoRoll } from './PixiGTPianoRoll';
 import { PixiGTPresetBrowser } from './PixiGTPresetBrowser';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
+import { GTUltraEngine } from '@/engine/gtultra/GTUltraEngine';
+import { getGTUltraASIDBridge } from '@/engine/gtultra/GTUltraASIDBridge';
 
 const TOOLBAR_H = 32;
 const SIDEBAR_W = 280;
@@ -56,6 +58,62 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const followPlay = useGTUltraStore((s) => s.followPlay);
   const engine = useGTUltraStore((s) => s.engine);
   const viewMode = useGTUltraStore((s) => s.viewMode);
+
+  // Initialize engine on mount (mirrors GTUltraView.tsx logic)
+  useEffect(() => {
+    // Skip if engine already exists (e.g. DOM view initialized it)
+    if (useGTUltraStore.getState().engine) return;
+
+    let gtEngine: GTUltraEngine | null = null;
+    let disposed = false;
+
+    const setup = async () => {
+      const audioCtx = new AudioContext();
+      gtEngine = new GTUltraEngine(audioCtx, {
+        onReady: () => {
+          console.log('[GTUltra/Pixi] Engine ready');
+          const store = useGTUltraStore.getState();
+          // Load any pending song data that arrived before engine was ready
+          if (store.pendingSongData) {
+            gtEngine!.loadSong(store.pendingSongData.buffer);
+            store.setPendingSongData(null);
+          }
+          store.refreshSongInfo();
+          store.refreshAllOrders();
+          store.refreshAllInstruments();
+          store.refreshAllTables();
+        },
+        onPosition: (pos) => useGTUltraStore.getState().updatePlaybackPos(pos),
+        onAsidWrite: (chip, reg, value) => getGTUltraASIDBridge().writeRegister(chip, reg, value),
+        onPatternData: (pattern, length, data) => useGTUltraStore.getState().updatePatternData(pattern, length, data),
+        onOrderData: (channel, data) => useGTUltraStore.getState().updateOrderData(channel, data),
+        onInstrumentData: (instrument, data) => useGTUltraStore.getState().updateInstrumentData(instrument, data),
+        onTableData: (tableType, left, right) => useGTUltraStore.getState().updateTableData(tableType, left, right),
+        onSidRegisters: (sidIdx, data) => useGTUltraStore.getState().updateSidRegisters(sidIdx, data),
+        onSongInfo: (info) => {
+          const store = useGTUltraStore.getState();
+          store.setSongName(info.name);
+          store.setSongAuthor(info.author);
+        },
+        onError: (err) => console.error('[GTUltra/Pixi] Engine error:', err),
+      });
+      await gtEngine.init();
+      await gtEngine.ready;
+      if (disposed) { gtEngine.dispose(); return; }
+      gtEngine.output.connect(audioCtx.destination);
+      useGTUltraStore.getState().setEngine(gtEngine);
+    };
+
+    setup().catch(console.error);
+
+    return () => {
+      disposed = true;
+      if (gtEngine) {
+        gtEngine.dispose();
+        useGTUltraStore.getState().setEngine(null);
+      }
+    };
+  }, []);
 
   const editorWidth = width - SIDEBAR_W;
   const editorHeight = height - TOOLBAR_H;
