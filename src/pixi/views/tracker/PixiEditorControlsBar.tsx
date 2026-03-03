@@ -238,7 +238,7 @@ const SIDSubsongAndInfo: React.FC = () => {
     });
   }, []);
 
-  if (!hasInfo) return null;
+  if (!hasInfo) return <pixiContainer />;
 
   return (
     <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
