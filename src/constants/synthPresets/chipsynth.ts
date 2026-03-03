@@ -1,0 +1,347 @@
+import type { SynthPreset } from './types';
+import type { ChipSynthConfig } from '../../types/instrument';
+
+export const CHIPSYNTH_PRESETS: SynthPreset[] = [
+  {
+    id: 'chip-major-arp',
+    name: 'Major Chord Arp',
+    description: 'Classic NES major chord arpeggio',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 50 },
+      bitDepth: 8,
+      sampleRate: 22050,
+      arpeggio: {
+        enabled: true,
+        speed: 20,
+        speedUnit: 'hz',
+        steps: [
+          { noteOffset: 0 },
+          { noteOffset: 4 },
+          { noteOffset: 7 },
+        ],
+        mode: 'loop',
+      },
+      envelope: { attack: 5, decay: 200, sustain: 0, release: 50 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-minor-arp',
+    name: 'Minor Chord Arp',
+    description: 'Melancholic minor arpeggio',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 25 },
+      bitDepth: 8,
+      arpeggio: {
+        enabled: true,
+        speed: 18,
+        speedUnit: 'hz',
+        steps: [
+          { noteOffset: 0 },
+          { noteOffset: 3 },
+          { noteOffset: 7 },
+        ],
+        mode: 'loop',
+      },
+      envelope: { attack: 5, decay: 300, sustain: 0, release: 50 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-triangle-bass',
+    name: 'Triangle Bass',
+    description: 'Pure NES triangle wave bass',
+    category: 'bass',
+    config: {
+      channel: 'triangle',
+      bitDepth: 4,
+      sampleRate: 22050,
+      envelope: { attack: 5, decay: 400, sustain: 0, release: 100 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-noise-kick',
+    name: 'Noise Kick',
+    description: 'Periodic noise drum kick',
+    category: 'drum',
+    config: {
+      channel: 'noise',
+      noise: { mode: 'periodic', period: 4 },
+      bitDepth: 8,
+      envelope: { attack: 0, decay: 80, sustain: 0, release: 20 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-noise-hat',
+    name: 'Noise Hi-Hat',
+    description: 'White noise hi-hat',
+    category: 'drum',
+    config: {
+      channel: 'noise',
+      noise: { mode: 'white', period: 1 },
+      bitDepth: 8,
+      envelope: { attack: 0, decay: 50, sustain: 0, release: 10 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-pulse-lead',
+    name: 'Pulse Lead',
+    description: '25% duty cycle lead',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 25 },
+      bitDepth: 8,
+      vibrato: { speed: 6, depth: 15, delay: 150 },
+      envelope: { attack: 5, decay: 500, sustain: 0, release: 100 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-square-lead',
+    name: 'Square Lead',
+    description: 'Full 50% square wave',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 50 },
+      bitDepth: 8,
+      envelope: { attack: 5, decay: 400, sustain: 0, release: 100 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-octave-arp',
+    name: 'Octave Arp',
+    description: 'Fast octave switching',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 50 },
+      arpeggio: {
+        enabled: true,
+        speed: 25,
+        speedUnit: 'hz',
+        steps: [
+          { noteOffset: 0 },
+          { noteOffset: 12 },
+        ],
+        mode: 'loop',
+      },
+      envelope: { attack: 5, decay: 300, sustain: 0, release: 50 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-power-chord',
+    name: 'Power Chord',
+    description: 'Fifth interval arp',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 25 },
+      arpeggio: {
+        enabled: true,
+        speed: 22,
+        speedUnit: 'hz',
+        steps: [
+          { noteOffset: 0 },
+          { noteOffset: 7 },
+        ],
+        mode: 'loop',
+      },
+      envelope: { attack: 5, decay: 350, sustain: 0, release: 50 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-diminished',
+    name: 'Diminished',
+    description: 'Tense diminished arpeggio',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 25 },
+      arpeggio: {
+        enabled: true,
+        speed: 18,
+        speedUnit: 'hz',
+        steps: [
+          { noteOffset: 0 },
+          { noteOffset: 3 },
+          { noteOffset: 6 },
+        ],
+        mode: 'loop',
+      },
+      envelope: { attack: 5, decay: 300, sustain: 0, release: 50 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-mega-man',
+    name: 'Mega Man',
+    description: 'Capcom NES style lead',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 50 },
+      bitDepth: 8,
+      vibrato: { speed: 8, depth: 20, delay: 100 },
+      envelope: { attack: 5, decay: 600, sustain: 0, release: 100 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-castlevania',
+    name: 'Castlevania',
+    description: 'Gothic NES bass sound',
+    category: 'bass',
+    config: {
+      channel: 'pulse2',
+      pulse: { duty: 12.5 },
+      bitDepth: 8,
+      envelope: { attack: 5, decay: 500, sustain: 0, release: 100 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-gb-wave',
+    name: 'Game Boy Wave',
+    description: 'Gameboy custom wave channel',
+    category: 'lead',
+    config: {
+      channel: 'triangle',
+      bitDepth: 4,
+      sampleRate: 16384,
+      envelope: { attack: 5, decay: 400, sustain: 0, release: 100 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-snare',
+    name: 'Chip Snare',
+    description: 'Periodic noise snare',
+    category: 'drum',
+    config: {
+      channel: 'noise',
+      noise: { mode: 'periodic', period: 8 },
+      bitDepth: 8,
+      envelope: { attack: 0, decay: 120, sustain: 0, release: 30 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-sus4-arp',
+    name: 'Sus4 Arp',
+    description: 'Suspended 4th arpeggio',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 50 },
+      arpeggio: {
+        enabled: true,
+        speed: 20,
+        speedUnit: 'hz',
+        steps: [
+          { noteOffset: 0 },
+          { noteOffset: 5 },
+          { noteOffset: 7 },
+        ],
+        mode: 'loop',
+      },
+      envelope: { attack: 5, decay: 300, sustain: 0, release: 50 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-7th-arp',
+    name: 'Major 7th Arp',
+    description: 'Jazzy major 7th arpeggio',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 25 },
+      arpeggio: {
+        enabled: true,
+        speed: 16,
+        speedUnit: 'hz',
+        steps: [
+          { noteOffset: 0 },
+          { noteOffset: 4 },
+          { noteOffset: 7 },
+          { noteOffset: 11 },
+        ],
+        mode: 'loop',
+      },
+      envelope: { attack: 5, decay: 400, sustain: 0, release: 50 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-pingpong',
+    name: 'Ping Pong Arp',
+    description: 'Bouncing ping-pong pattern',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 50 },
+      arpeggio: {
+        enabled: true,
+        speed: 18,
+        speedUnit: 'hz',
+        steps: [
+          { noteOffset: 0 },
+          { noteOffset: 4 },
+          { noteOffset: 7 },
+          { noteOffset: 12 },
+        ],
+        mode: 'pingpong',
+      },
+      envelope: { attack: 5, decay: 350, sustain: 0, release: 50 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-random',
+    name: 'Random Notes',
+    description: 'Chaotic random arpeggio',
+    category: 'fx',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 25 },
+      arpeggio: {
+        enabled: true,
+        speed: 15,
+        speedUnit: 'hz',
+        steps: [
+          { noteOffset: 0 },
+          { noteOffset: 5 },
+          { noteOffset: 7 },
+          { noteOffset: 12 },
+        ],
+        mode: 'random',
+      },
+      envelope: { attack: 5, decay: 200, sustain: 0, release: 50 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-thin',
+    name: 'Thin Pulse',
+    description: 'Nasal 12.5% duty',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 12.5 },
+      bitDepth: 8,
+      envelope: { attack: 5, decay: 350, sustain: 0, release: 100 },
+    } as Partial<ChipSynthConfig>,
+  },
+  {
+    id: 'chip-vibrato-lead',
+    name: 'Vibrato Lead',
+    description: 'Expressive vibrato lead',
+    category: 'lead',
+    config: {
+      channel: 'pulse1',
+      pulse: { duty: 50 },
+      bitDepth: 8,
+      vibrato: { speed: 5, depth: 30, delay: 80 },
+      envelope: { attack: 5, decay: 800, sustain: 0, release: 150 },
+    } as Partial<ChipSynthConfig>,
+  },
+];
+
+// ============================================
+// SUPERSAW PRESETS (Trance / EDM)
+// ============================================
+
