@@ -517,6 +517,7 @@ export const PixiArrangementView: React.FC = () => {
         <PixiButton label="-" variant="ghost" size="sm" onClick={handleZoomOut} />
         <PixiLabel text="Zoom" size="xs" color="textMuted" />
         <PixiButton label="+" variant="ghost" size="sm" onClick={handleZoomIn} />
+        <PixiButton label="Fit" variant="ghost" size="sm" onClick={() => useArrangementStore.getState().zoomToFit()} />
 
         {/* Snap */}
         <PixiButton

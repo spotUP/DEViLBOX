@@ -2,9 +2,9 @@
  * PixiNavBar — Modern single-row navigation bar.
  *
  * Three zones:
- *   Left (160px):  Logo + view selector pills (TRK, ARR, PRD, DJ, VJ)
+ *   Left (160px):  Logo + view selector pills (TRK, ARR, PRD, DJ, VJ, STU)
  *   Center (flex):  PixiTransportBar (play/stop/BPM/position/loop)
- *   Right (160px):  Save, Load, Theme, Dock toggle, DOM toggle
+ *   Right:  Volume knob, Save, Load, Collab, Auth, MIDI, Theme, Dock, DOM
  */
 
 import React, { useCallback } from 'react';
@@ -12,11 +12,16 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiButton } from '../components/PixiButton';
+import { PixiKnob } from '../components/PixiKnob';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useProjectStore } from '@stores/useProjectStore';
+import { useAudioStore } from '@stores/useAudioStore';
+import { useCollaborationStore } from '@stores/useCollaborationStore';
+import { useAuthStore } from '@stores/useAuthStore';
+import { useMIDIStore } from '@stores/useMIDIStore';
 import { MODERN_NAV_H } from '../workbench/workbenchLayout';
 import { serializeProjectToBlob, loadProjectFromObject } from '@hooks/useProjectPersistence';
 import { PixiTransportBar } from './PixiTransportBar';
@@ -58,6 +63,19 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
 
   // Settings store
   const setRenderMode = useSettingsStore((s) => s.setRenderMode);
+
+  // Audio store — master volume
+  const masterVolume = useAudioStore((s) => s.masterVolume);
+  const setMasterVolume = useAudioStore((s) => s.setMasterVolume);
+
+  // Collaboration store
+  const collabStatus = useCollaborationStore((s) => s.status);
+
+  // Auth store
+  const authUser = useAuthStore((s) => s.user);
+
+  // MIDI store
+  const hasMIDI = useMIDIStore((s) => s.isInitialized && s.inputDevices.length > 0);
 
   // Project store
   const projectName = useProjectStore((s) => s.metadata?.name ?? 'project');
@@ -112,6 +130,21 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
     setRenderMode('dom');
   }, [setRenderMode]);
 
+  // Collaboration modal
+  const handleOpenCollab = useCallback(() => {
+    useUIStore.getState().openModal('collaboration');
+  }, []);
+
+  // Auth modal
+  const handleOpenAuth = useCallback(() => {
+    useUIStore.getState().openModal('auth');
+  }, []);
+
+  // MIDI / Settings modal
+  const handleOpenMIDI = useCallback(() => {
+    useUIStore.getState().openModal('settings');
+  }, []);
+
   // Background
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
@@ -124,7 +157,7 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
 
   // Transport bar width: center zone gets whatever's left after left/right
   const LEFT_W = 280;
-  const RIGHT_W = 240;
+  const RIGHT_W = 380;
   const transportW = Math.max(200, width - LEFT_W - RIGHT_W);
 
   return (
@@ -181,7 +214,7 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
       {/* ═══ Center zone: Transport ═══ */}
       <PixiTransportBar width={transportW} height={MODERN_NAV_H} />
 
-      {/* ═══ Right zone: Actions ═══ */}
+      {/* ═══ Right zone: Volume, Actions, Status ═══ */}
       <pixiContainer
         layout={{
           width: RIGHT_W,
@@ -194,8 +227,47 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
           flexShrink: 0,
         }}
       >
+        {/* Master Volume */}
+        <PixiKnob
+          value={masterVolume}
+          min={-60}
+          max={0}
+          onChange={setMasterVolume}
+          label="VOL"
+          unit="dB"
+          size="sm"
+          defaultValue={0}
+          formatValue={(v) => `${v.toFixed(0)}`}
+          layout={{ marginRight: 4 }}
+        />
+
         <PixiButton label="SAVE" variant="ghost" size="sm" onClick={handleSaveFile} width={44} />
         <PixiButton label="LOAD" variant="ghost" size="sm" onClick={handleLoadFile} width={44} />
+
+        {/* Collaboration */}
+        <PixiButton
+          label={collabStatus === 'connected' ? 'LIVE' : 'COLLAB'}
+          variant={collabStatus === 'connected' ? 'ft2' : 'ghost'}
+          color={collabStatus === 'connected' ? 'green' : 'default'}
+          size="sm"
+          active={collabStatus === 'connected'}
+          onClick={handleOpenCollab}
+          width={48}
+        />
+
+        {/* Auth */}
+        <PixiButton
+          label={authUser ? authUser.username.slice(0, 6) : 'LOGIN'}
+          variant="ghost"
+          size="sm"
+          onClick={handleOpenAuth}
+          width={44}
+        />
+
+        {/* MIDI */}
+        {hasMIDI && (
+          <PixiButton label="MIDI" variant="ghost" size="sm" onClick={handleOpenMIDI} width={40} />
+        )}
 
         {/* Dock expand pill (visible when dock is collapsed) */}
         <PixiButton
