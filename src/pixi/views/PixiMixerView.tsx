@@ -96,6 +96,8 @@ export const PixiMixerView: React.FC = () => {
   return (
     <pixiContainer
       layout={{
+        width: '100%',
+        height: '100%',
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 8,

@@ -33,6 +33,7 @@ const VIEW_TABS = [
   { id: 'tracker',     label: 'Tracker' },
   { id: 'arrangement', label: 'Arrange' },
   { id: 'pianoroll',   label: 'Piano' },
+  { id: 'mixer',       label: 'Mixer' },
   { id: 'dj',          label: 'DJ'  },
   { id: 'vj',          label: 'VJ'  },
   { id: 'studio',      label: 'Studio' },

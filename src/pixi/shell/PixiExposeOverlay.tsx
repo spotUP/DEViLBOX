@@ -19,12 +19,13 @@ const EXPOSE_VIEWS = [
   { id: 'tracker',     label: 'Tracker',  icon: '♫', color: 0x60a5fa },
   { id: 'arrangement', label: 'Arrange',  icon: '≡', color: 0x34d399 },
   { id: 'pianoroll',   label: 'Piano',    icon: '♬', color: 0xc084fc },
+  { id: 'mixer',       label: 'Mixer',    icon: '☰', color: 0xa78bfa },
   { id: 'dj',          label: 'DJ',       icon: '◎', color: 0xfb923c },
   { id: 'vj',          label: 'VJ',       icon: '◈', color: 0xf472b6 },
   { id: 'studio',      label: 'Studio',   icon: '⊞', color: 0xfbbf24 },
 ] as const;
 
-const COLS = 3;
+const COLS = 4;
 const ROWS = 2;
 const CARD_GAP = 24;
 const CARD_RADIUS = 10;

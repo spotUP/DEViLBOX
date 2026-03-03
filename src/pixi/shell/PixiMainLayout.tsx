@@ -32,11 +32,12 @@ import { PixiArrangementView } from '../views/PixiArrangementView';
 import { PixiPianoRollView } from '../views/PixiPianoRollView';
 import { PixiDJView } from '../views/PixiDJView';
 import { PixiVJView } from '../views/PixiVJView';
+import { PixiMixerView } from '../views/PixiMixerView';
 import { WorkbenchContainer } from '../workbench/WorkbenchContainer';
 
 // ─── View router ─────────────────────────────────────────────────────────────
 
-type MainViewId = 'tracker' | 'arrangement' | 'pianoroll' | 'dj' | 'vj' | 'studio';
+type MainViewId = 'tracker' | 'arrangement' | 'pianoroll' | 'dj' | 'vj' | 'mixer' | 'studio';
 
 // Views that are always mounted (hidden when inactive) to avoid @pixi/layout BindingError.
 // WorkbenchContainer is excluded — it contains its own copies of these views inside
@@ -49,13 +50,14 @@ const ALWAYS_MOUNTED_VIEWS: Record<AlwaysMountedViewId, React.ComponentType> = {
   pianoroll: PixiPianoRollView,
   dj: PixiDJView,
   vj: PixiVJView,
+  mixer: PixiMixerView,
 };
 
 // Map UIStore activeView to our MainViewId (some views map to tracker)
 function resolveMainView(activeView: string): MainViewId {
   if (activeView === 'studio') return 'studio';
   if (activeView in ALWAYS_MOUNTED_VIEWS) return activeView as MainViewId;
-  // 'drumpad', 'mixer', or any unknown → default to tracker
+  // 'drumpad' or any unknown → default to tracker
   return 'tracker';
 }
 
@@ -75,7 +77,7 @@ export const PixiMainLayout: React.FC = () => {
   // Dock state (local — will be persisted to store later)
   const [dockHeight, setDockHeight] = useState(MODERN_DOCK_DEFAULT_H);
   const [dockCollapsed, setDockCollapsed] = useState(false);
-  const [dockTab, setDockTab] = useState<DockTab>('mixer');
+  const [dockTab, setDockTab] = useState<DockTab>('device');
   const [dockUndocked, setDockUndocked] = useState(false);
 
   // When undocked, dock takes 0 height (content renders as floating overlay)
@@ -199,6 +201,7 @@ export const PixiMainLayout: React.FC = () => {
       pianoroll: 'pianoroll',
       dj: 'dj',
       vj: 'vj',
+      mixer: 'mixer',
     };
     const winId = viewToWindowId[mainViewId];
     if (winId && store.windows[winId]) {
@@ -206,8 +209,8 @@ export const PixiMainLayout: React.FC = () => {
       store.resizeWindow(winId, width, mainViewH + TITLE_H);
       if (!store.windows[winId].visible) store.showWindow(winId);
     }
-    // Also sync dock views (mixer, instrument, master-fx)
-    for (const dockWinId of ['mixer', 'instrument', 'master-fx']) {
+    // Also sync dock views (instrument, master-fx)
+    for (const dockWinId of ['instrument', 'master-fx']) {
       if (store.windows[dockWinId]) {
         store.resizeWindow(dockWinId, width, effectiveDockH + TITLE_H);
       }

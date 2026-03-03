@@ -9,7 +9,6 @@ import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { MODERN_DOCK_TAB_H, MODERN_DOCK_MIN_H, MODERN_DOCK_MAX_H } from '../workbench/workbenchLayout';
-import { PixiMixerView } from '../views/PixiMixerView';
 import { PixiMasterFxView } from '../views/PixiMasterFxView';
 import { PixiInstrumentEditor } from '../views/PixiInstrumentEditor';
 import { PixiButton } from '../components/PixiButton';
@@ -18,10 +17,9 @@ import { useUIStore } from '@stores/useUIStore';
 
 // ─── Dock tab definitions ────────────────────────────────────────────────────
 
-export type DockTab = 'mixer' | 'device' | 'master-fx';
+export type DockTab = 'device' | 'master-fx';
 
 const DOCK_TABS: { id: DockTab; label: string }[] = [
-  { id: 'mixer',     label: 'MIXER' },
   { id: 'device',    label: 'DEVICE' },
   { id: 'master-fx', label: 'MASTER FX' },
 ];
@@ -253,7 +251,6 @@ export const PixiBottomDock: React.FC<PixiBottomDockProps> = ({
             flexDirection: 'column',
           }}
         >
-          {activeTab === 'mixer' && <PixiMixerView />}
           {activeTab === 'device' && <InstrumentEditorDockPanel />}
           {activeTab === 'master-fx' && <PixiMasterFxView />}
         </pixiContainer>
