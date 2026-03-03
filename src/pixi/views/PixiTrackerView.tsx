@@ -36,6 +36,8 @@ import { PixiGridSequencer } from './tracker/PixiGridSequencer';
 import { PixiTB303View } from './tracker/PixiTB303View';
 import { PixiSunVoxChannelView } from './sunvox/PixiSunVoxChannelView';
 import { PixiPianoRollView } from './PixiPianoRollView';
+import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
+import { GTUltraView } from '@/components/gtultra/GTUltraView';
 import { useTrackerInput } from '@/hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
 import { useTrackerStore, useUIStore, useInstrumentStore } from '@stores';
@@ -194,6 +196,16 @@ export const PixiTrackerView: React.FC = () => {
                   height={Math.max(50, instrumentPanelHeight - MUSICLINE_MATRIX_HEIGHT)}
                 />
               </pixiContainer>
+            )}
+            {viewMode === 'tracker' && editorMode === 'goattracker' && (
+              <PixiDOMOverlay
+                layout={{ width: Math.max(100, editorWidth), height: Math.max(100, instrumentPanelHeight) }}
+              >
+                <GTUltraView
+                  width={Math.max(100, editorWidth)}
+                  height={Math.max(100, instrumentPanelHeight)}
+                />
+              </PixiDOMOverlay>
             )}
           </pixiContainer>
 
