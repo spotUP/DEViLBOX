@@ -326,12 +326,11 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleViewModeChange = useCallback((val: string) => {
-    const v = val as ViewMode;
-    // Defer to break cross-reconciler sync (DOM event → Pixi reconciler state)
-    if (v === 'arrangement' || v === 'dj' || v === 'drumpad' || v === 'pianoroll' || v === 'vj' || v === 'studio') {
-      setTimeout(() => useUIStore.getState().setActiveView(v as any), 0);
+    // Some select values (arrangement, dj, etc.) switch the global activeView rather than the local viewMode
+    if (val === 'arrangement' || val === 'dj' || val === 'drumpad' || val === 'pianoroll' || val === 'vj' || val === 'studio') {
+      setTimeout(() => useUIStore.getState().setActiveView(val as any), 0);
     } else {
-      setTimeout(() => onViewModeChange(v), 0);
+      setTimeout(() => onViewModeChange(val as ViewMode), 0);
     }
   }, [onViewModeChange]);
 

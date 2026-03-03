@@ -214,7 +214,7 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
             key={view.id}
             eventMode="static"
             cursor="pointer"
-            onPointerUp={(e) => {
+            onPointerUp={(e: import('pixi.js').FederatedPointerEvent) => {
               e.stopPropagation();
               handleSelectView(view.id);
             }}
