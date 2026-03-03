@@ -669,7 +669,7 @@ export const PixiStatusBar: React.FC = () => {
   const onShowTips = useCallback(() => {
     openModal('help', { initialTab: 'tips' });
   }, [openModal]);
-  const minimapVisible = useWorkbenchStore((s) => s.minimapVisible);
+  const minimapVisible = useWorkbenchStore((s) => s.minimapVisible) && activeView === 'studio';
   const collabStatus = useCollaborationStore((s) => s.status);
   const collabRoomCode = useCollaborationStore((s) => s.roomCode);
 

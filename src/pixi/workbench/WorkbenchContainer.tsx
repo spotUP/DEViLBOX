@@ -4,7 +4,7 @@
  * - Applies camera transform (pan/zoom) to the world container
  * - Handles background pan (pointer drag) and wheel zoom
  * - Renders WorkbenchBackground + all visible PixiWindows
- * - Exposé (Tab key): spring-fit all windows; release to restore
+ * - Exposé (Alt+Tab): spring-fit all windows; release to restore
  * - Focus (green ◎ button): spring-fit a single window at 85% screen
  * - Snap guide lines: drawn imperatively via a Graphics ref, fade out 300ms
  * - Provides WorkbenchContext (camera + focusWindow + setSnapLines)
@@ -288,13 +288,13 @@ export const WorkbenchContainer: React.FC = () => {
     }
   }, [width, workbenchH, startSpring]);
 
-  // ─── Exposé (Tab hold) ────────────────────────────────────────────────────
+  // ─── Exposé (Alt+Tab hold) ──────────────────────────────────────────────────
 
   const exposeCameraRef = useRef<CameraState | null>(null);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || e.repeat) return;
+      if (e.key !== 'Tab' || !e.altKey || e.repeat) return;
       const tag = document.activeElement?.tagName.toLowerCase();
       if (tag === 'input' || tag === 'textarea') return;
       e.preventDefault();
@@ -304,9 +304,10 @@ export const WorkbenchContainer: React.FC = () => {
 
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
+      if (!exposeCameraRef.current) return;
       e.preventDefault();
       const saved = exposeCameraRef.current;
-      if (saved) startSpring(saved, () => { exposeCameraRef.current = null; });
+      startSpring(saved, () => { exposeCameraRef.current = null; });
     };
 
     window.addEventListener('keydown', onKeyDown);

@@ -45,6 +45,7 @@ const VIEW_MODE_OPTIONS: SelectOption[] = [
   { value: 'dj',          label: 'DJ Mixer' },
   { value: 'drumpad',     label: 'Drum Pads' },
   { value: 'vj',          label: 'VJ View' },
+  { value: 'studio',      label: 'Studio' },
 ];
 
 // ─── Separator ───────────────────────────────────────────────────────────────
@@ -327,7 +328,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   const handleViewModeChange = useCallback((val: string) => {
     const v = val as ViewMode;
     // Defer to break cross-reconciler sync (DOM event → Pixi reconciler state)
-    if (v === 'arrangement' || v === 'dj' || v === 'drumpad' || v === 'pianoroll' || v === 'vj') {
+    if (v === 'arrangement' || v === 'dj' || v === 'drumpad' || v === 'pianoroll' || v === 'vj' || v === 'studio') {
       setTimeout(() => useUIStore.getState().setActiveView(v as any), 0);
     } else {
       setTimeout(() => onViewModeChange(v), 0);
