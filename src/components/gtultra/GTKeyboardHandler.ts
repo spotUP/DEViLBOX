@@ -13,6 +13,7 @@
 
 import { useEffect, useCallback } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
+import { gtCopy, gtPaste, gtDelete, gtTranspose, gtInsertRow, gtDeleteRow, gtInterpolate } from './GTBlockOperations';
 
 // QWERTY → note offset (C-based, relative to current octave)
 const PIANO_MAP: Record<string, number> = {
@@ -141,6 +142,61 @@ export function useGTKeyboardHandler(active: boolean) {
       }
     }
 
+    // --- Block operations (Ctrl/Cmd) ---
+    if (e.ctrlKey || e.metaKey) {
+      switch (e.key.toLowerCase()) {
+        case 'c':
+          e.preventDefault();
+          gtCopy();
+          return;
+        case 'v':
+          e.preventDefault();
+          gtPaste();
+          return;
+        case 'x':
+          e.preventDefault();
+          gtCopy();
+          gtDelete();
+          return;
+        case 'z':
+          e.preventDefault();
+          // TODO: Undo via WASM engine (gt_undo)
+          return;
+        case 'y':
+          e.preventDefault();
+          // TODO: Redo via WASM engine (gt_redo)
+          return;
+        case 'i':
+          e.preventDefault();
+          gtInterpolate();
+          return;
+      }
+
+      // Ctrl+Shift+Up/Down = transpose
+      if (e.shiftKey && e.key === 'ArrowUp') {
+        e.preventDefault();
+        gtTranspose(1);
+        return;
+      }
+      if (e.shiftKey && e.key === 'ArrowDown') {
+        e.preventDefault();
+        gtTranspose(-1);
+        return;
+      }
+      // Ctrl+Up/Down = transpose by octave
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        gtTranspose(12);
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        gtTranspose(-12);
+        return;
+      }
+      return;
+    }
+
     // --- Navigation ---
     if (!e.ctrlKey && !e.metaKey) {
       switch (e.key) {
@@ -191,12 +247,12 @@ export function useGTKeyboardHandler(active: boolean) {
     // --- Edit operations ---
     if (e.key === 'Insert') {
       e.preventDefault();
-      // TODO: Insert row at cursor
+      gtInsertRow();
       return;
     }
     if (e.key === 'Backspace') {
       e.preventDefault();
-      // TODO: Delete row at cursor, shift up
+      gtDeleteRow();
       return;
     }
   }, [active]);
