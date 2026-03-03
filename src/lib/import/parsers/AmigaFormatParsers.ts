@@ -1,9 +1,16 @@
 /**
  * AmigaFormatParsers — Format-specific routing for Amiga, Furnace, and exotic formats
  *
- * Contains all format detection and dispatch logic for HivelyTracker/AHX,
- * Oktalyzer, OctaMED, Future Composer, DigiBooster, TFMX, and 100+ other
- * exotic Amiga/PC formats with UADE fallback.
+ * Contains format detection and dispatch for HivelyTracker/AHX, Oktalyzer,
+ * OctaMED, Future Composer, DigiBooster, TFMX, SID, and 100+ other Amiga
+ * formats with UADE fallback.
+ *
+ * Delegates to family-specific dispatchers:
+ * - ChipDumpParsers.ts — VGM, YM, NSF, SAP, AY
+ * - PCTrackerParsers.ts — S3M, IT, XM, MOD (native → libopenmpt)
+ * - UADEPrefixParsers.ts — 60+ prefix-based UADE-only formats + catch-all
+ *
+ * All format definitions live in FormatRegistry.ts (single source of truth).
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
