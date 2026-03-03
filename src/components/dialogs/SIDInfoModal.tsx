@@ -1,14 +1,17 @@
 /**
- * SIDInfoModal — Modal wrapper for SIDInfoPanel.
- * Shows full SID metadata when the user clicks the info button in the toolbar.
+ * SIDInfoModal — Modal wrapper for SIDInfoPanel + ComposerProfile.
+ * Shows full SID metadata and composer bio when the user clicks the info button in the toolbar.
  */
 
-import React, { useCallback } from 'react';
-import { X } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { X, Loader2 } from 'lucide-react';
 import { useTrackerStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { SIDInfoPanel } from './SIDInfoPanel';
+import { ComposerProfile } from './ComposerProfile';
 import { notify } from '@stores/useNotificationStore';
+import { fetchComposerProfile } from '@/lib/sid/composerApi';
+import type { ComposerProfile as ComposerData } from '@/lib/sid/composerApi';
 import type { SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
 
 interface SIDInfoModalProps {
@@ -44,6 +47,22 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
 
   if (!sidMetadata) return null;
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'info' | 'composer'>('info');
+  const [composer, setComposer] = useState<ComposerData | null>(null);
+  const [composerLoading, setComposerLoading] = useState(false);
+
+  // Fetch composer profile when modal opens or tab switches
+  useEffect(() => {
+    if (!sidMetadata?.author) return;
+    setComposerLoading(true);
+    fetchComposerProfile({ author: sidMetadata.author })
+      .then((result) => {
+        if (result.found) setComposer(result);
+      })
+      .finally(() => setComposerLoading(false));
+  }, [sidMetadata?.author]);
+
   // Build SIDHeaderInfo from store metadata
   const header: SIDHeaderInfo = {
     format: sidMetadata.format as 'PSID' | 'RSID',
@@ -77,9 +96,34 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
         className="bg-dark-bgPrimary border border-blue-800/50 rounded-lg shadow-2xl w-full max-w-md mx-4 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-blue-800/30 bg-blue-950/20">
-          <h2 className="text-sm font-medium text-blue-200">SID File Info</h2>
+        {/* Header with Tabs */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-blue-800/30 bg-blue-950/20">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setActiveTab('info')}
+              className={`px-3 py-1.5 text-xs rounded transition-colors ${
+                activeTab === 'info'
+                  ? 'bg-blue-800/40 text-blue-200 font-medium'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              SID Info
+            </button>
+            <button
+              onClick={() => setActiveTab('composer')}
+              className={`px-3 py-1.5 text-xs rounded transition-colors flex items-center gap-1.5 ${
+                activeTab === 'composer'
+                  ? 'bg-blue-800/40 text-blue-200 font-medium'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              Composer
+              {composerLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+              {!composerLoading && composer && (
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              )}
+            </button>
+          </div>
           <button
             onClick={onClose}
             className="p-1 text-text-muted hover:text-text-primary rounded transition-colors"
@@ -89,14 +133,33 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="p-4">
-          <SIDInfoPanel
-            header={header}
-            songDBInfo={songDB}
-            stilInfo={null}
-            selectedSubsong={sidMetadata.currentSubsong}
-            onSubsongChange={handleSubsongChange}
-          />
+        <div className="p-4 max-h-[70vh] overflow-y-auto">
+          {activeTab === 'info' && (
+            <SIDInfoPanel
+              header={header}
+              songDBInfo={songDB}
+              stilInfo={null}
+              selectedSubsong={sidMetadata.currentSubsong}
+              onSubsongChange={handleSubsongChange}
+            />
+          )}
+          {activeTab === 'composer' && (
+            composerLoading ? (
+              <div className="flex items-center justify-center py-8 text-text-muted">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                <span className="text-sm">Loading composer profile…</span>
+              </div>
+            ) : composer ? (
+              <ComposerProfile composer={composer} />
+            ) : (
+              <div className="text-center py-8 text-text-muted text-sm">
+                <p>No composer profile found for "{sidMetadata.author}"</p>
+                <p className="text-xs mt-1 text-text-muted/60">
+                  Profile data requires the DeepSID database on the server.
+                </p>
+              </div>
+            )
+          )}
         </div>
       </div>
     </div>
