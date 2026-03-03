@@ -12,7 +12,9 @@ import { MODERN_DOCK_TAB_H, MODERN_DOCK_MIN_H, MODERN_DOCK_MAX_H } from '../work
 import { PixiMixerView } from '../views/PixiMixerView';
 import { PixiMasterFxView } from '../views/PixiMasterFxView';
 import { PixiInstrumentEditor } from '../views/PixiInstrumentEditor';
+import { PixiButton } from '../components/PixiButton';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { useUIStore } from '@stores/useUIStore';
 
 // ─── Dock tab definitions ────────────────────────────────────────────────────
 
@@ -196,6 +198,17 @@ export const PixiBottomDock: React.FC<PixiBottomDockProps> = ({
 
         {/* Spacer */}
         <pixiContainer layout={{ flex: 1 }} />
+
+        {/* Instrument FX button */}
+        <PixiButton
+          label="INST FX"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            const s = useUIStore.getState();
+            s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx');
+          }}
+        />
 
         {/* Undock button */}
         <pixiContainer
