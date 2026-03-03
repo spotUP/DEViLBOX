@@ -15,7 +15,7 @@
  *                       currentPositionIndex, editStep, setEditStep, setCurrentPattern,
  *                       setPatternOrder, setCurrentPosition, duplicatePosition,
  *                       removeFromOrder, resizePattern, updatePatternName, toggleRecordMode
- *   useUIStore        — modalOpen, openModal, closeModal, compactToolbar, toggleCompactToolbar,
+ *   useUIStore        — modalOpen, openModal, closeModal,
  *                       showPatterns, togglePatterns, showAutomationLanes, toggleAutomationLanes
  *   useTabsStore      — addTab (New button)
  */
@@ -43,8 +43,6 @@ const VIZ_WIDTH   = 220;
 
 /** Total toolbar height (both transport rows + file row) */
 export const FT2_TOOLBAR_HEIGHT = TRANSPORT_ROW_H * 2 + FILE_ROW_H;
-/** Compact height — file action buttons hidden, saving 32px */
-export const FT2_TOOLBAR_HEIGHT_COMPACT = TRANSPORT_ROW_H * 2;
 
 // ─── Stable layout objects ───────────────────────────────────────────────────
 
@@ -159,7 +157,6 @@ export const PixiFT2Toolbar: React.FC = () => {
 
   // ── UI store ─────────────────────────────────────────────────────────────
   const modalOpen = useUIStore(s => s.modalOpen);
-  const compactToolbar = useUIStore(s => s.compactToolbar);
   const showAutomation = useUIStore(s => s.showAutomationLanes);
 
   // ── Project store (isDirty for Save button label) ─────────────────────────
@@ -304,7 +301,6 @@ export const PixiFT2Toolbar: React.FC = () => {
   const handleNameCancel = useCallback(() => setLocalName(nameRef.current), []);
 
   // ── Toggle handlers ───────────────────────────────────────────────────────
-  const handleToggleCompact   = useCallback(() => useUIStore.getState().toggleCompactToolbar(), []);
   const handleToggleAutomation= useCallback(() => useUIStore.getState().toggleAutomationLanes(), []);
 
   // ── FX Search & Replace panel ─────────────────────────────────────────────
@@ -354,7 +350,7 @@ export const PixiFT2Toolbar: React.FC = () => {
     <pixiContainer
       layout={{
         width: '100%',
-        height: compactToolbar ? FT2_TOOLBAR_HEIGHT_COMPACT : FT2_TOOLBAR_HEIGHT,
+        height: FT2_TOOLBAR_HEIGHT,
         flexDirection: 'column',
       }}
     >
@@ -437,14 +433,8 @@ export const PixiFT2Toolbar: React.FC = () => {
               onClick={handlePlayPattern}
             />
 
-            {/* Spacer + compact toggle */}
+            {/* Spacer */}
             <pixiContainer layout={{ flex: 1 }} />
-            <PixiButton
-              label={compactToolbar ? 'Expand' : 'Compact'}
-              variant="ghost"
-              size="sm"
-              onClick={handleToggleCompact}
-            />
           </pixiContainer>
 
           {/* Transport Row 2: SongLen | Speed Groove | Length | PatternName */}
@@ -547,11 +537,9 @@ export const PixiFT2Toolbar: React.FC = () => {
           </pixiContainer>
         </pixiContainer>
 
-        {/* Right: Visualizer (hidden via display:'none' when compact to avoid Yoga BindingError) */}
+        {/* Right: Visualizer */}
         <pixiContainer
-          renderable={!compactToolbar}
           layout={{
-            display: compactToolbar ? 'none' : 'flex',
             width: VIZ_WIDTH,
             height: TRANSPORT_ROW_H * 2,
             overflow: 'hidden',
@@ -583,11 +571,7 @@ export const PixiFT2Toolbar: React.FC = () => {
 
       {/* ── Row 4: File / action buttons ── */}
       <pixiContainer
-        alpha={!compactToolbar ? 1 : 0}
-        renderable={!compactToolbar}
-        eventMode={!compactToolbar ? 'static' : 'none'}
         layout={{
-          display: compactToolbar ? 'none' : 'flex',
           width: '100%',
           height: FILE_ROW_H,
           flexDirection: 'row',

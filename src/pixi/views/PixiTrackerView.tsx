@@ -14,7 +14,7 @@ import { useCallback, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
-import { PixiFT2Toolbar, FT2_TOOLBAR_HEIGHT, FT2_TOOLBAR_HEIGHT_COMPACT } from './tracker/PixiFT2Toolbar';
+import { PixiFT2Toolbar, FT2_TOOLBAR_HEIGHT } from './tracker/PixiFT2Toolbar';
 import { PixiInstrumentPanel } from './tracker/PixiInstrumentPanel';
 import { PixiChannelVUMeters } from './tracker/PixiChannelVUMeters';
 import { PixiPatternMinimap } from './tracker/PixiPatternMinimap';
@@ -62,7 +62,6 @@ export const PixiTrackerView: React.FC = () => {
   const closeModal = useUIStore(s => s.closeModal);
   const editorMode = useTrackerStore(s => s.editorMode);
   const showMacroSlots = useUIStore(s => s.showMacroSlots);
-  const compactToolbar = useUIStore(s => s.compactToolbar);
   const showKnobBar = useMIDIStore(s => s.showKnobBar);
   const [showInstrumentPanel, setShowInstrumentPanel] = useState(true);
 
@@ -115,7 +114,7 @@ export const PixiTrackerView: React.FC = () => {
   // there's no NavBar or StatusBar to subtract — those are outside the window.
   const CONTROLS_BAR_H = 32;
   const MACRO_SLOTS_H = showMacroSlots ? 32 : 0;
-  const toolbarH = compactToolbar ? FT2_TOOLBAR_HEIGHT_COMPACT : FT2_TOOLBAR_HEIGHT;
+  const toolbarH = FT2_TOOLBAR_HEIGHT;
   const tb303PanelH = hasTB303 && viewMode !== 'tb303' && viewMode !== 'sunvox'
     ? (tb303Collapsed ? TB303_PANEL_COLLAPSED_H : TB303_PANEL_EXPANDED_H)
     : 0;

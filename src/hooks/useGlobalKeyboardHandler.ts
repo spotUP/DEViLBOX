@@ -105,7 +105,7 @@ import {
 import {
   showAbout, showKeyboardHelp, openManual, panic, centerCursor,
   insertKeyoff, insertNoteCut, insertFadeOut, renderToSample, renderToInstrument, renderSong, exportMp3,
-  quickSave, revertToSaved, toggleCompactMode, resetView, increasePatternSize, decreasePatternSize,
+  quickSave, revertToSaved, resetView, increasePatternSize, decreasePatternSize,
   toggleHexMode, toggleRowHighlight, toggleChannelNames, zoomIn, zoomOut, resetZoom, fitToWindow,
   clonePattern as clonePatternCmd, createPattern, deletePattern, importMidi, exportMidi, importSample, exportSample,
   patternProperties, songProperties, cleanupUnused, toggleRecording, previewInstrument, previewSample, stopPreview,
@@ -572,7 +572,6 @@ function initializeRegistry() {
     { name: 'export_mp3', contexts: ['global'], handler: exportMp3, description: 'Export MP3' },
     { name: 'quick_save', contexts: ['global'], handler: quickSave, description: 'Quick save' },
     { name: 'revert_to_saved', contexts: ['global'], handler: revertToSaved, description: 'Revert to saved' },
-    { name: 'toggle_compact_mode', contexts: ['global'], handler: toggleCompactMode, description: 'Toggle compact mode' },
     { name: 'reset_view', contexts: ['global'], handler: resetView, description: 'Reset view' },
     { name: 'increase_pattern_size', contexts: ['pattern'], handler: increasePatternSize, description: 'Increase pattern size' },
     { name: 'decrease_pattern_size', contexts: ['pattern'], handler: decreasePatternSize, description: 'Decrease pattern size' },
