@@ -359,8 +359,10 @@ export const useTransportStore = create<TransportStore>()(
         const template = GROOVE_TEMPLATES.find(t => t.id === templateId);
         if (template) {
           state.grooveTemplateId = templateId;
-          // Swing is now independent and acts as a multiplier
-          
+          // Reset swing to zero when selecting straight (no groove)
+          if (templateId === 'straight') {
+            state.swing = 0;
+          }
         }
       }),
 

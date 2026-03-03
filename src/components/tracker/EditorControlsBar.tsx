@@ -147,7 +147,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
     notify.success(`Hardware System: ${SYSTEM_PRESETS.find(p => p.id === presetId)?.name.toUpperCase()}`);
   }, [applySystemPreset]);
 
-  const grooveActive = grooveTemplateId !== 'straight' || swing !== (useMpcScale ? 50 : 100) || jitter > 0;
+  const grooveActive = (grooveTemplateId !== 'straight' && swing > 0) || jitter > 0;
 
   const { quality, averageFps: avgFps } = fps;
 
