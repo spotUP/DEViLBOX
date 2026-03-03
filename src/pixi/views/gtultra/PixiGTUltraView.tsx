@@ -62,17 +62,21 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const editorWidth = width - SIDEBAR_W;
   const editorHeight = height - TOOLBAR_H;
   const oscH = 80;
-  // Pro mode: order + instrument + table + register monitor
+  // Pro mode layout
   const orderH = Math.floor((editorHeight - oscH) * 0.2);
   const instrH = Math.floor((editorHeight - oscH) * 0.3);
   const sideRemain = editorHeight - oscH - orderH - instrH;
-  const tableH = Math.floor(sideRemain * 0.5);
-  const regMonH = sideRemain - tableH;
-  // Studio mode: instrument designer + presets + visual tables + register monitor
+  const tableH = Math.floor(sideRemain * (sidCount === 2 ? 0.33 : 0.5));
+  const regMonTotal = sideRemain - tableH;
+  const regMonH = sidCount === 2 ? Math.floor(regMonTotal / 2) : regMonTotal;
+  const regMon2H = regMonTotal - regMonH;
+  // Studio mode layout
   const studioInstrH = Math.floor((editorHeight - oscH) * 0.3);
   const studioPresetH = Math.floor((editorHeight - oscH) * 0.22);
-  const studioTableH = Math.floor((editorHeight - oscH) * 0.25);
-  const studioRegH = editorHeight - oscH - studioInstrH - studioPresetH - studioTableH;
+  const studioTableH = Math.floor((editorHeight - oscH) * (sidCount === 2 ? 0.18 : 0.25));
+  const studioRegTotal = editorHeight - oscH - studioInstrH - studioPresetH - studioTableH;
+  const studioRegH = sidCount === 2 ? Math.floor(studioRegTotal / 2) : studioRegTotal;
+  const studioReg2H = studioRegTotal - studioRegH;
 
   // Toolbar info
   const infoText = useMemo(() => {
@@ -244,6 +248,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
               <PixiGTInstrumentPanel width={SIDEBAR_W} height={instrH} />
               <PixiGTTableEditor width={SIDEBAR_W} height={tableH} />
               <PixiGTSIDMonitor width={SIDEBAR_W} height={regMonH} sidIndex={0} />
+              {sidCount === 2 && <PixiGTSIDMonitor width={SIDEBAR_W} height={regMon2H} sidIndex={1} />}
             </>
           ) : (
             <>
@@ -252,6 +257,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
               <PixiGTPresetBrowser width={SIDEBAR_W} height={studioPresetH} onApplyPreset={handleApplyPreset} />
               <PixiGTStudioTables width={SIDEBAR_W} height={studioTableH} />
               <PixiGTSIDMonitor width={SIDEBAR_W} height={studioRegH} sidIndex={0} />
+              {sidCount === 2 && <PixiGTSIDMonitor width={SIDEBAR_W} height={studioReg2H} sidIndex={1} />}
             </>
           )}
         </pixiContainer>
