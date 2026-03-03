@@ -7,7 +7,7 @@ import { X, Maximize2, Keyboard } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore, type SIDEngineType } from '@stores/useSettingsStore';
-import { SID_ENGINES, type SIDEngineInfo } from '@engine/deepsid/DeepSIDEngineManager';
+import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';

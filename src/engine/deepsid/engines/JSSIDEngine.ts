@@ -34,16 +34,17 @@ export interface SIDVoiceState {
 export class JSSIDEngine {
   private jsSID: any;
   private player: any;
-  private audioContext: AudioContext | null = null;
+  private readonly sidData: Uint8Array;
+  private readonly config: JSSIDConfig;  private audioContext: AudioContext | null = null;
   private scriptProcessor: ScriptProcessorNode | null = null;
   private isPlaying = false;
   private subsong = 0;
   private numSubsongs = 1;
 
-  constructor(
-    private sidData: Uint8Array,
-    private config: JSSIDConfig = {}
-  ) {}
+  constructor(sidData: Uint8Array, config: JSSIDConfig = {}) {
+    this.sidData = sidData;
+    this.config = config;
+  }  ) {}
 
   /**
    * Initialize the engine

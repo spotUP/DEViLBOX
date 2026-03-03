@@ -616,6 +616,10 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
     setActiveLayer('milkdrop');
   }, []);
 
+  const handlePMBrowserSelect = useCallback((name: string, _idx: number) => {
+    projectmHandleRef.current?.loadPresetByName(name);
+  }, []);
+
   const handleNext = useCallback(() => {
     if (activeLayer === 'milkdrop') canvasHandleRef.current?.nextPreset();
     else if (activeLayer === 'isf') isfHandleRef.current?.nextPreset();
@@ -691,12 +695,14 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
         isFullscreen={isFullscreen}
         browserOpen={browserOpen}
       />
-      {activeLayer === 'milkdrop' && (
+      {(activeLayer === 'milkdrop' || activeLayer === 'projectm') && (
         <VJPresetBrowser
           isOpen={browserOpen}
           onClose={() => setBrowserOpen(false)}
-          onSelectPreset={handleBrowserSelect}
-          currentPresetIdx={presetIdx}
+          onSelectPreset={activeLayer === 'projectm' ? handlePMBrowserSelect : handleBrowserSelect}
+          currentPresetIdx={activeLayer === 'projectm' ? pmPresetIdx : presetIdx}
+          currentPresetName={activeLayer === 'projectm' ? pmPresetName : undefined}
+          mode={activeLayer === 'projectm' ? 'projectm' : 'butterchurn'}
         />
       )}
     </div>

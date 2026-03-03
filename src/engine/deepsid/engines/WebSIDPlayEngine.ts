@@ -37,11 +37,12 @@ export class WebSIDPlayEngine {
   private numSubsongs = 1;
   private metadata: any = null;
 
-  constructor(
-    private sidData: Uint8Array,
-    private config: WebSIDPlayConfig = {}
-  ) {}
-
+  private readonly sidData: Uint8Array;
+  private readonly config: WebSIDPlayConfig;  ) {}
+  constructor(sidData: Uint8Array, config: WebSIDPlayConfig = {}) {
+    this.sidData = sidData;
+    this.config = config;
+  }
   /**
    * Initialize the engine
    */
@@ -91,7 +92,7 @@ export class WebSIDPlayEngine {
     // WebSIDPlay prefers AudioWorklet for best quality
     if (audioContext.audioWorklet) {
       try {
-        this.sourceNode = await this.backend.createWorkletNode(audioContext);
+        this.sourceNode && this.sourceNode = await this.backend.createWorkletNode(audioContext);
         this.sourceNode.connect(audioContext.destination);
       } catch (error) {
         console.warn('[WebSIDPlay] AudioWorklet not available, using ScriptProcessor fallback');

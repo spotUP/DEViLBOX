@@ -3,9 +3,10 @@
  *
  * Features:
  *   - All 395 butterchurn presets (main + extra + extra2 + MD1 + nonMinimal)
- *   - Author-based categories (parsed from preset names)
+ *   - 9,795 projectM cream-of-the-crop presets (lazy-loaded from manifest)
+ *   - Author/category-based categories (parsed from preset names or manifest)
  *   - Full-text search
- *   - Favorites (persisted to localStorage)
+ *   - Favorites (persisted to localStorage, separate per backend)
  *   - Instant preview on click (loads preset with blend)
  */
 
@@ -26,11 +27,14 @@ export interface VJPresetBrowserProps {
   onClose: () => void;
   onSelectPreset: (name: string, idx: number) => void;
   currentPresetIdx: number;
+  currentPresetName?: string;
+  mode?: 'butterchurn' | 'projectm';
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const FAVORITES_KEY = 'devilbox-vj-favorites';
+const PM_FAVORITES_KEY = 'devilbox-vj-pm-favorites';
 const ALL_CATEGORY = '★ All';
 const FAVORITES_CATEGORY = '♥ Favorites';
 
@@ -101,19 +105,41 @@ export function getPresetMap(): Record<string, object> | null {
   return cachedPresetMap;
 }
 
+// ─── ProjectM preset loading (lazy, cached from manifest) ────────────────────
+
+let cachedPMPresets: PresetEntry[] | null = null;
+
+async function loadProjectMPresets(): Promise<PresetEntry[]> {
+  if (cachedPMPresets) return cachedPMPresets;
+  try {
+    const resp = await fetch('/projectm/presets-manifest.json');
+    const data = await resp.json();
+    cachedPMPresets = data.presets.map((p: { name: string; category: string }, i: number) => ({
+      name: p.name,
+      author: p.category,
+      pack: p.category,
+      idx: i,
+    }));
+    return cachedPMPresets!;
+  } catch {
+    cachedPMPresets = [];
+    return [];
+  }
+}
+
 // ─── Favorites persistence ────────────────────────────────────────────────────
 
-function loadFavorites(): Set<string> {
+function loadFavorites(key: string = FAVORITES_KEY): Set<string> {
   try {
-    const raw = localStorage.getItem(FAVORITES_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? new Set(JSON.parse(raw)) : new Set();
   } catch {
     return new Set();
   }
 }
 
-function saveFavorites(favs: Set<string>) {
-  localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favs]));
+function saveFavorites(favs: Set<string>, key: string = FAVORITES_KEY) {
+  localStorage.setItem(key, JSON.stringify([...favs]));
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -123,23 +149,37 @@ export const VJPresetBrowser: React.FC<VJPresetBrowserProps> = ({
   onClose,
   onSelectPreset,
   currentPresetIdx,
+  currentPresetName,
+  mode = 'butterchurn',
 }) => {
   const [entries, setEntries] = useState<PresetEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState(ALL_CATEGORY);
-  const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
+  const favKey = mode === 'projectm' ? PM_FAVORITES_KEY : FAVORITES_KEY;
+  const [favorites, setFavorites] = useState<Set<string>>(() => loadFavorites(favKey));
   const listRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Load presets on mount
+  // Load presets on mount (different loader per mode)
   useEffect(() => {
     if (!isOpen) return;
-    loadAllPresets().then(({ entries: e }) => {
-      setEntries(e);
-      setLoading(false);
-    });
-  }, [isOpen]);
+    setLoading(true);
+    setCategory(ALL_CATEGORY);
+    if (mode === 'projectm') {
+      loadProjectMPresets().then(e => {
+        setEntries(e);
+        setFavorites(loadFavorites(PM_FAVORITES_KEY));
+        setLoading(false);
+      });
+    } else {
+      loadAllPresets().then(({ entries: e }) => {
+        setEntries(e);
+        setFavorites(loadFavorites(FAVORITES_KEY));
+        setLoading(false);
+      });
+    }
+  }, [isOpen, mode]);
 
   // Focus search on open
   useEffect(() => {
@@ -187,10 +227,10 @@ export const VJPresetBrowser: React.FC<VJPresetBrowserProps> = ({
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
       else next.add(name);
-      saveFavorites(next);
+      saveFavorites(next, favKey);
       return next;
     });
-  }, []);
+  }, [favKey]);
 
   const handleSelect = useCallback((entry: PresetEntry) => {
     onSelectPreset(entry.name, entry.idx);
@@ -280,7 +320,7 @@ export const VJPresetBrowser: React.FC<VJPresetBrowserProps> = ({
             </div>
           ) : (
             filtered.map(entry => {
-              const isActive = entry.idx === currentPresetIdx;
+              const isActive = currentPresetName ? entry.name === currentPresetName : entry.idx === currentPresetIdx;
               const isFav = favorites.has(entry.name);
               return (
                 <div

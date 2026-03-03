@@ -37,11 +37,12 @@ export class WebSIDEngine {
   private numSubsongs = 1;
   private metadata: any = null;
 
-  constructor(
-    private sidData: Uint8Array,
-    private config: WebSIDConfig = {}
-  ) {}
-
+  private readonly sidData: Uint8Array;
+  private readonly config: WebSIDConfig;  ) {}
+  constructor(sidData: Uint8Array, config: WebSIDConfig = {}) {
+    this.sidData = sidData;
+    this.config = config;
+  }
   /**
    * Initialize the engine
    */
@@ -90,7 +91,7 @@ export class WebSIDEngine {
     if (audioContext.audioWorklet) {
       try {
         // Note: This assumes WebSID backend has worklet support
-        this.sourceNode = await this.backend.createWorkletNode(audioContext);
+        this.sourceNode && this.sourceNode = await this.backend.createWorkletNode(audioContext);
         this.sourceNode.connect(audioContext.destination);
       } catch (error) {
         console.warn('[WebSID] AudioWorklet not available, using ScriptProcessor fallback');

@@ -78,14 +78,7 @@ export const PatternMatchModal: React.FC = () => {
             {originalFile && (
               <p className="mt-2 text-ft2-text">
                 <span className="text-ft2-highlight">Original:</span>{' '}
-                {extractMetadata({
-                  id: originalFile.song_id,
-                  format: '',
-                  author: '',
-                  filename: '',
-                  full_path: originalFile.url,
-                  extension: ''
-                }).title}
+                {extractMetadata(originalFile).title}
               </p>
             )}
           </div>
@@ -119,14 +112,7 @@ export const PatternMatchModal: React.FC = () => {
               </div>
 
               {matches.map((match) => {
-                const meta = extractMetadata({
-                  id: match.song_id,
-                  format: '',
-                  author: '',
-                  filename: '',
-                  full_path: match.url,
-                  extension: ''
-                });
+                const meta = extractMetadata(match);
 
                 return (
                   <div
@@ -143,7 +129,7 @@ export const PatternMatchModal: React.FC = () => {
                         by {meta.artist}
                       </div>
                       <div className="text-ft2-textDim text-[9px] font-mono truncate mt-1">
-                        {meta.format} • {meta.path}
+                        {meta.format} • {match.url.split('/').slice(-2).join('/')}
                       </div>
                     </div>
 
