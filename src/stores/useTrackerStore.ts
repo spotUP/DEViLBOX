@@ -126,6 +126,18 @@ interface TrackerStore {
     duration_ms: number;
   } | null;
 
+  // C64 SID metadata (extracted from SID header during import)
+  sidMetadata: {
+    title: string;
+    author: string;
+    copyright: string;
+    chipModel: '6581' | '8580' | 'Unknown';
+    clockSpeed: 'PAL' | 'NTSC' | 'Unknown';
+    subsongs: number;
+    currentSubsong: number;
+  } | null;
+  setSidMetadata: (info: TrackerState['sidMetadata']) => void;
+
   // Actions
   setCurrentPattern: (index: number, fromReplayer?: boolean) => void;
   setCell: (channelIndex: number, rowIndex: number, cell: Partial<TrackerCell>) => void;
@@ -355,6 +367,7 @@ export const useTrackerStore = create<TrackerStore>()(
     channelGrooves: null,
 
     songDBInfo: null,
+    sidMetadata: null,
 
     // Actions
     setCurrentPattern: (index, fromReplayer) =>
@@ -1582,6 +1595,11 @@ export const useTrackerStore = create<TrackerStore>()(
         state.songDBInfo = info;
       }),
 
+    setSidMetadata: (info) =>
+      set((state) => {
+        state.sidMetadata = info;
+      }),
+
     applyEditorMode: (song) =>
       set((state) => {
         // Always store linearPeriods — affects period→Hz math for XM, IT, FTM, XTracker etc.
@@ -1830,6 +1848,7 @@ export const useTrackerStore = create<TrackerStore>()(
         state.furnaceSubsongs = null;
         state.furnaceActiveSubsong = 0;
         state.songDBInfo = null;
+        state.sidMetadata = null;
       });
     },
   }))

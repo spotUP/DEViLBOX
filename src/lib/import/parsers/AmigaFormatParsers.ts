@@ -10,6 +10,9 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { UADEMetadata } from '@/engine/uade/UADEEngine';
 import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 import { withNativeDefault, withNativeThenUADE, getBasename, type FallbackContext } from './withFallback';
+import { tryChipDumpParse } from './ChipDumpParsers';
+import { tryUADEPrefixParse } from './UADEPrefixParsers';
+import { tryPCTrackerParse } from './PCTrackerParsers';
 
 /** Check if a filename matches Future Composer extensions */
 function isFCFormat(filename: string): boolean {
@@ -308,23 +311,9 @@ export async function tryRouteFormat(
     return withNativeThenUADE('mugician', ctx, (buf, name) => parseDigitalMugicianFile(buf, name), 'DigitalMugicianParser');
   }
 
-  // ── VGM/VGZ — Video Game Music chip-dump ─────────────────────────────────
-  if (/\.(vgm|vgz)$/.test(filename)) {
-    const { parseVGMFile } = await import('@lib/import/formats/VGMParser');
-    return parseVGMFile(buffer, originalFileName);
-  }
-
-  // ── YM — Atari ST AY/YM2149 register dumps ────────────────────────────────
-  if (/\.ym$/.test(filename)) {
-    const { parseYMFile } = await import('@lib/import/formats/YMParser');
-    return parseYMFile(buffer, originalFileName);
-  }
-
-  // ── NSF/NSFE — NES Sound Format ───────────────────────────────────────────
-  if (/\.nsfe?$/.test(filename)) {
-    const { parseNSFFile } = await import('@lib/import/formats/NSFParser');
-    return parseNSFFile(buffer, originalFileName);
-  }
+  // ── Chip-dump formats (VGM, YM, NSF, SAP, AY) ───────────────────────────
+  { const chipResult = await tryChipDumpParse(buffer, filename, originalFileName);
+    if (chipResult) return chipResult; }
 
   // ── SidMon 1.0 (.sid1) ───────────────────────────────────────────────────
   // .sid1 files may be SidMon 1.0 or Commodore 64 SID — try magic detection first.
@@ -369,18 +358,6 @@ export async function tryRouteFormat(
     // Last resort: UADE (handles obscure Amiga formats with .sid extension)
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
-  }
-
-  // ── SAP — Atari 8-bit POKEY ───────────────────────────────────────────────
-  if (/\.sap$/.test(filename)) {
-    const { parseSAPFile } = await import('@lib/import/formats/SAPParser');
-    return parseSAPFile(buffer, originalFileName);
-  }
-
-  // ── AY — ZX Spectrum AY (ZXAYEMUL) ───────────────────────────────────────
-  if (/\.ay$/.test(filename)) {
-    const { parseAYFile } = await import('@lib/import/formats/AYParser');
-    return parseAYFile(buffer, originalFileName);
   }
 
   // ── David Whittaker (.dw / .dwold) ───────────────────────────────────────
