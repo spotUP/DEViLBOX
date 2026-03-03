@@ -34,6 +34,14 @@ window.addEventListener('error', (event) => {
     return;
   }
 
+  // Suppress PixiJS render-pipeline race conditions — a texture's source can become
+  // null between React reconciliation and PixiJS's render pass (alphaMode / renderPipeId).
+  // These are transient and self-heal on the next frame.
+  if (event.error?.message?.includes('alphaMode') || event.error?.message?.includes('renderPipeId')) {
+    event.preventDefault();
+    return;
+  }
+
   console.error('[Global] Uncaught error:', event.error);
   // In production, send to error reporting service
 });
