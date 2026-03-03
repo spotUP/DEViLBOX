@@ -161,20 +161,36 @@ router.get('/search', async (req: Request, res: Response) => {
   }
 });
 
+// Normalize HVSC paths from various sources into mirror-relative paths.
+// DeepSID DB stores: "_High Voltage SID Collection/MUSICIANS/H/Hubbard_Rob/Commando.sid"
+// Mirrors expect:    "MUSICIANS/H/Hubbard_Rob/Commando.sid"  (after C64Music/ base)
+function normalizeHVSCPath(raw: string): string {
+  let p = raw;
+  // Strip DeepSID database prefix
+  const hvscPrefix = '_High Voltage SID Collection/';
+  if (p.startsWith(hvscPrefix)) p = p.slice(hvscPrefix.length);
+  // Strip alternate CGSC prefix
+  const cgscPrefix = "_Compute's Gazette SID Collection/";
+  if (p.startsWith(cgscPrefix)) p = p.slice(cgscPrefix.length);
+  return p;
+}
+
 // ── GET /api/hvsc/download?path=... ─────────────────────────────────────────
 
 router.get('/download', async (req: Request, res: Response) => {
   try {
-    const path = req.query.path as string;
+    const rawPath = req.query.path as string;
     
-    if (!path) {
+    if (!rawPath) {
       return res.status(400).json({ error: 'Missing path parameter' });
     }
     
+    const normalizedPath = normalizeHVSCPath(rawPath);
+    
     // Check cache first
-    const cached = fileCache.get<Buffer>(path);
+    const cached = fileCache.get<Buffer>(normalizedPath);
     if (cached) {
-      console.log('[HVSC] Cache hit:', path);
+      console.log('[HVSC] Cache hit:', normalizedPath);
       res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('Cache-Control', 'public, max-age=86400');
       return res.send(cached);
@@ -191,7 +207,7 @@ router.get('/download', async (req: Request, res: Response) => {
     
     for (const mirror of HVSC_MIRRORS) {
       try {
-        const url = `${mirror}/${path}`;
+        const url = `${mirror}/${normalizedPath}`;
         console.log('[HVSC] Trying mirror:', url);
         
         const response = await axios.get(url, {
@@ -212,7 +228,7 @@ router.get('/download', async (req: Request, res: Response) => {
     }
     
     // Cache and record download
-    fileCache.set(path, buffer);
+    fileCache.set(normalizedPath, buffer);
     recordDownload();
     
     console.log('[HVSC] Downloaded from', successMirror, '- Size:', buffer.length, 'bytes');
