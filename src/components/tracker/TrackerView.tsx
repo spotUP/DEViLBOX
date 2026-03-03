@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { GridSequencer } from '@components/grid/GridSequencer';
-import { useTrackerStore, useCursorStore, useInstrumentStore, useProjectStore, useTransportStore, useAudioStore, useUIStore } from '@stores';
+import { useTrackerStore, useCursorStore, useInstrumentStore, useUIStore } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
@@ -106,62 +106,22 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const {
     patterns,
     currentPatternIndex,
-    showGhostPatterns,
-    loadPatterns,
-    setPatternOrder,
-    setOriginalModuleData,
-    setShowGhostPatterns,
     scaleVolume,
     fadeVolume,
     remapInstrument,
-    applySystemPreset,
     editorMode
   } = useTrackerStore(useShallow((state) => ({
     patterns: state.patterns,
     currentPatternIndex: state.currentPatternIndex,
-    showGhostPatterns: state.showGhostPatterns,
-    loadPatterns: state.loadPatterns,
-    setPatternOrder: state.setPatternOrder,
-    setOriginalModuleData: state.setOriginalModuleData,
-    setShowGhostPatterns: state.setShowGhostPatterns,
     scaleVolume: state.scaleVolume,
     fadeVolume: state.fadeVolume,
     remapInstrument: state.remapInstrument,
-    applySystemPreset: state.applySystemPreset,
     editorMode: state.editorMode
   })));
   // Fine-grained selector for cursor.channelIndex only — avoids re-rendering
   // the entire TrackerView on every cursor row/column move
   const cursorChannelIndex = useCursorStore((state) => state.cursor.channelIndex);
 
-  const { loadInstruments } = useInstrumentStore(useShallow(s => ({ loadInstruments: s.loadInstruments })));
-  const { setMetadata } = useProjectStore(useShallow(s => ({ setMetadata: s.setMetadata })));
-  const {
-    setBPM,
-    setSpeed,
-    smoothScrolling,
-    setSmoothScrolling,
-    grooveTemplateId,
-    swing,
-    jitter,
-    useMpcScale,
-    stop
-  } = useTransportStore(useShallow((state) => ({
-    setBPM: state.setBPM,
-    setSpeed: state.setSpeed,
-    smoothScrolling: state.smoothScrolling,
-    setSmoothScrolling: state.setSmoothScrolling,
-    grooveTemplateId: state.grooveTemplateId,
-    swing: state.swing,
-    jitter: state.jitter,
-    useMpcScale: state.useMpcScale,
-    stop: state.stop,
-  })));
-  const { masterMuted, toggleMasterMute } = useAudioStore(useShallow((state) => ({
-    masterMuted: state.masterMuted,
-    toggleMasterMute: state.toggleMasterMute,
-  })));
-  const statusMessage = useUIStore((state) => state.statusMessage);
   const pendingModuleFile = useUIStore((state) => state.pendingModuleFile);
   const setPendingModuleFile = useUIStore((state) => state.setPendingModuleFile);
   const pendingCompanionFiles = useUIStore((state) => state.pendingCompanionFiles);
@@ -171,9 +131,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const setPendingTD3File = useUIStore((state) => state.setPendingTD3File);
   const pendingSunVoxFile = useUIStore((state) => state.pendingSunVoxFile);
   const setPendingSunVoxFile = useUIStore((state) => state.setPendingSunVoxFile);
-  const setActiveView = useUIStore((state) => state.setActiveView);
   const dialogOpen = useUIStore((state) => state.dialogOpen);
   const closeDialogCommand = useUIStore((state) => state.closeDialogCommand);
+
+  // Import handlers (extracted to hook)
+  const { handleModuleImport, handleTD3Import, handleSunVoxImport } = useModuleImport();
 
   // View mode state
   type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303';
@@ -188,7 +150,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [showStrum, setShowStrum] = useState(false);
   const [showEffectPicker, setShowEffectPicker] = useState(false);
   const [showUndoHistory, setShowUndoHistory] = useState(false);
-  const [showGrooveSettings, setShowGrooveSettings] = useState(false);
   const [internalShowImportModule, setInternalShowImportModule] = useState(false);
   // FT2 dialogs
   const [showScaleVolume, setShowScaleVolume] = useState(false);
@@ -240,9 +201,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       case 'find-replace':
         setShowFindReplace(true);
         break;
-      case 'groove-settings':
-        setShowGrooveSettings(true);
-        break;
       case 'scale-volume-block':
         setVolumeOpScope('block');
         setShowScaleVolume(true);
@@ -261,9 +219,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     }
     closeDialogCommand();
   }, [dialogOpen, closeDialogCommand]);
-
-  // FPS monitoring (simplified - no longer does active measurement)
-  const { fps, averageFps, quality } = useFPSMonitor();
 
   // Sync grid channel with tracker cursor when switching views
   useEffect(() => {
@@ -354,378 +309,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const blockOps = useBlockOperations();
 
   // NOTE: usePatternPlayback() is called in App.tsx so it persists across view switches
-
-  // TD-3 pattern import handler
-  const handleTD3Import = useCallback(async (file: File, replacePatterns: boolean) => {
-    const { loadFile } = await import('@lib/file/UnifiedFileLoader');
-    const result = await loadFile(file, { requireConfirmation: false, replacePatterns });
-    if (result.success === true) notify.success(result.message);
-    else if (result.success === false) notify.error(result.error);
-  }, []);
-
-  // SunVox import handler
-  const handleSunVoxImport = useCallback(async (name: string, config: import('@/types/instrument').SunVoxConfig) => {
-    const file = pendingSunVoxFile;
-    setPendingSunVoxFile(null);
-    try {
-      if (config.isSong && file) {
-        // Full module extraction — one SunVoxSynth per module + tracker channels
-        const { loadFile } = await import('@lib/file/UnifiedFileLoader');
-        const result = await loadFile(file, { requireConfirmation: false });
-        if (result.success === true) notify.success(result.message);
-        else if (result.success === false) notify.error(result.error);
-      } else {
-        useInstrumentStore.getState().createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
-        notify.success(`Imported SunVox patch: ${name}`);
-      }
-    } catch (err) {
-      notify.error('Failed to import SunVox file');
-      console.error('[TrackerView] SunVox import failed:', err);
-    }
-  }, [pendingSunVoxFile, setPendingSunVoxFile]);
-
-  // Module import handler - used by both mobile and desktop views
-  const handleModuleImport = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
-    const { useLibopenmpt } = options;
-    let format = info.metadata.type; // Default from metadata
-
-    // Fire-and-forget SongDB metadata lookup (non-blocking)
-    const buf = info.arrayBuffer ?? (info.file ? await info.file.arrayBuffer() : null);
-    if (buf) {
-      lookupSongDB(computeSongDBHash(buf)).then(result => {
-        useTrackerStore.getState().setSongDBInfo(result ? {
-          authors: result.authors,
-          publishers: result.publishers,
-          album: result.album,
-          year: result.year,
-          format: result.format,
-          duration_ms: result.subsongs[0]?.duration_ms ?? 0,
-        } : null);
-      });
-    } else {
-      useTrackerStore.getState().setSongDBInfo(null);
-    }
-
-    // Always clean up engine state before import to prevent stale instruments/state
-    getToneEngine().releaseAll();
-
-    // Check if native parser data is available (XM/MOD)
-    if (info.nativeData) {
-      const { format: nativeFormat, importMetadata, instruments: parsedInstruments, patterns } = info.nativeData;
-      format = nativeFormat; // Use specific native format string
-
-      console.log(`[Import] Using native ${format} parser`);
-      console.log(`[Import] ${parsedInstruments.length} instruments, ${patterns.length} patterns`);
-      console.log(`[Import] libopenmpt playback mode: ${useLibopenmpt ? 'enabled' : 'disabled'}`);
-
-      // Convert patterns using native converter
-      // Pass original buffer for libopenmpt playback if enabled
-      let result;
-      if (format === 'XM') {
-        result = convertXMModule(
-          patterns as XMNote[][][],
-          importMetadata.originalChannelCount,
-          importMetadata,
-          parsedInstruments.map(i => i.name),
-          useLibopenmpt ? info.arrayBuffer : undefined
-        );
-      } else if (format === 'MOD') {
-        result = convertMODModule(
-          patterns as MODNote[][][],
-          importMetadata.originalChannelCount,
-          importMetadata,
-          parsedInstruments.map(i => i.name),
-          useLibopenmpt ? info.arrayBuffer : undefined
-        );
-      } else if (format === 'FUR' || format === 'DMF') {
-        // Furnace and DefleMask patterns are already converted
-        // Pattern data is [pattern][row][channel], need to convert to [pattern].channels[channel].rows[row]
-        const patternOrder = importMetadata.modData?.patternOrderTable || [];
-        const patLen = patterns[0]?.length || 64;
-        const numChannels = importMetadata.originalChannelCount || (patterns[0]?.[0] as unknown[] | undefined)?.length || 4;
-        console.log(`[Import] ${format} pattern structure: ${patterns.length} patterns, ${patLen} rows, ${numChannels} channels`);
-
-        // Apply system preset channel metadata from Furnace
-        const furnaceData = importMetadata.furnaceData;
-        const channelMetadata = (furnaceData?.systems && furnaceData?.systemChans)
-          ? getChannelMetadataFromFurnace(
-              furnaceData.systems,
-              furnaceData.systemChans,
-              numChannels,
-              furnaceData.channelShortNames,
-              furnaceData.effectColumns
-            )
-          : null;
-        
-        if (channelMetadata) {
-          console.log(`[Import] Applied system preset: ${furnaceData?.systemName}, systems: [${furnaceData?.systems?.map((s: number) => '0x' + s.toString(16)).join(', ')}]`);
-        }
-
-        result = {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          patterns: (patterns as any[]).map((pat: any[][], idx: number) => ({
-            id: `pattern-${idx}`,
-            name: `Pattern ${idx}`,
-            length: patLen,
-            importMetadata,
-            channels: Array.from({ length: numChannels }, (_, ch) => {
-              const meta = channelMetadata?.[ch];
-              return {
-                id: `channel-${ch}`,
-                name: meta?.name || `Channel ${ch + 1}`,
-                shortName: meta?.shortName,
-                muted: false,
-                solo: false,
-                collapsed: false,
-                volume: 100,
-                pan: 0,
-                instrumentId: null,
-                color: meta?.color || null,
-                channelMeta: meta?.channelMeta,
-                rows: pat.map((row: any[]) => {
-                  const cell = row[ch] || {};
-                  return {
-                    note: cell.note || 0,
-                    instrument: cell.instrument || 0,
-                    volume: cell.volume || 0,
-                    effTyp: cell.effectType || 0,
-                    eff: cell.effectParam || 0,
-                    effTyp2: cell.effectType2 || 0,
-                    eff2: cell.effectParam2 || 0,
-                    // Include all effects from Furnace (1-8 per channel)
-                    effects: cell.effects?.map((e: { type: number; param: number }) => ({ 
-                      type: e.type, 
-                      param: e.param 
-                    })),
-                  };
-                }),
-              };
-            }),
-          })),
-          order: patternOrder.length > 0 ? patternOrder : [0],
-          instrumentNames: parsedInstruments.map(i => i.name),
-        };
-        console.log(`[Import] ${format} patterns converted:`, result.patterns.length, 'patterns, first pattern has', result.patterns[0]?.channels?.length, 'channels');
-      } else {
-        // Unknown format - try MOD conversion as fallback
-        result = convertMODModule(
-          patterns as MODNote[][][],
-          importMetadata.originalChannelCount,
-          importMetadata,
-          parsedInstruments.map(i => i.name),
-          useLibopenmpt ? info.arrayBuffer : undefined
-        );
-      }
-
-      if (result.patterns.length === 0) {
-        notify.error(`Module "${info.metadata.title}" contains no patterns to import.`);
-        return;
-      }
-
-      // Convert instruments using native converter
-      // Track next available ID to avoid duplicates when multi-sample instruments expand
-      const instruments: InstrumentConfig[] = [];
-      let nextId = 1;
-      for (let i = 0; i < parsedInstruments.length; i++) {
-        // Use nextId to ensure globally unique IDs (handles multi-sample Furnace instruments)
-        const converted = convertToInstrument(parsedInstruments[i], nextId, format as any);
-        instruments.push(...converted);
-        nextId += converted.length; // Advance ID by number of instruments created
-      }
-
-      // Stop playback before loading to prevent STALE INSTRUMENT warnings
-      stop();
-
-      // Ensure audio context is running before loading instruments
-      // This prevents InvalidStateError when worklets try to initialize
-      try {
-        const context = Tone.getContext();
-        const rawContext = (context as any).rawContext || (context as any)._context;
-        if (rawContext && rawContext.state !== 'running') {
-          await context.resume();
-          // Wait for context to actually transition to running state
-          let attempts = 0;
-          while (rawContext.state !== 'running' && attempts < 20) {
-            await new Promise(resolve => setTimeout(resolve, 50));
-            attempts++;
-          }
-          console.log('[Import] Audio context resumed, state:', rawContext.state, 'after', attempts * 50, 'ms');
-        }
-      } catch (err) {
-        console.warn('[Import] Failed to resume audio context:', err);
-      }
-
-      // Load instruments first, then patterns
-      loadInstruments(instruments);
-      loadPatterns(result.patterns);
-
-      // Set pattern order from module (song position list)
-      console.log('[Import] result.order:', result.order);
-      if (result.order && result.order.length > 0) {
-        setPatternOrder(result.order);
-        console.log('[Import] Pattern order set:', result.order.length, 'positions, first 10:', result.order.slice(0, 10));
-      } else {
-        console.warn('[Import] No pattern order found in result!');
-      }
-
-      // Store original module data for libopenmpt playback if available
-      if (result.originalModuleData) {
-        setOriginalModuleData(result.originalModuleData);
-        console.log('[Import] Original module data stored for libopenmpt playback');
-      } else {
-        setOriginalModuleData(null);
-      }
-
-      // Update project metadata
-      setMetadata({
-        name: info.metadata.title,
-        author: '',
-        description: `Imported from ${info.file?.name || 'module'} (${format})`,
-      });
-
-      // Set BPM from module (or default to 125)
-      setBPM(importMetadata.modData?.initialBPM || 125);
-      // Set Speed from module (or default to 6)
-      setSpeed(importMetadata.modData?.initialSpeed || 6);
-
-      const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
-      console.log('Imported module:', info.metadata.title, {
-        format,
-        patterns: result.patterns.length,
-        channels: importMetadata.originalChannelCount,
-        instruments: instruments.length,
-        samplers: samplerCount,
-      });
-
-      // Pre-load all instruments (especially samplers) to ensure they're ready
-      if (samplerCount > 0) {
-        console.log('[Import] Preloading samples...');
-        await getToneEngine().preloadInstruments(instruments);
-        console.log('[Import] Samples ready for playback');
-      }
-
-      notify.success(`Imported "${info.metadata.title}" - ${result.patterns.length} patterns, ${instruments.length} instruments`);
-
-      // Reset editor mode to 'classic' and clear any stale native data (furnace, hively, etc.)
-      // from a previously loaded module. XM uses linear periods; MOD always uses Amiga periods.
-      const xmFreqType = importMetadata?.xmData?.frequencyType;
-      const linearPeriods = format === 'XM' ? (xmFreqType === 'linear' || xmFreqType === undefined) : false;
-      useTrackerStore.getState().applyEditorMode({ linearPeriods });
-
-      return;
-    }
-
-    // UADE / exotic Amiga path — no native parser data, no libopenmpt song data
-    // (UADE-exclusive formats produce a synthetic ModuleInfo with no metadata.song)
-    if (!info.metadata.song) {
-      if (!info.file) {
-        notify.error('File reference lost — cannot import');
-        return;
-      }
-      const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-      let song: TrackerSong;
-      try {
-        song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
-      } catch (err) {
-        notify.error(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-        return;
-      }
-      stop();
-      loadInstruments(song.instruments);
-      loadPatterns(song.patterns);
-      if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-      setOriginalModuleData(null);
-      setBPM(song.initialBPM);
-      setSpeed(song.initialSpeed);
-      setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
-      useTrackerStore.getState().applyEditorMode(song);
-      const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
-      if (samplerCount > 0) {
-        await getToneEngine().preloadInstruments(song.instruments);
-      }
-      notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
-      return;
-    }
-
-    // Fallback to libopenmpt path for other formats (IT, S3M, etc.)
-
-    console.log('[Import] Using libopenmpt fallback');
-
-    // Convert the module data to our pattern format
-    const result = convertModule(info.metadata.song);
-
-    if (result.patterns.length === 0) {
-      notify.error(`Module "${info.metadata.title}" contains no patterns to import.`);
-      return;
-    }
-
-    // Try to extract samples if the original file is available
-    let sampleUrls: Map<number, string> | undefined;
-    if (info.file && canExtractSamples(info.file.name)) {
-      try {
-        console.log('[Import] Extracting samples from module...');
-        const extraction = await extractSamples(info.file);
-        sampleUrls = new Map();
-
-        for (let i = 0; i < extraction.samples.length; i++) {
-          const sample = extraction.samples[i];
-          if (sample.pcmData.length > 0) {
-            const wavUrl = encodeWav(sample);
-            sampleUrls.set(i + 1, wavUrl);
-            console.log(`[Import] Sample ${i + 1}: ${sample.name} (${sample.pcmData.length} samples)`);
-          }
-        }
-        console.log(`[Import] Extracted ${sampleUrls.size} samples`);
-      } catch (err) {
-        console.warn('[Import] Could not extract samples, using synth fallback:', err);
-      }
-    }
-
-    // Create instruments for the module (with samples if available)
-    const instruments = createInstrumentsForModule(
-      result.patterns,
-      result.instrumentNames,
-      sampleUrls
-    );
-
-    // Load instruments first, then patterns
-    loadInstruments(instruments);
-    loadPatterns(result.patterns);
-
-    // Set pattern order from module (song position list)
-    if (result.order && result.order.length > 0) {
-      setPatternOrder(result.order);
-      console.log('[Import] Pattern order set:', result.order.length, 'positions');
-    }
-
-    // Update project metadata
-    setMetadata({
-      name: info.metadata.title,
-      author: '',
-      description: `Imported from ${info.file?.name || 'module'}`,
-    });
-
-    // Set ProTracker default tempo (125 BPM)
-    setBPM(125);
-
-    const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
-    console.log('Imported module:', info.metadata.title, {
-      format,
-      patterns: result.patterns.length,
-      channels: result.channelCount,
-      instruments: instruments.length,
-      samplers: samplerCount,
-    });
-
-    // Pre-load all instruments (especially samplers) to ensure they're ready
-    if (samplerCount > 0) {
-      console.log('[Import] Preloading samples...');
-      await getToneEngine().preloadInstruments(instruments);
-      console.log('[Import] Samples ready for playback');
-    }
-
-    notify.success(`Imported "${info.metadata.title}" - ${result.patterns.length} patterns, ${instruments.length} instruments`);
-  }, [loadInstruments, loadPatterns, setMetadata, setBPM, setSpeed, setPatternOrder, setOriginalModuleData]);
 
   // Acid generator handler
   const handleAcidGenerator = useCallback((channelIndex: number) => {
@@ -899,252 +482,16 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       )}
 
       {/* Editor Controls Toolbar - Compact & Shrinkable */}
-      <div className="flex-shrink flex items-center justify-between px-2 py-1 bg-dark-bgTertiary border-b border-dark-border min-h-[28px]">
-        <div className="flex items-center gap-2">
-          {/* View Mode Dropdown */}
-          <div className="flex items-center gap-1">
-            {viewMode === 'tracker' && <List size={14} className="text-text-secondary" />}
-            {viewMode === 'grid' && <Grid3x3 size={14} className="text-text-secondary" />}
-            {viewMode === 'pianoroll' && <Piano size={14} className="text-text-secondary" />}
-            {viewMode === 'tb303' && <Radio size={14} className="text-text-secondary" />}
-            <select
-              value={viewMode}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === 'arrangement') {
-                  setActiveView('arrangement');
-                } else if (val === 'dj') {
-                  setActiveView('dj');
-                } else if (val === 'drumpad') {
-                  setActiveView('drumpad');
-                } else if (val === 'vj') {
-                  setActiveView('vj');
-                } else {
-                  setViewMode(val as ViewMode);
-                }
-              }}
-              className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
-              title="Select editor view"
-            >
-              <option value="tracker">Tracker</option>
-              <option value="grid">Grid</option>
-              <option value="pianoroll">Piano Roll</option>
-              <option value="tb303">TB-303</option>
-              <option value="arrangement">Arrangement</option>
-              <option value="dj">DJ Mixer</option>
-              <option value="drumpad">Drum Pads</option>
-              <option value="vj">VJ View</option>
-            </select>
-          </div>
-
-          {/* Hardware System Preset Selector - High Visibility */}
-          <div className="flex items-center gap-1.5 ml-1 pl-2 border-l border-dark-border">
-            <Cpu size={14} className="text-text-secondary" />
-            <select
-              className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer outline-none"
-              onChange={(e) => {
-                applySystemPreset(e.target.value);
-                notify.success(`Hardware System: ${SYSTEM_PRESETS.find(p => p.id === e.target.value)?.name.toUpperCase()}`);
-              }}
-              defaultValue="none"
-              title="Select Hardware System Preset (NES, SMS, Genesis, etc.)"
-            >
-              <option value="none" disabled>SELECT HARDWARE...</option>
-              {getGroupedPresets().map(group => (
-                <optgroup key={group.label} label={group.label}>
-                  {group.presets.map(preset => (
-                    <option key={preset.id} value={preset.id} className="bg-dark-bgPrimary text-text-primary">{preset.name.toUpperCase()}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-
-          {/* Subsong Selector (Furnace multi-subsong modules) */}
-          <SubsongSelector />
-
-          {/* Channel Selector (grid and piano roll views) */}
-          {(viewMode === 'grid' || viewMode === 'pianoroll') && pattern && (
-            <>
-              <span className="text-text-secondary text-[10px] font-medium">CH:</span>
-              <select
-                value={gridChannelIndex}
-                onChange={(e) => setGridChannelIndex(Number(e.target.value))}
-                className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
-              >
-                {pattern.channels.map((_, idx) => (
-                  <option key={idx} value={idx}>
-                    {(idx + 1).toString().padStart(2, '0')}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-
-          {/* Ghost Patterns Toggle (tracker view only) */}
-          {viewMode === 'tracker' && (
-            <button
-              onClick={() => setShowGhostPatterns(!showGhostPatterns)}
-              className={`
-                flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors
-                ${showGhostPatterns
-                  ? 'bg-accent-primary/20 text-accent-primary'
-                  : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-                }
-              `}
-              title={showGhostPatterns ? "Hide ghost patterns" : "Show ghost patterns"}
-            >
-              {showGhostPatterns ? <Eye size={12} /> : <EyeOff size={12} />}
-              <span>Ghosts</span>
-            </button>
-          )}
-
-          {/* Advanced Edit Toggle (tracker view only) */}
-          {viewMode === 'tracker' && (
-            <button
-              onClick={() => setShowAdvancedEdit(!showAdvancedEdit)}
-              className={`
-                flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors
-                ${showAdvancedEdit
-                  ? 'bg-accent-primary/20 text-accent-primary'
-                  : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-                }
-              `}
-              title="Toggle Advanced Edit Panel"
-            >
-              <Zap size={12} />
-              <span>Edit</span>
-            </button>
-          )}
-
-          {/* Automation Editor Toggle (tracker view only) */}
-          {viewMode === 'tracker' && (
-            <button
-              onClick={() => setShowAutomation(true)}
-              className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
-              title="Open Automation Editor"
-            >
-              <Activity size={12} />
-              <span>Auto</span>
-            </button>
-          )}
-
-          {/* Drumpad Editor Toggle (any view) */}
-          <button
-            onClick={onShowDrumpads}
-            className="flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
-            title="Open Drumpad Editor"
-          >
-            <LayoutGrid size={12} />
-            <span>Pads</span>
-          </button>
-
-          {/* Rec Button (with settings access) */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => useTrackerStore.getState().toggleRecordMode()}
-              className={`
-                px-2 py-1 text-xs rounded font-medium transition-colors flex items-center gap-1
-                ${useTrackerStore.getState().recordMode
-                  ? 'bg-accent-error text-white animate-pulse'
-                  : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-                }
-              `}
-              title="Toggle Recording Mode (Space)"
-            >
-              <div className={`w-2 h-2 rounded-full ${useTrackerStore.getState().recordMode ? 'bg-white' : 'bg-accent-error'}`} />
-              REC
-            </button>
-            <button
-              onClick={() => useUIStore.getState().openModal('settings')}
-              className="p-1 rounded bg-dark-bgSecondary text-text-secondary hover:text-text-primary transition-colors"
-              title="Recording Settings (Quantize, Edit Step...)"
-            >
-              <SlidersHorizontal size={12} />
-            </button>
-          </div>
-
-          {/* Separator */}
-          <div className="w-px h-4 bg-border opacity-50 mx-1" />
-
-          {/* Mute Button */}
-          <button
-            onClick={toggleMasterMute}
-            className={`
-              px-2 py-1 text-xs rounded font-medium transition-colors
-              ${masterMuted
-                ? 'bg-accent-error/20 text-accent-error'
-                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-              }
-            `}
-            title={masterMuted ? 'Unmute master output' : 'Mute master output'}
-          >
-            {masterMuted ? 'Unmute' : 'Mute'}
-          </button>
-
-          {/* Stepped/Smooth Scrolling Toggle */}
-          <button
-            onClick={() => setSmoothScrolling(!smoothScrolling)}
-            className={`
-              px-2 py-1 text-xs rounded font-medium transition-colors
-              ${smoothScrolling
-                ? 'bg-accent-primary/20 text-accent-primary'
-                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-              }
-            `}
-            title={smoothScrolling ? 'Switch to stepped scrolling' : 'Switch to smooth scrolling'}
-          >
-            {smoothScrolling ? 'Smooth' : 'Stepped'}
-          </button>
-
-          {/* Groove Settings Button */}
-          <div className="flex items-center gap-1 ml-1 pl-2 border-l border-dark-border">
-            <button
-              onClick={() => setShowGrooveSettings(true)}
-              className={`px-2 py-1 text-[10px] rounded font-mono font-bold transition-colors ${
-                grooveTemplateId !== 'straight' || swing !== (useMpcScale ? 50 : 100) || jitter > 0
-                  ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/50'
-                  : 'bg-dark-bgSecondary text-text-secondary border border-dark-border hover:text-text-primary'
-              }`}
-              title={`Groove Settings (Current: ${GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name || 'None'})`}
-            >
-              GROOVE
-            </button>
-            {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
-          </div>
-
-          {/* Status Message (ProTracker Style) */}
-          {statusMessage && (
-            <div className="flex items-center px-3 ml-2 pl-3 border-l border-dark-border">
-              <span className="text-accent-primary font-bold tracking-[0.3em] text-[11px] animate-pulse font-mono">
-                {statusMessage.toUpperCase()}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* FPS / Quality Indicator - Compact */}
-        <div
-          className={`
-            flex items-center gap-1 px-2 py-0.5 text-xs rounded font-mono
-            ${quality === 'low'
-              ? 'bg-accent-error/20 text-accent-error'
-              : quality === 'medium'
-              ? 'bg-orange-500/20 text-orange-400'
-              : 'bg-green-500/20 text-green-400'
-            }
-          `}
-          title={`Performance: ${quality.toUpperCase()} | Avg FPS: ${averageFps} | Current: ${fps}`}
-        >
-          <span className="font-bold">{averageFps}</span>
-          <span className="text-[10px] opacity-70">FPS</span>
-          <div className={`w-1.5 h-1.5 rounded-full ${
-            quality === 'low' ? 'bg-accent-error' :
-            quality === 'medium' ? 'bg-orange-400' :
-            'bg-green-400'
-          } animate-pulse`} />
-        </div>
-      </div>
+      <EditorControlsBar
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        gridChannelIndex={gridChannelIndex}
+        onGridChannelChange={setGridChannelIndex}
+        showAdvancedEdit={showAdvancedEdit}
+        onToggleAdvancedEdit={() => setShowAdvancedEdit(!showAdvancedEdit)}
+        onShowAutomation={() => setShowAutomation(true)}
+        onShowDrumpads={onShowDrumpads}
+      />
 
       {/* Main Content Area with Pattern Editor and Instrument Panel - Flexbox Layout */}
       <div className="flex-1 min-h-0 min-w-0 relative z-10 flex overflow-hidden">
