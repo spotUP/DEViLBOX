@@ -17,7 +17,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useTabsStore } from '@stores/useTabsStore';
 import { getGroupedPresets, SYSTEM_PRESETS } from '@constants/systemPresets';
 import type { SystemPreset } from '@constants/systemPresets';
-import { UADE_INSTRUMENT_PRESETS, AMIGA_UADE_PRESET_IDS } from '@constants/uadeInstrumentPresets';
+import { AMIGA_UADE_PRESET_IDS, getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
 
 type WizardStep = 1 | 2 | 3;
 type StartMode = 'empty' | 'preset';
@@ -57,7 +57,7 @@ export const NewSongWizard: React.FC = () => {
 
         // 4. Load starter instruments
         if (mode === 'preset' && loadInstruments && presetId) {
-          const presets = UADE_INSTRUMENT_PRESETS[presetId] ?? [];
+          const presets = getInstrumentPresetsForSystem(presetId);
           presets.forEach((inst) => {
             useInstrumentStore.getState().createInstrument(inst);
           });
@@ -88,9 +88,9 @@ export const NewSongWizard: React.FC = () => {
 
   const hasStarterInstruments =
     selectedPresetId !== '' &&
-    (UADE_INSTRUMENT_PRESETS[selectedPresetId]?.length ?? 0) > 0;
+    (getInstrumentPresetsForSystem(selectedPresetId).length) > 0;
 
-  const starterInstruments = UADE_INSTRUMENT_PRESETS[selectedPresetId] ?? [];
+  const starterInstruments = getInstrumentPresetsForSystem(selectedPresetId);
 
   // --- Navigation ---
   const handleNext = () => {
@@ -283,7 +283,7 @@ const StepPresetBrowser: React.FC<StepPresetBrowserProps> = ({
   const [filter, setFilter] = useState('');
   const selected = SYSTEM_PRESETS.find((p) => p.id === selectedPresetId);
   const hasPresetInstruments =
-    (UADE_INSTRUMENT_PRESETS[selectedPresetId]?.length ?? 0) > 0;
+    (getInstrumentPresetsForSystem(selectedPresetId).length) > 0;
 
   const filteredGroups = useMemo(() => {
     const sorted = GROUPED_PRESETS.map((group) => ({
@@ -405,7 +405,7 @@ const StepPresetBrowser: React.FC<StepPresetBrowserProps> = ({
             {hasPresetInstruments && (
               <div className="flex items-center gap-2 p-3 bg-accent-primary/10 rounded border border-accent-primary/30 text-xs text-accent-primary">
                 <Check size={12} />
-                Includes {UADE_INSTRUMENT_PRESETS[selectedPresetId]?.length} starter instruments
+                Includes {getInstrumentPresetsForSystem(selectedPresetId).length} starter instruments
               </div>
             )}
           </div>
