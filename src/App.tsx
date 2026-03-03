@@ -31,6 +31,7 @@ import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
 import { RomUploadDialog } from '@components/ui/RomUploadDialog';
 import { ModlandContributionModal } from '@components/modland/ModlandContributionModal';
+import { PatternMatchModal } from '@components/modland/PatternMatchModal';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { ImportDBXDialog } from '@components/dialogs/ImportDBXDialog';
 import { ImportInstrumentDialog } from '@components/dialogs/ImportInstrumentDialog';
@@ -568,6 +569,7 @@ function App() {
             filename={modlandFilename}
             hash={modlandHash}
           />
+          <PatternMatchModal />
           {isDevServerDown && <DevServerDownBanner />}
           {updateAvailable && !updateDismissed && (
             <UpdateNotification

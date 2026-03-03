@@ -5,6 +5,7 @@ import { lookupFileByHash } from '../modlandApi';
 import { extractMetadata } from '../modland/ModlandMetadata';
 import { notify } from '@/stores/useNotificationStore';
 import { extractPatternsFromLibOpenMPT, hashPatterns } from '../modland/PatternHasher';
+import { useModlandResultStore } from '@/stores/useModlandResultStore';
 import type { ChiptuneMetadata } from '../import/ChiptunePlayer';
 
 export interface ModlandCheckResult {
@@ -13,6 +14,7 @@ export interface ModlandCheckResult {
   patternHash?: string; // bigint as string
   metadata?: ReturnType<typeof extractMetadata>;
   sample_count?: number;
+  file?: import('../modlandApi').ModlandHashFile; // Store the full file info for pattern matching
 }
 
 /**
@@ -64,17 +66,25 @@ export async function checkModlandFile(
         samples: result.sample_count
       });
 
-      return { 
+      const checkResult = { 
         found: true, 
         hash, 
         patternHash,
         metadata, 
-        sample_count: result.sample_count 
+        sample_count: result.sample_count,
+        file: result.file, // Store the file info for pattern matching
       };
+      
+      // Store result for UI access
+      useModlandResultStore.getState().setLastResult(checkResult);
+      
+      return checkResult;
     }
     
     // File not in Modland - return hash for contribution prompt
-    return { found: false, hash, patternHash };
+    const notFoundResult = { found: false, hash, patternHash };
+    useModlandResultStore.getState().setLastResult(notFoundResult);
+    return notFoundResult;
   } catch (error) {
     // Silently fail - don't block import if Modland check fails
     console.debug('[Modland] Hash check failed:', error);
