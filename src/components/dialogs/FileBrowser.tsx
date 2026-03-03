@@ -6,7 +6,7 @@
  * - Server API (jailed to data/ directory)
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardDrive, History, RotateCcw, Globe } from 'lucide-react';
 import '@cubone/react-file-manager/dist/style.css';
 import { hasElectronFS } from '@utils/electron';
@@ -34,6 +34,27 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   suggestedFilename = 'untitled.dbx',
 }) => {
   const [fileSource, setFileSource] = useState<FileSource>('demo');
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Protect text inputs inside the modal from being intercepted by global
+  // keyboard handlers. In WebGL mode the modal renders in a portal outside
+  // the React root, so capture-phase listeners on `window` may eat keystrokes
+  // before the browser's default input handling. Registering our own capture
+  // handler on the modal container lets us stopPropagation early.
+  useEffect(() => {
+    const el = modalRef.current;
+    if (!el || !isOpen) return;
+    const guard = (e: KeyboardEvent) => {
+      const t = e.target;
+      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) {
+        // Allow Escape to still close the modal
+        if (e.key === 'Escape') return;
+        e.stopPropagation();
+      }
+    };
+    el.addEventListener('keydown', guard, { capture: true });
+    return () => el.removeEventListener('keydown', guard, { capture: true });
+  }, [isOpen]);
 
   const nav = useFileNavigation({
     isOpen,
@@ -51,6 +72,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
       <div
+        ref={modalRef}
         className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl w-[800px] max-w-[90vw] h-[600px] max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
