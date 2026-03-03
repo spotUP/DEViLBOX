@@ -141,16 +141,19 @@ export function parse(tokens: Token[]): AstNode[] {
     }
 
     // RS.B / RS.W / RS.L — assign current offset to label, then advance
-    // Format: label RS.size count (e.g. "it_name RS.B 31")
+    // Format: label RS.size count (after label was already consumed above)
+    // first = DIRECTIVE "RS", lt[j+1] = SIZE ".B"
     if (
-      (first.kind === 'IDENTIFIER' || first.kind === 'LABEL') &&
-      lt[j + 1]?.kind === 'DIRECTIVE' && lt[j + 1]?.value === 'RS' &&
-      lt[j + 2]?.kind === 'SIZE'
+      first.kind === 'DIRECTIVE' && first.value === 'RS' &&
+      lt[j + 1]?.kind === 'SIZE'
     ) {
-      const name = first.value;
-      const sizeChar = lt[j + 2].value.slice(1).toUpperCase(); // B, W, L
+      // The label was already consumed and added as a label node. Pop it and convert to EQU.
+      const labelNode = nodes[nodes.length - 1];
+      const name = labelNode?.kind === 'label' ? labelNode.name : `_rs_${startLine}`;
+      if (labelNode?.kind === 'label') nodes.pop(); // remove the label node
+      const sizeChar = lt[j + 1].value.slice(1).toUpperCase(); // B, W, L
       const elemSize = sizeChar === 'B' ? 1 : sizeChar === 'W' ? 2 : 4;
-      const countToken = lt[j + 3];
+      const countToken = lt[j + 2];
       const count = countToken && (countToken.kind === 'NUMBER' || countToken.kind === 'IMMEDIATE')
         ? parseNumber(countToken.value.replace(/^#/, ''))
         : 0;
@@ -243,6 +246,23 @@ export function parse(tokens: Token[]): AstNode[] {
             continue;
           }
         }
+        // #expr*expr → multiplication in immediate (lexer splits on '*')
+        // e.g. #nt_sizeof*4 → IMMEDIATE "nt_sizeof", NUMBER "4" → combine as nt_sizeof * 4
+        if (lt[j].kind === 'IMMEDIATE' && lt[j + 1]?.kind === 'NUMBER' &&
+            (lt[j + 2]?.kind === 'COMMA' || lt[j + 2]?.kind === 'NEWLINE' || j + 2 >= lt.length || lt[j + 2] === undefined)) {
+          const imm = lt[j].value.replace(/^#/, '');
+          const mult = parseNumber(lt[j + 1].value);
+          const immVal = parseNumber(imm);
+          if (!isNaN(immVal)) {
+            operands.push({ kind: 'immediate', value: immVal * mult, raw: `#${immVal * mult}` });
+          } else {
+            // Symbolic: emit as string expression "sym * n" for the emitter to handle
+            operands.push({ kind: 'immediate', value: NaN, raw: `#(${imm}*${mult})` });
+          }
+          j += 2;
+          continue;
+        }
+
         // #'SMUS' → character constant immediate (lexer splits '#' and 'SMUS' separately)
         if (lt[j].kind === 'IMMEDIATE' && lt[j].value === '#' && lt[j + 1]?.kind === 'STRING') {
           const chars = lt[j + 1].value;
