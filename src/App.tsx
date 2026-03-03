@@ -60,7 +60,6 @@ const TD3PatternDialog = lazy(() => import('@components/midi/TD3PatternDialog').
 const DrumpadEditorModal = lazy(() => import('@components/midi/DrumpadEditorModal').then(m => ({ default: m.DrumpadEditorModal })));
 const DrumPadManager = lazy(() => import('@components/drumpad/DrumPadManager').then(m => ({ default: m.DrumPadManager })));
 const TipOfTheDay = lazy(() => import('@components/dialogs/TipOfTheDay').then(m => ({ default: m.TipOfTheDay })));
-const PatternManagement = lazy(() => import('@components/pattern/PatternManagement').then(m => ({ default: m.PatternManagement })));
 const SamplePackBrowser = lazy(() => import('@components/instruments/SamplePackBrowser').then(m => ({ default: m.SamplePackBrowser })));
 const InstrumentEditorPopout = lazy(() => import('./components/instruments/InstrumentEditorPopout').then(m => ({ default: m.InstrumentEditorPopout })));
 const PianoRoll = lazy(() => import('./components/pianoroll/PianoRoll').then(m => ({ default: m.PianoRoll })));
@@ -943,14 +942,6 @@ function App() {
 
             {activeView === 'tracker' && !isCollabSplit && (
               <>
-                {/* Pattern Management (optional) */}
-                {showPatterns && (
-                  <div className="h-48 border-b border-dark-border animate-fade-in">
-                    <Suspense fallback={<div className="h-full flex items-center justify-center text-text-muted">Loading patterns...</div>}>
-                      <PatternManagement />
-                    </Suspense>
-                  </div>
-                )}
                 {/* Pattern Editor */}
                 <div className="flex-1 min-h-0 min-w-0 flex flex-col">
                   <TrackerView
