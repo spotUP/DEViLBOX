@@ -26,6 +26,7 @@ import { PixiGTSIDMonitor } from './PixiGTSIDMonitor';
 import { PixiGTOscilloscope } from './PixiGTOscilloscope';
 import { PixiGTStudioInstrument } from './PixiGTStudioInstrument';
 import { PixiGTStudioTables } from './PixiGTStudioTables';
+import { PixiGTPianoRoll } from './PixiGTPianoRoll';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 
 const TOOLBAR_H = 32;
@@ -198,11 +199,18 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
 
       {/* ─── Main area ─── */}
       <pixiContainer layout={{ flexDirection: 'row', flex: 1, width, height: editorHeight }}>
-        {/* Pattern editor */}
-        <PixiGTPatternGrid
-          width={Math.max(100, editorWidth)}
-          height={Math.max(100, editorHeight)}
-        />
+        {/* Pattern editor: hex grid in Pro, piano roll in Studio */}
+        {viewMode === 'pro' ? (
+          <PixiGTPatternGrid
+            width={Math.max(100, editorWidth)}
+            height={Math.max(100, editorHeight)}
+          />
+        ) : (
+          <PixiGTPianoRoll
+            width={Math.max(100, editorWidth)}
+            height={Math.max(100, editorHeight)}
+          />
+        )}
 
         {/* Sidebar separator */}
         <pixiGraphics draw={drawSidebarSep} layout={{ position: 'absolute', left: editorWidth, width: 1, height: editorHeight }} />
