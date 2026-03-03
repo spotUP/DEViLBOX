@@ -24,7 +24,7 @@ import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useAuthStore } from '@stores/useAuthStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { MODERN_NAV_H } from '../workbench/workbenchLayout';
-import { serializeProjectToBlob, loadProjectFromObject } from '@hooks/useProjectPersistence';
+import { serializeProjectToBlob } from '@hooks/useProjectPersistence';
 import { PixiTransportBar } from './PixiTransportBar';
 
 // ─── View selector pills ─────────────────────────────────────────────────────
@@ -101,26 +101,9 @@ export const PixiNavBar: React.FC = () => {
     }
   }, [projectName]);
 
-  // ─── Project Load ────────────────────────────────────────────────────────
+  // ─── Project Load — open full file browser ────────────────────────────────
   const handleLoadFile = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.dvbx,.json';
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text) as unknown;
-        const ok = await loadProjectFromObject(data);
-        if (!ok) {
-          console.warn('[PixiNavBar] Failed to load project — incompatible or outdated file.');
-        }
-      } catch (err) {
-        console.error('[PixiNavBar] Failed to parse project file:', err);
-      }
-    };
-    input.click();
+    useUIStore.getState().setShowFileBrowser(true);
   }, []);
 
   // Theme cycling
