@@ -907,10 +907,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       const gGrid = gridGraphicsRef.current;
       if (gGrid) renderGrid(gGrid, p, vStart, SCROLL_BUFFER_ROWS);
       if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow, SCROLL_BUFFER_ROWS));
-      // Reset container shift after full regen
-      if (!p.isPlaying && gridScrollContainerRef.current) {
-        gridScrollContainerRef.current.y = 0;
-      }
     } else if (vStartChanged) {
       // Tile-shift — skip label regen, just shift the container (THE WIN)
       prevVStartRef.current = vStart;
