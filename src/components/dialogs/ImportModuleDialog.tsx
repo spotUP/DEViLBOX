@@ -20,6 +20,8 @@ import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSett
 import { detectFormat, getLibopenmptPlayableKeys, type FormatDefinition } from '@lib/import/FormatRegistry';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { computeSongDBHash, lookupSongDB, type SongDBResult } from '@lib/songdb';
+import { parseSIDHeader, type SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
+import { SIDInfoPanel } from './SIDInfoPanel';
 
 export interface ImportOptions {
   useLibopenmpt: boolean;     // Use libopenmpt for sample-accurate playback
@@ -82,6 +84,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
   const [selectedSubsong, setSelectedSubsong] = useState(0);
   const [songDBInfo, setSongDBInfo] = useState<SongDBResult | null>(null);
+  const [sidHeader, setSidHeader] = useState<SIDHeaderInfo | null>(null);
   // Track the companions used for the currently loaded file
   const [activeCompanions, setActiveCompanions] = useState<File[]>([]);
   // Track whether a UADE scan is in-flight so handleClose can cancel it
@@ -127,6 +130,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setModuleInfo(null);
     setUadeMetadata(null);
     setSongDBInfo(null);
+    setSidHeader(null);
     setSelectedSubsong(0);
     setLoadedFileName(fname);
 
@@ -188,6 +192,13 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
         // Fire-and-forget songdb lookup (non-blocking)
         lookupSongDB(computeSongDBHash(buf)).then(setSongDBInfo);
 
+        // SID-specific: extract header metadata (title, author, chip, subsongs)
+        const sidInfo = parseSIDHeader(new Uint8Array(buf));
+        if (sidInfo) {
+          setSidHeader(sidInfo);
+          setSelectedSubsong(sidInfo.defaultSubsong);
+        }
+
         // Fast header-only metadata extraction per format
         const meta = nativeFmtForFile
           ? getNativeFormatMetadata(nativeFmtForFile.key, buf)
@@ -195,7 +206,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
         setModuleInfo({
           metadata: {
-            title: file.name.replace(/\.[^/.]+$/, ''),
+            title: sidInfo?.title || file.name.replace(/\.[^/.]+$/, ''),
             type: isFurnace ? 'Furnace' : nativeFmtForFile!.label,
             channels:    meta.channels,
             patterns:    meta.patterns,
@@ -343,6 +354,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setError(null);
     setIsPlaying(false);
     setUadeMetadata(null);
+    setSidHeader(null);
     setSelectedSubsong(0);
     setActiveCompanions([]);
     onClose();
@@ -524,8 +536,18 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                 )}
               </div>
 
-              {/* SongDB metadata (author, album, year, group) */}
-              {songDBInfo && (
+              {/* SID Info Panel — shown for C64 SID files with rich metadata */}
+              {sidHeader && (
+                <SIDInfoPanel
+                  header={sidHeader}
+                  songDBInfo={songDBInfo}
+                  selectedSubsong={selectedSubsong}
+                  onSubsongChange={setSelectedSubsong}
+                />
+              )}
+
+              {/* SongDB metadata (author, album, year, group) — shown for non-SID formats */}
+              {songDBInfo && !sidHeader && (
                 <div className="grid grid-cols-2 gap-2 text-xs border-t border-dark-border pt-2 mt-1">
                   {songDBInfo.authors.length > 0 && (
                     <div className="flex justify-between text-text-muted col-span-2">

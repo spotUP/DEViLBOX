@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T12:26:22.395Z
+ * Generated: 2026-03-03T16:39:22.078Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2036';
-export const BUILD_NUMBER = '2036';
-export const BUILD_HASH = 'ef0b8c51';
+export const BUILD_VERSION = '1.0.2061';
+export const BUILD_NUMBER = '2061';
+export const BUILD_HASH = '1b2a4c44';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,105 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2036',
+    version: '1.0.2061',
     date: '2026-03-03',
     changes: [
+      {
+        type: 'fix',
+        "description": "Restore missing isSupportedModule import in UnifiedFileLoader"
+      },
+      {
+        type: 'fix',
+        "description": "Restore updateBpmSyncedEffects method removed during modularization"
+      },
+      {
+        type: 'improvement',
+        "description": "Delegate ToneEngine methods to 8 extracted modules"
+      },
+      {
+        type: 'feature',
+        "description": "Add withFallback helper, convert 83 format blocks to use DRY pattern"
+      },
+      {
+        type: 'improvement',
+        "description": "Clean up TrackerView, FileBrowser, and EditorControlsBar after modularization"
+      },
+      {
+        type: 'fix',
+        "description": "Missing imports in factoryPresets/drum.ts and EffectFactory.ts"
+      },
+      {
+        type: 'improvement',
+        "description": "Split stores and input hooks into focused helper modules (Tier 4)"
+      },
+      {
+        type: 'improvement',
+        "description": "Split TrackerReplayer.ts into focused modules (Tier 4)"
+      },
+      {
+        type: 'improvement',
+        "description": "Split FurnaceSongParser.ts into focused parser modules (Tier 4)"
+      },
+      {
+        type: 'improvement',
+        "description": "Split parseModuleToSong.ts into focused parser modules (Tier 4)"
+      },
+      {
+        type: 'improvement',
+        "description": "Split InstrumentFactory.ts into focused sub-factories (Tier 4)"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract FilePreviewPanel and useModuleImport from FileBrowser/TrackerView"
+      },
+      {
+        type: 'improvement',
+        "description": "Split VisualEffectEditors.tsx into category files"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract SampleLoopEditor and useSampleEditorUndo from SampleEditor"
+      },
+      {
+        type: 'improvement',
+        "description": "Split ExportDialog.tsx into per-format export panels"
+      },
+      {
+        type: 'improvement',
+        "description": "Split JeskolaEditors.tsx into per-category Buzzmachine editors"
+      },
+      {
+        type: 'improvement',
+        "description": "Split UnifiedInstrumentEditor into sub-modules"
+      },
+      {
+        type: 'improvement',
+        "description": "Split instrument.ts types into domain-grouped modules (Tier 2)"
+      },
+      {
+        type: 'improvement',
+        "description": "Split constant/preset files into per-category directories (Tier 1)"
+      },
+      {
+        type: 'feature',
+        "description": "Add FormatRegistry as single source of truth for 130+ format definitions"
+      },
+      {
+        type: 'feature',
+        "description": "JamCracker Pro full integration — WASM replayer, AM synth, editor UI"
+      },
+      {
+        type: 'feature',
+        "description": "Dual SID toggle button, .sng file validation tests"
+      },
+      {
+        type: 'feature',
+        "description": "Dual SID monitors, ASID UX, test .sng files, ADSR drag polish"
+      },
+      {
+        type: 'feature',
+        "description": "Interactive ADSR, table editing, preset browser, block ops, save/export"
+      },
       {
         type: 'improvement',
         "description": "Test: GTUltra test suite — 39 tests for mapping, detection, presets"
@@ -132,112 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Debug(vj): add preset selection logging in VJView"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert(tracker): restore overlay inside scroll container for 46fps scroll"
-      },
-      {
-        type: 'fix',
-        "description": "Encode preset paths and add error logging in ProjectMCanvas"
-      },
-      {
-        type: 'fix',
-        "description": "Show import dialog for SID files on drag-and-drop"
-      },
-      {
-        type: 'fix',
-        "description": "Clean up engine constructor syntax errors"
-      },
-      {
-        type: 'fix',
-        "description": "Never fall back to UADE for C64 SID files"
-      },
-      {
-        type: 'improvement',
-        "description": "Verify SID file routing path"
-      },
-      {
-        type: 'feature',
-        "description": "Add HVSC API endpoints"
-      },
-      {
-        type: 'feature',
-        "description": "Add HVSC browser tab to FileBrowser"
-      },
-      {
-        type: 'feature',
-        "description": "Implement STIL parser for SID tune metadata"
-      },
-      {
-        type: 'feature',
-        "description": "Add pattern match floating button"
-      },
-      {
-        type: 'feature',
-        "description": "Add pattern match UI foundation"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate C64 SID engines into playback system"
-      },
-      {
-        type: 'feature',
-        "description": "Add SID engine selector to Settings"
-      },
-      {
-        type: 'feature',
-        "description": "Add SID engine preference to settings"
-      },
-      {
-        type: 'feature',
-        "description": "Add 4 more SID engine wrappers"
-      },
-      {
-        type: 'feature',
-        "description": "Add engine manager and jsSID wrapper"
-      },
-      {
-        type: 'feature',
-        "description": "Add all 5 SID emulation engines"
-      },
-      {
-        type: 'fix',
-        "description": "Fix .mus file format collision (Karl Morton vs UFO/MicroProse)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix .sid file format detection (C64 vs SidMon1 Amiga)"
-      }
-    ]
-  },
-  {
-    version: '2026-03-02',
-    date: '2026-03-02',
-    changes: [
-      {
-        type: 'improvement',
-        "description": "Update status doc with dismissal feature"
-      },
-      {
-        type: 'feature',
-        "description": "Add 'Don't show again' option to Modland contribution modal"
-      },
-      {
-        type: 'feature',
-        "description": "Implement Modland pattern hash computation (FNV-1a)"
-      },
-      {
-        type: 'improvement',
-        "description": "Add Modland pattern hash algorithm implementation"
-      },
-      {
-        type: 'feature',
-        "description": "Add Modland contribution prompt for unknown modules"
-      },
-      {
-        type: 'fix',
-        "description": "Lazy-initialize songdb prepared statements"
       }
     ]
   }

@@ -141,13 +141,14 @@ const DJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
 const TrackerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
   const theme = usePixiTheme();
 
-  const { currentOctave, insertMode, recordMode, patternLength, songDBInfo } = useTrackerStore(
+  const { currentOctave, insertMode, recordMode, patternLength, songDBInfo, sidMetadata } = useTrackerStore(
     useShallow((s) => ({
       currentOctave: s.currentOctave,
       insertMode: s.insertMode,
       recordMode: s.recordMode,
       patternLength: s.patterns[s.currentPatternIndex]?.length || 64,
       songDBInfo: s.songDBInfo,
+      sidMetadata: s.sidMetadata,
     }))
   );
   const isPlaying = useTransportStore(s => s.isPlaying);
@@ -194,9 +195,21 @@ const TrackerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) =>
   const recStr = recordMode ? 'REC' : 'EDIT';
   const recColor = recordMode ? theme.error.color : theme.text.color;
 
-  const hasMetadata = !!songDBInfo;
+  const hasMetadata = !!songDBInfo || !!sidMetadata;
   let metadataStr = '';
-  if (hasMetadata) {
+  if (sidMetadata) {
+    const parts: string[] = [];
+    if (sidMetadata.title) parts.push(sidMetadata.title);
+    if (sidMetadata.author) parts.push(`by ${sidMetadata.author}`);
+    const chipInfo = [];
+    if (sidMetadata.chipModel !== 'Unknown') chipInfo.push(`MOS ${sidMetadata.chipModel}`);
+    if (sidMetadata.clockSpeed !== 'Unknown') chipInfo.push(sidMetadata.clockSpeed);
+    if (chipInfo.length) parts.push(`[${chipInfo.join(' ')}]`);
+    if (sidMetadata.subsongs > 1) parts.push(`Sub ${sidMetadata.currentSubsong + 1}/${sidMetadata.subsongs}`);
+    if (songDBInfo?.album) parts.push(`· ${songDBInfo.album}`);
+    if (songDBInfo?.year) parts.push(`(${songDBInfo.year})`);
+    metadataStr = parts.join(' ');
+  } else if (songDBInfo) {
     const parts: string[] = [];
     if (songDBInfo!.album) {
       parts.push(songDBInfo!.album);
