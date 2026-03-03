@@ -4373,6 +4373,49 @@ export class ToneEngine {
     _applyBpmSyncedParam(node, effectType, paramKey, value);
   }
 
+  public async updateBpmSyncedEffects(bpm: number): Promise<void> {
+    // 1. Master effects
+    this.masterEffectConfigs.forEach(({ node, config }) => {
+      if (!isEffectBpmSynced(config.parameters)) return;
+      const syncEntries = SYNCABLE_EFFECT_PARAMS[config.type];
+      if (!syncEntries) return;
+      const division = getEffectSyncDivision(config.parameters);
+      for (const entry of syncEntries) {
+        const value = computeSyncedValue(bpm, division, entry.unit);
+        this.applyBpmSyncedParam(node, config.type, entry.param, value);
+      }
+    });
+
+    // 2. Per-instrument effects
+    try {
+      const { useInstrumentStore } = await import('../stores/useInstrumentStore');
+      const instruments = useInstrumentStore.getState().instruments;
+
+      this.instrumentEffectChains.forEach((chain, key) => {
+        const instrumentId = key >> 16;
+        const instrument = instruments.find((inst: { id: number }) => inst.id === instrumentId);
+        if (!instrument?.effects) return;
+
+        const enabledEffects = instrument.effects.filter((fx: EffectConfig) => fx.enabled);
+
+        enabledEffects.forEach((config: EffectConfig, idx: number) => {
+          if (idx >= chain.effects.length) return;
+          if (!isEffectBpmSynced(config.parameters)) return;
+          const syncEntries = SYNCABLE_EFFECT_PARAMS[config.type];
+          if (!syncEntries) return;
+          const division = getEffectSyncDivision(config.parameters);
+          const node = chain.effects[idx];
+          for (const entry of syncEntries) {
+            const value = computeSyncedValue(bpm, division, entry.unit);
+            this.applyBpmSyncedParam(node, config.type, entry.param, value);
+          }
+        });
+      });
+    } catch {
+      // Store not yet initialized — skip instrument sync
+    }
+  }
+
   // ============================================================================
   // PER-CHANNEL ROUTING — delegated to ChannelRouting module
   // ============================================================================
