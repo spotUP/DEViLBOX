@@ -43,7 +43,8 @@ export class JSIDPlay2Engine {
   private currentTime = 0;
 
   private readonly sidData: Uint8Array;
-  private readonly config: JSIDPlay2Config;  ) {}
+  private readonly config: JSIDPlay2Config;
+
   constructor(sidData: Uint8Array, config: JSIDPlay2Config = {}) {
     this.sidData = sidData;
     this.config = config;

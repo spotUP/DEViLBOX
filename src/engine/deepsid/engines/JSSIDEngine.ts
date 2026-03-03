@@ -10,8 +10,6 @@
  * - Multi-SID support (2SID/3SID)
  */
 
-import type { SIDEngineType } from '../DeepSIDEngineManager';
-
 export interface JSSIDConfig {
   chipModel?: '6581' | '8580';
   sampleRate?: number;
@@ -33,9 +31,10 @@ export interface SIDVoiceState {
  */
 export class JSSIDEngine {
   private jsSID: any;
-  private player: any;
   private readonly sidData: Uint8Array;
-  private readonly config: JSSIDConfig;  private audioContext: AudioContext | null = null;
+  private readonly config: JSSIDConfig;
+
+  private audioContext: AudioContext | null = null;
   private scriptProcessor: ScriptProcessorNode | null = null;
   private isPlaying = false;
   private subsong = 0;
@@ -44,7 +43,7 @@ export class JSSIDEngine {
   constructor(sidData: Uint8Array, config: JSSIDConfig = {}) {
     this.sidData = sidData;
     this.config = config;
-  }  ) {}
+  }
 
   /**
    * Initialize the engine
@@ -261,7 +260,6 @@ export class JSSIDEngine {
   dispose(): void {
     this.stop();
     this.jsSID = null;
-    this.player = null;
     this.audioContext = null;
   }
 }
