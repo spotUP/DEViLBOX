@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T18:41:13.393Z
+ * Generated: 2026-03-03T18:51:24.708Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2075';
-export const BUILD_NUMBER = '2075';
-export const BUILD_HASH = '626399c7';
+export const BUILD_VERSION = '1.0.2076';
+export const BUILD_NUMBER = '2076';
+export const BUILD_HASH = 'a7a0dc10';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2075',
+    version: '1.0.2076',
     date: '2026-03-03',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Remove: delete PatternManagement component and panel"
+      },
       {
         type: 'fix',
         "description": "Remove duplicate Groove button from FT2 toolbar panel"
@@ -224,10 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "GTUltra ASID hardware bridge for USB-SID-Pico"
-      },
-      {
-        type: 'feature',
-        "description": "GTUltra block operations + SID register monitor"
       }
     ]
   }

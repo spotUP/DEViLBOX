@@ -1239,20 +1239,19 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   return (
     <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
-      {/* ─── Top Horizontal Scrollbar ─────────────────────────────────── */}
+      {/* ─── Top Horizontal Scrollbar (native GL) ─────────────────────── */}
       {/* Always rendered — use display:'none' to hide rather than conditional rendering,
           which would free the Yoga node and cause BindingErrors on the next layout pass. */}
-      <PixiDOMOverlay
-        layout={{ display: allChannelsFit ? 'none' : 'flex', width, height: SCROLLBAR_HEIGHT }}
-        style={{ zIndex: 25 }}
+      <PixiNativeScrollbar
+        width={width}
+        height={SCROLLBAR_HEIGHT}
+        totalWidth={totalChannelsWidth}
+        viewportWidth={width - LINE_NUMBER_WIDTH}
+        scrollLeft={scrollLeft}
         visible={!allChannelsFit}
-      >
-        <HorizontalScrollbar
-          totalWidth={totalChannelsWidth}
-          scrollLeft={scrollLeft}
-          onScrollChange={(v) => { scrollLeftRef.current = v; setScrollLeft(v); }}
-        />
-      </PixiDOMOverlay>
+        onScrollChange={(v) => { scrollLeftRef.current = v; setScrollLeft(v); }}
+        layout={{ display: allChannelsFit ? 'none' : 'flex', width, height: SCROLLBAR_HEIGHT }}
+      />
 
       {/* ─── Channel Header — native GL rendering ─────────────────────── */}
       <PixiChannelHeaders
@@ -1381,39 +1380,86 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   );
 };
 
-// ─── Horizontal Scrollbar ────────────────────────────────────────────────────
-// Thin scrollbar above the header, matching DOM PatternEditorCanvas's top scrollbar.
-// Syncs bidirectionally with header/grid scroll.
+// ─── Native GL Horizontal Scrollbar ──────────────────────────────────────────
 
-interface HorizontalScrollbarProps {
+interface PixiNativeScrollbarProps {
+  width: number;
+  height: number;
   totalWidth: number;
+  viewportWidth: number;
   scrollLeft: number;
+  visible: boolean;
   onScrollChange: (v: number) => void;
+  layout?: Record<string, unknown>;
 }
 
-const HorizontalScrollbar: React.FC<HorizontalScrollbarProps> = ({ totalWidth, scrollLeft, onScrollChange }) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
+const PixiNativeScrollbar: React.FC<PixiNativeScrollbarProps> = ({
+  width: barWidth, height: barHeight, totalWidth, viewportWidth,
+  scrollLeft, visible, onScrollChange, layout: layoutProp,
+}) => {
+  const theme = usePixiTheme();
+  const draggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const dragStartScrollRef = useRef(0);
 
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const left = e.currentTarget.scrollLeft;
-    setTimeout(() => onScrollChange(left), 0);
-  }, [onScrollChange]);
+  const trackX = LINE_NUMBER_WIDTH;
+  const trackW = Math.max(1, barWidth - trackX);
+  const ratio = viewportWidth / Math.max(1, totalWidth);
+  const thumbW = Math.max(20, Math.floor(trackW * Math.min(1, ratio)));
+  const maxScroll = Math.max(1, totalWidth - viewportWidth);
+  const thumbX = trackX + (scrollLeft / maxScroll) * (trackW - thumbW);
 
-  // Sync external scroll changes
-  useEffect(() => {
-    if (scrollRef.current && Math.abs(scrollRef.current.scrollLeft - scrollLeft) > 1) {
-      scrollRef.current.scrollLeft = scrollLeft;
+  const drawTrack = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.roundRect(trackX, 0, trackW, barHeight, 2).fill({ color: theme.bgTertiary.color, alpha: theme.bgTertiary.alpha });
+    g.rect(0, barHeight - 1, barWidth, 1).fill({ color: theme.border.color, alpha: theme.border.alpha * 0.5 });
+  }, [trackX, trackW, barHeight, barWidth, theme]);
+
+  const drawThumb = useCallback((g: GraphicsType) => {
+    g.clear();
+    if (!visible || ratio >= 1) return;
+    const hovered = draggingRef.current;
+    const alpha = hovered ? 0.9 : 0.6;
+    g.roundRect(thumbX, 1, thumbW, barHeight - 3, 2).fill({ color: theme.accent.color, alpha });
+  }, [thumbX, thumbW, barHeight, visible, ratio, theme]);
+
+  const handlePointerDown = useCallback((e: { global: { x: number }; stopPropagation: () => void }) => {
+    e.stopPropagation();
+    const localX = e.global.x;
+    // Click on track but not on thumb → jump to position
+    if (localX < thumbX || localX > thumbX + thumbW) {
+      const clickRatio = Math.max(0, Math.min(1, (localX - trackX - thumbW / 2) / (trackW - thumbW)));
+      onScrollChange(Math.round(clickRatio * maxScroll));
     }
-  }, [scrollLeft]);
+    draggingRef.current = true;
+    dragStartXRef.current = localX;
+    dragStartScrollRef.current = scrollLeft;
+  }, [thumbX, thumbW, trackX, trackW, maxScroll, scrollLeft, onScrollChange]);
+
+  const handlePointerMove = useCallback((e: { global: { x: number } }) => {
+    if (!draggingRef.current) return;
+    const dx = e.global.x - dragStartXRef.current;
+    const scrollRange = trackW - thumbW;
+    if (scrollRange <= 0) return;
+    const newScroll = Math.max(0, Math.min(maxScroll, dragStartScrollRef.current + (dx / scrollRange) * maxScroll));
+    onScrollChange(Math.round(newScroll));
+  }, [trackW, thumbW, maxScroll, onScrollChange]);
+
+  const handlePointerUp = useCallback(() => {
+    draggingRef.current = false;
+  }, []);
 
   return (
-    <div
-      ref={scrollRef}
-      onScroll={handleScroll}
-      className="h-3 bg-dark-bgTertiary border-b border-dark-border overflow-x-auto"
-      style={{ paddingLeft: LINE_NUMBER_WIDTH }}
+    <pixiContainer
+      layout={layoutProp}
+      eventMode="static"
+      cursor="pointer"
+      onglobalpointermove={handlePointerMove}
+      onglobalpointerup={handlePointerUp}
+      onPointerDown={handlePointerDown}
     >
-      <div style={{ width: totalWidth, height: 1 }} />
-    </div>
+      <pixiGraphics draw={drawTrack} />
+      <pixiGraphics draw={drawThumb} />
+    </pixiContainer>
   );
 };
