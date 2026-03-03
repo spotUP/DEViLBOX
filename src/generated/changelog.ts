@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T10:44:50.314Z
+ * Generated: 2026-03-03T12:26:22.395Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2026';
-export const BUILD_NUMBER = '2026';
-export const BUILD_HASH = '72417f35';
+export const BUILD_VERSION = '1.0.2036';
+export const BUILD_NUMBER = '2036';
+export const BUILD_HASH = 'ef0b8c51';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,49 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2026',
+    version: '1.0.2036',
     date: '2026-03-03',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Test: GTUltra test suite — 39 tests for mapping, detection, presets"
+      },
+      {
+        type: 'feature',
+        "description": "ASID hardware toggle in tracker toolbar"
+      },
+      {
+        type: 'fix',
+        "description": "SID monitor syntax error — missing y: property key"
+      },
+      {
+        type: 'feature',
+        "description": "GTUltra piano roll, preset browser, and visual mapping"
+      },
+      {
+        type: 'feature',
+        "description": "GTUltra SID presets and visual table editor"
+      },
+      {
+        type: 'feature',
+        "description": "GTUltra oscilloscope, studio mode, and visual instrument designer"
+      },
+      {
+        type: 'feature',
+        "description": "GTUltra UI enhancements and VJ component refactoring"
+      },
+      {
+        type: 'fix',
+        "description": "Use READ macros for label_ref operands in RMW ops"
+      },
+      {
+        type: 'feature',
+        "description": "Wire WASM heap data to GTUltra UI components"
+      },
+      {
+        type: 'feature',
+        "description": "GTUltra ASID hardware bridge for USB-SID-Pico"
+      },
       {
         type: 'feature',
         "description": "GTUltra block operations + SID register monitor"
@@ -198,46 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Lazy-initialize songdb prepared statements"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: Update generated changelog (post-push)"
-      },
-      {
-        type: 'improvement',
-        "description": "Add scroll performance tracking"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: Update asm68k instruction map"
-      },
-      {
-        type: 'improvement',
-        "description": "Add Modland server deployment documentation"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove client-side Modland database (645MB reduction)"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate server-side Modland hash API"
-      },
-      {
-        type: 'feature',
-        "description": "Add Modland hash database API endpoints"
-      },
-      {
-        type: 'feature',
-        "description": "Add Modland browser for 727K+ tracker module discovery"
-      },
-      {
-        type: 'improvement',
-        "description": "Reorder status bar metadata"
-      },
-      {
-        type: 'improvement',
-        "description": "Enhance(songdb): enrich status bar metadata display"
       }
     ]
   }

@@ -17,6 +17,7 @@ import {
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
   DEFAULT_HIVELY,
+  DEFAULT_JAMCRACKER,
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC, DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_DAVID_WHITTAKER,
   DEFAULT_SONIC_ARRANGER,
@@ -82,6 +83,7 @@ const VitalControls = lazy(() => import('../controls/VitalControls').then(m => (
 const Odin2Controls = lazy(() => import('../controls/Odin2Controls').then(m => ({ default: m.Odin2Controls })));
 const SurgeControls = lazy(() => import('../controls/SurgeControls').then(m => ({ default: m.SurgeControls })));
 const HivelyControls = lazy(() => import('../controls/HivelyControls').then(m => ({ default: m.HivelyControls })));
+const JamCrackerControls = lazy(() => import('../controls/JamCrackerControls').then(m => ({ default: m.JamCrackerControls })));
 const SoundMonControls = lazy(() => import('../controls/SoundMonControls').then(m => ({ default: m.SoundMonControls })));
 const SidMonControls = lazy(() => import('../controls/SidMonControls').then(m => ({ default: m.SidMonControls })));
 const DigMugControls = lazy(() => import('../controls/DigMugControls').then(m => ({ default: m.DigMugControls })));
@@ -129,7 +131,7 @@ import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
 import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 
 // Types
-type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'sonic-arranger' | 'musicline' | 'supercollider';
+type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'sonic-arranger' | 'musicline' | 'supercollider';
 
 interface UnifiedInstrumentEditorProps {
   instrument: InstrumentConfig;
@@ -256,6 +258,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isDexedType(synthType)) return 'dexed';
   if (isOBXdType(synthType)) return 'obxd';
   if (isHivelyType(synthType)) return 'hively';
+  if (synthType === 'JamCrackerSynth') return 'jamcracker';
   if (isSoundMonType(synthType)) return 'soundmon';
   if (isSidMonType(synthType)) return 'sidmon';
   if (isDigMugType(synthType)) return 'digmug';
@@ -644,6 +647,12 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
   const handleHivelyHardwareChange = useCallback((fullConfig: typeof DEFAULT_HIVELY) => {
     handleChange({ hively: fullConfig });
   }, [handleChange]);
+
+  // Handle JamCracker config updates
+  const handleJamCrackerChange = useCallback((updates: Partial<typeof instrument.jamCracker>) => {
+    const current = instrument.jamCracker || DEFAULT_JAMCRACKER;
+    handleChange({ jamCracker: { ...current, ...updates } });
+  }, [instrument.jamCracker, handleChange]);
 
   // Handle SoundMon config updates
   const handleSoundMonChange = useCallback((updates: Partial<typeof instrument.soundMon>) => {
@@ -1585,6 +1594,29 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
             />
           </Suspense>
         )}
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // JAMCRACKER EDITOR
+  // ============================================================================
+  if (editorMode === 'jamcracker') {
+    const jcConfig = deepMerge(DEFAULT_JAMCRACKER, instrument.jamCracker || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0a1a0a] to-[#050f05]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <JamCrackerControls
+            config={jcConfig}
+            onChange={handleJamCrackerChange}
+          />
+        </Suspense>
       </div>
     );
   }

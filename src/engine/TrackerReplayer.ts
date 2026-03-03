@@ -242,7 +242,8 @@ export type TrackerFormat =
   | 'NSF'  // NES Sound Format (2A03 + expansion chips)
   | 'SID'  // Commodore 64 SID (PSID/RSID)
   | 'SAP'  // Atari 8-bit POKEY
-  | 'AY';  // ZX Spectrum AY (ZXAYEMUL)
+  | 'AY'   // ZX Spectrum AY (ZXAYEMUL)
+  | 'JamCracker';  // JamCracker Pro (.jam, .jc)
 
 /**
  * Channel state - all the per-channel data needed for playback
@@ -390,6 +391,8 @@ export interface TrackerSong {
   musiclineFileData?: Uint8Array;
   /** Raw C64 SID binary for loading into the C64SIDEngine */
   c64SidFileData?: Uint8Array;
+  /** Raw JamCracker .jam binary for loading into the JamCrackerEngine WASM */
+  jamCrackerFileData?: ArrayBuffer;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;
@@ -1215,6 +1218,32 @@ export class TrackerReplayer {
       }
     }
 
+    // JamCracker: Load the raw .jam binary into the JamCrackerEngine WASM.
+    // The WASM replayer (transpiled 68k + Paula emulation) handles all synthesis.
+    if (this.song.jamCrackerFileData && this.song.format === 'JamCracker') {
+      try {
+        const { JamCrackerEngine } = await import('@/engine/jamcracker/JamCrackerEngine');
+        const jcEngine = JamCrackerEngine.getInstance();
+        await jcEngine.ready();
+        await jcEngine.loadTune(this.song.jamCrackerFileData.slice(0));
+
+        // Pre-create a JamCrackerSynth so its output is routed through the audio graph
+        const firstJC = this.song.instruments.find(i => i.synthType === 'JamCrackerSynth');
+        if (firstJC) {
+          engine.getInstrument(firstJC.id, firstJC);
+        }
+
+        if (!this._muted) {
+          jcEngine.play();
+          console.log('[TrackerReplayer] JamCrackerEngine tune loaded & playing');
+        } else {
+          console.log('[TrackerReplayer] JamCrackerEngine tune loaded but skipping play (muted)');
+        }
+      } catch (err) {
+        console.error('[TrackerReplayer] Failed to load JamCracker tune into WASM engine:', err);
+      }
+    }
+
     // C64 SID: Load the raw SID file into C64SIDEngine for hardware-accurate playback.
     // Similar to HivelyEngine, the SID engine handles all synthesis.
     if (this.song.c64SidFileData && this.song.format === 'SID') {
@@ -1321,6 +1350,17 @@ export class TrackerReplayer {
           HivelyEngine.getInstance().stop();
         }
       } catch { /* HivelyEngine may not be loaded */ }
+    }
+
+    // Stop JamCrackerEngine if this is a JamCracker song
+    if (this.song?.jamCrackerFileData && this.song.format === 'JamCracker') {
+      try {
+        import('@/engine/jamcracker/JamCrackerEngine').then(({ JamCrackerEngine }) => {
+          if (JamCrackerEngine.hasInstance()) {
+            JamCrackerEngine.getInstance().stop();
+          }
+        }).catch(() => { /* JamCrackerEngine may not be loaded */ });
+      } catch { /* ignore */ }
     }
 
     // Stop MusicLineEngine if this is an ML song
