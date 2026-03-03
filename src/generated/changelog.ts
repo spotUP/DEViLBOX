@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T01:20:31.316Z
+ * Generated: 2026-03-03T07:30:21.004Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2014';
-export const BUILD_NUMBER = '2014';
-export const BUILD_HASH = '67e9c112';
+export const BUILD_VERSION = '1.0.2015';
+export const BUILD_NUMBER = '2015';
+export const BUILD_HASH = '48033708';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2014',
+    version: '1.0.2015',
     date: '2026-03-03',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Note that HVSC browser requires backend server"
+      },
       {
         type: 'fix',
         "description": "Improve HVSC error messages and remove broken CORS fallback"
@@ -234,10 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Convert clip/empty-area context menus to GL dropdown"
-      },
-      {
-        type: 'feature',
-        "description": "Add octave control to FT2 toolbar transport row"
       }
     ]
   }

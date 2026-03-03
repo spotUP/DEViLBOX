@@ -8,7 +8,7 @@
 const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
 
 // HVSC mirrors (HTTP access)
-const HVSC_MIRRORS = [
+export const HVSC_MIRRORS = [
   'https://www.hvsc.c64.org/download/C64Music',
   'https://kohina.duckdns.org/HVSC/C64Music',
 ];

@@ -73,8 +73,8 @@ export function emitOperand(op: Operand, size: Size = 'L'): string {
       const addrC = op.raw.startsWith('$') ? `0x${op.raw.slice(1)}` : op.raw;
       return `READ${sizeStr(size)}(${addrC})`;
     }
-    case 'label_ref': return sanitizeLabel(op.name);
-    case 'pc_rel': return sanitizeLabel(op.label);
+    case 'label_ref': return `READ${sizeStr(size)}((uintptr_t)${sanitizeLabel(op.name)})`;
+    case 'pc_rel': return `READ${sizeStr(size)}((uintptr_t)${sanitizeLabel(op.label)})`;
     default: return '/* unknown_operand */';
   }
 }
