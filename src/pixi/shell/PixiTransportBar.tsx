@@ -73,7 +73,7 @@ export const PixiTransportBar: React.FC<PixiTransportBarProps> = ({ width, heigh
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 4,
+        gap: 6,
       }}
     >
       {/* Stop */}

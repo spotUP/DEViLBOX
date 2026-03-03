@@ -223,7 +223,7 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
           alignItems: 'center',
           justifyContent: 'flex-end',
           paddingRight: 12,
-          gap: 4,
+          gap: 6,
           flexShrink: 0,
         }}
       >
