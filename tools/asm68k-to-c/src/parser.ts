@@ -143,7 +143,7 @@ export function parse(tokens: Token[]): AstNode[] {
     // RS.B / RS.W / RS.L — assign current offset to label, then advance
     // Format: label RS.size count (e.g. "it_name RS.B 31")
     if (
-      first.kind === 'IDENTIFIER' &&
+      (first.kind === 'IDENTIFIER' || first.kind === 'LABEL') &&
       lt[j + 1]?.kind === 'DIRECTIVE' && lt[j + 1]?.value === 'RS' &&
       lt[j + 2]?.kind === 'SIZE'
     ) {
