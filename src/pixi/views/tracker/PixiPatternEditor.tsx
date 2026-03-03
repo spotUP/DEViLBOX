@@ -48,6 +48,7 @@ const FONT_SIZE = 11;
 const HEADER_HEIGHT = 28;
 const GL_MUTE_SOLO_H = 14; // Height of GL-rendered M/S button strip at top of grid
 const SCROLL_THRESHOLD = 50; // Horizontal scroll accumulator resistance
+const SCROLL_BUFFER_ROWS = 10; // Buffer rows above/below visible area for tile-shift scrolling
 
 // ─── Note formatting ─────────────────────────────────────────────────────────
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
@@ -133,18 +134,19 @@ interface RenderParams {
 }
 
 /** Static grid layer — backgrounds, separators, M/S strip, gutter. */
-function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
+function renderGrid(g: GraphicsType, p: RenderParams, vStart: number, bufferRows = 0): void {
   g.clear();
 
   if (!p.trackerVisualBg) {
-    g.rect(0, 0, p.width, p.gridHeight);
+    g.rect(0, 0, p.width, p.gridHeight + bufferRows * 2 * p.rowHeight);
     g.fill({ color: p.theme.bg.color });
   }
 
-  for (let i = 0; i < p.visibleLines; i++) {
+  for (let i = -bufferRows; i < p.visibleLines + bufferRows; i++) {
     const rowNum = vStart + i;
     const y = p.baseY + i * p.rowHeight;
-    if (y + p.rowHeight < 0 || y > p.gridHeight) continue;
+    // Relaxed culling — allow buffer rows outside visible area
+    if (y + p.rowHeight < -bufferRows * p.rowHeight || y > p.gridHeight + bufferRows * p.rowHeight) continue;
 
     const isInPattern = rowNum >= 0 && rowNum < p.patternLength;
     const isGhost = !isInPattern && p.showGhostPatterns;
@@ -300,7 +302,7 @@ function renderOverlay(
 }
 
 /** Generate text labels for visible rows (M/S buttons + cell data). */
-function generateLabels(p: RenderParams, vStart: number, currentRow: number): LabelData[] {
+function generateLabels(p: RenderParams, vStart: number, currentRow: number, bufferRows = 0): LabelData[] {
   if (!p.displayPattern) return [];
   const labels: LabelData[] = [];
 
@@ -326,10 +328,11 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
       color: isSolo ? 0xffffff : p.theme.textMuted.color, fontFamily: PIXI_FONTS.MONO });
   }
 
-  for (let i = 0; i < p.visibleLines; i++) {
+  for (let i = -bufferRows; i < p.visibleLines + bufferRows; i++) {
     const rowNum = vStart + i;
     const y = p.baseY + i * p.rowHeight + p.rowHeight / 2 - FONT_SIZE / 2;
-    if (y + p.rowHeight < -p.rowHeight || y > p.gridHeight + p.rowHeight) continue;
+    // Relaxed culling — allow buffer rows outside visible area
+    if (y + p.rowHeight < -bufferRows * p.rowHeight - p.rowHeight || y > p.gridHeight + bufferRows * p.rowHeight + p.rowHeight) continue;
 
     let actualRow = rowNum;
     let actualPattern = p.displayPattern;
@@ -794,9 +797,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     let rafId: number;
     const tick = () => {
       if (!isPlaying) {
-        // Reset smooth scroll when stopped
+        // Reset smooth scroll when stopped — tile-shift imperativeRedraw manages container.y
         smoothOffsetRef.current = 0;
-        if (gridScrollContainerRef.current) gridScrollContainerRef.current.y = 0;
         prevRowRef.current = -1;
         prevPatternRef.current = -1;
         rafId = requestAnimationFrame(tick);
@@ -884,6 +886,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   // ── Imperative redraw — called from subscription (cursor) and useEffect (other deps) ──
   const prevVStartRef = useRef(-9999);
+  const labelVStartRef = useRef(-9999); // vStart used when labels were last generated (tile-shift origin)
   const fullRedrawRef = useRef(true); // Force full redraw on non-cursor dep changes
 
   const imperativeRedraw = useCallback(() => {
@@ -894,22 +897,34 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     const vStart = currentRow - p.topLines;
     const vStartChanged = vStart !== prevVStartRef.current;
     const mega = megaTextRef.current;
+    const bufferExhausted = Math.abs(vStart - labelVStartRef.current) > SCROLL_BUFFER_ROWS;
 
-    if (fullRedrawRef.current) {
+    if (fullRedrawRef.current || bufferExhausted) {
+      // Full regeneration — generate labels with buffer rows
       fullRedrawRef.current = false;
       prevVStartRef.current = vStart;
-      lastLabelTimeRef.current = performance.now();
+      labelVStartRef.current = vStart;
       const gGrid = gridGraphicsRef.current;
-      if (gGrid) renderGrid(gGrid, p, vStart);
-      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+      if (gGrid) renderGrid(gGrid, p, vStart, SCROLL_BUFFER_ROWS);
+      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow, SCROLL_BUFFER_ROWS));
+      // Reset container shift after full regen
+      if (!p.isPlaying && gridScrollContainerRef.current) {
+        gridScrollContainerRef.current.y = 0;
+      }
     } else if (vStartChanged) {
+      // Tile-shift — skip label regen, just shift the container (THE WIN)
       prevVStartRef.current = vStart;
-      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+    }
+
+    // Apply tile-shift offset: shift container so labels align with new vStart
+    if (!p.isPlaying && gridScrollContainerRef.current) {
+      gridScrollContainerRef.current.y = (labelVStartRef.current - vStart) * p.rowHeight;
     }
 
     // Overlay ALWAYS redraws — cursor highlight, selection, peer cursors (cheap)
+    // Use labelVStart for positioning since overlay is inside the shifted container
     const gOverlay = overlayGraphicsRef.current;
-    if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
+    if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, labelVStartRef.current, currentRow,
       peerCursorRef.current, peerSelectionRef.current);
   }, []); // Empty deps — everything read from refs
 
