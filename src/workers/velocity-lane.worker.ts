@@ -160,7 +160,7 @@ function renderFrame(): void {
     ctx.fill();
 
     if (isSel) {
-      ctx.strokeStyle = '#ffffff';
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
       ctx.lineWidth = 1;
       ctx.stroke();
     }
