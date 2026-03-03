@@ -76,6 +76,10 @@ export class ProjectMEngine {
   private strBuf = 0; // reusable string buffer
   private strBufSize = 0;
   private _ready = false;
+  // Queue preset loads to be applied inside renderFrame where the WebGL context is active.
+  // Loading presets outside the render loop can fail silently because the SDL/Emscripten
+  // WebGL context may not be current, causing shader compilation to silently fail.
+  private pendingPreset: { data: string; smooth: boolean } | null = null;
 
   get ready(): boolean { return this._ready; }
 
@@ -92,7 +96,7 @@ export class ProjectMEngine {
       // Suppress non-fatal SDL event handler warnings
       printErr: (text: string) => {
         if (typeof text === 'string' && text.includes('registerOrRemoveHandler')) return;
-        console.warn('[projectM]', text);
+        void text;
       },
     }) as ProjectMModule;
 
@@ -108,12 +112,32 @@ export class ProjectMEngine {
     this.strBufSize = 65536;
     this.strBuf = this.mod._malloc(this.strBufSize);
 
+    // Lock presets to prevent projectM's internal auto-advance from interfering
+    // with our JS-side preset control. The C bridge sets preset_duration=30s by default.
+    this.mod._pm_set_preset_locked(1);
+
     this._ready = true;
   }
 
   /** Render one frame to the bound canvas. Call from rAF. */
   renderFrame(): void {
-    this.mod?._pm_render_frame();
+    if (!this.mod) return;
+    // Apply any queued preset load inside the render loop where the WebGL context is active
+    if (this.pendingPreset) {
+      const { data, smooth } = this.pendingPreset;
+      this.pendingPreset = null;
+      const bytes = this.mod.lengthBytesUTF8(data) + 1;
+      let ptr = this.strBuf;
+      let allocated = false;
+      if (bytes > this.strBufSize) {
+        ptr = this.mod._malloc(bytes);
+        allocated = true;
+      }
+      this.mod.stringToUTF8(data, ptr, bytes);
+      this.mod._pm_load_preset_data(ptr, smooth ? 1 : 0);
+      if (allocated) this.mod._free(ptr);
+    }
+    this.mod._pm_render_frame();
   }
 
   /**
@@ -129,20 +153,11 @@ export class ProjectMEngine {
     this.mod._pm_add_pcm(this.pcmBuf, count);
   }
 
-  /** Load a Milkdrop preset from its text content (.milk file). */
+  /** Queue a Milkdrop preset to be loaded on the next render frame.
+   *  Loading is deferred to renderFrame() where the SDL/WebGL context is guaranteed active. */
   loadPresetData(data: string, smooth = true): void {
     if (!this.mod) return;
-    const bytes = this.mod.lengthBytesUTF8(data) + 1;
-    // Use pre-allocated buffer if large enough, otherwise malloc
-    let ptr = this.strBuf;
-    let allocated = false;
-    if (bytes > this.strBufSize) {
-      ptr = this.mod._malloc(bytes);
-      allocated = true;
-    }
-    this.mod.stringToUTF8(data, ptr, bytes);
-    this.mod._pm_load_preset_data(ptr, smooth ? 1 : 0);
-    if (allocated) this.mod._free(ptr);
+    this.pendingPreset = { data, smooth };
   }
 
   /** Load a preset from the Emscripten virtual filesystem. */

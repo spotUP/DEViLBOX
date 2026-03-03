@@ -73,6 +73,7 @@ export interface GTTableData {
 
 export type GTEditMode = 'pattern' | 'instrument' | 'table' | 'order' | 'songname';
 export type GTSidModel = 0 | 1; // 0=6581, 1=8580
+export type GTViewMode = 'pro' | 'studio'; // Pro = hex editor, Studio = visual
 
 export interface GTUltraState {
   // Engine reference
@@ -80,6 +81,7 @@ export interface GTUltraState {
 
   // Editor mode
   editMode: GTEditMode;
+  viewMode: GTViewMode;
   activeTable: number; // 0=wave, 1=pulse, 2=filter, 3=speed
 
   // Cursor
@@ -135,6 +137,7 @@ export interface GTUltraState {
   // Actions
   setEngine: (engine: GTUltraEngine | null) => void;
   setEditMode: (mode: GTEditMode) => void;
+  setViewMode: (mode: GTViewMode) => void;
   setActiveTable: (table: number) => void;
   setCursor: (patch: Partial<GTEditorCursor>) => void;
   moveCursor: (dir: 'up' | 'down' | 'left' | 'right') => void;
@@ -197,6 +200,7 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
 
   // Editor mode
   editMode: 'pattern',
+  viewMode: 'pro',
   activeTable: 0,
 
   // Cursor
@@ -251,6 +255,7 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
 
   setEngine: (engine) => set({ engine }),
   setEditMode: (editMode) => set({ editMode }),
+  setViewMode: (viewMode) => set({ viewMode }),
   setActiveTable: (activeTable) => set({ activeTable }),
 
   setCursor: (patch) => set((s) => ({

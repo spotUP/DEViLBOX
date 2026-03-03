@@ -48,9 +48,7 @@ async function loadManifest(): Promise<void> {
     for (const [name, content] of Object.entries(BUILTIN_PRESETS)) {
       presetContentCache.set(name, content);
     }
-    console.log('[ProjectMCanvas] Manifest loaded:', allPresetNames.length, 'total presets');
-  } catch (err) {
-    console.error('[ProjectMCanvas] Failed to load manifest:', err);
+  } catch {
     allPresetNames = Object.keys(BUILTIN_PRESETS);
     for (const [name, content] of Object.entries(BUILTIN_PRESETS)) {
       presetContentCache.set(name, content);
@@ -62,21 +60,18 @@ async function fetchPresetContent(name: string): Promise<string | null> {
   if (presetContentCache.has(name)) return presetContentCache.get(name)!;
   const entry = manifestPresets?.find(p => p.name === name);
   if (!entry) {
-    console.warn('[ProjectMCanvas] No manifest entry for preset:', name, '(manifestPresets:', manifestPresets?.length ?? 'null', ')');
     return null;
   }
   try {
     const encodedPath = entry.path.split('/').map(encodeURIComponent).join('/');
     const resp = await fetch(`/projectm/presets/${encodedPath}`);
     if (!resp.ok) {
-      console.error('[ProjectMCanvas] Fetch failed for preset:', name, resp.status);
       return null;
     }
     const text = await resp.text();
     presetContentCache.set(name, text);
     return text;
   } catch (err) {
-    console.error('[ProjectMCanvas] Fetch error for preset:', name, err);
     return null;
   }
 }
@@ -157,7 +152,6 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
           setReady(true);
           onReady?.(names.length);
         } catch (err) {
-          console.error('[ProjectMCanvas] Failed to initialize:', err);
           setError(err instanceof Error ? err.message : String(err));
         }
       };
@@ -220,14 +214,14 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
     }, [ready]);
 
     // Load preset by index (async — fetches .milk on demand)
-    const doLoadPreset = useCallback(async (idx: number) => {
+    const doLoadPreset = useCallback(async (idx: number, smooth = true) => {
       const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
       if (!engineRef.current || names.length === 0) return;
       const wrappedIdx = ((idx % names.length) + names.length) % names.length;
       const name = names[wrappedIdx];
       const content = await fetchPresetContent(name);
       if (!content || !engineRef.current) return;
-      engineRef.current.loadPresetData(content, true);
+      engineRef.current.loadPresetData(content, smooth);
       currentIdxRef.current = wrappedIdx;
       onPresetChange?.(wrappedIdx, name);
       // Pre-fetch next random preset in background
@@ -236,12 +230,11 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
     }, [onPresetChange]);
 
     // Load preset by name (async)
-    const doLoadPresetByName = useCallback(async (name: string) => {
+    const doLoadPresetByName = useCallback(async (name: string, smooth = true) => {
       const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
       const idx = names.indexOf(name);
-      console.log('[ProjectMCanvas] loadPresetByName:', name, 'idx:', idx, 'total:', names.length);
       if (idx >= 0) {
-        await doLoadPreset(idx);
+        await doLoadPreset(idx, smooth);
       }
     }, [doLoadPreset]);
 
@@ -253,7 +246,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
         doLoadPreset(Math.floor(Math.random() * names.length));
       },
       loadPresetByIndex: (idx: number) => { doLoadPreset(idx); },
-      loadPresetByName: (name: string) => { doLoadPresetByName(name); },
+      loadPresetByName: (name: string, blendOrSmooth?: number | boolean) => { doLoadPresetByName(name, blendOrSmooth !== false); },
       getPresetNames: () => allPresetNames ?? Object.keys(BUILTIN_PRESETS),
       getCurrentIndex: () => currentIdxRef.current,
     }), [doLoadPreset, doLoadPresetByName]);

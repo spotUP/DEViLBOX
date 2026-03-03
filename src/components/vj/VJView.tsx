@@ -68,7 +68,8 @@ export interface VJCanvasHandle {
   nextPreset: () => void;
   randomPreset: () => void;
   loadPresetByIndex: (idx: number, blend?: number) => void;
-  loadPresetByName: (name: string, blend?: number) => void;
+  /** Load preset by name. blend/smooth: number for butterchurn (seconds), boolean for projectM */
+  loadPresetByName: (name: string, blendOrSmooth?: number | boolean) => void;
   getPresetNames: () => string[];
   getCurrentIndex: () => number;
 }
@@ -148,7 +149,7 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
           bus.enable();
           audioDataBusRef.current = bus;
         } catch (err) {
-          console.error('[VJCanvas] Failed to initialize butterchurn:', err);
+          void err;
         }
       }
 
@@ -233,7 +234,7 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
         doLoadPreset(Math.floor(Math.random() * names.length));
       },
       loadPresetByIndex: (idx: number, blend?: number) => doLoadPreset(idx, blend),
-      loadPresetByName: (name: string, blend?: number) => doLoadPresetByName(name, blend),
+      loadPresetByName: (name: string, blendOrSmooth?: number | boolean) => doLoadPresetByName(name, typeof blendOrSmooth === 'number' ? blendOrSmooth : undefined),
       getPresetNames: () => presetNamesRef.current,
       getCurrentIndex: () => currentIdxRef.current,
     }), [doLoadPreset, doLoadPresetByName]);
@@ -488,59 +489,6 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Audio debug meter
-  const debugBusRef = useRef<AudioDataBus | null>(null);
-  const debugCanvasRef = useRef<HTMLCanvasElement>(null);
-  const debugRafRef = useRef<number>(0);
-
-  useEffect(() => {
-    const bus = new AudioDataBus();
-    bus.enable();
-    debugBusRef.current = bus;
-    const canvas = debugCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const draw = () => {
-      const frame = bus.update();
-      const w = canvas.width;
-      const h = canvas.height;
-      ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.fillRect(0, 0, w, h);
-
-      const bars = [
-        { label: 'SUB', val: frame.subEnergy, color: '#f44' },
-        { label: 'BASS', val: frame.bassEnergy, color: '#f80' },
-        { label: 'MID', val: frame.midEnergy, color: '#ff0' },
-        { label: 'HIGH', val: frame.highEnergy, color: '#0f8' },
-        { label: 'RMS', val: frame.rms, color: '#08f' },
-        { label: 'PEAK', val: frame.peak, color: '#f0f' },
-      ];
-      const barW = (w - 8) / bars.length;
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      for (let i = 0; i < bars.length; i++) {
-        const x = 4 + i * barW;
-        const barH = Math.min(1, bars[i].val) * (h - 14);
-        ctx.fillStyle = bars[i].color;
-        ctx.fillRect(x + 1, h - 2 - barH, barW - 2, barH);
-        ctx.fillStyle = '#fff';
-        ctx.fillText(bars[i].label, x + barW / 2, 10);
-      }
-      if (frame.beat) {
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, 4, h);
-      }
-      debugRafRef.current = requestAnimationFrame(draw);
-    };
-    debugRafRef.current = requestAnimationFrame(draw);
-    return () => {
-      cancelAnimationFrame(debugRafRef.current);
-      bus.disable();
-    };
-  }, []);
-
   // Fullscreen toggle
   const handleFullscreen = useCallback(() => {
     const el = containerRef.current;
@@ -617,8 +565,14 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   }, []);
 
   const handlePMBrowserSelect = useCallback((name: string, _idx: number) => {
-    console.log('[VJView] handlePMBrowserSelect:', name, 'ref:', !!projectmHandleRef.current);
-    projectmHandleRef.current?.loadPresetByName(name);
+    // Instant switch (no blend) for manual browser picks + reset auto-advance timer
+    projectmHandleRef.current?.loadPresetByName(name, false);
+    // Close browser so user can see the preset change (80% black overlay hides it)
+    setBrowserOpen(false);
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = undefined;
+    }
   }, []);
 
   const handleNext = useCallback(() => {
@@ -671,14 +625,6 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
           />
         </React.Suspense>
       </div>
-      {/* Audio debug meter */}
-      <canvas
-        ref={debugCanvasRef}
-        width={180}
-        height={60}
-        className="absolute bottom-16 right-2 z-50 rounded"
-        style={{ imageRendering: 'pixelated' }}
-      />
       <VJControls
         currentName={currentName}
         currentIdx={currentIdx}
