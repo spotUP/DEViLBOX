@@ -7,7 +7,6 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/types';
-import { DEFAULT_FURNACE } from '@/types/instrument';
 import { Cpu6502, type MemoryMap } from '@/lib/import/cpu/Cpu6502';
 
 function emptyCell(): TrackerCell {
@@ -20,10 +19,10 @@ function readStr(buf: Uint8Array, off: number, len: number): string {
   return s.trim();
 }
 
-/** Map SID model bits to SynthType. bits[1:0]: 01=6581, 10=8580, 11=both, 00=unknown. */
-function sidModelType(flags: number, shift: number): 'FurnaceSID6581' | 'FurnaceSID8580' {
+/** Detect SID model from flags for display purposes (not used for synthesis). */
+function sidModelLabel(flags: number, shift: number): string {
   const model = (flags >> shift) & 0x03;
-  return model === 0x02 ? 'FurnaceSID8580' : 'FurnaceSID6581';
+  return model === 0x02 ? '8580' : '6581';
 }
 
 // SID frequency: freq_hz = freqReg * clock / 16777216
@@ -153,21 +152,20 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
     loadAddr = buf[dataOffset] | (buf[dataOffset + 1] << 8);
   }
 
-  const st1 = sidModelType(flags, 2);
-  const st2 = has2ndSID ? sidModelType(flags, 6) : st1;
+  const model1 = sidModelLabel(flags, 2);
+  const model2 = has2ndSID ? sidModelLabel(flags, 6) : model1;
 
   const instruments: InstrumentConfig[] = [];
   const chips = 1 + (has2ndSID ? 1 : 0) + (has3rdSID ? 1 : 0);
   let id = 1;
   for (let chip = 0; chip < chips; chip++) {
-    const st = chip === 0 ? st1 : st2;
+    const model = chip === 0 ? model1 : model2;
     const label = chip > 0 ? `SID${chip + 1}` : 'SID';
     for (let v = 1; v <= 3; v++) {
       instruments.push({
         id: id++,
-        name: `${label} Voice ${v}`,
-        type: 'synth', synthType: st,
-        furnace: { ...DEFAULT_FURNACE, chipType: 3, ops: 2 },
+        name: `${label} Voice ${v} (${model})`,
+        type: 'synth', synthType: 'C64SID',
         effects: [], volume: 0, pan: 0,
       });
     }
