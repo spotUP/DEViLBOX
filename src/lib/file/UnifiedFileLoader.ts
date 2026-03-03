@@ -526,6 +526,13 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       // Switch to GoatTracker editor mode
       applyEditorMode({ goatTrackerData: songBytes });
 
+      // Ensure we're on the tracker view with the tracker sub-view so the
+      // GTUltra editor is visible (it renders when editorMode === 'goattracker')
+      const { useUIStore } = await import('@stores/useUIStore');
+      const uiState = useUIStore.getState();
+      uiState.setActiveView('tracker');
+      uiState.setTrackerViewMode('tracker');
+
       return {
         success: true,
         message: `Loaded GoatTracker song: ${file.name}`,
