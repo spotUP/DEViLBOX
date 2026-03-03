@@ -78,6 +78,8 @@ export type GTViewMode = 'pro' | 'studio'; // Pro = hex editor, Studio = visual
 export interface GTUltraState {
   // Engine reference
   engine: GTUltraEngine | null;
+  /** Song data queued before engine was ready — consumed on init */
+  pendingSongData: Uint8Array | null;
 
   // Editor mode
   editMode: GTEditMode;
@@ -136,6 +138,7 @@ export interface GTUltraState {
 
   // Actions
   setEngine: (engine: GTUltraEngine | null) => void;
+  setPendingSongData: (data: Uint8Array | null) => void;
   setEditMode: (mode: GTEditMode) => void;
   setViewMode: (mode: GTViewMode) => void;
   setActiveTable: (table: number) => void;
@@ -197,6 +200,7 @@ const emptyTable = (): GTTableData => ({
 export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   // Engine
   engine: null,
+  pendingSongData: null,
 
   // Editor mode
   editMode: 'pattern',
@@ -254,6 +258,7 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   // --- Actions ---
 
   setEngine: (engine) => set({ engine }),
+  setPendingSongData: (data) => set({ pendingSongData: data }),
   setEditMode: (editMode) => set({ editMode }),
   setViewMode: (viewMode) => set({ viewMode }),
   setActiveTable: (activeTable) => set({ activeTable }),

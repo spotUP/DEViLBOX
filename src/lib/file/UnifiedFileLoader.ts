@@ -512,14 +512,19 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       const { useGTUltraStore } = await import('@/stores/useGTUltraStore');
       const gtStore = useGTUltraStore.getState();
 
-      // If engine exists, load the song data
+      // Queue song data — engine will load it when ready (or immediately if already init'd)
+      const songBytes = new Uint8Array(buf);
       if (gtStore.engine) {
         gtStore.engine.loadSong(buf);
+        gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
+      } else {
+        // Engine not yet initialized — store for later
+        gtStore.setPendingSongData(songBytes);
         gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
       }
 
       // Switch to GoatTracker editor mode
-      applyEditorMode({ goatTrackerData: new Uint8Array(buf) });
+      applyEditorMode({ goatTrackerData: songBytes });
 
       return {
         success: true,
