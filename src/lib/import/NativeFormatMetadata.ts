@@ -470,6 +470,18 @@ function sonicArrangerMeta(buf: Uint8Array): NativeFormatMeta {
   return UNKNOWN;
 }
 
+/** C64 SID (PSID/RSID) header metadata */
+function c64SidMeta(buf: Uint8Array): NativeFormatMeta {
+  if (buf.length < 0x76) return UNKNOWN;
+  const magic = String.fromCharCode(buf[0], buf[1], buf[2], buf[3]);
+  if (magic !== 'PSID' && magic !== 'RSID') return UNKNOWN;
+  const songs = (buf[0x0E] << 8) | buf[0x0F];
+  const version = (buf[0x04] << 8) | buf[0x05];
+  // SID has 3 voices per chip; PSIDv3+ flags at 0x77 bit 6 indicates 2nd SID
+  const channels = version >= 3 && buf.length > 0x77 && (buf[0x77] & 0x40) ? 6 : 3;
+  return { channels, patterns: -1, orders: songs, instruments: -1, samples: -1 };
+}
+
 /**
  * Extract header metadata for a native tracker format.
  *
@@ -493,6 +505,7 @@ export function getNativeFormatMetadata(key: string, buffer: ArrayBuffer): Nativ
     case 'musicLine': return musicLineMeta(buf);
     case 'tfmx':     return tfmxMeta(buf);
     case 'sonicArranger': return sonicArrangerMeta(buf);
+    case 'c64sid':       return c64SidMeta(buf);
     default:         return { ...UNKNOWN };
   }
 }
