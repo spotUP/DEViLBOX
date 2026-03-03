@@ -153,19 +153,27 @@ export const GTToolbar: React.FC<{ width: number; height: number }> = ({ width, 
         value={sidModel}
         onChange={(e) => setSidModel(Number(e.target.value))}
         style={{ background: '#16213e', color: '#e0e0ff', border: '1px solid #333', padding: '1px 4px', fontSize: 11 }}
+        title="SID chip model"
       >
         <option value={0}>6581</option>
         <option value={1}>8580</option>
       </select>
 
-      <select
-        value={sidCount}
-        onChange={(e) => setSidCount(Number(e.target.value) as 1 | 2)}
-        style={{ background: '#16213e', color: '#e0e0ff', border: '1px solid #333', padding: '1px 4px', fontSize: 11 }}
+      <button
+        onClick={() => setSidCount(sidCount === 1 ? 2 : 1)}
+        title={sidCount === 1 ? 'Switch to dual SID (6 channels)' : 'Switch to single SID (3 channels)'}
+        style={{
+          background: sidCount === 2 ? '#1a3a2a' : '#16213e',
+          color: sidCount === 2 ? '#00ff88' : '#e0e0ff',
+          border: `1px solid ${sidCount === 2 ? '#00ff88' : '#333'}`,
+          padding: '1px 6px',
+          fontSize: 11,
+          cursor: 'pointer',
+          fontWeight: sidCount === 2 ? 'bold' : 'normal',
+        }}
       >
-        <option value={1}>1xSID (3ch)</option>
-        <option value={2}>2xSID (6ch)</option>
-      </select>
+        {sidCount === 2 ? '🎛️ 2×SID 6ch' : '🎛️ 1×SID 3ch'}
+      </button>
 
       <ASIDToggle />
     </div>
