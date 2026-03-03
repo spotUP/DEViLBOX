@@ -106,49 +106,54 @@ export const PixiMainLayout: React.FC = () => {
   // Capture all visible views when Exposé opens
   useEffect(() => {
     if (!viewExposeActive || !app?.renderer) return;
-    const viewH = Math.max(100, mainViewH);
 
-    // Capture current view first (it's visible)
-    const current = viewRefsMap.current[mainViewId];
-    if (current) {
-      try {
-        thumbnailsRef.current[mainViewId]?.destroy(true);
-        const tex = app.renderer.generateTexture({
-          target: current,
-          frame: new Rectangle(0, 0, width, viewH),
-          resolution: 0.35,
-        });
-        thumbnailsRef.current[mainViewId] = tex;
-      } catch { /* ignore */ }
-    }
+    // Delay capture by one rAF frame to let React reconciliation + PixiJS
+    // render group updates complete. Without this, generateTexture can
+    // encounter destroyed display objects and crash with null alphaMode /
+    // renderPipeId errors.
+    const rafId = requestAnimationFrame(() => {
+      if (!app?.renderer) return;
+      const viewH = Math.max(100, mainViewH);
 
-    // Capture hidden views by briefly making them visible
-    for (const viewId of Object.keys(ALWAYS_MOUNTED_VIEWS)) {
-      if (viewId === mainViewId) continue; // already captured
-      const container = viewRefsMap.current[viewId];
-      if (!container) continue;
-      try {
-        container.visible = true;
-        thumbnailsRef.current[viewId]?.destroy(true);
-        const tex = app.renderer.generateTexture({
-          target: container,
-          frame: new Rectangle(0, 0, width, viewH),
-          resolution: 0.35,
-        });
-        thumbnailsRef.current[viewId] = tex;
-        container.visible = false;
-      } catch {
-        container.visible = false;
+      // Capture current view first (it's visible)
+      const current = viewRefsMap.current[mainViewId];
+      if (current) {
+        try {
+          thumbnailsRef.current[mainViewId]?.destroy(true);
+          const tex = app.renderer.generateTexture({
+            target: current,
+            frame: new Rectangle(0, 0, width, viewH),
+            resolution: 0.35,
+          });
+          thumbnailsRef.current[mainViewId] = tex;
+        } catch { /* ignore */ }
       }
-    }
 
-    setThumbnails({ ...thumbnailsRef.current });
+      // Capture hidden views by briefly making them visible
+      for (const viewId of Object.keys(ALWAYS_MOUNTED_VIEWS)) {
+        if (viewId === mainViewId) continue; // already captured
+        const container = viewRefsMap.current[viewId];
+        if (!container) continue;
+        try {
+          container.visible = true;
+          thumbnailsRef.current[viewId]?.destroy(true);
+          const tex = app.renderer.generateTexture({
+            target: container,
+            frame: new Rectangle(0, 0, width, viewH),
+            resolution: 0.35,
+          });
+          thumbnailsRef.current[viewId] = tex;
+          container.visible = false;
+        } catch {
+          container.visible = false;
+        }
+      }
+
+      setThumbnails({ ...thumbnailsRef.current });
+    });
+
+    return () => cancelAnimationFrame(rafId);
   }, [viewExposeActive]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Force compact toolbar in modern layout for maximum vertical space
-  useEffect(() => {
-    useUIStore.getState().setCompactToolbar(true);
-  }, []);
 
   // ─── Sync workbench window dimensions with zone dimensions ────────────────
   // Views like PixiTrackerView read their size from useWorkbenchStore.windows[id].
