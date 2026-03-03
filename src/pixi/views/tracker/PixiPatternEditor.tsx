@@ -9,8 +9,8 @@
  *  - pixiGraphics for: row backgrounds, channel separators, center-line,
  *    selection overlay, cursor caret, peer cursor/selection, ghost patterns
  *  - pixiBitmapText for all visible cell text (~30 visible rows)
- *  - Channel header via PixiDOMOverlay (interactive controls: inputs, context menus,
- *    color picker, mute/solo/collapse — these need DOM portals/dropdowns)
+ *  - Channel header via PixiChannelHeaders (native GL rendering; DOM portals
+ *    only for context menu, color picker, and name editing input)
  *  - Cell context menu via PixiDOMOverlay (right-click menu)
  *  - Collaboration peer cursor/selection in drawGrid
  *  - Stepped horizontal scroll with accumulator (matches DOM behavior)
@@ -30,12 +30,10 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
-import { ChannelContextMenu } from '@/components/tracker/ChannelContextMenu';
-import { ChannelColorPicker } from '@/components/tracker/ChannelColorPicker';
 import { CellContextMenu, useCellContextMenu } from '@/components/tracker/CellContextMenu';
 import { ParameterEditor } from '@/components/tracker/ParameterEditor';
-import { Plus, Volume2, VolumeX, Headphones, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TrackerVisualBackground } from '@/components/tracker/TrackerVisualBackground';
+import { PixiChannelHeaders } from './PixiChannelHeaders';
 import { haptics } from '@/utils/haptics';
 import * as Tone from 'tone';
 import type { CursorPosition, BlockSelection } from '@typedefs';
@@ -46,7 +44,7 @@ const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
 const FONT_SIZE = 11;
 const HEADER_HEIGHT = 28;
-const GL_MUTE_SOLO_H = 14; // Height of GL-rendered M/S button strip at top of grid
+// GL_MUTE_SOLO_H removed — M/S buttons are now in PixiChannelHeaders
 const SCROLL_THRESHOLD = 50; // Horizontal scroll accumulator resistance
 
 // ─── Note formatting ─────────────────────────────────────────────────────────
@@ -132,7 +130,7 @@ interface RenderParams {
   playbackPatternIdx: number;
 }
 
-/** Static grid layer — backgrounds, separators, M/S strip, gutter. */
+/** Static grid layer — backgrounds, separators, gutter. */
 function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
   g.clear();
 
@@ -168,44 +166,18 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
     if (colX + chW < 0 || colX > p.width) continue;
 
     if (p.channelMuted[ch]) {
-      g.rect(colX, GL_MUTE_SOLO_H, chW, p.gridHeight - GL_MUTE_SOLO_H);
+      g.rect(colX, 0, chW, p.gridHeight);
       g.fill({ color: 0x000000, alpha: 0.45 });
     }
 
     const channelColor = p.displayPattern?.channels[ch]?.color;
     if (channelColor) {
-      g.rect(colX, GL_MUTE_SOLO_H, 2, p.gridHeight - GL_MUTE_SOLO_H);
+      g.rect(colX, 0, 2, p.gridHeight);
       g.fill({ color: parseInt(channelColor.replace('#', ''), 16), alpha: 0.4 });
     }
 
     g.rect(colX + chW - 1, 0, 1, p.gridHeight);
     g.fill({ color: p.theme.border.color, alpha: p.theme.border.alpha });
-  }
-
-  // GL Mute/Solo button strip
-  const MS_BTN_W = 16;
-  const MS_BTN_H = 12;
-  const MS_BTN_Y = 1;
-  const MS_GAP = 2;
-
-  g.rect(LINE_NUMBER_WIDTH, 0, p.width - LINE_NUMBER_WIDTH, GL_MUTE_SOLO_H);
-  g.fill({ color: p.theme.bgTertiary.color, alpha: 0.9 });
-  g.rect(LINE_NUMBER_WIDTH, GL_MUTE_SOLO_H - 1, p.width - LINE_NUMBER_WIDTH, 1);
-  g.fill({ color: p.theme.border.color, alpha: 0.4 });
-
-  for (let ch = 0; ch < p.numChannels; ch++) {
-    const colX = p.channelOffsets[ch] - p.scrollLeft;
-    const chW = p.channelWidths[ch];
-    if (colX + chW < 0 || colX > p.width) continue;
-    const isMuted = p.channelMuted[ch] ?? false;
-    const isSolo = p.channelSolo[ch] ?? false;
-    const btnBaseX = colX + chW - (MS_BTN_W * 2 + MS_GAP + 4);
-
-    g.rect(btnBaseX, MS_BTN_Y, MS_BTN_W, MS_BTN_H);
-    g.fill({ color: isMuted ? p.theme.warning.color : p.theme.bgSecondary.color, alpha: isMuted ? 0.85 : 0.6 });
-
-    g.rect(btnBaseX + MS_BTN_W + MS_GAP, MS_BTN_Y, MS_BTN_W, MS_BTN_H);
-    g.fill({ color: isSolo ? p.theme.accent.color : p.theme.bgSecondary.color, alpha: isSolo ? 0.85 : 0.6 });
   }
 
   g.rect(0, 0, LINE_NUMBER_WIDTH, p.gridHeight);
@@ -230,7 +202,7 @@ function renderOverlay(
   if (cursorCh >= 0 && cursorCh < p.numChannels) {
     const colX = p.channelOffsets[cursorCh] - p.scrollLeft;
     const chW = p.channelWidths[cursorCh];
-    g.rect(colX, GL_MUTE_SOLO_H, chW, p.gridHeight - GL_MUTE_SOLO_H);
+    g.rect(colX, 0, chW, p.gridHeight);
     g.fill({ color: 0xffffff, alpha: 0.02 });
   }
 
@@ -303,28 +275,6 @@ function renderOverlay(
 function generateLabels(p: RenderParams, vStart: number, currentRow: number): LabelData[] {
   if (!p.displayPattern) return [];
   const labels: LabelData[] = [];
-
-  // M/S button labels
-  const MS_BTN_W = 16;
-  const MS_BTN_H = 12;
-  const MS_BTN_Y = 1;
-  const MS_GAP = 2;
-  const MS_FONT_SIZE = 8;
-  const MS_TEXT_Y = MS_BTN_Y + (MS_BTN_H - MS_FONT_SIZE) / 2;
-
-  for (let ch = 0; ch < p.numChannels; ch++) {
-    const colX = p.channelOffsets[ch] - p.scrollLeft;
-    const chW = p.channelWidths[ch];
-    if (colX + chW < 0 || colX > p.width) continue;
-    const isMuted = p.channelMuted[ch] ?? false;
-    const isSolo = p.channelSolo[ch] ?? false;
-    const btnBaseX = colX + chW - (MS_BTN_W * 2 + MS_GAP + 4);
-
-    labels.push({ x: btnBaseX + (MS_BTN_W - MS_FONT_SIZE * 0.6) / 2, y: MS_TEXT_Y, text: 'M',
-      color: isMuted ? 0xffffff : p.theme.textMuted.color, fontFamily: PIXI_FONTS.MONO });
-    labels.push({ x: btnBaseX + MS_BTN_W + MS_GAP + (MS_BTN_W - MS_FONT_SIZE * 0.6) / 2, y: MS_TEXT_Y, text: 'S',
-      color: isSolo ? 0xffffff : p.theme.textMuted.color, fontFamily: PIXI_FONTS.MONO });
-  }
 
   for (let i = 0; i < p.visibleLines; i++) {
     const rowNum = vStart + i;
@@ -861,12 +811,10 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   // ── Visible range ─────────────────────────────────────────────────────────
   const scrollbarHeight = allChannelsFit ? 0 : SCROLLBAR_HEIGHT;
-  // gridHeight includes the GL M/S strip at the top; cellGridHeight is the usable cell area
   const gridHeight = height - HEADER_HEIGHT - scrollbarHeight;
-  const cellGridHeight = gridHeight - GL_MUTE_SOLO_H;
-  const visibleLines = Math.ceil(cellGridHeight / rowHeight) + 2;
+  const visibleLines = Math.ceil(gridHeight / rowHeight) + 2;
   const topLines = Math.floor(visibleLines / 2);
-  const centerLineTop = GL_MUTE_SOLO_H + Math.floor(cellGridHeight / 2) - rowHeight / 2;
+  const centerLineTop = Math.floor(gridHeight / 2) - rowHeight / 2;
   // baseY no longer includes smoothOffset — the inner scroll container handles sub-pixel offset imperatively
   const baseY = centerLineTop - topLines * rowHeight;
   const patternLength = displayPattern?.length ?? 64;
@@ -1047,35 +995,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     const local = e.getLocalPosition(e.currentTarget);
     const nativeEvent = e.nativeEvent as PointerEvent;
 
-    // ── GL Mute/Solo button hit detection ─────────────────────────────────
-    if (local.y >= 0 && local.y < GL_MUTE_SOLO_H && nativeEvent.button === 0) {
-      const MS_BTN_W = 16;
-      const MS_BTN_H = 12;
-      const MS_BTN_Y = 1;
-      const MS_GAP = 2;
-      for (let ch = 0; ch < numChannels; ch++) {
-        const colX = channelOffsets[ch] - scrollLeftRef.current;
-        const chW = channelWidths[ch];
-        if (colX + chW < 0 || colX > width) continue;
-        const btnBaseX = colX + chW - (MS_BTN_W * 2 + MS_GAP + 4);
-
-        // M button hit area
-        if (local.x >= btnBaseX && local.x < btnBaseX + MS_BTN_W &&
-            local.y >= MS_BTN_Y && local.y < MS_BTN_Y + MS_BTN_H) {
-          useTrackerStore.getState().toggleChannelMute(ch);
-          return;
-        }
-        // S button hit area
-        const sBtnX = btnBaseX + MS_BTN_W + MS_GAP;
-        if (local.x >= sBtnX && local.x < sBtnX + MS_BTN_W &&
-            local.y >= MS_BTN_Y && local.y < MS_BTN_Y + MS_BTN_H) {
-          useTrackerStore.getState().toggleChannelSolo(ch);
-          return;
-        }
-      }
-      return; // click in M/S strip but not on a button — ignore
-    }
-
     const cell = getCellFromLocal(local.x, local.y);
     if (!cell) return;
 
@@ -1108,7 +1027,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       cursorStore.startSelection();
     }
     isDraggingRef.current = true;
-  }, [getCellFromLocal, cellContextMenu, numChannels, channelOffsets, channelWidths, width]);
+  }, [getCellFromLocal, cellContextMenu]);
 
   const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
     // Scratch drag — route to scratch controller
@@ -1335,48 +1254,43 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         />
       </PixiDOMOverlay>
 
-      {/* ─── Channel Header — DOM overlay for interactive controls ─────── */}
-      <PixiDOMOverlay
-        layout={{ width, height: HEADER_HEIGHT }}
-        style={{ overflow: 'hidden', zIndex: 20, borderBottom: '1px solid rgba(255,255,255,0.1)' }}
-        visible={isActive}
-      >
-        <ChannelHeaderDOM
-          pattern={pattern}
-          channelWidths={channelWidths}
-          totalChannelsWidth={totalChannelsWidth}
-          scrollLeft={scrollLeft}
-          onScrollChange={(v) => { scrollLeftRef.current = v; setScrollLeft(v); }}
-          channelSpeeds={getTrackerReplayer().getSong()?.channelSpeeds}
-          songInitialSpeed={getTrackerReplayer().getSong()?.initialSpeed}
-          onToggleMute={toggleChannelMute}
-          onToggleSolo={toggleChannelSolo}
-          onToggleCollapse={toggleChannelCollapse}
-          onSetColor={setChannelColor}
-          onUpdateName={updateChannelName}
-          onAddChannel={addChannel}
-          onFillPattern={handleFillPattern}
-          onClearChannel={handleClearChannel}
-          onCopyChannel={(ch) => copyTrack(ch)}
-          onCutChannel={(ch) => cutTrack(ch)}
-          onPasteChannel={(ch) => pasteTrack(ch)}
-          onTranspose={handleTranspose}
-          onHumanize={handleHumanize}
-          onInterpolate={handleInterpolate}
-          onReverseVisual={handleReverseVisual}
-          onPolyrhythm={handlePolyrhythm}
-          onFibonacci={handleFibonacci}
-          onEuclidean={handleEuclidean}
-          onPingPong={handlePingPong}
-          onGlitch={handleGlitch}
-          onStrobe={handleStrobe}
-          onVisualEcho={handleVisualEcho}
-          onConverge={handleConverge}
-          onSpiral={handleSpiral}
-          onBounce={handleBounce}
-          onChaos={handleChaos}
-        />
-      </PixiDOMOverlay>
+      {/* ─── Channel Header — native GL rendering ─────────────────────── */}
+      <PixiChannelHeaders
+        pattern={pattern}
+        channelWidths={channelWidths}
+        channelOffsets={channelOffsets}
+        totalChannelsWidth={totalChannelsWidth}
+        scrollLeft={scrollLeft}
+        width={width}
+        channelSpeeds={getTrackerReplayer().getSong()?.channelSpeeds}
+        songInitialSpeed={getTrackerReplayer().getSong()?.initialSpeed}
+        onToggleMute={toggleChannelMute}
+        onToggleSolo={toggleChannelSolo}
+        onToggleCollapse={toggleChannelCollapse}
+        onSetColor={setChannelColor}
+        onUpdateName={updateChannelName}
+        onAddChannel={addChannel}
+        onFillPattern={handleFillPattern}
+        onClearChannel={handleClearChannel}
+        onCopyChannel={(ch) => copyTrack(ch)}
+        onCutChannel={(ch) => cutTrack(ch)}
+        onPasteChannel={(ch) => pasteTrack(ch)}
+        onTranspose={handleTranspose}
+        onHumanize={handleHumanize}
+        onInterpolate={handleInterpolate}
+        onReverseVisual={handleReverseVisual}
+        onPolyrhythm={handlePolyrhythm}
+        onFibonacci={handleFibonacci}
+        onEuclidean={handleEuclidean}
+        onPingPong={handlePingPong}
+        onGlitch={handleGlitch}
+        onStrobe={handleStrobe}
+        onVisualEcho={handleVisualEcho}
+        onConverge={handleConverge}
+        onSpiral={handleSpiral}
+        onBounce={handleBounce}
+        onChaos={handleChaos}
+      />
 
       {/* ─── Pattern Grid — native Pixi rendering ────────────────────── */}
       <pixiContainer
@@ -1464,271 +1378,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         )}
       </PixiDOMOverlay>
     </pixiContainer>
-  );
-};
-
-// ─── Channel Header DOM Component ───────────────────────────────────────────
-// Rendered inside PixiDOMOverlay. Full DOM-based header with interactive controls
-// that match the DOM PatternEditorCanvas header 1:1.
-
-interface ChannelHeaderDOMProps {
-  pattern: NonNullable<ReturnType<typeof useTrackerStore.getState>['patterns'][0]>;
-  channelWidths: number[];
-  totalChannelsWidth: number;
-  scrollLeft: number;
-  onScrollChange: (v: number) => void;
-  /** Per-channel speeds from MusicLine/similar formats (undefined = all use initialSpeed) */
-  channelSpeeds?: number[];
-  songInitialSpeed?: number;
-  onToggleMute: (ch: number) => void;
-  onToggleSolo: (ch: number) => void;
-  onToggleCollapse: (ch: number) => void;
-  onSetColor: (ch: number, color: string | null) => void;
-  onUpdateName: (ch: number, name: string) => void;
-  onAddChannel: () => void;
-  onFillPattern: (ch: number, g: GeneratorType) => void;
-  onClearChannel: (ch: number) => void;
-  onCopyChannel: (ch: number) => void;
-  onCutChannel: (ch: number) => void;
-  onPasteChannel: (ch: number) => void;
-  onTranspose: (ch: number, s: number) => void;
-  onHumanize: (ch: number) => void;
-  onInterpolate: (ch: number) => void;
-  onReverseVisual: (ch: number) => void;
-  onPolyrhythm: (ch: number) => void;
-  onFibonacci: (ch: number) => void;
-  onEuclidean: (ch: number) => void;
-  onPingPong: (ch: number) => void;
-  onGlitch: (ch: number) => void;
-  onStrobe: (ch: number) => void;
-  onVisualEcho: (ch: number) => void;
-  onConverge: (ch: number) => void;
-  onSpiral: (ch: number) => void;
-  onBounce: (ch: number) => void;
-  onChaos: (ch: number) => void;
-}
-
-const ChannelHeaderDOM: React.FC<ChannelHeaderDOMProps> = ({
-  pattern,
-  channelWidths,
-  totalChannelsWidth,
-  scrollLeft,
-  onScrollChange,
-  channelSpeeds,
-  songInitialSpeed,
-  onToggleMute,
-  onToggleSolo,
-  onToggleCollapse,
-  onSetColor,
-  onUpdateName,
-  onAddChannel,
-  onFillPattern,
-  onClearChannel,
-  onCopyChannel,
-  onCutChannel,
-  onPasteChannel,
-  onTranspose,
-  onHumanize,
-  onInterpolate,
-  onReverseVisual,
-  onPolyrhythm,
-  onFibonacci,
-  onEuclidean,
-  onPingPong,
-  onGlitch,
-  onStrobe,
-  onVisualEcho,
-  onConverge,
-  onSpiral,
-  onBounce,
-  onChaos,
-}) => {
-  const headerScrollRef = useRef<HTMLDivElement>(null);
-  const showChannelNames = useUIStore(s => s.showChannelNames);
-
-  const handleHeaderScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const left = e.currentTarget.scrollLeft;
-    setTimeout(() => onScrollChange(left), 0);
-  }, [onScrollChange]);
-
-  // Sync scroll position when scrollLeft changes externally
-  useEffect(() => {
-    if (headerScrollRef.current && Math.abs(headerScrollRef.current.scrollLeft - scrollLeft) > 1) {
-      headerScrollRef.current.scrollLeft = scrollLeft;
-    }
-  }, [scrollLeft]);
-
-  return (
-    <div className="flex-shrink-0 bg-dark-bgTertiary border-dark-border z-20 relative h-[28px]">
-      <div className="flex h-full">
-        {/* Row number column header */}
-        <div
-          className="flex-shrink-0 px-2 text-text-muted text-xs font-medium text-center border-r border-dark-border flex items-center justify-center"
-          style={{ width: LINE_NUMBER_WIDTH }}
-        >
-          ROW
-        </div>
-
-        {/* Scrollable channel headers */}
-        <div
-          ref={headerScrollRef}
-          onScroll={handleHeaderScroll}
-          className="overflow-x-hidden overflow-y-hidden flex-1"
-          data-vu-scroll
-        >
-          <div className="flex" style={{ width: totalChannelsWidth }}>
-            {pattern.channels.map((channel, idx) => {
-              const channelWidth = channelWidths[idx];
-              const isCollapsed = channel.collapsed;
-
-              return (
-                <div
-                  key={channel.id}
-                  className={`flex-shrink-0 flex items-center justify-between gap-1 ${isCollapsed ? 'px-1' : 'px-2'} py-1
-                    border-r border-dark-border transition-colors relative
-                    ${channel.muted ? 'opacity-50' : ''}
-                    ${channel.solo ? 'bg-accent-primary/10' : ''}`}
-                  style={{
-                    width: channelWidth,
-                    backgroundColor: channel.color ? `${channel.color}15` : undefined,
-                    boxShadow: channel.color ? `inset 2px 0 0 ${channel.color}` : undefined,
-                  }}
-                >
-                  {!isCollapsed && (
-                    <div className="flex items-center gap-1.5 overflow-hidden flex-1 min-w-0">
-                      <span
-                        className="font-bold font-mono text-[11px] flex-shrink-0 opacity-80"
-                        style={{ color: channel.color || 'var(--color-accent)' }}
-                      >
-                        {(idx + 1).toString().padStart(2, '0')}
-                      </span>
-                      {channelSpeeds && channelSpeeds[idx] !== undefined && channelSpeeds[idx] !== songInitialSpeed && (
-                        <span
-                          className="flex-shrink-0 font-mono text-[9px] font-bold px-0.5 rounded"
-                          style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.35)' }}
-                          title={`Channel speed: ${channelSpeeds[idx]} ticks/row${channelSpeeds[idx] > 0 && channelSpeeds[idx] !== (songInitialSpeed ?? 0) ? ` (song: ${songInitialSpeed})` : ''}`}
-                        >
-                          S:{channelSpeeds[idx]}
-                        </span>
-                      )}
-                      {showChannelNames && (
-                        <input
-                          type="text"
-                          className="bg-transparent border-none outline-none font-mono text-[10px] font-bold text-text-primary focus:text-accent-primary transition-colors min-w-0 flex-1 overflow-hidden text-ellipsis uppercase px-0 placeholder:text-text-muted/50"
-                          value={channel.name || ''}
-                          placeholder={`CH${idx + 1}`}
-                          onChange={(e) => setTimeout(() => onUpdateName(idx, e.target.value), 0)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                          title={`Click to rename channel (Short: ${channel.shortName || (idx + 1)})`}
-                        />
-                      )}
-                    </div>
-                  )}
-
-                  {!isCollapsed && (
-                    <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
-                      <ChannelContextMenu
-                        channelIndex={idx}
-                        channel={channel}
-                        patternId={pattern.id}
-                        patternLength={pattern.length}
-                        onFillPattern={onFillPattern}
-                        onClearChannel={onClearChannel}
-                        onCopyChannel={onCopyChannel}
-                        onCutChannel={onCutChannel}
-                        onPasteChannel={onPasteChannel}
-                        onTranspose={onTranspose}
-                        onHumanize={onHumanize}
-                        onInterpolate={onInterpolate}
-                        onAcidGenerator={() => {}}
-                        onRandomize={() => {}}
-                        onToggleCollapse={onToggleCollapse}
-                        onReverseVisual={onReverseVisual}
-                        onPolyrhythm={onPolyrhythm}
-                        onFibonacci={onFibonacci}
-                        onEuclidean={onEuclidean}
-                        onPingPong={onPingPong}
-                        onGlitch={onGlitch}
-                        onStrobe={onStrobe}
-                        onVisualEcho={onVisualEcho}
-                        onConverge={onConverge}
-                        onSpiral={onSpiral}
-                        onBounce={onBounce}
-                        onChaos={onChaos}
-                      />
-                      <ChannelColorPicker
-                        currentColor={channel.color}
-                        onColorSelect={(color) => setTimeout(() => onSetColor(idx, color), 0)}
-                      />
-                      <button
-                        onClick={() => setTimeout(() => onToggleMute(idx), 0)}
-                        className={`p-1 rounded transition-colors ${
-                          channel.muted
-                            ? 'bg-accent-error/20 text-accent-error'
-                            : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
-                        }`}
-                        title={channel.muted ? 'Unmute' : 'Mute'}
-                      >
-                        {channel.muted ? <VolumeX size={12} /> : <Volume2 size={12} />}
-                      </button>
-                      <button
-                        onClick={() => setTimeout(() => onToggleSolo(idx), 0)}
-                        className={`p-1 rounded transition-colors ${
-                          channel.solo
-                            ? 'bg-accent-primary/20 text-accent-primary'
-                            : 'text-text-muted hover:text-text-primary hover:bg-dark-bgHover'
-                        }`}
-                        title={channel.solo ? 'Unsolo' : 'Solo'}
-                      >
-                        <Headphones size={12} />
-                      </button>
-                      <button
-                        onClick={() => setTimeout(() => onToggleCollapse(idx), 0)}
-                        className="p-1 rounded transition-colors text-text-muted hover:text-text-primary hover:bg-dark-bgHover"
-                        title="Collapse Channel"
-                      >
-                        <ChevronLeft size={12} />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Collapsed state */}
-                  {isCollapsed && (
-                    <div className="flex items-center justify-between w-full px-1">
-                      <span
-                        className="font-bold font-mono text-[9px] flex-shrink-0 opacity-80"
-                        style={{ color: channel.color || 'var(--color-accent)' }}
-                      >
-                        {(idx + 1).toString().padStart(2, '0')}
-                      </span>
-                      <button
-                        onClick={() => setTimeout(() => onToggleCollapse(idx), 0)}
-                        className="p-0.5 rounded transition-colors text-text-muted hover:text-text-primary hover:bg-dark-bgHover"
-                        title="Expand Channel"
-                      >
-                        <ChevronRight size={10} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Add channel button */}
-            {pattern.channels.length < 16 && (
-              <button
-                onClick={() => setTimeout(() => onAddChannel(), 0)}
-                className="flex-shrink-0 w-12 flex items-center justify-center border-r border-dark-border
-                  text-text-muted hover:text-accent-primary hover:bg-dark-bgHover transition-colors"
-                title="Add Channel"
-              >
-                <Plus size={16} />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
   );
 };
 
