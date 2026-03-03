@@ -19,7 +19,7 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 import {
   Upload, Trash2, Music, Play, Square, AlertCircle,
-  ZoomIn, ZoomOut, Repeat, Sparkles, Wand2, RefreshCcw, Zap,
+  ZoomIn, ZoomOut, Sparkles, Wand2, RefreshCcw, Zap,
   Scissors, Copy, ClipboardPaste, Crop, VolumeX, Volume2, Volume1,
   Undo2, Redo2, Eye, Download,
   ArrowLeft, ArrowRight, Maximize2, FlipHorizontal,
@@ -45,6 +45,7 @@ import { addManualSlice } from '../../lib/audio/BeatSliceAnalyzer';
 import { UADEEngine } from '../../engine/uade/UADEEngine';
 import { UADELiveParamsBar } from './controls/UADELiveParamsBar';
 import { UADEDebuggerPanel } from './controls/UADEDebuggerPanel';
+import { SampleLoopEditor } from './SampleLoopEditor';
 
 // ─── Props & types ─────────────────────────────────────────────────────
 
@@ -1251,68 +1252,14 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             </div>
 
             {/* ─── Loop Section ───────────────────────────────────── */}
-            <div className="border-t border-dark-border pt-3">
-              <div className="flex items-center gap-3 mb-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={loopEnabled} onChange={(e) => { updateParam('loopEnabled', e.target.checked); e.target.blur(); }} className="w-4 h-4 rounded" />
-                  <Repeat size={14} className="text-blue-400" />
-                  <span className="font-mono text-text-secondary text-xs">LOOP</span>
-                </label>
-
-                {loopEnabled && (
-                  <>
-                    <div className="flex items-center gap-0.5 bg-dark-bgSecondary rounded border border-dark-border p-0.5 ml-2">
-                      <button
-                        onClick={() => updateParam('loopType', 'forward')}
-                        className={
-                          'px-2 py-0.5 rounded text-[10px] font-mono transition-colors ' +
-                          (loopType === 'forward' || !loopType ? 'bg-blue-500/30 text-blue-400' : 'text-text-muted hover:bg-white/5')
-                        }
-                        title="Forward loop"
-                      >{'\u2192'}</button>
-                      <button
-                        onClick={() => updateParam('loopType', 'pingpong')}
-                        className={
-                          'px-2 py-0.5 rounded text-[10px] font-mono transition-colors ' +
-                          (loopType === 'pingpong' ? 'bg-blue-500/30 text-blue-400' : 'text-text-muted hover:bg-white/5')
-                        }
-                        title="Ping-pong loop"
-                      >{'\u2194'}</button>
-                    </div>
-                    <button
-                      onClick={doFindLoop}
-                      className="px-2 py-0.5 rounded text-[10px] font-mono text-blue-300 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-colors ml-auto"
-                      title="Auto-find best loop point"
-                    >Auto</button>
-                  </>
-                )}
-              </div>
-
-              {loopEnabled && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block font-mono text-text-muted text-xs mb-1">
-                      {'LOOP START: '}<span className="text-blue-400">{(loopStart * 100).toFixed(1)}%</span>
-                    </label>
-                    <input
-                      type="range" min="0" max="0.99" step="0.001" value={loopStart}
-                      onChange={(e) => updateParam('loopStart', Math.min(parseFloat(e.target.value), loopEnd - 0.01))}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-mono text-text-muted text-xs mb-1">
-                      {'LOOP END: '}<span className="text-blue-400">{(loopEnd * 100).toFixed(1)}%</span>
-                    </label>
-                    <input
-                      type="range" min="0.01" max="1" step="0.001" value={loopEnd}
-                      onChange={(e) => updateParam('loopEnd', Math.max(parseFloat(e.target.value), loopStart + 0.01))}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
+            <SampleLoopEditor
+              loopEnabled={loopEnabled}
+              loopStart={loopStart}
+              loopEnd={loopEnd}
+              loopType={loopType}
+              updateParam={updateParam}
+              doFindLoop={doFindLoop}
+            />
 
             {/* ─── Granular controls ──────────────────────────────── */}
             {isGranular && granular && (

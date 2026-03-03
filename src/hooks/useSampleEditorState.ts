@@ -6,10 +6,9 @@
  */
 
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { SampleUndoManager } from '../lib/audio/SampleUndoManager';
-import type { UndoState } from '../lib/audio/SampleUndoManager';
 import { WaveformProcessor } from '../lib/audio/WaveformProcessor';
 import { notify } from '../stores/useNotificationStore';
+import { useSampleEditorUndo } from './useSampleEditorUndo';
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -205,80 +204,13 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
   // ─── Clipboard ───────────────────────────────────────────────────
   const [clipboardBuffer, setClipboardBuffer] = useState<AudioBuffer | null>(null);
 
-  // ─── Undo/Redo ───────────────────────────────────────────────────
-  const undoManager = useRef(new SampleUndoManager(20));
-  const [undoInfo, setUndoInfo] = useState({
-    canUndo: false, canRedo: false,
-    undoLabel: null as string | null, redoLabel: null as string | null,
-    undoCount: 0, redoCount: 0,
+  // ─── Undo/Redo (extracted to useSampleEditorUndo) ─────────────────
+  const {
+    canUndo, canRedo, undoLabel, redoLabel, undoCount, redoCount,
+    pushUndo, doUndo, doRedo,
+  } = useSampleEditorUndo({
+    audioBuffer, instrumentParameters, setAudioBuffer, onPersistBuffer, onUpdateParams,
   });
-  const { canUndo, canRedo, undoLabel, redoLabel, undoCount, redoCount } = undoInfo;
-
-  // Call this after any undo stack mutation to sync state
-  const syncUndoState = useCallback(() => {
-    const mgr = undoManager.current;
-    const sizes = mgr.getStackSizes();
-    setUndoInfo({
-      canUndo: mgr.canUndo(),
-      canRedo: mgr.canRedo(),
-      undoLabel: mgr.getUndoLabel(),
-      redoLabel: mgr.getRedoLabel(),
-      undoCount: sizes.undo,
-      redoCount: sizes.redo,
-    });
-  }, []);
-
-  const paramsRef = useRef(instrumentParameters);
-  useEffect(() => { paramsRef.current = instrumentParameters; }, [instrumentParameters]);
-
-  const getCurrentUndoState = useCallback((): UndoState | null => {
-    if (!audioBuffer) return null;
-    const p = paramsRef.current || {};
-    return {
-      buffer: SampleUndoManager.cloneBuffer(audioBuffer),
-      label: '',
-      loopStart: (p.loopStart as number) ?? 0,
-      loopEnd: (p.loopEnd as number) ?? 1,
-      loopType: ((p.loopType as LoopType) || (p.loopEnabled ? 'forward' : 'off')),
-    };
-  }, [audioBuffer]);
-
-  const pushUndo = useCallback((label: string) => {
-    const state = getCurrentUndoState();
-    if (state) {
-      state.label = label;
-      undoManager.current.pushState(state);
-      syncUndoState();
-    }
-  }, [getCurrentUndoState, syncUndoState]);
-
-  const applyUndoState = useCallback(async (state: UndoState) => {
-    setAudioBuffer(state.buffer);
-    onUpdateParams({
-      loopStart: state.loopStart,
-      loopEnd: state.loopEnd,
-      loopType: state.loopType,
-      loopEnabled: state.loopType !== 'off',
-    });
-    await onPersistBuffer(state.buffer, 'Undo/Redo');
-    syncUndoState();
-  }, [onPersistBuffer, onUpdateParams, syncUndoState]);
-
-  const doUndo = useCallback(() => {
-    const current = getCurrentUndoState();
-    if (!current) return;
-    current.label = 'current';
-    const prev = undoManager.current.undo(current);
-    if (prev) applyUndoState(prev);
-  }, [getCurrentUndoState, applyUndoState]);
-
-  const doRedo = useCallback(() => {
-    const current = getCurrentUndoState();
-    if (!current) return;
-    current.label = 'current';
-    const next = undoManager.current.redo(current);
-    if (next) applyUndoState(next);
-  }, [getCurrentUndoState, applyUndoState]);
 
   // ─── Display toggles ────────────────────────────────────────────
   const [showSpectrum, setShowSpectrum] = useState(false);
