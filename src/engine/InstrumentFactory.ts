@@ -108,7 +108,7 @@ export class InstrumentFactory {
    * Create a synth instance based on InstrumentConfig.
    * Returns a Tone.ToneAudioNode for Tone.js synths, or a DevilboxSynth for native synths (e.g. WAM).
    */
-  public static createInstrument(config: InstrumentConfig): Tone.ToneAudioNode | DevilboxSynth {
+  public static createInstrument(config: InstrumentConfig): Tone.ToneAudioNode | DevilboxSynth | null {
     // Try SynthRegistry first (new registry architecture)
     const registryDesc = SynthRegistry.get(config.synthType);
     if (registryDesc) {

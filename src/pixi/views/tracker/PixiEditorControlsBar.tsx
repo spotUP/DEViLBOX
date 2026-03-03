@@ -25,7 +25,7 @@ const BAR_H = 32;
 
 // ─── View Mode ───────────────────────────────────────────────────────────────
 
-type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj';
+type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer';
 
 export interface PixiEditorControlsBarProps {
   viewMode: ViewMode;
