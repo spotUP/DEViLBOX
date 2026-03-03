@@ -6,10 +6,8 @@
  */
 
 import React from 'react';
-import { Sparkles, Share2, ExternalLink } from 'lucide-react';
+import { Sparkles, ExternalLink, X } from 'lucide-react';
 import { Modal } from '../ui/Modal';
-import { ModalHeader } from '../ui/ModalHeader';
-import { ModalFooter } from '../ui/ModalFooter';
 
 interface ModlandContributionModalProps {
   isOpen: boolean;
@@ -32,104 +30,99 @@ export const ModlandContributionModal: React.FC<ModlandContributionModalProps> =
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      size="md"
+      size="lg"
       theme="modern"
       closeOnBackdropClick={true}
       closeOnEscape={true}
     >
-      <div className="bg-dark-800 border border-dark-600 rounded-lg shadow-2xl">
-        <ModalHeader 
-          title="Rare Find!"
-          icon={<Sparkles size={24} className="text-purple-400" />}
-          onClose={onClose}
-        />
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-accent-primary/20 to-purple-500/20 border-b border-dark-border">
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 bg-accent-primary/20 rounded-lg">
+            <Sparkles size={18} className="text-accent-primary" />
+          </div>
+          <h2 className="text-base font-bold text-text-primary">Rare Find!</h2>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1.5 text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary rounded-lg transition-colors"
+        >
+          <X size={16} />
+        </button>
+      </div>
 
-        <div className="p-6 space-y-4">
-          {/* Congratulations */}
-          <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 border border-purple-500/30 rounded-lg p-4">
-            <p className="text-lg font-semibold text-white mb-2">
-              This module isn't in Modland's archive of <span className="text-purple-400">727,000+</span> files!
+      {/* Body — two-column layout */}
+      <div className="p-5 flex gap-5">
+        {/* Left: context */}
+        <div className="flex-1 space-y-3">
+          <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-accent-primary/20 rounded-lg p-3">
+            <p className="text-sm font-semibold text-text-primary mb-1">
+              Not in Modland's <span className="text-accent-primary">727,000+</span> file archive!
             </p>
-            <p className="text-gray-300 text-sm">
-              <span className="font-mono bg-dark-700 px-2 py-1 rounded">{filename}</span> might be a rare release,
-              personal creation, or lost gem from the demoscene.
+            <p className="text-text-secondary text-xs">
+              <span className="font-mono bg-dark-bgTertiary px-1.5 py-0.5 rounded text-text-muted">{filename}</span> may be a rare release, personal creation, or lost demoscene gem.
             </p>
           </div>
 
-          {/* Contribution Info */}
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Share2 size={18} className="text-purple-400" />
-              Share It With The Community
-            </h3>
+          <p className="text-text-secondary text-xs leading-relaxed">
+            Modland preserves tracker module history since the 1980s.
+            Your file could be valuable to collectors and future musicians.
+          </p>
 
-            <div className="bg-dark-700 border border-dark-600 rounded-lg p-4 space-y-3">
-              <div className="space-y-2">
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Modland is the world's largest tracker module archive, preserving demoscene history since the 1980s.
-                  Your module could be valuable to collectors, historians, and future musicians!
-                </p>
-              </div>
-
-              <div className="border-t border-dark-600 pt-3 space-y-2">
-                <p className="text-white font-semibold text-sm">How to contribute:</p>
-                <ol className="text-gray-300 text-sm space-y-2 list-decimal list-inside">
-                  <li>Join the <a href={demozooDiscord} target="_blank" rel="noopener noreferrer" 
-                      className="text-purple-400 hover:text-purple-300 underline font-semibold">Demozoo Discord</a></li>
-                  <li>Share information about the module (artist, year, etc.)</li>
-                  <li>Upload via FTP to <code className="bg-dark-800 px-1.5 py-0.5 rounded text-xs">
-                      ftp.modland.com/incoming/</code></li>
-                  <li>Or send to a Demozoo staff member for verification</li>
-                </ol>
-              </div>
-
-              <div className="border-t border-dark-600 pt-3">
-                <p className="text-gray-400 text-xs italic leading-relaxed">
-                  Most of Demozoo is user-editable. You can add productions, music, graphics, groups, sceners,
-                  and parties. For help or questions, the community is friendly and welcoming on Discord!
-                </p>
-              </div>
-            </div>
-
-            {/* Hash Info (for nerds) */}
-            {hash && (
-              <details className="bg-dark-900 border border-dark-700 rounded p-3">
-                <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-400">
-                  Technical Info (SHA-256 Hash)
-                </summary>
-                <p className="mt-2 text-xs font-mono text-gray-400 break-all bg-dark-800 p-2 rounded">
-                  {hash}
-                </p>
-              </details>
-            )}
-          </div>
+          {hash && (
+            <details className="bg-dark-bgTertiary border border-dark-border rounded p-2">
+              <summary className="text-[10px] text-text-muted cursor-pointer hover:text-text-secondary">
+                SHA-256 Hash
+              </summary>
+              <p className="mt-1.5 text-[10px] font-mono text-text-muted break-all bg-dark-bg p-1.5 rounded">
+                {hash}
+              </p>
+            </details>
+          )}
         </div>
 
-        <ModalFooter>
-          <button
-            onClick={onDismiss}
-            className="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded transition-colors text-sm"
-            title="Don't show this message again for this file"
-          >
-            Don't Show Again
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-dark-600 hover:bg-dark-500 text-white rounded transition-colors"
-          >
-            Maybe Later
-          </button>
-          <a
-            href={demozooDiscord}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={onClose}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded transition-colors font-semibold flex items-center gap-2"
-          >
-            <ExternalLink size={16} />
-            Join Demozoo Discord
-          </a>
-        </ModalFooter>
+        {/* Right: how to contribute */}
+        <div className="flex-1 bg-dark-bgTertiary border border-dark-border rounded-lg p-3 space-y-2">
+          <p className="text-xs font-semibold text-text-primary">How to contribute:</p>
+          <ol className="text-text-secondary text-xs space-y-1.5 list-decimal list-inside">
+            <li>Join the <a href={demozooDiscord} target="_blank" rel="noopener noreferrer" 
+                className="text-accent-primary hover:text-accent-secondary underline">Demozoo Discord</a></li>
+            <li>Share info about the module (artist, year, etc.)</li>
+            <li>Upload via FTP to <code className="bg-dark-bg px-1 py-0.5 rounded text-[10px] text-text-muted">
+                ftp.modland.com/incoming/</code></li>
+            <li>Or send to a Demozoo staff member</li>
+          </ol>
+          <p className="text-text-muted text-[10px] italic pt-1 border-t border-dark-border">
+            Demozoo is user-editable — add productions, music, groups, sceners and parties.
+          </p>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex gap-2 px-5 py-3 border-t border-dark-border bg-dark-bgSecondary justify-end">
+        <button
+          onClick={onDismiss}
+          className="px-3 py-1.5 bg-dark-bgTertiary hover:bg-dark-bgHover text-text-muted hover:text-text-secondary rounded text-xs transition-colors"
+          title="Don't show this message again for this file"
+        >
+          Don't Show Again
+        </button>
+        <button
+          onClick={onClose}
+          className="px-3 py-1.5 bg-dark-bgHover hover:bg-dark-bgActive text-text-secondary hover:text-text-primary rounded text-xs transition-colors"
+        >
+          Maybe Later
+        </button>
+        <a
+          href={demozooDiscord}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onClose}
+          className="px-3 py-1.5 bg-accent-primary hover:bg-accent-secondary text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors"
+        >
+          <ExternalLink size={13} />
+          Join Demozoo
+        </a>
       </div>
     </Modal>
   );
