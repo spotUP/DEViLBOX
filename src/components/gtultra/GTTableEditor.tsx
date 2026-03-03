@@ -69,7 +69,7 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
       if (isCursor) {
         ctx.fillStyle = 'rgba(255,255,255,0.1)';
         ctx.fillRect(0, y, width, ROW_H);
-        ctx.strokeStyle = '#fff';
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
         ctx.lineWidth = 1;
         ctx.strokeRect(0.5, y + 0.5, width - 1, ROW_H - 1);
       }

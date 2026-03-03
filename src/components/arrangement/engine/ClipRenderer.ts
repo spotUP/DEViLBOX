@@ -157,7 +157,7 @@ export class ClipRenderer {
 
     // Border
     if (selected) {
-      ctx.strokeStyle = '#ffffff';
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
       ctx.lineWidth = 2;
       ctx.stroke();
     } else if (isHovered && !ghost) {
