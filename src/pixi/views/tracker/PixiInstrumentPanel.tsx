@@ -104,7 +104,7 @@ const LUCIDE_TO_FAD: Record<string, string> = {
 const DEFAULT_ICON_CHAR = FAD_ICONS['keyboard'] ?? '';
 
 const ITEM_H = 26;
-const ACTION_BAR_H = 34;
+const ACTION_BAR_H = 46;
 const FOOTER_H = 22;
 const BUFFER = 3;
 
@@ -268,11 +268,11 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
       {/* ═══ Action Bar ═══ */}
       <pixiContainer layout={{ width, height: ACTION_BAR_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 3, paddingRight: 3, gap: 2, flexShrink: 0 }}>
         <pixiGraphics draw={drawActionBarBg} layout={{ position: 'absolute', width, height: ACTION_BAR_H }} />
-        <PixiButton label="ADD"    icon="preset-a"    variant="ghost" size="sm" onClick={handleAdd}        width={40} />
-        <PixiButton label="PRESET" icon="open"        variant="ghost" size="sm" onClick={handlePreset}     width={56} />
-        <PixiButton label="SAMPLE" icon="diskio"      variant="ghost" size="sm" onClick={handleSamplePack} width={56} color="green" />
-        <PixiButton label="EDIT"   icon="pen"         variant="ghost" size="sm" onClick={handleEdit}       width={40} />
-        <PixiButton label="CHIP"   icon="cpu"         variant="ghost" size="sm" onClick={handleChip}       width={40} />
+        <PixiButton label="ADD"    icon="preset-a"    iconPosition="top" variant="ghost" size="sm" onClick={handleAdd}        width={40} height={40} />
+        <PixiButton label="PRESET" icon="open"        iconPosition="top" variant="ghost" size="sm" onClick={handlePreset}     width={50} height={40} />
+        <PixiButton label="SAMPLE" icon="diskio"      iconPosition="top" variant="ghost" size="sm" onClick={handleSamplePack} width={50} height={40} color="green" />
+        <PixiButton label="EDIT"   icon="pen"         iconPosition="top" variant="ghost" size="sm" onClick={handleEdit}       width={40} height={40} />
+        <PixiButton label="CHIP"   icon="cpu"         iconPosition="top" variant="ghost" size="sm" onClick={handleChip}       width={40} height={40} />
       </pixiContainer>
 
       {/* ═══ Instrument List ═══ */}

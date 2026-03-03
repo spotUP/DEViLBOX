@@ -154,6 +154,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
             ref={modlandSearchRef}
             value={modlandQuery}
             onChange={(e) => setModlandQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
             placeholder="Search modules..."
             className="w-full pl-7 pr-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight
                        rounded text-text-primary placeholder:text-text-muted/40
@@ -399,6 +400,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
             ref={hvscSearchRef}
             value={hvscQuery}
             onChange={(e) => setHvscQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
             placeholder="Search composers, songs..."
             className="w-full pl-7 pr-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight
                        rounded text-text-primary placeholder:text-text-muted/40
