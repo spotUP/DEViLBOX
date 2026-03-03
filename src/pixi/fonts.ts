@@ -57,9 +57,10 @@ function installFonts(): void {
   const sansFamily = 'Inter, -apple-system, BlinkMacSystemFont, sans-serif';
 
   // Build character set: ASCII + UI symbol characters
-  const charSet = BitmapFontManager.ASCII.concat(
-    EXTRA_CHARS.split('').map(c => [c.charCodeAt(0), c.charCodeAt(0)] as [number, number])
-  );
+  const charSet: [string, string][] = [[' ', '~']];
+  for (const c of EXTRA_CHARS) {
+    charSet.push([c, c]);
+  }
 
   const fallbacks: { name: string; family: string; weight: TextStyleFontWeight }[] = [
     { name: PIXI_FONTS.MONO,          family: monoFamily, weight: 'normal' },
