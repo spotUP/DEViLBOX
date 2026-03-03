@@ -31,9 +31,10 @@ const PRESET_SYNTH_MAP: Record<string, SynthType> = {
   nes: 'FurnaceNES', gb: 'FurnaceGB', sms: 'FurnacePSG', pce: 'FurnacePCE',
   snes: 'FurnaceSNES', gba_dma: 'FurnaceGB', gba_minmod: 'FurnaceGB',
   nds: 'FurnaceGB', lynx: 'FurnaceLynx', swan: 'FurnaceSWAN',
-  vboy: 'FurnaceVB', pokemini: 'FurnacePSG',
+  vboy: 'FurnaceVB', pokemini: 'FurnacePSG', t6w28: 'FurnacePSG',
   // Commodore
-  c64_6581: 'FurnaceSID6581', c64_8580: 'FurnaceSID8580',
+  c64_6581: 'FurnaceSID6581', c64_8580: 'FurnaceSID8580', c64_pcm: 'Sampler',
+  sid2: 'FurnaceSID6581', sid3: 'FurnaceSID6581',
   // Atari
   pokey: 'FurnacePOKEY', tia: 'FurnacePSG',
   // AY/PSG
@@ -42,16 +43,29 @@ const PRESET_SYNTH_MAP: Record<string, SynthType> = {
   vrc6: 'FurnaceVRC6', fds: 'FurnaceFDS', mmc5: 'FurnaceNES', n163: 'FurnaceN163',
   '5e01': 'FurnaceNES',
   // Konami
-  scc: 'FurnaceSCC', 
-  // Other
+  scc: 'FurnaceSCC', scc_plus: 'FurnaceSCC',
+  // Namco
+  namco: 'FurnacePSG', namco_15xx: 'FurnacePSG', namco_cus30: 'FurnacePSG',
+  bubsys_wsg: 'FurnacePSG',
+  // OKI / PCM
+  msm5232: 'FurnacePSG', msm6258: 'Sampler', msm6295: 'Sampler',
+  // Other chips
   dave: 'FurnacePSG', saa1099: 'FurnacePSG', pet: 'FurnacePSG', vic20: 'FurnacePSG',
   ted: 'FurnacePSG', pcspkr: 'FurnacePSG', pv1000: 'FurnacePSG',
-  sm8521: 'FurnacePSG', supervision: 'FurnacePSG',
+  sm8521: 'FurnacePSG', supervision: 'FurnacePSG', vera: 'FurnacePSG',
+  sfx_beeper: 'FurnacePSG', sfx_beeper_quadtone: 'FurnacePSG',
+  upd1771c: 'FurnacePSG', powernoise: 'FurnacePSG',
+  // Fantasy / custom
+  sound_unit: 'FurnacePSG', bifurcator: 'FurnacePSG',
   // PCM / sample-based
   amiga: 'Sampler', segapcm: 'Sampler', qsound: 'Sampler', rf5c68: 'Sampler',
   multipcm: 'Sampler', pcm_dac: 'Sampler', c140: 'Sampler', c219: 'Sampler',
   es5506: 'Sampler', k007232: 'Sampler', k053260: 'Sampler', ga20: 'Sampler',
-  msm6258: 'Sampler', msm6295: 'Sampler', ymz280b: 'Sampler', x1_010: 'Sampler',
+  ymz280b: 'Sampler', x1_010: 'Sampler',
+  // Compound (multi-chip — use primary chip type)
+  genesis: 'FurnaceOPN', arcade: 'FurnaceOPM',
+  // Debug/test
+  pong: 'FurnacePSG', dummy: 'FurnacePSG',
 };
 
 /** Generate generic starter instruments for a chip preset */
