@@ -33,6 +33,47 @@ export const NewSongWizard: React.FC = () => {
   const [selectedPresetId, setSelectedPresetId] = useState<string>('amiga_protracker');
   const [withPresetInstruments, setWithPresetInstruments] = useState(true);
 
+  // useCallback must be called before any early return to keep hook order stable
+  const finish = useCallback(
+    (mode: StartMode, loadInstruments: boolean) => {
+      const presetId = selectedPresetId;
+      // 1. addTab() saves current project state and resets stores to blank
+      useTabsStore.getState().addTab();
+
+      // 2. Apply system preset (channel names, colors, count)
+      if (mode === 'preset' && presetId) {
+        useTrackerStore.getState().applySystemPreset(presetId);
+
+        // 3. Apply Amiga song settings (hard-panning + BPM) if Amiga format
+        if (AMIGA_UADE_PRESET_IDS.has(presetId)) {
+          useTrackerStore.getState().applyAmigaSongSettings(presetId);
+        }
+      }
+
+      // 4. Load starter instruments
+      if (mode === 'preset' && loadInstruments && presetId) {
+        const presets = UADE_INSTRUMENT_PRESETS[presetId] ?? [];
+        presets.forEach((inst) => {
+          useInstrumentStore.getState().createInstrument(inst);
+        });
+      }
+
+      // 5. Track active system for filtering
+      useUIStore.getState().setActiveSystemPreset(
+        mode === 'preset' ? presetId : null
+      );
+
+      useUIStore.getState().setStatusMessage('New project', false, 1500);
+
+      setStep(1);
+      setStartMode('empty');
+      setSelectedPresetId('amiga_protracker');
+      setWithPresetInstruments(true);
+      close();
+    },
+    [selectedPresetId, close]
+  );
+
   if (!isOpen) return null;
 
   const selectedPreset: SystemPreset | undefined = SYSTEM_PRESETS.find(
@@ -68,52 +109,12 @@ export const NewSongWizard: React.FC = () => {
   };
 
   const handleCancel = () => {
-    resetWizardState();
-    close();
-  };
-
-  const resetWizardState = () => {
     setStep(1);
     setStartMode('empty');
     setSelectedPresetId('amiga_protracker');
     setWithPresetInstruments(true);
+    close();
   };
-
-  const finish = useCallback(
-    (mode: StartMode, loadInstruments: boolean) => {
-      // 1. addTab() saves current project state and resets stores to blank
-      useTabsStore.getState().addTab();
-
-      // 2. Apply system preset (channel names, colors, count)
-      if (mode === 'preset' && selectedPresetId) {
-        useTrackerStore.getState().applySystemPreset(selectedPresetId);
-
-        // 3. Apply Amiga song settings (hard-panning + BPM) if Amiga format
-        if (AMIGA_UADE_PRESET_IDS.has(selectedPresetId)) {
-          useTrackerStore.getState().applyAmigaSongSettings(selectedPresetId);
-        }
-      }
-
-      // 4. Load starter instruments
-      if (mode === 'preset' && loadInstruments && selectedPresetId) {
-        const presets = UADE_INSTRUMENT_PRESETS[selectedPresetId] ?? [];
-        presets.forEach((inst) => {
-          useInstrumentStore.getState().createInstrument(inst);
-        });
-      }
-
-      // 5. Track active system for filtering
-      useUIStore.getState().setActiveSystemPreset(
-        mode === 'preset' ? selectedPresetId : null
-      );
-
-      useUIStore.getState().setStatusMessage('New project', false, 1500);
-
-      resetWizardState();
-      close();
-    },
-    [selectedPresetId, close]
-  );
 
   const handleFinish = () => {
     finish('preset', withPresetInstruments);
