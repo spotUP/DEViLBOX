@@ -38,7 +38,8 @@ export class WebSIDPlayEngine {
   private metadata: any = null;
 
   private readonly sidData: Uint8Array;
-  private readonly config: WebSIDPlayConfig;  ) {}
+  private readonly config: WebSIDPlayConfig;
+
   constructor(sidData: Uint8Array, config: WebSIDPlayConfig = {}) {
     this.sidData = sidData;
     this.config = config;
@@ -92,8 +93,10 @@ export class WebSIDPlayEngine {
     // WebSIDPlay prefers AudioWorklet for best quality
     if (audioContext.audioWorklet) {
       try {
-        this.sourceNode && this.sourceNode = await this.backend.createWorkletNode(audioContext);
-        this.sourceNode.connect(audioContext.destination);
+        this.sourceNode = await this.backend.createWorkletNode(audioContext);
+        if (this.sourceNode) {
+          this.sourceNode.connect(audioContext.destination);
+        }
       } catch (error) {
         console.warn('[WebSIDPlay] AudioWorklet not available, using ScriptProcessor fallback');
         this.playWithScriptProcessor(audioContext);

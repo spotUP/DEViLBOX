@@ -36,7 +36,8 @@ export class TinyRSIDEngine {
   private metadata: any = null;
 
   private readonly sidData: Uint8Array;
-  private readonly config: TinyRSIDConfig;  ) {}
+  private readonly config: TinyRSIDConfig;
+
   constructor(sidData: Uint8Array, config: TinyRSIDConfig = {}) {
     this.sidData = sidData;
     this.config = config;
