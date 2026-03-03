@@ -794,7 +794,7 @@ export class TrackerReplayer {
         newSep.outputTone.connect(engine.masterInput);
       }
       // Replace the readonly separation node
-      (this as { separationNode: StereoSeparationNode }).separationNode = newSep;
+      (this as unknown as { separationNode: StereoSeparationNode }).separationNode = newSep;
     }
 
     // Initialize channels

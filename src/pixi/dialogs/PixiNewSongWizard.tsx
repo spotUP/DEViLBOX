@@ -14,7 +14,7 @@ import { useTabsStore } from '@stores/useTabsStore';
 import { getGroupedPresets, SYSTEM_PRESETS } from '@constants/systemPresets';
 import type { SystemPreset } from '@constants/systemPresets';
 import { AMIGA_UADE_PRESET_IDS, getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
-import { PixiButton, PixiCheckbox } from '../components';
+import { PixiButton } from '../components';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
 import { Div, Txt, GlModal, GlModalFooter } from '../layout';
@@ -147,7 +147,6 @@ export const PixiNewSongWizard: React.FC = () => {
 const GlStep1: React.FC<{ startMode: StartMode; onSelectMode: (m: StartMode) => void }> = ({
   startMode, onSelectMode,
 }) => {
-  const theme = usePixiTheme();
   return (
     <Div className="flex-col gap-4 p-6">
       <Txt className="text-sm text-text-muted">How do you want to start?</Txt>
@@ -231,7 +230,6 @@ const GlStep2: React.FC<GlStep2Props> = ({
   }, [maxScroll]);
 
   // Calculate visible items
-  const detailsW = MODAL_W - LIST_W;
 
   return (
     <Div className="flex-row flex-1" layout={{ minHeight: 0 }}>
@@ -260,7 +258,7 @@ const GlStep2: React.FC<GlStep2Props> = ({
           onWheel={handleWheel as any}
         >
           <pixiContainer layout={{ position: 'absolute', top: -scrollY, width: LIST_W }}>
-            {flatItems.map((item, i) => {
+            {flatItems.map((item, _i) => {
               if (item.type === 'header') {
                 return (
                   <Div
