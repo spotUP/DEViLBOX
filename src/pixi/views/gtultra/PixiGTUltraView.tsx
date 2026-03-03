@@ -25,6 +25,7 @@ import { PixiGTTableEditor } from './PixiGTTableEditor';
 import { PixiGTSIDMonitor } from './PixiGTSIDMonitor';
 import { PixiGTOscilloscope } from './PixiGTOscilloscope';
 import { PixiGTStudioInstrument } from './PixiGTStudioInstrument';
+import { PixiGTStudioTables } from './PixiGTStudioTables';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 
 const TOOLBAR_H = 32;
@@ -222,8 +223,9 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
             </>
           ) : (
             <>
-              {/* Studio mode: visual instrument designer + order list */}
-              <PixiGTStudioInstrument width={SIDEBAR_W} height={instrH + tableH} />
+              {/* Studio mode: visual instrument designer + visual tables */}
+              <PixiGTStudioInstrument width={SIDEBAR_W} height={instrH} />
+              <PixiGTStudioTables width={SIDEBAR_W} height={tableH} />
               <PixiGTOrderList width={SIDEBAR_W} height={orderH} />
               <PixiGTSIDMonitor width={SIDEBAR_W} height={regMonH} sidIndex={0} />
             </>
