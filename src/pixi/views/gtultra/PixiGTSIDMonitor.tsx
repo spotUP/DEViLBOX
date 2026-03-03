@@ -144,17 +144,26 @@ export const PixiGTSIDMonitor: React.FC<Props> = ({ width, height, sidIndex = 0 
     mega.updateLabels(labels, FONT_SIZE);
   }, [width, height, sidIndex]);
 
-  // Animation loop: poll SID registers from engine
+  // Animation loop: poll SID registers from engine and update display
   useEffect(() => {
+    let frameCount = 0;
     const tick = () => {
-      // TODO: Read registers from WASM via engine.getSidRegisters(sidIndex)
-      // For now, show zeros
+      // Every ~6 frames (~100ms at 60fps), request fresh SID register data
+      if (frameCount++ % 6 === 0) {
+        const engine = useGTUltraStore.getState().engine;
+        engine?.requestSidRegisters(sidIndex);
+      }
+      // Read registers from store
+      const storeRegs = useGTUltraStore.getState().sidRegisters[sidIndex];
+      if (storeRegs) {
+        registersRef.current.set(storeRegs.subarray(0, Math.min(25, storeRegs.length)));
+      }
       redraw();
       animRef.current = requestAnimationFrame(tick);
     };
     animRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animRef.current);
-  }, [redraw]);
+  }, [redraw, sidIndex]);
 
   return (
     <pixiContainer ref={containerRef} layout={{ width, height }}>

@@ -98,10 +98,14 @@ export function useGTKeyboardHandler(active: boolean) {
           // Jam: always play the note
           engine?.jamNoteOn(cursor.channel, noteVal, currentInstrument);
 
-          // Record: write to pattern
+          // Record: write to pattern via WASM
           if (recordMode) {
-            // TODO: write to WASM pattern via engine
-            // For now, advance cursor by editStep
+            const orderData = state.orderData[cursor.channel];
+            const patIdx = orderData ? orderData[state.playbackPos.position] : 0;
+            engine?.setPatternCell(patIdx, cursor.row, 0, noteVal);
+            engine?.setPatternCell(patIdx, cursor.row, 1, currentInstrument);
+            // Refresh pattern data after edit
+            state.refreshPatternData(patIdx);
             state.setCursor({ row: Math.min(cursor.row + editStep, state.patternLength) });
           }
         }
@@ -112,7 +116,10 @@ export function useGTKeyboardHandler(active: boolean) {
       if (e.key === '1' || e.key === 'Delete') {
         e.preventDefault();
         if (recordMode) {
-          // Write key-off (0xBE) to pattern
+          const orderData = state.orderData[cursor.channel];
+          const patIdx = orderData ? orderData[state.playbackPos.position] : 0;
+          engine?.setPatternCell(patIdx, cursor.row, 0, 0xBE);
+          state.refreshPatternData(patIdx);
           state.setCursor({ row: Math.min(cursor.row + editStep, state.patternLength) });
         }
         return;
@@ -125,17 +132,29 @@ export function useGTKeyboardHandler(active: boolean) {
       if (hv !== null) {
         e.preventDefault();
         if (recordMode) {
-          // TODO: modify the hex digit in WASM pattern
-          // digit 0 = high nibble, digit 1 = low nibble
-          const nextDigit = cursor.digit === 0 ? 1 : 0;
+          // Read current cell value, modify the appropriate nibble, write back
+          const orderData = state.orderData[cursor.channel];
+          const patIdx = orderData ? orderData[state.playbackPos.position] : 0;
+          const pat = state.patternData.get(patIdx);
+          const col = cursor.column; // 1=instrument, 2=command, 3=data
+          let currentVal = 0;
+          if (pat && cursor.row < pat.length) {
+            currentVal = pat.data[cursor.row * 4 + col];
+          }
+          // Apply hex digit
+          const newVal = cursor.digit === 0
+            ? (hv << 4) | (currentVal & 0x0F)
+            : (currentVal & 0xF0) | hv;
+          engine?.setPatternCell(patIdx, cursor.row, col, newVal);
+          state.refreshPatternData(patIdx);
+
           if (cursor.digit === 1) {
-            // After entering both digits, advance row
             state.setCursor({
               digit: 0,
               row: Math.min(cursor.row + editStep, state.patternLength),
             });
           } else {
-            state.setCursor({ digit: nextDigit });
+            state.setCursor({ digit: 1 });
           }
         }
         return;
@@ -160,11 +179,11 @@ export function useGTKeyboardHandler(active: boolean) {
           return;
         case 'z':
           e.preventDefault();
-          // TODO: Undo via WASM engine (gt_undo)
+          useGTUltraStore.getState().engine?.undo();
           return;
         case 'y':
           e.preventDefault();
-          // TODO: Redo via WASM engine (gt_redo)
+          useGTUltraStore.getState().engine?.redo();
           return;
         case 'i':
           e.preventDefault();

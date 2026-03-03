@@ -121,6 +121,12 @@ export interface GTUltraState {
   // Table data (wave/pulse/filter/speed)
   tableData: Record<string, GTTableData>;
 
+  // Pattern data cache (pattern# → {length, data})
+  patternData: Map<number, { length: number; data: Uint8Array }>;
+
+  // SID register snapshots (per SID chip)
+  sidRegisters: Uint8Array[];
+
   // Order list cursor
   orderCursor: number;
   // Table cursor
@@ -151,6 +157,21 @@ export interface GTUltraState {
   setSongName: (name: string) => void;
   setSongAuthor: (author: string) => void;
   setTempo: (tempo: number) => void;
+
+  // Data update actions (from WASM)
+  updatePatternData: (pattern: number, length: number, data: Uint8Array) => void;
+  updateOrderData: (channel: number, data: Uint8Array) => void;
+  updateInstrumentData: (instrument: number, data: Uint8Array) => void;
+  updateTableData: (tableType: number, left: Uint8Array, right: Uint8Array) => void;
+  updateSidRegisters: (sidIdx: number, data: Uint8Array) => void;
+
+  // Request data refresh from WASM engine
+  refreshPatternData: (pattern: number) => void;
+  refreshAllOrders: () => void;
+  refreshAllInstruments: () => void;
+  refreshAllTables: () => void;
+  refreshSidRegisters: () => void;
+  refreshSongInfo: () => void;
 }
 
 // Column navigation order within a channel
@@ -221,6 +242,8 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
     filter: emptyTable(),
     speed: emptyTable(),
   },
+  patternData: new Map(),
+  sidRegisters: [new Uint8Array(25), new Uint8Array(25)],
   orderCursor: 0,
   tableCursor: 0,
 
@@ -321,4 +344,98 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   setSongName: (songName) => set({ songName }),
   setSongAuthor: (songAuthor) => set({ songAuthor }),
   setTempo: (tempo) => set({ tempo }),
+
+  // --- Data update actions (from WASM) ---
+
+  updatePatternData: (pattern, length, data) => set((s) => {
+    const next = new Map(s.patternData);
+    next.set(pattern, { length, data });
+    return { patternData: next };
+  }),
+
+  updateOrderData: (channel, data) => set((s) => {
+    const next = [...s.orderData];
+    next[channel] = data;
+    return { orderData: next };
+  }),
+
+  updateInstrumentData: (instrument, rawData) => set((s) => {
+    const next = [...s.instrumentData];
+    // Parse raw bytes: ad(1), sr(1), vibdelay(1), gatetimer(1), firstwave(1), name(16), wave(1), pulse(1), filter(1), speed(1)
+    const ad = rawData[0];
+    const sr = rawData[1];
+    const vibdelay = rawData[2];
+    const gatetimer = rawData[3];
+    const firstwave = rawData[4];
+    let name = '';
+    for (let i = 5; i < 21; i++) {
+      if (rawData[i] === 0) break;
+      name += String.fromCharCode(rawData[i]);
+    }
+    const wavePtr = rawData[21];
+    const pulsePtr = rawData[22];
+    const filterPtr = rawData[23];
+    const speedPtr = rawData[24];
+    next[instrument] = { ad, sr, vibdelay, gatetimer, firstwave, name, wavePtr, pulsePtr, filterPtr, speedPtr };
+    return { instrumentData: next };
+  }),
+
+  updateTableData: (tableType, left, right) => set((s) => {
+    const TABLE_NAMES = ['wave', 'pulse', 'filter', 'speed'];
+    const key = TABLE_NAMES[tableType] || 'wave';
+    return {
+      tableData: {
+        ...s.tableData,
+        [key]: { left, right },
+      },
+    };
+  }),
+
+  updateSidRegisters: (sidIdx, data) => set((s) => {
+    const next = [...s.sidRegisters];
+    next[sidIdx] = data;
+    return { sidRegisters: next };
+  }),
+
+  // --- Request data refresh from WASM engine ---
+
+  refreshPatternData: (pattern) => {
+    get().engine?.requestPatternData(pattern);
+  },
+
+  refreshAllOrders: () => {
+    const engine = get().engine;
+    if (!engine) return;
+    const maxCh = get().sidCount * 3;
+    for (let ch = 0; ch < maxCh; ch++) {
+      engine.requestOrderData(ch);
+    }
+  },
+
+  refreshAllInstruments: () => {
+    const engine = get().engine;
+    if (!engine) return;
+    for (let i = 0; i < 64; i++) {
+      engine.requestInstrumentData(i);
+    }
+  },
+
+  refreshAllTables: () => {
+    const engine = get().engine;
+    if (!engine) return;
+    for (let t = 0; t < 4; t++) {
+      engine.requestTableData(t);
+    }
+  },
+
+  refreshSidRegisters: () => {
+    const engine = get().engine;
+    if (!engine) return;
+    engine.requestSidRegisters(0);
+    if (get().sidCount === 2) engine.requestSidRegisters(1);
+  },
+
+  refreshSongInfo: () => {
+    get().engine?.requestSongInfo();
+  },
 }));
