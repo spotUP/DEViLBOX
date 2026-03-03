@@ -9,7 +9,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
-import { GT_PRESET_CATEGORIES, type GTPreset } from '@/constants/gtultraPresets';
+import { getPresetCategories, getPresetsByCategory, type GTSIDPreset } from '@/constants/gtultraPresets';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 
 const C_BG       = 0x16213e;
@@ -25,7 +25,7 @@ const C_HOVER    = 0x222244;
 interface Props {
   width: number;
   height: number;
-  onApplyPreset?: (preset: GTPreset) => void;
+  onApplyPreset?: (preset: GTSIDPreset) => void;
 }
 
 export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, onApplyPreset }) => {
@@ -39,9 +39,9 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, onApplyPre
 
   const currentInstrument = useGTUltraStore((s) => s.currentInstrument);
 
-  const categories = GT_PRESET_CATEGORIES;
-  const cat = categories[selectedCat];
-  const presets = cat?.presets || [];
+  const categories = getPresetCategories();
+  const catName = categories[selectedCat];
+  const presets = catName ? getPresetsByCategory(catName) : [];
 
   // Init MegaText
   useEffect(() => {
@@ -86,7 +86,7 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, onApplyPre
       bg.rect(cx, y, catW - 1, catH).fill({ color: isSel ? C_CAT_SEL : C_CAT_BG });
       labels.push({
         x: cx + 3, y: y + 2,
-        text: categories[i].name.slice(0, 5).toUpperCase(),
+        text: categories[i].slice(0, 5).toUpperCase(),
         color: isSel ? C_PRESET_SEL : C_LABEL,
         fontFamily: ff,
       });
@@ -134,7 +134,7 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, onApplyPre
     }
 
     mega.updateLabels(labels, 8);
-  }, [width, height, selectedCat, selectedPreset, scroll, categories, cat, presets, currentInstrument]);
+  }, [width, height, selectedCat, selectedPreset, scroll, categories, catName, presets, currentInstrument]);
 
   useEffect(() => {
     redraw();
