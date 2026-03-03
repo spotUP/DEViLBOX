@@ -43,6 +43,9 @@ export function loadPixiFonts(): Promise<void> {
 /** Guard against multiple installs across HMR reloads / StrictMode double-mounts */
 let _fontsInstalled = false;
 
+/** Extra characters used as icons/symbols in the GL UI (beyond ASCII) */
+const EXTRA_CHARS = '±·¼É×é–—•…₁₂₃₆⅓⅛⅟←↑→↓↔⇥⇱⇲−∞≡⊓⊕⊞⊿⏎─│┊┌┐└┘├┤┬┴┼═█■▲△▴▶▸▾◂◈○◎●★☰♫♬✓✕';
+
 /**
  * Install DynamicBitmapFont for all UI font families.
  * Canvas-rasterized at 48px / 2x resolution (96px effective detail).
@@ -52,6 +55,11 @@ function installFonts(): void {
   _fontsInstalled = true;
   const monoFamily = 'JetBrains Mono, Menlo, Consolas, monospace';
   const sansFamily = 'Inter, -apple-system, BlinkMacSystemFont, sans-serif';
+
+  // Build character set: ASCII + UI symbol characters
+  const charSet = BitmapFontManager.ASCII.concat(
+    EXTRA_CHARS.split('').map(c => [c.charCodeAt(0), c.charCodeAt(0)] as [number, number])
+  );
 
   const fallbacks: { name: string; family: string; weight: TextStyleFontWeight }[] = [
     { name: PIXI_FONTS.MONO,          family: monoFamily, weight: 'normal' },
@@ -75,7 +83,7 @@ function installFonts(): void {
           fontSize: 48,
           fill: 0xffffff,
         },
-        chars: BitmapFontManager.ASCII,
+        chars: charSet,
         resolution: 2, // 96px effective — crisp up to ~8x zoom
       });
     } catch {
