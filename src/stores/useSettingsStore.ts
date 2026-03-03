@@ -20,6 +20,11 @@ export type FormatEngineChoice = 'native' | 'uade';
  */
 export type UADEImportMode = 'enhanced' | 'classic';
 
+/**
+ * C64 SID player engine selection (5 engines available from DeepSID).
+ */
+export type SIDEngineType = 'jssid' | 'websid' | 'tinyrsid' | 'websidplay' | 'jsidplay2';
+
 export interface CRTParams {
   scanlineIntensity: number;  // 0–1
   scanlineCount:     number;  // 50–1200
@@ -199,6 +204,9 @@ interface SettingsStore {
 
   // Format Engine Preferences
   formatEngine: FormatEnginePreferences;
+  
+  // C64 SID Engine
+  sidEngine: SIDEngineType;  // Default SID player engine (websid recommended)
 
   // Audio Settings
   performanceQuality: 'high' | 'medium' | 'low';
@@ -226,6 +234,7 @@ interface SettingsStore {
   setLinearInterpolation: (enabled: boolean) => void;
   setMasterTuning: (hz: number) => void;
   setFormatEngine: (format: keyof FormatEnginePreferences, engine: FormatEngineChoice | UADEImportMode) => void;
+  setSidEngine: (engine: SIDEngineType) => void;
   setPerformanceQuality: (quality: 'high' | 'medium' | 'low') => void;
   setUseBLEP: (enabled: boolean) => void;
   setStereoSeparation: (percent: number) => void;
@@ -247,6 +256,7 @@ export const useSettingsStore = create<SettingsStore>()(
       amigaLimits: false,
       linearInterpolation: true,
       masterTuning: 440,
+      sidEngine: 'websid',  // Recommended default: fast + accurate WASM reSID
       formatEngine: {
         mod: 'native',      // libopenmpt — full sample extraction + effects
         hvl: 'native',      // HivelyParser — WebAudio synthesis
@@ -413,6 +423,11 @@ export const useSettingsStore = create<SettingsStore>()(
     setFormatEngine: (format, engine) =>
       set((state) => {
         (state.formatEngine as Record<string, string>)[format] = engine;
+      }),
+
+    setSidEngine: (engine) =>
+      set((state) => {
+        state.sidEngine = engine;
       }),
 
     setPerformanceQuality: (performanceQuality) =>

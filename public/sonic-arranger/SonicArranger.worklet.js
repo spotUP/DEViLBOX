@@ -9,13 +9,22 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
     this.ctx = null;
     this.initialized = false;
     this.players = {};
+    // Pre-allocated array of active player handles — avoids Object.keys() allocation in process()
+    this._activeHandles = [];
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
 
-  async handleMessage(data) {
+  /** Rebuild the cached handle list after player add/remove */
+  _rebuildHandles() {
+    const arr = [];
+    for (const k in this.players) arr.push(+k);
+    this._activeHandles = arr;
+  }
+
+  handleMessage(data) {
     switch (data.type) {
       case 'init':
-        await this.initWasm(data.sampleRate, data.wasmBinary, data.jsCode);
+        this.initWasm(data.sampleRate, data.wasmBinary, data.jsCode);
         break;
 
       case 'createPlayer': {
@@ -27,6 +36,7 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
             outPtrL: this.wasm._malloc(floatBytes),
             outPtrR: this.wasm._malloc(floatBytes),
           };
+          this._rebuildHandles();
           this.port.postMessage({ type: 'playerCreated', handle });
         } else {
           this.port.postMessage({ type: 'error', message: 'sa_create_player failed (max players reached)' });
@@ -41,6 +51,7 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
           this.wasm._free(this.players[h].outPtrL);
           this.wasm._free(this.players[h].outPtrR);
           delete this.players[h];
+          this._rebuildHandles();
         }
         this.wasm._sa_destroy_player(this.ctx, h);
         break;
@@ -80,13 +91,14 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
 
       case 'dispose':
         if (this.wasm && this.ctx) {
-          for (const h of Object.keys(this.players)) {
-            const hi = parseInt(h);
+          for (let i = 0; i < this._activeHandles.length; i++) {
+            const hi = this._activeHandles[i];
             this.wasm._free(this.players[hi].outPtrL);
             this.wasm._free(this.players[hi].outPtrR);
             this.wasm._sa_destroy_player(this.ctx, hi);
           }
           this.players = {};
+          this._activeHandles = [];
           this.wasm._sa_dispose(this.ctx);
           this.ctx = null;
         }
@@ -149,9 +161,11 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
     outputL.fill(0);
     outputR.fill(0);
     const heapF32 = this.wasm.HEAPF32;
-    for (const h of Object.keys(this.players)) {
-      const hi = parseInt(h);
-      const ptrs = this.players[hi];
+    const handles = this._activeHandles;
+    const players = this.players;
+    for (let idx = 0; idx < handles.length; idx++) {
+      const hi = handles[idx];
+      const ptrs = players[hi];
       if (!ptrs) continue;
       this.wasm._sa_render(this.ctx, hi, ptrs.outPtrL, ptrs.outPtrR, numSamples);
       const offL = ptrs.outPtrL >> 2;

@@ -13,7 +13,6 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { stringNoteToXM } from '@/lib/xmConversions';
-import { diagKeyRepeatRate, diagFrameStart, diagFrameEnd } from '../pixi/scrollPerf';
 
 // Track currently held notes to prevent retriggering and enable proper release
 interface HeldNote {
@@ -209,6 +208,17 @@ export const useTrackerInput = () => {
   // Track last Esc press for double-Esc panic (kill all notes)
   const lastEscPressRef = useRef<number>(0);
 
+  // ── RAF-driven arrow key scrolling ──────────────────────────────────────────
+  // macOS key repeat fires at 30Hz — we bypass it and drive cursor movement
+  // at 60fps via requestAnimationFrame for smooth scrolling.
+  const heldArrowRef = useRef<{ dir: 'up' | 'down'; selecting: boolean } | null>(null);
+  const arrowRafRef = useRef(0);
+  // Store callbacks in refs so the RAF loop always calls the latest version
+  const moveCursorRef = useRef(moveCursor);
+  moveCursorRef.current = moveCursor;
+  const endSelectionRef = useRef(endSelection);
+  endSelectionRef.current = endSelection;
+
   // FT2: Get the channel to use for note entry (multi-channel allocation)
   const getTargetChannel = useCallback(() => {
     const editMode = recordMode && !isPlaying;
@@ -399,8 +409,6 @@ export const useTrackerInput = () => {
   // Handle keyboard input
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      diagKeyRepeatRate();
-      const _t0 = performance.now();
       // Only handle keys when tracker view is active
       const activeView = useUIStore.getState().activeView;
       if (activeView !== 'tracker') {
@@ -695,28 +703,44 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // Arrow keys
-      if (key === 'ArrowUp') {
+      // Arrow keys (up/down)
+      // PERF: macOS key repeat fires at 30Hz — bypass it entirely.
+      // On first press, move immediately and start a RAF loop at 60Hz.
+      // On repeat, skip — the RAF loop handles continuous movement.
+      if (key === 'ArrowUp' || key === 'ArrowDown') {
         e.preventDefault();
-        if (e.altKey || e.shiftKey) {
-          // Alt+Arrow or Shift+Arrow: Mark/extend selection
-          if (!selectionRef.current) startSelection();
-          moveCursor('up');
-          endSelection();
-        } else {
-          moveCursor('up');
+        const dir = key === 'ArrowUp' ? 'up' as const : 'down' as const;
+        if (e.repeat) {
+          // PERF: Kill repeat events completely — prevents KeyboardRouter,
+          // useGlobalKeyboardHandler, and all other handlers from processing
+          // them. Our RAF loop drives movement at 60fps instead of the OS 30Hz.
+          e.stopImmediatePropagation();
+          return;
         }
-        return;
-      }
-
-      if (key === 'ArrowDown') {
-        e.preventDefault();
-        if (e.altKey || e.shiftKey) {
-          if (!selectionRef.current) startSelection();
-          moveCursor('down');
-          endSelection();
-        } else {
-          moveCursor('down');
+        const selecting = e.altKey || e.shiftKey;
+        if (selecting && !selectionRef.current) startSelection();
+        moveCursor(dir);
+        if (selecting) endSelection();
+        // Start RAF-driven scroll if not already running.
+        // PERF: Move cursor every 3rd frame (~20Hz). Each cursor move
+        // triggers full label regeneration (~15ms) in the pattern editor,
+        // exceeding the 16.7ms vsync budget. Spacing moves 3 frames apart
+        // gives 2 cheap "coast" frames between expensive redraws, keeping
+        // average FPS at ~45 instead of the 30fps ceiling from macOS's
+        // 30Hz key repeat rate.
+        heldArrowRef.current = { dir, selecting };
+        if (!arrowRafRef.current) {
+          let frameCount = 0;
+          const tick = () => {
+            const held = heldArrowRef.current;
+            if (!held) { arrowRafRef.current = 0; return; }
+            if (++frameCount % 3 === 0) {
+              moveCursorRef.current(held.dir);
+              if (held.selecting) endSelectionRef.current();
+            }
+            arrowRafRef.current = requestAnimationFrame(tick);
+          };
+          arrowRafRef.current = requestAnimationFrame(tick);
         }
         return;
       }
@@ -1478,13 +1502,19 @@ export const useTrackerInput = () => {
     ]
   );
 
-  // Handle key release for note off
+  // Handle key release for note off and arrow key scroll stop
   const handleKeyUp = useCallback(
     (e: KeyboardEvent) => {
       // Only handle keys when tracker view is active
       const activeView = useUIStore.getState().activeView;
       if (activeView !== 'tracker') {
         return;
+      }
+
+      // Stop RAF-driven arrow scrolling
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        heldArrowRef.current = null;
+        // RAF loop will self-terminate on next tick when it sees null
       }
 
       const keyLower = e.key.toLowerCase();
@@ -1500,24 +1530,17 @@ export const useTrackerInput = () => {
   // Attach keyboard listeners
   // Use capture phase to intercept F1-F12 before browser handles them
   useEffect(() => {
-    // PERF DIAG: Wrap handler to measure total event dispatch time
-    const wrappedKeyDown = (e: KeyboardEvent) => {
-      const t0 = performance.now();
-      handleKeyDown(e);
-      const syncTime = performance.now() - t0;
-      // Measure time until all microtasks complete (zustand subscribers, React batch)
-      queueMicrotask(() => {
-        const totalTime = performance.now() - t0;
-        if (e.repeat && totalTime > 1) {
-          console.log(`[keydown] key=${e.key} sync=${syncTime.toFixed(1)}ms total+microtask=${totalTime.toFixed(1)}ms`);
-        }
-      });
-    };
-    window.addEventListener('keydown', wrappedKeyDown, { capture: true });
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
     window.addEventListener('keyup', handleKeyUp, { capture: true });
     return () => {
-      window.removeEventListener('keydown', wrappedKeyDown, { capture: true });
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
       window.removeEventListener('keyup', handleKeyUp, { capture: true });
+      // Cancel any in-flight RAF scroll
+      if (arrowRafRef.current) {
+        cancelAnimationFrame(arrowRafRef.current);
+        arrowRafRef.current = 0;
+      }
+      heldArrowRef.current = null;
     };
   }, [handleKeyDown, handleKeyUp]);
 

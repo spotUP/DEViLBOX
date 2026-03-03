@@ -96,6 +96,11 @@ export async function loadFile(
   try {
     // === SONG FORMATS (replace project) ===
     if (isSongFormat(filename)) {
+      // .sid files need magic-based detection (C64 vs Amiga) - skip preview dialog
+      if (filename.endsWith('.sid') || filename.endsWith('.sid1') || filename.endsWith('.sid2')) {
+        return await loadSongFile(file, options);
+      }
+      
       if (options.requireConfirmation) {
         return { success: 'pending-confirmation', file };
       }

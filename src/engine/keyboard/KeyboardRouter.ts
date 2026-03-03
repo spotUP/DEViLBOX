@@ -72,6 +72,16 @@ function isModalOpen(): boolean {
  * Main keyboard event handler.
  */
 function handleKeyDown(e: KeyboardEvent): void {
+  // PERF: Suppress repeat arrow key events entirely. macOS key repeat fires
+  // at 30Hz which caps scroll FPS at 30. useTrackerInput drives cursor movement
+  // via its own RAF loop at 60fps. Killing repeats here (the first capture-phase
+  // listener) prevents ALL downstream handlers from wasting time on them.
+  if (e.repeat && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+
   // Skip if target is an input field
   if (isInputElement(e)) {
     return;

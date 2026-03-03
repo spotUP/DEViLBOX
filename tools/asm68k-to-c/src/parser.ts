@@ -65,6 +65,7 @@ function parseOperand(t: Token): Operand {
 
 export function parse(tokens: Token[]): AstNode[] {
   const nodes: AstNode[] = [];
+  let rsOffset = 0; // RS.x offset counter (reset by RSRESET)
   let i = 0;
 
   function peek(): Token { return tokens[i]; }
@@ -130,6 +131,31 @@ export function parse(tokens: Token[]): AstNode[] {
             : valToken.value
           : 0;
       nodes.push({ kind: 'equ', name, value: val, line: startLine });
+      continue;
+    }
+
+    // RSRESET — reset RS offset counter to 0
+    if (first.kind === 'DIRECTIVE' && first.value === 'RSRESET') {
+      rsOffset = 0;
+      continue;
+    }
+
+    // RS.B / RS.W / RS.L — assign current offset to label, then advance
+    // Format: label RS.size count (e.g. "it_name RS.B 31")
+    if (
+      first.kind === 'IDENTIFIER' &&
+      lt[j + 1]?.kind === 'DIRECTIVE' && lt[j + 1]?.value === 'RS' &&
+      lt[j + 2]?.kind === 'SIZE'
+    ) {
+      const name = first.value;
+      const sizeChar = lt[j + 2].value.slice(1).toUpperCase(); // B, W, L
+      const elemSize = sizeChar === 'B' ? 1 : sizeChar === 'W' ? 2 : 4;
+      const countToken = lt[j + 3];
+      const count = countToken && (countToken.kind === 'NUMBER' || countToken.kind === 'IMMEDIATE')
+        ? parseNumber(countToken.value.replace(/^#/, ''))
+        : 0;
+      nodes.push({ kind: 'equ', name, value: rsOffset, line: startLine });
+      rsOffset += elemSize * count;
       continue;
     }
 
