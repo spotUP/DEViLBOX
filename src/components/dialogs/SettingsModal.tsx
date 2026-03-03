@@ -6,7 +6,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Maximize2, Keyboard } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
-import { useSettingsStore } from '@stores/useSettingsStore';
+import { useSettingsStore, type SIDEngineType } from '@stores/useSettingsStore';
+import { SID_ENGINES, type SIDEngineInfo } from '@engine/deepsid/DeepSIDEngineManager';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
@@ -98,6 +99,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setCrtEnabled,
     setCrtParam,
     resetCrtParams,
+    sidEngine,
+    setSidEngine,
   } = useSettingsStore();
 
   const { sampleBusGain, setSampleBusGain, synthBusGain, setSynthBusGain, autoGain, setAutoGain } = useAudioStore();
@@ -865,6 +868,68 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               >
                 CLEAR DISMISSED FILES
               </button>
+            </div>
+            
+            {/* C64 SID Engine Selection */}
+            <div className="mb-4">
+              <h3 className="text-ft2-text text-xs font-bold mb-2 tracking-wide">C64 SID PLAYER ENGINE</h3>
+              <p className="text-ft2-textDim text-[9px] font-mono mb-2 leading-relaxed">
+                Choose the emulation engine for C64 SID music playback (.sid files). Each engine offers different
+                accuracy/performance tradeoffs. WebSID is recommended for best balance.
+              </p>
+              
+              <div className="space-y-2">
+                {Object.values(SID_ENGINES).map((engine) => (
+                  <label
+                    key={engine.id}
+                    className={`block p-2 border cursor-pointer transition-colors ${
+                      sidEngine === engine.id
+                        ? 'bg-ft2-rowEven border-ft2-highlight'
+                        : 'bg-transparent border-ft2-border hover:bg-ft2-rowEven/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="sidEngine"
+                        value={engine.id}
+                        checked={sidEngine === engine.id}
+                        onChange={(e) => setSidEngine(e.target.value as SIDEngineType)}
+                        className="accent-ft2-highlight"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-ft2-text text-[10px] font-mono font-bold">
+                            {engine.name}
+                          </span>
+                          <span className="text-ft2-textDim text-[9px] font-mono">
+                            {engine.size}
+                          </span>
+                          {engine.id === 'websid' && (
+                            <span className="text-ft2-highlight text-[9px] font-mono">
+                              (Recommended)
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-ft2-textDim text-[9px] font-mono mt-0.5">
+                          {engine.description}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-[8px] font-mono">
+                          <span className="text-ft2-textDim">
+                            Accuracy: <span className="text-ft2-text">{engine.accuracy}</span>
+                          </span>
+                          <span className="text-ft2-textDim">
+                            Speed: <span className="text-ft2-text">{engine.speed}</span>
+                          </span>
+                          {!engine.requiresWASM && (
+                            <span className="text-ft2-highlight">No WASM</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
             
             <div>
