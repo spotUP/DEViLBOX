@@ -108,6 +108,8 @@ export type SynthType =
   | 'FurnaceZXBEEPER' // ZX Spectrum beeper
   | 'FurnaceSCVTONE'  // Epoch Super Cassette Vision
   | 'FurnacePCMDAC'   // Generic PCM DAC
+  // C64 SID playback (audio handled by C64SIDEngine, not Furnace)
+  | 'C64SID'
   // Additive/Spectral
   | 'HarmonicSynth'
   // Bass synths
