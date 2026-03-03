@@ -631,7 +631,8 @@ export const PixiFT2Toolbar: React.FC = () => {
         <PixiButton label="Help"      variant="ghost" size="sm" onClick={() => handleShowHelp('shortcuts')} />
         <PixiButton label="Settings"  variant="ghost" size="sm" onClick={handleShowSettings} />
         <PixiButton
-          label={isFullscreen ? '⇱' : '⇲'}
+          label=""
+          icon={isFullscreen ? 'zoomout' : 'zoomin'}
           variant={isFullscreen ? 'ft2' : 'ghost'}
           color={isFullscreen ? 'blue' : 'default'}
           size="sm"

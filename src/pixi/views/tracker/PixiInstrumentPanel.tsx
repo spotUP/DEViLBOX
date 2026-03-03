@@ -300,10 +300,10 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
               {isSelected && (
                 <pixiContainer layout={{ flexDirection: 'row', gap: 2, flexShrink: 0, marginLeft: 2 }}>
                   {/* Clone */}
-                  <PixiButton label="⊕" variant="ghost" size="sm" onClick={() => handleClone(inst.id)} width={20} />
+                  <PixiButton label="" icon="copy" variant="ghost" size="sm" onClick={() => handleClone(inst.id)} width={20} />
                   {/* Delete */}
                   {instruments.length > 1 && (
-                    <PixiButton label="✕" variant="ghost" size="sm" color="red" onClick={() => handleDelete(inst.id)} width={20} />
+                    <PixiButton label="" icon="close" variant="ghost" size="sm" color="red" onClick={() => handleDelete(inst.id)} width={20} />
                   )}
                 </pixiContainer>
               )}
