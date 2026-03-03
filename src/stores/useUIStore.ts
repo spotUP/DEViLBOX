@@ -67,6 +67,10 @@ interface UIStore {
   // View switching (tracker vs arrangement vs DJ vs drum pads vs piano roll vs VJ vs studio)
   activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio';
 
+  // View Exposé (macOS Mission Control style view switcher)
+  viewExposeActive: boolean;
+  viewExposeSelectedIdx: number;
+
   // Pop-out window state
   tb303PoppedOut: boolean;
   instrumentEditorPoppedOut: boolean;
@@ -126,6 +130,11 @@ interface UIStore {
   // View switching actions
   setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio') => void;
   toggleActiveView: () => void;
+
+  // View Exposé actions
+  toggleViewExpose: () => void;
+  setViewExposeActive: (active: boolean) => void;
+  setViewExposeSelectedIdx: (idx: number) => void;
 
   // Pop-out window actions
   setTB303PoppedOut: (v: boolean) => void;
@@ -208,6 +217,10 @@ export const useUIStore = create<UIStore>()(
 
       // View switching
       activeView: 'tracker' as const,
+
+      // View Exposé
+      viewExposeActive: false,
+      viewExposeSelectedIdx: 0,
 
       // Pop-out window state
       tb303PoppedOut: false,
@@ -452,6 +465,24 @@ export const useUIStore = create<UIStore>()(
         set((state) => {
           state.activeView = state.activeView === 'tracker' ? 'arrangement' : 'tracker';
         }),
+
+      // View Exposé actions
+      toggleViewExpose: () =>
+        set((state) => {
+          state.viewExposeActive = !state.viewExposeActive;
+          if (state.viewExposeActive) {
+            // Pre-select current view when opening
+            const EXPOSE_VIEWS = ['tracker', 'arrangement', 'pianoroll', 'dj', 'vj', 'studio'];
+            const idx = EXPOSE_VIEWS.indexOf(state.activeView);
+            state.viewExposeSelectedIdx = idx >= 0 ? idx : 0;
+          }
+        }),
+
+      setViewExposeActive: (active) =>
+        set((state) => { state.viewExposeActive = active; }),
+
+      setViewExposeSelectedIdx: (idx) =>
+        set((state) => { state.viewExposeSelectedIdx = idx; }),
 
       // Pop-out window actions
       setTB303PoppedOut: (v) =>
