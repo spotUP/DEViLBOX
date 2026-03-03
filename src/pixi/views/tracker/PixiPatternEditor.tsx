@@ -898,7 +898,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     if (fullRedrawRef.current) {
       fullRedrawRef.current = false;
       prevVStartRef.current = vStart;
-      lastLabelTimeRef.current = performance.now();
       const gGrid = gridGraphicsRef.current;
       if (gGrid) renderGrid(gGrid, p, vStart);
       if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T00:58:01.930Z
+ * Generated: 2026-03-03T01:17:03.995Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2008';
-export const BUILD_NUMBER = '2008';
-export const BUILD_HASH = '0d71ca89';
+export const BUILD_VERSION = '1.0.2013';
+export const BUILD_NUMBER = '2013';
+export const BUILD_HASH = '044c5bb7';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,29 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2008',
+    version: '1.0.2013',
     date: '2026-03-03',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Revert(tracker): restore pre-tile-shift scroll (every-3rd-frame RAF)"
+      },
+      {
+        type: 'fix',
+        "description": "Debug(vj): add preset selection logging in VJView"
+      },
+      {
+        type: 'improvement',
+        "description": "Revert(tracker): restore overlay inside scroll container for 46fps scroll"
+      },
+      {
+        type: 'fix',
+        "description": "Encode preset paths and add error logging in ProjectMCanvas"
+      },
+      {
+        type: 'fix',
+        "description": "Show import dialog for SID files on drag-and-drop"
+      },
       {
         type: 'fix',
         "description": "Clean up engine constructor syntax errors"
@@ -218,26 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Always draw item hit rect in dropdown panel to eliminate shaky clicks"
-      },
-      {
-        type: 'feature',
-        "description": "Right-click GL context menu (quantize, transpose, delete)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix dropdown item selection by replacing DOM-capture close with PixiJS backdrop"
-      },
-      {
-        type: 'feature',
-        "description": "Instrument names, VU peak hold, dB level readout in GL mixer"
-      },
-      {
-        type: 'feature',
-        "description": "Follow-playback auto-scroll + ctrl+wheel zoom"
-      },
-      {
-        type: 'feature',
-        "description": "Remove channel in GL context menu"
       }
     ]
   }
