@@ -27,6 +27,7 @@ import { PixiGTOscilloscope } from './PixiGTOscilloscope';
 import { PixiGTStudioInstrument } from './PixiGTStudioInstrument';
 import { PixiGTStudioTables } from './PixiGTStudioTables';
 import { PixiGTPianoRoll } from './PixiGTPianoRoll';
+import { PixiGTPresetBrowser } from './PixiGTPresetBrowser';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 
 const TOOLBAR_H = 32;
@@ -61,11 +62,17 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const editorWidth = width - SIDEBAR_W;
   const editorHeight = height - TOOLBAR_H;
   const oscH = 80;
+  // Pro mode: order + instrument + table + register monitor
   const orderH = Math.floor((editorHeight - oscH) * 0.2);
   const instrH = Math.floor((editorHeight - oscH) * 0.3);
   const sideRemain = editorHeight - oscH - orderH - instrH;
   const tableH = Math.floor(sideRemain * 0.5);
   const regMonH = sideRemain - tableH;
+  // Studio mode: instrument designer + presets + visual tables + register monitor
+  const studioInstrH = Math.floor((editorHeight - oscH) * 0.3);
+  const studioPresetH = Math.floor((editorHeight - oscH) * 0.22);
+  const studioTableH = Math.floor((editorHeight - oscH) * 0.25);
+  const studioRegH = editorHeight - oscH - studioInstrH - studioPresetH - studioTableH;
 
   // Toolbar info
   const infoText = useMemo(() => {
@@ -95,6 +102,15 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
     const store = useGTUltraStore.getState();
     store.setViewMode(store.viewMode === 'pro' ? 'studio' : 'pro');
   }, []);
+
+  const handleApplyPreset = useCallback((preset: import('@/constants/gtultraPresets').GTSIDPreset) => {
+    if (!engine) return;
+    const idx = useGTUltraStore.getState().currentInstrument;
+    engine.setInstrumentAD(idx, preset.ad);
+    engine.setInstrumentSR(idx, preset.sr);
+    engine.setInstrumentFirstwave(idx, preset.waveform | 0x01); // set gate bit
+    engine.requestInstrumentData(idx);
+  }, [engine]);
 
   // Draw callbacks
   const drawBg = useCallback((g: GraphicsType) => {
@@ -231,11 +247,11 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
             </>
           ) : (
             <>
-              {/* Studio mode: visual instrument designer + visual tables */}
-              <PixiGTStudioInstrument width={SIDEBAR_W} height={instrH} />
-              <PixiGTStudioTables width={SIDEBAR_W} height={tableH} />
-              <PixiGTOrderList width={SIDEBAR_W} height={orderH} />
-              <PixiGTSIDMonitor width={SIDEBAR_W} height={regMonH} sidIndex={0} />
+              {/* Studio mode: visual instrument designer + presets + visual tables + register monitor */}
+              <PixiGTStudioInstrument width={SIDEBAR_W} height={studioInstrH} />
+              <PixiGTPresetBrowser width={SIDEBAR_W} height={studioPresetH} onApplyPreset={handleApplyPreset} />
+              <PixiGTStudioTables width={SIDEBAR_W} height={studioTableH} />
+              <PixiGTSIDMonitor width={SIDEBAR_W} height={studioRegH} sidIndex={0} />
             </>
           )}
         </pixiContainer>
