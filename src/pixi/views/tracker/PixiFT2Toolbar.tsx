@@ -108,7 +108,7 @@ export const PixiFT2Toolbar: React.FC = () => {
     speed, setSpeed,
     isPlaying, isLooping,
     play, stop, setIsLooping,
-    grooveTemplateId, swing, jitter, useMpcScale,
+    grooveTemplateId, swing, jitter,
   } = useTransportStore(useShallow(s => ({
     bpm: s.bpm,
     setBPM: s.setBPM,
@@ -122,7 +122,6 @@ export const PixiFT2Toolbar: React.FC = () => {
     grooveTemplateId: s.grooveTemplateId,
     swing: s.swing,
     jitter: s.jitter,
-    useMpcScale: s.useMpcScale,
   })));
 
   // ── Tracker store ─────────────────────────────────────────────────────────

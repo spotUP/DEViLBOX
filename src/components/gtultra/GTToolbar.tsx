@@ -3,7 +3,7 @@
  */
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { useGTUltraStore } from '../../stores/useGTUltraStore';
+import { useGTUltraStore, type GTSidModel } from '../../stores/useGTUltraStore';
 import { getGTUltraASIDBridge } from '../../engine/gtultra/GTUltraASIDBridge';
 import { getASIDDeviceManager } from '../../lib/sid/ASIDDeviceManager';
 
@@ -151,7 +151,7 @@ export const GTToolbar: React.FC<{ width: number; height: number }> = ({ width, 
       {/* SID config */}
       <select
         value={sidModel}
-        onChange={(e) => setSidModel(Number(e.target.value))}
+        onChange={(e) => setSidModel(Number(e.target.value) as GTSidModel)}
         style={{ background: '#16213e', color: '#e0e0ff', border: '1px solid #333', padding: '1px 4px', fontSize: 11 }}
         title="SID chip model"
       >

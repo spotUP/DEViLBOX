@@ -163,7 +163,7 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
           <Knob
             value={config.volume / 64}
             onChange={(v) => updateParam('volume', Math.round(v * 64))}
-            size={48}
+            size="md"
             label="Volume"
             min={0}
             max={1}
@@ -177,7 +177,7 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
             <Knob
               value={config.phaseDelta / 255}
               onChange={(v) => updateParam('phaseDelta', Math.round(v * 255))}
-              size={48}
+              size="md"
               label="Phase Δ"
               min={0}
               max={1}

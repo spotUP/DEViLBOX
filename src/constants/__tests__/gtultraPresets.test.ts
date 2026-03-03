@@ -2,7 +2,7 @@
  * GTUltra Presets Tests — Validate SID instrument preset data integrity
  */
 import { describe, it, expect } from 'vitest';
-import { SID_PRESETS, getPresetsByCategory, getPresetCategories, type GTSIDPreset } from '../../constants/gtultraPresets';
+import { SID_PRESETS, getPresetsByCategory, getPresetCategories } from '../../constants/gtultraPresets';
 
 describe('GTUltra Presets', () => {
   it('has presets defined', () => {

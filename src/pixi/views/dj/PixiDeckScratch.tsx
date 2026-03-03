@@ -106,7 +106,7 @@ export const PixiDeckScratch: React.FC<Props> = ({ deckId, width = 280, height =
     <pixiContainer layout={layoutProp ?? { width, height, flexDirection: 'column', gap: 2, paddingTop: 2, paddingLeft: 2 }}>
       {/* Row 1: Pattern buttons */}
       <pixiContainer layout={{ flexDirection: 'row', gap: BTN_GAP, height: ROW_H, alignItems: 'center' }}>
-        {VISIBLE_PATTERNS.map((pattern, i) => {
+        {VISIBLE_PATTERNS.map((pattern, _i) => {
           const isActive = activePatternName === pattern.name;
           const isWaiting = waitingPattern === pattern.name;
           const disabled = activePatternName !== null && !isActive;
@@ -120,7 +120,7 @@ export const PixiDeckScratch: React.FC<Props> = ({ deckId, width = 280, height =
               cursor={disabled ? 'default' : 'pointer'}
               onPointerDown={() => handlePatternDown(pattern.name)}
               onPointerUp={() => handlePatternUp(pattern.name)}
-              alpha={waiting && isWaiting ? 0.6 : 1}
+              alpha={isWaiting ? 0.6 : 1}
             >
               <pixiGraphics draw={(g: GraphicsType) => drawBtn(g, 0, BTN_W, isActive, isWaiting, disabled)} />
               <pixiBitmapText

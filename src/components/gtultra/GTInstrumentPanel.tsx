@@ -5,7 +5,7 @@
  * vibrato, gate timer, and first wave settings.
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 
 const LABEL_STYLE: React.CSSProperties = {

@@ -15,7 +15,6 @@
 
 import React, { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
-import { usePixiTheme } from '@/pixi/theme';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { PixiButton } from '@/pixi/components/PixiButton';
 import { PixiGTPatternGrid } from './PixiGTPatternGrid';
@@ -47,7 +46,6 @@ interface Props {
 }
 
 export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
-  const theme = usePixiTheme();
   const playing = useGTUltraStore((s) => s.playing);
   const songName = useGTUltraStore((s) => s.songName);
   const songAuthor = useGTUltraStore((s) => s.songAuthor);

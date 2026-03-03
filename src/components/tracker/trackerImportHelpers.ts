@@ -4,7 +4,7 @@
  * - getChannelMetadataFromFurnace: Maps Furnace system presets to channel metadata
  */
 
-import { SYSTEM_PRESETS, DivChanType, type SystemPreset } from '@/constants/systemPresets';
+import { SYSTEM_PRESETS, DivChanType } from '@/constants/systemPresets';
 import { CHANNEL_COLORS } from '@typedefs';
 import type { Pattern } from '@typedefs';
 import type { InstrumentConfig } from '@typedefs/instrument';

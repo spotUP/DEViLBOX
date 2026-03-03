@@ -8,7 +8,7 @@ import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
 import { isDevilboxSynth } from '@typedefs/synth';
 import { DB303Synth, DB303Synth as JC303Synth } from './db303';
-import { MAMESynth } from './MAMESynth';
+// MAMESynth imported via MAMEBaseSynth
 import { MAMEBaseSynth } from './mame/MAMEBaseSynth';
 import { InstrumentFactory } from './InstrumentFactory';
 import { periodToNoteIndex, getPeriodExtended } from './effects/PeriodTables';
@@ -34,7 +34,7 @@ import { SynthRegistry } from './registry/SynthRegistry';
 import { VoiceAllocator } from './audio/VoiceAllocator';
 
 // Extracted modules
-import { EFFECT_RAMP_TIME as _EFFECT_RAMP_TIME, applyEffectParametersDiff as _applyEffectParamsDiff, applyBpmSyncedParam as _applyBpmSyncedParam } from './tone/EffectParameterEngine';
+import { applyEffectParametersDiff as _applyEffectParamsDiff, applyBpmSyncedParam as _applyBpmSyncedParam } from './tone/EffectParameterEngine';
 import { applyFurnaceSynthEffect as _applyFurnaceSynthEffect } from './tone/FurnaceEffects';
 import { MetronomeManager } from './tone/Metronome';
 import { AutoGainController } from './tone/AutoGainController';
@@ -84,7 +84,6 @@ import {
   setChannelFunkRepeat as _setChannelFunkRepeat,
   handlePastNoteAction as _handlePastNoteAction,
   setChannelPitch as _setChannelPitch,
-  applyPitchToNode as _applyPitchToNode,
   setChannelFrequency as _setChannelFrequency,
   initChannelPitch as _initChannelPitch,
   clearChannelPitch as _clearChannelPitch,
@@ -101,8 +100,6 @@ import {
 import {
   type MasterEffectsContext,
   rebuildMasterEffects as _rebuildMasterEffects,
-  canUseParameterUpdatePath as _canUseParameterUpdatePath,
-  updateEffectParameters as _updateEffectParameters,
   getMasterEffectNode as _getMasterEffectNode,
   getMasterEffectAnalysers as _getMasterEffectAnalysers,
   updateMasterEffectParams as _updateMasterEffectParams,
@@ -4340,14 +4337,6 @@ export class ToneEngine {
     return _rebuildMasterEffects(this._masterFxCtx, effects);
   }
 
-  private canUseParameterUpdatePath(newEffects: EffectConfig[]): boolean {
-    return _canUseParameterUpdatePath(this._masterFxCtx, newEffects);
-  }
-
-  private updateEffectParameters(newEffects: EffectConfig[]): void {
-    _updateEffectParameters(this._masterFxCtx, newEffects);
-  }
-
   public getMasterEffectNode(effectId: string): Tone.ToneAudioNode | null {
     return _getMasterEffectNode(this._masterFxCtx, effectId);
   }
@@ -4361,10 +4350,8 @@ export class ToneEngine {
   }
 
   public updateInstrumentEffectParams(effectId: string, config: EffectConfig): void {
-    _updateInstrumentEffectParams(this._masterFxCtx, effectId, config);
+    _updateInstrumentEffectParams(this.instrumentEffectNodes, this._masterFxCtx.applyEffectParametersDiff, effectId, config);
   }
-
-  private static readonly EFFECT_RAMP_TIME = _EFFECT_RAMP_TIME;
 
   private applyEffectParametersDiff(node: Tone.ToneAudioNode, type: string, changed: Record<string, number | string>): void {
     _applyEffectParamsDiff(node, type, changed);
@@ -4447,7 +4434,6 @@ export class ToneEngine {
   public setChannelFunkRepeat(channelIndex: number, position: number): void { _setChannelFunkRepeat(this._channelCtx, channelIndex, position); }
   public handlePastNoteAction(channelIndex: number, action: number): void { _handlePastNoteAction(this._channelCtx, channelIndex, action); }
   public setChannelPitch(channelIndex: number, pitchMultiplier: number): void { _setChannelPitch(this._channelCtx, channelIndex, pitchMultiplier); }
-  private applyPitchToNode(node: Tone.ToneAudioNode | DevilboxSynth, pitchMultiplier: number, baseRate: number, instrumentKey: number): void { _applyPitchToNode(node, pitchMultiplier, baseRate, instrumentKey, this.instrumentSynthTypes); }
   public setChannelFrequency(channelIndex: number, frequency: number): void { _setChannelFrequency(this._channelCtx, channelIndex, frequency); }
   public initChannelPitch(channelIndex: number, instrumentKey: number, baseFrequency: number, basePlaybackRate: number = 1): void { _initChannelPitch(this._channelCtx, channelIndex, instrumentKey, baseFrequency, basePlaybackRate); }
   public clearChannelPitch(channelIndex: number): void { _clearChannelPitch(this._channelCtx, channelIndex); }

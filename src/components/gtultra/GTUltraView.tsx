@@ -15,7 +15,7 @@
  * └───────────────────────┴────────────────────┘
  */
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 import { GTPatternEditor } from './GTPatternEditor';
 import { GTToolbar } from './GTToolbar';
@@ -30,12 +30,10 @@ const SIDEBAR_WIDTH = 320;
 const TOOLBAR_HEIGHT = 36;
 
 export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width, height }) => {
-  const engine = useGTUltraStore((s) => s.engine);
   const setEngine = useGTUltraStore((s) => s.setEngine);
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const channelCount = sidCount * 3;
   const [patternData, setPatternData] = useState<Uint8Array[]>([]);
-  const animFrameRef = useRef(0);
 
   // Keyboard input
   useGTKeyboardHandler(true);

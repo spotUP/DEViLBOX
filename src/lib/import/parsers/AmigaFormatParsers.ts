@@ -46,7 +46,7 @@ export async function tryRouteFormat(
   // ── HivelyTracker / AHX ─────────────────────────────────────────────────
   if (filename.endsWith('.hvl') || filename.endsWith('.ahx')) {
     const { parseHivelyFile } = await import('@lib/import/formats/HivelyParser');
-    return withNativeDefault('hvl', ctx, (buf, name) => parseHivelyFile(buf, name));
+    return withNativeDefault('hvl', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseHivelyFile(buf as ArrayBuffer, name));
   }
 
   // ── X-Tracker DMF (.dmf only — magic "DDMF"; version 1–10) ─────────────
@@ -82,20 +82,20 @@ export async function tryRouteFormat(
   // ── Oktalyzer ────────────────────────────────────────────────────────────
   if (filename.endsWith('.okt')) {
     const { parseOktalyzerFile } = await import('@lib/import/formats/OktalyzerParser');
-    return withNativeDefault('okt', ctx, (buf, name) => parseOktalyzerFile(buf, name));
+    return withNativeDefault('okt', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseOktalyzerFile(buf as ArrayBuffer, name));
   }
 
   // ── OctaMED / MED ────────────────────────────────────────────────────────
   if (filename.endsWith('.med') || filename.endsWith('.mmd0') || filename.endsWith('.mmd1')
     || filename.endsWith('.mmd2') || filename.endsWith('.mmd3')) {
     const { parseMEDFile } = await import('@lib/import/formats/MEDParser');
-    return withNativeDefault('med', ctx, (buf, name) => parseMEDFile(buf, name));
+    return withNativeDefault('med', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseMEDFile(buf as ArrayBuffer, name));
   }
 
   // ── DigiBooster ──────────────────────────────────────────────────────────
   if (filename.endsWith('.digi')) {
     const { parseDigiBoosterFile } = await import('@lib/import/formats/DigiBoosterParser');
-    return withNativeDefault('digi', ctx, (buf, name) => parseDigiBoosterFile(buf, name));
+    return withNativeDefault('digi', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigiBoosterFile(buf as ArrayBuffer, name));
   }
 
   // ── Delta Music 2.0 ──────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ export async function tryRouteFormat(
   if (filename.endsWith('.dm2')) {
     const { isDeltaMusic2Format, parseDeltaMusic2File } = await import('@lib/import/formats/DeltaMusic2Parser');
     return withNativeThenUADE('deltaMusic2', ctx,
-      (bytes, name) => parseDeltaMusic2File(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseDeltaMusic2File(bytes as Uint8Array, name),
       'DeltaMusic2Parser', { isFormat: isDeltaMusic2Format, usesBytes: true });
   }
 
@@ -114,13 +114,13 @@ export async function tryRouteFormat(
   // fall through to UADE automatically when the native parser rejects them.
   if (isFCFormat(filename)) {
     const { parseFCFile } = await import('@lib/import/formats/FCParser');
-    return withNativeThenUADE('fc', ctx, (buf, name) => parseFCFile(buf, name), 'FCParser');
+    return withNativeThenUADE('fc', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseFCFile(buf as ArrayBuffer, name), 'FCParser');
   }
 
   // ── SoundMon (Brian Postma) ─────────────────────────────────────────────
   if (/\.(bp|bp3|sndmon)$/.test(filename)) {
     const { parseSoundMonFile } = await import('@lib/import/formats/SoundMonParser');
-    return withNativeThenUADE('soundmon', ctx, (buf, name) => parseSoundMonFile(buf, name), 'SoundMonParser');
+    return withNativeThenUADE('soundmon', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseSoundMonFile(buf as ArrayBuffer, name), 'SoundMonParser');
   }
 
   // ── SidMon 1.0 / SidMon II (.smn can be either) ─────────────────────────
@@ -152,19 +152,19 @@ export async function tryRouteFormat(
   // ── SidMon II (.sid2 — unambiguous SidMon 2) ─────────────────────────────
   if (/\.sid2$/.test(filename)) {
     const { parseSidMon2File } = await import('@lib/import/formats/SidMon2Parser');
-    return withNativeThenUADE('sidmon2', ctx, (buf, name) => parseSidMon2File(buf, name), 'SidMon2Parser');
+    return withNativeThenUADE('sidmon2', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseSidMon2File(buf as ArrayBuffer, name), 'SidMon2Parser');
   }
 
   // ── Fred Editor ───────────────────────────────────────────────────────────
   if (/\.fred$/.test(filename)) {
     const { parseFredEditorFile } = await import('@lib/import/formats/FredEditorParser');
-    return withNativeThenUADE('fred', ctx, (buf, name) => parseFredEditorFile(buf, name), 'FredEditorParser');
+    return withNativeThenUADE('fred', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseFredEditorFile(buf as ArrayBuffer, name), 'FredEditorParser');
   }
 
   // ── Sound-FX ──────────────────────────────────────────────────────────────
   if (/\.(sfx|sfx2|sfx13)$/.test(filename)) {
     const { parseSoundFXFile } = await import('@lib/import/formats/SoundFXParser');
-    return withNativeThenUADE('soundfx', ctx, (buf, name) => parseSoundFXFile(buf, name), 'SoundFXParser');
+    return withNativeThenUADE('soundfx', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseSoundFXFile(buf as ArrayBuffer, name), 'SoundFXParser');
   }
 
   // ── JamCracker ────────────────────────────────────────────────────────────
@@ -232,7 +232,7 @@ export async function tryRouteFormat(
   if (/\.is20$/.test(filename)) {
     const { isInStereo2Format, parseInStereo2File } = await import('@lib/import/formats/InStereo2Parser');
     return withNativeThenUADE('inStereo2', ctx,
-      (bytes, name) => parseInStereo2File(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseInStereo2File(bytes as Uint8Array, name),
       'InStereo2Parser', { isFormat: isInStereo2Format, usesBytes: true });
   }
 
@@ -241,7 +241,7 @@ export async function tryRouteFormat(
   if (/\.is10$/.test(filename)) {
     const { isInStereo1Format, parseInStereo1File } = await import('@lib/import/formats/InStereo1Parser');
     return withNativeThenUADE('inStereo1', ctx,
-      (bytes, name) => parseInStereo1File(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseInStereo1File(bytes as Uint8Array, name),
       'InStereo1Parser', { isFormat: isInStereo1Format, usesBytes: true });
   }
 
@@ -315,7 +315,7 @@ export async function tryRouteFormat(
   // ── Digital Mugician ──────────────────────────────────────────────────────
   if (/\.(dmu|dmu2|mug|mug2)$/.test(filename)) {
     const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
-    return withNativeThenUADE('mugician', ctx, (buf, name) => parseDigitalMugicianFile(buf, name), 'DigitalMugicianParser');
+    return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
   }
 
   // ── Chip-dump formats (VGM, YM, NSF, SAP, AY) ───────────────────────────
@@ -386,7 +386,7 @@ export async function tryRouteFormat(
   if (/\.(aon|aon8)$/.test(filename)) {
     const { isArtOfNoiseFormat, parseArtOfNoiseFile } = await import('@lib/import/formats/ArtOfNoiseParser');
     return withNativeThenUADE('artOfNoise', ctx,
-      (bytes, name) => parseArtOfNoiseFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseArtOfNoiseFile(bytes as Uint8Array, name),
       'ArtOfNoiseParser', { isFormat: isArtOfNoiseFormat, usesBytes: true });
   }
 
@@ -395,7 +395,7 @@ export async function tryRouteFormat(
   if (/\.dsym$/.test(filename)) {
     const { isDigitalSymphonyFormat, parseDigitalSymphonyFile } = await import('@lib/import/formats/DigitalSymphonyParser');
     return withNativeThenUADE('digitalSymphony', ctx,
-      (bytes, name) => parseDigitalSymphonyFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseDigitalSymphonyFile(bytes as Uint8Array, name),
       'DigitalSymphonyParser', { isFormat: isDigitalSymphonyFormat, usesBytes: true });
   }
 
@@ -404,7 +404,7 @@ export async function tryRouteFormat(
   if (/\.(gt2|gtk)$/.test(filename)) {
     const { isGraoumfTracker2Format, parseGraoumfTracker2File } = await import('@lib/import/formats/GraoumfTracker2Parser');
     return withNativeThenUADE('graoumfTracker2', ctx,
-      (bytes, name) => parseGraoumfTracker2File(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseGraoumfTracker2File(bytes as Uint8Array, name),
       'GraoumfTracker2Parser', { isFormat: isGraoumfTracker2Format, usesBytes: true });
   }
 
@@ -433,7 +433,7 @@ export async function tryRouteFormat(
   if (/\.dbm$/i.test(filename)) {
     const { isDigiBoosterProFormat, parseDigiBoosterProFile } = await import('@lib/import/formats/DigiBoosterProParser');
     return withNativeThenUADE('digiBoosterPro', ctx,
-      (bytes, name) => parseDigiBoosterProFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseDigiBoosterProFile(bytes as Uint8Array, name),
       'DigiBoosterProParser', { isFormat: isDigiBoosterProFormat, usesBytes: true });
   }
 
@@ -459,7 +459,7 @@ export async function tryRouteFormat(
   if (/\.syn$/.test(filename)) {
     const { isSynthesisFormat, parseSynthesisFile } = await import('@lib/import/formats/SynthesisParser');
     return withNativeThenUADE('synthesis', ctx,
-      (bytes, name) => parseSynthesisFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseSynthesisFile(bytes as Uint8Array, name),
       'SynthesisParser', { isFormat: isSynthesisFormat, usesBytes: true });
   }
 
@@ -468,7 +468,7 @@ export async function tryRouteFormat(
   if (/\.dss$/.test(filename)) {
     const { isDigitalSoundStudioFormat, parseDigitalSoundStudioFile } = await import('@lib/import/formats/DigitalSoundStudioParser');
     return withNativeThenUADE('digitalSoundStudio', ctx,
-      (bytes, name) => parseDigitalSoundStudioFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseDigitalSoundStudioFile(bytes as Uint8Array, name),
       'DigitalSoundStudioParser', { isFormat: isDigitalSoundStudioFormat, usesBytes: true });
   }
 
@@ -477,7 +477,7 @@ export async function tryRouteFormat(
   if (/\.ma$/.test(filename)) {
     const { isMusicAssemblerFormat, parseMusicAssemblerFile } = await import('@lib/import/formats/MusicAssemblerParser');
     return withNativeThenUADE('musicAssembler', ctx,
-      (bytes, name) => parseMusicAssemblerFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseMusicAssemblerFile(bytes as Uint8Array, name),
       'MusicAssemblerParser', { isFormat: isMusicAssemblerFormat, usesBytes: true });
   }
 
@@ -506,7 +506,7 @@ export async function tryRouteFormat(
   if (/\.cba$/.test(filename)) {
     const { isChuckBiscuitsFormat, parseChuckBiscuitsFile } = await import('@lib/import/formats/ChuckBiscuitsParser');
     return withNativeThenUADE('chuckBiscuits', ctx,
-      (bytes, name) => parseChuckBiscuitsFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseChuckBiscuitsFile(bytes as Uint8Array, name),
       'ChuckBiscuitsParser', { isFormat: isChuckBiscuitsFormat, usesBytes: true });
   }
 
@@ -612,7 +612,7 @@ export async function tryRouteFormat(
   if (/\.ftm$/.test(filename)) {
     const { isFaceTheMusicFormat, parseFaceTheMusicFile } = await import('@lib/import/formats/FaceTheMusicParser');
     return withNativeThenUADE('faceTheMusic', ctx,
-      (bytes, name) => parseFaceTheMusicFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseFaceTheMusicFile(bytes as Uint8Array, name),
       'FaceTheMusicParser', { isFormat: isFaceTheMusicFormat, usesBytes: true });
   }
 
@@ -639,7 +639,7 @@ export async function tryRouteFormat(
   if (/\.(sc|sct)$/.test(filename)) {
     const { isSoundControlFormat, parseSoundControlFile } = await import('@lib/import/formats/SoundControlParser');
     return withNativeThenUADE('soundControl', ctx,
-      (bytes, name) => parseSoundControlFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseSoundControlFile(bytes as Uint8Array, name),
       'SoundControlParser', { isFormat: isSoundControlFormat, usesBytes: true });
   }
 
@@ -647,7 +647,7 @@ export async function tryRouteFormat(
   if (/\.psf$/.test(filename)) {
     const { isSoundFactoryFormat, parseSoundFactoryFile } = await import('@lib/import/formats/SoundFactoryParser');
     return withNativeThenUADE('soundFactory', ctx,
-      (bytes, name) => parseSoundFactoryFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseSoundFactoryFile(bytes as Uint8Array, name),
       'SoundFactoryParser', { isFormat: isSoundFactoryFormat, usesBytes: true });
   }
 
@@ -656,7 +656,7 @@ export async function tryRouteFormat(
   if (/\.act$/.test(filename)) {
     const { isActionamicsFormat, parseActionamicsFile } = await import('@lib/import/formats/ActionamicsParser');
     return withNativeThenUADE('actionamics', ctx,
-      (bytes, name) => parseActionamicsFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseActionamicsFile(bytes as Uint8Array, name),
       'ActionamicsParser', { isFormat: isActionamicsFormat, usesBytes: true });
   }
 
@@ -665,7 +665,7 @@ export async function tryRouteFormat(
   if (/\.(avp|mw)$/.test(filename)) {
     const { isActivisionProFormat, parseActivisionProFile } = await import('@lib/import/formats/ActivisionProParser');
     return withNativeThenUADE('activisionPro', ctx,
-      (bytes, name) => parseActivisionProFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseActivisionProFile(bytes as Uint8Array, name),
       'ActivisionProParser', { isFormat: isActivisionProFormat, usesBytes: true });
   }
 
@@ -674,7 +674,7 @@ export async function tryRouteFormat(
   if (/\.(rk|rkb)$/.test(filename)) {
     const { isRonKlarenFormat, parseRonKlarenFile } = await import('@lib/import/formats/RonKlarenParser');
     return withNativeThenUADE('ronKlaren', ctx,
-      (bytes, name) => parseRonKlarenFile(bytes as Uint8Array, name),
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parseRonKlarenFile(bytes as Uint8Array, name),
       'RonKlarenParser', { isFormat: isRonKlarenFormat, usesBytes: true });
   }
 
@@ -949,7 +949,7 @@ export async function tryRouteFormat(
   if (/\.(ufo|mus)$/i.test(filename)) {
     const { isUFOFormat, parseUFOFile } = await import('@lib/import/formats/UFOParser');
     return withNativeThenUADE('ufo', ctx,
-      (buf, name) => { if (isUFOFormat(buf as ArrayBuffer)) return parseUFOFile(buf as ArrayBuffer, name); return null; },
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isUFOFormat(buf as ArrayBuffer)) return parseUFOFile(buf as ArrayBuffer, name); return null; },
       'UFOParser');
   }
 
@@ -1234,7 +1234,7 @@ export async function tryRouteFormat(
     if (_mightBeLME) {
       const { isLMEFormat, parseLMEFile } = await import('@lib/import/formats/LMEParser');
       return withNativeThenUADE('lme', ctx,
-        (buf, name) => { if (isLMEFormat(buf as ArrayBuffer)) return parseLMEFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isLMEFormat(buf as ArrayBuffer)) return parseLMEFile(buf as ArrayBuffer, name); return null; },
         'LMEParser');
     }
   }
@@ -1362,7 +1362,7 @@ export async function tryRouteFormat(
   ) {
     const { isFuturePlayerFormat, parseFuturePlayerFile } = await import('@lib/import/formats/FuturePlayerParser');
     return withNativeThenUADE('futurePlayer', ctx,
-      (buf, name) => { if (isFuturePlayerFormat(buf as ArrayBuffer)) return parseFuturePlayerFile(buf as ArrayBuffer, name); return null; },
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isFuturePlayerFormat(buf as ArrayBuffer)) return parseFuturePlayerFile(buf as ArrayBuffer, name); return null; },
       'FuturePlayerParser');
   }
 
@@ -1479,7 +1479,7 @@ export async function tryRouteFormat(
   if (/\.dum$/i.test(filename)) {
     const { isInfogramesFormat, parseInfogramesFile } = await import('@lib/import/formats/InfogramesParser');
     return withNativeThenUADE('infogrames', ctx,
-      (buf, name) => { if (isInfogramesFormat(buf as ArrayBuffer)) return parseInfogramesFile(buf as ArrayBuffer, name); return null; },
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isInfogramesFormat(buf as ArrayBuffer)) return parseInfogramesFile(buf as ArrayBuffer, name); return null; },
       'InfogramesParser');
   }
 
@@ -1491,7 +1491,7 @@ export async function tryRouteFormat(
   ) {
     const { isPSAFormat, parsePSAFile } = await import('@lib/import/formats/PSAParser');
     return withNativeThenUADE('psa', ctx,
-      (buf, name) => { if (isPSAFormat(buf as ArrayBuffer)) return parsePSAFile(buf as ArrayBuffer, name); return null; },
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPSAFormat(buf as ArrayBuffer)) return parsePSAFile(buf as ArrayBuffer, name); return null; },
       'PSAParser');
   }
 
@@ -1503,7 +1503,7 @@ export async function tryRouteFormat(
   ) {
     const { isMMDCFormat, parseMMDCFile } = await import('@lib/import/formats/MMDCParser');
     return withNativeThenUADE('mmdc', ctx,
-      (buf, name) => { if (isMMDCFormat(buf as ArrayBuffer)) return parseMMDCFile(buf as ArrayBuffer, name); return null; },
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMMDCFormat(buf as ArrayBuffer)) return parseMMDCFile(buf as ArrayBuffer, name); return null; },
       'MMDCParser');
   }
 
@@ -1516,7 +1516,7 @@ export async function tryRouteFormat(
   ) {
     const { isSteveTurnerFormat, parseSteveTurnerFile } = await import('@lib/import/formats/SteveTurnerParser');
     return withNativeThenUADE('steveTurner', ctx,
-      (buf, name) => { if (isSteveTurnerFormat(buf as ArrayBuffer)) return parseSteveTurnerFile(buf as ArrayBuffer, name); return null; },
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSteveTurnerFormat(buf as ArrayBuffer)) return parseSteveTurnerFile(buf as ArrayBuffer, name); return null; },
       'SteveTurnerParser');
   }
 
@@ -1527,7 +1527,7 @@ export async function tryRouteFormat(
     if (_tmkBase.startsWith('tmk.')) {
       const { isTimeTrackerFormat, parseTimeTrackerFile } = await import('@lib/import/formats/TimeTrackerParser');
       return withNativeThenUADE('timeTracker', ctx,
-        (buf, name) => { if (isTimeTrackerFormat(buf as ArrayBuffer)) return parseTimeTrackerFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTimeTrackerFormat(buf as ArrayBuffer)) return parseTimeTrackerFile(buf as ArrayBuffer, name); return null; },
         'TimeTrackerParser');
     }
   }
@@ -1557,7 +1557,7 @@ export async function tryRouteFormat(
     if (_cinBase.startsWith('cin.')) {
       const { isCinemawareFormat, parseCinemawareFile } = await import('@lib/import/formats/CinemawareParser');
       return withNativeThenUADE('cinemaware', ctx,
-        (buf, name) => { if (isCinemawareFormat(buf as ArrayBuffer)) return parseCinemawareFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isCinemawareFormat(buf as ArrayBuffer)) return parseCinemawareFile(buf as ArrayBuffer, name); return null; },
         'CinemawareParser');
     }
   }
@@ -1569,7 +1569,7 @@ export async function tryRouteFormat(
     if (_ntpBase.startsWith('ntp.')) {
       const { isNovoTradePackerFormat, parseNovoTradePackerFile } = await import('@lib/import/formats/NovoTradePackerParser');
       return withNativeThenUADE('novoTradePacker', ctx,
-        (buf, name) => { if (isNovoTradePackerFormat(buf as ArrayBuffer)) return parseNovoTradePackerFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isNovoTradePackerFormat(buf as ArrayBuffer)) return parseNovoTradePackerFile(buf as ArrayBuffer, name); return null; },
         'NovoTradePackerParser');
     }
   }
@@ -1581,7 +1581,7 @@ export async function tryRouteFormat(
     if (_alpBase.startsWith('alp.')) {
       const { isAlcatrazPackerFormat, parseAlcatrazPackerFile } = await import('@lib/import/formats/AlcatrazPackerParser');
       return withNativeThenUADE('alcatrazPacker', ctx,
-        (buf, name) => { if (isAlcatrazPackerFormat(buf as ArrayBuffer)) return parseAlcatrazPackerFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isAlcatrazPackerFormat(buf as ArrayBuffer)) return parseAlcatrazPackerFile(buf as ArrayBuffer, name); return null; },
         'AlcatrazPackerParser');
     }
   }
@@ -1593,7 +1593,7 @@ export async function tryRouteFormat(
     if (_udsBase.startsWith('uds.')) {
       const { isBladePackerFormat, parseBladePackerFile } = await import('@lib/import/formats/BladePackerParser');
       return withNativeThenUADE('bladePacker', ctx,
-        (buf, name) => { if (isBladePackerFormat(buf as ArrayBuffer)) return parseBladePackerFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isBladePackerFormat(buf as ArrayBuffer)) return parseBladePackerFile(buf as ArrayBuffer, name); return null; },
         'BladePackerParser');
     }
   }
@@ -1605,7 +1605,7 @@ export async function tryRouteFormat(
     if (_sgBase.startsWith('sg.')) {
       const { isTomyTrackerFormat, parseTomyTrackerFile } = await import('@lib/import/formats/TomyTrackerParser');
       return withNativeThenUADE('tomyTracker', ctx,
-        (buf, name) => { if (isTomyTrackerFormat(buf as ArrayBuffer)) return parseTomyTrackerFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTomyTrackerFormat(buf as ArrayBuffer)) return parseTomyTrackerFile(buf as ArrayBuffer, name); return null; },
         'TomyTrackerParser');
     }
   }
@@ -1618,7 +1618,7 @@ export async function tryRouteFormat(
     if (_imspBase.startsWith('ims.')) {
       const { isImagesMusicSystemFormat, parseImagesMusicSystemFile } = await import('@lib/import/formats/ImagesMusicSystemParser');
       return withNativeThenUADE('imagesMusicSystem', ctx,
-        (buf, name) => { if (isImagesMusicSystemFormat(buf as ArrayBuffer)) return parseImagesMusicSystemFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isImagesMusicSystemFormat(buf as ArrayBuffer)) return parseImagesMusicSystemFile(buf as ArrayBuffer, name); return null; },
         'ImagesMusicSystemParser');
     }
   }
@@ -1629,7 +1629,7 @@ export async function tryRouteFormat(
     if (_exBase.startsWith('ex.')) {
       const { isFashionTrackerFormat, parseFashionTrackerFile } = await import('@lib/import/formats/FashionTrackerParser');
       return withNativeThenUADE('fashionTracker', ctx,
-        (buf, name) => { if (isFashionTrackerFormat(buf as ArrayBuffer)) return parseFashionTrackerFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isFashionTrackerFormat(buf as ArrayBuffer)) return parseFashionTrackerFile(buf as ArrayBuffer, name); return null; },
         'FashionTrackerParser');
     }
   }
@@ -1640,7 +1640,7 @@ export async function tryRouteFormat(
     if (_mmsBase.startsWith('mms.') || _mmsBase.startsWith('sfx20.')) {
       const { isMultiMediaSoundFormat, parseMultiMediaSoundFile } = await import('@lib/import/formats/MultiMediaSoundParser');
       return withNativeThenUADE('multiMediaSound', ctx,
-        (buf, name) => { if (isMultiMediaSoundFormat(buf as ArrayBuffer)) return parseMultiMediaSoundFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMultiMediaSoundFormat(buf as ArrayBuffer)) return parseMultiMediaSoundFile(buf as ArrayBuffer, name); return null; },
         'MultiMediaSoundParser');
     }
   }
@@ -1690,7 +1690,7 @@ export async function tryRouteFormat(
     if (_titsBase.startsWith('tits.')) {
       const { isTitanicsPackerFormat, parseTitanicsPackerFile } = await import('@lib/import/formats/TitanicsPackerParser');
       return withNativeThenUADE('titanicsPacker', ctx,
-        (buf, name) => { if (isTitanicsPackerFormat(buf as ArrayBuffer)) return parseTitanicsPackerFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTitanicsPackerFormat(buf as ArrayBuffer)) return parseTitanicsPackerFile(buf as ArrayBuffer, name); return null; },
         'TitanicsPackerParser');
     }
   }
@@ -1702,7 +1702,7 @@ export async function tryRouteFormat(
     if (_khBase.startsWith('kh.')) {
       const { isKrisHatlelidFormat, parseKrisHatlelidFile } = await import('@lib/import/formats/KrisHatlelidParser');
       return withNativeThenUADE('krisHatlelid', ctx,
-        (buf, name) => { if (isKrisHatlelidFormat(buf as ArrayBuffer)) return parseKrisHatlelidFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isKrisHatlelidFormat(buf as ArrayBuffer)) return parseKrisHatlelidFile(buf as ArrayBuffer, name); return null; },
         'KrisHatlelidParser');
     }
   }
@@ -1714,7 +1714,7 @@ export async function tryRouteFormat(
     if (_twoBase.startsWith('two.')) {
       const { isNTSPFormat, parseNTSPFile } = await import('@lib/import/formats/NTSPParser');
       return withNativeThenUADE('ntsp', ctx,
-        (buf, name) => { if (isNTSPFormat(buf as ArrayBuffer)) return parseNTSPFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isNTSPFormat(buf as ArrayBuffer)) return parseNTSPFile(buf as ArrayBuffer, name); return null; },
         'NTSPParser');
     }
   }
@@ -1726,7 +1726,7 @@ export async function tryRouteFormat(
     if (_ufoBase.startsWith('mus.') || _ufoBase.startsWith('ufo.')) {
       const { isUFOFormat, parseUFOFile } = await import('@lib/import/formats/UFOParser');
       return withNativeThenUADE('ufo', ctx,
-        (buf, name) => { if (isUFOFormat(buf as ArrayBuffer)) return parseUFOFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isUFOFormat(buf as ArrayBuffer)) return parseUFOFile(buf as ArrayBuffer, name); return null; },
         'UFOParser');
     }
   }
@@ -1738,7 +1738,7 @@ export async function tryRouteFormat(
     if (_moshBase.startsWith('mosh.')) {
       const { isMoshPackerFormat, parseMoshPackerFile } = await import('@lib/import/formats/MoshPackerParser');
       return withNativeThenUADE('moshPacker', ctx,
-        (buf, name) => { if (isMoshPackerFormat(buf as ArrayBuffer)) return parseMoshPackerFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMoshPackerFormat(buf as ArrayBuffer)) return parseMoshPackerFile(buf as ArrayBuffer, name); return null; },
         'MoshPackerParser');
     }
   }
@@ -1749,7 +1749,7 @@ export async function tryRouteFormat(
     const _mugBase = getBasename(filename);
     if (_mugBase.startsWith('mug.')) {
       const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
-      return withNativeThenUADE('mugician', ctx, (buf, name) => parseDigitalMugicianFile(buf, name), 'DigitalMugicianParser');
+      return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
     }
   }
 
@@ -1759,7 +1759,7 @@ export async function tryRouteFormat(
     const _mug2Base = getBasename(filename);
     if (_mug2Base.startsWith('mug2.')) {
       const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
-      return withNativeThenUADE('mugician', ctx, (buf, name) => parseDigitalMugicianFile(buf, name), 'DigitalMugicianParser');
+      return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
     }
   }
 
@@ -1769,7 +1769,7 @@ export async function tryRouteFormat(
     if (_coreBase.startsWith('core.')) {
       const { isCoreDesignFormat, parseCoreDesignFile } = await import('@lib/import/formats/CoreDesignParser');
       return withNativeThenUADE('coreDesign', ctx,
-        (buf, name) => { if (isCoreDesignFormat(buf as ArrayBuffer)) return parseCoreDesignFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isCoreDesignFormat(buf as ArrayBuffer)) return parseCoreDesignFile(buf as ArrayBuffer, name); return null; },
         'CoreDesignParser');
     }
   }
@@ -1780,7 +1780,7 @@ export async function tryRouteFormat(
     if (_jmfBase.startsWith('jmf.')) {
       const { isJankoMrsicFlogelFormat, parseJankoMrsicFlogelFile } = await import('@lib/import/formats/JankoMrsicFlogelParser');
       return withNativeThenUADE('jankoMrsicFlogel', ctx,
-        (buf, name) => { if (isJankoMrsicFlogelFormat(buf as ArrayBuffer)) return parseJankoMrsicFlogelFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJankoMrsicFlogelFormat(buf as ArrayBuffer)) return parseJankoMrsicFlogelFile(buf as ArrayBuffer, name); return null; },
         'JankoMrsicFlogelParser');
     }
   }
@@ -1791,7 +1791,7 @@ export async function tryRouteFormat(
     if (_jdBase.startsWith('jd.')) {
       const { isSpecialFXFormat, parseSpecialFXFile } = await import('@lib/import/formats/SpecialFXParser');
       return withNativeThenUADE('specialFX', ctx,
-        (buf, name) => { if (isSpecialFXFormat(buf as ArrayBuffer)) return parseSpecialFXFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSpecialFXFormat(buf as ArrayBuffer)) return parseSpecialFXFile(buf as ArrayBuffer, name); return null; },
         'SpecialFXParser');
     }
   }
@@ -1802,7 +1802,7 @@ export async function tryRouteFormat(
     if (_sjsBase.startsWith('sjs.')) {
       const { isSoundPlayerFormat, parseSoundPlayerFile } = await import('@lib/import/formats/SoundPlayerParser');
       return withNativeThenUADE('soundPlayer', ctx,
-        (buf, name) => { if (isSoundPlayerFormat(buf as ArrayBuffer)) return parseSoundPlayerFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSoundPlayerFormat(buf as ArrayBuffer)) return parseSoundPlayerFile(buf as ArrayBuffer, name); return null; },
         'SoundPlayerParser');
     }
   }
@@ -1813,7 +1813,7 @@ export async function tryRouteFormat(
     if (_nppBase.startsWith('npp.')) {
       const { isNickPellingPackerFormat, parseNickPellingPackerFile } = await import('@lib/import/formats/NickPellingPackerParser');
       return withNativeThenUADE('nickPellingPacker', ctx,
-        (buf, name) => { if (isNickPellingPackerFormat(buf as ArrayBuffer)) return parseNickPellingPackerFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isNickPellingPackerFormat(buf as ArrayBuffer)) return parseNickPellingPackerFile(buf as ArrayBuffer, name); return null; },
         'NickPellingPackerParser');
     }
   }
@@ -1824,7 +1824,7 @@ export async function tryRouteFormat(
     if (_pvpBase.startsWith('pvp.')) {
       const { isPeterVerswyvelenPackerFormat, parsePeterVerswyvelenPackerFile } = await import('@lib/import/formats/PeterVerswyvelenPackerParser');
       return withNativeThenUADE('peterVerswyvelenPacker', ctx,
-        (buf, name) => { if (isPeterVerswyvelenPackerFormat(buf as ArrayBuffer)) return parsePeterVerswyvelenPackerFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPeterVerswyvelenPackerFormat(buf as ArrayBuffer)) return parsePeterVerswyvelenPackerFile(buf as ArrayBuffer, name); return null; },
         'PeterVerswyvelenPackerParser');
     }
   }
@@ -1835,7 +1835,7 @@ export async function tryRouteFormat(
     if (_wbBase.startsWith('wb.')) {
       const { isWallyBebenFormat, parseWallyBebenFile } = await import('@lib/import/formats/WallyBebenParser');
       return withNativeThenUADE('wallyBeben', ctx,
-        (buf, name) => { if (isWallyBebenFormat(buf as ArrayBuffer)) return parseWallyBebenFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isWallyBebenFormat(buf as ArrayBuffer)) return parseWallyBebenFile(buf as ArrayBuffer, name); return null; },
         'WallyBebenParser');
     }
   }
@@ -1846,7 +1846,7 @@ export async function tryRouteFormat(
     if (_sbBase.startsWith('sb.')) {
       const { isSteveBarrettFormat, parseSteveBarrettFile } = await import('@lib/import/formats/SteveBarrettParser');
       return withNativeThenUADE('steveBarrett', ctx,
-        (buf, name) => { if (isSteveBarrettFormat(buf as ArrayBuffer)) return parseSteveBarrettFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSteveBarrettFormat(buf as ArrayBuffer)) return parseSteveBarrettFile(buf as ArrayBuffer, name); return null; },
         'SteveBarrettParser');
     }
   }
@@ -1857,7 +1857,7 @@ export async function tryRouteFormat(
     if (_snkBase.startsWith('snk.')) {
       const { isPaulSummersFormat, parsePaulSummersFile } = await import('@lib/import/formats/PaulSummersParser');
       return withNativeThenUADE('paulSummers', ctx,
-        (buf, name) => { if (isPaulSummersFormat(buf as ArrayBuffer)) return parsePaulSummersFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulSummersFormat(buf as ArrayBuffer)) return parsePaulSummersFile(buf as ArrayBuffer, name); return null; },
         'PaulSummersParser');
     }
   }
@@ -1869,7 +1869,7 @@ export async function tryRouteFormat(
     if (_dsrBase.startsWith('dsr.')) {
       const { isDesireFormat, parseDesireFile } = await import('@lib/import/formats/DesireParser');
       return withNativeThenUADE('desire', ctx,
-        (buf, name) => { if (isDesireFormat(buf as ArrayBuffer)) return parseDesireFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDesireFormat(buf as ArrayBuffer)) return parseDesireFile(buf as ArrayBuffer, name); return null; },
         'DesireParser');
     }
   }
@@ -1881,7 +1881,7 @@ export async function tryRouteFormat(
     if (_dlnBase.startsWith('dln.')) {
       const { isDaveLoweNewFormat, parseDaveLoweNewFile } = await import('@lib/import/formats/DaveLoweNewParser');
       return withNativeThenUADE('daveLowe', ctx,
-        (buf, name) => { if (isDaveLoweNewFormat(buf as ArrayBuffer)) return parseDaveLoweNewFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDaveLoweNewFormat(buf as ArrayBuffer)) return parseDaveLoweNewFile(buf as ArrayBuffer, name); return null; },
         'DaveLoweNewParser');
     }
   }
@@ -1893,7 +1893,7 @@ export async function tryRouteFormat(
     if (_mwBase.startsWith('avp.') || _mwBase.startsWith('mw.')) {
       const { isMartinWalkerFormat, parseMartinWalkerFile } = await import('@lib/import/formats/MartinWalkerParser');
       return withNativeThenUADE('martinWalker', ctx,
-        (buf, name) => { if (isMartinWalkerFormat(buf as ArrayBuffer)) return parseMartinWalkerFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMartinWalkerFormat(buf as ArrayBuffer)) return parseMartinWalkerFile(buf as ArrayBuffer, name); return null; },
         'MartinWalkerParser');
     }
   }
@@ -1905,7 +1905,7 @@ export async function tryRouteFormat(
     if (_psBase.startsWith('ps.')) {
       const { isPaulShieldsFormat, parsePaulShieldsFile } = await import('@lib/import/formats/PaulShieldsParser');
       return withNativeThenUADE('paulShields', ctx,
-        (buf, name) => { if (isPaulShieldsFormat(buf as ArrayBuffer)) return parsePaulShieldsFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulShieldsFormat(buf as ArrayBuffer)) return parsePaulShieldsFile(buf as ArrayBuffer, name); return null; },
         'PaulShieldsParser');
     }
   }
@@ -1917,7 +1917,7 @@ export async function tryRouteFormat(
     if (_datBase.startsWith('dat.')) {
       const { isPaulRobothamFormat, parsePaulRobothamFile } = await import('@lib/import/formats/PaulRobothamParser');
       return withNativeThenUADE('paulRobotham', ctx,
-        (buf, name) => { if (isPaulRobothamFormat(buf as ArrayBuffer)) return parsePaulRobothamFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulRobothamFormat(buf as ArrayBuffer)) return parsePaulRobothamFile(buf as ArrayBuffer, name); return null; },
         'PaulRobothamParser');
     }
   }
@@ -1929,7 +1929,7 @@ export async function tryRouteFormat(
     if (_papBase.startsWith('pap.')) {
       const { isPierreAdaneFormat, parsePierreAdaneFile } = await import('@lib/import/formats/PierreAdaneParser');
       return withNativeThenUADE('pierreAdane', ctx,
-        (buf, name) => { if (isPierreAdaneFormat(buf as ArrayBuffer)) return parsePierreAdaneFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPierreAdaneFormat(buf as ArrayBuffer)) return parsePierreAdaneFile(buf as ArrayBuffer, name); return null; },
         'PierreAdaneParser');
     }
   }
@@ -2013,7 +2013,7 @@ export async function tryRouteFormat(
     if (_dscBase.startsWith('dsc.')) {
       const { isDscFormat, parseDscFile } = await import('@lib/import/formats/DigitalSonixChromeParser');
       return withNativeThenUADE('digitalSonixChrome', ctx,
-        (buf, name) => { if (isDscFormat(buf as ArrayBuffer)) return parseDscFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDscFormat(buf as ArrayBuffer)) return parseDscFile(buf as ArrayBuffer, name); return null; },
         'DigitalSonixChromeParser');
     }
   }
@@ -2053,7 +2053,7 @@ export async function tryRouteFormat(
     if (_joBase.startsWith('jo.')) {
       const { isJesperOlsenFormat, parseJesperOlsenFile } = await import('@lib/import/formats/JesperOlsenParser');
       return withNativeThenUADE('jesperOlsen', ctx,
-        (buf, name) => { if (isJesperOlsenFormat(buf as ArrayBuffer)) return parseJesperOlsenFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJesperOlsenFormat(buf as ArrayBuffer)) return parseJesperOlsenFile(buf as ArrayBuffer, name); return null; },
         'JesperOlsenParser');
     }
   }
@@ -2065,7 +2065,7 @@ export async function tryRouteFormat(
     if (_kimBase.startsWith('kim.')) {
       const { isKimChristensenFormat, parseKimChristensenFile } = await import('@lib/import/formats/KimChristensenParser');
       return withNativeThenUADE('kimChristensen', ctx,
-        (buf, name) => { if (isKimChristensenFormat(buf as ArrayBuffer)) return parseKimChristensenFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isKimChristensenFormat(buf as ArrayBuffer)) return parseKimChristensenFile(buf as ArrayBuffer, name); return null; },
         'KimChristensenParser');
     }
   }
@@ -2076,7 +2076,7 @@ export async function tryRouteFormat(
     if (_ashBase.startsWith('ash.')) {
       const { isAshleyHoggFormat, parseAshleyHoggFile } = await import('@lib/import/formats/AshleyHoggParser');
       return withNativeThenUADE('ashleyHogg', ctx,
-        (buf, name) => { if (isAshleyHoggFormat(buf as ArrayBuffer)) return parseAshleyHoggFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isAshleyHoggFormat(buf as ArrayBuffer)) return parseAshleyHoggFile(buf as ArrayBuffer, name); return null; },
         'AshleyHoggParser');
     }
   }
@@ -2104,7 +2104,7 @@ export async function tryRouteFormat(
     if (_jsBase.startsWith('js.')) {
       const { isJanneSalmijarviFormat, parseJanneSalmijarviFile } = await import('@lib/import/formats/JanneSalmijarviParser');
       return withNativeThenUADE('janneSalmijarvi', ctx,
-        (buf, name) => { if (isJanneSalmijarviFormat(buf as ArrayBuffer)) return parseJanneSalmijarviFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJanneSalmijarviFormat(buf as ArrayBuffer)) return parseJanneSalmijarviFile(buf as ArrayBuffer, name); return null; },
         'JanneSalmijarviParser');
     }
   }
@@ -2115,7 +2115,7 @@ export async function tryRouteFormat(
     if (_hip7Base.startsWith('hip7.') || _hip7Base.startsWith('s7g.')) {
       const { isJochenHippel7VFormat, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
       return withNativeThenUADE('jochenHippel7V', ctx,
-        (buf, name) => { if (isJochenHippel7VFormat(buf as ArrayBuffer)) return parseJochenHippel7VFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippel7VFormat(buf as ArrayBuffer)) return parseJochenHippel7VFile(buf as ArrayBuffer, name); return null; },
         'JochenHippel7VParser');
     }
   }
@@ -2126,7 +2126,7 @@ export async function tryRouteFormat(
     if (_hstBase.startsWith('hst.')) {
       const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
       return withNativeThenUADE('jochenHippelST', ctx,
-        (buf, name) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
         'JochenHippelSTParser');
     }
   }
@@ -2138,7 +2138,7 @@ export async function tryRouteFormat(
     if (_maxBase.startsWith('max.') || _maxExt === 'mxtx') {
       const { isMaximumEffectFormat, parseMaximumEffectFile } = await import('@lib/import/formats/MaximumEffectParser');
       return withNativeThenUADE('maximumEffect', ctx,
-        (buf, name) => { if (isMaximumEffectFormat(buf as ArrayBuffer)) return parseMaximumEffectFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMaximumEffectFormat(buf as ArrayBuffer)) return parseMaximumEffectFile(buf as ArrayBuffer, name); return null; },
         'MaximumEffectParser');
     }
   }
@@ -2149,7 +2149,7 @@ export async function tryRouteFormat(
     if (_midiBase.startsWith('midi.')) {
       const { isMIDILoricielFormat, parseMIDILoricielFile } = await import('@lib/import/formats/MIDILoricielParser');
       return withNativeThenUADE('midiLoriciel', ctx,
-        (buf, name) => { if (isMIDILoricielFormat(buf as ArrayBuffer)) return parseMIDILoricielFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMIDILoricielFormat(buf as ArrayBuffer)) return parseMIDILoricielFile(buf as ArrayBuffer, name); return null; },
         'MIDILoricielParser');
     }
   }
@@ -2160,7 +2160,7 @@ export async function tryRouteFormat(
     if (_oneBase.startsWith('one.')) {
       const { isOnEscapeeFormat, parseOnEscapeeFile } = await import('@lib/import/formats/OnEscapeeParser');
       return withNativeThenUADE('onEscapee', ctx,
-        (buf, name) => { if (isOnEscapeeFormat(buf as ArrayBuffer)) return parseOnEscapeeFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isOnEscapeeFormat(buf as ArrayBuffer)) return parseOnEscapeeFile(buf as ArrayBuffer, name); return null; },
         'OnEscapeeParser');
     }
   }
@@ -2171,7 +2171,7 @@ export async function tryRouteFormat(
     if (_patBase.startsWith('pat.')) {
       const { isPaulTongeFormat, parsePaulTongeFile } = await import('@lib/import/formats/PaulTongeParser');
       return withNativeThenUADE('paulTonge', ctx,
-        (buf, name) => { if (isPaulTongeFormat(buf as ArrayBuffer)) return parsePaulTongeFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulTongeFormat(buf as ArrayBuffer)) return parsePaulTongeFile(buf as ArrayBuffer, name); return null; },
         'PaulTongeParser');
     }
   }
@@ -2182,7 +2182,7 @@ export async function tryRouteFormat(
     if (_rhoBase.startsWith('rho.')) {
       const { isRobHubbardSTFormat, parseRobHubbardSTFile } = await import('@lib/import/formats/RobHubbardSTParser');
       return withNativeThenUADE('robHubbardST', ctx,
-        (buf, name) => { if (isRobHubbardSTFormat(buf as ArrayBuffer)) return parseRobHubbardSTFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isRobHubbardSTFormat(buf as ArrayBuffer)) return parseRobHubbardSTFile(buf as ArrayBuffer, name); return null; },
         'RobHubbardSTParser');
     }
   }
@@ -2221,7 +2221,7 @@ export async function tryRouteFormat(
     const _dmuBase = getBasename(filename);
     if (_dmuBase.startsWith('dmu.')) {
       const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
-      return withNativeThenUADE('mugician', ctx, (buf, name) => parseDigitalMugicianFile(buf, name), 'DigitalMugicianParser');
+      return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
     }
   }
 
@@ -2230,7 +2230,7 @@ export async function tryRouteFormat(
     const _dmu2Base = getBasename(filename);
     if (_dmu2Base.startsWith('dmu2.')) {
       const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
-      return withNativeThenUADE('mugician', ctx, (buf, name) => parseDigitalMugicianFile(buf, name), 'DigitalMugicianParser');
+      return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
     }
   }
 
@@ -2242,7 +2242,7 @@ export async function tryRouteFormat(
     if (_mdstBase.startsWith('mdst.')) {
       const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
       return withNativeThenUADE('jochenHippelST', ctx,
-        (buf, name) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
         'JochenHippelSTParser');
     }
   }
@@ -2254,7 +2254,7 @@ export async function tryRouteFormat(
     if (_dodaBase.startsWith('doda.')) {
       const { isSpecialFXFormat, parseSpecialFXFile } = await import('@lib/import/formats/SpecialFXParser');
       return withNativeThenUADE('specialFX', ctx,
-        (buf, name) => { if (isSpecialFXFormat(buf as ArrayBuffer)) return parseSpecialFXFile(buf as ArrayBuffer, name); return null; },
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSpecialFXFormat(buf as ArrayBuffer)) return parseSpecialFXFile(buf as ArrayBuffer, name); return null; },
         'SpecialFXParser');
     }
   }

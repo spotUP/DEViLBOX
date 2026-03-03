@@ -34,11 +34,9 @@ const CH_COLORS = [
   0xff44aa, // CH6 pink (SID2)
 ];
 
-const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 const BLACK_KEYS = [1, 3, 6, 8, 10]; // C#, D#, F#, G#, A#
 
 const PIANO_W = 36;
-const NOTE_H = 5;
 const MIN_NOTE = 24; // C-2
 const MAX_NOTE = 84; // C-7
 const VISIBLE_NOTES = MAX_NOTE - MIN_NOTE;
@@ -58,9 +56,9 @@ export const PixiGTPianoRoll: React.FC<Props> = ({ width, height }) => {
   const patternData = useGTUltraStore((s) => s.patternData);
   const orderData = useGTUltraStore((s) => s.orderData);
   const cursor = useGTUltraStore((s) => s.cursor);
-  const currentRow = useGTUltraStore((s) => s.currentRow);
-  const channelCount = useGTUltraStore((s) => s.channelCount);
-  const isPlaying = useGTUltraStore((s) => s.isPlaying);
+  const currentRow = useGTUltraStore((s) => s.playbackPos.row);
+  const channelCount = useGTUltraStore((s) => s.sidCount * 3);
+  const isPlaying = useGTUltraStore((s) => s.playing);
 
   // Init MegaText
   useEffect(() => {
@@ -125,7 +123,7 @@ export const PixiGTPianoRoll: React.FC<Props> = ({ width, height }) => {
     for (let ch = 0; ch < numCh; ch++) {
       const od = orderData[ch];
       if (od && od.length > 0) {
-        const orderPos = Math.min(cursor.orderPos, od.length - 1);
+        const orderPos = Math.min(cursor.row, od.length - 1);
         patNums.push(od[orderPos] ?? 0);
       } else {
         patNums.push(0);
@@ -170,7 +168,7 @@ export const PixiGTPianoRoll: React.FC<Props> = ({ width, height }) => {
         const offset = row * bytesPerCell;
         if (offset >= pd.length) break;
 
-        const note = pd[offset];
+        const note = pd.data[offset];
         if (note === 0 || note === 0xBE || note === 0xBF) continue;
         if (note < 1 || note > 96) continue;
 
@@ -182,7 +180,7 @@ export const PixiGTPianoRoll: React.FC<Props> = ({ width, height }) => {
         for (let r2 = row + 1; r2 < maxRows; r2++) {
           const off2 = r2 * bytesPerCell;
           if (off2 >= pd.length) break;
-          const n2 = pd[off2];
+          const n2 = pd.data[off2];
           if (n2 !== 0) break; // any non-empty = end of this note
           noteLen++;
         }
@@ -217,9 +215,9 @@ export const PixiGTPianoRoll: React.FC<Props> = ({ width, height }) => {
 
   return (
     <pixiContainer ref={containerRef} layout={{ width, height }}>
-      <pixiGraphics ref={bgRef} />
-      <pixiGraphics ref={notesRef} />
-      <pixiGraphics ref={overlayRef} />
+      <pixiGraphics ref={bgRef} draw={() => {}} />
+      <pixiGraphics ref={notesRef} draw={() => {}} />
+      <pixiGraphics ref={overlayRef} draw={() => {}} />
     </pixiContainer>
   );
 };

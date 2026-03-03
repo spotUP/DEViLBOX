@@ -1454,8 +1454,8 @@ const PixiNativeScrollbar: React.FC<PixiNativeScrollbarProps> = ({
       layout={layoutProp}
       eventMode="static"
       cursor="pointer"
-      onglobalpointermove={handlePointerMove}
-      onglobalpointerup={handlePointerUp}
+      onGlobalPointerMove={handlePointerMove}
+      onPointerUpOutside={handlePointerUp}
       onPointerDown={handlePointerDown}
     >
       <pixiGraphics draw={drawTrack} />

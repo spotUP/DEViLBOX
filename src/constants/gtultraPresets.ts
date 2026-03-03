@@ -272,8 +272,8 @@ export function getPresetCategories(): GTSIDPreset['category'][] {
  */
 export function applyPresetToInstrument(
   preset: GTSIDPreset,
-  instrumentIndex: number,
-  engine: { setPatternCell: (p: number, r: number, c: number, v: number) => void } | null
+  _instrumentIndex: number,
+  _engine: { setPatternCell: (p: number, r: number, c: number, v: number) => void } | null
 ): { ad: number; sr: number; firstwave: number; name: string } {
   return {
     ad: preset.ad,
