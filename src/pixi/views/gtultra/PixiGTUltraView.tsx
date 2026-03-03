@@ -133,26 +133,31 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
     g.rect(editorWidth - 1, 0, 1, editorHeight).fill({ color: GT_SEP });
   }, [editorWidth, editorHeight]);
 
-  // No engine loaded state
-  if (!engine) {
-    return (
-      <pixiContainer layout={{ width, height, alignItems: 'center', justifyContent: 'center' }}>
-        <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
+  // Always render the same tree structure to avoid @pixi/layout yoga BindingErrors.
+  // Use alpha/renderable to hide content when engine is not yet loaded.
+  const ready = !!engine;
+
+  return (
+    <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
+      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
+
+      {/* Initializing overlay — shown when engine is not yet loaded */}
+      <pixiContainer
+        alpha={ready ? 0 : 1}
+        renderable={!ready}
+        layout={{ position: 'absolute', width, height, alignItems: 'center', justifyContent: 'center' }}
+      >
         <pixiBitmapText
           text="GoatTracker Ultra — initializing..."
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
           tint={GT_TEXT_DIM}
         />
       </pixiContainer>
-    );
-  }
-
-  return (
-    <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
 
       {/* ─── Toolbar ─── */}
       <pixiContainer
+        alpha={ready ? 1 : 0}
+        renderable={ready}
         layout={{
           width,
           height: TOOLBAR_H,
@@ -218,7 +223,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
       </pixiContainer>
 
       {/* ─── Main area ─── */}
-      <pixiContainer layout={{ flexDirection: 'row', flex: 1, width, height: editorHeight }}>
+      <pixiContainer alpha={ready ? 1 : 0} renderable={ready} layout={{ flexDirection: 'row', flex: 1, width, height: editorHeight }}>
         {/* Pattern editor: hex grid in Pro, piano roll in Studio */}
         {viewMode === 'pro' ? (
           <PixiGTPatternGrid

@@ -283,7 +283,7 @@ interface TrackerStore {
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
   setHivelyNative: (data: HivelyNativeData | null) => void;
   setSongDBInfo: (info: { authors: string[]; publishers: string[]; album: string; year: string; format: string; duration_ms: number } | null) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array; c64SidFileData?: Uint8Array }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
 
   // Undo/Redo support
@@ -1646,8 +1646,8 @@ export const useTrackerStore = create<TrackerStore>()(
           state.channelTrackTables = song.channelTrackTables;
           state.channelSpeeds = song.channelSpeeds ?? null;
           state.channelGrooves = song.channelGrooves ?? null;
-        } else if (song.goatTrackerData || song.c64SidFileData) {
-          // GoatTracker Ultra SID tracker / C64 SID file
+        } else if (song.goatTrackerData) {
+          // GoatTracker Ultra SID tracker (.sng files only — requires GT engine)
           state.editorMode = 'goattracker';
           state.furnaceNative = null;
           state.hivelyNative = null;
