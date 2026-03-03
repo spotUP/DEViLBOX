@@ -617,6 +617,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   }, []);
 
   const handlePMBrowserSelect = useCallback((name: string, _idx: number) => {
+    console.log('[VJView] handlePMBrowserSelect:', name, 'ref:', !!projectmHandleRef.current);
     projectmHandleRef.current?.loadPresetByName(name);
   }, []);
 
