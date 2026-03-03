@@ -9,6 +9,7 @@ import { parseXM } from './formats/XMParser';
 import { parseMOD } from './formats/MODParser';
 import { parseFurnaceSong, convertFurnaceToDevilbox } from './formats/FurnaceSongParser';
 import { DefleMaskParser, type DMFModule } from './formats/DefleMaskParser';
+import { isGoatTrackerSong } from './formats/GoatTrackerDetect';
 import { FurnaceDispatchEngine } from '@engine/furnace-dispatch/FurnaceDispatchEngine';
 import type { ParsedInstrument, ImportMetadata } from '../../types/tracker';
 
@@ -60,6 +61,8 @@ export interface ModuleInfo {
     instruments: ParsedInstrument[];
     patterns: unknown[][];  // XMNote[][] or MODNote[][] or converted patterns
   };
+  // GoatTracker .sng raw data (loaded by GTUltra WASM engine)
+  goatTrackerData?: Uint8Array;
 }
 
 /** Error payload from ChiptunePlayer */
@@ -85,9 +88,34 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
 
       // Determine file type
       const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
-      const useNativeParser = ext === '.xm' || ext === '.mod' || ext === '.fur' || ext === '.dmf';
 
       try {
+        // Check for GoatTracker .sng by magic bytes (before extension-based routing
+        // since .sng is shared with ZoundMonitor and Richard Joseph formats)
+        if (isGoatTrackerSong(arrayBuffer)) {
+          console.log('[ModuleLoader] Detected GoatTracker song (GTS magic)');
+          const metadata: ModuleMetadata = {
+            title: file.name.replace(/\.sng$/i, ''),
+            type: 'GoatTracker',
+            channels: 3, // Will be updated to 6 if dual-SID
+            patterns: 0,
+            orders: 0,
+            instruments: 0,
+            samples: 0,
+            duration: 0,
+          };
+          resolve({
+            metadata,
+            arrayBuffer,
+            player: undefined,
+            file,
+            nativeData: undefined,
+            goatTrackerData: new Uint8Array(arrayBuffer),
+          });
+          return;
+        }
+
+        const useNativeParser = ext === '.xm' || ext === '.mod' || ext === '.fur' || ext === '.dmf';
         // Try native parser for XM/MOD
         if (useNativeParser) {
           console.log('[ModuleLoader] Trying native parser for', ext);

@@ -500,6 +500,33 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     return { success: true, message: `Loaded SunVox project: ${name}` };
   }
 
+  // === GoatTracker .sng files ===
+  // Detected by magic bytes (GTS!/GTS2/GTS3/GTS4/GTS5) in loadModuleFile
+  // Route directly to GTUltra engine — skip parseModuleToSong pipeline
+  {
+    const { isGoatTrackerSong } = await import('../import/formats/GoatTrackerDetect');
+    const buf = await file.arrayBuffer();
+    if (isGoatTrackerSong(buf)) {
+      console.log('[UnifiedFileLoader] GoatTracker .sng detected — routing to GTUltra engine');
+      const { useGTUltraStore } = await import('@/stores/useGTUltraStore');
+      const gtStore = useGTUltraStore.getState();
+
+      // If engine exists, load the song data
+      if (gtStore.engine) {
+        gtStore.engine.loadSong(buf);
+        gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
+      }
+
+      // Switch to GoatTracker editor mode
+      applyEditorMode({ goatTrackerData: new Uint8Array(buf) });
+
+      return {
+        success: true,
+        message: `Loaded GoatTracker song: ${file.name}`,
+      };
+    }
+  }
+
   // === All other tracker/module formats ===
   if (isSupportedModule(filename)) {
     const { parseModuleToSong, getLastPatternHash } = await import('@lib/import/parseModuleToSong');
