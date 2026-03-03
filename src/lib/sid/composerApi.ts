@@ -141,6 +141,49 @@ export async function fetchDeepSIDStats(): Promise<DeepSIDStats | null> {
 }
 
 /**
+ * Fetch a composer's tune list (discography).
+ */
+export interface ComposerTune {
+  id: number;
+  path: string;
+  filename: string;
+  name: string;
+  author: string;
+  copyright: string;
+  player: string;
+  sidModel: string;
+  clockSpeed: string;
+  subtunes: number;
+  lengths: string;
+}
+
+export interface ComposerTunesResult {
+  total: number;
+  tunes: ComposerTune[];
+}
+
+export async function fetchComposerTunes(opts: {
+  hvscPath?: string;
+  author?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<ComposerTunesResult> {
+  try {
+    const params = new URLSearchParams();
+    if (opts.hvscPath) params.set('path', opts.hvscPath);
+    if (opts.author) params.set('author', opts.author);
+    if (opts.limit) params.set('limit', String(opts.limit));
+    if (opts.offset) params.set('offset', String(opts.offset));
+
+    const res = await fetch(`${API_URL}/deepsid/tunes?${params}`);
+    if (!res.ok) return { total: 0, tunes: [] };
+    return res.json();
+  } catch {
+    return { total: 0, tunes: [] };
+  }
+}
+
+/**
  * Get the full URL for a composer photo.
  */
 export function getComposerPhotoUrl(photoUrl: string | null): string | null {
