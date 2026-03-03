@@ -5,3 +5,4 @@ export { PixiGTInstrumentPanel } from './PixiGTInstrumentPanel';
 export { PixiGTTableEditor } from './PixiGTTableEditor';
 export { PixiGTSIDMonitor } from './PixiGTSIDMonitor';
 export { PixiGTOscilloscope } from './PixiGTOscilloscope';
+export { PixiGTStudioInstrument } from './PixiGTStudioInstrument';
