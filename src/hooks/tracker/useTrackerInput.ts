@@ -1,112 +1,21 @@
 /**
  * useTrackerInput - FastTracker II Keyboard Input System
- * Implements authentic FT2 keyboard shortcuts
+ * Composition hook that combines navigation, note input, and effect input sub-hooks.
+ * Edit operations (undo/redo, cut/copy/paste, transpose, etc.) remain here.
  */
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useTrackerStore, useCursorStore, useTransportStore, useInstrumentStore } from '@stores';
-import { useSettingsStore } from '@stores/useSettingsStore';
+import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
 import { useUIStore } from '@stores/useUIStore';
 import { useHistoryStore } from '@stores/useHistoryStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
-import { stringNoteToXM } from '@/lib/xmConversions';
-
-// Track currently held notes to prevent retriggering and enable proper release
-interface HeldNote {
-  note: string;
-  xmNote: number;        // XM note number (1-96) for recording note-off
-  instrumentId: number;
-  channelIndex: number;  // Channel where this note was placed (for multi-channel)
-}
-
-// FT2 piano key mapping (QWERTY → notes)
-const NOTE_MAP: Record<string, { note: string; octaveOffset: number }> = {
-  // Bottom row (lower octave)
-  z: { note: 'C', octaveOffset: 0 },
-  s: { note: 'C#', octaveOffset: 0 },
-  x: { note: 'D', octaveOffset: 0 },
-  d: { note: 'D#', octaveOffset: 0 },
-  c: { note: 'E', octaveOffset: 0 },
-  v: { note: 'F', octaveOffset: 0 },
-  g: { note: 'F#', octaveOffset: 0 },
-  b: { note: 'G', octaveOffset: 0 },
-  h: { note: 'G#', octaveOffset: 0 },
-  n: { note: 'A', octaveOffset: 0 },
-  j: { note: 'A#', octaveOffset: 0 },
-  m: { note: 'B', octaveOffset: 0 },
-  ',': { note: 'C', octaveOffset: 1 },
-  // Top row (higher octave)
-  q: { note: 'C', octaveOffset: 1 },
-  '2': { note: 'C#', octaveOffset: 1 },
-  w: { note: 'D', octaveOffset: 1 },
-  '3': { note: 'D#', octaveOffset: 1 },
-  e: { note: 'E', octaveOffset: 1 },
-  r: { note: 'F', octaveOffset: 1 },
-  '5': { note: 'F#', octaveOffset: 1 },
-  t: { note: 'G', octaveOffset: 1 },
-  '6': { note: 'G#', octaveOffset: 1 },
-  y: { note: 'A', octaveOffset: 1 },
-  '7': { note: 'A#', octaveOffset: 1 },
-  u: { note: 'B', octaveOffset: 1 },
-  i: { note: 'C', octaveOffset: 2 },
-  '9': { note: 'C#', octaveOffset: 2 },
-  o: { note: 'D', octaveOffset: 2 },
-  '0': { note: 'D#', octaveOffset: 2 },
-  p: { note: 'E', octaveOffset: 2 },
-};
-
-// Alt+Q..I track jump mapping (tracks 0-7)
-const ALT_TRACK_MAP_1: Record<string, number> = {
-  q: 0, w: 1, e: 2, r: 3, t: 4, y: 5, u: 6, i: 7,
-};
-
-// Alt+A..K track jump mapping (tracks 8-15)
-const ALT_TRACK_MAP_2: Record<string, number> = {
-  a: 8, s: 9, d: 10, f: 11, g: 12, h: 13, j: 14, k: 15,
-};
-
-// Hex digit keys
-const HEX_DIGITS_ALL = '0123456789ABCDEFabcdef';
-
-// FT2 Volume Column Effect Keys (VOL1 position)
-// These map to volume effect types: 0-4 = set volume prefix, - = vol slide down, + = vol slide up, etc.
-// Index maps to high nibble value: 0=0x00, 1=0x10, 2=0x20, 3=0x30, 4=0x40, 5=0x60(down), 6=0x70(up), etc.
-const VOL1_KEY_MAP: Record<string, number> = {
-  '0': 0x0,  // 0x00-0x0F - nothing (or set volume 0 with second digit)
-  '1': 0x1,  // 0x10-0x1F - set volume 0-15
-  '2': 0x2,  // 0x20-0x2F - set volume 16-31
-  '3': 0x3,  // 0x30-0x3F - set volume 32-47
-  '4': 0x4,  // 0x40-0x4F - set volume 48-63 (0x50 = 64)
-  '-': 0x6,  // 0x60-0x6F - volume slide down
-  '+': 0x7,  // 0x70-0x7F - volume slide up
-  'd': 0x8,  // 0x80-0x8F - fine volume down
-  'u': 0x9,  // 0x90-0x9F - fine volume up
-  's': 0xA,  // 0xA0-0xAF - set vibrato speed
-  'v': 0xB,  // 0xB0-0xBF - vibrato
-  'p': 0xC,  // 0xC0-0xCF - set panning
-  'l': 0xD,  // 0xD0-0xDF - pan slide left
-  'r': 0xE,  // 0xE0-0xEF - pan slide right
-  'm': 0xF,  // 0xF0-0xFF - tone portamento
-};
-
-// FT2 Effect Type Keys (EFX0 position) - 36 effect commands
-// Maps 0-9, A-Z to effect types 0-35
-const EFFECT_TYPE_KEY_MAP: Record<string, number> = {
-  '0': 0x00, '1': 0x01, '2': 0x02, '3': 0x03, '4': 0x04,
-  '5': 0x05, '6': 0x06, '7': 0x07, '8': 0x08, '9': 0x09,
-  'a': 0x0A, 'b': 0x0B, 'c': 0x0C, 'd': 0x0D, 'e': 0x0E, 'f': 0x0F,
-  'g': 0x10, 'h': 0x11, 'i': 0x12, 'j': 0x13, 'k': 0x14, 'l': 0x15,
-  'm': 0x16, 'n': 0x17, 'o': 0x18, 'p': 0x19, 'q': 0x1A, 'r': 0x1B,
-  's': 0x1C, 't': 0x1D, 'u': 0x1E, 'v': 0x1F, 'w': 0x20, 'x': 0x21,
-  'y': 0x22, 'z': 0x23,
-};
+import { useNoteInput, useEffectInput, useNavigationInput } from './input';
 
 export const useTrackerInput = () => {
   // PERFORMANCE: cursor and selection are refs — updated via subscription, not React state.
-  // This prevents React DOM re-renders (and handleKeyDown recreation) on every cursor move.
   const cursorRef = useRef(useCursorStore.getState().cursor);
   const selectionRef = useRef(useCursorStore.getState().selection);
   useEffect(() => {
@@ -117,64 +26,46 @@ export const useTrackerInput = () => {
     return unsub;
   }, []);
 
+  const inputRefs = { cursorRef, selectionRef };
+
+  // Sub-hooks
+  const noteInput = useNoteInput(inputRefs);
+  const effectInput = useEffectInput(inputRefs);
+  const navInput = useNavigationInput(inputRefs);
+
   const {
     patterns,
     currentPatternIndex,
-    currentOctave,
     recordMode,
     editStep,
-    insertMode,
-    multiRecEnabled,
-    multiEditEnabled,
-    recReleaseEnabled,
   } = useTrackerStore(useShallow((state) => ({
     patterns: state.patterns,
     currentPatternIndex: state.currentPatternIndex,
-    currentOctave: state.currentOctave,
     recordMode: state.recordMode,
     editStep: state.editStep,
-    insertMode: state.insertMode,
-    multiRecEnabled: state.multiRecEnabled,
-    multiEditEnabled: state.multiEditEnabled,
-    recReleaseEnabled: state.recReleaseEnabled,
   })));
 
-  // Cursor/selection actions from useCursorStore
   const moveCursor = useCursorStore((state) => state.moveCursor);
   const moveCursorToRow = useCursorStore((state) => state.moveCursorToRow);
-  const moveCursorToChannel = useCursorStore((state) => state.moveCursorToChannel);
-  const moveCursorToColumn = useCursorStore((state) => state.moveCursorToColumn);
-  const startSelection = useCursorStore((state) => state.startSelection);
-  const endSelection = useCursorStore((state) => state.endSelection);
   const clearSelection = useCursorStore((state) => state.clearSelection);
 
-  // Other actions from useTrackerStore
   const setCell = useTrackerStore((state) => state.setCell);
   const clearCell = useTrackerStore((state) => state.clearCell);
-  const setCurrentPattern = useTrackerStore((state) => state.setCurrentPattern);
   const copySelection = useTrackerStore((state) => state.copySelection);
   const cutSelection = useTrackerStore((state) => state.cutSelection);
   const paste = useTrackerStore((state) => state.paste);
   const pasteMix = useTrackerStore((state) => state.pasteMix);
   const pasteFlood = useTrackerStore((state) => state.pasteFlood);
   const pastePushForward = useTrackerStore((state) => state.pastePushForward);
-  const setCurrentOctave = useTrackerStore((state) => state.setCurrentOctave);
   const transposeSelection = useTrackerStore((state) => state.transposeSelection);
   const toggleRecordMode = useTrackerStore((state) => state.toggleRecordMode);
-  const setEditStep = useTrackerStore((state) => state.setEditStep);
   const writeMacroSlot = useTrackerStore((state) => state.writeMacroSlot);
   const readMacroSlot = useTrackerStore((state) => state.readMacroSlot);
   const toggleInsertMode = useTrackerStore((state) => state.toggleInsertMode);
-  const setKeyOn = useTrackerStore((state) => state.setKeyOn);
-  const setKeyOff = useTrackerStore((state) => state.setKeyOff);
-  const findBestChannel = useTrackerStore((state) => state.findBestChannel);
   const insertRow = useTrackerStore((state) => state.insertRow);
   const deleteRow = useTrackerStore((state) => state.deleteRow);
-  const setPtnJumpPos = useTrackerStore((state) => state.setPtnJumpPos);
-  const getPtnJumpPos = useTrackerStore((state) => state.getPtnJumpPos);
   const interpolateSelection = useTrackerStore((state) => state.interpolateSelection);
   const replacePattern = useTrackerStore((state) => state.replacePattern);
-  const setColumnVisibility = useTrackerStore((state) => state.setColumnVisibility);
 
   const {
     isPlaying,
@@ -190,211 +81,13 @@ export const useTrackerInput = () => {
     setIsLooping: state.setIsLooping,
   })));
 
-  const {
-    instruments,
-    currentInstrumentId,
-    setCurrentInstrument
-  } = useInstrumentStore();
-
   const pattern = patterns[currentPatternIndex];
 
   // A pattern is read-only when it was imported in UADE classic (playback-only) mode.
-  // Enhanced UADE imports use sourceFormat 'MOD'; only 'UADE' means non-editable.
   const isPatternEditable = pattern?.importMetadata?.sourceFormat !== 'UADE';
-
-  // Track held notes by key to enable proper release
-  const heldNotesRef = useRef<Map<string, HeldNote>>(new Map());
 
   // Track last Esc press for double-Esc panic (kill all notes)
   const lastEscPressRef = useRef<number>(0);
-
-  // ── RAF-driven arrow key scrolling ──────────────────────────────────────────
-  // macOS key repeat fires at 30Hz — we bypass it and drive cursor movement
-  // at 60fps via requestAnimationFrame for smooth scrolling.
-  const heldArrowRef = useRef<{ dir: 'up' | 'down'; selecting: boolean } | null>(null);
-  const arrowRafRef = useRef(0);
-  // Store callbacks in refs so the RAF loop always calls the latest version
-  const moveCursorRef = useRef(moveCursor);
-  moveCursorRef.current = moveCursor;
-  const endSelectionRef = useRef(endSelection);
-  endSelectionRef.current = endSelection;
-
-  // FT2: Get the channel to use for note entry (multi-channel allocation)
-  const getTargetChannel = useCallback(() => {
-    const editMode = recordMode && !isPlaying;
-    const recMode = recordMode && isPlaying;
-
-    // Use multi-channel allocation if enabled for current mode
-    if ((multiEditEnabled && editMode) || (multiRecEnabled && recMode)) {
-      return findBestChannel();
-    }
-
-    // Default: use cursor channel
-    return cursorRef.current.channelIndex;
-  }, [recordMode, isPlaying, multiEditEnabled, multiRecEnabled, findBestChannel]);
-
-  // Preview note with attack (called on keydown)
-  const previewNote = useCallback(
-    async (note: string, octave: number, key: string, shiftKey = false) => {
-      if (currentInstrumentId === null) return;
-
-      const engine = getToneEngine();
-      const instrument = instruments.find((i) => i.id === currentInstrumentId);
-      if (!instrument) return;
-
-      const fullNote = `${note}${octave}`;
-      const noteStr = `${note}-${octave}`;
-      const xmNote = stringNoteToXM(noteStr);
-
-      // Check if this key is already held
-      if (heldNotesRef.current.has(key)) {
-        return; // Already playing this key
-      }
-
-      // TB-303 LEGATO DETECTION:
-      // If any other notes are currently held when we press a new key,
-      // this is a legato transition - the 303 should SLIDE to the new note
-      // without retriggering envelopes
-      const hasHeldNotes = heldNotesRef.current.size > 0;
-      const is303Synth = instrument.synthType === 'TB303' ||
-                         instrument.synthType === 'Buzz3o3';
-      const slideActive = hasHeldNotes && is303Synth;
-
-      // For accent, we could use velocity threshold but keyboard doesn't have velocity
-      // In the future, we could use a modifier key (e.g., Shift+key = accent)
-      const accent = shiftKey;
-
-      // FT2: Get target channel for multi-channel recording
-      const targetChannel = getTargetChannel();
-
-      // Ensure synth is ready (for WASM synths like FurnaceDispatch)
-      await engine.ensureInstrumentReady(instrument);
-
-      // PERFORMANCE: Trigger audio FIRST before any state updates
-      // State updates can cause React re-renders which delay audio
-      const { midiPolyphonic } = useSettingsStore.getState();
-      if (midiPolyphonic) {
-        // Polyphonic mode: use voice allocation for proper chord support
-        // Pass accent and slide for 303 legato behavior
-        engine.triggerPolyNoteAttack(currentInstrumentId, fullNote, 1, instrument, accent, slideActive);
-      } else {
-        // Monophonic mode: use legacy direct attack with accent/slide
-        engine.triggerNoteAttack(currentInstrumentId, fullNote, 0, 1, instrument, undefined, accent, slideActive);
-      }
-
-      // Track the held note with channel info (ref update, no re-render)
-      heldNotesRef.current.set(key, {
-        note: fullNote,
-        xmNote,
-        instrumentId: currentInstrumentId,
-        channelIndex: targetChannel,
-      });
-
-      // FT2: Track key state for multi-channel allocation (state update, may re-render)
-      setKeyOn(targetChannel, xmNote);
-    },
-    [currentInstrumentId, instruments, getTargetChannel, setKeyOn]
-  );
-
-  // Release note (called on keyup)
-  const releaseNote = useCallback(
-    (key: string) => {
-      const heldNote = heldNotesRef.current.get(key);
-      if (!heldNote) return;
-
-      const engine = getToneEngine();
-      const instrument = instruments.find((i) => i.id === heldNote.instrumentId);
-
-      // Release the note - use polyphonic API if enabled
-      const { midiPolyphonic } = useSettingsStore.getState();
-      if (midiPolyphonic && instrument) {
-        engine.triggerPolyNoteRelease(heldNote.instrumentId, heldNote.note, instrument);
-      } else {
-        engine.releaseNote(heldNote.instrumentId, heldNote.note);
-      }
-
-      // FT2: Track key-off for multi-channel allocation
-      setKeyOff(heldNote.channelIndex);
-
-      // FT2: Record note-off if enabled during recording
-      if (recReleaseEnabled && recordMode && isPlaying) {
-        // Record note-off (===) at current playback row
-        setCell(heldNote.channelIndex, playbackRow, { note: 97 }); // 97 = note off in XM
-      }
-
-      // Remove from held notes
-      heldNotesRef.current.delete(key);
-    },
-    [instruments, setKeyOff, recReleaseEnabled, recordMode, isPlaying, setCell, playbackRow]
-  );
-
-  // Enter note into cell
-  const enterNote = useCallback(
-    (note: string, octave: number, targetChannelOverride?: number) => {
-      // Convert note + octave to XM note number (1-96)
-      // FT2/XM format: note is numeric, not string
-      const noteStr = `${note}-${octave}`; // e.g., "C-4"
-      const xmNote = stringNoteToXM(noteStr);
-
-      if (xmNote === 0) {
-        console.warn(`Invalid note: ${noteStr}`);
-        return;
-      }
-
-      // FT2: Use target channel from multi-channel allocation or override
-      const targetChannel = targetChannelOverride !== undefined
-        ? targetChannelOverride
-        : getTargetChannel();
-
-      // When recording during playback, enter at the current playback row
-      // Otherwise enter at the cursor position
-      const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
-
-      // FT2: Insert mode - shift rows down before entering note
-      if (insertMode && !isPlaying) {
-        insertRow(targetChannel, targetRow);
-      }
-
-      // FT2: Auto-stamp instrument when entering notes (modern tracker behavior)
-      // If currentInstrumentId is set, stamp it into the pattern
-      // This allows TB-303 and other instruments to work without manual assignment
-      setCell(targetChannel, targetRow, {
-        note: xmNote,
-        instrument: currentInstrumentId !== null ? currentInstrumentId : undefined,
-      });
-
-      // Auto-enable 303 flag columns when entering notes with a TB-303/Buzz3o3 instrument
-      if (currentInstrumentId !== null) {
-        const inst = instruments.find((i) => i.id === currentInstrumentId);
-        if (inst && (inst.synthType === 'TB303' || inst.synthType === 'Buzz3o3')) {
-          const vis = useTrackerStore.getState().columnVisibility;
-          if (!vis.flag1 || !vis.flag2) {
-            setColumnVisibility({ flag1: true, flag2: true });
-          }
-        }
-      }
-
-      // Chord entry mode: advance to next channel instead of next row
-      const chordEntry = useUIStore.getState().chordEntryMode;
-      if (chordEntry && !isPlaying && targetChannelOverride === undefined) {
-        const channelCount = pattern.channels.length;
-        const nextChannel = cursorRef.current.channelIndex + 1;
-        if (nextChannel < channelCount) {
-          moveCursorToChannel(nextChannel);
-          // Don't advance row in chord mode - user advances manually
-          return;
-        }
-        // At last channel: fall through to normal row advance behavior
-      }
-
-      // FT2: Always advance cursor by editStep after note entry (unless during playback)
-      // Uses modulo wrapping, not clamping — FT2: (row + editRowSkip) % numRows
-      if (editStep > 0 && !isPlaying) {
-        moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-      }
-    },
-    [setCell, recordMode, editStep, pattern, moveCursorToRow, moveCursorToChannel, isPlaying, playbackRow, insertMode, insertRow, getTargetChannel, currentInstrumentId, instruments, setColumnVisibility]
-  );
 
   // FT2: Insert empty row at cursor, shift rows down (local wrapper)
   const handleInsertRow = useCallback(() => {
@@ -406,7 +99,7 @@ export const useTrackerInput = () => {
     deleteRow(cursorRef.current.channelIndex, cursorRef.current.rowIndex);
   }, [deleteRow]);
 
-  // Handle keyboard input
+  // Handle keyboard input — edit operations that remain in the composition hook
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       // Only handle keys when tracker view is active
@@ -432,151 +125,10 @@ export const useTrackerInput = () => {
       const key = e.key;
       const keyLower = key.toLowerCase();
 
-      // ============================================
-      // 5.1 Cursor Moves
-      // ============================================
+      // ── Delegate to sub-hooks (order matters) ──
 
-      // F9-F12: Jump in pattern (FT2-style)
-      // Plain: Jump to 0%, 25%, 50%, 75%
-      // Shift: Store current row as jump position
-      // Ctrl: Jump to stored position and play from there
-      if (key === 'F9') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          setPtnJumpPos(0, cursorRef.current.rowIndex);
-        } else if (e.ctrlKey || e.metaKey) {
-          const jumpRow = getPtnJumpPos(0);
-          moveCursorToRow(jumpRow);
-          // Restart playback from jumped position
-          if (isPlaying) stop();
-          setIsLooping(false);
-          getToneEngine().init().then(() => play());
-        } else {
-          moveCursorToRow(0);
-        }
-        return;
-      }
-      if (key === 'F10') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          setPtnJumpPos(1, cursorRef.current.rowIndex);
-        } else if (e.ctrlKey || e.metaKey) {
-          const jumpRow = getPtnJumpPos(1);
-          moveCursorToRow(jumpRow);
-          // Restart playback from jumped position
-          if (isPlaying) stop();
-          setIsLooping(false);
-          getToneEngine().init().then(() => play());
-        } else {
-          moveCursorToRow(Math.floor(pattern.length * 0.25));
-        }
-        return;
-      }
-      if (key === 'F11') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          setPtnJumpPos(2, cursorRef.current.rowIndex);
-        } else if (e.ctrlKey || e.metaKey) {
-          const jumpRow = getPtnJumpPos(2);
-          moveCursorToRow(jumpRow);
-          // Restart playback from jumped position
-          if (isPlaying) stop();
-          setIsLooping(false);
-          getToneEngine().init().then(() => play());
-        } else {
-          moveCursorToRow(Math.floor(pattern.length * 0.5));
-        }
-        return;
-      }
-      if (key === 'F12') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          setPtnJumpPos(3, cursorRef.current.rowIndex);
-        } else if (e.ctrlKey || e.metaKey) {
-          const jumpRow = getPtnJumpPos(3);
-          moveCursorToRow(jumpRow);
-          // Restart playback from jumped position
-          if (isPlaying) stop();
-          setIsLooping(false);
-          getToneEngine().init().then(() => play());
-        } else {
-          moveCursorToRow(Math.floor(pattern.length * 0.75));
-        }
-        return;
-      }
-
-      // PageUp: Jump 16 lines up
-      if (key === 'PageUp') {
-        e.preventDefault();
-        moveCursorToRow(Math.max(0, cursorRef.current.rowIndex - 16));
-        return;
-      }
-
-      // PageDown: Jump 16 lines down
-      if (key === 'PageDown') {
-        e.preventDefault();
-        moveCursorToRow(Math.min(pattern.length - 1, cursorRef.current.rowIndex + 16));
-        return;
-      }
-
-      // Home: Jump to line 0
-      if (key === 'Home') {
-        e.preventDefault();
-        moveCursorToRow(0);
-        return;
-      }
-
-      // End: Jump to last line
-      if (key === 'End') {
-        e.preventDefault();
-        moveCursorToRow(pattern.length - 1);
-        return;
-      }
-
-      // Tab/Shift+Tab: Jump to next/previous track (with wrapping)
-      // FT2: Tab always lands on CURSOR_NOTE of target channel
-      if (key === 'Tab') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          // FT2 Shift+Tab: If already on note column, go to previous channel
-          // If on any other column, just jump to note column of same channel
-          if (cursorRef.current.columnType === 'note') {
-            if (cursorRef.current.channelIndex > 0) {
-              moveCursorToChannel(cursorRef.current.channelIndex - 1);
-            } else {
-              moveCursorToChannel(pattern.channels.length - 1);
-            }
-          }
-        } else {
-          // FT2 Tab: Always go to note column of next channel
-          if (cursorRef.current.channelIndex < pattern.channels.length - 1) {
-            moveCursorToChannel(cursorRef.current.channelIndex + 1);
-          } else {
-            moveCursorToChannel(0);
-          }
-        }
-        // FT2: Always reset to note column
-        moveCursorToColumn('note');
-        return;
-      }
-
-      // Alt+Q..I: Jump to track 0-7 (FT2: always lands on note column)
-      if (e.altKey && ALT_TRACK_MAP_1[keyLower] !== undefined) {
-        e.preventDefault();
-        const track = ALT_TRACK_MAP_1[keyLower] % pattern.channels.length;
-        moveCursorToChannel(track);
-        moveCursorToColumn('note');
-        return;
-      }
-
-      // Alt+A..K: Jump to track 8-15 (FT2: always lands on note column)
-      if (e.altKey && ALT_TRACK_MAP_2[keyLower] !== undefined) {
-        e.preventDefault();
-        const track = ALT_TRACK_MAP_2[keyLower] % pattern.channels.length;
-        moveCursorToChannel(track);
-        moveCursorToColumn('note');
-        return;
-      }
+      // Navigation first (F9-F12, arrows, Tab, Page, Home/End, Alt+track)
+      if (navInput.handleKeyDown(e)) return;
 
       // ============================================
       // Undo / Redo (Ctrl+Z / Ctrl+Y, Ctrl+Shift+Z)
@@ -585,7 +137,6 @@ export const useTrackerInput = () => {
       if ((e.ctrlKey || e.metaKey) && keyLower === 'z' && !e.altKey) {
         e.preventDefault();
         if (e.shiftKey) {
-          // Ctrl+Shift+Z: Redo
           const histStore = useHistoryStore.getState();
           if (histStore.canRedo()) {
             const afterState = histStore.redo();
@@ -598,7 +149,6 @@ export const useTrackerInput = () => {
             useUIStore.getState().setStatusMessage('NOTHING TO REDO');
           }
         } else {
-          // Ctrl+Z: Undo
           const histStore = useHistoryStore.getState();
           if (histStore.canUndo()) {
             const action = histStore.getLastAction();
@@ -634,15 +184,12 @@ export const useTrackerInput = () => {
       // FT2: Macro Slots (Ctrl+1-8)
       // ============================================
 
-      // Ctrl+1-8: Read macro slot (Ctrl+Shift+1-8: Write)
       if ((e.ctrlKey || e.metaKey) && key >= '1' && key <= '8' && !e.altKey) {
         e.preventDefault();
         const slotIndex = parseInt(key) - 1;
         if (e.shiftKey) {
-          // Ctrl+Shift+1-8: Write current cell to macro slot
           writeMacroSlot(slotIndex);
         } else {
-          // Ctrl+1-8: Read macro slot to current cell
           readMacroSlot(slotIndex);
         }
         return;
@@ -652,22 +199,17 @@ export const useTrackerInput = () => {
       // FT2: Insert/Delete Row Operations
       // ============================================
 
-      // Insert key: In edit mode, insert row. Otherwise toggle insert mode.
-      // Shift+Insert: Insert entire line (all channels)
       if (key === 'Insert') {
         e.preventDefault();
         if (recordMode) {
           if (e.shiftKey) {
-            // Shift+Insert: Insert line (all channels) - insert on every channel
             for (let ch = 0; ch < pattern.channels.length; ch++) {
               insertRow(ch, cursorRef.current.rowIndex);
             }
           } else {
-            // Insert: Insert row on current channel only
             handleInsertRow();
           }
         } else {
-          // Not in edit mode: toggle insert mode
           toggleInsertMode();
         }
         return;
@@ -677,114 +219,34 @@ export const useTrackerInput = () => {
       // Transpose Selection (Ctrl+Arrow)
       // ============================================
 
-      // Ctrl+Up: Transpose selection up 1 semitone (requires edit mode)
       if (recordMode && (e.ctrlKey || e.metaKey) && key === 'ArrowUp' && !e.altKey) {
         e.preventDefault();
         if (e.shiftKey) {
-          // Ctrl+Shift+Up: Transpose up 12 semitones (octave)
           transposeSelection(12);
         } else {
-          // Ctrl+Up: Transpose up 1 semitone
           transposeSelection(1);
         }
         return;
       }
 
-      // Ctrl+Down: Transpose selection down 1 semitone (requires edit mode)
       if (recordMode && (e.ctrlKey || e.metaKey) && key === 'ArrowDown' && !e.altKey) {
         e.preventDefault();
         if (e.shiftKey) {
-          // Ctrl+Shift+Down: Transpose down 12 semitones (octave)
           transposeSelection(-12);
         } else {
-          // Ctrl+Down: Transpose down 1 semitone
           transposeSelection(-1);
         }
         return;
       }
 
-      // Arrow keys (up/down)
-      // PERF: macOS key repeat fires at 30Hz — bypass it entirely.
-      // On first press, move immediately and start a RAF loop at 60Hz.
-      // On repeat, skip — the RAF loop handles continuous movement.
-      if (key === 'ArrowUp' || key === 'ArrowDown') {
-        e.preventDefault();
-        const dir = key === 'ArrowUp' ? 'up' as const : 'down' as const;
-        if (e.repeat) {
-          // PERF: Kill repeat events completely — prevents KeyboardRouter,
-          // useGlobalKeyboardHandler, and all other handlers from processing
-          // them. Our RAF loop drives movement at 60fps instead of the OS 30Hz.
-          e.stopImmediatePropagation();
-          return;
-        }
-        const selecting = e.altKey || e.shiftKey;
-        if (selecting && !selectionRef.current) startSelection();
-        moveCursor(dir);
-        if (selecting) endSelection();
-        // Start RAF-driven scroll if not already running.
-        // PERF: Move cursor every 3rd frame (~20Hz). Each cursor move
-        // triggers full label regeneration (~15ms) in the pattern editor,
-        // exceeding the 16.7ms vsync budget. Spacing moves 3 frames apart
-        // gives 2 cheap "coast" frames between expensive redraws, keeping
-        // average FPS at ~45 instead of the 30fps ceiling from macOS's
-        // 30Hz key repeat rate.
-        heldArrowRef.current = { dir, selecting };
-        if (!arrowRafRef.current) {
-          let frameCount = 0;
-          const tick = () => {
-            const held = heldArrowRef.current;
-            if (!held) { arrowRafRef.current = 0; return; }
-            if (++frameCount % 3 === 0) {
-              moveCursorRef.current(held.dir);
-              if (held.selecting) endSelectionRef.current();
-            }
-            arrowRafRef.current = requestAnimationFrame(tick);
-          };
-          arrowRafRef.current = requestAnimationFrame(tick);
-        }
-        return;
-      }
-
-      if (key === 'ArrowLeft') {
-        e.preventDefault();
-        if (e.shiftKey && !e.altKey) {
-          // Shift+Left: Switch to previous pattern
-          if (currentPatternIndex > 0) setCurrentPattern(currentPatternIndex - 1);
-        } else if (e.altKey) {
-          if (!selectionRef.current) startSelection();
-          moveCursor('left');
-          endSelection();
-        } else {
-          moveCursor('left');
-        }
-        return;
-      }
-
-      if (key === 'ArrowRight') {
-        e.preventDefault();
-        if (e.shiftKey && !e.altKey) {
-          // Shift+Right: Switch to next pattern
-          if (currentPatternIndex < patterns.length - 1) setCurrentPattern(currentPatternIndex + 1);
-        } else if (e.altKey) {
-          if (!selectionRef.current) startSelection();
-          moveCursor('right');
-          endSelection();
-        } else {
-          moveCursor('right');
-        }
-        return;
-      }
-
       // ============================================
-      // 5.2 Cut/Copy/Paste
+      // Cut/Copy/Paste
       // ============================================
 
       // Delete: Different behaviors based on modifiers (requires edit mode)
-      // FT2: Delete clears fields then advances by editRowSkip with wrapping
       if (key === 'Delete' && recordMode) {
         e.preventDefault();
         if (e.shiftKey) {
-          // Shift+Del: Delete note, instrument, volume and effect (FT2-style)
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
             note: 0,
             instrument: 0,
@@ -793,20 +255,17 @@ export const useTrackerInput = () => {
             eff: 0,
           });
         } else if (e.ctrlKey || e.metaKey) {
-          // Ctrl+Del: Delete volume and effect (FT2-style)
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
             volume: 0,
             effTyp: 0,
             eff: 0,
           });
         } else if (e.altKey) {
-          // Alt+Del: Delete effect only (FT2-style)
           setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
             effTyp: 0,
             eff: 0,
           });
         } else {
-          // Del: Delete note or volume at cursor (FT2-style based on cursor position)
           if (cursorRef.current.columnType === 'note') {
             setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { note: 0, instrument: 0 });
           } else if (cursorRef.current.columnType === 'instrument') {
@@ -823,7 +282,6 @@ export const useTrackerInput = () => {
             clearCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex);
           }
         }
-        // FT2: Advance by editStep after delete (same as any data entry)
         if (editStep > 0 && !isPlaying) {
           moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
         }
@@ -834,7 +292,6 @@ export const useTrackerInput = () => {
       if (key === 'Backspace' && recordMode) {
         e.preventDefault();
         if (e.metaKey) {
-          // Cmd+Backspace: Mac-friendly delete-in-place (mirrors Delete key)
           if (cursorRef.current.columnType === 'note') {
             setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { note: 0, instrument: 0 });
           } else if (cursorRef.current.columnType === 'instrument') {
@@ -854,18 +311,15 @@ export const useTrackerInput = () => {
             moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
           }
         } else if (e.shiftKey) {
-          // Shift+Backspace: Delete previous line (FT2: shifts rows up)
           if (cursorRef.current.rowIndex > 0) {
             moveCursor('up');
             handleDeleteRow();
           }
         } else {
-          // Backspace: Delete previous note
           if (cursorRef.current.rowIndex > 0) {
             moveCursor('up');
             clearCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex);
           } else {
-            // At row 0: nowhere to move up, just clear the current cell
             clearCell(cursorRef.current.channelIndex, 0);
           }
         }
@@ -875,14 +329,7 @@ export const useTrackerInput = () => {
       // F3/F4/F5 with modifiers: Cut/Copy/Paste operations
       if (key === 'F3') {
         e.preventDefault();
-        if (e.altKey) {
-          // Alt+F3: Cut block
-          cutSelection();
-        } else if (e.ctrlKey || e.metaKey) {
-          // Ctrl+F3: Cut pattern (not implemented yet)
-          cutSelection();
-        } else if (e.shiftKey) {
-          // Shift+F3: Cut track (not implemented yet)
+        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
           cutSelection();
         }
         return;
@@ -890,14 +337,7 @@ export const useTrackerInput = () => {
 
       if (key === 'F4') {
         e.preventDefault();
-        if (e.altKey) {
-          // Alt+F4: Copy block
-          copySelection();
-        } else if (e.ctrlKey || e.metaKey) {
-          // Ctrl+F4: Copy pattern
-          copySelection();
-        } else if (e.shiftKey) {
-          // Shift+F4: Copy track
+        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
           copySelection();
         }
         return;
@@ -906,13 +346,12 @@ export const useTrackerInput = () => {
       if (key === 'F5') {
         e.preventDefault();
         if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
-          // Any modifier + F5: Paste
           paste();
         }
         return;
       }
 
-      // Standard Ctrl+C/X/V shortcuts (in addition to FT2's F3/F4/F5)
+      // Standard Ctrl+C/X/V shortcuts
       if ((e.ctrlKey || e.metaKey) && keyLower === 'c' && !e.altKey) {
         e.preventDefault();
         copySelection();
@@ -928,7 +367,6 @@ export const useTrackerInput = () => {
       if ((e.ctrlKey || e.metaKey) && keyLower === 'v' && !e.altKey) {
         e.preventDefault();
         if (e.shiftKey) {
-          // Ctrl+Shift+V: Mix Paste (only fill empty cells)
           pasteMix();
           useUIStore.getState().setStatusMessage('MIX PASTE');
         } else {
@@ -937,25 +375,21 @@ export const useTrackerInput = () => {
         }
         return;
       }
-      // Ctrl+Shift+F: Flood Paste (paste until pattern end)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && keyLower === 'f') {
         e.preventDefault();
         pasteFlood();
         return;
       }
-      // Ctrl+Shift+I: Push-Forward Paste (insert and shift down)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && keyLower === 'i') {
         e.preventDefault();
         pastePushForward();
         return;
       }
 
-      // I key (no modifiers): Interpolate values in selection
-      // Only consume the key if we're on the volume column (otherwise let it fall through to note entry)
+      // I key (no modifiers): Interpolate values in selection (only on volume column)
       if (keyLower === 'i' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && cursorRef.current.columnType === 'volume') {
         e.preventDefault();
         if (selectionRef.current) {
-          // Get start and end values from selection
           const startRow = Math.min(selectionRef.current.startRow, selectionRef.current.endRow);
           const endRow = Math.max(selectionRef.current.startRow, selectionRef.current.endRow);
           const channel = cursorRef.current.channelIndex;
@@ -976,16 +410,13 @@ export const useTrackerInput = () => {
       // Ctrl+H: Chord tool (expand note into chord)
       if ((e.ctrlKey || e.metaKey) && keyLower === 'h' && !e.altKey) {
         e.preventDefault();
-        // TODO: Implement chord expansion dialog
-        // For now, expand current note into a major chord (root, 3rd, 5th)
         if (cursorRef.current.columnType === 'note') {
           const currentCell = pattern.channels[cursorRef.current.channelIndex].rows[cursorRef.current.rowIndex];
           if (currentCell.note && currentCell.note > 0 && currentCell.note < 97) {
             const rootNote = currentCell.note;
-            const third = rootNote + 4; // Major third
-            const fifth = rootNote + 7; // Perfect fifth
+            const third = rootNote + 4;
+            const fifth = rootNote + 7;
 
-            // Place notes in consecutive channels if available
             if (cursorRef.current.channelIndex + 2 < pattern.channels.length) {
               setCell(cursorRef.current.channelIndex + 1, cursorRef.current.rowIndex, {
                 note: third,
@@ -1013,11 +444,10 @@ export const useTrackerInput = () => {
         const now = Date.now();
         const timeSinceLastEsc = now - lastEscPressRef.current;
 
-        // Double-Esc within 500ms = panic (kill all stuck notes)
         if (timeSinceLastEsc < 500) {
           getToneEngine().releaseAll();
           useUIStore.getState().setStatusMessage('PANIC - ALL NOTES OFF');
-          lastEscPressRef.current = 0; // Reset timer
+          lastEscPressRef.current = 0;
         } else {
           clearSelection();
           lastEscPressRef.current = now;
@@ -1026,12 +456,11 @@ export const useTrackerInput = () => {
       }
 
       // ============================================
-      // 5.3 Miscellaneous
+      // Miscellaneous
       // ============================================
 
       // FT2: Right Shift = Record pattern (play with recording)
-      if (e.key === 'Shift' && e.location === 2) { // location 2 = right side
-        // Skip if scratch mode is active (don't interrupt scratching)
+      if (e.key === 'Shift' && e.location === 2) {
         if (getTrackerScratchController().isActive) return;
         e.preventDefault();
         if (!recordMode) {
@@ -1039,21 +468,18 @@ export const useTrackerInput = () => {
             useUIStore.getState().openNonEditableDialog();
             return;
           }
-          toggleRecordMode(); // Enable record mode
+          toggleRecordMode();
         }
-        // Always restart playback from beginning
         if (isPlaying) stop();
-        setIsLooping(true); // Loop current pattern only
+        setIsLooping(true);
         getToneEngine().init().then(() => play());
         return;
       }
 
       // FT2: Right Ctrl = Play song
       if (e.key === 'Control' && e.location === 2) {
-        // Skip if scratch mode is active (don't interrupt scratching)
         if (getTrackerScratchController().isActive) return;
         e.preventDefault();
-        // Always restart song playback from beginning
         if (isPlaying) stop();
         setIsLooping(false);
         getToneEngine().init().then(() => play());
@@ -1062,10 +488,8 @@ export const useTrackerInput = () => {
 
       // FT2: Right Alt = Play pattern
       if (e.key === 'Alt' && e.location === 2) {
-        // Skip if scratch mode is active (don't interrupt scratching)
         if (getTrackerScratchController().isActive) return;
         e.preventDefault();
-        // Always restart pattern playback from beginning
         if (isPlaying) stop();
         setIsLooping(true);
         getToneEngine().init().then(() => play());
@@ -1076,21 +500,16 @@ export const useTrackerInput = () => {
       if (key === ' ') {
         e.preventDefault();
 
-        // FT2 behavior: If playing, stop. If not playing, toggle edit mode.
         if (isPlaying) {
-          // Stop the replayer IMMEDIATELY (don't wait for React effect cycle)
           getTrackerReplayer().stop();
           stop();
-          // Kill all active notes to prevent stuck/jammed synths
           getToneEngine().releaseAll();
           useUIStore.getState().setStatusMessage('STOPPED');
         } else {
-          // Block entering edit mode on non-editable (UADE classic) patterns
           if (!recordMode && !isPatternEditable) {
             useUIStore.getState().openNonEditableDialog();
             return;
           }
-          // Toggle edit/record mode
           toggleRecordMode();
           const isRec = useTrackerStore.getState().recordMode;
           useUIStore.getState().setStatusMessage(isRec ? 'RECORD ON' : 'RECORD OFF');
@@ -1098,10 +517,9 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // Ctrl+Enter or Right Enter: Play song
+      // Ctrl+Enter: Play song
       if (key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        // Always restart song playback from beginning
         if (isPlaying) stop();
         setIsLooping(false);
         getToneEngine().init().then(() => play());
@@ -1109,352 +527,11 @@ export const useTrackerInput = () => {
         return;
       }
 
-      // CapsLock: Enter note-off (XM note 97)
-      if (key === 'CapsLock') {
-        e.preventDefault();
-        if (cursorRef.current.columnType === 'note') {
-          // When recording during playback, enter at the current playback row
-          const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
-          setCell(cursorRef.current.channelIndex, targetRow, { note: 97 }); // 97 = note off in XM format
-          // FT2: Advance cursor by editStep with wrapping (unless during playback)
-          if (editStep > 0 && !isPlaying) {
-            moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-          }
-        }
-        return;
-      }
+      // ── Delegate to note input (CapsLock, F1-F7, octave, grave, piano keys) ──
+      if (noteInput.handleKeyDown(e)) return;
 
-      // F1-F7: Select octave 1-7 (FT2 uses F1-F8 for octaves 0-6, we use 1-7)
-      if (key >= 'F1' && key <= 'F7') {
-        e.preventDefault();
-        const octave = parseInt(key.substring(1));
-        setCurrentOctave(octave);
-        useUIStore.getState().setStatusMessage(`OCTAVE ${octave}`);
-        return;
-      }
-
-      // FT2: Grave key (`) - Cycle edit step (0-16)
-      // Shift+` decreases, plain ` increases
-      if (key === '`' || key === '~') {
-        e.preventDefault();
-        let newStep: number;
-        if (e.shiftKey) {
-          // Decrease edit step (wrap from 0 to 16)
-          newStep = editStep === 0 ? 16 : editStep - 1;
-        } else {
-          // Increase edit step (wrap from 16 to 0)
-          newStep = editStep === 16 ? 0 : editStep + 1;
-        }
-        setEditStep(newStep);
-        useUIStore.getState().setStatusMessage(`EDIT STEP ${newStep}`);
-        return;
-      }
-
-      // FT2: Numpad +/- or Keypad * to change octave
-      if (e.code === 'NumpadAdd' || (key === '+' && !e.shiftKey && e.location === 3)) {
-        e.preventDefault();
-        if (currentOctave < 7) {
-          setCurrentOctave(currentOctave + 1);
-        }
-        return;
-      }
-      if (e.code === 'NumpadSubtract' || (key === '-' && e.location === 3)) {
-        e.preventDefault();
-        if (currentOctave > 1) {
-          setCurrentOctave(currentOctave - 1);
-        }
-        return;
-      }
-
-      // ============================================
-      // Note Entry (Piano Keys)
-      // ============================================
-
-      // Check if this is a note key
-      // IMPORTANT: Ignore key repeats to prevent retriggering while holding a key
-      // FT2: Only process note keys when cursor is on the NOTE column
-      // Otherwise, keys like 'c', 'v', 'b' etc. should go to effect/volume entry
-      if (NOTE_MAP[keyLower] && !e.altKey && !e.ctrlKey && !e.metaKey && !e.repeat && cursorRef.current.columnType === 'note') {
-        e.preventDefault();
-        const { note, octaveOffset } = NOTE_MAP[keyLower];
-        const octave = currentOctave + octaveOffset;
-
-        // Preview note (pass key for tracking held notes)
-        // This also sets up the target channel for multi-channel recording
-        previewNote(note, octave, keyLower, e.shiftKey);
-
-        // FT2: Only enter notes when in edit/record mode
-        if (recordMode) {
-          // FT2: Get the channel that was allocated by previewNote for multi-channel
-          const heldNote = heldNotesRef.current.get(keyLower);
-          const targetChannel = heldNote?.channelIndex;
-          enterNote(note, octave, targetChannel);
-        }
-        return;
-      }
-
-      // FT2: Key repeat behavior - only repeat note entry in edit mode
-      // In edit mode (recordMode && !isPlaying), allow key repeat for notes
-      if (NOTE_MAP[keyLower] && e.repeat && cursorRef.current.columnType === 'note') {
-        e.preventDefault();
-        // FT2 behavior: Allow key repeat only in edit mode
-        if (recordMode && !isPlaying) {
-          const { note, octaveOffset } = NOTE_MAP[keyLower];
-          const octave = currentOctave + octaveOffset;
-          const heldNote = heldNotesRef.current.get(keyLower);
-          enterNote(note, octave, heldNote?.channelIndex);
-        }
-        return;
-      }
-
-      // ============================================
-      // FT2-Style Data Entry (Instrument/Volume/Effect)
-      // Requires recordMode to be enabled (FT2: Edit mode)
-      // ============================================
-
-      const currentCell = pattern.channels[cursorRef.current.channelIndex].rows[cursorRef.current.rowIndex];
-
-      // ---------- INSTRUMENT COLUMN (hex digits only) ----------
-      if (recordMode && cursorRef.current.columnType === 'instrument' && HEX_DIGITS_ALL.includes(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        const hexDigit = parseInt(key, 16);
-        const currentValue = currentCell.instrument || 0;
-
-        let newValue: number;
-        if (cursorRef.current.digitIndex === 0) {
-          // High nibble: (hex << 4) | (current & 0x0F)
-          newValue = (hexDigit << 4) | (currentValue & 0x0F);
-        } else {
-          // Low nibble: (current & 0xF0) | hex
-          newValue = (currentValue & 0xF0) | hexDigit;
-        }
-
-        // XM instrument range is 0-128
-        if (newValue > 128) newValue = 128;
-        setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { instrument: newValue });
-
-        // FT2: Stay on same column/digit, advance row by editStep with wrapping
-        if (editStep > 0 && !isPlaying) {
-          moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-        }
-        return;
-      }
-
-      // ---------- VOLUME COLUMN (FT2 VOL1 special keys + VOL2 hex) ----------
-      if (recordMode && cursorRef.current.columnType === 'volume' && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        const currentValue = currentCell.volume || 0;
-
-        if (cursorRef.current.digitIndex === 0) {
-          // VOL1: Use FT2 volume effect keys (not hex)
-          const vol1Key = VOL1_KEY_MAP[keyLower];
-          if (vol1Key !== undefined) {
-            e.preventDefault();
-            // Set high nibble, preserve low nibble
-            let newValue = (vol1Key << 4) | (currentValue & 0x0F);
-            // FT2: volume 0x51-0x5F clamps to 0x50
-            if (newValue >= 0x51 && newValue <= 0x5F) newValue = 0x50;
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { volume: newValue });
-            // FT2: Stay on same column/digit, advance row by editStep with wrapping
-            if (editStep > 0 && !isPlaying) {
-              moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-            }
-            return;
-          }
-        } else {
-          // VOL2: Use hex digits
-          if (HEX_DIGITS_ALL.includes(key)) {
-            e.preventDefault();
-            const hexDigit = parseInt(key, 16);
-            let newValue: number;
-
-            // FT2: If volume was < 0x10, set to 0x10 + digit
-            if (currentValue < 0x10) {
-              newValue = 0x10 + hexDigit;
-            } else {
-              newValue = (currentValue & 0xF0) | hexDigit;
-            }
-
-            // FT2: volume 0x51-0x5F clamps to 0x50
-            if (newValue >= 0x51 && newValue <= 0x5F) newValue = 0x50;
-            setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { volume: newValue });
-
-            // FT2: Stay on same column/digit, advance row by editStep with wrapping
-            if (editStep > 0 && !isPlaying) {
-              moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-            }
-            return;
-          }
-        }
-      }
-
-      // ---------- EFFECT TYPE (EFX0): FT2 effect command keys (0-9, A-Z) ----------
-      if (recordMode && cursorRef.current.columnType === 'effTyp' && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        const effKey = EFFECT_TYPE_KEY_MAP[keyLower];
-        if (effKey !== undefined) {
-          e.preventDefault();
-          // Convert effTyp to effect letter (0-9 = '0'-'9', 10+ = 'A'-'Z')
-          const effChar = effKey < 10 ? effKey.toString() : String.fromCharCode(55 + effKey);
-          const effParam = currentCell.eff || 0;
-          const effectString = effChar + effParam.toString(16).padStart(2, '0').toUpperCase();
-          setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
-            effTyp: effKey,
-            effect: effectString
-          });
-          // FT2: Stay on same column, advance row by editStep with wrapping
-          if (editStep > 0 && !isPlaying) {
-            moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-          }
-          return;
-        }
-      }
-
-      // ---------- EFFECT PARAMETER (EFX1/EFX2): Hex digits only ----------
-      if (recordMode && cursorRef.current.columnType === 'effParam' && HEX_DIGITS_ALL.includes(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        const hexDigit = parseInt(key, 16);
-        const currentValue = currentCell.eff || 0;
-
-        let newValue: number;
-        if (cursorRef.current.digitIndex === 0) {
-          // High nibble (EFX1)
-          newValue = (hexDigit << 4) | (currentValue & 0x0F);
-        } else {
-          // Low nibble (EFX2)
-          newValue = (currentValue & 0xF0) | hexDigit;
-        }
-
-        // Update effect string along with numeric eff value
-        const effTyp = currentCell.effTyp || 0;
-        const effChar = effTyp < 10 ? effTyp.toString() : String.fromCharCode(55 + effTyp);
-        const effectString = effChar + newValue.toString(16).padStart(2, '0').toUpperCase();
-
-        setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
-          eff: newValue,
-          effect: effectString
-        });
-
-        // FT2: Stay on same column/digit, advance row by editStep with wrapping
-        if (editStep > 0 && !isPlaying) {
-          moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-        }
-        return;
-      }
-
-      // ---------- EFFECT2 TYPE (EFX2_0): FT2 effect command keys (0-9, A-Z) ----------
-      if (recordMode && cursorRef.current.columnType === 'effTyp2' && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        const effKey = EFFECT_TYPE_KEY_MAP[keyLower];
-        if (effKey !== undefined) {
-          e.preventDefault();
-          // Convert effTyp2 to effect letter (0-9 = '0'-'9', 10+ = 'A'-'Z')
-          const effChar = effKey < 10 ? effKey.toString() : String.fromCharCode(55 + effKey);
-          const effParam = currentCell.eff2 || 0;
-          const effectString = effChar + effParam.toString(16).padStart(2, '0').toUpperCase();
-          setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
-            effTyp2: effKey,
-            effect2: effectString
-          });
-          // FT2: Stay on same column, advance row by editStep with wrapping
-          if (editStep > 0 && !isPlaying) {
-            moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-          }
-          return;
-        }
-      }
-
-      // ---------- FLAG COLUMNS: 'A' for accent (1), 'S' for slide (2), 'M' for mute (3), 'H' for hammer (4), '0'/'.' to clear ----------
-      if (recordMode && (cursorRef.current.columnType === 'flag1' || cursorRef.current.columnType === 'flag2') && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        const flagField = cursorRef.current.columnType; // 'flag1' or 'flag2'
-
-        if (keyLower === 'a') {
-          e.preventDefault();
-          setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 1 }); // 1 = accent
-          if (editStep > 0 && !isPlaying) moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-          return;
-        }
-        if (keyLower === 's') {
-          e.preventDefault();
-          setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 2 }); // 2 = slide
-          if (editStep > 0 && !isPlaying) moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-          return;
-        }
-        if (keyLower === 'm') {
-          e.preventDefault();
-          setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 3 }); // 3 = mute (TT-303)
-          if (editStep > 0 && !isPlaying) moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-          return;
-        }
-        if (keyLower === 'h') {
-          e.preventDefault();
-          setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 4 }); // 4 = hammer (TT-303)
-          if (editStep > 0 && !isPlaying) moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-          return;
-        }
-        if (key === '0' || key === '.') {
-          e.preventDefault();
-          setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [flagField]: 0 }); // 0 = clear
-          if (editStep > 0 && !isPlaying) moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-          return;
-        }
-      }
-
-      // ---------- EFFECT2 PARAMETER (EFX2_1/EFX2_2): Hex digits only ----------
-      if (recordMode && cursorRef.current.columnType === 'effParam2' && HEX_DIGITS_ALL.includes(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        const hexDigit = parseInt(key, 16);
-        const currentValue = currentCell.eff2 || 0;
-
-        let newValue: number;
-        if (cursorRef.current.digitIndex === 0) {
-          // High nibble
-          newValue = (hexDigit << 4) | (currentValue & 0x0F);
-        } else {
-          // Low nibble
-          newValue = (currentValue & 0xF0) | hexDigit;
-        }
-
-        // Update effect2 string along with numeric eff2 value
-        const effTyp2 = currentCell.effTyp2 || 0;
-        const effChar = effTyp2 < 10 ? effTyp2.toString() : String.fromCharCode(55 + effTyp2);
-        const effectString = effChar + newValue.toString(16).padStart(2, '0').toUpperCase();
-
-        setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, {
-          eff2: newValue,
-          effect2: effectString
-        });
-
-        // FT2: Stay on same column/digit, advance row by editStep with wrapping
-        if (editStep > 0 && !isPlaying) {
-          moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-        }
-        return;
-      }
-
-      // ---------- PROBABILITY COLUMN: Decimal digits 0-9 (percentage 0-99) ----------
-      if (recordMode && cursorRef.current.columnType === 'probability' && /^[0-9]$/.test(key) && !e.altKey && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        const digit = parseInt(key, 10);
-        const currentValue = currentCell.probability || 0;
-
-        let newValue: number;
-        if (cursorRef.current.digitIndex === 0) {
-          // Tens digit
-          newValue = (digit * 10) + (currentValue % 10);
-        } else {
-          // Ones digit
-          newValue = (Math.floor(currentValue / 10) * 10) + digit;
-        }
-
-        // Clamp to 0-99
-        newValue = Math.min(99, Math.max(0, newValue));
-
-        setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { probability: newValue });
-
-        // FT2: Stay on same column/digit, advance row by editStep with wrapping
-        if (editStep > 0 && !isPlaying) {
-          moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
-        }
-        return;
-      }
+      // ── Delegate to effect input (instrument, volume, effect, flag, probability columns) ──
+      if (effectInput.handleKeyDown(e)) return;
     },
     [
       pattern,
@@ -1462,25 +539,15 @@ export const useTrackerInput = () => {
       currentPatternIndex,
       isPlaying,
       playbackRow,
-      currentOctave,
-      currentInstrumentId,
-      instruments,
       recordMode,
       toggleRecordMode,
       editStep,
-      setEditStep,
       moveCursor,
       moveCursorToRow,
-      moveCursorToChannel,
-      moveCursorToColumn,
       setCell,
       clearCell,
-      setCurrentPattern,
-      setCurrentInstrument,
       stop,
       play,
-      startSelection,
-      endSelection,
       clearSelection,
       copySelection,
       cutSelection,
@@ -1488,66 +555,52 @@ export const useTrackerInput = () => {
       pasteMix,
       pasteFlood,
       pastePushForward,
-      previewNote,
-      enterNote,
       handleInsertRow,
       handleDeleteRow,
       transposeSelection,
-      setPtnJumpPos,
-      getPtnJumpPos,
       readMacroSlot,
       writeMacroSlot,
-      setCurrentOctave,
       toggleInsertMode,
+      replacePattern,
+      interpolateSelection,
+      insertRow,
+      setIsLooping,
+      isPatternEditable,
+      navInput,
+      noteInput,
+      effectInput,
     ]
   );
 
-  // Handle key release for note off and arrow key scroll stop
+  // Handle key release
   const handleKeyUp = useCallback(
     (e: KeyboardEvent) => {
-      // Only handle keys when tracker view is active
       const activeView = useUIStore.getState().activeView;
       if (activeView !== 'tracker') {
         return;
       }
 
-      // Stop RAF-driven arrow scrolling
-      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        heldArrowRef.current = null;
-        // RAF loop will self-terminate on next tick when it sees null
-      }
-
-      const keyLower = e.key.toLowerCase();
-
-      // Release note if this is a note key
-      if (NOTE_MAP[keyLower]) {
-        releaseNote(keyLower);
-      }
+      navInput.handleKeyUp(e);
+      noteInput.handleKeyUp(e);
     },
-    [releaseNote]
+    [navInput, noteInput]
   );
 
   // Attach keyboard listeners
-  // Use capture phase to intercept F1-F12 before browser handles them
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     window.addEventListener('keyup', handleKeyUp, { capture: true });
     return () => {
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       window.removeEventListener('keyup', handleKeyUp, { capture: true });
-      // Cancel any in-flight RAF scroll
-      if (arrowRafRef.current) {
-        cancelAnimationFrame(arrowRafRef.current);
-        arrowRafRef.current = 0;
-      }
-      heldArrowRef.current = null;
+      navInput.cleanup();
     };
-  }, [handleKeyDown, handleKeyUp]);
+  }, [handleKeyDown, handleKeyUp, navInput]);
 
   return {
-    previewNote,
-    enterNote,
-    currentOctave,
-    setCurrentOctave,
+    previewNote: noteInput.previewNote,
+    enterNote: noteInput.enterNote,
+    currentOctave: noteInput.currentOctave,
+    setCurrentOctave: noteInput.setCurrentOctave,
   };
 };
