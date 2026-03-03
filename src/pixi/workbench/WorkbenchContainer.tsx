@@ -613,6 +613,9 @@ export const WorkbenchContainer: React.FC = () => {
             NO sortableChildren: React sorts windows by zIndex instead (see
             sortedWindowEntries above) — highest zIndex renders last = on top. */}
         <pixiContainer ref={worldRef}>
+          {/* Tether: Instrument Editor ↔ Tracker — behind windows */}
+          <WindowTether fromId="instrument" toId="tracker" />
+
           {/* Windows — rendered in ascending zIndex order (highest = last = on top) */}
           {sortedWindowEntries.map(([id, { title, component: ViewComponent }]) => {
             const win = windows[id];
@@ -644,9 +647,6 @@ export const WorkbenchContainer: React.FC = () => {
               </pixiContainer>
             );
           })}
-
-          {/* Tether: Instrument Editor ↔ Tracker */}
-          <WindowTether fromId="instrument" toId="tracker" />
 
           {/* Snap guide lines — drawn imperatively, always on top */}
           <pixiGraphics
