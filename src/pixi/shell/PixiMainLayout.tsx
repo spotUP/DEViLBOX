@@ -34,18 +34,23 @@ import { WorkbenchContainer } from '../workbench/WorkbenchContainer';
 
 type MainViewId = 'tracker' | 'arrangement' | 'pianoroll' | 'dj' | 'vj' | 'studio';
 
-const MAIN_VIEW_COMPONENTS: Record<MainViewId, React.ComponentType> = {
+// Views that are always mounted (hidden when inactive) to avoid @pixi/layout BindingError.
+// WorkbenchContainer is excluded — it contains its own copies of these views inside
+// PixiWindows, so always-mounting it would cause duplicate Yoga node conflicts.
+type AlwaysMountedViewId = Exclude<MainViewId, 'studio'>;
+
+const ALWAYS_MOUNTED_VIEWS: Record<AlwaysMountedViewId, React.ComponentType> = {
   tracker: PixiTrackerView,
   arrangement: PixiArrangementView,
   pianoroll: PixiPianoRollView,
   dj: PixiDJView,
   vj: PixiVJView,
-  studio: WorkbenchContainer,
 };
 
 // Map UIStore activeView to our MainViewId (some views map to tracker)
 function resolveMainView(activeView: string): MainViewId {
-  if (activeView in MAIN_VIEW_COMPONENTS) return activeView as MainViewId;
+  if (activeView === 'studio') return 'studio';
+  if (activeView in ALWAYS_MOUNTED_VIEWS) return activeView as MainViewId;
   // 'drumpad', 'mixer', or any unknown → default to tracker
   return 'tracker';
 }
@@ -138,8 +143,9 @@ export const PixiMainLayout: React.FC = () => {
         />
       </pixiContainer>
 
-      {/* Main view zone — all views always mounted (avoids @pixi/layout BindingError).
-          All are position:absolute stacked; only the active one is visible. */}
+      {/* Main view zone — always-mounted views are stacked; only the active one is visible.
+          WorkbenchContainer is conditionally mounted (it has its own sub-views that
+          would conflict with Yoga layout nodes if always mounted). */}
       <pixiContainer
         zIndex={0}
         layout={{
@@ -149,7 +155,7 @@ export const PixiMainLayout: React.FC = () => {
           overflow: 'hidden',
         }}
       >
-        {(Object.entries(MAIN_VIEW_COMPONENTS) as [MainViewId, React.ComponentType][]).map(
+        {(Object.entries(ALWAYS_MOUNTED_VIEWS) as [AlwaysMountedViewId, React.ComponentType][]).map(
           ([viewId, ViewComponent]) => {
             const isActive = viewId === mainViewId;
             return (
@@ -168,6 +174,22 @@ export const PixiMainLayout: React.FC = () => {
               </pixiContainer>
             );
           }
+        )}
+        {/* Studio/Workbench — conditionally mounted */}
+        {mainViewId === 'studio' && (
+          <pixiContainer
+            key="studio"
+            visible
+            eventMode="auto"
+            layout={{
+              position: 'absolute',
+              width,
+              height: Math.max(100, mainViewH),
+              flexDirection: 'column',
+            }}
+          >
+            <WorkbenchContainer />
+          </pixiContainer>
         )}
       </pixiContainer>
 
