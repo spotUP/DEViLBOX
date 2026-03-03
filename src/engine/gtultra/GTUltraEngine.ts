@@ -39,13 +39,15 @@ export interface GTUltraCallbacks {
   onTableData?: (tableType: number, left: Uint8Array, right: Uint8Array) => void;
   onSidRegisters?: (sidIdx: number, data: Uint8Array) => void;
   onSongInfo?: (info: GTUltraSongInfo) => void;
+  onSngData?: (data: ArrayBuffer | null) => void;
 }
 
 export class GTUltraEngine {
   private context: AudioContext;
   private workletNode: AudioWorkletNode | null = null;
   private outputNode: GainNode;
-  private callbacks: GTUltraCallbacks;
+  /** Public so views can wire additional callbacks after init */
+  callbacks: GTUltraCallbacks;
   private readyResolve: (() => void) | null = null;
   private readyPromise: Promise<void>;
   private disposed = false;
@@ -180,6 +182,9 @@ export class GTUltraEngine {
       case 'songInfo':
         this.callbacks.onSongInfo?.(msg as unknown as GTUltraSongInfo);
         break;
+      case 'sngData':
+        this.callbacks.onSngData?.(msg.data as ArrayBuffer | null);
+        break;
     }
   }
 
@@ -277,6 +282,44 @@ export class GTUltraEngine {
 
   redo(): void {
     this.post({ type: 'redo' });
+  }
+
+  // --- Save/Export ---
+
+  saveSng(): void {
+    this.post({ type: 'saveSng' });
+  }
+
+  // --- Instrument editing ---
+
+  setInstrumentAD(instrument: number, value: number): void {
+    this.post({ type: 'setInstrumentAD', instrument, value });
+  }
+
+  setInstrumentSR(instrument: number, value: number): void {
+    this.post({ type: 'setInstrumentSR', instrument, value });
+  }
+
+  setInstrumentFirstwave(instrument: number, value: number): void {
+    this.post({ type: 'setInstrumentFirstwave', instrument, value });
+  }
+
+  setInstrumentTablePtr(instrument: number, tableType: number, value: number): void {
+    this.post({ type: 'setInstrumentTablePtr', instrument, tableType, value });
+  }
+
+  // --- Song metadata ---
+
+  setSongName(name: string): void {
+    this.post({ type: 'setSongName', name });
+  }
+
+  setAuthorName(name: string): void {
+    this.post({ type: 'setAuthorName', name });
+  }
+
+  setCopyright(name: string): void {
+    this.post({ type: 'setCopyright', name });
   }
 
   // --- Lifecycle ---

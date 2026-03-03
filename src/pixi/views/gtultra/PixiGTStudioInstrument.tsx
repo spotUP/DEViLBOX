@@ -2,22 +2,16 @@
  * PixiGTStudioInstrument — Visual SID Instrument Designer for Studio Mode.
  *
  * Provides a graphical ADSR envelope editor with draggable control points
- * and visual waveform selectors (saw, triangle, pulse, noise) instead of
- * hex value editing. For users who want to design SID sounds without
- * needing to understand raw hex values.
- *
- * Features:
- * - Draggable ADSR envelope visualization
- * - Waveform selector buttons with visual icons
- * - Pulse width slider (for pulse wave)
- * - Table pointer assignments with preview
+ * and visual waveform selectors. Users can click/drag ADSR points and
+ * click waveform buttons to toggle oscillator types.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
+import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
+import { encodeAD, encodeSR, attackLabel, decayLabel, sustainLabel } from '@/lib/gtultra/GTVisualMapping';
 
 // ── Colors ──
 const C_BG       = 0x16213e;
@@ -27,9 +21,9 @@ const C_HEADER   = 0xe94560;
 const C_ENV_LINE = 0x2a9d8f;
 const C_ENV_FILL = 0x2a9d8f;
 const C_POINT    = 0xffffff;
+const C_POINT_HOVER = 0xffcc00;
 const C_WAVE_ON  = 0x00ff88;
 const C_WAVE_OFF = 0x444466;
-const C_PW_BAR   = 0x6699ff;
 
 const WAVEFORMS = [
   { name: 'TRI', bit: 0x10, icon: '△' },
@@ -37,6 +31,8 @@ const WAVEFORMS = [
   { name: 'PUL', bit: 0x40, icon: '⊓' },
   { name: 'NOI', bit: 0x80, icon: '⊕' },
 ];
+
+type DragTarget = 'attack' | 'decay' | 'sustain' | 'release' | null;
 
 interface Props {
   width: number;
@@ -48,6 +44,7 @@ export const PixiGTStudioInstrument: React.FC<Props> = ({ width, height }) => {
   const bgRef = useRef<GraphicsType>(null);
   const envRef = useRef<GraphicsType>(null);
   const megaRef = useRef<MegaText | null>(null);
+  const [dragging, setDragging] = useState<DragTarget>(null);
 
   const currentInstrument = useGTUltraStore((s) => s.currentInstrument);
   const instrumentData = useGTUltraStore((s) => s.instrumentData);
@@ -62,12 +59,126 @@ export const PixiGTStudioInstrument: React.FC<Props> = ({ width, height }) => {
   const release = inst.sr & 0x0F;
   const waveform = inst.firstwave & 0xFE; // mask off gate bit
 
+  // Layout constants for hit testing
+  const pad = 8;
+  const envY = 28;
+  const envH = Math.min(80, height * 0.3);
+  const envW = width - pad * 2;
+  const btnY = envY + envH + 36;
+  const btnW = 48;
+  const btnH = 20;
+
   // Init MegaText
   useEffect(() => {
     const mega = new MegaText();
     megaRef.current = mega;
     if (containerRef.current) containerRef.current.addChild(mega);
     return () => { mega.destroy(); megaRef.current = null; };
+  }, []);
+
+  // ── Envelope geometry helpers ──
+  const getEnvPoints = useCallback(() => {
+    const aTbl = [0.002, 0.008, 0.016, 0.024, 0.038, 0.056, 0.068, 0.080, 0.100, 0.250, 0.500, 0.800, 1.0, 3.0, 5.0, 8.0];
+    const dTbl = [0.006, 0.024, 0.048, 0.072, 0.114, 0.168, 0.204, 0.240, 0.300, 0.750, 1.5, 2.4, 3.0, 9.0, 15.0, 24.0];
+    const aTime = aTbl[attack] || 0.1;
+    const dTime = dTbl[decay] || 0.3;
+    const sLevel = sustain / 15;
+    const rTime = dTbl[release] || 0.3;
+    const totalTime = aTime + dTime + rTime + 0.2;
+
+    const timeToX = (t: number) => pad + (t / totalTime) * envW;
+    const levelToY = (l: number) => envY + envH * (1 - l);
+
+    return {
+      x0: pad,
+      x1: timeToX(aTime),
+      x2: timeToX(aTime + dTime),
+      x3: timeToX(aTime + dTime + 0.2),
+      x4: timeToX(totalTime),
+      yTop: envY + 2,
+      ySustain: levelToY(sLevel),
+      yBottom: envY + envH,
+    };
+  }, [attack, decay, sustain, release, envW, envH]);
+
+  // ── Pointer handlers for ADSR dragging ──
+  const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
+    const local = e.getLocalPosition(containerRef.current);
+    const mx = local.x;
+    const my = local.y;
+
+    // Check waveform buttons first
+    for (let i = 0; i < WAVEFORMS.length; i++) {
+      const bx = pad + i * (btnW + 6);
+      if (mx >= bx && mx <= bx + btnW && my >= btnY && my <= btnY + btnH) {
+        // Toggle this waveform bit
+        const wf = WAVEFORMS[i];
+        const newWave = (waveform ^ wf.bit) | (inst.firstwave & 0x01); // preserve gate bit
+        engine?.setInstrumentFirstwave(currentInstrument, newWave);
+        // Update local store immediately
+        const newInst = { ...inst, firstwave: newWave };
+        const data = [...useGTUltraStore.getState().instrumentData];
+        data[currentInstrument] = newInst;
+        useGTUltraStore.setState({ instrumentData: data });
+        return;
+      }
+    }
+
+    // Check ADSR control points (within 10px radius)
+    const pts = getEnvPoints();
+    const hitR = 10;
+    const candidates: [DragTarget, number, number][] = [
+      ['attack', pts.x1, pts.yTop],
+      ['decay', pts.x2, pts.ySustain],
+      ['sustain', pts.x3, pts.ySustain],
+      ['release', pts.x4, pts.yBottom],
+    ];
+
+    for (const [target, px, py] of candidates) {
+      const dist = Math.hypot(mx - px, my - py);
+      if (dist < hitR) {
+        setDragging(target);
+        return;
+      }
+    }
+  }, [engine, currentInstrument, inst, waveform, btnY, getEnvPoints]);
+
+  const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
+    if (!dragging || !engine) return;
+    const local = e.getLocalPosition(containerRef.current);
+    const mx = local.x;
+    const my = local.y;
+
+    // Map pointer position to parameter value (0-15)
+    const xFrac = Math.max(0, Math.min(1, (mx - pad) / envW));
+    const yFrac = Math.max(0, Math.min(1, 1 - (my - envY) / envH));
+
+    let newVal: number;
+    switch (dragging) {
+      case 'attack':
+        newVal = Math.round(xFrac * 15);
+        engine.setInstrumentAD(currentInstrument, encodeAD(newVal, decay));
+        break;
+      case 'decay':
+        newVal = Math.round(xFrac * 15);
+        engine.setInstrumentAD(currentInstrument, encodeAD(attack, newVal));
+        break;
+      case 'sustain':
+        newVal = Math.round(yFrac * 15);
+        engine.setInstrumentSR(currentInstrument, encodeSR(newVal, release));
+        break;
+      case 'release':
+        newVal = Math.round(xFrac * 15);
+        engine.setInstrumentSR(currentInstrument, encodeSR(sustain, newVal));
+        break;
+    }
+
+    // Refresh instrument data from WASM
+    engine.requestInstrumentData(currentInstrument);
+  }, [dragging, engine, currentInstrument, attack, decay, sustain, release, envW, envH]);
+
+  const handlePointerUp = useCallback(() => {
+    setDragging(null);
   }, []);
 
   // Draw
@@ -82,7 +193,6 @@ export const PixiGTStudioInstrument: React.FC<Props> = ({ width, height }) => {
 
     const labels: GlyphLabel[] = [];
     const ff = PIXI_FONTS.MONO;
-    const pad = 8;
 
     // Background
     bg.rect(0, 0, width, height).fill({ color: C_BG });
@@ -93,73 +203,50 @@ export const PixiGTStudioInstrument: React.FC<Props> = ({ width, height }) => {
     labels.push({ x: pad, y: pad, text: `#${currentInstrument.toString(16).padStart(2, '0').toUpperCase()} ${name}`, color: C_HEADER, fontFamily: ff });
 
     // ── ADSR Envelope visualization ──
-    const envY = 28;
-    const envH = Math.min(80, height * 0.3);
-    const envW = width - pad * 2;
-
-    // Draw envelope background
     bg.rect(pad, envY, envW, envH).fill({ color: 0x0a0a1a });
     bg.rect(pad, envY, envW, envH).stroke({ color: C_BORDER, width: 1 });
 
-    // ADSR times (SID values 0-15 → visual widths)
-    const aTbl = [0.002, 0.008, 0.016, 0.024, 0.038, 0.056, 0.068, 0.080, 0.100, 0.250, 0.500, 0.800, 1.0, 3.0, 5.0, 8.0];
-    const dTbl = [0.006, 0.024, 0.048, 0.072, 0.114, 0.168, 0.204, 0.240, 0.300, 0.750, 1.5, 2.4, 3.0, 9.0, 15.0, 24.0];
-
-    const aTime = aTbl[attack] || 0.1;
-    const dTime = dTbl[decay] || 0.3;
-    const sLevel = sustain / 15;
-    const rTime = dTbl[release] || 0.3;
-    const totalTime = aTime + dTime + rTime + 0.2; // extra sustain display time
-
-    const timeToX = (t: number) => pad + (t / totalTime) * envW;
-    const levelToY = (l: number) => envY + envH * (1 - l);
-
-    // Draw envelope shape
-    const x0 = pad;
-    const x1 = timeToX(aTime);
-    const x2 = timeToX(aTime + dTime);
-    const x3 = timeToX(aTime + dTime + 0.2);
-    const x4 = timeToX(totalTime);
-
-    const yBottom = envY + envH;
-    const yTop = envY + 2;
-    const ySustain = levelToY(sLevel);
+    const pts = getEnvPoints();
 
     // Filled area
-    env.moveTo(x0, yBottom);
-    env.lineTo(x1, yTop);
-    env.lineTo(x2, ySustain);
-    env.lineTo(x3, ySustain);
-    env.lineTo(x4, yBottom);
+    env.moveTo(pts.x0, pts.yBottom);
+    env.lineTo(pts.x1, pts.yTop);
+    env.lineTo(pts.x2, pts.ySustain);
+    env.lineTo(pts.x3, pts.ySustain);
+    env.lineTo(pts.x4, pts.yBottom);
     env.closePath();
     env.fill({ color: C_ENV_FILL, alpha: 0.15 });
 
     // Line
-    env.moveTo(x0, yBottom);
-    env.lineTo(x1, yTop);
-    env.lineTo(x2, ySustain);
-    env.lineTo(x3, ySustain);
-    env.lineTo(x4, yBottom);
+    env.moveTo(pts.x0, pts.yBottom);
+    env.lineTo(pts.x1, pts.yTop);
+    env.lineTo(pts.x2, pts.ySustain);
+    env.lineTo(pts.x3, pts.ySustain);
+    env.lineTo(pts.x4, pts.yBottom);
     env.stroke({ color: C_ENV_LINE, width: 2 });
 
-    // Control points
-    for (const [px, py] of [[x1, yTop], [x2, ySustain], [x3, ySustain], [x4, yBottom]]) {
-      env.circle(px, py, 3).fill({ color: C_POINT });
+    // Control points (highlight dragging target)
+    const points: [number, number, DragTarget][] = [
+      [pts.x1, pts.yTop, 'attack'],
+      [pts.x2, pts.ySustain, 'decay'],
+      [pts.x3, pts.ySustain, 'sustain'],
+      [pts.x4, pts.yBottom, 'release'],
+    ];
+    for (const [px, py, target] of points) {
+      const color = dragging === target ? C_POINT_HOVER : C_POINT;
+      env.circle(px, py, dragging === target ? 5 : 3).fill({ color });
     }
 
-    // ADSR value labels
-    labels.push({ x: pad, y: envY + envH + 4, text: `A:${attack}`, color: C_LABEL, fontFamily: ff });
-    labels.push({ x: pad + 32, y: envY + envH + 4, text: `D:${decay}`, color: C_LABEL, fontFamily: ff });
-    labels.push({ x: pad + 64, y: envY + envH + 4, text: `S:${sustain}`, color: C_LABEL, fontFamily: ff });
-    labels.push({ x: pad + 96, y: envY + envH + 4, text: `R:${release}`, color: C_LABEL, fontFamily: ff });
+    // ADSR value labels with timing
+    labels.push({ x: pad, y: envY + envH + 4, text: `A:${attack} ${attackLabel(attack)}`, color: C_LABEL, fontFamily: ff });
+    labels.push({ x: pad + 72, y: envY + envH + 4, text: `D:${decay} ${decayLabel(decay)}`, color: C_LABEL, fontFamily: ff });
+    labels.push({ x: pad, y: envY + envH + 16, text: `S:${sustain} ${sustainLabel(sustain)}`, color: C_LABEL, fontFamily: ff });
+    labels.push({ x: pad + 72, y: envY + envH + 16, text: `R:${release} ${decayLabel(release)}`, color: C_LABEL, fontFamily: ff });
 
     // ── Waveform buttons ──
-    const waveY = envY + envH + 22;
+    const waveY = envY + envH + 32;
     labels.push({ x: pad, y: waveY, text: 'Waveform:', color: C_LABEL, fontFamily: ff });
 
-    const btnY = waveY + 14;
-    const btnW = 48;
-    const btnH = 20;
     for (let i = 0; i < WAVEFORMS.length; i++) {
       const wf = WAVEFORMS[i];
       const bx = pad + i * (btnW + 6);
@@ -187,14 +274,23 @@ export const PixiGTStudioInstrument: React.FC<Props> = ({ width, height }) => {
     }
 
     mega.updateLabels(labels, 10);
-  }, [width, height, inst, currentInstrument, attack, decay, sustain, release, waveform]);
+  }, [width, height, inst, currentInstrument, attack, decay, sustain, release, waveform, dragging, getEnvPoints, btnY, envW, envH]);
 
   useEffect(() => {
     redraw();
   }, [redraw]);
 
   return (
-    <pixiContainer ref={containerRef} layout={{ width, height }}>
+    <pixiContainer
+      ref={containerRef}
+      layout={{ width, height }}
+      eventMode="static"
+      cursor={dragging ? 'grabbing' : 'pointer'}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerUpOutside={handlePointerUp}
+    >
       <pixiGraphics ref={bgRef} />
       <pixiGraphics ref={envRef} />
     </pixiContainer>
